@@ -5,8 +5,9 @@ import { cn } from "@/lib/utils";
 
 /**
  * An origin as a link that opens what it serves, in a new tab. The text
- * truncates to its container. `px-0!`: the size's `has-[>svg]:px-1.5` is a
- * variant and out-specifies a plain `px-0`.
+ * truncates to its container. The default target is not a URL, so it is plain
+ * text. `px-0!`: the size's `has-[>svg]:px-1.5` is a variant and out-specifies
+ * a plain `px-0`.
  */
 export function OriginLink({
   origin,
@@ -17,6 +18,9 @@ export function OriginLink({
   className?: string;
   iconClassName?: string;
 }) {
+  if (origin === "default") {
+    return <span className={cn("truncate text-xs", className)}>Default target</span>;
+  }
   return (
     <Button asChild variant="link" size="xs" className={cn("h-6 max-w-full px-0!", className)}>
       <a href={origin} target="_blank" rel="noreferrer">

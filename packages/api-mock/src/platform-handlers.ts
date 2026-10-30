@@ -1510,13 +1510,13 @@ function releaseResponse(release: ReleaseRecord): Record<string, unknown> {
   };
 }
 
+/** The targets keyword, and stored origin, of the project default target. */
+const DEFAULT_TARGET = "default";
+
 /**
  * Which origins a deployment went to: a preview target carries an expiry, a
  * primary one never does, and the two cannot be mixed in one deployment.
  */
-/** The targets keyword, and stored origin, of the project default target. */
-const DEFAULT_TARGET = "default";
-
 function deploymentKind(deployment: DeploymentRecord): "primary" | "preview" {
   return deployment.targets.some((target) => target.expiresAt !== null) ? "preview" : "primary";
 }

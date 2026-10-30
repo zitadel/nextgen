@@ -253,7 +253,7 @@ describe("new deployment", () => {
       projectId: "proj_test",
       body: {
         release_id: "rel_2",
-        targets: ["primary"],
+        targets: ["primary", "default"],
         message: "Ship it",
         expected_deployment_id: "dep_live",
       },
@@ -291,7 +291,7 @@ describe("new deployment", () => {
     expect(screen.queryByText("Release deployed")).not.toBeInTheDocument();
     expect(posted).toEqual({
       release_id: "rel_2",
-      targets: ["primary"],
+      targets: ["primary", "default"],
       expected_deployment_id: "dep_live",
     });
     expect(screen.queryByRole("dialog", { name: "Deploy release" })).not.toBeInTheDocument();
@@ -505,7 +505,11 @@ describe("redeploy from a row", () => {
     await userEvent.click(inDrawer.getByRole("button", { name: "Redeploy release" }));
 
     expect(await screen.findByText("Release redeployed")).toBeInTheDocument();
-    expect(posted).toEqual({ release_id: "rel_1", targets: ["primary"], message: "Again" });
+    expect(posted).toEqual({
+      release_id: "rel_1",
+      targets: ["primary", "default"],
+      message: "Again",
+    });
   });
 
   it("offers no redeploy on a preview row", async () => {
