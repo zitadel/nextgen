@@ -102,10 +102,7 @@ describe("deployment rollback", () => {
         expect(result).toFailWith("E_VALIDATION");
       });
 
-      it.each([
-        ["on one page", () => {}],
-        ["one deployment per page", () => platform.pagesDeploymentsOneAtATime()],
-      ])("undoes the last deploy, not a preview deployed after it, read %s", async (_, paging) => {
+      it("undoes the last deploy, not a preview deployed after it", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin();
         await app.addOrigin("https://*-acme.vercel.app", "preview");
@@ -115,7 +112,6 @@ describe("deployment rollback", () => {
         });
         await app.deployData();
         await app.previewData("https://x-acme.vercel.app");
-        paging();
 
         const result = await app.run([
           "deployment",

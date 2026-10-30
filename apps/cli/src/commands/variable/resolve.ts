@@ -54,7 +54,7 @@ export default class VariableResolve extends EnvironmentCommand {
     const deployments = await client.listDeployments.all({
       project_id: projectId,
       live: true,
-      ...(origin === undefined ? {} : { origin }),
+      origin,
     });
 
     // Without `--origin`, more than one live deployment means there is no single

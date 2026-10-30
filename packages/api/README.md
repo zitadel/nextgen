@@ -25,11 +25,11 @@ handle; different values log a warning and keep the original — safe for HMR
 and framework double-mounts. The same handle is what you pass to the shared
 web components' `project` property.
 
-Every list method also walks its cursor for you, one page at a time as the
-loop asks: `client.listDeployments.items({ project_id })` yields every
+Every paged list method also walks its cursor for you, one page at a time as
+the loop asks: `client.listDeployments.items({ project_id })` yields every
 deployment, `.pages(...)` every page, and `.all(...)` collects them into one
-array. A wrapper that proxies the client keeps them with `withPaging(name, call)`
-from `@zitadel/api/client`.
+array. To change what every call returns, each page included, pass
+`onResponse` or `onError` to `createZitadelClient`.
 
 ## Entry points
 

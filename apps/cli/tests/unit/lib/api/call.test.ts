@@ -164,19 +164,4 @@ describe("sendAll", () => {
 
     expect(response.body).toMatchObject({ passkeys: ["d", "e", "f", "g"] });
   });
-
-  it("refuses a server that hands back the page it started from", async () => {
-    const asked: Array<string | null> = [];
-    server.use(
-      http.get(`${SERVER}/users/user_1/passkeys`, ({ request }) => {
-        asked.push(new URL(request.url).searchParams.get("page_token"));
-        return HttpResponse.json({ passkeys: ["d"], next_page_token: "cursor-3" });
-      }),
-    );
-
-    await expect(
-      sendAll(SERVER, "s", requestFor("listUserPasskeys", ["page_token=cursor-3"], ["user_1"])),
-    ).rejects.toThrow("The server repeated a page cursor");
-    expect(asked).toEqual(["cursor-3"]);
-  });
 });

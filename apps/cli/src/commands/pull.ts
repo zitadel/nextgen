@@ -8,7 +8,7 @@ import { ZitadelError } from "../lib/errors";
 import { FLOWS_DIR } from "../lib/flows";
 import { readJsonDirEntries } from "../lib/json-dir";
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../lib/oclif";
-import { DEPLOY_ARGS, servesPrimary } from "../lib/release";
+import { DEPLOY_ARGS, newestPrimaryDeployments } from "../lib/release";
 import { writeBackResource } from "../lib/sync";
 import { SCHEMAS_DIR } from "../lib/user-schema";
 import { reportWarning } from "../lib/warnings";
@@ -205,8 +205,14 @@ export default class Pull extends EnvironmentCommand {
       return deployment.release_id;
     }
     if (classified.kind === "latest") {
-      const live = await client.listDeployments.all({ project_id: projectId, live: true });
-      const deployment = live.find(servesPrimary);
+      const [deployment] = await newestPrimaryDeployments(
+        client,
+        {
+          project_id: projectId,
+          live: true,
+        },
+        1,
+      );
       if (deployment === undefined) {
         throw new ZitadelError("E_NOT_FOUND", "Nothing is deployed to a primary origin yet.", {
           hint: `Deploy first with \`zitadel ${DEPLOY_ARGS}${this.environmentSelector()}\`, then pull.`,

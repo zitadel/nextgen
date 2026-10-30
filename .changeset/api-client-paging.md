@@ -3,4 +3,4 @@
 "@zitadel/cli": patch
 ---
 
-Every paged function of the `@zitadel/api` client now carries `pages()`, `items()` and `all()`, which walk its cursor lazily: `for await (const deployment of client.listDeployments.items({ project_id }))` fetches the next page only when the loop reaches it. The walk itself is exported from `@zitadel/api/runtime/paging`. The CLI's `--all`, `--paginate` and the commands that read every deployment now page through it, and a server that repeats a page cursor is refused with "The server repeated a page cursor, so the list would never end".
+Every paged list method of the [`@zitadel/api` client](https://preview.zitadel.com/docs/sdks/api-client) now has `items()`, `pages()` and `all()`, which follow the cursor for you, and `createZitadelClient` takes `onResponse` and `onError` hooks. The CLI's `--all` and `zitadel api --paginate` page through the same code.

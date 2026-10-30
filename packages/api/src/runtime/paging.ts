@@ -3,7 +3,7 @@
  * and the next request sends it back as `page_token`.
  */
 
-/** Fetches the page a cursor names; `undefined` asks for the first. */
+/** Fetches the page a cursor names; `undefined` asks for the first page. */
 export type FetchPage<P> = (token: string | undefined) => Promise<P>;
 
 /**
@@ -17,8 +17,8 @@ export function nextToken(page: unknown, field = "next_page_token"): string | un
 
 /**
  * Every page, fetched only when the loop asks for the next one, so a caller
- * that stops early never reads the rest. `start` is the cursor the first page
- * was asked for, if any; `next` reads a page's cursor.
+ * that stops early never reads the rest. The walk begins at the cursor `start`
+ * names, or at the first page without one; `next` reads a page's cursor.
  */
 export async function* pages<P>(
   fetchPage: FetchPage<P>,
@@ -26,14 +26,17 @@ export async function* pages<P>(
 ): AsyncGenerator<P, void, undefined> {
   // A server that answers a cursor it already issued would be walked forever.
   const seen = new Set(start === undefined ? [] : [start]);
-  let token: string | undefined;
+  let token = start;
   do {
     const page = await fetchPage(token);
     yield page;
     token = next(page);
     if (token !== undefined) {
       if (seen.has(token)) {
-        throw new Error("The server repeated a page cursor, so the list would never end");
+        throw new Error(
+          "The server repeated a page cursor, so the list would never end. " +
+            "Read it one page at a time instead, and report the repeated cursor.",
+        );
       }
       seen.add(token);
     }

@@ -161,9 +161,9 @@ export async function customFetch<T>(url: string, options: RequestInit): Promise
   }
 
   // The body is trusted to have the shape the generated types promise; no
-  // response is checked. Should that be needed, check it here, against the
-  // generated Zod response schemas, so every call is covered and no caller
-  // checks fields of its own.
+  // response is checked here, and the paged functions only make sure a page
+  // carries its list. Should more be needed, check it here, against the
+  // generated Zod response schemas, so every call is covered.
   return parsed as T;
 }
 

@@ -66,6 +66,9 @@ export interface PlatformMock {
    */
   racesTheNextDeploy(): void;
 
+  /** Answers the next read of the deployment or preview list with an empty body. */
+  answersTheNextListWithNothing(list: "deployments" | "previews"): void;
+
   /** Drops any arranged failure, so the platform answers normally again. */
   recovers(): void;
 
@@ -80,12 +83,6 @@ export interface PlatformMock {
 
   /** Records every rollback request's body, then lets the platform answer it. */
   capturesRollbacks(): Captured<Record<string, unknown>>;
-
-  /**
-   * Answers the deployment list one deployment per page, as a project whose
-   * history runs past a page does. A request that names its own `limit` keeps it.
-   */
-  pagesDeploymentsOneAtATime(): void;
 }
 
 /** Starts the mock platform for a spec file and resets it between tests. */
@@ -147,6 +144,11 @@ export function usePlatformMock(): PlatformMock {
           }),
         );
       });
+    },
+
+    answersTheNextListWithNothing(list) {
+      const path = list === "deployments" ? "*/deployments" : "*/projects/:projectId/previews";
+      server.use(http.get(path, () => new HttpResponse(null, { status: 204 }), { once: true }));
     },
 
     racesTheNextDeploy() {
@@ -230,20 +232,6 @@ export function usePlatformMock(): PlatformMock {
           return published.at(-1);
         },
       };
-    },
-
-    pagesDeploymentsOneAtATime() {
-      server.use(
-        http.get("*/deployments", ({ request }) => {
-          const url = new URL(request.url);
-          if (url.searchParams.has("limit")) {
-            return undefined;
-          }
-          // Asked again with a page of one, which the platform then answers.
-          url.searchParams.set("limit", "1");
-          return HttpResponse.redirect(url.toString(), 307);
-        }),
-      );
     },
 
     capturesRollbacks() {

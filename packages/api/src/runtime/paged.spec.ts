@@ -40,7 +40,7 @@ describe("paged", () => {
     const call = vi.fn(async () => ({ next_page_token: "" }));
 
     await expect(paged(call, { items: "rows", arg: 0 }).all()).rejects.toThrow(
-      'Expected the response to carry a "rows" array',
+      'Unexpected list response: missing "rows" array',
     );
   });
 });

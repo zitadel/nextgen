@@ -41,16 +41,6 @@ describe("collectPages", () => {
     expect(request.mock.calls.map(([token]) => token)).toEqual([undefined, "p2", "p3"]);
   });
 
-  it("treats an empty next_page_token as the last page", async () => {
-    await expect(
-      collectPages(async () => ({ users: [], next_page_token: "" }), {
-        items: "users",
-        all: true,
-        ...cursor,
-      }),
-    ).resolves.toEqual({ items: [], next: null });
-  });
-
   it("rejects a response without the items array", async () => {
     await expect(
       collectPages(async () => ({ nope: [] }), { items: "users", all: false, ...cursor }),

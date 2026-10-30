@@ -59,17 +59,25 @@ export default class DeploymentList extends EnvironmentCommand {
     await this.toMeta(flags);
     const { client, projectId } = await this.connect();
 
-    const params = {
-      project_id: projectId,
-      ...(flags.origin === undefined ? {} : { origin: flags.origin }),
-      ...(flags.live ? { live: true } : {}),
-      ...(flags.limit === undefined ? {} : { limit: flags.limit }),
-      ...(flags["page-token"] === undefined ? {} : { page_token: flags["page-token"] }),
-    };
     // One page unless `--all`, whose drain leaves no next page to report.
-    const page = flags.all ? undefined : await client.listDeployments(params);
-    const deployments = page ? page.deployments : await client.listDeployments.all(params);
-    const next = page === undefined ? undefined : nextToken(page);
+    const page = flags.all
+      ? {
+          deployments: await client.listDeployments.all({
+            project_id: projectId,
+            origin: flags.origin,
+            live: flags.live,
+            limit: flags.limit,
+          }),
+        }
+      : await client.listDeployments({
+          project_id: projectId,
+          origin: flags.origin,
+          live: flags.live,
+          limit: flags.limit,
+          page_token: flags["page-token"],
+        });
+    const { deployments } = page;
+    const next = nextToken(page);
 
     // Flatten each deployment's targets to one `origins` cell for the table.
     const rows = deployments.map((deployment) => ({

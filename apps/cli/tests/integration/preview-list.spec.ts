@@ -67,6 +67,13 @@ describe("preview list", () => {
         expect(result).toSay(CREDENTIALS[PREVIEW_CREDENTIAL]);
       });
 
+      it("reads no further when a page comes back empty without --all", async () => {
+        const app = await anAppWithTwoPreviews();
+        platform.answersTheNextListWithNothing("previews");
+
+        expect(await app.run(["preview", "list", "--limit", "1", "--json"])).toFail();
+      });
+
       it("is empty on a project with no previews", async () => {
         const app = await aSetUpApp();
 

@@ -64,7 +64,7 @@ const project = await client.getProject(process.env.ZITADEL_PROJECT_ID!);
 
 ### Lists
 
-A list method returns one page and its `next_page_token`. Each one also carries `items()`, `pages()` and `all()`, which take the same arguments and follow the cursor for you:
+A paged list method returns one page and its `next_page_token`. Each one also carries `items()`, `pages()` and `all()`, which take the same arguments and follow the cursor for you:
 
 ```ts
 for await (const deployment of client.listDeployments.items({ project_id })) {
@@ -74,7 +74,7 @@ for await (const deployment of client.listDeployments.items({ project_id })) {
 const schemas = await client.listSchemas.all({ project_id, limit: 100 });
 ```
 
-`items()` and `pages()` fetch the next page only when the loop reaches it, so a loop that stops early reads nothing more. `limit` sets the page size, and a `page_token` among the arguments is where the walk starts. A wrapper that proxies the client keeps these methods by passing each function through `withPaging(name, call)` from `@zitadel/api/client`.
+`items()` and `pages()` fetch the next page only when the loop reaches it, so a loop that stops early reads nothing more. `limit` sets the page size, and a `page_token` among the arguments is where the walk starts. To change what every call returns, each page included, pass `onResponse` or `onError` to `createZitadelClient`.
 
 Every operation in the [API reference](/docs/reference/api) shows its call through this client, beside its request and response shapes. The method is named after the operation and takes its path parameters, its body, then its query parameters; an optional body comes after required query parameters.
 

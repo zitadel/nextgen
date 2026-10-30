@@ -49,11 +49,24 @@ describe("pages", () => {
 
     await expect(async () => {
       for await (const _ of pages(fetch));
-    }).rejects.toThrow("The server repeated a page cursor, so the list would never end");
+    }).rejects.toThrow(
+      "The server repeated a page cursor, so the list would never end. " +
+        "Read it one page at a time instead, and report the repeated cursor.",
+    );
+  });
+
+  it("begins at the cursor it is given", async () => {
+    const fetch = fetchPage({ t1: { rows: ["b"], next: "t2" }, t2: { rows: ["c"] } });
+
+    const rows = [];
+    for await (const page of pages(fetch, { start: "t1" })) rows.push(...page.rows);
+
+    expect(rows).toEqual(["b", "c"]);
+    expect(fetch.mock.calls).toEqual([["t1"], ["t2"]]);
   });
 
   it("refuses the cursor it started from without fetching that page again", async () => {
-    const fetch = fetchPage({ "": { rows: ["b"], next: "t1" } });
+    const fetch = fetchPage({ t1: { rows: ["b"], next: "t1" } });
 
     await expect(async () => {
       for await (const _ of pages(fetch, { start: "t1" }));

@@ -9,12 +9,12 @@
  * public API.
  *
  * Per-instance isolation: multiple clients can coexist in one process
- * (different servers, different tokens). Their Proxy `get` traps set
- * the globals synchronously before invoking the underlying generated
- * function, which reads them at the top of `customFetch` before any
- * `await`. Two clients running interleaved within a single JS turn
- * are safe; two clients running in parallel across awaits could
- * clobber each other — not a pattern any current consumer uses.
+ * (different servers, different tokens). Every call through a client,
+ * each page of a paged one included, sets that client's globals
+ * synchronously before invoking the underlying generated function,
+ * which reads them at the top of `customFetch` before any `await`. So
+ * clients can run in parallel across awaits without clobbering each
+ * other.
  */
 import * as endpoints from "../generated/endpoints/zitadelNextGen";
 import { paging } from "../generated/paging";
@@ -84,17 +84,17 @@ export type ZitadelClientOptions = {
    * Unset by default: no deadline beyond the runtime's own.
    */
   timeoutMs?: number;
+  /**
+   * Applied to every response this client resolves with, each page of a
+   * paged function's included, before the caller sees it.
+   */
+  onResponse?: (body: unknown) => unknown;
+  /** Applied to every failure, each page's included; it rethrows what the caller sees. */
+  onError?: (error: unknown) => never;
 };
 
-/**
- * `call` with {@link Paged} added when `name` is a function that pages, and
- * as it is otherwise. A wrapper around the client uses it to keep paging, with
- * every page going through its own `call`.
- */
-export function withPaging<F extends (...args: unknown[]) => unknown>(
-  name: PropertyKey,
-  call: F,
-): F {
+/** `call`, with {@link Paged} added when `name` is a function that pages. */
+function withPaging(name: PropertyKey, call: (...args: unknown[]) => Promise<unknown>) {
   if (!Object.hasOwn(paging, name)) {
     return call;
   }
@@ -134,7 +134,10 @@ export function createZitadelClient(opts: ZitadelClientOptions): ZitadelClient {
             setProxyPath(baseUrl);
             setApiAuthToken(opts.token);
             setRequestPolicy({ signal: opts.signal, timeoutMs: opts.timeoutMs });
-            return (value as (...a: unknown[]) => Promise<unknown>)(...args);
+            return (value as (...a: unknown[]) => Promise<unknown>)(...args).then(
+              opts.onResponse,
+              opts.onError,
+            );
           }),
         );
       }

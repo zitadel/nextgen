@@ -49,7 +49,7 @@ function withToken(args: readonly unknown[], index: number, token: string): unkn
 function itemsOf(page: unknown, field: string): readonly unknown[] {
   const list = (page as Record<string, unknown> | null)?.[field];
   if (!Array.isArray(list)) {
-    throw new TypeError(`Expected the response to carry a "${field}" array`);
+    throw new TypeError(`Unexpected list response: missing "${field}" array`);
   }
   return list;
 }

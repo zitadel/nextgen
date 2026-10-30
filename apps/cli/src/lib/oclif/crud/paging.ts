@@ -25,7 +25,7 @@ export const collectPages = async (
   // last: these resources are unbounded, and a wide `--all` would otherwise
   // copy every record once per remaining page.
   const collected: unknown[] = [];
-  for await (const response of pages((cursor) => request(cursor ?? token), {
+  for await (const response of pages(request, {
     start: token,
     next,
   })) {

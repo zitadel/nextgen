@@ -230,7 +230,9 @@ const PIPELINE_SOURCES: readonly string[] = [
  */
 const standaloneCommandOperations = async (): Promise<ReadonlyMap<string, ReadonlySet<string>>> => {
   const callsIn = async (path: string): Promise<string[]> =>
-    [...(await readFile(path, "utf8")).matchAll(/\bclient\.(\w+)\(/g)].map((m) => m[1] as string);
+    [
+      ...(await readFile(path, "utf8")).matchAll(/\bclient\.(\w+)(?:\.(?:all|items|pages))?\(/g),
+    ].map((m) => m[1] as string);
   const pipeline = (
     await Promise.all(
       PIPELINE_SOURCES.map((file) => callsIn(join(import.meta.dirname, "../../../src", file))),

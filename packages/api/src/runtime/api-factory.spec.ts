@@ -3,8 +3,13 @@ import type { AddressInfo } from "node:net";
 
 import { afterEach, describe, expect, expectTypeOf, it } from "vitest";
 
+import type * as endpoints from "../generated/endpoints/zitadelNextGen";
 import type { ListDeployments200DeploymentsItem } from "../generated/model";
+import type { paging } from "../generated/paging";
 import { createZitadelClient } from "./api-factory";
+
+type Endpoints = typeof endpoints;
+type Paging = typeof paging;
 
 const servers: Server[] = [];
 
@@ -60,6 +65,47 @@ describe("createZitadelClient", () => {
     expectTypeOf(client.listDeployments.all).returns.resolves.toEqualTypeOf<
       ListDeployments200DeploymentsItem[]
     >();
+  });
+
+  it("applies its response hook to every page", async () => {
+    const { base } = await deployments();
+    const client = createZitadelClient({
+      baseUrl: base,
+      onResponse: (body) => ({
+        ...(body as object),
+        deployments: (body as { deployments: { id: string }[] }).deployments.map((d) => ({
+          id: d.id.toUpperCase(),
+        })),
+      }),
+    });
+
+    const ids = (await client.listDeployments.all({ project_id: "proj_1" })).map((d) => d.id);
+
+    expect(ids).toEqual(["DEP_1", "DEP_2"]);
+  });
+
+  it("hands every failure to its error hook", async () => {
+    const client = createZitadelClient({
+      baseUrl: "http://127.0.0.1:1",
+      onError: () => {
+        throw new Error("handled");
+      },
+    });
+
+    await expect(client.listDeployments.all({ project_id: "proj_1" })).rejects.toThrow("handled");
+  });
+
+  it("puts every paged function's page_token in an argument that takes one", () => {
+    // A wrong index in the generated table fails here, naming the function.
+    type Misplaced = {
+      [K in keyof Paging]: "page_token" extends keyof NonNullable<
+        Parameters<Endpoints[K]>[Paging[K]["arg"]]
+      >
+        ? never
+        : K;
+    }[keyof Paging];
+
+    expectTypeOf<Misplaced>().toBeNever();
   });
 
   it("leaves paging off a function that does not page", () => {

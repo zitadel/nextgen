@@ -38,20 +38,25 @@ export function servesPrimary(deployment: Pick<ListedDeployment, "targets">): bo
 }
 
 /**
- * The project's newest primary deployments, at most `count`, newest first. The
- * history is read page by page and no further than they take: a deployment
- * further back can sit beyond the first page behind live previews.
+ * The newest primary deployments the query lists, at most `count`, newest
+ * first: from the project's history, or with `live` from what it serves now.
+ * The list is read page by page and no further than they take: a primary
+ * deployment can sit beyond the first page behind live previews.
  */
 export async function newestPrimaryDeployments(
   client: ZitadelClient,
-  projectId: string,
+  query: Readonly<{ project_id: string; live?: boolean }>,
   count: number,
 ): Promise<ListedDeployment[]> {
   const found: ListedDeployment[] = [];
   if (count <= 0) {
     return found;
   }
-  for await (const deployment of client.listDeployments.items({ project_id: projectId })) {
+  // The largest page the server allows, so a long history takes few requests.
+  for await (const deployment of client.listDeployments.items({
+    ...query,
+    limit: 100,
+  })) {
     if (servesPrimary(deployment)) {
       found.push(deployment);
       if (found.length === count) {
