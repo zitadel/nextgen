@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import type { Page } from "@playwright/test";
 
 /**
@@ -26,4 +28,20 @@ export async function recordPolicyViolations(page: Page): Promise<string[]> {
     });
   });
   return violations;
+}
+
+/**
+ * The inline scripts in `html` whose hash the policy's `script-src` does not
+ * list; all of them when it allows any inline script.
+ */
+export function unlistedInlineScripts(html: string, policy: string): string[] {
+  const scripts = policy.match(/(?:^|; )script-src ([^;]*)/)?.[1] ?? "";
+  return [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\b[^>]*>/gi)]
+    .filter(([, attributes, body]) => body && !/\bsrc\s*=/i.test(attributes ?? ""))
+    .map(([, , body]) => body ?? "")
+    .filter(
+      (body) =>
+        scripts.includes("'unsafe-inline'") ||
+        !scripts.includes(`'sha256-${createHash("sha256").update(body).digest("base64")}'`),
+    );
 }

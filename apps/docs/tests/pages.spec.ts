@@ -107,7 +107,7 @@ test("every page answers as HTML, titled, described, in its size and under its p
     const html = body.toString("utf8");
     const expected = `<title>${escapeHtml(title)}</title>`;
     if (!html.includes(expected)) return `${url}: no ${expected}`;
-    const policy = policyProblem(response.headers());
+    const policy = policyProblem(response.headers(), html);
     if (policy) return `${url}: ${policy}`;
     const meta = metaContent(html, "description");
     if (meta === undefined) {

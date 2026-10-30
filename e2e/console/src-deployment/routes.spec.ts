@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 
+import { unlistedInlineScripts } from "../support/policy";
+
 /**
  * How the repo-root vercel.json routes the console's paths on one origin: the
  * console service at /console/, the server's runtime document under that
@@ -132,6 +134,25 @@ test("no service's page may be framed", async ({ request }) => {
     const response = await request.get(path, { headers: { accept: "text/html" } });
     const policy = response.headers()["content-security-policy"] ?? "(none)";
     if (!policy.includes("frame-ancestors 'none'")) wrong.push(`${path}: ${policy}`);
+  }
+  expect(wrong).toEqual([]);
+});
+
+// The website's pages stay prerendered, so their report-only policy allows
+// each page's inline scripts by hash (apps/website/csp-adapter.mjs) rather
+// than all of them. The docs' own suite checks every docs page the same way.
+test("the website's pages list a hash for each of their inline scripts", async ({ request }) => {
+  const changelog = await request.get("/changelog", { headers: { accept: "text/html" } });
+  const entry = (await changelog.text()).match(/href="(\/changelog\/[^"/]+)"/)?.[1];
+  expect(entry, "a changelog entry's link").toBeDefined();
+  const wrong: string[] = [];
+  for (const path of ["/", "/changelog", entry ?? ""]) {
+    const response = await request.get(path, { headers: { accept: "text/html" } });
+    const policy = response.headers()["content-security-policy-report-only"] ?? "";
+    const unlisted = unlistedInlineScripts(await response.text(), policy);
+    if (response.status() !== 200 || unlisted.length) {
+      wrong.push(`${path}: ${response.status()}, ${unlisted.length} inline scripts without a hash`);
+    }
   }
   expect(wrong).toEqual([]);
 });

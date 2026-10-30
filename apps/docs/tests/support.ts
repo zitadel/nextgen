@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import type { APIResponse, Page } from "@playwright/test";
 
 /**
@@ -116,19 +118,36 @@ export function metaContent(html: string, key: string): string | undefined {
 }
 
 /**
- * What is wrong with a page's policies (next.config.mjs), if anything: the
- * enforced one lets nothing frame it, and the report-only one keeps its
- * requests on the docs' own origin.
+ * What is wrong with a page's policies, if anything: the enforced one
+ * (next.config.mjs) lets nothing frame it, and the report-only one
+ * (csp-adapter.mjs) keeps its requests on the docs' own origin and allows
+ * each of its inline scripts by hash, not all of them.
  */
-export function policyProblem(headers: Record<string, string>): string | undefined {
+export function policyProblem(headers: Record<string, string>, html: string): string | undefined {
   const enforced = headers["content-security-policy"] ?? "(none)";
   if (!enforced.includes("frame-ancestors 'none'")) {
     return `its policy ${enforced} lets another site frame it`;
   }
   const reportOnly = headers["content-security-policy-report-only"] ?? "(none)";
-  return /(^|; )connect-src 'self'(;|$)/.test(reportOnly)
-    ? undefined
-    : `its report-only policy ${reportOnly} lets it connect elsewhere`;
+  if (!/(^|; )connect-src 'self'(;|$)/.test(reportOnly)) {
+    return `its report-only policy ${reportOnly} lets it connect elsewhere`;
+  }
+  const scripts = reportOnly.match(/(?:^|; )script-src ([^;]*)/)?.[1] ?? "";
+  if (scripts.includes("'unsafe-inline'")) return "its report-only policy allows any inline script";
+  const unlisted = inlineScripts(html).filter(
+    (script) =>
+      !scripts.includes(`'sha256-${createHash("sha256").update(script).digest("base64")}'`),
+  );
+  return unlisted.length
+    ? `its report-only policy lists no hash for ${unlisted.length} of its inline scripts, the first starting ${JSON.stringify(unlisted[0]?.slice(0, 60))}`
+    : undefined;
+}
+
+/** The bodies of a page's inline scripts. */
+function inlineScripts(html: string): string[] {
+  return [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\b[^>]*>/gi)]
+    .filter(([, attributes, body]) => body && !/\bsrc\s*=/i.test(attributes ?? ""))
+    .map(([, , body]) => body ?? "");
 }
 
 /**
