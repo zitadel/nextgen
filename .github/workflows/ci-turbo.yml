@@ -91,7 +91,10 @@ env:
   TURBO_TELEMETRY_DISABLED: "1"
   # Vercel's remote cache is shared with the cloud deployments. The
   # remote-cache step authenticates these GitHub-hosted jobs over OIDC.
-  TURBO_API: https://vercel.com
+  # TURBO_API stays unset: turbo's default, https://vercel.com/api, is the
+  # cache's endpoint, while https://vercel.com alone is the dashboard,
+  # which answers turbo's uploads with 405.
+  #
   # Every run reads and writes the remote cache, pull requests and the
   # merge queue too, as moon's runs do with Depot's: a pull request's
   # later pushes restore what its earlier ones built, the merge queue

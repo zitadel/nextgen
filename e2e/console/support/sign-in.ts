@@ -29,7 +29,7 @@ export async function signIn(
  * Completes the console's login screen (Console ADR 0003) as `user`, through
  * the kit's `loginWithPassword`: the default-login flow's identifier step,
  * then its password step. The widget exchanges the handoff for the
- * `__nextgen_session` cookie and performs a full-document navigation away
+ * session cookie and performs a full-document navigation away
  * from /login.
  *
  * Only the login, not the grant `signIn` writes first, and free of the test
