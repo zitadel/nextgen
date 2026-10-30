@@ -36,8 +36,9 @@
     // Where Go keeps its toolchain, module and build caches; their contents
     // are keyed by Go itself. GOCACHEPROG is the cache program Depot's CI
     // runners set (`depot gocache`), which authenticates with the job's
-    // DEPOT_CACHE_TOKEN. GOFLAGS and the target platform change outputs, so
-    // the Go tasks list those as hashed `env` instead.
+    // DEPOT_CACHE_TOKEN. Native Go commands are not runner-cached: Go hashes
+    // the effective compiler and target defaults itself. The Go tasks list
+    // GOFLAGS and explicit target variables as `env` so strict mode passes them.
     "GOPATH",
     "GOCACHE",
     "GOCACHEPROG",
@@ -70,10 +71,8 @@
   ],
   // The files moon's .moon/tasks/*.yml list as implicitInputs: a change to
   // any of them re-runs every task. Turbo hashes each package's slice of
-  // pnpm-lock.yaml on its own, so the lockfile is not listed. Every test
-  // config spreads @zitadel/vitest-config and every SDK build reads
-  // @zitadel/vite, but no task edge reaches those packages, so their files
-  // are listed here.
+  // pnpm-lock.yaml on its own, so the lockfile is not listed. Shared test
+  // configuration belongs to test and typecheck inputs, not every build.
   "globalDependencies": [
     ".nvmrc",
     ".npmrc",
@@ -82,11 +81,7 @@
     "devbox.json",
     "devbox.lock",
     "tsconfig.base.json",
-    "biome.json",
-    "packages/vitest-config/vitest.shared.mjs",
-    "packages/vitest-config/vitest.shared.d.mts",
-    "packages/vite/vite.shared.mjs",
-    "packages/vite/vite.shared.d.mts"
+    "biome.json"
   ],
   "tasks": {
     // ---- The standard tasks of every TypeScript package (.moon/tasks/
@@ -106,6 +101,10 @@
     "typecheck": {
       "inputs": [
         "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/packages/vitest-config/vitest.shared.mjs",
+        "$TURBO_ROOT$/packages/vitest-config/vitest.shared.d.mts",
+        "$TURBO_ROOT$/packages/vite/vite.shared.mjs",
+        "$TURBO_ROOT$/packages/vite/vite.shared.d.mts",
         "!**/README.md",
         "!**/AGENTS.md",
         "!**/CLAUDE.md",
@@ -119,6 +118,8 @@
     "build": {
       "inputs": [
         "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/packages/vite/vite.shared.mjs",
+        "$TURBO_ROOT$/packages/vite/vite.shared.d.mts",
         "!**/README.md",
         "!**/AGENTS.md",
         "!**/CLAUDE.md",
@@ -141,6 +142,8 @@
     "test": {
       "inputs": [
         "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/packages/vitest-config/vitest.shared.mjs",
+        "$TURBO_ROOT$/packages/vitest-config/vitest.shared.d.mts",
         "!**/README.md",
         "!**/AGENTS.md",
         "!**/CLAUDE.md",
@@ -265,8 +268,31 @@
     },
     "//#test": {
       "inputs": [
+        "packages/vitest-config/vitest.shared.mjs",
+        "packages/vitest-config/vitest.shared.d.mts",
         "scripts/ci-mode.mjs",
         "scripts/ci-mode.test.mjs",
+        "scripts/go-generate.mjs",
+        "scripts/go-generate.test.mjs",
+        "scripts/task-graph.test.mjs",
+        "moon.yml",
+        "turbo.json",
+        "apps/*/moon.yml",
+        "apps/*/turbo.json",
+        "apps/*/package.json",
+        "packages/*/moon.yml",
+        "packages/*/turbo.json",
+        "packages/*/package.json",
+        "tools/*/moon.yml",
+        "tools/*/turbo.json",
+        "tools/*/package.json",
+        "e2e/moon.yml",
+        "e2e/turbo.json",
+        "e2e/package.json",
+        ".moon/**/*.yml",
+        ".github/workflows/ci.yml",
+        ".github/workflows/ci-turbo.yml",
+        ".gitignore",
         "scripts/dev-process.mjs",
         "scripts/dev-process.test.mjs",
         "scripts/shims/pnpm",
@@ -293,6 +319,8 @@
     },
     "//#check-typecheck": {
       "inputs": [
+        "packages/vitest-config/vitest.shared.mjs",
+        "packages/vitest-config/vitest.shared.d.mts",
         "scripts/check-typecheck-programs.mjs",
         "scripts/check-typecheck-programs.test.mjs",
         "scripts/assert-file.mjs",
@@ -310,6 +338,8 @@
     },
     "//#check-openapi-rules": {
       "inputs": [
+        "packages/vitest-config/vitest.shared.mjs",
+        "packages/vitest-config/vitest.shared.d.mts",
         "scripts/openapi-casing-rules.test.mjs",
         "scripts/assert-file.mjs",
         "scripts/testdata/openapi-casing/**",

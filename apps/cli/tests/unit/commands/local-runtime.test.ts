@@ -239,7 +239,8 @@ describe("local runtime commands", () => {
     const cwd = await tempProject("zitadel-doctor-runtime-fail-");
     const fake = await fakeDocker();
     const port = nextPort();
-    await writeRuntimeMetadata(cwd, runtimeFor(cwd, `http://localhost:${String(port)}`));
+    const serverUrl = await startHealthServer(false);
+    await writeRuntimeMetadata(cwd, runtimeFor(cwd, serverUrl));
 
     const result = await runCliForTest(["doctor", "--cwd", cwd, "--json", "--port", String(port)], {
       PATH: `${fake.binDir}:${process.env.PATH ?? ""}`,
@@ -1237,10 +1238,10 @@ async function readDockerCalls(logPath: string): Promise<string[][]> {
     .map((line) => JSON.parse(line) as string[]);
 }
 
-async function startHealthServer(): Promise<string> {
+async function startHealthServer(healthy = true): Promise<string> {
   const server = createServer((req, res) => {
     if (req.url === "/readyz") {
-      res.writeHead(200).end("ok");
+      res.writeHead(healthy ? 200 : 503).end(healthy ? "ok" : "unhealthy");
       return;
     }
     res.writeHead(404).end();

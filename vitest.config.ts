@@ -1,6 +1,7 @@
 import { defineConfig } from "vitest/config";
 
-import { baseTest } from "@zitadel/vitest-config";
+// @boundaries-ignore A root workspace dependency hashes this config into every Turbo task; root tests list these files as inputs instead.
+import { baseTest } from "./packages/vitest-config/vitest.shared.mjs";
 
 /**
  * Root workspace-tooling tests (all Vitest, run in Node). This is not a project

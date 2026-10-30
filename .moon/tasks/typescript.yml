@@ -24,14 +24,6 @@ implicitInputs:
   - "/biome.json"
   # The GritQL rules biome.json loads as plugins: rules too.
   - "/biome-plugins/*.grit"
-  # Spread into every project's vitest config's `test` block. Without these a
-  # change to the shared base would leave every project's test task cache-hit
-  # (and unselected by `moon ci`), running stale config.
-  - "/packages/vitest-config/vitest.shared.mjs"
-  - "/packages/vitest-config/vitest.shared.d.mts"
-  # The Vite build of the SDKs (`libraryBuild()`), which their build tasks read.
-  - "/packages/vite/vite.shared.mjs"
-  - "/packages/vite/vite.shared.d.mts"
 
 tasks:
   # Single standardized linter + formatter for every TypeScript project: Biome
@@ -54,11 +46,25 @@ tasks:
   # opts out with `workspace.inheritedTasks.exclude`.
   typecheck:
     command: "corepack pnpm run typecheck"
+    inputs:
+      - "**/*"
+      - "/packages/vitest-config/vitest.shared.mjs"
+      - "/packages/vitest-config/vitest.shared.d.mts"
+      - "/packages/vite/vite.shared.mjs"
+      - "/packages/vite/vite.shared.d.mts"
 
   build:
     command: "corepack pnpm run build"
+    inputs:
+      - "**/*"
+      - "/packages/vite/vite.shared.mjs"
+      - "/packages/vite/vite.shared.d.mts"
     outputs:
       - "dist/**/*"
 
   test:
     command: "corepack pnpm run test:all"
+    inputs:
+      - "**/*"
+      - "/packages/vitest-config/vitest.shared.mjs"
+      - "/packages/vitest-config/vitest.shared.d.mts"

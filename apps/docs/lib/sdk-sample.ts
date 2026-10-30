@@ -34,14 +34,14 @@ export function sdkSample(
   path: string,
   pathItem: PathItemObject,
   request: RequestData,
+  auth: Authentication = authentication(operation),
 ): string {
   const method = clientMethod(operation.operationId ?? "");
   const parameters = operationParameters(operation, pathItem);
-  const auth = authentication(operation);
-  // Every write the session cookie authenticates needs the CSRF token. (The
-  // query reads the session scheme exempts accept a project secret, which the
-  // sample uses instead.)
-  const csrf = !safeMethods.has(request.method.toLowerCase());
+  // The session scheme exempts POST /…/query reads from CSRF, as well as
+  // safe methods. A session-authenticated write still needs the token.
+  const methodName = request.method.toLowerCase();
+  const csrf = !safeMethods.has(methodName) && !(methodName === "post" && path.endsWith("/query"));
 
   const query = parameters.filter((parameter) => parameter.in === "query");
   const params = queryArguments(query, request);
@@ -107,10 +107,22 @@ export type Authentication = "none" | "secret" | "session";
 // A project secret is the server-side credential: the bearer the oauth2 scheme
 // accepts. An operation that accepts only the session cookie is called from
 // the browser, through the framework SDK's proxy, which carries the cookie.
-export function authentication(operation: OperationObject): Authentication {
+export function authentication(operation: OperationObject, request?: RequestData): Authentication {
   const requirements = operation.security ?? [];
   if (requirements.length === 0 || requirements.some((item) => Object.keys(item).length === 0)) {
     return "none";
+  }
+  // The playground's selected provider writes Authorization for oauth2,
+  // including when its input is empty. Session auth adds no header: the
+  // browser carries its HttpOnly cookie. Read the request, not the available
+  // schemes, so switching providers updates the sample without exposing a
+  // pasted credential. Static samples keep the default below.
+  if (
+    request &&
+    requirements.some((item) => "sessionCookie" in item) &&
+    !Object.keys(request.header).some((name) => name.toLowerCase() === "authorization")
+  ) {
+    return "session";
   }
   return requirements.some((item) => "oauth2" in item) ? "secret" : "session";
 }
