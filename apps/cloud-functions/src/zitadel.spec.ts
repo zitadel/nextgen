@@ -56,40 +56,39 @@ describe("the person calling", () => {
   });
 });
 
+/** One membership of `GET /users/me/teams`, joined on the given day of 2026. */
+function membership(id: string, membership_status: string, day: string) {
+  return { id, name: id, membership_status, created_at: `2026-${day}T00:00:00Z` };
+}
+
 describe("the person's teams", () => {
   it("are the active memberships of every page, the earliest being the personal team", async () => {
     serve({
       "/users/me/teams?limit=100": {
-        teams: [
-          {
-            id: "team_b",
-            name: "B",
-            membership_status: "active",
-            created_at: "2026-10-02T00:00:00Z",
-          },
-          {
-            id: "team_p",
-            name: "P",
-            membership_status: "pending",
-            created_at: "2026-09-01T00:00:00Z",
-          },
-        ],
+        teams: [membership("team_b", "active", "10-02"), membership("team_p", "pending", "10-03")],
         next_page_token: "next",
       },
       "/users/me/teams?limit=100&page_token=next": {
+        teams: [membership("team_a", "active", "10-01")],
+      },
+    });
+    expect(await liveDirectory(SERVER).administeredTeams(COOKIE)).toEqual([
+      { id: "team_b", name: "team_b", personal: false },
+      { id: "team_a", name: "team_a", personal: true },
+    ]);
+  });
+
+  it("have no personal team while the earliest membership is not active, as the server has none", async () => {
+    serve({
+      "/users/me/teams?limit=100": {
         teams: [
-          {
-            id: "team_a",
-            name: "A",
-            membership_status: "active",
-            created_at: "2026-10-01T00:00:00Z",
-          },
+          membership("team_invited", "pending", "09-01"),
+          membership("team_a", "active", "10-01"),
         ],
       },
     });
     expect(await liveDirectory(SERVER).administeredTeams(COOKIE)).toEqual([
-      { id: "team_b", name: "B", personal: false },
-      { id: "team_a", name: "A", personal: true },
+      { id: "team_a", name: "team_a", personal: false },
     ]);
   });
 });

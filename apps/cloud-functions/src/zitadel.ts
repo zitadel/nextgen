@@ -78,17 +78,21 @@ export function liveDirectory(server: string): Directory {
         memberships.push(...page.teams);
         pageToken = page.next_page_token ?? undefined;
       } while (pageToken);
-      const active = memberships.filter((membership) => membership.membership_status === "active");
-      // The server models no personal team: it is the person's earliest active
-      // membership (internal/service/personal_team.go).
-      const earliest = active.reduce<(typeof active)[number] | undefined>(
+      // The server models no personal team: it is the person's earliest
+      // membership, whatever its status, and only while that one is active. It
+      // never falls back to a later team (`GetPersonalTeamForUser` in
+      // internal/service/statement.go). The API leaves out memberships the
+      // person was removed from.
+      const earliest = memberships.reduce<(typeof memberships)[number] | undefined>(
         (first, membership) =>
           !first || Date.parse(membership.created_at) < Date.parse(first.created_at)
             ? membership
             : first,
         undefined,
       );
-      return active.map(({ id, name }) => ({ id, name, personal: id === earliest?.id }));
+      return memberships
+        .filter((membership) => membership.membership_status === "active")
+        .map(({ id, name }) => ({ id, name, personal: id === earliest?.id }));
     },
 
     async usage() {
