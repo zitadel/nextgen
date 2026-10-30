@@ -16,13 +16,25 @@ const ensure = () =>
 /** Which workflows `start` was given, in order. */
 const started = () => vi.mocked(start).mock.calls.map(([workflow]) => workflow);
 
-afterEach(() => vi.mocked(start).mockClear());
+afterEach(() => {
+  vi.mocked(start).mockClear();
+  vi.restoreAllMocks();
+});
 
 describe("starting a person's onboarding", () => {
   it("starts the CRM's even when every team has a Stripe customer, so HubSpot never waits on Stripe", async () => {
     const team: Team = { id: "team_paid", name: "Paid", personal: false };
     await onboardingSystems().stripe.ensureCustomer(team, MOCK_PERSON);
     expect(await ensure()(MOCK_PERSON, [team])).toBe(true);
+    expect(started()).toEqual([provisionCrm]);
+  });
+
+  it("starts the CRM's before it asks Stripe, so a Stripe failure holds up only billing's", async () => {
+    const team: Team = { id: "team_stripe_down", name: "Down", personal: false };
+    vi.spyOn(onboardingSystems().stripe, "hasCustomer").mockRejectedValue(
+      new Error("Stripe is down"),
+    );
+    await expect(ensure()(MOCK_PERSON, [team])).rejects.toThrow("Stripe is down");
     expect(started()).toEqual([provisionCrm]);
   });
 

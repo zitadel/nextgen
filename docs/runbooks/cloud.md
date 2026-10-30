@@ -566,13 +566,14 @@ project and imports the root admin.
 ## Operating
 
 - **Onboarding runs:** each signed-in person starts `provision-crm`, and
-  `provision-billing` for a team without a Stripe customer. The CRM's steps
-  return the HubSpot calls they would make, which nothing sends yet:
-  read them in Vercel → Observability → Workflows, a run, then Decrypt
+  `provision-billing` for a team without a Stripe customer. Their steps
+  return the HubSpot and Stripe calls they would make, which nothing sends
+  yet: read them in Vercel → Observability → Workflows, a run, then Decrypt
   (permission to read the project's environment variables). From
   `apps/cloud-functions`, with the Vercel CLI linked:
   `npx workflow inspect runs --backend vercel --env preview --decrypt`, or
-  `--env production`. The log lines start `hubspot (mock, not sent)`.
+  `--env production`. The log lines start `hubspot (mock, not sent)` or
+  `stripe (mock, not sent)`.
 - **Logs:** Vercel runtime logs of the `server` function (JSON). The
   launcher's first line names the database host and database it serves
   from. Add a log drain for retention. A line's `request_id` is Vercel's

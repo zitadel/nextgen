@@ -327,10 +327,10 @@ server's catch-all.
   so a change made in one Vercel instance is not seen by another. Zitadel's
   reads (the person, their teams) are live, at the server the sign-in hop
   uses; its usage and plans have no API yet (§8.3).
-- HubSpot's mock records the calls the live client will send and sends
-  nothing. Each provisioning step returns them, so a run in Observability →
-  Workflows shows them once decrypted; its log lines name ids, never an
-  email.
+- HubSpot's mock, and Stripe's for the customer, record the calls the live
+  clients will send and send nothing. Each provisioning step returns them, so
+  a run in Observability → Workflows shows them once decrypted; their log
+  lines name ids, never an email.
 - Production refuses mocks with `503 cloud.not_live`, and a screen that reads
   one shows its preview state instead (`whenLive`). In production, Billing says
   the cloud is free during the preview and that nothing is charged until a

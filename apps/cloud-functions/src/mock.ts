@@ -1,8 +1,10 @@
 import type { EmailPreferences, Plan, TeamBilling, Ticket } from "./contract";
 import { type HubspotAnswer, type Send, hubspotCrm } from "./hubspot/crm";
 import type { HubspotSettings } from "./hubspot/requests";
+import { type Send as SendToStripe, stripeBilling } from "./stripe/billing";
 import type {
   Billing,
+  BillingRequest,
   Caller,
   Crm,
   CrmRequest,
@@ -71,14 +73,16 @@ function mockDirectory(plans: Map<string, Plan["id"]>): Directory {
 function mockBilling(plans: Map<string, Plan["id"]>): Billing {
   const customers = new Map<string, string>();
   const reported = new Map<string, UsageRecord>();
+  const stripe = stripeBilling(recordingStripe());
   return {
+    // Asked of what this process recorded, which the recorder's search never finds.
     async hasCustomer(team) {
       return customers.has(team.id);
     },
-    async ensureCustomer(team) {
-      const known = customers.get(team.id) ?? `cus_mock_${team.id}`;
-      customers.set(team.id, known);
-      return { customer_id: known };
+    async ensureCustomer(team, owner) {
+      const write = await stripe.ensureCustomer(team, owner);
+      customers.set(team.id, write.customer_id);
+      return write;
     },
     async overview(team): Promise<TeamBilling> {
       const now = new Date();
@@ -125,6 +129,20 @@ function mockBilling(plans: Map<string, Plan["id"]>): Billing {
       const team = [...customers].find(([, id]) => id === customerId)?.[0] ?? MOCK_TEAM.id;
       return { team_id: team, plan: "pro" };
     },
+  };
+}
+
+/**
+ * Stripe as the recorder answers it (root ADR 084 §9), like
+ * `recordingHubspot`: nothing leaves the process, a search finds nothing, and
+ * a created customer's id is made from the team's, so every instance answers
+ * alike.
+ */
+export function recordingStripe(): SendToStripe {
+  return async (request: BillingRequest) => {
+    console.info(`stripe (mock, not sent): ${request.label}`);
+    if (request.method === "GET") return { status: 200, body: { data: [] } };
+    return { status: 200, body: { id: `cus_mock_${request.body?.["metadata[zitadel_team_id]"]}` } };
   };
 }
 

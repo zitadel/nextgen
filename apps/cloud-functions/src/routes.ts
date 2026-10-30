@@ -16,7 +16,7 @@ export interface Runtime {
   systems: Systems;
   /**
    * Starts the person's onboarding, a workflow per system: the CRM's
-   * (`src/workflows/provision-crm.ts`) once per instance, and billing's
+   * (`src/workflows/provision-crm.ts`) once per instance, and then billing's
    * (`src/workflows/provision-billing.ts`) unless every team of theirs has a
    * Stripe customer already. `false` when neither started.
    */
