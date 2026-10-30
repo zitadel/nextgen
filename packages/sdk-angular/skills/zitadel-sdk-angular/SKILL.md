@@ -129,7 +129,7 @@ exact names, inputs, and props, treat the installed package as authoritative:
 
 - `node_modules/@zitadel/sdk-angular/README.md` — the install, usage, and
   proxy/deployment notes.
-- The TypeScript types / exports (`node_modules/@zitadel/sdk-angular/dist/types/public-api.d.ts`)
+- The TypeScript types / exports (`node_modules/@zitadel/sdk-angular/dist/public-api.d.ts`)
   — the exported symbols (`ZitadelLoginComponent`, `ZitadelLogoutComponent`,
   `ZitadelSessionComponent`, `configureZitadel`, `ZitadelConfig`,
   `ZitadelProject`, `businessLocales`) and every component `@Input()` /

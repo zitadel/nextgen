@@ -1,33 +1,31 @@
 import { qwikVite } from "@qwik.dev/core/optimizer";
+import dts from "unplugin-dts/vite";
 import { defineConfig } from "vite";
-import dts from "vite-plugin-dts";
 
-// Qwik library build (run with `--mode lib`): the optimizer emits QRL segments
-// and the `.qwik.mjs` entry the consuming app's qwikVite further processes;
-// vite-plugin-dts emits the `.d.ts`. ESM-only — Qwik is ESM-only and the
-// consuming app's bundler always imports the `.qwik.mjs`. Workspace + qwik deps
-// are externalized — the consumer provides them. An explicit `build.outDir` is
-// read by qwikVite (vite.ts) and used instead of its library-mode `lib/` default,
-// so this package ships from `dist/` like every other SDK.
+import { failOnDiagnostics, libraryBuild } from "@zitadel/vite";
+
+// qwikVite writes an app's client manifest (`q-manifest.json`, a bundle graph) in a post hook, and
+// prints a warning for every import the library keeps external. A library has no use for either.
+const qwik = [qwikVite()]
+  .flat()
+  .map((plugin) =>
+    plugin && "name" in plugin && plugin.name === "vite-plugin-qwik-post"
+      ? { ...plugin, generateBundle: undefined }
+      : plugin,
+  );
+
 export default defineConfig({
-  build: {
-    target: "es2020",
-    outDir: "dist",
-    lib: {
-      entry: "./src/index.tsx",
-      formats: ["es"],
-      fileName: () => "index.qwik.mjs",
-    },
-    rollupOptions: {
-      external: [/^@zitadel\//, /^@qwik\.dev\//],
-    },
-  },
+  build: { target: "es2020" },
   plugins: [
-    qwikVite(),
+    // Qwik ships its libraries unminified, and its plugin turns minify off for them: the app's
+    // optimizer splits the inlined QRLs out of `.qwik.mjs` and needs their closures as written.
+    libraryBuild(import.meta.dirname, { minify: false }),
+    qwik,
     dts({
       tsconfigPath: "./tsconfig.lib.json",
-      include: ["src"],
+      // A test-only declaration and the test helpers are not part of the package.
       exclude: ["src/**/*.spec.*", "src/**/__tests__/**", "src/browser-commands.d.ts"],
+      afterDiagnostic: failOnDiagnostics,
     }),
   ],
 });

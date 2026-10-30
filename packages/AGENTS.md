@@ -1,7 +1,7 @@
 # Agent Instructions — `packages/`
 
-Rules for the packages without an `AGENTS.md` of their own: the SDKs
-(`packages/sdk-*`), `packages/api` and `packages/config`.
+Rules for `packages/api`, `packages/config` and the rules every SDK
+(`packages/sdk-*`) shares. Each SDK's own packaging is in its `AGENTS.md`.
 
 ## The SDKs (`packages/sdk-*`)
 
@@ -23,10 +23,16 @@ change needs a changeset, and the whole train versions together.
 - **TypeScript floor**: consumers need TypeScript ≥ 5.0, because the entry
   points use `export type *`. This is the one statement of it; READMEs link
   here.
-- **Keep each package's build tool** (its `build` script). `sdk-next` builds
-  per file with `tsc` because bundlers merge `"use client"` modules into shared
-  chunks and strip the directive. Never unify the builds without re-testing
-  the App Router client/server split.
+- **Build an SDK with plain Vite**: `libraryBuild()` from `@zitadel/vite`, the
+  framework plugin and `unplugin-dts` (`svelteTypes()` for Svelte; Analog
+  writes Angular's).
+- **Add an entry point to `exports` and give it a source, never to a config**:
+  `libraryBuild()` derives the entries from `exports`.
+- **Fix a Rolldown warning, or allow its code with a comment saying why**:
+  `libraryBuild()` fails the build on any other.
+- **Ship SDKs minified with source maps**: `libraryBuild()` does both; a build
+  outside it reuses `minify` from `@zitadel/vite`. Exceptions are in the SDK's
+  `AGENTS.md`.
 - **The same-origin proxy is the shared concept**: every SDK fronts the API
   through `/__nextgen/*` on the app's own origin
   ([ADR 036](../docs/adrs/036-api-credential-planes.md), ADR 005). Server SDKs

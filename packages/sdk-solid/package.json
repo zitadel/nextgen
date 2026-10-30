@@ -49,13 +49,14 @@
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "@zitadel/api-mock": "workspace:*",
+    "@zitadel/vite": "workspace:*",
     "@zitadel/vitest-config": "workspace:*",
     "jsdom": "catalog:",
     "msw": "catalog:",
     "solid-js": "^1.9.16",
     "typescript": "catalog:",
+    "unplugin-dts": "catalog:",
     "vite": "catalog:",
-    "vite-plugin-dts": "catalog:",
     "vite-plugin-solid": "^2.11.0",
     "vitest": "catalog:"
   }

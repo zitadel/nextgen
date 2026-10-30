@@ -1,23 +1,13 @@
+import dts from "unplugin-dts/vite";
 import { defineConfig } from "vite";
-import dts from "vite-plugin-dts";
 import solid from "vite-plugin-solid";
 
-// Solid library build. vite-plugin-solid compiles the JSX; vite-plugin-dts
-// emits the `.d.ts`. solid-js and workspace deps are externalized — the
-// consumer provides them.
+import { failOnDiagnostics, libraryBuild } from "@zitadel/vite";
+
 export default defineConfig({
-  build: {
-    lib: {
-      entry: "./src/index.tsx",
-      formats: ["es"],
-      fileName: "index",
-    },
-    rollupOptions: {
-      external: [/^@zitadel\//, /^solid-js($|\/)/],
-    },
-  },
   plugins: [
+    libraryBuild(import.meta.dirname),
     solid(),
-    dts({ tsconfigPath: "./tsconfig.lib.json", include: ["src"], exclude: ["src/**/*.spec.*"] }),
+    dts({ tsconfigPath: "./tsconfig.lib.json", afterDiagnostic: failOnDiagnostics }),
   ],
 });

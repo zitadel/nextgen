@@ -1,0 +1,19 @@
+{
+  "name": "@zitadel/vite",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The Vite library build every SDK builds through. Workspace tooling only; nothing is published.",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "main": "./vite.shared.mjs",
+  "types": "./vite.shared.d.mts",
+  "exports": {
+    ".": {
+      "types": "./vite.shared.d.mts",
+      "default": "./vite.shared.mjs"
+    }
+  },
+  "devDependencies": {
+    "vitest": "catalog:"
+  }
+}

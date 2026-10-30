@@ -1,9 +1,9 @@
-export { handleNextgenRequest, createNextgenRequestMiddleware, getAuth } from "./middleware";
+export { handleNextgenRequest, createNextgenRequestMiddleware, getAuth } from "./middleware.js";
 export type {
   NextgenRequestDecision,
   NextgenRequestOptions,
   RequestMiddlewareContext,
-} from "./middleware";
+} from "./middleware.js";
 export type {
   NextgenMiddlewareOptions,
   AuthResult,
