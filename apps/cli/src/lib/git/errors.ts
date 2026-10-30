@@ -13,6 +13,25 @@ export class RepositoryError extends Error {
     super(message);
     this.name = "RepositoryError";
   }
+
+  /**
+   * The one line of the message that says why git failed, for a one-line warning; never empty.
+   *
+   * git writes `warning:` and `hint:` lines before and after the line that
+   * gives the reason, so the first `fatal:` or `error:` line is taken, then
+   * the first line, then a fixed phrase when git said nothing.
+   */
+  headline(): string {
+    const lines = this.message
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line !== "");
+    const reason = lines.find((line) => line.startsWith("fatal:") || line.startsWith("error:"));
+    if (reason !== undefined) {
+      return reason;
+    }
+    return lines[0] ?? "git gave no reason";
+  }
 }
 
 /**

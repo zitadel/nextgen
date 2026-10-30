@@ -154,26 +154,31 @@ interface Answer {
   readonly stderr?: string;
 }
 
+/** How a {@link fakeGit} is asked: the arguments, and the environment `with` added. */
+type Question = (args: readonly string[], env: NodeJS.ProcessEnv) => Answer;
+
 /** A `Git` that runs nothing and answers every call from `answer`. */
 class FakeGit extends Git {
-  private readonly answer: (args: readonly string[]) => Answer;
+  private readonly answer: Question;
   private readonly existing: readonly string[];
+  private readonly added: NodeJS.ProcessEnv;
 
-  /** Answers from `answer`; of paths, only `existing` exist. */
-  constructor(answer: (args: readonly string[]) => Answer, existing: readonly string[]) {
+  /** Answers from `answer`, told the environment `added`; of paths, only `existing` exist. */
+  constructor(answer: Question, existing: readonly string[], added: NodeJS.ProcessEnv = {}) {
     super("/fake");
     this.answer = answer;
     this.existing = existing;
+    this.added = added;
   }
 
-  /** The same fake, whatever is added to its environment. */
-  override with(): Git {
-    return this;
+  /** The same fake, telling `answer` about `env` as well, so a test can see which staging area a call used. */
+  override with(env: NodeJS.ProcessEnv): Git {
+    return new FakeGit(this.answer, this.existing, { ...this.added, ...env });
   }
 
   /** What `answer` gives; throws, as git would, for an exit code other than 0 or `allow`. */
   override async run(args: readonly string[], allow: readonly number[] = []): Promise<GitResult> {
-    const { exitCode = 0, stdout = "", stderr = "" } = this.answer(args);
+    const { exitCode = 0, stdout = "", stderr = "" } = this.answer(args, this.added);
     const result = new GitResult(exitCode, stdout, stderr);
     if (exitCode !== 0 && !allow.includes(exitCode)) {
       throw new RepositoryError(result.reason());
@@ -189,12 +194,10 @@ class FakeGit extends Git {
 
 /**
  * A stand-in for `Git` that answers every call with what `answer` returns for
- * its arguments, so a check or an operation can be tested on every outcome
- * without building a repository for each.
+ * its arguments and the environment added with `with`, so a check or an
+ * operation can be tested on every outcome without building a repository for
+ * each, and a test can see whether a call ran in a temporary staging area.
  */
-export function fakeGit(
-  answer: (args: readonly string[]) => Answer,
-  existing: readonly string[] = [],
-): Git {
+export function fakeGit(answer: Question, existing: readonly string[] = []): Git {
   return new FakeGit(answer, existing);
 }

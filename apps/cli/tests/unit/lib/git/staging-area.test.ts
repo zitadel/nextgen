@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
-import { chmod, rm, writeFile } from "node:fs/promises";
+import { chmod, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { promisify } from "node:util";
 
@@ -37,6 +37,27 @@ async function staged(staging: StagingArea): Promise<string[]> {
 
 const AUTHOR = { name: "Someone", email: "someone@example.com" };
 
+/** What a commit from `cwd` would stage, with `except` left out. */
+async function stagedFrom(
+  cwd: string,
+  except: (path: string) => boolean = () => false,
+): Promise<string[]> {
+  return StagingArea.temporary(new Git(cwd), async (staging) => {
+    await staging.startFromHead(new Git(cwd));
+    await staging.addAll(except);
+    return staged(staging);
+  });
+}
+
+/** Whether git's object store holds the content of the file at `path`. */
+async function stored(cwd: string, path: string): Promise<boolean> {
+  const blob = (await git(cwd, "hash-object", path)).trim();
+  return git(cwd, "cat-file", "-e", blob).then(
+    () => true,
+    () => false,
+  );
+}
+
 /** Where `staging` keeps its index. */
 async function indexOf(staging: StagingArea): Promise<string> {
   return (await staging.git.run(["rev-parse", "--git-path", "index"])).text();
@@ -47,7 +68,7 @@ describe("StagingArea", () => {
     const cwd = await scratch.committed({ "a.txt": "a\n" });
 
     const files = await StagingArea.temporary(new Git(cwd), async (staging) => {
-      await staging.startFromHead();
+      await staging.startFromHead(new Git(cwd));
       return staged(staging);
     });
 
@@ -59,7 +80,7 @@ describe("StagingArea", () => {
     await write(cwd, { "b.txt": "b\n" });
 
     const files = await StagingArea.temporary(new Git(cwd), async (staging) => {
-      await staging.startFromHead();
+      await staging.startFromHead(new Git(cwd));
       await staging.addAll(() => false);
       return staged(staging);
     });
@@ -75,7 +96,7 @@ describe("StagingArea", () => {
     await write(cwd, { "b.txt": "b\n", ".env": "S=1\n" });
 
     const files = await StagingArea.temporary(new Git(cwd), async (staging) => {
-      await staging.startFromHead();
+      await staging.startFromHead(new Git(cwd));
       await staging.addAll((path) => path === ".env");
       return staged(staging);
     });
@@ -101,7 +122,7 @@ describe("StagingArea", () => {
     await write(cwd, { "b.txt": "b\n" });
 
     const files = await StagingArea.temporary(new Git(cwd), async (staging) => {
-      await staging.startFromHead();
+      await staging.startFromHead(new Git(cwd));
       await staging.markAsAdded(["b.txt", "gone.txt"]);
       return (await staging.git.run(["ls-files", "-z"])).paths();
     });
@@ -113,7 +134,7 @@ describe("StagingArea", () => {
     const cwd = await scratch.committed({ "a.txt": "a\n" });
 
     const problem = await StagingArea.temporary(new Git(cwd), async (staging) => {
-      await staging.startFromHead();
+      await staging.startFromHead(new Git(cwd));
       return staging.problem([new SomethingIsStaged()]);
     });
 
@@ -125,7 +146,7 @@ describe("StagingArea", () => {
     await write(cwd, { "b.txt": "b\n" });
 
     await StagingArea.temporary(new Git(cwd), async (staging) => {
-      await staging.startFromHead();
+      await staging.startFromHead(new Git(cwd));
       await staging.addAll(() => false);
       await staging.commit("add b", AUTHOR);
     });
@@ -140,7 +161,7 @@ describe("StagingArea", () => {
     await write(cwd, { "b.txt": "b\n" });
 
     await StagingArea.temporary(new Git(cwd), async (staging) => {
-      await staging.startFromHead();
+      await staging.startFromHead(new Git(cwd));
       await staging.addAll(() => false);
       await staging.commit("add b", null);
     });
@@ -156,7 +177,7 @@ describe("StagingArea", () => {
     vi.stubEnv("GIT_AUTHOR_NAME", "");
 
     await StagingArea.temporary(new Git(cwd), async (staging) => {
-      await staging.startFromHead();
+      await staging.startFromHead(new Git(cwd));
       await staging.addAll(() => false);
       await staging.commit("add b", AUTHOR);
     });
@@ -171,7 +192,7 @@ describe("StagingArea", () => {
     await write(cwd, { "b.txt": "b\n" });
 
     await StagingArea.temporary(new Git(cwd), async (staging) => {
-      await staging.startFromHead();
+      await staging.startFromHead(new Git(cwd));
       await staging.addAll(() => false);
       await staging.commit("add b", AUTHOR);
     });
@@ -203,7 +224,7 @@ describe("StagingArea", () => {
     const cwd = await scratch.repository();
 
     const files = await StagingArea.temporary(new Git(cwd), async (staging) => {
-      await staging.startFromHead();
+      await staging.startFromHead(new Git(cwd));
       return (await staging.git.run(["ls-files", "-z"])).paths();
     });
 
@@ -227,7 +248,7 @@ describe("StagingArea", () => {
     const blob = (await git(cwd, "hash-object", ".env")).trim();
 
     await StagingArea.temporary(new Git(cwd), async (staging) => {
-      await staging.startFromHead();
+      await staging.startFromHead(new Git(cwd));
       await staging.addAll((path) => path === ".env");
     });
 
@@ -239,7 +260,7 @@ describe("StagingArea", () => {
     await write(cwd, { ".env": "NEW=1\n" });
 
     const files = await StagingArea.temporary(new Git(cwd), async (staging) => {
-      await staging.startFromHead();
+      await staging.startFromHead(new Git(cwd));
       await staging.addAll((path) => path === ".env");
       return staged(staging);
     });
@@ -258,7 +279,7 @@ describe("StagingArea", () => {
     await git(cwd, "commit", "--quiet", "--message=latin1");
 
     const files = await StagingArea.temporary(new Git(cwd), async (staging) => {
-      await staging.startFromHead();
+      await staging.startFromHead(new Git(cwd));
       await staging.addAll(() => false);
       return staged(staging);
     });
@@ -271,7 +292,7 @@ describe("StagingArea", () => {
     await write(cwd, { "café.txt": "secret\n", "b.txt": "b\n" });
 
     const files = await StagingArea.temporary(new Git(cwd), async (staging) => {
-      await staging.startFromHead();
+      await staging.startFromHead(new Git(cwd));
       await staging.addAll((path) => path === "café.txt");
       return staged(staging);
     });
@@ -284,7 +305,7 @@ describe("StagingArea", () => {
     await rm(join(cwd, "b.txt"));
 
     const files = await StagingArea.temporary(new Git(cwd), async (staging) => {
-      await staging.startFromHead();
+      await staging.startFromHead(new Git(cwd));
       await staging.addAll(() => false);
       return staged(staging);
     });
@@ -296,7 +317,7 @@ describe("StagingArea", () => {
     const cwd = await scratch.committed({ "a.txt": "a\n" });
 
     const files = await StagingArea.temporary(new Git(cwd), async (staging) => {
-      await staging.startFromHead();
+      await staging.startFromHead(new Git(cwd));
       await staging.markAsAdded(["gone.txt"]);
       return (await staging.git.run(["ls-files", "-z"])).paths();
     });
@@ -309,7 +330,7 @@ describe("StagingArea", () => {
     await write(cwd, { "dist/x.txt": "x\n", "b.txt": "b\n" });
 
     const files = await StagingArea.temporary(new Git(cwd), async (staging) => {
-      await staging.startFromHead();
+      await staging.startFromHead(new Git(cwd));
       await staging.markAsAdded(["dist/x.txt", "b.txt"]);
       return (await staging.git.run(["ls-files", "-z"])).paths();
     });
@@ -322,7 +343,7 @@ describe("StagingArea", () => {
     await write(cwd, { "b.txt": "b\n" });
 
     const problem = await StagingArea.temporary(new Git(cwd), async (staging) => {
-      await staging.startFromHead();
+      await staging.startFromHead(new Git(cwd));
       await staging.addAll(() => false);
       return staging.problem([new NothingExcludedIsStaged(() => false), new SomethingIsStaged()]);
     });
@@ -345,7 +366,7 @@ describe("StagingArea", () => {
     await write(cwd, { "b.txt": "b\n" });
 
     await StagingArea.temporary(new Git(cwd), async (staging) => {
-      await staging.startFromHead();
+      await staging.startFromHead(new Git(cwd));
       await staging.addAll(() => false);
       await staging.commit("add b", AUTHOR);
     });
@@ -360,7 +381,7 @@ describe("StagingArea", () => {
     await write(cwd, { "b.txt": "secret\n" });
 
     const entry = await StagingArea.temporary(new Git(cwd), async (staging) => {
-      await staging.startFromHead();
+      await staging.startFromHead(new Git(cwd));
       await staging.markAsAdded(["b.txt"]);
       return (await staging.git.run(["ls-files", "--stage", "--", "b.txt"])).text();
     });
@@ -375,7 +396,7 @@ describe("StagingArea", () => {
     await write(cwd, { "b.txt": "b\n" });
 
     await StagingArea.temporary(new Git(cwd), async (staging) => {
-      await staging.startFromHead();
+      await staging.startFromHead(new Git(cwd));
       await staging.addAll(() => false);
       await staging.commit("add b", AUTHOR);
     });
@@ -392,11 +413,108 @@ describe("StagingArea", () => {
     await write(cwd, { "b.txt": "b\n" });
 
     await StagingArea.temporary(new Git(cwd), async (staging) => {
-      await staging.startFromHead();
+      await staging.startFromHead(new Git(cwd));
       await staging.addAll(() => false);
       await staging.commit("add b", AUTHOR);
     });
 
     expect(await headChanges(cwd)).toEqual(["b.txt"]);
+  });
+
+  it.each([["skip-worktree"], ["assume-unchanged"]])(
+    "leaves out the local edit of a file the developer marked %s",
+    async (flag) => {
+      const cwd = await scratch.committed({ "config.json": "KEY=placeholder\n" });
+      await git(cwd, "update-index", `--${flag}`, "config.json");
+      await write(cwd, { "config.json": "KEY=live\n", "new.txt": "n\n" });
+
+      expect(await stagedFrom(cwd)).toEqual(["new.txt"]);
+    },
+  );
+
+  it("stages nothing when the only change is to a file the developer marked skip-worktree", async () => {
+    const cwd = await scratch.committed({ "config.json": "KEY=placeholder\n" });
+    await git(cwd, "update-index", "--skip-worktree", "config.json");
+    await write(cwd, { "config.json": "KEY=live\n" });
+
+    expect(await stagedFrom(cwd)).toEqual([]);
+  });
+
+  it("never stores the local content of a file the developer marked skip-worktree", async () => {
+    const cwd = await scratch.committed({ "config.json": "KEY=placeholder\n" });
+    await git(cwd, "update-index", "--skip-worktree", "config.json");
+    await write(cwd, { "config.json": "KEY=live\n" });
+
+    await stagedFrom(cwd);
+
+    expect(await stored(cwd, "config.json")).toBe(false);
+  });
+
+  it("stages only the checked-out part of a sparse checkout", async () => {
+    const cwd = await scratch.committed({ "web/a.txt": "a\n", "other/b.txt": "b\n" });
+    await git(cwd, "sparse-checkout", "set", "--cone", "web");
+    await write(cwd, { "web/new.txt": "n\n" });
+
+    expect(await stagedFrom(cwd)).toEqual(["web/new.txt"]);
+  });
+
+  it("stages a tracked file in a directory .gitignore ignores", async () => {
+    const cwd = await scratch.committed({ ".gitignore": "tmp/\n" });
+    await write(cwd, { "tmp/kept.txt": "a\n" });
+    await git(cwd, "add", "--force", "tmp/kept.txt");
+    await git(cwd, "commit", "--quiet", "--message=kept");
+    await write(cwd, { "tmp/kept.txt": "b\n" });
+
+    expect(await stagedFrom(cwd)).toEqual(["tmp/kept.txt"]);
+  });
+
+  it("never stores an excluded file inside a directory that replaced a file", async () => {
+    const cwd = await scratch.committed({ config: "c\n" });
+    await rm(join(cwd, "config"));
+    await write(cwd, { "config/.env": "SECRET=1\n", "config/x.txt": "x\n" });
+
+    await stagedFrom(cwd, (path) => path.endsWith(".env"));
+
+    expect(await stored(cwd, "config/.env")).toBe(false);
+  });
+
+  it.skipIf(process.getuid?.() === 0)(
+    "gives the work's result even when its staging area cannot be removed (not as root)",
+    async () => {
+      const cwd = await scratch.committed({ "a.txt": "a\n" });
+      const folder = { path: "" };
+
+      try {
+        const result = await StagingArea.temporary(new Git(cwd), async (staging) => {
+          folder.path = dirname(await indexOf(staging));
+          await writeFile(join(folder.path, "held"), "");
+          await chmod(folder.path, 0o500);
+          return "done";
+        });
+
+        expect(result).toBe("done");
+      } finally {
+        await chmod(folder.path, 0o755);
+        await rm(folder.path, { recursive: true, force: true });
+      }
+    },
+  );
+
+  it("runs the commit's hooks with no literal-paths setting of its own", async () => {
+    const cwd = await scratch.committed({ "a.txt": "a\n" });
+    const hooks = await scratch.directory();
+    const seen = join(hooks, "seen");
+    await writeFile(join(hooks, "post-commit"), `#!/bin/sh\nenv > "${seen}"\n`);
+    await chmod(join(hooks, "post-commit"), 0o755);
+    await git(cwd, "config", "core.hooksPath", hooks);
+    await write(cwd, { "b.txt": "b\n" });
+
+    await StagingArea.temporary(new Git(cwd), async (staging) => {
+      await staging.startFromHead(new Git(cwd));
+      await staging.addAll(() => false);
+      await staging.commit("add b", AUTHOR);
+    });
+
+    expect(await readFile(seen, "utf8")).not.toContain("GIT_LITERAL_PATHSPECS");
   });
 });

@@ -38,38 +38,48 @@ describe("Git", () => {
     );
   });
 
-  it("takes a path with glob characters literally", async () => {
+  it("takes a path made literal as only itself", async () => {
     const cwd = await scratch.repository();
     await write(cwd, { "app/[id].tsx": "", "app/i.tsx": "", "app/d.tsx": "" });
 
-    await git(cwd, ["add", "--", "app/[id].tsx"]);
+    await git(cwd, ["add", "--", Git.literal("app/[id].tsx")]);
 
     expect(await git(cwd, ["diff", "--cached", "--name-only"])).toBe("app/[id].tsx\n");
   });
 
-  it("acts on the repository it runs in, not one an inherited GIT_DIR names", async () => {
+  it("acts on the repository an inherited GIT_DIR names, as git does", async () => {
     const other = await scratch.repository();
     const cwd = await scratch.repository();
     vi.stubEnv("GIT_DIR", join(other, ".git"));
 
     expect((await git(cwd, ["rev-parse", "--absolute-git-dir"])).trim()).toBe(
-      await realpath(join(cwd, ".git")),
+      await realpath(join(other, ".git")),
     );
   });
 
-  it("acts on its own work tree, not one an inherited GIT_WORK_TREE names", async () => {
-    const other = await scratch.repository();
+  it("uses the staging area an inherited GIT_INDEX_FILE names, as git does", async () => {
     const cwd = await scratch.repository();
-    vi.stubEnv("GIT_WORK_TREE", other);
+    const index = join(await scratch.directory(), "index");
+    vi.stubEnv("GIT_INDEX_FILE", index);
 
-    expect((await git(cwd, ["rev-parse", "--show-toplevel"])).trim()).toBe(await realpath(cwd));
+    expect((await git(cwd, ["rev-parse", "--git-path", "index"])).trim()).toBe(index);
   });
 
-  it("uses its own staging area, not one an inherited GIT_INDEX_FILE names", async () => {
-    const cwd = await scratch.repository();
-    vi.stubEnv("GIT_INDEX_FILE", join(await scratch.directory(), "index"));
+  it.each([["GIT_ICASE_PATHSPECS"], ["GIT_GLOB_PATHSPECS"], ["GIT_NOGLOB_PATHSPECS"]])(
+    "still takes paths when %s is inherited",
+    async (name) => {
+      const cwd = await scratch.committed({ "a.txt": "a\n" });
+      vi.stubEnv(name, "1");
 
-    expect((await git(cwd, ["rev-parse", "--git-path", "index"])).trim()).toBe(".git/index");
+      expect(await git(cwd, ["ls-files", "--", Git.literal("a.txt")])).toBe("a.txt\n");
+    },
+  );
+
+  it("still honours :(exclude) when GIT_LITERAL_PATHSPECS is inherited", async () => {
+    const cwd = await scratch.committed({ "a.txt": "a\n", ".env": "S=1\n" });
+    vi.stubEnv("GIT_LITERAL_PATHSPECS", "1");
+
+    expect(await git(cwd, ["ls-files", "--", ".", ":(exclude,literal).env"])).toBe("a.txt\n");
   });
 
   it("names git's own error when git wrote nothing to stderr", async () => {
@@ -103,20 +113,22 @@ describe("Git", () => {
     expect(new Git(await scratch.directory()).exists("")).toBe(false);
   });
 
-  it("names git's first line in its error", async () => {
+  it("names git's message in its error", async () => {
+    vi.stubEnv("LC_ALL", "C");
+
     await expect(git(await scratch.directory(), ["log"])).rejects.toThrow(
       /^fatal: not a git repository/,
     );
   });
 
-  it("runs git in English whatever the locale", async () => {
+  it("leaves git in the developer's own locale", async () => {
     const bin = await scratch.directory();
     await writeFile(join(bin, "git"), '#!/bin/sh\necho "$LC_ALL" >&2\nexit 1\n');
     await chmod(join(bin, "git"), 0o755);
     vi.stubEnv("LC_ALL", "de_DE.UTF-8");
     vi.stubEnv("PATH", bin);
 
-    await expect(git(await scratch.directory(), ["log"])).rejects.toThrow(/^C$/);
+    await expect(git(await scratch.directory(), ["log"])).rejects.toThrow(/^de_DE\.UTF-8$/);
   });
 
   it("throws a GitDidNotStartError when there is no git on PATH", async () => {

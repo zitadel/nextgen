@@ -683,3 +683,42 @@ describe("unavailableWarning", () => {
     );
   });
 });
+
+describe("assertCleanWorktree where a commit would not land on a branch", () => {
+  it("refuses a detached HEAD before setup writes anything", async () => {
+    const cwd = await aRepository();
+    await run("git", ["checkout", "--quiet", "--detach"], { cwd });
+
+    await expect(assertCleanWorktree(cwd)).rejects.toMatchObject({ code: "E_CONFLICT" });
+  });
+
+  it("names what stops the commit", async () => {
+    const cwd = await aRepository();
+    await run("git", ["checkout", "--quiet", "--detach"], { cwd });
+
+    await expect(assertCleanWorktree(cwd)).rejects.toThrow(
+      "Setup cannot commit here: HEAD is detached, so the commit would be on no branch",
+    );
+  });
+});
+
+describe("ensureInitialCommit when git warns before it fails", () => {
+  it("reports the line that says why, not the warning", async () => {
+    const cwd = await aProject();
+    const binDir = await mkdtemp(join(tmpdir(), "zitadel-initial-commit-"));
+    dirs.push(binDir);
+    await writeFile(
+      join(binDir, "git"),
+      "#!/bin/sh\nprintf 'warning: LF will be replaced by CRLF\\nfatal: adding files failed\\n' >&2\nexit 1\n",
+    );
+    await chmod(join(binDir, "git"), 0o755);
+    vi.stubEnv("PATH", binDir);
+    try {
+      expect(await ensureInitialCommit(cwd)).toMatchObject({
+        reason: "fatal: adding files failed",
+      });
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+});

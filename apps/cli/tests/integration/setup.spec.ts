@@ -231,6 +231,16 @@ describe("setup", () => {
         expect(result).toFailWith("E_CONFLICT");
       });
 
+      it("refuses a detached HEAD, where its commit would be on no branch", async () => {
+        const app = await anApp();
+        await app.underVersionControl();
+        await app.onADetachedHead();
+
+        const result = await app.setup();
+
+        expect(result).toFailWith("E_CONFLICT");
+      });
+
       it("names the untracked file it refused over", async () => {
         const app = await anApp();
         await app.underVersionControl();

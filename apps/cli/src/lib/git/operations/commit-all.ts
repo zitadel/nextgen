@@ -15,7 +15,8 @@ import { CurrentCommit } from "./current-commit";
  *
  * The commit is built in a temporary staging area that starts from the last
  * commit, never in the developer's own: theirs may hold another package's
- * staged work, which would be swept in. A pathspec is no way round that,
+ * staged work, which would be swept in. It carries the developer's per-file
+ * flags, so a file they told git to leave alone stays out of the commit. A pathspec is no way round that,
  * since `git commit -- .` commits the working tree and ignores the staging
  * area, so an excluded file that is already tracked would go in anyway.
  *
@@ -56,13 +57,20 @@ export class CommitAll implements Operation<CommitOutcome> {
    * later deploy against.
    *
    * What is about to be committed is checked rather than trusted, since a
-   * file committed once cannot be taken out of history. The reset of the developer's staging
-   * area afterwards is best effort, since the commit has already landed.
+   * file committed once cannot be taken out of history. The reset of the
+   * developer's staging area afterwards is best effort, since the commit has
+   * already landed.
+   *
+   * A commit can land and git still fail afterwards: a post-commit hook that
+   * errors, or one that runs past the five-minute limit. So when the commit
+   * fails, HEAD is read again, and a HEAD that moved means the commit was made
+   * and is reported as made.
    */
   async run(git: Git): Promise<CommitOutcome> {
     const identity = await AuthorIdentity.of(git);
+    const before = await new CurrentCommit().run(git);
     return StagingArea.temporary(git, async (staging) => {
-      await staging.startFromHead();
+      await staging.startFromHead(git);
       await staging.addAll(this.options.except);
       const problem = await staging.problem([
         new NothingExcludedIsStaged(this.options.except),
@@ -71,10 +79,16 @@ export class CommitAll implements Operation<CommitOutcome> {
       if (problem !== null) {
         return this.refused(problem);
       }
-      if (identity.source === "fallback") {
-        await staging.commit(this.message, this.options.authorIfGitHasNone);
-      } else {
-        await staging.commit(this.message, null);
+      try {
+        if (identity.source === "fallback") {
+          await staging.commit(this.message, this.options.authorIfGitHasNone);
+        } else {
+          await staging.commit(this.message, null);
+        }
+      } catch (error) {
+        if ((await new CurrentCommit().run(git)) === before) {
+          throw error;
+        }
       }
       const sha = await new CurrentCommit().run(git);
       if (sha === null) {

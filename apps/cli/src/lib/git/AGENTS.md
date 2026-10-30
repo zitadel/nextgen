@@ -10,8 +10,8 @@ Zitadel: callers say what to leave out and whom to name as author.
 
 - Start git only through `Git.run`, which applies the same safety to every
   call; nothing else in `apps/cli` spawns `git`.
-- Export only `Repository` and types from `index.ts`; callers never see git's
-  arguments or output, so a git detail is fixed in one place.
+- Export only `Repository`, `RepositoryError` and types from `index.ts`;
+  callers never see git's arguments or output, so a git detail is fixed in one place.
 - Add a capability as an `Operation` in `operations/` (`checks`, `refused`,
   `run`) plus a one-line `Repository` method that calls `perform`.
 - Add a precondition as a `Check` in `checks/`, one class per condition, so
@@ -27,14 +27,24 @@ Zitadel: callers say what to leave out and whom to name as author.
 
 The reason for each rule is in the doc of the class named.
 
-- Never touch the developer's index; build in a `StagingArea`.
+- Never stage or commit in the developer's index; build in a `StagingArea`.
+  The one write is the reset after a commit lands (`CommitAll`).
+- Start a commit from the developer's index reset to HEAD, keeping their
+  per-file flags (`StagingArea.startFromHead`).
 - Diff in one `git diff` call, never one per file (`DiffSince`).
-- Stage only the files you keep, never add then unstage (`StagingArea.addAll`).
+- Stage with one `git add --all -- .` that excludes what `except` matches;
+  never name the files to add one by one (`StagingArea.addAll`).
 - Keep the copied index's timestamps (`StagingArea.startFromDevelopers`).
+- Make a path literal where it is passed (`Git.literal`); set no global flag
+  or locale, which a hook would inherit (`Git.run`).
+- Honour inherited `GIT_DIR`, `GIT_WORK_TREE` and `GIT_INDEX_FILE`; drop only
+  the pathspec variables (`Git.run`).
+- Resolve a directory to its real path before asking git about it (`Repository.open`).
 - Keep `--submodule=short` on the per-file diff only (`DiffFilesSince`).
 - Keep `--no-verify` and `commit.gpgsign=false` on commits (`StagingArea.commit`).
 - Refuse to commit while an operation is under way or HEAD is detached
-  (`NoOperationUnderWay`, `HeadIsOnABranch`).
+  (`NoOperationUnderWay`, `HeadIsOnABranch`); ask before any work starts
+  (`Repository.readyToCommit`).
 - Leave secrets out of a commit in any case (`isSecretPath`); exempt only
   `.zitadel/local/` as written from setup's clean-tree check (`isLocalRuntimePath`).
 

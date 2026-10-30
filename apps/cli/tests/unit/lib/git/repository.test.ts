@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { chmod, mkdir, rm, symlink, utimes, writeFile } from "node:fs/promises";
+import { chmod, lstat, mkdir, rm, symlink, utimes, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -60,6 +60,25 @@ async function fakeGitRunning(script: string): Promise<string> {
   return bin;
 }
 
+/** A repository with a merge in progress, its changes all at the root, and an empty `apps/web` beside them. */
+async function aMergeUnderWay(): Promise<string> {
+  const cwd = await twoCommits();
+  const branch = (await git(cwd, "symbolic-ref", "--short", "HEAD")).trim();
+  await git(cwd, "checkout", "--quiet", "-b", "side", "HEAD~1");
+  await write(cwd, { "c.txt": "c\n" });
+  await commitEverything(cwd, "side");
+  await git(cwd, "merge", "--no-commit", "--no-ff", "--quiet", branch);
+  await mkdir(join(cwd, "apps/web"), { recursive: true });
+  return cwd;
+}
+
+/** A symlink to `target`, at a different depth from it. */
+async function aLinkTo(target: string): Promise<string> {
+  const link = join(await scratch.directory(), "web");
+  await symlink(target, link);
+  return link;
+}
+
 /** How many `diff --git` sections `patch` holds. */
 function sectionsOf(patch: string): number {
   return patch.split("diff --git").length - 1;
@@ -107,6 +126,19 @@ describe("Repository.open", () => {
     vi.stubEnv("PATH", await scratch.brokenGit());
 
     await expect(Repository.open(cwd)).rejects.toThrow("git: not available");
+  });
+
+  it("recognises no repository whatever the developer's locale", async () => {
+    const bin = await scratch.directory();
+    await writeFile(
+      join(bin, "git"),
+      '#!/bin/sh\nif [ "$LC_ALL" = C ]; then echo "fatal: not a git repository" >&2; else echo "fatal: kein Git-Repository" >&2; fi\nexit 128\n',
+    );
+    await chmod(join(bin, "git"), 0o755);
+    vi.stubEnv("LC_ALL", "de_DE.UTF-8");
+    vi.stubEnv("PATH", bin);
+
+    expect(await Repository.open(await scratch.directory())).toBeNull();
   });
 
   it("throws when git refuses the repository, rather than answering no repository", async () => {
@@ -159,6 +191,16 @@ describe("Repository.create", () => {
     expect(await Repository.open(cwd)).not.toBeNull();
   });
 
+  it("keeps a .git symlink to something missing when git init fails", async () => {
+    const cwd = await scratch.directory();
+    await symlink(join(cwd, "missing"), join(cwd, ".git"));
+    vi.stubEnv("PATH", await gitThatFailsHalfwayThroughInit());
+
+    await Repository.create(cwd).catch(() => undefined);
+
+    expect((await lstat(join(cwd, ".git"))).isSymbolicLink()).toBe(true);
+  });
+
   it("leaves no half-made repository behind when git init fails", async () => {
     const cwd = await scratch.directory();
     vi.stubEnv("PATH", await gitThatFailsHalfwayThroughInit());
@@ -185,15 +227,18 @@ describe("Repository.create", () => {
     await expect(Repository.create(cwd)).rejects.toThrow("fatal: could not write config");
   });
 
-  it("throws git's message even when the half-made repository cannot be removed", async () => {
-    const cwd = await scratch.directory();
-    vi.stubEnv("PATH", await gitThatLeavesAnUnremovableRepository());
-    try {
-      await expect(Repository.create(cwd)).rejects.toThrow("fatal: could not write config");
-    } finally {
-      await chmod(join(cwd, ".git"), 0o755);
-    }
-  });
+  it.skipIf(process.getuid?.() === 0)(
+    "throws git's message even when the half-made repository cannot be removed (not as root, who can remove it)",
+    async () => {
+      const cwd = await scratch.directory();
+      vi.stubEnv("PATH", await gitThatLeavesAnUnremovableRepository());
+      try {
+        await expect(Repository.create(cwd)).rejects.toThrow("fatal: could not write config");
+      } finally {
+        await chmod(join(cwd, ".git"), 0o755);
+      }
+    },
+  );
 });
 
 describe("Repository.currentCommit", () => {
@@ -355,7 +400,41 @@ describe("Repository.commitAll", () => {
   });
 });
 
+describe("Repository.readyToCommit", () => {
+  it("is null on a branch with nothing under way", async () => {
+    expect(await (await open(await twoCommits())).readyToCommit()).toBeNull();
+  });
+
+  it("names a merge under way", async () => {
+    expect(await (await open(await aMergeUnderWay())).readyToCommit()).toBe(
+      "a merge is in progress",
+    );
+  });
+
+  it("names a detached HEAD", async () => {
+    const cwd = await twoCommits();
+    await git(cwd, "checkout", "--quiet", "--detach");
+
+    expect(await (await open(cwd)).readyToCommit()).toBe(
+      "HEAD is detached, so the commit would be on no branch",
+    );
+  });
+
+  it("sees a merge under way through a symlinked directory", async () => {
+    const link = await aLinkTo(join(await aMergeUnderWay(), "apps/web"));
+
+    expect(await (await open(link)).readyToCommit()).toBe("a merge is in progress");
+  });
+});
+
 describe("Repository.commitAll in a busy repository", () => {
+  it("commits nothing when a merge is in progress and the directory is reached through a symlink", async () => {
+    const link = await aLinkTo(join(await aMergeUnderWay(), "apps/web"));
+    await write(link, { "new.txt": "n\n" });
+
+    expect(await (await open(link)).commitAll("m", OPTIONS)).toMatchObject({ committed: false });
+  });
+
   it("commits nothing when a merge is in progress", async () => {
     const cwd = await twoCommits();
     const branch = (await git(cwd, "symbolic-ref", "--short", "HEAD")).trim();
@@ -507,6 +586,16 @@ describe("Repository.diffSince", () => {
     const { cwd } = await base();
 
     expect(await (await open(cwd)).diffSince("0".repeat(40), [".zitadel/"], {})).toBeNull();
+  });
+
+  it("diffs a path with glob characters as only itself", async () => {
+    const cwd = await scratch.committed({ "app/[id].tsx": "a\n", "app/i.tsx": "i\n" });
+    const sha = (await git(cwd, "rev-parse", "HEAD")).trim();
+    await write(cwd, { "app/[id].tsx": "b\n", "app/i.tsx": "j\n" });
+
+    const diff = await (await open(cwd)).diffSince(sha, ["app/[id].tsx"], {});
+
+    expect(diff?.match(/^diff --git .*$/gm)).toEqual(["diff --git a/app/[id].tsx b/app/[id].tsx"]);
   });
 
   it("is null for an object that is not a commit", async () => {

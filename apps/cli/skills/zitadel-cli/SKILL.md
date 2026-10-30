@@ -389,7 +389,8 @@ commits `.env*` files (other than `.env.example`), `.zitadel/secret` or
 first, then rerun. Only what `start` leaves is exempt: `.zitadel/local/` and
 the `.gitignore` line that ignores it. A connection under `.zitadel/idps/` is
 yours and is not exempt. During a merge, rebase, cherry-pick, revert or bisect,
-or on a detached HEAD, setup makes no commit and warns why.
+or on a detached HEAD, setup refuses with `E_CONFLICT` before it writes
+anything, naming what stops the commit.
 
 Setup deploys nothing, and it does not need to: a project with no release
 resolves the newest revisions, which are the ones setup just uploaded, so

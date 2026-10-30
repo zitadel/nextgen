@@ -41,7 +41,7 @@ describe("DiffSince", () => {
 
     await new DiffSince(SHA, ["new.json"], {}).run(gitDiffing("", calls));
 
-    expect(calls).toContainEqual(["add", "--intent-to-add", "--", "new.json"]);
+    expect(calls).toContainEqual(["add", "--intent-to-add", "--", ":(literal)new.json"]);
   });
 
   it("still diffs plainly when untracked files cannot be marked as added", async () => {
@@ -66,7 +66,7 @@ describe("DiffSince", () => {
       flag,
       SHA,
       "--",
-      ".",
+      ":(literal).",
     ]);
   });
 
@@ -76,5 +76,42 @@ describe("DiffSince", () => {
     await new DiffSince(SHA, ["."], {}, ["--raw"]).run(gitDiffing("", calls));
 
     expect(calls.find((args) => args[0] === "diff")).toContain("--raw");
+  });
+
+  it("marks and diffs in a temporary staging area, never the developer's", async () => {
+    const env: NodeJS.ProcessEnv[] = [];
+    const git = fakeGit(
+      (args, added) => {
+        if (args.includes("--intent-to-add") || args[0] === "diff") {
+          env.push(added);
+        }
+        return {};
+      },
+      ["new.json"],
+    );
+
+    await new DiffSince(SHA, ["new.json"], {}).run(git);
+
+    expect(env.map((added) => added.GIT_INDEX_FILE !== undefined)).toEqual([true, true]);
+  });
+
+  it("diffs in the developer's staging area when the temporary one cannot be used", async () => {
+    const env: NodeJS.ProcessEnv[] = [];
+    const git = fakeGit(
+      (args, added) => {
+        if (args.includes("--intent-to-add")) {
+          return { exitCode: 128, stderr: "fatal: cannot mark" };
+        }
+        if (args[0] === "diff") {
+          env.push(added);
+        }
+        return {};
+      },
+      ["new.json"],
+    );
+
+    await new DiffSince(SHA, ["new.json"], {}).run(git);
+
+    expect(env.at(-1)?.GIT_INDEX_FILE).toBeUndefined();
   });
 });

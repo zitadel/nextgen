@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { rm } from "node:fs/promises";
+import { lstat, realpath, rm } from "node:fs/promises";
 import { join } from "node:path";
 
 import { GitDidNotStartError, RepositoryError } from "./errors";
@@ -10,6 +10,7 @@ import { CurrentCommit } from "./operations/current-commit";
 import { DiffFilesSince } from "./operations/diff-files-since";
 import { DiffSince } from "./operations/diff-since";
 import { IsDirty } from "./operations/is-dirty";
+import { ReadyToCommit } from "./operations/ready-to-commit";
 import { UncommittedFiles } from "./operations/uncommitted-files";
 import type {
   CommitOptions,
@@ -48,12 +49,19 @@ export class Repository {
    * refusal over ownership or a broken `HOME`, is thrown: answering "none"
    * would let a caller `git init` a second repository inside the first, or
    * skip a check that the tree is clean.
+   *
+   * `dir` is resolved to its real path first: git answers paths such as
+   * `--git-path MERGE_HEAD` relative to where it really runs, so through a
+   * symlink they would point somewhere else. git is asked in English here,
+   * since "not a git repository" is recognised by its wording.
    */
   static async open(dir: string): Promise<Repository | null> {
     if (!existsSync(dir)) {
       return null;
     }
-    const result = await new Git(dir)
+    const real = await realpath(dir);
+    const result = await new Git(real)
+      .with({ LC_ALL: "C" })
       .run(["rev-parse", "--show-prefix"], [128])
       .catch((error: unknown) => {
         if (error instanceof GitDidNotStartError) {
@@ -70,7 +78,7 @@ export class Repository {
     if (!result.succeeded()) {
       throw new RepositoryError(result.reason());
     }
-    return new Repository(dir, result.text());
+    return new Repository(real, result.text());
   }
 
   /**
@@ -108,19 +116,26 @@ export class Repository {
    * the removal fails too, its own failure is dropped, since git's message
    * names the real cause. This assumes nothing else creates a repository in
    * `dir` at the same time.
+   *
+   * A `.git` counts as there before even when it is a symlink to something
+   * missing, so a developer's link to an unmounted volume is never removed.
    */
   static async create(dir: string): Promise<Repository> {
-    const gitDir = join(dir, ".git");
-    const hadOne = existsSync(gitDir);
+    const real = await realpath(dir);
+    const gitDir = join(real, ".git");
+    const hadOne = await lstat(gitDir).then(
+      () => true,
+      () => false,
+    );
     try {
-      await new Git(dir).run(["init", "--quiet"]);
+      await new Git(real).run(["init", "--quiet"]);
     } catch (error) {
       if (!hadOne) {
         await rm(gitDir, { recursive: true, force: true }).catch(() => undefined);
       }
       throw error;
     }
-    return new Repository(dir, "");
+    return new Repository(real, "");
   }
 
   /** The commit it is at, or null before its first commit. */
@@ -136,6 +151,11 @@ export class Repository {
   /** The uncommitted files under the directory, untracked ones included. */
   uncommittedFiles(): Promise<UncommittedFile[]> {
     return this.perform(new UncommittedFiles(this.prefix));
+  }
+
+  /** Why a commit here would land where it should not (an operation under way, a detached HEAD), or null. */
+  readyToCommit(): Promise<string | null> {
+    return this.perform(new ReadyToCommit());
   }
 
   /**

@@ -40,8 +40,9 @@ export class DiffFilesSince implements Operation<DiffedFile[] | null> {
    * one list of files, in one order, so they pair one to one. The exception is
    * a file whose type changed (a file replaced by a symlink): git shows it as
    * two sections under one header, which are joined. The patch is split only
-   * where a line starts with `diff --git`, so a file whose content mentions it
-   * stays whole.
+   * where `diff --git` follows a newline. A file's content may mention it, and
+   * a file with old Mac line endings (a lone `\r`) has no newline before it,
+   * so its section stays whole.
    */
   async run(git: Git): Promise<DiffedFile[]> {
     const output = await this.diff.run(git);
@@ -50,7 +51,7 @@ export class DiffFilesSince implements Operation<DiffedFile[] | null> {
       return [];
     }
     const patches: string[] = [];
-    for (const section of output.slice(end + 2).split(/^(?=diff --git )/m)) {
+    for (const section of output.slice(end + 2).split(/(?<=\n)(?=diff --git )/)) {
       const last = patches.at(-1);
       if (
         last !== undefined &&

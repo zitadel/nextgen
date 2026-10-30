@@ -3,7 +3,7 @@ import { copyFile, mkdtemp, rm, stat, utimes, writeFile } from "node:fs/promises
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
-import type { Git } from "./git";
+import { Git } from "./git";
 import type { Check } from "./operation";
 import { CurrentCommit } from "./operations/current-commit";
 import type { Author, PathFilter } from "./types";
@@ -14,7 +14,7 @@ import type { Author, PathFilter } from "./types";
  * of theirs, another package's included.
  *
  * Made with {@link temporary}, which removes it however the work ends. A
- * commit starts it from the last commit ({@link startFromHead}); a diff starts
+ * commit starts it at the last commit ({@link startFromHead}); a diff starts
  * it from a copy of the developer's ({@link startFromDevelopers}). Its methods
  * are the steps an operation takes, so the operation reads as a list of them.
  */
@@ -29,21 +29,42 @@ export class StagingArea {
     this.git = git.with({ GIT_INDEX_FILE: index });
   }
 
-  /** Runs `work` with a new staging area for `git`'s directory, removed afterwards. */
+  /**
+   * Runs `work` with a new staging area for `git`'s directory, removed afterwards.
+   *
+   * A failure to remove it is dropped: by then the work is done, and a commit
+   * that landed must not be reported as failed because a temporary file was
+   * briefly held open (as Windows Defender does).
+   */
   static async temporary<T>(git: Git, work: (staging: StagingArea) => Promise<T>): Promise<T> {
     const scratch = await mkdtemp(join(tmpdir(), "git-staging-"));
     try {
       return await work(new StagingArea(git, join(scratch, "index")));
     } finally {
-      await rm(scratch, { recursive: true, force: true });
+      await rm(scratch, { recursive: true, force: true }).catch(() => undefined);
     }
   }
 
-  /** Starts from the last commit, so a commit carries the rest of the repository unchanged; empty before one. */
-  async startFromHead(): Promise<void> {
+  /**
+   * Starts at the last commit, keeping what the developer's staging area knows about each file; empty before one.
+   *
+   * It starts as a copy of `developers`' staging area and is then reset to
+   * the last commit with `read-tree -m`, which keeps each entry's flags and
+   * file timestamps where the content is unchanged. The flags matter: a file
+   * the developer marked `skip-worktree` or `assume-unchanged` (a local
+   * config with real credentials, or the files outside a sparse checkout)
+   * keeps its mark, so its local state is never staged. The timestamps spare
+   * git from hashing every file again. Another package's staged work is
+   * dropped by the reset, so the commit carries the rest of the repository as
+   * last committed.
+   */
+  async startFromHead(developers: Git): Promise<void> {
+    await this.startFromDevelopers(developers);
     const head = await new CurrentCommit().run(this.git);
-    if (head !== null) {
-      await this.git.run(["read-tree", head]);
+    if (head === null) {
+      await this.git.run(["read-tree", "--empty"]);
+    } else {
+      await this.git.run(["read-tree", "-m", head]);
     }
   }
 
@@ -69,18 +90,27 @@ export class StagingArea {
   }
 
   /**
-   * Stages everything under the directory but what `except` matches, as `git add --all` would.
+   * Stages everything under the directory but what `except` matches, as `git add --all -- .` would.
    *
-   * The changed and untracked files are listed first and only the kept ones
-   * are added, so an excluded file's content is never written to the object
-   * store, where it would sit as a loose object until git cleans it up. The
-   * list goes through a file beside the staging area rather than the command
-   * line, which a project of thousands of files would overflow. A file that is
-   * already tracked and excluded keeps what the last commit has.
+   * The changed and untracked files are listed first to find the ones
+   * `except` matches, and those are then left out of a single
+   * `git add --all -- .` with `:(exclude)`. An excluded file is never read, so
+   * its content is never written to the object store, where it would sit as
+   * a loose object until git cleans it up. Staging stays `git add --all -- .`
+   * in every other way: a file that vanishes meanwhile, a tracked file in an
+   * ignored directory and a sparse checkout all behave as they do for the
+   * developer, and matching stays linear however many files there are. A
+   * file that is already tracked and excluded keeps what the last commit has.
    *
-   * The list is read and written back byte for byte: a name that is not
-   * valid UTF-8, which Linux allows, would otherwise come back changed and
-   * match nothing. `except` sees each name as UTF-8.
+   * The pathspecs go through a file beside the staging area, read and written
+   * byte for byte: a name that is not valid UTF-8, which Linux allows, would
+   * otherwise come back changed and match nothing. `except` sees each name as
+   * UTF-8.
+   *
+   * Exit 1 is accepted: git gives it when everything `.` matches is a file the
+   * developer marked `skip-worktree`, having staged nothing, which is the
+   * right result. A real failure, such as a file that cannot be read, exits
+   * 128. Whether anything was staged is for the caller to check.
    */
   async addAll(except: PathFilter): Promise<void> {
     const listed = await this.git.run(
@@ -88,14 +118,16 @@ export class StagingArea {
       [],
       "latin1",
     );
-    const kept = listed
+    const excluded = listed
       .paths()
-      .filter((path) => !except(Buffer.from(path, "latin1").toString("utf8")));
-    if (kept.length > 0) {
-      const list = join(dirname(this.index), "paths");
-      await writeFile(list, Buffer.from(kept.join("\0"), "latin1"));
-      await this.git.run(["add", "--all", `--pathspec-from-file=${list}`, "--pathspec-file-nul"]);
-    }
+      .filter((path) => except(Buffer.from(path, "latin1").toString("utf8")))
+      .map((path) => `:(exclude,literal)${path}`);
+    const list = join(dirname(this.index), "paths");
+    await writeFile(list, Buffer.from([".", ...excluded].join("\0"), "latin1"));
+    await this.git.run(
+      ["add", "--all", `--pathspec-from-file=${list}`, "--pathspec-file-nul"],
+      [1],
+    );
   }
 
   /**
@@ -104,10 +136,11 @@ export class StagingArea {
    * Intent to add records the file without its content, so nothing is written
    * to the object store. Only paths that exist are passed: `git add` refuses
    * the whole call when one matches nothing. An ignored path makes it mark the
-   * rest and exit 1, which is accepted.
+   * rest and exit 1, which is accepted. Each path is taken literally
+   * ({@link Git.literal}), so `app/[id].tsx` marks only itself.
    */
   async markAsAdded(paths: readonly string[]): Promise<void> {
-    const present = paths.filter((path) => this.git.exists(path));
+    const present = paths.filter((path) => this.git.exists(path)).map(Git.literal);
     if (present.length > 0) {
       await this.git.run(["add", "--intent-to-add", "--", ...present], [1]);
     }

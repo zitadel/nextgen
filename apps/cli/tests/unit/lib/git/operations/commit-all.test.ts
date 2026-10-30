@@ -7,6 +7,42 @@ import { fakeGit } from "../../../../helpers/git-repo";
 
 const OPTIONS = { except: () => false, authorIfGitHasNone: { name: "n", email: "e" } };
 
+/** One git call a {@link repositoryThatCommits} answered: its arguments and the environment it ran with. */
+interface Call {
+  readonly args: readonly string[];
+  readonly env: NodeJS.ProcessEnv;
+}
+
+/**
+ * A git whose HEAD is `old` until it is asked to commit, with `a.txt` staged.
+ * The commit fails with "fatal: commit failed" when `fails`, and moves HEAD to
+ * `new` when `lands`; every call is recorded in `calls`.
+ */
+function repositoryThatCommits(
+  { fails, lands }: { fails: boolean; lands: boolean },
+  calls: Call[] = [],
+) {
+  const state = { head: "old" };
+  return fakeGit((args, env) => {
+    calls.push({ args: [...args], env });
+    if (args.includes("HEAD^{commit}")) {
+      return { stdout: `${state.head}\n` };
+    }
+    if (args.includes("--cached")) {
+      return { stdout: "a.txt\0" };
+    }
+    if (args.includes("commit") && args.includes("--no-verify")) {
+      if (lands) {
+        state.head = "new";
+      }
+      if (fails) {
+        return { exitCode: 1, stderr: "fatal: commit failed" };
+      }
+    }
+    return {};
+  });
+}
+
 describe("CommitAll", () => {
   it("is checked for an operation under way and a detached HEAD", () => {
     expect(new CommitAll("m", OPTIONS).checks().map((check) => check.constructor)).toEqual([
@@ -92,5 +128,44 @@ describe("CommitAll", () => {
     await new CommitAll("the message", OPTIONS).run(git);
 
     expect(calls.find((args) => args.includes("commit"))).toContain("--message=the message");
+  });
+
+  it("reports a commit that landed although git failed afterwards", async () => {
+    const git = repositoryThatCommits({ fails: true, lands: true });
+
+    expect(await new CommitAll("m", OPTIONS).run(git)).toMatchObject({
+      committed: true,
+      sha: "new",
+    });
+  });
+
+  it("throws git's error when the commit failed and HEAD did not move", async () => {
+    const git = repositoryThatCommits({ fails: true, lands: false });
+
+    await expect(new CommitAll("m", OPTIONS).run(git)).rejects.toThrow("fatal: commit failed");
+  });
+
+  it("stages and checks in a temporary staging area, never the developer's", async () => {
+    const calls: Call[] = [];
+
+    await new CommitAll("m", OPTIONS).run(
+      repositoryThatCommits({ fails: false, lands: true }, calls),
+    );
+
+    expect(
+      calls
+        .filter(({ args }) => args.includes("--cached") || args.includes("--all"))
+        .every(({ env }) => env.GIT_INDEX_FILE !== undefined),
+    ).toBe(true);
+  });
+
+  it("brings the developer's own staging area up to the new commit afterwards", async () => {
+    const calls: Call[] = [];
+
+    await new CommitAll("m", OPTIONS).run(
+      repositoryThatCommits({ fails: false, lands: true }, calls),
+    );
+
+    expect(calls.find(({ args }) => args[0] === "reset")?.env.GIT_INDEX_FILE).toBeUndefined();
   });
 });

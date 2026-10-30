@@ -1,5 +1,5 @@
 import { CommitIsHere } from "../checks/commit-is-here";
-import type { Git } from "../git";
+import { Git } from "../git";
 import type { Check, Operation } from "../operation";
 import { StagingArea } from "../staging-area";
 import type { DiffOptions } from "../types";
@@ -52,8 +52,9 @@ export class DiffSince implements Operation<string | null> {
    * never in the developer's own staging area. When that cannot be done the
    * plain diff is given instead, which still shows every tracked change.
    *
-   * `--no-ext-diff` keeps a configured external diff tool out, and
-   * `--relative` names paths from the directory.
+   * `--no-ext-diff` keeps a configured external diff tool out, `--relative`
+   * names paths from the directory, and each path is taken literally
+   * ({@link Git.literal}), so `app/[id].tsx` does not also diff `app/i.tsx`.
    */
   async run(git: Git): Promise<string> {
     const diff = [
@@ -63,7 +64,7 @@ export class DiffSince implements Operation<string | null> {
       ...this.format,
       this.commit,
       "--",
-      ...this.paths,
+      ...this.paths.map(Git.literal),
     ];
     return StagingArea.temporary(git, async (staging) => {
       try {

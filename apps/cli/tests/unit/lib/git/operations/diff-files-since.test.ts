@@ -42,7 +42,7 @@ describe("DiffFilesSince", () => {
       "--submodule=short",
       SHA,
       "--",
-      ".",
+      ":(literal).",
     ]);
   });
 
@@ -72,6 +72,14 @@ describe("DiffFilesSince", () => {
 
   it("splits the patch only where a line starts a file's section", async () => {
     const patch = "diff --git a/a b/a\n+see diff --git a/x b/x\n";
+
+    expect(await filesFrom([":100644 100644 1 2 M", "a"], patch)).toEqual([
+      { path: "a", status: "modified", patch },
+    ]);
+  });
+
+  it("keeps a file with old Mac line endings whole when its content mentions diff --git", async () => {
+    const patch = "diff --git a/a b/a\n+notes\rdiff --git a/x b/x\rmore\r\n";
 
     expect(await filesFrom([":100644 100644 1 2 M", "a"], patch)).toEqual([
       { path: "a", status: "modified", patch },

@@ -1,5 +1,5 @@
 import { ZitadelError } from "../../lib/errors";
-import { type Author, Repository } from "../../lib/git";
+import { type Author, Repository, RepositoryError } from "../../lib/git";
 import { isLocalRuntimePath, isSecretPath } from "../../lib/secret-paths";
 
 /**
@@ -74,6 +74,11 @@ const FALLBACK_AUTHOR: Author = { name: "Zitadel Setup", email: "setup@zitadel.l
  * than any diff it would buy. Checked up front rather than at commit time, so
  * a refusal costs nothing and leaves no half-made project behind.
  *
+ * A repository where a commit would land where it should not (during a
+ * merge, rebase, cherry-pick, revert or bisect, or on a detached HEAD) is
+ * refused here too, for the same reason: found only at commit time, setup
+ * would already have done all its work.
+ *
  * When git cannot answer, setup refuses rather than carries on: the commit
  * does not check again, so going ahead would stage and commit the very work
  * this guard exists to protect.
@@ -83,18 +88,16 @@ export async function assertCleanWorktree(cwd: string): Promise<void> {
   if (repository === null) {
     return;
   }
-  const files = await repository.uncommittedFiles().catch((error: unknown) => {
-    throw new ZitadelError(
-      "E_CONFLICT",
-      `Could not tell whether the git working tree is clean: ${messageOf(error)}`,
-      {
-        hint:
-          "Setup commits the files it writes, and will not do that without knowing the tree " +
-          "started clean. Fix what git is reporting, then run setup again, or pass --no-git to " +
-          "set up without touching version control.",
-      },
-    );
-  });
+  const blocked = await repository.readyToCommit().catch(cannotTell);
+  if (blocked !== null) {
+    throw new ZitadelError("E_CONFLICT", `Setup cannot commit here: ${blocked}`, {
+      hint:
+        "Setup commits the project so the first release records a commit. Finish or abort what " +
+        "is under way, or check out a branch, then run setup again, or pass --no-git to set up " +
+        "without touching version control.",
+    });
+  }
+  const files = await repository.uncommittedFiles().catch(cannotTell);
   const dirty = files.filter((file) => !isCliOwned(file.path));
   if (dirty.length === 0) {
     return;
@@ -114,6 +117,20 @@ export async function assertCleanWorktree(cwd: string): Promise<void> {
       "version control at all, pass --no-git.",
     details: { modified, untracked },
   });
+}
+
+/** The refusal for a repository git could not answer about. */
+function cannotTell(error: unknown): never {
+  throw new ZitadelError(
+    "E_CONFLICT",
+    `Could not tell whether the git working tree is clean: ${messageOf(error)}`,
+    {
+      hint:
+        "Setup commits the files it writes, and will not do that without knowing the tree " +
+        "started clean. Fix what git is reporting, then run setup again, or pass --no-git to " +
+        "set up without touching version control.",
+    },
+  );
 }
 
 /** `s` unless the list holds exactly one entry. */
@@ -164,8 +181,11 @@ export async function ensureInitialCommit(cwd: string): Promise<InitialCommitOut
   }
 }
 
-/** git's first line, since the reason goes into a one-line warning. */
+/** The one line that says why the commit failed, since it goes into a one-line warning. */
 function firstLineOf(error: unknown): string {
+  if (error instanceof RepositoryError) {
+    return error.headline();
+  }
   return messageOf(error).split("\n")[0] ?? "";
 }
 

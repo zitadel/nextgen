@@ -57,7 +57,8 @@ export class GitResult {
  * which makes it safe the same way (see there), so no caller can forget a
  * setting. It knows nothing about repositories or Zitadel: it runs git and
  * reads its answer. `with` gives the same git with more environment, which is
- * how a temporary staging area or a fallback author is applied to one call.
+ * how a temporary staging area, a fallback author or an English locale is
+ * applied to one call.
  */
 export class Git {
   /** The directory git runs in. */
@@ -79,15 +80,20 @@ export class Git {
    * Runs git with `args`; throws a {@link RepositoryError} for an exit code other than 0 or `allow`.
    *
    * Every call is made safe the same way:
-   * - `GIT_DIR`, `GIT_WORK_TREE` and `GIT_INDEX_FILE` are dropped from the
-   *   inherited environment. A git hook sets them to its own repository, so a
-   *   CLI run from a hook would otherwise act on that one.
-   * - `LC_ALL=C`, so git answers in English and a failure is recognised by its
-   *   wording (`Repository.open` looks for "not a git repository").
+   * - `GIT_LITERAL_PATHSPECS`, `GIT_GLOB_PATHSPECS`, `GIT_NOGLOB_PATHSPECS`
+   *   and `GIT_ICASE_PATHSPECS` are dropped from the inherited environment.
+   *   They change what every path given to git matches, and the literal one
+   *   turns off the `:(exclude)` a commit uses to keep a secret out.
    * - `GIT_TERMINAL_PROMPT=0`, so git never waits on a prompt.
-   * - `--literal-pathspecs`, so `app/[id].tsx` matches only itself and not `app/i.tsx`.
    * - Output is capped at 16 MB and a call at five minutes, so a stuck or
    *   runaway git cannot hang the CLI.
+   *
+   * `GIT_DIR`, `GIT_WORK_TREE` and `GIT_INDEX_FILE` are honoured, as git
+   * itself does: a build that keeps `.git` elsewhere names it this way. No
+   * flag is set that git passes on to hooks, so a hook that runs during a
+   * commit sees the developer's own settings: a path is made literal where it
+   * is given ({@link Git.literal}), and the locale is set to English only for
+   * the one call whose wording is read.
    *
    * Output is read as UTF-8 unless `encoding` says otherwise; `latin1` keeps
    * every byte as one character, for a path list that must go back to git
@@ -104,14 +110,19 @@ export class Git {
     encoding: "utf8" | "latin1" = "utf8",
   ): Promise<GitResult> {
     const inherited = { ...process.env };
-    for (const name of ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE"]) {
+    for (const name of [
+      "GIT_LITERAL_PATHSPECS",
+      "GIT_GLOB_PATHSPECS",
+      "GIT_NOGLOB_PATHSPECS",
+      "GIT_ICASE_PATHSPECS",
+    ]) {
       delete inherited[name];
     }
-    const env = { ...inherited, LC_ALL: "C", GIT_TERMINAL_PROMPT: "0", ...this.env };
+    const env = { ...inherited, GIT_TERMINAL_PROMPT: "0", ...this.env };
     return new Promise((resolveResult, reject) => {
       execFile(
         "git",
-        ["--literal-pathspecs", ...args],
+        [...args],
         { cwd: this.dir, env, encoding, maxBuffer: 16 * 1024 * 1024, timeout: 5 * 60 * 1000 },
         (error, stdout, stderr) => {
           const failure = error as (NodeJS.ErrnoException & { killed?: boolean }) | null;
@@ -150,6 +161,16 @@ export class Git {
   async stagedFiles(): Promise<string[]> {
     const staged = ["diff", "--cached", "-z", "--name-only", "--no-renames", "--relative"];
     return (await this.run(staged)).paths();
+  }
+
+  /**
+   * `path` as a pathspec that matches only itself, so `app/[id].tsx` does not also match `app/i.tsx`.
+   *
+   * Set per path rather than with `--literal-pathspecs`, which git would pass
+   * on to every hook it runs as `GIT_LITERAL_PATHSPECS`.
+   */
+  static literal(path: string): string {
+    return `:(literal)${path}`;
   }
 
   /** Whether `path`, relative to the directory, names something that exists. */

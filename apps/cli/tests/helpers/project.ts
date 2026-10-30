@@ -312,6 +312,11 @@ export class ScaffoldedApp {
     );
   }
 
+  /** Detaches HEAD from its branch, as a checkout of a tag or a CI job's checkout does. */
+  async onADetachedHead(): Promise<void> {
+    await execFileAsync("git", ["checkout", "--quiet", "--detach"], { cwd: this.path });
+  }
+
   /** Leaves a file nobody has committed, as a developer mid-change would. */
   async withUncommittedWork(): Promise<void> {
     await writeFile(join(this.path, "notes.md"), "a note to self\n");
