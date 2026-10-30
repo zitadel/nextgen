@@ -949,8 +949,16 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiH
 	// binary serves the console, because a console served elsewhere reads it
 	// from here: the hosted cloud's console service, and the console's dev
 	// server through its proxy. Registered as an exact path, so it wins over
-	// the catch-all API mount below.
-	mux.Handle(consoleRuntimePath, newConsoleRuntimeHandler(runtime))
+	// the catch-all API mount below. It takes the request ID and the request
+	// line, which its error lines join, but none of the middleware a
+	// client's API request passes.
+	mux.Handle(consoleRuntimePath, middleware.Chain(newConsoleRuntimeHandler(runtime),
+		func(next http.Handler) http.Handler {
+			return middleware.WithRequestContextMiddleware(reqIdGen, cfg.RequestIDHeader, next)
+		},
+		middleware.WithLogging,
+		api.WithRecover,
+	))
 
 	chain := func(h http.Handler) http.Handler {
 		return middleware.Chain(h,

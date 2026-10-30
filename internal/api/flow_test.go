@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -18,6 +19,7 @@ import (
 	"github.com/zitadel/nextgen/internal/api"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/service/mocks"
 	"github.com/zitadel/oidc/v3/pkg/op"
@@ -825,4 +827,35 @@ func TestSubmitFlowStep_HandedOffAttemptReturns409(t *testing.T) {
 	if !strings.Contains(string(body), "att.already_handed_off") {
 		t.Errorf("expected the handed-off code, got %s", body)
 	}
+}
+
+// A submit the engine answers with an error key logs one API error line
+// naming the step and the key, with the key's cause, at the 400 it answers.
+func TestSubmitFlowStep_StepErrorLogsOnce(t *testing.T) {
+	var logs bytes.Buffer
+	ts := newTestServer(t, func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ctx := zlog.WithLoggingContext(r.Context(), slog.New(slog.NewJSONHandler(&logs, nil)))
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	})
+	state := &domain.FlowState{ID: "flow_1", ProjectID: "proj_1", SessionID: "sess_1", IssuedAt: time.Now()}
+	cookieVal := ts.sealCookie(t, state)
+	failure := domain.FlowStepFailed(domain.FlowStepErrorInvalidCredentials, domain.ErrAuthAttemptProofRejected(nil))
+	ts.fake.submitResult = domain.FlowStepResult{State: state, Step: &domain.FlowStep{Name: "password", Error: &failure.Key, Failure: failure}}
+
+	resp, _ := doRequest(t, http.MethodPost, ts.srv.URL+"/flow/flow_1/submit", map[string]any{
+		"action": "submit",
+		"fields": map[string]any{"x-auth-methods#password": "wrong"},
+	}, cookieVal)
+	require.Equal(t, http.StatusBadRequest, resp.StatusCode)
+
+	var record map[string]any
+	require.NoError(t, json.Unmarshal(logs.Bytes(), &record), "one line: %q", logs.String())
+	require.Equal(t, "api error", record["msg"])
+	require.Equal(t, "INFO", record["level"])
+	require.Equal(t, "password", record["step"])
+	require.Equal(t, domain.FlowStepErrorInvalidCredentials, record["step_error"])
+	require.Equal(t, "proj_1", record["project_id"])
+	require.Equal(t, domain.ErrAuthAttemptProofRejected(nil).Code, record["error"].(map[string]any)["code"])
 }

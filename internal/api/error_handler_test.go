@@ -25,6 +25,7 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/errorpage"
 	"github.com/zitadel/nextgen/internal/errreport"
+	"github.com/zitadel/nextgen/internal/instrumentation/errlog"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/service/mocks"
@@ -779,7 +780,9 @@ func (h errorStubHandler) GetLive(context.Context) (api.GetLiveRes, error) {
 // logger that carries the request id, as WithLogging sets it) and returns the
 // response and every record logged while serving it (see recordLogs). Not
 // parallel: it changes globals.
-func serveAndRecordLogs(t *testing.T, h api.Handler, tokenService service.TokenService, req *http.Request) (*httptest.ResponseRecorder, []map[string]any) {
+// It also returns the operation id the holder ends with, which the request
+// line reads.
+func serveAndRecordLogs(t *testing.T, h api.Handler, tokenService service.TokenService, req *http.Request) (*httptest.ResponseRecorder, []map[string]any, string) {
 	t.Helper()
 	records := recordLogs(t)
 
@@ -794,7 +797,8 @@ func serveAndRecordLogs(t *testing.T, h api.Handler, tokenService service.TokenS
 	ctx = middleware.WithOperationIDContext(ctx, "")
 	rec := httptest.NewRecorder()
 	WithRecover(srv).ServeHTTP(rec, req.WithContext(ctx))
-	return rec, records()
+	operationID, _ := middleware.GetOperationIDContext(ctx)
+	return rec, records(), operationID
 }
 
 // recordLogs points slog.Default, which every logger lookup without a request
@@ -835,7 +839,7 @@ func enableErrorOrigins(t *testing.T) {
 // request and operation it failed and where it was raised.
 func TestOgenErrorHandlerLogsServerFaultOnce(t *testing.T) {
 	enableErrorOrigins(t)
-	rec, records := serveAndRecordLogs(t, errorStubHandler{err: errors.New("disk on fire")}, nil,
+	rec, records, operationID := serveAndRecordLogs(t, errorStubHandler{err: errors.New("disk on fire")}, nil,
 		httptest.NewRequest(http.MethodGet, "/livez", nil))
 
 	require.Equal(t, http.StatusInternalServerError, rec.Code)
@@ -843,8 +847,7 @@ func TestOgenErrorHandlerLogsServerFaultOnce(t *testing.T) {
 	record := records[0]
 	require.Equal(t, "ERROR", record["level"])
 	require.Equal(t, "api error", record["msg"])
-	require.EqualValues(t, http.StatusInternalServerError, record["status"])
-	require.Equal(t, "getLive", record["operation_id"])
+	require.Equal(t, "getLive", operationID)
 	require.Equal(t, "req_1", record["request_id"])
 	logged, ok := record["error"].(map[string]any)
 	require.True(t, ok, "error must be logged as a group: %v", record["error"])
@@ -860,13 +863,12 @@ func TestOgenErrorHandlerLogsServerFaultOnce(t *testing.T) {
 func TestOgenErrorHandlerLogsClientErrorAtInfo(t *testing.T) {
 	enableErrorOrigins(t)
 	err := domain.ErrProjectNotFound().WithParent(errors.New("no rows in result set"))
-	rec, records := serveAndRecordLogs(t, errorStubHandler{err: err}, nil,
+	rec, records, _ := serveAndRecordLogs(t, errorStubHandler{err: err}, nil,
 		httptest.NewRequest(http.MethodGet, "/livez", nil))
 
 	require.Equal(t, http.StatusNotFound, rec.Code)
 	require.Len(t, records, 1)
 	require.Equal(t, "INFO", records[0]["level"])
-	require.EqualValues(t, http.StatusNotFound, records[0]["status"])
 	requireBriefError(t, records[0], err.Code, err.Message, "no rows in result set")
 }
 
@@ -879,7 +881,6 @@ func requireBriefError(t *testing.T, record map[string]any, code, message, paren
 	require.Equal(t, code, logged["code"])
 	require.Equal(t, message, logged["message"])
 	require.Contains(t, logged["parent"], parent)
-	require.NotContains(t, logged, "reportLocation")
 	require.NotContains(t, logged, "stackTrace")
 }
 
@@ -889,13 +890,13 @@ func requireBriefError(t *testing.T, record map[string]any, code, message, paren
 func TestOgenErrorHandlerLogsDecodeKind(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/projects", strings.NewReader(`{"name":`))
 	req.Header.Set("Content-Type", "application/json")
-	rec, records := serveAndRecordLogs(t, errorStubHandler{}, nil, req)
+	rec, records, operationID := serveAndRecordLogs(t, errorStubHandler{}, nil, req)
 
 	require.Equal(t, http.StatusBadRequest, rec.Code)
 	require.JSONEq(t, `{"code":"req.invalid","message":`+fmt.Sprintf("%q", domain.ErrRequestInvalid().Message)+`}`, rec.Body.String())
 	require.Len(t, records, 1)
 	require.Equal(t, "INFO", records[0]["level"])
-	require.Equal(t, "createProject", records[0]["operation_id"], "ogen fails before its middleware names the operation")
+	require.Equal(t, "createProject", operationID, "ogen fails before its middleware names the operation")
 	logged := records[0]["error"].(map[string]any)
 	require.Equal(t, "req.invalid", logged["code"])
 	require.Equal(t, "decode body", logged["parent"])
@@ -907,7 +908,7 @@ func TestOgenErrorHandlerLogOmitsRejectedValue(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/projects",
 		strings.NewReader(`{"name":"p","origins":[{"pattern":"https://a.example","kind":"s3cr3t-value-xyz"}]}`))
 	req.Header.Set("Content-Type", "application/json")
-	rec, records := serveAndRecordLogs(t, errorStubHandler{}, nil, req)
+	rec, records, _ := serveAndRecordLogs(t, errorStubHandler{}, nil, req)
 
 	require.Equal(t, http.StatusBadRequest, rec.Code)
 	require.Contains(t, rec.Body.String(), `"fields":["origins.[0].kind"]`)
@@ -921,7 +922,7 @@ func TestOgenErrorHandlerLogOmitsRejectedValue(t *testing.T) {
 // Details are for the client: the log line never carries them.
 func TestOgenErrorHandlerLogOmitsDetails(t *testing.T) {
 	err := domain.ErrUserAlreadyExists().WithDetails(domain.UserAttributesDetails{Keys: []domain.AttributeKey{"email"}})
-	rec, records := serveAndRecordLogs(t, errorStubHandler{err: err}, nil,
+	rec, records, _ := serveAndRecordLogs(t, errorStubHandler{err: err}, nil,
 		httptest.NewRequest(http.MethodGet, "/livez", nil))
 
 	require.Equal(t, http.StatusConflict, rec.Code)
@@ -943,7 +944,7 @@ func TestOgenErrorHandlerLogsSecurityInternalErrorOnce(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/sessions/me", nil)
 	req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: "credential"})
 
-	rec, records := serveAndRecordLogs(t, errorStubHandler{}, tokenService, req)
+	rec, records, operationID := serveAndRecordLogs(t, errorStubHandler{}, tokenService, req)
 
 	require.Equal(t, http.StatusInternalServerError, rec.Code)
 	require.JSONEq(t, `{"code":"internal","message":"An unexpected error occurred."}`, rec.Body.String())
@@ -951,7 +952,7 @@ func TestOgenErrorHandlerLogsSecurityInternalErrorOnce(t *testing.T) {
 	record := records[0]
 	require.Equal(t, "ERROR", record["level"])
 	require.Equal(t, "api error", record["msg"])
-	require.Equal(t, "getMySession", record["operation_id"])
+	require.Equal(t, "getMySession", operationID)
 	logged := record["error"].(map[string]any)
 	require.Equal(t, "internal", logged["code"])
 	require.Equal(t, "failed to read token record", logged["message"])
@@ -982,13 +983,12 @@ func TestOgenErrorHandlerLogsClientCancelAtWarn(t *testing.T) {
 			if tc.canceled {
 				cancel()
 			}
-			rec, records := serveAndRecordLogs(t, errorStubHandler{err: err}, nil,
+			rec, records, _ := serveAndRecordLogs(t, errorStubHandler{err: err}, nil,
 				httptest.NewRequestWithContext(ctx, http.MethodGet, "/livez", nil))
 
 			require.Equal(t, http.StatusInternalServerError, rec.Code)
 			require.Len(t, records, 1)
 			require.Equal(t, tc.wantLevel, records[0]["level"])
-			require.EqualValues(t, http.StatusInternalServerError, records[0]["status"])
 			if tc.wantLevel == "WARN" {
 				requireBriefError(t, records[0], err.Code, err.Message, "broken pipe")
 			} else {
@@ -998,9 +998,9 @@ func TestOgenErrorHandlerLogsClientCancelAtWarn(t *testing.T) {
 	}
 }
 
-// A line below Error level carries no location or stack in any mode. A text
-// or JSON handler reads the error through its log value; GCP error reporting
-// builds a report from any `error` attribute and reads the location and stack
+// A line below Error level carries the location but no stack in any mode. A
+// text or JSON handler reads the error through its log value; GCP error
+// reporting builds a report from any `error` attribute and reads the stack
 // through the error's interfaces, at every level. A 5xx keeps both.
 func TestLogAPIErrorBriefLinesCarryNoStackInGCPMode(t *testing.T) {
 	enableErrorOrigins(t)
@@ -1008,34 +1008,34 @@ func TestLogAPIErrorBriefLinesCarryNoStackInGCPMode(t *testing.T) {
 	internal := domain.ErrInternal(errors.New("disk on fire"))
 
 	t.Run("plain mode", func(t *testing.T) {
-		logged := loggedErrorValue(t, logAPIErrorRecord(t, http.StatusNotFound, notFound)).Resolve()
+		logged := loggedErrorValue(t, logAPIErrorRecord(t, notFound)).Resolve()
 		require.Equal(t, slog.KindGroup, logged.Kind())
 		var keys []string
 		for _, attr := range logged.Group() {
 			keys = append(keys, attr.Key)
 		}
-		require.ElementsMatch(t, []string{"code", "message", "parent"}, keys)
+		require.ElementsMatch(t, []string{"code", "message", "parent", "reportLocation"}, keys)
 	})
 
 	t.Run("gcp mode", func(t *testing.T) {
 		errreport.GCPReporting(true)
 		t.Cleanup(func() { errreport.GCPReporting(false) })
 
-		brief := gcpReport(t, logAPIErrorRecord(t, http.StatusNotFound, notFound))
+		brief := gcpReport(t, logAPIErrorRecord(t, notFound))
 		require.Contains(t, brief, notFound.Message)
 		require.NotContains(t, brief, "goroutine")
 		require.NotContains(t, brief, "unsupported type")
 
-		require.Contains(t, gcpReport(t, logAPIErrorRecord(t, http.StatusInternalServerError, internal)), "goroutine")
+		require.Contains(t, gcpReport(t, logAPIErrorRecord(t, internal)), "goroutine")
 	})
 }
 
-// logAPIErrorRecord returns the record logAPIError writes, before any handler
-// resolves its values.
-func logAPIErrorRecord(t *testing.T, status int, err domain.Error) slog.Record {
+// logAPIErrorRecord returns the record the API error sink writes, before any
+// handler resolves its values.
+func logAPIErrorRecord(t *testing.T, err domain.Error) slog.Record {
 	t.Helper()
 	var records []slog.Record
-	logAPIError(zlog.WithLoggingContext(t.Context(), slog.New(recordingHandler{records: &records})), status, err)
+	errlog.Log(zlog.WithLoggingContext(t.Context(), slog.New(recordingHandler{records: &records})), err)
 	require.Len(t, records, 1)
 	return records[0]
 }
@@ -1204,7 +1204,7 @@ func TestOgenErrorHandlerLogsTheInvalidParameterName(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/users/s3cr3t-value-xyz", nil)
 	req.Header.Set("Authorization", "Bearer credential")
-	rec, records := serveAndRecordLogs(t, errorStubHandler{}, tokenService, req)
+	rec, records, _ := serveAndRecordLogs(t, errorStubHandler{}, tokenService, req)
 
 	require.Equal(t, http.StatusBadRequest, rec.Code)
 	require.Contains(t, rec.Body.String(), `"fields":["user_id"]`)

@@ -8,7 +8,7 @@ import (
 	"net/http"
 
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
+	"github.com/zitadel/nextgen/internal/instrumentation/errlog"
 	"github.com/zitadel/nextgen/internal/service"
 )
 
@@ -105,12 +105,13 @@ func publishableKey(
 // newConsoleRuntimeHandler serves the runtime document.
 func newConsoleRuntimeHandler(resolve runtimeResolver) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
 			w.Header().Set("Allow", "GET, HEAD")
+			errlog.Log(ctx, domain.ErrRequestMethodNotAllowed())
 			http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
 			return
 		}
-		ctx := r.Context()
 		meta, err := resolve(ctx)
 		if err != nil {
 			// This endpoint bootstraps the console: a failure here surfaces in
@@ -118,21 +119,14 @@ func newConsoleRuntimeHandler(resolve runtimeResolver) http.Handler {
 			// and the causes are all server-side (default-project lookup, key
 			// access, key derivation). Without this line the only signal is a
 			// bare 500 in the access log.
-			runtimeLogger(ctx).Error(
-				"console runtime resolution failed",
-				"path", consoleRuntimePath,
-				"err", err,
-			)
+			errlog.LogFault(ctx, err, slog.String("path", consoleRuntimePath))
 			http.Error(w, "failed to resolve console runtime metadata", http.StatusInternalServerError)
 			return
 		}
 		body, err := json.Marshal(meta)
 		if err != nil {
-			runtimeLogger(ctx).Error(
-				"console runtime encoding failed",
-				"path", consoleRuntimePath,
-				"err", err,
-			)
+			errlog.LogFault(ctx, domain.ErrInternal(err).WithMessage("failed to encode console runtime metadata"),
+				slog.String("path", consoleRuntimePath))
 			http.Error(w, "failed to encode console runtime metadata", http.StatusInternalServerError)
 			return
 		}
@@ -145,13 +139,4 @@ func newConsoleRuntimeHandler(resolve runtimeResolver) http.Handler {
 		}
 		_, _ = w.Write(body)
 	})
-}
-
-// runtimeLogger is the request-scoped logger for the runtime endpoint. The
-// handler is mounted on the bare mux (outside the API middleware chain), so
-// the context carries no request id and this falls back to the default
-// logger — the stream tag keeps the records grouped with request logging
-// either way.
-func runtimeLogger(ctx context.Context) *slog.Logger {
-	return zlog.WithStream(zlog.GetLoggingContext(ctx), zlog.StreamRequest)
 }
