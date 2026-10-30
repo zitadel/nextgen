@@ -97,3 +97,129 @@ test("a token lookup that never answers ends with the playground's timeout", asy
   });
   expect(writes).toEqual([]);
 });
+
+test("optional project scope starts unset and can be set and unset explicitly", async ({
+  page,
+  context,
+  baseURL,
+}) => {
+  await stubSession(context, baseURL!, () => ada);
+  const origin = new URL(baseURL!).origin;
+  const projects: (string | null)[] = [];
+  await context.route(
+    (url) => url.origin === origin && url.pathname === "/users/query",
+    async (route) => {
+      projects.push(new URL(route.request().url()).searchParams.get("project_id"));
+      await route.fulfill({ json: { users: [] } });
+    },
+  );
+
+  await page.goto("/docs/reference/api/users/queryUsers");
+  await page.getByRole("button", { name: "Try in Playground" }).click();
+  const playground = page.getByRole("dialog", { name: "Query users" });
+  await expect(playground.getByText("Sent with your session", { exact: false })).toContainText(
+    ada.display,
+  );
+  const project = playground.getByRole("textbox", { name: "project_id", exact: true });
+  const sample = playground.locator("pre").filter({ hasText: "@zitadel/api/" });
+  const send = playground.getByRole("button", { name: /^Send/ });
+
+  await expect(project).toHaveValue("");
+  await expect(sample).toContainText("client.queryUsers({})");
+  await send.click();
+  await expect.poll(() => projects).toEqual([null]);
+
+  await project.fill("proj_docs_target");
+  await expect(sample).toContainText('project_id: "proj_docs_target"');
+  await send.click();
+  await expect.poll(() => projects).toEqual([null, "proj_docs_target"]);
+
+  await playground.getByRole("button", { name: "Unset", exact: true }).click();
+  await expect(sample).toContainText("client.queryUsers({})");
+  await send.click();
+  await expect.poll(() => projects).toEqual([null, "proj_docs_target", null]);
+});
+
+for (const operation of [
+  { section: "users", id: "queryUsers", title: "Query users" },
+  { section: "teams", id: "createTeam", title: "Create team" },
+]) {
+  test(`${operation.title}: the TypeScript sample follows the selected authentication`, async ({
+    page,
+    context,
+    baseURL,
+  }) => {
+    await stubSession(context, baseURL!, () => ada);
+    await page.goto(`/docs/reference/api/${operation.section}/${operation.id}`);
+    await page.getByRole("button", { name: "Try in Playground" }).click();
+    const playground = page.getByRole("dialog", { name: operation.title });
+    const sample = playground.locator("pre").filter({ hasText: "@zitadel/api/" });
+    await expect(playground.getByText("Sent with your session", { exact: false })).toContainText(
+      ada.display,
+    );
+    await expect(sample).toContainText("@zitadel/api/config");
+    await expect(sample).not.toContainText("ZITADEL_PROJECT_SECRET");
+    // A session-authenticated write must show how to obtain and send CSRF.
+    if (operation.id === "createTeam") {
+      await expect(sample).toContainText("setApiCsrfToken");
+      await expect(sample).toContainText("client.getMySessionCsrfToken()");
+      // Required project parameters still start with their documented example.
+      await expect(
+        playground.getByRole("textbox", { name: "project_id", exact: true }),
+      ).toHaveValue("proj_01KWH1P4MYS7F0N9WD3P2E4YM5");
+    } else {
+      await expect(sample).not.toContainText("setApiCsrfToken");
+    }
+
+    await playground
+      .getByRole("combobox")
+      .filter({ hasText: /^sessionCookie$/ })
+      .click();
+    await page.getByRole("option", { name: "oauth2", exact: true }).click();
+    await expect(sample).toContainText("token: process.env.ZITADEL_PROJECT_SECRET!");
+    await expect(sample).not.toContainText("setApiCsrfToken");
+    const authorization = playground.getByRole("textbox", { name: "Authorization", exact: true });
+    await authorization.fill("Bearer docs-test-secret");
+    await expect(sample).not.toContainText("docs-test-secret");
+    // Even an empty bearer input still selects project-secret authentication.
+    await authorization.fill("");
+    await expect(sample).toContainText("token: process.env.ZITADEL_PROJECT_SECRET!");
+
+    await playground
+      .getByRole("combobox")
+      .filter({ hasText: /^oauth2$/ })
+      .click();
+    await page.getByRole("option", { name: "sessionCookie", exact: true }).click();
+    await expect(sample).toContainText("@zitadel/api/config");
+    await expect(sample).not.toContainText("ZITADEL_PROJECT_SECRET");
+  });
+}
+
+test("a signed-out reader's sample starts with project-secret authentication", async ({
+  page,
+  context,
+  baseURL,
+}) => {
+  const origin = new URL(baseURL!).origin;
+  await context.route(
+    (url) => url.origin === origin && url.pathname === "/sessions/me",
+    (route) => route.fulfill({ status: 401, json: { code: "auth.unauthorized" } }),
+  );
+  await page.goto("/docs/reference/api/users/queryUsers");
+  await page.getByRole("button", { name: "Try in Playground" }).click();
+  const playground = page.getByRole("dialog", { name: "Query users" });
+  await expect(
+    playground.getByRole("textbox", { name: "Authorization", exact: true }),
+  ).toBeVisible();
+  const sample = playground.locator("pre").filter({ hasText: "@zitadel/api/" });
+  await expect(sample).toContainText("token: process.env.ZITADEL_PROJECT_SECRET!");
+  await expect(sample).toContainText("client.queryUsers({})");
+
+  await playground
+    .getByRole("combobox")
+    .filter({ hasText: /^oauth2$/ })
+    .click();
+  await page.getByRole("option", { name: "sessionCookie", exact: true }).click();
+  await expect(sample).toContainText("@zitadel/api/config");
+  await expect(sample).not.toContainText("ZITADEL_PROJECT_SECRET");
+});
