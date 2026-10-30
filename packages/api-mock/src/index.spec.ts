@@ -171,6 +171,130 @@ describe("setupMockHandlers", () => {
     expect(next.step.notice).toBeUndefined();
   });
 
+  /** A mock whose typed emails route by account, as `accounts` opts in. */
+  function routeByAccount(accounts: readonly string[]): void {
+    mock = setupMockHandlers({ accounts });
+    server.resetHandlers(...mock.handlers);
+  }
+
+  async function submitEmail(purpose: "login" | "register", email: string) {
+    const start = await createFlow({ purpose, project_id: PROJECT_ID });
+    const next = await submitFlowStep(start.id, {
+      session_token: start.session_token,
+      action: "submit",
+      fields: { email },
+    });
+    return { id: start.id, next };
+  }
+
+  test("a provider's return asks the same accounts as a typed email", async () => {
+    routeByAccount(["known@example.com"]);
+    const id = mock.returnFromProvider({ provider: "google", email: "known@example.com" });
+
+    expect((await getFlowStep(id)).step.name).toBe("sso-conflict");
+  });
+
+  test("the password-account fixture signs in instead of failing sign-up", async () => {
+    // The default flow wires user_already_exists on register, so the
+    // collision is the switch, not the unwired `error.email_exists`.
+    routeByAccount([]);
+    const { next } = await submitEmail("register", "exists@example.com");
+
+    expect(next.step).toMatchObject({
+      name: "password",
+      purpose: "login",
+      notice: "notice.user_already_exists",
+    });
+    expect(next.step.error).toBeUndefined();
+  });
+
+  test("back from the password step a sign-up switched to signs up again", async () => {
+    routeByAccount(["known@example.com"]);
+    const { id, next: password } = await submitEmail("register", "known@example.com");
+
+    const back = await submitFlowStep(id, {
+      session_token: password.session_token,
+      action: "back",
+      fields: {},
+    });
+    expect(back.step).toMatchObject({ name: "register", purpose: "register" });
+    expect(back.step.notice).toBeUndefined();
+
+    // A hand-off from sign-in afterwards goes back to sign-in.
+    const identifier = await submitFlowStep(id, {
+      session_token: back.session_token,
+      action: "sign_in",
+      fields: {},
+    });
+    const again = await submitFlowStep(id, {
+      session_token: identifier.session_token,
+      action: "submit",
+      fields: { email: "known@example.com" },
+    });
+    const backAgain = await submitFlowStep(id, {
+      session_token: again.session_token,
+      action: "back",
+      fields: {},
+    });
+    expect(backAgain.step).toMatchObject({ name: "identifier", purpose: "login" });
+  });
+
+  test("an account the mock signs up is found by the next flow until reset", async () => {
+    routeByAccount(["known@example.com"]);
+    const { id, next: password } = await submitEmail("register", "new@example.com");
+    const done = await submitFlowStep(id, {
+      session_token: password.session_token,
+      action: "submit",
+      fields: { [PASSWORD_FIELD]: "correct-horse-battery-staple" },
+    });
+    expect(done.step.name).toBe("done");
+
+    const signIn = await submitEmail("login", "NEW@example.com");
+    expect(signIn.next.step).toMatchObject({ name: "password", purpose: "login" });
+    expect(signIn.next.step.notice).toBeUndefined();
+
+    mock.reset();
+    expect((await submitEmail("login", "new@example.com")).next.step.name).toBe("register");
+    expect((await submitEmail("login", "known@example.com")).next.step.name).toBe("password");
+  });
+
+  test.each([
+    {
+      origin: "a sign-up that collides with an account",
+      email: "exists@example.com",
+      via: "sso-conflict",
+    },
+    {
+      origin: "a new identity that chooses sign-in",
+      email: "ada@example.test",
+      via: "register-sso",
+    },
+  ] as const)("$origin finishes as a sign-in", async ({ email, via }) => {
+    const id = mock.returnFromProvider({ provider: "google", email, purpose: "register" });
+    let step = await getFlowStep(id);
+    expect(step.step.name).toBe(via);
+
+    if (via === "register-sso") {
+      step = await submitFlowStep(id, {
+        session_token: step.session_token,
+        action: "sign_in",
+        fields: {},
+      });
+      step = await submitFlowStep(id, {
+        session_token: step.session_token,
+        action: "submit",
+        fields: { email },
+      });
+    }
+    const done = await submitFlowStep(id, {
+      session_token: step.session_token,
+      action: "submit",
+      fields: { [PASSWORD_FIELD]: "correct-horse-battery-staple" },
+    });
+
+    expect(done.step).toMatchObject({ name: "done", purpose: "login" });
+  });
+
   test("captures every request body for assertions", async () => {
     const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
     await submitFlowStep(start.id, {
