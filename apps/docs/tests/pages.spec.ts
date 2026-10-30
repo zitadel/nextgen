@@ -12,6 +12,7 @@ import {
   markdownUrl,
   metaContent,
   parseIndex,
+  policyProblem,
   siteLinks,
 } from "./support";
 
@@ -82,7 +83,9 @@ test("the index lists every section, each page once, under /docs", async ({ requ
   expect(indexStrays(index), "lines of the index where the page tree puts none").toEqual([]);
 });
 
-test("every page answers as HTML, titled, described and in its size", async ({ request }) => {
+test("every page answers as HTML, titled, described, in its size and under its policies", async ({
+  request,
+}) => {
   test.setTimeout(120_000);
   const pages = await indexedPages(request);
 
@@ -104,6 +107,8 @@ test("every page answers as HTML, titled, described and in its size", async ({ r
     const html = body.toString("utf8");
     const expected = `<title>${escapeHtml(title)}</title>`;
     if (!html.includes(expected)) return `${url}: no ${expected}`;
+    const policy = policyProblem(response.headers());
+    if (policy) return `${url}: ${policy}`;
     const meta = metaContent(html, "description");
     if (meta === undefined) {
       return description || operationPage.test(url) ? `${url}: no description` : null;

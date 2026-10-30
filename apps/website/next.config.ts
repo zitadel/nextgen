@@ -11,6 +11,39 @@ if (sampleRate && !(Number(sampleRate) >= 0 && Number(sampleRate) <= 1)) {
   );
 }
 
+const dev = process.env.NODE_ENV === "development";
+const policy = (directives: string[]) => directives.join("; ");
+const enforcedPolicy = [
+  "object-src 'none'",
+  "base-uri 'self'",
+  "frame-ancestors 'none'",
+  "report-uri /csp-report",
+];
+// Reported on, not enforced. Inline scripts run unchecked ('unsafe-inline'):
+// a nonce would take a render per request, and the pages are prerendered.
+// What it limits is where a script, an image or a request may come from or
+// go to, so what a script could carry off.
+const reportOnlyPolicy = [
+  "default-src 'self'",
+  // Vercel builds its toolbar's loader into every deployment's bundle, which
+  // fetches the toolbar from vercel.live. React rebuilds server error stacks
+  // with eval in development only.
+  `script-src 'self' 'unsafe-inline' https://vercel.live${dev ? " 'unsafe-eval'" : ""}`,
+  // React's and the login previews' style attributes.
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data:",
+  // Vercel's analytics on the same origin; next dev's reload socket.
+  `connect-src 'self'${dev ? " ws:" : ""}`,
+  // The toolbar's page, which makes its own requests under vercel.live's
+  // policy.
+  "frame-src https://vercel.live",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'none'",
+  "report-uri /csp-report",
+];
+
 // The cloud routes /, /_next/* and the favicons (/favicon.ico, /favicons/*)
 // to this app (repo-root vercel.json), so it needs no base path or asset
 // prefix: its other assets already load from /_next/.
@@ -22,6 +55,22 @@ const config: NextConfig = {
   // Keeps `next dev` from writing Next's agent rules into AGENTS.md when an
   // AI coding agent runs it (apps/AGENTS.md).
   agentRules: false,
+  async headers() {
+    // Every response, the pages' and the other routes'. On the cloud's host
+    // the website shares an origin with the API and the console, so a script
+    // that runs here acts with a signed-in user's session.
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          // Enforced: nothing frames the website, embeds a plugin or moves its
+          // base URL.
+          { key: "Content-Security-Policy", value: policy(enforcedPolicy) },
+          { key: "Content-Security-Policy-Report-Only", value: policy(reportOnlyPolicy) },
+        ],
+      },
+    ];
+  },
 };
 
 export default config;

@@ -1,5 +1,7 @@
 import { expect, type Page, test } from "@playwright/test";
 
+import { recordPolicyViolations } from "./support";
+
 /**
  * The live examples (components/examples): their atoms render, and each
  * page's <zitadel-login> runs against the mock in the browser, whose service
@@ -23,6 +25,8 @@ function collectErrors(page: Page) {
 
 test("the components page walks a sign-in over the mock, inside /docs/", async ({ page }) => {
   const errors = collectErrors(page);
+  // The worker and the login run under the page's policies too.
+  const violations = await recordPolicyViolations(page);
   // Every call the login makes is the mock's to answer; one that reached the
   // network would be on its way to a server.
   const unmocked: string[] = [];
@@ -44,6 +48,7 @@ test("the components page walks a sign-in over the mock, inside /docs/", async (
   expect(scope).toBe(new URL("/docs/", page.url()).href);
   expect(unmocked).toEqual([]);
   expect(errors).toEqual([]);
+  expect(violations, "policy violations").toEqual([]);
 });
 
 test("the components page renders its atoms", async ({ page }) => {

@@ -1,4 +1,4 @@
-import type { APIResponse } from "@playwright/test";
+import type { APIResponse, Page } from "@playwright/test";
 
 /**
  * A page as /docs/llms.txt lists it, `- [title](/docs/....md): description`:
@@ -113,6 +113,45 @@ function unescapeHtml(text: string): string {
 export function metaContent(html: string, key: string): string | undefined {
   const tag = html.match(new RegExp(`<meta (?:name|property)="${key}" content="([^"]*)"`));
   return tag ? unescapeHtml(tag[1] ?? "") : undefined;
+}
+
+/**
+ * What is wrong with a page's policies (next.config.mjs), if anything: the
+ * enforced one lets nothing frame it, and the report-only one keeps its
+ * requests on the docs' own origin.
+ */
+export function policyProblem(headers: Record<string, string>): string | undefined {
+  const enforced = headers["content-security-policy"] ?? "(none)";
+  if (!enforced.includes("frame-ancestors 'none'")) {
+    return `its policy ${enforced} lets another site frame it`;
+  }
+  const reportOnly = headers["content-security-policy-report-only"] ?? "(none)";
+  return /(^|; )connect-src 'self'(;|$)/.test(reportOnly)
+    ? undefined
+    : `its report-only policy ${reportOnly} lets it connect elsewhere`;
+}
+
+/**
+ * Records each violation of the page's policies, enforced or report-only,
+ * from before its first script and across navigations: first-party code
+ * breaks neither, so a spec expects the list to stay empty.
+ */
+export async function recordPolicyViolations(page: Page): Promise<string[]> {
+  const violations: string[] = [];
+  await page.exposeFunction("recordPolicyViolation", (violation: string) => {
+    violations.push(violation);
+  });
+  await page.addInitScript(() => {
+    const record = (window as unknown as { recordPolicyViolation(violation: string): void })
+      .recordPolicyViolation;
+    window.addEventListener("securitypolicyviolation", (event) => {
+      record(
+        `${event.disposition} ${event.effectiveDirective} ${event.blockedURI || "(none)"}` +
+          ` at ${event.sourceFile}:${event.lineNumber}`,
+      );
+    });
+  });
+  return violations;
 }
 
 /** Runs `fn` over `items`, at most `limit` at a time, keeping the order of the results. */

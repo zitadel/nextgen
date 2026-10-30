@@ -44,6 +44,14 @@ MCP, `llms.txt`, Open Graph images, `.md` pages) live under `/docs` here.
 - Link the website (`/`) with a plain `<a>`, never `next/link`: it is another
   deployment, which `next/link` would prefetch and route to in this app.
 
+## Content-Security-Policy
+
+- The policies are `next.config.mjs`' `headers()`, the same for every page,
+  so pages stay prerendered. The report-only one allows inline scripts, so it
+  does not cover them; it does cover where requests and images go.
+- Load nothing from another origin without widening the report-only policy
+  in the same change; `tests/` fails a page whose violations it sees.
+
 ## Content
 
 - Leave `index` out of a folder's `meta.json` `pages`: Fumadocs then opens it

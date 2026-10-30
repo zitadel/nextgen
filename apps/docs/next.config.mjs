@@ -19,6 +19,40 @@ if (sampleRate && !(Number(sampleRate) >= 0 && Number(sampleRate) <= 1)) {
   );
 }
 
+const dev = process.env.NODE_ENV === "development";
+const policy = (directives) => directives.join("; ");
+const enforcedPolicy = [
+  "object-src 'none'",
+  "base-uri 'self'",
+  "frame-ancestors 'none'",
+  "report-uri /csp-report",
+];
+// Reported on, not enforced. Inline scripts run unchecked ('unsafe-inline'):
+// a nonce would take a render per request, and the pages are prerendered.
+// What it limits is where a script, an image or a request may come from or
+// go to, so what a script could carry off.
+const reportOnlyPolicy = [
+  "default-src 'self'",
+  // Vercel builds its toolbar's loader into every deployment's bundle, which
+  // fetches the toolbar from vercel.live. React rebuilds server error stacks
+  // with eval in development only.
+  `script-src 'self' 'unsafe-inline' https://vercel.live${dev ? " 'unsafe-eval'" : ""}`,
+  // Code blocks colour their tokens with style attributes (Shiki).
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data:",
+  // Search, the feedback route, the API reference's calls to the API on the
+  // same origin, Vercel's analytics; next dev's reload socket.
+  `connect-src 'self'${dev ? " ws:" : ""}`,
+  // The toolbar's page, which makes its own requests under vercel.live's
+  // policy.
+  "frame-src https://vercel.live",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'none'",
+  "report-uri /csp-report",
+];
+
 /** @type {import('next').NextConfig} */
 const config = {
   reactStrictMode: true,
@@ -33,6 +67,22 @@ const config = {
   // service worker the package ships beside itself
   // (app/docs/mock-service-worker.js).
   serverExternalPackages: ["@zitadel/api-mock"],
+  async headers() {
+    // Every response, the pages' and the other routes'. On the cloud's host
+    // the docs share an origin with the API and the console, so a script
+    // that runs here acts with a signed-in user's session.
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          // Enforced: nothing frames the docs, embeds a plugin or moves their
+          // base URL.
+          { key: "Content-Security-Policy", value: policy(enforcedPolicy) },
+          { key: "Content-Security-Policy-Report-Only", value: policy(reportOnlyPolicy) },
+        ],
+      },
+    ];
+  },
   async redirects() {
     // The root serves nothing; locally (next dev, next start) it opens the
     // docs. On the cloud's host the root is the website's start page.

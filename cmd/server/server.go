@@ -48,6 +48,7 @@ import (
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/instrumentation/zotel"
 	"github.com/zitadel/nextgen/internal/policy"
+	"github.com/zitadel/nextgen/internal/securityheaders"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/serviceping"
 	"github.com/zitadel/nextgen/internal/staticui/console"
@@ -928,7 +929,7 @@ func consoleLink(consolePath string) *errorpage.Link {
 	return &errorpage.Link{Label: "Open the console", Href: consolePath + "/"}
 }
 
-func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiHandler, idpCallbackHandler http.Handler, runtime runtimeResolver, requestEvents *audit.RequestBuffer, retentionTrigger http.Handler) (*http.ServeMux, error) {
+func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiHandler, idpCallbackHandler http.Handler, runtime runtimeResolver, requestEvents *audit.RequestBuffer, retentionTrigger http.Handler) (http.Handler, error) {
 	mux := http.NewServeMux()
 
 	if cfg.ConsoleEnabled {
@@ -985,8 +986,19 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiH
 			api.WithRecover,
 		))
 	}
+	// Where browsers post the violations of the console's and the error
+	// page's policies, and on the hosted cloud those of every service's
+	// pages. Outside the API's chain: a browser posts it without the CSRF
+	// token or a session, and nobody's audit trail needs it.
+	mux.Handle(securityheaders.ReportPath, middleware.Chain(securityheaders.Report(),
+		func(next http.Handler) http.Handler {
+			return middleware.WithRequestContextMiddleware(reqIdGen, cfg.RequestIDHeader, next)
+		},
+		middleware.WithLogging,
+		api.WithRecover,
+	))
 	mux.Handle("/", chain(apiHandler))
-	return mux, nil
+	return securityheaders.Middleware(mux), nil
 }
 
 // withIncomingTraceContext decides what an incoming trace context means for

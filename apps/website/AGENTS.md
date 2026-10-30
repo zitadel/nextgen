@@ -17,6 +17,14 @@ Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
 - It does not use `@zitadel/design-tokens`; only the login previews paint with
   them, on the login's own atoms.
 
+## Content-Security-Policy
+
+- The policies are `next.config.ts`' `headers()`, the same for every page,
+  so pages stay prerendered. The report-only one allows inline scripts, so it
+  does not cover them; it does cover where requests and images go.
+- Load nothing from another origin without widening the report-only policy
+  in the same change.
+
 ## The fonts
 
 - Load every face through `next/font/local` from `app/fonts/`, never
