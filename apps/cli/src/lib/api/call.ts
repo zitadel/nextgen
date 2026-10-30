@@ -103,6 +103,11 @@ export const sendAll = async (
     {
       items: paging.items,
       all: true,
+      // The page the caller asked for, so a server that hands it back is refused.
+      token:
+        paging.token === "body"
+          ? (request.body as { page_token?: string } | undefined)?.page_token
+          : request.query.find(([name]) => name === "page_token")?.[1],
       nextPageToken: "next_page_token",
     },
   );
