@@ -930,12 +930,13 @@ function validateAgainstSchema(def: FlowDef, schema: object): FlowValidationIssu
     for (const step of def.steps) {
       if (!identifierFree.has(step.name)) continue;
       if (!challengesByStep.get(step.name)?.has("password")) continue;
-      issues.push({
-        severity: "warning",
-        rule: "warn/password-without-identifier",
-        message: `step ${q(step.name)} collects ${AUTH_METHOD_PREFIX}password on the login path but no upstream step collects an identifier field — the engine cannot resolve which user to challenge`,
-        step: step.name,
-      });
+      issues.push(
+        warning(
+          "warn/password-without-identifier",
+          `step ${q(step.name)} collects ${AUTH_METHOD_PREFIX}password on the login path but no upstream step collects an identifier field — the engine cannot resolve which user to challenge`,
+          step.name,
+        ),
+      );
     }
   }
 

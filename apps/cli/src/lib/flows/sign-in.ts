@@ -143,23 +143,17 @@ function loginJourney(flow: Record<string, unknown>): Record<string, unknown> {
       // `action` goes to another flow, whose step names are not this flow's,
       // and one into another purpose (register, say) leaves the login
       // journey. A null `action` or `purpose` is the same as an absent one.
-      // A transition that names only `purpose: login` goes to the login entry.
+      // One that names only `purpose: login` goes back to the login entry,
+      // where the walk started, so it adds no step.
       if (
         isObject(transition) &&
+        typeof transition.target === "string" &&
         (transition.action === undefined || transition.action === null) &&
         (transition.purpose === undefined ||
           transition.purpose === null ||
           transition.purpose === "login")
       ) {
-        const target =
-          typeof transition.target === "string"
-            ? transition.target
-            : transition.purpose === "login"
-              ? entry
-              : undefined;
-        if (typeof target === "string") {
-          queue.push(target);
-        }
+        queue.push(transition.target);
       }
     }
   }

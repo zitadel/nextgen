@@ -366,7 +366,8 @@ type FlowSSOProvider struct {
 	ConnectionID string
 }
 
-// FlowStepTransition maps an action name to either a target step (regular) or a pivot purpose.
+// FlowStepTransition says where an action or outcome goes: a step of this
+// flow, the entry step of a purpose it serves, or another flow.
 type FlowStepTransition struct {
 	Action *FlowDefinitionTransitionAction
 	// Target is either a step in the current flow OR a new flow.
@@ -378,9 +379,10 @@ type FlowStepTransition struct {
 	// Purpose, when non-nil, re-purposes the flow locally: taking this
 	// transition sets [FlowState.CurrentPurpose] to this purpose while the
 	// pinned [FlowState.Purpose] stays untouched. The purpose must be one
-	// the definition serves and Target must be that purpose's entry step
-	// (validated). Mutually exclusive with Action — a transition either
-	// pivots to another flow or re-purposes within this one, never both.
+	// the definition serves, and Target, when set, must be that purpose's
+	// entry step (validated). Mutually exclusive with Action — a transition
+	// either pivots to another flow or re-purposes within this one, never
+	// both.
 	Purpose *FlowDefinitionPurpose
 }
 

@@ -342,6 +342,7 @@ func uniqueNonEmptyFields(stepName string, items []Field) error {
 
 // validateGraph checks that the flow definition graph is valid:
 // - every non-terminal step must have at least one outgoing transition
+// - every transition names a target or a served purpose (whose entry step a target must be)
 // - every transition target with no action must be a step in the flow definition
 // - every transition target with an action must be an active flow definition in the same project
 // - every step must be reachable from some entry point in Purposes

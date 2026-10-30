@@ -12,10 +12,12 @@ user enters via the wrong purpose; explicit navigation CTAs (`register` /
 
 - **Multi-purpose definition.** `purposes` maps `login` and `register` to
   distinct entry steps in the same definition.
-- **Flip-table coverage.** Because both purposes are served, the validator
-  requires:
-  - Login entry (`identifier`) to wire `user_not_found`.
-  - Register entry (`register-identifier`) to wire `user_already_exists`.
+- **Automatic switch.** Because both purposes are served, the entry steps
+  wire the outcomes that switch between them:
+  - Login entry (`identifier`) wires `user_not_found`.
+  - Register entry (`register-identifier`) wires `user_already_exists`.
+
+  Both are optional; leaving one out shows that outcome's error instead.
 - **Purpose flip.** When the engine emits one of these outcomes, it flips
   `state.CurrentPurpose` so dispatch on subsequent steps follows the other
   sub-flow's semantics (password verify vs. password create).
