@@ -28,7 +28,7 @@ func (h *Handler) CreateIdp(ctx context.Context, req *api.CreateIdpRequest, para
 	if de, ok := errors.AsType[domain.Error](err); ok && de.Code == idpEndpointsPartialCode {
 		// The engine refuses this at sign-in too, where it is the server's
 		// fault. Only here is it the author's, so only here is it a 400.
-		refused := api.CreateIdpBadRequest(domainErrorDetails(de))
+		refused := api.CreateIdpBadRequest(refusal(ctx, de))
 		return &refused, nil
 	}
 	if err != nil {

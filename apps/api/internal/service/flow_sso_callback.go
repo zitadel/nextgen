@@ -74,15 +74,22 @@ type FlowSSOCallbackOutput struct {
 	// ReturnTarget is where the browser goes next: the page the sign-in
 	// started on, stored on the record at submit.
 	ReturnTarget string
+	// Failure is the ceremony's failure, when it had one: the key the step
+	// shows and the cause the handler logs with the redirect (ADR 030).
+	// Nil when the ceremony succeeded.
+	Failure *domain.FlowStepFailure
+	// ProjectID and Slug name the project and the connection, for that line.
+	ProjectID string
+	Slug      string
 }
 
 // Process consumes the state record and stores the ceremony's outcome on it.
 // Any failure after the consume, the provider's, the configuration's or this
-// process's, is stored as a generic error key and logged, and the browser
-// still goes back to the return target, where the originating step shows the
-// error. Process itself returns an error only when the state cannot be
-// consumed or the outcome cannot be stored: for both, the handler answers its
-// uniform error page.
+// process's, is stored as a generic error key and returned as the output's
+// Failure, and the browser still goes back to the return target, where the
+// originating step shows the error. Process itself returns an error only when
+// the state cannot be consumed or the outcome cannot be stored: for both, the
+// handler answers its uniform error page.
 func (c *FlowSSOCallback) Process(ctx context.Context, in FlowSSOCallbackInput) (FlowSSOCallbackOutput, error) {
 	// The project is read from the state because the lookup needs one and
 	// this request carries no other project source. A state without one is
@@ -126,16 +133,10 @@ func (c *FlowSSOCallback) Process(ctx context.Context, in FlowSSOCallbackInput) 
 		if in.Error == oauthErrorAccessDenied {
 			key = domain.FlowStepErrorSSOCancelled
 		}
-		// The description and URI are logged for the operator and never
+		// The description and URI go to the operator's line and are never
 		// stored: the user sees only the localized key.
-		getLoggingContext(ctx, "flow").Warn("sso provider returned an error",
-			slog.String("project_id", projectID),
-			slog.String("slug", pending.ProviderSlug),
-			slog.String("error", in.Error),
-			slog.String("error_description", in.ErrorDescription),
-			slog.String("error_uri", in.ErrorURI),
-		)
-		return c.park(ctx, projectID, check, key, domain.EventTypeAuthSSOAuthorizationFailed)
+		cause := fmt.Errorf("the provider answered %q: %q (%s)", in.Error, in.ErrorDescription, in.ErrorURI)
+		return c.park(ctx, projectID, check, domain.FlowStepFailed(key, cause), domain.EventTypeAuthSSOAuthorizationFailed)
 	}
 
 	if in.Code == "" {
@@ -167,7 +168,7 @@ func (c *FlowSSOCallback) Process(ctx context.Context, in FlowSSOCallbackInput) 
 		}
 		return c.fail(ctx, projectID, check, domain.ErrInternal(err), domain.EventTypeAuthSSOExchangeFailed)
 	}
-	return FlowSSOCallbackOutput{ReturnTarget: pending.ReturnTarget}, nil
+	return FlowSSOCallbackOutput{ReturnTarget: pending.ReturnTarget, ProjectID: projectID, Slug: pending.ProviderSlug}, nil
 }
 
 func (c *FlowSSOCallback) pinnedConnection(ctx context.Context, projectID string, pending *domain.SSOStatePayload) (idp.Connection, error) {
@@ -237,35 +238,26 @@ func (c *FlowSSOCallback) resolveClientSecret(ctx context.Context, projectID, de
 	return secret, nil
 }
 
-// fail logs the cause the user must not see and stores the generic failure
-// key with eventType. An internal error is still stored, so the user can retry
-// from the step: the state is already consumed, and the error page has no way
-// back.
+// fail stores the generic failure key with eventType and hands the cause the
+// user must not see to the handler's line. An internal error is still stored,
+// so the user can retry from the step: the state is already consumed, and the
+// error page has no way back.
 func (c *FlowSSOCallback) fail(ctx context.Context, projectID string, check *domain.SSOCallbackCheck, cause error, eventType domain.EventType) (FlowSSOCallbackOutput, error) {
-	// A cancelled request is not the provider's fault, and the client is
-	// gone, so nothing is logged. A deadline is still logged.
-	if !errors.Is(ctx.Err(), context.Canceled) {
-		// An internal error is a bug in this process, not a ceremony outcome.
-		level := slog.LevelWarn
-		if errors.Is(cause, domain.ErrInternal(nil)) {
-			level = slog.LevelError
-		}
-		getLoggingContext(ctx, "flow").Log(ctx, level, "sso callback failed",
-			slog.String("project_id", projectID),
-			slog.String("slug", check.Pending.ProviderSlug),
-			slog.Any("error", cause),
-		)
-	}
-	return c.park(ctx, projectID, check, domain.FlowStepErrorSSOFailed, eventType)
+	return c.park(ctx, projectID, check, domain.FlowStepFailed(domain.FlowStepErrorSSOFailed, cause), eventType)
 }
 
-// park stores an error result on the consumed record, emitting eventType, and
-// sends the browser back to the return target, where the originating step
-// shows the key.
-func (c *FlowSSOCallback) park(ctx context.Context, projectID string, check *domain.SSOCallbackCheck, key string, eventType domain.EventType) (FlowSSOCallbackOutput, error) {
-	result := &domain.SSOCallbackResult{ErrorKey: key}
+// park stores the failure's key on the consumed record, emitting eventType,
+// and sends the browser back to the return target, where the originating
+// step shows the key.
+func (c *FlowSSOCallback) park(ctx context.Context, projectID string, check *domain.SSOCallbackCheck, failure *domain.FlowStepFailure, eventType domain.EventType) (FlowSSOCallbackOutput, error) {
+	result := &domain.SSOCallbackResult{ErrorKey: failure.Key}
 	if err := c.attempts.SetSSOCallbackResult(ctx, projectID, check, result, eventType); err != nil {
 		return FlowSSOCallbackOutput{}, err
 	}
-	return FlowSSOCallbackOutput{ReturnTarget: check.Pending.ReturnTarget}, nil
+	return FlowSSOCallbackOutput{
+		ReturnTarget: check.Pending.ReturnTarget,
+		Failure:      failure,
+		ProjectID:    projectID,
+		Slug:         check.Pending.ProviderSlug,
+	}, nil
 }

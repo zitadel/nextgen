@@ -4,9 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"net/http"
-	"os"
 	"strings"
 	"sync/atomic"
 
@@ -18,7 +16,7 @@ import (
 	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/errorpage"
-	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
+	"github.com/zitadel/nextgen/internal/instrumentation/errlog"
 )
 
 // FullErrorInResponse attaches the unwrapped cause of an error to the response
@@ -101,6 +99,14 @@ func createFullErrDetailsDetailsMap(err error) any {
 	}
 
 	return errmap
+}
+
+// refusal is the body of a typed error response a handler answers itself,
+// instead of returning err to the sink: it logs err as the sink would have
+// (ADR 030).
+func refusal(ctx context.Context, err error) api.ErrorDetails {
+	errlog.Log(ctx, err)
+	return domainErrorDetails(err)
 }
 
 func errorResponse(err error) *api.ErrorDetailsStatusCode {
@@ -223,8 +229,12 @@ func OgenErrorHandler(ctx context.Context, w http.ResponseWriter, _ *http.Reques
 			ctx = middleware.WithOperationIDContext(ctx, oc.OperationID())
 		}
 	}
-	logAPIError(ctx, status, logged)
-	writeErrorResponse(w, &api.ErrorDetailsStatusCode{StatusCode: status, Response: details})
+	if status >= http.StatusInternalServerError {
+		errlog.LogFault(ctx, logged)
+	} else {
+		errlog.Log(ctx, logged)
+	}
+	writeErrorResponse(ctx, w, &api.ErrorDetailsStatusCode{StatusCode: status, Response: details})
 }
 
 // apiError maps an error to the status it answers, the error the log line carries
@@ -290,29 +300,6 @@ func apiError(err error) (status int, logged domain.Error, details api.ErrorDeta
 	return resp.StatusCode, logged, resp.Response
 }
 
-// logAPIError writes the one log line a returned error gets (ADR 030).
-func logAPIError(ctx context.Context, status int, err domain.Error) {
-	level := slog.LevelInfo
-	switch {
-	// The request context is done when the client left, or when net/http hit
-	// the server's write deadline, which the deadline error tells apart.
-	case status >= http.StatusInternalServerError && ctx.Err() != nil && !errors.Is(err, os.ErrDeadlineExceeded):
-		level = slog.LevelWarn
-	case status >= http.StatusInternalServerError:
-		level = slog.LevelError
-	}
-	var logged error = err
-	if level < slog.LevelError {
-		logged = err.Brief()
-	}
-	operationID, _ := middleware.GetOperationIDContext(ctx)
-	zlog.Log(ctx, level, "api error",
-		slog.Int("status", status),
-		slog.String("operation_id", operationID),
-		slog.Any(zlog.ErrorAttributeKey, logged),
-	)
-}
-
 // OgenNotFound answers a path no API operation matches (ADR 076). A browser
 // navigation gets the error page, with home as its way on; everything else
 // gets the req.not_found envelope, so a client can tell a path this server
@@ -321,11 +308,16 @@ func logAPIError(ctx context.Context, status int, err domain.Error) {
 func OgenNotFound(home *errorpage.Link) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Vary", "Accept")
+		notFound := domain.ErrRequestNotFound()
 		if errorpage.Wants(r) {
-			errorpage.Write(w, r, errorpage.NotFound(home))
+			page := errorpage.NotFound(home)
+			errlog.Log(r.Context(), notFound)
+			errorpage.Write(w, r, page)
 			return
 		}
-		writeErrorResponse(w, errorResponse(domain.ErrRequestNotFound()))
+		resp := errorResponse(notFound)
+		errlog.Log(r.Context(), notFound)
+		writeErrorResponse(r.Context(), w, resp)
 	}
 }
 
@@ -341,16 +333,24 @@ func OgenMethodNotAllowed(w http.ResponseWriter, r *http.Request, allowed string
 		return
 	}
 	w.Header().Set("Allow", allowed)
-	writeErrorResponse(w, errorResponse(domain.ErrRequestMethodNotAllowed()))
+	notAllowed := domain.ErrRequestMethodNotAllowed()
+	resp := errorResponse(notAllowed)
+	errlog.Log(r.Context(), notAllowed)
+	writeErrorResponse(r.Context(), w, resp)
 }
 
-func writeErrorResponse(w http.ResponseWriter, resp *api.ErrorDetailsStatusCode) {
+// writeErrorResponse writes resp. The body is generated from the spec, so a
+// body that does not marshal is a bug: the status still goes out, and the
+// line says why the body did not.
+func writeErrorResponse(ctx context.Context, w http.ResponseWriter, resp *api.ErrorDetailsStatusCode) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(resp.StatusCode)
 	data, err := resp.Response.MarshalJSON()
-	if err == nil {
-		_, _ = w.Write(data)
+	if err != nil {
+		errlog.LogFault(ctx, domain.ErrInternal(err).WithMessage("failed to encode the error response"))
+		return
 	}
+	_, _ = w.Write(data)
 }
 
 // csrfInvalidCode is compared on every error response, so it is read once:

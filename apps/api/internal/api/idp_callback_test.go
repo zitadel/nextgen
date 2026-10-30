@@ -3,12 +3,13 @@ package api_test
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -227,16 +228,22 @@ func TestIDPCallbackHandler_RefusesNonGET(t *testing.T) {
 	assert.Zero(t, stub.calls)
 }
 
-// A cancelled request is the client leaving and is not logged as a bug. A
-// deadline is not the client's doing and still is.
-func TestIDPCallbackHandler_LogsUnlessCancelled(t *testing.T) {
+// A processing failure is the one API error line, at Error on a live request
+// and at Warn once the client has walked away, as every 5xx is.
+func TestIDPCallbackHandler_LogsAProcessingFailure(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name      string
 		ctx       func(context.Context) (context.Context, context.CancelFunc)
 		cause     error
-		wantError bool
+		wantLevel string
 	}{
+		{
+			name:      "live request",
+			ctx:       context.WithCancel,
+			cause:     errors.New("connection refused"),
+			wantLevel: "ERROR",
+		},
 		{
 			name: "cancelled",
 			ctx: func(ctx context.Context) (context.Context, context.CancelFunc) {
@@ -244,22 +251,15 @@ func TestIDPCallbackHandler_LogsUnlessCancelled(t *testing.T) {
 				cancel()
 				return ctx, cancel
 			},
-			cause: context.Canceled,
-		},
-		{
-			name: "past its deadline",
-			ctx: func(ctx context.Context) (context.Context, context.CancelFunc) {
-				return context.WithDeadline(ctx, time.Now().Add(-time.Second))
-			},
-			cause:     context.DeadlineExceeded,
-			wantError: true,
+			cause:     context.Canceled,
+			wantLevel: "WARN",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			var logs bytes.Buffer
-			ctx, cancel := tt.ctx(zlog.WithLoggingContext(t.Context(), slog.New(slog.NewTextHandler(&logs, nil))))
+			ctx, cancel := tt.ctx(zlog.WithLoggingContext(t.Context(), slog.New(slog.NewJSONHandler(&logs, nil))))
 			defer cancel()
 			stub := &stubSSOCallback{err: fmt.Errorf("failed to set sso callback result: %w", tt.cause)}
 			req := httptest.NewRequestWithContext(ctx, http.MethodGet, api.IDPCallbackPath("google")+"?state=proj-1.rand&code=the-code", nil)
@@ -267,7 +267,11 @@ func TestIDPCallbackHandler_LogsUnlessCancelled(t *testing.T) {
 			callbackMux(t, api.NewIDPCallbackHandler(stub)).ServeHTTP(rec, req)
 
 			assert.Equal(t, http.StatusInternalServerError, rec.Code)
-			assert.Equal(t, tt.wantError, bytes.Contains(logs.Bytes(), []byte("sso callback processing failed")))
+			var record map[string]any
+			require.NoError(t, json.Unmarshal(logs.Bytes(), &record), "one line: %q", logs.String())
+			assert.Equal(t, "api error", record["msg"])
+			assert.Equal(t, tt.wantLevel, record["level"])
+			assert.Contains(t, record["error"].(map[string]any)["parent"], tt.cause.Error())
 		})
 	}
 }
@@ -308,4 +312,34 @@ func TestIDPCallbackHandler_StartsAServerSpan(t *testing.T) {
 	assert.Equal(t, "idpCallback", spans[0].Name)
 	assert.Equal(t, trace.SpanKindServer, spans[0].SpanKind)
 	assert.Equal(t, stub.serverSpan, spans[0].SpanContext)
+}
+
+// The provider's reason is logged even when the stored return target is then
+// refused: the failure line comes first, the refusal's after it.
+func TestIDPCallbackHandler_LogsTheFailureBeforeRefusingTheTarget(t *testing.T) {
+	t.Parallel()
+	var logs bytes.Buffer
+	ctx := zlog.WithLoggingContext(t.Context(), slog.New(slog.NewJSONHandler(&logs, nil)))
+	stub := &stubSSOCallback{out: service.FlowSSOCallbackOutput{
+		ReturnTarget: "https://app.example.com//evil.example/login",
+		Failure:      domain.FlowStepFailed(domain.FlowStepErrorSSOFailed, errors.New("the provider answered \"server_error\"")),
+		ProjectID:    "proj-1",
+		Slug:         "google",
+	}}
+	req := httptest.NewRequestWithContext(ctx, http.MethodGet, api.IDPCallbackPath("google")+"?state=proj-1.rand&code=the-code", nil)
+	rec := httptest.NewRecorder()
+	callbackMux(t, api.NewIDPCallbackHandler(stub)).ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusInternalServerError, rec.Code)
+	lines := bytes.Split(bytes.TrimSpace(logs.Bytes()), []byte("\n"))
+	require.Len(t, lines, 2, "the failure and the refusal: %s", logs.String())
+	var failure, refusal map[string]any
+	require.NoError(t, json.Unmarshal(lines[0], &failure))
+	require.NoError(t, json.Unmarshal(lines[1], &refusal))
+	assert.Equal(t, "WARN", failure["level"])
+	assert.Equal(t, domain.FlowStepErrorSSOFailed, failure["step_error"])
+	assert.Equal(t, "google", failure["slug"])
+	assert.Contains(t, fmt.Sprint(failure["error"]), "server_error")
+	assert.Equal(t, "ERROR", refusal["level"])
+	assert.Contains(t, fmt.Sprint(refusal["error"]), "return target refused")
 }
