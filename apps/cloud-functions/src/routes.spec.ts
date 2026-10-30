@@ -53,13 +53,12 @@ describe("the add-on's RPC", () => {
     expect((await response).status).toBe(404);
   });
 
-  it("starts provisioning with the person's teams and what they ticked at sign-up", async () => {
+  it("starts provisioning with the person and the teams they are in", async () => {
     const { response, runtime } = call("POST", "/cloud/api/account/ensure", { body: {} });
     expect(await (await response).json()).toEqual({ state: "started" });
     expect(runtime.provisionOnce).toHaveBeenCalledWith(
       expect.objectContaining({ user_id: "user_mock" }),
       [MOCK_TEAM],
-      expect.objectContaining({ product_news: false }),
     );
   });
 

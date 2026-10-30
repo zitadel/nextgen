@@ -17,7 +17,10 @@ export interface EnsureAccountResponse {
 
 /** `GET` and `PUT /cloud/api/account/preferences`: the person's email subscriptions. */
 export interface EmailPreferences {
-  /** Product news and tips: marketing, so off until the person turns it on. */
+  /**
+   * Product news and tips: marketing, which onboarding subscribes everyone to
+   * and the person may turn off (root ADR 084 §7).
+   */
   product_news: boolean;
 }
 

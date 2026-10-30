@@ -1,19 +1,37 @@
 import { start } from "workflow/api";
 
 import type { Runtime } from "./routes";
-import { currentSystems } from "./systems";
-import { provisionAccount } from "./workflows/provision-account";
+import { onboardingSystems, rpcSystems } from "./systems";
+import { provisionBilling } from "./workflows/provision-billing";
+import { provisionCrm } from "./workflows/provision-crm";
+import { liveDirectory, zitadelServer } from "./zitadel";
 
-/** The routes' runtime on Vercel and under `next dev`: workflows start for real. */
-export function workflowRuntime(): Runtime {
-  const systems = currentSystems();
+/**
+ * The people, with their teams, whose CRM onboarding this instance started:
+ * a page load starts it once per instance. Its run looks up what exists
+ * before it writes, so another instance starting it again changes nothing.
+ */
+const crmStarted = new Set<string>();
+
+/**
+ * The routes' runtime on Vercel and under `next dev`: Zitadel read live as the
+ * person calling, and workflows that start for real.
+ */
+export function workflowRuntime(request: Request): Runtime {
   return {
-    systems,
-    async provisionOnce(person, teams, consent) {
-      const known = await Promise.all(teams.map((team) => systems.stripe.hasCustomer(team)));
-      if (teams.length > 0 && known.every(Boolean)) return false;
-      await start(provisionAccount, [{ person, teams, consent }]);
-      return true;
+    systems: rpcSystems(liveDirectory(zitadelServer(request))),
+    async provisionOnce(person, teams) {
+      const { stripe } = onboardingSystems();
+      const crmKey = [person.user_id, ...teams.map((team) => team.id).sort()].join(" ");
+      const crm = !crmStarted.has(crmKey);
+      const customers = await Promise.all(teams.map((team) => stripe.hasCustomer(team)));
+      const billing = !customers.every(Boolean);
+      if (crm) {
+        await start(provisionCrm, [person, teams]);
+        crmStarted.add(crmKey);
+      }
+      if (billing) await start(provisionBilling, [person, teams]);
+      return crm || billing;
     },
   };
 }
