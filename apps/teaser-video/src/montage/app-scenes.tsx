@@ -8,7 +8,7 @@ import { APPLE, GITHUB, GOOGLE, primary, providers } from "./atoms";
 // place it, some over a picture of their own, drawn here rather than
 // photographed: a wide desktop sign-in card, a split screen beside a travel
 // picture, a dialog over a dashboard whose session ran out, a landing page's
-// sign-up, a phone app, a store's checkout. The apps, their names and their content
+// sign-up, a concert hall's tickets, a store's checkout. The apps, their names and their content
 // are invented; everything paints with the --zl-* properties of the app's
 // brand, so the login and its app read as one product.
 
@@ -147,35 +147,6 @@ function CityAtDusk() {
           )}
         </g>
       ))}
-    </Backdrop>
-  );
-}
-
-/** Hills in the morning: a pale sky, the sun low, the hills fading back into the haze. */
-function MorningHills() {
-  return (
-    <Backdrop>
-      <defs>
-        <linearGradient id="morning" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#dbe7ff" />
-          <stop offset="0.6" stopColor="#f7e8f7" />
-          <stop offset="1" stopColor="#fff4e6" />
-        </linearGradient>
-      </defs>
-      <rect width="1920" height="1080" fill="url(#morning)" />
-      <circle cx="1460" cy="420" r="120" fill="#fff6d8" />
-      <path
-        d="M0 640 C 380 520, 700 600, 1000 560 S 1600 520, 1920 600 L1920 1080 L0 1080 Z"
-        fill="#d6c8f2"
-      />
-      <path
-        d="M0 760 C 300 680, 640 760, 980 700 S 1560 680, 1920 740 L1920 1080 L0 1080 Z"
-        fill="#b9a6e8"
-      />
-      <path
-        d="M0 880 C 360 820, 760 900, 1120 840 S 1700 830, 1920 870 L1920 1080 L0 1080 Z"
-        fill="#9b86d8"
-      />
     </Backdrop>
   );
 }
@@ -636,142 +607,139 @@ export function LandingSignUp() {
   );
 }
 
-function Notice({
-  icon,
-  title,
-  detail,
-  style,
-}: {
-  icon: string;
-  title: string;
-  detail: string;
-  style: CSSProperties;
-}) {
+/** The seats a concert hall holds while the visitor signs in. */
+const SEATS = [
+  ["Parterre · Row 7", "Seats 12–13"],
+  ["2 × Standard", "CHF 136.00"],
+  ["Booking fee", "CHF 4.00"],
+];
+
+/** A concert hall's tickets: the ticket on the left, held, the login on the right to claim it. */
+export function Tickets() {
   return (
-    <div
-      style={{
-        position: "absolute",
-        display: "flex",
-        alignItems: "center",
-        gap: 20,
-        padding: "22px 28px",
-        borderRadius: 24,
-        background: "var(--zl-card)",
-        boxShadow: "0 24px 60px rgb(0 0 0 / 0.12)",
-        ...style,
-      }}
-    >
-      <span
+    <Frame>
+      <header
         style={{
-          width: 56,
-          height: 56,
-          borderRadius: 28,
-          display: "grid",
-          placeItems: "center",
-          fontSize: 28,
-          background: tint(18),
+          height: 104,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "0 120px",
+          borderBottom: `1px solid ${faint(10)}`,
         }}
       >
-        {icon}
-      </span>
-      <div>
-        <div style={{ fontSize: 22, fontWeight: 600 }}>{title}</div>
-        <div style={{ fontSize: 18, color: faint(60), marginTop: 4 }}>{detail}</div>
-      </div>
-    </div>
-  );
-}
-
-/** A clinic's phone app: the login on a phone, the app's notifications around it. */
-export function PhoneApp() {
-  return (
-    <Frame
-      style={{
-        display: "grid",
-        placeItems: "center",
-      }}
-    >
-      <MorningHills />
-      <Notice
-        icon="✓"
-        title="Your lab results are ready"
-        detail="Today, 08:12"
-        style={{ left: 250, top: 300 }}
-      />
-      <Notice
-        icon="◷"
-        title="Next appointment"
-        detail="Tue 14 Nov · 09:30 · Dr. Okafor"
-        style={{ right: 230, top: 620 }}
-      />
-      <Large scale={1.18}>
-        <div
+        <span style={{ ...heading, fontSize: 34, letterSpacing: 6 }}>SALA NOVA</span>
+        <span style={{ display: "flex", gap: 44, fontSize: 18, color: faint(60) }}>
+          <span>Programme</span>
+          <span>Venue</span>
+          <span style={{ color: "var(--zl-foreground)" }}>Seats held for 9:42</span>
+        </span>
+      </header>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "620px 1fr",
+          gap: 96,
+          padding: "160px 120px 0",
+          alignItems: "start",
+        }}
+      >
+        <article
           style={{
-            width: 408,
-            height: 860,
-            boxSizing: "border-box",
-            borderRadius: 60,
-            border: "12px solid #111",
-            background: "var(--zl-background)",
+            borderRadius: "var(--zl-radius-xl)",
+            border: `1px solid ${faint(12)}`,
             overflow: "hidden",
-            display: "flex",
-            flexDirection: "column",
-            boxShadow: "0 40px 90px rgb(0 0 0 / 0.25)",
+            background: faint(3),
           }}
         >
-          <div
-            style={{
-              height: 44,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              padding: "0 26px",
-              fontSize: 15,
-              fontWeight: 600,
-            }}
-          >
-            <span>9:41</span>
-            <span style={{ letterSpacing: 2 }}>▮▮▮ ◔</span>
-          </div>
-          <div style={{ padding: "18px 22px 26px" }}>
-            <Logo name="Mosaic Clinic" size={30} />
-          </div>
-          <div style={{ display: "flex", justifyContent: "center" }}>
-            <div style={{ width: 384 }}>
-              <Card
-                title="Patient portal"
-                subtitle="Sign in to see your appointments"
-                fields={
-                  <zl-field
-                    label="Phone"
-                    type="tel"
-                    placeholder="079 000 00 00"
-                    autocomplete="off"
-                    data-state="focused"
-                  />
-                }
-                actions={primary("Continue")}
-                nav={{ lead: "First visit? ", link: "Register" }}
-              />
+          <div style={{ position: "relative", height: 300, background: "#0b0b0d" }}>
+            <svg
+              viewBox="0 0 620 300"
+              width="620"
+              height="300"
+              role="presentation"
+              style={{ position: "absolute", inset: 0 }}
+            >
+              {Array.from({ length: 14 }, (_, ring) => (
+                <circle
+                  // biome-ignore lint/suspicious/noArrayIndexKey: fixed rings, never reordered
+                  key={ring}
+                  cx="470"
+                  cy="150"
+                  r={24 + ring * 22}
+                  fill="none"
+                  stroke="#fafafa"
+                  strokeOpacity={0.5 - ring * 0.03}
+                  strokeWidth="1"
+                />
+              ))}
+            </svg>
+            <div style={{ position: "absolute", left: 40, bottom: 34 }}>
+              <div style={{ fontSize: 16, letterSpacing: 4, color: faint(60) }}>
+                SAT 14 DEC · 20:00
+              </div>
+              <h2 style={{ ...heading, fontSize: 52, fontWeight: 500, margin: "10px 0 0" }}>
+                Liminal Orchestra
+              </h2>
+              <div style={{ fontSize: 20, color: faint(70), marginTop: 6 }}>Winter Programme</div>
             </div>
           </div>
           <div
-            style={{
-              marginTop: "auto",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: 22,
-              padding: "0 0 12px",
-              fontSize: 14,
-              color: faint(60),
-            }}
+            style={{ padding: "30px 40px 36px", display: "flex", flexDirection: "column", gap: 20 }}
           >
-            <span>Need help? Call 044 000 00 00</span>
-            <span style={{ width: 130, height: 5, borderRadius: 3, background: faint(80) }} />
+            {SEATS.map(([label, value]) => (
+              <div
+                key={label}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  fontSize: 20,
+                  color: faint(70),
+                }}
+              >
+                <span>{label}</span>
+                <span>{value}</span>
+              </div>
+            ))}
+            <div style={{ height: 1, background: faint(12) }} />
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                fontSize: 26,
+                fontWeight: 600,
+              }}
+            >
+              <span>Total</span>
+              <span>CHF 140.00</span>
+            </div>
           </div>
+        </article>
+        {/* Room above for the card's scale, which grows it from its centre. */}
+        <div style={{ display: "grid", placeItems: "center", paddingTop: 110 }}>
+          <Large scale={1.4}>
+            <Card
+              title="Sign in to get your tickets"
+              subtitle="They go straight to your account"
+              fields={
+                <zl-field
+                  label="Email"
+                  type="email"
+                  placeholder="you@example.com"
+                  autocomplete="off"
+                />
+              }
+              actions={
+                <>
+                  {primary("Continue")}
+                  {providers([GOOGLE, APPLE])}
+                  <zl-button hierarchy="text" type="button" label="Continue as guest" block />
+                </>
+              }
+            />
+          </Large>
         </div>
-      </Large>
+      </div>
     </Frame>
   );
 }
