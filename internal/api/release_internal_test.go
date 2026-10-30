@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"testing"
 
@@ -10,7 +11,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	api "github.com/zitadel/nextgen/api/generated"
+	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
 )
 
 // Pins the release resource-flavored answers through the resolver gate. The
@@ -134,22 +137,49 @@ func TestReleaseErrorResponseConflicts(t *testing.T) {
 }
 
 // The 409 names every origin still serving the release, so the caller can
-// deploy elsewhere or roll back before revoking again.
+// deploy elsewhere or roll back before revoking again, and records the error
+// for the error line.
 func TestReleaseInUseResponseCarriesOrigins(t *testing.T) {
-	resp, ok := releaseInUseResponse(domain.ErrReleaseInUse(domain.ReleaseInUseDetails{Origins: []domain.ReleaseInUseOrigin{
+	ctx := recordingContext(t)
+	err := domain.ErrReleaseInUse(domain.ReleaseInUseDetails{Origins: []domain.ReleaseInUseOrigin{
 		{Origin: "https://app.acme.com", DeploymentID: "dep_1"},
-	}}))
+	}})
+	resp, ok := releaseInUseResponse(ctx, err)
 	require.True(t, ok)
 	assert.Equal(t, api.ErrorCode(domain.ErrReleaseInUse(domain.ReleaseInUseDetails{}).Code), resp.Code)
 	assert.Equal(t, []api.RevokeReleaseConflictDetailsOriginsItem{
 		{Origin: "https://app.acme.com", DeploymentID: "dep_1"},
 	}, resp.Details.Origins)
+	recorded, _ := middleware.RecordedError(ctx)
+	assert.ErrorIs(t, recorded, err)
 }
 
-// Without the origins the 409 cannot name them, so the generic envelope answers.
+// Without the origins the 409 cannot name them, so the generic envelope
+// answers and logs.
 func TestReleaseInUseResponseNeedsOrigins(t *testing.T) {
-	_, ok := releaseInUseResponse(domain.ErrReleaseInUse(domain.ReleaseInUseDetails{}).WithDetails(nil))
+	ctx := recordingContext(t)
+	_, ok := releaseInUseResponse(ctx, domain.ErrReleaseInUse(domain.ReleaseInUseDetails{}).WithDetails(nil))
 	assert.False(t, ok)
+	_, recorded := middleware.RecordedError(ctx)
+	assert.False(t, recorded)
+}
+
+// The typed 400 is recorded under the code the body carries, with the
+// resources that failed as its cause.
+func TestBundleValidationBadRequestRecordsTheError(t *testing.T) {
+	ctx := recordingContext(t)
+	bundleErr := &service.BundleValidationError{Resources: []service.BundleResourceFailure{
+		{Kind: domain.ReleasePointerKindSchema, Index: 0, Err: domain.ErrRequestInvalid()},
+	}}
+	resp := bundleValidationBadRequest(ctx, bundleErr)
+
+	assert.Equal(t, api.ErrorCode(domain.ErrReleaseInvalid(nil, nil).Code), resp.Code)
+	recorded, ok := middleware.RecordedError(ctx)
+	require.True(t, ok)
+	assert.ErrorIs(t, recorded, domain.ErrReleaseInvalid(nil, nil))
+	cause, ok := errors.AsType[*service.BundleValidationError](recorded)
+	require.True(t, ok)
+	assert.Same(t, bundleErr, cause)
 }
 
 func TestRequireBuildKindScopes(t *testing.T) {

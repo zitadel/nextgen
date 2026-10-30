@@ -881,13 +881,24 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiH
 		mux.Handle(cfg.ConsolePath+"/", consoleHandler)
 	}
 
+	// bare gives a mount outside the API the request ID and the request and
+	// error lines, but none of the middleware a client's request passes.
+	bare := func(h http.Handler) http.Handler {
+		return middleware.Chain(h,
+			func(next http.Handler) http.Handler {
+				return middleware.WithRequestContextMiddleware(reqIdGen, cfg.RequestIDHeader, next)
+			},
+			middleware.WithLogging,
+			api.WithRecover,
+		)
+	}
 	// Pre-session runtime metadata for the console (Console ADR 0004 §3): the
 	// default project and its publishable key. Mounted whether or not this
 	// binary serves the console, because a console served elsewhere reads it
 	// from here: the hosted cloud's console service, and the console's dev
 	// server through its proxy. Registered as an exact path, so it wins over
 	// the catch-all API mount below.
-	mux.Handle(consoleRuntimePath, newConsoleRuntimeHandler(runtime))
+	mux.Handle(consoleRuntimePath, bare(newConsoleRuntimeHandler(runtime)))
 
 	chain := func(h http.Handler) http.Handler {
 		return middleware.Chain(h,
@@ -912,16 +923,9 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiH
 	mux.Handle(api.IDPCallbackUpstreamPattern, callback)
 	// The event retention trigger, when a scheduler outside the process runs
 	// the purge (events.retention.trigger_secret, ADR 049): the operator's,
-	// not the API's, so it takes the request ID and the request line but none
-	// of the middleware a client's request passes.
+	// not the API's.
 	if retentionTrigger != nil {
-		mux.Handle(audit.RetentionTriggerPath, middleware.Chain(retentionTrigger,
-			func(next http.Handler) http.Handler {
-				return middleware.WithRequestContextMiddleware(reqIdGen, cfg.RequestIDHeader, next)
-			},
-			middleware.WithLogging,
-			api.WithRecover,
-		))
+		mux.Handle(audit.RetentionTriggerPath, bare(retentionTrigger))
 	}
 	mux.Handle("/", chain(apiHandler))
 	return mux, nil

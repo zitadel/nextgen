@@ -17,6 +17,8 @@ import (
 
 	cryptomock "github.com/zitadel/nextgen/internal/crypto/mock"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/errreport"
+	"github.com/zitadel/sloggcp"
 	domainmock "github.com/zitadel/nextgen/internal/domain/mock"
 )
 
@@ -320,6 +322,57 @@ func TestFlowStateMachine_Process_RegistrationHappyPath(t *testing.T) {
 	assert.Equal(t, handoffToken, result.HandoffToken)
 }
 
+// A step error an on_success handler returns keeps the user on the step, and
+// the result carries the handler's cause for the log.
+func TestFlowStateMachine_Process_OnSuccessStepErrorCarriesItsCause(t *testing.T) {
+	t.Parallel()
+	w := newFlowTestWorld(t)
+	def := signupDefinition()
+
+	const email = "alice@example.com"
+	policy := domain.ErrUserPasswordPolicyViolation(map[string]any{"min_length": 12})
+
+	w.schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
+		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
+		AnyTimes()
+	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("att_1", nil)
+	w.createUser.EXPECT().
+		Handle(gomock.Any(), gomock.Any()).
+		Return(domain.FlowOnSuccessResult{
+			StepError: new(domain.PasswordPolicyStepError(map[string]any{"min_length": 12})),
+			StepCause: policy,
+		}, nil)
+	w.authAttemptService.EXPECT().
+		SubmitIdentifier(gomock.Any(), gomock.Any()).
+		Return("", domain.ErrAuthAttemptProofRejected(nil)).
+		Times(1)
+
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeRegister,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+
+	result, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionSubmit,
+		Fields: map[string]any{
+			"email":                   email,
+			"x-auth-methods#password": "short",
+		},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, result.Step)
+	require.Equal(t, "credentials", result.Step.Name)
+	require.NotNil(t, result.Step.Error)
+	assert.Equal(t, "error.x-auth-methods#password_min_length", *result.Step.Error)
+	require.ErrorIs(t, result.Cause, domain.ErrFlowStepRejected())
+	assert.Equal(t, *result.Step.Error, result.Cause.Error())
+	assert.ErrorIs(t, result.Cause, domain.ErrUserPasswordPolicyViolation(nil))
+}
+
 func TestFlowStateMachine_Process_LoginHappyPath(t *testing.T) {
 	t.Parallel()
 	w := newFlowTestWorld(t)
@@ -466,6 +519,10 @@ func TestFlowStateMachine_Process_LoginInvalidPassword(t *testing.T) {
 	require.Equal(t, "credentials", result.Step.Name)
 	require.NotNil(t, result.Step.Error)
 	assert.Equal(t, domain.FlowStepErrorInvalidCredentials, *result.Step.Error)
+	// The log-only cause names the key and wraps the rejection behind it.
+	require.ErrorIs(t, result.Cause, domain.ErrFlowStepRejected())
+	assert.Equal(t, domain.FlowStepErrorInvalidCredentials, result.Cause.Error())
+	assert.ErrorIs(t, result.Cause, domain.ErrAuthAttemptProofRejected(nil))
 }
 
 // A collision on a step that declares create_user never runs the mutation,
@@ -567,6 +624,66 @@ func TestFlowStateMachine_Process_FieldValidationErrorKeepsStep(t *testing.T) {
 		// `_invalid`-spelled text key, not a raw diagnostic string.
 		assert.Equal(t, "error.email_invalid", *result.Step.Error)
 	}
+	// The log-only cause names the key and carries the violations.
+	require.ErrorIs(t, result.Cause, domain.ErrFlowStepRejected())
+	assert.Equal(t, "error.email_invalid", result.Cause.Error())
+	violations, ok := errors.AsType[domain.FlowFieldValidationErrors](result.Cause)
+	require.True(t, ok, "the cause wraps the validation errors")
+	assert.Equal(t, "error.email_invalid", violations.StepError())
+}
+
+// A rejection whose cause carries no location (none, or a plain sentinel) is
+// placed at the site that decided it, not inside the helpers that render it,
+// so two rejections with the same key from different checks log different
+// locations. Not parallel: it turns location capture on.
+func TestFlowStateMachine_stepRejectionIsLocatedAtItsSite(t *testing.T) {
+	errreport.EnableLocation(true)
+	t.Cleanup(func() { errreport.EnableLocation(false) })
+	location := func(t *testing.T, cause error) *sloggcp.ReportLocation {
+		t.Helper()
+		rejected, ok := errors.AsType[domain.Error](cause)
+		require.True(t, ok)
+		loc := rejected.ReportLocation()
+		require.NotNil(t, loc)
+		assert.NotContains(t, loc.FunctionName, "stepRejected")
+		assert.NotContains(t, loc.FunctionName, "renderStepError")
+		assert.Contains(t, loc.FunctionName, "FlowStateMachineRuntime")
+		return loc
+	}
+
+	// A field that fails a rule: the validation errors carry no location.
+	w := newFlowTestWorld(t)
+	def := signupDefinition()
+	w.schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
+		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
+		AnyTimes()
+	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeRegister,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+	invalid, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionSubmit,
+		Fields: map[string]any{"email": "not-an-email", "x-auth-methods#password": "correct-horse-battery-staple"},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, invalid.Cause)
+	validation := location(t, invalid.Cause)
+
+	// A parked identity that may not create a user: no error at all.
+	rw, rdef, state := ssoRenderWorld(t)
+	rw.expectParked(&domain.FlowSSOParkedIdentity{CheckID: "ch-1", ConnectionID: "idp-1", Subject: "sub-1", CreationDisabled: true}, nil)
+	disabled, err := rw.sm.Render(t.Context(), rdef, state)
+	require.NoError(t, err)
+	require.NotNil(t, disabled.Cause)
+	creation := location(t, disabled.Cause)
+
+	assert.NotEqual(t, validation.FunctionName, creation.FunctionName)
+	assert.NotEqual(t, validation.LineNumber, creation.LineNumber)
 }
 
 func TestFlowStateMachine_Process_OmittedRequiredFieldKeepsStep(t *testing.T) {
@@ -937,6 +1054,10 @@ func TestFlowStateMachine_Process_SSO_ProviderUnavailableReRendersStep(t *testin
 	require.NotNil(t, result.Step.Error)
 	assert.Equal(t, domain.FlowStepErrorSSOUnavailable, *result.Step.Error)
 	assert.Len(t, result.Step.SSOProviders, 2, "the other providers stay on offer")
+	require.ErrorIs(t, result.Cause, domain.ErrFlowStepRejected())
+	assert.ErrorIs(t, result.Cause, domain.ErrFlowSSOUnavailable(nil), "the log gets the issuer's error")
+	assert.True(t, domain.IsDependencyFault(result.Cause))
+	assert.EqualError(t, errors.Unwrap(errors.Unwrap(result.Cause)), "discovery timed out")
 	assert.Nil(t, result.Step.RedirectURL)
 	assert.Empty(t, result.SSOBindingNonce)
 	assert.Nil(t, result.State.PendingChallenge, "the abandoned ceremony is dropped")

@@ -239,8 +239,17 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 		return nil, err
 	}
 
-	// Validation error: state machine keeps the user on the step with Error set.
+	// Validation error: state machine keeps the user on the step with Error
+	// set. The answer is a 400, so its cause is recorded for the error line.
 	if result.Step != nil && result.Step.Error != nil {
+		cause := result.Cause
+		if cause == nil {
+			cause = domain.ErrFlowStepRejected().WithMessage(*result.Step.Error)
+		}
+		middleware.RecordError(ctx, cause,
+			slog.String("flow_id", state.ID),
+			slog.String("step", result.Step.Name),
+		)
 		return &api.SubmitFlowStepBadRequest{
 			SetCookie:    []string{flowSetCookie(ctx, cookieValue, false)},
 			CacheControl: api.NewOptString(sessionStateCacheControl),
@@ -265,27 +274,27 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 func (h *Handler) GetFlowStep(ctx context.Context, params api.GetFlowStepParams) (api.GetFlowStepRes, error) {
 	state, err := h.openState(ctx, params.Zflow)
 	if err != nil {
-		return mapFlowGetError(err)
+		return mapFlowGetError(ctx, err)
 	}
 	audit.BindPublicRequest(ctx, state.ProjectID, state.ID, state.SessionID)
 	if state.ID != params.ID {
-		return mapFlowGetError(domain.ErrFlowNotFound())
+		return mapFlowGetError(ctx, domain.ErrFlowNotFound())
 	}
 	ctx, err = h.withSealedRuntime(ctx, state.ProjectID, state.DeploymentID, state.ReleaseID)
 	if err != nil {
-		return mapFlowGetError(err)
+		return mapFlowGetError(ctx, err)
 	}
 
 	result, err := h.flowService.GetStep(ctx, service.GetFlowStepRequest{State: state})
 	if err != nil {
-		return mapFlowGetError(normalizeFlowError(err))
+		return mapFlowGetError(ctx, normalizeFlowError(err))
 	}
 	// A render can complete the flow (a parked SSO identity resolved into a
 	// sign-in), and then it carries the handoff token. Without one, the flow
 	// was already complete before this request.
 	terminal := result.Step != nil && result.Step.Complete != nil
 	if terminal && result.HandoffToken == "" {
-		return mapFlowGetError(domain.ErrFlowCompleted())
+		return mapFlowGetError(ctx, domain.ErrFlowCompleted())
 	}
 
 	// Only a render that resolved a parked SSO identity is re-sealed: the
@@ -712,22 +721,30 @@ func normalizeFlowError(err error) error {
 	return domErr
 }
 
-func mapFlowGetError(err error) (api.GetFlowStepRes, error) {
+// mapFlowGetError answers a GetFlowStep failure. The answers it builds
+// itself bypass the ogen error sink, so it records err, which carries the
+// cause and its location, for the error line; anything else goes back to
+// ogen as is.
+func mapFlowGetError(ctx context.Context, err error) (api.GetFlowStepRes, error) {
+	var res api.GetFlowStepRes
 	switch {
 	case isCookieOrIDError(err):
 		notFound := api.GetFlowStepNotFound(domainErrorDetails(domain.ErrFlowNotFound()))
-		return &notFound, nil
+		res = &notFound
 	case errors.Is(err, domain.ErrFlowCompleted()):
 		gone := api.GetFlowStepGone(domainErrorDetails(domain.ErrFlowCompleted()))
-		return &gone, nil
+		res = &gone
 	case errors.Is(err, domain.ErrFlowRestartRequired()):
 		conflict := api.GetFlowStepConflict(domainErrorDetails(domain.ErrFlowRestartRequired()))
-		return &conflict, nil
+		res = &conflict
 	case errors.Is(err, domain.ErrReleaseRevoked()):
 		conflict := api.GetFlowStepConflict(domainErrorDetails(domain.ErrReleaseRevoked()))
-		return &conflict, nil
+		res = &conflict
+	default:
+		return nil, err
 	}
-	return nil, err
+	middleware.RecordError(ctx, err)
+	return res, nil
 }
 
 func buildResolveHint(opt api.OptFlowHint) service.ResolveFlowHint {

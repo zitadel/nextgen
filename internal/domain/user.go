@@ -3,7 +3,9 @@ package domain
 import (
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/ianlancetaylor/jsonschema"
@@ -30,9 +32,65 @@ func ErrUserInvalid() Error {
 	return newError(PrefixUser.ErrorCodePrefix("invalid"), "user invalid", nil, nil)
 }
 
+// ErrUserAttributesInvalid refuses a document the user schema rejects.
+// validationErr is the schema validator's error; its messages quote the
+// rejected values, so the parent logs only where it failed (see
+// [schemaViolations]) and hands the validator's error to [ValidationFailures].
 func ErrUserAttributesInvalid(validationErr error) Error {
+	if validationErr != nil {
+		if _, wrapped := validationErr.(schemaViolations); !wrapped {
+			validationErr = schemaViolations{err: validationErr}
+		}
+	}
 	return newError(PrefixUser.ErrorCodePrefix("attributes_invalid"),
 		"the user's attributes do not satisfy the user schema", nil, validationErr)
+}
+
+// schemaViolations is the parent of [ErrUserAttributesInvalid]: the schema
+// validator's error, whose messages quote the rejected values. Error and the
+// log value say only which attributes failed, by key when the document was
+// at hand, and at which schema keywords; Unwrap keeps the validator's error
+// for [ValidationFailures] and the key lookups.
+type schemaViolations struct {
+	err  error
+	keys []AttributeKey
+}
+
+func (v schemaViolations) Error() string {
+	text := strings.Join(v.locations(), "; ")
+	if len(v.keys) == 0 {
+		return text
+	}
+	keys := make([]string, len(v.keys))
+	for i, key := range v.keys {
+		keys[i] = string(key)
+	}
+	return "attributes " + strings.Join(keys, ", ") + ": " + text
+}
+
+func (v schemaViolations) Unwrap() error { return v.err }
+
+// LogValue implements [slog.LogValuer], so no handler falls back to the
+// validator's text.
+func (v schemaViolations) LogValue() slog.Value {
+	attrs := []slog.Attr{slog.Any("locations", v.locations())}
+	if len(v.keys) > 0 {
+		attrs = append(attrs, slog.Any("keys", v.keys))
+	}
+	return slog.GroupValue(attrs...)
+}
+
+// locations are the schema paths of the failures, as in
+// /properties/email: where the validator stopped, never the value. A
+// property that fails several keywords is listed once.
+func (v schemaViolations) locations() []string {
+	failures := ValidationFailures(v.err)
+	locations := make([]string, len(failures))
+	for i, ve := range failures {
+		locations[i] = ValidationLocation(ve)
+	}
+	slices.Sort(locations)
+	return slices.Compact(locations)
 }
 
 func IsUserInvalid(err error) bool {
@@ -322,8 +380,9 @@ func validateAndFlattenAttributes(schema []byte, doc map[string]any, emptyMessag
 	}
 	if err := jschema.Validate(doc); err != nil {
 		if jsonschema.IsValidationError(err) {
-			return nil, ErrUserAttributesInvalid(err).
-				WithDetails(UserAttributesDetails{Keys: InvalidAttributeKeys(err, doc)})
+			keys := InvalidAttributeKeys(err, doc)
+			return nil, ErrUserAttributesInvalid(schemaViolations{err: err, keys: keys}).
+				WithDetails(UserAttributesDetails{Keys: keys})
 		}
 		return nil, ErrUserInvalid().WithParent(err).WithMessage("user is not valid according to schema")
 	}

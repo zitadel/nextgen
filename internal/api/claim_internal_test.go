@@ -9,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	api "github.com/zitadel/nextgen/api/generated"
+	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/service/mocks"
@@ -242,15 +243,21 @@ func TestAlreadyClaimedResponse(t *testing.T) {
 		DashboardURL: "https://console.invalid/ui/console/projects/proj_1",
 	})
 
-	resp, ok := alreadyClaimedResponse(conflict)
+	ctx := recordingContext(t)
+	resp, ok := alreadyClaimedResponse(ctx, conflict)
 	require.True(t, ok)
 	require.Equal(t, domain.ErrProjectAlreadyClaimed().Code, resp.Code)
 	require.Equal(t, api.TeamID("team_1"), resp.Details.TeamID)
 	require.Equal(t, "https://console.invalid/ui/console/projects/proj_1", resp.Details.DashboardURL.String())
+	recorded, _ := middleware.RecordedError(ctx)
+	require.ErrorIs(t, recorded, conflict, "the typed 409 is recorded for the error line")
 
-	_, ok = alreadyClaimedResponse(domain.ErrProjectClaimExpired())
+	ctx = recordingContext(t)
+	_, ok = alreadyClaimedResponse(ctx, domain.ErrProjectClaimExpired())
 	require.False(t, ok, "wrong code must fall back to the generic envelope")
 
-	_, ok = alreadyClaimedResponse(domain.ErrProjectAlreadyClaimed())
+	_, ok = alreadyClaimedResponse(ctx, domain.ErrProjectAlreadyClaimed())
 	require.False(t, ok, "conflict without details must fall back to the generic envelope")
+	_, recorded2 := middleware.RecordedError(ctx)
+	require.False(t, recorded2, "the generic envelope's line is the error handler's")
 }

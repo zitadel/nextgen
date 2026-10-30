@@ -31,5 +31,10 @@ func runTests(m *testing.M) int {
 	defer pool.Close(ctx)
 
 	harness.DB = service.NewPool(pool)
-	return m.Run()
+	code := m.Run()
+	if err := harness.UnrecordedErrors(); err != nil {
+		slog.Error("teardown: the server answered errors it did not record", slogctx.Err(err))
+		return 1
+	}
+	return code
 }

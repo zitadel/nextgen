@@ -11,6 +11,7 @@ import (
 	"go.uber.org/mock/gomock"
 
 	api "github.com/zitadel/nextgen/api/generated"
+	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
@@ -37,13 +38,18 @@ func TestDeploymentErrorResponseStatuses(t *testing.T) {
 
 // The 409 exists so the caller can retry on top of what actually runs, which
 // only works if details.deployment reaches the caller. Nothing deployed yet
-// is a null deployment rather than a dropped key.
+// is a null deployment rather than a dropped key. The error is recorded for
+// the error line.
 func TestDeploymentConflictCarriesDetails(t *testing.T) {
-	resp, ok := deploymentConflictResponse(domain.ErrDeploymentConflict(domain.DeploymentConflictDetails{}))
+	ctx := recordingContext(t)
+	err := domain.ErrDeploymentConflict(domain.DeploymentConflictDetails{})
+	resp, ok := deploymentConflictResponse(ctx, err)
 	require.True(t, ok)
 	body := resp.DeploymentGuardConflict
 	assert.Equal(t, domain.ErrDeploymentConflict(domain.DeploymentConflictDetails{}).Code, body.Code)
 	assert.True(t, body.Details.Deployment.Null)
+	recorded, _ := middleware.RecordedError(ctx)
+	assert.ErrorIs(t, recorded, err)
 }
 
 // A conflict renders the deployment in the API's shape, kind and status
@@ -62,7 +68,7 @@ func TestDeploymentConflictRendersTheDeployment(t *testing.T) {
 			DeployedByType: new(domain.EventActorTypeService),
 		},
 	}
-	resp, ok := deploymentConflictResponse(domain.ErrDeploymentConflict(domain.DeploymentConflictDetails{Deployment: newest}))
+	resp, ok := deploymentConflictResponse(recordingContext(t), domain.ErrDeploymentConflict(domain.DeploymentConflictDetails{Deployment: newest}))
 	require.True(t, ok)
 	assert.Equal(t, api.NewNilDeployment(api.Deployment{
 		ID:         "dep_1",
@@ -80,18 +86,23 @@ func TestDeploymentConflictRendersTheDeployment(t *testing.T) {
 	}), resp.DeploymentGuardConflict.Details.Deployment)
 }
 
-// A revoked release is the other member of the 409 union.
+// A revoked release is the other member of the 409 union, recorded too.
 func TestDeploymentConflictRendersARevokedRelease(t *testing.T) {
-	resp, ok := deploymentConflictResponse(domain.ErrReleaseRevoked())
+	ctx := recordingContext(t)
+	resp, ok := deploymentConflictResponse(ctx, domain.ErrReleaseRevoked())
 	require.True(t, ok)
 	assert.Equal(t, api.ReleaseRevokedConflictDeploymentConflict, resp.Type)
 	assert.Equal(t, domain.ErrReleaseRevoked().Code, resp.ReleaseRevokedConflict.Code)
+	recorded, _ := middleware.RecordedError(ctx)
+	assert.ErrorIs(t, recorded, domain.ErrReleaseRevoked())
 }
 
-// The 400 names the kind and every missing variable on details, sorted.
+// The 400 names the kind and every missing variable on details, sorted, and
+// records the error for the error line.
 func TestDeploymentVariablesMissingResponse(t *testing.T) {
+	ctx := recordingContext(t)
 	err := domain.ErrDeploymentVariablesMissing(domain.DeploymentOriginKindPreview, []string{"GOOGLE_CLIENT_SECRET", "GOOGLE_CLIENT_ID"})
-	resp, ok := deploymentVariablesMissingResponse(err)
+	resp, ok := deploymentVariablesMissingResponse(ctx, err)
 	require.True(t, ok)
 	body, isMissing := resp.GetDeploymentVariablesMissing()
 	require.True(t, isMissing)
@@ -101,17 +112,25 @@ func TestDeploymentVariablesMissingResponse(t *testing.T) {
 		Kind:  api.DeploymentKindPreview,
 		Names: []string{"GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"},
 	}, body.Details)
+	recorded, _ := middleware.RecordedError(ctx)
+	assert.ErrorIs(t, recorded, err)
 }
 
 func TestDeploymentVariablesMissingResponseIgnoresOtherErrors(t *testing.T) {
-	_, ok := deploymentVariablesMissingResponse(domain.ErrDeploymentInvalid())
+	ctx := recordingContext(t)
+	_, ok := deploymentVariablesMissingResponse(ctx, domain.ErrDeploymentInvalid())
 	assert.False(t, ok)
+	_, recorded := middleware.RecordedError(ctx)
+	assert.False(t, recorded)
 }
 
-// Any other error is left to NewError.
+// Any other error is left to NewError, and to the error handler's line.
 func TestDeploymentConflictResponseIgnoresOtherErrors(t *testing.T) {
-	_, ok := deploymentConflictResponse(domain.ErrDeploymentNotFound())
+	ctx := recordingContext(t)
+	_, ok := deploymentConflictResponse(ctx, domain.ErrDeploymentNotFound())
 	assert.False(t, ok)
+	_, recorded := middleware.RecordedError(ctx)
+	assert.False(t, recorded)
 }
 
 // The explanation is the message, so the body matches the contract.

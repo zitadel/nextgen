@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/errreport"
+	"github.com/zitadel/sloggcp"
 )
 
 func TestError_messageOnly(t *testing.T) {
@@ -100,7 +101,9 @@ func TestError_logValue_nonGCPIncludesLocationWhenEnabled(t *testing.T) {
 }
 
 // A brief line keeps the root cause of a nested domain error, which its
-// Error() text alone would drop, and no location or stack at any depth.
+// Error() text alone would drop, and where it was raised, but no stack at
+// any depth. In GCP mode the location is left to the handler, which reads it
+// through the error's interface.
 func TestError_briefLogValue_keepsNestedCause(t *testing.T) {
 	errreport.EnableLocation(true)
 	errreport.EnableStack(true)
@@ -111,18 +114,62 @@ func TestError_briefLogValue_keepsNestedCause(t *testing.T) {
 
 	err := domain.ErrProjectNotFound().WithParent(
 		domain.ErrInternal(errors.New("pq: connection reset")).WithMessage("failed to load project"))
-	var out bytes.Buffer
-	slog.New(slog.NewJSONHandler(&out, nil)).Info("api error", slog.Attr{Key: "error", Value: err.BriefLogValue()})
+	briefLine := func(t *testing.T) (map[string]any, string) {
+		t.Helper()
+		var out bytes.Buffer
+		slog.New(slog.NewJSONHandler(&out, nil)).Info("api error", slog.Attr{Key: "error", Value: err.BriefLogValue()})
+		var record map[string]any
+		require.NoError(t, json.Unmarshal(out.Bytes(), &record))
+		logged, ok := record["error"].(map[string]any)
+		require.True(t, ok, "the error is a group: %v", record["error"])
+		return logged, out.String()
+	}
 
-	var record map[string]any
-	require.NoError(t, json.Unmarshal(out.Bytes(), &record))
-	parent, ok := record["error"].(map[string]any)["parent"].(map[string]any)
-	require.True(t, ok, "the nested domain error is a group: %v", record["error"])
+	logged, line := briefLine(t)
+	parent, ok := logged["parent"].(map[string]any)
+	require.True(t, ok, "the nested domain error is a group: %v", logged)
 	assert.Equal(t, "internal", parent["code"])
 	assert.Equal(t, "failed to load project", parent["message"])
 	assert.Equal(t, "pq: connection reset", parent["parent"])
-	assert.NotContains(t, out.String(), "reportLocation")
-	assert.NotContains(t, out.String(), "stackTrace")
+	assert.Contains(t, logged, "reportLocation")
+	assert.Contains(t, parent, "reportLocation")
+	assert.NotContains(t, line, "stackTrace")
+
+	t.Run("gcp mode", func(t *testing.T) {
+		errreport.GCPReporting(true)
+		t.Cleanup(func() { errreport.GCPReporting(false) })
+
+		_, line := briefLine(t)
+		assert.NotContains(t, line, "reportLocation")
+		assert.NotContains(t, line, "stackTrace")
+	})
+}
+
+// A brief error hands a handler its location, never its stack.
+func TestError_brief_exposesTheLocationNotTheStack(t *testing.T) {
+	errreport.EnableLocation(true)
+	errreport.EnableStack(true)
+	t.Cleanup(func() {
+		errreport.EnableLocation(true)
+		errreport.EnableStack(true)
+	})
+
+	brief := domain.ErrInternal(errors.New("cause")).Brief()
+
+	located, ok := errors.AsType[sloggcp.ReportLocationError](brief)
+	require.True(t, ok)
+	assert.NotNil(t, located.ReportLocation())
+	_, ok = errors.AsType[sloggcp.StackTraceError](brief)
+	assert.False(t, ok)
+}
+
+func TestIsDependencyFault(t *testing.T) {
+	assert.True(t, domain.IsDependencyFault(domain.ErrUnavailable()), "the database did not answer")
+	assert.True(t, domain.IsDependencyFault(domain.ErrFlowStepRejected().WithParent(domain.ErrFlowSSOUnavailable(errors.New("discovery timed out")))), "a provider did not answer, behind a step rejection")
+	assert.True(t, domain.IsDependencyFault(fmt.Errorf("read: %w", domain.ErrUnavailable())), "a wrapped one")
+	assert.False(t, domain.IsDependencyFault(domain.ErrInternal(errors.New("disk on fire"))), "a server fault of its own")
+	assert.False(t, domain.IsDependencyFault(domain.ErrAuthAttemptNotFound()), "a client error")
+	assert.False(t, domain.IsDependencyFault(nil))
 }
 
 func TestIsServerFault(t *testing.T) {

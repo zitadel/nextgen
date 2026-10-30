@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/zitadel/nextgen/internal/api/middleware"
 	cryptomock "github.com/zitadel/nextgen/internal/crypto/mock"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
@@ -60,48 +62,40 @@ func TestConsoleRuntimeHandlerOmitsAbsentProject(t *testing.T) {
 	assert.JSONEq(t, `{"mode":"standalone"}`, rec.Body.String())
 }
 
+// serveRuntimeLogged serves req behind the request logging the mux mounts the
+// handler with, and returns the response and the error line, parsed, or nil
+// when the request got none.
+func serveRuntimeLogged(t *testing.T, handler http.Handler, req *http.Request) (*httptest.ResponseRecorder, map[string]any) {
+	t.Helper()
+	var logs bytes.Buffer
+	req = req.WithContext(zlog.WithLoggingContext(req.Context(), slog.New(slog.NewJSONHandler(&logs, nil))))
+	rec := httptest.NewRecorder()
+	middleware.WithLogging(handler).ServeHTTP(rec, req)
+
+	var errorLine map[string]any
+	for line := range bytes.Lines(logs.Bytes()) {
+		var record map[string]any
+		require.NoError(t, json.Unmarshal(line, &record))
+		if record["msg"] == "api error" {
+			require.Nil(t, errorLine, "one error line per request")
+			errorLine = record
+		}
+	}
+	return rec, errorLine
+}
+
 // The 500 body is deliberately opaque, so the underlying cause has to reach
 // the log or a broken deployment is undiagnosable from the server side.
 func TestConsoleRuntimeHandlerAnswers500OnResolverError(t *testing.T) {
 	handler := newConsoleRuntimeHandler(staticResolver(consoleRuntime{}, errors.New("db down")))
-	records := &recordingHandler{}
 
-	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, consoleRuntimePath, nil)
-	req = req.WithContext(zlog.WithLoggingContext(req.Context(), slog.New(records)))
-	handler.ServeHTTP(rec, req)
+	rec, line := serveRuntimeLogged(t, handler, httptest.NewRequest(http.MethodGet, consoleRuntimePath, nil))
 
 	assert.Equal(t, http.StatusInternalServerError, rec.Code)
-	require.Len(t, records.records, 1)
-	logged := records.records[0]
-	assert.Equal(t, slog.LevelError, logged.Level)
-	assert.Equal(t, "console runtime resolution failed", logged.Message)
-	assert.Contains(t, recordAttrs(logged), "err=db down")
-}
-
-// recordingHandler captures emitted records so tests can assert on them.
-type recordingHandler struct {
-	records []slog.Record
-}
-
-func (h *recordingHandler) Enabled(context.Context, slog.Level) bool { return true }
-
-func (h *recordingHandler) Handle(_ context.Context, r slog.Record) error {
-	h.records = append(h.records, r)
-	return nil
-}
-
-func (h *recordingHandler) WithAttrs([]slog.Attr) slog.Handler { return h }
-
-func (h *recordingHandler) WithGroup(string) slog.Handler { return h }
-
-func recordAttrs(r slog.Record) []string {
-	var attrs []string
-	r.Attrs(func(attr slog.Attr) bool {
-		attrs = append(attrs, attr.Key+"="+attr.Value.String())
-		return true
-	})
-	return attrs
+	require.NotNil(t, line)
+	assert.Equal(t, "ERROR", line["level"])
+	assert.EqualValues(t, http.StatusInternalServerError, line["status"])
+	assert.Equal(t, "db down", line["error"].(map[string]any)["parent"])
 }
 
 func TestConsoleRuntimeHandlerHeadHasNoBody(t *testing.T) {
@@ -117,11 +111,12 @@ func TestConsoleRuntimeHandlerHeadHasNoBody(t *testing.T) {
 func TestConsoleRuntimeHandlerRejectsNonReadMethods(t *testing.T) {
 	handler := newConsoleRuntimeHandler(staticResolver(consoleRuntime{Mode: ConsoleModeStandalone}, nil))
 
-	rec := httptest.NewRecorder()
-	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, consoleRuntimePath, nil))
+	rec, line := serveRuntimeLogged(t, handler, httptest.NewRequest(http.MethodPost, consoleRuntimePath, nil))
 
 	assert.Equal(t, http.StatusMethodNotAllowed, rec.Code)
 	assert.Equal(t, "GET, HEAD", rec.Header().Get("Allow"))
+	require.NotNil(t, line)
+	assert.Equal(t, domain.ErrRequestMethodNotAllowed().Code, line["error"].(map[string]any)["code"])
 }
 
 // TestLoadConfigReadsPlatformProjectIDEnv locks in the Console ADR 0004 §2

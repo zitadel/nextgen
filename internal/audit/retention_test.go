@@ -1,9 +1,12 @@
 package audit
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -12,6 +15,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/zitadel/nextgen/internal/api/middleware"
+	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 )
 
 type fakePurger struct {
@@ -228,6 +235,72 @@ func TestRetentionJob_TriggerAnswersAFailedPurgeWith500(t *testing.T) {
 
 	assert.Equal(t, http.StatusInternalServerError, rec.Code, "the scheduler's log shows the run failed")
 	assert.Equal(t, "event retention: purge failed\n", rec.Body.String(), "the cause stays in the server's log")
+}
+
+// serveTriggerLogged is serveTrigger behind the request logging the server
+// mounts the trigger with, and returns the error line, parsed, or nil when
+// the request got none.
+func serveTriggerLogged(t *testing.T, trigger http.Handler, method, authorization string) (*httptest.ResponseRecorder, map[string]any) {
+	t.Helper()
+	var logs bytes.Buffer
+	r := httptest.NewRequest(method, RetentionTriggerPath, nil)
+	if authorization != "" {
+		r.Header.Set("Authorization", authorization)
+	}
+	r = r.WithContext(zlog.WithLoggingContext(r.Context(), slog.New(slog.NewJSONHandler(&logs, nil))))
+	rec := httptest.NewRecorder()
+	middleware.WithLogging(trigger).ServeHTTP(rec, r)
+
+	var errorLine map[string]any
+	for line := range bytes.Lines(logs.Bytes()) {
+		var record map[string]any
+		require.NoError(t, json.Unmarshal(line, &record))
+		if record["msg"] == "api error" {
+			require.Nil(t, errorLine, "one error line per request")
+			errorLine = record
+		}
+	}
+	return rec, errorLine
+}
+
+// A refused request or a failed run records its error for the error line:
+// the scheduler's log shows the status, the server's the cause.
+func TestRetentionJob_TriggerRecordsTheErrorItAnswers(t *testing.T) {
+	for _, tt := range []struct {
+		name          string
+		method        string
+		authorization string
+		purger        *fakePurger
+		wantStatus    int
+		wantLevel     string
+		wantCode      string
+		wantParent    string
+	}{
+		{"a method it does not take", http.MethodPut, "Bearer " + testTriggerSecret, &fakePurger{}, http.StatusMethodNotAllowed, "INFO", domain.ErrRequestMethodNotAllowed().Code, ""},
+		{"without the secret", http.MethodGet, "", &fakePurger{}, http.StatusUnauthorized, "INFO", domain.ErrAuthUnauthorized(nil).Code, ""},
+		{"a failed purge", http.MethodGet, "Bearer " + testTriggerSecret, &fakePurger{err: errors.New("failed to connect")}, http.StatusInternalServerError, "ERROR", domain.ErrInternal(nil).Code, "failed to connect"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			rec, line := serveTriggerLogged(t, newTrigger(t, tt.purger), tt.method, tt.authorization)
+
+			require.Equal(t, tt.wantStatus, rec.Code)
+			require.NotNil(t, line)
+			assert.Equal(t, tt.wantLevel, line["level"])
+			assert.EqualValues(t, tt.wantStatus, line["status"])
+			logged := line["error"].(map[string]any)
+			assert.Equal(t, tt.wantCode, logged["code"])
+			if tt.wantParent != "" {
+				assert.Equal(t, tt.wantParent, logged["parent"])
+			}
+		})
+	}
+
+	t.Run("a run that went well", func(t *testing.T) {
+		rec, line := serveTriggerLogged(t, newTrigger(t, &fakePurger{n: 2}), http.MethodGet, "Bearer "+testTriggerSecret)
+
+		require.Equal(t, http.StatusOK, rec.Code)
+		assert.Nil(t, line)
+	})
 }
 
 // slowPurger takes its time, as a purge with a backlog does, unless its

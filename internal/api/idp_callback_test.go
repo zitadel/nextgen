@@ -3,12 +3,13 @@ package api_test
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -215,59 +216,92 @@ func TestIDPCallbackHandler_LoopbackHTTPReadsTheUnprefixedCookie(t *testing.T) {
 	assert.Equal(t, "google", stub.in.ConnectionSlug)
 }
 
+// serveCallbackLogged serves req behind the request logging the server mounts
+// the callback with, and returns the response and the error line, parsed, or
+// nil when the request got none.
+func serveCallbackLogged(t *testing.T, handler http.Handler, req *http.Request) (*httptest.ResponseRecorder, map[string]any) {
+	t.Helper()
+	var logs bytes.Buffer
+	ctx := zlog.WithLoggingContext(req.Context(), slog.New(slog.NewJSONHandler(&logs, nil)))
+	rec := httptest.NewRecorder()
+	middleware.WithLogging(handler).ServeHTTP(rec, req.WithContext(ctx))
+
+	var errorLine map[string]any
+	for line := range bytes.Lines(logs.Bytes()) {
+		var record map[string]any
+		require.NoError(t, json.Unmarshal(line, &record))
+		if record["msg"] == "api error" {
+			require.Nil(t, errorLine, "one error line per request")
+			errorLine = record
+		}
+	}
+	return rec, errorLine
+}
+
 func TestIDPCallbackHandler_RefusesNonGET(t *testing.T) {
 	t.Parallel()
 	stub := &stubSSOCallback{}
 	req := httptest.NewRequest(http.MethodPost, api.IDPCallbackPath("google"), nil)
-	rec := httptest.NewRecorder()
-	callbackMux(t, api.NewIDPCallbackHandler(stub)).ServeHTTP(rec, req)
+	rec, line := serveCallbackLogged(t, callbackMux(t, api.NewIDPCallbackHandler(stub)), req)
 
 	require.Equal(t, http.StatusMethodNotAllowed, rec.Code)
 	assert.Equal(t, http.MethodGet, rec.Header().Get("Allow"))
 	assert.Zero(t, stub.calls)
+	require.NotNil(t, line)
+	assert.Equal(t, domain.ErrRequestMethodNotAllowed().Code, line["error"].(map[string]any)["code"])
 }
 
-// A cancelled request is the client leaving and is not logged as a bug. A
-// deadline is not the client's doing and still is.
-func TestIDPCallbackHandler_LogsUnlessCancelled(t *testing.T) {
+// Every failed callback gets one error line with the cause the page does not
+// show: Info for a refused state, Error for a bug in the process, and Warn
+// when the client had already left.
+func TestIDPCallbackHandler_RecordsTheErrorItAnswers(t *testing.T) {
 	t.Parallel()
+	const refusedTarget = "https://app.example.com//evil.example/login"
+	processFailed := fmt.Errorf("failed to set sso callback result: %w", errors.New("connection reset"))
 	tests := []struct {
-		name      string
-		ctx       func(context.Context) (context.Context, context.CancelFunc)
-		cause     error
-		wantError bool
+		name         string
+		err          error
+		storedTarget string
+		canceled     bool
+		wantStatus   int
+		wantLevel    string
+		wantCode     string
+		wantParent   string
 	}{
-		{
-			name: "cancelled",
-			ctx: func(ctx context.Context) (context.Context, context.CancelFunc) {
-				ctx, cancel := context.WithCancel(ctx)
-				cancel()
-				return ctx, cancel
-			},
-			cause: context.Canceled,
-		},
-		{
-			name: "past its deadline",
-			ctx: func(ctx context.Context) (context.Context, context.CancelFunc) {
-				return context.WithDeadline(ctx, time.Now().Add(-time.Second))
-			},
-			cause:     context.DeadlineExceeded,
-			wantError: true,
-		},
+		{name: "an invalid state", err: domain.ErrSSOStateInvalid(), wantStatus: http.StatusBadRequest, wantLevel: "INFO", wantCode: domain.ErrSSOStateInvalid().Code},
+		{name: "a failed process", err: processFailed, wantStatus: http.StatusInternalServerError, wantLevel: "ERROR", wantCode: "internal", wantParent: "connection reset"},
+		{name: "a failed process after the client left", err: processFailed, canceled: true, wantStatus: http.StatusInternalServerError, wantLevel: "WARN", wantCode: "internal", wantParent: "connection reset"},
+		{name: "a refused return target", storedTarget: refusedTarget, wantStatus: http.StatusInternalServerError, wantLevel: "ERROR", wantCode: "internal"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			var logs bytes.Buffer
-			ctx, cancel := tt.ctx(zlog.WithLoggingContext(t.Context(), slog.New(slog.NewTextHandler(&logs, nil))))
+			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
-			stub := &stubSSOCallback{err: fmt.Errorf("failed to set sso callback result: %w", tt.cause)}
+			if tt.canceled {
+				cancel()
+			}
+			stored := "https://app.example.com/login"
+			if tt.storedTarget != "" {
+				stored = tt.storedTarget
+			}
+			stub := &stubSSOCallback{out: service.FlowSSOCallbackOutput{ReturnTarget: stored}, err: tt.err}
 			req := httptest.NewRequestWithContext(ctx, http.MethodGet, api.IDPCallbackPath("google")+"?state=proj-1.rand&code=the-code", nil)
-			rec := httptest.NewRecorder()
-			callbackMux(t, api.NewIDPCallbackHandler(stub)).ServeHTTP(rec, req)
+			rec, line := serveCallbackLogged(t, callbackMux(t, api.NewIDPCallbackHandler(stub)), req)
 
-			assert.Equal(t, http.StatusInternalServerError, rec.Code)
-			assert.Equal(t, tt.wantError, bytes.Contains(logs.Bytes(), []byte("sso callback processing failed")))
+			assert.Equal(t, tt.wantStatus, rec.Code)
+			require.NotNil(t, line)
+			assert.Equal(t, tt.wantLevel, line["level"])
+			assert.EqualValues(t, tt.wantStatus, line["status"])
+			assert.Equal(t, "idpCallback", line["operation_id"])
+			logged := line["error"].(map[string]any)
+			assert.Equal(t, tt.wantCode, logged["code"])
+			if tt.wantParent != "" {
+				assert.Contains(t, logged["parent"], tt.wantParent)
+			}
+			if tt.storedTarget != "" {
+				assert.Equal(t, tt.storedTarget, line["return_target"])
+			}
 		})
 	}
 }

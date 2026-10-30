@@ -12,7 +12,6 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/errorpage"
 	"github.com/zitadel/nextgen/internal/httputil"
-	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/service"
 )
 
@@ -53,6 +52,7 @@ func (h *IDPCallbackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer span.End()
 	middleware.SetServerSpanContext(ctx, span.SpanContext())
 	if r.Method != http.MethodGet {
+		middleware.RecordError(ctx, domain.ErrRequestMethodNotAllowed())
 		w.Header().Set("Allow", http.MethodGet)
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -77,17 +77,15 @@ func (h *IDPCallbackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "private, no-store")
 	out, err := h.callback.Process(ctx, in)
 	if errors.Is(err, domain.ErrSSOStateInvalid()) {
+		middleware.RecordError(ctx, err)
 		writeIDPCallbackErrorPage(w, r, http.StatusBadRequest)
 		return
 	}
 	if err != nil {
 		// Process logs ceremony failures itself; what reaches here is a bug in
-		// the process, logged with its cause before the cause-free page. A
-		// cancelled request is the client leaving, not a bug; a deadline is
-		// still logged.
-		if !errors.Is(ctx.Err(), context.Canceled) {
-			zlog.GetLoggingContext(ctx).Error("sso callback processing failed", slog.Any("error", err))
-		}
+		// the process, recorded with its cause for the error line ahead of the
+		// cause-free page.
+		middleware.RecordError(ctx, err)
 		writeIDPCallbackErrorPage(w, r, http.StatusInternalServerError)
 		return
 	}
@@ -95,8 +93,7 @@ func (h *IDPCallbackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// where it is used, so a target stored before the check was as strict as it
 	// is now can never be redirected to.
 	if _, err := httputil.ParseRedirectTarget(out.ReturnTarget); err != nil {
-		zlog.GetLoggingContext(ctx).Error("sso callback return target refused",
-			slog.String("return_target", out.ReturnTarget), slog.Any("error", err))
+		middleware.RecordError(ctx, err, slog.String("return_target", out.ReturnTarget))
 		writeIDPCallbackErrorPage(w, r, http.StatusInternalServerError)
 		return
 	}

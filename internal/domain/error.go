@@ -5,6 +5,7 @@ import (
 	"log/slog"
 
 	"github.com/zitadel/nextgen/internal/errreport"
+	"github.com/zitadel/sloggcp"
 )
 
 type Error struct {
@@ -69,8 +70,8 @@ func (e Error) LogValue() slog.Value {
 }
 
 // BriefLogValue is the shape of an error logged below Error level: code,
-// message and the cause chain. Location and stack stay on Error lines
-// (ADR 030).
+// message, the cause chain and, outside GCP mode, where it was raised. The
+// stack stays on Error lines (ADR 030).
 func (e Error) BriefLogValue() slog.Value {
 	attrs := []slog.Attr{
 		slog.String("code", e.Code),
@@ -86,16 +87,26 @@ func (e Error) BriefLogValue() slog.Value {
 	default:
 		attrs = append(attrs, slog.String("parent", e.Parent.Error()))
 	}
+	if errreport.GCPReportingEnabled() {
+		return slog.GroupValue(attrs...)
+	}
+	if loc := e.ReportLocation(); loc != nil {
+		attrs = append(attrs, slog.Any("reportLocation", loc))
+	}
 	return slog.GroupValue(attrs...)
 }
 
 // Brief returns e as an error that logs through BriefLogValue and exposes
-// no location or stack, for lines below Error level (ADR 030).
+// its location but no stack, for lines below Error level (ADR 030).
 func (e Error) Brief() error { return briefError{e} }
 
-type briefError struct{ e Error } // a field, not embedded: Origin's methods must not be promoted
+type briefError struct{ e Error } // a field, not embedded: Origin's StackTrace must not be promoted
 
 func (b briefError) Error() string { return b.e.Message }
+
+// ReportLocation implements [sloggcp.ReportLocationError], so the GCP
+// handler places a brief line too.
+func (b briefError) ReportLocation() *sloggcp.ReportLocation { return b.e.ReportLocation() }
 
 func (b briefError) LogValue() slog.Value { return b.e.BriefLogValue() }
 
@@ -205,6 +216,15 @@ var serverFaultCodes = map[string]bool{
 func IsServerFault(err error) bool {
 	e, ok := errors.AsType[Error](err)
 	return !ok || serverFaultCodes[e.Code]
+}
+
+// IsDependencyFault reports whether err means a system the server depends on,
+// the database or an identity provider, did not answer: the chain carries
+// [ErrUnavailable] or [ErrFlowSSOUnavailable]. The error line logs one at
+// Warn when it is not also a server fault, since the operator may have to
+// act on it while the client got an answer it can act on.
+func IsDependencyFault(err error) bool {
+	return errors.Is(err, ErrUnavailable()) || errors.Is(err, ErrFlowSSOUnavailable(nil))
 }
 
 // RequestInvalidFieldDetails names a request field that failed validation.

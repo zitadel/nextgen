@@ -44,7 +44,7 @@ npx @zitadel/cli@latest start --port 8081
 
 ## Read the server's log
 
-When a sign-in step or a request fails, the browser only says that it did. The server logs why, for example that it could not reach a sign-in provider. Keep the log open in another terminal while you work:
+When a sign-in step or a request fails, the browser only says that it did. The server logs why, as an `api error` line with the error code, the message and the cause. A rejected input or a refused request, for example a password the policy does not accept, is logged at `info`; a sign-in provider or a database the server could not reach at `warn`; a fault of the server's own at `error`. Keep the log open in another terminal while you work:
 
 ```sh
 npx @zitadel/cli@latest logs --follow
@@ -55,6 +55,8 @@ On a terminal, warnings are yellow and errors red. To print only those:
 ```sh
 npx @zitadel/cli@latest logs --level warn
 ```
+
+`--level warn` shows the provider the server could not reach and its own faults. To also see why a step or request was rejected, use `--level info`. The `api error` line and the `request served` line of one request share a `request_id`.
 
 `--level` takes `debug`, `info`, `warn` or `error`. `--tail` sets how many lines to print, 200 by default, counting only the lines `--level` shows. `logs` finds the server from the directory `start` ran in or one inside it.
 

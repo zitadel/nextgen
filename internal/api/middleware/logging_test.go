@@ -52,8 +52,9 @@ func attrString(t *testing.T, r slog.Record, key string) (string, bool) {
 	return value, found
 }
 
-// serve runs handler behind WithLogging for one request and returns the single
-// record it logged.
+// serve runs handler behind WithLogging for one request and returns the
+// request line it logged, which comes last; a failed request has its error
+// line ahead of it (see error_line_test.go).
 func serve(t *testing.T, target string, handler http.HandlerFunc) (slog.Record, *httptest.ResponseRecorder) {
 	t.Helper()
 	var records recordHandler
@@ -61,8 +62,11 @@ func serve(t *testing.T, target string, handler http.HandlerFunc) (slog.Record, 
 	req := httptest.NewRequest(http.MethodGet, target, nil).WithContext(ctx)
 	rec := httptest.NewRecorder()
 	middleware.WithLogging(handler).ServeHTTP(rec, req)
-	require.Len(t, records.records, 1, "exactly one line per request")
-	return records.records[0], rec
+	require.NotEmpty(t, records.records)
+	require.LessOrEqual(t, len(records.records), 2, "one request line, one error line at most")
+	last := records.records[len(records.records)-1]
+	require.Equal(t, "request served", last.Message)
+	return last, rec
 }
 
 func TestWithLogging_oneInfoLinePerRequest(t *testing.T) {

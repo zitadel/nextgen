@@ -230,7 +230,10 @@ func TestFlowSSORedirectIssuer_Issue(t *testing.T) {
 		assert.NotErrorIs(t, err, domain.ErrFlowSSOUnavailable(nil))
 	})
 
-	t.Run("a cancelled request is unavailable without a provider warning", func(t *testing.T) {
+	// The issuer logs nothing itself: the error line of the request that
+	// submitted the provider carries the cause, and tells a cancelled request
+	// apart by its level.
+	t.Run("a cancelled request is unavailable, with the cause naming the provider", func(t *testing.T) {
 		t.Parallel()
 		var logs bytes.Buffer
 		ctx, cancel := context.WithCancel(zlog.WithLoggingContext(t.Context(), slog.New(slog.NewTextHandler(&logs, nil))))
@@ -239,10 +242,11 @@ func TestFlowSSORedirectIssuer_Issue(t *testing.T) {
 		_, err := ssoIssuer(t, []byte(ssoDiscoveryDocument), &fakeAuthAttempts{}, nil, nil, nil).Issue(ctx, ssoIssueInput)
 		require.ErrorIs(t, err, domain.ErrFlowSSOUnavailable(nil))
 		require.ErrorIs(t, err, context.Canceled)
+		assert.Contains(t, errors.Unwrap(err).Error(), `sso provider "google"`)
 		assert.Empty(t, logs.String())
 	})
 
-	t.Run("a request past its deadline is unavailable with a provider warning", func(t *testing.T) {
+	t.Run("a request past its deadline is unavailable, with the cause naming the provider", func(t *testing.T) {
 		t.Parallel()
 		var logs bytes.Buffer
 		ctx, cancel := context.WithDeadline(zlog.WithLoggingContext(t.Context(), slog.New(slog.NewTextHandler(&logs, nil))), time.Now().Add(-time.Second))
@@ -250,7 +254,9 @@ func TestFlowSSORedirectIssuer_Issue(t *testing.T) {
 
 		_, err := ssoIssuer(t, []byte(ssoDiscoveryDocument), &fakeAuthAttempts{}, nil, nil, nil).Issue(ctx, ssoIssueInput)
 		require.ErrorIs(t, err, domain.ErrFlowSSOUnavailable(nil))
-		assert.Contains(t, logs.String(), "sso provider unavailable")
+		require.ErrorIs(t, err, context.DeadlineExceeded)
+		assert.Contains(t, errors.Unwrap(err).Error(), `sso provider "google"`)
+		assert.Empty(t, logs.String())
 	})
 
 	t.Run("attempt error passes through", func(t *testing.T) {

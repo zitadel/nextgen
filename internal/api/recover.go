@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"runtime/debug"
 
+	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
@@ -27,12 +28,12 @@ func WithRecover(next http.Handler) http.Handler {
 			if p == http.ErrAbortHandler {
 				panic(p)
 			}
-			// A panic is a bug whoever is still listening: without the
-			// request's cancel it logs at Error even after the client left.
-			// The domain error takes the panic's stack from its parent,
+			// A panic is a bug whoever is still listening: recorded without
+			// the request's cancel, it logs at Error even after the client
+			// left. The domain error takes the panic's stack from its parent,
 			// whatever the stack trace setting says, and the panic names it.
 			pe := panicError{value: p, stack: debug.Stack()}
-			logAPIError(context.WithoutCancel(r.Context()), http.StatusInternalServerError,
+			middleware.RecordError(context.WithoutCancel(r.Context()),
 				domain.ErrInternal(pe).WithMessage(pe.Error()))
 			if tw.wroteHeader {
 				panic(http.ErrAbortHandler)

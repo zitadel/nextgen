@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	api "github.com/zitadel/nextgen/api/generated"
+	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 )
@@ -17,7 +18,7 @@ func (h *Handler) RevokeRelease(ctx context.Context, params api.RevokeReleasePar
 	}
 
 	entity, err := h.releaseService.Revoke(ctx, string(params.ProjectID), string(params.ReleaseID))
-	if conflict, ok := releaseInUseResponse(err); ok {
+	if conflict, ok := releaseInUseResponse(ctx, err); ok {
 		return conflict, nil
 	}
 	if err != nil {
@@ -27,9 +28,10 @@ func (h *Handler) RevokeRelease(ctx context.Context, params api.RevokeReleasePar
 	return &release, nil
 }
 
-// releaseInUseResponse answers rel.in_use with the typed 409. Through NewError
-// the details would nest under details.details.
-func releaseInUseResponse(err error) (*api.RevokeReleaseConflict, bool) {
+// releaseInUseResponse answers rel.in_use with the typed 409, recorded for
+// the error line. Through NewError the details would nest under
+// details.details.
+func releaseInUseResponse(ctx context.Context, err error) (*api.RevokeReleaseConflict, bool) {
 	de, ok := errors.AsType[domain.Error](err)
 	if !ok || de.Code != domain.ErrReleaseInUse(domain.ReleaseInUseDetails{}).Code {
 		return nil, false
@@ -38,6 +40,7 @@ func releaseInUseResponse(err error) (*api.RevokeReleaseConflict, bool) {
 	if !ok {
 		return nil, false
 	}
+	middleware.RecordError(ctx, err)
 	origins := make([]api.RevokeReleaseConflictDetailsOriginsItem, len(details.Origins))
 	for i, origin := range details.Origins {
 		origins[i] = api.RevokeReleaseConflictDetailsOriginsItem{
@@ -69,7 +72,7 @@ func (h *Handler) BuildRelease(ctx context.Context, req *api.BuildReleaseRequest
 	result, err := h.releaseService.Build(ctx, input)
 	if err != nil {
 		if bundleErr, ok := errors.AsType[*service.BundleValidationError](err); ok {
-			return bundleValidationBadRequest(bundleErr), nil
+			return bundleValidationBadRequest(ctx, bundleErr), nil
 		}
 		return nil, err
 	}
@@ -185,7 +188,10 @@ func mapBuildReleaseRequest(projectID string, req *api.BuildReleaseRequest) (ser
 	return input, nil
 }
 
-func bundleValidationBadRequest(err *service.BundleValidationError) *api.BuildReleaseBadRequest {
+// bundleValidationBadRequest answers the typed 400 naming every resource that
+// failed, recorded for the error line under the code the body carries.
+func bundleValidationBadRequest(ctx context.Context, err *service.BundleValidationError) *api.BuildReleaseBadRequest {
+	middleware.RecordError(ctx, domain.ErrReleaseInvalid(nil, err))
 	resources := make([]api.BundleResourceError, 0, len(err.Resources))
 	for _, failure := range err.Resources {
 		item := api.BundleResourceError{

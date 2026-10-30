@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -397,9 +398,13 @@ func TestSSOCallbackForAReplacedStateFailsLikeAReusedOne(t *testing.T) {
 	requireAuthenticated(t, f.getStep(t, flow))
 }
 
+// requestIDReference is the one part of an error page that differs per
+// request: the reference naming its request id.
+var requestIDReference = regexp.MustCompile(`<code>req_[0-9A-Z]+</code>`)
+
 // Every failure shape answers the same page: a state of another shape, an
 // unknown state and a replayed one must be indistinguishable, so none of them
-// confirms what exists.
+// confirms what exists. Only the request id reference tells the pages apart.
 func TestSSOCallbackAnswersInvalidStatesUniformly(t *testing.T) {
 	f := newSSOCallbackFixture(t)
 	flow := f.startFlow(t, nil)
@@ -420,7 +425,7 @@ func TestSSOCallbackAnswersInvalidStatesUniformly(t *testing.T) {
 		body, err := io.ReadAll(resp.Body)
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusBadRequest, resp.StatusCode, name)
-		pages = append(pages, string(body))
+		pages = append(pages, requestIDReference.ReplaceAllString(string(body), "<code>req_X</code>"))
 	}
 	for _, page := range pages[1:] {
 		assert.Equal(t, pages[0], page, "every invalid state answers the same bytes")

@@ -2,9 +2,12 @@ package helpers
 
 import (
 	"bytes"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
+	"strings"
 	"sync"
 	"testing"
 
@@ -14,6 +17,7 @@ import (
 	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/service"
+	"github.com/zitadel/nextgen/internal/storage/dialect/idgen"
 	"go.opentelemetry.io/otel"
 )
 
@@ -35,6 +39,48 @@ func (h *Harness) ServerLog() string {
 	h.serverLog.mutex.Lock()
 	defer h.serverLog.mutex.Unlock()
 	return h.serverLog.buf.String()
+}
+
+// The fields of a text log line, as WithLogging writes them: the request id
+// at the root and the request fields in the request group.
+var (
+	requestIDField = regexp.MustCompile(`\brequest_id=(\S+)`)
+	methodField    = regexp.MustCompile(`\brequest\.method=(\S+)`)
+	pathField      = regexp.MustCompile(`\brequest\.path=("[^"]*"|\S+)`)
+)
+
+func logField(pattern *regexp.Regexp, line string) string {
+	if match := pattern.FindStringSubmatch(line); match != nil {
+		return match[1]
+	}
+	return ""
+}
+
+// UnrecordedErrors is non-nil when the server under test answered an error
+// without recording its cause (middleware.UnrecordedErrorMessage), and names
+// each such request by the request line sharing its request id. The run
+// fails on it: the route that answered calls middleware.RecordError.
+func (h *Harness) UnrecordedErrors() error {
+	requests := map[string]string{}
+	var unrecorded []string
+	for line := range strings.Lines(h.ServerLog()) {
+		id := logField(requestIDField, line)
+		switch {
+		case strings.Contains(line, `msg="request served"`):
+			requests[id] = logField(methodField, line) + " " + logField(pathField, line)
+		case strings.Contains(line, `msg="`+middleware.UnrecordedErrorMessage+`"`):
+			unrecorded = append(unrecorded, id)
+		}
+	}
+	if len(unrecorded) == 0 {
+		return nil
+	}
+	named := make([]string, len(unrecorded))
+	for i, id := range unrecorded {
+		named[i] = requests[id] + " (request_id " + id + ")"
+	}
+	return fmt.Errorf("%d answers without a recorded error, see middleware.RecordError: %s",
+		len(named), strings.Join(named, "; "))
 }
 
 func (h *Harness) EnsureTestServer(t testing.TB) *httptest.Server {
@@ -64,11 +110,12 @@ func (h *Harness) EnsureTestServer(t testing.TB) *httptest.Server {
 
 // withServerLog hands every request a logger collecting into the harness, the
 // way the production middleware hands one writing to the process log, and runs
-// the production request logging and panic recovery on top so the buffer holds
-// real log lines.
+// the production request ID, request logging and panic recovery on top so the
+// buffer holds real log lines, each naming its request.
 func (h *Harness) withServerLog(next http.Handler) http.Handler {
 	logger := slog.New(slog.NewTextHandler(&h.serverLog, nil))
-	logging := middleware.WithLogging(api.WithRecover(next))
+	logging := middleware.WithRequestContextMiddleware(idgen.NewULID(), "",
+		middleware.WithLogging(api.WithRecover(next)))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		logging.ServeHTTP(w, r.WithContext(zlog.WithLoggingContext(r.Context(), logger)))
 	})

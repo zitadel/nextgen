@@ -9,6 +9,7 @@ import (
 
 	"github.com/muhlemmer/gu"
 	api "github.com/zitadel/nextgen/api/generated"
+	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
@@ -23,7 +24,7 @@ func (h *Handler) InitClaim(ctx context.Context, params api.InitClaimParams) (ap
 	scopeCtx, _ := GetScopeContext(ctx)
 	res, err := h.claimService.Init(ctx, projectID, scopeCtx.SecretHash)
 	if err != nil {
-		if resp, ok := alreadyClaimedResponse(err); ok {
+		if resp, ok := alreadyClaimedResponse(ctx, err); ok {
 			return resp, nil
 		}
 		return nil, err
@@ -77,7 +78,7 @@ func (h *Handler) CompleteClaim(ctx context.Context, req *api.CompleteClaimReque
 	}
 	res, err := h.claimService.Complete(ctx, string(params.ProjectID), string(req.ChallengeID), userID)
 	if err != nil {
-		if resp, ok := alreadyClaimedResponse(err); ok {
+		if resp, ok := alreadyClaimedResponse(ctx, err); ok {
 			return resp, nil
 		}
 		return nil, err
@@ -154,10 +155,11 @@ func (h Handler) verifyClaimSession(ctx context.Context) (string, error) {
 // ------------------ Errors ---------------
 
 // alreadyClaimedResponse converts proj.already_claimed into the typed 409 body
-// with flat details {team_id, dashboard_url}. Routing it through NewError
-// instead would nest the producer details under details.details (ADR 030
-// envelope), which the CLI (error.body.details.team_id) cannot read.
-func alreadyClaimedResponse(err error) (*api.AlreadyClaimedResponse, bool) {
+// with flat details {team_id, dashboard_url}, recorded for the error line.
+// Routing it through NewError instead would nest the producer details under
+// details.details (ADR 030 envelope), which the CLI
+// (error.body.details.team_id) cannot read.
+func alreadyClaimedResponse(ctx context.Context, err error) (*api.AlreadyClaimedResponse, bool) {
 	de, ok := errors.AsType[domain.Error](err)
 	if !ok || de.Code != domain.ErrProjectAlreadyClaimed().Code {
 		return nil, false
@@ -172,6 +174,7 @@ func alreadyClaimedResponse(err error) (*api.AlreadyClaimedResponse, bool) {
 		// conflict the service already resolved.
 		return nil, false
 	}
+	middleware.RecordError(ctx, err)
 	return &api.AlreadyClaimedResponse{
 		Code:    de.Code,
 		Message: de.Message,

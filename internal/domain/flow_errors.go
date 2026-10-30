@@ -52,6 +52,14 @@ func ErrFlowIntegrity() Error {
 	return newError(PrefixFlow.ErrorCodePrefix("integrity"), "flow state integrity violation", nil, nil)
 }
 
+// ErrFlowStepRejected is the cause the API logs when a step keeps the user on
+// it with a step error (a wrong password, a taken value, a field that fails a
+// rule). It is log-only and never on the wire: the step error key replaces its
+// message, and the error that decided the rejection, if any, is its parent.
+func ErrFlowStepRejected() Error {
+	return newError(PrefixFlow.ErrorCodePrefix("step_rejected"), "the step rejected the submission", nil, nil)
+}
+
 // ErrFlowSSOUnavailable reports a provider the engine could not start a
 // sign-in with: discovery failed or the connection document breaks a
 // protocol rule. The user stays on the step and may pick another method;

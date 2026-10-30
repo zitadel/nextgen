@@ -175,6 +175,7 @@ func TestBuildHTTPMuxServesRuntimeDocumentWithTheConsoleOff(t *testing.T) {
 	require.Equal(t, http.StatusOK, rec.Code)
 	assert.Empty(t, rec.Header().Get("X-Test-Handler"), "runtime document must not fall through to the API")
 	assert.JSONEq(t, `{"mode":"standalone","console_project_id":"proj_first"}`, rec.Body.String())
+	assert.NotEmpty(t, rec.Header().Get("X-Request-Id"), "the runtime document takes the request ID and the request line")
 
 	// With the console off, its prefix is not a mount at all.
 	assert.Equal(t, "api", get(t, mux, "/ui/console/").Header().Get("X-Test-Handler"))

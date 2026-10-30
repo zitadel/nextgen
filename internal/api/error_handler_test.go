@@ -28,7 +28,6 @@ import (
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/service/mocks"
-	"github.com/zitadel/sloggcp"
 	"go.uber.org/mock/gomock"
 )
 
@@ -471,6 +470,7 @@ var unmappedClientCodes = map[string]bool{
 	"claim.session_wrong_project": true,
 	"enc_key.no_replacement_key":  true,
 	"enc_key.not_found":           true,
+	"flow.step_rejected":          true,
 	"idp.endpoint_cleartext":      true,
 	"idp.endpoints_partial":       true,
 	"idp.protocol_block_missing":  true,
@@ -531,19 +531,19 @@ func TestErrorResponse_serverFaultsAre5xx(t *testing.T) {
 // built in the error handler, so its cause and origin stay on the line. The
 // body keeps the stable code and message.
 func TestOgenErrorHandlerLogsTheCSRFErrorItWasGiven(t *testing.T) {
-	records := recordLogs(t)
 	err := &ogenerrors.SecurityError{
 		Security: "NextgenSession",
 		Err:      domain.ErrAuthCSRFInvalid().WithParent(errors.New("origin mismatch")),
 	}
-	rec := httptest.NewRecorder()
-	OgenErrorHandler(t.Context(), rec, httptest.NewRequest(http.MethodPost, "/teams", nil), err)
+	rec, records := serveLogged(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		OgenErrorHandler(r.Context(), w, r, err)
+	}), httptest.NewRequest(http.MethodPost, "/teams", nil))
 
 	require.Equal(t, http.StatusForbidden, rec.Code)
 	want := domain.ErrAuthCSRFInvalid()
 	require.JSONEq(t, fmt.Sprintf(`{"code":%q,"message":%q}`, want.Code, want.Message), rec.Body.String())
-	require.Len(t, records(), 1)
-	require.Equal(t, "origin mismatch", records()[0]["error"].(map[string]any)["parent"])
+	require.Len(t, records, 1)
+	require.Equal(t, "origin mismatch", records[0]["error"].(map[string]any)["parent"])
 }
 
 // A security handler that cannot reach a decision (the CSRF request state is
@@ -774,27 +774,51 @@ func (h errorStubHandler) GetLive(context.Context) (api.GetLiveRes, error) {
 	return nil, h.err
 }
 
-// serveAndRecordLogs serves req the way the production chain does (WithRecover
-// around the generated server, ogen's operation id middleware, a request
-// logger that carries the request id, as WithLogging sets it) and returns the
-// response and every record logged while serving it (see recordLogs). Not
-// parallel: it changes globals.
+// serveAndRecordLogs serves req the way the production chain does (WithLogging
+// and WithRecover around the generated server, ogen's operation id middleware)
+// and returns the response and every record logged while serving it, except
+// the request line (see serveLogged). Not parallel: it changes globals.
 func serveAndRecordLogs(t *testing.T, h api.Handler, tokenService service.TokenService, req *http.Request) (*httptest.ResponseRecorder, []map[string]any) {
 	t.Helper()
-	records := recordLogs(t)
-
 	srv, err := api.NewServer(h, NewSecurityHandler(tokenService),
 		api.WithErrorHandler(OgenErrorHandler),
 		api.WithMiddleware(middleware.AddOperationIdToContext()),
 	)
 	require.NoError(t, err)
+	return serveLogged(t, WithRecover(srv), req)
+}
 
+// serveLogged serves req through WithLogging and h, with a request logger
+// writing to the JSON recorder of recordLogs, and returns the response and
+// every record logged while serving it except the request line, which is
+// WithLogging's own and tested with it. Not parallel: it changes globals.
+func serveLogged(t *testing.T, h http.Handler, req *http.Request) (*httptest.ResponseRecorder, []map[string]any) {
+	t.Helper()
+	records := recordLogs(t)
 	ctx := middleware.WithRequestIDContext(req.Context(), "req_1")
-	ctx = zlog.WithLoggingContext(ctx, slog.Default().With("request_id", "req_1"))
-	ctx = middleware.WithOperationIDContext(ctx, "")
+	ctx = zlog.WithLoggingContext(ctx, slog.Default())
 	rec := httptest.NewRecorder()
-	WithRecover(srv).ServeHTTP(rec, req.WithContext(ctx))
-	return rec, records()
+	middleware.WithLogging(h).ServeHTTP(rec, req.WithContext(ctx))
+
+	var logged []map[string]any
+	for _, record := range records() {
+		if record["msg"] != "request served" {
+			logged = append(logged, record)
+		}
+	}
+	return rec, logged
+}
+
+// recordingContext returns a context RecordError records into, as a request
+// behind WithLogging has one.
+func recordingContext(t *testing.T) context.Context {
+	t.Helper()
+	var ctx context.Context
+	req := httptest.NewRequest(http.MethodGet, "/", nil).WithContext(zlog.WithLoggingContext(t.Context(), slog.New(slog.DiscardHandler)))
+	middleware.WithLogging(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		ctx = r.Context()
+	})).ServeHTTP(httptest.NewRecorder(), req)
+	return ctx
 }
 
 // recordLogs points slog.Default, which every logger lookup without a request
@@ -870,8 +894,8 @@ func TestOgenErrorHandlerLogsClientErrorAtInfo(t *testing.T) {
 	requireBriefError(t, records[0], err.Code, err.Message, "no rows in result set")
 }
 
-// requireBriefError asserts the record logs the error without its location
-// and stack, as every line below Error level does.
+// requireBriefError asserts the record logs the error with where it was
+// raised but without its stack, as every line below Error level does.
 func requireBriefError(t *testing.T, record map[string]any, code, message, parent string) {
 	t.Helper()
 	logged, ok := record["error"].(map[string]any)
@@ -879,7 +903,7 @@ func requireBriefError(t *testing.T, record map[string]any, code, message, paren
 	require.Equal(t, code, logged["code"])
 	require.Equal(t, message, logged["message"])
 	require.Contains(t, logged["parent"], parent)
-	require.NotContains(t, logged, "reportLocation")
+	require.Contains(t, logged, "reportLocation")
 	require.NotContains(t, logged, "stackTrace")
 }
 
@@ -998,83 +1022,6 @@ func TestOgenErrorHandlerLogsClientCancelAtWarn(t *testing.T) {
 	}
 }
 
-// A line below Error level carries no location or stack in any mode. A text
-// or JSON handler reads the error through its log value; GCP error reporting
-// builds a report from any `error` attribute and reads the location and stack
-// through the error's interfaces, at every level. A 5xx keeps both.
-func TestLogAPIErrorBriefLinesCarryNoStackInGCPMode(t *testing.T) {
-	enableErrorOrigins(t)
-	notFound := domain.ErrProjectNotFound().WithParent(errors.New("no rows in result set"))
-	internal := domain.ErrInternal(errors.New("disk on fire"))
-
-	t.Run("plain mode", func(t *testing.T) {
-		logged := loggedErrorValue(t, logAPIErrorRecord(t, http.StatusNotFound, notFound)).Resolve()
-		require.Equal(t, slog.KindGroup, logged.Kind())
-		var keys []string
-		for _, attr := range logged.Group() {
-			keys = append(keys, attr.Key)
-		}
-		require.ElementsMatch(t, []string{"code", "message", "parent"}, keys)
-	})
-
-	t.Run("gcp mode", func(t *testing.T) {
-		errreport.GCPReporting(true)
-		t.Cleanup(func() { errreport.GCPReporting(false) })
-
-		brief := gcpReport(t, logAPIErrorRecord(t, http.StatusNotFound, notFound))
-		require.Contains(t, brief, notFound.Message)
-		require.NotContains(t, brief, "goroutine")
-		require.NotContains(t, brief, "unsupported type")
-
-		require.Contains(t, gcpReport(t, logAPIErrorRecord(t, http.StatusInternalServerError, internal)), "goroutine")
-	})
-}
-
-// logAPIErrorRecord returns the record logAPIError writes, before any handler
-// resolves its values.
-func logAPIErrorRecord(t *testing.T, status int, err domain.Error) slog.Record {
-	t.Helper()
-	var records []slog.Record
-	logAPIError(zlog.WithLoggingContext(t.Context(), slog.New(recordingHandler{records: &records})), status, err)
-	require.Len(t, records, 1)
-	return records[0]
-}
-
-func loggedErrorValue(t *testing.T, record slog.Record) slog.Value {
-	t.Helper()
-	var logged slog.Value
-	record.Attrs(func(a slog.Attr) bool {
-		if a.Key == zlog.ErrorAttributeKey {
-			logged = a.Value
-		}
-		return true
-	})
-	return logged
-}
-
-// gcpReport is what the GCP error reporting handler writes for record.
-func gcpReport(t *testing.T, record slog.Record) string {
-	t.Helper()
-	var out bytes.Buffer
-	require.NoError(t, sloggcp.NewErrorReportingHandler(&out, nil).Handle(t.Context(), record))
-	return out.String()
-}
-
-// recordingHandler keeps every record as logged, before any handler
-// resolves its values.
-type recordingHandler struct{ records *[]slog.Record }
-
-func (h recordingHandler) Enabled(context.Context, slog.Level) bool { return true }
-
-func (h recordingHandler) Handle(_ context.Context, r slog.Record) error {
-	*h.records = append(*h.records, r.Clone())
-	return nil
-}
-
-func (h recordingHandler) WithAttrs([]slog.Attr) slog.Handler { return h }
-
-func (h recordingHandler) WithGroup(string) slog.Handler { return h }
-
 // newRouterTestServer is newErrorHandlerTestServer with the answers to a path
 // or method no operation takes, as the server mounts them (ADR 076).
 func newRouterTestServer(t *testing.T, home *errorpage.Link) *api.Server {
@@ -1169,6 +1116,47 @@ func TestOgenMethodNotAllowed(t *testing.T) {
 		require.Equal(t, "GET", rec.Header().Get("Access-Control-Allow-Methods"))
 		require.Empty(t, rec.Header().Get("Allow"))
 		require.Empty(t, rec.Body.String())
+	})
+}
+
+// The answers to a path or method no operation takes record their error, so
+// the request gets its error line with the code the body carries, page or
+// envelope. A CORS preflight is no error. Not parallel: serveLogged changes
+// globals.
+func TestOgenRouterAnswersRecordTheirError(t *testing.T) {
+	srv := newRouterTestServer(t, &errorpage.Link{Label: "Open the console", Href: "/ui/console/"})
+	for _, tc := range []struct {
+		name, method, path, accept string
+		wantStatus                 int
+		wantCode                   string
+	}{
+		{"a path nothing serves", http.MethodGet, "/no-such-path", "*/*", http.StatusNotFound, domain.ErrRequestNotFound().Code},
+		{"a browser on a path nothing serves", http.MethodGet, "/no-such-path", "text/html", http.StatusNotFound, domain.ErrRequestNotFound().Code},
+		{"a method the path does not take", http.MethodDelete, "/livez", "", http.StatusMethodNotAllowed, domain.ErrRequestMethodNotAllowed().Code},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(tc.method, tc.path, nil)
+			if tc.accept != "" {
+				req.Header.Set("Accept", tc.accept)
+			}
+			rec, records := serveLogged(t, srv, req)
+
+			require.Equal(t, tc.wantStatus, rec.Code)
+			require.Len(t, records, 1)
+			require.Equal(t, "INFO", records[0]["level"])
+			require.Equal(t, "api error", records[0]["msg"])
+			require.EqualValues(t, tc.wantStatus, records[0]["status"])
+			require.Equal(t, tc.wantCode, records[0]["error"].(map[string]any)["code"])
+		})
+	}
+
+	t.Run("CORS preflight", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodOptions, "/livez", nil)
+		req.Header.Set("Access-Control-Request-Method", "GET")
+		rec, records := serveLogged(t, srv, req)
+
+		require.Equal(t, http.StatusNoContent, rec.Code)
+		require.Empty(t, records)
 	})
 }
 

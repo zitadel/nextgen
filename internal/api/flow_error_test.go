@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	api "github.com/zitadel/nextgen/api/generated"
+	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
@@ -155,7 +156,7 @@ func TestMapFlowErrorStatus_usesFlowSentinels(t *testing.T) {
 func TestMapFlowGetError_restartRequiredIs409(t *testing.T) {
 	t.Parallel()
 
-	res, err := mapFlowGetError(fmt.Errorf("%w: other schema", domain.ErrFlowRestartRequired()))
+	res, err := mapFlowGetError(recordingContext(t), fmt.Errorf("%w: other schema", domain.ErrFlowRestartRequired()))
 	require.NoError(t, err)
 	conflict, ok := res.(*api.GetFlowStepConflict)
 	require.True(t, ok, "got %T", res)
@@ -166,9 +167,50 @@ func TestMapFlowGetError_restartRequiredIs409(t *testing.T) {
 func TestMapFlowGetError_releaseRevokedIs409(t *testing.T) {
 	t.Parallel()
 
-	res, err := mapFlowGetError(domain.ErrReleaseRevoked())
+	res, err := mapFlowGetError(recordingContext(t), domain.ErrReleaseRevoked())
 	require.NoError(t, err)
 	conflict, ok := res.(*api.GetFlowStepConflict)
 	require.True(t, ok, "got %T", res)
 	assert.Equal(t, "rel.revoked", string(conflict.Code))
+}
+
+// Every typed answer bypasses the ogen error sink, so mapFlowGetError records
+// the error it decided on, wrapping and all, for the error line; an error it
+// does not answer goes back to ogen unrecorded, which records it itself.
+func TestMapFlowGetError_recordsTheErrorItAnswers(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		err  error
+		want api.GetFlowStepRes
+	}{
+		{name: "an invalid cookie", err: domain.ErrFlowCookieInvalid(), want: &api.GetFlowStepNotFound{}},
+		{name: "an expired cookie", err: domain.ErrFlowCookieExpired(), want: &api.GetFlowStepNotFound{}},
+		{name: "an unknown flow", err: fmt.Errorf("open: %w", domain.ErrFlowNotFound()), want: &api.GetFlowStepNotFound{}},
+		{name: "a completed flow", err: domain.ErrFlowCompleted(), want: &api.GetFlowStepGone{}},
+		{name: "a restart", err: domain.ErrFlowRestartRequired().WithParent(errors.New("other schema")), want: &api.GetFlowStepConflict{}},
+		{name: "a revoked release", err: domain.ErrReleaseRevoked(), want: &api.GetFlowStepConflict{}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ctx := recordingContext(t)
+			res, err := mapFlowGetError(ctx, tt.err)
+			require.NoError(t, err)
+			require.IsType(t, tt.want, res)
+			recorded, ok := middleware.RecordedError(ctx)
+			require.True(t, ok, "the answer records its error")
+			assert.Equal(t, tt.err, recorded, "the original error, with its cause and location")
+		})
+	}
+
+	t.Run("an error it does not answer", func(t *testing.T) {
+		t.Parallel()
+		ctx := recordingContext(t)
+		res, err := mapFlowGetError(ctx, errors.New("disk on fire"))
+		require.Error(t, err)
+		assert.Nil(t, res)
+		_, ok := middleware.RecordedError(ctx)
+		assert.False(t, ok, "ogen's sink records what it is handed")
+	})
 }

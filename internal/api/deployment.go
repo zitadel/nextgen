@@ -8,6 +8,7 @@ import (
 	"time"
 
 	api "github.com/zitadel/nextgen/api/generated"
+	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 )
@@ -48,10 +49,10 @@ func (h *Handler) CreateDeployment(ctx context.Context, req *api.CreateDeploymen
 	}
 
 	result, err := h.deploymentService.Deploy(ctx, input)
-	if conflict, ok := deploymentConflictResponse(err); ok {
+	if conflict, ok := deploymentConflictResponse(ctx, err); ok {
 		return conflict, nil
 	}
-	if missing, ok := deploymentVariablesMissingResponse(err); ok {
+	if missing, ok := deploymentVariablesMissingResponse(ctx, err); ok {
 		return missing, nil
 	}
 	if err != nil {
@@ -86,7 +87,7 @@ func (h *Handler) RollbackDeployment(ctx context.Context, req api.OptRollbackDep
 	}
 
 	result, err := h.deploymentService.Rollback(ctx, input)
-	if conflict, ok := deploymentConflictResponse(err); ok {
+	if conflict, ok := deploymentConflictResponse(ctx, err); ok {
 		return conflict, nil
 	}
 	if err != nil {
@@ -222,20 +223,22 @@ func (h *Handler) RemovePreview(ctx context.Context, req *api.RemovePreviewReque
 }
 
 // deploymentConflictResponse answers dep.conflict with the typed 409, whose
-// details.deployment is the deployment the write replaces. Through NewError
-// the details would nest under details.details.
-func deploymentConflictResponse(err error) (*api.DeploymentConflict, bool) {
+// details.deployment is the deployment the write replaces, recorded for the
+// error line. Through NewError the details would nest under details.details.
+func deploymentConflictResponse(ctx context.Context, err error) (*api.DeploymentConflict, bool) {
 	de, ok := errors.AsType[domain.Error](err)
 	if !ok {
 		return nil, false
 	}
 	if de.Code == domain.ErrReleaseRevoked().Code {
+		middleware.RecordError(ctx, err)
 		resp := api.NewReleaseRevokedConflictDeploymentConflict(api.ReleaseRevokedConflict{Code: de.Code, Message: de.Message})
 		return &resp, true
 	}
 	if de.Code != domain.ErrDeploymentConflict(domain.DeploymentConflictDetails{}).Code {
 		return nil, false
 	}
+	middleware.RecordError(ctx, err)
 	body := api.DeploymentGuardConflict{Code: de.Code, Message: de.Message}
 	if details, _ := de.Details.(domain.DeploymentConflictDetails); details.Deployment != nil {
 		// The deployment a write replaces is the newest one.
@@ -248,9 +251,10 @@ func deploymentConflictResponse(err error) (*api.DeploymentConflict, bool) {
 }
 
 // deploymentVariablesMissingResponse answers dep.variables_missing with the
-// typed 400, whose details.kind and details.names sit on the body. Through
-// NewError the details would nest under details.details.
-func deploymentVariablesMissingResponse(err error) (*api.CreateDeploymentBadRequest, bool) {
+// typed 400, whose details.kind and details.names sit on the body, recorded
+// for the error line. Through NewError the details would nest under
+// details.details.
+func deploymentVariablesMissingResponse(ctx context.Context, err error) (*api.CreateDeploymentBadRequest, bool) {
 	de, ok := errors.AsType[domain.Error](err)
 	if !ok || de.Code != domain.ErrDeploymentVariablesMissing(domain.DeploymentOriginKindPrimary, nil).Code {
 		return nil, false
@@ -259,6 +263,7 @@ func deploymentVariablesMissingResponse(err error) (*api.CreateDeploymentBadRequ
 	if !ok {
 		return nil, false
 	}
+	middleware.RecordError(ctx, err)
 	resp := api.NewDeploymentVariablesMissingCreateDeploymentBadRequest(api.DeploymentVariablesMissing{
 		Code:    de.Code,
 		Message: de.Message,

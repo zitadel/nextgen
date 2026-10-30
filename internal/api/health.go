@@ -2,12 +2,12 @@ package api
 
 import (
 	"context"
-	"log/slog"
 	"strings"
 	"time"
 
 	api "github.com/zitadel/nextgen/api/generated"
-	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
+	"github.com/zitadel/nextgen/internal/api/middleware"
+	"github.com/zitadel/nextgen/internal/domain"
 )
 
 // The probes answer two questions apart (ADR 079 §5): /livez whether to
@@ -38,16 +38,18 @@ func (h *Handler) GetLive(ctx context.Context) (api.GetLiveRes, error) {
 }
 
 // GetReady answers ok once the database answers a ping within readyTimeout:
-// one round trip on the pool.
+// one round trip on the pool. A 503 records why for the error line.
 func (h *Handler) GetReady(ctx context.Context) (api.GetReadyRes, error) {
 	if h.readiness == nil {
+		middleware.RecordError(ctx, domain.ErrUnavailable())
 		return notReady(), nil
 	}
-	ctx, cancel := context.WithTimeout(ctx, readyTimeout)
+	// Recorded on the request's context, not the ping's: a ping at its
+	// deadline is the database not answering, not the client leaving.
+	pingCtx, cancel := context.WithTimeout(ctx, readyTimeout)
 	defer cancel()
-	if err := h.readiness.Ping(ctx); err != nil {
-		// The request log records the 503; this line says why.
-		zlog.GetLoggingContext(ctx).Warn("not ready: the database did not answer", slog.Any("error", err))
+	if err := h.readiness.Ping(pingCtx); err != nil {
+		middleware.RecordError(ctx, domain.ErrUnavailable().WithParent(err))
 		return notReady(), nil
 	}
 	return &api.GetReadyOK{Data: strings.NewReader("ok")}, nil

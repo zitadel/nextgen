@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net/http"
 
 	"github.com/zitadel/nextgen/internal/crypto"
@@ -42,16 +41,16 @@ func (i *FlowSSORedirectIssuer) Issue(ctx context.Context, in domain.FlowIssueSS
 	// engine's codes on the submit endpoint, where unavailable hides them.
 	conn, parseErr := idp.ParseConnection(connection.RevisionID, connection.Document)
 	if parseErr != nil {
-		return domain.FlowSSORedirectOutput{}, i.unavailable(ctx, in, parseErr)
+		return domain.FlowSSORedirectOutput{}, i.unavailable(in, parseErr)
 	}
 	// The client secret is not read here: the authorize request does not
 	// use it.
 	if resolveErr := resolveSSOClientID(ctx, i.variables, in.ProjectID, sealedDeploymentID(ctx), &conn); resolveErr != nil {
-		return domain.FlowSSORedirectOutput{}, i.unavailable(ctx, in, resolveErr)
+		return domain.FlowSSORedirectOutput{}, i.unavailable(in, resolveErr)
 	}
 	client, clientErr := idp.NewOIDCClient(ctx, conn, in.RedirectURI, i.httpClient)
 	if clientErr != nil {
-		return domain.FlowSSORedirectOutput{}, i.unavailable(ctx, in, clientErr)
+		return domain.FlowSSORedirectOutput{}, i.unavailable(in, clientErr)
 	}
 	var encrypter crypto.Encrypter
 	if conn.OIDC.PKCEEnabled {
@@ -185,23 +184,15 @@ func (i *FlowSSORedirectIssuer) connectionForSlug(ctx context.Context, projectID
 }
 
 // unavailable turns an engine rejection of the connection into the step
-// error the user can act on, and logs the cause the user must not see. An
-// internal error is a bug in this process, not the provider, and stays
-// internal; it is wrapped rather than passed so the error analysis does not
-// put the engine's codes on the submit endpoint.
-func (i *FlowSSORedirectIssuer) unavailable(ctx context.Context, in domain.FlowIssueSSORedirectInput, err error) error {
+// error the user can act on. The cause the user must not see names the
+// provider and reaches the log on the request's error line, which also
+// decides its level: a cancelled request fails the discovery fetch too, and
+// is told apart there. An internal error is a bug in this process, not the
+// provider, and stays internal; it is wrapped rather than passed so the error
+// analysis does not put the engine's codes on the submit endpoint.
+func (i *FlowSSORedirectIssuer) unavailable(in domain.FlowIssueSSORedirectInput, err error) error {
 	if errors.Is(err, domain.ErrInternal(nil)) {
 		return domain.ErrInternal(err)
 	}
-	// A cancelled request fails the discovery fetch too; that is not the
-	// provider's fault, and the client is gone, so no warning. A deadline is
-	// still logged.
-	if !errors.Is(ctx.Err(), context.Canceled) {
-		getLoggingContext(ctx, "flow").Warn("sso provider unavailable",
-			slog.String("project_id", in.ProjectID),
-			slog.String("slug", in.ProviderSlug),
-			slog.Any("error", err),
-		)
-	}
-	return domain.ErrFlowSSOUnavailable(err)
+	return domain.ErrFlowSSOUnavailable(fmt.Errorf("sso provider %q: %w", in.ProviderSlug, err))
 }

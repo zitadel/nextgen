@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	api "github.com/zitadel/nextgen/api/generated"
+	"github.com/zitadel/nextgen/internal/domain"
 )
 
 // fakeDatabase answers a ping with err, and keeps the deadline it was asked
@@ -65,6 +66,33 @@ func TestProbes(t *testing.T) {
 			live := probe(srv, "/livez")
 			require.Equal(t, http.StatusOK, live.Code)
 			require.Equal(t, "ok", live.Body.String())
+		})
+	}
+}
+
+// A 503 records why, for the error line: the ping failed, or there is no
+// database to ask. Not parallel: serveLogged changes globals.
+func TestReadyzRecordsWhyItIsNotReady(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		database   Pinger
+		wantParent string
+	}{
+		{"the database is unreachable", &fakeDatabase{err: errors.New("dial tcp 127.0.0.1:5432: connect: connection refused")}, "connection refused"},
+		{"no database to ask", nil, ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			rec, records := serveLogged(t, newHealthTestServer(t, tc.database), httptest.NewRequest(http.MethodGet, "/readyz", nil))
+
+			require.Equal(t, http.StatusServiceUnavailable, rec.Code)
+			require.Len(t, records, 1)
+			require.Equal(t, "ERROR", records[0]["level"])
+			require.Equal(t, "api error", records[0]["msg"])
+			logged := records[0]["error"].(map[string]any)
+			require.Equal(t, domain.ErrUnavailable().Code, logged["code"])
+			if tc.wantParent != "" {
+				require.Contains(t, logged["parent"], tc.wantParent)
+			}
 		})
 	}
 }

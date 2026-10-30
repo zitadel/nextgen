@@ -2,12 +2,15 @@ package api
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/errreport"
+	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 )
 
 // A panicking handler answers the standard internal error and is logged as
@@ -49,18 +52,27 @@ func TestWithRecoverLogsPanicAtErrorAfterTheClientLeft(t *testing.T) {
 
 // A panic after the response started cannot be answered any more: the
 // connection is aborted, so the client never takes the truncated response
-// for a success.
+// for a success. The panic is still logged at Error, with the status the
+// client got.
 func TestWithRecoverAbortsAStartedResponse(t *testing.T) {
 	records := recordLogs(t)
-	h := WithRecover(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	h := middleware.WithLogging(WithRecover(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusCreated)
 		panic("boom")
-	}))
+	})))
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req = req.WithContext(zlog.WithLoggingContext(req.Context(), slog.Default()))
 
 	require.PanicsWithValue(t, http.ErrAbortHandler, func() {
-		h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/", nil))
+		h.ServeHTTP(httptest.NewRecorder(), req)
 	})
-	require.Len(t, records(), 1)
+	logged := records()
+	require.Len(t, logged, 2, "the error line and the request line")
+	require.Equal(t, "ERROR", logged[0]["level"])
+	require.Equal(t, "api error", logged[0]["msg"])
+	require.EqualValues(t, http.StatusCreated, logged[0]["status"])
+	require.Equal(t, "panic: boom", logged[0]["error"].(map[string]any)["message"])
+	require.Equal(t, "request served", logged[1]["msg"])
 }
 
 // A flushed response has started: a later panic must not write a second

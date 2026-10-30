@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -16,8 +17,11 @@ import (
 	"github.com/stretchr/testify/require"
 	gen "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api"
+	apimw "github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/errreport"
+	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/service/mocks"
 	"github.com/zitadel/oidc/v3/pkg/op"
@@ -170,6 +174,7 @@ func newTestServerKeys(t *testing.T, openErr, sealErr error, middleware ...func(
 		handler,
 		api.NewSecurityHandler(tokenService),
 		gen.WithErrorHandler(api.OgenErrorHandler),
+		gen.WithMiddleware(apimw.AddOperationIdToContext()),
 	)
 	require.NoError(t, err)
 	var h http.Handler = oas
@@ -648,6 +653,63 @@ func TestSubmitFlowStep_UnknownPropertiesReturnError(t *testing.T) {
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d (body = %s)", resp.StatusCode, http.StatusBadRequest, body)
 	}
+}
+
+// A submit the step keeps the user on answers 400 through a typed response,
+// so the handler records the engine's cause: one Info line with the step
+// error key as the message, the error behind it, where it was raised, and the
+// flow and step it happened on.
+func TestSubmitFlowStep_StepErrorRecordsItsCause(t *testing.T) {
+	errreport.EnableLocation(true)
+	t.Cleanup(func() { errreport.EnableLocation(false) })
+
+	var logs bytes.Buffer
+	withRequestLogger := func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ctx := zlog.WithLoggingContext(r.Context(), slog.New(slog.NewJSONHandler(&logs, nil)))
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
+	ts := newTestServer(t, apimw.WithLogging, withRequestLogger)
+	state := &domain.FlowState{ID: "flow_1", ProjectID: "proj_1", SessionID: "sess_1", IssuedAt: time.Now()}
+	key := domain.FlowStepErrorInvalidCredentials
+	ts.fake.submitResult = domain.FlowStepResult{
+		State: state,
+		Step:  &domain.FlowStep{Name: "credentials", Error: &key},
+		Cause: domain.ErrFlowStepRejected().WithMessage(key).WithParent(domain.ErrAuthAttemptProofRejected(nil)),
+	}
+
+	resp, body := doRequest(t, http.MethodPost, ts.srv.URL+"/flow/flow_1/submit", map[string]any{
+		"action": "submit",
+		"fields": map[string]any{"email": "alice@example.com", "x-auth-methods#password": "wrong"},
+	}, ts.sealCookie(t, state))
+	require.Equal(t, http.StatusBadRequest, resp.StatusCode, string(body))
+	require.Contains(t, string(body), key)
+
+	var errorLines []map[string]any
+	for line := range bytes.Lines(logs.Bytes()) {
+		var record map[string]any
+		require.NoError(t, json.Unmarshal(line, &record))
+		if record["msg"] == "api error" {
+			errorLines = append(errorLines, record)
+		}
+	}
+	require.Len(t, errorLines, 1, "one error line per request")
+	line := errorLines[0]
+	require.Equal(t, "INFO", line["level"])
+	require.EqualValues(t, http.StatusBadRequest, line["status"])
+	require.Equal(t, "submitFlowStep", line["operation_id"])
+	require.Equal(t, "flow_1", line["flow_id"])
+	require.Equal(t, "credentials", line["step"])
+	logged, ok := line["error"].(map[string]any)
+	require.True(t, ok, "error must be logged as a group: %v", line["error"])
+	require.Equal(t, domain.ErrFlowStepRejected().Code, logged["code"])
+	require.Equal(t, key, logged["message"])
+	parent, ok := logged["parent"].(map[string]any)
+	require.True(t, ok, "the cause is logged as a group: %v", logged["parent"])
+	require.Equal(t, domain.ErrAuthAttemptProofRejected(nil).Code, parent["code"])
+	require.NotEmpty(t, logged["reportLocation"])
+	require.NotContains(t, logged, "stackTrace")
 }
 
 func TestGetFlowStep_ReturnsCurrentStep(t *testing.T) {

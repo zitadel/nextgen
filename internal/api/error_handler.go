@@ -4,9 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"net/http"
-	"os"
 	"strings"
 	"sync/atomic"
 
@@ -18,7 +16,6 @@ import (
 	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/errorpage"
-	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 )
 
 // FullErrorInResponse attaches the unwrapped cause of an error to the response
@@ -223,7 +220,7 @@ func OgenErrorHandler(ctx context.Context, w http.ResponseWriter, _ *http.Reques
 			ctx = middleware.WithOperationIDContext(ctx, oc.OperationID())
 		}
 	}
-	logAPIError(ctx, status, logged)
+	middleware.RecordError(ctx, logged)
 	writeErrorResponse(w, &api.ErrorDetailsStatusCode{StatusCode: status, Response: details})
 }
 
@@ -290,29 +287,6 @@ func apiError(err error) (status int, logged domain.Error, details api.ErrorDeta
 	return resp.StatusCode, logged, resp.Response
 }
 
-// logAPIError writes the one log line a returned error gets (ADR 030).
-func logAPIError(ctx context.Context, status int, err domain.Error) {
-	level := slog.LevelInfo
-	switch {
-	// The request context is done when the client left, or when net/http hit
-	// the server's write deadline, which the deadline error tells apart.
-	case status >= http.StatusInternalServerError && ctx.Err() != nil && !errors.Is(err, os.ErrDeadlineExceeded):
-		level = slog.LevelWarn
-	case status >= http.StatusInternalServerError:
-		level = slog.LevelError
-	}
-	var logged error = err
-	if level < slog.LevelError {
-		logged = err.Brief()
-	}
-	operationID, _ := middleware.GetOperationIDContext(ctx)
-	zlog.Log(ctx, level, "api error",
-		slog.Int("status", status),
-		slog.String("operation_id", operationID),
-		slog.Any(zlog.ErrorAttributeKey, logged),
-	)
-}
-
 // OgenNotFound answers a path no API operation matches (ADR 076). A browser
 // navigation gets the error page, with home as its way on; everything else
 // gets the req.not_found envelope, so a client can tell a path this server
@@ -320,6 +294,7 @@ func logAPIError(ctx context.Context, status int, err domain.Error) {
 // and Vary says so to caches.
 func OgenNotFound(home *errorpage.Link) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		middleware.RecordError(r.Context(), domain.ErrRequestNotFound())
 		w.Header().Add("Vary", "Accept")
 		if errorpage.Wants(r) {
 			errorpage.Write(w, r, errorpage.NotFound(home))
@@ -340,8 +315,10 @@ func OgenMethodNotAllowed(w http.ResponseWriter, r *http.Request, allowed string
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
+	notAllowed := domain.ErrRequestMethodNotAllowed()
+	middleware.RecordError(r.Context(), notAllowed)
 	w.Header().Set("Allow", allowed)
-	writeErrorResponse(w, errorResponse(domain.ErrRequestMethodNotAllowed()))
+	writeErrorResponse(w, errorResponse(notAllowed))
 }
 
 func writeErrorResponse(w http.ResponseWriter, resp *api.ErrorDetailsStatusCode) {

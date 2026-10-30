@@ -48,6 +48,9 @@ through any wrapping.
 - A handler a browser lands on, outside the API, answers a failure with
   `internal/errorpage`, never HTML of its own; an API path answers the
   envelope even to a browser ([ADR 076](../docs/adrs/076-error-pages-and-unmatched-routes.md)).
+- A handler or route that answers 400 or above without returning the error to
+  ogen records it with `middleware.RecordError`; the integration run fails on
+  an answer with none.
 
 ## Format before push
 

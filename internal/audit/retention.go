@@ -11,6 +11,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/zitadel/nextgen/internal/api/middleware"
+	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 )
 
@@ -189,6 +191,7 @@ func (j *RetentionJob) Trigger() http.Handler {
 	secret := sha256.Sum256([]byte(j.cfg.TriggerSecret))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet && r.Method != http.MethodPost {
+			middleware.RecordError(r.Context(), domain.ErrRequestMethodNotAllowed())
 			w.Header().Set("Allow", "GET, POST")
 			http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
 			return
@@ -196,6 +199,7 @@ func (j *RetentionJob) Trigger() http.Handler {
 		scheme, token, _ := strings.Cut(r.Header.Get("Authorization"), " ")
 		sent := sha256.Sum256([]byte(token))
 		if !strings.EqualFold(scheme, "Bearer") || subtle.ConstantTimeCompare(sent[:], secret[:]) != 1 {
+			middleware.RecordError(r.Context(), domain.ErrAuthUnauthorized(nil))
 			w.Header().Set("WWW-Authenticate", "Bearer")
 			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 			return
@@ -214,7 +218,9 @@ func (j *RetentionJob) Trigger() http.Handler {
 		n, err := j.deleteExpired(ctx)
 		if err != nil {
 			failJobSpan(ctx, err)
-			zlog.Error(ctx, "event retention: purge failed", slog.String("error", err.Error()))
+			// Recorded on the request's context, not the run's: a run at its
+			// deadline is not the scheduler leaving.
+			middleware.RecordError(r.Context(), err)
 			http.Error(w, "event retention: purge failed", http.StatusInternalServerError)
 			return
 		}

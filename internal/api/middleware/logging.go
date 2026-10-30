@@ -22,7 +22,8 @@ func getLoggingContext(ctx context.Context) *slog.Logger {
 // WithLogging logs one Info line per request, whatever the status. The line
 // is written when the handler returns or panics. The path is logged without
 // its query, so no query value (an authorization code, a single-use state)
-// reaches the log. Errors are logged by the API error sink, not here.
+// reaches the log. A request that failed gets one error line ahead of it,
+// from what the boundary recorded with [RecordError].
 func WithLogging(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -41,6 +42,8 @@ func WithLogging(next http.Handler) http.Handler {
 		// retrieved later in this function. Since ogen middleware always runs
 		// after net/http middleware, this will not overwrite anything
 		ctx = WithOperationIDContext(ctx, "")
+		// The same for the error the boundary records, read back below.
+		ctx, recorded := withErrorHolder(ctx)
 
 		lrw := &loggingResponseWriter{ResponseWriter: w}
 		// Deferred without recover: a panic keeps propagating and the request
@@ -62,6 +65,9 @@ func WithLogging(next http.Handler) http.Handler {
 					slog.String(slogotel.DefaultKeySpanID, sc.SpanID().String()),
 				)
 			}
+			// The error line goes through the request logger, not the request
+			// stream, as every error line does.
+			recorded.log(ctx, zlog.GetLoggingContext(ctx), status, operationID)
 			logger.InfoContext(ctx, "request served",
 				slog.String("method", r.Method),
 				slog.String("path", r.URL.Path),

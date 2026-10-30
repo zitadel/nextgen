@@ -474,8 +474,12 @@ Do not treat a rendered login or registration form as completion.
 
 When a step against the local server fails without saying why (the login says a
 sign-in provider "is not available right now", or a request returns 500), the
-server logged the cause. Read it with `logs --level warn --json`: `data.logs`
-holds the warnings and errors, and `--tail` counts only those lines. `logs
+server logged the cause as an `api error` line with the error code, message and
+cause. Read it with `logs --level warn --json`: `data.logs` holds the warnings
+(a sign-in provider or a database the server could not reach) and the errors
+(the server's own faults), and `--tail` counts only those lines. A rejected
+input or a refused request (a password the policy does not accept, a 400 or a
+403) is logged at `info`: read it with `logs --level info --json`. `logs
 --follow` streams the log for a person at a terminal, with warnings yellow and
 errors red; it refuses `--json`. `start`, and `doctor` when it finds the server
 running, name it in `data.next_actions`.
