@@ -5,21 +5,23 @@ import consola from "consola";
 import * as rosie from "rosie-skills";
 
 import { type BoxAction, command } from "./box";
+import { publicCliCommand } from "./public-cli";
 import { telemetryConfigDir } from "./telemetry/identity";
 
 export type SkillsHintInput = {
   env: NodeJS.ProcessEnv;
   /** False for `--json`, `--non-interactive`, or a non-TTY stream. */
   interactive: boolean;
+  /** The running CLI's, whose skills the named command adds. */
+  cliVersion: string;
 };
 
 const SHOWN_FILE = "skills-hint.json";
-const INSTALL_COMMAND = "npx skills add zitadel/nextgen --full-depth";
 
 /**
  * Tell a developer who has AI coding agents installed how to give them the
  * Zitadel skills, once per machine and after the command's own next steps.
- * The CLI never installs anything itself: it names the command and the
+ * The note adds nothing itself: it names `zitadel skills add` and the
  * developer runs it. Modelled on Wrangler's skills suggestion, minus the prompt.
  *
  * The marker lives in the user's CLI config directory (`telemetryConfigDir`),
@@ -60,7 +62,7 @@ export async function eligibleForSkills({ env, interactive }: SkillsHintInput): 
  * summary, or `undefined` if another run took it first. Written exclusively,
  * so of two concurrent first runs only one shows it.
  */
-export function claimSkills(env: NodeJS.ProcessEnv): BoxAction | undefined {
+export function claimSkills(env: NodeJS.ProcessEnv, cliVersion: string): BoxAction | undefined {
   try {
     const shownPath = join(telemetryConfigDir(env), SHOWN_FILE);
     mkdirSync(dirname(shownPath), { recursive: true });
@@ -68,15 +70,19 @@ export function claimSkills(env: NodeJS.ProcessEnv): BoxAction | undefined {
       flag: "wx",
     });
     return {
-      text: "Using an AI coding agent? Install the Zitadel skills so it can work with the CLI:",
-      command: INSTALL_COMMAND,
+      text: "Using an AI coding agent? Add the Zitadel skills to your project so it can work with the CLI:",
+      command: publicCliCommand("skills add", cliVersion),
     };
   } catch {
     return undefined;
   }
 }
 
-export async function showSkillsHint({ env, interactive }: SkillsHintInput): Promise<void> {
+export async function showSkillsHint({
+  env,
+  interactive,
+  cliVersion,
+}: SkillsHintInput): Promise<void> {
   try {
     if (!interactive || isCI(env) || isOptedOut(env)) {
       return;
@@ -105,9 +111,9 @@ export async function showSkillsHint({ env, interactive }: SkillsHintInput): Pro
         [
           "",
           "Using an AI coding agent?",
-          "Install Zitadel skills to help your agent work with Zitadel's CLI and authentication integrations:",
+          "Add the Zitadel skills to your project to help your agent work with Zitadel's CLI and authentication integrations:",
           "",
-          `  ${command(INSTALL_COMMAND)}`,
+          `  ${command(publicCliCommand("skills add", cliVersion))}`,
           "",
           "Optional. You can continue without installing skills.",
         ].join("\n"),

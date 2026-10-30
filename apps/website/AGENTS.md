@@ -93,7 +93,8 @@ Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
   elements and never as HTML: this origin also serves the console's session.
   The feed carries each entry's plain-text summary instead.
 - Keep `metadata.internal` in the skill's `SKILL.md`: it keeps the skill out
-  of `npx skills add zitadel/nextgen --full-depth`, the users' install.
+  of the users' installs, `zitadel skills add` and
+  `npx skills add zitadel/nextgen --full-depth`.
 
 ## Analytics
 

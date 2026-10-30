@@ -317,6 +317,7 @@ export abstract class BaseCommand extends Command {
     this.skillsOffered = await eligibleForSkills({
       env: process.env,
       interactive: !this.meta.nonInteractive,
+      cliVersion: this.config.version,
     });
     this.openTelemetry(typeof flags.telemetry === "boolean" ? flags.telemetry : undefined);
     return this.meta;
@@ -523,7 +524,7 @@ export abstract class BaseCommand extends Command {
       : [{ text: OVERVIEW, command: publicCliCommand("", this.config.version) }];
     // The skills offer is the last step of the first summary a machine sees,
     // rather than a block of its own after the box.
-    const skills = this.skillsOffered ? [claimSkills(process.env)] : [];
+    const skills = this.skillsOffered ? [claimSkills(process.env, this.config.version)] : [];
     return {
       ...summary,
       next: [...steps, ...overview, ...skills.filter((step) => step !== undefined)],

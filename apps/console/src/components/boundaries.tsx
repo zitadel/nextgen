@@ -10,6 +10,7 @@ import { fetchSession, invalidateSessionCache } from "@/auth/session";
 import { describeError } from "@/lib/api-error";
 import { routerRelativeHref } from "@/lib/base-path";
 import { withoutTrailingSlash } from "@/lib/project-scope";
+import { titleCase } from "@/lib/text";
 
 import { navItemFor, useNavItems } from "./app-shell/use-nav-items";
 import { EYEBROW } from "./typography";
@@ -217,7 +218,7 @@ export function ErrorState({ error }: ErrorComponentProps) {
     return (
       <ErrorPage
         status={404}
-        title={`${resource.charAt(0).toUpperCase()}${resource.slice(1)} not found`}
+        title={`${titleCase(resource)} not found`}
         requestId={error instanceof ApiError ? error.requestId : undefined}
         action={
           <Button asChild>

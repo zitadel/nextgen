@@ -29,6 +29,7 @@ beforeEach(() =>
       }),
     ),
     http.post("http://localhost/api/grants/query", () => HttpResponse.json({ grants: [] })),
+    http.get("http://localhost/api/projects/:id/admins", () => HttpResponse.json({ admins: [] })),
     http.get("http://localhost/api/variables", () => HttpResponse.json({})),
     http.get("http://localhost/api/users/me/projects", () =>
       HttpResponse.json({ projects: [{ id: PROJECT_ID, name: "River" }] }),

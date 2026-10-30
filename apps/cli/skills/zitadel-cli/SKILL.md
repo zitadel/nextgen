@@ -47,6 +47,13 @@ by declared range or installed release, with `E_UNSUPPORTED_PROJECT_SHAPE`
 left the project untouched. The message names the minimum and the hint says to
 upgrade, so upgrade the app and rerun rather than retrying.
 
+The CLI ships this skill and the other Zitadel skills. `skills add` puts the
+ones of the version that runs it into the project's `.agents/skills/`, and into
+`.claude/skills/` when Claude Code is installed or the project has a `.claude/`
+folder, replacing older copies. After moving the app to a newer CLI, run it
+with that version so the skills describe it. It talks to no server and asks
+nothing; `data.skills` and `data.directories` say what it added where.
+
 ## Using the CLI
 
 - **Drive it non-interactively.** Always pass `--non-interactive --json` (short:

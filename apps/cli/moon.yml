@@ -23,6 +23,13 @@ tasks:
   build:
     deps:
       - "sdk-next:build"
+    inputs:
+      - "**/*"
+      # Every public agent skill, which the build copies into dist/skills
+      # (src/lib/skills/bundle.ts) for `zitadel skills add`.
+      - "/skills/**/*"
+      - "/apps/*/skills/**/*"
+      - "/packages/*/skills/**/*"
 
   build-release:
     script: |
@@ -78,6 +85,8 @@ tasks:
       - "/.github/semantic.yml"
       - "/Dockerfile"
       - "/docs/design/idp/schemas/**/*"
+      # The bundle's test checks every skill it ships is under an MIT path.
+      - "/LICENSING.md"
     options:
       # The built oclif commands import @zitadel/{api,config,sdk-next} from
       # those packages' dist/ at runtime. Their build-release tasks rewrite

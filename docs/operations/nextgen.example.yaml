@@ -28,6 +28,12 @@ server:
   # dashboard URLs. Set to http://localhost:8080 when running the server
   # locally by hand (env: NEXTGEN_SERVER_PUBLIC_BASE).
   public_base: https://nextgen.zitadel.cloud
+  # Other origins the console is reached at, beside public_base's, such as
+  # another hostname in front of this deployment. Like public_base's, they may
+  # open any project's flow to preview its login
+  # (env: NEXTGEN_SERVER_CONSOLE_ORIGINS, comma separated).
+  # console_origins:
+  #   - https://console.example.com
 
 # Optional. When omitted, the server uses SQLite at <data_dir>/zitadel.db.
 # Configure exactly one dialect to override the default:
