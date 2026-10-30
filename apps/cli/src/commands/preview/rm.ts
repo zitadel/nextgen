@@ -65,7 +65,7 @@ export default class PreviewRm extends Promptable(PreviewCommand) {
         status: "skipped",
         reason: "not-live",
         pretty: `${url} is not a live preview of the project; nothing was removed`,
-        nextCommands: [this.suggest("preview list")],
+        next: { commands: [this.suggest("preview list")] },
       });
     }
 

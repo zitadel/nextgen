@@ -34,7 +34,6 @@ import {
   type OperationStatics,
   ResourceCommand,
 } from "./command";
-import { nextCommandsData } from "../../envelope";
 
 /**
  * `--data` / `--file`: the whole document at once, and `--set`: one field of
@@ -247,19 +246,16 @@ abstract class WriteOperation<
 
     const result = await this.send(await this.context(), body, id);
     const resultId = isObject(result) ? result[resource.idField] : undefined;
-    const nextCommands =
-      typeof resultId === "string" && resource.get
-        ? [this.suggest(`${topic} get ${resultId} --json`)]
-        : [];
     return {
       status: "ok",
       // An ok envelope always carries `data`, also when the server accepts a
       // write without a body (`grants create` by identifier answers 202).
-      data:
-        isObject(result) && nextCommands.length > 0
-          ? { ...result, ...nextCommandsData(nextCommands) }
-          : (result ?? {}),
+      data: result ?? {},
+      ...(typeof resultId === "string" && resource.get
+        ? { next: { commands: [this.suggest(`${topic} get ${resultId} --json`)] } }
+        : {}),
       pretty: JSON.stringify(result, null, 2),
+      machineReadable: true,
     };
   }
 

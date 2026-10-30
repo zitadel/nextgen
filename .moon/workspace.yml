@@ -8,6 +8,8 @@ projects:
     cli: "apps/cli"
     e2e: "e2e"
     console: "apps/console"
+    cloud-console: "apps/cloud-console"
+    cloud-functions: "apps/cloud-functions"
     docs: "apps/docs"
     demo-next: "apps/demo-next"
     demo-nuxt: "apps/demo-nuxt"

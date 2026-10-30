@@ -59,6 +59,11 @@ func (ps projectStatements) CreateProject(ctx context.Context, project *domain.P
 const (
 	deleteByIDProjectStmt = `DELETE FROM zitadel_nextgen.projects WHERE id = $1`
 	projectQuery          = "SELECT id, name, password_hash_policy, created_at, updated_at FROM zitadel_nextgen.projects"
+
+	// FOR UPDATE holds the project row until the transaction ends. A second
+	// removal of the project's last owner waits here, then reads the first
+	// one's result. A plain SELECT would not wait at READ COMMITTED.
+	lockProjectStmt = `SELECT id FROM zitadel_nextgen.projects WHERE id = $1 FOR UPDATE`
 )
 
 // DeleteProjectByID implements [service.ProjectStatements].
@@ -258,3 +263,9 @@ var projectSchema = database.NewSchema(map[domain.ProjectField]database.FieldBin
 		Coerce:   database.CoerceTime,
 	},
 })
+
+// LockProject implements [service.ProjectStatements].
+func (ps projectStatements) LockProject(ctx context.Context, id string) error {
+	var locked string
+	return wrapError(ps.client.QueryRow(ctx, lockProjectStmt, id).Scan(&locked))
+}

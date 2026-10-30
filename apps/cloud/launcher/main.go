@@ -39,6 +39,10 @@
 // fails its build and never replaces the deployment that serves. A local run
 // without CLOUD_DATABASE_URL (`pnpm run cloud`, scripts/run-cloud.mjs) has no
 // build step, so it migrates its own database before serving.
+//
+// `launcher drop-preview` removes preview databases from the preview cluster:
+// a merged branch's, or every one no deployment stamped for a while
+// (.github/workflows/preview-cleanup.yml).
 package main
 
 import (
@@ -46,6 +50,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"flag"
 	"fmt"
 	"net/url"
 	"os"
@@ -88,6 +93,13 @@ func main() {
 			if errors.Is(err, errPrepareFailed) {
 				os.Exit(64)
 			}
+			os.Exit(1)
+		}
+		return
+	}
+	if len(os.Args) > 1 && os.Args[1] == "drop-preview" {
+		if err := runDropPreview(os.Args[2:]); err != nil {
+			fmt.Fprintln(os.Stderr, "launcher:", err)
 			os.Exit(1)
 		}
 		return
@@ -137,7 +149,7 @@ func runMigrate(extra []string) error {
 	}
 	baseDSN := os.Getenv(migratorDatabaseURLVar)
 	fmt.Fprintf(os.Stderr, "launcher: preview migrate hit a poisoned sticky schema; recreating %s\n", name)
-	if dropErr := dropDatabase(context.Background(), baseDSN, name); dropErr != nil {
+	if dropErr := dropDatabase(context.Background(), baseDSN, time.Time{}, name); dropErr != nil {
 		return fmt.Errorf("%v (also failed to drop preview database: %w)", err, dropErr)
 	}
 	args, err = prepareMigration(extra)
@@ -145,6 +157,95 @@ func runMigrate(extra []string) error {
 		return fmt.Errorf("%w: %v", errPrepareFailed, err)
 	}
 	return executeServer(args)
+}
+
+const dropPreviewUsage = "usage: launcher drop-preview [--dry-run] (--idle-days <n> | [--] <branch>...)"
+
+// runDropPreview drops preview databases for
+// .github/workflows/preview-cleanup.yml: each named branch's, once its pull
+// request has merged, or with --idle-days every one whose stamp is older than
+// that. It connects through the URL a preview build migrates through and
+// computes a branch's name as the build does, so the two never disagree. It
+// only ever drops a preview_* database, which the production cluster has
+// none of. --dry-run lists what it would drop instead.
+func runDropPreview(args []string) error {
+	flags := flag.NewFlagSet("drop-preview", flag.ContinueOnError)
+	idleDays := flags.Int("idle-days", 0, "drop every preview database no deployment stamped for this many days")
+	dryRun := flags.Bool("dry-run", false, "list what would be dropped and drop nothing")
+	if err := flags.Parse(args); err != nil {
+		return fmt.Errorf("%w; %s", err, dropPreviewUsage)
+	}
+	refs := flags.Args()
+	if *idleDays < 0 || (*idleDays > 0) == (len(refs) > 0) {
+		return errors.New(dropPreviewUsage)
+	}
+	dsn := os.Getenv(migratorDatabaseURLVar)
+	if dsn == "" {
+		return fmt.Errorf("%s must name the preview cluster's base database", migratorDatabaseURLVar)
+	}
+
+	var names []string
+	// Zero for named branches, which go whatever their stamp says.
+	var idleBefore time.Time
+	if *idleDays > 0 {
+		databases, err := listDatabases(context.Background(), dsn)
+		if err != nil {
+			return err
+		}
+		idleBefore = time.Now().Add(-time.Duration(*idleDays) * 24 * time.Hour)
+		idle, undated := idlePreviewDatabases(databases, idleBefore)
+		for _, name := range undated {
+			fmt.Fprintf(os.Stderr, "launcher: keeping preview database %s: its stamp says no deployment time\n", name)
+		}
+		for _, db := range idle {
+			fmt.Fprintf(os.Stderr, "launcher: preview database %s of %s last deployed %s\n",
+				db.name, db.branch, db.deployedAt.Format(time.RFC3339))
+			names = append(names, db.name)
+		}
+		fmt.Fprintf(os.Stderr, "launcher: %d of %d preview databases idle for over %d days\n", len(idle), len(databases), *idleDays)
+	} else {
+		for _, ref := range refs {
+			name, err := previewDatabaseName(ref)
+			if err != nil {
+				return err
+			}
+			names = append(names, name)
+		}
+	}
+	if *dryRun {
+		for _, name := range names {
+			fmt.Fprintf(os.Stderr, "launcher: would drop preview database %s\n", name)
+		}
+		return nil
+	}
+	// The list above is a snapshot; the drop reads each stamp again under the
+	// lock a deployment holds while it stamps.
+	return dropDatabase(context.Background(), dsn, idleBefore, names...)
+}
+
+// idlePreview is a preview database whose last deployment is older than a
+// cutoff.
+type idlePreview struct {
+	name, branch string
+	deployedAt   time.Time
+}
+
+// idlePreviewDatabases picks the databases whose stamp is older than cutoff,
+// oldest first. One without a stamp's deployment time, which a failed stamp
+// leaves, cannot be dated and is never picked; it comes back as undated.
+func idlePreviewDatabases(databases []previewDatabase, cutoff time.Time) (idle []idlePreview, undated []string) {
+	for _, db := range databases {
+		branch, deployedAt, ok := parseStamp(db.stamp)
+		if !ok {
+			undated = append(undated, db.name)
+			continue
+		}
+		if deployedAt.Before(cutoff) {
+			idle = append(idle, idlePreview{name: db.name, branch: branch, deployedAt: deployedAt})
+		}
+	}
+	slices.SortFunc(idle, func(a, b idlePreview) int { return a.deployedAt.Compare(b.deployedAt) })
+	return idle, undated
 }
 
 // shouldRecreatePreviewOnMigrateError reports migrate failures that a fresh

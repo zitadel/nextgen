@@ -1640,7 +1640,7 @@ func TestSelfAccessReads(t *testing.T) {
 
 	for _, path := range []string{"/users/me", "/users/me/schema", "/users/me/teams", "/users/me/passkeys", "/users/me/identity_links", "/users/me/password"} {
 		for name, cookie := range map[string]*http.Cookie{
-			"anonymous session": {Name: "__nextgen_session", Value: anonymous},
+			"anonymous session": {Name: "__Host-zitadel_session", Value: anonymous},
 			"no cookie":         nil,
 		} {
 			t.Run(path+" "+name, func(t *testing.T) {

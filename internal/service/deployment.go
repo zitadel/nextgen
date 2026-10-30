@@ -197,14 +197,13 @@ func (s *DeploymentService) Rollback(ctx context.Context, input RollbackDeployme
 }
 
 // rollbackTargets rebuilds the keywords a primary deployment was created
-// with. Concrete web origins fold back into primary; the empty origin is the
-// default target.
+// with. Concrete web origins fold back into primary.
 func rollbackTargets(previous *domain.Deployment) []string {
 	targets := make([]string, 0, 2)
 	coversWeb := false
 	coversDefault := false
 	for _, origin := range previous.Origins() {
-		if origin == domain.DefaultTargetOrigin {
+		if origin == domain.DeploymentTargetDefault {
 			coversDefault = true
 			continue
 		}

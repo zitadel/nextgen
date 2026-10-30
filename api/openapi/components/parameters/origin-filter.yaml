@@ -2,8 +2,8 @@ name: origin
 in: query
 required: false
 description: |
-  Narrows the list to the deployments that targeted this origin, given
-  exactly as the deployment records it. An origin no deployment targeted
-  answers an empty list, not an error.
+  Narrows the list to the deployments that targeted this origin, or
+  `default` for the default target, given exactly as the deployment records
+  it. An origin no deployment targeted answers an empty list, not an error.
 schema:
-  $ref: '../schemas/origin.yaml'
+  $ref: '../../endpoints/deployments/deployment-target-origin.yaml'

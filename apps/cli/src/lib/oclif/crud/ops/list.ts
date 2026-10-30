@@ -19,7 +19,6 @@ import {
   type OperationStatics,
   ResourceCommand,
 } from "./command";
-import { nextCommandsData } from "../../envelope";
 
 /**
  * `<topic> list`: one page by default, `--all` to drain, `--filter` / `--sort`
@@ -235,8 +234,9 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
         items,
         count: items.length,
         [wire.nextPageToken]: next,
-        ...(nextCommands.length > 0 ? nextCommandsData(nextCommands) : {}),
       },
+      ...(nextCommands.length > 0 ? { next: { commands: nextCommands } } : {}),
+      machineReadable: plain,
       pretty: plain
         ? renderRows(columns, items)
         : items.length === 0

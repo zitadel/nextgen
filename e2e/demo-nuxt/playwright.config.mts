@@ -1,7 +1,6 @@
-import { defineConfig } from "@playwright/test";
+import { defineConfig, devices } from "@playwright/test";
 import {
   apiMockServer,
-  chromiumProjects,
   e2eActionTimeouts,
   e2eTimeouts,
   e2eTrace,
@@ -58,5 +57,10 @@ export default defineConfig({
       },
     },
   ],
-  projects: chromiumProjects,
+  projects: [
+    // One load of /login before the specs, so none of them waits while
+    // `nuxt dev` builds the browser's modules (src/warm-up.setup.ts).
+    { name: "warm-up", testMatch: /warm-up\.setup\.ts$/, use: { ...devices["Desktop Chrome"] } },
+    { name: "chromium", use: { ...devices["Desktop Chrome"] }, dependencies: ["warm-up"] },
+  ],
 });

@@ -16,6 +16,7 @@ fileGroups:
     - "moon.yml"
     # The root module is a dependency through the replace directive.
     - "/**/*.go"
+    - "!/tools/oidc-mock/**"
     - "/go.mod"
     - "/go.sum"
     # Files the root packages bench imports compile in through //go:embed:
@@ -36,17 +37,22 @@ tasks:
       fi
     inputs:
       - "**/*.go"
+    options:
+      cache: false
 
   # Compiles the root module's generated Go (api/generated, the enumer and
   # mock files) through the replace directive, which server:generate and its
   # checks rewrite mid-graph; the dep keeps vet behind them, as server:vet is.
-  # build and test are ordered through vet.
+  # Test is ordered through vet; build waits directly on generation so a
+  # test-only change does not select a production build through vet.
   vet:
     command: "go vet ./..."
     deps:
       - "server:check-generate"
     inputs:
       - "@group(benchInputs)"
+    options:
+      cache: false
 
   # This is a Go project, so it inherits no Biome lint task, but it owns a
   # JavaScript k6 script (scripts/*.js). Lint it here so a change to it cannot
@@ -65,11 +71,15 @@ tasks:
   build:
     command: "go build -o dist/k6 ./cmd/k6"
     deps:
-      - "vet"
+      - "server:check-generate"
     inputs:
       - "@group(benchInputs)"
+      - "!/**/*_test.go"
+      - "!/**/testdata/**"
     outputs:
       - "dist/k6"
+    options:
+      cache: false
 
   test:
     command: "go test -timeout 5m ./..."
@@ -78,6 +88,8 @@ tasks:
       - "vet"
     inputs:
       - "@group(benchInputs)"
+    options:
+      cache: false
 
   # Local sweep against a server that is already running: provision
   # fixtures/local.json, run every scenario at 1, 5 and 20 VUs, summarise.

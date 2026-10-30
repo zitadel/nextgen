@@ -1,9 +1,11 @@
+import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { scopedPath } from "@/test/project-scope.fixture";
 import { server } from "@/test/msw";
+import { createAppRouter } from "../router";
 
 // The `_authed` layout guards every screen behind `GET /sessions/me`
 // (Console ADR 0003); mock the auth module so routes render as signed in.
@@ -43,10 +45,6 @@ beforeEach(() =>
  * otherwise tear the dialog down before it renders).
  */
 async function openDialog() {
-  const [{ RouterProvider, createMemoryHistory }, { createAppRouter }] = await Promise.all([
-    import("@tanstack/react-router"),
-    import("../router"),
-  ]);
   const router = createAppRouter({
     history: createMemoryHistory({ initialEntries: [scopedPath("/users")] }),
   });
@@ -60,10 +58,6 @@ describe("delete user dialog", () => {
   it("offers only actions that reach the API", async () => {
     // Every menu item reaches an endpoint.
     server.use(http.post(USERS_QUERY_URL, () => HttpResponse.json({ users: [USER] })));
-    const [{ RouterProvider, createMemoryHistory }, { createAppRouter }] = await Promise.all([
-      import("@tanstack/react-router"),
-      import("../router"),
-    ]);
     render(
       <RouterProvider
         router={createAppRouter({

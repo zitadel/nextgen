@@ -477,7 +477,7 @@ func TestDeploymentStatements_ProjectDeleteCascades(t *testing.T) {
 	})
 }
 
-// The default target is the empty origin. A deployment that names only it
+// The default target is a row like any origin's. A deployment that names only it
 // stays live beside the primary origins, and a later primary deployment does
 // not clear it.
 func TestDeploymentStatements_DefaultTarget(t *testing.T) {
@@ -488,15 +488,15 @@ func TestDeploymentStatements_DefaultTarget(t *testing.T) {
 		relB := createRelease(t, d.stmts, projectID, "0002", domain.ReleaseMetadata{})
 
 		primary := deploy(t, d.stmts, projectID, relA.ID, []string{appOrigin, wwwOrigin}, deployArgs{})
-		def := deploy(t, d.stmts, projectID, relA.ID, []string{domain.DefaultTargetOrigin}, deployArgs{})
+		def := deploy(t, d.stmts, projectID, relA.ID, []string{domain.DeploymentTargetDefault}, deployArgs{})
 		now := time.Now()
 
 		assert.Equal(t, []string{def.ID, primary.ID}, deployment.DeploymentIDs(live(t, d.stmts, projectID, now, nil)))
-		serving, err := d.stmts.GetNewestPerOrigin(t.Context(), projectID, []string{domain.DefaultTargetOrigin})
+		serving, err := d.stmts.GetNewestPerOrigin(t.Context(), projectID, []string{domain.DeploymentTargetDefault})
 		require.NoError(t, err)
 		require.Len(t, serving, 1)
 		assert.Equal(t, def.ID, serving[0].DeploymentID)
-		assert.Empty(t, serving[0].Origin)
+		assert.Equal(t, domain.DeploymentTargetDefault, serving[0].Origin)
 
 		got, err := d.stmts.GetLiveDeployment(t.Context(), projectID, appOrigin, now)
 		require.NoError(t, err)
@@ -506,13 +506,13 @@ func TestDeploymentStatements_DefaultTarget(t *testing.T) {
 		got, err = d.stmts.GetLiveDeployment(t.Context(), projectID, appOrigin, now)
 		require.NoError(t, err)
 		assert.Equal(t, newer.ID, got.ID)
-		serving, err = d.stmts.GetNewestPerOrigin(t.Context(), projectID, []string{domain.DefaultTargetOrigin})
+		serving, err = d.stmts.GetNewestPerOrigin(t.Context(), projectID, []string{domain.DeploymentTargetDefault})
 		require.NoError(t, err)
 		require.Len(t, serving, 1)
 		assert.Equal(t, def.ID, serving[0].DeploymentID, "a primary deployment that omits default leaves it")
 
-		replaced := deploy(t, d.stmts, projectID, relB.ID, []string{domain.DefaultTargetOrigin}, deployArgs{})
-		serving, err = d.stmts.GetNewestPerOrigin(t.Context(), projectID, []string{domain.DefaultTargetOrigin})
+		replaced := deploy(t, d.stmts, projectID, relB.ID, []string{domain.DeploymentTargetDefault}, deployArgs{})
+		serving, err = d.stmts.GetNewestPerOrigin(t.Context(), projectID, []string{domain.DeploymentTargetDefault})
 		require.NoError(t, err)
 		require.Len(t, serving, 1)
 		assert.Equal(t, replaced.ID, serving[0].DeploymentID)

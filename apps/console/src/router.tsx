@@ -1,8 +1,14 @@
 import { type RouterHistory, createRouter } from "@tanstack/react-router";
 
+import { addon } from "./addon";
+import { mountAddonScreens, mountAddonSignedOutScreens } from "./addon/screens";
 import { ErrorState, NotFoundState, PendingState } from "./components/boundaries";
 import { basePath } from "./lib/base-path";
 import { routeTree } from "./routeTree.gen";
+
+// The build's add-on screens join the generated tree before any router reads it.
+mountAddonScreens(addon.screens);
+mountAddonSignedOutScreens(addon.signedOutScreens);
 
 /**
  * The single place that constructs the app router (Console ADR 0001).

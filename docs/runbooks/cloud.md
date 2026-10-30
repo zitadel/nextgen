@@ -22,14 +22,15 @@ not run them.
 
 ## Layout
 
-One Vercel deployment, five [services](https://vercel.com/docs/services):
+One Vercel deployment, six [services](https://vercel.com/docs/services):
 
 | Service | Built by | Serves |
 |---|---|---|
-| `server` | Go preset; the build command installs, because Vercel's Go builder runs no `installCommand`, and then runs `node_modules/.bin/turbo run deploy --filter=@zitadel/cloud`. turbo goes by its path because, unlike the JS builders, the Go builder puts no `node_modules/.bin` on `PATH`. `@zitadel/cloud`'s `build` compiles `apps/cloud/launcher` without the console (`-tags noconsole`), then `migrate` migrates and `deploy` hands the binary to the preset, none of them cached | every path except the console's, the docs', the website's and the Mixpanel proxy's, including `/console/runtime.json` |
-| `console` | Vite; `turbo run build` with `CONSOLE_BASE_PATH=/console/` and `CONSOLE_VERCEL_INSIGHTS=1`, so it reports Vercel Web Analytics and Speed Insights; the service serves the build where it lands, `internal/staticui/console/dist` | `/console/*` (bare `/console` redirects to the slash form; `/ui/console` and `/ui/console/*` redirect here with a 307) |
+| `server` | Go preset; the build command installs, because Vercel's Go builder runs no `installCommand`, and then runs `node_modules/.bin/turbo run deploy --filter=@zitadel/cloud`. turbo goes by its path because, unlike the JS builders, the Go builder puts no `node_modules/.bin` on `PATH`. `@zitadel/cloud`'s `build` compiles `apps/cloud/launcher` without the console (`-tags noconsole`), then `migrate` migrates and `deploy` hands the binary to the preset, none of them cached | every path except the console's, the docs', the website's, the cloud functions' and the Mixpanel proxy's, including `/console/runtime.json` |
+| `console` | Vite; `turbo run build` with `CONSOLE_BASE_PATH=/console/` and `CONSOLE_ADDON=../cloud-console`, which compiles in the cloud's add-on ([`apps/cloud-console`](../../apps/cloud-console/AGENTS.md)): it reports Vercel Web Analytics and Speed Insights, adds the unlisted sign-up page `/console/signup`, and adds Billing and Support to Settings, which until their systems are live say the cloud is free during the preview and point to GitHub issues; in previews it also adds Email and sends the sign-in widget's calls through BotID's check in `cloud-functions`; the service serves the build where it lands, `internal/staticui/console/dist` | `/console/*` (bare `/console` redirects to the slash form; `/ui/console` and `/ui/console/*` redirect here with a 307) |
 | `docs` | Next.js; `turbo run build --filter=@zitadel/docs`, after `@zitadel/components`, `@zitadel/api-mock` and the `@zitadel/api` client the mock calls, which the live examples render, and the docs' typecheck. The build's cache key holds the deployment's ID, which Skew Protection bakes into it, so it never comes from the cache; never moon, which cannot archive the symlinks Vercel's Next.js adapter writes | `/docs` and `/docs/*`: pages, assets (`/docs/_next/`), search, `llms.txt`, each page's `.md` and the MCP server |
 | `website` | Next.js; `turbo run build --filter=@zitadel/website`, after the atoms of `@zitadel/components` its showcase renders; keyed by the deployment's ID, as the docs' | `/`, the front page, `/changelog` (`/changelog/` redirects there) with its entries' pages and its feed under it, `/changelog/*`, and their assets at `/_next/*`; the host's `/llms.txt`; the host's favicons at `/favicon.ico` and `/favicons/*`, which the console, the login UI and the docs link |
+| `cloud-functions` | Next.js; `turbo run build --filter=@zitadel/cloud-functions`, route handlers and the Workflow SDK's routes, no pages ([`apps/cloud-functions`](../../apps/cloud-functions/AGENTS.md), [ADR 084](../adrs/084-hosted-cloud-business-systems.md)); keyed by the deployment's ID, as the website's. Its systems are mocks, and production answers `503 cloud.not_live` | `/cloud/*`: the console add-on's calls (`/cloud/api/*`), the sign-in widget's calls through BotID's check (`/cloud/zitadel/*`), Stripe's webhooks (`/cloud/hooks/stripe`) and its cron routes (`/cloud/cron/*`, none scheduled yet) |
 | `schemas` | Static files: `turbo run schemas --filter=@zitadel/cloud` renders them with [`scripts/render-builtin-schemas.mjs`](../../scripts/render-builtin-schemas.mjs) into `apps/cloud/dist/cloud-schemas`. The service is rooted at `apps/cloud`, whose `package.json` has no dependencies, so Vercel detects no framework: a service takes no `framework: null`, and a framework dependency there would change how it builds | `/schemas/v1/*`: the [built-in schemas](#built-in-schemas), as `application/schema+json`, fresh for an hour and readable from any origin |
 
 The console lives on the same origin, at `/console/` rather than a
@@ -51,6 +52,27 @@ longer paused: keep it, ahead of the server's catch-all.
 The docs' live examples mock the flow API in the browser with a service
 worker scoped to `/docs/`, so the mock never answers for the console on the
 same origin.
+
+Every service shares the origin, and with it a signed-in user's session, so
+each response carries security headers:
+
+- `vercel.json`'s top-level `headers` reach every service's responses (not
+  its own redirects): `nosniff`, `Referrer-Policy`, `X-Frame-Options` and a
+  `Permissions-Policy` disabling camera, microphone and geolocation.
+  Passkeys and clipboard remain available.
+- Each service sends its own Content-Security-Policy: the console's enforced
+  and report-only policies in its service's `headers` (a server test holds
+  them to the server's policy for the same page, plus Vercel's toolbar), the
+  docs' and the website's from their `next.config` and, per prerendered page,
+  their build adapter (`csp-adapter.mjs`), the server's from the Go code.
+  Violations go to the server's `/csp-report`.
+- The console's enforced policy covers inline script. The docs' and the
+  website's enforced policies list each prerendered page's inline scripts by
+  hash. Every other URL gets the prerendered 404's policy, so the 404
+  hydrates; unknown docs slugs reach that 404, in the docs layout.
+- HSTS is Vercel's default: zitadel.com is on the preload list with its
+  subdomains, so the cloud's host needs no `includeSubDomains` or `preload`
+  of its own.
 
 The launcher pins what follows from this layout (listen address from
 `PORT`, console off with its links at `/console`) and defaults the rest
@@ -119,14 +141,39 @@ migrates through, because migrations hold a session advisory lock.
   creates it when it is missing, stamps it with the branch and the time of
   the deployment (a database comment), and migrates it; the function serves
   from it. Previews start empty and never see production data.
-- **Cleanup** is not automated yet. The plan: drop preview databases whose
-  stamp is older than 30 days. Until then, by hand on `preview`:
+- **Cleanup:** [`preview-cleanup.yml`](../../.github/workflows/preview-cleanup.yml)
+  drops a branch's database once its pull request from this repository
+  merges (`launcher drop-preview <branch>`), and every day each database
+  whose stamp is older than 30 days (`launcher drop-preview --idle-days
+  30`). That sweep also takes an open pull request nobody pushed to for
+  30 days; its next push starts it empty. A database without a stamp's
+  deployment time is kept and logged, and so is one a deployment stamps
+  while the sweep runs. The branch's preview deployments
+  stay up, without a database.
+  - **By hand:** run the workflow from the Actions tab. It lists what the
+    sweep would drop; tick *Drop* to drop it.
+  - **The secret:** the workflow expects the repository secret
+    `CLOUD_PREVIEW_MIGRATOR_DATABASE_URL`: a role of the PlanetScale
+    database `preview` (whose `main` PlanetScale calls a production
+    branch) that inherits `postgres`, its database `postgres`, port 5432,
+    as Vercel's **Preview** `CLOUD_MIGRATOR_DATABASE_URL` is. Never
+    production's: the launcher refuses a URL whose database holds the
+    server's schema, as production's does. Set it with `gh secret set
+    CLOUD_PREVIEW_MIGRATOR_DATABASE_URL --repo zitadel/nextgen`, which
+    prompts for the value.
+  - **Ownership:** only a database's owner, or a role that inherits it, may
+    drop it. The launcher creates preview databases as `postgres`, so any
+    role inheriting `postgres` can. One the builds' role created as itself,
+    before the launcher did that, only that role can, until the dashboard's
+    *Reassign objects* on it (Settings, Roles) hands its databases to
+    `postgres`; the builds keep working, as they inherit `postgres`.
+  - **One database by hand,** on `preview`:
 
-  ```sql
-  SELECT datname, shobj_description(oid, 'pg_database') AS stamp
-  FROM pg_database WHERE datname LIKE 'preview\_%' ORDER BY 2;
-  DROP DATABASE "preview_…" WITH (FORCE);
-  ```
+    ```sql
+    SELECT datname, shobj_description(oid, 'pg_database') AS stamp
+    FROM pg_database WHERE datname LIKE 'preview\_%' ORDER BY 2;
+    DROP DATABASE "preview_…" WITH (FORCE);
+    ```
 
 ## One-time setup
 
@@ -140,10 +187,11 @@ cluster, a connection budget or an admin role with pull request code:
   `pg_write_all_data` for the running server, and one inheriting `postgres`
   for the migrations (they create extensions and the schema and set
   database options).
-- **`preview`**, single node. One role inheriting `postgres`: it creates the
-  preview databases, migrates them and serves from them. Postgres never
-  passes the `CREATEDB` attribute on through membership, so the launcher
-  creates a database as `postgres` when the role lacks the attribute itself.
+- **`preview`**, single node. One role inheriting `postgres`
+  (`vercel-preview-migrator`): it creates the preview databases, migrates
+  them and serves from them. The launcher creates each as `postgres`, which
+  then owns it, so the cleanup's role can drop it (Database, cleanup);
+  without `CREATEDB` of its own the role still may, as `postgres` has it.
 
 ### 2. Master keys and root admins
 
@@ -218,6 +266,15 @@ Environment variables (add secrets with
 | `TURBO_PLATFORM_ENV_DISABLED` | Production, Preview | `1`: stops turbo listing, under every task, each project variable `turbo.json` does not pass; the JS builds are not meant to see them (strict environment mode) |
 | `CLOUD_PRODUCTION_BRANCH` | Production; only while testing a pull request as production | the branch production deploys from; unset means `main` (see Deploying) |
 
+The cloud functions read no Stripe or HubSpot key yet: their systems are
+mocks ([ADR 084](../adrs/084-hosted-cloud-business-systems.md) §9), and each
+live adapter adds its variables to this table. Two project settings serve
+them already: "Automatically expose System Environment Variables" stays on,
+since the Workflow SDK picks Vercel's world from `VERCEL_DEPLOYMENT_ID`, and
+Protection Bypass for Automation gives a preview's functions
+`VERCEL_AUTOMATION_BYPASS_SECRET`, which their calls to the preview's own
+server carry.
+
 Database URLs take the form PlanetScale's Connect dialog gives,
 `postgresql://<role>.<branch id>:<password>@<host>:<port>/postgres?sslmode=verify-full&sslrootcert=system`,
 without pool parameters: the launcher adds them.
@@ -272,12 +329,18 @@ or garbled fails the build and the serving deployment stays.
   (a single `*` would stop at the branch's second `/` and match nothing).
   The pull request already has its preview, and the commit the queue lands
   on `main` deploys as production. A preview per queue branch would build
-  all four services again and leave one more database behind for every
+  every service again and leave one more database behind for every
   queued pull request.
 - **Migrations must be expand/contract.** The previous deployment serves on
   the new schema until the new one is live, and Instant Rollback promotes
   an older deployment without touching the schema.
 - **Startup never migrates:** the serving function refuses `--migrate`.
+- **The server's defaults must be expand/contract too.** The platform project
+  is deployed from them on every start, and a new deployment's checks start it
+  before the production domains move, so the previous deployment serves the
+  new defaults. Instant Rollback keeps them: a server never replaces a
+  deployment a newer build made. A default that turns out wrong is fixed by
+  shipping a corrected one.
 
 ## Deployment checks
 
@@ -426,8 +489,9 @@ not use:
   the builder takes that binary instead. Without
   `CLOUD_DATABASE_URL` and outside a deployment, the launcher serves from
   SQLite and migrates it at startup.
-- The `console` service's `devCommand` builds it and serves the build behind
-  the same service rewrites a deployment serves it behind. Its dev server
+- The `console` service's `devCommand` builds it with the add-on
+  (`CONSOLE_ADDON`), as a deployment's build command does, and serves the
+  build behind the same service rewrites a deployment serves it behind. Its dev server
   cannot sit behind those rewrites, so its live loop stays
   `moon run console:dev-real`. `NODE_ENV` is set because `vercel dev` runs dev
   commands under `development`, which makes `vite build` a development build.
@@ -535,6 +599,12 @@ project and imports the root admin.
     | jq -r 'select(.type == "log") | .data.message | fromjson? | select(.level == "ERROR") | .msg'
   ```
 
+- **Policy violations:** a browser's report of a Content-Security-Policy
+  violation is a `WARN` line `content security policy violation` from the
+  `server` function, naming the page, the directive and what it blocked.
+  First-party code reports nothing. The docs' and the website's policies
+  allow the script and the frame of Vercel's toolbar, which Vercel builds
+  into their bundles.
 - **Cold starts:** a Go instance boots in one to two seconds.
 - **Concurrency:** an instance serves several requests at once on its one
   vCPU, the Go service included, although Vercel's Fluid docs name only

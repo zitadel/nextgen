@@ -76,6 +76,9 @@ func TestRequestBuffer_flush_metrics(t *testing.T) {
 		buf.Enqueue(&domain.Event{ProjectID: "proj_1", EventType: typ, Category: domain.EventCategoryRequest})
 	}
 	require.Eventually(t, func() bool { return buf.Flushed() >= 3 }, time.Second, 10*time.Millisecond)
+	// Flushed advances before the per-type metrics. Join the flusher before
+	// collecting them so a scheduler pause cannot expose partial counts.
+	buf.Close()
 	require.Equal(t, 1, ins.batchCalls())
 
 	durations(metrics.AuditRequest)

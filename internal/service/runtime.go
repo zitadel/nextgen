@@ -121,6 +121,9 @@ func (r *RuntimeResolver) resolve(ctx context.Context, projectID, origin string)
 	if err != nil {
 		return nil, err
 	}
+	if matched.miss == missDefault {
+		return r.resolutionForDefault(ctx, project, matched.origin)
+	}
 
 	dep, err := r.newestDeployment(ctx, projectID, matched.origin)
 	if err != nil {
@@ -129,15 +132,12 @@ func (r *RuntimeResolver) resolve(ctx context.Context, projectID, origin string)
 	if dep != nil {
 		return r.finish(ctx, project, matched.origin, matched.pattern, "origin", dep)
 	}
-	if matched.miss == missDefault {
-		return r.resolutionForDefault(ctx, project, matched.origin)
-	}
 	return nil, domain.ErrReleaseNotDeployed(map[string]string{"origin": matched.origin}).
 		WithMessage("nothing is deployed to " + matched.origin)
 }
 
 func (r *RuntimeResolver) resolutionForDefault(ctx context.Context, project *domain.Project, requestOrigin string) (*RuntimeResolution, error) {
-	dep, err := r.newestDeployment(ctx, project.ID, domain.DefaultTargetOrigin)
+	dep, err := r.newestDeployment(ctx, project.ID, domain.DeploymentTargetDefault)
 	if err != nil {
 		return nil, err
 	}
@@ -185,11 +185,12 @@ func (r *RuntimeResolver) newestDeployment(ctx context.Context, projectID, origi
 	return dep, nil
 }
 
-// missKind is what an admitted origin answers when nothing is deployed to it.
+// missKind is where an admitted origin looks for its deployment.
 type missKind uint8
 
 const (
-	// missNotDeployed is a listed origin, a loopback origin, or a live preview.
+	// missNotDeployed is a listed origin, a loopback origin, or a live preview:
+	// its own target, refused when nothing is deployed there.
 	missNotDeployed missKind = iota
 	// missDefault is a console host the project does not list.
 	missDefault
@@ -215,9 +216,6 @@ type matchedOrigin struct {
 func (r *RuntimeResolver) gateOpening(ctx context.Context, project *domain.Project, origin string) (*matchedOrigin, error) {
 	matched, err := r.Gate(ctx, project, origin)
 	if err == nil {
-		if matched == nil {
-			return &matchedOrigin{miss: missDefault}, nil
-		}
 		return matched, nil
 	}
 	if !r.isOwnOrigin(origin) || !errors.Is(err, domain.ErrProjectOriginNotAllowed(nil)) {

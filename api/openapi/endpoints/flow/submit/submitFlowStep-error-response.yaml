@@ -29,6 +29,7 @@ content:
         - $ref: '../../../components/schemas/errors/internal.yaml'
         - $ref: '../../../components/schemas/errors/tkn-invalid.yaml'
         - $ref: '../../../components/schemas/errors/not_implemented.yaml'
+        - $ref: '../../../components/schemas/errors/proj-last_owner.yaml'
         - $ref: '../../../components/schemas/errors/proj-origin_not_allowed.yaml'
         - $ref: '../../../components/schemas/errors/proj-preview_not_live.yaml'
         - $ref: '../../../components/schemas/errors/rel-not_deployed.yaml'
@@ -72,6 +73,7 @@ content:
           internal: '../../../components/schemas/errors/internal.yaml'
           tkn.invalid: '../../../components/schemas/errors/tkn-invalid.yaml'
           not_implemented: '../../../components/schemas/errors/not_implemented.yaml'
+          proj.last_owner: '../../../components/schemas/errors/proj-last_owner.yaml'
           proj.origin_not_allowed: '../../../components/schemas/errors/proj-origin_not_allowed.yaml'
           proj.preview_not_live: '../../../components/schemas/errors/proj-preview_not_live.yaml'
           rel.not_deployed: '../../../components/schemas/errors/rel-not_deployed.yaml'
@@ -213,6 +215,11 @@ content:
         value:
           code: not_implemented
           message: 'This feature is not implemented yet.'
+      proj.last_owner:
+        summary: proj.last_owner
+        value:
+          code: proj.last_owner
+          message: 'This user is the last active member of the team that owns a project. Add another member to that team, then try again.'
       proj.origin_not_allowed:
         summary: proj.origin_not_allowed
         value:

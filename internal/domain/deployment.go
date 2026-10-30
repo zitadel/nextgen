@@ -171,8 +171,8 @@ func SamePrimaryRelease(candidate, current *Deployment) bool {
 		current.ReleaseID == candidate.ReleaseID && slices.Equal(current.Origins(), candidate.Origins())
 }
 
-// DeploymentsEqual reports whether candidate repeats current, the project's
-// newest primary deployment: the same release, the same origins, and the same
+// DeploymentsEqual reports whether candidate repeats current, the newest
+// deployment to its origins: the same release, the same origins, and the same
 // frozen variable set, so writing it would change nothing. A deployment to
 // preview URLs never equals one, since writing it renews its previews.
 func DeploymentsEqual(candidate, current *Deployment, candidateSetHash, currentSetHash string) bool {
@@ -223,9 +223,6 @@ func NewDeployment(projectID, releaseID string, kind DeploymentOriginKind, origi
 		return nil, ErrDeploymentInvalid().WithMessage("at least one target is required")
 	}
 	for _, origin := range origins {
-		if origin == DefaultTargetOrigin {
-			continue
-		}
 		if strings.TrimSpace(origin) == "" {
 			return nil, ErrDeploymentInvalid().WithMessage("an origin is empty")
 		}
@@ -262,11 +259,10 @@ const (
 	// of the project.
 	DeploymentTargetPrimary = "primary"
 	// DeploymentTargetDefault is the targets keyword for the project default
-	// target, the one a caller with no origin is served.
+	// target, the one a caller with no origin is served. It is stored as the
+	// row's origin too, where no web origin can collide with it: an origin has
+	// a scheme.
 	DeploymentTargetDefault = "default"
-	// DefaultTargetOrigin is the origin row that keyword is stored as. It is
-	// empty so it cannot collide with a web origin.
-	DefaultTargetOrigin = ""
 )
 
 // ResolveDeploymentTargets resolves deploymentTargets against projectOrigins
@@ -313,7 +309,7 @@ func resolvePrimaryTarget(projectOrigins []Origin, deploymentTargets []string) (
 		}
 	}
 	if hasDefault {
-		origins = append(origins, DefaultTargetOrigin)
+		origins = append(origins, DeploymentTargetDefault)
 	}
 	// TODO(#1572): cap primary origins at MaxDeploymentTargets.
 	return DeploymentOriginKindPrimary, origins, nil

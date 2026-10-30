@@ -133,14 +133,14 @@ func (s *Server) handleAddOriginRequest(args [1]string, argsEscaped bool, w http
 			}
 		}
 		{
-			sctx, ok, err := s.securityNextgenSession(ctx, AddOriginOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, AddOriginOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "NextgenSession",
+					Security:         "SessionCookie",
 					Err:              err,
 				}
-				defer recordError("Security:NextgenSession", err)
+				defer recordError("Security:SessionCookie", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -695,7 +695,7 @@ func (s *Server) handleBuildReleaseRequest(args [0]string, argsEscaped bool, w h
 // handleCompleteClaimRequest handles completeClaim operation.
 //
 // Called by the browser after the developer authenticates on the claim page.
-// Authenticated by the `__nextgen_session` cookie, it attaches the project to
+// Authenticated by the session cookie, it attaches the project to
 // the developer's personal team using the `challenge_id` from the claim URL as
 // its single-use, browser-safe authorization.
 //
@@ -775,14 +775,14 @@ func (s *Server) handleCompleteClaimRequest(args [1]string, argsEscaped bool, w 
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			sctx, ok, err := s.securityNextgenSession(ctx, CompleteClaimOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, CompleteClaimOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "NextgenSession",
+					Security:         "SessionCookie",
 					Err:              err,
 				}
-				defer recordError("Security:NextgenSession", err)
+				defer recordError("Security:SessionCookie", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -1313,9 +1313,9 @@ func (s *Server) handleCreateBrandingRequest(args [0]string, argsEscaped bool, w
 // variable values for its kind, with no fallback between primary and
 // preview values. A deployment that names `default` freezes the primary
 // values.
-// A deployment to `primary` changes nothing when the project's newest
-// primary deployment has the same release and frozen values and covers
-// exactly the current primary origins: the call answers `200` with that
+// A deployment to `primary` or `default` changes nothing when the newest
+// deployment to its targets has the same release and frozen values and
+// covers exactly those targets: the call answers `200` with that
 // deployment. Any other request writes a new deployment and answers `201`;
 // for preview URLs that record renews their previews.
 // Failures:
@@ -1426,14 +1426,14 @@ func (s *Server) handleCreateDeploymentRequest(args [0]string, argsEscaped bool,
 			}
 		}
 		{
-			sctx, ok, err := s.securityNextgenSession(ctx, CreateDeploymentOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, CreateDeploymentOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "NextgenSession",
+					Security:         "SessionCookie",
 					Err:              err,
 				}
-				defer recordError("Security:NextgenSession", err)
+				defer recordError("Security:SessionCookie", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -1566,10 +1566,10 @@ func (s *Server) handleCreateDeploymentRequest(args [0]string, argsEscaped bool,
 // answers `403` with `proj.preview_not_live`; nothing deployed to a listed
 // origin, a loopback origin, or a live preview answers `409` with
 // `rel.not_deployed`; a revoked release answers `409` with `rel.revoked`.
-// A request with no `Origin`, and one from the server's own origin when the
-// project does not list that host, is served the `default` target. No
-// default deployment answers `409` with `rel.no_default`. A step submitted
-// from the server's own origin is still refused unless the project lists it.
+// A request with no `Origin`, and one from a console origin the project does
+// not list, is served the `default` target. No default deployment answers
+// `409` with `rel.no_default`. A step submitted from a console origin is
+// still refused unless the project lists it.
 // The response contains an `id` field — the flow handle. Use it as the path
 // parameter for all subsequent `/flow/{id}/submit` calls.
 // The response also sets an encrypted `HttpOnly` cookie (`_zflow`) containing
@@ -1943,9 +1943,9 @@ func (s *Server) handleCreateFlowDefinitionRequest(args [0]string, argsEscaped b
 // `grant.invalid` on either user locator. Read the grant back for
 // identifier and display.
 // Accepts either a project secret (`oauth2`) or a user-bound Console
-// session cookie (`nextgenSession`). Session callers are authorized as
+// session cookie (`sessionCookie`). Session callers are authorized as
 // the human against the target project (home may differ). Cookie-authenticated
-// requests follow the scheme's CSRF rules (`nextgenSession`).
+// requests follow the scheme's CSRF rules (`sessionCookie`).
 //
 // POST /grants
 func (s *Server) handleCreateGrantRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -2040,14 +2040,14 @@ func (s *Server) handleCreateGrantRequest(args [0]string, argsEscaped bool, w ht
 			}
 		}
 		{
-			sctx, ok, err := s.securityNextgenSession(ctx, CreateGrantOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, CreateGrantOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "NextgenSession",
+					Security:         "SessionCookie",
 					Err:              err,
 				}
-				defer recordError("Security:NextgenSession", err)
+				defer recordError("Security:SessionCookie", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -3177,8 +3177,9 @@ func (s *Server) handleCreateSchemaRequest(args [0]string, argsEscaped bool, w h
 // Creating a session is an app-plane operation on the project credential
 // (`session.write`). The returned `session_token` is a session credential for the
 // end-user client, not a management scope: it is delivered as the
-// `__nextgen_session` cookie and authorises the self-service operations
-// `GET /sessions/me` and `DELETE /sessions/me` (`nextgenSession` scheme). The
+// `__Host-zitadel_session` cookie (`zitadel_session` over plain http to a
+// loopback host) and authorises the self-service operations
+// `GET /sessions/me` and `DELETE /sessions/me` (`sessionCookie` scheme). The
 // by-id operations `GET /sessions/{session_id}` and `DELETE /sessions/{session_id}`
 // are operator endpoints and require `session.read` / `session.delete` instead.
 // The `session_token` is superseded when a handoff exchange completes — clients must
@@ -3468,14 +3469,14 @@ func (s *Server) handleCreateTeamRequest(args [0]string, argsEscaped bool, w htt
 			}
 		}
 		{
-			sctx, ok, err := s.securityNextgenSession(ctx, CreateTeamOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, CreateTeamOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "NextgenSession",
+					Security:         "SessionCookie",
 					Err:              err,
 				}
-				defer recordError("Security:NextgenSession", err)
+				defer recordError("Security:SessionCookie", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -3691,14 +3692,14 @@ func (s *Server) handleCreateUserRequest(args [0]string, argsEscaped bool, w htt
 			}
 		}
 		{
-			sctx, ok, err := s.securityNextgenSession(ctx, CreateUserOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, CreateUserOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "NextgenSession",
+					Security:         "SessionCookie",
 					Err:              err,
 				}
-				defer recordError("Security:NextgenSession", err)
+				defer recordError("Security:SessionCookie", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -3825,8 +3826,8 @@ func (s *Server) handleCreateUserRequest(args [0]string, argsEscaped bool, w htt
 // return 404. The row is not un-revoked. Expired grants can still be
 // revoked so the unique binding can be reused.
 // Accepts either a project secret (`oauth2`) or a user-bound Console
-// session cookie (`nextgenSession`). Cookie-authenticated requests
-// follow the scheme's CSRF rules (`nextgenSession`).
+// session cookie (`sessionCookie`). Cookie-authenticated requests
+// follow the scheme's CSRF rules (`sessionCookie`).
 //
 // DELETE /grants/{id}
 func (s *Server) handleDeleteGrantRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -3921,14 +3922,14 @@ func (s *Server) handleDeleteGrantRequest(args [1]string, argsEscaped bool, w ht
 			}
 		}
 		{
-			sctx, ok, err := s.securityNextgenSession(ctx, DeleteGrantOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, DeleteGrantOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "NextgenSession",
+					Security:         "SessionCookie",
 					Err:              err,
 				}
-				defer recordError("Security:NextgenSession", err)
+				defer recordError("Security:SessionCookie", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -4236,7 +4237,9 @@ func (s *Server) handleDeleteTeamRequest(args [1]string, argsEscaped bool, w htt
 // The user is removed, not deactivated, and the deletion emits `user.deleted`,
 // plus `authz.revoked` for each grant on that grant's project.
 // With a project secret the request is idempotent: deleting a user that exists
-// in no project succeeds without changing anything.
+// in no project succeeds without changing anything. Deleting the last active
+// member of a project's owning team returns 409 `proj.last_owner` and changes
+// nothing.
 //
 // DELETE /users/{user_id}
 func (s *Server) handleDeleteUserByIDRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -4331,14 +4334,14 @@ func (s *Server) handleDeleteUserByIDRequest(args [1]string, argsEscaped bool, w
 			}
 		}
 		{
-			sctx, ok, err := s.securityNextgenSession(ctx, DeleteUserByIDOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, DeleteUserByIDOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "NextgenSession",
+					Security:         "SessionCookie",
 					Err:              err,
 				}
-				defer recordError("Security:NextgenSession", err)
+				defer recordError("Security:SessionCookie", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -4749,14 +4752,14 @@ func (s *Server) handleEvaluatePolicyRequest(args [0]string, argsEscaped bool, w
 			}
 		}
 		{
-			sctx, ok, err := s.securityNextgenSession(ctx, EvaluatePolicyOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, EvaluatePolicyOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "NextgenSession",
+					Security:         "SessionCookie",
 					Err:              err,
 				}
-				defer recordError("Security:NextgenSession", err)
+				defer recordError("Security:SessionCookie", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -5596,14 +5599,14 @@ func (s *Server) handleGetBrandingByIdRequest(args [1]string, argsEscaped bool, 
 			}
 		}
 		{
-			sctx, ok, err := s.securityNextgenSession(ctx, GetBrandingByIdOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, GetBrandingByIdOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "NextgenSession",
+					Security:         "SessionCookie",
 					Err:              err,
 				}
-				defer recordError("Security:NextgenSession", err)
+				defer recordError("Security:SessionCookie", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -6155,14 +6158,14 @@ func (s *Server) handleGetDeploymentByIdRequest(args [1]string, argsEscaped bool
 			}
 		}
 		{
-			sctx, ok, err := s.securityNextgenSession(ctx, GetDeploymentByIdOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, GetDeploymentByIdOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "NextgenSession",
+					Security:         "SessionCookie",
 					Err:              err,
 				}
-				defer recordError("Security:NextgenSession", err)
+				defer recordError("Security:SessionCookie", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -6751,14 +6754,14 @@ func (s *Server) handleGetFlowDefinitionRequest(args [1]string, argsEscaped bool
 			}
 		}
 		{
-			sctx, ok, err := s.securityNextgenSession(ctx, GetFlowDefinitionOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, GetFlowDefinitionOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "NextgenSession",
+					Security:         "SessionCookie",
 					Err:              err,
 				}
-				defer recordError("Security:NextgenSession", err)
+				defer recordError("Security:SessionCookie", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -7025,8 +7028,8 @@ func (s *Server) handleGetFlowStepRequest(args [1]string, argsEscaped bool, w ht
 // secrets. A user-bound Console session that already passed the project
 // Check may expand without those scopes.
 // Accepts either a project secret (`oauth2`) or a user-bound Console
-// session cookie (`nextgenSession`). Cookie-authenticated requests
-// follow the scheme's CSRF rules (`nextgenSession`).
+// session cookie (`sessionCookie`). Cookie-authenticated requests
+// follow the scheme's CSRF rules (`sessionCookie`).
 //
 // GET /grants/{id}
 func (s *Server) handleGetGrantRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -7121,14 +7124,14 @@ func (s *Server) handleGetGrantRequest(args [1]string, argsEscaped bool, w http.
 			}
 		}
 		{
-			sctx, ok, err := s.securityNextgenSession(ctx, GetGrantOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, GetGrantOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "NextgenSession",
+					Security:         "SessionCookie",
 					Err:              err,
 				}
-				defer recordError("Security:NextgenSession", err)
+				defer recordError("Security:SessionCookie", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -7336,14 +7339,14 @@ func (s *Server) handleGetIdpByIdRequest(args [1]string, argsEscaped bool, w htt
 			}
 		}
 		{
-			sctx, ok, err := s.securityNextgenSession(ctx, GetIdpByIdOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, GetIdpByIdOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "NextgenSession",
+					Security:         "SessionCookie",
 					Err:              err,
 				}
-				defer recordError("Security:NextgenSession", err)
+				defer recordError("Security:SessionCookie", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -7547,14 +7550,14 @@ func (s *Server) handleGetIdpRevisionByIdRequest(args [1]string, argsEscaped boo
 			}
 		}
 		{
-			sctx, ok, err := s.securityNextgenSession(ctx, GetIdpRevisionByIdOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, GetIdpRevisionByIdOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "NextgenSession",
+					Security:         "SessionCookie",
 					Err:              err,
 				}
-				defer recordError("Security:NextgenSession", err)
+				defer recordError("Security:SessionCookie", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -7870,14 +7873,14 @@ func (s *Server) handleGetMyPasswordStateRequest(args [0]string, argsEscaped boo
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			sctx, ok, err := s.securityNextgenSession(ctx, GetMyPasswordStateOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, GetMyPasswordStateOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "NextgenSession",
+					Security:         "SessionCookie",
 					Err:              err,
 				}
-				defer recordError("Security:NextgenSession", err)
+				defer recordError("Security:SessionCookie", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -8062,14 +8065,14 @@ func (s *Server) handleGetMySessionRequest(args [0]string, argsEscaped bool, w h
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			sctx, ok, err := s.securityNextgenSession(ctx, GetMySessionOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, GetMySessionOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "NextgenSession",
+					Security:         "SessionCookie",
 					Err:              err,
 				}
-				defer recordError("Security:NextgenSession", err)
+				defer recordError("Security:SessionCookie", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -8174,7 +8177,7 @@ func (s *Server) handleGetMySessionRequest(args [0]string, argsEscaped bool, w h
 // Returns the session-bound token for cross-site request forgery protection
 // (ADR 053 §5). Browser code sends it in the `X-Zitadel-CSRF` header on the
 // state-changing requests the session cookie authenticates that require it
-// — see the `nextgenSession` scheme. It authorizes nothing on its own: the
+// — see the `sessionCookie` scheme. It authorizes nothing on its own: the
 // HttpOnly cookie is still the credential, and a cross-site page cannot
 // read this response. It stays the same for the life of the session, so a
 // client fetches it once per session.
@@ -8257,14 +8260,14 @@ func (s *Server) handleGetMySessionCsrfTokenRequest(args [0]string, argsEscaped 
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			sctx, ok, err := s.securityNextgenSession(ctx, GetMySessionCsrfTokenOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, GetMySessionCsrfTokenOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "NextgenSession",
+					Security:         "SessionCookie",
 					Err:              err,
 				}
-				defer recordError("Security:NextgenSession", err)
+				defer recordError("Security:SessionCookie", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -8448,14 +8451,14 @@ func (s *Server) handleGetMyUserRequest(args [0]string, argsEscaped bool, w http
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			sctx, ok, err := s.securityNextgenSession(ctx, GetMyUserOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, GetMyUserOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "NextgenSession",
+					Security:         "SessionCookie",
 					Err:              err,
 				}
-				defer recordError("Security:NextgenSession", err)
+				defer recordError("Security:SessionCookie", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -8637,14 +8640,14 @@ func (s *Server) handleGetMyUserSchemaRequest(args [0]string, argsEscaped bool, 
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			sctx, ok, err := s.securityNextgenSession(ctx, GetMyUserSchemaOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, GetMyUserSchemaOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "NextgenSession",
+					Security:         "SessionCookie",
 					Err:              err,
 				}
-				defer recordError("Security:NextgenSession", err)
+				defer recordError("Security:SessionCookie", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -8844,14 +8847,14 @@ func (s *Server) handleGetPolicyRequest(args [1]string, argsEscaped bool, w http
 			}
 		}
 		{
-			sctx, ok, err := s.securityNextgenSession(ctx, GetPolicyOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, GetPolicyOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "NextgenSession",
+					Security:         "SessionCookie",
 					Err:              err,
 				}
-				defer recordError("Security:NextgenSession", err)
+				defer recordError("Security:SessionCookie", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -9055,14 +9058,14 @@ func (s *Server) handleGetPolicyRevisionRequest(args [1]string, argsEscaped bool
 			}
 		}
 		{
-			sctx, ok, err := s.securityNextgenSession(ctx, GetPolicyRevisionOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, GetPolicyRevisionOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "NextgenSession",
+					Security:         "SessionCookie",
 					Err:              err,
 				}
-				defer recordError("Security:NextgenSession", err)
+				defer recordError("Security:SessionCookie", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -9264,14 +9267,14 @@ func (s *Server) handleGetProjectRequest(args [1]string, argsEscaped bool, w htt
 			}
 		}
 		{
-			sctx, ok, err := s.securityNextgenSession(ctx, GetProjectOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, GetProjectOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "NextgenSession",
+					Security:         "SessionCookie",
 					Err:              err,
 				}
-				defer recordError("Security:NextgenSession", err)
+				defer recordError("Security:SessionCookie", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -9605,14 +9608,14 @@ func (s *Server) handleGetReleaseByIdRequest(args [1]string, argsEscaped bool, w
 			}
 		}
 		{
-			sctx, ok, err := s.securityNextgenSession(ctx, GetReleaseByIdOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, GetReleaseByIdOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "NextgenSession",
+					Security:         "SessionCookie",
 					Err:              err,
 				}
-				defer recordError("Security:NextgenSession", err)
+				defer recordError("Security:SessionCookie", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -9822,14 +9825,14 @@ func (s *Server) handleGetSchemaByIdRequest(args [1]string, argsEscaped bool, w 
 			}
 		}
 		{
-			sctx, ok, err := s.securityNextgenSession(ctx, GetSchemaByIdOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, GetSchemaByIdOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "NextgenSession",
+					Security:         "SessionCookie",
 					Err:              err,
 				}
-				defer recordError("Security:NextgenSession", err)
+				defer recordError("Security:SessionCookie", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -10226,14 +10229,14 @@ func (s *Server) handleGetTeamRequest(args [1]string, argsEscaped bool, w http.R
 			}
 		}
 		{
-			sctx, ok, err := s.securityNextgenSession(ctx, GetTeamOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, GetTeamOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "NextgenSession",
+					Security:         "SessionCookie",
 					Err:              err,
 				}
-				defer recordError("Security:NextgenSession", err)
+				defer recordError("Security:SessionCookie", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -10433,14 +10436,14 @@ func (s *Server) handleGetUserByIDRequest(args [1]string, argsEscaped bool, w ht
 			}
 		}
 		{
-			sctx, ok, err := s.securityNextgenSession(ctx, GetUserByIDOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, GetUserByIDOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "NextgenSession",
+					Security:         "SessionCookie",
 					Err:              err,
 				}
-				defer recordError("Security:NextgenSession", err)
+				defer recordError("Security:SessionCookie", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -10644,14 +10647,14 @@ func (s *Server) handleGetUserPasswordStateRequest(args [1]string, argsEscaped b
 			}
 		}
 		{
-			sctx, ok, err := s.securityNextgenSession(ctx, GetUserPasswordStateOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, GetUserPasswordStateOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "NextgenSession",
+					Security:         "SessionCookie",
 					Err:              err,
 				}
-				defer recordError("Security:NextgenSession", err)
+				defer recordError("Security:SessionCookie", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -10851,14 +10854,14 @@ func (s *Server) handleGetVariableRequest(args [1]string, argsEscaped bool, w ht
 			}
 		}
 		{
-			sctx, ok, err := s.securityNextgenSession(ctx, GetVariableOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, GetVariableOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "NextgenSession",
+					Security:         "SessionCookie",
 					Err:              err,
 				}
-				defer recordError("Security:NextgenSession", err)
+				defer recordError("Security:SessionCookie", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -11067,14 +11070,14 @@ func (s *Server) handleGetVariablesRequest(args [0]string, argsEscaped bool, w h
 			}
 		}
 		{
-			sctx, ok, err := s.securityNextgenSession(ctx, GetVariablesOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, GetVariablesOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "NextgenSession",
+					Security:         "SessionCookie",
 					Err:              err,
 				}
-				defer recordError("Security:NextgenSession", err)
+				defer recordError("Security:SessionCookie", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -11677,14 +11680,14 @@ func (s *Server) handleListBrandingRequest(args [0]string, argsEscaped bool, w h
 			}
 		}
 		{
-			sctx, ok, err := s.securityNextgenSession(ctx, ListBrandingOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, ListBrandingOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "NextgenSession",
+					Security:         "SessionCookie",
 					Err:              err,
 				}
-				defer recordError("Security:NextgenSession", err)
+				defer recordError("Security:SessionCookie", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -11893,14 +11896,14 @@ func (s *Server) handleListDeploymentsRequest(args [0]string, argsEscaped bool, 
 			}
 		}
 		{
-			sctx, ok, err := s.securityNextgenSession(ctx, ListDeploymentsOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, ListDeploymentsOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "NextgenSession",
+					Security:         "SessionCookie",
 					Err:              err,
 				}
-				defer recordError("Security:NextgenSession", err)
+				defer recordError("Security:SessionCookie", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -12379,14 +12382,14 @@ func (s *Server) handleListFlowDefinitionsRequest(args [0]string, argsEscaped bo
 			}
 		}
 		{
-			sctx, ok, err := s.securityNextgenSession(ctx, ListFlowDefinitionsOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, ListFlowDefinitionsOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "NextgenSession",
+					Security:         "SessionCookie",
 					Err:              err,
 				}
-				defer recordError("Security:NextgenSession", err)
+				defer recordError("Security:SessionCookie", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -12795,14 +12798,14 @@ func (s *Server) handleListMyIdentityLinksRequest(args [0]string, argsEscaped bo
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			sctx, ok, err := s.securityNextgenSession(ctx, ListMyIdentityLinksOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, ListMyIdentityLinksOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "NextgenSession",
+					Security:         "SessionCookie",
 					Err:              err,
 				}
-				defer recordError("Security:NextgenSession", err)
+				defer recordError("Security:SessionCookie", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -12994,14 +12997,14 @@ func (s *Server) handleListMyPasskeysRequest(args [0]string, argsEscaped bool, w
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			sctx, ok, err := s.securityNextgenSession(ctx, ListMyPasskeysOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, ListMyPasskeysOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "NextgenSession",
+					Security:         "SessionCookie",
 					Err:              err,
 				}
-				defer recordError("Security:NextgenSession", err)
+				defer recordError("Security:SessionCookie", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -13202,14 +13205,14 @@ func (s *Server) handleListMyProjectsRequest(args [0]string, argsEscaped bool, w
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			sctx, ok, err := s.securityNextgenSession(ctx, ListMyProjectsOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, ListMyProjectsOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "NextgenSession",
+					Security:         "SessionCookie",
 					Err:              err,
 				}
-				defer recordError("Security:NextgenSession", err)
+				defer recordError("Security:SessionCookie", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -13403,14 +13406,14 @@ func (s *Server) handleListMyTeamsRequest(args [0]string, argsEscaped bool, w ht
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			sctx, ok, err := s.securityNextgenSession(ctx, ListMyTeamsOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, ListMyTeamsOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "NextgenSession",
+					Security:         "SessionCookie",
 					Err:              err,
 				}
-				defer recordError("Security:NextgenSession", err)
+				defer recordError("Security:SessionCookie", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -13619,14 +13622,14 @@ func (s *Server) handleListPoliciesRequest(args [0]string, argsEscaped bool, w h
 			}
 		}
 		{
-			sctx, ok, err := s.securityNextgenSession(ctx, ListPoliciesOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, ListPoliciesOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "NextgenSession",
+					Security:         "SessionCookie",
 					Err:              err,
 				}
-				defer recordError("Security:NextgenSession", err)
+				defer recordError("Security:SessionCookie", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -13839,14 +13842,14 @@ func (s *Server) handleListPolicyRevisionsRequest(args [1]string, argsEscaped bo
 			}
 		}
 		{
-			sctx, ok, err := s.securityNextgenSession(ctx, ListPolicyRevisionsOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, ListPolicyRevisionsOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "NextgenSession",
+					Security:         "SessionCookie",
 					Err:              err,
 				}
-				defer recordError("Security:NextgenSession", err)
+				defer recordError("Security:SessionCookie", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -14180,7 +14183,7 @@ func (s *Server) handleListPreviewsRequest(args [1]string, argsEscaped bool, w h
 // grants.
 // Ordered by `user_id` and paginated with `page_token`.
 // Accepts either a project secret (`oauth2`) or a user-bound Console
-// session cookie (`nextgenSession`) that can read the project.
+// session cookie (`sessionCookie`) that can read the project.
 //
 // GET /projects/{project_id}/admins
 func (s *Server) handleListProjectAdminsRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -14275,14 +14278,14 @@ func (s *Server) handleListProjectAdminsRequest(args [1]string, argsEscaped bool
 			}
 		}
 		{
-			sctx, ok, err := s.securityNextgenSession(ctx, ListProjectAdminsOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, ListProjectAdminsOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "NextgenSession",
+					Security:         "SessionCookie",
 					Err:              err,
 				}
-				defer recordError("Security:NextgenSession", err)
+				defer recordError("Security:SessionCookie", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -14496,14 +14499,14 @@ func (s *Server) handleListReleasesRequest(args [0]string, argsEscaped bool, w h
 			}
 		}
 		{
-			sctx, ok, err := s.securityNextgenSession(ctx, ListReleasesOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, ListReleasesOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "NextgenSession",
+					Security:         "SessionCookie",
 					Err:              err,
 				}
-				defer recordError("Security:NextgenSession", err)
+				defer recordError("Security:SessionCookie", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -14714,14 +14717,14 @@ func (s *Server) handleListSchemasRequest(args [0]string, argsEscaped bool, w ht
 			}
 		}
 		{
-			sctx, ok, err := s.securityNextgenSession(ctx, ListSchemasOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, ListSchemasOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "NextgenSession",
+					Security:         "SessionCookie",
 					Err:              err,
 				}
-				defer recordError("Security:NextgenSession", err)
+				defer recordError("Security:SessionCookie", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -14944,14 +14947,14 @@ func (s *Server) handleListUserIdentityLinksRequest(args [1]string, argsEscaped 
 			}
 		}
 		{
-			sctx, ok, err := s.securityNextgenSession(ctx, ListUserIdentityLinksOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, ListUserIdentityLinksOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "NextgenSession",
+					Security:         "SessionCookie",
 					Err:              err,
 				}
-				defer recordError("Security:NextgenSession", err)
+				defer recordError("Security:SessionCookie", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -15160,14 +15163,14 @@ func (s *Server) handleListUserPasskeysRequest(args [1]string, argsEscaped bool,
 			}
 		}
 		{
-			sctx, ok, err := s.securityNextgenSession(ctx, ListUserPasskeysOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, ListUserPasskeysOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "NextgenSession",
+					Security:         "SessionCookie",
 					Err:              err,
 				}
-				defer recordError("Security:NextgenSession", err)
+				defer recordError("Security:SessionCookie", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -15378,14 +15381,14 @@ func (s *Server) handleListUserTeamsRequest(args [1]string, argsEscaped bool, w 
 			}
 		}
 		{
-			sctx, ok, err := s.securityNextgenSession(ctx, ListUserTeamsOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, ListUserTeamsOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "NextgenSession",
+					Security:         "SessionCookie",
 					Err:              err,
 				}
-				defer recordError("Security:NextgenSession", err)
+				defer recordError("Security:SessionCookie", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -15578,14 +15581,14 @@ func (s *Server) handlePatchMyUserRequest(args [0]string, argsEscaped bool, w ht
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			sctx, ok, err := s.securityNextgenSession(ctx, PatchMyUserOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, PatchMyUserOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "NextgenSession",
+					Security:         "SessionCookie",
 					Err:              err,
 				}
-				defer recordError("Security:NextgenSession", err)
+				defer recordError("Security:SessionCookie", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -15797,14 +15800,14 @@ func (s *Server) handlePatchProjectRequest(args [1]string, argsEscaped bool, w h
 			}
 		}
 		{
-			sctx, ok, err := s.securityNextgenSession(ctx, PatchProjectOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, PatchProjectOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "NextgenSession",
+					Security:         "SessionCookie",
 					Err:              err,
 				}
-				defer recordError("Security:NextgenSession", err)
+				defer recordError("Security:SessionCookie", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -16020,14 +16023,14 @@ func (s *Server) handlePatchUserByIDRequest(args [1]string, argsEscaped bool, w 
 			}
 		}
 		{
-			sctx, ok, err := s.securityNextgenSession(ctx, PatchUserByIDOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, PatchUserByIDOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "NextgenSession",
+					Security:         "SessionCookie",
 					Err:              err,
 				}
-				defer recordError("Security:NextgenSession", err)
+				defer recordError("Security:SessionCookie", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -16375,8 +16378,8 @@ func (s *Server) handlePublishPolicyRequest(args [0]string, argsEscaped bool, w 
 // body-conditional). A user-bound Console session that already passed
 // the project Check may expand without those scopes.
 // Accepts either a project secret (`oauth2`) or a user-bound Console
-// session cookie (`nextgenSession`). Cookie-authenticated requests
-// follow the scheme's CSRF rules (`nextgenSession`).
+// session cookie (`sessionCookie`). Cookie-authenticated requests
+// follow the scheme's CSRF rules (`sessionCookie`).
 //
 // POST /grants/query
 func (s *Server) handleQueryGrantsRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -16471,14 +16474,14 @@ func (s *Server) handleQueryGrantsRequest(args [0]string, argsEscaped bool, w ht
 			}
 		}
 		{
-			sctx, ok, err := s.securityNextgenSession(ctx, QueryGrantsOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, QueryGrantsOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "NextgenSession",
+					Security:         "SessionCookie",
 					Err:              err,
 				}
-				defer recordError("Security:NextgenSession", err)
+				defer recordError("Security:SessionCookie", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -16692,14 +16695,14 @@ func (s *Server) handleQueryIdpsRequest(args [0]string, argsEscaped bool, w http
 			}
 		}
 		{
-			sctx, ok, err := s.securityNextgenSession(ctx, QueryIdpsOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, QueryIdpsOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "NextgenSession",
+					Security:         "SessionCookie",
 					Err:              err,
 				}
-				defer recordError("Security:NextgenSession", err)
+				defer recordError("Security:SessionCookie", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -17213,6 +17216,8 @@ func (s *Server) handleQuerySessionsRequest(args [0]string, argsEscaped bool, w 
 // handleQueryTeamsRequest handles queryTeams operation.
 //
 // Returns the teams of a project, paginated with a cursor.
+// `project_id` names the project to list; without it, the credential's own
+// project is listed.
 //
 // POST /teams/query
 func (s *Server) handleQueryTeamsRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -17307,14 +17312,14 @@ func (s *Server) handleQueryTeamsRequest(args [0]string, argsEscaped bool, w htt
 			}
 		}
 		{
-			sctx, ok, err := s.securityNextgenSession(ctx, QueryTeamsOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, QueryTeamsOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "NextgenSession",
+					Security:         "SessionCookie",
 					Err:              err,
 				}
-				defer recordError("Security:NextgenSession", err)
+				defer recordError("Security:SessionCookie", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -17436,8 +17441,8 @@ func (s *Server) handleQueryTeamsRequest(args [0]string, argsEscaped bool, w htt
 // `project_id` names the project to list; without it, the credential's own
 // project is listed.
 // Accepts either a project secret (`oauth2`) or a user-bound Console
-// session cookie (`nextgenSession`). Cookie-authenticated requests
-// follow the scheme's CSRF rules (`nextgenSession`).
+// session cookie (`sessionCookie`). Cookie-authenticated requests
+// follow the scheme's CSRF rules (`sessionCookie`).
 //
 // POST /users/query
 func (s *Server) handleQueryUsersRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -17532,14 +17537,14 @@ func (s *Server) handleQueryUsersRequest(args [0]string, argsEscaped bool, w htt
 			}
 		}
 		{
-			sctx, ok, err := s.securityNextgenSession(ctx, QueryUsersOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, QueryUsersOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "NextgenSession",
+					Security:         "SessionCookie",
 					Err:              err,
 				}
-				defer recordError("Security:NextgenSession", err)
+				defer recordError("Security:SessionCookie", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -17755,14 +17760,14 @@ func (s *Server) handleRemoveOriginRequest(args [1]string, argsEscaped bool, w h
 			}
 		}
 		{
-			sctx, ok, err := s.securityNextgenSession(ctx, RemoveOriginOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, RemoveOriginOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "NextgenSession",
+					Security:         "SessionCookie",
 					Err:              err,
 				}
-				defer recordError("Security:NextgenSession", err)
+				defer recordError("Security:SessionCookie", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -18089,7 +18094,7 @@ func (s *Server) handleRemovePreviewRequest(args [1]string, argsEscaped bool, w 
 // handleRevokeMySessionRequest handles revokeMySession operation.
 //
 // Logs out by permanently deleting the session.
-// The `__nextgen_session` cookie issued at creation (or superseded by a handoff
+// The session cookie issued at creation (or superseded by a handoff
 // exchange) is required, with the session's token from `GET /sessions/me/csrf`
 // in the `X-Zitadel-CSRF` header. Idempotent: if the session is already gone
 // this still returns 204. Any tokens derived from the session are invalidated,
@@ -18173,14 +18178,14 @@ func (s *Server) handleRevokeMySessionRequest(args [0]string, argsEscaped bool, 
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			sctx, ok, err := s.securityNextgenSession(ctx, RevokeMySessionOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, RevokeMySessionOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "NextgenSession",
+					Security:         "SessionCookie",
 					Err:              err,
 				}
-				defer recordError("Security:NextgenSession", err)
+				defer recordError("Security:SessionCookie", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -18392,14 +18397,14 @@ func (s *Server) handleRevokeReleaseRequest(args [1]string, argsEscaped bool, w 
 			}
 		}
 		{
-			sctx, ok, err := s.securityNextgenSession(ctx, RevokeReleaseOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, RevokeReleaseOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "NextgenSession",
+					Security:         "SessionCookie",
 					Err:              err,
 				}
-				defer recordError("Security:NextgenSession", err)
+				defer recordError("Security:SessionCookie", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -18508,8 +18513,8 @@ func (s *Server) handleRevokeReleaseRequest(args [1]string, argsEscaped bool, w 
 //
 // Permanently deletes the session, terminating it immediately.
 // This is the operator revoke path and requires the `session.delete` scope on a
-// project-bound credential. End-user logout with the `__nextgen_session` cookie is
-// `DELETE /sessions/me` (`nextgenSession` scheme).
+// project-bound credential. End-user logout with the session cookie is
+// `DELETE /sessions/me` (`sessionCookie` scheme).
 // Idempotent: deleting a session that does not exist (or was already deleted)
 // still returns 204. After deletion, any tokens derived from the session are
 // invalidated.
@@ -18806,14 +18811,14 @@ func (s *Server) handleRollbackDeploymentRequest(args [1]string, argsEscaped boo
 			}
 		}
 		{
-			sctx, ok, err := s.securityNextgenSession(ctx, RollbackDeploymentOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, RollbackDeploymentOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "NextgenSession",
+					Security:         "SessionCookie",
 					Err:              err,
 				}
-				defer recordError("Security:NextgenSession", err)
+				defer recordError("Security:SessionCookie", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -19441,14 +19446,14 @@ func (s *Server) handleUpdateTeamRequest(args [1]string, argsEscaped bool, w htt
 			}
 		}
 		{
-			sctx, ok, err := s.securityNextgenSession(ctx, UpdateTeamOperation, r)
+			sctx, ok, err := s.securitySessionCookie(ctx, UpdateTeamOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "NextgenSession",
+					Security:         "SessionCookie",
 					Err:              err,
 				}
-				defer recordError("Security:NextgenSession", err)
+				defer recordError("Security:SessionCookie", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}

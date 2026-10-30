@@ -82,6 +82,12 @@ type ProjectStatements interface {
 	ListProjects(ctx context.Context, filter *database.ListOptions[domain.ProjectField]) (*database.ListResult[*domain.Project], error)
 	// DeleteProjectByID removes the project. changed is false when no row matched.
 	DeleteProjectByID(ctx context.Context, id string) (changed bool, err error)
+	// LockProject locks the project row until the transaction ends. Callers
+	// that lock several projects do it in project id order, one row at a time.
+	// Postgres and Spanner take FOR UPDATE; SQLite already holds the write lock
+	// from BEGIN IMMEDIATE, so its statement is a plain read. Returns
+	// [database.NoRowFoundError] when no project carries the id.
+	LockProject(ctx context.Context, id string) error
 }
 
 // OriginStatements persists project origin patterns under the natural key
@@ -771,6 +777,15 @@ type AuthzAssignmentStatements interface {
 	// project's admin teams that viewerUserID is also an active member of.
 	// Each carries every way they administer the project.
 	ListProjectAdmins(ctx context.Context, projectID, viewerUserID string, page database.Page[domain.ProjectAdminField]) (*database.ListResult[*domain.ProjectAdminRecord], error)
+	// ListProjectsOwnedThroughMember returns the projects, ordered by project
+	// id, whose active owning team has userID as an active member (a
+	// membership edge). Admin grants, platform operators and the project
+	// secret are not owners.
+	ListProjectsOwnedThroughMember(ctx context.Context, userID string) ([]string, error)
+	// ListProjectsLosingLastOwner returns the projects from
+	// ListProjectsOwnedThroughMember where userID is the owning team's only
+	// active member.
+	ListProjectsLosingLastOwner(ctx context.Context, userID string) ([]string, error)
 	// GetActiveOwningTeamGrant returns the project's active owning-team grant
 	// (object project, relation team) or NoRowFoundError when the project is
 	// unclaimed. The unique active grant is the claim source of truth

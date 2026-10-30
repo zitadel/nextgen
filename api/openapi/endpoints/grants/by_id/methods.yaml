@@ -17,14 +17,14 @@ get:
     Check may expand without those scopes.
 
     Accepts either a project secret (`oauth2`) or a user-bound Console
-    session cookie (`nextgenSession`). Cookie-authenticated requests
-    follow the scheme's CSRF rules (`nextgenSession`).
+    session cookie (`sessionCookie`). Cookie-authenticated requests
+    follow the scheme's CSRF rules (`sessionCookie`).
   tags:
     - Grants
   security:
     - oauth2:
         - project.read
-    - nextgenSession: []
+    - sessionCookie: []
   parameters:
     - $ref: ../../../components/parameters/grant-id.yaml
     - $ref: ../../../components/parameters/project-id.yaml
@@ -80,14 +80,14 @@ delete:
     revoked so the unique binding can be reused.
 
     Accepts either a project secret (`oauth2`) or a user-bound Console
-    session cookie (`nextgenSession`). Cookie-authenticated requests
-    follow the scheme's CSRF rules (`nextgenSession`).
+    session cookie (`sessionCookie`). Cookie-authenticated requests
+    follow the scheme's CSRF rules (`sessionCookie`).
   tags:
     - Grants
   security:
     - oauth2:
         - project.write
-    - nextgenSession: []
+    - sessionCookie: []
   parameters:
     - $ref: ../../../components/parameters/grant-id.yaml
     - $ref: ../../../components/parameters/project-id.yaml

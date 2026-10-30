@@ -385,7 +385,7 @@ func TestRevokeRelease(t *testing.T) {
 		require.IsType(t, &api.RevokeReleaseConflict{}, resp, helpers.MustMarshal(t, resp))
 		conflict := resp.(*api.RevokeReleaseConflict)
 		require.Len(t, conflict.Details.Origins, 1)
-		assert.Equal(t, api.Origin(previewOrigin), conflict.Details.Origins[0].Origin)
+		assert.Equal(t, api.DeploymentTargetOrigin(previewOrigin), conflict.Details.Origins[0].Origin)
 		assert.Equal(t, api.DeploymentID(preview.Deployment.ID), conflict.Details.Origins[0].DeploymentID)
 
 		// The preview moves on to the other release, so nothing serves it.
@@ -516,7 +516,7 @@ func TestDeploymentReads(t *testing.T) {
 	})
 
 	t.Run("the history of one origin", func(t *testing.T) {
-		assert.Equal(t, []api.DeploymentID{second.ID, first.ID}, ids(list(t, api.ListDeploymentsParams{Origin: api.NewOptOrigin(wwwOrigin)})))
+		assert.Equal(t, []api.DeploymentID{second.ID, first.ID}, ids(list(t, api.ListDeploymentsParams{Origin: api.NewOptDeploymentTargetOrigin(wwwOrigin)})))
 	})
 
 	t.Run("the live view is the newest primary deployment", func(t *testing.T) {
@@ -536,9 +536,9 @@ func TestDeploymentReads(t *testing.T) {
 	t.Run("a primary origin added since serves nothing", func(t *testing.T) {
 		const added = "https://acme.com"
 		fixture.addOrigin(t, domain.Origin{Pattern: added, Kind: domain.OriginKindPrimary})
-		assert.Empty(t, list(t, api.ListDeploymentsParams{Origin: api.NewOptOrigin(added), Live: api.NewOptBool(true)}))
+		assert.Empty(t, list(t, api.ListDeploymentsParams{Origin: api.NewOptDeploymentTargetOrigin(added), Live: api.NewOptBool(true)}))
 		assert.Equal(t, []api.DeploymentID{second.ID},
-			ids(list(t, api.ListDeploymentsParams{Origin: api.NewOptOrigin(appOrigin), Live: api.NewOptBool(true)})))
+			ids(list(t, api.ListDeploymentsParams{Origin: api.NewOptDeploymentTargetOrigin(appOrigin), Live: api.NewOptBool(true)})))
 	})
 
 	t.Run("a removed primary origin drops out of the live view", func(t *testing.T) {
