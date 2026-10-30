@@ -147,7 +147,7 @@ async function expectProtectedRouteToRedirect(page: Page): Promise<void> {
 }
 
 async function expectSessionCookie(page: Page): Promise<void> {
-  const name = await appSessionCookieName();
+  const name = await appSessionCookieName(page.url());
   await expect
     .poll(
       async () =>

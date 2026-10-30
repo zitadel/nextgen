@@ -50,7 +50,7 @@ test("signs in end to end against the embedded API", async ({ page, seed }) => {
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
 
   // Terminal step → `POST /sessions/exchange` with the runtime-discovered
-  // publishable key → `__nextgen_session` cookie → full-document navigation
+  // publishable key → session cookie → full-document navigation
   // back into the console, where the guard's `GET /sessions/me` now answers
   // 200. Four more calls that only resolve if the base is right.
   await page.waitForURL((url) => !url.pathname.endsWith("/login"));

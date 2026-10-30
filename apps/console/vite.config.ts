@@ -44,7 +44,7 @@ export default defineConfig(({ command, mode, isPreview }) => ({
     // browser calls the same-origin `/api` base and this Node-side proxy
     // forwards it to the Go server, stripping the prefix. It adds no
     // credential: the console user signs in through the embedded login widget
-    // (Console ADR 0003), and the `__nextgen_session` cookie that rides along
+    // (Console ADR 0003), and the session cookie that rides along
     // on these same-origin requests authorizes every management call, exactly
     // as it does in the embedded build (#1300). `vite preview` is deliberately
     // left un-proxied so it can't be mistaken for the production path.
