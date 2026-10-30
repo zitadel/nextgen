@@ -30,8 +30,9 @@ func TestPlatformProjectSignsInFromTheConsole(t *testing.T) {
 	t.Cleanup(func() {
 		_, _ = harness.EnsureServiceDB(t).Statements().DeleteProjectByID(context.Background(), domain.PlatformProjectID)
 	})
+	builtAt := time.Now()
 	deploy := func() error {
-		return platformbootstrap.EnsureDeployed(t.Context(), helpers.BuiltinSchemaBaseURL, time.Now(),
+		return platformbootstrap.EnsureDeployed(t.Context(), helpers.BuiltinSchemaBaseURL, builtAt,
 			helpers.ConsoleOrigin, projects, harness.EnsureReleaseService(t), harness.EnsureDeploymentService(t))
 	}
 	served := func() []domain.OriginDeployment {
@@ -43,16 +44,18 @@ func TestPlatformProjectSignsInFromTheConsole(t *testing.T) {
 	}
 
 	// Replicas that start together race on an empty project: on a serverless
-	// platform a cold burst brings up one per request.
+	// platform a cold burst brings up one per request. Each can mint its own copy
+	// of the schema, so the next start settles on the newest.
 	var starts errgroup.Group
 	for range 4 {
 		starts.Go(deploy)
 	}
 	require.NoError(t, starts.Wait())
-	first := served()
-	require.Len(t, first, 1, "the console origin is served")
+	require.Len(t, served(), 1, "the console origin is served")
 	require.NoError(t, deploy())
-	assert.Equal(t, first, served(), "a restart that changes nothing deploys nothing")
+	settled := served()
+	require.NoError(t, deploy())
+	assert.Equal(t, settled, served(), "a restart that changes nothing deploys nothing")
 
 	resp, body := openFlow(t, domain.PlatformProjectID, helpers.ConsoleOrigin)
 	require.Equal(t, http.StatusCreated, resp.StatusCode, string(body))

@@ -76,6 +76,12 @@ func EnsureDeployed(
 		slog.Warn("platform bootstrap: this server's configuration is a revoked release", slog.String("release_id", built.Release.ID))
 		return nil
 	}
+	if errors.Is(err, domain.ErrDeploymentConflict(domain.DeploymentConflictDetails{})) {
+		// Replicas that start together can each mint a schema, so their releases
+		// differ and keep replacing each other. Another start is deploying.
+		slog.Info("platform bootstrap: another start deployed the platform project")
+		return nil
+	}
 	if err != nil {
 		return fmt.Errorf("deploy platform release: %w", err)
 	}
