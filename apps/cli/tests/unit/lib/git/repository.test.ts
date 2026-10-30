@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { chmod, mkdir, rm, symlink, utimes, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
@@ -37,6 +38,17 @@ const OPTIONS = {
   except: (path: string) => path.endsWith(".env"),
   authorIfGitHasNone: { name: "Fallback", email: "fallback@example.com" },
 };
+
+/** A `git` on PATH that starts a repository and then fails, as a full disk would. Returns its directory. */
+async function halfInitGit(): Promise<string> {
+  const bin = await scratch.directory();
+  await writeFile(
+    join(bin, "git"),
+    "#!/bin/sh\n/bin/mkdir -p .git/objects\necho 'fatal: could not write config' >&2\nexit 1\n",
+  );
+  await chmod(join(bin, "git"), 0o755);
+  return bin;
+}
 
 /** How many `diff --git` sections `patch` holds. */
 function sectionsOf(patch: string): number {
@@ -135,6 +147,32 @@ describe("Repository.create", () => {
     await Repository.create(cwd);
 
     expect(await Repository.open(cwd)).not.toBeNull();
+  });
+
+  it("leaves no half-made repository behind when git init fails", async () => {
+    const cwd = await scratch.directory();
+    vi.stubEnv("PATH", await halfInitGit());
+
+    await Repository.create(cwd).catch(() => undefined);
+
+    expect(existsSync(join(cwd, ".git"))).toBe(false);
+  });
+
+  it("keeps a .git that was there before when git init fails", async () => {
+    const cwd = await scratch.directory();
+    await mkdir(join(cwd, ".git"));
+    vi.stubEnv("PATH", await halfInitGit());
+
+    await Repository.create(cwd).catch(() => undefined);
+
+    expect(existsSync(join(cwd, ".git"))).toBe(true);
+  });
+
+  it("throws git's message when git init fails", async () => {
+    const cwd = await scratch.directory();
+    vi.stubEnv("PATH", await halfInitGit());
+
+    await expect(Repository.create(cwd)).rejects.toThrow("fatal: could not write config");
   });
 });
 

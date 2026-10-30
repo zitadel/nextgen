@@ -9,7 +9,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   assertCleanWorktree,
   ensureInitialCommit,
+  gitReport,
   INITIAL_COMMIT_SUBJECT,
+  unavailableWarning,
 } from "../../../../src/commands/setup/initial-commit";
 
 const run = promisify(execFile);
@@ -627,5 +629,57 @@ describe("ensureInitialCommit when the commit fails in a repository it existed i
       kind: "unavailable",
       createdRepository: false,
     });
+  });
+});
+
+describe("gitReport", () => {
+  it("reports a repository setup created and committed into", () => {
+    expect(
+      gitReport({ kind: "created", sha: "abc", guessedIdentity: false, invented: false }),
+    ).toEqual({ initialized: true, commit: "abc" });
+  });
+
+  it("reports a commit into a repository that already existed", () => {
+    expect(
+      gitReport({ kind: "committed", sha: "abc", guessedIdentity: false, invented: false }),
+    ).toEqual({ initialized: false, commit: "abc" });
+  });
+
+  it("reports a repository setup created even when its commit failed", () => {
+    expect(gitReport({ kind: "unavailable", reason: "r", createdRepository: true })).toEqual({
+      initialized: true,
+      commit: null,
+    });
+  });
+
+  it("reports no repository and no commit when the commit failed in an existing one", () => {
+    expect(gitReport({ kind: "unavailable", reason: "r", createdRepository: false })).toEqual({
+      initialized: false,
+      commit: null,
+    });
+  });
+
+  it("reports nothing when setup skipped git", () => {
+    expect(gitReport({ kind: "skipped" })).toEqual({ initialized: false, commit: null });
+  });
+});
+
+describe("unavailableWarning", () => {
+  it("names the reason the commit could not be made", () => {
+    expect(unavailableWarning({ reason: "fatal: one", createdRepository: false })).toBe(
+      "Could not commit the scaffolded project (fatal: one); the first release records no commit, so the next deploy cannot show a diff.",
+    );
+  });
+
+  it("names a missing reason rather than leaving it blank", () => {
+    expect(unavailableWarning({ reason: "", createdRepository: false })).toContain(
+      "(git gave no reason)",
+    );
+  });
+
+  it("says when setup left a new, empty repository behind", () => {
+    expect(unavailableWarning({ reason: "fatal: one", createdRepository: true })).toContain(
+      "Setup created a new, empty git repository here.",
+    );
   });
 });

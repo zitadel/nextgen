@@ -1,4 +1,6 @@
 import { existsSync } from "node:fs";
+import { rm } from "node:fs/promises";
+import { join } from "node:path";
 
 import { GitDidNotStartError, RepositoryError } from "./errors";
 import { Git } from "./git";
@@ -95,9 +97,26 @@ export class Repository {
     }
   }
 
-  /** A new repository in `dir`. */
+  /**
+   * A new repository in `dir`; when git cannot make one, nothing is left behind.
+   *
+   * `git init` writes `.git` before it is done, so a failure partway (a full
+   * or read-only disk) leaves a half-made repository that every later git
+   * command would trip over. When `dir` had no `.git` before, a failed
+   * `git init` removes it again, so a caller gets either a working repository
+   * or an error, never something in between.
+   */
   static async create(dir: string): Promise<Repository> {
-    await new Git(dir).run(["init", "--quiet"]);
+    const gitDir = join(dir, ".git");
+    const hadOne = existsSync(gitDir);
+    try {
+      await new Git(dir).run(["init", "--quiet"]);
+    } catch (error) {
+      if (!hadOne) {
+        await rm(gitDir, { recursive: true, force: true });
+      }
+      throw error;
+    }
     return new Repository(dir, "");
   }
 

@@ -27,8 +27,10 @@ export type InitialCommitOutcome =
     }
   /** `--no-git`, or a dry run. */
   | { readonly kind: "skipped" }
-  /** git is missing, or init/add/commit failed, or a secret would have been committed. */
-  /** No commit; `createdRepository` says whether setup ran `git init` before it failed. */
+  /**
+   * No commit: git is missing, or init/add/commit failed, or a secret would have been committed.
+   * `createdRepository` says whether setup ran `git init` before it failed.
+   */
   | {
       readonly kind: "unavailable";
       readonly reason: string;
@@ -170,4 +172,34 @@ function firstLineOf(error: unknown): string {
 /** git's own message, so the warning names the real cause. */
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+/** What `setup --json` reports under `git`: whether setup ran `git init`, even if the commit then failed, and the commit, or null. */
+export function gitReport(outcome: InitialCommitOutcome): {
+  readonly initialized: boolean;
+  readonly commit: string | null;
+} {
+  if (outcome.kind === "created") {
+    return { initialized: true, commit: outcome.sha };
+  }
+  if (outcome.kind === "committed") {
+    return { initialized: false, commit: outcome.sha };
+  }
+  if (outcome.kind === "unavailable") {
+    return { initialized: outcome.createdRepository, commit: null };
+  }
+  return { initialized: false, commit: null };
+}
+
+/** The warning for a commit that could not be made, saying so when setup left a new, empty repository behind. */
+export function unavailableWarning(outcome: {
+  readonly reason: string;
+  readonly createdRepository: boolean;
+}): string {
+  const reason = outcome.reason || "git gave no reason";
+  const warning = `Could not commit the scaffolded project (${reason}); the first release records no commit, so the next deploy cannot show a diff.`;
+  if (outcome.createdRepository) {
+    return `${warning} Setup created a new, empty git repository here.`;
+  }
+  return warning;
 }
