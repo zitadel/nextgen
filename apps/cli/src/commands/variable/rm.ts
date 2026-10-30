@@ -16,6 +16,8 @@ import { Promptable } from "../../lib/oclif/promptable";
 export default class VariableRm extends Promptable(EnvironmentCommand) {
   static override description = "Remove one variable from the project.";
   static override group = CommandGroups.configuration;
+
+  static override heading = "Removing a variable";
   static override examples = [
     "<%= config.bin %> variable rm GOOGLE_CLIENT_ID",
     "<%= config.bin %> variable rm API_URL --preview",
@@ -61,8 +63,7 @@ export default class VariableRm extends Promptable(EnvironmentCommand) {
       });
     }
 
-    const confirmed = await this.input({
-      kind: "confirm",
+    const confirmed = await this.ask.confirm({
       name: `remove ${name} from the project`,
       message: `Remove ${name} from the project?`,
       retry: this.suggest(`variable rm ${name}${flags.preview ? " --preview" : ""} --force`),

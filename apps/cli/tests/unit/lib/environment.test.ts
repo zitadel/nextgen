@@ -10,6 +10,7 @@ import {
   requireValueInteractive,
   resolveEnvironment,
 } from "../../../src/lib/environment";
+import type { Questions } from "../../../src/lib/ui";
 
 /** The answer the mocked clack prompt returns; set per test. */
 const promptAnswer: { value: string | symbol } = { value: "" };
@@ -485,24 +486,50 @@ describe("requireValue", () => {
   });
 });
 
+/**
+ * The asker the command would hand in, answering with `answer`. It records
+ * which method was asked, because which one is the behaviour: a credential is
+ * never echoed, and a normal command must not be drawn a prompt.
+ */
+function asking(answer: string) {
+  const refuse = () => {
+    throw new Error("not asked by this question");
+  };
+  return {
+    text: vi.fn(async () => answer),
+    secret: vi.fn(async () => answer),
+    select: vi.fn(refuse),
+    multiselect: vi.fn(refuse),
+    confirm: vi.fn(refuse),
+  } as unknown as Questions & {
+    text: ReturnType<typeof vi.fn>;
+    secret: ReturnType<typeof vi.fn>;
+  };
+}
+
 describe("requireValueInteractive", () => {
   it("throws without prompting when non-interactive", async () => {
-    const { text } = await import("@clack/prompts");
+    const ask = asking("unused");
     const environment = await resolve({ envName: "production" });
 
     await expect(
-      requireValueInteractive(environment, "ZITADEL_PROJECT_ID", { cwd: dir, interactive: false }),
+      requireValueInteractive(environment, "ZITADEL_PROJECT_ID", {
+        cwd: dir,
+        interactive: false,
+        ask,
+      }),
     ).rejects.toMatchObject({ code: "E_VALIDATION" });
-    expect(text).not.toHaveBeenCalled();
+    expect(ask.text).not.toHaveBeenCalled();
   });
 
   it("prompts for a missing value and persists it to .env.<name>.local", async () => {
-    promptAnswer.value = "proj_prompted";
+    const ask = asking("proj_prompted");
     const environment = await resolve({ envName: "production" });
 
     const value = await requireValueInteractive(environment, "ZITADEL_PROJECT_ID", {
       cwd: dir,
       interactive: true,
+      ask,
     });
 
     expect(value).toBe("proj_prompted");
@@ -511,14 +538,47 @@ describe("requireValueInteractive", () => {
     );
   });
 
+  // The command hands in its own asker, so a normal command's question is one
+  // plain line. Minting a drawn asker here put a clack gutter above the answer
+  // of every environment command that had a value to ask for.
+  it("asks through the asker it was given, never one of its own", async () => {
+    const { text, password } = await import("@clack/prompts");
+    const ask = asking("proj_prompted");
+    const environment = await resolve({ envName: "production" });
+
+    await requireValueInteractive(environment, "ZITADEL_PROJECT_ID", {
+      cwd: dir,
+      interactive: true,
+      ask,
+    });
+
+    expect(ask.text).toHaveBeenCalledOnce();
+    expect(text).not.toHaveBeenCalled();
+    expect(password).not.toHaveBeenCalled();
+  });
+
+  it("asks for a credential as a secret, so it is never echoed", async () => {
+    const ask = asking("sk_typed");
+    const environment = await resolve({ envName: "production" });
+
+    await requireValueInteractive(environment, "ZITADEL_PROJECT_SECRET", {
+      cwd: dir,
+      interactive: true,
+      ask,
+    });
+
+    expect(ask.secret).toHaveBeenCalledOnce();
+    expect(ask.text).not.toHaveBeenCalled();
+  });
+
   it("keeps a value typed for an --env-file run out of .env.<name>.local", async () => {
-    promptAnswer.value = "sk_typed";
     await write("ci.env", { ZITADEL_PROJECT_ID: "proj_ci" });
     const environment = await resolveFromDir({ envFile: "ci.env" });
 
     await requireValueInteractive(environment, "ZITADEL_PROJECT_SECRET", {
       cwd: dir,
       interactive: true,
+      ask: asking("sk_typed"),
     });
 
     await expect(readFile(join(dir, ".env.development.local"), "utf8")).rejects.toThrow();

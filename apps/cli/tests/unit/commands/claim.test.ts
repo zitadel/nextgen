@@ -169,9 +169,9 @@ describe("claim", () => {
     expect(json.data.dashboard_url).toContain(json.data.team_id);
     // The human output speaks permanence and points at the Console; the team
     // id stays available here in the envelope.
-    expect(json.data.title).toBe("Your Project is now permanent.");
+    expect(json.data.title).toBe("Your project is now permanent.");
     expect(json.data.next_actions).toEqual([
-      "Manage your Project and collaborate in the Console:",
+      "Manage your project and collaborate in the Console:",
       json.data.dashboard_url,
     ]);
 
@@ -199,8 +199,8 @@ describe("claim", () => {
     const output = `${res.stdout}${res.stderr}`;
     expect(output).toContain("/claim/ch_");
     expect(output).toContain("Project claimed");
-    expect(output).toContain("Your Project is now permanent.");
-    expect(output).toContain("Manage your Project and collaborate in the Console:");
+    expect(output).toContain("Your project is now permanent");
+    expect(output).toContain("Manage your project and collaborate in the Console:");
     // The team stays in the envelope and the secret, not in the prose. The
     // mock's dashboard_url embeds the team id in its path, so assert on the
     // retired sentence rather than on the raw id.
@@ -477,7 +477,7 @@ describe("claim", () => {
       expect(res.exitCode).toBe(0);
       const json = parseJson(res.stdout) as LinkEnvelope;
       expect(json.status).toBe("ok");
-      expect(json.data.title).toBe("Open the link in a browser to make your Project permanent.");
+      expect(json.data.title).toBe("Open the link in a browser to make your project permanent.");
       expect(json.data.project_id).toBe(project.id);
       expect(json.data.challenge_id).toMatch(/^ch_/);
       expect(json.data.claim_url).toContain(`/claim/${json.data.challenge_id}`);
@@ -558,7 +558,7 @@ describe("claim", () => {
         data: { title: string; team_id: string; claimed_at: string };
       };
       expect(json.status).toBe("ok");
-      expect(json.data.title).toBe("Your Project is now permanent.");
+      expect(json.data.title).toBe("Your project is now permanent.");
       const secret = await readSecret(cwd);
       expect(secret.team_id).toBe(json.data.team_id);
       expect(secret.claimed_at).toBe(json.data.claimed_at);

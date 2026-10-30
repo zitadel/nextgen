@@ -1,5 +1,3 @@
-import { spinner } from "@clack/prompts";
-
 import type { Parsed } from "@zitadel/config/idp";
 
 import { LocalServer } from "../../../lib/local-server/server";
@@ -37,10 +35,9 @@ export class ServerPrompt implements SetupPrompt {
     if (ctx.serverFlag) {
       return answers;
     }
-    const detected = await detectLocalServer(ctx.cwd);
+    const detected = await detectLocalServer(ctx);
 
-    const choice = await ctx.input({
-      kind: "select",
+    const choice = await ctx.ask.select({
       name: "server",
       message: "Which Zitadel server should your app use?",
       options: [
@@ -52,12 +49,15 @@ export class ServerPrompt implements SetupPrompt {
           ? {
               value: detected,
               label: `Local server (${detected})`,
-              hint: "started with zitadel start",
+              // The option's hint says what this server is, not how to get
+              // one: a command named here is one nobody can run until the
+              // question is answered, and the option below is disabled.
+              hint: "already running on this machine",
             }
           : {
               value: LOCAL_NOT_RUNNING,
               label: "Local server",
-              hint: "not running — run zitadel start first",
+              hint: "not running — start it first",
               disabled: true,
             },
         { value: CUSTOM, label: "Custom URL (self-hosted)" },
@@ -67,8 +67,7 @@ export class ServerPrompt implements SetupPrompt {
     if (choice !== CUSTOM) {
       return { ...answers, server: choice };
     }
-    const custom = await ctx.input({
-      kind: "text",
+    const custom = await ctx.ask.text({
       name: "server URL",
       message: "What is the URL of your Zitadel server?",
       placeholder: "https://zitadel.internal",
@@ -92,10 +91,9 @@ export class ServerPrompt implements SetupPrompt {
  * line behind, because the options it decides already say what it found, and
  * it draws no guide line of its own, which clearing would leave behind.
  */
-async function detectLocalServer(cwd: string): Promise<string | undefined> {
-  const s = spinner({ withGuide: false });
-  s.start("Checking for a local Zitadel server");
-  const detected = await LocalServer.detectUrl(cwd);
-  s.clear();
+async function detectLocalServer(ctx: PromptContext): Promise<string | undefined> {
+  const probing = ctx.spinner("Checking for a local Zitadel server", { guide: false });
+  const detected = await LocalServer.detectUrl(ctx.cwd);
+  probing.clear();
   return detected;
 }

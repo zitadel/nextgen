@@ -98,15 +98,21 @@ const SECRET_MARKER = "(secret)";
 /**
  * The variables a deployment froze, as `deployment get` shows them: the
  * `variable resolve` table, indented under a heading.
+ *
+ * Laid out as every block a record carries under its fields is (a release's
+ * pointers), because the fields themselves sit at the left margin: the
+ * heading beside them, the table indented under it. A deployment that froze
+ * nothing says so on the heading's own line rather than drawing an empty
+ * table.
  */
 export function frozenVariables(rows: readonly VariableRow[]): string {
   if (rows.length === 0) {
-    return "  variables  none";
+    return "variables  none";
   }
   const table = renderTable(["name", "value"], variableCells(rows))
     .split("\n")
-    .map((line) => `    ${line}`);
-  return ["  variables", ...table].join("\n");
+    .map((line) => `  ${line}`);
+  return ["variables", ...table].join("\n");
 }
 
 /** Stands in for a kind the name holds no value for at all. */
@@ -213,14 +219,14 @@ const VARIABLE_NAME_MAX = 255;
 /** Reject a name the platform would refuse, naming it. */
 export function assertVariableName(name: string): void {
   if (!VARIABLE_NAME.test(name)) {
-    throw new ZitadelError("E_VALIDATION", `Invalid variable name ${JSON.stringify(name)}.`, {
+    throw new ZitadelError("E_VALIDATION", `Invalid variable name ${JSON.stringify(name)}`, {
       hint: "A variable name contains only letters, digits and underscores.",
     });
   }
   if (name.length > VARIABLE_NAME_MAX) {
     throw new ZitadelError(
       "E_VALIDATION",
-      `Variable name is ${name.length} characters; the limit is ${VARIABLE_NAME_MAX}.`,
+      `Variable name is ${name.length} characters; the limit is ${VARIABLE_NAME_MAX}`,
       { hint: "Shorten the name." },
     );
   }

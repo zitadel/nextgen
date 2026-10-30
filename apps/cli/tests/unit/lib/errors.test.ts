@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { ApiError, NetworkError } from "@zitadel/api/runtime/fetch";
 
-import { EXIT_CODES, ZitadelError, toZitadelError } from "../../../src/lib/errors";
+import { EXIT_CODES, failureText, ZitadelError, toZitadelError } from "../../../src/lib/errors";
 import { unscopedCommand } from "../../../src/lib/suggestion";
 
 describe("EXIT_CODES", () => {
@@ -354,5 +354,72 @@ describe("endpoints the platform reports missing", () => {
     expect(error.hint).toBe(
       "The server rejected this field: oidc.issuer. The server reports this endpoint missing: jwks_uri.",
     );
+  });
+});
+
+// Every failure the CLI reports is one grammar: `Error <code>: <sentence>`,
+// said once. These are the two places the sentence a person reads differs
+// from the one `--json` carries, which is never touched.
+describe("a failure as a person is shown it", () => {
+  describe("a message that opens on a plain word", () => {
+    it.each([
+      ["variable not found", "Variable not found"],
+      ["release: still served by an origin", "Release: still served by an origin"],
+      ["cancelled", "Cancelled"],
+    ])("reads %j as a sentence", (message, sentence) => {
+      expect(failureText(message).sentence).toBe(sentence);
+    });
+  });
+
+  // Capitalising the first letter of these would rename what they point at.
+  describe("a message that opens on something that is not a word", () => {
+    it.each([
+      ["http://localhost:9/users/query got no response"],
+      ["usr_1 was not found on the project"],
+      [".zitadel/state.json could not be read"],
+      ["--client-id was given an empty value"],
+      ["POST http://localhost:9/users/query got no response"],
+    ])("leaves %j exactly as it was thrown", (message) => {
+      expect(failureText(message).sentence).toBe(message);
+    });
+  });
+
+  describe("oclif's own rendering of a refused command line", () => {
+    const refused =
+      "The following error occurred:\n  Missing required flag kind\nSee more help with --help";
+
+    it("states the reason as the one sentence, without oclif's heading", () => {
+      expect(failureText(refused).sentence).toBe("Missing required flag kind");
+    });
+
+    it("says the command line was refused, so --help can be offered under Next:", () => {
+      expect(failureText(refused).misuse).toBe(true);
+    });
+
+    it("drops oclif's own help footer, which nothing else writes", () => {
+      expect(failureText(refused).sentence).not.toContain("--help");
+    });
+
+    it("joins the reasons when the command line was wrong in more than one way", () => {
+      const both =
+        "The following errors occurred:\n  Missing required flag kind\n  Missing required flag pattern\nSee more help with --help";
+
+      expect(failureText(both).sentence).toBe(
+        "Missing required flag kind; Missing required flag pattern",
+      );
+    });
+
+    it("names what a heading introduces on the heading's own line", () => {
+      const missing = "Missing 1 required arg:\nurl  the origin to add\nSee more help with --help";
+
+      expect(failureText(missing).sentence).toBe("Missing 1 required arg: url");
+    });
+
+    it("leaves an ordinary failure's own lines alone", () => {
+      expect(failureText("Bad port\nUse 1 to 65535.")).toEqual({
+        sentence: "Bad port\nUse 1 to 65535.",
+        misuse: false,
+      });
+    });
   });
 });

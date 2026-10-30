@@ -28,6 +28,8 @@ const INVENTORY_COLUMNS = ["name", "value", "preview"] as const;
 export default class VariableList extends EnvironmentCommand {
   static override description = "List the variables entered on the project.";
   static override group = CommandGroups.configuration;
+
+  static override heading = "Listing variables";
   static override examples = [
     "<%= config.bin %> variable list",
     "<%= config.bin %> variable list --preview",
@@ -62,16 +64,12 @@ export default class VariableList extends EnvironmentCommand {
     // empty, so `cut`, `awk` and `wc -l` work on it; a terminal gets a table.
     const cells = flags.preview ? variableCells(rows) : variableInventoryCells(rows);
     const plain = flags.plain || !process.stdout.isTTY;
-    const empty = flags.preview
-      ? "No preview values on the project."
-      : "No variables on the project.";
     return this.emit({
       status: "ok",
       data: listData(rows),
       pretty: renderList(flags.preview ? COLUMNS : INVENTORY_COLUMNS, cells as never, {
         plain,
         singular: "variable",
-        empty,
       }),
     });
   }

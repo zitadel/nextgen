@@ -9,6 +9,7 @@ import AuthMethodPasskeyDisable from "../../../../src/commands/auth-method/passk
 import AuthMethodSsoDisable from "../../../../src/commands/auth-method/sso/disable";
 import { makeProject, readJson, writeJson } from "../../../helpers/local-project";
 import { cliPackageRoot } from "../../../helpers/oclif-build";
+import { asTerminalTyping } from "../../../helpers/terminal";
 
 // The terminal paths of the auth-method base class: the confirmation that
 // guards the last way to sign in, and the runs that never prompt. The command
@@ -49,16 +50,19 @@ afterEach(async () => {
 });
 
 /**
- * Run a command class in-process with its output kept out of the test log:
- * oclif prints through console.log and console.error, consola through the
- * streams.
+ * Runs a command class in-process with a person typing `answers` at the plain
+ * questions it asks, and its output kept out of the test log: oclif prints
+ * through console.log and console.error, consola through the streams. What
+ * was written comes back, since a plain question is written rather than drawn.
  */
-async function quietly<T>(run: () => Promise<T>): Promise<T> {
-  vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+async function quietly<T>(
+  answers: readonly string[],
+  run: () => Promise<T>,
+): Promise<{ result: T; shown: string }> {
   vi.spyOn(process.stderr, "write").mockImplementation(() => true);
   vi.spyOn(console, "log").mockImplementation(() => undefined);
   vi.spyOn(console, "error").mockImplementation(() => undefined);
-  return run();
+  return asTerminalTyping(answers, run);
 }
 
 const schemaWith = (methods: Record<string, unknown>) => ({
@@ -89,9 +93,9 @@ async function methodOf(cwd: string, method: string): Promise<unknown> {
   return (schema["x-auth-methods"] as Record<string, unknown>)[method];
 }
 
-async function disablePasskey(cwd: string, ...extra: string[]) {
+async function disablePasskey(answers: readonly string[], cwd: string, ...extra: string[]) {
   const config = await Config.load({ root: cliPackageRoot });
-  return quietly(() =>
+  return quietly(answers, () =>
     AuthMethodPasskeyDisable.run(["--cwd", cwd, "--no-telemetry", ...extra], config),
   );
 }
@@ -99,30 +103,37 @@ async function disablePasskey(cwd: string, ...extra: string[]) {
 describe("auth-method passkey disable confirmation", () => {
   it("asks before removing the last way to sign in", async () => {
     const cwd = await passkeyOnlyProject();
-    vi.mocked(confirm).mockResolvedValue(false as never);
 
-    await disablePasskey(cwd);
+    const { shown } = await disablePasskey(["n"], cwd);
 
-    expect(confirm).toHaveBeenCalledOnce();
+    expect(shown).toContain("Disable passkey anyway?");
+  });
+
+  // A normal command asks on one plain line, with no chain around it.
+  it("asks it plainly rather than as a drawn prompt", async () => {
+    const cwd = await passkeyOnlyProject();
+
+    const { shown } = await disablePasskey(["n"], cwd);
+
+    expect(confirm).not.toHaveBeenCalled();
+    expect(shown).toContain("? ");
   });
 
   it("ends as skipped and writes nothing when declined", async () => {
     const cwd = await passkeyOnlyProject();
-    vi.mocked(confirm).mockResolvedValue(false as never);
 
-    const envelope = await disablePasskey(cwd);
+    const { result } = await disablePasskey(["n"], cwd);
 
-    expect(envelope).toMatchObject({ status: "skipped", reason: "disable-cancelled" });
+    expect(result).toMatchObject({ status: "skipped", reason: "disable-cancelled" });
     expect(await methodOf(cwd, "passkey")).toEqual({ enabled: true });
   });
 
   it("disables the method and warns when confirmed", async () => {
     const cwd = await passkeyOnlyProject();
-    vi.mocked(confirm).mockResolvedValue(true as never);
 
-    const envelope = await disablePasskey(cwd);
+    const { result } = await disablePasskey(["y"], cwd);
 
-    expect(envelope).toMatchObject({
+    expect(result).toMatchObject({
       status: "ok",
       warnings: [
         "default-human-user has no way to sign in left. Its users can only be managed through the API.",
@@ -132,23 +143,17 @@ describe("auth-method passkey disable confirmation", () => {
   });
 });
 
-describe("auth-method passkey disable cancelled with Ctrl-C", () => {
+describe("auth-method passkey disable left unanswered", () => {
   it("fails, as every cancelled prompt does", async () => {
     const cwd = await passkeyOnlyProject();
-    vi.mocked(confirm).mockResolvedValue(Symbol("cancel") as never);
-    vi.mocked(isCancel).mockReturnValueOnce(true);
 
-    await expect(disablePasskey(cwd)).rejects.toThrow();
-
-    expect(cancel).toHaveBeenCalledWith("Cancelled.");
+    await expect(disablePasskey([], cwd)).rejects.toThrow();
   });
 
   it("writes nothing", async () => {
     const cwd = await passkeyOnlyProject();
-    vi.mocked(confirm).mockResolvedValue(Symbol("cancel") as never);
-    vi.mocked(isCancel).mockReturnValueOnce(true);
 
-    await disablePasskey(cwd).catch(() => undefined);
+    await disablePasskey([], cwd).catch(() => undefined);
 
     expect(await methodOf(cwd, "passkey")).toEqual({ enabled: true });
   });
@@ -166,9 +171,9 @@ function googleOnlyProject(): Promise<string> {
   });
 }
 
-async function disableGoogle(cwd: string) {
+async function disableGoogle(answers: readonly string[], cwd: string) {
   const config = await Config.load({ root: cliPackageRoot });
-  return quietly(() =>
+  return quietly(answers, () =>
     AuthMethodSsoDisable.run(["--provider", "google", "--cwd", cwd, "--no-telemetry"], config),
   );
 }
@@ -176,34 +181,29 @@ async function disableGoogle(cwd: string) {
 describe("auth-method sso disable confirmation", () => {
   it("asks before removing the last way to sign in", async () => {
     const cwd = await googleOnlyProject();
-    vi.mocked(confirm).mockResolvedValue(false as never);
 
-    await disableGoogle(cwd);
+    const { shown } = await disableGoogle(["n"], cwd);
 
-    expect(confirm).toHaveBeenCalledWith(
-      expect.objectContaining({
-        message: "Disable google anyway? Nobody will be able to sign in to default-human-user.",
-      }),
+    expect(shown).toContain(
+      "Disable google anyway? Nobody will be able to sign in to default-human-user.",
     );
   });
 
   it("ends as skipped and writes nothing when declined", async () => {
     const cwd = await googleOnlyProject();
-    vi.mocked(confirm).mockResolvedValue(false as never);
 
-    const envelope = await disableGoogle(cwd);
+    const { result } = await disableGoogle(["n"], cwd);
 
-    expect(envelope).toMatchObject({ status: "skipped", reason: "disable-cancelled" });
+    expect(result).toMatchObject({ status: "skipped", reason: "disable-cancelled" });
     expect(await methodOf(cwd, "sso")).toEqual({ enabled: true, providers: ["google"] });
   });
 
   it("removes the provider and warns when confirmed", async () => {
     const cwd = await googleOnlyProject();
-    vi.mocked(confirm).mockResolvedValue(true as never);
 
-    const envelope = await disableGoogle(cwd);
+    const { result } = await disableGoogle(["y"], cwd);
 
-    expect(envelope).toMatchObject({
+    expect(result).toMatchObject({
       status: "ok",
       warnings: [
         "default-human-user has no way to sign in left. Its users can only be managed through the API.",
@@ -217,17 +217,17 @@ describe("auth-method passkey disable in a terminal without a prompt", () => {
   it("does not ask on a dry run", async () => {
     const cwd = await passkeyOnlyProject();
 
-    await disablePasskey(cwd, "--dry-run");
+    const { shown } = await disablePasskey([], cwd, "--dry-run");
 
-    expect(confirm).not.toHaveBeenCalled();
+    expect(shown).not.toContain("Disable passkey anyway?");
   });
 
   it("previews a dry run, and warns, rather than refusing", async () => {
     const cwd = await passkeyOnlyProject();
 
-    const envelope = await disablePasskey(cwd, "--dry-run");
+    const { result } = await disablePasskey([], cwd, "--dry-run");
 
-    expect(envelope).toMatchObject({
+    expect(result).toMatchObject({
       status: "skipped",
       reason: "dry-run",
       warnings: [
@@ -240,14 +240,14 @@ describe("auth-method passkey disable in a terminal without a prompt", () => {
   it("does not ask when --force is passed", async () => {
     const cwd = await passkeyOnlyProject();
 
-    const envelope = await disablePasskey(cwd, "--force");
+    const { result, shown } = await disablePasskey([], cwd, "--force");
 
-    expect(confirm).not.toHaveBeenCalled();
-    expect(envelope).toMatchObject({ status: "ok" });
+    expect(shown).not.toContain("Disable passkey anyway?");
+    expect(result).toMatchObject({ status: "ok" });
   });
 });
 
-describe("auth-method passkey disable run from inside the Project", () => {
+describe("auth-method passkey disable run from inside the project", () => {
   it("suggests a dry run and a deploy without --cwd", async () => {
     const cwd = await passkeyOnlyProject();
     await writeJson(
@@ -258,11 +258,11 @@ describe("auth-method passkey disable run from inside the Project", () => {
     vi.spyOn(process, "cwd").mockReturnValue(cwd);
     const config = await Config.load({ root: cliPackageRoot });
 
-    const envelope = await quietly(() =>
+    const { result } = await quietly([], () =>
       AuthMethodPasskeyDisable.run(["--no-telemetry", "--non-interactive"], config),
     );
 
-    expect(envelope).toMatchObject({
+    expect(result).toMatchObject({
       data: {
         next_args: [
           ["deploy", "--dry-run"],

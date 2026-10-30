@@ -55,6 +55,13 @@ describe("parseDisplayName", () => {
     expect(parseDisplayName("x".repeat(257))).toMatchObject({ ok: false });
     expect(parseDisplayName("  Acme SSO ")).toEqual({ ok: true, value: "Acme SSO" });
   });
+
+  it("states what is wrong rather than ordering the reader to type something", () => {
+    expect(parseDisplayName("   ")).toEqual({
+      ok: false,
+      problem: "The name shown on the sign-in button is empty.",
+    });
+  });
 });
 
 describe("parseIssuer", () => {
@@ -102,6 +109,11 @@ describe("parseClientId and parseClientSecret", () => {
     expect(parseClientId(" id ")).toEqual({ ok: true, value: "id" });
     expect(parseClientSecret("")).toMatchObject({ ok: false });
     expect(parseClientSecret(" s3cret ")).toEqual({ ok: true, value: "s3cret" });
+  });
+
+  it("state what is wrong rather than ordering the reader to type something", () => {
+    expect(parseClientId("  ")).toEqual({ ok: false, problem: "The client id is empty." });
+    expect(parseClientSecret("")).toEqual({ ok: false, problem: "The client secret is empty." });
   });
 });
 

@@ -5,6 +5,7 @@
  */
 export { buildBundle, type BuiltBundle, type ConfigurationBundle } from "./bundle";
 export {
+  abbreviate,
   createReleaseFromBundle,
   revokeRelease,
   type Release,

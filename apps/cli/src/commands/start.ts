@@ -24,6 +24,8 @@ import type { SuggestedCommand } from "../lib/suggestion";
 export default class Start extends BaseCommand {
   static override description = "Start a local Zitadel server.";
   static override group = CommandGroups.gettingStarted;
+
+  static override heading = "Starting the local Zitadel server";
   static override groupOrder = 2;
   static override flags = {
     image: nonBlankString({ description: "Container image to run." }),
@@ -179,7 +181,7 @@ function readyData(
       console: `${metadata.server_url}/ui/console/`,
     },
     next_actions: [
-      "Create an app with authentication. Run setup in this directory or a subdirectory.",
+      "Create an app with authentication by running setup in this directory or a subdirectory.",
       "Setup asks for a framework and sign-in method, creates or updates your app, and installs its dependencies.",
       serverLogAction(cliVersion),
     ],

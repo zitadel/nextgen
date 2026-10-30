@@ -16,6 +16,8 @@ import { Promptable } from "../../lib/oclif/promptable";
 export default class ReleaseRevoke extends Promptable(EnvironmentCommand) {
   static override description = "Revoke a release so its content is never served again.";
   static override group = CommandGroups.configuration;
+
+  static override heading = "Revoking a release";
   static override examples = [
     "<%= config.bin %> release revoke rel_01KX3RG8A7F0N9WD3P2E4YM5C1",
     "<%= config.bin %> release revoke rel_01KX3RG8A7F0N9WD3P2E4YM5C1 --force",
@@ -43,12 +45,11 @@ export default class ReleaseRevoke extends Promptable(EnvironmentCommand) {
       return this.emit({
         status: "ok",
         data: { dry_run: true, release_id: releaseId },
-        pretty: `Would revoke ${releaseId}. Nothing was revoked (dry run).`,
+        pretty: `Would revoke ${releaseId} (dry run)`,
       });
     }
 
-    const confirmed = await this.input({
-      kind: "confirm",
+    const confirmed = await this.ask.confirm({
       name: `revoke ${releaseId}`,
       message: `Revoke ${releaseId}? Its content can never be served again.`,
       retry: this.suggest(`release revoke ${releaseId} --force`),

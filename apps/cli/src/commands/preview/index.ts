@@ -87,7 +87,8 @@ export default class Preview extends PreviewCommand {
     // production with it, so the keyword is refused outright.
     if (requested.includes("primary")) {
       throw new ZitadelError("E_VALIDATION", "A preview cannot target the primary origins", {
-        hint: "Pass the preview URLs with --origin; production is deployed by `zitadel deploy`, after merge.",
+        hint: "Pass the preview URLs with --origin; production is deployed after merge.",
+        nextCommands: [this.suggest("deploy")],
       });
     }
 
@@ -110,7 +111,7 @@ export default class Preview extends PreviewCommand {
       return this.emit({
         status: "skipped",
         reason: "nothing-to-preview",
-        pretty: "nothing to preview — production is deployed by `zitadel deploy`, after merge",
+        pretty: "nothing to preview — production is deployed after merge",
       });
     }
     // `development` by default is a developer's machine. In a CI build it is
@@ -173,7 +174,8 @@ export default class Preview extends PreviewCommand {
     const production = urls.filter((url) => primaries.includes(url));
     if (production.length > 0) {
       throw new ZitadelError("E_VALIDATION", `${production.join(", ")} is a primary origin`, {
-        hint: "Pass the preview URLs with --origin; production is deployed by `zitadel deploy`, after merge.",
+        hint: "Pass the preview URLs with --origin; production is deployed after merge.",
+        nextCommands: [this.suggest("deploy")],
       });
     }
 

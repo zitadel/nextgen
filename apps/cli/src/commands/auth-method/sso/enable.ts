@@ -31,6 +31,7 @@ import { loopbackReach } from "../../../lib/local-server/runtime";
 import { refuseBrokenFlows, refuseUneditable } from "../../../lib/auth-methods";
 import { isDevelopmentBuild } from "../../../lib/build-channel";
 import { ZitadelError } from "../../../lib/errors";
+import { DEPLOY_ARGS } from "../../../lib/release";
 import { stableStringify } from "../../../lib/json";
 import {
   applySsoToFlow,
@@ -77,7 +78,7 @@ import {
   nonBlankString,
 } from "../../../lib/oclif";
 import { environmentFlags } from "../../../lib/oclif/environment-flags";
-import { inShell, type SuggestedCommand } from "../../../lib/suggestion";
+import { inShell, type SuggestedCommand, unscopedCommand } from "../../../lib/suggestion";
 import { reportWarning } from "../../../lib/warnings";
 
 /**
@@ -96,6 +97,10 @@ import { reportWarning } from "../../../lib/warnings";
 export default class AuthMethodSsoEnable extends AuthMethodCommand {
   static override description = "Add an identity provider to a user schema.";
   static override group = CommandGroups.authentication;
+
+  static override heading = "Enabling single sign-on";
+
+  static override wizard = true;
   static override examples = [
     "<%= config.bin %> auth-method sso enable --provider google",
     "<%= config.bin %> auth-method sso enable --provider google --schema customers",
@@ -148,6 +153,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
           flags,
           this.environment.values.ZITADEL_ISSUER?.value,
           !this.meta.nonInteractive && !this.meta.dryRun,
+          this.meta.cliVersion,
         ),
     });
     const { issuer } = project;
@@ -259,9 +265,11 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       flowsAfter: edits.flows.map(({ result }) => result.document as Record<string, unknown>),
     };
 
-    consola.info(`Project   ${projectId}`);
+    // Which project this ran against is the summary's last line, not a label
+    // printed before the first question: `connect()` above already recorded it.
+    // The schema is this command's own subject, so it stays as narration.
     consola.info(
-      `Schema    ${schema.path}${schema.methods.length > 0 ? ` (${schema.methods.join(", ")})` : ""}`,
+      `Editing ${schema.path}${schema.methods.length > 0 ? `, which offers ${schema.methods.join(", ")}` : ""}`,
     );
 
     if (dryRun) {
@@ -323,8 +331,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       // Reuse never demands a secret: the project may already hold it, and
       // refusing an unattended rerun for a credential that has not changed
       // would be noise. It is only read so that a rerun can replace it.
-      const piped = await this.input({
-        kind: "secret",
+      const piped = await this.ask.secret({
         name: "client secret",
         message: `What is the client secret of your ${entry.displayName} OAuth app?`,
         parse: parseClientSecret,
@@ -361,11 +368,10 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
           ? await askConnectionEndpoints({
               provider: selection.id,
               developmentBuild: isDevelopmentBuild() && !nonInteractive,
-              ask: this.input,
+              ask: this.ask,
             })
           : undefined;
-      const clientId = await this.input({
-        kind: "text",
+      const clientId = await this.ask.text({
         name: `client id for ${entry.displayName}`,
         message: `What is the client ID of your ${entry.displayName} OAuth app?`,
         flag: "--client-id",
@@ -378,8 +384,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       // variables, so enabling a provider without one writes a sign-in button
       // that fails at the token endpoint with `invalid_client` -- a failure
       // that surfaces in a browser, not here. Refusing now is the cheaper answer.
-      const secretValue = await this.input({
-        kind: "secret",
+      const secretValue = await this.ask.secret({
         name: `client secret for ${scaffolded.clientSecret}`,
         message: `What is the client secret of your ${entry.displayName} OAuth app? It will be stored on the project as ${scaffolded.clientSecret}.`,
         parse: parseClientSecret,
@@ -487,21 +492,22 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     const unpublished = !reusing || written.length > 0;
     const credentialsStored =
       secret?.published === "stored" && (clientIdState === undefined || clientIdState === "stored");
-    const stored = credentialsStored ? ["Provider credentials are stored on your Project."] : [];
+    const stored = credentialsStored ? ["and its credentials are stored in your project"] : [];
     const name = entry.displayName;
 
     return this.emit({
       status: "ok",
+      boxed: true,
       data: {
         // Configured is not live, and stored credentials are only claimed once
         // they reached the Project (a failed or deferred publish warns instead).
         title: unpublished
-          ? [`${name} sign-in is configured locally.`, ...stored].join(" ")
-          : `${name} sign-in is already configured locally.`,
+          ? [`${name} sign-in is configured locally`, ...stored].join(" ")
+          : `${name} sign-in is already configured locally`,
         ...(unpublished
           ? {
               next_actions: [
-                `Deploy the configuration to make ${name} sign-in available in your app, then reload your app and test ${name} sign-in.`,
+                `Deploy it to make ${name} sign-in available in your app, then reload the app and test it: ${this.suggest(DEPLOY_ARGS)}`,
               ],
             }
           : {}),
@@ -574,8 +580,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     files: readonly ConnectionFile[],
     beforeAsking: (slug: ConnectionSlug) => void,
   ): Promise<Required<CustomFlagValues>> {
-    const slug = await this.input({
-      kind: "text",
+    const slug = await this.ask.text({
       name: "connection name",
       message:
         "What would you like to call this connection? It is used in your configuration, for example acme-sso.",
@@ -593,22 +598,19 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     if (existing !== undefined && givenIssuer?.ok) {
       refuseChangedIssuer(existing, slug, givenIssuer.value, ENABLE_FLAG_NAMES.slug);
     }
-    const displayName = await this.input({
-      kind: "text",
+    const displayName = await this.ask.text({
       name: "display name",
       message: "What name should the sign-in button show? For example Acme SSO.",
       parse: parseDisplayName,
       given: given.displayName ?? stored?.displayName,
     });
-    const issuer = await this.input({
-      kind: "text",
+    const issuer = await this.ask.text({
       name: "issuer",
       message: "What is the issuer URL of the provider?",
       parse: parseIssuer,
       given: given.issuer ?? stored?.issuer,
     });
-    const scopes = await this.input({
-      kind: "text",
+    const scopes = await this.ask.text({
       name: "scopes",
       message: "Which scopes should we request? Separate them with spaces.",
       parse: parseScopes,
@@ -701,6 +703,7 @@ async function readProject(
   flags: { readonly [K in (typeof ENABLE_FLAG_KEYS)[keyof typeof ENABLE_FLAG_KEYS]]?: string },
   issuer: string | undefined,
   interactive: boolean,
+  cliVersion: string,
 ): Promise<ProjectContext> {
   const provider = flags[ENABLE_FLAG_KEYS.provider];
   if (provider === undefined) {
@@ -727,8 +730,8 @@ async function readProject(
     );
   }
   if (issuer === undefined) {
-    throw new ZitadelError("E_VALIDATION", "This Project has no development issuer", {
-      hint: "Run `zitadel setup` first, or set ZITADEL_ISSUER to the origin your app serves from.",
+    throw new ZitadelError("E_VALIDATION", "This project has no development issuer", {
+      hint: `Run ${unscopedCommand("setup", cliVersion)} first, or set ZITADEL_ISSUER to the origin your app serves from.`,
     });
   }
   return { selection, values, issuer };

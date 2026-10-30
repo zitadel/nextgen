@@ -77,7 +77,7 @@ export function parseConfigModule(
   if (hasCommonJsExport(mod)) {
     throw new ZitadelError(
       "E_VALIDATION",
-      `${filename} is a CommonJS module, which can't be edited`,
+      `${filename} is a CommonJS module, which cannot be edited`,
       {
         hint: `The Zitadel edits use ESM imports. Convert the config to ESM (a .ts/.mts file, or set "type": "module"), or add the Zitadel block manually.`,
       },

@@ -318,6 +318,7 @@ export const RESOURCES = {
   idps: {
     group: CommandGroups.authentication,
     singular: "identity provider connection",
+    plural: "identity provider connections",
     idField: "id",
     columns: ["id", "slug", "definition.protocol", "definition.display_name", "created_at"],
     heading: "slug",
@@ -446,6 +447,7 @@ export const RESOURCES = {
   release: {
     group: CommandGroups.configuration,
     singular: "release",
+    plural: "releases",
     idField: "id",
     columns: ["id", "metadata.message", "metadata.git_sha", "revoked_at", "metadata.created_at"],
     heading: "id",
@@ -474,6 +476,7 @@ export const RESOURCES = {
   "flow-definitions": {
     group: CommandGroups.configuration,
     singular: "flow definition",
+    plural: "flow definitions",
     idField: "id",
     // Addressed by flow name as well as by revision id; see `schemas`.
     idArg: "flow",
@@ -531,6 +534,7 @@ export const RESOURCES = {
   branding: {
     group: CommandGroups.configuration,
     singular: "branding revision",
+    plural: "branding revisions",
     idField: "id",
     columns: ["id", "created_at"],
     heading: "id",

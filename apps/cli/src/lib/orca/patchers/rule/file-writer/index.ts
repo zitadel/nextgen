@@ -234,7 +234,7 @@ async function writeText(
 
   if (existing !== undefined && !opts.force) {
     throw new ZitadelError("E_CONFLICT", `Refusing to overwrite ${path}`, {
-      hint: "Re-run with --force if you want the CLI to replace this file.",
+      hint: "Rerun with --force if you want the CLI to replace this file.",
       details: { path },
     });
   }

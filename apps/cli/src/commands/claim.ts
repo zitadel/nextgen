@@ -17,7 +17,7 @@ import { nextCommandsData } from "../lib/oclif/envelope";
 import { hasZitadelSecret, readZitadelSecret, writeZitadelSecret } from "../lib/project";
 import { isLoopbackUrl } from "../lib/server";
 import { reportWarning } from "../lib/warnings";
-import type { SuggestedCommand } from "../lib/suggestion";
+import { type SuggestedCommand, unscopedCommand } from "../lib/suggestion";
 
 /**
  * Poll cadence while a human completes the browser step. Starts responsive so
@@ -86,6 +86,10 @@ export function claimDeadline(input: {
 export default class Claim extends EnvironmentCommand {
   static override description =
     "Claim this project to make it permanent. Opens a browser to create an account or sign in.";
+
+  static override heading = "Claiming the project";
+
+  static override wizard = true;
   static override group = CommandGroups.gettingStarted;
   static override groupOrder = 4;
 
@@ -126,7 +130,7 @@ export default class Claim extends EnvironmentCommand {
     if (challengeId !== undefined && !isChallengeId(challengeId)) {
       throw new ZitadelError(
         "E_VALIDATION",
-        "--challenge-id takes the challenge_id a `claim --no-wait` run returned, which starts with ch_.",
+        "--challenge-id takes the challenge_id that the --no-wait run returned, which starts with ch_.",
         { nextCommands: [this.suggest("claim --no-wait")] },
       );
     }
@@ -217,7 +221,7 @@ export default class Claim extends EnvironmentCommand {
         }
         if (isClaimWindowExpired(error)) {
           this.recordTelemetry({ claim_outcome: "window_expired" });
-          throw claimWindowExpiredError();
+          throw claimWindowExpiredError(this.meta.cliVersion);
         }
         throw error;
       }
@@ -246,7 +250,7 @@ export default class Claim extends EnvironmentCommand {
       consola.box({
         title: "Finish in your browser",
         message: wrapForBox(
-          "Create an account or sign in to claim your Project, make it permanent and start collaborating.",
+          "Create an account or sign in to claim your project, make it permanent and start collaborating.",
         ),
         style: { padding: 1, borderStyle: "rounded", borderColor: "cyan" },
       });
@@ -308,14 +312,14 @@ export default class Claim extends EnvironmentCommand {
     return this.emit({
       status: "ok",
       data: {
-        title: "Your Project is now permanent.",
+        title: "Your project is now permanent.",
         project_id: projectId,
         team_id: completed.team_id,
         claimed_at: completed.claimed_at,
         dashboard_url: completed.dashboard_url,
         // Two entries so the pretty renderer puts the URL on its own line.
         next_actions: [
-          "Manage your Project and collaborate in the Console:",
+          "Manage your project and collaborate in the Console:",
           completed.dashboard_url,
         ],
       },
@@ -354,7 +358,7 @@ export default class Claim extends EnvironmentCommand {
         // own 410 code, and it must not read as the retryable link expiry.
         if (isClaimWindowExpired(error)) {
           this.recordTelemetry({ claim_outcome: "window_expired", poll_count: polls });
-          throw claimWindowExpiredError();
+          throw claimWindowExpiredError(this.meta.cliVersion);
         }
         if (error instanceof ApiError && error.status === 410) {
           this.recordTelemetry({ claim_outcome: "expired", poll_count: polls });
@@ -407,7 +411,7 @@ export default class Claim extends EnvironmentCommand {
     return this.emit({
       status: "ok",
       data: {
-        title: "Open the link in a browser to make your Project permanent.",
+        title: "Open the link in a browser to make your project permanent.",
         project_id: projectId,
         claim_url: challenge.claim_url,
         challenge_id: challenge.challenge_id,
@@ -509,12 +513,12 @@ function expiredError(message: string, claimAgain: SuggestedCommand): ZitadelErr
  * cannot fix a closed window, so suggesting `claim` again would send the
  * user in a circle.
  */
-function claimWindowExpiredError(): ZitadelError {
+function claimWindowExpiredError(cliVersion: string): ZitadelError {
   return new ZitadelError(
     "E_VALIDATION",
-    `This project was not claimed within ${CLAIM_WINDOW_DAYS} days of creation, so it can no longer be claimed.`,
+    `This project was not claimed within ${CLAIM_WINDOW_DAYS} days of creation, so it can no longer be claimed`,
     {
-      hint: "The project still works for now, but it stays temporary and its data may be lost. To get a claimable project, run `zitadel setup` in a fresh directory (here it would just skip as already initialized) and claim the new one within the window.",
+      hint: `The project still works for now, but it stays temporary and its data may be lost. To get a claimable project, run ${unscopedCommand("setup", cliVersion)} in a fresh directory (here it would just skip as already initialized) and claim the new one within the window.`,
     },
   );
 }

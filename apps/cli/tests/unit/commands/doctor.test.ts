@@ -19,7 +19,9 @@ import {
   expectedPublicCliCommand,
   parseJson,
   runCliForTest,
+  stripAnsi,
 } from "../../helpers/run-cli";
+import { asTerminal } from "../../helpers/terminal";
 
 type Check = { name: string; status: "pass" | "warn" | "fail"; message: string; path?: string };
 
@@ -825,6 +827,24 @@ console.log(["p4242", "cnode", "n127.0.0.1:" + process.env.LSOF_FIXTURE_PORT].jo
     expect(json.data.ok).toBe(true);
     const dependency = json.data.checks.find((check) => check.name === "dependency");
     expect(dependency?.status).toBe("pass");
+  });
+
+  // It never opens a connection, so nothing else records where it ran; the
+  // project comes from `.zitadel/secret` and the server from `zitadel.json`.
+  it("names the project it checked, not only the server", async () => {
+    const cwd = await makeHealthyProject();
+    const fake = await fakeDocker();
+
+    const res = await asTerminal(() =>
+      runCliForTest(["doctor", "--cwd", cwd, "--port", String(nextPort())], {
+        PATH: `${fake.binDir}:${process.env.PATH ?? ""}`,
+        DOCKER_LOG: fake.logPath,
+      }),
+    );
+
+    expect(stripAnsi(res.stdout)).toContain(
+      "Using project proj-001 on your Zitadel server at api.zitadel.cloud",
+    );
   });
 });
 

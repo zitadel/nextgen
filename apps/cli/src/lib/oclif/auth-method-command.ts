@@ -63,7 +63,7 @@ export abstract class AuthMethodCommand extends Promptable(EnvironmentCommand) {
       hidden: true,
     } as (typeof environmentFlags)["env-file"],
     schema: nonBlankString({
-      description: "User schema to change. Required when the Project has more than one.",
+      description: "User schema to change. Required when the project has more than one.",
     }),
   };
 
@@ -136,8 +136,7 @@ export abstract class AuthMethodCommand extends Promptable(EnvironmentCommand) {
       // instead, as argument lists an agent can run whatever the quoting.
       refuseLastMethod({ schema: input.schema, retryArgs, cwdArgs: input.cwdArgs, cliVersion });
     }
-    return this.input({
-      kind: "confirm",
+    return this.ask.confirm({
       name: `disable ${input.disabling}, the last way to sign in to ${input.schema.name}`,
       message: `Disable ${input.disabling} anyway? Nobody will be able to sign in to ${input.schema.name}.`,
       retry: portableSuggestions([retryArgs], cliVersion)[0],
@@ -305,11 +304,11 @@ export abstract class AuthMethodCommand extends Promptable(EnvironmentCommand) {
           : `Nothing to ${verb} for ${schema.name}`,
       });
     }
+    // Nothing is narrated when nothing changed: the closing line below already
+    // says it, and saying it twice reads as two separate findings.
     if (change.changed) {
       await writeFile(join(cwd, schema.path), `${stableStringify(change.document)}\n`);
       consola.success(`Updated ${schema.path}`);
-    } else {
-      consola.info(`${method} is already ${verb}d for ${schema.name}`);
     }
     this.reportOutcome(outcome);
     return this.emit({
@@ -391,7 +390,7 @@ function refuseLastMethod(input: {
   throw new ZitadelError("E_VALIDATION", `${schema.path} would have no way to sign in left`, {
     hint:
       "Enable another method first, such as `zitadel auth-method sso enable --provider <name>`. " +
-      "If the schema's users are only managed through the API, re-run with --force " +
+      "If the schema's users are only managed through the API, rerun with --force " +
       "(the first of details.suggested_args holds the exact arguments).",
     details: {
       file: schema.path,

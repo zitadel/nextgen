@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@clack/prompts", async () => (await import("../../helpers/clack")).clackDouble());
 
-import { cancel, confirm, isCancel } from "@clack/prompts";
+import { confirm, isCancel } from "@clack/prompts";
 
 import {
   CONTAINER_DATA_DIR,
@@ -27,7 +27,7 @@ import {
   parseJson,
   runCliForTest,
 } from "../../helpers/run-cli";
-import { asTerminal } from "../../helpers/terminal";
+import { asTerminalTyping } from "../../helpers/terminal";
 
 const tempDirs: string[] = [];
 const servers: Server[] = [];
@@ -573,7 +573,7 @@ describe("local runtime commands", () => {
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain("Local Zitadel server is ready.");
     expect(result.stdout).toContain(
-      "  Create an app with authentication. Run setup in this directory",
+      "  Create an app with authentication by running setup in this directory",
     );
     expect(result.stdout).toContain(
       `  $ ${expectedPublicCliCommand(`setup --server local --cwd ${cwd}`)}`,
@@ -693,7 +693,7 @@ describe("local runtime commands", () => {
     expect(envelope.status).toBe("ok");
     expect(envelope.data.urls.api).toBe(serverUrl);
     expect(envelope.data.next_actions.join("\n")).toContain(
-      "Run setup in this directory or a subdirectory",
+      "by running setup in this directory or a subdirectory",
     );
     expect(envelope.data.next_actions.join("\n")).toContain("Setup asks for a framework");
     // As in the binary case: setup is the only next step, and no `console` one.
@@ -962,15 +962,13 @@ describe("local runtime commands", () => {
   describe("reset asked on a terminal", () => {
     // The built CLI bundles its own prompts, so a prompt can only be answered
     // by running the command from source, where `input` is the one module asked.
-    const resetting = async (answer: unknown, cancelled: boolean) => {
+    const resetting = async (...answers: string[]) => {
       const cwd = await tempProject("zitadel-reset-asked-");
       const paths = localRuntimePaths(cwd);
       await mkdir(paths.dataDir, { recursive: true });
       await writeRuntimeMetadata(cwd, runtimeFor(cwd, "http://localhost:8080"));
-      vi.mocked(isCancel).mockReturnValue(cancelled);
-      vi.mocked(confirm).mockResolvedValueOnce(answer as never);
-      const outcome = await asTerminal(() => Reset.run(["--cwd", cwd])).then(
-        (envelope) => ({ envelope: JSON.parse(JSON.stringify(envelope)) as unknown }),
+      const outcome = await asTerminalTyping(answers, () => Reset.run(["--cwd", cwd])).then(
+        ({ result }) => ({ envelope: JSON.parse(JSON.stringify(result)) as unknown }),
         (error: unknown) => ({ error }),
       );
       return {
@@ -989,7 +987,7 @@ describe("local runtime commands", () => {
     });
 
     it("is skipped, deleting nothing, when the answer is no", async () => {
-      const { outcome, kept } = await resetting(false, false);
+      const { outcome, kept } = await resetting("n");
 
       expect(outcome).toMatchObject({
         envelope: { status: "skipped", reason: "reset-cancelled" },
@@ -997,11 +995,10 @@ describe("local runtime commands", () => {
       expect(kept).toBe(true);
     });
 
-    it("fails, deleting nothing, on Ctrl-C", async () => {
-      const { outcome, kept } = await resetting(Symbol("cancel"), true);
+    it("fails, deleting nothing, when the person walks away", async () => {
+      const { outcome, kept } = await resetting();
 
       expect(outcome).toHaveProperty("error");
-      expect(cancel).toHaveBeenCalledWith("Cancelled.");
       expect(kept).toBe(true);
     });
   });

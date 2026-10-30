@@ -7,7 +7,7 @@ import type {
 
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope, nonBlankArg } from "../../lib/oclif";
 import { collectPages } from "../../lib/oclif/crud/paging";
-import { renderTable } from "../../lib/oclif/crud/table";
+import { renderCount, renderTable } from "../../lib/oclif/crud/table";
 import { listLiveDeployments, rollbackDeployment, servesPrimary } from "../../lib/release";
 import { toZitadelError, ZitadelError } from "../../lib/errors";
 import { Promptable } from "../../lib/oclif/promptable";
@@ -27,6 +27,8 @@ import { reportWarning } from "../../lib/warnings";
 export default class DeploymentRollback extends Promptable(EnvironmentCommand) {
   static override description = "Roll back to an earlier deployment.";
   static override group = CommandGroups.configuration;
+
+  static override heading = "Rolling back a deployment";
   static override examples = [
     "<%= config.bin %> deployment rollback",
     "<%= config.bin %> deployment rollback dep_01KX5N7C9D2E7F0N9WD3P2E4YM6",
@@ -98,7 +100,7 @@ export default class DeploymentRollback extends Promptable(EnvironmentCommand) {
       return this.emit({
         status: "ok",
         data: { dry_run: true, deployment_id: targetId },
-        pretty: `Would re-apply ${targetId}. Nothing was rolled back (dry run).`,
+        pretty: `Would re-apply ${targetId} (dry run)`,
       });
     }
 
@@ -111,8 +113,7 @@ export default class DeploymentRollback extends Promptable(EnvironmentCommand) {
     // when nothing is live there, which an optional id cannot stand in for.
     const expectedDeploymentId = bareGuard ?? (await liveGuard(client, projectId));
 
-    const confirmed = await this.input({
-      kind: "confirm",
+    const confirmed = await this.ask.confirm({
       name: `re-apply ${targetId}`,
       message: `Re-apply ${targetId}? Its release goes live again.`,
       retry: this.suggest(`deployment rollback ${targetId} --force`),
@@ -145,8 +146,9 @@ export default class DeploymentRollback extends Promptable(EnvironmentCommand) {
         origins,
         ...(pointers === undefined ? {} : { pointers }),
       },
+      // Counted, not spelled out, for the reason `deployment create` gives.
       pretty: [
-        `Rolled back to ${deployment.release_id} on ${origins.join(", ")}`,
+        `Rolled back to ${deployment.release_id} on ${renderCount(origins.length, { singular: "origin" })}`,
         ...(pointers === undefined
           ? []
           : ["", renderTable(["kind", "handle", "revision_id"], pointers)]),

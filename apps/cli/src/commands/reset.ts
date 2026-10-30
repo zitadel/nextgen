@@ -14,6 +14,8 @@ import { Promptable } from "../lib/oclif/promptable";
 export default class Reset extends Promptable(BaseCommand) {
   static override description = "Delete the local Zitadel server runtime and data.";
   static override group = CommandGroups.localDevelopment;
+
+  static override heading = "Resetting the local Zitadel server";
   static override groupOrder = 4;
   static override flags = {
     force: Flags.boolean({
@@ -50,8 +52,7 @@ export default class Reset extends Promptable(BaseCommand) {
       });
     }
 
-    const confirmed = await this.input({
-      kind: "confirm",
+    const confirmed = await this.ask.confirm({
       name: "delete the local runtime and its data",
       message: "Delete the local Zitadel runtime and .zitadel/local/nextgen-data?",
       retry: this.suggestUnscoped("reset --force"),

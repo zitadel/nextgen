@@ -363,7 +363,7 @@
     {
       "id": "console",
       "group": "Local development",
-      "description": "Open the local console, signed in as the local admin.\n\nThe local admin is the one `zitadel start` created. Run this in the directory `zitadel start` ran in, or one inside it: the local admin is read from the nearest `.zitadel/local/` on the way up.",
+      "description": "Open the local console, signed in as the local admin.\n\nThe local admin is the one the start command created. Run this in the directory it ran in, or one inside it: the local admin is read from the nearest .zitadel/local/ on the way up.",
       "args": [],
       "flags": [
         {
@@ -1278,7 +1278,7 @@
         },
         {
           "name": "schema",
-          "description": "User schema to change. Required when the Project has more than one.",
+          "description": "User schema to change. Required when the project has more than one.",
           "type": "option"
         }
       ],
@@ -1299,7 +1299,7 @@
       "flags": [
         {
           "name": "schema",
-          "description": "User schema to change. Required when the Project has more than one.",
+          "description": "User schema to change. Required when the project has more than one.",
           "type": "option"
         }
       ],
@@ -1326,7 +1326,7 @@
         },
         {
           "name": "schema",
-          "description": "User schema to change. Required when the Project has more than one.",
+          "description": "User schema to change. Required when the project has more than one.",
           "type": "option"
         }
       ],
@@ -1347,7 +1347,7 @@
       "flags": [
         {
           "name": "schema",
-          "description": "User schema to change. Required when the Project has more than one.",
+          "description": "User schema to change. Required when the project has more than one.",
           "type": "option"
         }
       ],
@@ -1379,7 +1379,7 @@
         },
         {
           "name": "schema",
-          "description": "User schema to change. Required when the Project has more than one.",
+          "description": "User schema to change. Required when the project has more than one.",
           "type": "option"
         }
       ],
@@ -1445,7 +1445,7 @@
         },
         {
           "name": "schema",
-          "description": "User schema to change. Required when the Project has more than one.",
+          "description": "User schema to change. Required when the project has more than one.",
           "type": "option"
         }
       ],

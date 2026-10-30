@@ -5,15 +5,11 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-vi.mock("@clack/prompts", () => ({
-  confirm: vi.fn(),
-  cancel: vi.fn(),
-  isCancel: vi.fn().mockReturnValue(false),
-}));
+vi.mock("@clack/prompts", async () => (await import("../../../../helpers/clack")).clackDouble());
 
-import { cancel, confirm, isCancel } from "@clack/prompts";
+import { confirm, isCancel } from "@clack/prompts";
 
-import { asTerminal } from "../../../../helpers/terminal";
+import { asTerminal, asTerminalTyping } from "../../../../helpers/terminal";
 import { EXIT_CODES } from "../../../../../src/lib/errors";
 import { BaseCommand } from "../../../../../src/lib/oclif";
 import {
@@ -302,6 +298,57 @@ describe("wire conventions", () => {
   });
 });
 
+describe("list rendering", () => {
+  /** What a run wrote to a terminal, which is where the table and count go. */
+  const printed = async (spec: ListSpec<Ctx>, topic: string): Promise<string> => {
+    const tty = process.stdout.isTTY;
+    const write = process.stdout.write.bind(process.stdout);
+    const log = console.log;
+    let out = "";
+    Object.defineProperty(process.stdout, "isTTY", { value: true, configurable: true });
+    process.stdout.write = ((chunk: string | Uint8Array) => {
+      out += typeof chunk === "string" ? chunk : Buffer.from(chunk).toString();
+      return true;
+    }) as typeof process.stdout.write;
+    console.log = (...args: unknown[]) => {
+      out += `${args.join(" ")}\n`;
+    };
+    try {
+      const command = bindOperation(ListOperation as OperationClass<Ctx, ListSpec<Ctx>>, {
+        ...definition(spec),
+        topic,
+        resource: {
+          ...resource,
+          singular: "flow definition",
+          plural: "flow definitions",
+          list: spec,
+        },
+      });
+      await (command as unknown as { run(argv: string[]): Promise<unknown> }).run([]);
+    } finally {
+      Object.defineProperty(process.stdout, "isTTY", { value: tty, configurable: true });
+      process.stdout.write = write;
+      console.log = log;
+    }
+    return out;
+  };
+
+  it("counts in the resource's own plural rather than the topic key", async () => {
+    const two: ListSpec<Ctx> = {
+      items: "rows",
+      call: async () => ({ rows: [{ id: "a" }, { id: "b" }] }),
+    };
+
+    expect(await printed(two, "flow-definitions")).toContain("2 flow definitions");
+  });
+
+  it("says the one derived sentence when a generated list finds nothing", async () => {
+    const none: ListSpec<Ctx> = { items: "rows", call: async () => ({ rows: [] }) };
+
+    expect(await printed(none, "flow-definitions")).toContain("No flow definitions found");
+  });
+});
+
 describe("write results", () => {
   it("carries data in the envelope when the server answers without a body", async () => {
     // `grants create` by identifier answers 202 with no body.
@@ -511,30 +558,32 @@ describe("delete confirmation", () => {
   );
 
   it("asks the question with the verb, the resource and the id", async () => {
-    vi.mocked(confirm).mockResolvedValueOnce(true as never);
+    const { shown } = await asTerminalTyping(["y"], () => deleting("revoke").run(["team_1"]));
 
-    await asTerminal(() => deleting("revoke").run(["team_1"]));
+    expect(shown).toContain("Revoke team team_1?");
+  });
 
-    expect(vi.mocked(confirm).mock.calls[0]?.[0]).toMatchObject({ message: "Revoke team team_1?" });
+  // A generated resource command is a normal command, so its one question is a
+  // plain line: no chain around it, and no prompt drawn in one.
+  it("asks it plainly, not as a drawn prompt", async () => {
+    const { shown } = await asTerminalTyping(["y"], () => deleting("revoke").run(["team_1"]));
+
+    expect(confirm).not.toHaveBeenCalled();
+    expect(shown).toContain("Revoke team team_1? [y/N] ");
   });
 
   it("is skipped when the answer is no", async () => {
-    vi.mocked(confirm).mockResolvedValueOnce(false as never);
+    const { result } = await asTerminalTyping(["n"], () => deleting("delete").run(["team_1"]));
 
-    const envelope = await asTerminal(() => deleting("delete").run(["team_1"]));
-
-    expect(JSON.parse(JSON.stringify(envelope))).toMatchObject({
+    expect(JSON.parse(JSON.stringify(result))).toMatchObject({
       status: "skipped",
       reason: "delete-cancelled",
     });
   });
 
-  it("fails instead of skipping on Ctrl-C", async () => {
-    vi.mocked(isCancel).mockReturnValue(true);
-    vi.mocked(confirm).mockResolvedValueOnce(Symbol("cancel") as never);
-
-    await expect(asTerminal(() => deleting("delete").run(["team_1"]))).rejects.toThrow();
-
-    expect(cancel).toHaveBeenCalledWith("Cancelled.");
+  it("fails instead of skipping when the person walks away", async () => {
+    await expect(
+      asTerminalTyping([], () => deleting("delete").run(["team_1"])),
+    ).rejects.toThrowError(expect.objectContaining({ oclif: { exit: EXIT_CODES.E_CANCELLED } }));
   });
 });

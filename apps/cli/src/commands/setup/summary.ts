@@ -9,16 +9,16 @@ import semver from "semver";
 
 import { detectors } from "../../lib/orca/detectors";
 import type { Detector } from "../../lib/orca/detectors/types";
+import { type Fact, type Section as UiSection, section as uiSection } from "../../lib/ui";
 import { detectPackageManager, type PackageManager } from "../../lib/package-manager";
 import type { PasswordMinLength } from "../../lib/policies";
 
 /**
- * Structured end-of-command summary, modelled on the report layout the
- * setup mock specifies: one line per fact, grouped under uppercase section
- * headers, with consistent `✓ label value` formatting. Each {@link Row}
- * carries the label, the primary value (already styled by the caller),
- * and an optional `secondary` shown after a dim `→` to mirror the
- * "package → file" lines in the mock.
+ * Structured end-of-command summary: one row per fact, grouped under a
+ * heading. Each {@link Row} carries the label, the primary value (already
+ * styled by the caller), and an optional `secondary` — where to look next for
+ * that row, said in the value rather than in a column of its own, because a
+ * second column only lines up when every value in the group is the same width.
  */
 export type Row = {
   label: string;
@@ -45,27 +45,31 @@ export function relativeDisplayPath(cwd: string, absolute: string): string {
 }
 
 /**
- * Renders the section list as a single multi-line string. Labels are
- * padded to a common width per section so the `✓ label  value` columns
- * line up, the title prints in dim gray, and `✓` is green. Values come
- * in pre-styled — use the helpers below ({@link path}, {@link url},
- * {@link id}, {@link dim}) to keep the colour palette consistent with
- * the mock.
+ * The section list as the facts every other command's box states: a heading,
+ * then `label   value` rows the shared layout aligns ({@link UiSection}).
+ *
+ * Setup used to render these itself, with a green `✓` on every row and
+ * SCREAMING headings no other box had, and a `→ secondary` column that only
+ * lined up when a group's values happened to be the same width. The facts are
+ * the same facts; drawing them through the one layout is what makes setup's
+ * ending comparable with every other command's at a glance.
  */
-export function renderSummary(sections: Section[]): string {
-  const lines: string[] = [];
-  for (const section of sections) {
-    if (section.rows.length === 0) continue;
-    if (lines.length > 0) lines.push("");
-    lines.push(pc.dim(section.title.toUpperCase()));
-    const labelWidth = Math.max(...section.rows.map((r) => r.label.length)) + 3;
-    for (const row of section.rows) {
-      const labelCol = row.label.padEnd(labelWidth);
-      const secondary = row.secondary ? `   ${pc.dim("→")} ${row.secondary}` : "";
-      lines.push(`${pc.green("✓")} ${labelCol}${row.value}${secondary}`);
-    }
-  }
-  return lines.join("\n");
+export function summarySections(sections: Section[]): UiSection[] {
+  return sections
+    .filter((section) => section.rows.length > 0)
+    .map((section) =>
+      uiSection(
+        section.title,
+        ...section.rows.map(
+          (row): Fact => [
+            row.label,
+            row.secondary === undefined
+              ? row.value
+              : `${row.value} ${pc.dim(`(${row.secondary})`)}`,
+          ],
+        ),
+      ),
+    );
 }
 
 /** Cyan, for filesystem paths the user can open. */

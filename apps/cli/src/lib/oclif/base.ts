@@ -5,18 +5,27 @@ import { Command, Flags } from "@oclif/core";
 import { nonBlankString } from "./flags";
 import consola from "consola";
 
-import { toZitadelError, type ZitadelError } from "../errors";
+import { failureText, toZitadelError, type ZitadelError } from "../errors";
 import { listenForInterrupt, stopListeningForInterrupt } from "../interrupt";
 import { isObject } from "../json";
 import { type LocalServers, PsLocalServers } from "../local-server/processes";
 import { resolveCwd } from "../paths";
-import { normalizePublicCliCommand, normalizePublicCliCommands } from "../public-cli";
+import {
+  normalizePublicCliCommand,
+  normalizePublicCliCommands,
+  publicCliCommand,
+} from "../public-cli";
 import { DEFAULT_SERVER, resolveServer, SERVER_VARIABLE } from "../server";
 import { type SuggestedCommand, unscopedCommand } from "../suggestion";
 import { type Properties, Telemetry, type TelemetryDeps } from "../telemetry";
 import { DO_NOT_TRACK, ZITADEL_TELEMETRY } from "../telemetry/consent";
 import { buildUserAgent, installUserAgent, processUserAgentFacts } from "../user-agent";
+import { claimSkills, eligibleForSkills } from "../skills-hint";
 import { takeReportedWarnings } from "../warnings";
+import type { Presentation, Summary } from "../ui";
+import { Ui } from "../ui";
+import { stripColumnMarks } from "../ui/layout";
+import { summaryOfText } from "./result-summary";
 import {
   CLI_COMMAND_COMPLETED,
   CLI_COMMAND_FAILED,
@@ -84,6 +93,31 @@ export abstract class BaseCommand extends Command {
   static override enableJsonFlag = true;
 
   /**
+   * What this command is doing, as the heading of its output
+   * (`┌  Listing origins`): a gerund phrase said of the command itself, never of
+   * the project it runs on, which is added after it. A command that sets none
+   * is headed by its own name.
+   */
+  static heading?: string;
+
+  /**
+   * Whether this command is a wizard: it walks a person through something, so
+   * it draws a chain (`┌`/`│`/`└`), asks its questions inside it, and closes
+   * on the summary box holding what it did, what to do next and where it ran.
+   *
+   * It belongs to the kind of command and nothing else, which is the whole
+   * point of declaring it: an unset one is a normal command, and a normal
+   * command draws no chain and no box on any run, however many questions it
+   * asked, whatever it warned about, and whether or not `--force` spared it a
+   * question. See {@link Presentation}.
+   *
+   * {@link Presentation} names the ten that set it. A command that merely
+   * *does* something — `variable rm`, `users delete` — is not one of them,
+   * however much it asks on the way.
+   */
+  static wizard?: boolean;
+
+  /**
    * The group the root help lists this command under (see `lib/oclif/groups`).
    * Every product command must set it; the root-help test fails otherwise.
    */
@@ -131,6 +165,15 @@ export abstract class BaseCommand extends Command {
 
   /** Resolved context for the current invocation; set by {@link toMeta}. */
   protected meta: GlobalOptions = this.fallbackMeta();
+
+  /** Everything a command shows a person. Silent until {@link toMeta} finds a terminal. */
+  protected ui: Ui = new Ui({ interactive: false, force: false }, this.presentation());
+
+  /**
+   * Whether this run may offer the Zitadel skills, resolved while the command
+   * works so the summary can be built without waiting on a filesystem scan.
+   */
+  private skillsOffered = false;
 
   /**
    * Anonymous usage analytics for this invocation, created once in
@@ -264,6 +307,18 @@ export abstract class BaseCommand extends Command {
       env: process.env,
       isTTY,
     };
+    this.ui = new Ui(
+      { interactive: !this.meta.nonInteractive, force: this.meta.force },
+      this.presentation(),
+    );
+    const named = this.constructor as typeof BaseCommand;
+    this.ui.describe(named.heading ?? `zitadel ${(this.id ?? "").replaceAll(":", " ")}`.trim());
+    this.ui.bridgeNarration();
+    this.skillsOffered = await eligibleForSkills({
+      env: process.env,
+      interactive: !this.meta.nonInteractive,
+      cliVersion: this.config.version,
+    });
     this.openTelemetry(typeof flags.telemetry === "boolean" ? flags.telemetry : undefined);
     return this.meta;
   }
@@ -363,17 +418,127 @@ export abstract class BaseCommand extends Command {
     // An empty rendering is written as nothing, not as a blank line: a piped
     // list of no records must leave stdout empty, so `wc -l` reports 0.
     const rendered = renderPretty(normalized, this.meta);
-    if (rendered !== "") {
-      this.log(rendered);
-    }
-    if (normalized.status === "ok" && normalized.footer !== undefined) {
-      this.log(`\n${normalized.footer}`);
+    const footer = normalized.status === "ok" ? normalized.footer : undefined;
+    // A skip ends on its own summary too, so a deliberate no-op reads like
+    // every other ending instead of as the reason token the envelope carries.
+    const ending = this.endingOf(normalized, rendered, footer);
+    if (this.ui.interactive) {
+      // A person at a terminal: the result closes the chain the questions began.
+      // A command that said everything itself returns nothing, and draws nothing.
+      if (ending !== undefined) {
+        this.ui.finish(ending);
+      }
+    } else if (this.rendersForAMachine()) {
+      // Nothing folds this text, so nothing takes the mark a builder puts at
+      // the head of a row it aligned (`COLUMN_MARK`): it is invisible on
+      // screen but it is in the bytes, and it would travel with anything
+      // copied or parsed out of them.
+      if (rendered !== "") {
+        this.log(stripColumnMarks(rendered));
+      }
+      if (footer !== undefined) {
+        this.log(`\n${stripColumnMarks(footer)}`);
+      }
+    } else if (ending !== undefined) {
+      // Nothing can be drawn, so the same ending is written out instead. It
+      // goes through `log`, which `--json` silences, so the envelope still
+      // travels alone on stdout.
+      const text = this.ui.written(ending).replace(/\n+$/, "");
+      if (text !== "") {
+        this.log(text);
+      }
     }
     // Reported warnings were printed when they happened, so they join the
     // envelope only: printing them again here would show them twice.
     const reported = takeReportedWarnings();
     const envelope = toEnvelope(withReportedWarnings(normalized, reported), this.meta);
     return envelope.status === "skipped" ? withWarnings(envelope, reported) : envelope;
+  }
+
+  /**
+   * How this command ends, as the one {@link Summary} both renderings are
+   * built from: the command's own, or the one split out of what it printed.
+   * It is settled here rather than per rendering, so a run that is drawn and
+   * a run that is written cannot end on different words.
+   *
+   * Nothing at all is an ending only when the command said nothing: no
+   * rendering, no footer, and nothing drawn into the chain on the way.
+   */
+  private endingOf(
+    result: CommandResult,
+    rendered: string,
+    footer: string | undefined,
+  ): Summary | undefined {
+    const own = result.summary;
+    if (own !== undefined) {
+      return this.withOverview(own);
+    }
+    if (rendered === "" && footer === undefined && !this.ui.opened) {
+      return undefined;
+    }
+    return this.withOverview(
+      summaryOfText(
+        this.summarises() && footer !== undefined ? `${rendered}\n\n${footer}` : rendered,
+        false,
+        this.summarises(),
+        this.id,
+        // A command that answers keeps its own trailing line for the footer,
+        // rather than letting it become another body line.
+        this.summarises() || footer === undefined ? [] : footer.split("\n"),
+      ),
+    );
+  }
+
+  /**
+   * Whether what this command rendered is for a machine rather than a person,
+   * in which case it is written as it is and the ending never decorates it.
+   *
+   * Two things make it so. A command that took its own ending away as text
+   * (`setup`, through `Ui.ending`) has already said everything an ending
+   * says. And off a terminal a normal command's answer is the machine form it
+   * chose for itself — `--plain` is implied there, so a list is tab-separated
+   * rows and a record is the record — which `cut`, `awk` and `wc -l` read and
+   * which a count or a footer under it would break. A wizard has no such
+   * form: what it writes is prose for a person however it is read, so it ends
+   * the way it always ends.
+   */
+  private rendersForAMachine(): boolean {
+    return this.ui.reported || (!this.summarises() && !process.stdout.isTTY);
+  }
+
+  /**
+   * The command overview as the last step of a summary that has steps, so every
+   * box ends the same way and the overview can be found from anywhere without
+   * already knowing it exists. A summary that names it already keeps its own.
+   */
+  private withOverview(summary: Summary): Summary {
+    const steps = summary.next ?? [];
+    if (!this.summarises()) {
+      // A normal command has no box, and no overview step either: that is a
+      // wizard's last word. Its own steps are kept, and the ending writes them
+      // out as lines rather than losing the command to run next.
+      return { ...summary, boxed: false };
+    }
+    const overview = steps.some((step) => step.text === OVERVIEW)
+      ? []
+      : [{ text: OVERVIEW, command: publicCliCommand("", this.config.version) }];
+    // The skills offer is the last step of the first summary a machine sees,
+    // rather than a block of its own after the box.
+    const skills = this.skillsOffered ? [claimSkills(process.env, this.config.version)] : [];
+    return {
+      ...summary,
+      next: [...steps, ...overview, ...skills.filter((step) => step !== undefined)],
+    };
+  }
+
+  /** Which of the two shapes this command draws. See {@link BaseCommand.wizard}. */
+  private presentation(): Presentation {
+    return (this.constructor as typeof BaseCommand).wizard === true ? "wizard" : "plain";
+  }
+
+  /** Whether this command ends on a summary box, which only a wizard does. */
+  private summarises(): boolean {
+    return this.presentation() === "wizard";
   }
 
   /**
@@ -404,11 +569,24 @@ export abstract class BaseCommand extends Command {
     }
     if (this.jsonEnabled()) {
       this.logJson(withWarnings(toErrorEnvelope(zitadelError, meta), takeReportedWarnings()));
-    } else if (zitadelError.code !== "E_CANCELLED") {
+    } else if (zitadelError.code === "E_CANCELLED") {
       // Ctrl-C is the person's own decision, and the terminal already shows it
       // (`^C`, or a cancelled prompt's "Cancelled."), so it gets no error
-      // block. The exit code still says the command did not finish.
-      this.logToStderr(renderError(zitadelError, meta));
+      // block. The exit code still says the command did not finish. The chain
+      // it interrupted still has to be closed, or the shell prompt is drawn
+      // inside the gutter.
+      this.ui.stop(zitadelError);
+    } else {
+      // A failure has no machine form — `--json` is where a machine reads one
+      // — so it is said in the command's own shape either way, drawn when
+      // there is a terminal and written when there is not. It stays on
+      // stderr off a terminal, where a script expects to find it.
+      const ending = summaryOfText(renderError(zitadelError, meta), true, false, this.id);
+      if (this.ui.interactive) {
+        this.ui.finish(ending);
+      } else {
+        this.logToStderr(this.ui.written(ending).replace(/\n+$/, ""));
+      }
     }
     return this.exit(zitadelError.exitCode);
   }
@@ -429,6 +607,9 @@ export abstract class BaseCommand extends Command {
    */
   protected override async finally(error: Error | undefined): Promise<void> {
     stopListeningForInterrupt();
+    // `consola` is process-wide: the chain borrows its reporters while this
+    // command runs and must give them back however the command ended.
+    this.ui.releaseNarration();
     await this.telemetry?.shutdown(1000);
     if (this.telemetry?.enabled) {
       setTimeout(() => process.exit(process.exitCode ?? 0), 250).unref();
@@ -571,22 +752,35 @@ function renderPretty(result: CommandResult, meta: GlobalOptions): string {
 }
 
 /**
- * Renders a {@link ZitadelError} as a human-readable block for stderr: the
- * coded message, an optional hint, and any suggested next commands.
+ * Renders a {@link ZitadelError} as the one block every failure is shown as:
+ * the coded sentence, an optional hint, and any commands to run next. It is
+ * the only place a failure becomes words for a person, so there is one grammar
+ * however the failure arose — the CLI's own refusal, the platform's, a socket
+ * that never answered, or oclif refusing the command line.
  */
 function renderError(error: ZitadelError, meta: GlobalOptions): string {
-  const lines = [`Error ${error.code}: ${error.message}`];
+  const { sentence, misuse } = failureText(error.message);
+  const lines = [`Error ${error.code}: ${sentence}`];
   if (error.hint) {
     lines.push(error.hint);
   }
-  const nextCommands = normalizePublicCliCommands(error.nextCommands, meta.cliVersion);
-  if (nextCommands && nextCommands.length > 0) {
+  const suggested = normalizePublicCliCommands(error.nextCommands, meta.cliVersion) ?? [];
+  // A refused command line is told where its own help is, under the same label
+  // as every other suggestion, rather than under oclif's "See more help with".
+  const nextCommands = suggested.length > 0 ? suggested : misuse ? [helpFor(meta)] : [];
+  if (nextCommands.length > 0) {
     lines.push("Next:");
     for (const cmd of nextCommands) {
       lines.push(`  $ ${cmd}`);
     }
   }
   return lines.join("\n");
+}
+
+/** `zitadel <command> --help`: the step a refused command line ends on. */
+function helpFor(meta: GlobalOptions): string {
+  const command = meta.command.replaceAll(":", " ").trim();
+  return publicCliCommand(command === "" ? "--help" : `${command} --help`, meta.cliVersion);
 }
 
 function formatData(data: unknown, warnings: string[], opts: GlobalOptions): string {
@@ -648,18 +842,22 @@ function warningRenderedInChecks(data: unknown, warning: string): boolean {
 function renderKnownSections(lines: string[], data: Record<string, unknown>): void {
   if (isObject(data.project)) {
     const project = data.project;
-    const segments: string[] = [];
+    // One sentence, not `label=value  label=value`: a label and three values
+    // aligned with nothing were a table in appearance only, and the two spaces
+    // holding them apart were enough to carry the line off the right of the
+    // screen. Said as prose it wraps like every other sentence the CLI writes.
+    const said: string[] = [];
     if (typeof project.project_id === "string") {
-      segments.push(`project=${project.project_id}`);
+      said.push(`Project ${project.project_id}`);
     }
     if (typeof project.lifecycle === "string") {
-      segments.push(`lifecycle=${project.lifecycle}`);
+      said.push(`lifecycle ${project.lifecycle}`);
     }
     if (typeof project.issuer === "string") {
-      segments.push(`issuer=${project.issuer}`);
+      said.push(`issuer ${project.issuer}`);
     }
-    if (segments.length > 0) {
-      lines.push(`Project: ${segments.join("  ")}`);
+    if (said.length > 0) {
+      lines.push(`${said.join(", ")}.`);
     }
   }
 
@@ -671,23 +869,6 @@ function renderKnownSections(lines: string[], data: Record<string, unknown>): vo
     const written = Array.isArray(data.files_written) ? data.files_written.length : 0;
     const skippedCount = Array.isArray(data.files_skipped) ? data.files_skipped.length : 0;
     lines.push(`Files: ${written} written, ${skippedCount} unchanged`);
-  }
-
-  if (isObject(data.apply)) {
-    const apply = data.apply;
-    const bits: string[] = [];
-    if (typeof apply.config_version === "number") {
-      bits.push(`v${apply.config_version}`);
-    }
-    if (typeof apply.hash === "string") {
-      bits.push(`hash=${String(apply.hash).slice(0, 12)}`);
-    }
-    if (typeof apply.environment === "string") {
-      bits.push(`env=${apply.environment}`);
-    }
-    if (bits.length > 0) {
-      lines.push(`Apply: ${bits.join("  ")}`);
-    }
   }
 
   if (Array.isArray(data.checks) && data.checks.length > 0) {
@@ -718,3 +899,6 @@ function suffixBlock(opts: GlobalOptions): string {
   const suffix = sourceSuffix(opts);
   return suffix ? ` ${suffix}` : "";
 }
+
+/** The last step of every box: where to find every command. */
+const OVERVIEW = "Explore all commands:";

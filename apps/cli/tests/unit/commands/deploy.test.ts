@@ -1,8 +1,54 @@
 import { describe, expect, it } from "vitest";
 
-import { noPrimaryOriginError } from "../../../src/commands/deploy";
+import { deployed, liveOn, noPrimaryOriginError } from "../../../src/commands/deploy";
 import { environmentSelectorSuffix } from "../../../src/lib/oclif/environment-flags";
 import { cliVersion, expectedPublicCliCommand } from "../../helpers/run-cli";
+
+const HASH = `sha256:${"a".repeat(64)}`;
+
+describe("the line a deploy closes on", () => {
+  it("says what was deployed, not what it is called", () => {
+    expect(deployed(3)).toBe("Deployed 3 resources");
+  });
+
+  it("counts one resource as one", () => {
+    expect(deployed(1)).toBe("Deployed 1 resource");
+  });
+});
+
+describe("where a release went", () => {
+  it("names the one origin it landed on", () => {
+    expect(liveOn(HASH, ["http://localhost:3000"])).toBe(
+      "Release sha256:aaaaaaaaaaaa is now live on http://localhost:3000.",
+    );
+  });
+
+  // A bullet list of one line is not a list, so several origins are named in
+  // the sentence rather than under it.
+  it("joins several origins into the sentence", () => {
+    expect(liveOn(HASH, ["https://a.example.com", "https://b.example.com"])).toContain(
+      "live on https://a.example.com and https://b.example.com.",
+    );
+  });
+
+  it("lists three with commas and a final and", () => {
+    expect(liveOn(HASH, ["a", "b", "c"])).toContain("live on a, b and c.");
+  });
+
+  it("says nothing about where when it landed nowhere", () => {
+    expect(liveOn(HASH, [])).toBe("Release sha256:aaaaaaaaaaaa is now live.");
+  });
+
+  // The full digest identifies the release to a machine, and the envelope is
+  // where a machine reads it.
+  it("never spells the whole digest at a person", () => {
+    expect(liveOn(HASH, ["http://localhost:3000"])).not.toContain("a".repeat(64));
+  });
+
+  it("stays inside the box it is drawn in", () => {
+    expect(liveOn(HASH, ["http://localhost:3000"]).length).toBeLessThanOrEqual(73);
+  });
+});
 
 const ISSUER = "http://localhost:3000";
 const PREVIEW_ISSUER = [{ pattern: ISSUER, kind: "preview" }];
@@ -77,7 +123,9 @@ describe("noPrimaryOriginError", () => {
       selector: environmentSelectorSuffix({ envName: "prod" }),
     });
 
-    expect(error.hint).toContain("zitadel origin add <url> --kind primary --env prod");
+    expect(error.hint).toContain(
+      expectedPublicCliCommand("origin add <url> --kind primary --env prod"),
+    );
   });
 
   it("suggests origin list when no issuer resolves", () => {

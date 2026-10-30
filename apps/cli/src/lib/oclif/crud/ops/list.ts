@@ -1,4 +1,3 @@
-import { spinner } from "@clack/prompts";
 import { Flags } from "@oclif/core";
 
 import { nonBlankString } from "../../flags";
@@ -11,7 +10,7 @@ import { parseOrThrow } from "../shared";
 import { chosenColumns } from "../columns";
 import { shellOption } from "../../../shell";
 import { fieldPaths, itemSchemaOf } from "../paths";
-import { renderRows, renderTable } from "../table";
+import { renderList } from "../table";
 import type { Json, ListSpec } from "../types";
 import {
   type OperationDefinition,
@@ -86,6 +85,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
         : {}),
     };
     return {
+      heading: `Listing ${topic.replaceAll("-", " ")}`,
       description: `List ${topic}.${spec.drains === true ? " Fetches every page unless --limit or --page-token asks for one." : ""}`,
       examples: [
         `<%= config.bin %> ${topic} list --json`,
@@ -173,10 +173,9 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
     const asked = flags.limit !== undefined || flags["page-token"] !== undefined;
     const all = paged && (flags.all === true || (spec.drains === true && !asked));
     // `--all` is one request per page, so a wide drain would otherwise sit
-    // silent. The spinner is terminal-only: no animation reaches a pipe, and
-    // `--json` has already silenced everything.
-    const progress = all && process.stdout.isTTY && !this.jsonEnabled() ? spinner() : undefined;
-    progress?.start(`Fetching ${topic}`);
+    // silent. `this.ui` hands out a spinner that draws nothing when nobody is
+    // watching, so no animation reaches a pipe and `--json` stays one envelope.
+    const progress = all ? this.ui.spinner(`Fetching ${topic}`) : undefined;
     let fetched = 0;
     let drained = false;
     // The spinner owns the cursor and a SIGINT handler until it is stopped, so a
@@ -237,16 +236,15 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
         [wire.nextPageToken]: next,
         ...(nextCommands.length > 0 ? nextCommandsData(nextCommands) : {}),
       },
-      pretty: plain
-        ? renderRows(columns, items)
-        : items.length === 0
-          ? `No ${topic} found.`
-          : [
-              renderTable(columns, items),
-              "",
-              `${items.length} ${items.length === 1 ? resource.singular : topic}`,
-              ...(next ? [`More available: ${shellOption("--page-token", next)} (or --all)`] : []),
-            ].join("\n"),
+      // Every list — generated or hand-written — counts and reports emptiness
+      // through the same renderer, so the words come from the resource's own
+      // nouns rather than from whoever wrote the command.
+      pretty: renderList(columns, items, {
+        plain,
+        singular: resource.singular,
+        plural: resource.plural ?? topic,
+        footer: next ? [`More available: ${shellOption("--page-token", next)} (or --all)`] : [],
+      }),
     };
   }
 }

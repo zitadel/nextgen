@@ -318,7 +318,7 @@ function planCatalogConnection(options: {
       "E_CONFLICT",
       `More than one ${entry.displayName} connection exists: ${names}`,
       {
-        hint: "Keep the one this Project should use and remove the others, then run the command again.",
+        hint: "Keep the one this project should use and remove the others, then run the command again.",
         details: { provider: slug, files: matches.map((m) => m.path) },
       },
     );
@@ -337,7 +337,7 @@ function planCatalogConnection(options: {
         "E_VALIDATION",
         `${match.path} is a ${entry.displayName} connection with no usable slug`,
         {
-          hint: "Give the connection file a slug -- the schemas and flows reference it by that name.",
+          hint: "Give the connection file a slug — the schemas and flows reference it by that name.",
           details: { file: match.path, problem: matchSlug.problem },
         },
       );

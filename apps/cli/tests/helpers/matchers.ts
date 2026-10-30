@@ -2,6 +2,22 @@ import { expect } from "vitest";
 
 import { EXIT_CODE_FOR, type ErrorCode } from "./errors";
 import { parseJson } from "./run-cli";
+import { asOneLine } from "./terminal";
+
+/**
+ * Whether a run said `text`, wherever the layout happened to break it.
+ *
+ * An ending is laid out for a terminal 80 columns wide, so a sentence folds
+ * where its own length puts the fold and a step's command sits on a line
+ * under the sentence that introduces it. A spec asserts the words a command
+ * said; where they were broken is the layout's, and its unit tests'.
+ *
+ * Text that names a tab is matched exactly instead. A tab is not spacing in
+ * what a normal command prints — it is the separator `cut` and `awk` read the
+ * rows by — and flattening it would let a row that lost its tabs pass.
+ */
+const said = (output: string, text: string): boolean =>
+  output.includes(text) || (!text.includes("\t") && asOneLine(output).includes(asOneLine(text)));
 
 /** Matchers that assert the CLI's behaviour in its own terms. */
 
@@ -146,7 +162,7 @@ expect.extend({
   },
 
   toPrint(received: CliResult, text: string) {
-    const pass = received.stdout.includes(text);
+    const pass = said(received.stdout, text);
     return {
       pass,
       message: () =>
@@ -174,7 +190,7 @@ expect.extend({
 
   toSay(received: CliResult, text: string) {
     const output = `${received.stdout}\n${received.stderr}`;
-    const pass = output.includes(text);
+    const pass = said(output, text);
     return {
       pass,
       message: () =>

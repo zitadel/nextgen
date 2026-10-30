@@ -33,6 +33,8 @@ export default class Api extends Promptable(BaseCommand) {
   static override group = CommandGroups.diagnostics;
   static override description =
     "Call any operation of the Zitadel API, with this project's server and project secret.";
+
+  static override heading = "Calling the Zitadel API";
   static override examples = [
     "<%= config.bin %> api queryUsers -F limit=5",
     "<%= config.bin %> api GetUserByID user_01JZ8Y3V4Q0K7N2M5P6R8S9T0W",
@@ -110,6 +112,11 @@ export default class Api extends Promptable(BaseCommand) {
       operation.auth === "secret"
         ? await readZitadelSecret(meta.cwd)
         : await readZitadelSecret(meta.cwd).catch(() => undefined);
+    // This command calls the server, so its summary says where it ran, the
+    // same sentence every other command ends on. The project is the one whose
+    // secret authenticates the call, which an unauthenticated operation has
+    // none of.
+    this.ui.ranAgainst(secret?.project_id, meta.source.replace(/^https?:\/\//, ""));
     const positionals = (argv as string[]).slice(args.operation === undefined ? 0 : 1);
     const pathValues = await this.pathValues(target, positionals, secret?.project_id);
     const request = buildRequest({
@@ -160,8 +167,7 @@ export default class Api extends Promptable(BaseCommand) {
   private async chooseOperation(): Promise<string> {
     const callable = OPERATIONS.filter((operation) => uncallable(operation) === undefined);
     const retry = this.suggestUnscoped("api ls --json");
-    const tag = await this.input({
-      kind: "select",
+    const tag = await this.ask.select({
       name: "operation",
       message: "Which part of the API would you like to use?",
       retry,
@@ -170,8 +176,7 @@ export default class Api extends Promptable(BaseCommand) {
         label: value,
       })),
     });
-    return this.input({
-      kind: "select",
+    return this.ask.select({
       name: "operation",
       message: "Which operation would you like to run?",
       retry,
@@ -194,8 +199,7 @@ export default class Api extends Promptable(BaseCommand) {
     const { values, missing } = pathValuesOf(target, positionals, projectId);
     const filled: Record<string, string> = { ...values };
     for (const name of missing) {
-      filled[name] = await this.input({
-        kind: "text",
+      filled[name] = await this.ask.text({
         name,
         message: `What is the value of ${name}?`,
         retry: this.suggestUnscoped(

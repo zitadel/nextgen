@@ -36,17 +36,46 @@
 
 ## Command code
 
+- Name the CLI one way in anything a person reads — a hint, a warning, a box
+  line, a description: the public `npx @zitadel/cli@<version> …` form, from a
+  `src/lib/suggestion.ts` builder, never bare `zitadel …` and never in
+  backticks. `tests/unit/lib/public-cli.test.ts` scans `src/commands` for both.
+  - Say it once: when the run's own step already prints the command, the
+    prose says what to do and leaves the spelling to the step.
+- `Run next:` is the only label that introduces a command. Anything else that
+  introduces one is a sentence saying what the command cannot say for itself —
+  why it is there, or when to run it — ending in a colon, one fact per
+  sentence. `Explore all commands:` is the exception: it closes every box by
+  pointing at the command index, not at this run's next step.
 - Report a warning through `reportWarning` (`src/lib/warnings.ts`) or a
   result's `warnings`, never `consola.warn`: `--json` silences consola. A unit
   test fails on any other `consola.warn`.
-- Ask for input through `this.input(...)` (`src/lib/input.ts`), never clack's
-  prompts and never a hand-written flag-or-stdin-or-prompt rule. A unit test
-  fails on a clack import elsewhere.
+- Ask for input through `this.ask` — `this.ask.text/secret/select/multiselect/confirm`
+  (`src/lib/ui/questions.ts`, engine in `src/lib/input.ts`) — never clack's
+  prompts and never a hand-written flag-or-stdin-or-prompt rule. One method per
+  kind of question and no `kind` string: a unit test fails on a clack import
+  elsewhere and on a `kind:` question outside the engine.
+- A command draws one of two shapes, and the shape is the command's, never
+  inferred from how a run went (`src/lib/ui/presentation.ts`). A wizard sets
+  `static override wizard = true` and gets the chain, the drawn prompts and
+  the summary box; every other command draws neither chain nor box, asks on a
+  plain line, and ends on its answer and one dim footer. Adding a question, a
+  warning or a `--force` to a command must not change its shape.
+  - The shape holds off a terminal: a run nothing can be drawn into has its
+    ending written out in the same words (`Ui.written`), so only the gutter
+    and the frame are missing. There is no third rendering.
+  - The exception is a machine's: `--json`, and the form a normal command
+    already chooses off a terminal (`--plain` is implied, so a list is
+    tab-separated rows and a record is the record). The ending never
+    decorates one, or `cut`, `awk` and `wc -l` stop working.
+- Draw through `this.ui` (`src/lib/ui/`) alone: never `@clack/prompts`,
+  `consola` or a write to `process.stdout`/`process.stderr` in a new file.
+  `tests/unit/lib/ui/index.test.ts` lists every file that still does; add none.
 - Fail early: run every check that does not depend on an answer before the
   first question, and each one that does as soon as its answer is given.
 - A command that asks anything extends `Promptable(...)`
   (`src/lib/oclif/promptable.ts`), as in `Promptable(BaseCommand)` or
-  `Promptable(EnvironmentCommand)`. Only such a command has `this.input`, so
+  `Promptable(EnvironmentCommand)`. Only such a command has `this.ask`, so
   what can prompt is visible from its class, and the compiler rejects a
   command that asks without it.
 - Word every prompt as a polite question to a person, never a field label or a
@@ -58,11 +87,16 @@
   - Add where the answer comes from or where it goes, in the same message: "It
     will be stored on the project as GOOGLE_CLIENT_SECRET."
   - A confirmation that acts on something may be a short direct question, as
-    long as it names the thing and, when it is not obvious, what happens:
-    "Delete user usr_1?" or "Revoke rel_1? Its content can never be served again."
+    long as it names the thing and, when it is not obvious, what happens. It
+    stays one question: fold the consequence into it rather than adding a
+    second sentence, and use the verb the command's own result uses.
+    "Delete user usr_1?" or "Revoke rel_1 so its content can never be served
+    again?"; "Roll back to dep_1 …?", never "Re-apply dep_1 …?".
   - Leave names and ids in a prompt unquoted ("What is the value of user_id?",
     "Remove FOO from the project?"); a terminal does not render backticks.
   - Ask the same thing the same way in every command that asks it.
+- Write "project" in lowercase in every message ("stored in your project"), as the prompts
+  do; only product names are capitalised.
 - A command whose `--force` means something other than "yes to every
   confirm" builds its own asker with `force: false`, as `setup` does.
 - The flag surface follows the [WebCLI spec](https://webcli.com/). Record a new

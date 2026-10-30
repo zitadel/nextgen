@@ -42,7 +42,7 @@ export class DependencyVersionCheck implements SanityCheck {
     if (exact === undefined) {
       // A missing or unparsable package.json is the dependency check's
       // failure to report; double-flagging the same root cause helps nobody.
-      return { ...base, status: "pass", message: "no package.json to compare pins against" };
+      return { ...base, status: "pass", message: "No package.json to compare pins against" };
     }
     const mismatched = exact.filter(([, version]) => !semver.eq(version, ctx.cliVersion));
     if (mismatched.length > 0) {
@@ -59,7 +59,7 @@ export class DependencyVersionCheck implements SanityCheck {
         message:
           `${mismatched.map(([name, version]) => `${name}@${version}`).join(", ")} ` +
           `does not match this CLI's version (${ctx.cliVersion}); scaffolded files and ` +
-          `guidance target the CLI's train — update with \`${remedy}\``,
+          `guidance target the CLI's train — update with ${remedy}`,
         details: {
           mismatched: mismatched.map(([name, version]) => ({
             name,
@@ -76,7 +76,7 @@ export class DependencyVersionCheck implements SanityCheck {
       message:
         exact.length > 0
           ? `Zitadel package pins match the CLI version (${exact.length} compared)`
-          : "no exactly-pinned Zitadel packages to compare",
+          : "No exactly-pinned Zitadel packages to compare",
     };
   }
 

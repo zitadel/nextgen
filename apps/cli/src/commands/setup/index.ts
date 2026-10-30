@@ -1,7 +1,6 @@
 import { readFile, rm, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 
-import { intro, note, outro } from "@clack/prompts";
 import { Flags } from "@oclif/core";
 import type { CreateProject201 } from "@zitadel/api/generated/model";
 import {
@@ -23,12 +22,10 @@ import {
   selectionName,
   type ConnectionSlug,
 } from "@zitadel/config/idp";
-import { consola } from "consola";
 import semver from "semver";
 
 import { createZitadelClient } from "../../lib/api-client";
 import { isDevelopmentBuild } from "../../lib/build-channel";
-import { renderBoxActions, wrapForBox } from "../../lib/box";
 import { setupDesignRemovedError } from "../../lib/branding/designs";
 import {
   claimAction,
@@ -60,6 +57,7 @@ import {
   type SecretOutcome,
   type SecretPublisher,
 } from "../../lib/idp";
+import type { BoxAction } from "../../lib/box";
 import { brandingGuidanceAction, exploreAllCommands } from "../../lib/journey-guidance";
 import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../../lib/oclif";
 import { environmentSelectorSuffix, projectEnvFile } from "../../lib/oclif/environment-flags";
@@ -89,7 +87,6 @@ import {
   RENDERER_IDS,
 } from "../../lib/orca/patchers/rule/next/renderers/registry";
 import type { PatchContext } from "../../lib/orca/patchers/types";
-import { type Asker, input } from "../../lib/input";
 import { hasZitadelConfig, hasZitadelSecret } from "../../lib/project";
 import {
   PASSWORD_POLICY_PATH,
@@ -103,7 +100,12 @@ import {
   materializeSetupResources,
   type MaterializeSetupResourcesResult,
 } from "../../lib/setup-resources";
-import { DEPLOY_ARGS, deployInitialRelease, type InitialDeployment } from "../../lib/release";
+import {
+  abbreviate,
+  DEPLOY_ARGS,
+  deployInitialRelease,
+  type InitialDeployment,
+} from "../../lib/release";
 import { installDependenciesForSetup } from "./install";
 import {
   assertCleanWorktree,
@@ -114,6 +116,7 @@ import { moveDevPort } from "./move-dev-port";
 import {
   askCustomSettings,
   PickFrameworkPrompt,
+  type PromptContext,
   SETUP_PROMPTS,
   type SetupAnswers,
   type SsoDraft,
@@ -123,17 +126,16 @@ import {
   detectProjectFacts,
   fileNameOf,
   formatFrameworkLine,
-  id as styleId,
   path as stylePath,
   relativeDisplayPath as relativeDisplay,
-  renderSummary,
-  signInSummary,
+  summarySections,
+  id as styleId,
   url as styleUrl,
   type Row,
   type Section,
 } from "./summary";
 import { shellOption } from "../../lib/shell";
-import { showSkillsHint } from "../../lib/skills-hint";
+import type { Questions, Step, Summary } from "../../lib/ui";
 import { reportWarning } from "../../lib/warnings";
 import {
   type EnvironmentSelector,
@@ -170,7 +172,7 @@ const RENDERER_FLAG_DESCRIPTION =
     : `Renderer (default: react). Not yet available: ${UNAVAILABLE_RENDERER_IDS.join(", ")}.`;
 
 /** The message the release setup publishes carries. */
-const INITIAL_DEPLOY_MESSAGE = "Initial deployment from zitadel setup";
+const INITIAL_DEPLOY_MESSAGE = "Initial deployment from setup";
 
 /**
  * The selector appended to setup's credential-recovery commands. `variable set`
@@ -219,6 +221,10 @@ function localRecoverySelector(cwd: string | undefined): EnvironmentSelector {
 export default class Setup extends Promptable(BaseCommand) {
   static override description =
     "Create a Zitadel project and scaffold local auth. An interactive setup ends with a note about the Zitadel agent skills, shown once per machine; set NO_SKILLS_PROMPT=1 to hide it.";
+
+  static override heading = "Setting up Zitadel";
+
+  static override wizard = true;
   static override group = CommandGroups.gettingStarted;
   static override groupOrder = 1;
   static override examples = [
@@ -361,23 +367,21 @@ export default class Setup extends Promptable(BaseCommand) {
     // inconsistent set of --sso flags is a mistake in the command line, and
     // reporting it after a project has been created would leave the developer
     // to clean up.
-    // Not `this.input`: that one answers a confirm when `--force` is given, and
+    // Not `this.ask`: that one answers a confirm when `--force` is given, and
     // here `--force` permits overwriting files, so it must never answer a
-    // question. Interactive only when a person is there, which is also the only
-    // time the wizard runs.
-    const wizardInput: Asker = (question) =>
-      input(question, { interactive: !nonInteractive, force: false });
+    // question.
+    const wizardQuestions = this.ui.questions({ honorForce: false });
     const ssoFromCommandLine = await ssoFromFlags(
       flags,
       nonInteractive,
       dryRun,
-      wizardInput,
+      wizardQuestions,
       this.config.version,
     );
 
     const orca = createOrca();
 
-    consola.start(`Detecting framework in ${shortPath(cwd)}`);
+    const detecting = this.ui.begin(`Detecting framework in ${shortPath(cwd)}`);
     // The app the questions are about: the one detected here, or else a new
     // one. Setup creates a new app only once it has every answer, just before
     // it patches it, so cancelling a question leaves the directory as it was,
@@ -391,16 +395,17 @@ export default class Setup extends Promptable(BaseCommand) {
     try {
       detected = await orca.detect(cwd, flags.framework);
       app = { framework: detected.id, devPort: detected.devPort };
-      consola.success(
+      detecting.done(
         `Detected ${orca.displayName(detected.id)}${detected.devPort ? ` (dev port ${detected.devPort})` : ""}`,
       );
     } catch (error) {
       if (error instanceof ZitadelError && error.code === "E_FRAMEWORK_NOT_DETECTED") {
         const target = await inspectScaffoldTarget(cwd);
         if (!target.scaffoldable && !force) {
+          detecting.fail();
           throw frameworkDetectionWithScaffoldTarget(error, cwd, target);
         }
-        consola.info(
+        detecting.done(
           target.scaffoldable
             ? "Fresh app directory — setup scaffolds a new project"
             : "Non-empty directory with --force — setup scaffolds a new project",
@@ -411,11 +416,12 @@ export default class Setup extends Promptable(BaseCommand) {
             retry: retryOptionsFromFlags(flags),
             serverFlag: this.meta.serverFlag,
             cliVersion: this.config.version,
-            ask: wizardInput,
+            ask: wizardQuestions,
           }),
         );
         scaffoldedBesideFiles = !target.scaffoldable;
       } else {
+        detecting.fail();
         throw error;
       }
     }
@@ -459,12 +465,11 @@ export default class Setup extends Promptable(BaseCommand) {
     };
 
     if (!nonInteractive && !dryRun) {
-      // Asking which framework to scaffold opened the wizard already.
-      if (!scaffoldedFramework || flags.framework !== undefined) {
-        intro("Zitadel setup");
-      }
-      const promptCtx = {
-        input: wizardInput,
+      const promptCtx: PromptContext = {
+        ask: wizardQuestions,
+        note: (title, lines) => this.ui.note(title, lines),
+        say: (text) => this.ui.say(text),
+        spinner: (label, options) => this.ui.spinner(label, options),
         framework: { id: app.framework, displayName: orca.displayName(app.framework) },
         suggest: (args: string) =>
           projectCommand(args, recoverySelector(flags.cwd), this.meta.cliVersion),
@@ -481,8 +486,6 @@ export default class Setup extends Promptable(BaseCommand) {
       for (const prompt of SETUP_PROMPTS) {
         answers = await prompt.ask(answers, promptCtx);
       }
-      note(signInSummary(answers), "Sign-in");
-      outro("Configuration captured");
     } else if (
       flags["dev-port"] === undefined &&
       !(await LocalServer.isPortFree(answers.devPort))
@@ -556,13 +559,17 @@ export default class Setup extends Promptable(BaseCommand) {
     // creates none, so it has no app to patch.
     let created = detected;
     let newApp: UndoableScaffold | undefined;
+    // The step that is running, so a failure ends it as failed.
+    let current: Step | undefined;
     if (created === undefined && dryRun) {
-      consola.info(`Would scaffold a new ${app.framework} project (dry run)`);
+      this.ui
+        .begin(`Scaffolding a new ${app.framework} project`)
+        .done(`Would scaffold a new ${app.framework} project (dry run)`);
     } else if (created === undefined) {
-      consola.start(`Scaffolding a new ${app.framework} project`);
+      current = this.ui.begin(`Scaffolding a new ${app.framework} project`);
       newApp = await orca.scaffoldUndoably(cwd, app.framework, force);
       created = newApp.facts;
-      consola.success(`Scaffolded ${created.id} skeleton`);
+      current.done(`Scaffolded ${created.id} skeleton`);
     }
     // The DevPortPrompt can change the port interactively, so fold the answer
     // back into the framework: the patched dev-server config reads
@@ -595,7 +602,7 @@ export default class Setup extends Promptable(BaseCommand) {
       // `POST /projects` is unauthenticated. CLI-managed projects opt out of
       // server fallback defaults, then setup uploads the local default schema and
       // flow files through the typed resource APIs and records the returned IDs.
-      consola.start(`Creating project on ${answers.server}${dryRun ? " (dry run)" : ""}`);
+      current = this.ui.begin(`Creating project on ${answers.server}${dryRun ? " (dry run)" : ""}`);
       const unauthClient = createZitadelClient({ baseUrl: answers.server });
       const projectName = defaultProjectName(cwd, app.framework);
       // Register the app's own origin so the backend's origin check allows
@@ -622,7 +629,7 @@ export default class Setup extends Promptable(BaseCommand) {
               passwordMinLength: answers.passwordMinLength,
             },
           );
-      consola.success(`Created project ${project.id}`);
+      current.done(`Created project ${project.id}`);
       this.recordTelemetry({ step: "project_created" });
 
       // `.env.local` as it is before the patch merges this project's id and
@@ -630,10 +637,12 @@ export default class Setup extends Promptable(BaseCommand) {
       const envFilesBefore = await readCredentialEnvFiles(cwd);
       if (framework === undefined) {
         // What the patch writes depends on the files the scaffold creates.
-        consola.info("Would patch the new project (dry run): its files come from the scaffold");
+        this.ui
+          .begin("Patching project files (dry run)")
+          .done("Would patch the new project (dry run): its files come from the scaffold");
         result = { dryRun, files: [], filesWritten: [], filesSkipped: [], depsAdded: [] };
       } else {
-        consola.start(`Patching project files${dryRun ? " (dry run)" : ""}`);
+        current = this.ui.begin(`Patching project files${dryRun ? " (dry run)" : ""}`);
         try {
           result = await patcher.patch(patchContext(framework, project), { cwd, dryRun, force });
         } catch (error) {
@@ -650,10 +659,10 @@ export default class Setup extends Promptable(BaseCommand) {
       }
       for (const file of result.filesWritten) {
         const sentence = describeWrittenFile(relativeDisplay(cwd, file), dryRun);
-        if (sentence) consola.info(sentence);
+        if (sentence) current?.detail(sentence);
       }
       for (const file of result.filesSkipped) {
-        consola.info(`Left ${relativeDisplay(cwd, file)} unchanged (already matches target)`);
+        current?.detail(`Left ${relativeDisplay(cwd, file)} unchanged (already matches target)`);
       }
       try {
         resourceResult = dryRun
@@ -695,14 +704,14 @@ export default class Setup extends Promptable(BaseCommand) {
             cause.hint ??
             (newApp === undefined
               ? "The project was created but its default resources (schema, login flow, " +
-                "password policy) did not all upload. Re-run `zitadel setup` to start over; " +
+                `password policy) did not all upload. Rerun ${this.suggestUnscoped("setup")} to start over; ` +
                 "--force overwrites the schema and flow files setup scaffolds and keeps an " +
-                "existing password policy file. It does not cover a connection under .zitadel/idps/ -- those are " +
+                "existing password policy file. It does not cover a connection under .zitadel/idps/ — those are " +
                 "yours, so setup never replaces or removes one; delete it to scaffold a fresh " +
                 "one, or keep it and enable the provider after setup to reuse it."
               : "The project was created but its default resources (schema, login flow, " +
                 "password policy) did not all upload, so setup removed the new app again. " +
-                "Re-run setup as before to start over."),
+                "Rerun setup as before to start over."),
           nextCommands:
             cause.nextCommands ??
             (newApp === undefined ? [this.suggestUnscoped("setup --force")] : []),
@@ -710,8 +719,9 @@ export default class Setup extends Promptable(BaseCommand) {
         });
       }
     } catch (error) {
+      current?.fail();
       if (newApp !== undefined) {
-        await removeNewApp(newApp, cwd);
+        await removeNewApp(newApp, cwd, (text) => this.ui.say(text));
       }
       throw error;
     }
@@ -725,11 +735,11 @@ export default class Setup extends Promptable(BaseCommand) {
     }
     for (const file of resourceResult.filesWritten) {
       const sentence = describeWrittenFile(relativeDisplay(cwd, file), dryRun);
-      if (sentence) consola.info(sentence);
+      if (sentence) current?.detail(sentence);
     }
     const allFilesWritten = [...result.filesWritten, ...resourceResult.filesWritten];
     if (framework !== undefined) {
-      consola.success(
+      current?.done(
         `Patched ${allFilesWritten.length} file${allFilesWritten.length === 1 ? "" : "s"}` +
           (result.filesSkipped.length > 0 ? ` (${result.filesSkipped.length} unchanged)` : ""),
       );
@@ -817,7 +827,13 @@ export default class Setup extends Promptable(BaseCommand) {
           posture,
         });
       } catch (error) {
-        consola.debug("Failed to record the scaffold manifest", error);
+        // Said out loud rather than logged under `--debug`, as every other
+        // best-effort step here is: nothing else tells the developer that
+        // `doctor` will be checking their app files against the templates
+        // instead of against what setup actually wrote.
+        reportWarning(
+          `Could not record what setup scaffolded, so doctor will check this app against the current templates: ${toZitadelError(error).message}`,
+        );
       }
     }
 
@@ -833,6 +849,7 @@ export default class Setup extends Promptable(BaseCommand) {
       selector: recoverySelector(flags.cwd),
       scaffoldedFramework,
       skipInstall: Boolean(flags["skip-install"]),
+      task: (label, work, done) => this.ui.task(label, work, done),
     });
 
     this.recordTelemetry({
@@ -922,7 +939,7 @@ export default class Setup extends Promptable(BaseCommand) {
           // so an unattached project is one the local admin never sees. A
           // server started by hand has no local admin anywhere, hence the "if".
           reportWarning(
-            `No local admin for ${answers.server} in ${cwd} or its parents, so the project is not attached to a team and the local console will not list it. If \`zitadel start\` started this server, run setup from the directory it ran in, or one inside it.`,
+            `No local admin for ${answers.server} in ${cwd} or its parents, so the project is not attached to a team and the local console will not list it. If ${this.suggestUnscoped("start")} started this server, run setup from the directory it ran in, or one inside it.`,
           );
         }
         if (admin) {
@@ -942,7 +959,9 @@ export default class Setup extends Promptable(BaseCommand) {
             claimed_at: owner.claimed_at,
           });
           ownedByLocalAdmin = { email: admin.email, team_id: owner.team_id };
-          consola.success(`Project owned by ${admin.email} (team ${owner.team_id})`);
+          this.ui
+            .begin("Attaching the project to the local admin")
+            .done(`Project owned by ${admin.email} (team ${owner.team_id})`);
         }
       } catch (error) {
         reportWarning(
@@ -985,6 +1004,19 @@ export default class Setup extends Promptable(BaseCommand) {
     // The structured report is human-only. Under `--json` we let the
     // envelope returned from `this.emit(...)` be the sole stdout
     // payload (oclif requires single-doc JSON).
+    //
+    // The two renderings are one summary: a person at a terminal gets it as
+    // the ending of the chain their answers opened, and a run with nobody
+    // watching gets the same thing as text, because the chain draws nothing
+    // then and this report is the whole point of running setup. The overview
+    // is the last step of both — the base command appends it to a chain's
+    // ending, so only the text one names it here.
+    let summary: Summary | undefined;
+    let report = "";
+    // Where setup ran, as the box's last line, the way every other command's
+    // box states it. Setup learns its project while it works rather than
+    // before its first question, so it says so here.
+    this.ui.ranAgainst(project.id, answers.server.replace(/^https?:\/\//, ""));
     if (!this.jsonEnabled()) {
       const projectFacts = await detectProjectFacts(cwd, app.framework);
       const sections = buildSummary({
@@ -998,52 +1030,39 @@ export default class Setup extends Promptable(BaseCommand) {
         scaffoldedBesideFiles,
         sso: answers.sso,
       });
-      // Frame the report in a consola box so it reads as a distinct
-      // status panel separate from the per-step narration above it.
-      // `box` accepts ANSI-styled text in the message body, so our
-      // pre-coloured rows (path/url/id helpers) survive intact.
-      // `wrapForBox` caps the content at the terminal width: consola sizes
-      // the frame to the longest line, so an unwrapped sentence wider than
-      // the window would break the right border.
-      consola.box({
-        title: "Zitadel is ready",
-        message: wrapForBox(
-          [
-            renderSummary(sections),
-            "",
-            renderBoxActions([
-              ...deployStep.boxActions,
-              ...installOutcome.boxActions,
-              ...consoleStep.boxActions,
-              ...claimNudge.boxActions,
-            ]),
-          ].join("\n"),
-        ),
-        style: { padding: 1, borderStyle: "rounded", borderColor: "green" },
-      });
-      // After the steps that start the app and test sign-in, outside the box so
-      // the command can be copied without its border.
-      consola.log(`\n${exploreAllCommands(this.meta.cliVersion)}`);
-      // Then the skills note, once per machine, as the last thing setup prints.
-      // Only on a run that succeeded: a failed or cancelled setup never reaches here,
-      // so it does not use up the once-per-machine note.
-      await showSkillsHint({
-        env: process.env,
-        interactive:
-          !dryRun &&
-          !flags["non-interactive"] &&
-          Boolean(process.stdout.isTTY && process.stdin.isTTY),
-        cliVersion: this.meta.cliVersion,
-      });
+      const nextActions = [
+        ...deployStep.boxActions,
+        ...installOutcome.boxActions,
+        ...consoleStep.boxActions,
+        ...claimNudge.boxActions,
+      ];
+      summary = {
+        // The chain closes on what the run did, in the past tense every other
+        // wizard closes on, and the box it opens is the `Summary` every other
+        // box is titled: a run that says "Zitadel is ready" twice in four
+        // lines has said it once too often.
+        title: "Set up Zitadel in this app",
+        sections: summarySections(sections),
+        next: nextActions,
+        boxed: true,
+      };
+      if (!this.ui.interactive) {
+        report = this.ui.ending({
+          ...summary,
+          next: [...nextActions, ...exploreAction(this.meta.cliVersion)],
+        });
+        summary = undefined;
+      }
     }
 
-    return this.emit({
+    const envelope = this.emit({
       status: "ok",
-      // Human-facing output was already shown via consola (box + per-step
-      // narration). Pass an empty `pretty` so the base command's fallback
-      // renderer doesn't duplicate the summary on stdout. The JSON envelope
-      // still carries the full structured payload.
-      pretty: "",
+      // The whole of what a person sees, so the base command's generic
+      // renderer does not summarise the payload underneath it. Empty for a
+      // run that ends on the chain instead, and under `--json`, where the
+      // envelope is the only thing on stdout.
+      pretty: report,
+      ...(summary === undefined ? {} : { summary }),
       data: {
         title: "Zitadel is ready.",
         project: { project_id: project.id, issuer },
@@ -1145,6 +1164,7 @@ export default class Setup extends Promptable(BaseCommand) {
         ]),
       },
     });
+    return envelope;
   }
 
   /**
@@ -1161,12 +1181,19 @@ export default class Setup extends Promptable(BaseCommand) {
       return { kind: "skipped" };
     }
     if (dryRun) {
-      consola.info("Would initialise a git repository and commit the scaffolded project (dry run)");
+      this.ui
+        .begin("Committing the scaffolded project")
+        .done("Would initialise a git repository and commit the project (dry run)");
       return { kind: "skipped" };
     }
+    const committing = this.ui.begin("Committing the scaffolded project");
     const outcome = await ensureInitialCommit(cwd);
+    if (outcome.kind !== "created" && outcome.kind !== "committed") {
+      // Why there is no commit is said once, in the warning under the step.
+      committing.done("Left the project uncommitted");
+    }
     if (outcome.kind === "created" || outcome.kind === "committed") {
-      consola.success(`Committed the project as ${outcome.sha.slice(0, 7)}`);
+      committing.done(`Committed the project as ${outcome.sha.slice(0, 7)}`);
       // git guesses an author from the machine when none is configured and
       // commits anyway, so the commit exists but carries a name the developer
       // did not choose. Said out loud, with the one command that fixes it.
@@ -1174,12 +1201,12 @@ export default class Setup extends Promptable(BaseCommand) {
         reportWarning(
           "git could build no author identity on this machine, so the commit was made as " +
             "Zitadel Setup <setup@zitadel.local>. Set user.name and user.email, then run " +
-            "`git commit --amend --reset-author` to put your own name on it.",
+            "git commit --amend --reset-author to put your own name on it.",
         );
       } else if (outcome.guessedIdentity) {
         reportWarning(
           "This machine has no git user.name/user.email, so git guessed the author from your " +
-            "username and hostname. Set your identity and run `git commit --amend --reset-author` " +
+            "username and hostname. Set your identity and run git commit --amend --reset-author " +
             "to put your own name on the commit.",
         );
       }
@@ -1205,11 +1232,13 @@ export default class Setup extends Promptable(BaseCommand) {
     selector: EnvironmentSelector;
   }): Promise<InitialDeployment | undefined> {
     if (opts.dryRun) {
-      consola.info("Would deploy .zitadel/ to the project (dry run)");
+      this.ui
+        .begin("Deploying .zitadel/ to the project")
+        .done("Would deploy .zitadel/ to the project (dry run)");
       return undefined;
     }
     const json = this.jsonEnabled();
-    consola.start("Deploying .zitadel/ to the project");
+    const deploying = this.ui.begin("Deploying .zitadel/ to the project");
     try {
       const deployment = await deployInitialRelease({
         client: createZitadelClient({
@@ -1224,13 +1253,18 @@ export default class Setup extends Promptable(BaseCommand) {
         message: INITIAL_DEPLOY_MESSAGE,
         suggest: (args) => projectCommand(args, opts.selector, this.meta.cliVersion),
       });
-      consola.success(
-        `Deployed ${deployment.contentHash} to ${deployment.origins.length} origin${deployment.origins.length === 1 ? "" : "s"}`,
+      // Abbreviated, because a step of the chain is one line and `sha256:`
+      // with 64 hex digits is wider than one. The envelope carries the hash
+      // in full, for whatever matches on it.
+      deploying.done(
+        `Deployed ${abbreviate(deployment.contentHash)} to ${deployment.origins.length} origin${deployment.origins.length === 1 ? "" : "s"}`,
       );
       return deployment;
     } catch (error) {
+      // Why there is no deployment is said once, in the warning under the step.
+      deploying.done("Left .zitadel/ undeployed");
       reportWarning(
-        `The project was set up but its first deploy failed: ${toZitadelError(error).message}. Run \`zitadel ${DEPLOY_ARGS}${opts.selector}\` to publish .zitadel/.`,
+        `The project was set up but its first deploy failed: ${toZitadelError(error).message}. Run ${projectCommand(DEPLOY_ARGS, opts.selector, this.meta.cliVersion)} to publish .zitadel/.`,
       );
       return undefined;
     }
@@ -1247,7 +1281,9 @@ export default class Setup extends Promptable(BaseCommand) {
   ): Promise<JsonEnvelope> {
     const config = await readZitadelConfig(cwd);
     const server = readProjectServer(config);
-    consola.start(`Moving the app to ${issuerFromPort(devPort)}${dryRun ? " (dry run)" : ""}`);
+    const moving = this.ui.begin(
+      `Moving the app to ${issuerFromPort(devPort)}${dryRun ? " (dry run)" : ""}`,
+    );
     const move = await moveDevPort({
       cwd,
       devPort,
@@ -1255,9 +1291,12 @@ export default class Setup extends Promptable(BaseCommand) {
       orca: createOrca(),
       cliVersion: this.meta.cliVersion,
       dryRun,
+    }).catch((error: unknown) => {
+      moving.fail();
+      throw error;
     });
     for (const file of move.result.filesWritten) {
-      consola.info(`${dryRun ? "Would update" : "Updated"} ${relativeDisplay(cwd, file)}`);
+      moving.detail(`${dryRun ? "Would update" : "Updated"} ${relativeDisplay(cwd, file)}`);
     }
     if (move.staleOrigin !== undefined) {
       reportWarning(
@@ -1271,9 +1310,9 @@ export default class Setup extends Promptable(BaseCommand) {
     }
     const moved = move.previousIssuer !== move.issuer;
     if (moved) {
-      consola.success(`Moved from ${move.previousIssuer} to ${move.issuer}`);
+      moving.done(`Moved from ${move.previousIssuer} to ${move.issuer}`);
     } else {
-      consola.success(`Already on ${move.issuer}`);
+      moving.done(`Already on ${move.issuer}`);
     }
     return this.emit({
       status: "ok",
@@ -1316,7 +1355,7 @@ async function resolveScaffoldFramework(
   framework: string | undefined,
   nonInteractive: boolean,
   orca: Orca,
-  guidance: { retry: SetupRetryOptions; serverFlag?: string; cliVersion: string; ask: Asker },
+  guidance: { retry: SetupRetryOptions; serverFlag?: string; cliVersion: string; ask: Questions },
 ): Promise<string> {
   if (framework) {
     return framework;
@@ -1328,22 +1367,26 @@ async function resolveScaffoldFramework(
     // `setupRetryFlags` pins `--server local`.
     const choices = orca.availableFrameworks().map((choice) => choice.id);
     const suggested = choices.includes("next") ? "next" : choices[0];
-    throw new ZitadelError("E_FRAMEWORK_NOT_DETECTED", "Empty directory — pass --framework", {
-      hint: (
-        "Setup asks which framework to scaffold only in a terminal. Without one, or with " +
-        `--json or --non-interactive, pass --framework with one of: ${choices.join(", ")}.`
-      ).trimEnd(),
-      nextCommands:
-        guidance.serverFlag === "local" && suggested
-          ? [
-              unscopedCommand(
-                `setup ${setupRetryFlags({ ...guidance.retry, framework: suggested })}`,
-                guidance.cliVersion,
-              ),
-            ]
-          : [],
-      details: { frameworks: choices },
-    });
+    throw new ZitadelError(
+      "E_FRAMEWORK_NOT_DETECTED",
+      "This directory is empty, so setup needs --framework",
+      {
+        hint: (
+          "Setup asks which framework to scaffold only in a terminal. Without one, or with " +
+          `--json or --non-interactive, pass --framework with one of: ${choices.join(", ")}.`
+        ).trimEnd(),
+        nextCommands:
+          guidance.serverFlag === "local" && suggested
+            ? [
+                unscopedCommand(
+                  `setup ${setupRetryFlags({ ...guidance.retry, framework: suggested })}`,
+                  guidance.cliVersion,
+                ),
+              ]
+            : [],
+        details: { frameworks: choices },
+      },
+    );
   }
   return new PickFrameworkPrompt().ask(orca.availableFrameworks(), guidance.ask);
 }
@@ -1368,10 +1411,14 @@ export async function localServerHostsPlatform(server: string, timeoutMs = 1500)
  * back what the directory held. A failure to do so is reported, not thrown:
  * the error that stopped setup is the one the developer needs.
  */
-async function removeNewApp(newApp: UndoableScaffold, cwd: string): Promise<void> {
+async function removeNewApp(
+  newApp: UndoableScaffold,
+  cwd: string,
+  say: (text: string) => void,
+): Promise<void> {
   try {
     await newApp.undo();
-    consola.info(`Removed the new app, so ${shortPath(cwd)} holds what it did before setup`);
+    say(`Removed the new app, so ${shortPath(cwd)} holds what it did before setup`);
   } catch (error) {
     reportWarning(
       `Could not remove the new app setup scaffolded in ${cwd}: ${toZitadelError(error).message}`,
@@ -1493,7 +1540,7 @@ export async function ssoFromFlags(
   },
   nonInteractive: boolean,
   dryRun: boolean,
-  ask: Asker,
+  ask: Questions,
   cliVersion: string,
 ): Promise<SsoDraft | undefined> {
   const customValues = customFlagValues(flags, SETUP_FLAG_KEYS);
@@ -1557,8 +1604,7 @@ export async function ssoFromFlags(
   // sign-in button that fails at the provider with `invalid_client`, long
   // after setup reports success. It is never a flag — that would put it in
   // shell history, a process listing and CI logs.
-  const secret = await ask({
-    kind: "secret",
+  const secret = await ask.secret({
     name: "client secret",
     message: `What is the client secret of your ${providerOf(selection).displayName} OAuth app?`,
     parse: parseClientSecret,
@@ -1971,7 +2017,7 @@ function localSetupHint(error: unknown, retry: SetupRetryOptions, cliVersion: st
           "To script it instead, add --sso-client-id and --non-interactive, and pipe the secret in. "
         : "") +
       sso.hint +
-      "After setup succeeds, follow its next_commands to start the app and verify registration, logout, and login in the browser.",
+      "After setup succeeds, follow its next_commands to check in the browser that registration, sign-out and sign-in all work.",
     nextCommands: [
       unscopedCommand(`start${cwdArg(retry)}`, cliVersion),
       unscopedCommand(setupCommand, cliVersion),
@@ -2104,7 +2150,7 @@ const SENTENCE_BY_PATH: Record<string, { subject: string }> = {
 };
 
 /**
- * Builds the section list driving {@link renderSummary} for the setup command.
+ * Builds the section list driving {@link summarySections} for the setup command.
  * Exported so its wording is unit-tested.
  */
 export function buildSummary(opts: {
@@ -2217,4 +2263,12 @@ export function buildSummary(opts: {
     { title: "Customize", rows: customizeRows },
     { title: "Project", rows: projectRows },
   ];
+}
+
+/** The command overview, as the last step of the summary, wherever it is drawn. */
+function exploreAction(cliVersion: string): BoxAction[] {
+  const [text = "", command] = exploreAllCommands(cliVersion)
+    .split("\n")
+    .map((line) => line.trim());
+  return command === undefined ? [] : [{ text, command }];
 }

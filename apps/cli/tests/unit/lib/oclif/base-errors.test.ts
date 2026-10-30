@@ -1,13 +1,19 @@
 import type { Config } from "@oclif/core";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("@clack/prompts", async () => (await import("../../../helpers/clack")).clackDouble());
+
+import { intro, outro } from "@clack/prompts";
 
 import { ZitadelError } from "../../../../src/lib/errors";
 import { BaseCommand } from "../../../../src/lib/oclif/base";
+import { asTerminal } from "../../../helpers/terminal";
 
 /** A command that fails with a given error and records what it prints. */
 class FailingCommand extends BaseCommand {
   public static override readonly id = "errors-test";
   public readonly stderr: string[] = [];
+  declare public ui: BaseCommand["ui"];
   public readonly json: unknown[] = [];
   public exitCode: number | undefined;
   private readonly asJson: boolean;
@@ -31,8 +37,22 @@ class FailingCommand extends BaseCommand {
     throw new Error("unused");
   }
 
-  public async fail(error: Error): Promise<void> {
+  private prepared = false;
+
+  /**
+   * Builds the UI the way a real run does, once. A second `toMeta` would
+   * build a second `Ui` and throw away the chain the first one opened.
+   */
+  public async open(): Promise<void> {
+    if (this.prepared) {
+      return;
+    }
+    this.prepared = true;
     await this.toMeta({ "no-telemetry": true }, { resolveServer: false, source: "mock" });
+  }
+
+  public async fail(error: Error): Promise<void> {
+    await this.open();
     try {
       await this.catch(error);
     } catch (exit) {
@@ -40,6 +60,11 @@ class FailingCommand extends BaseCommand {
       this.exitCode = (exit as { oclif?: { exit?: number } }).oclif?.exit;
     }
   }
+}
+
+/** The same, as one of the ten wizards, which is what has a chain to close. */
+class FailingWizard extends FailingCommand {
+  public static override wizard = true;
 }
 
 describe("BaseCommand errors", () => {
@@ -66,5 +91,132 @@ describe("BaseCommand errors", () => {
     await cmd.fail(new ZitadelError("E_CANCELLED", "Cancelled by user"));
 
     expect(cmd.json).toEqual([expect.objectContaining({ code: "E_CANCELLED" })]);
+  });
+});
+
+// Every failure is shown as one block, however it arose. The platform writes
+// fragments and oclif writes a rendering of its own; the person reads one
+// grammar, and `--json` still carries the message exactly as it was thrown.
+describe("the one block every failure is shown as", () => {
+  const refused = (message: string) => Object.assign(new Error(message), { oclif: { exit: 2 } });
+
+  it("states a server's lowercase fragment as a sentence", async () => {
+    const cmd = new FailingCommand(false);
+
+    await cmd.fail(new ZitadelError("E_NOT_FOUND", "variable not found"));
+
+    expect(cmd.stderr).toEqual(["Error E_NOT_FOUND: Variable not found"]);
+  });
+
+  it("leaves the thrown message alone in the envelope", async () => {
+    const cmd = new FailingCommand(true);
+
+    await cmd.fail(new ZitadelError("E_NOT_FOUND", "variable not found"));
+
+    expect(cmd.json).toEqual([expect.objectContaining({ message: "variable not found" })]);
+  });
+
+  it("says why oclif refused the command line in the CLI's own words", async () => {
+    const cmd = new FailingCommand(false);
+
+    await cmd.fail(
+      refused(
+        "The following error occurred:\n  Missing required flag kind\nSee more help with --help",
+      ),
+    );
+
+    expect(cmd.stderr[0]?.split("\n")[0]).toBe("Error E_VALIDATION: Missing required flag kind");
+  });
+
+  // The label is the one every ending introduces a command under, whether the
+  // ending is drawn or written: oclif's "See more help with" is not it, and
+  // neither is the bare `Next:` a run off a terminal used to fall through to.
+  it("offers that command's help under Run next:, not under oclif's own label", async () => {
+    const cmd = new FailingCommand(false);
+
+    await cmd.fail(
+      refused(
+        "The following error occurred:\n  Missing required flag kind\nSee more help with --help",
+      ),
+    );
+
+    expect(cmd.stderr[0]).toBe(
+      "Error E_VALIDATION: Missing required flag kind\nRun next:\n  $ npx @zitadel/cli@test errors-test --help",
+    );
+  });
+
+  it("keeps oclif's rendering whole in the envelope", async () => {
+    const cmd = new FailingCommand(true);
+
+    await cmd.fail(
+      refused(
+        "The following error occurred:\n  Missing required flag kind\nSee more help with --help",
+      ),
+    );
+
+    expect(cmd.json).toEqual([
+      expect.objectContaining({
+        message:
+          "The following error occurred:\n  Missing required flag kind\nSee more help with --help",
+      }),
+    ]);
+  });
+});
+
+// Ctrl-C closes nothing by itself. Without `catch` telling the chain to stop,
+// an interrupted run ends on a bare opening line and the shell prompt is
+// drawn inside the gutter.
+describe("BaseCommand on an interrupted run", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("closes a chain the interrupt left open", async () => {
+    const cmd = new FailingWizard(false);
+    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await asTerminal(async () => {
+      await cmd.open();
+      cmd.ui.say("something happened");
+      await cmd.fail(new ZitadelError("E_CANCELLED", "Cancelled"));
+      // A real run ends by giving consola its reporters back; without it the
+      // next command in this process keeps drawing into this chain.
+      cmd.ui.releaseNarration();
+    });
+
+    expect(intro).toHaveBeenCalled();
+    expect(outro).toHaveBeenCalledWith(expect.stringContaining("Cancelled"));
+    vi.restoreAllMocks();
+  });
+
+  it("closes nothing when the interrupt arrived before anything was drawn", async () => {
+    const cmd = new FailingWizard(false);
+    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await asTerminal(async () => {
+      await cmd.open();
+      await cmd.fail(new ZitadelError("E_CANCELLED", "Cancelled"));
+      cmd.ui.releaseNarration();
+    });
+
+    expect(outro).not.toHaveBeenCalled();
+    vi.restoreAllMocks();
+  });
+
+  // A normal command has no chain, so an interrupt leaves nothing open and
+  // nothing to close, however much it said on the way.
+  it("opens and closes nothing for a normal command", async () => {
+    const cmd = new FailingCommand(false);
+    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await asTerminal(async () => {
+      await cmd.open();
+      cmd.ui.say("something happened");
+      await cmd.fail(new ZitadelError("E_CANCELLED", "Cancelled"));
+    });
+
+    expect(intro).not.toHaveBeenCalled();
+    expect(outro).not.toHaveBeenCalled();
+    vi.restoreAllMocks();
   });
 });

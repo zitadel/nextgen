@@ -120,16 +120,15 @@ describe("status", () => {
 
         const result = await app.runWithoutServer(["status", "--server", "https://self.example"]);
 
-        expect(result).toPrint("Zitadel status.");
-        expect(result).toPrint("project=proj-001");
+        expect(result).toPrint("Project proj-001");
       });
 
-      it("names a non-default server", async () => {
+      it("ends on where it ran, whether or not it was drawn", async () => {
         const app = await aConfiguredApp();
 
         const result = await app.runWithoutServer(["status", "--server", "https://self.example"]);
 
-        expect(result).toPrint("(server: self.example)");
+        expect(result).toPrint("Using project proj-001 on your Zitadel server at self.example.");
       });
 
       it("renders text rather than a json envelope", async () => {
@@ -145,7 +144,7 @@ describe("status", () => {
 
         const result = await app.runWithoutServer(["status", "--server", "https://self.example"]);
 
-        expect(result).toPrint("Next:");
+        expect(result).toPrint("Run next:");
       });
     });
   });

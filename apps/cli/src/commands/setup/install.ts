@@ -1,5 +1,3 @@
-import { consola } from "consola";
-
 import type { BoxAction } from "../../lib/box";
 import { ZitadelError } from "../../lib/errors";
 import { customizeAndPublishActions, verifyLoginAction } from "../../lib/journey-guidance";
@@ -68,6 +66,12 @@ export type SetupInstallInput = {
   selector: EnvironmentSelector;
   scaffoldedFramework: boolean;
   skipInstall: boolean;
+  /**
+   * How the install is drawn: the command's `this.ui.task`, so the step sits
+   * in the same chain as every other one setup reports. Passed in rather than
+   * reached for, because this module draws nothing itself.
+   */
+  task: <T>(label: string, work: () => Promise<T>, done?: (result: T) => string) => Promise<T>;
   run?: typeof runPackageCommand;
 };
 
@@ -117,17 +121,21 @@ export async function installDependenciesForSetup(
     });
   }
 
-  consola.start(`Installing dependencies with ${installCommand.display}`);
-  try {
-    await (input.run ?? runPackageCommand)(installCommand, {
-      cwd: input.cwd,
-      env: input.env,
-      redirectStdoutToStderr: input.json,
-    });
-  } catch (error) {
-    throw installFailed(error, installCommand, devCommand, shownInstall, input.cwd);
-  }
-  consola.success("Installed dependencies");
+  await input.task(
+    `Installing dependencies with ${installCommand.display}`,
+    async () => {
+      try {
+        await (input.run ?? runPackageCommand)(installCommand, {
+          cwd: input.cwd,
+          env: input.env,
+          redirectStdoutToStderr: input.json,
+        });
+      } catch (error) {
+        throw installFailed(error, installCommand, devCommand, shownInstall, input.cwd);
+      }
+    },
+    () => "Installed dependencies",
+  );
 
   return outcome({
     install: {
@@ -161,9 +169,18 @@ function outcome(input: {
     `Start your project: ${input.devCommand} (then open ${input.issuer}/login)`,
     verifyLoginAction(),
   ];
+  // Every step is a sentence that says what its command cannot say for
+  // itself — why it is here, or when to run it. `Run next:` is the label for
+  // commands nothing introduces, and a box that introduces its own commands
+  // never needs it.
   const boxActions: BoxAction[] = [
     ...(input.includeInstallCommand
-      ? [{ text: "Install dependencies:", command: input.installCommand }]
+      ? [
+          {
+            text: "Setup did not install the new dependencies, so install them first:",
+            command: input.installCommand,
+          },
+        ]
       : []),
     { text: `Start your project (then open ${input.issuer}/login):`, command: input.devCommand },
     { text: verifyLoginAction() },
@@ -172,10 +189,8 @@ function outcome(input: {
     {
       text: "The dev server keeps its terminal busy. Open a second terminal in this directory for further commands.",
     },
-    {
-      text: "Once login works, this shows your next steps (customizing is covered in your README's Zitadel section):",
-      command: statusCommand,
-    },
+    { text: "Once login works, this shows your next steps:", command: statusCommand },
+    { text: "Customizing the login is covered in your README's Zitadel section." },
   ];
   return {
     install: input.install,

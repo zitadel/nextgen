@@ -63,7 +63,7 @@ export async function validateSsoConsistency(cwd: string): Promise<void> {
     {
       hint:
         "These checks read the schemas, flows and connection files together. " +
-        "Fix the files named above and re-run; no changes were made. " +
+        "Fix the files named above and rerun; no changes were made. " +
         "Only the CLI makes these checks.",
       details: {
         issues: issues.map(({ rule, file, steps, message }) => ({

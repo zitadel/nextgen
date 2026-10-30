@@ -39,6 +39,8 @@ import { Promptable } from "../../lib/oclif/promptable";
 export default class VariableSet extends Promptable(EnvironmentCommand) {
   static override description = "Set one variable on the project.";
   static override group = CommandGroups.configuration;
+
+  static override heading = "Setting a variable";
   static override examples = [
     "<%= config.bin %> variable set GOOGLE_CLIENT_ID 1234.apps.googleusercontent.com",
     "<%= config.bin %> variable set GOOGLE_CLIENT_SECRET --secret < secret.txt",
@@ -89,14 +91,14 @@ export default class VariableSet extends Promptable(EnvironmentCommand) {
     // lose digits, and one stored as a boolean is meaningless. Refused before
     // anything is asked for, so no secret is typed only to be turned away.
     if (flags.secret && type !== "string") {
-      throw new ZitadelError("E_VALIDATION", "A secret is stored as a string.", {
+      throw new ZitadelError("E_VALIDATION", "A secret is stored as a string", {
         hint: "Drop --as, or drop --secret for a non-credential number or boolean.",
       });
     }
     // A secret never comes from the command line: it would land in shell history
     // and a process listing. It is prompted for or piped instead.
     if (flags.secret && args.value !== undefined) {
-      throw new ZitadelError("E_VALIDATION", "A secret value is not given on the command line.", {
+      throw new ZitadelError("E_VALIDATION", "A secret value is not given on the command line", {
         hint: "Drop the value and pipe it in, or let the prompt ask for it.",
       });
     }
@@ -129,7 +131,7 @@ export default class VariableSet extends Promptable(EnvironmentCommand) {
       if (typeof held === "object" && held !== null) {
         throw new ZitadelError(
           "E_VALIDATION",
-          `${name} is a secret, so its preview value must be one too.`,
+          `${name} is a secret, so its preview value must be one too`,
           {
             hint: "Set the preview value with --secret, piped in or prompted for.",
             nextCommands: [
@@ -170,18 +172,22 @@ export default class VariableSet extends Promptable(EnvironmentCommand) {
     // when the value is to be stored as a secret, so it does not stay on screen
     // or in a scrollback buffer. An empty string is a value the scalar schema
     // accepts; only an absent input is an error.
-    const value = await this.input({
-      kind: flags.secret ? "secret" : "text",
+    const question = {
       name: `value for ${name}`,
       message: `What should the value of ${name} be?`,
-      ...(flags.secret || args.value === undefined ? {} : { given: args.value }),
       stdin: true,
       // The selector this.suggest appends must precede the stdin redirection.
       retry: inShell(this.suggest(pipeArgs(name, flags.secret, type, flags.preview)), {
         after: " < value.txt",
       }),
       parse: (raw: string) => parseVariableValue(raw, type),
-    });
+    };
+    const value = flags.secret
+      ? await this.ask.secret(question)
+      : await this.ask.text({
+          ...question,
+          ...(args.value === undefined ? {} : { given: args.value }),
+        });
 
     // The write answers with the kind it wrote, so a secret says only that a
     // value is held (ADR 062 §7), never the value itself. The kind this write

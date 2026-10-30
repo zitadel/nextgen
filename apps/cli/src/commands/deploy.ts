@@ -2,6 +2,7 @@ import { Flags } from "@oclif/core";
 
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../lib/oclif";
 import {
+  abbreviate,
   buildBundle,
   createDeployment,
   DEPLOY_ARGS,
@@ -41,6 +42,10 @@ import { nextCommandsData } from "../lib/oclif/envelope";
 export default class Deploy extends EnvironmentCommand {
   static override description =
     "Apply your local configuration to Zitadel.\n\nBuilds a release from .zitadel/ and deploys it to the project. Use --dry-run to preview what would change.";
+
+  static override heading = "Deploying the configuration";
+
+  static override wizard = true;
   static override group = CommandGroups.configuration;
   static override groupOrder = 1;
   static override examples = [
@@ -130,7 +135,7 @@ export default class Deploy extends EnvironmentCommand {
           targets: ["primary"],
           ...reported,
         },
-        pretty: `Validated ${resourceCount} resource${resourceCount === 1 ? "" : "s"}. Nothing was deployed (dry run).`,
+        pretty: `Validated ${resourceCount} resource${resourceCount === 1 ? "" : "s"} and deployed nothing (dry run)`,
       });
     }
 
@@ -199,7 +204,7 @@ export default class Deploy extends EnvironmentCommand {
         "E_CONFLICT",
         "Another deploy changed the targets since this one was prepared",
         {
-          hint: `Re-run \`zitadel ${DEPLOY_ARGS}${this.environmentSelector()}\`; it will build and deploy against the current state.`,
+          hint: `Rerun ${this.suggest(DEPLOY_ARGS)}; it will build and deploy against the current state.`,
           details: current === undefined ? undefined : { current_deployment: current },
           nextCommands: [this.suggest("deployment list --live")],
         },
@@ -219,13 +224,38 @@ export default class Deploy extends EnvironmentCommand {
         ...reported,
         ...nextCommandsData([this.suggest("deployment list")]),
       },
-      pretty: [
-        `Deployed ${release.content_hash}`,
-        `  ${resourceCount} resource${resourceCount === 1 ? "" : "s"} to ${servedOrigins.length} origin${servedOrigins.length === 1 ? "" : "s"}`,
-        ...servedOrigins.map((served) => `  - ${served}`),
-      ].join("\n"),
+      pretty: [deployed(resourceCount), liveOn(release.content_hash, servedOrigins)].join("\n"),
+      summary: {
+        title: deployed(resourceCount),
+        sections: [],
+        lines: [liveOn(release.content_hash, servedOrigins)],
+        boxed: true,
+      },
     });
   }
+}
+
+/** What the run did, as the one sentence the chain closes on. */
+export function deployed(resources: number): string {
+  return `Deployed ${resources} resource${resources === 1 ? "" : "s"}`;
+}
+
+/**
+ * Where the release went, as one sentence.
+ *
+ * The origins are named inside it rather than listed under it: a deploy
+ * usually lands on one, and a bullet list of a single item is not a list. The
+ * hash is the short one — the full digest identifies the release to a machine
+ * and is in the envelope, where a machine reads it.
+ */
+export function liveOn(hash: string, origins: readonly string[]): string {
+  const release = `Release ${abbreviate(hash)} is now live`;
+  if (origins.length === 0) {
+    return `${release}.`;
+  }
+  const where =
+    origins.length === 1 ? origins[0] : `${origins.slice(0, -1).join(", ")} and ${origins.at(-1)}`;
+  return `${release} on ${where}.`;
 }
 
 /** The `code` of an API error body, when it carries one. */
@@ -261,32 +291,32 @@ export function noPrimaryOriginError(input: {
   const preview =
     input.issuer === undefined ? undefined : issuerHeldAsPreview(input.origins, input.issuer);
   if (preview !== undefined) {
-    const held = `It holds its issuer ${preview} as a preview origin, as \`zitadel setup\` 0.1.0 registered it, so adding it as primary conflicts.`;
+    const held = `It holds its issuer ${preview} as a preview origin, as setup 0.1.0 registered it, so adding it as primary conflicts.`;
     if (input.setupProject) {
       const doctor = suggest("doctor --fix");
       return new ZitadelError("E_VALIDATION", message, {
-        hint: `${held} Run \`${doctor}\` to make it primary, then deploy.`,
+        hint: `${held} Run ${doctor} to make it primary, then deploy.`,
         nextCommands: [doctor],
       });
     }
     const remove = suggest(`origin rm ${shellArg(preview)} --force`);
     const add = suggest(`origin add ${shellArg(preview)} --kind primary`);
     return new ZitadelError("E_VALIDATION", message, {
-      hint: `${held} Remove it with \`${remove}\`, add it back with \`${add}\`, then deploy.`,
+      hint: `${held} Remove it with ${remove}, add it back with ${add}, then deploy.`,
       nextCommands: [remove, add],
     });
   }
   if (input.issuer !== undefined) {
     const add = suggest(`origin add ${shellArg(originOf(input.issuer))} --kind primary`);
     return new ZitadelError("E_VALIDATION", message, {
-      hint: `Add the URL the app serves from with \`${add}\`, then deploy.`,
+      hint: `Add the URL the app serves from with ${add}, then deploy.`,
       nextCommands: [add],
     });
   }
   return new ZitadelError("E_VALIDATION", message, {
     // Named in the text, not as a next command: the URL is the developer's to
     // fill in, and a `<url>` placeholder is a shell redirection.
-    hint: `Add one with \`zitadel origin add <url> --kind primary${input.selector}\`, then deploy.`,
+    hint: `Add one with ${suggest("origin add <url> --kind primary")}, then deploy.`,
     nextCommands: [suggest("origin list")],
   });
 }

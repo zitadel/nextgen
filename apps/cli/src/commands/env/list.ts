@@ -17,6 +17,8 @@ const COLUMNS = ["name", "source", "server", "project_id", "resolved"] as const;
 export default class EnvList extends EnvironmentCommand {
   static override description = "List the environments bound in this directory's .env files.";
   static override group = CommandGroups.configuration;
+
+  static override heading = "Listing environments";
   static override examples = ["<%= config.bin %> env list", "<%= config.bin %> env list --plain"];
   static override flags = {
     plain: Flags.boolean({
@@ -65,7 +67,6 @@ export default class EnvList extends EnvironmentCommand {
         {
           plain,
           singular: "environment",
-          empty: "No environments are bound here. Run `zitadel env add <name>` to bind one.",
           footer: [`Resolved now: ${name.value} (from ${name.source})`],
         },
       ),

@@ -20,7 +20,7 @@ import {
   writeJson,
 } from "../../../../helpers/local-project";
 import { parseJson, runCliForTest } from "../../../../helpers/run-cli";
-import { asTerminal } from "../../../../helpers/terminal";
+import { asOneLine, asTerminal } from "../../../../helpers/terminal";
 
 // The built CLI bundles its own prompts, so a prompt can only be answered by
 // running the command from source, where `input` is the one module asked.
@@ -190,7 +190,7 @@ describe("auth-method sso enable --provider custom after it writes a connection"
       ]),
     );
 
-    const output = result.stdout;
+    const output = asOneLine(result.stdout);
     expect(output).toContain("Claim mappings in .zitadel/idps/acme-sso.json.");
     expect(output).toContain("email ← email");
     expect(output).toContain("Verification, which a mapping alone does not give:");

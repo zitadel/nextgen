@@ -1,4 +1,5 @@
 import { createZitadelClient, type ZitadelClient } from "../../../lib/api-client";
+import { unscopedCommand } from "../../../lib/suggestion";
 import { issuerHeldAsPreview, recordedOrigins } from "../../../lib/origins";
 import {
   readProjectServer,
@@ -51,8 +52,8 @@ export class IssuerOriginCheck implements SanityCheck {
       status: "warn",
       message:
         `The project has no primary origin to deploy to: it holds ${finding.pattern} as a ` +
-        "preview origin, as `zitadel setup` 0.1.0 registered it. Run `zitadel doctor --fix` " +
-        "to make it primary.",
+        "preview origin, as setup 0.1.0 registered it. Run " +
+        `${unscopedCommand("doctor --fix", ctx.cliVersion)} to make it primary.`,
       details: { pattern: finding.pattern, server: finding.server },
       path: this.path,
     };

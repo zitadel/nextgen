@@ -227,6 +227,9 @@ Each invocation prints one JSON object:
   is structured context.
 - `next_commands`: the suggested follow-ups, inside `data` on success and at
   the top level on a no-op or failure. Prefer these over free-text hints.
+- A command named in a `hint`, a `warning` or a `next_actions` line is written
+  the same way `next_commands` writes it — `npx @zitadel/cli@<version> …`,
+  unquoted — so prose and follow-up never name the same command two ways.
 - `warnings`: things that went wrong without stopping the command, such as a
   value that was not published. Always present on success (often empty), and
   present on a no-op or failure when there are any. Read them before you report
@@ -299,8 +302,14 @@ covers a server that answered 5xx and one that never answered — refused,
 unresolvable, or silent past the 30-second request deadline. Ctrl-C exits
 130: a command waiting on the server, or on an answer at a prompt, stops at
 once with `E_CANCELLED`, and any other command exits within a second, possibly
-without an envelope. In human mode a cancel prints no error block. An
-unknown command is handled by the CLI's help layer, not the envelope.
+without an envelope. In human mode a cancel prints no error block. A name the
+CLI cannot resolve to a command is handled by its help layer, not the envelope:
+an unknown command, an unknown subcommand, and a stray extra word (read as a
+subcommand) each write nothing to stdout, explain themselves on stderr, and
+exit 127. Treat an empty stdout as that case rather than as a parse failure.
+Everything the CLI does resolve answers with an envelope, errors included — an
+unknown flag, a missing argument and a resource that is not found are all
+`status: "error"` objects on stdout.
 
 ## Clarify before you configure
 
@@ -386,7 +395,7 @@ npx @zitadel/cli@latest deploy -m "<why this release changes>" --non-interactive
 
 `setup` commits the project it scaffolds: `git init` first when the directory
 is not yet a repository, then one commit, `chore: scaffold the project with
-zitadel setup`. A release records the commit it was built from and `deploy`
+Zitadel setup`. A release records the commit it was built from and `deploy`
 diffs `.zitadel/` against it, so without this the first release carries no
 commit and the next deploy reports no diff.
 
@@ -405,14 +414,9 @@ first, then rerun. Only what `start` leaves is exempt: `.zitadel/local/` and
 the `.gitignore` line that ignores it. A connection under `.zitadel/idps/` is
 yours and is not exempt.
 
-Setup deploys nothing, and it does not need to: a project with no release
-resolves the newest revisions, which are the ones setup just uploaded, so
-sign-in already runs on `.zitadel/`. Deploying pins them into a release, which
-is what the server will require once that fallback goes (#1616). The publish
-step says so and names the command. `data.git` reports what setup did
-(`initialized`, and the `commit`, or null). `--no-git` skips both the refusal
-and the commit, and nothing prompts, so this is the same interactively and in
-CI.
+`data.git` reports what setup did (`initialized`, and the `commit`, or null).
+`--no-git` skips both the refusal and the commit, and nothing prompts, so this
+is the same interactively and in CI.
 
 `setup` scaffolds into an empty directory, or patches an existing app project
 where it detects a framework. What `start` leaves in a directory —

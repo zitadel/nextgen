@@ -100,12 +100,12 @@ describe("origin list", () => {
     expect(text).toContain("1 origin");
   });
 
-  it("says the project has no origins when the list is empty", async () => {
+  it("says nothing was found in the words every list uses when it is empty", async () => {
     const cwd = await anAppDir();
 
     const result = await onATerminal(() => list(cwd));
 
-    expect(stripAnsi(result.stdout)).toContain("No origins on the project.");
+    expect(stripAnsi(result.stdout)).toContain("No origins found");
   });
 
   it("prints tab-separated rows with no header when piped", async () => {

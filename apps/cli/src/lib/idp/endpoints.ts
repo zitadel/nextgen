@@ -5,7 +5,7 @@ import {
   parseIssuer,
 } from "@zitadel/config/idp";
 
-import type { Asker } from "../input";
+import type { Questions } from "../ui";
 
 /**
  * Ask where a provider lives, on a development run only.
@@ -24,8 +24,8 @@ import type { Asker } from "../input";
 export async function askConnectionEndpoints(options: {
   readonly provider: CatalogProviderId;
   readonly developmentBuild: boolean;
-  /** How the question is asked: the running command's `input`. */
-  readonly ask: Asker;
+  /** How the question is asked: the running command's `this.ask`. */
+  readonly ask: Questions;
 }): Promise<ConnectionEndpoints | undefined> {
   const { provider, developmentBuild, ask } = options;
   if (!developmentBuild) {
@@ -43,8 +43,7 @@ export async function askConnectionEndpoints(options: {
   // be written to a connection that then fails on apply. Refusing at the prompt
   // puts the complaint where the value was typed.
   return {
-    issuer: await ask({
-      kind: "text",
+    issuer: await ask.text({
       name: "issuer",
       message: "What is the issuer URL of the provider?",
       parse: parseIssuer,

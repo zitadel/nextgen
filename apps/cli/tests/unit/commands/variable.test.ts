@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Readable } from "node:stream";
 
+import { stripAnsi } from "consola/utils";
 import { HttpResponse, http } from "msw";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { setupServer } from "msw/node";
@@ -11,13 +12,13 @@ import { resetPlatformStore, setupPlatformHandlers } from "@zitadel/api-mock/pla
 
 vi.mock("@clack/prompts", async () => (await import("../../helpers/clack")).clackDouble());
 
-import { cancel, confirm, isCancel, text } from "@clack/prompts";
+import { confirm, isCancel } from "@clack/prompts";
 
 import VariableRm from "../../../src/commands/variable/rm";
 import VariableSet from "../../../src/commands/variable/set";
 import { DEFAULT_SERVER } from "../../../src/lib/server";
 import { parseJson, runCliForTest } from "../../helpers/run-cli";
-import { asTerminal as asPerson } from "../../helpers/terminal";
+import { asTerminal as asPerson, asTerminalTyping } from "../../helpers/terminal";
 
 const server = setupServer(...setupPlatformHandlers());
 
@@ -222,7 +223,18 @@ describe("variable list", () => {
 
     const res = await asTerminal(() => runCliForTest(["variable", "list", ...plainArgs(cwd)]));
 
-    expect(res.stdout).toContain("No variables on the project.");
+    expect(res.stdout).toContain("No variables found");
+  });
+
+  it("says nothing was found in the same words when --preview holds none", async () => {
+    const cwd = await makeProject();
+    server.use(http.get("*/variables", () => HttpResponse.json({})));
+
+    const res = await asTerminal(() =>
+      runCliForTest(["variable", "list", "--preview", ...plainArgs(cwd)]),
+    );
+
+    expect(res.stdout).toContain("No variables found");
   });
 
   it("refuses to guess a server when nothing names one", async () => {
@@ -248,21 +260,27 @@ describe("variable list", () => {
     expect(json.message).toContain("ZITADEL_URL");
   });
 
-  it("prints the project and the server on a terminal, and neither on a pipe", async () => {
+  it("answers with the table alone, on a terminal as on a pipe", async () => {
     const cwd = await makeProject();
     server.use(http.get("*/variables", () => HttpResponse.json({ A: { primary: "b" } })));
 
     // The harness captures stdout, so process.stdout.isTTY is undefined here —
-    // the same condition a pipe or a redirect creates.
+    // the same condition a pipe or a redirect creates. The terminal run drops
+    // --non-interactive too: that flag is a person saying there is nobody to
+    // draw for, whatever the stream is.
     const piped = await runCliForTest(["variable", "list", ...plainArgs(cwd)]);
-    const terminal = await asTerminal(() => runCliForTest(["variable", "list", ...plainArgs(cwd)]));
+    const terminal = await asPerson(() =>
+      runCliForTest(["variable", "list", "--cwd", cwd, "--server", DEFAULT_SERVER]),
+    );
 
     expect(piped.exitCode).toBe(0);
-    expect(piped.stdout).not.toContain("Project   ");
-    expect(piped.stdout).not.toContain("Server    ");
     expect(piped.stdout.trim()).toBe("A\tb\t-");
-    expect(terminal.stdout).toContain("proj_test");
-    expect(terminal.stdout).toContain(DEFAULT_SERVER);
+    // A listing is the answer: the table at the margin, then one footer
+    // line. No chain and no box, but the footer does name where it ran.
+    expect(terminal.stdout).toContain("A");
+    expect(terminal.stdout).not.toContain("╭");
+    expect(terminal.stdout).not.toContain("┌");
+    expect(terminal.stdout).toMatch(/Found 1 variable · project /);
   });
 
   it("takes the server from ZITADEL_URL, not from zitadel.json", async () => {
@@ -937,8 +955,10 @@ describe("variable set --as", () => {
 describe("variable rm asked on a terminal", () => {
   // The built CLI bundles its own prompts, so a prompt can only be answered
   // by running the command from source, where `input` is the one module asked.
-  const removing = (cwd: string) =>
-    asPerson(() => VariableRm.run(["SUPPORT_EMAIL", "--cwd", cwd, "--server", DEFAULT_SERVER]));
+  const removing = (cwd: string, ...answers: string[]) =>
+    asTerminalTyping(answers, () =>
+      VariableRm.run(["SUPPORT_EMAIL", "--cwd", cwd, "--server", DEFAULT_SERVER]),
+    );
   const watchingDeletes = () => {
     const seen = { deleted: false };
     server.use(
@@ -956,29 +976,50 @@ describe("variable rm asked on a terminal", () => {
     vi.mocked(isCancel).mockReturnValue(false);
   });
 
+  it("asks plainly, with the answer typed on the question's own line", async () => {
+    const cwd = await makeProject();
+    watchingDeletes();
+
+    const { shown } = await removing(cwd, "y");
+
+    expect(stripAnsi(shown)).toMatch(/^Remove SUPPORT_EMAIL from the project\? \[y\/N\] /);
+  });
+
+  // --force only removes the question. The line the command ends on is the
+  // same one, so the command looks the same either way.
+  it("ends on the same line forced as it does answering", async () => {
+    const cwd = await makeProject();
+    watchingDeletes();
+
+    const answered = await removing(cwd, "y");
+    const forced = await asTerminalTyping([], () =>
+      VariableRm.run(["SUPPORT_EMAIL", "--cwd", cwd, "--server", DEFAULT_SERVER, "--force"]),
+    );
+
+    expect(stripAnsi(answered.shown)).toBe(
+      `Remove SUPPORT_EMAIL from the project? [y/N] ${stripAnsi(forced.shown)}`,
+    );
+  });
+
   it("is skipped, removing nothing, when the answer is no", async () => {
     const cwd = await makeProject();
     const seen = watchingDeletes();
-    vi.mocked(confirm).mockResolvedValueOnce(false as never);
 
-    const envelope = await removing(cwd);
+    const { result } = await removing(cwd, "n");
 
-    expect(JSON.parse(JSON.stringify(envelope))).toMatchObject({
+    expect(JSON.parse(JSON.stringify(result))).toMatchObject({
       status: "skipped",
       reason: "remove-cancelled",
     });
     expect(seen.deleted).toBe(false);
   });
 
-  it("fails, removing nothing, on Ctrl-C", async () => {
+  it("fails, removing nothing, when the person walks away", async () => {
     const cwd = await makeProject();
     const seen = watchingDeletes();
-    vi.mocked(isCancel).mockReturnValue(true);
-    vi.mocked(confirm).mockResolvedValueOnce(Symbol("cancel") as never);
 
     await expect(removing(cwd)).rejects.toThrow();
 
-    expect(cancel).toHaveBeenCalledWith("Cancelled.");
     expect(seen.deleted).toBe(false);
   });
 });
@@ -986,15 +1027,12 @@ describe("variable rm asked on a terminal", () => {
 describe("variable set asked on a terminal", () => {
   it("asks what the value should be, as a question", async () => {
     const cwd = await makeProject();
-    vi.mocked(text).mockResolvedValueOnce("support@acme.example" as never);
 
-    await asPerson(() =>
+    const { shown } = await asTerminalTyping(["support@acme.example"], () =>
       VariableSet.run(["SUPPORT_EMAIL", "--cwd", cwd, "--server", DEFAULT_SERVER]),
-    ).catch(() => undefined);
-
-    expect(vi.mocked(text).mock.calls[0]?.[0].message).toBe(
-      "What should the value of SUPPORT_EMAIL be?",
     );
+
+    expect(shown).toContain("What should the value of SUPPORT_EMAIL be? ");
   });
 });
 

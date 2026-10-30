@@ -17,6 +17,8 @@ const COLUMNS = ["pattern", "kind"] as const;
 export default class OriginList extends EnvironmentCommand {
   static override description = "List the origin patterns on the project.";
   static override group = CommandGroups.configuration;
+
+  static override heading = "Listing origins";
   static override examples = [
     "<%= config.bin %> origin list",
     "<%= config.bin %> origin list --plain",
@@ -46,7 +48,6 @@ export default class OriginList extends EnvironmentCommand {
       pretty: renderList(COLUMNS, origins, {
         plain,
         singular: "origin",
-        empty: "No origins on the project.",
       }),
     });
   }

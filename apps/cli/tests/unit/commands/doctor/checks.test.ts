@@ -1535,7 +1535,9 @@ describe("ClaimCheck", () => {
     const outcome = await new ClaimCheck().run(ctxFor(cwd));
     expect(outcome.status).toBe("warn");
     expect(outcome.message).toContain("claim window has closed");
-    expect(outcome.message).toContain("zitadel claim");
+    // The public spelling, which is the one that runs where the reader is.
+    expect(outcome.message).toContain("npx @zitadel/cli@0.1.0-alpha.0 claim");
+    expect(outcome.message).not.toContain("`");
     expect(outcome.message).toContain("no longer be claimed");
     expect(outcome.details).toEqual({ claimable: false });
   });
@@ -1760,7 +1762,7 @@ describe("DependencyVersionCheck", () => {
       cliVersion: "0.1.0-alpha.18",
     });
     expect(outcome.status).toBe("pass");
-    expect(outcome.message).toContain("no exactly-pinned");
+    expect(outcome.message).toContain("No exactly-pinned");
   });
 
   it("skips the comparison for non-release CLI versions", async () => {

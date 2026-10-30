@@ -24,6 +24,8 @@ export default class ResourcesList extends BaseCommand {
   static override group = CommandGroups.diagnostics;
   static override description =
     "List the resources this CLI manages.\n\nShows what can be done to each.";
+
+  static override heading = "Listing resources";
   static override examples = [
     "<%= config.bin %> resources",
     "<%= config.bin %> resources --json",
@@ -61,7 +63,6 @@ export default class ResourcesList extends BaseCommand {
       pretty: renderList(COLUMNS, rows, {
         plain,
         singular: "resource",
-        empty: "No resources.",
         footer: [`Run \`${this.config.bin} <resource> <verb> --help\` for a command's flags.`],
       }),
     });

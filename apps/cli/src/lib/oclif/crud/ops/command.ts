@@ -17,6 +17,8 @@ export type OperationDefinition<Ctx, Spec> = Readonly<{
 /** The oclif statics an operation derives from its definition. */
 export type OperationStatics = Readonly<{
   description: string;
+  /** What the command is doing, as the heading of its output: `Listing variables`. */
+  heading: string;
   examples: readonly string[];
   flags: Interfaces.FlagInput;
   args: Interfaces.ArgInput;
@@ -90,6 +92,7 @@ export const bindOperation = <Ctx, Spec>(
   const statics = operation.describe(definition);
   const bound = class extends operation {
     static override description = statics.description;
+    static override heading = statics.heading;
     static override examples = [...statics.examples];
     static override flags = statics.flags;
     static override args = statics.args;

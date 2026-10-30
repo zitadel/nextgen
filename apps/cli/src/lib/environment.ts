@@ -3,7 +3,7 @@ import { join, resolve } from "node:path";
 import { parseEnv } from "node:util";
 
 import { ZitadelError } from "./errors";
-import { input } from "./input";
+import type { Questions } from "./ui";
 import { hasZitadelSecret, readZitadelSecret } from "./project";
 import { appendManagedEnvValue } from "./fs-safe";
 import { parseServer, resolveServer, serverOrigin } from "./server";
@@ -356,7 +356,7 @@ const SECRET_KEYS: ReadonlySet<EnvironmentKey> = new Set([
 export async function requireValueInteractive(
   environment: Environment,
   key: EnvironmentKey,
-  options: { cwd: string; interactive: boolean },
+  options: { cwd: string; interactive: boolean; ask: Questions },
 ): Promise<string> {
   const resolved = environment.values[key];
   if (resolved) {
@@ -367,23 +367,27 @@ export async function requireValueInteractive(
     return requireValue(environment, key);
   }
   const name = environment.name.value;
-  const value = await input(
-    {
-      kind: SECRET_KEYS.has(key) ? "secret" : "text",
-      name: key,
-      message: `${key} for the ${name} environment`,
-      // Persist (and return) the normalized form, matching how the resolver
-      // stores a server value, so the file and this run agree with every later run.
-      parse: (answer: string) => {
-        const typed = answer.trim();
-        if (typed === "") {
-          return { ok: false, problem: `Enter ${key}.` } as const;
-        }
-        return key === "ZITADEL_URL" ? parseServer(typed) : ({ ok: true, value: typed } as const);
-      },
+  const question = {
+    name: key,
+    message: `What is the value of ${key} for the ${name} environment?`,
+    // Persist (and return) the normalized form, matching how the resolver
+    // stores a server value, so the file and this run agree with every later run.
+    parse: (answer: string) => {
+      const typed = answer.trim();
+      if (typed === "") {
+        return { ok: false, problem: `${key} cannot be empty` } as const;
+      }
+      return key === "ZITADEL_URL" ? parseServer(typed) : ({ ok: true, value: typed } as const);
     },
-    { interactive: true, force: false },
-  );
+  };
+  // The command's own asker, so the question is drawn the way that command
+  // draws everything: a plain line for a normal command, a prompt inside the
+  // chain for a wizard. Minting one here drew a gutter for a chain that was
+  // never opened. A credential is never echoed, so which method asks it is
+  // the question's own property rather than a flag passed to one method.
+  const value = SECRET_KEYS.has(key)
+    ? await options.ask.secret(question)
+    : await options.ask.text(question);
   if (environment.envFile === undefined) {
     await persistEnvValue(join(options.cwd, `.env.${name}.local`), key, value);
   }

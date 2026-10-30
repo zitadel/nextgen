@@ -184,6 +184,12 @@ export type ResourceDescriptor<Ctx> = Readonly<{
   /** Singular noun for messages (`user`). */
   singular: string;
   /**
+   * Plural noun for messages (`identity providers`). Defaults to the topic
+   * key, which is the command's name and not always a word for a person:
+   * `idps`, `flow-definitions`, and `release`, which is not even plural.
+   */
+  plural?: string;
+  /**
    * Group the root help lists this resource's commands under. Generated
    * commands have no file to carry a `static group`, so the table says it.
    */

@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 
+import { consola } from "consola";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { StepContext } from "../../../../../src/lib/release/pipeline";
@@ -21,17 +22,31 @@ type Live = {
 
 let cwd: string;
 let written: string[];
+/** Anything the step wrote to the stream itself, which it never may. */
+let streamed: string[];
+const reporters = [...consola.options.reporters];
+const level = consola.level;
 
 beforeEach(async () => {
   cwd = await mkdtemp(join(tmpdir(), "zitadel-diff-step-"));
   written = [];
+  streamed = [];
+  // The step narrates through consola so the command's chain can draw it; a
+  // reporter is what the chain installs, and what a test reads back. Under a
+  // test runner consola answers only warnings and errors, so the level a
+  // person's terminal has is set here, or every line would be dropped before
+  // any reporter saw it.
+  consola.level = 3;
+  consola.setReporters([{ log: (entry) => written.push(`${String(entry.args[0])}\n`) }]);
   vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
-    written.push(String(chunk));
+    streamed.push(String(chunk));
     return true;
   });
 });
 
 afterEach(async () => {
+  consola.setReporters(reporters);
+  consola.level = level;
   vi.restoreAllMocks();
   await rm(cwd, { recursive: true, force: true });
 });
@@ -66,7 +81,10 @@ function ctx(live: Live[], json = false, env: Record<string, string> = {}): Step
 async function liveCommit(): Promise<string> {
   const git = (args: string[]) => run("git", args, { cwd });
   await mkdir(join(cwd, ".zitadel", "schemas"), { recursive: true });
-  await writeFile(join(cwd, ".zitadel", "schemas", "user.json"), '{ "type": "object" }\n');
+  await writeFile(
+    join(cwd, ".zitadel", "schemas", "user.json"),
+    '{ "type": "object", "title": "User" }\n',
+  );
   await git(["init", "-q"]);
   await git(["config", "user.email", "test@example.com"]);
   await git(["config", "user.name", "Test"]);
@@ -261,5 +279,13 @@ describe("diffStep", () => {
         },
       });
     });
+  });
+
+  // Written straight to the stream it landed above the chain's opening `┌`,
+  // because the chain had not been drawn when the step ran.
+  it("never writes to the stream itself, so its lines land inside the chain", async () => {
+    await diffStep.run(ctx([]));
+
+    expect(streamed).toEqual([]);
   });
 });

@@ -17,6 +17,8 @@ import { Promptable } from "../../lib/oclif/promptable";
 export default class OriginRm extends Promptable(EnvironmentCommand) {
   static override description = "Remove an origin pattern from the project.";
   static override group = CommandGroups.configuration;
+
+  static override heading = "Removing an origin";
   static override examples = [
     "<%= config.bin %> origin rm https://app.acme.com",
     "<%= config.bin %> origin rm https://app.acme.com --force",
@@ -55,8 +57,7 @@ export default class OriginRm extends Promptable(EnvironmentCommand) {
     // A preview pattern can carry a `*`, so the retry is copy-pasteable only if
     // the shell will not expand it: `shellArg` single-quotes any pattern holding
     // a glob or other special character before interpolating it.
-    const confirmed = await this.input({
-      kind: "confirm",
+    const confirmed = await this.ask.confirm({
       name: `remove ${pattern} from the project`,
       message: `Remove ${pattern} from the project?`,
       retry: this.suggest(`origin rm ${shellArg(pattern)} --force`),
@@ -86,7 +87,7 @@ export default class OriginRm extends Promptable(EnvironmentCommand) {
         // Named in the text, not as a next command: the URL is the developer's
         // to fill in, and a `<url>` placeholder is a shell redirection. The
         // selector keeps it on the environment that was just opened up.
-        `${pattern} was the project's last origin, so the project now admits every origin. Add the ones it should admit with \`zitadel origin add <url> --kind primary${this.environmentSelector()}\`.`,
+        `${pattern} was the project's last origin, so the project now admits every origin. Add the ones it should admit with ${this.suggest("origin add <url> --kind primary")}.`,
       );
     }
 

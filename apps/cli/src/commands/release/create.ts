@@ -11,6 +11,7 @@ import {
   worktreeIsDirty,
 } from "../../lib/release";
 import { nextCommandsData } from "../../lib/oclif/envelope";
+import { renderCount } from "../../lib/oclif/crud/table";
 import { ZitadelError } from "../../lib/errors";
 
 /**
@@ -25,6 +26,8 @@ import { ZitadelError } from "../../lib/errors";
 export default class ReleaseCreate extends EnvironmentCommand {
   static override description = "Build a release from .zitadel/ without deploying it.";
   static override group = CommandGroups.configuration;
+
+  static override heading = "Creating a release";
   static override examples = [
     "<%= config.bin %> release create",
     "<%= config.bin %> release create -m 'add phone_number to human-user'",
@@ -73,7 +76,7 @@ export default class ReleaseCreate extends EnvironmentCommand {
       return this.emit({
         status: "ok",
         data: { dry_run: true, resources: resourceCount },
-        pretty: `Validated ${resourceCount} resource${resourceCount === 1 ? "" : "s"}. No release was created (dry run).`,
+        pretty: `Validated ${renderCount(resourceCount, { singular: "resource" })} and created no release (dry run)`,
       });
     }
 
@@ -103,7 +106,12 @@ export default class ReleaseCreate extends EnvironmentCommand {
         resources: resourceCount,
         ...nextCommandsData([this.suggest(`deployment create --release ${release.id}`)]),
       },
-      pretty: `Created ${release.id} (${release.content_hash})`,
+      // One clause and nothing else, like every other small action. The
+      // content hash is 71 characters nobody reads off a terminal, and a
+      // headline that long is replaced by "Done" — so printing it here cost
+      // the footer the only half that said what happened. `--json` and
+      // `release get` still carry it.
+      pretty: `Created ${release.id}`,
     });
   }
 }
