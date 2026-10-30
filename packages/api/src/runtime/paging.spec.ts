@@ -49,10 +49,13 @@ describe("pages", () => {
 
     await expect(async () => {
       for await (const _ of pages(fetch));
-    }).rejects.toThrow(
-      "The server returned the same page cursor twice, so the list would never end. " +
+    }).rejects.toMatchObject({
+      name: "RepeatedCursorError",
+      cursor: "t1",
+      message:
+        "The server returned the same page cursor twice, so the list would never end. " +
         "Read it one page at a time instead.",
-    );
+    });
   });
 
   it("begins at the cursor it is given", async () => {

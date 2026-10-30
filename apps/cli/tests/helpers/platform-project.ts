@@ -1,8 +1,11 @@
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { resetPlatformStore, setupPlatformHandlers } from "@zitadel/api-mock/platform";
 import { HttpResponse, http } from "msw";
+import { setupServer } from "msw/node";
+import { afterAll, afterEach, beforeAll } from "vitest";
 
 import { DEFAULT_SERVER } from "../../src/lib/server";
 
@@ -114,4 +117,23 @@ export function liveAcrossTwoPages(primary: { id: string; release_id: string }) 
           },
     );
   });
+}
+
+/**
+ * An msw server answering as the mock platform for the calling suite, and the
+ * project directories it removes after each test.
+ */
+export function usePlatformServer(): { server: ReturnType<typeof setupServer>; dirs: string[] } {
+  const server = setupServer(...setupPlatformHandlers());
+  const dirs: string[] = [];
+  beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
+  afterAll(() => server.close());
+  afterEach(async () => {
+    server.resetHandlers();
+    resetPlatformStore();
+    for (const dir of dirs.splice(0)) {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+  return { server, dirs };
 }

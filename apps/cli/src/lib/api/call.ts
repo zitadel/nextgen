@@ -113,6 +113,7 @@ export const sendAll = async (
     {
       items: (body) => itemsOf(body, paging.items),
       all: true,
+      onePage: "-F limit=<n> and -F page_token=<token>",
     },
   );
   return {

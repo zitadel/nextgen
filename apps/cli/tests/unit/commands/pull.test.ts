@@ -2,16 +2,15 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { resetPlatformStore, setupPlatformHandlers } from "@zitadel/api-mock/platform";
 import { http } from "msw";
-import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { classifyTarget, RECONSTRUCTABLE, relPathForHandle } from "../../../src/commands/pull";
 import {
   aProjectWithTwoDeploys,
   liveAcrossTwoPages,
   PLATFORM_URL,
+  usePlatformServer,
 } from "../../helpers/platform-project";
 import { runCliForTest } from "../../helpers/run-cli";
 
@@ -85,18 +84,7 @@ describe("relPathForHandle", () => {
 });
 
 describe("pull latest", () => {
-  const server = setupServer(...setupPlatformHandlers());
-  const dirs: string[] = [];
-
-  beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
-  afterAll(() => server.close());
-  afterEach(async () => {
-    server.resetHandlers();
-    resetPlatformStore();
-    for (const dir of dirs.splice(0)) {
-      await rm(dir, { recursive: true, force: true });
-    }
-  });
+  const { server, dirs } = usePlatformServer();
 
   it("pulls the release of the primary that is live, past the first page", async () => {
     const project = await aProjectWithTwoDeploys("zitadel-pull-");

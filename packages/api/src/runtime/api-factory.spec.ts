@@ -6,7 +6,7 @@ import { afterEach, describe, expect, expectTypeOf, it } from "vitest";
 import type * as endpoints from "../generated/endpoints/zitadelNextGen";
 import type { ListDeployments200DeploymentsItem } from "../generated/model";
 import type { paging } from "../generated/paging";
-import { createZitadelClient } from "./api-factory";
+import { createZitadelClient, type ItemOf } from "./api-factory";
 
 type Endpoints = typeof endpoints;
 type Paging = typeof paging;
@@ -178,6 +178,15 @@ describe("createZitadelClient", () => {
     }[keyof Paging];
 
     expectTypeOf<Misplaced>().toBeNever();
+  });
+
+  it("types every paged function's items", () => {
+    // A list field the generated types lost or renamed fails here, naming the function.
+    type Untyped = {
+      [K in keyof Paging]: [ItemOf<K>] extends [never] ? K : never;
+    }[keyof Paging];
+
+    expectTypeOf<Untyped>().toBeNever();
   });
 
   it("builds a URL against its own base URL", () => {

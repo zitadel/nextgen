@@ -59,6 +59,24 @@ describe("paged", () => {
     ]);
   });
 
+  it("waits for a response hook that answers later", async () => {
+    const later = { ...asIs, respond: async (body: unknown) => body };
+
+    expect(await paged(endpoint(), { items: "rows", arg: 1 }, later).all("user_1")).toEqual([
+      "a",
+      "b",
+    ]);
+  });
+
+  it("starts at the page_token among its arguments, and refuses a server that hands it back", async () => {
+    const call = vi.fn(async () => ({ rows: ["c"], next_page_token: "c3" }));
+
+    await expect(
+      paged(call, { items: "rows", arg: 1 }, asIs).all("user_1", { page_token: "c3" }),
+    ).rejects.toThrow("The server returned the same page cursor twice");
+    expect(call).toHaveBeenCalledTimes(1);
+  });
+
   it("hands every failure of the walk to its error hook once", async () => {
     const seen: unknown[] = [];
     const call = vi.fn(async () => ({ next_page_token: "" }));

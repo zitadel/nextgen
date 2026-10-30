@@ -190,7 +190,9 @@ describe("sendAll", () => {
 
     await expect(
       sendAll(SERVER, "s", requestFor("listUserPasskeys", ["page_token=cursor-3"], ["user_1"])),
-    ).rejects.toThrow("The server returned the same page cursor twice");
+    ).rejects.toMatchObject({
+      hint: "Fetch one page at a time with -F limit=<n> and -F page_token=<token>.",
+    });
     expect(asked).toEqual(["cursor-3"]);
   });
 });

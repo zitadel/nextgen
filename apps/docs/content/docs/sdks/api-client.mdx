@@ -46,7 +46,7 @@ The package has no root export; import from its subpaths:
 - `@zitadel/api/generated/model` — request and response types.
 - `@zitadel/api/generated/endpoints/zitadelNextGen` — the endpoint functions behind the client, with `.zod` and `.msw` variants for the Zod schemas and MSW handlers. Call the endpoints through `createZitadelClient`: on their own they use one base URL and token for the whole process, and the client sets both before each call. The MSW handlers need the optional peers `msw` and `@faker-js/faker`.
 - `@zitadel/api/runtime/fetch` — `ApiError` and `NetworkError`, which a call throws when the request fails.
-- `@zitadel/api/runtime/paging` — `pages()`, the cursor walk behind the client's list methods, for a request the client does not make.
+- `@zitadel/api/runtime/paging` — `pages()`, the cursor walk behind the client's list methods, for a request the client does not make; `nextToken()` and `itemsOf()`, which read a page's cursor and list; and `RepeatedCursorError`, which a walk throws when the server repeats a cursor.
 - `@zitadel/api/runtime/base-url` and `@zitadel/api/runtime/auth` — low-level settings, such as the base URL and the token the client sets for you.
 
 Call the API from server-side code:

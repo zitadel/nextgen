@@ -200,11 +200,13 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
         // A wrapped page names its list; an endpoint that answers with the
         // collection itself has nothing to name.
         items: (response) => {
-          const list = spec.items === undefined ? response : itemsOf(response, spec.items);
-          if (!Array.isArray(list)) {
+          if (spec.items !== undefined) {
+            return itemsOf(response, spec.items);
+          }
+          if (!Array.isArray(response)) {
             throw new TypeError("Unexpected list response: expected an array");
           }
-          return list as readonly unknown[];
+          return response;
         },
         all,
         next: cursorOf,

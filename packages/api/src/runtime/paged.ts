@@ -38,7 +38,7 @@ export function paged(send: (...args: unknown[]) => unknown, shape: PagingShape,
     );
     try {
       for await (const page of raw) {
-        for (const value of take(hooks.respond(page))) {
+        for (const value of take(await hooks.respond(page))) {
           yield value;
         }
       }

@@ -24,6 +24,20 @@ export function itemsOf(page: unknown, field: string): readonly unknown[] {
   return list;
 }
 
+/** A server answered a cursor it had already issued, so the walk would never end. */
+export class RepeatedCursorError extends Error {
+  readonly cursor: string;
+
+  constructor(cursor: string) {
+    super(
+      "The server returned the same page cursor twice, so the list would never end. " +
+        "Read it one page at a time instead.",
+    );
+    this.name = "RepeatedCursorError";
+    this.cursor = cursor;
+  }
+}
+
 /**
  * Every page, fetched only when the loop asks for the next one, so a caller
  * that stops early never reads the rest. The walk begins at the cursor `start`
@@ -47,10 +61,7 @@ export async function* pages<P>(
       return;
     }
     if (seen.has(token)) {
-      throw new Error(
-        "The server returned the same page cursor twice, so the list would never end. " +
-          "Read it one page at a time instead.",
-      );
+      throw new RepeatedCursorError(token);
     }
     seen.add(token);
   }

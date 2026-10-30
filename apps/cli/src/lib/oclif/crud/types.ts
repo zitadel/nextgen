@@ -13,7 +13,6 @@ import type { References } from "./secrets";
 export type Verb = "list" | "get" | "create" | "update" | "delete" | "revoke" | "deactivate";
 export type ResourceCommandId = `${string}:${Verb}`;
 export type Json = Readonly<Record<string, unknown>>;
-export type Page = Readonly<{ items: readonly unknown[]; next: string | null }>;
 
 /**
  * Structural subset of a Zod schema (a `ZodType<B>` satisfies it); keeps the
