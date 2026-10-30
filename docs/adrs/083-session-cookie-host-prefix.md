@@ -1,6 +1,6 @@
 # ADR 083: Rename the Session Cookies and Use `__Host-` on https
 
-> **Status:** Proposed
+> **Status:** Accepted — 2026-10-29
 > **Date:** 2026-10-29
 > **Context:** The preview is unpublished, so the session cookies can be
 > renamed together without preserving sessions or supporting older SDKs.
@@ -107,8 +107,9 @@ preview to migrate, this adds risk and work without a benefit.
 
 ## Decision
 
-Option A. This ADR remains a proposal; the implementation must ship the
-following changes together.
+Option A. The implementation
+([zitadel/nextgen#2488](https://github.com/zitadel/nextgen/pull/2488)) ships
+the following changes together.
 
 ### The names
 
@@ -250,7 +251,7 @@ change are not a supported mixed-version combination.
   if its source comments change. Historical ADRs retain their original names.
 - **Changesets**: describe the coordinated rename for the server, sdk-core,
   CLI and `@zitadel/testing`; there is no subsequent compatibility-removal
-  changeset. This proposal itself changes no shipped behavior.
+  changeset. This ADR itself changes no shipped behavior.
 
 ### Not covered
 
