@@ -32,9 +32,14 @@ export class GitResult {
     return this.stdout.split("\0").filter((path) => path !== "");
   }
 
-  /** The first line git wrote to stderr, its own reason for failing; empty when it wrote none. */
+  /**
+   * Everything git wrote to stderr, its own reason for failing; empty when it wrote none.
+   *
+   * All of it, not the first line: git's later lines often say how to fix the
+   * failure, as a refusal over ownership names the `safe.directory` command.
+   */
   reason(): string {
-    return this.stderr.trim().split("\n")[0] ?? "";
+    return this.stderr.trim();
   }
 }
 
@@ -55,21 +60,35 @@ export class Git {
     return new Git(this.dir, { ...this.env, ...env });
   }
 
-  /** Runs git with `args`; throws a {@link RepositoryError} for an exit code other than 0 or `allow`. */
+  /**
+   * Runs git with `args`; throws a {@link RepositoryError} for an exit code other than 0 or `allow`.
+   *
+   * Every call is made safe the same way:
+   * - `GIT_DIR`, `GIT_WORK_TREE` and `GIT_INDEX_FILE` are dropped from the
+   *   inherited environment. A git hook sets them to its own repository, so a
+   *   CLI run from a hook would otherwise act on that one.
+   * - `LC_ALL=C`, so git answers in English and a failure is recognised by its
+   *   wording (`Repository.open` looks for "not a git repository").
+   * - `GIT_TERMINAL_PROMPT=0`, so git never waits on a prompt.
+   * - `--literal-pathspecs`, so `app/[id].tsx` matches only itself and not `app/i.tsx`.
+   * - Output is capped at 16 MB and a call at five minutes, so a stuck or
+   *   runaway git cannot hang the CLI.
+   *
+   * An allowed exit code is an answer, not a failure. Only a git that ran and
+   * exited has one, so no allow list can mistake a missing git for an answer;
+   * that throws {@link GitDidNotStartError}. Every other failure carries git's
+   * own message, or Node's when git wrote nothing.
+   */
   run(args: readonly string[], allow: readonly number[] = []): Promise<GitResult> {
-    // A git hook sets these to point at its own repository.
     const inherited = { ...process.env };
     for (const name of ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE"]) {
       delete inherited[name];
     }
-    // English messages, so a failure is recognised by its wording; never a prompt.
     const env = { ...inherited, LC_ALL: "C", GIT_TERMINAL_PROMPT: "0", ...this.env };
     return new Promise((resolveResult, reject) => {
       execFile(
         "git",
-        // Paths are taken literally, so `app/[id].tsx` matches only itself and not `app/i.tsx`.
         ["--literal-pathspecs", ...args],
-        // A stuck git is stopped after five minutes rather than hang the CLI.
         { cwd: this.dir, env, maxBuffer: 16 * 1024 * 1024, timeout: 5 * 60 * 1000 },
         (error, stdout, stderr) => {
           const failure = error as (NodeJS.ErrnoException & { killed?: boolean }) | null;
@@ -77,13 +96,8 @@ export class Git {
             resolveResult(new GitResult(0, stdout, stderr));
             return;
           }
-          // The exit code is a number when git ran; a string such as ENOENT when it did not.
-          let exitCode = -1;
-          if (typeof failure.code === "number") {
-            exitCode = failure.code;
-          }
-          const result = new GitResult(exitCode, stdout, stderr);
-          if (allow.includes(exitCode)) {
+          const result = new GitResult(Number(failure.code), stdout, stderr);
+          if (typeof failure.code === "number" && allow.includes(failure.code)) {
             resolveResult(result);
           } else if (failure.code === "ENOENT") {
             reject(new GitDidNotStartError(failure.message));
@@ -99,7 +113,15 @@ export class Git {
     });
   }
 
-  /** Every file staged under the directory, relative to it. */
+  /**
+   * Every file staged under the directory, relative to it.
+   *
+   * `--relative` both limits the list to the directory and names each path
+   * from it, which is what `git reset -- <path>` resolves against: a path from
+   * the repository root, handed back to reset from a subdirectory, matches
+   * nothing and leaves the file staged. `--no-renames` lists both ends of a
+   * rename, so neither escapes a check.
+   */
   async stagedFiles(): Promise<string[]> {
     const staged = ["diff", "--cached", "-z", "--name-only", "--no-renames", "--relative"];
     return (await this.run(staged)).paths();

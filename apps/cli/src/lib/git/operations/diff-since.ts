@@ -4,7 +4,15 @@ import type { Check, Operation } from "../operation";
 import { StagingArea } from "../staging-area";
 import type { DiffOptions } from "../types";
 
-/** The diff of `paths` since `commit`, untracked files as added, as git prints it. */
+/**
+ * The diff of `paths` since `commit`, untracked files as added, as git prints it.
+ *
+ * One `git diff` over all of `paths`. Not one per file: a path matches
+ * everything under it too, so a file replaced by a directory took in the
+ * directory's files, and hundreds of files meant hundreds of processes, which
+ * ran out of open files. Nothing is left out of the diff: the paths are the
+ * caller's to choose, and a secret has no business under them.
+ */
 export class DiffSince implements Operation<string | null> {
   private readonly commit: string;
   private readonly paths: readonly string[];
@@ -36,12 +44,25 @@ export class DiffSince implements Operation<string | null> {
     return null;
   }
 
-  /** Diffs in a copy of the developer's staging area with untracked files marked as added; plainly if that fails. */
+  /**
+   * Diffs in a copy of the developer's staging area with untracked files marked as added.
+   *
+   * `git diff` leaves untracked files out, but a new file is part of what a
+   * deploy publishes, so it is marked "intent to add" first, in a copy and
+   * never in the developer's own staging area. When that cannot be done the
+   * plain diff is given instead, which still shows every tracked change.
+   *
+   * `--no-ext-diff` keeps a configured external diff tool out, `--relative`
+   * names paths from the directory, and `--submodule=short` keeps a
+   * submodule's part under a `diff --git` header, which `diff.submodule=log`
+   * would replace with a `Submodule …` line.
+   */
   async run(git: Git): Promise<string> {
     const diff = [
       "diff",
       "--no-ext-diff",
       "--relative",
+      "--submodule=short",
       ...this.format,
       this.commit,
       "--",

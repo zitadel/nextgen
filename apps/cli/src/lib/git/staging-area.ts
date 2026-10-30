@@ -9,8 +9,9 @@ import { CurrentCommit } from "./operations/current-commit";
 import type { PathFilter } from "./types";
 
 /**
- * A temporary staging area, so a commit or a diff is put together without
- * touching the developer's own, which may hold staged work of theirs.
+ * A temporary staging area (`GIT_INDEX_FILE`), so a commit or a diff is put
+ * together without touching the developer's own, which may hold staged work
+ * of theirs, another package's included.
  */
 export class StagingArea {
   /** git, pointed at this staging area. */
@@ -41,11 +42,16 @@ export class StagingArea {
     }
   }
 
-  /** Starts as a copy of the developer's staging area, keeping its timestamps. */
+  /**
+   * Starts as a copy of the developer's staging area, keeping its timestamps.
+   *
+   * A copy rather than an empty one, so a tracked file that `.gitignore` now
+   * matches still diffs. The timestamps matter: git trusts an entry only for a
+   * file older than the index, so a copy stamped now hid an edit made in the
+   * same second as the developer's last `git add`. A fresh repository has no
+   * index yet, and the copy then starts empty.
+   */
   async startFromDevelopers(developers: Git): Promise<void> {
-    // The timestamps matter: git trusts an index entry only for files older
-    // than the index, so a copy stamped now would hide an edit made in the
-    // same second. A fresh repository has no index yet; the copy then starts empty.
     const index = resolve(
       developers.dir,
       (await developers.run(["rev-parse", "--git-path", "index"])).text(),
@@ -62,19 +68,28 @@ export class StagingArea {
     await this.git.run(["add", "--all", "--", "."]);
   }
 
-  /** Marks the untracked files among `paths` "intent to add", so a diff shows them as added. */
+  /**
+   * Marks the untracked files among `paths` "intent to add", so a diff shows them as added.
+   *
+   * Intent to add records the file without its content, so nothing is written
+   * to the object store. Only paths that exist are passed: `git add` refuses
+   * the whole call when one matches nothing. An ignored path makes it mark the
+   * rest and exit 1, which is accepted.
+   */
   async markAsAdded(paths: readonly string[]): Promise<void> {
-    // `git add` refuses the whole call when one path matches nothing. For an
-    // ignored path it marks the rest and exits 1, which is fine here.
     const present = paths.filter((path) => this.git.exists(path));
     if (present.length > 0) {
       await this.git.run(["add", "--intent-to-add", "--", ...present], [1]);
     }
   }
 
-  /** Takes every staged file `except` matches back out, to what the last commit has. */
+  /**
+   * Takes every staged file `except` matches back out, to what the last commit has.
+   *
+   * Nothing is reset when nothing matches: `git reset` with no path would take
+   * everything out.
+   */
   async unstage(except: PathFilter): Promise<void> {
-    // `git reset` with no path would take everything out.
     const unwanted = (await this.git.stagedFiles()).filter(except);
     if (unwanted.length > 0) {
       await this.git.run(["reset", "--quiet", "--", ...unwanted]);
@@ -92,7 +107,14 @@ export class StagingArea {
     return null;
   }
 
-  /** Commits what is staged with `message`, with `identity` added to git's environment. */
+  /**
+   * Commits what is staged with `message`, with `identity` added to git's environment.
+   *
+   * Signing is turned off, so a configured key cannot block on a passphrase
+   * prompt. `--no-verify` skips the pre-commit and commit-msg hooks, which a
+   * scaffolded app's linter would otherwise fail; post-commit hooks still run,
+   * as they always did.
+   */
   async commit(message: string, identity: NodeJS.ProcessEnv): Promise<void> {
     const commit = [
       "-c",

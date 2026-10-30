@@ -1,5 +1,5 @@
 import { ZitadelError } from "../../lib/errors";
-import { type Author, Repository, type UncommittedFile } from "../../lib/git";
+import { type Author, Repository } from "../../lib/git";
 import { isLocalRuntimePath, isSecretPath } from "../../lib/secret-paths";
 
 /**
@@ -66,19 +66,17 @@ const FALLBACK_AUTHOR: Author = { name: "Zitadel Setup", email: "setup@zitadel.l
  * apart, and committing someone's work-in-progress under setup's name is worse
  * than any diff it would buy. Checked up front rather than at commit time, so
  * a refusal costs nothing and leaves no half-made project behind.
+ *
+ * When git cannot answer, setup refuses rather than carries on: the commit
+ * does not check again, so going ahead would stage and commit the very work
+ * this guard exists to protect.
  */
 export async function assertCleanWorktree(cwd: string): Promise<void> {
   const repository = await Repository.open(cwd);
   if (repository === null) {
     return;
   }
-  let dirty: UncommittedFile[];
-  try {
-    dirty = (await repository.uncommittedFiles()).filter((file) => !isCliOwned(file.path));
-  } catch (error) {
-    // Refuse rather than carry on. The commit does not check again, so going
-    // ahead here would stage and commit the very work this guard exists to
-    // protect, on the strength of a question git declined to answer.
+  const files = await repository.uncommittedFiles().catch((error: unknown) => {
     throw new ZitadelError(
       "E_CONFLICT",
       `Could not tell whether the git working tree is clean: ${messageOf(error)}`,
@@ -89,7 +87,8 @@ export async function assertCleanWorktree(cwd: string): Promise<void> {
           "set up without touching version control.",
       },
     );
-  }
+  });
+  const dirty = files.filter((file) => !isCliOwned(file.path));
   if (dirty.length === 0) {
     return;
   }
@@ -141,16 +140,15 @@ export async function ensureInitialCommit(cwd: string): Promise<InitialCommitOut
     if (!outcome.committed) {
       return { kind: "unavailable", reason: outcome.reason };
     }
-    let kind: "created" | "committed" = "committed";
-    if (existing === null) {
-      kind = "created";
-    }
-    return {
-      kind,
+    const commit = {
       sha: outcome.sha,
       guessedIdentity: outcome.author !== "yours",
       invented: outcome.author === "fallback",
     };
+    if (existing === null) {
+      return { kind: "created", ...commit };
+    }
+    return { kind: "committed", ...commit };
   } catch (error) {
     return { kind: "unavailable", reason: messageOf(error) };
   }

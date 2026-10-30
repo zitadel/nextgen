@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 
 import { GitDidNotStartError, RepositoryError } from "./errors";
-import { Git, type GitResult } from "./git";
+import { Git } from "./git";
 import type { Operation } from "./operation";
 import { CommitAll } from "./operations/commit-all";
 import { CurrentCommit } from "./operations/current-commit";
@@ -24,6 +24,9 @@ import type {
  * is limited to the directory and names paths relative to it, except
  * {@link isDirty}, which looks at the whole repository. When git fails, a
  * method throws a `RepositoryError` carrying git's own message.
+ *
+ * Each method is one {@link Operation}: its checks run first, and the first
+ * one that fails decides the answer through the operation's `refused`.
  */
 export class Repository {
   private readonly git: Git;
@@ -36,28 +39,34 @@ export class Repository {
     this.prefix = prefix;
   }
 
-  /** The repository `dir` is in, or null when it is in none, does not exist, or there is no git. */
+  /**
+   * The repository `dir` is in, or null when it is in none, does not exist, or there is no git.
+   *
+   * Only those three mean "no repository". Any other failure, such as a
+   * refusal over ownership or a broken `HOME`, is thrown: answering "none"
+   * would let a caller `git init` a second repository inside the first, or
+   * skip a check that the tree is clean.
+   */
   static async open(dir: string): Promise<Repository | null> {
     if (!existsSync(dir)) {
       return null;
     }
-    // Only git's own "not a git repository" means none, or no git at all; any
-    // other failure, such as a refusal over ownership, is thrown.
-    let result: GitResult;
-    try {
-      result = await new Git(dir).run(["rev-parse", "--show-prefix"], [128]);
-    } catch (error) {
-      if (error instanceof GitDidNotStartError) {
-        return null;
-      }
-      throw error;
+    const result = await new Git(dir)
+      .run(["rev-parse", "--show-prefix"], [128])
+      .catch((error: unknown) => {
+        if (error instanceof GitDidNotStartError) {
+          return null;
+        }
+        throw error;
+      });
+    if (result === null) {
+      return null;
     }
     if (/^fatal: not a git repository/m.test(result.stderr)) {
       return null;
     }
-    // All of git's message, which for a refusal over ownership says how to allow the repository.
     if (!result.succeeded()) {
-      throw new RepositoryError(result.stderr.trim());
+      throw new RepositoryError(result.reason());
     }
     return new Repository(dir, result.text());
   }
@@ -83,7 +92,14 @@ export class Repository {
     return this.perform(new UncommittedFiles(this.prefix));
   }
 
-  /** Commits everything under the directory but `options.except`, leaving the developer's staged work alone. */
+  /**
+   * Commits everything under the directory but `options.except`; see {@link CommitAll}.
+   *
+   * Meant for a directory with nothing uncommitted of the developer's own:
+   * check {@link uncommittedFiles} first. Afterwards the developer's staging
+   * area under the directory is reset to the new commit, so anything they had
+   * staged there would be unstaged.
+   */
   commitAll(message: string, options: CommitOptions): Promise<CommitOutcome> {
     return this.perform(new CommitAll(message, options));
   }

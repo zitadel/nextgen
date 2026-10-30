@@ -442,6 +442,34 @@ describe("Repository.diffFilesSince", () => {
     ]);
   });
 
+  it("gives a changed submodule its own section whatever diff.submodule says", async () => {
+    const sub = await scratch.committed({ "a.txt": "a\n" });
+    const cwd = await scratch.committed({ ".zitadel/branding/a.json": "{}\n" });
+    await git(
+      cwd,
+      "-c",
+      "protocol.file.allow=always",
+      "submodule",
+      "add",
+      "--quiet",
+      sub,
+      ".zitadel/branding/b",
+    );
+    await commitEverything(cwd, "submodule");
+    const sha = (await git(cwd, "rev-parse", "HEAD")).trim();
+    await write(join(cwd, ".zitadel/branding/b"), { "c.txt": "c\n" });
+    await commitEverything(join(cwd, ".zitadel/branding/b"), "c");
+    await write(cwd, { ".zitadel/branding/a.json": "[]\n" });
+    await git(cwd, "config", "diff.submodule", "log");
+
+    const files = await (await open(cwd)).diffFilesSince(sha, [".zitadel/"]);
+
+    expect(files?.map(({ path, patch }) => ({ path, sections: sectionsOf(patch) }))).toEqual([
+      { path: ".zitadel/branding/a.json", sections: 1 },
+      { path: ".zitadel/branding/b", sections: 1 },
+    ]);
+  });
+
   it("gives a file replaced by a directory of the same name only its own deletion", async () => {
     const { cwd, sha } = await base();
     await rm(join(cwd, ".zitadel/schemas/a.json"));

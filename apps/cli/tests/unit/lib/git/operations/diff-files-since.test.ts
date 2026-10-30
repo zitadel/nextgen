@@ -35,6 +35,7 @@ describe("DiffFilesSince", () => {
       "diff",
       "--no-ext-diff",
       "--relative",
+      "--submodule=short",
       "--no-color",
       "--raw",
       "-z",

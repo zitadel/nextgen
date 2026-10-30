@@ -63,6 +63,7 @@ describe("DiffSince", () => {
       "diff",
       "--no-ext-diff",
       "--relative",
+      "--submodule=short",
       flag,
       SHA,
       "--",

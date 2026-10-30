@@ -14,25 +14,29 @@ export class Change {
     this.previousPath = previousPath;
   }
 
-  /** Every change in the NUL-separated `fields` of a `--raw -z` list, in its order. */
+  /**
+   * Every change in the NUL-separated `fields` of a `--raw -z` list, in its order.
+   *
+   * Each entry is `:<modes> <ids> <letter>[<score>]`, then the path, or for a
+   * rename or a copy where it came from and where it went. The entries are
+   * read in order rather than by looking for a `:`, since a path may start
+   * with one. M, T (a type change) and U (unmerged) all count as modified.
+   */
   static listedIn(fields: readonly string[]): Change[] {
-    // Each entry is `:<modes> <ids> <letter>[<score>]`, then the path, or for a
-    // rename or a copy where it came from and where it went.
     const statuses: Record<string, DiffedFile["status"]> = {
       A: "added",
       D: "deleted",
       R: "renamed",
       C: "copied",
     };
+    const unread = [...fields];
     const changes: Change[] = [];
-    let index = 0;
-    while (index < fields.length) {
-      const entry = fields[index++] ?? "";
-      // M, T (a type change) and U (unmerged) all count as modified.
+    while (unread.length > 0) {
+      const entry = unread.shift() ?? "";
       const status = statuses[entry.charAt(entry.lastIndexOf(" ") + 1)] ?? "modified";
-      const first = fields[index++] ?? "";
+      const first = unread.shift() ?? "";
       if (status === "renamed" || status === "copied") {
-        changes.push(new Change(fields[index++] ?? "", status, first));
+        changes.push(new Change(unread.shift() ?? "", status, first));
       } else {
         changes.push(new Change(first, status));
       }

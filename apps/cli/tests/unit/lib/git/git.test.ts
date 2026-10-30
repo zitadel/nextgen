@@ -133,7 +133,14 @@ describe("Git", () => {
     await expect(new Git(cwd).run(["status"], [1])).rejects.toBeInstanceOf(GitDidNotStartError);
   });
 
-  it("names git's first line for any other failure", async () => {
+  it("names all of git's message, how to fix it included", async () => {
+    const cwd = await scratch.directory();
+    vi.stubEnv("PATH", await scratch.brokenGit("fatal: refused\nhint: run this to fix it", 128));
+
+    await expect(git(cwd, ["status"])).rejects.toThrow("fatal: refused\nhint: run this to fix it");
+  });
+
+  it("names git's message for any other failure", async () => {
     const cwd = await scratch.directory();
     vi.stubEnv("PATH", await scratch.brokenGit());
 
@@ -157,7 +164,9 @@ describe("GitResult", () => {
     expect(new GitResult(0, "a\0b c\0", "").paths()).toEqual(["a", "b c"]);
   });
 
-  it("gives git's first line on stderr as its reason", () => {
-    expect(new GitResult(128, "", "fatal: one\nhint: two\n").reason()).toBe("fatal: one");
+  it("gives all of git's stderr as its reason", () => {
+    expect(new GitResult(128, "", "fatal: one\nhint: two\n").reason()).toBe(
+      "fatal: one\nhint: two",
+    );
   });
 });

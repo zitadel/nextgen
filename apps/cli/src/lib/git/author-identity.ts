@@ -13,10 +13,16 @@ export class AuthorIdentity {
     this.fallback = fallback;
   }
 
-  /** The identity git would commit with in `git`'s directory, with `fallback` for when it has none. */
+  /**
+   * The identity git would commit with in `git`'s directory, with `fallback` for when it has none.
+   *
+   * Without an identity of the developer's own, git guesses one from the
+   * username and hostname and commits anyway; `user.useConfigOnly` turns that
+   * guess back into an error, which tells a real identity from a guessed one.
+   * Only where git cannot even guess, as in a bare CI container, is the
+   * fallback used: no commit would leave nothing to diff a deploy against.
+   */
   static async of(git: Git, fallback: Author): Promise<AuthorIdentity> {
-    // `user.useConfigOnly` turns git's guess from the username and hostname
-    // back into an error, which tells a real identity from a guessed one.
     const own = await git.run(["-c", "user.useConfigOnly=true", "var", "GIT_AUTHOR_IDENT"], [128]);
     if (own.succeeded()) {
       return new AuthorIdentity("yours", fallback);
@@ -28,10 +34,14 @@ export class AuthorIdentity {
     return new AuthorIdentity("fallback", fallback);
   }
 
-  /** The environment that names the fallback as author and committer, or nothing when git has its own. */
+  /**
+   * The environment that names the fallback as author and committer, or nothing when git has its own.
+   *
+   * The environment rather than `-c user.*`: an inherited empty
+   * `GIT_AUTHOR_NAME=`, as some CI runners leave it, outranks `-c`, and git
+   * would refuse the commit with "empty ident name".
+   */
   environment(): NodeJS.ProcessEnv {
-    // The environment rather than `-c user.*`: an inherited empty
-    // `GIT_AUTHOR_NAME=` outranks `-c`, and git would refuse the commit.
     if (this.source !== "fallback") {
       return {};
     }

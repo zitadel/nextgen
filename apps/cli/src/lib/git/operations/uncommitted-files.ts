@@ -22,7 +22,15 @@ export class UncommittedFiles implements Operation<UncommittedFile[]> {
     return [];
   }
 
-  /** Asks git for the status of the directory. */
+  /**
+   * Asks git for the status of the directory.
+   *
+   * `-- .` keeps a sibling package's work out. `--untracked-files=all` names
+   * each file of an untracked directory rather than the directory alone.
+   * `status` names paths from the repository root, so the prefix is taken off;
+   * a rename or a copy carries a second entry, where it came from, which is
+   * skipped.
+   */
   async run(git: Git): Promise<UncommittedFile[]> {
     const result = await git.run([
       "status",
@@ -32,18 +40,19 @@ export class UncommittedFiles implements Operation<UncommittedFile[]> {
       "--",
       ".",
     ]);
-    // A rename or copy carries a second entry, where it came from, which is skipped.
-    const entries = result.paths();
+    const unread = result.paths();
     const files: UncommittedFile[] = [];
-    for (let index = 0; index < entries.length; index += 1) {
-      const entry = entries[index] ?? "";
-      let path = entry.slice(3);
+    while (unread.length > 0) {
+      const entry = unread.shift() ?? "";
+      const path = entry.slice(3);
+      const untracked = entry.startsWith("??");
       if (path.startsWith(this.prefix)) {
-        path = path.slice(this.prefix.length);
+        files.push({ path: path.slice(this.prefix.length), untracked });
+      } else {
+        files.push({ path, untracked });
       }
-      files.push({ path, untracked: entry.startsWith("??") });
       if (/^(R|C|.R|.C)/.test(entry)) {
-        index += 1;
+        unread.shift();
       }
     }
     return files;
