@@ -1,4 +1,9 @@
-/** A test for paths to leave out, given a path relative to the directory. */
+/**
+ * A test for paths to leave out, given a path relative to the directory.
+ *
+ * How a caller says which files are its secrets without this module knowing
+ * what a secret is.
+ */
 export type PathFilter = (path: string) => boolean;
 
 /** Who to name as author where git has no identity of its own. */

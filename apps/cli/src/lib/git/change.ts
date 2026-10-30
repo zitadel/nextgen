@@ -1,6 +1,14 @@
 import type { DiffedFile } from "./types";
 
-/** One changed file, as `git diff --raw -z` lists it. */
+/**
+ * One changed file, as `git diff --raw -z` lists it: where it is, what
+ * happened to it, and where it came from when it was renamed or copied.
+ *
+ * Read from git's raw list rather than from the patch's `diff --git` headers:
+ * the list is NUL-separated and never quoted, while a header quotes a path
+ * holding a space or a non-ASCII byte and cannot be split reliably.
+ * {@link DiffFilesSince} pairs each change with its part of the patch.
+ */
 export class Change {
   readonly path: string;
   readonly status: DiffedFile["status"];

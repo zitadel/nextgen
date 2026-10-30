@@ -5,7 +5,9 @@ import type { PathFilter } from "../types";
 /**
  * No staged file is one `except` matches.
  *
- * Checked, not assumed: a file committed once cannot be taken out of history.
+ * The last guard before a commit. {@link StagingArea.addAll} already leaves
+ * excluded files out, but a file committed once cannot be taken out of
+ * history, so what is about to be committed is checked rather than trusted.
  */
 export class NothingExcludedIsStaged implements Check {
   private readonly except: PathFilter;

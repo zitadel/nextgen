@@ -1,7 +1,14 @@
 import type { Git } from "../git";
 import type { Check } from "../operation";
 
-/** No merge, rebase, cherry-pick, revert or bisect is under way, so a commit lands where meant. */
+/**
+ * No merge, rebase, cherry-pick, revert or bisect is under way, so a commit lands where meant.
+ *
+ * Mid-merge, a commit would conclude the merge with the developer's
+ * half-resolved work; mid-rebase or cherry-pick, it would be woven into a
+ * history being rewritten; mid-bisect, it would land on whichever commit is
+ * being tested.
+ */
 export class NoOperationUnderWay implements Check {
   /**
    * "a merge is in progress" and the like, or null.

@@ -2,7 +2,13 @@ import type { Git } from "../git";
 import type { Check, Operation } from "../operation";
 import type { UncommittedFile } from "../types";
 
-/** The uncommitted files under the directory, untracked ones included, each file of an untracked directory listed. */
+/**
+ * The uncommitted files under the directory, untracked ones included, each file of an untracked directory listed.
+ *
+ * What a commit of the whole directory would sweep in. In a monorepo a
+ * sibling package's work is not listed, since a commit here never touches
+ * it. Each path is named from the directory, as the developer sees it.
+ */
 export class UncommittedFiles implements Operation<UncommittedFile[]> {
   /** Where the directory sits in the repository, e.g. `apps/web/`: what `status` puts before each path. */
   private readonly prefix: string;

@@ -4,7 +4,14 @@ import { resolve } from "node:path";
 
 import { GitDidNotStartError, RepositoryError } from "./errors";
 
-/** What one git call returned, and ways to read it. */
+/**
+ * What one git call returned, and ways to read it.
+ *
+ * A call returns one only when it succeeded or exited with a code the caller
+ * allowed; anything else is thrown by {@link Git.run}. Reading lives here so
+ * every caller reads git's output the same way: `paths()` for `-z` lists,
+ * `text()` for one value, `reason()` for why it failed.
+ */
 export class GitResult {
   readonly exitCode: number;
   readonly stdout: string;
@@ -43,7 +50,15 @@ export class GitResult {
   }
 }
 
-/** The git command line, run in one directory with one environment. */
+/**
+ * The git command line, run in one directory with one environment.
+ *
+ * The one place the CLI starts git. Every call goes through {@link run},
+ * which makes it safe the same way (see there), so no caller can forget a
+ * setting. It knows nothing about repositories or Zitadel: it runs git and
+ * reads its answer. `with` gives the same git with more environment, which is
+ * how a temporary staging area or a fallback author is applied to one call.
+ */
 export class Git {
   /** The directory git runs in. */
   readonly dir: string;

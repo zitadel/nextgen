@@ -1,7 +1,16 @@
 import type { Git } from "./git";
 import type { Author, AuthorSource } from "./types";
 
-/** Whose name git puts on a commit, and the fallback for when it can name no one. */
+/**
+ * Whose name git puts on a commit, and the fallback for when it can name no one.
+ *
+ * Three cases: the developer has an identity of their own (config or
+ * `GIT_AUTHOR_*`), git can only guess one from the username and hostname, or
+ * git cannot build one at all, as on a bare CI runner. Only the last uses the
+ * fallback, since an invented author is worse than git's own guess; the
+ * caller is told which it was, so it can say so. The fallback itself comes
+ * from the caller: this module names no one.
+ */
 export class AuthorIdentity {
   /** Where the author's name comes from. */
   readonly source: AuthorSource;

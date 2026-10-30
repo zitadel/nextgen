@@ -12,6 +12,11 @@ import type { PathFilter } from "./types";
  * A temporary staging area (`GIT_INDEX_FILE`), so a commit or a diff is put
  * together without touching the developer's own, which may hold staged work
  * of theirs, another package's included.
+ *
+ * Made with {@link temporary}, which removes it however the work ends. A
+ * commit starts it from the last commit ({@link startFromHead}); a diff starts
+ * it from a copy of the developer's ({@link startFromDevelopers}). Its methods
+ * are the steps an operation takes, so the operation reads as a list of them.
  */
 export class StagingArea {
   /** git, pointed at this staging area. */

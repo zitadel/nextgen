@@ -1,7 +1,13 @@
 import type { Git } from "../git";
 import type { Check, Operation } from "../operation";
 
-/** Whether anything in the whole repository is uncommitted, not only under the directory. */
+/**
+ * Whether anything in the whole repository is uncommitted, not only under the directory.
+ *
+ * The whole repository, because a release records the commit it was built
+ * from: a change anywhere, a code change the config depends on, say, makes
+ * that record inexact.
+ */
 export class IsDirty implements Operation<boolean> {
   /** Nothing to check. */
   checks(): Check[] {

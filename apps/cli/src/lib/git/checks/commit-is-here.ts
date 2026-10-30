@@ -1,7 +1,13 @@
 import type { Git } from "../git";
 import type { Check } from "../operation";
 
-/** `commit` is a commit in local history; a shallow clone may lack it. */
+/**
+ * `commit` is a commit in local history; a shallow clone may lack it.
+ *
+ * Checked before a diff, so a missing commit answers null ("no diff
+ * available") rather than failing, and an empty diff is never mistaken for a
+ * clean tree.
+ */
 export class CommitIsHere implements Check {
   private readonly commit: string;
 
