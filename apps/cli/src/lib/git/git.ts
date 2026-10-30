@@ -96,9 +96,13 @@ export class Git {
             resolveResult(new GitResult(0, stdout, stderr));
             return;
           }
-          const result = new GitResult(Number(failure.code), stdout, stderr);
-          if (typeof failure.code === "number" && allow.includes(failure.code)) {
-            resolveResult(result);
+          if (typeof failure.code === "number") {
+            const result = new GitResult(failure.code, stdout, stderr);
+            if (allow.includes(failure.code)) {
+              resolveResult(result);
+            } else {
+              reject(new RepositoryError(result.reason() || failure.message));
+            }
           } else if (failure.code === "ENOENT") {
             reject(new GitDidNotStartError(failure.message));
           } else if (failure.code === "ERR_CHILD_PROCESS_STDIO_MAXBUFFER") {
@@ -106,7 +110,7 @@ export class Git {
           } else if (failure.killed) {
             reject(new RepositoryError("git did not finish in time"));
           } else {
-            reject(new RepositoryError(result.reason() || failure.message));
+            reject(new RepositoryError(stderr.trim() || failure.message));
           }
         },
       );
@@ -117,9 +121,7 @@ export class Git {
    * Every file staged under the directory, relative to it.
    *
    * `--relative` both limits the list to the directory and names each path
-   * from it, which is what `git reset -- <path>` resolves against: a path from
-   * the repository root, handed back to reset from a subdirectory, matches
-   * nothing and leaves the file staged. `--no-renames` lists both ends of a
+   * from it, as a path filter expects. `--no-renames` lists both ends of a
    * rename, so neither escapes a check.
    */
   async stagedFiles(): Promise<string[]> {

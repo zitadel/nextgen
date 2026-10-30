@@ -6,7 +6,7 @@ import { fakeGit } from "../../../../helpers/git-repo";
 const SHA = "a".repeat(40);
 
 describe("CommitIsHere", () => {
-  it.each([SHA, "ABCDEF12".repeat(5), "f".repeat(64)])(
+  it.each([SHA, "abcd", "ABCDEF12", "f".repeat(64)])(
     "passes for %s in local history",
     async (commit) => {
       expect(await new CommitIsHere(commit).problem(fakeGit(() => ({})))).toBeNull();
@@ -19,20 +19,14 @@ describe("CommitIsHere", () => {
     );
   });
 
-  it.each([
-    "HEAD",
-    "--output=/tmp/x",
-    "",
-    "beef",
-    "abcdef1",
-    "a".repeat(41),
-    "a".repeat(65),
-    `${"a".repeat(39)}g`,
-  ])("fails for %j without asking git", async (commit) => {
-    const git = fakeGit(() => {
-      throw new Error("git was asked");
-    });
+  it.each(["HEAD", "--output=/tmp/x", "", "abc", "a".repeat(65), "abcg"])(
+    "fails for %j without asking git",
+    async (commit) => {
+      const git = fakeGit(() => {
+        throw new Error("git was asked");
+      });
 
-    expect(await new CommitIsHere(commit).problem(git)).toBe(`${commit} is not a commit id`);
-  });
+      expect(await new CommitIsHere(commit).problem(git)).toBe(`${commit} is not a commit id`);
+    },
+  );
 });

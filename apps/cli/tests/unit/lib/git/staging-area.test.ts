@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { chmod, writeFile } from "node:fs/promises";
+import { chmod, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -61,7 +61,7 @@ describe("StagingArea", () => {
 
     const files = await StagingArea.temporary(new Git(cwd), async (staging) => {
       await staging.startFromHead();
-      await staging.addAll();
+      await staging.addAll(() => false);
       return staged(staging);
     });
 
@@ -77,8 +77,7 @@ describe("StagingArea", () => {
 
     const files = await StagingArea.temporary(new Git(cwd), async (staging) => {
       await staging.startFromHead();
-      await staging.addAll();
-      await staging.unstage((path) => path === ".env");
+      await staging.addAll((path) => path === ".env");
       return staged(staging);
     });
 
@@ -128,7 +127,7 @@ describe("StagingArea", () => {
 
     await StagingArea.temporary(new Git(cwd), async (staging) => {
       await staging.startFromHead();
-      await staging.addAll();
+      await staging.addAll(() => false);
       await staging.commit("add b", IDENTITY);
     });
 
@@ -141,7 +140,7 @@ describe("StagingArea", () => {
 
     await StagingArea.temporary(new Git(cwd), async (staging) => {
       await staging.startFromHead();
-      await staging.addAll();
+      await staging.addAll(() => false);
       await staging.commit("add b", IDENTITY);
     });
 
@@ -190,18 +189,43 @@ describe("StagingArea", () => {
     expect(files).toEqual([]);
   });
 
-  it("leaves everything staged when `except` matches nothing", async () => {
+  it("never writes an excluded file's content to the object store", async () => {
     const cwd = await scratch.committed({ "a.txt": "a\n" });
-    await write(cwd, { "b.txt": "b\n", "c.txt": "c\n" });
+    await write(cwd, { "b.txt": "b\n", ".env": "TOKEN=hunter2\n" });
+    const blob = (await git(cwd, "hash-object", ".env")).trim();
+
+    await StagingArea.temporary(new Git(cwd), async (staging) => {
+      await staging.startFromHead();
+      await staging.addAll((path) => path === ".env");
+    });
+
+    await expect(git(cwd, "cat-file", "-e", blob)).rejects.toThrow();
+  });
+
+  it("keeps a tracked excluded file as the last commit has it", async () => {
+    const cwd = await scratch.committed({ ".env": "OLD=1\n" });
+    await write(cwd, { ".env": "NEW=1\n" });
 
     const files = await StagingArea.temporary(new Git(cwd), async (staging) => {
       await staging.startFromHead();
-      await staging.addAll();
-      await staging.unstage(() => false);
+      await staging.addAll((path) => path === ".env");
       return staged(staging);
     });
 
-    expect(files).toEqual(["b.txt", "c.txt"]);
+    expect(files).toEqual([]);
+  });
+
+  it("stages a deletion", async () => {
+    const cwd = await scratch.committed({ "a.txt": "a\n", "b.txt": "b\n" });
+    await rm(join(cwd, "b.txt"));
+
+    const files = await StagingArea.temporary(new Git(cwd), async (staging) => {
+      await staging.startFromHead();
+      await staging.addAll(() => false);
+      return staged(staging);
+    });
+
+    expect(files).toEqual(["b.txt"]);
   });
 
   it("marks nothing when no path exists", async () => {
@@ -235,7 +259,7 @@ describe("StagingArea", () => {
 
     const problem = await StagingArea.temporary(new Git(cwd), async (staging) => {
       await staging.startFromHead();
-      await staging.addAll();
+      await staging.addAll(() => false);
       return staging.problem([new NothingExcludedIsStaged(() => false), new SomethingIsStaged()]);
     });
 
@@ -258,7 +282,7 @@ describe("StagingArea", () => {
 
     await StagingArea.temporary(new Git(cwd), async (staging) => {
       await staging.startFromHead();
-      await staging.addAll();
+      await staging.addAll(() => false);
       await staging.commit("add b", IDENTITY);
     });
 
@@ -288,7 +312,7 @@ describe("StagingArea", () => {
 
     await StagingArea.temporary(new Git(cwd), async (staging) => {
       await staging.startFromHead();
-      await staging.addAll();
+      await staging.addAll(() => false);
       await staging.commit("add b", IDENTITY);
     });
 
@@ -305,7 +329,7 @@ describe("StagingArea", () => {
 
     await StagingArea.temporary(new Git(cwd), async (staging) => {
       await staging.startFromHead();
-      await staging.addAll();
+      await staging.addAll(() => false);
       await staging.commit("add b", IDENTITY);
     });
 

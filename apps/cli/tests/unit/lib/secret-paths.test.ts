@@ -13,6 +13,10 @@ describe("isSecretPath", () => {
     ".zitadel/local",
     ".zitadel/local/admin.json",
     "nested/.zitadel/local/data/db",
+    ".ENV",
+    ".Env.local",
+    ".Zitadel/Secret",
+    ".ZITADEL/LOCAL/admin.json",
   ])("treats %s as a secret", (path) => {
     expect(isSecretPath(path)).toBe(true);
   });
@@ -20,6 +24,7 @@ describe("isSecretPath", () => {
   it.each([
     ".env.example",
     "apps/web/.env.example",
+    ".ENV.EXAMPLE",
     "src/env.ts",
     ".zitadel/schemas/user.json",
     ".zitadel/secrets/readme.md",

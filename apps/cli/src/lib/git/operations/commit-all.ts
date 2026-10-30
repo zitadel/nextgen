@@ -49,19 +49,17 @@ export class CommitAll implements Operation<CommitOutcome> {
   }
 
   /**
-   * Stages everything, takes the excluded files back out, checks, and commits.
+   * Stages everything but the excluded files, checks, and commits.
    *
-   * What is about to be committed is checked rather than trusted: a file
-   * committed once cannot be taken out of history, and `reset` reports
-   * success for a path it did not match. The reset of the developer's staging
+   * What is about to be committed is checked rather than trusted, since a
+   * file committed once cannot be taken out of history. The reset of the developer's staging
    * area afterwards is best effort, since the commit has already landed.
    */
   async run(git: Git): Promise<CommitOutcome> {
     const author = await AuthorIdentity.of(git, this.options.authorIfGitHasNone);
     return StagingArea.temporary(git, async (staging) => {
       await staging.startFromHead();
-      await staging.addAll();
-      await staging.unstage(this.options.except);
+      await staging.addAll(this.options.except);
       const problem = await staging.problem([
         new NothingExcludedIsStaged(this.options.except),
         new SomethingIsStaged(),

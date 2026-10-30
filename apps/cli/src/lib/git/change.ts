@@ -29,14 +29,13 @@ export class Change {
       R: "renamed",
       C: "copied",
     };
-    const unread = [...fields];
+    const unread = fields.values();
     const changes: Change[] = [];
-    while (unread.length > 0) {
-      const entry = unread.shift() ?? "";
+    for (const entry of unread) {
       const status = statuses[entry.charAt(entry.lastIndexOf(" ") + 1)] ?? "modified";
-      const first = unread.shift() ?? "";
+      const first = unread.next().value ?? "";
       if (status === "renamed" || status === "copied") {
-        changes.push(new Change(unread.shift() ?? "", status, first));
+        changes.push(new Change(unread.next().value ?? "", status, first));
       } else {
         changes.push(new Change(first, status));
       }

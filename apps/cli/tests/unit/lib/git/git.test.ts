@@ -126,6 +126,17 @@ describe("Git", () => {
     await expect(git(cwd, ["status"])).rejects.toBeInstanceOf(GitDidNotStartError);
   });
 
+  it("throws when git is stopped by a signal, even where exit 0 is allowed", async () => {
+    const bin = await scratch.directory();
+    await writeFile(join(bin, "git"), "#!/bin/sh\nkill -TERM $$\n");
+    await chmod(join(bin, "git"), 0o755);
+    vi.stubEnv("PATH", bin);
+
+    await expect(new Git(await scratch.directory()).run(["status"], [0])).rejects.toBeInstanceOf(
+      RepositoryError,
+    );
+  });
+
   it("throws a GitDidNotStartError even where exit 1 is allowed", async () => {
     const cwd = await scratch.directory();
     vi.stubEnv("PATH", await scratch.directory());

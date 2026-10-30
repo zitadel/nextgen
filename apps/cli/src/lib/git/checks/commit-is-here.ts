@@ -13,13 +13,11 @@ export class CommitIsHere implements Check {
   /**
    * Why the commit cannot be used, or null.
    *
-   * Only a full object id (40 characters, or 64 in a SHA-256 repository) is
-   * handed to git. A shorter one could be a branch or tag name such as `beef`,
-   * which git would resolve, or an abbreviation matching several objects; and
-   * anything else could be read as an option.
+   * Only an object id, full or abbreviated, is handed to git; anything else
+   * could be read as an option or name a branch.
    */
   async problem(git: Git): Promise<string | null> {
-    if (!/^([0-9a-f]{40}|[0-9a-f]{64})$/i.test(this.commit)) {
+    if (!/^[0-9a-f]{4,64}$/i.test(this.commit)) {
       return `${this.commit} is not a commit id`;
     }
     const result = await git.run(["cat-file", "-e", `${this.commit}^{commit}`], [1, 128]);

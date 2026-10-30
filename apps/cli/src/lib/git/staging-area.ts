@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
-import { copyFile, mkdtemp, rm, stat, utimes } from "node:fs/promises";
+import { copyFile, mkdtemp, rm, stat, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 
 import type { Git } from "./git";
 import type { Check } from "./operation";
@@ -63,9 +63,33 @@ export class StagingArea {
     }
   }
 
-  /** Stages everything under the directory, as `git add --all` does. */
-  async addAll(): Promise<void> {
-    await this.git.run(["add", "--all", "--", "."]);
+  /**
+   * Stages everything under the directory but what `except` matches, as `git add --all` would.
+   *
+   * The changed and untracked files are listed first and only the kept ones
+   * are added, so an excluded file's content is never written to the object
+   * store, where it would sit as a loose object until git cleans it up. The
+   * list goes through a file beside the staging area rather than the command
+   * line, which a project of thousands of files would overflow. A file that is
+   * already tracked and excluded keeps what the last commit has.
+   */
+  async addAll(except: PathFilter): Promise<void> {
+    const listed = await this.git.run([
+      "ls-files",
+      "-z",
+      "--modified",
+      "--deleted",
+      "--others",
+      "--exclude-standard",
+      "--",
+      ".",
+    ]);
+    const kept = listed.paths().filter((path) => !except(path));
+    if (kept.length > 0) {
+      const list = join(dirname(this.index), "paths");
+      await writeFile(list, kept.join("\0"));
+      await this.git.run(["add", "--all", `--pathspec-from-file=${list}`, "--pathspec-file-nul"]);
+    }
   }
 
   /**
@@ -80,19 +104,6 @@ export class StagingArea {
     const present = paths.filter((path) => this.git.exists(path));
     if (present.length > 0) {
       await this.git.run(["add", "--intent-to-add", "--", ...present], [1]);
-    }
-  }
-
-  /**
-   * Takes every staged file `except` matches back out, to what the last commit has.
-   *
-   * Nothing is reset when nothing matches: `git reset` with no path would take
-   * everything out.
-   */
-  async unstage(except: PathFilter): Promise<void> {
-    const unwanted = (await this.git.stagedFiles()).filter(except);
-    if (unwanted.length > 0) {
-      await this.git.run(["reset", "--quiet", "--", ...unwanted]);
     }
   }
 

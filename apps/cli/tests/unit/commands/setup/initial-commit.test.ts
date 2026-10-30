@@ -576,3 +576,22 @@ describe("ensureInitialCommit when it refuses to commit", () => {
     expect(stdout.trim()).toBe("");
   });
 });
+
+describe("ensureInitialCommit when git explains at length", () => {
+  it("reports only git's first line, for a one-line warning", async () => {
+    const cwd = await aProject();
+    const binDir = await mkdtemp(join(tmpdir(), "zitadel-initial-commit-"));
+    dirs.push(binDir);
+    await writeFile(
+      join(binDir, "git"),
+      "#!/bin/sh\nprintf 'fatal: one\\nhint: two\\n' >&2\nexit 1\n",
+    );
+    await chmod(join(binDir, "git"), 0o755);
+    vi.stubEnv("PATH", binDir);
+    try {
+      expect(await ensureInitialCommit(cwd)).toEqual({ kind: "unavailable", reason: "fatal: one" });
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+});

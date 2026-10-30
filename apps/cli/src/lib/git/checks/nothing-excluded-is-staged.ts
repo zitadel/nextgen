@@ -5,8 +5,7 @@ import type { PathFilter } from "../types";
 /**
  * No staged file is one `except` matches.
  *
- * Checked, not assumed: `git reset` reports success for a path it did not
- * match, and a file committed once cannot be taken out of history.
+ * Checked, not assumed: a file committed once cannot be taken out of history.
  */
 export class NothingExcludedIsStaged implements Check {
   private readonly except: PathFilter;

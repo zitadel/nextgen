@@ -40,10 +40,9 @@ export class UncommittedFiles implements Operation<UncommittedFile[]> {
       "--",
       ".",
     ]);
-    const unread = result.paths();
+    const unread = result.paths().values();
     const files: UncommittedFile[] = [];
-    while (unread.length > 0) {
-      const entry = unread.shift() ?? "";
+    for (const entry of unread) {
       const path = entry.slice(3);
       const untracked = entry.startsWith("??");
       if (path.startsWith(this.prefix)) {
@@ -52,7 +51,7 @@ export class UncommittedFiles implements Operation<UncommittedFile[]> {
         files.push({ path, untracked });
       }
       if (/^(R|C|.R|.C)/.test(entry)) {
-        unread.shift();
+        unread.next();
       }
     }
     return files;

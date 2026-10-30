@@ -372,6 +372,28 @@ describe("Repository.diffSince", () => {
     expect(diff?.includes("\u001b[")).toBe(coloured);
   });
 
+  it("shows a submodule as the developer configured", async () => {
+    const sub = await scratch.committed({ "a.txt": "a\n" });
+    const cwd = await scratch.committed({ "README.md": "r\n" });
+    await git(
+      cwd,
+      "-c",
+      "protocol.file.allow=always",
+      "submodule",
+      "add",
+      "--quiet",
+      sub,
+      ".zitadel/sub",
+    );
+    await commitEverything(cwd, "submodule");
+    const sha = (await git(cwd, "rev-parse", "HEAD")).trim();
+    await write(join(cwd, ".zitadel/sub"), { "c.txt": "c\n" });
+    await commitEverything(join(cwd, ".zitadel/sub"), "add c");
+    await git(cwd, "config", "diff.submodule", "log");
+
+    expect(await (await open(cwd)).diffSince(sha, [".zitadel/"], {})).toContain("> add c");
+  });
+
   it("still shows a new file as added beside an ignored path", async () => {
     const { cwd, sha } = await base();
     await write(cwd, {

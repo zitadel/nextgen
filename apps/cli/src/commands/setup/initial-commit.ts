@@ -127,7 +127,8 @@ function plural(list: readonly unknown[]): string {
  *
  * Nothing here prompts, so it behaves the same interactively and in CI, and no
  * failure is fatal: the worst case is the first release carrying no commit,
- * which is what happened before this existed.
+ * which is what happened before this existed. The reason is git's first line,
+ * since it goes into a one-line warning.
  */
 export async function ensureInitialCommit(cwd: string): Promise<InitialCommitOutcome> {
   try {
@@ -150,7 +151,7 @@ export async function ensureInitialCommit(cwd: string): Promise<InitialCommitOut
     }
     return { kind: "committed", ...commit };
   } catch (error) {
-    return { kind: "unavailable", reason: messageOf(error) };
+    return { kind: "unavailable", reason: messageOf(error).split("\n")[0] ?? "" };
   }
 }
 
