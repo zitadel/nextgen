@@ -11,6 +11,7 @@ import {
 } from "remotion";
 
 import { type Brand, brandProperties } from "../brands";
+import { handheld, push } from "../camera";
 import { Card } from "../card";
 import { fontsLoaded, LoginSurface } from "../login-surface";
 import { HEIGHT, WIDTH } from "../timeline";
@@ -38,7 +39,15 @@ const IDENTIFIER = "alan@zitadel.com";
 
 const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
 
-export function AvatarShot({ brand, length }: { brand: Brand; length: number }) {
+export function AvatarShot({
+  brand,
+  length,
+  seed,
+}: {
+  brand: Brand;
+  length: number;
+  seed: number;
+}) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const stage = useRef<HTMLDivElement>(null);
@@ -75,7 +84,7 @@ export function AvatarShot({ brand, length }: { brand: Brand; length: number }) 
   });
   const swayA = 90 * Math.sin((2 * Math.PI * seconds) / 0.9);
   const swayB = 45 * Math.sin((2 * Math.PI * seconds) / 1.3);
-  const zoom = SCALE * interpolate(frame, [0, length], [1, 1.06]);
+  const zoom = SCALE * push(frame, length, 0.06);
   const at = focus ?? { x: WIDTH / 2, y: HEIGHT / 2 };
 
   return (
@@ -87,7 +96,7 @@ export function AvatarShot({ brand, length }: { brand: Brand; length: number }) 
           width: WIDTH,
           height: HEIGHT,
           transformOrigin: "0 0",
-          transform: `translate(${ANCHOR * WIDTH}px, ${HEIGHT / 2}px) scale(${zoom}) translate(${-at.x}px, ${-at.y}px)`,
+          transform: `${handheld(frame, seed)} translate(${ANCHOR * WIDTH}px, ${HEIGHT / 2}px) scale(${zoom}) translate(${-at.x}px, ${-at.y}px)`,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",

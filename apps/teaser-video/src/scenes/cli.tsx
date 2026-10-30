@@ -1,13 +1,22 @@
-import { useCurrentFrame } from "remotion";
+import { useRef } from "react";
+import { Easing, interpolate, useCurrentFrame } from "remotion";
 
-import { FRAMES_PER_BEAT, HEIGHT, WIDTH, beats } from "../timeline";
+import { Card, SIGN_UP } from "../card";
+import { BrowserWindow, MenuBar, Wallpaper, WINDOW_SHADOW } from "../desktop";
+import { LoginSurface } from "../login-surface";
+import { primary } from "../montage/atoms";
+import { useAtomsRendered } from "../montage/shot";
+
+import { FRAMES_PER_BEAT, HEIGHT, WIDTH, beats, seconds } from "../timeline";
 import { keystrokes } from "./typing";
 
 // Before the login, where it comes from: a terminal in a new app's folder
 // running the README's quick start (apps/website/app/commands.ts). `start`
 // prints what the website's recorded session printed; `setup` lists the files
 // that session wrote, the user model and the login flow lit; `npm run dev`
-// ends on the app's address, a line of our own, and the cut opens its login.
+// ends on the app's address, a line of our own. It all runs on a desktop,
+// and as the address comes up the browser opens on the login, which the cut
+// to the cold open then moves into.
 
 const PROMPT = "myapp $ ";
 
@@ -23,9 +32,9 @@ type Step = {
 };
 
 /** Enter, a few frames after the last key; the output follows. */
-const ENTER_AFTER = 8;
-const OUTPUT_AFTER = 14;
-const OUTPUT_GAP = 8;
+const ENTER_AFTER = seconds(0.13);
+const OUTPUT_AFTER = seconds(0.23);
+const OUTPUT_GAP = seconds(0.13);
 
 const STEPS: Step[] = [
   {
@@ -63,7 +72,6 @@ export const CLI_KEYS = STEPS.map(({ command, typing: [from, to] }) => ({
 
 /** The website's terminal colours (apps/website/app/globals.css). */
 const COLORS = {
-  ground: "#050505",
   window: "#141417",
   bar: "#18181c",
   edge: "rgb(255 255 255 / 0.08)",
@@ -77,8 +85,23 @@ const COLORS = {
 const FONT = 'ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace';
 const SIZE = 34;
 
+/** When the browser opens on the login, in beats from the scene's start: as the address prints. */
+const BROWSER_OPENS = 15;
+
 export function Cli() {
   const frame = useCurrentFrame();
+  const browser = useRef<HTMLDivElement>(null);
+  useAtomsRendered(browser, frame);
+  const opening = interpolate(
+    frame,
+    [beats(BROWSER_OPENS), beats(BROWSER_OPENS) + seconds(0.25)],
+    [0, 1],
+    {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+      easing: Easing.out(Easing.cubic),
+    },
+  );
 
   // The terminal so far: each command as typed, its output once entered, and
   // the next prompt, its caret waiting, once the output is all there.
@@ -118,21 +141,25 @@ export function Cli() {
   return (
     <div
       style={{
+        position: "relative",
         width: WIDTH,
         height: HEIGHT,
-        background: COLORS.ground,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
       }}
     >
+      <Wallpaper />
+      <MenuBar app="Terminal" />
       <div
         style={{
+          position: "relative",
           width: 1560,
           height: 900,
-          borderRadius: 20,
+          marginTop: 34,
+          borderRadius: 14,
           background: COLORS.window,
-          border: `1px solid ${COLORS.edge}`,
+          boxShadow: WINDOW_SHADOW,
           overflow: "hidden",
           display: "flex",
           flexDirection: "column",
@@ -190,6 +217,48 @@ export function Cli() {
           ))}
         </div>
       </div>
+      {opening > 0 && (
+        <div
+          ref={browser}
+          style={{
+            position: "absolute",
+            left: 230,
+            top: 120,
+            opacity: opening,
+            transform: `translateY(${(1 - opening) * 30}px) scale(${0.94 + opening * 0.06})`,
+          }}
+        >
+          <BrowserWindow
+            url="localhost:3000/login"
+            title="Sign in · myapp"
+            theme="dark"
+            width={1500}
+            height={880}
+          >
+            <LoginSurface>
+              <div style={{ display: "grid", placeItems: "center", height: "100%" }}>
+                <div style={{ transform: "scale(1.3)" }}>
+                  <Card
+                    title="Sign in"
+                    subtitle="Enter your email to continue"
+                    fields={
+                      <zl-field
+                        label="Email"
+                        type="email"
+                        placeholder="you@example.com"
+                        autocomplete="off"
+                        required
+                      />
+                    }
+                    actions={primary("Continue")}
+                    nav={SIGN_UP}
+                  />
+                </div>
+              </div>
+            </LoginSurface>
+          </BrowserWindow>
+        </div>
+      )}
     </div>
   );
 }

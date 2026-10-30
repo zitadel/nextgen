@@ -124,7 +124,7 @@ export function Outro() {
     easing: Easing.out(Easing.cubic),
   });
   // The call to action blurs away over the frames before the logo's downbeat.
-  const leave = interpolate(frame, [logoFrom - 8, logoFrom], [0, 1], clamp);
+  const leave = interpolate(frame, [logoFrom - Math.round(0.13 * fps), logoFrom], [0, 1], clamp);
   const black = interpolate(
     frame,
     [beats(OUTRO.black), beats(SECTIONS.outro.length)],

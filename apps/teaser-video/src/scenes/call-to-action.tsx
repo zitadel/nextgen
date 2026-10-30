@@ -16,7 +16,7 @@ import {
 } from "simple-icons";
 import { Easing, interpolate } from "remotion";
 
-import { HEIGHT, WIDTH } from "../timeline";
+import { HEIGHT, WIDTH, seconds } from "../timeline";
 
 // The call to action, before the logo: "Meet the new Zitadel", the promise
 // under it and the command that keeps it, the one the video opened on (apps/website/app/commands.ts); above,
@@ -61,9 +61,15 @@ const MONO = 'ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace';
 
 const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
 
-/** How far `frame` is into a blur-in that starts at `from`: 0 out of focus, 1 sharp. */
-const focusIn = (frame: number, from: number, length = 14) =>
-  interpolate(frame, [from, from + length], [0, 1], { ...clamp, easing: Easing.out(Easing.cubic) });
+/**
+ * How far `frame` is into a blur-in that starts `from` seconds in and lasts
+ * `length`: 0 out of focus, 1 sharp.
+ */
+const focusIn = (frame: number, from: number, length = 0.23) =>
+  interpolate(frame, [seconds(from), seconds(from + length)], [0, 1], {
+    ...clamp,
+    easing: Easing.out(Easing.cubic),
+  });
 
 const focused = (share: number, leave: number): CSSProperties => ({
   opacity: share * (1 - leave),
@@ -85,9 +91,9 @@ function Mark({ icon, size }: { icon: SimpleIcon; size: number }) {
  */
 export function CallToAction({ frame, leave }: { frame: number; leave: number }) {
   // The name first, the promise under it, then the command that keeps it.
-  const words = focusIn(frame, 4, 30);
-  const promise = focusIn(frame, 14, 26);
-  const command = focusIn(frame, 24, 24);
+  const words = focusIn(frame, 0.07, 0.5);
+  const promise = focusIn(frame, 0.23, 0.43);
+  const command = focusIn(frame, 0.4, 0.4);
   return (
     // One column, so the two rows of marks sit the same distance above and
     // below the words, and the whole stays centred on the frame.
@@ -108,7 +114,7 @@ export function CallToAction({ frame, leave }: { frame: number; leave: number })
         {FRAMEWORKS.map((icon, index) => (
           <span
             key={icon.slug}
-            style={{ display: "flex", ...focused(focusIn(frame, 10 + index * 4), leave) }}
+            style={{ display: "flex", ...focused(focusIn(frame, 0.17 + index * 0.07), leave) }}
           >
             <Mark icon={icon} size={52} />
           </span>
@@ -171,7 +177,7 @@ export function CallToAction({ frame, leave }: { frame: number; leave: number })
               display: "flex",
               alignItems: "center",
               gap: 16,
-              ...focused(focusIn(frame, 28 + index * 6), leave),
+              ...focused(focusIn(frame, 0.47 + index * 0.1), leave),
             }}
           >
             {icon && <Mark icon={icon} size={40} />}

@@ -2,17 +2,22 @@
 // a beat is a whole number of frames, so nothing drifts off the music. A new
 // track changes BPM here and everything moves with it.
 
-export const FPS = 60;
+// 30 frames a second, as film-like footage runs, rather than the glassy 60 of
+// a screen recording; a beat is still a whole 15 frames.
+export const FPS = 30;
 export const BPM = 120;
 export const WIDTH = 1920;
 export const HEIGHT = 1080;
 
-/** Frames in one beat: 30 at 60 fps and 120 BPM. */
+/** Frames in one beat: 15 at 30 fps and 120 BPM. */
 export const FRAMES_PER_BEAT = (FPS * 60) / BPM;
 export const BEATS_PER_BAR = 4;
 
 /** Frames in `count` beats, rounded to the nearest frame. */
 export const beats = (count: number) => Math.round(count * FRAMES_PER_BEAT);
+
+/** Frames in `count` seconds, rounded to the nearest frame: timings off the beat grid. */
+export const seconds = (count: number) => Math.round(count * FPS);
 
 type Section = { from: number; length: number };
 

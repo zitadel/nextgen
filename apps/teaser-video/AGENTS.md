@@ -13,6 +13,8 @@ moon run teaser-video:render   # dist/teaser.mp4
   every time.
 - Place every cut, keystroke and hit in beats through `src/timeline.ts`; a new
   track changes `BPM` there, never a frame number in a scene.
+- Give a timing off the beat grid in seconds through `seconds()`, never a raw
+  frame count, so a change of `FPS` keeps it.
 - Force an atom's interaction state with its stories-only `data-state`
   attribute, never with real focus or hover.
 - `src/freeze-motion.ts` switches off the atoms' own transitions and

@@ -1,9 +1,11 @@
 import { type ReactNode, useRef, useState } from "react";
 import { flushSync } from "react-dom";
-import { interpolate, useCurrentFrame } from "remotion";
+import { useCurrentFrame } from "remotion";
 
 import { type Brand, brandProperties } from "../brands";
+import { handheld, push } from "../camera";
 import { LoginSurface } from "../login-surface";
+import { Pointer } from "../pointer";
 import { HEIGHT, WIDTH } from "../timeline";
 import { useAtomsRendered } from "./shot";
 
@@ -17,19 +19,28 @@ type Point = { x: number; y: number };
 export function FocusShot({
   brand,
   length,
+  seed,
   scale,
   anchor = { x: 0.5, y: 0.5 },
-  push = 0.06,
+  pushBy = 0.06,
+  pointer,
   render,
 }: {
   brand: Brand;
   length: number;
+  /** Which shot this is, so its camera drifts its own way. */
+  seed: number;
   /** How much larger than on a page the screen is shown. */
   scale: number;
   /** Where on the frame the focused element sits, as shares of its width and height. */
   anchor?: Point;
   /** How much closer the camera ends than it starts. */
-  push?: number;
+  pushBy?: number;
+  /**
+   * Where a pointer moves in and clicks (pointer.tsx), as an offset in the
+   * screen's own pixels from the focused element's centre.
+   */
+  pointer?: Point;
   /** The screen `frame` frames in, one element of it marked `data-focus`. */
   render: (frame: number) => ReactNode;
 }) {
@@ -56,7 +67,7 @@ export function FocusShot({
     );
   });
 
-  const zoom = scale * interpolate(frame, [0, length], [1, 1 + push]);
+  const zoom = scale * push(frame, length, pushBy);
   const at = focus ?? { x: WIDTH / 2, y: HEIGHT / 2 };
   return (
     <LoginSurface theme={brand.theme} brand={brandProperties(brand)}>
@@ -67,13 +78,16 @@ export function FocusShot({
           width: WIDTH,
           height: HEIGHT,
           transformOrigin: "0 0",
-          transform: `translate(${anchor.x * WIDTH}px, ${anchor.y * HEIGHT}px) scale(${zoom}) translate(${-at.x}px, ${-at.y}px)`,
+          transform: `${handheld(frame, seed)} translate(${anchor.x * WIDTH}px, ${anchor.y * HEIGHT}px) scale(${zoom}) translate(${-at.x}px, ${-at.y}px)`,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
         }}
       >
         {render(frame)}
+        {focus && pointer && (
+          <Pointer x={focus.x + pointer.x} y={focus.y + pointer.y} frame={frame} />
+        )}
       </div>
     </LoginSurface>
   );

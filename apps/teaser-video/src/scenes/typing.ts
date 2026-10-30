@@ -1,6 +1,6 @@
 import { random } from "remotion";
 
-import { beats } from "../timeline";
+import { beats, seconds } from "../timeline";
 
 // Keystrokes, in frames from a shot's start, shared by the picture
 // (identifier.tsx) and the click track's key sounds (click-track.tsx): the
@@ -11,7 +11,7 @@ export const TYPED = "ada@zitadel.com";
 /** The caret blinks in the empty field for two beats, then the typing starts. */
 export const TYPING_START = beats(2);
 /** The last key, a little under a beat before Enter. */
-export const TYPING_END = beats(7) - 6;
+export const TYPING_END = beats(7) - seconds(0.1);
 /** Enter, on the downbeat that starts the montage. */
 export const ENTER = beats(8);
 

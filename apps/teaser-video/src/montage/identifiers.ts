@@ -1,7 +1,7 @@
 import { type Brand, COLORS } from "../brands";
 import type { IdentifierField } from "../scenes/identifier";
 import { keystrokes } from "../scenes/typing";
-import { beats } from "../timeline";
+import { beats, seconds } from "../timeline";
 
 // What identifies a person is up to the user schema. After the cold open's
 // email, the montage keeps the same view of the identifier step while it
@@ -33,7 +33,7 @@ const identifier = (
   look,
   // Typed from the cut, done well before the next one, so the value rests a
   // moment with the caret blinking after it.
-  keys: keystrokes(text, 3, beats(IDENTIFIER_BEATS) - 14, `id-${text}`),
+  keys: keystrokes(text, seconds(0.05), beats(IDENTIFIER_BEATS) - seconds(0.23), `id-${text}`),
 });
 
 export const IDENTIFIERS: Identifier[] = [

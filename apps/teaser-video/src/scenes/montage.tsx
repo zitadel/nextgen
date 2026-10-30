@@ -1,7 +1,6 @@
-import { Sequence, useCurrentFrame } from "remotion";
+import { Sequence } from "remotion";
 
-import { Shot } from "../montage/shot";
-import { SHOTS, type ShotSpec } from "../montage/shots";
+import { SHOTS } from "../montage/shots";
 import { SECTIONS, beats } from "../timeline";
 
 // The montage: the shots back to back, each cut on the beat grid.
@@ -27,22 +26,10 @@ export function Montage() {
         return (
           // biome-ignore lint/suspicious/noArrayIndexKey: a fixed list, never reordered
           <Sequence key={index} from={from} durationInFrames={length} name={`Shot ${index + 1}`}>
-            <PlayedShot shot={shot} length={length} />
+            {shot.scene(length, index)}
           </Sequence>
         );
       })}
     </>
-  );
-}
-
-function PlayedShot({ shot, length }: { shot: ShotSpec; length: number }) {
-  const frame = useCurrentFrame();
-  if ("scene" in shot) {
-    return <>{shot.scene(length)}</>;
-  }
-  return (
-    <Shot brand={shot.brand} length={length} scale={shot.scale} push={shot.push}>
-      {shot.content(frame)}
-    </Shot>
   );
 }

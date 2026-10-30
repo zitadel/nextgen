@@ -1,6 +1,7 @@
-import { AbsoluteFill, Composition, Sequence } from "remotion";
+import { Composition, Sequence } from "remotion";
 
 import { ClickTrack } from "./click-track";
+import { FilmLook } from "./film-look";
 import { Cli } from "./scenes/cli";
 import { ColdOpen } from "./scenes/cold-open";
 import { Outro } from "./scenes/outro";
@@ -24,7 +25,7 @@ function Sound({ metronome = false }: { metronome?: boolean }) {
 function Teaser({ metronome = false }: { metronome?: boolean }) {
   const { cli, coldOpen, montage, outro } = SECTIONS;
   return (
-    <AbsoluteFill style={{ background: "#000" }}>
+    <FilmLook>
       <Sequence from={beats(cli.from)} durationInFrames={beats(cli.length)} name="Terminal">
         <Cli />
       </Sequence>
@@ -42,18 +43,18 @@ function Teaser({ metronome = false }: { metronome?: boolean }) {
         <Outro />
       </Sequence>
       <Sound metronome={metronome} />
-    </AbsoluteFill>
+    </FilmLook>
   );
 }
 
 function Section({ name, children }: { name: keyof typeof SECTIONS; children: React.ReactNode }) {
   return (
-    <AbsoluteFill style={{ background: "#000" }}>
+    <FilmLook>
       {children}
       <Sequence from={-beats(SECTIONS[name].from)} layout="none">
         <Sound />
       </Sequence>
-    </AbsoluteFill>
+    </FilmLook>
   );
 }
 
