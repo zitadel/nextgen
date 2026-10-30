@@ -1,5 +1,20 @@
 # @zitadel/testing
 
+## 0.4.0
+
+### Minor Changes
+
+- [#2488](https://github.com/zitadel/nextgen/pull/2488) [`db05fbb`](https://github.com/zitadel/nextgen/commit/db05fbb18b1bf33251694382787be8445da608da) - The session cookie is now `__Host-zitadel_session`, which a browser accepts only from Zitadel's own host over https, so another site under the same domain can no longer plant a session. On `http://localhost` it is `zitadel_session`, so sign-in keeps working in Safari. An app's own, behind a server SDK or dev proxy, adds `_<project id>`.
+  
+  **Breaking:** every browser signs in again: cookies named `__nextgen_session` are no longer read. Update the server, the server SDKs, the CLI and `@zitadel/testing` together; an SDK from before this release keeps no session with this server, nor the other way round. In `@zitadel/testing`, `SESSION_COOKIE_NAME` is `__Host-zitadel_session`, and `sessionCookieName(projectId, url)` and the new `browserSessionCookieName(url)` name the cookies for the app's URL. `zitadel doctor` fails on the dev proxy of a single-page app set up before this release until `zitadel doctor --fix` updates it.
+
+### Patch Changes
+
+- Updated dependencies [[`9b1ef1e`](https://github.com/zitadel/nextgen/commit/9b1ef1ed0b0d1b8565a7da1e4e2e8d358482e877), [`f34a0a5`](https://github.com/zitadel/nextgen/commit/f34a0a58fa0694f34d0b0ad09a2593d405a112bd), [`3481a07`](https://github.com/zitadel/nextgen/commit/3481a07fcfc471fb326eeca87d17f638ea67fa73), [`1894af6`](https://github.com/zitadel/nextgen/commit/1894af64decaf46a8dd3c0d9fe6b4eba725b566e), [`d277b8f`](https://github.com/zitadel/nextgen/commit/d277b8f8eef7e24a64b40db3eb6f60d327cc3950), [`bf6ce2e`](https://github.com/zitadel/nextgen/commit/bf6ce2eb657078c261b7f9a3481073b10f85698c), [`26097dd`](https://github.com/zitadel/nextgen/commit/26097dd104c9b6fd6b9e8183921464b54f851a10), [`eaa07c3`](https://github.com/zitadel/nextgen/commit/eaa07c36f3c76a963214faa8a230f3befa2cff9b), [`665ea7d`](https://github.com/zitadel/nextgen/commit/665ea7db04c57c3abe2b9d60030fcd68f6339e15), [`db05fbb`](https://github.com/zitadel/nextgen/commit/db05fbb18b1bf33251694382787be8445da608da), [`b2d9cb9`](https://github.com/zitadel/nextgen/commit/b2d9cb9033e6d91641af451886d04652b34ed721)]:
+  - @zitadel/cli@0.4.0
+  - @zitadel/api@0.4.0
+  - @zitadel/config@0.4.0
+
 ## 0.3.0
 
 ### Patch Changes

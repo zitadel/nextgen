@@ -1,5 +1,21 @@
 # @zitadel/api
 
+## 0.4.0
+
+### Minor Changes
+
+- [#2398](https://github.com/zitadel/nextgen/pull/2398) [`26097dd`](https://github.com/zitadel/nextgen/commit/26097dd104c9b6fd6b9e8183921464b54f851a10) - Deleting a user who is the last active member of a project's owning team now fails with `409 proj.last_owner` and changes nothing. The message names the projects and says to add another member to that team, then retry. `details.details.project_ids` lists the same ids. Admin grants stay freely revocable, suspending or deactivating a user is still allowed, and a project whose owning team already has no active member is left alone.
+
+- [#2477](https://github.com/zitadel/nextgen/pull/2477) [`eaa07c3`](https://github.com/zitadel/nextgen/commit/eaa07c36f3c76a963214faa8a230f3befa2cff9b) - `POST /teams/query` now accepts an omitted `project_id` and defaults to the credential's project, matching `POST /users/query`; explicit project IDs still use the existing authorization checks.
+
+### Patch Changes
+
+- [#2503](https://github.com/zitadel/nextgen/pull/2503) [`665ea7d`](https://github.com/zitadel/nextgen/commit/665ea7db04c57c3abe2b9d60030fcd68f6339e15) - Fix sign-in behind a compressing edge failing with "got no response" after a successful exchange: the SDK proxies no longer forward `content-encoding` for a body `fetch` has already decoded, nor the browser's `accept-encoding`. A response whose body cannot be read now fails as a `NetworkError` with reason `unreadable` and says which status arrived, instead of claiming the server never answered.
+
+- [#2488](https://github.com/zitadel/nextgen/pull/2488) [`db05fbb`](https://github.com/zitadel/nextgen/commit/db05fbb18b1bf33251694382787be8445da608da) - The session cookie is now `__Host-zitadel_session`, which a browser accepts only from Zitadel's own host over https, so another site under the same domain can no longer plant a session. On `http://localhost` it is `zitadel_session`, so sign-in keeps working in Safari. An app's own, behind a server SDK or dev proxy, adds `_<project id>`.
+  
+  **Breaking:** every browser signs in again: cookies named `__nextgen_session` are no longer read. Update the server, the server SDKs, the CLI and `@zitadel/testing` together; an SDK from before this release keeps no session with this server, nor the other way round. In `@zitadel/testing`, `SESSION_COOKIE_NAME` is `__Host-zitadel_session`, and `sessionCookieName(projectId, url)` and the new `browserSessionCookieName(url)` name the cookies for the app's URL. `zitadel doctor` fails on the dev proxy of a single-page app set up before this release until `zitadel doctor --fix` updates it.
+
 ## 0.3.0
 
 ### Minor Changes
