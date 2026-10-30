@@ -41,6 +41,8 @@ function artifactEdge(project, target) {
 // Declared packages no task needs to build first.
 const UNREACHED_ALLOWED = new Set([
   "cli:@zitadel/server", // the runtime wrapper; cli:test lists it as an input
+  "cloud-console:@zitadel/console", // the add-on contract, from source; typecheck lists it as an input
+  "cloud-console:@zitadel/cloud-functions", // the functions' contract, from source; typecheck lists it as an input
   "console:@zitadel/testing", // dev-real only, resolved from source
   "docs:@zitadel/cli", // its committed command-reference.json; docs:generate lists it as an input
 ]);

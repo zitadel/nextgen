@@ -18,14 +18,17 @@ tasks:
     inputs:
       # Declaring inputs drops the default project folder, so it is restated.
       - "**/*"
-      # The hosted cloud's build bakes its base path, Vercel's insights, their
-      # sample rate and the commit its events report in (vite.config.ts,
-      # src/vite-env.d.ts), so the variables are part of the cache key: that
-      # build is never restored into the server's embedded console, or the
-      # reverse.
+      # The hosted cloud's build bakes its base path, its add-on, and what the
+      # add-on's plugin reads (the sample rate, the commit its events report,
+      # the Vercel environment; apps/cloud-console/vite.ts), so the variables
+      # are part of the cache key: that build is never restored into the
+      # server's embedded console, or the reverse. The add-on's own files are
+      # not inputs: the embedded build never compiles them in, and the commit
+      # makes every cloud build miss.
       - "$CONSOLE_BASE_PATH"
-      - "$CONSOLE_VERCEL_INSIGHTS"
+      - "$CONSOLE_ADDON"
       - "$CONSOLE_SPEED_INSIGHTS_SAMPLE_RATE"
+      - "$VERCEL_ENV"
       - "$VERCEL_GIT_COMMIT_SHA"
     outputs:
       - "/internal/staticui/console/dist/**/*"
