@@ -1,3 +1,5 @@
+import { fileURLToPath } from "node:url";
+
 import { createNextStory } from "@fumadocs/story/next";
 import { createMDX } from "fumadocs-mdx/next";
 
@@ -19,6 +21,14 @@ if (sampleRate && !(Number(sampleRate) >= 0 && Number(sampleRate) <= 1)) {
   );
 }
 
+const policy = (directives) => directives.join("; ");
+const enforcedPolicy = [
+  "object-src 'none'",
+  "base-uri 'self'",
+  "frame-ancestors 'none'",
+  "report-uri /csp-report",
+];
+
 /** @type {import('next').NextConfig} */
 const config = {
   reactStrictMode: true,
@@ -33,6 +43,25 @@ const config = {
   // service worker the package ships beside itself
   // (app/docs/mock-service-worker.js).
   serverExternalPackages: ["@zitadel/api-mock"],
+  // Adds each prerendered page's report-only policy, with its inline
+  // scripts' hashes, once the build has written the page.
+  adapterPath: fileURLToPath(new URL("./csp-adapter.mjs", import.meta.url)),
+  async headers() {
+    // Every response, the pages' and the other routes'. On the cloud's host
+    // the docs share an origin with the API and the console, so a script
+    // that runs here acts with a signed-in user's session.
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          // Enforced: nothing frames the docs, embeds a plugin or moves their
+          // base URL. Each prerendered page also carries a report-only policy
+          // that allows its inline scripts by hash (csp-adapter.mjs).
+          { key: "Content-Security-Policy", value: policy(enforcedPolicy) },
+        ],
+      },
+    ];
+  },
   async redirects() {
     // The root serves nothing; locally (next dev, next start) it opens the
     // docs. On the cloud's host the root is the website's start page.

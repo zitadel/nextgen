@@ -12071,8 +12071,9 @@ func decodeQuerySessionsParams(args [0]string, argsEscaped bool, r *http.Request
 
 // QueryTeamsParams is parameters of queryTeams operation.
 type QueryTeamsParams struct {
-	// The unique identifier of the project.
-	ProjectID ProjectID
+	// The project the request addresses. Omit it to address the credential's own
+	// project.
+	ProjectID OptProjectID `json:",omitempty,omitzero"`
 }
 
 func unpackQueryTeamsParams(packed middleware.Parameters) (params QueryTeamsParams) {
@@ -12081,7 +12082,9 @@ func unpackQueryTeamsParams(packed middleware.Parameters) (params QueryTeamsPara
 			Name: "project_id",
 			In:   "query",
 		}
-		params.ProjectID = packed[key].(ProjectID)
+		if v, ok := packed[key]; ok {
+			params.ProjectID = v.(OptProjectID)
+		}
 	}
 	return params
 }
@@ -12098,38 +12101,50 @@ func decodeQueryTeamsParams(args [0]string, argsEscaped bool, r *http.Request) (
 
 		if err := q.HasParam(cfg); err == nil {
 			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
-				var paramsDotProjectIDVal string
+				var paramsDotProjectIDVal ProjectID
 				if err := func() error {
-					val, err := d.DecodeValue()
-					if err != nil {
+					var paramsDotProjectIDValVal string
+					if err := func() error {
+						val, err := d.DecodeValue()
+						if err != nil {
+							return err
+						}
+
+						c, err := conv.ToString(val)
+						if err != nil {
+							return err
+						}
+
+						paramsDotProjectIDValVal = c
+						return nil
+					}(); err != nil {
 						return err
 					}
-
-					c, err := conv.ToString(val)
-					if err != nil {
-						return err
-					}
-
-					paramsDotProjectIDVal = c
+					paramsDotProjectIDVal = ProjectID(paramsDotProjectIDValVal)
 					return nil
 				}(); err != nil {
 					return err
 				}
-				params.ProjectID = ProjectID(paramsDotProjectIDVal)
+				params.ProjectID.SetTo(paramsDotProjectIDVal)
 				return nil
 			}); err != nil {
 				return err
 			}
 			if err := func() error {
-				if err := params.ProjectID.Validate(); err != nil {
-					return err
+				if value, ok := params.ProjectID.Get(); ok {
+					if err := func() error {
+						if err := value.Validate(); err != nil {
+							return err
+						}
+						return nil
+					}(); err != nil {
+						return err
+					}
 				}
 				return nil
 			}(); err != nil {
 				return err
 			}
-		} else {
-			return err
 		}
 		return nil
 	}(); err != nil {

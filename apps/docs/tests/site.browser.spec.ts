@@ -1,10 +1,13 @@
 import { expect, test } from "@playwright/test";
 
+import { recordPolicyViolations } from "./support";
+
 /**
  * The browser checks: the built site hydrates and navigates, and it wears the
  * console's look. Everything else the suite proves over HTTP.
  */
 test("a page renders, navigates client-side and logs no errors", async ({ page }) => {
+  const violations = await recordPolicyViolations(page);
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   page.on("console", (message) => {
@@ -23,6 +26,7 @@ test("a page renders, navigates client-side and logs no errors", async ({ page }
   await expect(page.getByRole("heading", { level: 1, name: "Agent setup" })).toBeVisible();
 
   expect(errors).toEqual([]);
+  expect(violations, "policy violations").toEqual([]);
 });
 
 test("a link to a file the docs serve opens it, without fetching it as a page", async ({

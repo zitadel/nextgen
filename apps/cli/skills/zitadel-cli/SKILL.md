@@ -47,6 +47,13 @@ by declared range or installed release, with `E_UNSUPPORTED_PROJECT_SHAPE`
 left the project untouched. The message names the minimum and the hint says to
 upgrade, so upgrade the app and rerun rather than retrying.
 
+The CLI ships this skill and the other Zitadel skills. `skills add` puts the
+ones of the version that runs it into the project's `.agents/skills/`, and into
+`.claude/skills/` when Claude Code is installed or the project has a `.claude/`
+folder, replacing older copies. After moving the app to a newer CLI, run it
+with that version so the skills describe it. It talks to no server and asks
+nothing; `data.skills` and `data.directories` say what it added where.
+
 ## Using the CLI
 
 - **Drive it non-interactively.** Always pass `--non-interactive --json` (short:
@@ -238,6 +245,9 @@ Each invocation prints one JSON object:
   `--origin`, which selects targets but never authorizes a preview deploy. A CI
   build other than Vercel or Netlify must set `ZITADEL_ENV=preview`, or it is
   skipped too. `preview list` and `preview rm <url>` read and end live previews.
+- `deployment get <id>` emits the deployment as the API serves it; on a
+  terminal it also shows the variables the deployment froze, secrets masked.
+  Read them as JSON with `variable resolve`.
 - `deployment rollback` emits `data.release_id` (the release live again),
   `data.origins` and `data.pointers`, the `{kind, handle, revision_id}`
   revisions that release pins; the `schema` one is what new registrations use.
@@ -379,6 +389,13 @@ is not yet a repository, then one commit, `chore: scaffold the project with
 zitadel setup`. A release records the commit it was built from and `deploy`
 diffs `.zitadel/` against it, so without this the first release carries no
 commit and the next deploy reports no diff.
+
+Then setup deploys `.zitadel/` to the app's origin, so the sign-in it asks you
+to verify is served the release it built. `data.deployment` carries the
+`release_id`, `content_hash`, `deployment_id` and `origins`, and is null on
+`--dry-run` or when the deploy failed. A failed deploy is a warning, never a
+failed setup, and `data.next_commands` then leads with the `deploy` that fixes
+it.
 
 Setup refuses with `E_CONFLICT` when the repository already has uncommitted
 work, untracked files included, which `details.untracked` lists separately
@@ -560,6 +577,15 @@ missing or outdated (after an upgrade that changed a dialect), and
 `doctor --fix` writes the current ones, unless the project pins a newer
 `@zitadel/*` version (run that version's `doctor --fix`) or a symlink is on
 the path; `deploy --dry-run` validates without them either way.
+
+An SPA's dev proxy (`vite.config.*`, Angular's `proxy.conf.cjs`) keeps the
+app's session in a cookie of its own project, `zitadel_session_<project id>`
+on `http://localhost` and `__Host-zitadel_session_<project id>` over https.
+`doctor` fails (`managed-files`, `outdated managed config wiring`) on the
+session-cookie hooks a CLI wrote before these names: the server no longer
+reads the cookies they keep. `doctor --fix` replaces hooks that are as the CLI
+wrote them; ones changed by hand must be updated by hand, which the failure
+says. Browsers signed in before the change sign in again.
 
 ## Claiming a project
 

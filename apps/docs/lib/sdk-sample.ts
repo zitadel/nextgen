@@ -15,7 +15,7 @@ import type { RequestData } from "fumadocs-openapi/requests";
 // not arguments; the fetch options carry the headers.
 
 /** The security schemes the spec declares, which pick how the sample authenticates. */
-export const securitySchemes = ["oauth2", "nextgenSession"] as const;
+export const securitySchemes = ["oauth2", "sessionCookie"] as const;
 
 /** The server: the spec's is the current origin, its local one localhost:8080. */
 const baseUrl = 'process.env.ZITADEL_URL ?? "http://localhost:8080"';

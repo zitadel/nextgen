@@ -17,6 +17,19 @@ Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
 - It does not use `@zitadel/design-tokens`; only the login previews paint with
   them, on the login's own atoms.
 
+## Content-Security-Policy
+
+- The enforced policy is `next.config.ts`'; the report-only one is
+  `csp-adapter.mjs`', with each prerendered page's inline scripts by hash.
+- Never give a page a nonce or `'unsafe-inline'`: pages, the changelog too,
+  stay prerendered ([why](../../docs/design/cloud/csp-docs-and-website.md)).
+- `csp-adapter.mjs` copies `apps/docs/csp-adapter.mjs` but for the policy:
+  change both.
+- Load nothing from another origin without widening the report-only policy
+  in the same change.
+- The cloud's deployment checks (`e2e/console/src-deployment/routes.spec.ts`)
+  fail a page with an unhashed inline script.
+
 ## The fonts
 
 - Load every face through `next/font/local` from `app/fonts/`, never
@@ -93,7 +106,8 @@ Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
   elements and never as HTML: this origin also serves the console's session.
   The feed carries each entry's plain-text summary instead.
 - Keep `metadata.internal` in the skill's `SKILL.md`: it keeps the skill out
-  of `npx skills add zitadel/nextgen --full-depth`, the users' install.
+  of the users' installs, `zitadel skills add` and
+  `npx skills add zitadel/nextgen --full-depth`.
 
 ## Analytics
 

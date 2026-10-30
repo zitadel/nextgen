@@ -52,7 +52,7 @@ export type ClaimOutcome =
 
 /**
  * Spend a claim challenge: `POST /projects/{project_id}/claim/complete`,
- * authenticated by the `__nextgen_session` cookie.
+ * authenticated by the session cookie.
  *
  * Deliberately the **single** place the completion request is made (#615):
  * it carries ADR 053's `X-Zitadel-CSRF` token, which the claim route's loader

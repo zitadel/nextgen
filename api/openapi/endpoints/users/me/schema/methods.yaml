@@ -9,7 +9,7 @@ get:
   tags:
     - Users
   security:
-    - nextgenSession: []
+    - sessionCookie: []
   parameters:
     - $ref: ../../../../components/parameters/session-project-id.yaml
   responses:

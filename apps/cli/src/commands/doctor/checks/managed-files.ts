@@ -78,6 +78,7 @@ export class ManagedFilesCheck implements SanityCheck {
       (s) => s.state === "detached" && s.wiring === "convenience",
     );
     const unverifiable = wiring.filter((s) => s.state === "unknown");
+    const outdated = wiring.filter((s) => s.state === "outdated");
     const conflicts = boundaries.filter((b) => b.disposition === "conflict");
     const removable = boundaries.filter((b) => b.disposition === "removable");
     const details = {
@@ -96,6 +97,13 @@ export class ManagedFilesCheck implements SanityCheck {
     if (detachedInfrastructure.length > 0) {
       failures.push(
         `detached managed config wiring: ${detachedInfrastructure.map((s) => s.path).join(", ")}`,
+      );
+    }
+    if (outdated.length > 0) {
+      failures.push(
+        `outdated managed config wiring: ${outdated
+          .map((s) => (s.reason ? `${s.path} (${s.reason})` : s.path))
+          .join(", ")}`,
       );
     }
     for (const conflict of conflicts) {

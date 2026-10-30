@@ -1,6 +1,7 @@
 import { expect, test } from "@zitadel/testing/playwright";
 
 import { withErrorBody } from "../support/api";
+import { recordPolicyViolations } from "../support/policy";
 import { openAddTeam, uniqueName } from "../support/screens";
 import { EMBEDDED_LOGIN_URL, signIn } from "../support/sign-in";
 
@@ -21,6 +22,9 @@ import { EMBEDDED_LOGIN_URL, signIn } from "../support/sign-in";
 
 test("signs in end to end against the embedded API", async ({ page, seed }) => {
   const user = await seed.user();
+  // The binary sends the console's policies with every page of it; the
+  // sign-in and the shell break neither.
+  const violations = await recordPolicyViolations(page);
 
   await page.goto("/ui/console/");
 
@@ -46,7 +50,7 @@ test("signs in end to end against the embedded API", async ({ page, seed }) => {
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
 
   // Terminal step → `POST /sessions/exchange` with the runtime-discovered
-  // publishable key → `__nextgen_session` cookie → full-document navigation
+  // publishable key → session cookie → full-document navigation
   // back into the console, where the guard's `GET /sessions/me` now answers
   // 200. Four more calls that only resolve if the base is right.
   await page.waitForURL((url) => !url.pathname.endsWith("/login"));
@@ -66,6 +70,7 @@ test("signs in end to end against the embedded API", async ({ page, seed }) => {
   await expect(page.getByRole("button", { name: /^Account:/ })).toBeVisible();
   await expect(page.getByRole("navigation", { name: "Primary" })).toHaveCount(0);
   await expect(page.getByText("No projects yet.")).toBeVisible();
+  expect(violations, "policy violations").toEqual([]);
 });
 
 test("manages the project with the session cookie alone", async ({ page, seed, zitadel }) => {

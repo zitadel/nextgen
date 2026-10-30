@@ -38,7 +38,7 @@ get:
   security:
     - oauth2:
         - user.read
-    - nextgenSession: []
+    - sessionCookie: []
   responses:
     '200':
       description: Current user information retrieved successfully
@@ -77,7 +77,7 @@ patch:
   security:
     - oauth2:
         - user.write
-    - nextgenSession: []
+    - sessionCookie: []
   requestBody:
     description: The changes to merge into the user.
     required: true
@@ -164,7 +164,7 @@ delete:
     security:
       - oauth2:
           - user.delete
-      - nextgenSession: []
+      - sessionCookie: []
     responses:
       '204':
         description: User deleted successfully.

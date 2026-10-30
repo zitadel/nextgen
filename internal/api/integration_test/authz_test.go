@@ -272,7 +272,7 @@ func TestManagementAuthz(t *testing.T) {
 
 			// A read of a foreign project answers "nothing there", so a
 			// listing cannot be used to prove the project exists.
-			queryResp, err := foreign.QueryTeams(t.Context(), &api.QueryTeamsRequest{}, api.QueryTeamsParams{ProjectID: victimID})
+			queryResp, err := foreign.QueryTeams(t.Context(), &api.QueryTeamsRequest{}, api.QueryTeamsParams{ProjectID: api.NewOptProjectID(victimID)})
 			require.NoError(t, err)
 			assertAuthzError(t, queryResp, "team.team_not_found")
 		})
@@ -290,7 +290,7 @@ func TestManagementAuthz(t *testing.T) {
 			// Fabricated path id misses RSI before the preview ceiling runs.
 			assertAuthzError(t, updateResp, "team.team_not_found")
 
-			queryResp, err := preview.QueryTeams(t.Context(), &api.QueryTeamsRequest{}, api.QueryTeamsParams{ProjectID: victimID})
+			queryResp, err := preview.QueryTeams(t.Context(), &api.QueryTeamsRequest{}, api.QueryTeamsParams{ProjectID: api.NewOptProjectID(victimID)})
 			require.NoError(t, err)
 			require.IsType(t, &api.QueryTeamsForbidden{}, queryResp, helpers.MustMarshal(t, queryResp))
 			assertAuthzError(t, queryResp, "team.permission_denied")
@@ -534,7 +534,7 @@ func TestListAuthzTeamScopedOnlyPartialView(t *testing.T) {
 	require.NoError(t, err)
 	assertAuthzStatus(t, inUseResp, http.StatusForbidden, domain.ErrJSONSchemaPermissionDenied().Code)
 
-	teamsResp, err := client.QueryTeams(t.Context(), &api.QueryTeamsRequest{}, api.QueryTeamsParams{ProjectID: api.ProjectID(project.ID)})
+	teamsResp, err := client.QueryTeams(t.Context(), &api.QueryTeamsRequest{}, api.QueryTeamsParams{ProjectID: api.NewOptProjectID(api.ProjectID(project.ID))})
 	require.NoError(t, err)
 	require.IsType(t, &api.QueryTeamsResponse{}, teamsResp, helpers.MustMarshal(t, teamsResp))
 	listed := teamsResp.(*api.QueryTeamsResponse)
