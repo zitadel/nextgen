@@ -44,6 +44,13 @@ properties:
     description: OIDC/SAML auth request ID (links flow to protocol request).
   redirect_uri:
     type: string
-    format: uri
+    maxLength: 2048
+    description: |
+      Where a terminal `redirect` step sends the browser once the flow
+      completes (the OIDC/SAML callback). The caller supplies it, so the
+      server parses it the way a browser reads it and refuses a target it
+      could be tricked into redirecting off-origin to: a path that reads as
+      another host, a backslash, an encoded dot or slash, a control
+      character, userinfo, a non-http(s) scheme. An absolute URL.
   hint:
     $ref: flow-hint.yaml

@@ -66,9 +66,17 @@ func (h *Handler) CreateFlow(ctx context.Context, req *api.CreateFlowRequest, pa
 		Definition: def,
 		Purpose:    purpose,
 	}
-	if uri, ok := req.RedirectURI.Get(); ok {
-		// TODO: validate against RP's redirect_uri allowlist when OIDC lands.
-		s := uri.String()
+	if rawRedirectURI, ok := req.RedirectURI.Get(); ok {
+		// A redirect_uri is caller input the terminal step sends a browser to,
+		// so it goes through the one hardened check, like return_target, never
+		// a url.Parse by hand. ParseRedirectTarget decides whether the URL is
+		// safe for a browser; which hosts are acceptable is the RP's
+		// redirect_uri allowlist, still to come when OIDC lands.
+		redirectURI, err := httputil.ParseRedirectTarget(rawRedirectURI)
+		if err != nil {
+			return nil, domain.ErrRequestInvalid().WithMessage(fmt.Sprintf("redirect_uri %q is %v", rawRedirectURI, err))
+		}
+		s := redirectURI.String()
 		startReq.RedirectURI = &s
 	}
 	if id, ok := req.AuthRequestID.Get(); ok {

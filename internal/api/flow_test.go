@@ -252,6 +252,79 @@ func TestCreateFlow_ReturnsCookieAndFlowID(t *testing.T) {
 	}
 }
 
+// TestCreateFlow_StoresASafeRedirectURI proves the caller's redirect_uri
+// reaches the engine as the terminal redirect once it passes the check.
+func TestCreateFlow_StoresASafeRedirectURI(t *testing.T) {
+	ts := newTestServer(t)
+	ts.fake.def = &domain.FlowDefinition{ProjectID: "proj_1", ID: "def_1", Purposes: map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "identify"}}
+	ts.fake.startResult = domain.FlowStepResult{
+		State: &domain.FlowState{ID: "flow_1", ProjectID: "proj_1", SessionID: "sess_1", IssuedAt: time.Now()},
+		Step:  &domain.FlowStep{Name: "identify"},
+	}
+
+	resp, body := doRequest(t, http.MethodPost, ts.srv.URL+"/flow", map[string]any{
+		"project_id":   "proj_1",
+		"purpose":      "login",
+		"redirect_uri": "https://app.test/callback?code=abc",
+	}, "")
+	require.Equal(t, http.StatusCreated, resp.StatusCode, string(body))
+	require.NotNil(t, ts.fake.gotStartReq.RedirectURI)
+	require.Equal(t, "https://app.test/callback?code=abc", *ts.fake.gotStartReq.RedirectURI)
+}
+
+// TestCreateFlow_RejectsAnUnsafeRedirectURI proves the caller's redirect_uri
+// goes through httputil.ParseRedirectTarget, so no sign-in starts for a target
+// a browser could read as another host. The parser's full corpus is covered on
+// its own in internal/httputil; here it is enough to prove the handler wires it.
+func TestCreateFlow_RejectsAnUnsafeRedirectURI(t *testing.T) {
+	tests := []struct {
+		name        string
+		redirectURI string
+	}{
+		{
+			// A proxy re-basing the redirect onto its own host reads
+			// //evil.example as the host once the origin is stripped.
+			name:        "a path starting with two slashes",
+			redirectURI: "https://app.test//evil.example/login",
+		},
+		{
+			name:        "a backslash a browser reads as a slash",
+			redirectURI: `https://app.test/\evil.example`,
+		},
+		{
+			name:        "an encoded parent segment before two slashes",
+			redirectURI: "https://app.test/%2e%2e//evil.example/login",
+		},
+		{
+			name:        "userinfo hiding the real host",
+			redirectURI: "https://app.test@evil.example/login",
+		},
+		{
+			name:        "a non-http(s) scheme",
+			redirectURI: "javascript:alert(1)",
+		},
+		{
+			name:        "a redirect_uri longer than the 2048 maxLength",
+			redirectURI: "https://app.test/" + strings.Repeat("a", 2100),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ts := newTestServer(t)
+			ts.fake.def = &domain.FlowDefinition{ProjectID: "proj_1", ID: "def_1", Purposes: map[domain.FlowDefinitionPurpose]string{domain.FlowDefinitionPurposeLogin: "identify"}}
+
+			resp, body := doRequest(t, http.MethodPost, ts.srv.URL+"/flow", map[string]any{
+				"project_id":   "proj_1",
+				"purpose":      "login",
+				"redirect_uri": tt.redirectURI,
+			}, "")
+			require.Equal(t, http.StatusBadRequest, resp.StatusCode, string(body))
+			require.Contains(t, string(body), "redirect_uri")
+			require.Nil(t, ts.fake.gotStartReq.RedirectURI, "no flow is started")
+		})
+	}
+}
+
 func TestSubmitFlowStep_PathIDMismatchReturns404(t *testing.T) {
 	ts := newTestServer(t)
 	state := &domain.FlowState{ID: "flow_real", IssuedAt: time.Now()}

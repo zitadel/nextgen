@@ -15132,9 +15132,15 @@ type CreateFlowRequest struct {
 	SessionID    OptString            `json:"session_id"`
 	SessionToken OptSessionProofToken `json:"session_token"`
 	// OIDC/SAML auth request ID (links flow to protocol request).
-	AuthRequestID OptString   `json:"auth_request_id"`
-	RedirectURI   OptURI      `json:"redirect_uri"`
-	Hint          OptFlowHint `json:"hint"`
+	AuthRequestID OptString `json:"auth_request_id"`
+	// Where a terminal `redirect` step sends the browser once the flow
+	// completes (the OIDC/SAML callback). The caller supplies it, so the
+	// server parses it the way a browser reads it and refuses a target it
+	// could be tricked into redirecting off-origin to: a path that reads as
+	// another host, a backslash, an encoded dot or slash, a control
+	// character, userinfo, a non-http(s) scheme. An absolute URL.
+	RedirectURI OptString   `json:"redirect_uri"`
+	Hint        OptFlowHint `json:"hint"`
 }
 
 // GetProjectID returns the value of ProjectID.
@@ -15183,7 +15189,7 @@ func (s *CreateFlowRequest) GetAuthRequestID() OptString {
 }
 
 // GetRedirectURI returns the value of RedirectURI.
-func (s *CreateFlowRequest) GetRedirectURI() OptURI {
+func (s *CreateFlowRequest) GetRedirectURI() OptString {
 	return s.RedirectURI
 }
 
@@ -15238,7 +15244,7 @@ func (s *CreateFlowRequest) SetAuthRequestID(val OptString) {
 }
 
 // SetRedirectURI sets the value of RedirectURI.
-func (s *CreateFlowRequest) SetRedirectURI(val OptURI) {
+func (s *CreateFlowRequest) SetRedirectURI(val OptString) {
 	s.RedirectURI = val
 }
 
