@@ -403,7 +403,7 @@ The canonical mapper (`domainErrorDetails` → only `Code` + `Message`) is clean
 | Align `WithLogging`: 4xx at `Info`/`Warn`, stop logging raw response bodies | API / instrumentation | Done, #522; superseded by the request line, #2254 |
 | Request line: one `Info` line per request, no body | API / instrumentation | Done, #2254 |
 | Error line: log every API error once in `OgenErrorHandler`, level by status class | API | Done, #2252 |
-| Error line for every answer ≥ 400 (typed responses, flow step rejections, routes outside ogen) | API | Done, #TBD |
+| Error line for every answer ≥ 400 (typed responses, flow step rejections, routes outside ogen) | API | Done, #2509 |
 | Deduplicate API `code → HTTP status` mapping (helper / manifest in `internal/api`; no `ErrorClass` on domain) | API | [#585](https://github.com/zitadel/nextgen/issues/585) |
 | Schema-declared attribute sensitivity; audit no secret/PII in path/query params | API / domain | [#585](https://github.com/zitadel/nextgen/issues/585) |
 | `errors.Is(err, domain.ErrX())` builds a sentinel per comparison and captures its location and stack (36 sites outside tests) | Domain | [#2344](https://github.com/zitadel/nextgen/issues/2344) |
