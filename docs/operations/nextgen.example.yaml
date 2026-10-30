@@ -30,7 +30,8 @@ server:
   public_base: https://nextgen.zitadel.cloud
   # Other origins the console is reached at, beside public_base's, such as
   # another hostname in front of this deployment. Like public_base's, they may
-  # open any project's flow to preview its login
+  # open any project's flow to preview its login; signing in to the platform
+  # project works only at public_base
   # (env: NEXTGEN_SERVER_CONSOLE_ORIGINS, comma separated).
   # console_origins:
   #   - https://console.example.com

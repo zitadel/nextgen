@@ -277,11 +277,11 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	)
 
 	// Bootstrap runs here rather than straight after the migrations because it
-	// now seeds a usable project (keys, user schema, login flows) and so needs
-	// the project service, which needs the key service. It must still precede
-	// the user import: that import creates a bare, unseeded project row for any
-	// project id a bootstrap user names, and a project row that already exists
-	// would make this a no-op and leave the platform project unseeded.
+	// creates the project's keys and so needs the project service, which needs
+	// the key service. It must still precede the user import: that import
+	// creates a bare project row for any project id a bootstrap user names, and
+	// a project row that already exists would make this a no-op and leave the
+	// platform project without keys.
 	if err := platform.Ensure(ctx, projectService, serviceDBPool, cfg.Platform.BootstrapProject); err != nil {
 		return fmt.Errorf("failed to bootstrap platform project: %w", err)
 	}
@@ -339,7 +339,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	// there like any other project. Before the user import, which needs the
 	// platform user schema this release stores.
 	if cfg.Platform.BootstrapProject {
-		if err := platform.EnsureDeployed(ctx, cfg.Schema.BuiltinPublicBase, consoleHosts[0], projectService, releaseService, deploymentService); err != nil {
+		if err := platform.EnsureDeployed(ctx, serviceDBPool, cfg.Schema.BuiltinPublicBase, build.Version(), consoleHosts[0], projectService, releaseService, deploymentService); err != nil {
 			return fmt.Errorf("failed to deploy the platform project: %w", err)
 		}
 	}

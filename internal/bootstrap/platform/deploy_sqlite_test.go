@@ -3,6 +3,7 @@
 package platform
 
 import (
+	"context"
 	"net/url"
 	"strings"
 	"testing"
@@ -39,7 +40,7 @@ func TestEnsureDeployedSQLiteServesTheServersBundle(t *testing.T) {
 
 	deploy := func() {
 		t.Helper()
-		require.NoError(t, EnsureDeployed(ctx, testSchemaBase, consoleOrigin, projects, releases, deployments))
+		require.NoError(t, EnsureDeployed(ctx, pool, testSchemaBase, "1.0.0", consoleOrigin, projects, releases, deployments))
 	}
 	served := func() []domain.OriginDeployment {
 		t.Helper()
@@ -84,6 +85,87 @@ func TestEnsureDeployedSQLiteServesTheServersBundle(t *testing.T) {
 	userSchema, err := pool.Statements().GetJSONSchemaByID(ctx, domain.PlatformProjectID, schemaID)
 	require.NoError(t, err)
 	assert.Equal(t, []string{schemas.PlatformDisplayNameProperty}, domain.DesignatedDisplay(userSchema.Schema))
+}
+
+// A server older than the one that built the live release finds it newer, so
+// it leaves the console's deployment alone.
+func TestEnsureDeployedSQLiteOlderServerLeavesTheNewerRelease(t *testing.T) {
+	ctx := t.Context()
+	dbPool, stop, err := dbtest.SQLite(ctx)
+	require.NoError(t, err)
+	t.Cleanup(stop)
+	pool := service.NewPool(dbPool)
+	projects, keys := newTestProjects(t, pool)
+	releases, deployments := newTestReleases(t, pool, keys)
+	require.NoError(t, Ensure(ctx, projects, pool, true))
+	require.NoError(t, EnsureDeployed(ctx, pool, testSchemaBase, "2.0.0", consoleOrigin, projects, releases, deployments))
+
+	scoped := service.WithAuthzListUnrestricted(ctx)
+	older, err := newerServerDeployed(scoped, pool, releases, "1.0.0", consoleOrigin)
+	require.NoError(t, err)
+	assert.True(t, older)
+	same, err := newerServerDeployed(scoped, pool, releases, "2.0.0", consoleOrigin)
+	require.NoError(t, err)
+	assert.False(t, same)
+}
+
+// Every start leaves public_base's origin the one primary origin, so a public
+// base the deployment has left is no longer admitted. Preview origins stay.
+func TestEnsureDeployedSQLiteOwnsThePrimaryOrigins(t *testing.T) {
+	ctx := t.Context()
+	dbPool, stop, err := dbtest.SQLite(ctx)
+	require.NoError(t, err)
+	t.Cleanup(stop)
+	pool := service.NewPool(dbPool)
+	projects, keys := newTestProjects(t, pool)
+	releases, deployments := newTestReleases(t, pool, keys)
+	require.NoError(t, Ensure(ctx, projects, pool, true))
+
+	const preview = "https://*-console.example.com"
+	require.NoError(t, EnsureDeployed(ctx, pool, testSchemaBase, "1.0.0", "https://old.example.com", projects, releases, deployments))
+	_, err = projects.AddOrigin(ctx, domain.PlatformProjectID, domain.Origin{Pattern: preview, Kind: domain.OriginKindPreview})
+	require.NoError(t, err)
+
+	require.NoError(t, EnsureDeployed(ctx, pool, testSchemaBase, "1.0.0", consoleOrigin, projects, releases, deployments))
+
+	project, err := projects.Get(ctx, domain.PlatformProjectID, service.ProjectQueryOptions{})
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []domain.Origin{
+		{Pattern: consoleOrigin, Kind: domain.OriginKindPrimary},
+		{Pattern: preview, Kind: domain.OriginKindPreview},
+	}, project.Origins)
+}
+
+// conflictOnce is a release service whose first build loses the race another
+// replica won, the way a concurrent start does.
+type conflictOnce struct {
+	service.ReleaseService
+	lost bool
+}
+
+func (s *conflictOnce) Build(ctx context.Context, input service.BuildReleaseInput) (*service.CreateReleaseOutput, error) {
+	if !s.lost {
+		s.lost = true
+		return nil, domain.ErrPolicyRevisionConflict()
+	}
+	return s.ReleaseService.Build(ctx, input)
+}
+
+// A replica that loses the race to store the revisions still starts: its second
+// build finds what the winner stored.
+func TestEnsureDeployedSQLiteRetriesALostBuild(t *testing.T) {
+	ctx := t.Context()
+	dbPool, stop, err := dbtest.SQLite(ctx)
+	require.NoError(t, err)
+	t.Cleanup(stop)
+	pool := service.NewPool(dbPool)
+	projects, keys := newTestProjects(t, pool)
+	releases, deployments := newTestReleases(t, pool, keys)
+	require.NoError(t, Ensure(ctx, projects, pool, true))
+
+	losing := &conflictOnce{ReleaseService: releases}
+	require.NoError(t, EnsureDeployed(ctx, pool, testSchemaBase, "1.0.0", consoleOrigin, projects, losing, deployments))
+	assert.True(t, losing.lost)
 }
 
 // newTestReleases wires the release and deployment services the way the

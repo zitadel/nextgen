@@ -9,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/errgroup"
 
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
@@ -28,10 +29,9 @@ func TestPlatformProjectSignsInFromTheConsole(t *testing.T) {
 	t.Cleanup(func() {
 		_, _ = harness.EnsureServiceDB(t).Statements().DeleteProjectByID(context.Background(), domain.PlatformProjectID)
 	})
-	deploy := func() {
-		t.Helper()
-		require.NoError(t, platformbootstrap.EnsureDeployed(t.Context(), helpers.BuiltinSchemaBaseURL, helpers.ConsoleOrigin,
-			projects, harness.EnsureReleaseService(t), harness.EnsureDeploymentService(t)))
+	deploy := func() error {
+		return platformbootstrap.EnsureDeployed(t.Context(), harness.EnsureServiceDB(t), helpers.BuiltinSchemaBaseURL, "1.0.0",
+			helpers.ConsoleOrigin, projects, harness.EnsureReleaseService(t), harness.EnsureDeploymentService(t))
 	}
 	served := func() []domain.OriginDeployment {
 		t.Helper()
@@ -41,10 +41,16 @@ func TestPlatformProjectSignsInFromTheConsole(t *testing.T) {
 		return read
 	}
 
-	deploy()
+	// Replicas that start together race on an empty project: on a serverless
+	// platform a cold burst brings up one per request.
+	var starts errgroup.Group
+	for range 4 {
+		starts.Go(deploy)
+	}
+	require.NoError(t, starts.Wait())
 	first := served()
 	require.Len(t, first, 1, "the console origin is served")
-	deploy()
+	require.NoError(t, deploy())
 	assert.Equal(t, first, served(), "a restart that changes nothing deploys nothing")
 
 	resp, body := openFlow(t, domain.PlatformProjectID, helpers.ConsoleOrigin)
