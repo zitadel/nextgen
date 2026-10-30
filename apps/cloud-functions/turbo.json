@@ -1,0 +1,19 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  // The hosted cloud's functions under /cloud/ (Next.js, route handlers
+  // only; root ADR 084). Mirrors apps/cloud-functions/moon.yml; `lint`,
+  // `test` and `dev` are the root's.
+  "tasks": {
+    // Waits for the build, for apps/website/turbo.json's reason.
+    "typecheck": {
+      "dependsOn": ["build"]
+    },
+    // The cloud's service builds through this task, keyed by the
+    // deployment's ID as the website's is: on Vercel it never hits.
+    "build": {
+      "env": ["VERCEL_DEPLOYMENT_ID"],
+      "outputs": [".next/**", "!.next/cache/**"]
+    }
+  }
+}

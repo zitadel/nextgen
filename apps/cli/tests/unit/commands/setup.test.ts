@@ -787,6 +787,7 @@ describe("setup command", () => {
         "http://localhost:9942",
         "--non-interactive",
         "--skip-install",
+        "--no-git",
         "--framework",
         "next",
         ...PINNED_DEV_PORT,
@@ -846,6 +847,7 @@ describe("setup command", () => {
         "http://localhost:9944",
         "--non-interactive",
         "--skip-install",
+        "--no-git",
         "--framework",
         "next",
         ...PINNED_DEV_PORT,
@@ -904,7 +906,7 @@ describe("setup command", () => {
         `${local}/sessions/exchange`,
         () =>
           new HttpResponse(null, {
-            headers: { "set-cookie": "__nextgen_session=admin_session; Path=/; HttpOnly" },
+            headers: { "set-cookie": "zitadel_session=admin_session; Path=/; HttpOnly" },
           }),
       ),
       http.post(`${local}/projects/:projectId/claim/init`, () =>

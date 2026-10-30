@@ -193,6 +193,7 @@ which ships in this package.
 * [`zitadel sessions list`](#zitadel-sessions-list)
 * [`zitadel sessions revoke ID`](#zitadel-sessions-revoke-id)
 * [`zitadel setup`](#zitadel-setup)
+* [`zitadel skills add`](#zitadel-skills-add)
 * [`zitadel start`](#zitadel-start)
 * [`zitadel status`](#zitadel-status)
 * [`zitadel stop`](#zitadel-stop)
@@ -3423,6 +3424,44 @@ EXAMPLES
   $ zitadel setup --framework react --dev-port 3000
 ```
 
+## `zitadel skills add`
+
+Add the Zitadel agent skills to this project.
+
+```
+USAGE
+  $ zitadel skills add [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry]
+
+FLAGS
+  -c, --cwd=<value>      Project directory to operate on.
+  -n, --non-interactive  Disable prompts. Required when scripting or running as
+                         an agent.
+  -s, --server=<value>   Override the resolved server URL.
+  -v, --verbose          Verbose logging.
+      --[no-]color       Colorize human output. Disable with --no-color;
+                         NO_COLOR and FORCE_COLOR are honored too.
+      --debug            Debug logging.
+      --dry-run          Preview without mutating files or the platform.
+      --[no-]telemetry   Send anonymous usage analytics. Disable with
+                         --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Add the Zitadel agent skills to this project.
+
+  Adds the skills of this CLI's version to .agents/skills, which most coding
+  agents read, and to .claude/skills for Claude Code. Run it again after
+  updating the CLI to replace them with the new version's.
+
+EXAMPLES
+  $ zitadel skills add
+
+  $ zitadel skills add --cwd my-app
+```
+
 ## `zitadel start`
 
 Start a local Zitadel server.
@@ -4069,10 +4108,11 @@ FLAGS
       qual|greater_than|greater_than_or_equal), id (equals|not_equals|contains|not
       _contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal),
       schema (equals|not_equals|contains|not_contains|less_than|less_than_or_equal
-      |greater_than|greater_than_or_equal), status (equals|not_equals|contains|not
-      _contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal),
-      team_id (equals|not_equals|contains|not_contains|less_than|less_than_or_equa
-      l|greater_than|greater_than_or_equal), lifecycle_owner_team_id
+      |greater_than|greater_than_or_equal), schema_object_type
+      (equals|not_equals|contains), status (equals|not_equals|contains|not_contain
+      s|less_than|less_than_or_equal|greater_than|greater_than_or_equal), team_id
+      (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greate
+      r_than|greater_than_or_equal), lifecycle_owner_team_id
       (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greate
       r_than|greater_than_or_equal).
 

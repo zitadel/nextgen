@@ -6,7 +6,7 @@ import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
-import { type Platform, RESOURCES } from "../../../src/commands/resources";
+import { type Platform, RESOURCES, releasePointers } from "../../../src/commands/resources";
 import { COMMANDS } from "../../../src/index";
 import {
   definitionOf,
@@ -1893,13 +1893,35 @@ describe("flow definitions list the current flows", () => {
 });
 
 describe("the release resource", () => {
-  it("lists whether each release is revoked", () => {
-    expect(RESOURCES.release.columns).toContain("revoked_at");
+  it("lists whether each release is revoked, and when it was created", () => {
+    expect(RESOURCES.release.columns).toEqual(
+      expect.arrayContaining(["revoked_at", "metadata.created_at"]),
+    );
   });
 
   it("shows a release's content hash and revocation", () => {
     expect(RESOURCES.release.detail).toEqual(
       expect.arrayContaining(["content_hash", "revoked_at"]),
+    );
+  });
+
+  it("shows the resources a release pins as a table under its fields", () => {
+    const release = {
+      pointers: [
+        { kind: "schema", handle: "human-user", revision_id: "sch_1" },
+        { kind: "flow_definition", handle: "default-login", revision_id: "fd_1" },
+      ],
+    };
+
+    expect(RESOURCES.release.get.sections?.(release)).toEqual([releasePointers(release)]);
+    expect(releasePointers(release)).toBe(
+      [
+        "resources",
+        "  kind             handle         revision_id",
+        "  ---------------  -------------  -----------",
+        "  schema           human-user     sch_1",
+        "  flow_definition  default-login  fd_1",
+      ].join("\n"),
     );
   });
 });

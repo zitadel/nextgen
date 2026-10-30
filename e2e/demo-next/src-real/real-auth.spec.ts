@@ -15,9 +15,12 @@ async function expectAuthenticatedAs(
   await expect(page.getByRole("heading", { name: "Admin" })).toBeVisible();
   // Default schema: email identifier, no display — the line shows the email.
   await expect(page.getByText(`Signed in as ${user.email}`)).toBeVisible();
-  // The SDK keeps the session under the project's name (ADR 073).
+  // The SDK keeps the session under the project's name, for the app's URL
+  // (ADR 073, ADR 083).
   const cookies = await page.context().cookies();
-  const session = cookies.find((cookie) => cookie.name === sessionCookieName(projectId));
+  const session = cookies.find(
+    (cookie) => cookie.name === sessionCookieName(projectId, page.url()),
+  );
   expect(session).toBeDefined();
   expect(session?.httpOnly).toBe(true);
 }

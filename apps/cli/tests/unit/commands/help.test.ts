@@ -30,6 +30,7 @@ Getting started
   start             Start a local Zitadel server
   status            Summarize the local Zitadel server and project state
   claim             Claim this project to make it permanent
+  skills            Give coding agents the Zitadel skills
 
 Local development
   console           Open the local console, signed in as the local admin
@@ -57,7 +58,7 @@ Configuration and releases
   env               Show and bind environments
   flow-definitions  View login flows
   origin            Manage the project's allowed origins
-  policies          View policies
+  policies          View and test policies
   projects          View and update projects
   release           Build and manage releases
   schemas           View user schemas

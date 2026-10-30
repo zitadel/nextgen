@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -15,6 +16,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
+
+	"github.com/zitadel/nextgen/internal/audit"
 )
 
 const testPEM = "-----BEGIN RSA PRIVATE KEY-----\nMIIBOgIBAAJBAKj34GkxFhD90vcNLYLInFEX6Ppy1tPf9Cnzj4p4WGeKLs1Pt8Qu\n-----END RSA PRIVATE KEY-----\n"
@@ -43,6 +47,7 @@ func setLauncherEnv(t *testing.T, dataDir string) {
 		"NEXTGEN_PLATFORM_OPERATORS",
 		"NEXTGEN_SERVER_ADDRESS",
 		"NEXTGEN_SERVER_CONSOLE_ENABLED",
+		"NEXTGEN_SERVER_CONSOLE_ORIGINS",
 		"NEXTGEN_SERVER_CONSOLE_PATH",
 		"NEXTGEN_SERVER_PUBLIC_BASE",
 		"NEXTGEN_SERVER_REQUEST_ID_HEADER",
@@ -58,7 +63,11 @@ func setLauncherEnv(t *testing.T, dataDir string) {
 	t.Setenv("NEXTGEN_SERVER_DATA_DIR", dataDir)
 	t.Setenv("MASTER_KEY_PEM_B64", base64.StdEncoding.EncodeToString([]byte(testPEM)))
 	t.Setenv("MASTER_KEY_ID", "cloud-2026-10")
+	// Every deployment has one; a case about a local run clears it.
+	t.Setenv("CRON_SECRET", testCronSecret)
 }
+
+const testCronSecret = "0123456789abcdef-cron"
 
 type ensureCall struct {
 	baseDSN, name, ref string
@@ -89,6 +98,8 @@ func TestPrepareServerRendersTheMasterKeyIntoTheConfig(t *testing.T) {
 	dataDir := t.TempDir()
 	setLauncherEnv(t, dataDir)
 	t.Setenv("PORT", "9090")
+	// A local run has no cron job, so the server keeps its own purge loop.
+	t.Setenv("CRON_SECRET", "")
 
 	args, err := prepareServer(nil)
 	require.NoError(t, err)
@@ -138,6 +149,7 @@ func TestPrepareServerNormalizesThePEM(t *testing.T) {
 func TestPrepareServerRendersThePreviousMasterKeyForDecryption(t *testing.T) {
 	dataDir := t.TempDir()
 	setLauncherEnv(t, dataDir)
+	t.Setenv("CRON_SECRET", "")
 	const previousPEM = "-----BEGIN RSA PRIVATE KEY-----\nOLDKEY\n-----END RSA PRIVATE KEY-----\n"
 	t.Setenv("MASTER_KEY_PREVIOUS_PEM_B64", base64.StdEncoding.EncodeToString([]byte(previousPEM)))
 	t.Setenv("MASTER_KEY_PREVIOUS_ID", "cloud-2026-09")
@@ -185,6 +197,35 @@ func TestPrepareServerServesProductionFromThePooledURL(t *testing.T) {
 		"pool_max_conns":          {"4"},
 		"default_query_exec_mode": {"cache_describe"},
 	}, served.Query())
+}
+
+// A function runs only while it serves a request, so the server's own purge
+// loop cannot run here: the cron job in vercel.json calls the server's
+// trigger with CRON_SECRET, which the server takes from the config file.
+func TestPrepareServerLeavesThePurgeToTheCronJob(t *testing.T) {
+	dataDir := t.TempDir()
+	setLauncherEnv(t, dataDir)
+	t.Setenv("VERCEL_ENV", "production")
+	t.Setenv("CLOUD_DATABASE_URL", pooledURL)
+	// A quote is the one character the YAML string has to escape.
+	const secret = "0123456789'abcdef"
+	t.Setenv("CRON_SECRET", secret)
+
+	_, err := prepareServer(nil)
+	require.NoError(t, err)
+
+	raw, err := os.ReadFile(filepath.Join(dataDir, "nextgen.yaml"))
+	require.NoError(t, err)
+	var config struct {
+		Events struct {
+			Retention struct {
+				TriggerSecret string `yaml:"trigger_secret"`
+			} `yaml:"retention"`
+		} `yaml:"events"`
+	}
+	require.NoError(t, yaml.Unmarshal(raw, &config))
+	assert.Equal(t, secret, config.Events.Retention.TriggerSecret)
+	assert.Empty(t, os.Getenv("CRON_SECRET"), "the secret leaves the environment once it is on disk")
 }
 
 func TestPrepareServerServesAPreviewFromItsOwnDatabase(t *testing.T) {
@@ -266,6 +307,7 @@ func TestPrepareServerPinsTheDeploymentShape(t *testing.T) {
 	assert.Equal(t, "true", os.Getenv("NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT"))
 	assert.Equal(t, "json", os.Getenv("NEXTGEN_INSTRUMENTATION_LOG_FORMAT"))
 	assert.Equal(t, "https://nextgen-preview-cloud.vercel.app", os.Getenv("NEXTGEN_SERVER_PUBLIC_BASE"))
+	assert.Equal(t, "https://nextgen-preview-cloud.vercel.app", os.Getenv("NEXTGEN_SERVER_CONSOLE_ORIGINS"))
 }
 
 // vercel.json mounts the console service, and builds it, at the path the
@@ -334,11 +376,61 @@ func TestVercelJSONKeepsTheServerInFrankfurt(t *testing.T) {
 	assert.Equal(t, []string{"fra1"}, function.Regions, "the region of the PlanetScale databases")
 }
 
+// The cron job is the only caller of the audit event purge in the cloud, so
+// its path is the server's trigger, and nothing routes it anywhere but the
+// server: a redirect would end the run, which a cron job does not follow, and
+// another service would answer 404.
+func TestVercelJSONSchedulesTheEventRetentionPurge(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "vercel.json"))
+	require.NoError(t, err)
+	var config struct {
+		Crons []struct {
+			Path     string `json:"path"`
+			Schedule string `json:"schedule"`
+		} `json:"crons"`
+		Redirects []struct {
+			Source string `json:"source"`
+		} `json:"redirects"`
+		Rewrites []struct {
+			Source      string          `json:"source"`
+			Destination json.RawMessage `json:"destination"`
+		} `json:"rewrites"`
+	}
+	require.NoError(t, json.Unmarshal(raw, &config))
+
+	require.Len(t, config.Crons, 1)
+	assert.Equal(t, audit.RetentionTriggerPath, config.Crons[0].Path)
+	assert.Equal(t, "17 * * * *", config.Crons[0].Schedule, "hourly, as a self-hosted server purges")
+
+	for _, redirect := range config.Redirects {
+		assert.False(t, routeMatches(redirect.Source, audit.RetentionTriggerPath), "redirected by %s", redirect.Source)
+	}
+	var service string
+	for _, rewrite := range config.Rewrites {
+		if routeMatches(rewrite.Source, audit.RetentionTriggerPath) {
+			var destination struct{ Service string }
+			require.NoError(t, json.Unmarshal(rewrite.Destination, &destination))
+			service = destination.Service
+			break
+		}
+	}
+	assert.Equal(t, "server", service, "the first rewrite that matches the trigger's path")
+}
+
+// routeMatches reports whether a vercel.json source matches path, for the
+// forms the file uses: literal paths, (.*) and a named :param(.*).
+func routeMatches(source, path string) bool {
+	pattern := strings.ReplaceAll(regexp.QuoteMeta(source), `\(\.\*\)\?`, `(.*)`)
+	pattern = strings.ReplaceAll(pattern, `\(\.\*\)`, `(.*)`)
+	pattern = regexp.MustCompile(`:\w+`).ReplaceAllString(pattern, "")
+	return regexp.MustCompile("^" + pattern + "$").MatchString(path)
+}
+
 // The console service builds into the server's embed directory in the same
 // checkout, so the function is compiled without it; a plain build would
 // carry the console whenever that service built first.
 func TestBuildScriptLeavesTheConsoleOut(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join("..", "build.sh"))
+	raw, err := os.ReadFile(filepath.Join("..", "build-launcher.sh"))
 	require.NoError(t, err)
 	var builds []string
 	for _, line := range strings.Split(string(raw), "\n") {
@@ -346,7 +438,7 @@ func TestBuildScriptLeavesTheConsoleOut(t *testing.T) {
 			builds = append(builds, line)
 		}
 	}
-	require.Len(t, builds, 1, "build.sh compiles the function once")
+	require.Len(t, builds, 1, "build-launcher.sh compiles the function once")
 	assert.Contains(t, builds[0], "-tags noconsole")
 }
 
@@ -363,6 +455,27 @@ func TestPrepareServerKeepsExplicitDefaults(t *testing.T) {
 
 	assert.Equal(t, "https://cloud.example.com", os.Getenv("NEXTGEN_SERVER_PUBLIC_BASE"))
 	assert.Equal(t, "text", os.Getenv("NEXTGEN_INSTRUMENTATION_LOG_FORMAT"))
+}
+
+func TestConsoleOrigins(t *testing.T) {
+	setLauncherEnv(t, t.TempDir())
+	t.Setenv("VERCEL_URL", "nextgen-preview-cloud-abc123-zitadel.vercel.app")
+	t.Setenv("VERCEL_BRANCH_URL", "nextgen-preview-cloud-git-feature-zitadel.vercel.app")
+
+	t.Setenv("VERCEL_PROJECT_PRODUCTION_URL", "preview.zitadel.com")
+
+	previewHosts := "https://nextgen-preview-cloud-abc123-zitadel.vercel.app,https://nextgen-preview-cloud-git-feature-zitadel.vercel.app"
+	assert.Equal(t, previewHosts, consoleOrigins("preview", ""),
+		"a preview serves the console on its own URL and its branch's, never on the production domain")
+	assert.Equal(t, "https://console.example.com,"+previewHosts, consoleOrigins("preview", " https://console.example.com "),
+		"a configured custom domain keeps Vercel's hosts beside it")
+	assert.Equal(t, previewHosts, consoleOrigins("preview", previewHosts), "a second call adds nothing")
+	assert.Equal(t, previewHosts+",https://preview.zitadel.com", consoleOrigins("production", ""),
+		"production also serves it on the production domain")
+
+	t.Setenv("VERCEL_URL", "")
+	t.Setenv("VERCEL_BRANCH_URL", "")
+	assert.Empty(t, consoleOrigins("", ""), "a local run names none")
 }
 
 func TestPublicBase(t *testing.T) {
@@ -548,6 +661,21 @@ func TestPrepareServerRefusesBadInput(t *testing.T) {
 			_, err := prepareServer(nil)
 			assert.ErrorContains(t, err, "does not decode to a bootstrap user document")
 		},
+		"a deployment without a cron secret, which would never purge expired audit events": func(t *testing.T) {
+			t.Setenv("CLOUD_DATABASE_URL", pooledURL)
+			t.Setenv("VERCEL_GIT_COMMIT_REF", branch)
+			t.Setenv("CRON_SECRET", "")
+			for _, env := range []string{"production", "preview"} {
+				t.Setenv("VERCEL_ENV", env)
+				_, err := prepareServer(nil)
+				assert.ErrorContains(t, err, "CRON_SECRET must be set for a "+env+" deployment")
+			}
+		},
+		"a cron secret short enough to guess": func(t *testing.T) {
+			t.Setenv("CRON_SECRET", "0123456789")
+			_, err := prepareServer(nil)
+			assert.ErrorContains(t, err, "CRON_SECRET must be at least 16 printable ASCII characters")
+		},
 	}
 	for name, check := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -593,8 +721,9 @@ func TestRunMigrateRecreatesPreviewOnOutOfOrder(t *testing.T) {
 	ensureCalls := stubEnsureDatabase(t)
 	var dropped []string
 	previousDrop := dropDatabase
-	dropDatabase = func(_ context.Context, _, name string) error {
-		dropped = append(dropped, name)
+	dropDatabase = func(_ context.Context, _ string, idleBefore time.Time, names ...string) error {
+		assert.True(t, idleBefore.IsZero(), "a recreate drops whatever the stamp says")
+		dropped = append(dropped, names...)
 		return nil
 	}
 	t.Cleanup(func() { dropDatabase = previousDrop })
@@ -626,8 +755,9 @@ func TestRunMigrateRecreatesPreviewOnDuplicateColumn(t *testing.T) {
 	ensureCalls := stubEnsureDatabase(t)
 	var dropped []string
 	previousDrop := dropDatabase
-	dropDatabase = func(_ context.Context, _, name string) error {
-		dropped = append(dropped, name)
+	dropDatabase = func(_ context.Context, _ string, idleBefore time.Time, names ...string) error {
+		assert.True(t, idleBefore.IsZero(), "a recreate drops whatever the stamp says")
+		dropped = append(dropped, names...)
 		return nil
 	}
 	t.Cleanup(func() { dropDatabase = previousDrop })
@@ -659,7 +789,7 @@ func TestRunMigrateDoesNotDropProductionOnOutOfOrder(t *testing.T) {
 	ensureCalls := stubEnsureDatabase(t)
 	var dropped int
 	previousDrop := dropDatabase
-	dropDatabase = func(context.Context, string, string) error {
+	dropDatabase = func(context.Context, string, time.Time, ...string) error {
 		dropped++
 		return nil
 	}
@@ -681,6 +811,113 @@ func TestRunMigrateDoesNotDropProductionOnOutOfOrder(t *testing.T) {
 	require.Error(t, err)
 	assert.Zero(t, dropped)
 	assert.Empty(t, *ensureCalls, "production creates no preview database")
+}
+
+// stubDropDatabase records what runDropPreview drops, through which URL and
+// with which cutoff.
+func stubDropDatabase(t *testing.T) (dsns, dropped *[]string, idleBefore *[]time.Time) {
+	t.Helper()
+	dsns, dropped, idleBefore = new([]string), new([]string), new([]time.Time)
+	previousDrop := dropDatabase
+	dropDatabase = func(_ context.Context, dsn string, cutoff time.Time, names ...string) error {
+		*dsns = append(*dsns, dsn)
+		*idleBefore = append(*idleBefore, cutoff)
+		*dropped = append(*dropped, names...)
+		return nil
+	}
+	t.Cleanup(func() { dropDatabase = previousDrop })
+	return dsns, dropped, idleBefore
+}
+
+// stubListDatabases makes the preview cluster hold databases.
+func stubListDatabases(t *testing.T, databases ...previewDatabase) {
+	t.Helper()
+	previousList := listDatabases
+	listDatabases = func(_ context.Context, dsn string) ([]previewDatabase, error) {
+		assert.Equal(t, migratorURL, dsn)
+		return databases, nil
+	}
+	t.Cleanup(func() { listDatabases = previousList })
+}
+
+func stamped(t *testing.T, name, ref string, deployedAt time.Time) previewDatabase {
+	t.Helper()
+	stamp, err := json.Marshal(map[string]string{"branch": ref, "deployed_at": deployedAt.UTC().Format(time.RFC3339)})
+	require.NoError(t, err)
+	return previewDatabase{name: name, stamp: string(stamp)}
+}
+
+func TestRunDropPreviewDropsTheBranchesDatabases(t *testing.T) {
+	dsns, dropped, idleBefore := stubDropDatabase(t)
+	t.Setenv("CLOUD_MIGRATOR_DATABASE_URL", migratorURL)
+
+	require.NoError(t, runDropPreview([]string{"--", branch, "feature/other"}))
+	other, err := previewDatabaseName("feature/other")
+	require.NoError(t, err)
+	assert.Equal(t, []string{previewName(t), other}, *dropped, "the name each branch's build gives its database")
+	assert.Equal(t, []string{migratorURL}, *dsns, "through the direct URL, in one call")
+	assert.Equal(t, []time.Time{{}}, *idleBefore, "a merged branch goes whatever its stamp says")
+}
+
+func TestRunDropPreviewDropsIdleDatabases(t *testing.T) {
+	dsns, dropped, idleBefore := stubDropDatabase(t)
+	now := time.Now()
+	stubListDatabases(t,
+		stamped(t, "preview_recent", "recent", now.Add(-24*time.Hour)),
+		stamped(t, "preview_idle", "idle", now.Add(-40*24*time.Hour)),
+		stamped(t, "preview_older", "older", now.Add(-60*24*time.Hour)),
+		previewDatabase{name: "preview_unstamped"},
+	)
+	t.Setenv("CLOUD_MIGRATOR_DATABASE_URL", migratorURL)
+
+	require.NoError(t, runDropPreview([]string{"--idle-days", "30"}))
+	assert.Equal(t, []string{"preview_older", "preview_idle"}, *dropped, "oldest first; recent and undated ones kept")
+	assert.Equal(t, []string{migratorURL}, *dsns)
+	require.Len(t, *idleBefore, 1)
+	assert.WithinDuration(t, now.Add(-30*24*time.Hour), (*idleBefore)[0], time.Minute,
+		"the drop rechecks each stamp against the same cutoff")
+}
+
+func TestRunDropPreviewDryRunDropsNothing(t *testing.T) {
+	_, dropped, _ := stubDropDatabase(t)
+	stubListDatabases(t, stamped(t, "preview_idle", "idle", time.Now().Add(-40*24*time.Hour)))
+	t.Setenv("CLOUD_MIGRATOR_DATABASE_URL", migratorURL)
+
+	require.NoError(t, runDropPreview([]string{"--dry-run", "--idle-days", "30"}))
+	require.NoError(t, runDropPreview([]string{"--dry-run", branch}))
+	assert.Empty(t, *dropped)
+}
+
+func TestIdlePreviewDatabases(t *testing.T) {
+	cutoff := time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)
+	idle, undated := idlePreviewDatabases([]previewDatabase{
+		stamped(t, "preview_at_cutoff", "a", cutoff),
+		stamped(t, "preview_before", "feature/it's", cutoff.Add(-time.Second)),
+		{name: "preview_unstamped"},
+		{name: "preview_garbled", stamp: "not json"},
+		{name: "preview_branch_only", stamp: `{"branch":"b"}`},
+	}, cutoff)
+	assert.Equal(t, []idlePreview{{name: "preview_before", branch: "feature/it's", deployedAt: cutoff.Add(-time.Second)}}, idle)
+	assert.Equal(t, []string{"preview_unstamped", "preview_garbled", "preview_branch_only"}, undated)
+}
+
+func TestRunDropPreviewRefusesBadInput(t *testing.T) {
+	previousDrop := dropDatabase
+	dropDatabase = func(context.Context, string, time.Time, ...string) error {
+		t.Fatal("nothing may be dropped")
+		return nil
+	}
+	t.Cleanup(func() { dropDatabase = previousDrop })
+
+	t.Setenv("CLOUD_MIGRATOR_DATABASE_URL", migratorURL)
+	assert.ErrorContains(t, runDropPreview(nil), "usage")
+	assert.ErrorContains(t, runDropPreview([]string{"--idle-days", "30", branch}), "usage", "one mode at a time")
+	assert.ErrorContains(t, runDropPreview([]string{"--idle-days", "-1"}), "usage")
+	assert.ErrorContains(t, runDropPreview([]string{"--idle", "30"}), "usage")
+	assert.ErrorContains(t, runDropPreview([]string{""}), "Git branch")
+
+	t.Setenv("CLOUD_MIGRATOR_DATABASE_URL", "")
+	assert.ErrorContains(t, runDropPreview([]string{branch}), "CLOUD_MIGRATOR_DATABASE_URL")
 }
 
 func TestPrepareMigrationMigratesProductionInPlace(t *testing.T) {
@@ -710,6 +947,7 @@ func TestPrepareMigrationRefusesWhatTheFunctionWouldRefuse(t *testing.T) {
 		"no database to serve":          {map[string]string{"CLOUD_DATABASE_URL": ""}, "CLOUD_DATABASE_URL must be set"},
 		"a broken admin document":       {map[string]string{"BOOTSTRAP_ADMIN_USER_JSON_B64": "%%%"}, "BOOTSTRAP_ADMIN_USER_JSON_B64 is not base64"},
 		"a previous key without its id": {map[string]string{"MASTER_KEY_PREVIOUS_PEM_B64": base64.StdEncoding.EncodeToString([]byte(testPEM))}, "go together"},
+		"no cron secret":                {map[string]string{"CRON_SECRET": ""}, "CRON_SECRET must be set"},
 	}
 	for _, env := range []string{"production", "preview"} {
 		for name, tc := range cases {

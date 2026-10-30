@@ -42,7 +42,7 @@ export function SiteFooter() {
             Open-source auth that lives in your repo.
           </p>
           <div className="mt-1 rounded-lg border border-window-border bg-window px-3 py-1 font-mono text-xs leading-7">
-            <CommandLine command={startCommand} />
+            <CommandLine command={startCommand} placement="footer" />
           </div>
         </div>
         <nav aria-label="Footer" className="grid grid-cols-2 gap-x-16 gap-y-8 text-sm">

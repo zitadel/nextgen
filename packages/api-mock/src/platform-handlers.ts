@@ -69,6 +69,8 @@ import {
   GetClaimWindowResponse,
   GetDeploymentByIdParams,
   GetDeploymentByIdQueryParams,
+  GetDeploymentVariablesParams,
+  GetDeploymentVariablesQueryParams,
   GetFlowDefinitionParams,
   GetFlowDefinitionResponse,
   GetIdpByIdParams,
@@ -106,6 +108,9 @@ import {
   ListPolicyRevisionsResponse,
   ListSchemasQueryParams,
   PublishPolicyQueryParams,
+  EvaluatePolicyBody,
+  EvaluatePolicyQueryParams,
+  EvaluatePolicyResponse,
   PublishPolicyResponse,
   QueryIdpsBody,
   QueryIdpsQueryParams,
@@ -129,7 +134,7 @@ import { getDefaultHumanUserSchema, getDefaultLoginFlow } from "@zitadel/config/
 import { missingEndpoints } from "@zitadel/config/idp";
 import { policyConfigSchema } from "@zitadel/config/schemas";
 import { http, HttpResponse } from "msw";
-import type { z } from "zod";
+import { z } from "zod";
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -412,6 +417,8 @@ type DeploymentRecord = {
   rollbackTo: string | null;
   deployedAt: string;
   seq: number;
+  /** The variables of its kind it froze, keyed by name, in the wire shape. */
+  variables: Record<string, unknown>;
 };
 
 /**
@@ -646,6 +653,20 @@ function variablesResponse(
   return out;
 }
 
+/** The variables of one kind a deployment freezes, keyed by name. */
+function frozenVariables(
+  variables: Map<string, Map<string, VariableRecord>>,
+  projectId: string,
+  kind: VariableKind,
+): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(variablesResponse(variables, projectId, [kind])).map(([name, byKind]) => [
+      name,
+      byKind[kind],
+    ]),
+  );
+}
+
 /** One connection, in the wire shape every idp endpoint answers with. */
 function idpResponse(record: IdpConnectionRecord): Record<string, unknown> {
   return {
@@ -728,6 +749,64 @@ function publishPolicyRevision(
       };
   store.policies.set(record.id, record);
   return { record, revision };
+}
+
+/**
+ * The evaluate body as the server decodes it. The generated schema is not
+ * strict (orval's `strict.body: false`), so it would drop an unknown key the
+ * server refuses with `req.invalid`: `config`, `input` and `facts` are closed
+ * here, while an extra top-level key is ignored, as on publish.
+ */
+const EvaluatePolicyStrictBody = EvaluatePolicyBody.extend({
+  config: policyConfigSchema.shape.config,
+  input: z.strictObject(EvaluatePolicyBody.shape.input.shape),
+  facts: z.strictObject(EvaluatePolicyBody.shape.facts.unwrap().shape).optional(),
+});
+
+/** The server's length cap on a password (`domain.MaxPasswordLength`). */
+const MAX_PASSWORD_LENGTH = 64;
+
+/**
+ * What `POST /policies/evaluate` answers for a password set: the server's
+ * `CheckPassword` (internal/service/password_policy.go) on the given config.
+ * The empty guard comes first, then the template's rules on the length in
+ * code points after NFC, the history only for a user's own set within the
+ * cap, and the cap as `max_length`. A rule the template gains must be added
+ * here.
+ */
+function evaluatePasswordSet(
+  config: Record<string, unknown>,
+  password: string,
+  facts: { self_service: boolean; history_matches: boolean[] },
+): { allowed: boolean; code?: string; violations?: Record<string, unknown> } {
+  const normalized = password.normalize("NFC");
+  if (normalized === "") {
+    return { allowed: false, code: "user.password_empty" };
+  }
+  const length = [...normalized].length;
+  const { min_length: min, max_length: max, history_depth: depth } = config;
+  const violations: Record<string, unknown> = {};
+  if (typeof min === "number" && length < min) {
+    violations.min_length = min;
+  }
+  if (typeof max === "number" && length > max) {
+    violations.max_length = max;
+  }
+  if (
+    typeof depth === "number" &&
+    facts.self_service &&
+    length <= MAX_PASSWORD_LENGTH &&
+    facts.history_matches.slice(0, depth).some(Boolean)
+  ) {
+    violations.history_depth = depth;
+  }
+  if (!("max_length" in violations) && length > MAX_PASSWORD_LENGTH) {
+    violations.max_length = MAX_PASSWORD_LENGTH;
+  }
+  if (Object.keys(violations).length === 0) {
+    return { allowed: true };
+  }
+  return { allowed: false, code: "user.password_policy_violation", violations };
 }
 
 /** A shallow copy with its keys in order, so two configs compare by value. */
@@ -1885,8 +1964,8 @@ export function setupPlatformHandlers() {
     // --- deployments -----------------------------------------------------
     // A deployment makes a release live on a set of targets, expanding
     // `primary` to the project's primary origins. It is idempotent on what is
-    // served and append-only; rollback re-applies an earlier one. Variable
-    // freezing arrives with the variables work. The Go handlers are stubs.
+    // served and append-only; rollback re-applies an earlier one. Each one
+    // freezes the variables of its kind; a rollback reuses the restored set.
 
     http.post("*/deployments", async ({ request }) => {
       const query = parse(CreateDeploymentQueryParams, queryRecord(request), "invalid_query");
@@ -2077,6 +2156,7 @@ export function setupPlatformHandlers() {
         rollbackTo: null,
         deployedAt: createdAt,
         seq: ++store.lastSeq,
+        variables: frozenVariables(store.variables, project.id, sawPreview ? "preview" : "primary"),
       };
       store.deployments.set(id, record);
       return HttpResponse.json(deploymentResponse(record), { status: 201 });
@@ -2318,6 +2398,7 @@ export function setupPlatformHandlers() {
         rollbackTo: target.id,
         deployedAt: nowIso(),
         seq: ++store.lastSeq,
+        variables: target.variables,
       };
       store.deployments.set(id, record);
       return HttpResponse.json(deploymentResponse(record), { status: 201 });
@@ -2649,7 +2730,14 @@ export function setupPlatformHandlers() {
     }),
 
     http.get("*/schemas", ({ request }) => {
-      const query = parse(ListSchemasQueryParams, listQueryRecord(request), "invalid_query");
+      // `expand` repeats (`expand=in_use&expand=…`) and is an array in the
+      // spec; queryRecord keeps only its last value.
+      const expand = new URL(request.url).searchParams.getAll("expand");
+      const raw = {
+        ...listQueryRecord(request),
+        ...(expand.length === 0 ? {} : { expand }),
+      };
+      const query = parse(ListSchemasQueryParams, raw, "invalid_query");
       if (!query.ok) {
         return query.response;
       }
@@ -2672,11 +2760,13 @@ export function setupPlatformHandlers() {
         return paged.response;
       }
       const { page, next } = paged;
+      // The mock keeps no users, so no revision is ever in use.
+      const inUse = query.data.expand?.includes("in_use") ? { in_use: false } : {};
       const responseBody: ListSchemas200 = {
         schemas: page.map((r) => ({
           id: r.id,
           schema: r.body,
-          metadata: { created_at: r.createdAt },
+          metadata: { created_at: r.createdAt, ...inUse },
         })),
         next_page_token: next,
       };
@@ -2997,6 +3087,40 @@ export function setupPlatformHandlers() {
       return HttpResponse.json(out.data, { status: 201 });
     }),
 
+    // A dry run: nothing is read or stored. The config is checked as a
+    // publish checks it, then evaluated as the server's password set would.
+    http.post("*/policies/evaluate", async ({ request }) => {
+      const query = parse(EvaluatePolicyQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+      const raw = await readJson(request);
+      if (raw === null) {
+        return HttpResponse.json(INVALID_JSON, { status: 400 });
+      }
+      const body = parse(EvaluatePolicyStrictBody, raw, "req.invalid");
+      if (!body.ok) {
+        return body.response;
+      }
+      if (policyRuleViolated(body.data.config)) {
+        return HttpResponse.json(
+          errorBody("pol.invalid", "policy: invalid", {
+            details: { violations: [MIN_ABOVE_MAX_VIOLATION] },
+          }),
+          { status: 400 },
+        );
+      }
+      const decision = evaluatePasswordSet(body.data.config, body.data.input.password, {
+        self_service: body.data.facts?.self_service ?? true,
+        history_matches: body.data.facts?.history_matches ?? [],
+      });
+      const out = parse(EvaluatePolicyResponse, decision, "mock_response_invalid");
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data);
+    }),
+
     http.get("*/policies", ({ request }) => {
       const query = parse(ListPoliciesQueryParams, listQueryRecord(request), "invalid_query");
       if (!query.ok) {
@@ -3107,13 +3231,24 @@ export function setupPlatformHandlers() {
     // publishes the client id and secret here, so without them a scaffolded
     // provider has no credentials and sign-in fails at the token endpoint.
 
-    // Registered ahead of `*/variables`, which would otherwise match it. The
-    // server answers 501 until it stores frozen sets, and so does the mock.
-    http.get("*/deployments/:deploymentId/variables", () =>
-      HttpResponse.json(errorBody("not_implemented", "This feature is not implemented yet."), {
-        status: 501,
-      }),
-    ),
+    // Registered ahead of `*/variables`, which would otherwise match it.
+    http.get("*/deployments/:deployment_id/variables", ({ params, request }) => {
+      const path = parse(GetDeploymentVariablesParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
+      }
+      const query = parse(GetDeploymentVariablesQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+      const deployment = store.deployments.get(path.data.deployment_id);
+      if (!deployment || deployment.projectId !== query.data.project_id) {
+        return HttpResponse.json(errorBody("dep.not_found", "deployment: not found"), {
+          status: 404,
+        });
+      }
+      return HttpResponse.json(deployment.variables);
+    }),
 
     http.get("*/variables", ({ request }) => {
       const query = parse(GetVariablesQueryParams, queryRecord(request), "invalid_query");

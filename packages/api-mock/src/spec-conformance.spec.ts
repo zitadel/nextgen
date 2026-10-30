@@ -83,7 +83,7 @@ afterAll(async () => {
 });
 
 /**
- * The `__nextgen_session` cookie of a session belonging to `project`, active
+ * The `zitadel_session` cookie of a session belonging to `project`, active
  * with a verified factor.
  */
 async function sessionCookie(project: string): Promise<string> {
@@ -93,7 +93,7 @@ async function sessionCookie(project: string): Promise<string> {
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ handoff_token: handoff }),
   });
-  const setCookie = exchange.headers.getSetCookie().find((c) => c.startsWith("__nextgen_session="));
+  const setCookie = exchange.headers.getSetCookie().find((c) => c.startsWith("zitadel_session="));
   return setCookie?.split(";")[0] ?? "";
 }
 
@@ -149,7 +149,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     expect(exchange.status).toBe(200);
     const cookie = exchange.headers
       .getSetCookie()
-      .find((c) => c.startsWith("__nextgen_session="))
+      .find((c) => c.startsWith("zitadel_session="))
       ?.split(";")[0];
 
     const res = await fetch(`${BASE}/sessions/me`, { headers: { cookie: cookie ?? "" } });
@@ -161,6 +161,26 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
       identifier_property: "email",
       display: "Ada Lovelace",
     });
+  });
+
+  // Mirrors the server on loopback http (ADR 083): it sets zitadel_session,
+  // reads it and the canonical name the SDK proxies send upstream, the
+  // canonical one first, and reads no session cookie from before ADR 083.
+  test("GET /sessions/me reads the session under both of its names, and no old one", async () => {
+    const pair = await sessionCookie("proj_me_names");
+    const token = pair.slice(pair.indexOf("=") + 1);
+    expect(pair).toBe(`zitadel_session=${token}`);
+
+    for (const [cookie, status] of [
+      [`zitadel_session=${token}`, 200],
+      [`__Host-zitadel_session=${token}`, 200],
+      [`zitadel_session=deadbeef; __Host-zitadel_session=${token}`, 200],
+      [`__nextgen_session=${token}`, 401],
+      [`__nextgen_session_proj_me_names=${token}`, 401],
+    ] as const) {
+      const res = await fetch(`${BASE}/sessions/me`, { headers: { cookie } });
+      expect({ cookie, status: res.status }).toEqual({ cookie, status });
+    }
   });
 
   // Mirrors the server: a read that names a project refuses a session of any
@@ -175,7 +195,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     expect(exchange.status).toBe(200);
     const cookie = exchange.headers
       .getSetCookie()
-      .find((c) => c.startsWith("__nextgen_session="))
+      .find((c) => c.startsWith("zitadel_session="))
       ?.split(";")[0];
 
     const refused = await fetch(`${BASE}/sessions/me?project_id=proj_me_other`, {
@@ -258,7 +278,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
       headers: signOutHeaders,
     });
     expect(signedOut.status).toBe(204);
-    expect(signedOut.headers.getSetCookie().some((c) => /^__nextgen_session=;/.test(c))).toBe(true);
+    expect(signedOut.headers.getSetCookie().some((c) => /^zitadel_session=;/.test(c))).toBe(true);
   });
 
   test("GET /sessions/me returns body parseable by GetMySessionResponse with a user ref", async () => {
@@ -271,7 +291,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     expect(exchange.status).toBe(200);
     const cookie = exchange.headers
       .getSetCookie()
-      .find((c) => c.startsWith("__nextgen_session="))
+      .find((c) => c.startsWith("zitadel_session="))
       ?.split(";")[0];
     expect(cookie).toBeDefined();
 
@@ -349,9 +369,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ handoff_token: handoff }),
     });
-    const setCookie = exchange.headers
-      .getSetCookie()
-      .find((c) => c.startsWith("__nextgen_session="));
+    const setCookie = exchange.headers.getSetCookie().find((c) => c.startsWith("zitadel_session="));
     expect(setCookie).toBeDefined();
     const sessionCookie = setCookie?.split(";")[0] ?? "";
 
@@ -376,7 +394,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
       },
     });
     expect(revoke.status).toBe(204);
-    expect(revoke.headers.getSetCookie().some((c) => /^__nextgen_session=;/.test(c))).toBe(true);
+    expect(revoke.headers.getSetCookie().some((c) => /^zitadel_session=;/.test(c))).toBe(true);
 
     // Session is gone after revocation.
     const after = await fetch(`${BASE}/sessions/me`, { headers: { cookie: sessionCookie } });
@@ -421,7 +439,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
   test("DELETE /sessions/me with an unknown session token returns 401", async () => {
     const res = await fetch(`${BASE}/sessions/me`, {
       method: "DELETE",
-      headers: { cookie: "__nextgen_session=deadbeefdeadbeef" },
+      headers: { cookie: "zitadel_session=deadbeefdeadbeef" },
     });
     expect(res.status).toBe(401);
     const body = (await res.json()) as Record<string, unknown>;
@@ -684,6 +702,32 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     const row = body.schemas.find((entry) => entry.id === id);
     expect(row?.schema).toEqual(doc);
     expect(typeof row?.metadata.created_at).toBe("string");
+  });
+
+  test("GET /schemas adds metadata.in_use only when expanded", async () => {
+    const create = await fetch(`${BASE}/schemas?project_id=proj_schema_in_use`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        kind: "user-schema",
+        metaSchema: "https://nextgen.com/api/schemas/user-schema.json",
+        objectType: "conformance-in-use",
+        "x-auth-methods": { password: { enabled: true } },
+      }),
+    });
+    const { id } = (await create.json()) as { id: string };
+    const metadataOf = async (query: string) => {
+      const res = await fetch(`${BASE}/schemas?project_id=proj_schema_in_use${query}`);
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as {
+        schemas: Array<{ id: string; metadata: Record<string, unknown> }>;
+      };
+      return body.schemas.find((entry) => entry.id === id)?.metadata;
+    };
+
+    expect(await metadataOf("")).not.toHaveProperty("in_use");
+    // The mock keeps no users, so an expanded revision is never in use.
+    expect(await metadataOf("&expand=in_use")).toMatchObject({ in_use: false });
   });
 
   test("GET /schemas pages with limit and next_page_token", async () => {
@@ -1769,15 +1813,15 @@ describe("api-mock idp and variable contract details", () => {
     });
   });
 
-  test("answers not_implemented for a deployment's variables", async () => {
+  test("answers not found for the variables of a deployment the project does not hold", async () => {
     const projectId = await newProject("vars-deployment");
 
     const res = await fetch(
       `${BASE}/deployments/dep_01KX5N7C9D2E7F0N9WD3P2E4YM6/variables?project_id=${projectId}`,
     );
 
-    expect(res.status).toBe(501);
-    expect(((await res.json()) as { code?: string }).code).toBe("not_implemented");
+    expect(res.status).toBe(404);
+    expect(((await res.json()) as { code?: string }).code).toBe("dep.not_found");
   });
 
   test("reads back what the write did not touch", async () => {
@@ -1841,6 +1885,78 @@ describe("api-mock releases and deployments", () => {
       headers: { "content-type": "application/json", authorization: `Bearer ${secret}` },
       body: JSON.stringify(body),
     });
+
+  test("freezes the variables of the deployment's kind, untouched by later writes", async () => {
+    const project = await newProject("deployment-frozen-variables");
+    await addPrimary(project.id, project.secret, "https://app.acme.com");
+    const variables = `${BASE}/variables?project_id=${project.id}`;
+    const write = (kind: string, payload: object) =>
+      fetch(`${variables}&kind=${kind}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+        body: JSON.stringify(payload),
+      });
+    await write("primary", { HOST: "app.acme.com", TOKEN: { value: "s3cr3t", secret: true } });
+    await write("preview", { HOST: "preview.acme.com" });
+    const release = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      id: string;
+    };
+    const deployment = (await (
+      await createDeployment(project.id, project.secret, {
+        release_id: release.id,
+        targets: ["primary"],
+      })
+    ).json()) as { id: string };
+    await write("primary", { HOST: "changed.acme.com" });
+
+    const res = await fetch(
+      `${BASE}/deployments/${deployment.id}/variables?project_id=${project.id}`,
+      { headers: { authorization: `Bearer ${project.secret}` } },
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ HOST: "app.acme.com", TOKEN: { secret: true } });
+  });
+
+  test("reuses the restored deployment's frozen variables on rollback", async () => {
+    const project = await newProject("rollback-frozen-variables");
+    await addPrimary(project.id, project.secret, "https://app.acme.com");
+    const write = (payload: object) =>
+      fetch(`${BASE}/variables?project_id=${project.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+        body: JSON.stringify(payload),
+      });
+    const deploy = async (body: object) => {
+      const release = (await (await createRelease(project.id, project.secret, body)).json()) as {
+        id: string;
+      };
+      return (await (
+        await createDeployment(project.id, project.secret, {
+          release_id: release.id,
+          targets: ["primary"],
+        })
+      ).json()) as { id: string };
+    };
+    await write({ HOST: "first.acme.com" });
+    const first = await deploy(rel1);
+    await write({ HOST: "second.acme.com" });
+    await deploy(rel2);
+    const rolledBack = (await (
+      await fetch(`${BASE}/deployments/${first.id}/rollback?project_id=${project.id}`, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+        body: JSON.stringify({}),
+      })
+    ).json()) as { id: string };
+
+    const res = await fetch(
+      `${BASE}/deployments/${rolledBack.id}/variables?project_id=${project.id}`,
+      { headers: { authorization: `Bearer ${project.secret}` } },
+    );
+
+    expect(await res.json()).toEqual({ HOST: "first.acme.com" });
+  });
 
   test("builds a release whose bundle carries a connection, resolving it by slug", async () => {
     const project = await newProject("release-build-idps");
@@ -1936,6 +2052,88 @@ describe("api-mock releases and deployments", () => {
 
     expect(res.status).toBe(400);
     expect(((await res.json()) as { code: string }).code).toBe("idp.field_immutable");
+  });
+
+  test("evaluates a password policy as a password set would, storing nothing", async () => {
+    const project = await newProject("policy-evaluate");
+    const evaluate = (body: object) =>
+      fetch(`${BASE}/policies/evaluate?project_id=${project.id}`, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+        body: JSON.stringify({ operation: "auth.factor.password.set", ...body }),
+      });
+    const decision = async (body: object) => {
+      const res = await evaluate(body);
+      expect(res.status).toBe(200);
+      return res.json();
+    };
+
+    expect(
+      await decision({ config: { min_length: 12 }, input: { password: "a-long-enough-one" } }),
+    ).toEqual({
+      allowed: true,
+    });
+    expect(await decision({ config: { min_length: 12 }, input: { password: "short1" } })).toEqual({
+      allowed: false,
+      code: "user.password_policy_violation",
+      violations: { min_length: 12 },
+    });
+    // 13 code points, 14 bytes.
+    expect(
+      await decision({ config: { min_length: 14 }, input: { password: "Passwört12345" } }),
+    ).toMatchObject({
+      violations: { min_length: 14 },
+    });
+    expect(await decision({ config: {}, input: { password: "" } })).toEqual({
+      allowed: false,
+      code: "user.password_empty",
+    });
+    expect(await decision({ config: {}, input: { password: "a".repeat(65) } })).toMatchObject({
+      violations: { max_length: 64 },
+    });
+    expect(
+      await decision({
+        config: { history_depth: 2 },
+        input: { password: "reused" },
+        facts: { history_matches: [false, true] },
+      }),
+    ).toMatchObject({ violations: { history_depth: 2 } });
+    expect(
+      await decision({
+        config: { history_depth: 2 },
+        input: { password: "reused" },
+        facts: { self_service: false, history_matches: [true] },
+      }),
+    ).toEqual({ allowed: true });
+
+    const contradicting = await evaluate({
+      config: { min_length: 20, max_length: 10 },
+      input: { password: "x" },
+    });
+    expect(contradicting.status).toBe(400);
+    expect(((await contradicting.json()) as { code: string }).code).toBe("pol.invalid");
+    for (const malformed of [
+      { config: { min_lenght: 12 }, input: { password: "x" } },
+      { config: {}, input: { password: "x", passwd: "x" } },
+      { config: { history_depth: 2 }, input: { password: "x" }, facts: { history_match: [true] } },
+      { config: {}, input: { password: "a".repeat(4097) } },
+      {
+        config: {},
+        input: { password: "x" },
+        facts: { history_matches: [false, false, false, false, true] },
+      },
+    ]) {
+      const res = await evaluate(malformed);
+      expect(res.status, JSON.stringify(malformed)).toBe(400);
+      expect(((await res.json()) as { code: string }).code).toBe("req.invalid");
+    }
+
+    const listed = (await (
+      await fetch(`${BASE}/policies?project_id=${project.id}`, {
+        headers: { authorization: `Bearer ${project.secret}` },
+      })
+    ).json()) as { policies: unknown[] };
+    expect(listed.policies).toEqual([]);
   });
 
   test("builds a release whose bundle carries a policy, revising it only when it changes", async () => {

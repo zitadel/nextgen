@@ -134,6 +134,7 @@ describe("deployment rollback", () => {
           schema.properties.company = { type: "string" };
         });
         await app.deployData();
+        const before = await app.liveDeploymentCount();
 
         // A dry run is exempt from the destructive-confirm gate, so it succeeds
         // without --force even non-interactively.
@@ -147,16 +148,13 @@ describe("deployment rollback", () => {
 
         expect(result).toSucceed();
         expect(app.envelopeOf<{ dry_run: boolean }>(result).data.dry_run).toBe(true);
-        // No rollback deployment was written: the history still holds the two
-        // deploys and nothing more.
-        const listed = await app.run(["deployment", "list", "--json"]);
-        expect(app.envelopeOf<{ count: number }>(listed).data.count).toBe(2);
+        // No rollback deployment was written: the history holds what it held.
+        expect(await app.liveDeploymentCount()).toBe(before);
       });
 
       it("fails when there is no earlier deployment", async () => {
+        // Setup's deployment is the only one.
         const app = await aSetUpApp();
-        await app.addPrimaryOrigin();
-        await app.deployData();
 
         const result = await app.run([
           "deployment",

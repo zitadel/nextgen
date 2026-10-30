@@ -103,7 +103,13 @@ import {
   materializeSetupResources,
   type MaterializeSetupResourcesResult,
 } from "../../lib/setup-resources";
+import { DEPLOY_ARGS, deployInitialRelease, type InitialDeployment } from "../../lib/release";
 import { installDependenciesForSetup } from "./install";
+import {
+  assertCleanWorktree,
+  ensureInitialCommit,
+  type InitialCommitOutcome,
+} from "./initial-commit";
 import { moveDevPort } from "./move-dev-port";
 import {
   askCustomSettings,
@@ -162,6 +168,9 @@ const RENDERER_FLAG_DESCRIPTION =
   UNAVAILABLE_RENDERER_IDS.length === 0
     ? "Renderer (default: react)."
     : `Renderer (default: react). Not yet available: ${UNAVAILABLE_RENDERER_IDS.join(", ")}.`;
+
+/** The message the release setup publishes carries. */
+const INITIAL_DEPLOY_MESSAGE = "Initial deployment from zitadel setup";
 
 /**
  * The selector appended to setup's credential-recovery commands. `variable set`
@@ -233,6 +242,12 @@ export default class Setup extends Promptable(BaseCommand) {
     }),
     "skip-install": Flags.boolean({
       description: "Do not install dependencies after setup updates package.json.",
+    }),
+    git: Flags.boolean({
+      allowNo: true,
+      default: true,
+      description:
+        "Commit the project setup writes, initialising a repository first when there is none, so a release records the commit it was built from. Refuses a repository that already has uncommitted work. Use --no-git to leave version control alone.",
     }),
     preset: Flags.string({
       description:
@@ -324,6 +339,14 @@ export default class Setup extends Promptable(BaseCommand) {
       throw new ZitadelError("E_CONFLICT", ".zitadel/secret exists without zitadel.json", {
         hint: "Move the secret aside or restore zitadel.json before running setup.",
       });
+    }
+    // Before anything is written: setup commits what it writes, and it can
+    // only tell its own files from the developer's when the tree starts clean.
+    // A dirty repository is refused here, where nothing has happened yet.
+    // A dry run too: the check only reads, and previewing success on a
+    // repository the real run would refuse is a worse lie than refusing early.
+    if (flags.git !== false) {
+      await assertCleanWorktree(cwd);
     }
     // Before anything is detected, created or written: a server another CLI
     // release left running fails setup halfway, after the project exists.
@@ -817,6 +840,42 @@ export default class Setup extends Promptable(BaseCommand) {
       package_manager: installOutcome.install.package_manager,
     });
 
+    // The commit exists so that the release a later `deploy` builds records
+    // the commit it came from; without it that deploy has no baseline and the
+    // one after it can show no diff (#1651).
+    const commit = await this.makeInitialCommit(cwd, dryRun, flags.git !== false);
+
+    // Setup publishes what it scaffolded, after the commit so the release
+    // records it, so the sign-in setup asks the developer to verify next is
+    // served that release rather than the newest stored revisions (#2331).
+    const deployment = await this.deployScaffoldedProject({
+      cwd,
+      server: answers.server,
+      project,
+      dryRun,
+      selector: recoverySelector(flags.cwd),
+    });
+    // A failed deploy leaves the project on its newest stored revisions
+    // rather than a release, so the deploy that fixes it leads both surfaces.
+    const deployCommand = projectCommand(
+      DEPLOY_ARGS,
+      recoverySelector(flags.cwd),
+      this.meta.cliVersion,
+    );
+    const deployStep =
+      deployment === undefined && !dryRun
+        ? {
+            actions: [`Deploy .zitadel/ so the project serves its release: ${deployCommand}`],
+            boxActions: [
+              {
+                text: "Deploy .zitadel/ so the project serves its release:",
+                command: deployCommand,
+              },
+            ],
+            commands: [deployCommand],
+          }
+        : { actions: [], boxActions: [], commands: [] as SuggestedCommand[] };
+
     const writtenRel = allFilesWritten.map((file) => relativeDisplay(cwd, file));
     // The nudge rides both surfaces from one decision: the box for humans, the
     // envelope for agents.
@@ -953,6 +1012,7 @@ export default class Setup extends Promptable(BaseCommand) {
             renderSummary(sections),
             "",
             renderBoxActions([
+              ...deployStep.boxActions,
               ...installOutcome.boxActions,
               ...consoleStep.boxActions,
               ...claimNudge.boxActions,
@@ -973,6 +1033,7 @@ export default class Setup extends Promptable(BaseCommand) {
           !dryRun &&
           !flags["non-interactive"] &&
           Boolean(process.stdout.isTTY && process.stdin.isTTY),
+        cliVersion: this.meta.cliVersion,
       });
     }
 
@@ -1000,6 +1061,14 @@ export default class Setup extends Promptable(BaseCommand) {
         })),
         files_skipped: result.filesSkipped.map((file) => relativeDisplay(cwd, file)),
         install: installOutcome.install,
+        // Whether setup created the repository, and the commit it made.
+        // `initialized` is false when the project was already in one, which it
+        // is still committed into; the commit is `null` only under `--no-git`
+        // or when git could not be used.
+        git: {
+          initialized: commit.kind === "created",
+          commit: commit.kind === "created" || commit.kind === "committed" ? commit.sha : null,
+        },
         // The provider enabled during scaffolding, or null. `secret` reports
         // where the value went, never the value itself — `published` is the
         // one that decides whether the provider button works.
@@ -1027,7 +1096,19 @@ export default class Setup extends Promptable(BaseCommand) {
         }),
         // Branding guidance before the claim nudge: make it yours, then
         // claim to keep it (the same order the manifesto's journey walks).
+        // What setup's first deploy published, or null when there was none:
+        // a dry run, or a deploy that failed, which is a warning.
+        deployment:
+          deployment === undefined
+            ? null
+            : {
+                release_id: deployment.releaseId,
+                content_hash: deployment.contentHash,
+                deployment_id: deployment.deploymentId,
+                origins: [...deployment.origins],
+              },
         next_actions: [
+          ...deployStep.actions,
           ...installOutcome.nextActions,
           brandingGuidanceAction(this.meta.cliVersion),
           ...consoleStep.actions,
@@ -1057,12 +1138,102 @@ export default class Setup extends Promptable(BaseCommand) {
             this.meta.cliVersion,
             recoverySelector(flags.cwd),
           ),
+          ...deployStep.commands,
           ...installOutcome.nextCommands,
           ...consoleStep.commands,
           ...claimNudge.commands,
         ]),
       },
     });
+  }
+
+  /**
+   * Put the scaffolded project under version control, unless it already is or
+   * `--no-git` said not to. Narrated but never fatal: without the commit the
+   * first release simply records no provenance, which is what setup did before.
+   */
+  private async makeInitialCommit(
+    cwd: string,
+    dryRun: boolean,
+    enabled: boolean,
+  ): Promise<InitialCommitOutcome> {
+    if (!enabled) {
+      return { kind: "skipped" };
+    }
+    if (dryRun) {
+      consola.info("Would initialise a git repository and commit the scaffolded project (dry run)");
+      return { kind: "skipped" };
+    }
+    const outcome = await ensureInitialCommit(cwd);
+    if (outcome.kind === "created" || outcome.kind === "committed") {
+      consola.success(`Committed the project as ${outcome.sha.slice(0, 7)}`);
+      // git guesses an author from the machine when none is configured and
+      // commits anyway, so the commit exists but carries a name the developer
+      // did not choose. Said out loud, with the one command that fixes it.
+      if (outcome.invented) {
+        reportWarning(
+          "git could build no author identity on this machine, so the commit was made as " +
+            "Zitadel Setup <setup@zitadel.local>. Set user.name and user.email, then run " +
+            "`git commit --amend --reset-author` to put your own name on it.",
+        );
+      } else if (outcome.guessedIdentity) {
+        reportWarning(
+          "This machine has no git user.name/user.email, so git guessed the author from your " +
+            "username and hostname. Set your identity and run `git commit --amend --reset-author` " +
+            "to put your own name on the commit.",
+        );
+      }
+    }
+    if (outcome.kind === "unavailable") {
+      reportWarning(
+        `Could not commit the scaffolded project (${outcome.reason}); the first release records no commit, so the next deploy cannot show a diff.`,
+      );
+    }
+    return outcome;
+  }
+
+  /**
+   * Deploy `.zitadel/` to the project setup just created, to its primary
+   * origin. Narrated but never fatal: the app is scaffolded and committed, and
+   * a failure leaves the deploy one command away.
+   */
+  private async deployScaffoldedProject(opts: {
+    cwd: string;
+    server: string;
+    project: CreateProject201;
+    dryRun: boolean;
+    selector: EnvironmentSelector;
+  }): Promise<InitialDeployment | undefined> {
+    if (opts.dryRun) {
+      consola.info("Would deploy .zitadel/ to the project (dry run)");
+      return undefined;
+    }
+    const json = this.jsonEnabled();
+    consola.start("Deploying .zitadel/ to the project");
+    try {
+      const deployment = await deployInitialRelease({
+        client: createZitadelClient({
+          baseUrl: opts.server,
+          token: opts.project.project_secret,
+        }),
+        projectId: opts.project.id,
+        cwd: opts.cwd,
+        env: this.meta.env,
+        json,
+        color: !json && Boolean(process.stdout.isTTY) && !process.env.NO_COLOR,
+        message: INITIAL_DEPLOY_MESSAGE,
+        suggest: (args) => projectCommand(args, opts.selector, this.meta.cliVersion),
+      });
+      consola.success(
+        `Deployed ${deployment.contentHash} to ${deployment.origins.length} origin${deployment.origins.length === 1 ? "" : "s"}`,
+      );
+      return deployment;
+    } catch (error) {
+      reportWarning(
+        `The project was set up but its first deploy failed: ${toZitadelError(error).message}. Run \`zitadel ${DEPLOY_ARGS}${opts.selector}\` to publish .zitadel/.`,
+      );
+      return undefined;
+    }
   }
 
   /**

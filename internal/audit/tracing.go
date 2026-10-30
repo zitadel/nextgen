@@ -20,9 +20,12 @@ var tracer = otel.Tracer("github.com/zitadel/nextgen/internal/audit")
 // spans of the run would never be recorded. The sampler samples an Internal
 // root that carries [zotel.JobRoot] at the trace ratio, as it does a request's
 // server span; the kind is set explicitly because the sampler sees an unset
-// kind as unspecified.
-func startJobSpan(name string, attrs ...attribute.KeyValue) (context.Context, trace.Span) {
-	return tracer.Start(context.Background(), name,
+// kind as unspecified. The span is a root even under a ctx that carries one:
+// ctx gives the run its deadline and its logger, a request that starts a run
+// included.
+func startJobSpan(ctx context.Context, name string, attrs ...attribute.KeyValue) (context.Context, trace.Span) {
+	return tracer.Start(ctx, name,
+		trace.WithNewRoot(),
 		trace.WithSpanKind(trace.SpanKindInternal),
 		trace.WithAttributes(append(attrs, zotel.JobRoot)...),
 	)
