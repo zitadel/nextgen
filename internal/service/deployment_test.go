@@ -522,6 +522,38 @@ func TestDeploymentServiceRollback(t *testing.T) {
 		assert.Equal(t, new("dep_previous"), result.Deployment.Metadata.RollbackTo)
 	})
 
+	// Web origins come back as the project's current primary origins, so the
+	// one this deployment went to, since removed, is not served again.
+	for _, tt := range []struct {
+		name    string
+		origins []string
+		want    []string
+	}{
+		{"web origins", []string{"https://removed.example.com"}, []string{appOrigin}},
+		{"the default target alone", []string{domain.DeploymentTargetDefault}, []string{domain.DeploymentTargetDefault}},
+		{"both", []string{domain.DeploymentTargetDefault, "https://removed.example.com"}, []string{domain.DeploymentTargetDefault, appOrigin}},
+	} {
+		t.Run("restores the targets of "+tt.name, func(t *testing.T) {
+			svc, statements := newMockedDeploymentService(t)
+			previous := previousDeployment()
+			previous.Targets = nil
+			for _, origin := range tt.origins {
+				previous.Targets = append(previous.Targets, domain.DeploymentTarget{Origin: origin})
+			}
+			statements.EXPECT().GetDeploymentByID(gomock.Any(), "proj_1", "dep_previous").Return(previous, nil)
+			expectProjectOrigins(statements, appPrimary)
+			statements.EXPECT().GetReleaseByID(gomock.Any(), "proj_1", "rel_1").Return(&domain.Release{ID: "rel_1"}, nil)
+			set := emptyVariableSet()
+			expectDeploymentSet(statements, "dep_previous", set)
+			statements.EXPECT().GetNewestPerOrigin(gomock.Any(), "proj_1", tt.want).Return(nil, nil)
+			expectInsert(statements, nil, set)
+
+			result, err := svc.Rollback(t.Context(), rollback(nil))
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, result.Deployment.Origins())
+		})
+	}
+
 	t.Run("unchanged answers the newest primary deployment", func(t *testing.T) {
 		svc, statements := newMockedDeploymentService(t)
 		statements.EXPECT().GetDeploymentByID(gomock.Any(), "proj_1", "dep_previous").Return(previousDeployment(), nil)
