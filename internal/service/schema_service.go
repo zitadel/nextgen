@@ -323,7 +323,9 @@ func matchingSchemaByObjectType(ctx context.Context, stmts AllStatements, projec
 	return nil, nil
 }
 
-func latestSchemaByObjectType(ctx context.Context, stmts AllStatements, projectID, objectType string) (*domain.JSONSchema, error) {
+// LatestSchemaByObjectType is the project's newest schema declaring objectType,
+// nil when it has none.
+func LatestSchemaByObjectType(ctx context.Context, stmts AllStatements, projectID, objectType string) (*domain.JSONSchema, error) {
 	if objectType == "" {
 		return nil, nil
 	}
