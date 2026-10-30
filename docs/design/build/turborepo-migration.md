@@ -429,7 +429,7 @@ Two workable setups; the prototype's draft uses the first.
 
 | | Vercel Remote Cache (OIDC) | Depot's turbo cache |
 |---|---|---|
-| Setup | a repository variable `TURBO_TEAM=zitadel`, `id-token: write` on the job, `vercel/setup-turborepo-remote-cache-action@v1.1.0` before the first `turbo` (with `policy:` set to the policy's ID only if more than one of the team's Turborepo policies matches the token: Vercel then refuses the exchange), `TURBO_API=https://vercel.com` on Depot runners (they inject Depot's `TURBO_API`), and a **Turborepo CLI OIDC policy** in the Vercel team settings (Build and Deployment → OIDC Policies for CLI Access → Turborepo CLI Policies, not a VCR policy; select GitHub, repository `zitadel/nextgen`; optionally restrict to a workflow or branch) | nothing on Depot runners: `TURBO_API`, `TURBO_TOKEN`, `TURBO_TEAM` are injected |
+| Setup | a repository variable `TURBO_TEAM=zitadel`, `id-token: write` on the job, `vercel/setup-turborepo-remote-cache-action@v1.1.0` before the first `turbo` (with `policy:` set to the policy's ID only if more than one of the team's Turborepo policies matches the token: Vercel then refuses the exchange), no `TURBO_API` (turbo's default, `https://vercel.com/api`, is the cache; `https://vercel.com` is the dashboard, which answers 405), a runner that does not point turbo at a cache of its own (Depot's do, unless the organization turns off "Allow Actions jobs to automatically connect to Depot Cache": ci-turbo's Depot runs restored from Depot's cache with `TURBO_API` set in the workflow), and a **Turborepo CLI OIDC policy** in the Vercel team settings (Build and Deployment → OIDC Policies for CLI Access → Turborepo CLI Policies, not a VCR policy; select GitHub, repository `zitadel/nextgen`; optionally restrict to a workflow or branch) | nothing on Depot runners: `TURBO_API`, `TURBO_TOKEN`, `TURBO_TEAM` are injected |
 | Shared with | the cloud deployments (same team cache, apart by key: turbo hashes `VERCEL_TARGET_ENV` into every task on Vercel, so a build CI did is no hit there) | CI only |
 | Cost | free, within a fair-use limit of 1 TB/month of uploads on Pro; artifacts expire after 7 days | part of the Depot plan (as moon's cache today) |
 | Forks | no token, local cache only | same |
@@ -441,10 +441,12 @@ deployments use it already. Set up on 2026-10-12: the variable
 `zitadel/nextgen`. The first exchanges after the policy was created
 answered HTTP 400, one job got 400 and 200 for identical requests a third of
 a second apart, and every exchange since has succeeded: a new policy
-probably takes a while to apply everywhere. To check a run,
-look for "Remote caching enabled" in turbo's output. If the policy is not
-wanted, delete the `TURBO_API` line and the cache step from the workflow and
-Depot's cache is used with no further setup.
+probably takes a while to apply everywhere. To check a run, read turbo's
+`Cached:` line on a run of tasks an earlier run built, and look for `failed
+to contact remote cache` warnings: turbo prints "Remote caching enabled"
+whenever it has a token, even when every request fails. If the policy is not
+wanted, delete the cache step from the workflow: on GitHub-hosted runners the
+jobs then run with the local cache only.
 
 ### Who may write to the cache
 
