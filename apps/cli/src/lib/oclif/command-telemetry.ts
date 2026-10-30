@@ -19,19 +19,37 @@ export const CLI_COMMAND_COMPLETED = "cli_command_completed";
 export const CLI_COMMAND_FAILED = "cli_command_failed";
 
 /**
- * The properties the Vercel Web Analytics copy of a lifecycle event keeps, in
- * priority order, the header first: the intake takes 8 (proof of concept).
+ * The one dimension of its own a command's Vercel Web Analytics copy keeps, by
+ * command id; the rest go to Mixpanel only.
  */
-export const VERCEL_EVENT_KEYS = [
-  "surface",
-  "cli_version",
-  "server_kind",
-  "command",
-  "status",
-  "reason",
-  "host_agent",
-  "non_interactive",
-] as const;
+export const VERCEL_COMMAND_DIMENSIONS: ReadonlyMap<string, string> = new Map([
+  ["setup", "framework"],
+  ["claim", "claim_outcome"],
+  ["doctor", "failed_checks"],
+  ["api", "operation"],
+  ["start", "runtime"],
+]);
+
+/**
+ * The properties the Vercel Web Analytics copy of `command`'s lifecycle events
+ * keeps, in priority order, the header first: the intake takes 8. The
+ * command's own dimension ranks after `host_agent`, so on a failed run, where
+ * `reason` fills the eighth place, it takes `non_interactive`'s.
+ */
+export function vercelEventKeys(command: string): readonly string[] {
+  const dimension = VERCEL_COMMAND_DIMENSIONS.get(command);
+  return [
+    "surface",
+    "cli_version",
+    "server_kind",
+    "command",
+    "status",
+    "reason",
+    "host_agent",
+    ...(dimension === undefined ? [] : [dimension]),
+    "non_interactive",
+  ];
+}
 
 export const FIRST_RUN_NOTICE =
   "Zitadel CLI collects anonymous usage analytics to help improve the tool. " +

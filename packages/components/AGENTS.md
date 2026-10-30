@@ -80,7 +80,7 @@ The widget never broadcasts a password or one-time-code value through its own ev
   `edge` and `browser` (Chromium, `*.browser.spec.ts`). `pnpm test:unit` is the fast lane;
   `pnpm test:browser` runs the browser project alone.
 - The `edge` project runs `*.edge.spec.ts` inside the `edge-runtime` VM
-  (`edgeProject()` in `vitest.shared.mjs`). Only `src/server.ts`, which exists
+  (`edgeProject()` in `@zitadel/vitest-config`). Only `src/server.ts`, which exists
   for the edge, has one; it imports the built `dist/server.mjs`.
 - Put a test in the lowest project that proves it (the ladder in
   [`packages/testing/AGENTS.md`](../testing/AGENTS.md#which-layer-a-test-belongs-in)):

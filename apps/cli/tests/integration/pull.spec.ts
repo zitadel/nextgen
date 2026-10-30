@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "../helpers/platform";
-import { anApp, aSetUpApp, type ScaffoldedApp } from "../helpers/project";
+import { anApp, anUndeployedEnvironment, aSetUpApp, type ScaffoldedApp } from "../helpers/project";
 
 const platform = usePlatformMock();
 
@@ -77,9 +77,9 @@ describe("pull", () => {
       });
 
       it("fails when nothing is deployed to pull", async () => {
-        const project = await aSetUpApp();
+        const project = await anUndeployedEnvironment();
 
-        expect(await project.run(["pull", "--json"])).toFailWith("E_NOT_FOUND");
+        expect(await project.run(["pull", "--env", "staging", "--json"])).toFailWith("E_NOT_FOUND");
       });
 
       it("rejects a target that is neither latest nor an id", async () => {

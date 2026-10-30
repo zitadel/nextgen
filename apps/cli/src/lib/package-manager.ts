@@ -2,6 +2,9 @@ import { spawn } from "node:child_process";
 import { readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 
+import { optionArgs } from "./public-cli";
+import { shellOption } from "./shell";
+
 export type PackageManager = "npm" | "pnpm" | "yarn" | "bun";
 
 export type PackageCommand = {
@@ -60,6 +63,46 @@ export function devCommandFor(packageManager: PackageManager): PackageCommand {
     case "bun":
       return command("bun", ["run", "dev"]);
   }
+}
+
+/**
+ * The flag that runs a package manager in another directory, and whether a
+ * relative directory may be given to it: npm's `--prefix` and pnpm's `--dir`
+ * read one from the shell's directory, while bun documents `--cwd` as an
+ * absolute path and Yarn 2+ has mishandled relative ones, so those two get the
+ * resolved directory.
+ */
+const DIRECTORY_FLAG: Record<PackageManager, { flag: string; relative: boolean }> = {
+  npm: { flag: "--prefix", relative: true },
+  pnpm: { flag: "--dir", relative: true },
+  yarn: { flag: "--cwd", relative: false },
+  bun: { flag: "--cwd", relative: false },
+};
+
+/**
+ * `packageCommand` as suggested from the shell's directory when the project is
+ * elsewhere (`npm --prefix app run dev`), for a run given `--cwd`. Each
+ * suggested command runs in a shell of its own, so a `cd` in front of one would
+ * not carry over to the next.
+ *
+ * @param typed - `--cwd` as typed; `undefined` leaves the command as it is.
+ * @param resolved - The same directory, absolute.
+ */
+export function inDirectory(
+  packageCommand: PackageCommand,
+  typed: string | undefined,
+  resolved: string,
+): PackageCommand {
+  if (typed === undefined) {
+    return packageCommand;
+  }
+  const { flag, relative } = DIRECTORY_FLAG[packageCommand.command];
+  const dir = relative ? typed : resolved;
+  return {
+    command: packageCommand.command,
+    args: [...optionArgs(flag, dir), ...packageCommand.args],
+    display: [packageCommand.command, shellOption(flag, dir), ...packageCommand.args].join(" "),
+  };
 }
 
 export async function runPackageCommand(

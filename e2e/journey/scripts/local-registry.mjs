@@ -3,9 +3,13 @@ import { spawn } from "node:child_process";
 import { cp, mkdir, open, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
+// @boundaries-ignore root scripts/ belongs to the workspace root, which no package can depend on
 import { runCapture } from "../../../scripts/dev-process.mjs";
+// @boundaries-ignore root scripts/ belongs to the workspace root, which no package can depend on
 import { packPublicPackages } from "../../../scripts/release-artifacts.mjs";
+// @boundaries-ignore root scripts/ belongs to the workspace root, which no package can depend on
 import { APP_RELEASE_PACKAGES, PUBLIC_PACKAGE_DIRS } from "../../../scripts/release-manifest.mjs";
+// @boundaries-ignore root scripts/ belongs to the workspace root, which no package can depend on
 import { runnerCommand } from "../../../scripts/task-runner.mjs";
 import { packageName, parsePort } from "./lib.mjs";
 
@@ -20,8 +24,7 @@ export const packageDirs = [...PUBLIC_PACKAGE_DIRS];
 // ask npmjs nothing; a fresh local store only skips repeat checks within a run.
 //
 // Longer is not better: npmjs releases reach the journey up to `maxage` late
-// (`npm create vite@latest`, `nuxi@latest` and `@angular/cli@latest` resolve
-// `latest` here), and `nuxi init` downloads its starter template from GitHub,
+// (`nuxi@latest` and `@angular/cli@latest` resolve `latest` here), and `nuxi init` downloads its starter template from GitHub,
 // which has adopted a new nuxt release as soon as two hours after it was
 // published. A packument cached past that point lacks the version the
 // template asks for, and the nuxt install fails until the entry expires.

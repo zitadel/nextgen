@@ -9,7 +9,7 @@ import { DETAIL_BODY, DETAIL_CARD, DetailHeader, DetailSection } from "@/compone
 import { FormError } from "@/components/form-error";
 import { Page } from "@/components/layout";
 import { StatusBadge } from "@/components/status-badge";
-import { FIELD_LABEL_TYPOGRAPHY } from "@/components/typography";
+import { FIELD_LABEL_TYPOGRAPHY, SECTION_HEADING } from "@/components/typography";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -388,9 +388,7 @@ function ProfileCard({
           with the fields' inset and gap, so the title takes the label column
           at the fields' breakpoint. */}
       <div className="@container/field-group flex flex-wrap items-center gap-x-3 gap-y-2 px-6 pt-5 pb-4">
-        <h2 className={`text-foreground font-serif text-base leading-5 ${LABEL_COLUMN}`}>
-          User schema
-        </h2>
+        <h2 className={`${SECTION_HEADING} ${LABEL_COLUMN}`}>User schema</h2>
         {schema && schemaId && (
           <div className="flex max-w-full min-w-0 flex-wrap items-center gap-x-3">
             {name !== schemaId && (

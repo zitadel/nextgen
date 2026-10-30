@@ -171,8 +171,9 @@ tasks:
       - "console:build"
     inputs:
       - "@group(serverInputs)"
-      # The Biome config the launcher check runs against.
+      # The Biome config the launcher check runs against, and its plugins.
       - "/biome.json"
+      - "/biome-plugins/*.grit"
     options:
       runFromWorkspaceRoot: true
 
@@ -196,10 +197,12 @@ tasks:
     inputs:
       - "@group(serverInputs)"
       # Read by the cloud launcher's tests (apps/cloud/launcher), which hold
-      # the deployment's configuration together. Scoped to test: nothing the
-      # server compiles reads them.
+      # the deployment's configuration together, and by the console's
+      # (internal/staticui/console), which hold the cloud's console headers to
+      # its page. Scoped to test: nothing the server compiles reads them.
       - "/vercel.json"
-      - "/apps/cloud/build.sh"
+      - "/apps/cloud/build-launcher.sh"
+      - "/apps/console/index.html"
     options:
       runFromWorkspaceRoot: true
 
@@ -263,12 +266,12 @@ tasks:
     # aborts a spanner_integration build injects on purpose (#788); pinning it
     # hid a missing retry rather than fixing it. Do not put it back.
     #
-    # -p is left at its default, so the three packages run at once. Each still
+    # -p is left at its default, so the packages run at once. Each still
     # gets its own database: with ZITADEL_TEST_SPANNER_INSTANCE set (spanner.yml
     # points it at Spanner Omni) every package provisions one on that instance,
     # because one shared database failed on tests reading each other's
     # leftovers (#1011). Without it, each package starts its own emulator
-    # container, so a local run starts three at once.
+    # container, so a local run starts one per package at once.
     command: "go"
     args:
       - "test"
@@ -278,7 +281,7 @@ tasks:
       - "spanner_integration"
       # Per package. Against Spanner Omni each package first spends about six
       # minutes creating and migrating its database (#1011), and spanner.yml
-      # runs all three on one engine on a 4-vCPU runner. A hang still surfaces
+      # runs them all on one engine on a 4-vCPU runner. A hang still surfaces
       # well inside that job's 60 minutes.
       - "-timeout"
       - "30m"
@@ -287,6 +290,7 @@ tasks:
       # but runs against Postgres, which test-postgres covers.
       - "./internal/api/integration_test/"
       - "./internal/storage/dialect/spanner/"
+      - "./internal/storage/dialect/spanner/migration/"
       - "./internal/storage/stmttest/"
     deps:
       # check-generate rewrites api/generated; see test-postgres.

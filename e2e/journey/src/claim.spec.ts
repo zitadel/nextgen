@@ -105,6 +105,7 @@ test("the setup admin can add and remove a project admin, and the colleague sees
     // Locators copied from `e2e/console/src-real/console-real.spec.ts`,
     // which proves the same screen against an API-created project.
     await page.goto(projectUrl);
+    await page.getByRole("tab", { name: "Admins" }).click();
     await expect(page.getByRole("region", { name: "Admins" })).toBeVisible();
     await page.getByRole("button", { name: "Add admin", exact: true }).click();
     const dialog = page.getByRole("dialog", { name: "Add admin" });
@@ -117,17 +118,18 @@ test("the setup admin can add and remove a project admin, and the colleague sees
     // was created.
     const row = page.getByRole("row").filter({ hasText: email });
     await expect(row).toBeVisible();
-    await expect(row.getByText("Admin", { exact: true })).toBeVisible();
+    await expect(row.getByText("Admin grant", { exact: true })).toBeVisible();
 
     // And the grant is what the colleague's own session can now open.
     await colleaguePage.goto(projectUrl);
+    await colleaguePage.getByRole("tab", { name: "Admins" }).click();
     await expect(colleaguePage.getByRole("region", { name: "Admins" })).toBeVisible();
 
     await row.getByRole("button", { name: `Actions for ${email}` }).click();
-    await page.getByRole("menuitem", { name: "Remove admin" }).click();
+    await page.getByRole("menuitem", { name: "Remove grant" }).click();
     await page
       .getByRole("alertdialog")
-      .getByRole("button", { name: "Remove admin", exact: true })
+      .getByRole("button", { name: "Remove grant", exact: true })
       .click();
     // The region is asserted again rather than only the row's absence: the
     // table is gone from a not-found state, an unauthorized one and a redirect

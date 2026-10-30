@@ -115,10 +115,21 @@ get:
         type: string
         enum:
           - user-schema
+    - name: expand
+      in: query
+      required: false
+      description: Extra fields to add onto each returned schema.
+      style: form
+      explode: true
+      schema:
+        type: array
+        uniqueItems: true
+        items:
+          $ref: schema-expand.yaml
   security:
     - oauth2:
         - schema.read
-    - nextgenSession: []
+    - sessionCookie: []
   responses:
     '200':
       description: A list of schemas was retrieved successfully.

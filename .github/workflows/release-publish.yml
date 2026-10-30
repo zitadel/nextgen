@@ -41,7 +41,7 @@ concurrency:
 
 jobs:
   changesets:
-    runs-on: depot-ubuntu-24.04-4
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     outputs:
       publish_should_run: ${{ steps.release-publish.outputs.should_run }}
@@ -83,6 +83,7 @@ jobs:
         run: corepack pnpm install --frozen-lockfile
 
       - name: Open or update version PR
+        id: version-pr
         if: ${{ github.event_name == 'push' && steps.release-publish.outputs.should_run != 'true' }}
         uses: changesets/action@v1
         with:
@@ -91,6 +92,18 @@ jobs:
           title: "build: version packages"
           commit: "build: version packages"
           createGithubReleases: false
+
+      # The action's description repeats each change under every package it
+      # ships in and drops every changelog past 60,000 characters. This one
+      # lists each change once, read from the checkout the action versioned.
+      - name: Describe the version PR's changes
+        if: ${{ steps.version-pr.outputs.pullRequestNumber }}
+        run: |
+          node scripts/release-github.mjs version-pr-body > "$RUNNER_TEMP/version-pr-body.md"
+          gh pr edit "$PULL_REQUEST" --repo "$GITHUB_REPOSITORY" --body-file "$RUNNER_TEMP/version-pr-body.md"
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          PULL_REQUEST: ${{ steps.version-pr.outputs.pullRequestNumber }}
 
   publish:
     needs: changesets

@@ -186,6 +186,21 @@ describe("NextPatcher.plan", () => {
     expect(writeContents(plan, "middleware.ts")).toBeUndefined();
   });
 
+  it("runs the request boundary on every route but Next's build files", () => {
+    // Next.js runs the boundary only where its matcher says: a matcher listing
+    // routes would leave a route later added to protectedRoutes public.
+    const boundary = writeContents(new NextPatcher().plan(ctxFor("app", 16)), "proxy.ts") ?? "";
+    const [, pattern] = /matcher: \["([^"]+)"\]/.exec(boundary) ?? [];
+    const matched = (path: string) => new RegExp(`^${pattern}$`).test(path);
+
+    for (const path of ["/", "/profile", "/orders/42", "/files/a.pdf", "/api/x", "/__nextgen/x"]) {
+      expect(matched(path), path).toBe(true);
+    }
+    for (const path of ["/_next/static/chunks/main.js", "/_next/image", "/favicon.ico"]) {
+      expect(matched(path), path).toBe(false);
+    }
+  });
+
   it("uses the CLI prerelease tag for the SDK dependency", () => {
     const plan = new NextPatcher().plan(ctxFor("app"));
     const dep = plan.ops.find(

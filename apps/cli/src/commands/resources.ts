@@ -49,6 +49,7 @@ import {
   buildResourceCommands,
   type CreateSpec,
   type ListSpec,
+  renderTable,
   type ResourceRegistry,
   type Schema,
   type UpdateSpec,
@@ -95,6 +96,15 @@ const FILTER_OPERATIONS = [
 
 const EVENT_CATEGORIES = ["request", "auth", "session", "admin", "entity", "signal"] as const;
 
+/** A release's pointers as an indented table, one pinned revision per row. */
+export const releasePointers = (release: unknown): string => {
+  const pointers = (release as { pointers?: readonly unknown[] }).pointers ?? [];
+  const table = renderTable(["kind", "handle", "revision_id"], pointers)
+    .split("\n")
+    .map((line) => `  ${line}`);
+  return ["resources", ...table].join("\n");
+};
+
 /** The operations a policy can guard, as the generated publish body names them. */
 const POLICY_OPERATIONS = PublishPolicyBody.shape.operation.options;
 
@@ -107,7 +117,8 @@ const POLICY_OPERATIONS = PublishPolicyBody.shape.operation.options;
  */
 export const RESOURCES = {
   users: {
-    group: CommandGroups.resources,
+    group: CommandGroups.usersAndTeams,
+    groupOrder: 1,
     singular: "user",
     idField: "id",
     // `identifier` is the user's login handle (their email under the default
@@ -131,6 +142,7 @@ export const RESOURCES = {
         { field: "created_at", operations: FILTER_OPERATIONS },
         { field: "id", operations: FILTER_OPERATIONS },
         { field: "schema", operations: FILTER_OPERATIONS },
+        { field: "schema_object_type", operations: ["equals", "not_equals", "contains"] },
         { field: "status", operations: FILTER_OPERATIONS },
         { field: "team_id", operations: FILTER_OPERATIONS },
         { field: "lifecycle_owner_team_id", operations: FILTER_OPERATIONS },
@@ -149,7 +161,8 @@ export const RESOURCES = {
   },
 
   teams: {
-    group: CommandGroups.resources,
+    group: CommandGroups.usersAndTeams,
+    groupOrder: 2,
     singular: "team",
     idField: "id",
     columns: ["id", "name", "status", "created_at"],
@@ -178,7 +191,7 @@ export const RESOURCES = {
   },
 
   sessions: {
-    group: CommandGroups.resources,
+    group: CommandGroups.authentication,
     singular: "session",
     idField: "session_id",
     columns: ["session_id", "state", "user_id", "created_at", "expires_at"],
@@ -204,7 +217,7 @@ export const RESOURCES = {
   },
 
   events: {
-    group: CommandGroups.resources,
+    group: CommandGroups.diagnostics,
     singular: "event",
     idField: "id",
     columns: ["id", "event_type", "category", "actor_id", "occurred_at"],
@@ -261,7 +274,8 @@ export const RESOURCES = {
   },
 
   grants: {
-    group: CommandGroups.resources,
+    group: CommandGroups.usersAndTeams,
+    groupOrder: 3,
     singular: "grant",
     idField: "id",
     columns: ["id", "user.user_id", "team.team_id", "relation", "created_at", "expires_at"],
@@ -302,7 +316,7 @@ export const RESOURCES = {
   // The revision routes are not modelled here — the CLI has no grammar for a
   // sub-resource listing yet, so `idps revisions` is deliberately absent.
   idps: {
-    group: CommandGroups.resources,
+    group: CommandGroups.authentication,
     singular: "identity provider connection",
     idField: "id",
     columns: ["id", "slug", "definition.protocol", "definition.display_name", "created_at"],
@@ -341,7 +355,7 @@ export const RESOURCES = {
   },
 
   projects: {
-    group: CommandGroups.resources,
+    group: CommandGroups.configuration,
     singular: "project",
     idField: "id",
     columns: ["id", "name", "created_at"],
@@ -433,7 +447,7 @@ export const RESOURCES = {
     group: CommandGroups.configuration,
     singular: "release",
     idField: "id",
-    columns: ["id", "metadata.message", "metadata.git_sha", "revoked_at"],
+    columns: ["id", "metadata.message", "metadata.git_sha", "revoked_at", "metadata.created_at"],
     heading: "id",
     detail: [
       "id",
@@ -453,6 +467,7 @@ export const RESOURCES = {
     get: {
       call: ({ client, projectId }, id) => client.getReleaseById(id, { project_id: projectId }),
       response: GetReleaseByIdResponse,
+      sections: (release) => [releasePointers(release)],
     },
   },
 
@@ -533,8 +548,9 @@ export const RESOURCES = {
     },
   },
 
-  // Operation policies (ADR 066). Configuration: written from
-  // .zitadel/policies/ by `apply`, so only read here. A project has one
+  // Operation policies (ADR 066). Configuration: carried from
+  // .zitadel/policies/ by `deploy`, so only read here (`policies test` is a
+  // hand-written command). A project has one
   // policy per operation, and the list shows each at its newest revision.
   // The revision routes are not modelled, for the reason `idps` gives.
   policies: {

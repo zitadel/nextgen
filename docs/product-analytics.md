@@ -10,6 +10,8 @@ These guidelines apply across all Zitadel interfaces, including the marketing we
 
 Vercel Web Analytics and Speed Insights continue to provide traffic and performance reporting for the hosted frontends. Mixpanel provides product journey, funnel and outcome reporting. Counts may differ because collection methods and consent conditions differ.
 
+Mixpanel is paused for now: the CLI and the service ping send it nothing, and the CLI's events go only to Vercel Web Analytics ([the catalog](product-analytics-events.yaml) says how).
+
 This document defines shared patterns. [`product-analytics-events.yaml`](product-analytics-events.yaml) defines the header every event carries, and lists every event and property per interface: what each one sends today and what its tracking ticket plans.
 
 ## Event names
@@ -108,6 +110,8 @@ Exclude:
 - Raw command arguments, file paths, full URLs and raw error messages.
 
 Use stable page names, predefined categories, counts and error codes instead of raw values that may contain sensitive information.
+
+The one exception is a message a person writes to us in a feedback form and chooses to send. Keep it to one property of at most 255 characters, and never tie it to who sent it.
 
 ## Tracking behaviour
 

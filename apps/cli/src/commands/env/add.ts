@@ -10,17 +10,7 @@ import { isEnvironmentName } from "../../lib/environment";
 import { writeManagedEnvFile } from "../../lib/fs-safe";
 import { input } from "../../lib/input";
 import { isObject } from "../../lib/json";
-import {
-  buildBundle,
-  createDeployment,
-  createReleaseFromBundle,
-  DEPLOY_ARGS,
-  headSha,
-  runSteps,
-  type StepContext,
-  validateStep,
-  worktreeIsDirty,
-} from "../../lib/release";
+import { DEPLOY_ARGS, deployInitialRelease, type InitialDeployment } from "../../lib/release";
 import { reportWarning } from "../../lib/warnings";
 import {
   BaseCommand,
@@ -33,9 +23,10 @@ import { PUBLIC_PROJECT_ID_VARIABLE } from "../../lib/orca/patchers/rule/public-
 import { readZitadelConfig } from "../../lib/project";
 import { DEFAULT_SERVER, parseServer, resolveServer } from "../../lib/server";
 import { shellArg, shellOption } from "../../lib/shell";
-import { environmentSelectorSuffix } from "../../lib/oclif/environment-flags";
+import { environmentSelectorSuffix, projectEnvFile } from "../../lib/oclif/environment-flags";
 import { nextCommandsData } from "../../lib/oclif/envelope";
 import { type EnvironmentSelector, projectCommand } from "../../lib/suggestion";
+import { Promptable } from "../../lib/oclif/promptable";
 
 /** A variable to set on a hosting platform or in a pipeline. A secret is named, never printed. */
 type PlatformVariable = { name: string; value?: string; secret?: boolean };
@@ -46,14 +37,6 @@ const SERVER_RENDERED = ["next", "nuxt"];
 /** The message the release this command publishes carries. */
 const INITIAL_DEPLOY_MESSAGE = "Initial deployment from zitadel env add";
 
-/** What the initial deploy published, for the envelope to report. */
-type DeployedRelease = {
-  readonly releaseId: string;
-  readonly contentHash: string;
-  readonly deploymentId: string;
-  readonly origins: readonly string[];
-};
-
 /**
  * `zitadel env add` — bind an environment to a project: create one on the
  * server, or bind an id a teammate sent over, and write the
@@ -62,10 +45,9 @@ type DeployedRelease = {
  * platform builds from git), so the command ends by printing exactly which
  * values the platform and the pipeline need.
  */
-export default class EnvAdd extends BaseCommand {
+export default class EnvAdd extends Promptable(BaseCommand) {
   static override description = "Bind an environment to a project, creating the project if needed.";
-  static override group = CommandGroups.project;
-  static override groupOrder = 7;
+  static override group = CommandGroups.configuration;
   static override examples = [
     "<%= config.bin %> env add production --server https://api.zitadel.cloud --app-url https://app.acme.com",
     "<%= config.bin %> env add staging --server https://api.zitadel.cloud --project proj_01K9AA9M3K7E2QX8VB4T",
@@ -124,7 +106,7 @@ export default class EnvAdd extends BaseCommand {
       : await this.input({
           kind: "text",
           name: "server",
-          message: "Server URL",
+          message: "What is the URL of your Zitadel server?",
           flag: "--server",
           initialValue: DEFAULT_SERVER,
           parse: parseServer,
@@ -150,7 +132,7 @@ export default class EnvAdd extends BaseCommand {
         : await this.input({
             kind: "text",
             name: "app URL",
-            message: "URL the app is served from (leave empty to skip)",
+            message: "What URL is your app served from? You can leave this empty to skip it.",
             flag: "--app-url",
             placeholder: "https://app.acme.com",
             parse: (answer: string) => ({ ok: true, value: answer.trim() || undefined }) as const,
@@ -247,9 +229,10 @@ export default class EnvAdd extends BaseCommand {
     // a follow-up run in a shell exporting another project's ZITADEL_* values
     // still acts on the project this run bound. This run's own selection is
     // not it either way.
+    const cwdFlag = typeof flags.cwd === "string" ? flags.cwd : undefined;
     const newEnvironment = environmentSelectorSuffix({
-      envFile: file,
-      ...(typeof flags.cwd === "string" ? { cwd: flags.cwd } : {}),
+      envFile: projectEnvFile(cwdFlag, file),
+      ...(cwdFlag === undefined ? {} : { cwd: cwdFlag }),
     });
     // A created project already holds its app URL as a primary origin, which
     // closes it; only a bound one (`--project`) still needs the pattern added.
@@ -273,7 +256,7 @@ export default class EnvAdd extends BaseCommand {
     // not go through `this.input`: that one answers a confirm when `--force`
     // is given, and here `--force` permits overwriting the env file, so it
     // must never answer it.
-    let deployment: DeployedRelease | undefined;
+    let deployment: InitialDeployment | undefined;
     if (hasSomewhereToLand && !nonInteractive && projectSecret !== undefined) {
       consola.info(
         "Nothing is deployed to this environment yet, so it serves the server's default schema and login flow rather than your .zitadel/ files.",
@@ -282,7 +265,7 @@ export default class EnvAdd extends BaseCommand {
         {
           kind: "confirm",
           name: "deploy .zitadel/ to the new environment",
-          message: "Deploy .zitadel/ to it now?",
+          message: "Would you like to deploy .zitadel/ to it now?",
           initialValue: true,
         },
         { interactive: !nonInteractive, force: false },
@@ -405,10 +388,8 @@ export default class EnvAdd extends BaseCommand {
   }
 
   /**
-   * Publish `.zitadel/` to the project this run just created, the way `deploy`
-   * does: build the bundle, validate it, create the release and deploy it to
-   * every primary origin. `deploy`'s diff step is left out, because nothing
-   * has ever been deployed here and there is no baseline to diff against.
+   * Publish `.zitadel/` to the project this run just created (see
+   * {@link deployInitialRelease}).
    *
    * It authenticates with the new project's own secret rather than the one
    * this directory resolves to, since `env add` binds a different project from
@@ -421,50 +402,24 @@ export default class EnvAdd extends BaseCommand {
     projectId: string;
     projectSecret: string;
     selector: EnvironmentSelector;
-  }): Promise<DeployedRelease | undefined> {
+  }): Promise<InitialDeployment | undefined> {
     const json = this.jsonEnabled();
-    const client = createZitadelClient({ baseUrl: opts.server, token: opts.projectSecret });
     consola.start("Deploying .zitadel/ to the new environment");
     try {
-      const { bundle, brandingSources, idpFiles, policyFiles } = await buildBundle(opts.cwd);
-      const ctx: StepContext = {
-        cwd: opts.cwd,
-        client,
+      const deployment = await deployInitialRelease({
+        client: createZitadelClient({ baseUrl: opts.server, token: opts.projectSecret }),
         projectId: opts.projectId,
+        cwd: opts.cwd,
         env: this.meta.env,
-        mode: "deploy",
-        dryRun: false,
         json,
         color: !json && Boolean(process.stdout.isTTY) && !process.env.NO_COLOR,
-        bundle,
-        brandingSources,
-        idpFiles,
-        policyFiles,
+        message: INITIAL_DEPLOY_MESSAGE,
         suggest: (args) => projectCommand(args, opts.selector, this.meta.cliVersion),
-      };
-      await runSteps([validateStep], ctx);
-      const release = await createReleaseFromBundle(client, opts.projectId, bundle, {
-        message: INITIAL_DEPLOY_MESSAGE,
-        gitSha: await headSha(opts.cwd),
-        gitDirty: await worktreeIsDirty(opts.cwd),
       });
-      // No optimistic guard: the project was created moments ago and nothing
-      // has ever been deployed to it, so there is no deployment to race with.
-      const deployment = await createDeployment(client, opts.projectId, {
-        releaseId: release.id,
-        targets: ["primary"],
-        message: INITIAL_DEPLOY_MESSAGE,
-      });
-      const origins = deployment.targets.map((target) => target.origin);
       consola.success(
-        `Deployed ${release.content_hash} to ${origins.length} origin${origins.length === 1 ? "" : "s"}`,
+        `Deployed ${deployment.contentHash} to ${deployment.origins.length} origin${deployment.origins.length === 1 ? "" : "s"}`,
       );
-      return {
-        releaseId: release.id,
-        contentHash: release.content_hash,
-        deploymentId: deployment.id,
-        origins,
-      };
+      return deployment;
     } catch (error) {
       reportWarning(
         `The environment was bound but the first deploy failed: ${toZitadelError(error).message}. Run \`zitadel ${DEPLOY_ARGS}${opts.selector}\` to publish it.`,

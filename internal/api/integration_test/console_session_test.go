@@ -20,7 +20,7 @@ import (
 )
 
 // TestConsoleManagementAcceptsSession pins #1300 §1: the embedded Console
-// holds only __nextgen_session, so every management operation its screens
+// holds only its session cookie, so every management operation its screens
 // call must accept that cookie as the signed-in user. The caller holds a
 // direct admin grant on the platform project it signed in to, so home and
 // target project are the same -- the single-project deployment. (The owning
@@ -161,6 +161,96 @@ func TestConsoleManagementAcceptsSession(t *testing.T) {
 		revoked, err := session.RevokeRelease(t.Context(), api.RevokeReleaseParams{ProjectID: ownedID, ReleaseID: created.ID})
 		require.NoError(t, err)
 		require.IsType(t, &api.RevokeReleaseConflict{}, revoked, helpers.MustMarshal(t, revoked))
+	})
+
+	t.Run("policies", func(t *testing.T) {
+		t.Parallel()
+		// The Project settings page reads the password policy and the release
+		// detail a pinned revision with the session; publishing stays with the
+		// secret. A policy is project state, so the project is this test's own.
+		owned, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+		require.NoError(t, err)
+		harness.SeedProjectAdmin(t, owned.ID, claimerID)
+		ownedID := api.ProjectID(owned.ID)
+		secret, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+		require.NoError(t, err)
+		harness.SetProjectSecretOnApiClient(t, secret, owned)
+		published := passwordSetPolicy(t, publishPolicy(t, secret, owned.ID, api.PasswordSetConfig{MinLength: api.NewOptInt(12)}))
+
+		listed, err := session.ListPolicies(t.Context(), api.ListPoliciesParams{
+			ProjectID: ownedID, Operation: api.NewOptPolicyOperation(passwordSetOperation),
+		})
+		require.NoError(t, err)
+		require.IsType(t, &api.ListPoliciesResponse{}, listed, helpers.MustMarshal(t, listed))
+		require.Len(t, listed.(*api.ListPoliciesResponse).Policies, 1)
+		assert.Equal(t, published.ID, passwordSetPolicy(t, &listed.(*api.ListPoliciesResponse).Policies[0]).ID)
+
+		got, err := session.GetPolicy(t.Context(), api.GetPolicyParams{ProjectID: ownedID, PolicyID: published.ID})
+		require.NoError(t, err)
+		assert.Equal(t, published.RevisionID, passwordSetPolicy(t, got).RevisionID)
+
+		revisions, err := session.ListPolicyRevisions(t.Context(), api.ListPolicyRevisionsParams{ProjectID: ownedID, PolicyID: published.ID})
+		require.NoError(t, err)
+		require.IsType(t, &api.ListPolicyRevisionsResponse{}, revisions, helpers.MustMarshal(t, revisions))
+
+		revision, err := session.GetPolicyRevision(t.Context(), api.GetPolicyRevisionParams{ProjectID: ownedID, RevisionID: published.RevisionID})
+		require.NoError(t, err)
+		assert.Equal(t, published.ID, passwordSetPolicy(t, revision).ID)
+	})
+
+	t.Run("origins and variables", func(t *testing.T) {
+		t.Parallel()
+		// The Project settings page adds and removes origins and reads the
+		// variables with the session (#2320). Variables are written with the
+		// secret only. The project is this test's own: origins and variables
+		// are project state, and the platform project is shared.
+		owned, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+		require.NoError(t, err)
+		harness.SeedProjectAdmin(t, owned.ID, claimerID)
+		ownedID := api.ProjectID(owned.ID)
+		secret, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+		require.NoError(t, err)
+		harness.SetProjectSecretOnApiClient(t, secret, owned)
+
+		origin := api.ProjectOrigin{Pattern: "https://console-session-origin.example.com", Kind: api.ProjectOriginKindPrimary}
+		added, err := session.AddOrigin(t.Context(), &origin, api.AddOriginParams{ProjectID: ownedID})
+		require.NoError(t, err)
+		require.IsType(t, &api.AddOriginResponse{}, added, helpers.MustMarshal(t, added))
+		project, err := session.GetProject(t.Context(), api.GetProjectParams{ProjectID: ownedID})
+		require.NoError(t, err)
+		require.IsType(t, &api.ProjectDetailResponse{}, project, helpers.MustMarshal(t, project))
+		require.Contains(t, project.(*api.ProjectDetailResponse).Origins, origin)
+
+		removed, err := session.RemoveOrigin(t.Context(), &api.RemoveOriginReq{Pattern: origin.Pattern}, api.RemoveOriginParams{ProjectID: ownedID})
+		require.NoError(t, err)
+		require.IsType(t, &api.RemoveOriginNoContent{}, removed, helpers.MustMarshal(t, removed))
+		project, err = session.GetProject(t.Context(), api.GetProjectParams{ProjectID: ownedID})
+		require.NoError(t, err)
+		require.NotContains(t, project.(*api.ProjectDetailResponse).Origins, origin)
+
+		written, err := secret.UpdateVariables(t.Context(), api.UpdateVariablesRequest{
+			"SESSION_PLAIN": api.NewVariableScalarVariableInput(api.NewStringVariableScalar("shown")),
+			"SESSION_SECRET": api.NewSecretVariableInputVariableInput(api.SecretVariableInput{
+				Value: api.NewStringVariableScalar("never-shown"), Secret: true,
+			}),
+		}, api.UpdateVariablesParams{ProjectID: ownedID})
+		require.NoError(t, err)
+		require.IsType(t, &api.VariablesByKind{}, written, helpers.MustMarshal(t, written))
+
+		// The session reads every name with its value per kind, the secret held.
+		held := api.NewSecretVariableVariable(api.SecretVariable{Secret: true})
+		listed, err := session.GetVariables(t.Context(), api.GetVariablesParams{ProjectID: ownedID})
+		require.NoError(t, err)
+		require.IsType(t, &api.VariablesByKind{}, listed, helpers.MustMarshal(t, listed))
+		variables := *listed.(*api.VariablesByKind)
+		assert.Equal(t, api.NewVariableScalarVariable(api.NewStringVariableScalar("shown")), variables["SESSION_PLAIN"].Primary.Value)
+		assert.Equal(t, held, variables["SESSION_SECRET"].Primary.Value)
+		assert.NotContains(t, helpers.MustMarshal(t, listed), "never-shown")
+
+		one, err := session.GetVariable(t.Context(), api.GetVariableParams{ProjectID: ownedID, VariableName: "SESSION_SECRET"})
+		require.NoError(t, err)
+		require.IsType(t, &api.VariableByKind{}, one, helpers.MustMarshal(t, one))
+		assert.Equal(t, api.VariableByKind{Primary: api.NewOptVariable(held)}, *one.(*api.VariableByKind))
 	})
 
 	t.Run("teams", func(t *testing.T) {
@@ -404,6 +494,26 @@ func TestConsoleManagementSessionWithoutAccess(t *testing.T) {
 		revoked, err := session.RevokeRelease(t.Context(), api.RevokeReleaseParams{ProjectID: otherID, ReleaseID: created.ID})
 		require.NoError(t, err)
 		assertAuthzError(t, revoked, domain.ErrReleaseProjectNotFound().Code)
+	})
+
+	t.Run("cannot add or remove another project's origins, nor read its variables", func(t *testing.T) {
+		// Every op is project-scoped: the miss is the resource's own not
+		// found, which says nothing about the project.
+		added, err := session.AddOrigin(t.Context(), &api.ProjectOrigin{
+			Pattern: "https://stranger.example.com", Kind: api.ProjectOriginKindPrimary,
+		}, api.AddOriginParams{ProjectID: otherID})
+		require.NoError(t, err)
+		assertAuthzError(t, added, domain.ErrOriginNotFound().Code)
+		removed, err := session.RemoveOrigin(t.Context(), &api.RemoveOriginReq{Pattern: "https://stranger.example.com"}, api.RemoveOriginParams{ProjectID: otherID})
+		require.NoError(t, err)
+		assertAuthzError(t, removed, domain.ErrOriginNotFound().Code)
+
+		listed, err := session.GetVariables(t.Context(), api.GetVariablesParams{ProjectID: otherID})
+		require.NoError(t, err)
+		assertAuthzError(t, listed, domain.ErrVariableNotFound().Code)
+		one, err := session.GetVariable(t.Context(), api.GetVariableParams{ProjectID: otherID, VariableName: "ANY"})
+		require.NoError(t, err)
+		assertAuthzError(t, one, domain.ErrVariableNotFound().Code)
 	})
 
 	t.Run("cannot read another project's schema", func(t *testing.T) {
@@ -692,6 +802,30 @@ func TestConsoleSessionReadsTargetProjectByID(t *testing.T) {
 		require.IsType(t, &api.Release{}, got, helpers.MustMarshal(t, got))
 	})
 
+	t.Run("origins and variables", func(t *testing.T) {
+		t.Parallel()
+		origin := api.ProjectOrigin{Pattern: "https://granted-origin.example.com", Kind: api.ProjectOriginKindPreview}
+		added, err := session.AddOrigin(t.Context(), &origin, api.AddOriginParams{ProjectID: customerProjectID})
+		require.NoError(t, err)
+		require.IsType(t, &api.AddOriginResponse{}, added, helpers.MustMarshal(t, added))
+		removed, err := session.RemoveOrigin(t.Context(), &api.RemoveOriginReq{Pattern: origin.Pattern}, api.RemoveOriginParams{ProjectID: customerProjectID})
+		require.NoError(t, err)
+		require.IsType(t, &api.RemoveOriginNoContent{}, removed, helpers.MustMarshal(t, removed))
+
+		written, err := customerSecret.UpdateVariables(t.Context(), api.UpdateVariablesRequest{
+			"GRANTED_READ": api.NewVariableScalarVariableInput(api.NewStringVariableScalar("granted")),
+		}, api.UpdateVariablesParams{ProjectID: customerProjectID})
+		require.NoError(t, err)
+		require.IsType(t, &api.VariablesByKind{}, written, helpers.MustMarshal(t, written))
+		listed, err := session.GetVariables(t.Context(), api.GetVariablesParams{ProjectID: customerProjectID})
+		require.NoError(t, err)
+		require.IsType(t, &api.VariablesByKind{}, listed, helpers.MustMarshal(t, listed))
+		require.Contains(t, *listed.(*api.VariablesByKind), "GRANTED_READ")
+		one, err := session.GetVariable(t.Context(), api.GetVariableParams{ProjectID: customerProjectID, VariableName: "GRANTED_READ"})
+		require.NoError(t, err)
+		require.IsType(t, &api.VariableByKind{}, one, helpers.MustMarshal(t, one))
+	})
+
 	t.Run("without a grant the resource is not found", func(t *testing.T) {
 		t.Parallel()
 		strangerID, _ := harness.CreateUserOwnedByTeam(t, console.ID)
@@ -815,6 +949,68 @@ func TestConsoleSessionPartialAccessDoesNotExpand(t *testing.T) {
 		require.NoError(t, err)
 		require.IsType(t, &api.ListUserTeamsNotFound{}, resp, helpers.MustMarshal(t, resp))
 		assert.Equal(t, api.ErrorCode("user.not_found"), resp.(*api.ListUserTeamsNotFound).Code)
+	})
+}
+
+// TestConsoleSessionSchemaInUseNeedsProjectRead pins the gate on
+// GET /schemas?expand=in_use: the flag says whether users exist on a revision,
+// so it is read under the users' permission (ADR 059 rule 8). A session minting
+// no scopes gets it from read on the whole project; a viewer grant scoped to
+// one team still lists schemas but is refused the flag.
+func TestConsoleSessionSchemaInUseNeedsProjectRead(t *testing.T) {
+	t.Parallel()
+
+	customer, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+	_, teamID := harness.CreateUserOwnedByTeam(t, customer.ID)
+	params := api.ListSchemasParams{
+		ProjectID: api.ProjectID(customer.ID),
+		Expand:    []api.SchemaExpand{api.SchemaExpandInUse},
+	}
+
+	t.Run("read on the whole project", func(t *testing.T) {
+		t.Parallel()
+		console := harness.EnsurePlatformProject(t)
+		operatorID, _ := harness.CreateUserOwnedByTeam(t, console.ID)
+		harness.SeedProjectAdmin(t, customer.ID, operatorID)
+
+		resp, err := sessionClientForUser(t, operatorID).ListSchemas(t.Context(), params)
+		require.NoError(t, err)
+		listed, ok := resp.(*api.ListSchemasResponse)
+		require.True(t, ok, helpers.MustMarshal(t, resp))
+		require.NotEmpty(t, listed.Schemas)
+		for _, schema := range listed.Schemas {
+			assert.True(t, schema.Metadata.InUse.Set, "in_use must be set on %s", schema.ID)
+		}
+	})
+
+	t.Run("a grant scoped to one team", func(t *testing.T) {
+		t.Parallel()
+		_, operatorID, cookie := ownSessionUser(t)
+		asgn := &domain.AuthzAssignment{
+			ProjectID:     customer.ID,
+			CatalogID:     domain.SystemCatalogID,
+			PrincipalType: domain.AuthzPrincipalTypeUser,
+			PrincipalID:   operatorID,
+			ObjectType:    "project",
+			Relation:      "viewer",
+		}
+		asgn.ApplyScope(domain.NewTeamAssignmentScope(teamID))
+		require.NoError(t, harness.EnsureServiceDB(t).Statements().CreateAuthzAssignment(t.Context(), asgn))
+		session, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+		require.NoError(t, err)
+		session.SetSessionToken(cookie.Value)
+
+		listed, err := session.ListSchemas(t.Context(), api.ListSchemasParams{ProjectID: params.ProjectID})
+		require.NoError(t, err)
+		require.IsType(t, &api.ListSchemasResponse{}, listed, "the foothold still lists: %s", helpers.MustMarshal(t, listed))
+
+		resp, err := session.ListSchemas(t.Context(), params)
+		require.NoError(t, err)
+		status, code, _, ok := errorResponseParts(t, resp)
+		require.True(t, ok, helpers.MustMarshal(t, resp))
+		assert.Equal(t, http.StatusForbidden, status)
+		assert.Equal(t, domain.ErrJSONSchemaPermissionDenied().Code, code)
 	})
 }
 
@@ -951,7 +1147,7 @@ func TestConsoleManagementBearerIgnoresStaleCookie(t *testing.T) {
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+harness.ProjectSecret(t, console))
-	req.AddCookie(&http.Cookie{Name: "__nextgen_session", Value: "stale-or-garbage"})
+	req.AddCookie(&http.Cookie{Name: "__Host-zitadel_session", Value: "stale-or-garbage"})
 
 	resp, err := harness.EnsureHttpClient(t).Do(req)
 	require.NoError(t, err)

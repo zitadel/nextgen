@@ -18,7 +18,7 @@ import {
   publishPolicyBodyOneConfigMinLengthMax,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import type { PublishPolicyBody } from "@zitadel/api/generated/model";
-import { policyConfigSchema } from "@zitadel/config/schemas";
+import { policyConfigSchema, RECOMMENDED_PASSWORD_MIN_LENGTH } from "@zitadel/config/schemas";
 import type { Parsed } from "@zitadel/config/idp";
 import { POLICY_FILE_SCHEMA_REF } from "@zitadel/config/meta-schemas";
 
@@ -38,6 +38,17 @@ export type PolicyFile = {
  */
 export function toPolicyWireBody(file: PolicyFile): PublishPolicyBody {
   return { operation: file.operation, config: file.config };
+}
+
+/**
+ * The suffix of a policy test file (`<operation>.test.json`), which sits
+ * beside the policies but is never deployed: `zitadel policies test` runs it.
+ */
+export const POLICY_TEST_SUFFIX = ".test.json";
+
+/** Whether a file in `.zitadel/policies/` is a test file rather than a policy. */
+export function isPolicyTestFile(name: string): boolean {
+  return name.endsWith(POLICY_TEST_SUFFIX);
 }
 
 /** The name a policy file must have: its operation, so one file holds one operation's policy. */
@@ -77,23 +88,25 @@ export const PASSWORD_POLICY_PATH = `${POLICIES_DIR}/${policyFileName(PASSWORD_P
 /**
  * A minimum password length as `setup` was given it: a number, or `null` for
  * an explicit "none" (an empty answer, or 0), which is not the same as not
- * being asked: a kept policy file loses its `min_length` on "none" and keeps it
- * when nothing was given.
+ * being asked: a new policy file gets {@link RECOMMENDED_PASSWORD_MIN_LENGTH}
+ * when nothing was given, and a kept one loses its `min_length` on "none" and
+ * keeps it when nothing was given.
  */
 export type PasswordMinLength = number | null;
 
 /**
- * The password policy file `setup` writes. Without a minimum its `config` is
- * empty, which enforces nothing: the CLI does not choose a value on the
- * project's behalf, it only makes the policy easy to find and to set.
+ * The password policy file `setup` writes for a new project: the given
+ * minimum, {@link RECOMMENDED_PASSWORD_MIN_LENGTH} when none was given, and an
+ * empty `config`, which enforces nothing, for an explicit "none".
  */
 export function passwordPolicyFile(
   minLength?: PasswordMinLength,
 ): PolicyFile & { $schema: string } {
+  const value = minLength === undefined ? RECOMMENDED_PASSWORD_MIN_LENGTH : minLength;
   return {
     $schema: POLICY_FILE_SCHEMA_REF,
     operation: PASSWORD_POLICY_OPERATION,
-    config: typeof minLength === "number" ? { min_length: minLength } : {},
+    config: value === null ? {} : { min_length: value },
   };
 }
 

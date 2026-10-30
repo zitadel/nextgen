@@ -45,7 +45,6 @@ import {
   customExample,
   customFlagValues,
   flagText,
-  ENABLE_FLAG_NAMES,
   givenCustomFlags,
   loopbackIssuerWarning,
   publishClientId,
@@ -56,13 +55,14 @@ import {
   republishCommands,
   SETUP_FLAG_KEYS,
   SETUP_FLAG_NAMES,
+  ssoEnableArgs,
   storeClientSecret,
   type SecretOutcome,
   type SecretPublisher,
 } from "../../lib/idp";
-import { brandingGuidanceAction } from "../../lib/journey-guidance";
+import { brandingGuidanceAction, exploreAllCommands } from "../../lib/journey-guidance";
 import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../../lib/oclif";
-import { environmentSelectorSuffix } from "../../lib/oclif/environment-flags";
+import { environmentSelectorSuffix, projectEnvFile } from "../../lib/oclif/environment-flags";
 import { serverKind } from "../../lib/oclif/server-kind";
 import { findLocalAdminFor } from "../../lib/local-server/admin-credential";
 import { claimProjectAsAdmin } from "../../lib/local-server/claim-as-admin";
@@ -75,6 +75,7 @@ import {
   writeZitadelSecret,
 } from "../../lib/project";
 import {
+  assertDirectoryOrMissing,
   createOrca,
   inspectScaffoldTarget,
   issuerFromPort,
@@ -102,7 +103,13 @@ import {
   materializeSetupResources,
   type MaterializeSetupResourcesResult,
 } from "../../lib/setup-resources";
+import { DEPLOY_ARGS, deployInitialRelease, type InitialDeployment } from "../../lib/release";
 import { installDependenciesForSetup } from "./install";
+import {
+  assertCleanWorktree,
+  ensureInitialCommit,
+  type InitialCommitOutcome,
+} from "./initial-commit";
 import { moveDevPort } from "./move-dev-port";
 import {
   askCustomSettings,
@@ -136,6 +143,7 @@ import {
   unscopedCommand,
 } from "../../lib/suggestion";
 import { nextCommandsData } from "../../lib/oclif/envelope";
+import { Promptable } from "../../lib/oclif/promptable";
 
 /**
  * The frameworks `--framework` accepts, derived from Orca's registry so the
@@ -161,6 +169,9 @@ const RENDERER_FLAG_DESCRIPTION =
     ? "Renderer (default: react)."
     : `Renderer (default: react). Not yet available: ${UNAVAILABLE_RENDERER_IDS.join(", ")}.`;
 
+/** The message the release setup publishes carries. */
+const INITIAL_DEPLOY_MESSAGE = "Initial deployment from zitadel setup";
+
 /**
  * The selector appended to setup's credential-recovery commands. `variable set`
  * is an `EnvironmentCommand` that resolves the project and server from the
@@ -171,9 +182,13 @@ const RENDERER_FLAG_DESCRIPTION =
  * the process environment (unlike `--env`); same reasoning as the SSO recovery.
  */
 function recoverySelector(cwd: string | undefined): EnvironmentSelector {
-  // `--cwd` too, as typed: `--env-file` resolves against it, so a recovery
-  // run from where setup was launched reads the file setup wrote.
-  return environmentSelectorSuffix({ envFile: ".env.development.local", cwd });
+  // `--cwd` too, as typed, and the file under it: `--env-file` is read from
+  // the shell's directory, so a recovery run from where setup was launched
+  // reads the file setup wrote.
+  return environmentSelectorSuffix({
+    envFile: projectEnvFile(cwd, ".env.development.local"),
+    cwd,
+  });
 }
 
 /**
@@ -181,7 +196,11 @@ function recoverySelector(cwd: string | undefined): EnvironmentSelector {
  * local-server failure (see `ssoRecovery`).
  */
 function localRecoverySelector(cwd: string | undefined): EnvironmentSelector {
-  return environmentSelectorSuffix({ envFile: ".env.development.local", server: "local", cwd });
+  return environmentSelectorSuffix({
+    envFile: projectEnvFile(cwd, ".env.development.local"),
+    server: "local",
+    cwd,
+  });
 }
 
 /** `zitadel setup` — create a project and scaffold local auth.
@@ -197,10 +216,10 @@ function localRecoverySelector(cwd: string | undefined): EnvironmentSelector {
  * — each entry is a small class) and {@link PickFrameworkPrompt} (the
  * empty-directory framework choice, before the main wizard).
  */
-export default class Setup extends BaseCommand {
+export default class Setup extends Promptable(BaseCommand) {
   static override description =
     "Create a Zitadel project and scaffold local auth. An interactive setup ends with a note about the Zitadel agent skills, shown once per machine; set NO_SKILLS_PROMPT=1 to hide it.";
-  static override group = CommandGroups.project;
+  static override group = CommandGroups.gettingStarted;
   static override groupOrder = 1;
   static override examples = [
     "<%= config.bin %> setup --framework next",
@@ -224,6 +243,12 @@ export default class Setup extends BaseCommand {
     "skip-install": Flags.boolean({
       description: "Do not install dependencies after setup updates package.json.",
     }),
+    git: Flags.boolean({
+      allowNo: true,
+      default: true,
+      description:
+        "Commit the project setup writes, initialising a repository first when there is none, so a release records the commit it was built from. Refuses a repository that already has uncommitted work. Use --no-git to leave version control alone.",
+    }),
     preset: Flags.string({
       description:
         "Sign-in preset for the scaffolded schema and login flow (default: password-first).",
@@ -240,7 +265,7 @@ export default class Setup extends BaseCommand {
     design: nonBlankString({ hidden: true }),
     "password-min-length": nonBlankString({
       description:
-        "Minimum password length for the project's password policy, for example 15; 0 sets none. Without it, setup writes the policy with no rules; change it in .zitadel/policies/ later.",
+        "Minimum password length for the project's password policy, for example 12; 0 sets none. Without it, setup sets 15, the NIST minimum for password-only sign-in; change it in .zitadel/policies/ later.",
     }),
     [SETUP_FLAG_KEYS.provider]: Flags.string({
       description:
@@ -298,6 +323,9 @@ export default class Setup extends BaseCommand {
       throw localSetupHint(error, retryOptionsFromFlags(flags), this.config.version);
     }
     const { cwd, nonInteractive, dryRun, force } = this.meta;
+    // A `--cwd` that does not exist yet is the new app's directory, created
+    // with the app; one that is a file is a mistake to name before any read.
+    await assertDirectoryOrMissing(cwd);
 
     if (await hasZitadelConfig(cwd)) {
       // An app already set up has nothing left to scaffold, but an explicit
@@ -311,6 +339,14 @@ export default class Setup extends BaseCommand {
       throw new ZitadelError("E_CONFLICT", ".zitadel/secret exists without zitadel.json", {
         hint: "Move the secret aside or restore zitadel.json before running setup.",
       });
+    }
+    // Before anything is written: setup commits what it writes, and it can
+    // only tell its own files from the developer's when the tree starts clean.
+    // A dirty repository is refused here, where nothing has happened yet.
+    // A dry run too: the check only reads, and previewing success on a
+    // repository the real run would refuse is a worse lie than refusing early.
+    if (flags.git !== false) {
+      await assertCleanWorktree(cwd);
     }
     // Before anything is detected, created or written: a server another CLI
     // release left running fails setup halfway, after the project exists.
@@ -356,7 +392,7 @@ export default class Setup extends BaseCommand {
       detected = await orca.detect(cwd, flags.framework);
       app = { framework: detected.id, devPort: detected.devPort };
       consola.success(
-        `Detected ${detected.id}${detected.devPort ? ` (dev port ${detected.devPort})` : ""}`,
+        `Detected ${orca.displayName(detected.id)}${detected.devPort ? ` (dev port ${detected.devPort})` : ""}`,
       );
     } catch (error) {
       if (error instanceof ZitadelError && error.code === "E_FRAMEWORK_NOT_DETECTED") {
@@ -395,7 +431,8 @@ export default class Setup extends BaseCommand {
       use_case: flags["use-case"] ?? DEFAULT_SETUP_USE_CASE,
       sso: flags.sso ?? "none",
       // Read from the raw flag: it is parsed below, so a bad value fails after
-      // this step is recorded, like the other flags'. 0 sets none.
+      // this step is recorded, like the other flags'. 0 sets none, and no
+      // flag the recommended minimum.
       password_policy: setsMinLength(flags["password-min-length"]) ? "set" : "empty",
       step: "framework_resolved",
     });
@@ -428,7 +465,9 @@ export default class Setup extends BaseCommand {
       }
       const promptCtx = {
         input: wizardInput,
-        framework: { id: app.framework },
+        framework: { id: app.framework, displayName: orca.displayName(app.framework) },
+        suggest: (args: string) =>
+          projectCommand(args, recoverySelector(flags.cwd), this.meta.cliVersion),
         cwd,
         frameworkChosen: scaffoldedFramework || flags.framework !== undefined,
         serverFlag: this.meta.serverFlag,
@@ -444,6 +483,18 @@ export default class Setup extends BaseCommand {
       }
       note(signInSummary(answers), "Sign-in");
       outro("Configuration captured");
+    } else if (
+      flags["dev-port"] === undefined &&
+      !(await LocalServer.isPortFree(answers.devPort))
+    ) {
+      // The wizard asks for another port when the detected one is taken. A run
+      // that asks nothing still pins the dev script to it, so it says so, with
+      // the command that puts the app on a free one.
+      reportWarning(
+        portInUseWarning(answers.devPort, await LocalServer.nextFreePort(answers.devPort), (args) =>
+          this.suggestUnscoped(args),
+        ),
+      );
     }
 
     // The interactive prompts can override the flag/default preset and use
@@ -464,8 +515,10 @@ export default class Setup extends BaseCommand {
               ? selectionName(answers.sso[0].selection)
               : "none"
             : "multiple",
-      // Whether a minimum went into the password policy, never the value.
-      password_policy: typeof answers.passwordMinLength === "number" ? "set" : "empty",
+      // Whether a minimum goes into the password policy, never the value. None
+      // given is the recommended one (`passwordPolicyFile`), unless `--force`
+      // keeps a policy file: `files_patched` records what was published.
+      password_policy: answers.passwordMinLength === null ? "empty" : "set",
     });
 
     const issuer = issuerFromPort(answers.devPort);
@@ -604,7 +657,7 @@ export default class Setup extends BaseCommand {
       }
       try {
         resourceResult = dryRun
-          ? { filesWritten: [] }
+          ? { filesWritten: [], passwordMinLengthSet: false }
           : await materializeSetupResources({
               cwd,
               // Verbatim: what setup reads back is stored in state, never printed.
@@ -685,6 +738,14 @@ export default class Setup extends BaseCommand {
       step: "files_patched",
       files_written_count: allFilesWritten.length,
     });
+    if (!dryRun) {
+      // What was published, which a policy file `--force` keeps decides as much
+      // as the answers recorded before. A dry run publishes nothing and keeps
+      // those.
+      this.recordTelemetry({
+        password_policy: resourceResult.passwordMinLengthSet ? "set" : "empty",
+      });
+    }
 
     // After the connection exists, not before: a credential published under a
     // name nothing references yet is an orphan in the project's variables, and
@@ -763,6 +824,7 @@ export default class Setup extends BaseCommand {
     const installOutcome = await installDependenciesForSetup({
       cliVersion: this.meta.cliVersion,
       cwd,
+      ...(flags.cwd === undefined ? {} : { cwdFlag: flags.cwd }),
       depsAdded: result.depsAdded,
       dryRun,
       env: this.meta.env,
@@ -777,6 +839,42 @@ export default class Setup extends BaseCommand {
       step: "dependencies_installed",
       package_manager: installOutcome.install.package_manager,
     });
+
+    // The commit exists so that the release a later `deploy` builds records
+    // the commit it came from; without it that deploy has no baseline and the
+    // one after it can show no diff (#1651).
+    const commit = await this.makeInitialCommit(cwd, dryRun, flags.git !== false);
+
+    // Setup publishes what it scaffolded, after the commit so the release
+    // records it, so the sign-in setup asks the developer to verify next is
+    // served that release rather than the newest stored revisions (#2331).
+    const deployment = await this.deployScaffoldedProject({
+      cwd,
+      server: answers.server,
+      project,
+      dryRun,
+      selector: recoverySelector(flags.cwd),
+    });
+    // A failed deploy leaves the project on its newest stored revisions
+    // rather than a release, so the deploy that fixes it leads both surfaces.
+    const deployCommand = projectCommand(
+      DEPLOY_ARGS,
+      recoverySelector(flags.cwd),
+      this.meta.cliVersion,
+    );
+    const deployStep =
+      deployment === undefined && !dryRun
+        ? {
+            actions: [`Deploy .zitadel/ so the project serves its release: ${deployCommand}`],
+            boxActions: [
+              {
+                text: "Deploy .zitadel/ so the project serves its release:",
+                command: deployCommand,
+              },
+            ],
+            commands: [deployCommand],
+          }
+        : { actions: [], boxActions: [], commands: [] as SuggestedCommand[] };
 
     const writtenRel = allFilesWritten.map((file) => relativeDisplay(cwd, file));
     // The nudge rides both surfaces from one decision: the box for humans, the
@@ -867,7 +965,9 @@ export default class Setup extends BaseCommand {
       : { actions: [], boxActions: [], commands: [] as SuggestedCommand[] };
     // Only when the project is the local admin's: the console lists nothing
     // else for them, so the command would open an empty console otherwise.
-    const consoleCommand = unscopedCommand("console", this.meta.cliVersion);
+    // `console` finds the server from its directory up, so a run with `--cwd`
+    // passes it on.
+    const consoleCommand = this.suggestUnscoped("console");
     const consoleStep = ownedByLocalAdmin
       ? {
           actions: [
@@ -912,6 +1012,7 @@ export default class Setup extends BaseCommand {
             renderSummary(sections),
             "",
             renderBoxActions([
+              ...deployStep.boxActions,
               ...installOutcome.boxActions,
               ...consoleStep.boxActions,
               ...claimNudge.boxActions,
@@ -920,8 +1021,11 @@ export default class Setup extends BaseCommand {
         ),
         style: { padding: 1, borderStyle: "rounded", borderColor: "green" },
       });
-      // Last, below the steps that start the app and test sign-in, and only on
-      // a run that succeeded: a failed or cancelled setup never reaches here,
+      // After the steps that start the app and test sign-in, outside the box so
+      // the command can be copied without its border.
+      consola.log(`\n${exploreAllCommands(this.meta.cliVersion)}`);
+      // Then the skills note, once per machine, as the last thing setup prints.
+      // Only on a run that succeeded: a failed or cancelled setup never reaches here,
       // so it does not use up the once-per-machine note.
       await showSkillsHint({
         env: process.env,
@@ -929,6 +1033,7 @@ export default class Setup extends BaseCommand {
           !dryRun &&
           !flags["non-interactive"] &&
           Boolean(process.stdout.isTTY && process.stdin.isTTY),
+        cliVersion: this.meta.cliVersion,
       });
     }
 
@@ -956,6 +1061,14 @@ export default class Setup extends BaseCommand {
         })),
         files_skipped: result.filesSkipped.map((file) => relativeDisplay(cwd, file)),
         install: installOutcome.install,
+        // Whether setup created the repository, and the commit it made.
+        // `initialized` is false when the project was already in one, which it
+        // is still committed into; the commit is `null` only under `--no-git`
+        // or when git could not be used.
+        git: {
+          initialized: commit.kind === "created",
+          commit: commit.kind === "created" || commit.kind === "committed" ? commit.sha : null,
+        },
         // The provider enabled during scaffolding, or null. `secret` reports
         // where the value went, never the value itself — `published` is the
         // one that decides whether the provider button works.
@@ -983,7 +1096,19 @@ export default class Setup extends BaseCommand {
         }),
         // Branding guidance before the claim nudge: make it yours, then
         // claim to keep it (the same order the manifesto's journey walks).
+        // What setup's first deploy published, or null when there was none:
+        // a dry run, or a deploy that failed, which is a warning.
+        deployment:
+          deployment === undefined
+            ? null
+            : {
+                release_id: deployment.releaseId,
+                content_hash: deployment.contentHash,
+                deployment_id: deployment.deploymentId,
+                origins: [...deployment.origins],
+              },
         next_actions: [
+          ...deployStep.actions,
           ...installOutcome.nextActions,
           brandingGuidanceAction(this.meta.cliVersion),
           ...consoleStep.actions,
@@ -1013,12 +1138,102 @@ export default class Setup extends BaseCommand {
             this.meta.cliVersion,
             recoverySelector(flags.cwd),
           ),
+          ...deployStep.commands,
           ...installOutcome.nextCommands,
           ...consoleStep.commands,
           ...claimNudge.commands,
         ]),
       },
     });
+  }
+
+  /**
+   * Put the scaffolded project under version control, unless it already is or
+   * `--no-git` said not to. Narrated but never fatal: without the commit the
+   * first release simply records no provenance, which is what setup did before.
+   */
+  private async makeInitialCommit(
+    cwd: string,
+    dryRun: boolean,
+    enabled: boolean,
+  ): Promise<InitialCommitOutcome> {
+    if (!enabled) {
+      return { kind: "skipped" };
+    }
+    if (dryRun) {
+      consola.info("Would initialise a git repository and commit the scaffolded project (dry run)");
+      return { kind: "skipped" };
+    }
+    const outcome = await ensureInitialCommit(cwd);
+    if (outcome.kind === "created" || outcome.kind === "committed") {
+      consola.success(`Committed the project as ${outcome.sha.slice(0, 7)}`);
+      // git guesses an author from the machine when none is configured and
+      // commits anyway, so the commit exists but carries a name the developer
+      // did not choose. Said out loud, with the one command that fixes it.
+      if (outcome.invented) {
+        reportWarning(
+          "git could build no author identity on this machine, so the commit was made as " +
+            "Zitadel Setup <setup@zitadel.local>. Set user.name and user.email, then run " +
+            "`git commit --amend --reset-author` to put your own name on it.",
+        );
+      } else if (outcome.guessedIdentity) {
+        reportWarning(
+          "This machine has no git user.name/user.email, so git guessed the author from your " +
+            "username and hostname. Set your identity and run `git commit --amend --reset-author` " +
+            "to put your own name on the commit.",
+        );
+      }
+    }
+    if (outcome.kind === "unavailable") {
+      reportWarning(
+        `Could not commit the scaffolded project (${outcome.reason}); the first release records no commit, so the next deploy cannot show a diff.`,
+      );
+    }
+    return outcome;
+  }
+
+  /**
+   * Deploy `.zitadel/` to the project setup just created, to its primary
+   * origin. Narrated but never fatal: the app is scaffolded and committed, and
+   * a failure leaves the deploy one command away.
+   */
+  private async deployScaffoldedProject(opts: {
+    cwd: string;
+    server: string;
+    project: CreateProject201;
+    dryRun: boolean;
+    selector: EnvironmentSelector;
+  }): Promise<InitialDeployment | undefined> {
+    if (opts.dryRun) {
+      consola.info("Would deploy .zitadel/ to the project (dry run)");
+      return undefined;
+    }
+    const json = this.jsonEnabled();
+    consola.start("Deploying .zitadel/ to the project");
+    try {
+      const deployment = await deployInitialRelease({
+        client: createZitadelClient({
+          baseUrl: opts.server,
+          token: opts.project.project_secret,
+        }),
+        projectId: opts.project.id,
+        cwd: opts.cwd,
+        env: this.meta.env,
+        json,
+        color: !json && Boolean(process.stdout.isTTY) && !process.env.NO_COLOR,
+        message: INITIAL_DEPLOY_MESSAGE,
+        suggest: (args) => projectCommand(args, opts.selector, this.meta.cliVersion),
+      });
+      consola.success(
+        `Deployed ${deployment.contentHash} to ${deployment.origins.length} origin${deployment.origins.length === 1 ? "" : "s"}`,
+      );
+      return deployment;
+    } catch (error) {
+      reportWarning(
+        `The project was set up but its first deploy failed: ${toZitadelError(error).message}. Run \`zitadel ${DEPLOY_ARGS}${opts.selector}\` to publish .zitadel/.`,
+      );
+      return undefined;
+    }
   }
 
   /**
@@ -1345,7 +1560,7 @@ export async function ssoFromFlags(
   const secret = await ask({
     kind: "secret",
     name: "client secret",
-    message: "Client secret",
+    message: `What is the client secret of your ${providerOf(selection).displayName} OAuth app?`,
     parse: parseClientSecret,
     stdin: true,
     // A concrete rerun for an agent, never carrying the value: the secret is
@@ -1421,6 +1636,8 @@ export function setupRetryFlags(opts: SetupRetryOptions): string {
   if (opts.devPort !== undefined) {
     parts.push(`--dev-port ${opts.devPort}`);
   }
+  // Even the recommended one, unlike the defaults above: without the flag, a
+  // policy file `--force` keeps keeps its own minimum.
   if (opts.passwordMinLength !== undefined) {
     parts.push(`--password-min-length ${opts.passwordMinLength ?? 0}`);
   }
@@ -1617,15 +1834,7 @@ function ssoRecovery(
     // process environment (unlike `--env`), so it is the one that forces the
     // generated development credential the local project actually expects.
     commands: remaining.map((selection) =>
-      projectCommand(
-        `auth-method sso enable --provider ${selectionName(selection)}${
-          selection.kind === "custom"
-            ? ` ${customFlagText(selection.connection, ENABLE_FLAG_NAMES)}`
-            : ""
-        }`,
-        localRecoverySelector(retry.cwd),
-        cliVersion,
-      ),
+      projectCommand(ssoEnableArgs(selection), localRecoverySelector(retry.cwd), cliVersion),
     ),
   };
 }
@@ -1812,12 +2021,28 @@ function describeWrittenFile(relPath: string, dryRun: boolean): string | null {
 }
 
 /**
- * Whether `--password-min-length` asks for a minimum, rather than none,
- * nothing, or a value the parser refuses (setup fails on that just after).
+ * What a run that cannot ask says about a taken app port, with the command
+ * that moves the app to `free`. With no free port among the next ones it names
+ * only the flag: a placeholder in a suggested command is a shell redirection.
+ */
+export function portInUseWarning(
+  port: number,
+  free: number | undefined,
+  suggest: (args: string) => SuggestedCommand,
+): string {
+  return free === undefined
+    ? `Port ${port} and the ports after it are already in use. If that is not this app's dev server, run setup with --dev-port and a free port.`
+    : `Port ${port} is already in use. If that is not this app's dev server, run setup with a free port: ${suggest(`setup --dev-port ${free}`)}`;
+}
+
+/**
+ * Whether `--password-min-length` leaves a minimum in the policy: a value, or
+ * no flag, which means the recommended one; not none, or a value the parser
+ * refuses (setup fails on that just after).
  */
 function setsMinLength(value: string | undefined): boolean {
   if (value === undefined) {
-    return false;
+    return true;
   }
   const parsed = parsePasswordMinLength(value);
   return parsed.ok && typeof parsed.value === "number";

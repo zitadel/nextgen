@@ -54,6 +54,27 @@ properties:
     description: Step name from the flow definition.
   texts:
     $ref: step-texts.yaml
+  purpose:
+    type: string
+    enum: [login, register, recovery, profiling, reauth, link_account]
+    description: |
+      What the flow does on this step. A login moves between `login` and
+      `register` by itself: an identifier with no account continues as a
+      sign-up, and one with an account continues a sign-up as a sign-in.
+      A page that titles the login itself follows this value rather than
+      the step's `name`, which the flow definition chooses.
+  notice:
+    oneOf:
+      - type: string
+      - type: 'null'
+    description: |
+      Localisation key that tells the user why the flow moved to this
+      step's `purpose` without being asked: `notice.user_not_found` (an
+      identifier with no account, now signing up),
+      `notice.user_already_exists` (an identifier that has an account, now
+      signing in) or `notice.sso_user_not_found` (a provider's sign-in
+      with no account, now signing up). Present only on the step right
+      after the move, not when the user chose it.
   error:
     oneOf:
       - type: string

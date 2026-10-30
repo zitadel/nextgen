@@ -1,7 +1,7 @@
-import { access, mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 
-import { ZitadelError } from "../errors";
+import { isErrno, ZitadelError } from "../errors";
 import { LOCAL_RUNTIME_DIR } from "../local-server/runtime";
 import { detectors } from "./detectors";
 import { detectDevPort } from "./detectors/port";
@@ -191,13 +191,20 @@ export class Orca {
       });
     }
     assertNpmSafeScaffoldDirectoryName(cwd);
+    // A directory that does not exist yet is created only now, so a refusal or
+    // a dry run leaves no trace of it, and an undo removes it again with any
+    // parent it took to create it.
+    const created = await mkdir(cwd, { recursive: true });
     const before = await listEntries(cwd);
     // The underlying scaffolders require an empty directory. When it holds the
     // local runtime `start` left, or --force lets us scaffold into a non-empty
     // one, move the existing entries aside, scaffold, then restore anything the
     // scaffold did not create itself.
     const stash = await stashScaffoldDir(cwd, target.entries);
-    const undo = () => undoScaffold(cwd, before, stash);
+    const undo = () =>
+      created === undefined
+        ? undoScaffold(cwd, before, stash)
+        : rm(created, { recursive: true, force: true });
     let facts: FrameworkFacts;
     try {
       await this.scaffolderFor(framework).scaffold(cwd, framework);
@@ -252,10 +259,14 @@ export class Orca {
     return this.detectors.map((detector) => detector.framework);
   }
 
+  /** A framework's name as people write it ("Next.js" for `next`), or its id when it has none. */
+  displayName(id: string): string {
+    return this.availableFrameworks().find((framework) => framework.id === id)?.displayName ?? id;
+  }
+
   /** `cwd` holds a `detected` app, and setup was asked to set up a `requested` one. */
   private frameworkMismatch(requested: string, detected: string): ZitadelError {
-    const name = (id: string) =>
-      this.availableFrameworks().find((framework) => framework.id === id)?.displayName ?? id;
+    const name = (id: string) => this.displayName(id);
     return new ZitadelError(
       "E_CONFLICT",
       `Setup detects ${name(detected)} here, not ${name(requested)}`,
@@ -332,7 +343,7 @@ export async function inspectScaffoldTarget(cwd: string): Promise<ScaffoldTarget
   // and then `setup` work in a new directory: the local runtime, and the
   // `.gitignore` line that keeps it out of git. `scaffold()` moves both aside
   // while the generator runs and merges the `.gitignore` back.
-  const names = [...(await readdir(cwd))].sort();
+  const names = [...(await scaffoldTargetEntries(cwd))].sort();
   const others: string[] = [];
   for (const name of names) {
     if (!(await isLocalRuntimeEntry(cwd, name))) {
@@ -347,6 +358,47 @@ export async function inspectScaffoldTarget(cwd: string): Promise<ScaffoldTarget
     reason: `Directory is not empty (contains ${others.join(", ")}).`,
     entries: names,
   };
+}
+
+/**
+ * The entries of a scaffold target, or none when it does not exist yet: the
+ * scaffold creates it, as a framework's own generator creates `my-app`, so a
+ * `--cwd` naming the new app's directory works before that directory does.
+ */
+async function scaffoldTargetEntries(cwd: string): Promise<string[]> {
+  try {
+    return await readdir(cwd);
+  } catch (error) {
+    if (isErrno(error, "ENOENT")) {
+      return [];
+    }
+    throw error;
+  }
+}
+
+/**
+ * Refuses a project directory that is a file, or lies under one, before
+ * anything reads inside it. One that does not exist yet passes: a scaffold
+ * creates it.
+ */
+export async function assertDirectoryOrMissing(cwd: string): Promise<void> {
+  let isDirectory: boolean;
+  try {
+    isDirectory = (await stat(cwd)).isDirectory();
+  } catch (error) {
+    if (isErrno(error, "ENOENT")) {
+      return;
+    }
+    if (!isErrno(error, "ENOTDIR")) {
+      throw error;
+    }
+    isDirectory = false;
+  }
+  if (!isDirectory) {
+    throw new ZitadelError("E_VALIDATION", `${cwd} is not a directory`, {
+      hint: "Point --cwd at the app's directory, or at one that does not exist yet for setup to create.",
+    });
+  }
 }
 
 /**

@@ -354,10 +354,10 @@
   }
 }
 
-/* The changelog's Markdown (changelog/markdown.tsx): what GitHub's release
-   notes hold, in the page's type, with its links, code and emphasis in the
-   primary ink. A long command or URL breaks rather than widen a phone's
-   page; a code block scrolls. */
+/* The changelog's Markdown (changelog/markdown.tsx): what an entry holds, in
+   the page's type, with its links, code and emphasis in the primary ink. A
+   long command or URL breaks rather than widen a phone's page; a code block
+   scrolls. */
 @layer components {
   .release-notes {
     color: var(--color-text-secondary);
@@ -390,9 +390,13 @@
     color: var(--color-text-muted);
   }
 
-  .release-notes :where(strong, h4, h5, h6) {
+  .release-notes :where(strong, h2, h3, h4, h5, h6) {
     color: var(--color-text-primary);
     font-weight: 600;
+  }
+
+  .release-notes > * + :where(h2, h3, h4, h5, h6) {
+    margin-top: 1.75rem;
   }
 
   .release-notes a {

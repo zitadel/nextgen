@@ -75,6 +75,22 @@ describe("buildBundle", () => {
     expect(policyFiles).toEqual(["auth.factor.password.set.json"]);
   });
 
+  it("never carries a policy test file, valid or not", async () => {
+    const cwd = await project({
+      ".zitadel/policies/auth.factor.password.set.json": {
+        operation: "auth.factor.password.set",
+        config: {},
+      },
+      ".zitadel/policies/auth.factor.password.set.test.json": { cases: "not a policy" },
+    });
+
+    const { bundle, resourceCount, policyFiles } = await buildBundle(cwd);
+
+    expect(resourceCount).toBe(1);
+    expect(bundle.policies).toEqual([{ operation: "auth.factor.password.set", config: {} }]);
+    expect(policyFiles).toEqual(["auth.factor.password.set.json"]);
+  });
+
   it("leaves `policies` out when there are none, so a server without the kind takes it", async () => {
     const cwd = await project({ ".zitadel/schemas/human-user.json": { objectType: "human-user" } });
 

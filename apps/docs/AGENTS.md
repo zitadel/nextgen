@@ -44,6 +44,17 @@ MCP, `llms.txt`, Open Graph images, `.md` pages) live under `/docs` here.
 - Link the website (`/`) with a plain `<a>`, never `next/link`: it is another
   deployment, which `next/link` would prefetch and route to in this app.
 
+## Content-Security-Policy
+
+- The enforced policy is `next.config.mjs`'; the report-only one is
+  `csp-adapter.mjs`', with each prerendered page's inline scripts by hash.
+- Never give a page a nonce or `'unsafe-inline'`: pages stay prerendered
+  ([why](../../docs/design/cloud/csp-docs-and-website.md)).
+- `csp-adapter.mjs` copies `apps/website/csp-adapter.mjs` but for the policy:
+  change both. `next dev` runs no adapter, so dev pages report nothing.
+- Load nothing from another origin without widening the report-only policy
+  in the same change; `tests/` fail on a violation or an unhashed script.
+
 ## Content
 
 - Leave `index` out of a folder's `meta.json` `pages`: Fumadocs then opens it
@@ -72,7 +83,8 @@ MCP, `llms.txt`, Open Graph images, `.md` pages) live under `/docs` here.
   (`lib/source.ts`), never `getOpenAPIPageProps()` directly, which hands the
   client component the whole OpenAPI document.
 - `llms-full.txt` leaves out operations and webhooks, and its test fails on a
-  Markdown link to one: link prose to the section's page.
+  Markdown link to one: link prose to the section's page. Of the CLI's release
+  notes it carries the newest version only.
 - An operation's samples are its `@zitadel/api` call (`lib/sdk-sample.ts`),
   its `zitadel` command (`x-zitadel-cli`, `lib/cli-sample.ts`) and cURL
   (`components/api-page.tsx`); its Markdown repeats all three for the default
@@ -94,9 +106,18 @@ Fumadocs stories (`components/examples/`).
   once per page: every login on a page walks the same mock flow.
 - Never widen the mock's worker's scope beyond `/docs/`: on the cloud's host
   it would answer for the console.
+- Keep the mock's request guard in `mock.ts`: only same-origin
+  `/docs/mock-api/` calls may reach its handlers; worker scope limits pages, not requests.
 - A page's Markdown leaves its examples out (`lib/source.ts`): write the prose
   around one so it reads without it.
 - Type an atom an example renders in `elements.d.ts`, from the example's props.
+
+## Page feedback
+
+- `app/docs/api/feedback` posts ratings to the deployment's own URL, which
+  deployment protection covers: keep the `cloud` project's automation bypass.
+- Never send that route a valid rating from `tests/`: the suite runs against
+  deployments, where it becomes a real event.
 
 ## Checks and tests
 
@@ -107,8 +128,12 @@ moon run docs:e2e     # tests/ against the local build
 CLOUD_URL=https://cloud-….vercel.app moon run docs:e2e-deployment
 ```
 
-- Vercel builds with `pnpm run build`, never moon: moon cannot archive the
-  symlinks Vercel's Next.js adapter writes into `.next/output`.
+- Try the API playground on `moon run workspace:cloud`: it sends to its page's
+  origin with the reader's session, and no API answers on the docs' port 3003.
+- Vercel builds with `turbo run build --filter=@zitadel/docs`, never moon:
+  moon cannot archive the symlinks Vercel's Next.js adapter writes into
+  `.next/output`. The build's key holds the deployment's ID, so Vercel never
+  restores it ([turborepo.md](../../docs/design/build/turborepo.md)).
 - `tests/` is a contract suite written against a URL, so the same specs check
   the local build and any deployment. A deployment run needs
   `VERCEL_AUTOMATION_BYPASS_SECRET`.

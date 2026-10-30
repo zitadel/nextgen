@@ -3,7 +3,9 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
+	"slices"
 	"strings"
 	"time"
 
@@ -18,8 +20,8 @@ type RuntimeResolution struct {
 	// request carried none.
 	Origin string
 	// Target is the project origin pattern that admitted Origin, "" when
-	// admission was open (empty allowlist, loopback or the deployment's own
-	// origin) rather than a stored pattern.
+	// admission was open (empty allowlist, loopback or an origin of the
+	// deployment's console) rather than a stored pattern.
 	Target string
 	// Source is "origin" when a deployment to the exact origin answered, or
 	// empty when resolution refused before a target was found.
@@ -53,15 +55,23 @@ func (res *RuntimeResolution) logAttrs() []any {
 type RuntimeResolver struct {
 	v2Pool   *DB
 	releases ReleaseService
-	// ownOrigin is the deployment's own origin, normalized; "" when unknown.
-	ownOrigin string
-	now       func() time.Time
+	// ownOrigins are the origins the deployment's console runs on, normalized.
+	ownOrigins []string
+	now        func() time.Time
 }
 
-// NewRuntimeResolver builds the resolver. ownOrigin is the origin of the
-// deployment's public base, where its console runs; "" names none.
-func NewRuntimeResolver(v2Pool *DB, releases ReleaseService, ownOrigin string) *RuntimeResolver {
-	return &RuntimeResolver{v2Pool: v2Pool, releases: releases, ownOrigin: ownOrigin, now: time.Now}
+// NewRuntimeResolver builds the resolver. ownOrigins are the origins the
+// deployment's console runs on, normalized here as a request's origin is;
+// one that is blank or not an origin names none.
+func NewRuntimeResolver(v2Pool *DB, releases ReleaseService, ownOrigins ...string) *RuntimeResolver {
+	var origins []string
+	for _, origin := range ownOrigins {
+		normalized, err := domain.NormalizeOrigin(origin)
+		if err == nil && !slices.Contains(origins, normalized) {
+			origins = append(origins, normalized)
+		}
+	}
+	return &RuntimeResolver{v2Pool: v2Pool, releases: releases, ownOrigins: origins, now: time.Now}
 }
 
 // Resolve walks the three layers: the gate refuses an origin no pattern
@@ -75,12 +85,17 @@ func (r *RuntimeResolver) Resolve(ctx context.Context, projectID, origin string)
 	)
 	resolution, err := r.resolve(ctx, projectID, origin)
 	if err != nil {
-		attrs := []any{slog.Any("error", err)}
-		var de domain.Error
-		if errors.As(err, &de) {
-			attrs = append(attrs, slog.String("code", de.Code))
+		// The parent carries project and origin to the boundary line, which logs
+		// the refusal once. The Origin captured where the error was made stays.
+		if de, ok := errors.AsType[domain.Error](err); ok {
+			where := fmt.Sprintf("project %s, origin %q", projectID, strings.TrimSpace(origin))
+			if de.Parent == nil {
+				de.Parent = errors.New(where)
+			} else {
+				de.Parent = fmt.Errorf("%s: %w", where, de.Parent)
+			}
+			return nil, de
 		}
-		logger.Warn("runtime resolution refused", attrs...)
 		return nil, err
 	}
 	if resolution == nil {
@@ -163,8 +178,8 @@ func (r *RuntimeResolver) newestDeployment(ctx context.Context, projectID, origi
 // matchedOrigin is an origin the gate admitted: the normalized request
 // origin, the project origin pattern that matched it (empty when open),
 // whether it was admitted by a preview row rather than a primary pattern,
-// and whether admission was open (empty allowlist, loopback or the
-// deployment's own origin).
+// and whether admission was open (empty allowlist, loopback or an origin of
+// the deployment's console).
 type matchedOrigin struct {
 	origin  string
 	pattern string
@@ -173,21 +188,21 @@ type matchedOrigin struct {
 }
 
 // gateOpening is Gate for the request that opens an attempt, which also
-// opens the deployment's own origin where the project's origins refuse it:
-// its console previews a project's login from there with the project's own
-// flow. A project that admits that origin itself keeps its own rules there,
-// deployments and previews included. Only the opening takes this exemption;
-// every later step answers to Gate alone, so that origin can show a project's
-// first step but never sign anyone in.
+// opens an origin of the deployment's console where the project's origins
+// refuse it: the console previews a project's login from there with the
+// project's own flow. A project that admits that origin itself keeps its own
+// rules there, deployments and previews included. Only the opening takes
+// this exemption; every later step answers to Gate alone, so that origin can
+// show a project's first step but never sign anyone in.
 func (r *RuntimeResolver) gateOpening(ctx context.Context, project *domain.Project, origin string) (*matchedOrigin, error) {
 	matched, err := r.Gate(ctx, project, origin)
-	if err == nil || r.ownOrigin == "" {
+	if err == nil || len(r.ownOrigins) == 0 {
 		return matched, err
 	}
 	if !errors.Is(err, domain.ErrProjectOriginNotAllowed(nil)) && !errors.Is(err, domain.ErrProjectPreviewNotLive(nil)) {
 		return nil, err
 	}
-	if normalized, normErr := domain.NormalizeOrigin(strings.TrimSpace(origin)); normErr == nil && normalized == r.ownOrigin {
+	if normalized, normErr := domain.NormalizeOrigin(strings.TrimSpace(origin)); normErr == nil && slices.Contains(r.ownOrigins, normalized) {
 		return &matchedOrigin{origin: normalized, open: true}, nil
 	}
 	return nil, err

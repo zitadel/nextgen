@@ -322,7 +322,7 @@ function indexMarkdown(cliReference: CliReference) {
     "A command that succeeds, or skips because there is nothing to do, exits `0`. One that fails exits with the code of the error its envelope names in `code`.",
     exitCodeTable(cliReference.exitCodes),
     ...groups,
-    `\`${cli} --help\` also lists oclif's own commands, such as \`help\` and \`version\`, under Additional commands.`,
+    `\`${cli} --help\` also lists oclif's own commands, such as \`help\` and \`version\`, under Diagnostics and utilities.`,
   ].join("\n\n");
 }
 
@@ -342,17 +342,35 @@ function changeItem({ text: markdown, pull }: CliRelease["sections"][number]["ch
   return `- ${lines.map((line, i) => (i === 0 || line === "" ? line : `  ${line}`)).join("\n")}`;
 }
 
-/** Every version, newest first, as the changelog lists it: a heading each. */
+/** A version, as the changelog lists it: a heading, then its changes by kind. */
+function releaseMarkdown({ version, sections }: CliRelease) {
+  return [
+    `## ${version}`,
+    ...sections.flatMap(({ kind, changes }) => [
+      `**${kind.charAt(0).toUpperCase()}${kind.slice(1)} changes**`,
+      changes.map(changeItem).join("\n\n"),
+    ]),
+  ];
+}
+
+/** Every version, newest first. */
 function releaseNotesMarkdown(cliReleases: CliRelease[]) {
   return [
     `What changed in each version of the \`${reference.bin}\` CLI, newest first, from [its changelog](https://github.com/${gitConfig.user}/${gitConfig.repo}/blob/${gitConfig.branch}/apps/cli/CHANGELOG.md). \`--version\` prints the version you run: \`${cli} --version\`.`,
-    ...cliReleases.flatMap(({ version, sections }) => [
-      `## ${version}`,
-      ...sections.flatMap(({ kind, changes }) => [
-        `**${kind.charAt(0).toUpperCase()}${kind.slice(1)} changes**`,
-        changes.map(changeItem).join("\n\n"),
-      ]),
-    ]),
+    ...cliReleases.flatMap(releaseMarkdown),
+  ].join("\n\n");
+}
+
+// llms-full.txt carries the newest version only: every release adds a section,
+// and the whole file has to stay small enough for an agent to read in one go.
+function latestReleaseNotesMarkdown(cliReleases: CliRelease[]) {
+  const [latest, ...earlier] = cliReleases;
+  return [
+    `What changed in the newest version of the \`${reference.bin}\` CLI. \`--version\` prints the version you run: \`${cli} --version\`.`,
+    ...(latest ? releaseMarkdown(latest) : []),
+    ...(earlier.length > 0
+      ? [`Earlier versions are on the [release notes](${indexUrl}/${releaseNotes}) page.`]
+      : []),
   ].join("\n\n");
 }
 
@@ -417,6 +435,7 @@ export const cliSource = (
         "Release notes",
         releaseNotesDescription,
         releaseNotesMarkdown(releases),
+        latestReleaseNotesMarkdown(releases),
       ),
     },
     ...reference.commands.map((command) => ({

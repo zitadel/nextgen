@@ -70,6 +70,9 @@ func TestCombinedFlowLoginFlipToRegister(t *testing.T) {
 	require.IsType(t, &api.SubmitFlowStepOK{}, flipResp, helpers.MustMarshal(t, flipResp))
 	flipOK := flipResp.(*api.SubmitFlowStepOK)
 	require.Equal(t, "register-identifier", flipOK.Response.Step.Name, "user_not_found must flip to register-identifier")
+	require.Equal(t, api.NewOptFlowStepPurpose(api.FlowStepPurposeRegister), flipOK.Response.Step.Purpose)
+	require.Equal(t, api.NewOptNilString(domain.FlowStepNoticeUserNotFound), flipOK.Response.Step.Notice,
+		"the user asked to sign in, so the sign-up says why")
 	zflow = mustExtractZflow(t, flipOK.SetCookie)
 
 	// Complete the register-identifier step. The default schema collects only

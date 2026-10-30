@@ -21,9 +21,9 @@ const COLUMNS = ["topic", "verbs", "filters"] as const;
  */
 export default class ResourcesList extends BaseCommand {
   static override id = "resources";
-  static override group = CommandGroups.resources;
-  static override groupOrder = 0;
-  static override description = "List the resources this CLI manages and what can be done to each.";
+  static override group = CommandGroups.diagnostics;
+  static override description =
+    "List the resources this CLI manages.\n\nShows what can be done to each.";
   static override examples = [
     "<%= config.bin %> resources",
     "<%= config.bin %> resources --json",
