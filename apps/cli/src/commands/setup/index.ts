@@ -1033,6 +1033,7 @@ export default class Setup extends Promptable(BaseCommand) {
           !dryRun &&
           !flags["non-interactive"] &&
           Boolean(process.stdout.isTTY && process.stdin.isTTY),
+        cliVersion: this.meta.cliVersion,
       });
     }
 

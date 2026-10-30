@@ -23,6 +23,13 @@ tasks:
   build:
     deps:
       - "sdk-next:build"
+    inputs:
+      - "**/*"
+      # Every public agent skill, which the build copies into dist/skills
+      # (src/lib/skills/bundle.ts) for `zitadel skills add`.
+      - "/skills/**/*"
+      - "/apps/*/skills/**/*"
+      - "/packages/*/skills/**/*"
 
   build-release:
     script: |

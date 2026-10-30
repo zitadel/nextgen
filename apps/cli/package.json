@@ -113,6 +113,9 @@
       },
       "api": {
         "description": "Call any operation of the Zitadel API."
+      },
+      "skills": {
+        "description": "Give coding agents the Zitadel skills."
       }
     }
   },
