@@ -117,6 +117,20 @@ describe("toZitadelError", () => {
     );
   });
 
+  it("maps a response whose body could not be read to E_NETWORK with a hint about proxies", () => {
+    const err = new NetworkError(
+      "http://localhost:8080/idps",
+      "unreadable",
+      "GET http://localhost:8080/idps answered 200, but its body could not be read",
+    );
+    const result = toZitadelError(err);
+    expect(result.code).toBe("E_NETWORK");
+    expect(result.hint).toBe(
+      "The server answered, but its response could not be read. Check any proxy between you and the server, then retry.",
+    );
+    expect(result.details).toEqual({ url: "http://localhost:8080/idps", reason: "unreadable" });
+  });
+
   it("does not guess a network failure from a TypeError's message", () => {
     const result = toZitadelError(new TypeError("fetch failed"));
     expect(result.code).toBe("E_VALIDATION");
