@@ -231,6 +231,41 @@ func TestBuildHTTPMuxRecordsCSRFRequestState(t *testing.T) {
 	require.True(t, recorded, "api.WithCSRFRequest must wrap the API handler")
 }
 
+// The generated reader knows only __Host-zitadel_session. A browser on a
+// loopback http server holds zitadel_session, which reaches it only through
+// api.WithLoopbackSessionCookie, and only after api.WithRequestHostMiddleware
+// has said the request is loopback http; pinned so neither can drop out of
+// the chain or swap places unnoticed.
+func TestBuildHTTPMuxHandsTheAPITheLoopbackSessionCookie(t *testing.T) {
+	t.Parallel()
+	var found string
+	mux, err := buildHTTPMux(uiConfig(false), idgen.NewULID(),
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			found = ""
+			if cookie, err := r.Cookie("__Host-zitadel_session"); err == nil {
+				found = cookie.Value
+			}
+			w.WriteHeader(http.StatusTeapot)
+		}),
+		idpCallbackEcho(),
+		staticResolver(consoleRuntime{Mode: ConsoleModeStandalone, ConsoleProjectID: "proj_first"}, nil),
+		nil, nil)
+	require.NoError(t, err)
+
+	loopback := httptest.NewRequest(http.MethodGet, "http://localhost:8080/sessions/me", nil)
+	loopback.Header.Set("Cookie", "zitadel_session=tok")
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, loopback)
+	require.Equal(t, http.StatusTeapot, rec.Code, "the request must reach the API handler")
+	assert.Equal(t, "tok", found, "loopback http hands the API the loopback cookie")
+
+	forwarded := httptest.NewRequest(http.MethodGet, "http://localhost:8080/sessions/me", nil)
+	forwarded.Header.Set("X-Forwarded-Proto", "https")
+	forwarded.Header.Set("Cookie", "zitadel_session=tok")
+	mux.ServeHTTP(httptest.NewRecorder(), forwarded)
+	assert.Empty(t, found, "https leaves the loopback cookie unread")
+}
+
 // Every response carries the security headers, and each surface its own
 // policy: the console the pair its page needs, everything else the policy of
 // a response that is no page.

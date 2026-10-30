@@ -695,7 +695,7 @@ func (s *Server) handleBuildReleaseRequest(args [0]string, argsEscaped bool, w h
 // handleCompleteClaimRequest handles completeClaim operation.
 //
 // Called by the browser after the developer authenticates on the claim page.
-// Authenticated by the `__nextgen_session` cookie, it attaches the project to
+// Authenticated by the session cookie, it attaches the project to
 // the developer's personal team using the `challenge_id` from the claim URL as
 // its single-use, browser-safe authorization.
 //
@@ -3172,7 +3172,8 @@ func (s *Server) handleCreateSchemaRequest(args [0]string, argsEscaped bool, w h
 // Creating a session is an app-plane operation on the project credential
 // (`session.write`). The returned `session_token` is a session credential for the
 // end-user client, not a management scope: it is delivered as the
-// `__nextgen_session` cookie and authorises the self-service operations
+// `__Host-zitadel_session` cookie (`zitadel_session` over plain http to a
+// loopback host) and authorises the self-service operations
 // `GET /sessions/me` and `DELETE /sessions/me` (`sessionCookie` scheme). The
 // by-id operations `GET /sessions/{session_id}` and `DELETE /sessions/{session_id}`
 // are operator endpoints and require `session.read` / `session.delete` instead.
@@ -18086,7 +18087,7 @@ func (s *Server) handleRemovePreviewRequest(args [1]string, argsEscaped bool, w 
 // handleRevokeMySessionRequest handles revokeMySession operation.
 //
 // Logs out by permanently deleting the session.
-// The `__nextgen_session` cookie issued at creation (or superseded by a handoff
+// The session cookie issued at creation (or superseded by a handoff
 // exchange) is required, with the session's token from `GET /sessions/me/csrf`
 // in the `X-Zitadel-CSRF` header. Idempotent: if the session is already gone
 // this still returns 204. Any tokens derived from the session are invalidated,
@@ -18505,7 +18506,7 @@ func (s *Server) handleRevokeReleaseRequest(args [1]string, argsEscaped bool, w 
 //
 // Permanently deletes the session, terminating it immediately.
 // This is the operator revoke path and requires the `session.delete` scope on a
-// project-bound credential. End-user logout with the `__nextgen_session` cookie is
+// project-bound credential. End-user logout with the session cookie is
 // `DELETE /sessions/me` (`sessionCookie` scheme).
 // Idempotent: deleting a session that does not exist (or was already deleted)
 // still returns 204. After deletion, any tokens derived from the session are

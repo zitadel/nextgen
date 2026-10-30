@@ -72,7 +72,8 @@ func (s SecurityHandler) HandleOAuth2(ctx context.Context, operationName api.Ope
 }
 
 // HandleSessionCookie handles the sessionCookie security scheme: the
-// __nextgen_session cookie. It verifies the cookie decrypts to a session
+// __Host-zitadel_session cookie, or zitadel_session on loopback http
+// (WithLoopbackSessionCookie). It verifies the cookie decrypts to a session
 // token and stashes it for handlers. User-bound sessions mint ScopeContext
 // so management ops can authorize the human, unless oauth2 already minted
 // one (dual-scheme OR). Anonymous sessions skip the grant/user-query ops
@@ -255,7 +256,7 @@ var secretHashOperations = map[api.OperationName]bool{
 
 type sessionTokenKey struct{}
 
-// sessionCookieKey carries the raw __nextgen_session value of a request the
+// sessionCookieKey carries the raw session cookie value of a request the
 // cookie authenticated, so GET /sessions/me/csrf can derive its CSRF token.
 type sessionCookieKey struct{}
 
@@ -264,8 +265,8 @@ func sessionCookieFromContext(ctx context.Context) (string, bool) {
 	return v, ok && v != ""
 }
 
-// sessionTokenFromContext returns the session token parsed from the
-// __nextgen_session cookie by HandleSessionCookie.
+// sessionTokenFromContext returns the session token parsed from the session
+// cookie by HandleSessionCookie.
 func sessionTokenFromContext(ctx context.Context) (*domain.Token, bool) {
 	v, ok := ctx.Value(sessionTokenKey{}).(*domain.Token)
 	return v, ok && v != nil
@@ -365,6 +366,36 @@ func cookieSecureFromContext(ctx context.Context) bool {
 		return false
 	}
 	return true
+}
+
+// WithLoopbackSessionCookie hands the generated reader, which reads only the
+// canonical __Host-zitadel_session, the session a browser keeps as
+// zitadel_session: the name the server sets over plain http to a loopback
+// host, where the cookie has no Secure and so no prefix (ADR 083). It copies
+// that cookie under the canonical name, only on such a request and only when
+// the canonical one is absent, so the canonical name wins. Everywhere else
+// zitadel_session is ignored: over https a browser holds the session only
+// under the prefix, which no other host can plant. It reads the scheme and
+// host WithRequestHostMiddleware resolved, so it runs after it.
+func WithLoopbackSessionCookie(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !cookieSecureFromContext(r.Context()) {
+			if _, err := r.Cookie(sessionCookieName); err != nil {
+				if loopback, err := r.Cookie(loopbackSessionCookieName); err == nil {
+					// A clone, so the request the middleware in front holds
+					// keeps its header; a line of its own, so no cookie of the
+					// request's other lines is lost.
+					r = r.Clone(r.Context())
+					r.Header.Add("Cookie", (&http.Cookie{
+						Name:   sessionCookieName,
+						Value:  loopback.Value,
+						Quoted: loopback.Quoted,
+					}).String())
+				}
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 // isLoopbackHost reports whether host is localhost or a loopback IP

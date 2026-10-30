@@ -960,6 +960,7 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiH
 			middleware.WithLogging,
 			api.WithRecover,
 			api.WithRequestHostMiddleware,
+			api.WithLoopbackSessionCookie,
 			middleware.WithUserAgentMiddleware,
 			api.WithSessionStateNoStore,
 			api.WithCSRFRequest,
