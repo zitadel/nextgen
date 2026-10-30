@@ -25,6 +25,12 @@ handle; different values log a warning and keep the original — safe for HMR
 and framework double-mounts. The same handle is what you pass to the shared
 web components' `project` property.
 
+Every list method also walks its cursor for you, one page at a time as the
+loop asks: `client.listDeployments.items({ project_id })` yields every
+deployment, `.pages(...)` every page, and `.all(...)` collects them into one
+array. A wrapper that proxies the client keeps them with `withPaging(name, call)`
+from `@zitadel/api/client`.
+
 ## Entry points
 
 | Import | What it carries |
@@ -39,6 +45,7 @@ web components' `project` property.
 | `@zitadel/api/runtime/base-url` | `setProxyPath()` / `getProxyPath()` — the low-level slot `configureZitadel()` writes; call it directly only when you manage configuration yourself |
 | `@zitadel/api/runtime/auth` | `getApiAuthToken()` and bearer plumbing; `setApiCsrfToken()` / `getApiCsrfToken()` / `setApiCsrfRejectionHandler()` for session-cookie writes (see below) |
 | `@zitadel/api/runtime/fetch` | The shared `customFetch` interceptor |
+| `@zitadel/api/runtime/paging` | `pages()`, the cursor walk behind every paged function's `pages`, `items` and `all` |
 
 ### CSRF token for session-cookie writes
 

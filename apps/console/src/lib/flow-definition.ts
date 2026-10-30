@@ -4,8 +4,6 @@ import type {
   ListFlowDefinitions200FlowDefinitionsItemFlowDefinitionStepsItem,
 } from "@zitadel/api/generated/model";
 
-import { api } from "@/api/zitadel";
-import { readAllPages } from "./paging";
 import { titleCase } from "./text";
 
 /**
@@ -24,19 +22,6 @@ export type FlowDefinition = ListFlowDefinitions200FlowDefinitionsItemFlowDefini
 
 /** One step of a definition. */
 export type FlowStep = ListFlowDefinitions200FlowDefinitionsItemFlowDefinitionStepsItem;
-
-/** Every login flow in the project, at its latest revision. */
-export async function fetchAllFlows(projectId: string): Promise<FlowDefinitionEntry[]> {
-  return readAllPages(async (pageToken) => {
-    const page = await api.listFlowDefinitions({
-      project_id: projectId,
-      revisions: "latest",
-      limit: 100,
-      page_token: pageToken,
-    });
-    return { items: page.flow_definitions, next: page.next_page_token };
-  });
-}
 
 /** Fixed order, not the JSON's, so two rows stay comparable at a glance. */
 const PURPOSE_ORDER = ["login", "register", "recovery", "reauth", "profiling", "link_account"];

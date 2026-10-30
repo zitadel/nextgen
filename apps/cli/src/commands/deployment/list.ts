@@ -1,4 +1,5 @@
 import { Flags } from "@oclif/core";
+import { nextToken } from "@zitadel/api/runtime/paging";
 
 import {
   CommandGroups,
@@ -6,22 +7,12 @@ import {
   type JsonEnvelope,
   nonBlankString,
 } from "../../lib/oclif";
-import { collectPages } from "../../lib/oclif/crud/paging";
 import { renderList } from "../../lib/oclif/crud/table";
 import { listData } from "../../lib/oclif/envelope";
 import { shellArg } from "../../lib/shell";
 
 /** The columns `list` renders, in order. */
 const COLUMNS = ["id", "release_id", "reason", "origins", "deployed_at"] as const;
-
-/** A deployment as the list endpoint returns it, narrowed to what the table reads. */
-type DeploymentRow = {
-  id: string;
-  release_id: string;
-  metadata: { reason?: string };
-  targets: { origin: string }[];
-  deployed_at: string;
-};
 
 /**
  * `zitadel deployment list` — show the project's deployment history.
@@ -68,22 +59,17 @@ export default class DeploymentList extends EnvironmentCommand {
     await this.toMeta(flags);
     const { client, projectId } = await this.connect();
 
-    const request = (token?: string): Promise<unknown> =>
-      client.listDeployments({
-        project_id: projectId,
-        ...(flags.origin === undefined ? {} : { origin: flags.origin }),
-        ...(flags.live ? { live: true } : {}),
-        ...(flags.limit === undefined ? {} : { limit: flags.limit }),
-        ...(token === undefined ? {} : { page_token: token }),
-      });
-
-    const { items, next } = await collectPages(request, {
-      items: "deployments",
-      all: flags.all === true,
-      token: flags["page-token"],
-      nextPageToken: "next_page_token",
-    });
-    const deployments = items as DeploymentRow[];
+    const params = {
+      project_id: projectId,
+      ...(flags.origin === undefined ? {} : { origin: flags.origin }),
+      ...(flags.live ? { live: true } : {}),
+      ...(flags.limit === undefined ? {} : { limit: flags.limit }),
+      ...(flags["page-token"] === undefined ? {} : { page_token: flags["page-token"] }),
+    };
+    // One page unless `--all`, whose drain leaves no next page to report.
+    const page = flags.all ? undefined : await client.listDeployments(params);
+    const deployments = page ? page.deployments : await client.listDeployments.all(params);
+    const next = page === undefined ? undefined : nextToken(page);
 
     // Flatten each deployment's targets to one `origins` cell for the table.
     const rows = deployments.map((deployment) => ({

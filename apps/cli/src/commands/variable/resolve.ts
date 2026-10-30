@@ -4,7 +4,7 @@ import type { ZitadelClient } from "@zitadel/api/client";
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../../lib/oclif";
 import { renderRows, renderTable } from "../../lib/oclif/crud/table";
 import { listData } from "../../lib/oclif/envelope";
-import { DEPLOY_ARGS, listLiveDeployments, originMatchesPattern } from "../../lib/release";
+import { DEPLOY_ARGS, originMatchesPattern } from "../../lib/release";
 import { ZitadelError } from "../../lib/errors";
 import { shellArg } from "../../lib/shell";
 import { toVariableRows, variableCells } from "../../lib/variables";
@@ -51,11 +51,11 @@ export default class VariableResolve extends EnvironmentCommand {
     // arbitrary deployment.
     // Drained across pages, so a project with many live previews still names
     // every origin, primaries included.
-    const deployments = await listLiveDeployments(
-      client,
-      projectId,
-      origin === undefined ? {} : { origin },
-    );
+    const deployments = await client.listDeployments.all({
+      project_id: projectId,
+      live: true,
+      ...(origin === undefined ? {} : { origin }),
+    });
 
     // Without `--origin`, more than one live deployment means there is no single
     // frozen map to show: each origin may run a different one. The live origins

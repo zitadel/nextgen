@@ -1,5 +1,6 @@
 import {
   createZitadelClient as createRawClient,
+  withPaging,
   type ZitadelClient,
   type ZitadelClientOptions,
 } from "@zitadel/api/client";
@@ -180,16 +181,25 @@ export function createZitadelClient(
     timeoutMs: REQUEST_TIMEOUT_MS,
     ...opts,
   });
+  // Built once per function, not on every property read.
+  const bound = new Map<PropertyKey, unknown>();
   return new Proxy(client, {
     get(target, prop, receiver) {
       const value = Reflect.get(target, prop, receiver);
       if (typeof value !== "function") {
         return value;
       }
-      return (...args: unknown[]) => {
-        const result = (value as (...a: unknown[]) => unknown)(...args);
-        return result instanceof Promise ? result.then(onResolve, sanitizeRejection) : result;
-      };
+      if (!bound.has(prop)) {
+        // Paging is added again on top, so every page is sanitized like any response.
+        bound.set(
+          prop,
+          withPaging(prop, (...args: unknown[]) => {
+            const result = (value as (...a: unknown[]) => unknown)(...args);
+            return result instanceof Promise ? result.then(onResolve, sanitizeRejection) : result;
+          }),
+        );
+      }
+      return bound.get(prop);
     },
   });
 }

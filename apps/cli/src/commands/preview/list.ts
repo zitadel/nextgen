@@ -1,20 +1,13 @@
 import { Flags } from "@oclif/core";
+import { nextToken } from "@zitadel/api/runtime/paging";
 
 import { CommandGroups, type JsonEnvelope, nonBlankString, PreviewCommand } from "../../lib/oclif";
-import { collectPages } from "../../lib/oclif/crud/paging";
 import { renderList } from "../../lib/oclif/crud/table";
 import { listData } from "../../lib/oclif/envelope";
 import { shellArg } from "../../lib/shell";
 
 /** The columns `list` renders, in order. */
 const COLUMNS = ["url", "expires", "created"] as const;
-
-/** A preview as the list endpoint returns it, narrowed to what the table reads. */
-type PreviewRow = {
-  origin: string;
-  expires_at: string;
-  created_at: string;
-};
 
 /**
  * `zitadel preview list` — show the project's live previews.
@@ -58,19 +51,14 @@ export default class PreviewList extends PreviewCommand {
     await this.toMeta(flags);
     const { client, projectId } = await this.connect();
 
-    const request = (token?: string): Promise<unknown> =>
-      client.listPreviews(projectId, {
-        ...(flags.limit === undefined ? {} : { limit: flags.limit }),
-        ...(token === undefined ? {} : { page_token: token }),
-      });
-
-    const { items, next } = await collectPages(request, {
-      items: "previews",
-      all: flags.all === true,
-      token: flags["page-token"],
-      nextPageToken: "next_page_token",
-    });
-    const previews = items as PreviewRow[];
+    const params = {
+      ...(flags.limit === undefined ? {} : { limit: flags.limit }),
+      ...(flags["page-token"] === undefined ? {} : { page_token: flags["page-token"] }),
+    };
+    // One page unless `--all`, whose drain leaves no next page to report.
+    const page = flags.all ? undefined : await client.listPreviews(projectId, params);
+    const previews = page ? page.previews : await client.listPreviews.all(projectId, params);
+    const next = page === undefined ? undefined : nextToken(page);
 
     const rows = previews.map((preview) => ({
       url: preview.origin,

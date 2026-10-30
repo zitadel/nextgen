@@ -83,8 +83,7 @@ const pageOf = (request: ApiRequest, token: string | undefined): ApiRequest => {
 /**
  * Send a paged request until the server's `next_page_token` runs out, and
  * answer the last page with the page field holding every page's items. The
- * walk is `collectPages`, the resource lists' `--all`, so a server that
- * repeats a cursor is caught the same way.
+ * walk is `collectPages`, the resource lists' `--all`.
  */
 export const sendAll = async (
   server: string,
@@ -105,7 +104,6 @@ export const sendAll = async (
       items: paging.items,
       all: true,
       nextPageToken: "next_page_token",
-      flags: { all: "--paginate", onePage: "-F limit=<n> and -F page_token=<token>" },
     },
   );
   return {

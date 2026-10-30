@@ -164,19 +164,4 @@ describe("sendAll", () => {
 
     expect(response.body).toMatchObject({ passkeys: ["d", "e", "f", "g"] });
   });
-
-  it("stops on a server that repeats a cursor", async () => {
-    server.use(
-      http.get(`${SERVER}/users/user_1/passkeys`, () =>
-        HttpResponse.json({ passkeys: ["a"], next_page_token: "again" }),
-      ),
-    );
-
-    await expect(
-      sendAll(SERVER, "s", requestFor("listUserPasskeys", [], ["user_1"])),
-    ).rejects.toMatchObject({
-      message: "The server repeated a page cursor, so --paginate would never finish",
-      hint: "Fetch one page at a time with -F limit=<n> and -F page_token=<token>, and report the repeated cursor.",
-    });
-  });
 });

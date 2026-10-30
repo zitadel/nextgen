@@ -57,6 +57,11 @@
       "types": "./dist/runtime/auth.d.mts",
       "import": "./dist/runtime/auth.mjs"
     },
+    "./runtime/paging": {
+      "@zitadel/source": "./src/runtime/paging.ts",
+      "types": "./dist/runtime/paging.d.mts",
+      "import": "./dist/runtime/paging.mjs"
+    },
     "./runtime/fetch": {
       "@zitadel/source": "./src/runtime/fetch.ts",
       "types": "./dist/runtime/fetch.d.mts",

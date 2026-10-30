@@ -8,7 +8,6 @@ import {
   createReleaseFromBundle,
   diffStep,
   headSha,
-  listLiveDeployments,
   runSteps,
   servesPrimary,
   type StepContext,
@@ -155,7 +154,7 @@ export default class Deploy extends EnvironmentCommand {
     // preview, which never targets a primary, is never it. It guards the
     // create against another deploy that raced in since we inspected: the
     // server refuses with 409 rather than overwriting that deploy unseen (#538).
-    const live = await listLiveDeployments(client, projectId);
+    const live = await client.listDeployments.all({ project_id: projectId, live: true });
     const observed = live.find((deployment) =>
       deployment.targets.some((entry) => landing.includes(entry.origin)),
     )?.id;
@@ -194,7 +193,9 @@ export default class Deploy extends EnvironmentCommand {
         );
       }
       // The deployment that raced in on a primary origin, not a live preview.
-      const current = (await listLiveDeployments(client, projectId)).find(servesPrimary);
+      const current = (
+        await client.listDeployments.all({ project_id: projectId, live: true })
+      ).find(servesPrimary);
       throw new ZitadelError(
         "E_CONFLICT",
         "Another deploy changed the targets since this one was prepared",

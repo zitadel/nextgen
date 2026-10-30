@@ -5,10 +5,8 @@ import type {
 } from "@zitadel/api/generated/model";
 
 import { api } from "@/api/zitadel";
-import { consoleSessionProject } from "@/auth/session";
 import type { FlowDefinitionEntry } from "./flow-definition";
 import { nullOnForbidden } from "./api-error";
-import { readAllPages } from "./paging";
 import {
   type SchemaEntry,
   schemaAuthMethods,
@@ -44,43 +42,16 @@ export type IdpDefinition = QueryIdps200IdpsItemDefinition;
  */
 export function fetchAllIdps(projectId: string): Promise<IdpConnection[] | null> {
   return nullOnForbidden(
-    readAllPages(async (pageToken) => {
-      // The API sorts ascending by default.
-      const page = await api.queryIdps(
-        { limit: 100, page_token: pageToken, sorting: { field: "created_at", direction: "desc" } },
-        { project_id: projectId },
-      );
-      return { items: page.idps, next: page.next_page_token };
-    }),
+    // The API sorts ascending by default.
+    api.queryIdps.all(
+      { limit: 100, sorting: { field: "created_at", direction: "desc" } },
+      { project_id: projectId },
+    ),
   );
 }
 
 /** One provider account linked to a user. */
 export type UserIdentityLink = ListUserIdentityLinks200IdentityLinksItem;
-
-/** A user's linked provider accounts, oldest first: the order they were linked in. */
-export function fetchUserIdentityLinks(userId: string): Promise<UserIdentityLink[]> {
-  return readAllPages(async (pageToken) => {
-    const page = await api.listUserIdentityLinks(userId, { limit: 100, page_token: pageToken });
-    return { items: page.identity_links, next: page.next_page_token };
-  });
-}
-
-/**
- * The signed-in person's own linked provider accounts, oldest first, read with
- * the session alone (`GET /users/me/identity_links`): no grant needed, so it
- * answers for a platform user who holds none.
- */
-export function fetchMyIdentityLinks(): Promise<UserIdentityLink[]> {
-  return readAllPages(async (pageToken) => {
-    const page = await api.listMyIdentityLinks({
-      limit: 100,
-      page_token: pageToken,
-      ...consoleSessionProject(),
-    });
-    return { items: page.identity_links, next: page.next_page_token };
-  });
-}
 
 /**
  * The connection's client id, as written in its `oidc` block. A `${{ VAR }}`

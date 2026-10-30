@@ -42,6 +42,14 @@ describe("createZitadelClient", () => {
 
   const client = () => createZitadelClient({ baseUrl: "http://localhost:8080", token: "t" });
 
+  it("escapes every page a paged function reads", async () => {
+    stubFetch(200, { deployments: [{ id: "\u001b[2Jdep_1" }] });
+
+    await expect(client().listDeployments.all({ project_id: "p1" })).resolves.toEqual([
+      { id: "\\x1b[2Jdep_1" },
+    ]);
+  });
+
   it("escapes a hostile string at any depth of a response", async () => {
     stubFetch(200, {
       name: "\u001b[2Jwiped",

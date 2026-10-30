@@ -21,12 +21,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSubmit } from "@/hooks/use-submit";
 import { formatDate, formatDateTime } from "@/lib/date";
-import {
-  type IdpConnection,
-  type UserIdentityLink,
-  fetchAllIdps,
-  fetchUserIdentityLinks,
-} from "@/lib/idp";
+import { type IdpConnection, type UserIdentityLink, fetchAllIdps } from "@/lib/idp";
 import { passwordState } from "@/lib/sign-in-methods";
 import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
 import { displayValue, field } from "@/lib/record";
@@ -73,11 +68,8 @@ export const Route = createFileRoute("/_authed/users/$userId")({
             .then((value) => value.schema as UserSchema)
             .catch(() => undefined)
         : Promise.resolve(undefined),
-      api
-        .listUserPasskeys(params.userId)
-        .then((result) => result.passkeys)
-        .catch(() => undefined),
-      fetchUserIdentityLinks(params.userId).catch(() => undefined),
+      api.listUserPasskeys.all(params.userId, { limit: 100 }).catch(() => undefined),
+      api.listUserIdentityLinks.all(params.userId, { limit: 100 }).catch(() => undefined),
       // `null`: the user has no password; `undefined`: it could not be read.
       api
         .getUserPasswordState(params.userId)

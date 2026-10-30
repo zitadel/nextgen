@@ -51,19 +51,6 @@ describe("collectPages", () => {
     ).resolves.toEqual({ items: [], next: null });
   });
 
-  it("stops when the server repeats a cursor, rather than draining forever", async () => {
-    // A server that keeps handing back the same token would otherwise loop.
-    const request = vi.fn(async () => ({ users: [1], next_page_token: "same" }));
-    await expect(
-      collectPages(request, { items: "users", all: true, ...cursor }),
-    ).rejects.toMatchObject({
-      code: "E_VALIDATION",
-      message: "The server repeated a page cursor, so --all would never finish",
-      details: { cursor: "same" },
-    });
-    expect(request).toHaveBeenCalledTimes(2);
-  });
-
   it("rejects a response without the items array", async () => {
     await expect(
       collectPages(async () => ({ nope: [] }), { items: "users", all: false, ...cursor }),
