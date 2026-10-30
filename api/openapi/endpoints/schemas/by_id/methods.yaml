@@ -18,7 +18,7 @@ get:
   security:
     - oauth2:
         - schema.read
-    - nextgenSession: []
+    - sessionCookie: []
   parameters:
     - $ref: ../../../components/parameters/schema-id.yaml
     - $ref: ../../../components/parameters/team-id.yaml

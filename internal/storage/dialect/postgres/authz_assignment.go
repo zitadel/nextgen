@@ -356,3 +356,35 @@ func (s authzAssignmentStatements) ListProjectAdmins(ctx context.Context, projec
 	}
 	return &database.ListResult[*domain.ProjectAdminRecord]{Items: admins, NextCursor: next}, nil
 }
+
+// ListProjectsOwnedThroughMember implements [service.AuthzAssignmentStatements].
+func (s authzAssignmentStatements) ListProjectsOwnedThroughMember(ctx context.Context, userID string) ([]string, error) {
+	return s.listOwnerProjects(ctx, userID, false)
+}
+
+// ListProjectsLosingLastOwner implements [service.AuthzAssignmentStatements].
+func (s authzAssignmentStatements) ListProjectsLosingLastOwner(ctx context.Context, userID string) ([]string, error) {
+	return s.listOwnerProjects(ctx, userID, true)
+}
+
+func (s authzAssignmentStatements) listOwnerProjects(ctx context.Context, userID string, losing bool) ([]string, error) {
+	var c statementCompiler
+	if losing {
+		authz.WriteProjectsLosingLastOwner(&c, postgresAuthzEnv(), userID)
+	} else {
+		authz.WriteProjectsOwnedThroughMember(&c, postgresAuthzEnv(), userID)
+	}
+	rows, err := s.client.Query(ctx, c.String(), c.args...)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	ids, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (string, error) {
+		var id string
+		err := row.Scan(&id)
+		return id, err
+	})
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	return ids, nil
+}

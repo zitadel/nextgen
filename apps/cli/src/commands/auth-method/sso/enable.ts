@@ -86,6 +86,7 @@ import {
   nonBlankString,
 } from "../../../lib/oclif";
 import { environmentFlags } from "../../../lib/oclif/environment-flags";
+import { asStepsShown } from "../../../lib/oclif/next-steps";
 import { inShell, type SuggestedCommand } from "../../../lib/suggestion";
 import { reportWarning } from "../../../lib/warnings";
 
@@ -497,7 +498,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     const followUps = this.followUps(unpublished, scopeArgs, recovery);
     // Commands come back only when every argument can be run as written: the
     // credential ones first, then the two deploy commands.
-    const commands = followUps.next_commands.map(String);
+    const commands = followUps.commands.map(String);
     await this.reportConnection({
       cwd,
       body: connectionBody,
@@ -509,6 +510,8 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       republish: commands.slice(0, recovery.length),
       deployCommands: commands.slice(recovery.length),
     });
+    // The box ends with these steps, so the base command does not repeat them.
+    const nextShown = this.jsonEnabled() ? undefined : asStepsShown();
 
     return this.emit({
       status: "ok",
@@ -522,13 +525,6 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         title: unpublished
           ? [`${name} sign-in is configured locally.`, ...stored].join(" ")
           : `${name} sign-in is already configured locally.`,
-        ...(unpublished
-          ? {
-              next_actions: [
-                `Deploy the configuration to make ${name} sign-in available in your app, then reload your app and test ${name} sign-in.`,
-              ],
-            }
-          : {}),
         ...this.payload({
           projectId,
           provider,
@@ -543,10 +539,19 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
           body: connectionBody,
           status: reusing ? "present" : "saved",
         }),
-        // An ok result carries its follow-ups in data.next_commands (errors
-        // use the top-level nextCommands instead).
-        ...followUps,
+        next_args: followUps.args,
       },
+      next: {
+        ...(unpublished
+          ? {
+              actions: [
+                `Deploy the configuration to make ${name} sign-in available in your app, then reload your app and test ${name} sign-in.`,
+              ],
+            }
+          : {}),
+        commands: followUps.commands,
+      },
+      nextShown,
     });
   }
 

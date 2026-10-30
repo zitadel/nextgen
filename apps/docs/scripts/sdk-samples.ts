@@ -11,7 +11,7 @@ import type { HttpMethods, OperationObject, PathItemObject } from "fumadocs-open
 
 import bundled from "../.generated/openapi.mjs";
 import { defaultRequest, withRefValues } from "../lib/default-request.ts";
-import { clientMethod, sdkSample, securitySchemes } from "../lib/sdk-sample.ts";
+import { authentication, clientMethod, sdkSample, securitySchemes } from "../lib/sdk-sample.ts";
 
 const outputDir = resolve(dirname(fileURLToPath(import.meta.url)), "../.generated/sdk-samples");
 const methods: HttpMethods[] = [
@@ -53,12 +53,22 @@ for (const [path, item] of Object.entries(document.paths ?? {})) {
     if (!operation) continue;
     const name = clientMethod(operation.operationId ?? `${method} ${path}`);
     const request = defaultRequest(operation, pathItem, method);
-    const sample = sdkSample(operation, path, pathItem, request);
-    await writeFile(
-      resolve(outputDir, `${name}.ts`),
-      `// ${method.toUpperCase()} ${path}\n${sample}\n`,
-    );
-    count++;
+    // Compile both branches of dual-scheme operations: the playground can
+    // select a session even when the default Markdown sample uses a secret.
+    const auths = new Set([
+      authentication(operation),
+      ...(operation.security ?? []).map((requirement) =>
+        authentication({ ...operation, security: [requirement] }),
+      ),
+    ]);
+    for (const auth of auths) {
+      const sample = sdkSample(operation, path, pathItem, request, auth);
+      await writeFile(
+        resolve(outputDir, `${name}-${auth}.ts`),
+        `// ${method.toUpperCase()} ${path}\n${sample}\n`,
+      );
+      count++;
+    }
   }
 }
 

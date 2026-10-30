@@ -246,7 +246,7 @@ func getMyProjectsRaw(t *testing.T, sessionToken string) (int, *api.ErrorDetails
 	t.Helper()
 	var cookie *http.Cookie
 	if sessionToken != "" {
-		cookie = &http.Cookie{Name: "__nextgen_session", Value: sessionToken}
+		cookie = &http.Cookie{Name: "__Host-zitadel_session", Value: sessionToken}
 	}
 	status, body := cookieRequest(t, cookie, http.MethodGet, "/users/me/projects", "", nil)
 	return status, helpers.MustUnmarshal[api.ErrorDetails](t, []byte(body))

@@ -117,7 +117,9 @@ import { installDependenciesForSetup } from "./install";
 import {
   assertCleanWorktree,
   ensureInitialCommit,
+  gitReport,
   type InitialCommitOutcome,
+  unavailableWarning,
 } from "./initial-commit";
 import { moveDevPort } from "./move-dev-port";
 import {
@@ -152,7 +154,7 @@ import {
   type SuggestedCommand,
   unscopedCommand,
 } from "../../lib/suggestion";
-import { nextCommandsData } from "../../lib/oclif/envelope";
+import { asStepsShown, type StepsShown } from "../../lib/oclif/next-steps";
 import { Promptable } from "../../lib/oclif/promptable";
 
 /**
@@ -1034,6 +1036,7 @@ export default class Setup extends Promptable(BaseCommand) {
     // The structured report is human-only. Under `--json` we let the
     // envelope returned from `this.emit(...)` be the sole stdout
     // payload (oclif requires single-doc JSON).
+    let nextShown: StepsShown | undefined;
     if (!this.jsonEnabled()) {
       const projectFacts = await detectProjectFacts(cwd, app.framework);
       const sections = buildSummary({
@@ -1068,6 +1071,8 @@ export default class Setup extends Promptable(BaseCommand) {
           ]),
         ].join("\n"),
       });
+      // The box holds the next steps, so the base command does not repeat them.
+      nextShown = asStepsShown();
       // After the steps that start the app and test sign-in, outside the box so
       // the command can be copied without its border.
       consola.log(`\n${exploreAllCommands(this.meta.cliVersion)}`);
@@ -1080,6 +1085,7 @@ export default class Setup extends Promptable(BaseCommand) {
           !dryRun &&
           !flags["non-interactive"] &&
           Boolean(process.stdout.isTTY && process.stdin.isTTY),
+        cliVersion: this.meta.cliVersion,
       });
     }
 
@@ -1107,14 +1113,7 @@ export default class Setup extends Promptable(BaseCommand) {
         })),
         files_skipped: result.filesSkipped.map((file) => relativeDisplay(cwd, file)),
         install: installOutcome.install,
-        // Whether setup created the repository, and the commit it made.
-        // `initialized` is false when the project was already in one, which it
-        // is still committed into; the commit is `null` only under `--no-git`
-        // or when git could not be used.
-        git: {
-          initialized: commit.kind === "created",
-          commit: commit.kind === "created" || commit.kind === "committed" ? commit.sha : null,
-        },
+        git: gitReport(commit),
         // The provider enabled during scaffolding, or null. `secret` reports
         // where the value went, never the value itself — `published` is the
         // one that decides whether the provider button works.
@@ -1155,7 +1154,9 @@ export default class Setup extends Promptable(BaseCommand) {
                 deployment_id: deployment.deploymentId,
                 origins: [...deployment.origins],
               },
-        next_actions: [
+      },
+      next: {
+        actions: [
           ...deployStep.actions,
           ...installOutcome.nextActions,
           brandingGuidanceAction(this.meta.cliVersion),
@@ -1165,7 +1166,7 @@ export default class Setup extends Promptable(BaseCommand) {
         // A JSON run prints no warnings, so a credential the project never
         // received would otherwise appear only as a `published` status with
         // nothing to act on. `auth-method sso enable` reports the same recovery step.
-        ...nextCommandsData([
+        commands: [
           ...republishCommands(
             answers.sso.flatMap((answer) => {
               const slug = providerOf(answer.selection).slug;
@@ -1190,8 +1191,9 @@ export default class Setup extends Promptable(BaseCommand) {
           ...installOutcome.nextCommands,
           ...consoleStep.commands,
           ...claimNudge.commands,
-        ]),
+        ],
       },
+      nextShown,
     });
   }
 
@@ -1233,9 +1235,7 @@ export default class Setup extends Promptable(BaseCommand) {
       }
     }
     if (outcome.kind === "unavailable") {
-      reportWarning(
-        `Could not commit the scaffolded project (${outcome.reason}); the first release records no commit, so the next deploy cannot show a diff.`,
-      );
+      reportWarning(unavailableWarning(outcome));
     }
     return outcome;
   }
@@ -1332,8 +1332,8 @@ export default class Setup extends Promptable(BaseCommand) {
         issuer: move.issuer,
         dev_port: devPort,
         files_written: move.result.filesWritten.map((file) => relativeDisplay(cwd, file)),
-        next_actions: [`Restart the dev server and open ${move.issuer}/login.`],
       },
+      next: { actions: [`Restart the dev server and open ${move.issuer}/login.`] },
     });
   }
 }

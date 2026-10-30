@@ -83,7 +83,7 @@ afterAll(async () => {
 });
 
 /**
- * The `__nextgen_session` cookie of a session belonging to `project`, active
+ * The `zitadel_session` cookie of a session belonging to `project`, active
  * with a verified factor.
  */
 async function sessionCookie(project: string): Promise<string> {
@@ -93,7 +93,7 @@ async function sessionCookie(project: string): Promise<string> {
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ handoff_token: handoff }),
   });
-  const setCookie = exchange.headers.getSetCookie().find((c) => c.startsWith("__nextgen_session="));
+  const setCookie = exchange.headers.getSetCookie().find((c) => c.startsWith("zitadel_session="));
   return setCookie?.split(";")[0] ?? "";
 }
 
@@ -149,7 +149,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     expect(exchange.status).toBe(200);
     const cookie = exchange.headers
       .getSetCookie()
-      .find((c) => c.startsWith("__nextgen_session="))
+      .find((c) => c.startsWith("zitadel_session="))
       ?.split(";")[0];
 
     const res = await fetch(`${BASE}/sessions/me`, { headers: { cookie: cookie ?? "" } });
@@ -161,6 +161,26 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
       identifier_property: "email",
       display: "Ada Lovelace",
     });
+  });
+
+  // Mirrors the server on loopback http (ADR 083): it sets zitadel_session,
+  // reads it and the canonical name the SDK proxies send upstream, the
+  // canonical one first, and reads no session cookie from before ADR 083.
+  test("GET /sessions/me reads the session under both of its names, and no old one", async () => {
+    const pair = await sessionCookie("proj_me_names");
+    const token = pair.slice(pair.indexOf("=") + 1);
+    expect(pair).toBe(`zitadel_session=${token}`);
+
+    for (const [cookie, status] of [
+      [`zitadel_session=${token}`, 200],
+      [`__Host-zitadel_session=${token}`, 200],
+      [`zitadel_session=deadbeef; __Host-zitadel_session=${token}`, 200],
+      [`__nextgen_session=${token}`, 401],
+      [`__nextgen_session_proj_me_names=${token}`, 401],
+    ] as const) {
+      const res = await fetch(`${BASE}/sessions/me`, { headers: { cookie } });
+      expect({ cookie, status: res.status }).toEqual({ cookie, status });
+    }
   });
 
   // Mirrors the server: a read that names a project refuses a session of any
@@ -175,7 +195,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     expect(exchange.status).toBe(200);
     const cookie = exchange.headers
       .getSetCookie()
-      .find((c) => c.startsWith("__nextgen_session="))
+      .find((c) => c.startsWith("zitadel_session="))
       ?.split(";")[0];
 
     const refused = await fetch(`${BASE}/sessions/me?project_id=proj_me_other`, {
@@ -258,7 +278,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
       headers: signOutHeaders,
     });
     expect(signedOut.status).toBe(204);
-    expect(signedOut.headers.getSetCookie().some((c) => /^__nextgen_session=;/.test(c))).toBe(true);
+    expect(signedOut.headers.getSetCookie().some((c) => /^zitadel_session=;/.test(c))).toBe(true);
   });
 
   test("GET /sessions/me returns body parseable by GetMySessionResponse with a user ref", async () => {
@@ -271,7 +291,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     expect(exchange.status).toBe(200);
     const cookie = exchange.headers
       .getSetCookie()
-      .find((c) => c.startsWith("__nextgen_session="))
+      .find((c) => c.startsWith("zitadel_session="))
       ?.split(";")[0];
     expect(cookie).toBeDefined();
 
@@ -349,9 +369,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ handoff_token: handoff }),
     });
-    const setCookie = exchange.headers
-      .getSetCookie()
-      .find((c) => c.startsWith("__nextgen_session="));
+    const setCookie = exchange.headers.getSetCookie().find((c) => c.startsWith("zitadel_session="));
     expect(setCookie).toBeDefined();
     const sessionCookie = setCookie?.split(";")[0] ?? "";
 
@@ -376,7 +394,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
       },
     });
     expect(revoke.status).toBe(204);
-    expect(revoke.headers.getSetCookie().some((c) => /^__nextgen_session=;/.test(c))).toBe(true);
+    expect(revoke.headers.getSetCookie().some((c) => /^zitadel_session=;/.test(c))).toBe(true);
 
     // Session is gone after revocation.
     const after = await fetch(`${BASE}/sessions/me`, { headers: { cookie: sessionCookie } });
@@ -421,7 +439,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
   test("DELETE /sessions/me with an unknown session token returns 401", async () => {
     const res = await fetch(`${BASE}/sessions/me`, {
       method: "DELETE",
-      headers: { cookie: "__nextgen_session=deadbeefdeadbeef" },
+      headers: { cookie: "zitadel_session=deadbeefdeadbeef" },
     });
     expect(res.status).toBe(401);
     const body = (await res.json()) as Record<string, unknown>;

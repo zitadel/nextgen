@@ -17,14 +17,14 @@ post:
     the project Check may expand without those scopes.
 
     Accepts either a project secret (`oauth2`) or a user-bound Console
-    session cookie (`nextgenSession`). Cookie-authenticated requests
-    follow the scheme's CSRF rules (`nextgenSession`).
+    session cookie (`sessionCookie`). Cookie-authenticated requests
+    follow the scheme's CSRF rules (`sessionCookie`).
   tags:
     - Grants
   security:
     - oauth2:
         - project.read
-    - nextgenSession: []
+    - sessionCookie: []
   parameters:
     - $ref: ../../../components/parameters/project-id.yaml
   requestBody:

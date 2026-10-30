@@ -3,6 +3,8 @@ package errorpage_test
 import (
 	"net/http"
 	"net/http/httptest"
+	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -10,6 +12,7 @@ import (
 
 	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/errorpage"
+	"github.com/zitadel/nextgen/internal/securityheaders"
 )
 
 func TestWants(t *testing.T) {
@@ -69,6 +72,33 @@ func TestWriteRendersTheAnatomy(t *testing.T) {
 	} {
 		assert.Contains(t, body, part)
 	}
+}
+
+// The page's policy allows its own inline script and style by hash, so a
+// change to either that skips the policy breaks the page here, not in a
+// browser.
+func TestWriteAllowsThePagesInlineCodeAndNothingElse(t *testing.T) {
+	t.Parallel()
+	rec := httptest.NewRecorder()
+
+	errorpage.Write(rec, httptest.NewRequest(http.MethodGet, "/", nil), errorpage.NotFound(nil))
+
+	policy := rec.Header().Get(securityheaders.PolicyHeader)
+	directives := map[string]string{}
+	for _, directive := range strings.Split(policy, "; ") {
+		name, sources, _ := strings.Cut(directive, " ")
+		directives[name] = sources
+	}
+	assert.Equal(t, "'none'", directives["default-src"])
+	assert.Equal(t, "'none'", directives["frame-ancestors"])
+
+	body := rec.Body.String()
+	scripts := securityheaders.InlineScriptHashes(body)
+	require.NotEmpty(t, scripts)
+	assert.Equal(t, strings.Join(scripts, " "), directives["script-src"])
+	style := regexp.MustCompile(`(?s)<style>(.*?)</style>`).FindAllStringSubmatch(body, -1)
+	require.Len(t, style, 1)
+	assert.Equal(t, securityheaders.Hash(style[0][1]), directives["style-src"])
 }
 
 func TestWriteKeepsTheCallersCachePolicy(t *testing.T) {

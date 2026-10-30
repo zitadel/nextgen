@@ -18,7 +18,7 @@ import (
 
 type allowAll struct{}
 
-func (allowAll) HandleNextgenSession(ctx context.Context, _ oasapi.OperationName, _ oasapi.NextgenSession) (context.Context, error) {
+func (allowAll) HandleSessionCookie(ctx context.Context, _ oasapi.OperationName, _ oasapi.SessionCookie) (context.Context, error) {
 	return ctx, nil
 }
 

@@ -71,13 +71,14 @@ func (s SecurityHandler) HandleOAuth2(ctx context.Context, operationName api.Ope
 	return ctx, nil
 }
 
-// HandleNextgenSession handles the nextgenSession security scheme: the
-// __nextgen_session cookie. It verifies the cookie decrypts to a session
+// HandleSessionCookie handles the sessionCookie security scheme: the
+// __Host-zitadel_session cookie, or zitadel_session on loopback http
+// (WithLoopbackSessionCookie). It verifies the cookie decrypts to a session
 // token and stashes it for handlers. User-bound sessions mint ScopeContext
 // so management ops can authorize the human, unless oauth2 already minted
 // one (dual-scheme OR). Anonymous sessions skip the grant/user-query ops
 // so a leftover building cookie cannot 401 a valid Bearer.
-func (s SecurityHandler) HandleNextgenSession(ctx context.Context, operationName api.OperationName, t api.NextgenSession) (context.Context, error) {
+func (s SecurityHandler) HandleSessionCookie(ctx context.Context, operationName api.OperationName, t api.SessionCookie) (context.Context, error) {
 	// A Bearer that already satisfied a dual-scheme operation is the
 	// credential; the cookie is not consulted at all. Otherwise a stale or
 	// malformed cookie riding along would fail here and 401 a request the
@@ -255,7 +256,7 @@ var secretHashOperations = map[api.OperationName]bool{
 
 type sessionTokenKey struct{}
 
-// sessionCookieKey carries the raw __nextgen_session value of a request the
+// sessionCookieKey carries the raw session cookie value of a request the
 // cookie authenticated, so GET /sessions/me/csrf can derive its CSRF token.
 type sessionCookieKey struct{}
 
@@ -264,8 +265,8 @@ func sessionCookieFromContext(ctx context.Context) (string, bool) {
 	return v, ok && v != ""
 }
 
-// sessionTokenFromContext returns the session token parsed from the
-// __nextgen_session cookie by HandleNextgenSession.
+// sessionTokenFromContext returns the session token parsed from the session
+// cookie by HandleSessionCookie.
 func sessionTokenFromContext(ctx context.Context) (*domain.Token, bool) {
 	v, ok := ctx.Value(sessionTokenKey{}).(*domain.Token)
 	return v, ok && v != nil
@@ -367,6 +368,36 @@ func cookieSecureFromContext(ctx context.Context) bool {
 	return true
 }
 
+// WithLoopbackSessionCookie hands the generated reader, which reads only the
+// canonical __Host-zitadel_session, the session a browser keeps as
+// zitadel_session: the name the server sets over plain http to a loopback
+// host, where the cookie has no Secure and so no prefix (ADR 083). It copies
+// that cookie under the canonical name, only on such a request and only when
+// the canonical one is absent, so the canonical name wins. Everywhere else
+// zitadel_session is ignored: over https a browser holds the session only
+// under the prefix, which no other host can plant. It reads the scheme and
+// host WithRequestHostMiddleware resolved, so it runs after it.
+func WithLoopbackSessionCookie(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !cookieSecureFromContext(r.Context()) {
+			if _, err := r.Cookie(sessionCookieName); err != nil {
+				if loopback, err := r.Cookie(loopbackSessionCookieName); err == nil {
+					// A clone, so the request the middleware in front holds
+					// keeps its header; a line of its own, so no cookie of the
+					// request's other lines is lost.
+					r = r.Clone(r.Context())
+					r.Header.Add("Cookie", (&http.Cookie{
+						Name:   sessionCookieName,
+						Value:  loopback.Value,
+						Quoted: loopback.Quoted,
+					}).String())
+				}
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 // isLoopbackHost reports whether host is localhost or a loopback IP
 // (127.0.0.0/8, ::1). Host must already be stripped of any port.
 func isLoopbackHost(host string) bool {
@@ -411,6 +442,14 @@ func WithScopeContext(ctx context.Context, scopeCtx ScopeContext) context.Contex
 func GetScopeContext(ctx context.Context) (ScopeContext, bool) {
 	v, ok := ctx.Value(contextKey{}).(ScopeContext)
 	return v, ok
+}
+
+// listProjectID is the project a list taking the optional project_id
+// (project-id-query.yaml) addresses: the one it names, else the credential's
+// own. A missing scope yields "", which the list gate refuses.
+func listProjectID(ctx context.Context, projectID api.OptProjectID) string {
+	scopeCtx, _ := GetScopeContext(ctx)
+	return string(projectID.Or(api.ProjectID(scopeCtx.ProjectID)))
 }
 
 func withActorFromToken(ctx context.Context, token *domain.Token) context.Context {
