@@ -65,6 +65,8 @@ between files are the sign the component is missing.
 - In specs, assert on `router.state.resolvedLocation`, never
   `router.state.location`: ending on `location` can leave a loader's request
   in flight, which MSW reports as unhandled in a later test.
+- In specs, import `createAppRouter` at the top of the file, never inside a
+  test: the router mock in `src/test-setup.ts` fails a spec that does.
 
 ## Analytics
 

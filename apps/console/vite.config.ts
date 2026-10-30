@@ -100,9 +100,9 @@ export default defineConfig(({ command, mode, isPreview }) => ({
     unstubEnvs: true,
     // Above the RTL asyncUtilTimeout (5s, set in test-setup.ts) with room for a
     // test that makes several queries, so a slow query reports its own Testing
-    // Library diagnostic rather than being cut short by this budget. A file's
-    // first test also imports the router and every screen (test-setup.ts): in
-    // CI that first test takes ~9s, and up to ~16s on a busy runner.
+    // Library diagnostic rather than being cut short by this budget. A file
+    // loads the router and every screen before its first test, outside this
+    // budget (test-setup.ts).
     testTimeout: 30_000,
   },
 }));
