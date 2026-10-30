@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    // Remotion's bundler compiles the JSX; tsc only type-checks it.
+    "jsx": "react-jsx"
+  },
+  "include": ["remotion.config.ts", "src/**/*.ts", "src/**/*.tsx"]
+}

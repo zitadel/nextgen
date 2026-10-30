@@ -1,0 +1,55 @@
+/* The page ground and the light-DOM typography around the atoms: what
+   <zitadel-login>'s layout chrome
+   (packages/components/src/orchestrator/templates/layout-chrome.css) gives the
+   card's title, subtitle, field group, actions and register line. */
+
+.login-surface {
+  background: var(--zl-background);
+  color: var(--zl-foreground);
+  font-family: var(--zl-font-family-sans);
+}
+
+.login-surface .zl-card-title {
+  margin: 0;
+  font-family: var(--zl-font-family-heading);
+  font-size: var(--zl-text-xl-size);
+  font-weight: var(--zl-font-weight-medium);
+  line-height: 1;
+  color: var(--zl-card-foreground);
+  text-align: left;
+}
+
+.login-surface .zl-card-subtitle {
+  margin: 0;
+  font-size: var(--zl-text-sm-size);
+  line-height: var(--zl-text-sm-leading);
+  font-weight: var(--zl-font-weight-normal);
+  color: var(--zl-muted-foreground);
+}
+
+.login-surface .zl-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--zl-spacing-7);
+}
+
+.login-surface .zl-card-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--zl-spacing-3);
+}
+
+.login-surface .zl-card-nav {
+  margin: 0;
+  font-size: var(--zl-text-sm-size);
+  line-height: var(--zl-text-sm-leading);
+  font-weight: var(--zl-font-weight-normal);
+  color: var(--zl-muted-foreground);
+  text-align: center;
+}
+
+.login-surface .zl-card-nav__link {
+  color: var(--zl-link);
+  text-decoration: underline;
+  text-underline-offset: var(--zl-spacing-1);
+}

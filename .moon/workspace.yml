@@ -32,6 +32,7 @@ projects:
     testing: "packages/testing"
     storybook: "apps/storybook"
     website: "apps/website"
+    teaser-video: "apps/teaser-video"
 
 vcs:
   defaultBranch: "main"

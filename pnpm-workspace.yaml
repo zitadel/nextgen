@@ -48,6 +48,9 @@ catalog:
   # Exact: the OpenAPI lint gate, the casing-rule tests and the docs bundle all
   # call the library the Redocly CLI is built on, so they must agree.
   "@redocly/openapi-core": 2.31.5
+  # Every remotion and @remotion/* package must resolve to the same version;
+  # move them together.
+  "@remotion/cli": ^4.0.539
   "@storybook/addon-a11y": ^10.3.6
   "@storybook/addon-vitest": ^10.3.6
   "@storybook/web-components-vite": ^10.3.6
@@ -110,6 +113,7 @@ catalog:
   react-markdown: ^10.1.0
   remark: ^15.0.1
   remark-gfm: ^4.0.1
+  remotion: ^4.0.539
   rosie-skills: ^0.8.5
   safe-stable-stringify: ^2.5.0
   sanitize-html: ^2.18.0

@@ -1,0 +1,29 @@
+{
+  "name": "@zitadel/teaser-video",
+  "version": "0.0.0",
+  "engines": {
+    "node": "24.x"
+  },
+  "private": true,
+  "description": "The login teaser video, rendered with Remotion from the real atoms of @zitadel/components.",
+  "type": "module",
+  "scripts": {
+    "dev": "remotion studio src/index.ts",
+    "render": "remotion render src/index.ts Teaser dist/teaser.mp4",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "biome check ."
+  },
+  "dependencies": {
+    "@fontsource/arimo": "catalog:",
+    "@remotion/cli": "catalog:",
+    "@zitadel/components": "workspace:*",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "remotion": "catalog:"
+  },
+  "devDependencies": {
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "typescript": "catalog:"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  // The login teaser video (Remotion). Mirrors apps/teaser-video/moon.yml.
+  "tasks": {
+    "typecheck": {
+      "dependsOn": ["@zitadel/components#build"]
+    },
+    "dev": {
+      "dependsOn": ["@zitadel/components#build"]
+    },
+    "render": {
+      "dependsOn": ["@zitadel/components#build"],
+      "outputs": ["dist/**"]
+    }
+  }
+}
