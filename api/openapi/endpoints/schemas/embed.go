@@ -48,6 +48,7 @@ func PlatformHumanUserSchema(serverURL string) ([]byte, error) {
 		"description": "The user's name, shown in place of their email.",
 	}
 	doc["x-display"] = []any{PlatformDisplayNameProperty}
+	// TODO(#2470): remove once the default schema declares no `$id`.
 	delete(doc, "$id")
 	return json.MarshalIndent(doc, "", "  ")
 }
