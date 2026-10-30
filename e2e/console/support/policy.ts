@@ -36,8 +36,8 @@ export async function recordPolicyViolations(page: Page): Promise<string[]> {
  */
 export function unlistedInlineScripts(html: string, policy: string): string[] {
   const scripts = policy.match(/(?:^|; )script-src ([^;]*)/)?.[1] ?? "";
-  return [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g)]
-    .filter(([, attributes, body]) => body && !/\bsrc=/.test(attributes ?? ""))
+  return [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\b[^>]*>/gi)]
+    .filter(([, attributes, body]) => body && !/\bsrc\s*=/i.test(attributes ?? ""))
     .map(([, , body]) => body ?? "")
     .filter(
       (body) =>

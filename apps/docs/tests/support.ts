@@ -145,8 +145,8 @@ export function policyProblem(headers: Record<string, string>, html: string): st
 
 /** The bodies of a page's inline scripts. */
 function inlineScripts(html: string): string[] {
-  return [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g)]
-    .filter(([, attributes, body]) => body && !/\bsrc=/.test(attributes ?? ""))
+  return [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\b[^>]*>/gi)]
+    .filter(([, attributes, body]) => body && !/\bsrc\s*=/i.test(attributes ?? ""))
     .map(([, , body]) => body ?? "");
 }
 

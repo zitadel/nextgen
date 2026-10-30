@@ -41,8 +41,10 @@ function reportOnlyPolicy(hashes) {
 /** The SHA-256 of each inline script in `html`, base64, once each. */
 function inlineScriptHashes(html) {
   const hashes = new Set();
-  for (const [, attributes, body] of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g)) {
-    if (!body || /\bsrc=/.test(attributes)) continue;
+  for (const [, attributes, body] of html.matchAll(
+    /<script\b([^>]*)>([\s\S]*?)<\/script\b[^>]*>/gi,
+  )) {
+    if (!body || /\bsrc\s*=/i.test(attributes)) continue;
     hashes.add(createHash("sha256").update(body).digest("base64"));
   }
   return [...hashes];
