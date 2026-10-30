@@ -314,7 +314,8 @@ server's catch-all.
 - The add-on's production build (`CLOUD_STAGE`) leaves out what has no
   preview state: Email, since nothing sends marketing email yet, the
   provisioning call, and the sign-in hop and BotID client until a preview has
-  shown them working. Previews and local runs get all of it.
+  shown them working. Previews get all of it; local runs get all but BotID's
+  client, whose challenge only a deployment serves.
 - The hourly cron is not in `vercel.json` yet. Cron runs in production only,
   where it would answer 503 every hour; it lands with the live Stripe
   adapter. `erase-account` is not scaffolded: it starts from the event

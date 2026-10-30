@@ -20,7 +20,11 @@ import { VercelInsights } from "./vercel-insights";
  */
 const unreleased = import.meta.env.CLOUD_STAGE !== "production";
 
-if (unreleased) startBotCheck();
+// BotID's client loads its challenge from paths only a Vercel deployment
+// serves, so it starts in a preview's build alone. A local production build
+// (`workspace:cloud`) would fail every flow write without the challenge,
+// while the functions' check answers human outside Vercel anyway.
+if (import.meta.env.CLOUD_STAGE === "preview") startBotCheck();
 
 /**
  * The hosted cloud's add-on to the console (Console ADR 0006): what only the

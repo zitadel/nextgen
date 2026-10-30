@@ -5,6 +5,7 @@ import type {
   EmailPreferences,
   EnsureAccountResponse,
   NewTicket,
+  Plan,
   TicketList,
 } from "./contract";
 import type { Caller, SignupConsent, Systems, Team } from "./ports";
@@ -48,9 +49,7 @@ export const routes: Record<string, Handler> = {
   "PUT /cloud/api/account/preferences": async (request, { systems }) => {
     const auth = await authenticate(request, systems.zitadel);
     if (auth instanceof Response) return auth;
-    const body = (await request.json().catch(() => undefined)) as
-      | Partial<EmailPreferences>
-      | undefined;
+    const body = await jsonBody(request);
     if (typeof body?.product_news !== "boolean") {
       return failure(400, "cloud.invalid_preferences", "Say whether to send product news.");
     }
@@ -86,25 +85,50 @@ export const routes: Record<string, Handler> = {
   "POST /cloud/api/support/tickets": async (request, { systems }) => {
     const auth = await authenticate(request, systems.zitadel);
     if (auth instanceof Response) return auth;
-    const body = (await request.json().catch(() => undefined)) as Partial<NewTicket> | undefined;
-    const subject = body?.subject?.trim();
-    const text = body?.body?.trim();
-    if (!subject || !text) {
+    const body = await jsonBody(request);
+    const subject = stringField(body?.subject)?.trim();
+    const message = stringField(body?.body)?.trim();
+    if (!subject || !message) {
       return failure(400, "cloud.invalid_ticket", "A request needs a subject and a message.");
     }
     const severity = body?.severity ?? "question";
-    if (!["question", "problem", "outage"].includes(severity)) {
+    if (!oneOf(SEVERITIES, severity)) {
       return failure(400, "cloud.invalid_ticket", "Severity is question, problem or outage.");
+    }
+    const projectId = body?.project_id;
+    if (projectId !== undefined && typeof projectId !== "string") {
+      return failure(400, "cloud.invalid_ticket", "Name the project by its id.");
     }
     const ticket = await systems.hubspot.createTicket(auth.caller, {
       subject,
-      body: text,
+      body: message,
       severity,
-      ...(body?.project_id ? { project_id: body.project_id } : {}),
+      ...(projectId ? { project_id: projectId } : {}),
     });
     return json({ ticket }, 201);
   },
 };
+
+const SEVERITIES: readonly NewTicket["severity"][] = ["question", "problem", "outage"];
+const PLANS: readonly Plan["id"][] = ["free", "pro", "enterprise"];
+
+/**
+ * A request's JSON body, as the caller sent it: its fields are unknown until
+ * checked, whatever the contract's types say, so a number where the contract
+ * has a string is a 400, not a throw.
+ */
+async function jsonBody(request: Request): Promise<Record<string, unknown> | undefined> {
+  const body: unknown = await request.json().catch(() => undefined);
+  return body && typeof body === "object" ? (body as Record<string, unknown>) : undefined;
+}
+
+function stringField(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
+}
+
+function oneOf<T extends string>(allowed: readonly T[], value: unknown): value is T {
+  return allowed.includes(value as T);
+}
 
 /** Opens a Stripe page for a team the person administers, returning to Billing. */
 async function billingSession(
@@ -114,17 +138,17 @@ async function billingSession(
 ): Promise<Response> {
   const auth = await authenticate(request, systems.zitadel);
   if (auth instanceof Response) return auth;
-  const body = (await request.json().catch(() => undefined)) as
-    | Partial<BillingSessionRequest>
-    | undefined;
+  const body = await jsonBody(request);
+  const plan = body?.plan_id;
+  if (plan !== undefined && !oneOf(PLANS, plan)) {
+    return failure(400, "cloud.invalid_plan", "The plan is free, pro or enterprise.");
+  }
   const teams = await systems.zitadel.administeredTeams(auth.cookie);
   const team = teams.find((candidate) => candidate.id === body?.team_id);
   if (!team) {
     return failure(404, "cloud.team_not_found", "You administer no team with that id.");
   }
-  return json({
-    url: await open(team, returnUrl(request), body?.plan_id),
-  } satisfies BillingSessionResponse);
+  return json({ url: await open(team, returnUrl(request), plan) } satisfies BillingSessionResponse);
 }
 
 /**

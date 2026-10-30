@@ -462,8 +462,9 @@ not use:
   the builder takes that binary instead. Without
   `CLOUD_DATABASE_URL` and outside a deployment, the launcher serves from
   SQLite and migrates it at startup.
-- The `console` service's `devCommand` builds it and serves the build behind
-  the same service rewrites a deployment serves it behind. Its dev server
+- The `console` service's `devCommand` builds it with the add-on
+  (`CONSOLE_ADDON`), as a deployment's build command does, and serves the
+  build behind the same service rewrites a deployment serves it behind. Its dev server
   cannot sit behind those rewrites, so its live loop stays
   `moon run console:dev-real`. `NODE_ENV` is set because `vercel dev` runs dev
   commands under `development`, which makes `vite build` a development build.

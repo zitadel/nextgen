@@ -58,6 +58,26 @@ describe("the add-on's RPC", () => {
     const { response } = call("POST", "/cloud/api/support/tickets", { body: { subject: "Help" } });
     expect((await response).status).toBe(400);
   });
+
+  it.each([
+    { subject: 42, body: "Message" },
+    { subject: "Help", body: ["Message"] },
+    { subject: "Help", body: "Message", project_id: 7 },
+  ])("refuses a ticket whose fields are not what the contract says: %j", async (ticket) => {
+    const { response } = call("POST", "/cloud/api/support/tickets", { body: ticket });
+    const answer = await response;
+    expect(answer.status).toBe(400);
+    expect(await answer.json()).toMatchObject({ error: { code: "cloud.invalid_ticket" } });
+  });
+
+  it("refuses a checkout for a plan there is none of, before it reaches Stripe", async () => {
+    const { response } = call("POST", "/cloud/api/billing/checkout", {
+      body: { team_id: MOCK_TEAM.id, plan_id: "gold" },
+    });
+    const answer = await response;
+    expect(answer.status).toBe(400);
+    expect(await answer.json()).toMatchObject({ error: { code: "cloud.invalid_plan" } });
+  });
 });
 
 describe("the way back from Stripe", () => {

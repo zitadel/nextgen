@@ -17,7 +17,7 @@
       "framework": "vite",
       "installCommand": "pnpm install --os=current --cpu=current --optimistic-repeat-install",
       "buildCommand": "CONSOLE_BASE_PATH=/console/ CONSOLE_ADDON=../cloud-console turbo run build",
-      "devCommand": "NODE_ENV=production CONSOLE_BASE_PATH=/console/ vite build --outDir node_modules/.cloud-dev && vite preview --outDir node_modules/.cloud-dev --base / --port $PORT --strictPort",
+      "devCommand": "NODE_ENV=production CONSOLE_BASE_PATH=/console/ CONSOLE_ADDON=../cloud-console vite build --outDir node_modules/.cloud-dev && vite preview --outDir node_modules/.cloud-dev --base / --port $PORT --strictPort",
       "outputDirectory": "../../internal/staticui/console/dist",
       "rewrites": [
         {
