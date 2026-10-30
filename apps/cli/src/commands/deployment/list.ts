@@ -103,10 +103,9 @@ export default class DeploymentList extends EnvironmentCommand {
     const plain = flags.plain || !process.stdout.isTTY;
     return this.emit({
       status: "ok",
-      data: listData(deployments, {
-        nextPageToken: next,
-        nextCommands: nextCommand === undefined ? undefined : [nextCommand],
-      }),
+      data: listData(deployments, { nextPageToken: next }),
+      ...(nextCommand === undefined ? {} : { next: { commands: [nextCommand] } }),
+      machineReadable: plain,
       pretty: renderList(COLUMNS, rows, {
         plain,
         singular: "deployment",

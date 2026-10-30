@@ -4232,7 +4232,9 @@ func (s *Server) handleDeleteTeamRequest(args [1]string, argsEscaped bool, w htt
 // The user is removed, not deactivated, and the deletion emits `user.deleted`,
 // plus `authz.revoked` for each grant on that grant's project.
 // With a project secret the request is idempotent: deleting a user that exists
-// in no project succeeds without changing anything.
+// in no project succeeds without changing anything. Deleting the last active
+// member of a project's owning team returns 409 `proj.last_owner` and changes
+// nothing.
 //
 // DELETE /users/{user_id}
 func (s *Server) handleDeleteUserByIDRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {

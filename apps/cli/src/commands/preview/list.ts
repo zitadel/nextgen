@@ -84,10 +84,9 @@ export default class PreviewList extends PreviewCommand {
     const plain = flags.plain || !process.stdout.isTTY;
     return this.emit({
       status: "ok",
-      data: listData(previews, {
-        nextPageToken: next,
-        nextCommands: nextCommand === undefined ? undefined : [nextCommand],
-      }),
+      data: listData(previews, { nextPageToken: next }),
+      ...(nextCommand === undefined ? {} : { next: { commands: [nextCommand] } }),
+      machineReadable: plain,
       pretty: renderList(COLUMNS, rows, {
         plain,
         singular: "preview",

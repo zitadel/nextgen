@@ -8,7 +8,6 @@ import {
 import { LocalServer } from "../lib/local-server/server";
 import { BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
 import { resolveCwd } from "../lib/paths";
-import { nextCommandsData } from "../lib/oclif/envelope";
 import { Promptable } from "../lib/oclif/promptable";
 
 export default class Reset extends Promptable(BaseCommand) {
@@ -45,8 +44,8 @@ export default class Reset extends Promptable(BaseCommand) {
               : { container_name: containerName }),
             data_deleted: true,
           },
-          ...nextCommandsData([this.suggestUnscoped("reset --force")]),
         },
+        next: { commands: [this.suggestUnscoped("reset --force")] },
       });
     }
 

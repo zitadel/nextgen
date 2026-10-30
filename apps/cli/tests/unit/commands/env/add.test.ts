@@ -12,7 +12,12 @@ vi.mock("@clack/prompts", async () => (await import("../../../helpers/clack")).c
 import { confirm, text } from "@clack/prompts";
 
 import EnvAdd from "../../../../src/commands/env/add";
-import { parseJson, runCliForTest, stripAnsi } from "../../../helpers/run-cli";
+import {
+  expectedPublicCliCommand,
+  parseJson,
+  runCliForTest,
+  stripAnsi,
+} from "../../../helpers/run-cli";
 import { asTerminal } from "../../../helpers/terminal";
 
 const SERVER = "https://api.zitadel.example";
@@ -219,8 +224,24 @@ describe("env add", () => {
       const out = stripAnsi(await addRendered(cwd, "--app-url", "https://app.acme.com"));
 
       expect(out).toContain(
-        `Deploy to it: zitadel deploy -m '<what changed>' --env-file ${cwd}/.env.production.local`,
+        `$ ${expectedPublicCliCommand(`deploy -m '<what changed>' --env-file ${cwd}/.env.production.local`)}`,
       );
+    });
+
+    it("names the deploy a person should run only once", async () => {
+      const cwd = await makeProject("next");
+
+      const out = stripAnsi(await addRendered(cwd, "--app-url", "https://app.acme.com"));
+
+      expect(out.split("deploy -m '<what changed>'")).toHaveLength(2);
+    });
+
+    it("names the check of what resolves only once", async () => {
+      const cwd = await makeProject("next");
+
+      const out = stripAnsi(await addRendered(cwd));
+
+      expect(out.split(" env --env-file ")).toHaveLength(2);
     });
 
     it("offers no origin add without an app URL to add", async () => {
