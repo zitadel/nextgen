@@ -159,7 +159,7 @@ func TestTeamReadsAcceptSession(t *testing.T) {
 
 	// The allowlist is per-operation: deleteTeam declares oauth2 only, so the
 	// generated client cannot even offer the cookie and fails before sending.
-	// That pins the spec half -- adding nextgenSession to its security block
+	// That pins the spec half -- adding sessionCookie to its security block
 	// breaks it.
 	t.Run("team delete does not offer the session scheme", func(t *testing.T) {
 		_, err := session.DeleteTeam(t.Context(), api.DeleteTeamParams{TeamID: api.TeamID(claimerTeamID)})

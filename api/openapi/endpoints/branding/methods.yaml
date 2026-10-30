@@ -56,7 +56,7 @@ get:
   security:
     - oauth2:
         - branding.read
-    - nextgenSession: []
+    - sessionCookie: []
   responses:
     '200':
       description: Branding revisions were retrieved successfully.
