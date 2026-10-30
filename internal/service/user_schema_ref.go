@@ -24,9 +24,7 @@ type userSchemaStatements interface {
 // its objectType. A `$id` under one of the built-in bases resolves under
 // every base bases knows (domain.BuiltinSchemaBases).
 //
-// The request's release is the only source: the revision it pins for the
-// handle. A handle that release does not pin is an internal error. A request
-// with no release is not deployed.
+// The revision is the one the request's release pins for the handle.
 func resolveUserSchema(ctx context.Context, stmts userSchemaStatements, bases domain.BuiltinSchemaBases, projectID, ref string) (*domain.JSONSchema, error) {
 	pins, err := runtimePins(ctx, domain.ReleasePointerKindSchema)
 	if err != nil {
@@ -36,7 +34,18 @@ func resolveUserSchema(ctx context.Context, stmts userSchemaStatements, bases do
 	if err != nil {
 		return nil, err
 	}
-	return pinnedUserSchema(ctx, stmts, projectID, pins, handle)
+	revisionID, ok := pins[handle]
+	if !ok {
+		return nil, domain.ErrInternal(nil).WithMessage(fmt.Sprintf("release does not pin user schema %q", handle))
+	}
+	schema, err := stmts.GetJSONSchemaByID(ctx, projectID, revisionID)
+	if _, missing := errors.AsType[*database.NoRowFoundError](err); missing {
+		return nil, domain.ErrInternal(err).WithMessage(fmt.Sprintf("release pins a missing user schema %q", handle))
+	}
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to get schema from database")
+	}
+	return schema, nil
 }
 
 func userSchemaHandle(ctx context.Context, stmts userSchemaStatements, bases domain.BuiltinSchemaBases, projectID, ref string) (string, error) {
@@ -46,9 +55,8 @@ func userSchemaHandle(ctx context.Context, stmts userSchemaStatements, bases dom
 	return schemaObjectType(bases.GetJSONSchema(ctx, stmts, projectID, ref))
 }
 
-// newestUserSchema is the catalog read: flow-definition create and release
-// build name a schema that is not yet pinned by a release. A request that is
-// serving a release does not use it.
+// newestUserSchema is the catalog read for flow-definition create and release
+// build, which name a schema no release pins yet.
 func newestUserSchema(ctx context.Context, stmts userSchemaStatements, bases domain.BuiltinSchemaBases, projectID, ref string) (*domain.JSONSchema, error) {
 	handle, err := userSchemaHandle(ctx, stmts, bases, projectID, ref)
 	if err != nil {
@@ -68,21 +76,6 @@ func newestUserSchema(ctx context.Context, stmts userSchemaStatements, bases dom
 		return nil, domain.ErrJSONSchemaNotFound()
 	}
 	return result.Items[0], nil
-}
-
-func pinnedUserSchema(ctx context.Context, stmts userSchemaStatements, projectID string, pins PinnedRevisions, handle string) (*domain.JSONSchema, error) {
-	revisionID, ok := pins[handle]
-	if !ok {
-		return nil, domain.ErrInternal(nil).WithMessage(fmt.Sprintf("release does not pin user schema %q", handle))
-	}
-	schema, err := stmts.GetJSONSchemaByID(ctx, projectID, revisionID)
-	if _, missing := errors.AsType[*database.NoRowFoundError](err); missing {
-		return nil, domain.ErrInternal(err).WithMessage(fmt.Sprintf("release pins a missing user schema %q", handle))
-	}
-	if err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to get schema from database")
-	}
-	return schema, nil
 }
 
 // userSchemaObjectType returns the objectType the schema id (`$id` URL or

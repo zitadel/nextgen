@@ -158,31 +158,14 @@ func (s *BrandingService) Get(ctx context.Context, projectID, id string) (_ *dom
 	return entity, nil
 }
 
-// GetLatest returns the newest revision for the project, or nil (no error)
-// when the project has none — callers fall back to built-in defaults.
-func (s *BrandingService) GetLatest(ctx context.Context, projectID string) (_ *domain.Branding, err error) {
-	ctx, end := startSpan(ctx, "BrandingService.GetLatest")
-	defer end(&err)
-
-	result, err := s.v2Pool.Statements().ListBrandings(WithAuthzListUnrestricted(ctx), branding.ListOptions(projectID, 1))
-	if err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to resolve latest branding revision")
-	}
-	if len(result.Items) == 0 {
-		return nil, nil
-	}
-	return result.Items[0], nil
-}
-
 // flowBrandingReader is the branding lookup a flow response needs.
 type flowBrandingReader interface {
 	Get(ctx context.Context, projectID, id string) (*domain.Branding, error)
 }
 
-// ResolveFlowBranding returns the branding revision a flow response should
-// carry. The request's release is the only source: the revision it pins, or
-// nil when it pins none. A request with no release is not deployed. The
-// caller serves the built-in default for a nil revision or a failed read.
+// ResolveFlowBranding returns the revision the request's release pins, or nil
+// when it pins none. The caller serves the built-in default for a nil revision
+// or a failed read.
 func ResolveFlowBranding(ctx context.Context, reader flowBrandingReader, projectID string) (*domain.Branding, error) {
 	pins, err := runtimePins(ctx, domain.ReleasePointerKindBranding)
 	if err != nil {

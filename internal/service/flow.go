@@ -63,8 +63,8 @@ type ResolveFlowRequest struct {
 	Name          *string // direct-lookup slug
 	SchemaVersion *string // nil = the revision the release pins
 	AuthRequestID *string
-	// Hint scopes audience resolution (ignored when Name is set) — see
-	// resolvePinned for the scoring rules.
+	// Hint scopes audience resolution (ignored when Name is set); see
+	// flowAudienceScore.
 	Hint ResolveFlowHint
 }
 
@@ -96,11 +96,9 @@ type flowService struct {
 
 var _ FlowService = (*flowService)(nil)
 
-// Resolve picks the definition that serves the request. The request's release
-// (WithRuntimeResolution) is the only source: by name, the revision pinned
-// under that handle; by audience, the pinned set scored as usual. A release
-// that pins no flow definition has no definition to serve. A request with no
-// release is not deployed.
+// Resolve picks the definition from the revisions the request's release pins:
+// by name, the one under that handle; by audience, the set scored by
+// flowAudienceScore.
 func (s *flowService) Resolve(ctx context.Context, req ResolveFlowRequest) (_ *domain.FlowDefinition, err error) {
 	ctx, end := startSpan(ctx, "FlowService.Resolve")
 	defer end(&err)

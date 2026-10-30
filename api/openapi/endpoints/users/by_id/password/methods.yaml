@@ -59,6 +59,11 @@ put:
 
     The new password replaces the current one, and setting it emits
     `auth.factor.password.set`.
+
+    The password policy is the one deployed to the `default` target, whatever
+    the caller's `Origin`. With nothing deployed there the call answers `409`
+    with `rel.no_default`, and a revoked release answers `409` with
+    `rel.revoked`.
   tags:
     - Users
   parameters:

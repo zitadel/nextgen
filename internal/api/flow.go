@@ -394,8 +394,7 @@ func flowSetCookie(ctx context.Context, value string, clear bool) string {
 }
 
 // buildFlowResponse assembles the wire response for a flow step. Branding is
-// resolved per response (latest revision for the project, ADR 040) so a
-// published template change reaches in-flight flows on their next step.
+// the revision the request's release pins (ADR 040).
 func (h *Handler) buildFlowResponse(ctx context.Context, result domain.FlowStepResult, terminal bool) api.FlowResponse {
 	resp := api.FlowResponse{
 		ID:        result.State.ID,

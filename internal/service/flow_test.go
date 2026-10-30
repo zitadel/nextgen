@@ -118,16 +118,6 @@ func stubListFlowDefinitions(t *testing.T, defs []*domain.FlowDefinition) *servi
 			return &database.ListResult[*domain.FlowDefinition]{Items: out}, nil
 		},
 	).AnyTimes()
-	stmts.EXPECT().GetFlowDefinitionByID(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
-		func(_ context.Context, projectID, id string) (*domain.FlowDefinition, error) {
-			for _, def := range defs {
-				if def.ProjectID == projectID && def.ID == id {
-					return def, nil
-				}
-			}
-			return nil, new(database.NoRowFoundError)
-		},
-	).AnyTimes()
 	pool.EXPECT().Statements().Return(stmts).AnyTimes()
 	return service.NewPool(pool)
 }
@@ -165,36 +155,12 @@ func filterMatches(def *domain.FlowDefinition, filter database.Filter[domain.Flo
 			return def.ProjectID == term.Value.(string)
 		case domain.FlowDefinitionFieldID:
 			return def.ID == term.Value.(string)
-		case domain.FlowDefinitionFieldName:
-			return def.Name == term.Value.(string)
-		case domain.FlowDefinitionFieldSchemaVersion:
-			return def.SchemaVersion == term.Value.(string)
-		case domain.FlowDefinitionFieldStatus:
-			return def.Status.String() == term.Value.(string)
 		default:
 			return true
 		}
-	case *database.ArrayContainsFilter[domain.FlowDefinitionField]:
-		if f.Column.Field() != domain.FlowDefinitionFieldPurposes {
-			return true
-		}
-		s, ok := f.Value.(string)
-		if !ok {
-			return false
-		}
-		purpose, err := domain.FlowDefinitionPurposeString(s)
-		if err != nil {
-			return false
-		}
-		return hasPurpose(def, purpose)
 	default:
 		return true
 	}
-}
-
-func hasPurpose(def *domain.FlowDefinition, purpose domain.FlowDefinitionPurpose) bool {
-	_, ok := def.Purposes[purpose]
-	return ok
 }
 
 func newDef(name, version string, audience domain.FlowDefinitionAudience, purposes ...domain.FlowDefinitionPurpose) *domain.FlowDefinition {
@@ -268,26 +234,6 @@ func TestResolve_ResolveByName_ExactVersion(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Same(t, want, got)
-}
-
-func TestResolve_ResolveByName_LoadsThePinnedRevision(t *testing.T) {
-	def := newDef("login", "1.2.3", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
-
-	ctrl := gomock.NewController(t)
-	pool := servicemocks.NewMockPool(ctrl)
-	stmts := servicemocks.NewMockAllStatements(ctrl)
-	stmts.EXPECT().GetFlowDefinitionByID(gomock.Any(), "proj", def.ID).Return(def, nil)
-	pool.EXPECT().Statements().Return(stmts).AnyTimes()
-	repo := service.NewPool(pool)
-
-	got, err := service.NewFlowService(repo, nil, domain.BuiltinSchemaBases{}).Resolve(pinnedDefs(t, def), service.ResolveFlowRequest{
-		ProjectID:     "proj",
-		Purpose:       domain.FlowDefinitionPurposeLogin,
-		Name:          new("login"),
-		SchemaVersion: new("1.2.3"),
-	})
-	require.NoError(t, err)
-	assert.Same(t, def, got)
 }
 
 // A newer revision of the same name is not a candidate. The release names the one that serves.
@@ -584,7 +530,7 @@ func stubGetFlowDefinition(t *testing.T, defs ...*domain.FlowDefinition) *servic
 	stmts.EXPECT().GetFlowDefinitionByID(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
 		func(_ context.Context, projectID, id string) (*domain.FlowDefinition, error) {
 			for _, def := range defs {
-				if def != nil && def.ProjectID == projectID && def.ID == id {
+				if def.ProjectID == projectID && def.ID == id {
 					return def, nil
 				}
 			}

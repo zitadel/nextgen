@@ -42,15 +42,11 @@ one per guarded operation and named after it. A file is the publish body
   gets `list` and `get` only; the file is the writer.
 - What applies follows the release (ADR 035,
   [ADR 066](../../adrs/066-operation-policies.md#where-the-catalog-lives-and-how-an-operation-is-added)):
-  a sign-in or sign-up served a release that pins a flow gets the policy that
-  release pins, and none when it pins none, with no fallback to a stored
-  revision. Deleting the file and deploying switches the policy off there,
-  with the confirmation `deploy` asks for every removal, and a release that
-  was only built changes nothing. A request that resolves no release (a
-  password set through the API, or anything before the first deploy) still
-  gets the newest revision, as for every kind
-  ([#1616](https://github.com/zitadel/nextgen/issues/1616)), so
-  `"config": {}` is how to switch the rules off for those too.
+  a request gets the policy its release pins, and none when it pins none,
+  with no fallback to a stored revision. Deleting the file and deploying
+  switches the policy off, with the confirmation `deploy` asks for every
+  removal, and a release that was only built changes nothing. A password set
+  through the API follows the `default` target's release.
 
 A file is validated locally against the operation-typed schema before
 anything is sent: an unknown setting, a value outside the template's bounds or

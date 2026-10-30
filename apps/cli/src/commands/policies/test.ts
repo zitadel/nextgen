@@ -82,12 +82,6 @@ export default class PoliciesTest extends EnvironmentCommand {
       if (fromRelease.revoked) {
         reportWarning(`Release ${flags.release} is revoked, so no origin serves its policies.`);
       }
-      if (!fromRelease.pinsFlow) {
-        // TODO(#2331): drop once runtime reads follow every release's pins.
-        reportWarning(
-          `Release ${flags.release} pins no flow, so sign-ins served it use the newest policy revisions, not the ones tested here.`,
-        );
-      }
       policies = fromRelease.policies;
     }
 

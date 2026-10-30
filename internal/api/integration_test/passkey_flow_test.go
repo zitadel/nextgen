@@ -33,7 +33,6 @@ func TestPasskeyFlowLogin(t *testing.T) {
 	// --- Seed project ---------------------------------------------------------
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
-	deployDefaultTarget(t, project.ID)
 
 	// Create the user schema so the resolver can look it up from the DB.  The
 	// schema's $id becomes the URL that the flow definition references.

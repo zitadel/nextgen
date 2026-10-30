@@ -206,7 +206,6 @@ func TestPolicyService_ResolvePolicy(t *testing.T) {
 }
 
 func TestPolicyService_ResolvePolicyFollowsTheRelease(t *testing.T) {
-	flow := domain.ReleasePointer{Kind: domain.ReleasePointerKindFlowDefinition, Handle: "login", RevisionID: "flow_1"}
 	pinned := domain.ReleasePointer{Kind: domain.ReleasePointerKindPolicy, Handle: service.OperationPasswordSet, RevisionID: "polrev_1"}
 	served := func(t *testing.T, pointers ...domain.ReleasePointer) context.Context {
 		t.Helper()
@@ -218,7 +217,7 @@ func TestPolicyService_ResolvePolicyFollowsTheRelease(t *testing.T) {
 		f.statements.EXPECT().GetPolicyRevision(gomock.Any(), "proj_1", "polrev_1").
 			Return(&domain.Policy{Operation: service.OperationPasswordSet, Config: []byte(`{"min_length":10}`)}, nil)
 
-		inst, err := f.svc.ResolvePolicy(served(t, flow, pinned), "proj_1", service.OperationPasswordSet)
+		inst, err := f.svc.ResolvePolicy(served(t, pinned), "proj_1", service.OperationPasswordSet)
 		require.NoError(t, err)
 		require.NotNil(t, inst)
 		assert.Equal(t, json.Number("10"), inst.Config["min_length"])
@@ -227,7 +226,7 @@ func TestPolicyService_ResolvePolicyFollowsTheRelease(t *testing.T) {
 	t.Run("a release that pins a flow and no policy means no policy, not the newest", func(t *testing.T) {
 		f := newPolicyFixture(t)
 
-		inst, err := f.svc.ResolvePolicy(served(t, flow), "proj_1", service.OperationPasswordSet)
+		inst, err := f.svc.ResolvePolicy(served(t), "proj_1", service.OperationPasswordSet)
 		require.NoError(t, err)
 		assert.Nil(t, inst)
 	})
@@ -236,20 +235,10 @@ func TestPolicyService_ResolvePolicyFollowsTheRelease(t *testing.T) {
 		f := newPolicyFixture(t)
 		f.statements.EXPECT().GetPolicyRevision(gomock.Any(), "proj_1", "polrev_1").Return(nil, new(database.NoRowFoundError))
 
-		_, err := f.svc.ResolvePolicy(served(t, flow, pinned), "proj_1", service.OperationPasswordSet)
+		_, err := f.svc.ResolvePolicy(served(t, pinned), "proj_1", service.OperationPasswordSet)
 		assert.ErrorIs(t, err, domain.ErrInternal(nil))
 	})
 
-	t.Run("a release that pins no flow serves the policy revision it pins", func(t *testing.T) {
-		f := newPolicyFixture(t)
-		f.statements.EXPECT().GetPolicyRevision(gomock.Any(), "proj_1", "polrev_1").
-			Return(&domain.Policy{Operation: service.OperationPasswordSet, Config: []byte(`{"min_length":12}`)}, nil)
-
-		inst, err := f.svc.ResolvePolicy(served(t, pinned), "proj_1", service.OperationPasswordSet)
-		require.NoError(t, err)
-		require.NotNil(t, inst)
-		assert.Equal(t, json.Number("12"), inst.Config["min_length"])
-	})
 }
 
 func TestPolicyService_StoresCanonicalSettings(t *testing.T) {

@@ -16,6 +16,7 @@ import (
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
 )
 
 // idpFixture is a project and a client holding that project's secret.
@@ -31,6 +32,11 @@ func newIdpFixture(t *testing.T) idpFixture {
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
 	harness.SetProjectSecretOnApiClient(t, client, project)
+	// A deployment refuses a connection whose variables have no value.
+	require.NoError(t, harness.EnsureVariableService(t).SetVariables(t.Context(),
+		domain.VariableOwner{ProjectID: project.ID},
+		nil,
+		[]service.VariableToSet{{Name: "GOOGLE_CLIENT_SECRET", Value: "client-secret", IsSecret: true}}))
 	return idpFixture{project: project, client: client}
 }
 

@@ -66,7 +66,7 @@ func TestResolveUserSchema(t *testing.T) {
 		{name: "unknown id", ref: "sch_unknown", wantErr: domain.ErrJSONSchemaNotFound()},
 		{name: "schema declaring no objectType", ref: unparsed.URL, wantErr: domain.ErrJSONSchemaNotFound()},
 	}
-	// The release pins both schemas. A request with no release is not deployed.
+	// The release pins both schemas.
 	ctx := withPins(t,
 		domain.ReleasePointer{Kind: domain.ReleasePointerKindSchema, Handle: "human-user", RevisionID: human.URL},
 		domain.ReleasePointer{Kind: domain.ReleasePointerKindSchema, Handle: "machine-user", RevisionID: machine.URL},
@@ -104,12 +104,10 @@ func TestResolveUserSchemaUnderAnotherBuiltinBase(t *testing.T) {
 func TestResolveUserSchemaPinnedRevision(t *testing.T) {
 	v1 := &domain.JSONSchema{URL: "sch_v1", ObjectType: new("human-user")}
 	v2 := &domain.JSONSchema{URL: "sch_v2", ObjectType: new("human-user")}
-	// Listed newest-first, which is what the unpinned lookup returns.
 	schemas := fakeUserSchemas{v2, v1}
-	flow := domain.ReleasePointer{Kind: domain.ReleasePointerKindFlowDefinition, Handle: "login", RevisionID: "flow_1"}
 	schemaV1 := domain.ReleasePointer{Kind: domain.ReleasePointerKindSchema, Handle: "human-user", RevisionID: v1.URL}
 
-	pinned := withPins(t, flow, schemaV1)
+	pinned := withPins(t, schemaV1)
 	got, err := resolveUserSchema(pinned, schemas, domain.BuiltinSchemaBases{}, "proj", "human-user")
 	require.NoError(t, err)
 	assert.Same(t, v1, got)
@@ -122,11 +120,7 @@ func TestResolveUserSchemaPinnedRevision(t *testing.T) {
 	_, err = resolveUserSchema(t.Context(), schemas, domain.BuiltinSchemaBases{}, "proj", "human-user")
 	assert.ErrorIs(t, err, domain.ErrReleaseNotDeployed(nil))
 
-	got, err = resolveUserSchema(withPins(t, schemaV1), schemas, domain.BuiltinSchemaBases{}, "proj", "human-user")
-	require.NoError(t, err)
-	assert.Same(t, v1, got, "a release that pins no flow serves the schema it pins")
-
-	_, err = resolveUserSchema(withPins(t, flow), schemas, domain.BuiltinSchemaBases{}, "proj", "human-user")
+	_, err = resolveUserSchema(withPins(t), schemas, domain.BuiltinSchemaBases{}, "proj", "human-user")
 	assert.ErrorIs(t, err, domain.ErrInternal(nil))
 }
 

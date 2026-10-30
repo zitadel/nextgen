@@ -402,7 +402,7 @@ to verify is served the release it built. `data.deployment` carries the
 `release_id`, `content_hash`, `deployment_id` and `origins`, and is null on
 `--dry-run` or when the deploy failed. A failed deploy is a warning, never a
 failed setup, and `data.next_commands` then leads with the `deploy` that fixes
-it.
+it. Until that deploy succeeds, the project serves no sign-in.
 
 Setup refuses with `E_CONFLICT` when the repository already has uncommitted
 work, untracked files included, which `details.untracked` lists separately
@@ -416,11 +416,7 @@ yours and is not exempt. During a merge, rebase, cherry-pick, revert or bisect,
 or on a detached HEAD, setup refuses with `E_CONFLICT` before it writes
 anything, naming what stops the commit.
 
-Setup deploys nothing, and it does not need to: a project with no release
-resolves the newest revisions, which are the ones setup just uploaded, so
-sign-in already runs on `.zitadel/`. Deploying pins them into a release, which
-is what the server will require once that fallback goes (#1616). The publish
-step says so and names the command. `data.git` reports what setup did:
+`data.git` reports what setup did:
 `initialized` when it ran `git init`, even if the commit then failed, and the
 `commit`, or null. `--no-git` skips both the refusal
 and the commit, and nothing prompts, so this is the same interactively and in

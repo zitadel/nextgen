@@ -8336,7 +8336,7 @@ func (*BeginUserPasskeyRegistrationUnauthorized) beginUserPasskeyRegistrationRes
 // Branding configuration, used in two places with one shape: as the request
 // body of `POST /branding`, which publishes it as a new immutable revision,
 // and as a read-only projection on flow responses, which carries the
-// project's latest revision. Locally it is the `.zitadel/branding/` descriptor
+// revision the request's release pins. Locally it is the `.zitadel/branding/` descriptor
 // that `zitadel apply` publishes.
 // Every field is optional. An omitted key uses Zitadel's maintained default,
 // so a revision carrying one colour is as valid as one carrying the whole
@@ -26889,7 +26889,7 @@ type FlowDefinition struct {
 	Name   string               `json:"name"`
 	Status FlowDefinitionStatus `json:"status"`
 	// The user schema this flow operates on, named by its `objectType`. The
-	// flow runs against the project's newest revision of that schema, so
+	// flow runs against the revision of that schema its release pins, so
 	// publishing a schema revision needs no change to the flow. A schema id
 	// as returned by `POST /schemas` is also accepted and is stored as that
 	// schema's `objectType`; reading the definition back returns the

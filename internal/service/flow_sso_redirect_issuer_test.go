@@ -107,7 +107,6 @@ func ssoRuntime(t *testing.T, ctx context.Context) context.Context {
 	return service.WithRuntimeResolution(ctx, &service.RuntimeResolution{
 		Deployment: &domain.Deployment{ID: "dep_1"},
 		Release: &domain.Release{Pointers: []domain.ReleasePointer{
-			{Kind: domain.ReleasePointerKindFlowDefinition, Handle: "login", RevisionID: "flow_1"},
 			{Kind: domain.ReleasePointerKindIDP, Handle: "google", RevisionID: "idprev_1"},
 		}},
 	})
@@ -281,22 +280,6 @@ func TestFlowSSORedirectIssuer_Issue(t *testing.T) {
 	})
 }
 
-func TestFlowSSORedirectIssuer_PinnedConnection(t *testing.T) {
-	t.Parallel()
-	ctrl := gomock.NewController(t)
-	connections := servicemocks.NewMockIDPConnectionService(ctrl)
-	connections.EXPECT().GetRevision(gomock.Any(), "proj-1", "idprev_v1").
-		Return(&domain.IDPConnection{Slug: "google", RevisionID: "idprev_v1", Document: ssoConnectionDocument(false)}, nil)
-	attempts := &fakeAuthAttempts{issueSSOState: &domain.SSOState{State: "state-1", BindingNonce: "bind-1", OIDCNonce: "nonce-1"}}
-	issuer := service.NewFlowSSORedirectIssuer(connections, attempts, servicemocks.NewMockKeyService(ctrl), servicemocks.NewMockVariableService(ctrl), &http.Client{})
-
-	_, err := issuer.Issue(pinnedFlowContext(t, domain.ReleasePointer{
-		Kind: domain.ReleasePointerKindIDP, Handle: "google", RevisionID: "idprev_v1",
-	}), ssoIssueInput)
-	require.NoError(t, err)
-	assert.Equal(t, "idprev_v1", attempts.issueSSOStateIn.ConnectionRevisionID)
-}
-
 func TestFlowSSORedirectIssuer_UnpinnedSlugIsInternal(t *testing.T) {
 	t.Parallel()
 	ctrl := gomock.NewController(t)
@@ -309,23 +292,6 @@ func TestFlowSSORedirectIssuer_UnpinnedSlugIsInternal(t *testing.T) {
 	_, err := issuer.Issue(pinnedFlowContext(t), ssoIssueInput)
 	require.ErrorIs(t, err, domain.ErrInternal(nil))
 	assert.Empty(t, attempts.issueSSOStateIn.AttemptID)
-}
-
-func TestFlowSSORedirectIssuer_FrozenClientID(t *testing.T) {
-	t.Parallel()
-	set, err := domain.NewVariableSet("proj-1", []*domain.Variable{{
-		Name: "GOOGLE_CLIENT_ID", Value: "client-from-deployment",
-	}})
-	require.NoError(t, err)
-	variables := servicemocks.NewMockVariableService(gomock.NewController(t))
-	variables.EXPECT().GetDeploymentVariables(gomock.Any(), "proj-1", "dep_1").Return(set, nil)
-	attempts := &fakeAuthAttempts{issueSSOState: &domain.SSOState{State: "state-1", BindingNonce: "bind-1", OIDCNonce: "nonce-1"}}
-
-	out, err := ssoIssuer(t, ssoClientIDReferenceDocument, attempts, nil, variables, nil).Issue(ssoRuntime(t, t.Context()), ssoIssueInput)
-	require.NoError(t, err)
-	u, err := url.Parse(out.RedirectURL)
-	require.NoError(t, err)
-	assert.Equal(t, "client-from-deployment", u.Query().Get("client_id"))
 }
 
 func TestFlowSSORedirectIssuer_SealedDeploymentWithoutVariablesIsUnavailable(t *testing.T) {

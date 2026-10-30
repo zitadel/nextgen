@@ -14,7 +14,9 @@ import (
 
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
+	"github.com/zitadel/nextgen/internal/api/integration_test/test_data"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
 )
 
 // TestFlowOrigins covers which browser origins may open a flow of a project
@@ -77,6 +79,21 @@ func TestDefaultTarget(t *testing.T) {
 	assertFlowCode(t, fixture.project, "", domain.ErrReleaseNoDefault().Code)
 	assertFlowCode(t, fixture.project, helpers.ConsoleOrigin, domain.ErrReleaseNoDefault().Code)
 	assertFlowCode(t, fixture.project, appOrigin, domain.ErrReleaseNotDeployed(nil).Code)
+
+	user, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
+		ProjectID:  fixture.project,
+		SchemaURL:  test_data.UserSchemaURL,
+		Attributes: harness.EnsureTestData(t).Generator.GenerateUser(t, "no-default@example.com"),
+	})
+	require.NoError(t, err)
+	password, err := fixture.client.SetUserPassword(t.Context(), &api.SetUserPasswordRequest{Password: "a-long-enough-password"}, api.SetUserPasswordParams{UserID: api.UserID(user.ID)})
+	require.NoError(t, err)
+	require.IsType(t, &api.SetUserPasswordErrorResponseStatusCode{}, password, helpers.MustMarshal(t, password))
+	assert.Equal(t, http.StatusConflict, password.(*api.SetUserPasswordErrorResponseStatusCode).StatusCode)
+	attempt, err := fixture.client.CreateAuthAttempt(t.Context(), &api.CreateAuthAttemptRequest{ProjectID: api.ProjectID(fixture.project)})
+	require.NoError(t, err)
+	require.IsType(t, &api.CreateAuthAttemptErrorResponseStatusCode{}, attempt, helpers.MustMarshal(t, attempt))
+	assert.Equal(t, http.StatusConflict, attempt.(*api.CreateAuthAttemptErrorResponseStatusCode).StatusCode)
 
 	listResp, err := fixture.client.ListFlowDefinitions(t.Context(), api.ListFlowDefinitionsParams{
 		ProjectID: api.ProjectID(fixture.project),

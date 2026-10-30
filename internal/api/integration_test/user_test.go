@@ -360,7 +360,7 @@ func TestDeleteUser(t *testing.T) {
 			require.NoError(t, err)
 			userID := user.ID
 
-			err = userService.SetPassword(t.Context(), service.SetPasswordInput{
+			err = userService.SetPassword(releaseContext(t), service.SetPasswordInput{
 				ProjectID: project.ID,
 				UserID:    userID,
 				Password:  password,
@@ -420,6 +420,7 @@ func TestGetUserPasswordState(t *testing.T) {
 	}
 	assert.False(t, setAt(t).IsSet(), "a user without a password has no set_at")
 
+	deployDefaultTarget(t, project.ID)
 	resp, err := client.SetUserPassword(t.Context(), &api.SetUserPasswordRequest{Password: "fake-password"},
 		api.SetUserPasswordParams{UserID: params.UserID})
 	require.NoError(t, err)
@@ -1092,7 +1093,7 @@ func TestPatchMyUser(t *testing.T) {
 		require.NoError(t, err)
 
 		const password = "fake-password"
-		require.NoError(t, userService.SetPassword(t.Context(), service.SetPasswordInput{
+		require.NoError(t, userService.SetPassword(releaseContext(t), service.SetPasswordInput{
 			ProjectID: project.ID,
 			UserID:    user.ID,
 			Password:  password,
@@ -1277,7 +1278,7 @@ func TestGetMyUser(t *testing.T) {
 		userEmail := user.StringAttribute("email")
 
 		const password = "fake-password"
-		err = userService.SetPassword(t.Context(), service.SetPasswordInput{
+		err = userService.SetPassword(releaseContext(t), service.SetPasswordInput{
 			ProjectID: project.ID,
 			UserID:    userID,
 			Password:  password,
@@ -1364,7 +1365,7 @@ func TestMyUser_HoldsTheSessionToTheNamedProject(t *testing.T) {
 	})
 	require.NoError(t, err)
 	const password = "fake-password"
-	require.NoError(t, userService.SetPassword(t.Context(), service.SetPasswordInput{
+	require.NoError(t, userService.SetPassword(releaseContext(t), service.SetPasswordInput{
 		ProjectID: project.ID,
 		UserID:    user.ID,
 		Password:  password,

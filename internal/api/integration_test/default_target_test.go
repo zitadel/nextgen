@@ -4,7 +4,6 @@ package integration_test
 
 import (
 	"context"
-	"fmt"
 	"slices"
 	"testing"
 
@@ -21,9 +20,7 @@ import (
 func deployDefaultTarget(t *testing.T, projectID string) {
 	t.Helper()
 	ctx := service.WithAuthzListUnrestricted(t.Context())
-	content, err := defaultTargetContent(t, ctx, projectID)
-	require.NoError(t, err)
-	pointers, err := content.Pointers()
+	pointers, err := defaultTargetContent(t, ctx, projectID).Pointers()
 	require.NoError(t, err)
 	require.NotEmpty(t, pointers, "a default target needs at least one revision")
 
@@ -41,19 +38,22 @@ func deployDefaultTarget(t *testing.T, projectID string) {
 	require.NoError(t, err)
 }
 
-func defaultTargetContent(t *testing.T, ctx context.Context, projectID string) (domain.ReleaseContent, error) {
+// releaseContext serves an empty release to a test that calls a service
+// directly, so no policy applies.
+func releaseContext(t *testing.T) context.Context {
+	t.Helper()
+	return service.WithRuntimeResolution(t.Context(), &service.RuntimeResolution{Release: &domain.Release{}})
+}
+
+func defaultTargetContent(t *testing.T, ctx context.Context, projectID string) domain.ReleaseContent {
 	t.Helper()
 	schemas, err := harness.EnsureSchemaService(t).ListSchemas(ctx, service.ListSchemasInput{
 		ProjectID:                   projectID,
 		LatestRevisionPerObjectType: true,
 		Limit:                       100,
 	})
-	if err != nil {
-		return domain.ReleaseContent{}, err
-	}
-	if err := onePage(schemas.NextPageToken, "schemas"); err != nil {
-		return domain.ReleaseContent{}, err
-	}
+	require.NoError(t, err)
+	require.Empty(t, schemas.NextPageToken)
 	// A schema whose document was never parsed declares no objectType, so it
 	// is not a revision a release can pin.
 	schemas.Items = slices.DeleteFunc(schemas.Items, func(schema *domain.JSONSchema) bool {
@@ -64,36 +64,22 @@ func defaultTargetContent(t *testing.T, ctx context.Context, projectID string) (
 		LatestRevisionPerName: true,
 		Limit:                 100,
 	})
-	if err != nil {
-		return domain.ReleaseContent{}, err
-	}
-	if err := onePage(flows.NextPageToken, "flow definitions"); err != nil {
-		return domain.ReleaseContent{}, err
-	}
+	require.NoError(t, err)
+	require.Empty(t, flows.NextPageToken)
 	connections, err := harness.EnsureIDPConnectionService(t).List(ctx, service.ListIDPConnectionsInput{
 		ProjectID: projectID,
 		Limit:     100,
 	})
-	if err != nil {
-		return domain.ReleaseContent{}, err
-	}
-	if err := onePage(connections.NextPageToken, "identity providers"); err != nil {
-		return domain.ReleaseContent{}, err
-	}
+	require.NoError(t, err)
+	require.Empty(t, connections.NextPageToken)
 	brandings, err := harness.EnsureBrandingService(t).List(ctx, projectID)
-	if err != nil {
-		return domain.ReleaseContent{}, err
-	}
+	require.NoError(t, err)
 	policies, err := harness.EnsurePolicyService(t).List(ctx, service.ListPoliciesInput{
 		ProjectID: projectID,
 		Limit:     100,
 	})
-	if err != nil {
-		return domain.ReleaseContent{}, err
-	}
-	if err := onePage(policies.NextPageToken, "policies"); err != nil {
-		return domain.ReleaseContent{}, err
-	}
+	require.NoError(t, err)
+	require.Empty(t, policies.NextPageToken)
 	var branding *domain.Branding
 	if len(brandings) > 0 {
 		branding = brandings[0]
@@ -104,14 +90,7 @@ func defaultTargetContent(t *testing.T, ctx context.Context, projectID string) (
 		IDPConnections:  connections.Items,
 		Policies:        policies.Items,
 		Branding:        branding,
-	}, nil
-}
-
-func onePage(token, kind string) error {
-	if token != "" {
-		return fmt.Errorf("list %s: more than one page", kind)
 	}
-	return nil
 }
 
 func releasePointers(pointers []domain.ReleasePointer) []service.CreateReleasePointer {

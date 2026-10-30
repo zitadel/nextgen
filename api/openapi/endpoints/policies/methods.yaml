@@ -52,10 +52,9 @@ post:
   summary: Publish a policy
   description: |
     Publishes the project's policy for an operation as a new immutable
-    revision, creating the policy on its first publish. The newest revision
-    applies to the next time the operation runs; nothing already stored is
-    re-evaluated, so a stricter password policy applies the next time a
-    password is set.
+    revision, creating the policy on its first publish. A revision applies
+    once a deployed release pins it; nothing already stored is re-evaluated,
+    so a stricter password policy applies the next time a password is set.
 
     The request is typed by `operation`: an unknown operation or setting, or
     a value of the wrong type or outside its bounds, answers `req.invalid`

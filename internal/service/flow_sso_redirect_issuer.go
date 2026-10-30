@@ -33,7 +33,7 @@ func NewFlowSSORedirectIssuer(connections IDPConnectionService, attempts AuthAtt
 var _ domain.FlowSSORedirectIssuer = (*FlowSSORedirectIssuer)(nil)
 
 func (i *FlowSSORedirectIssuer) Issue(ctx context.Context, in domain.FlowIssueSSORedirectInput) (domain.FlowSSORedirectOutput, error) {
-	connection, err := i.connectionForSlug(ctx, in.ProjectID, in.ProviderSlug)
+	connection, err := pinnedIDPConnection(ctx, i.connections, in.ProjectID, in.ProviderSlug)
 	if err != nil {
 		return domain.FlowSSORedirectOutput{}, err
 	}
@@ -104,9 +104,8 @@ func resolveSSOClientID(ctx context.Context, variables VariableService, projectI
 	return nil
 }
 
-// ssoVariable is the variable name names for this sign-in. A sealed
-// deployment reads the set it froze. A sign-in with no deployment is not
-// deployed, and does not read the live primary row.
+// ssoVariable is the variable name names for this sign-in, from the set its
+// deployment froze.
 func ssoVariable(ctx context.Context, variables VariableService, projectID, deploymentID, name string) (*domain.Variable, error) {
 	if deploymentID == "" {
 		return nil, domain.ErrReleaseNotDeployed(nil)
@@ -154,18 +153,6 @@ func sealedDeploymentID(ctx context.Context) string {
 		return ""
 	}
 	return resolution.Deployment.ID
-}
-
-func (i *FlowSSORedirectIssuer) connectionForSlug(ctx context.Context, projectID, slug string) (*domain.IDPConnection, error) {
-	revisionID, err := pinnedIDPRevision(ctx, slug)
-	if err != nil {
-		return nil, err
-	}
-	connection, err := i.connections.GetRevision(ctx, projectID, revisionID)
-	if err != nil {
-		return nil, pinnedIDPReadError(slug, err)
-	}
-	return connection, nil
 }
 
 // unavailable turns an engine rejection of the connection into the step

@@ -44,7 +44,6 @@ func TestFlowSSOSubmitRedirectsToProvider(t *testing.T) {
 	require.NoError(t, err)
 	require.IsType(t, &api.VariablesByKind{}, varsResp, helpers.MustMarshal(t, varsResp))
 	// A deployment freezes the variables, so these need one of their own.
-	deployDefaultTarget(t, f.project.ID)
 
 	defResp, err := f.client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID:      f.projectID(),
