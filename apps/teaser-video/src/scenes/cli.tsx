@@ -134,8 +134,8 @@ export function Cli() {
           position: "absolute",
           inset: 0,
           background: [
-            "radial-gradient(34% 42% at 12% 86%, rgb(242 85 67 / 0.4), transparent 70%)",
-            "radial-gradient(36% 44% at 88% 14%, rgb(187 165 228 / 0.34), transparent 70%)",
+            "radial-gradient(58% 70% at 10% 90%, rgb(242 85 67 / 0.42), transparent 72%)",
+            "radial-gradient(60% 72% at 90% 10%, rgb(187 165 228 / 0.36), transparent 72%)",
           ].join(", "),
         }}
       />
@@ -146,9 +146,9 @@ export function Cli() {
           height: 900,
           borderRadius: 20,
           ...GLASS,
-          // Nearly opaque, so the glow stays behind the window and does not
-          // tint the text; the glass keeps its edge and its light.
-          background: "rgb(20 20 23 / 0.94)",
+          // Mostly opaque, so the glow stays behind the window and only
+          // faintly shows through; the glass keeps its edge and its light.
+          background: "rgb(20 20 23 / 0.84)",
           overflow: "hidden",
           display: "flex",
           flexDirection: "column",
