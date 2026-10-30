@@ -563,7 +563,7 @@ components:
   console:
     source: apps/console
     automatic:
-      - Vercel Web Analytics page views and Speed Insights, in the cloud build only (`CONSOLE_VERCEL_INSIGHTS=1`).
+      - Vercel Web Analytics page views and Speed Insights, in the cloud build only (its add-on, `apps/cloud-console`).
     events:
       copied_command:
         status: emitted

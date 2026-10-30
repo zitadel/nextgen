@@ -30,7 +30,7 @@ post:
   security:
     - oauth2:
         - policy.read
-    - nextgenSession: []
+    - sessionCookie: []
   requestBody:
     required: true
     content:

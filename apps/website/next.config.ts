@@ -1,3 +1,5 @@
+import { fileURLToPath } from "node:url";
+
 import type { NextConfig } from "next";
 
 // The share of page loads that send Speed Insights (app/layout.tsx), from 0
@@ -11,6 +13,14 @@ if (sampleRate && !(Number(sampleRate) >= 0 && Number(sampleRate) <= 1)) {
   );
 }
 
+const policy = (directives: string[]) => directives.join("; ");
+const enforcedPolicy = [
+  "object-src 'none'",
+  "base-uri 'self'",
+  "frame-ancestors 'none'",
+  "report-uri /csp-report",
+];
+
 // The cloud routes /, /_next/* and the favicons (/favicon.ico, /favicons/*)
 // to this app (repo-root vercel.json), so it needs no base path or asset
 // prefix: its other assets already load from /_next/.
@@ -22,6 +32,25 @@ const config: NextConfig = {
   // Keeps `next dev` from writing Next's agent rules into AGENTS.md when an
   // AI coding agent runs it (apps/AGENTS.md).
   agentRules: false,
+  // Adds each prerendered page's report-only policy, with its inline
+  // scripts' hashes, once the build has written the page.
+  adapterPath: fileURLToPath(new URL("./csp-adapter.mjs", import.meta.url)),
+  async headers() {
+    // Every response, the pages' and the other routes'. On the cloud's host
+    // the website shares an origin with the API and the console, so a script
+    // that runs here acts with a signed-in user's session.
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          // Enforced: nothing frames the website, embeds a plugin or moves its
+          // base URL. Each prerendered page also carries a report-only policy
+          // that allows its inline scripts by hash (csp-adapter.mjs).
+          { key: "Content-Security-Policy", value: policy(enforcedPolicy) },
+        ],
+      },
+    ];
+  },
 };
 
 export default config;
