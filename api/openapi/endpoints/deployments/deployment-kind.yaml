@@ -1,7 +1,9 @@
 title: DeploymentKind
 type: string
 description: |
-  `primary` for the project's primary origins, `preview` for preview URLs.
+  `preview` for preview URLs. `primary` for everything else: the project's
+  primary origins, its `default` target, or both. `default` has no kind of its
+  own, so read `targets` to see what a `primary` deployment covers.
 enum:
   - primary
   - preview

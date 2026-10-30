@@ -1,6 +1,6 @@
 title: DeploymentTarget
 type: object
-description: One origin a deployment made its release live on.
+description: One target a deployment made its release live on, a web origin or `default`.
 required:
   - origin
 properties:

@@ -21056,8 +21056,10 @@ type Deployment struct {
 	// when the request named the release by `content_hash`.
 	ReleaseID ReleaseID      `json:"release_id"`
 	Kind      DeploymentKind `json:"kind"`
-	// The resolved origins, sorted. For `primary`, the project's primary
-	// origins at creation. The live view lists only the targets still served.
+	// The resolved targets, sorted. For `primary`, the project's primary
+	// origins at creation, plus `default` when the deployment named it. The
+	// live view lists only the targets still served, so a deployment that
+	// covered both can read as `default` alone once its origins move on.
 	Targets []DeploymentTarget `json:"targets"`
 	Status  DeploymentStatus   `json:"status"`
 	// When the deployment was created.
@@ -21875,7 +21877,9 @@ func (s *DeploymentGuardConflictDetails) SetDeployment(val NilDeployment) {
 
 type DeploymentID string
 
-// `primary` for the project's primary origins, `preview` for preview URLs.
+// `preview` for preview URLs. `primary` for everything else: the project's
+// primary origins, its `default` target, or both. `default` has no kind of its
+// own, so read `targets` to see what a `primary` deployment covers.
 // Ref: #
 type DeploymentKind string
 
@@ -22130,7 +22134,7 @@ func (s *DeploymentStatus) UnmarshalText(data []byte) error {
 	}
 }
 
-// One origin a deployment made its release live on.
+// One target a deployment made its release live on, a web origin or `default`.
 // Ref: #
 type DeploymentTarget struct {
 	Origin DeploymentTargetOrigin `json:"origin"`
@@ -81042,7 +81046,7 @@ func (s *RevokeReleaseConflict) SetDetails(val RevokeReleaseConflictDetails) {
 func (*RevokeReleaseConflict) revokeReleaseRes() {}
 
 type RevokeReleaseConflictDetails struct {
-	// Every origin that still serves the release.
+	// Every target that still serves the release, a web origin or `default`.
 	Origins []RevokeReleaseConflictDetailsOriginsItem `json:"origins"`
 }
 
