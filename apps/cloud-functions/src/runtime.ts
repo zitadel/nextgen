@@ -20,11 +20,11 @@ const crmStarted = new Set<string>();
 export function workflowRuntime(request: Request): Runtime {
   return {
     systems: rpcSystems(liveDirectory(zitadelServer(request))),
-    async provisionOnce(person, teams) {
+    async provisionOnce(person, teams, attribution) {
       const crmKey = [person.user_id, ...teams.map((team) => team.id).sort()].join(" ");
       const crm = !crmStarted.has(crmKey);
       if (crm) {
-        await start(provisionCrm, [person, teams]);
+        await start(provisionCrm, [person, teams, attribution]);
         crmStarted.add(crmKey);
       }
       // Stripe is asked only once the CRM's run has started, so HubSpot never

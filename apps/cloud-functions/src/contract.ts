@@ -9,6 +9,42 @@
  * console's session cookie reaches it and no CORS is involved.
  */
 
+/**
+ * `POST /cloud/api/account/ensure`'s body: where the page that sent it says
+ * the person came from. Onboarding writes it on the person's contact the
+ * first time it makes or takes over that contact, and never again (root ADR
+ * 084 §3).
+ */
+export interface EnsureAccountRequest {
+  attribution?: SignupAttribution;
+}
+
+/**
+ * A sign-up's source, as the address of the page that sent it carries it:
+ * never stored on the device, so it holds only what the link said.
+ */
+export interface SignupAttribution {
+  /** `cli` when the account was made on the CLI's claim page, `console` otherwise. */
+  via: "cli" | "console";
+  /** The link's campaign parameters, each up to 100 characters and never an email. */
+  utm_source?: string;
+  utm_medium?: string;
+  utm_campaign?: string;
+}
+
+/**
+ * A campaign parameter as both sides keep it: trimmed, at most 100
+ * characters, with no control character and no `@`, since some mail tools put
+ * the reader's address into a link. Anything else is `undefined`, so a bad
+ * value is dropped rather than refused.
+ */
+export function campaignValue(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.length > 100 || trimmed.includes("@")) return undefined;
+  return /\p{Cc}/u.test(trimmed) ? undefined : trimmed;
+}
+
 /** `POST /cloud/api/account/ensure`: starts the person's provisioning, once. */
 export interface EnsureAccountResponse {
   /** `started` the first time, `known` once the workflow has run or is running. */

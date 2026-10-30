@@ -177,10 +177,36 @@ server's catch-all.
   idempotency key, and returns the calls it made, which the run shows.
   Sign-up never waits on Stripe or HubSpot.
 - **Today's trigger.** The add-on calls `POST /cloud/api/account/ensure` on
-  the first signed-in page. The function starts `provision-billing` unless
-  every team of the person's already has a Stripe customer, and
-  `provision-crm` once per instance, whose lookups find what exists: HubSpot
-  never waits on Stripe's answer.
+  the first signed-in page, and on the CLI's claim page, where the CLI's
+  sign-ups land signed in outside the signed-in shell. The function starts
+  `provision-billing` unless every team of the person's already has a Stripe
+  customer, and `provision-crm` once per instance, whose lookups find what
+  exists: HubSpot never waits on Stripe's answer.
+- **Where a sign-up came from** (decided 2026-10-30). The source travels in
+  the address only, never on the device, so it needs no consent banner and
+  holds only as far as links carry it.
+  - What counts as the source: a link's `utm_source`, `utm_medium` and
+    `utm_campaign`, and whether the account was made on the CLI's claim page
+    (`cli`) or the console's sign-up or login page (`console`).
+  - How it gets through sign-in: `/login` already keeps the page it returns
+    to, query and all, in `next`, and `/signup` copies its own campaign
+    parameters there too. The add-on reads the address it loads at, before
+    the console's redirects drop the query, and sends it with `ensure`.
+  - On the contact: `provision-crm` writes it in the contact's `signup_*`
+    properties when it makes or takes over the contact, and never again. The
+    first touch wins, and HubSpot's own "Original Traffic Source" stays its
+    tracking script's.
+  - In Vercel: the add-on reports `signup_completed` from the browser when the
+    sign-in widget finishes a flow whose last step created the user, with the
+    page, the parameters and the referring host
+    ([catalog](../product-analytics-events.yaml)).
+  - When the website's sign-up link comes (§8.2), it goes to
+    `/console/signup` and forwards its page's `utm_*`.
+  - What is lost: a journey across the website's pages, or through the
+    terminal (website, quickstart, CLI), loses the earlier parameters.
+  - With the target trigger, `user.created` starts provisioning and reports
+    `signup_completed` from the server, and `ensure` only delivers the
+    source.
 - **The target trigger.** A cron route reads the platform project's
   `GET /events` (`user.created`, `team.created`) for the last minutes, with
   the project secret §8.1 gives the cloud, as a customer would read theirs.
@@ -292,6 +318,12 @@ server's catch-all.
   urgent security issues and maintenance go out as HubSpot transactional
   email to a segment of the cloud's contacts, which no one can leave. A
   newsletter sign-up without an account is a HubSpot form on the website.
+- **Sign-up source.** The contact keeps how the person reached sign-up
+  (§3), for learning which channels bring customers, on legitimate interest.
+  zitadel.com's privacy policy says so: the link's campaign parameters and
+  CLI or console are stored on the contact, and an anonymous count, with the
+  referring host, goes to Vercel Web Analytics, with no cookie or device
+  storage.
 - **Erasure.** When an account is deleted (`user.deleted`, read as in §3),
   `erase-account` deletes the HubSpot contact through HubSpot's GDPR delete,
   and removes the person from the contact fields of their team's Stripe
@@ -356,6 +388,9 @@ server's catch-all.
      follows §8.2. The adapter needs, in HubSpot:
      - unique-value properties `zitadel_user_id` (contacts) and
        `zitadel_team_id` (deals);
+     - the sign-up's source on contacts, in a "Cloud sign-up" group:
+       `signup_via` (dropdown: `cli`, `console`) and `signup_utm_source`,
+       `signup_utm_medium` and `signup_utm_campaign` (single-line text);
      - the pipeline and first stage for a team's deal: "Cloud Pipeline", the
        legacy cloud's, or one of its own;
      - the ids of the Newsletter and Security subscription types;

@@ -38,6 +38,15 @@ describe("starting a person's onboarding", () => {
     expect(started()).toEqual([provisionCrm]);
   });
 
+  it("hands the CRM's run the sign-up's source, for the contact it makes", async () => {
+    const team: Team = { id: "team_sourced", name: "Sourced", personal: true };
+    await ensure()(MOCK_PERSON, [team], { via: "cli" });
+    expect(vi.mocked(start).mock.calls[0]).toEqual([
+      provisionCrm,
+      [MOCK_PERSON, [team], { via: "cli" }],
+    ]);
+  });
+
   it("starts billing's for a team without a customer, and each only once per instance", async () => {
     const team: Team = { id: "team_new", name: "New", personal: true };
     expect(await ensure()(MOCK_PERSON, [team])).toBe(true);
