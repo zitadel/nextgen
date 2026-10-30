@@ -138,15 +138,6 @@ func (d *Deployment) Origins() []string {
 	return origins
 }
 
-// DeploymentTargetName is how an origin reads outside storage: the origin
-// itself, or the keyword for the default target.
-func DeploymentTargetName(origin string) string {
-	if origin == DefaultTargetOrigin {
-		return DeploymentTargetDefault
-	}
-	return origin
-}
-
 // OriginDeployment is one deployment to one origin. Seq counts the
 // deployments to the origin; the newest has the highest.
 type OriginDeployment struct {
@@ -232,9 +223,6 @@ func NewDeployment(projectID, releaseID string, kind DeploymentOriginKind, origi
 		return nil, ErrDeploymentInvalid().WithMessage("at least one target is required")
 	}
 	for _, origin := range origins {
-		if origin == DefaultTargetOrigin {
-			continue
-		}
 		if strings.TrimSpace(origin) == "" {
 			return nil, ErrDeploymentInvalid().WithMessage("an origin is empty")
 		}
@@ -271,11 +259,10 @@ const (
 	// of the project.
 	DeploymentTargetPrimary = "primary"
 	// DeploymentTargetDefault is the targets keyword for the project default
-	// target, the one a caller with no origin is served.
+	// target, the one a caller with no origin is served. It is stored as the
+	// row's origin too, where no web origin can collide with it: an origin has
+	// a scheme.
 	DeploymentTargetDefault = "default"
-	// DefaultTargetOrigin is the origin row that keyword is stored as. It is
-	// empty so it cannot collide with a web origin.
-	DefaultTargetOrigin = ""
 )
 
 // ResolveDeploymentTargets resolves deploymentTargets against projectOrigins
@@ -322,7 +309,7 @@ func resolvePrimaryTarget(projectOrigins []Origin, deploymentTargets []string) (
 		}
 	}
 	if hasDefault {
-		origins = append(origins, DefaultTargetOrigin)
+		origins = append(origins, DeploymentTargetDefault)
 	}
 	// TODO(#1572): cap primary origins at MaxDeploymentTargets.
 	return DeploymentOriginKindPrimary, origins, nil

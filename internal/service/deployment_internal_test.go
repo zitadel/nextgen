@@ -18,8 +18,8 @@ func TestRollbackTargets(t *testing.T) {
 		want    []string
 	}{
 		{"web origins fold into primary", []string{webOrigin, "https://www.acme.com"}, []string{domain.DeploymentTargetPrimary}},
-		{"the default target alone", []string{domain.DefaultTargetOrigin}, []string{domain.DeploymentTargetDefault}},
-		{"both", []string{domain.DefaultTargetOrigin, webOrigin}, []string{domain.DeploymentTargetPrimary, domain.DeploymentTargetDefault}},
+		{"the default target alone", []string{domain.DeploymentTargetDefault}, []string{domain.DeploymentTargetDefault}},
+		{"both", []string{domain.DeploymentTargetDefault, webOrigin}, []string{domain.DeploymentTargetPrimary, domain.DeploymentTargetDefault}},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()

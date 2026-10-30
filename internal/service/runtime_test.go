@@ -39,7 +39,7 @@ func TestRuntimeResolver_Resolve(t *testing.T) {
 	t.Run("absent origin with no default deployment", func(t *testing.T) {
 		resolver, statements, _ := newMockedRuntimeResolver(t)
 		statements.EXPECT().GetProjectByID(gomock.Any(), projectID).Return(&domain.Project{ID: projectID}, nil)
-		statements.EXPECT().GetNewestPerOrigin(gomock.Any(), projectID, []string{domain.DefaultTargetOrigin}).
+		statements.EXPECT().GetNewestPerOrigin(gomock.Any(), projectID, []string{domain.DeploymentTargetDefault}).
 			Return([]domain.OriginDeployment{}, nil)
 		_, err := resolver.Resolve(t.Context(), projectID, "")
 		require.Error(t, err)
@@ -49,9 +49,9 @@ func TestRuntimeResolver_Resolve(t *testing.T) {
 	t.Run("absent origin is served by the default deployment", func(t *testing.T) {
 		resolver, statements, releases := newMockedRuntimeResolver(t)
 		statements.EXPECT().GetProjectByID(gomock.Any(), projectID).Return(&domain.Project{ID: projectID}, nil)
-		statements.EXPECT().GetNewestPerOrigin(gomock.Any(), projectID, []string{domain.DefaultTargetOrigin}).
+		statements.EXPECT().GetNewestPerOrigin(gomock.Any(), projectID, []string{domain.DeploymentTargetDefault}).
 			Return([]domain.OriginDeployment{{
-				Origin: domain.DefaultTargetOrigin, DeploymentID: "dep_default", ReleaseID: "rel_default", DeployedAt: time.Now(),
+				Origin: domain.DeploymentTargetDefault, DeploymentID: "dep_default", ReleaseID: "rel_default", DeployedAt: time.Now(),
 			}}, nil)
 		statements.EXPECT().GetDeploymentByID(gomock.Any(), projectID, "dep_default").Return(&domain.Deployment{
 			ID: "dep_default", ProjectID: projectID, ReleaseID: "rel_default",
@@ -163,9 +163,9 @@ func TestRuntimeResolver_Resolve(t *testing.T) {
 				{Pattern: origin, Kind: domain.OriginKindPrimary},
 			},
 		}, nil)
-		statements.EXPECT().GetNewestPerOrigin(gomock.Any(), projectID, []string{domain.DefaultTargetOrigin}).
+		statements.EXPECT().GetNewestPerOrigin(gomock.Any(), projectID, []string{domain.DeploymentTargetDefault}).
 			Return([]domain.OriginDeployment{{
-				Origin: domain.DefaultTargetOrigin, DeploymentID: "dep_default", ReleaseID: "rel_default", DeployedAt: time.Now(),
+				Origin: domain.DeploymentTargetDefault, DeploymentID: "dep_default", ReleaseID: "rel_default", DeployedAt: time.Now(),
 			}}, nil)
 		statements.EXPECT().GetDeploymentByID(gomock.Any(), projectID, "dep_default").Return(&domain.Deployment{
 			ID: "dep_default", ProjectID: projectID, ReleaseID: "rel_default",
@@ -197,9 +197,9 @@ func TestRuntimeResolver_Resolve(t *testing.T) {
 				{Pattern: origin, Kind: domain.OriginKindPrimary},
 			},
 		}, nil)
-		statements.EXPECT().GetNewestPerOrigin(gomock.Any(), projectID, []string{domain.DefaultTargetOrigin}).
+		statements.EXPECT().GetNewestPerOrigin(gomock.Any(), projectID, []string{domain.DeploymentTargetDefault}).
 			Return([]domain.OriginDeployment{{
-				Origin: domain.DefaultTargetOrigin, DeploymentID: "dep_default", ReleaseID: "rel_default", DeployedAt: time.Now(),
+				Origin: domain.DeploymentTargetDefault, DeploymentID: "dep_default", ReleaseID: "rel_default", DeployedAt: time.Now(),
 			}}, nil)
 		statements.EXPECT().GetDeploymentByID(gomock.Any(), projectID, "dep_default").Return(&domain.Deployment{
 			ID: "dep_default", ProjectID: projectID, ReleaseID: "rel_default",
@@ -222,7 +222,7 @@ func TestRuntimeResolver_Resolve(t *testing.T) {
 				{Pattern: origin, Kind: domain.OriginKindPrimary},
 			},
 		}, nil)
-		statements.EXPECT().GetNewestPerOrigin(gomock.Any(), projectID, []string{domain.DefaultTargetOrigin}).
+		statements.EXPECT().GetNewestPerOrigin(gomock.Any(), projectID, []string{domain.DeploymentTargetDefault}).
 			Return([]domain.OriginDeployment{}, nil)
 
 		_, err := resolver.Resolve(t.Context(), projectID, ownOrigin)

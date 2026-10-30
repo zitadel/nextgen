@@ -41,7 +41,7 @@ func releaseInUseResponse(err error) (*api.RevokeReleaseConflict, bool) {
 	origins := make([]api.RevokeReleaseConflictDetailsOriginsItem, len(details.Origins))
 	for i, origin := range details.Origins {
 		origins[i] = api.RevokeReleaseConflictDetailsOriginsItem{
-			Origin:       toAPIDeploymentTargetOrigin(origin.Origin),
+			Origin:       api.DeploymentTargetOrigin(origin.Origin),
 			DeploymentID: api.DeploymentID(origin.DeploymentID),
 		}
 	}

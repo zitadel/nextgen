@@ -232,28 +232,28 @@ func variableSet(t *testing.T, name, value string) *domain.VariableSet {
 	return set
 }
 
-// A default-only deploy locks the empty origin it writes. A later default-only
+// A default-only deploy locks the default target it writes. A later default-only
 // row is not the lock for a web origin, and this deploy never asks for one.
-func TestDeploymentServiceCreateDefaultOnlyLocksTheEmptyOrigin(t *testing.T) {
+func TestDeploymentServiceCreateDefaultOnlyLocksTheDefaultTarget(t *testing.T) {
 	svc, statements := newMockedDeploymentService(t)
 	statements.EXPECT().GetReleaseByID(gomock.Any(), "proj_1", "rel_1").Return(&domain.Release{ID: "rel_1"}, nil)
 	expectLiveVariables(statements, domain.DeploymentOriginKindPrimary)
 	current := &domain.Deployment{
 		ProjectID: "proj_1", ID: "dep_default", ReleaseID: "rel_1",
 		OriginKind: domain.DeploymentOriginKindPrimary,
-		Targets:    []domain.DeploymentTarget{{Origin: domain.DefaultTargetOrigin}},
+		Targets:    []domain.DeploymentTarget{{Origin: domain.DeploymentTargetDefault}},
 		DeployedAt: deployedAt.Add(-time.Hour),
 	}
-	statements.EXPECT().GetNewestPerOrigin(gomock.Any(), "proj_1", []string{domain.DefaultTargetOrigin}).
+	statements.EXPECT().GetNewestPerOrigin(gomock.Any(), "proj_1", []string{domain.DeploymentTargetDefault}).
 		Return([]domain.OriginDeployment{{
-			Origin: domain.DefaultTargetOrigin, DeploymentID: current.ID, ReleaseID: current.ReleaseID,
+			Origin: domain.DeploymentTargetDefault, DeploymentID: current.ID, ReleaseID: current.ReleaseID,
 			Kind: current.OriginKind, DeployedAt: current.DeployedAt, Seq: 3,
 		}}, nil)
 	statements.EXPECT().GetDeploymentByID(gomock.Any(), "proj_1", current.ID).Return(current, nil)
 	expectDeploymentSet(statements, current.ID, emptyVariableSet())
 
 	input := deploymentInput()
-	input.Origins = []string{domain.DefaultTargetOrigin}
+	input.Origins = []string{domain.DeploymentTargetDefault}
 	result, err := svc.Create(t.Context(), input)
 	require.NoError(t, err)
 	assert.False(t, result.Created)

@@ -21,7 +21,7 @@ func TestDeployedByNewerBuild(t *testing.T) {
 	preview := &domain.Deployment{OriginKind: domain.DeploymentOriginKindPreview}
 	defaultOnly := &domain.Deployment{
 		OriginKind: domain.DeploymentOriginKindPrimary,
-		Targets:    []domain.DeploymentTarget{{Origin: domain.DefaultTargetOrigin}},
+		Targets:    []domain.DeploymentTarget{{Origin: domain.DeploymentTargetDefault}},
 	}
 
 	for _, tt := range []struct {

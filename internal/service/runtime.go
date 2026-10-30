@@ -137,7 +137,7 @@ func (r *RuntimeResolver) resolve(ctx context.Context, projectID, origin string)
 }
 
 func (r *RuntimeResolver) resolutionForDefault(ctx context.Context, project *domain.Project, requestOrigin string) (*RuntimeResolution, error) {
-	dep, err := r.newestDeployment(ctx, project.ID, domain.DefaultTargetOrigin)
+	dep, err := r.newestDeployment(ctx, project.ID, domain.DeploymentTargetDefault)
 	if err != nil {
 		return nil, err
 	}

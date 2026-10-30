@@ -107,7 +107,7 @@ func buildRelease(ctx context.Context, releases service.ReleaseService, bundle s
 func deployedByNewerBuild(live []*domain.Deployment, builtAt time.Time) bool {
 	for _, deployment := range live {
 		if deployment.OriginKind != domain.DeploymentOriginKindPrimary ||
-			slices.Equal(deployment.Origins(), []string{domain.DefaultTargetOrigin}) {
+			slices.Equal(deployment.Origins(), []string{domain.DeploymentTargetDefault}) {
 			continue
 		}
 		if deployment.Metadata.Message == nil || builtAt.IsZero() {

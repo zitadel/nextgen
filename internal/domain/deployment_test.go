@@ -18,10 +18,10 @@ func TestNewDeploymentValidates(t *testing.T) {
 		assert.Equal(t, []string{"https://app.acme.com"}, entity.Origins())
 	})
 
-	t.Run("the default target is the empty origin", func(t *testing.T) {
-		entity, err := NewDeployment("proj_1", "rel_1", DeploymentOriginKindPrimary, []string{DefaultTargetOrigin, "https://app.acme.com"}, DeploymentMetadata{Reason: DeploymentReasonDeploy})
+	t.Run("the default target is a target like any origin", func(t *testing.T) {
+		entity, err := NewDeployment("proj_1", "rel_1", DeploymentOriginKindPrimary, []string{DeploymentTargetDefault, "https://app.acme.com"}, DeploymentMetadata{Reason: DeploymentReasonDeploy})
 		require.NoError(t, err)
-		assert.Equal(t, []string{DefaultTargetOrigin, "https://app.acme.com"}, entity.Origins())
+		assert.Equal(t, []string{DeploymentTargetDefault, "https://app.acme.com"}, entity.Origins())
 	})
 
 	t.Run("targets are sorted and deduplicated", func(t *testing.T) {
@@ -171,14 +171,14 @@ func TestResolveDeploymentTargets(t *testing.T) {
 		kind, origins, err := ResolveDeploymentTargets(nil, []string{DeploymentTargetDefault})
 		require.NoError(t, err)
 		assert.Equal(t, DeploymentOriginKindPrimary, kind)
-		assert.Equal(t, []string{DefaultTargetOrigin}, origins)
+		assert.Equal(t, []string{DeploymentTargetDefault}, origins)
 	})
 
 	t.Run("default with primary", func(t *testing.T) {
 		kind, origins, err := ResolveDeploymentTargets(projectOrigins, []string{DeploymentTargetPrimary, DeploymentTargetDefault})
 		require.NoError(t, err)
 		assert.Equal(t, DeploymentOriginKindPrimary, kind)
-		assert.Equal(t, []string{"https://www.acme.com", "https://app.acme.com", DefaultTargetOrigin}, origins)
+		assert.Equal(t, []string{"https://www.acme.com", "https://app.acme.com", DeploymentTargetDefault}, origins)
 	})
 
 	t.Run("default and a preview URL mixed", func(t *testing.T) {
@@ -251,11 +251,4 @@ func TestResolvePreviewTTL(t *testing.T) {
 	}
 	_, err = ResolvePreviewTTL(new(MaxPreviewTTL + time.Second))
 	assert.ErrorContains(t, err, "at most 365 days")
-}
-
-func TestDeploymentPayloadSnapshotNamesTheDefaultTarget(t *testing.T) {
-	t.Parallel()
-
-	deployment := &Deployment{Targets: []DeploymentTarget{{Origin: DefaultTargetOrigin}, {Origin: "https://app.acme.com"}}}
-	assert.Equal(t, []string{"default", "https://app.acme.com"}, DeploymentPayloadSnapshot(deployment).Targets)
 }

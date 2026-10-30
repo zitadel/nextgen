@@ -86,7 +86,7 @@ func TestDeploymentTargetRendersTheDefaultToken(t *testing.T) {
 		ID:         "dep_1",
 		ReleaseID:  "rel_1",
 		OriginKind: domain.DeploymentOriginKindPrimary,
-		Targets:    []domain.DeploymentTarget{{Origin: domain.DefaultTargetOrigin}},
+		Targets:    []domain.DeploymentTarget{{Origin: domain.DeploymentTargetDefault}},
 		DeployedAt: time.Date(2026, 10, 2, 14, 52, 0, 0, time.UTC),
 		Metadata:   domain.DeploymentMetadata{Reason: domain.DeploymentReasonDeploy},
 	}

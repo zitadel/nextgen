@@ -49,7 +49,7 @@ func TestEnsureDeployedSQLiteServesTheServersBundle(t *testing.T) {
 	served := func() []domain.OriginDeployment {
 		t.Helper()
 		read, err := pool.Statements().GetNewestPerOrigin(ctx, domain.PlatformProjectID,
-			[]string{consoleOrigin, domain.DefaultTargetOrigin})
+			[]string{consoleOrigin, domain.DeploymentTargetDefault})
 		require.NoError(t, err)
 		return read
 	}

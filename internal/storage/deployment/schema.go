@@ -38,14 +38,14 @@ func RowServes(tables Tables, placeholder string) string {
 func primaryRowServes(tables Tables) string {
 	// A deployment that names only the default target has no web origin, so it
 	// must not take the primary origins off the previous primary deployment.
-	// The default row itself is the newest row for the empty origin.
+	// The default row itself is the newest row for the default target.
 	newerPrimary := `EXISTS (SELECT 1 FROM ` + tables.Deployments + ` np` +
 		` WHERE np.project_id = t.project_id AND np.origin_kind = 'primary'` +
 		` AND EXISTS (SELECT 1 FROM ` + tables.Origins + ` covered` +
-		` WHERE covered.project_id = np.project_id AND covered.deployment_id = np.id AND covered.origin <> '')` +
+		` WHERE covered.project_id = np.project_id AND covered.deployment_id = np.id AND covered.origin <> '` + domain.DeploymentTargetDefault + `')` +
 		` AND (np.deployed_at > t.deployed_at OR (np.deployed_at = t.deployed_at AND np.id > t.deployment_id)))`
-	return `(t.origin_kind = 'primary' AND ((t.origin <> '' AND ` + isPrimaryOrigin(tables) + ` AND NOT ` + newerPrimary + `)` +
-		` OR (t.origin = '' AND NOT ` + NewerOriginRowExists(tables.Origins) + `)))`
+	return `(t.origin_kind = 'primary' AND ((t.origin <> '` + domain.DeploymentTargetDefault + `' AND ` + isPrimaryOrigin(tables) + ` AND NOT ` + newerPrimary + `)` +
+		` OR (t.origin = '` + domain.DeploymentTargetDefault + `' AND NOT ` + NewerOriginRowExists(tables.Origins) + `)))`
 }
 
 func previewRowServes(tables Tables, placeholder string) string {
