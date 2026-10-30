@@ -68,8 +68,8 @@ each response carries security headers:
   Violations go to the server's `/csp-report`.
 - The console's enforced policy covers inline script. The docs' and the
   website's enforced policies list each prerendered page's inline scripts by
-  hash. Unknown URLs get a scriptless fallback. Unknown docs slugs use a
-  complete prerendered 404 in the docs layout; its ordinary links still work.
+  hash. Every other URL gets the prerendered 404's policy, so the 404
+  hydrates; unknown docs slugs reach that 404, in the docs layout.
 - HSTS is Vercel's default: zitadel.com is on the preload list with its
   subdomains, so the cloud's host needs no `includeSubDomains` or `preload`
   of its own.

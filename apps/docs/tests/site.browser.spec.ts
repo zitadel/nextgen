@@ -50,17 +50,16 @@ test("a page blocks an inline script absent from its CSP hashes", async ({ page 
   await expect(page.locator("html")).not.toHaveAttribute("data-untrusted-script", "ran");
 });
 
-test("an unknown docs URL stays readable under its scriptless fallback", async ({ page }) => {
+test("an unknown docs URL hydrates under the 404's hash policy", async ({ page }) => {
+  const violations = await recordPolicyViolations(page);
   const response = await page.goto("/docs/no-such-page");
   expect(response?.status()).toBe(404);
-  expect(response?.headers()["content-security-policy"]).toContain("script-src 'none'");
   await expect(page.getByRole("heading", { level: 1, name: "Page not found" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Search the docs", exact: true })).toHaveCount(0);
-  await page.getByRole("link", { name: "Go to the docs home" }).click();
-  await expect(page).toHaveURL(/\/docs$/);
-  // The link performs a full navigation, so the destination's hashed policy
-  // replaces the fallback and the page hydrates again.
+  // The theme's inline script ran, and the search opens: the page hydrated.
   await expect(page.locator("html")).toHaveAttribute("data-theme", /light|dark/);
+  await page.getByRole("button", { name: "Search the docs", exact: true }).click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  expect(violations, "policy violations").toEqual([]);
 });
 
 test("a link to a file the docs serve opens it, without fetching it as a page", async ({

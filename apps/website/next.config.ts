@@ -15,9 +15,10 @@ if (sampleRate && !(Number(sampleRate) >= 0 && Number(sampleRate) <= 1)) {
 
 const policy = (directives: string[]) => directives.join("; ");
 const enforcedPolicy = [
-  // Prerendered pages replace this fallback with their script hashes. HTML
-  // rendered on demand stays scriptless. next dev has no prerender adapter
-  // and needs its development runtime.
+  // csp-adapter.mjs replaces this fallback with the prerendered 404's policy,
+  // and gives each prerendered page's URL its own, both with script hashes.
+  // Scriptless stays if the build prerendered no 404.
+  // next dev has no prerender adapter and needs its development runtime.
   ...(process.env.NODE_ENV === "development"
     ? []
     : [
@@ -57,8 +58,8 @@ const config: NextConfig = {
       {
         source: "/:path*",
         headers: [
-          // Fail closed for on-demand HTML; csp-adapter.mjs gives each
-          // prerendered page its own enforced policy with script hashes.
+          // The prerendered 404's hash policy once csp-adapter.mjs has run;
+          // a prerendered page's URL gets its own (enforcedPolicy).
           { key: "Content-Security-Policy", value: policy(enforcedPolicy) },
         ],
       },

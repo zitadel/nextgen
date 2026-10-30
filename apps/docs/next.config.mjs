@@ -22,9 +22,17 @@ if (sampleRate && !(Number(sampleRate) >= 0 && Number(sampleRate) <= 1)) {
 }
 
 const policy = (directives) => directives.join("; ");
+// Nothing frames the docs, embeds a plugin or moves their base URL.
+const basePolicy = [
+  "object-src 'none'",
+  "base-uri 'self'",
+  "frame-ancestors 'none'",
+  "report-uri /csp-report",
+];
 const enforcedPolicy = [
-  // Prerendered page URLs replace this fallback with their script hashes.
-  // Other responses, including unknown docs URLs, stay scriptless.
+  // csp-adapter.mjs replaces this fallback with the prerendered 404's policy,
+  // and gives each prerendered page's URL its own, both with script hashes.
+  // Scriptless stays if the build prerendered no 404.
   // next dev has no prerender adapter and needs its development runtime.
   ...(process.env.NODE_ENV === "development"
     ? []
@@ -37,10 +45,7 @@ const enforcedPolicy = [
         "frame-src 'none'",
         "form-action 'self'",
       ]),
-  "object-src 'none'",
-  "base-uri 'self'",
-  "frame-ancestors 'none'",
-  "report-uri /csp-report",
+  ...basePolicy,
 ];
 
 /** @type {import('next').NextConfig} */
@@ -68,10 +73,18 @@ const config = {
       {
         source: "/:path*",
         headers: [
-          // Fail closed for on-demand HTML; csp-adapter.mjs gives each
-          // prerendered page its own enforced policy with script hashes.
+          // The prerendered 404's hash policy once csp-adapter.mjs has run;
+          // a prerendered page's URL gets its own (enforcedPolicy).
           { key: "Content-Security-Policy", value: policy(enforcedPolicy) },
         ],
+      },
+      {
+        // The live examples' service worker. A worker's policy comes from
+        // its own script's response, and MSW's passes the pages' unmocked
+        // requests on with fetch(), which the fallback's connect-src would
+        // confine to this origin (Vercel's toolbar is on vercel.live).
+        source: "/docs/mock-service-worker.js",
+        headers: [{ key: "Content-Security-Policy", value: policy(basePolicy) }],
       },
     ];
   },

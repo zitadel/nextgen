@@ -59,6 +59,25 @@ const platform = platformPath
     ).then((module) => module.default ?? module)
   : undefined;
 
+/**
+ * Sets the policy of next.config's catch-all rule, in the platform's routing
+ * and in `next start`'s build manifest. A rule for a narrower path keeps its
+ * own policy.
+ */
+function replaceFallback(routing, manifest, policy) {
+  for (const rule of routing.beforeMiddleware) {
+    if (rule.source === "/:path*" && rule.headers?.["Content-Security-Policy"]) {
+      rule.headers["Content-Security-Policy"] = policy;
+    }
+  }
+  for (const rule of manifest.headers) {
+    if (rule.source !== "/:path*") continue;
+    for (const header of rule.headers) {
+      if (header.key === "Content-Security-Policy") header.value = policy;
+    }
+  }
+}
+
 /** @type {import("next").NextAdapter} */
 export default {
   name: platform ? `csp hashes + ${platform.name}` : "csp hashes",
@@ -90,8 +109,21 @@ export default {
       });
       pages++;
     }
+    // Every URL without a page of its own answers with the one prerendered
+    // 404, which Next writes as a static pages/404.html, its inline scripts
+    // fixed by the build: its policy replaces the scriptless fallback, so the
+    // 404 hydrates like any page.
+    const notFound = ctx.outputs.staticFiles.find(
+      ({ pathname, filePath }) => pathname === "/404" && filePath?.endsWith(".html"),
+    );
+    if (notFound) {
+      const policy = pagePolicy(inlineScriptHashes(await readFile(notFound.filePath, "utf8")));
+      replaceFallback(ctx.routing, manifest, policy);
+    }
     await writeFile(manifestPath, JSON.stringify(manifest));
-    console.log(`csp-adapter: allowed the inline scripts of ${pages} prerendered pages by hash`);
+    console.log(
+      `csp-adapter: allowed the inline scripts of ${pages} prerendered pages${notFound ? " and the 404" : ""} by hash`,
+    );
     await platform?.onBuildComplete?.(ctx);
   },
 };

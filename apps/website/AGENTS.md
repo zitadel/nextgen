@@ -19,8 +19,8 @@ Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
 
 ## Content-Security-Policy
 
-- `csp-adapter.mjs` enforces each prerendered page's script hashes;
-  `next.config.ts` supplies the scriptless fallback for other URLs.
+- `csp-adapter.mjs` enforces each prerendered page's script hashes, and the
+  404's for other URLs in place of `next.config.ts`' scriptless fallback.
 - Never give a page a nonce or `'unsafe-inline'`: pages, the changelog too,
   stay prerendered ([why](../../docs/design/cloud/csp-docs-and-website.md)).
 - `csp-adapter.mjs` copies `apps/docs/csp-adapter.mjs` but for the policy:

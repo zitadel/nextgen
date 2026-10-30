@@ -3,20 +3,15 @@
 import { buttonVariants } from "fumadocs-ui/components/ui/button";
 import { useSearchContext } from "fumadocs-ui/contexts/search";
 import Link from "next/link";
-import { useEffect, useState } from "react";
 
 /**
  * A docs path no page answers, inside the docs' own layout, so the sidebar
  * and the search stay at hand; app/not-found.tsx prerenders it in the same
- * chrome for an unknown slug or route. It has the anatomy every error page shares
- * (ADR 076): the status, a title, one sentence and the ways on.
+ * chrome for an unknown slug or route. It has the anatomy every error page
+ * shares (ADR 076): the status, a title, one sentence and the ways on.
  */
 export default function NotFound() {
   const search = useSearchContext();
-  // Unknown URLs use the scriptless fallback, so their 404 is unhydrated.
-  // Offer search only when it can actually open.
-  const [interactive, setInteractive] = useState(false);
-  useEffect(() => setInteractive(true), []);
   return (
     <div className="flex min-h-[70vh] flex-1 flex-col items-center justify-center px-6 py-16 text-center">
       {/* A client component exports no metadata; React hoists this into the head. */}
@@ -29,7 +24,7 @@ export default function NotFound() {
         There is nothing at this address. The link may be broken, or the page may have moved.
       </p>
       <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
-        {interactive && search.enabled && (
+        {search.enabled && (
           <button
             type="button"
             className={buttonVariants({ variant: "primary" })}

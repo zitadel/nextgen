@@ -1,6 +1,6 @@
 # Inline scripts under the docs' and the website's Content-Security-Policy
 
-> **Status:** decided, 2026-10-29: enforced hashes with a scriptless fallback.
+> **Status:** decided, 2026-10-29: enforced hashes, the 404's for unknown URLs.
 > Next.js 16.4.1 on Vercel (project `cloud`), after zitadel/nextgen#2480. Each app's
 > `csp-adapter.mjs` implements it.
 > **Question:** how can the docs (`apps/docs`) and the website
@@ -183,16 +183,24 @@ same-origin styles with style attributes, images, fonts and connections,
 and no framing. `next dev` retains only the base policy because it has no
 prerender hashes and needs its development runtime.
 
-`dynamicParams = false` sends an unknown docs slug to the prerendered root
-404, which wraps the same docs layout. This produces complete, readable HTML
-without hydration: Next's on-demand error response can require inline script
-just to reveal its content. The link back home works without JavaScript;
-the error page's search button appears only after hydration, when it can work. A full
-navigation back to a known page loads that page's hashed policy.
+Every unknown URL answers with the same prerendered 404 (`dynamicParams =
+false` sends an unknown docs slug there, inside the docs layout). Next writes
+it as a static `pages/404.html` whose inline scripts the build fixes, so the
+adapter hashes them like any page's and puts that policy in place of the
+fallback. The 404 hydrates: the layout's search, sidebar and theme work, Web
+Analytics counts it, and its scripts send no violation reports. A 404
+rendered on demand would carry scripts no policy lists, and Next's can need
+one just to reveal its content. If the build writes no static 404, the
+scriptless fallback stays and the 404 browser checks fail.
+
+The fallback also reaches responses that are not HTML. For a service worker
+it is the worker's own policy: the docs' live examples run MSW's worker, which
+`fetch()`es every request it does not mock, so its script gets only the base
+policy.
 
 The URL-based checks inspect the **enforced** policy, including every
 inline script's hash, and browser checks verify hydration, navigation,
-inline-script blocking and the docs 404. The same suites run against a
+inline-script blocking and both 404s. The same suites run against a
 Vercel deployment to catch routing/header precedence differences.
 
 Keep `https://vercel.live` for the toolbar. The adapter still wraps
@@ -216,8 +224,9 @@ next bug.
 2. Assert, on every deployment, that every inline script carries a hash in
    its page's policy: the docs' `tests/` for every docs page, the cloud's
    `e2e/console/src-deployment/routes.spec.ts` for the website's. Done.
-3. Enforce the hash policy and give on-demand HTML its scriptless fallback.
-   Validate both against the local build and the deployed artifact.
+3. Enforce the hash policy, and give every URL without a page of its own the
+   prerendered 404's, scriptless if the build wrote none. Validate both
+   against the local build and the deployed artifact.
 
 ## How it was measured
 

@@ -36,11 +36,13 @@ test("the website blocks an inline script absent from its CSP hashes", async ({ 
   await expect(page.locator("html")).not.toHaveAttribute("data-untrusted-script", "ran");
 });
 
-test("an unknown website URL stays readable under its scriptless fallback", async ({ page }) => {
+test("an unknown website URL hydrates under the 404's hash policy", async ({ page }) => {
+  const violations = await recordPolicyViolations(page);
   const response = await page.goto("/changelog/no-such-entry-security-policy");
   expect(response?.status()).toBe(404);
-  expect(response?.headers()["content-security-policy"]).toContain("script-src 'none'");
   await expect(page.getByRole("heading", { level: 1, name: "Not found" })).toBeVisible();
-  await page.getByRole("link", { name: "changelog", exact: true }).last().click();
-  await expect(page).toHaveURL(/\/changelog$/);
+  // The header's theme toggle works only once the page has hydrated.
+  await page.getByRole("button", { name: "Light", exact: true }).click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  expect(violations, "policy violations").toEqual([]);
 });

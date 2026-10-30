@@ -46,8 +46,8 @@ MCP, `llms.txt`, Open Graph images, `.md` pages) live under `/docs` here.
 
 ## Content-Security-Policy
 
-- `csp-adapter.mjs` enforces each prerendered page's script hashes;
-  `next.config.mjs` supplies the scriptless fallback for other URLs.
+- `csp-adapter.mjs` enforces each prerendered page's script hashes, and the
+  404's for other URLs in place of `next.config.mjs`' scriptless fallback.
 - Never give a page a nonce or `'unsafe-inline'`: pages stay prerendered
   ([why](../../docs/design/cloud/csp-docs-and-website.md)).
 - `csp-adapter.mjs` copies `apps/website/csp-adapter.mjs` but for the policy:
