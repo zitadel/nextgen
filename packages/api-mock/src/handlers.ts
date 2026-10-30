@@ -176,8 +176,20 @@ function returnTargetRefusal(
  *   `"http://localhost:4000"`). Pass the server's own origin so that
  *   `verifyHandoffToken` can enforce issuer consistency.
  */
-export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
+export function setupMockHandlers(
+  options: {
+    iss?: string;
+    /**
+     * Resolve typed emails against this account list, switching purpose as the
+     * default flow does. Unlisted emails are new; omit to keep happy-path and
+     * error fixtures for existing consumers. Addresses are case-insensitive.
+     */
+    accounts?: readonly string[];
+  } = {},
+): MockHandle {
   const iss = options.iss ?? "http://localhost:8080";
+  const accounts =
+    options.accounts && new Set(options.accounts.map((email) => email.toLowerCase()));
   let actor: FlowActor = startFlowActor();
   let captured: CapturedRequest[] = [];
   const authn = new AuthnStore();
@@ -337,8 +349,8 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
   /**
    * `step.purpose`, as the server reports it: the default flow fixes it on the
    * steps that sign in or sign up, and the others keep the purpose the flow
-   * started with. The mock never switches between them by itself, so no step
-   * carries a `notice`.
+   * currently serves. Automatic email switches attach their notice only to
+   * the submit response, as the engine does, not to later reads of that step.
    */
   function withPurpose(response: CreateFlow201): CreateFlow201 {
     const purpose =
@@ -454,8 +466,17 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
         iss,
       };
 
+      const outcome =
+        body.action === "submit" && email && accounts
+          ? before === "identifier" && !accounts.has(email.toLowerCase())
+            ? "user_not_found"
+            : before === "register" && accounts.has(email.toLowerCase())
+              ? "user_already_exists"
+              : undefined
+          : undefined;
+
       const registrationErrorKey =
-        before === "register" && body.action === "submit" && email
+        !accounts && before === "register" && body.action === "submit" && email
           ? authn.registrationError(email)
           : null;
       if (registrationErrorKey) {
@@ -541,8 +562,14 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
         action: body.action,
         fields: submitted,
         sso_provider_id: body.sso_provider_id ?? null,
+        outcome,
       });
-      return ok(await currentResponse());
+      const response = await currentResponse();
+      return ok(
+        outcome
+          ? { ...response, step: { ...response.step, notice: `notice.${outcome}` } }
+          : response,
+      );
     }),
     getGetFlowStepMockHandler(async ({ params }) => {
       captured.push({ kind: "getFlowStep", flowId: String(params.id) });

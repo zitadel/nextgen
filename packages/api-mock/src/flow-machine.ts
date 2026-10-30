@@ -98,6 +98,7 @@ export type FlowMachineEvent =
       action: string;
       fields: Record<string, string>;
       sso_provider_id?: string | null;
+      outcome?: "user_not_found" | "user_already_exists";
     }
   | {
       // The provider sending the browser back to the callback. It is not a
@@ -200,6 +201,11 @@ const setPurpose = assign<
   purpose: ({ event }) => event.purpose,
 });
 
+const changePurpose = (purpose: CreateFlowBodyPurpose) =>
+  assign<FlowMachineContext, FlowMachineEvent, undefined, FlowMachineEvent, never>({
+    purpose: () => purpose,
+  });
+
 export const flowMachine = createMachine({
   types: {} as {
     context: FlowMachineContext;
@@ -237,7 +243,12 @@ export const flowMachine = createMachine({
           {
             guard: ({ event }) => event.action === "register",
             target: "register",
-            actions: [captureFields, rotateToken],
+            actions: [captureFields, changePurpose("register"), rotateToken],
+          },
+          {
+            guard: ({ event }) => event.action === "submit" && event.outcome === "user_not_found",
+            target: "register",
+            actions: [captureFields, changePurpose("register"), rotateToken],
           },
           {
             guard: ({ event }) => event.action === "passkey",
@@ -265,7 +276,13 @@ export const flowMachine = createMachine({
           {
             guard: ({ event }) => event.action === "sign_in",
             target: "identifier",
-            actions: [captureFields, rotateToken],
+            actions: [captureFields, changePurpose("login"), rotateToken],
+          },
+          {
+            guard: ({ event }) =>
+              event.action === "submit" && event.outcome === "user_already_exists",
+            target: "password",
+            actions: [captureFields, changePurpose("login"), rotateToken],
           },
           {
             target: "register-password",

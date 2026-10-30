@@ -118,6 +118,59 @@ describe("setupMockHandlers", () => {
     expect(password.step.purpose).toBe("register");
   });
 
+  test.each([
+    {
+      purpose: "login",
+      email: "new@example.com",
+      name: "register",
+      nextPurpose: "register",
+      notice: "notice.user_not_found",
+    },
+    {
+      purpose: "register",
+      email: "known@example.com",
+      name: "password",
+      nextPurpose: "login",
+      notice: "notice.user_already_exists",
+    },
+  ] as const)(
+    "routes $purpose for $email and explains the automatic switch once",
+    async ({ purpose, email, name, nextPurpose, notice }) => {
+      mock = setupMockHandlers({ accounts: ["known@example.com"] });
+      server.resetHandlers(...mock.handlers);
+      const start = await createFlow({ purpose, project_id: PROJECT_ID });
+      const switched = await submitFlowStep(start.id, {
+        session_token: start.session_token,
+        action: "submit",
+        fields: { email },
+      });
+
+      expect(switched.step).toMatchObject({ name, purpose: nextPurpose, notice });
+      expect(switched.session_token).not.toBe(start.session_token);
+      expect(switched.step.error).toBeUndefined();
+      const resumed = await getFlowStep(start.id);
+      expect(resumed.step).toMatchObject({ name, purpose: nextPurpose });
+      expect(resumed.step.notice).toBeUndefined();
+    },
+  );
+
+  test.each([
+    { purpose: "login", email: "KNOWN@example.com", name: "password" },
+    { purpose: "register", email: "new@example.com", name: "register-password" },
+  ] as const)("keeps $purpose for $email without a notice", async ({ purpose, email, name }) => {
+    mock = setupMockHandlers({ accounts: ["known@example.com"] });
+    server.resetHandlers(...mock.handlers);
+    const start = await createFlow({ purpose, project_id: PROJECT_ID });
+    const next = await submitFlowStep(start.id, {
+      session_token: start.session_token,
+      action: "submit",
+      fields: { email },
+    });
+
+    expect(next.step).toMatchObject({ name, purpose });
+    expect(next.step.notice).toBeUndefined();
+  });
+
   test("captures every request body for assertions", async () => {
     const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
     await submitFlowStep(start.id, {
