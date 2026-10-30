@@ -16,8 +16,11 @@ export default defineConfig({
     // never ships events, independent of the moon/CI env.
     // CI markers are blanked for the code under test (the retry below reads the
     // real one at config time), so a suite behaves the same on a CI runner as
-    // on a laptop: `preview` and the skills hint branch on running in CI.
+    // on a laptop: `preview` and the skills hint branch on running in CI, and
+    // a deploy's default message on the build's own.
     env: {
+      GITHUB_EVENT_NAME: "",
+      VERCEL_GIT_COMMIT_MESSAGE: "",
       DO_NOT_TRACK: "1",
       CI: "",
       GITHUB_ACTIONS: "",
