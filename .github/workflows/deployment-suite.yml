@@ -1,0 +1,175 @@
+name: deployment-suite
+
+on:
+  workflow_call:
+    inputs:
+      suite:
+        required: true
+        type: string
+      url:
+        required: true
+        type: string
+      sha:
+        required: true
+        type: string
+      environment:
+        required: true
+        type: string
+      timeout:
+        type: number
+        default: 15
+    secrets:
+      VERCEL_AUTOMATION_BYPASS_SECRET:
+        required: true
+    outputs:
+      result:
+        description: "success after the suite passes, empty on failure or cancellation"
+        value: ${{ jobs.suite.outputs.result }}
+
+permissions:
+  contents: read
+
+jobs:
+  suite:
+    name: ${{ inputs.suite }} (${{ inputs.environment }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: ${{ inputs.timeout }}
+    outputs:
+      result: ${{ steps.passed.outputs.result }}
+    env:
+      SUITE: ${{ inputs.suite }}
+      CLOUD_URL: ${{ inputs.url }}
+      # Production can test a deployed commit from before the CLOUD_URL rename.
+      DOCS_BASE_URL: ${{ inputs.url }}
+      CONSOLE_DEPLOYMENT_URL: ${{ inputs.url }}
+      VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+      DO_NOT_TRACK: "1"
+      # Playwright sets FORCE_COLOR; avoid conflicting NO_COLOR warnings.
+      NO_COLOR: ""
+    steps:
+      - name: Name the deployment in the run's summary
+        env:
+          ENVIRONMENT: ${{ inputs.environment }}
+          COMMIT: ${{ startsWith(inputs.sha, 'refs/') && github.sha || inputs.sha }}
+        run: |
+          {
+            echo "- Deployment: $CLOUD_URL ($ENVIRONMENT, commit ${COMMIT:0:8})"
+            echo "- Suite: $SUITE"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.sha }}
+
+      # A production dispatch runs main's workflow against the deployed commit.
+      # Retain the old console location and the pre-schemas-service case.
+      - name: Find the suite in this commit
+        id: suite
+        run: |
+          package=@zitadel/e2e
+          results=
+          browser=false
+          case "$SUITE" in
+            docs)
+              task=e2e-deployment package=@zitadel/docs results=apps/docs/test-results browser=true
+              ;;
+            console)
+              browser=true
+              if [ -f e2e/console/playwright.deployment.config.mts ]; then
+                task=console-deployment results=e2e/console/test-results
+              elif [ -f apps/console-e2e/playwright.deployment.config.mts ]; then
+                task=e2e-deployment package=@zitadel/console-e2e results=apps/console-e2e/test-results
+              else
+                echo "::error::This commit has no console deployment suite."
+                exit 1
+              fi
+              ;;
+            schemas)
+              if [ ! -f e2e/schemas/playwright.deployment.config.mts ]; then
+                echo "- This commit predates the schemas service: nothing to check." >> "$GITHUB_STEP_SUMMARY"
+                exit 0
+              fi
+              task=schemas-deployment
+              ;;
+            cli)
+              task=cli-deployment results=e2e/cli/test-results browser=true
+              ;;
+            *) echo "::error::Unknown deployment suite: $SUITE"; exit 1 ;;
+          esac
+          {
+            echo "present=true"
+            echo "task=$task"
+            echo "package=$package"
+            echo "results=$results"
+            echo "browser=$browser"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Show how to reproduce the suite
+        if: steps.suite.outputs.present == 'true'
+        env:
+          SUITE_TASK: ${{ steps.suite.outputs.task }}
+          SUITE_PACKAGE: ${{ steps.suite.outputs.package }}
+        run: |
+          echo "- Reproduce: \`CLOUD_URL=$CLOUD_URL VERCEL_AUTOMATION_BYPASS_SECRET=… pnpm exec turbo run $SUITE_TASK --filter=$SUITE_PACKAGE\`" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Check the bypass secret is set
+        if: steps.suite.outputs.present == 'true'
+        run: |
+          [ -n "$VERCEL_AUTOMATION_BYPASS_SECRET" ] || {
+            echo "::error::Set the repository secret VERCEL_AUTOMATION_BYPASS_SECRET (docs/runbooks/cloud.md, Deployment checks)"
+            exit 1
+          }
+
+      - uses: pnpm/action-setup@v5
+        if: steps.suite.outputs.present == 'true'
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v6
+        if: steps.suite.outputs.present == 'true'
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        if: steps.suite.outputs.present == 'true'
+        run: corepack pnpm install --frozen-lockfile
+
+      - name: Put workspace binaries on PATH
+        if: steps.suite.outputs.present == 'true'
+        run: echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
+
+      - name: Cache Playwright browsers
+        if: steps.suite.outputs.browser == 'true'
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Install Playwright Chromium
+        if: steps.suite.outputs.browser == 'true'
+        env:
+          SUITE_PACKAGE: ${{ steps.suite.outputs.package }}
+        run: corepack pnpm --filter "$SUITE_PACKAGE" exec playwright install chromium
+
+      - name: Run the suite against the deployment
+        if: steps.suite.outputs.present == 'true'
+        env:
+          SUITE_TASK: ${{ steps.suite.outputs.task }}
+          SUITE_PACKAGE: ${{ steps.suite.outputs.package }}
+        run: turbo run "$SUITE_TASK" --filter="$SUITE_PACKAGE"
+
+      - name: Record the pass
+        id: passed
+        run: echo "result=success" >> "$GITHUB_OUTPUT"
+
+      # Only screenshots: traces and error-context.md can expose the bypass
+      # secret in public artifacts. An empty results path must never become /**.
+      - name: Upload the screenshots
+        if: ${{ failure() && steps.suite.outputs.results != '' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ inputs.suite }}-deployment-screenshots
+          path: ${{ steps.suite.outputs.results }}/**/*.png
+          if-no-files-found: ignore
+          retention-days: 7

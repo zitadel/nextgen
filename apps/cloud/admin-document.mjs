@@ -11,21 +11,21 @@
 //   DIR/admin.json       email, password, ids: the password manager's login item
 //   DIR/admin-user.json  the document: the password's PBKDF2 hash, never the password
 //
-// The document mirrors what `zitadel start` writes for its local admin
-// (apps/cli/src/lib/local-server/admin-credential.ts): same ids layout, same
-// attributes, same passlib-style `$pbkdf2-sha256$` hash, which the server's
-// passwap verifies. It names the platform project and the server's default
+// The document uses @zitadel/config/bootstrap-user, as `zitadel start` does,
+// including the passlib-style hash the server verifies. It names the platform
+// project and the server's default
 // user schema, published under schema.builtin_public_base; a document that
 // names a schema the server does not have is imported against an empty
 // placeholder and its admin could never sign in.
 //
-// Node only, no dependencies: the build and a developer's machine both have it.
-import { pbkdf2Sync, randomBytes } from "node:crypto";
+// Node only; install the workspace dependencies first. The shared builder
+// ships directly, so setup needs no package build.
+import { randomBytes } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
 
-const PBKDF2_ROUNDS = 210_000;
+import { bootstrapUserDocument } from "@zitadel/config/bootstrap-user";
 
 const { values } = parseArgs({
   options: {
@@ -55,23 +55,11 @@ const admin = {
   team_id: values["team-id"],
 };
 
-const document = {
-  header: {
-    project_id: values.project,
-    team_id: admin.team_id,
-    schema_url: values["schema-url"],
-    id: admin.user_id,
-  },
-  attributes: {
-    username: admin.email,
-    email: admin.email,
-    "zitadel.source": "cli",
-    "zitadel.default_user": true,
-  },
-  authenticators: {
-    password: { encoded_hash: pbkdf2Hash(admin.password), change_required: false },
-  },
-};
+const document = bootstrapUserDocument({
+  ...admin,
+  project_id: values.project,
+  schema_url: values["schema-url"],
+});
 
 mkdirSync(values.out, { recursive: true, mode: 0o700 });
 // "wx": never over an existing file, whose password a server may already hold.
@@ -86,17 +74,3 @@ writeFileSync(join(values.out, "admin-user.json"), `${JSON.stringify(document, n
 console.log(
   `admin ${admin.email} (${admin.user_id}): ${join(values.out, "admin.json")}, document ${join(values.out, "admin-user.json")}`,
 );
-
-/**
- * passlib's `$pbkdf2-sha256$rounds$salt$hash`. Salt and digest use passlib's
- * adapted base64: `+` becomes `.` and the padding is dropped.
- */
-function pbkdf2Hash(password) {
-  const salt = randomBytes(16);
-  const hash = pbkdf2Sync(password, salt, PBKDF2_ROUNDS, 32, "sha256");
-  return `$pbkdf2-sha256$${String(PBKDF2_ROUNDS)}$${ab64(salt)}$${ab64(hash)}`;
-}
-
-function ab64(bytes) {
-  return bytes.toString("base64").replace(/=+$/, "").replaceAll("+", ".");
-}

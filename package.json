@@ -12,7 +12,7 @@
     "docs": "moon run docs:dev",
     "check": "node scripts/check.mjs",
     "check:cloud": "turbo run e2e-deployment console-deployment schemas-deployment cli-deployment --continue",
-    "test": "node scripts/assert-file.mjs scripts/ci-mode.test.mjs scripts/dev-process.test.mjs scripts/release-github.test.mjs scripts/generate-meta-schemas.test.ts scripts/render-builtin-schemas.test.mjs && vitest run scripts/ci-mode.test.mjs scripts/dev-process.test.mjs scripts/release-github.test.mjs scripts/generate-meta-schemas.test.ts scripts/render-builtin-schemas.test.mjs",
+    "test": "node scripts/assert-file.mjs scripts/ci-mode.test.mjs scripts/cloud-setup.test.mjs scripts/deployment-suite.test.mjs scripts/dev-process.test.mjs scripts/release-github.test.mjs scripts/generate-meta-schemas.test.ts scripts/render-builtin-schemas.test.mjs && vitest run scripts/ci-mode.test.mjs scripts/cloud-setup.test.mjs scripts/deployment-suite.test.mjs scripts/dev-process.test.mjs scripts/release-github.test.mjs scripts/generate-meta-schemas.test.ts scripts/render-builtin-schemas.test.mjs",
     "test:all": "pnpm run test",
     "release:snapshot": "moon run release:snapshot",
     "release:publish": "moon run release:publish",

@@ -31,7 +31,7 @@ One Vercel deployment, six [services](https://vercel.com/docs/services):
 | `docs` | Next.js; `turbo run build --filter=@zitadel/docs`, after `@zitadel/components`, `@zitadel/api-mock` and the `@zitadel/api` client the mock calls, which the live examples render, and the docs' typecheck. The build's cache key holds the deployment's ID, which Skew Protection bakes into it, so it never comes from the cache; never moon, which cannot archive the symlinks Vercel's Next.js adapter writes | `/docs` and `/docs/*`: pages, assets (`/docs/_next/`), search, `llms.txt`, each page's `.md` and the MCP server |
 | `website` | Next.js; `turbo run build --filter=@zitadel/website`, after the atoms of `@zitadel/components` its showcase renders; keyed by the deployment's ID, as the docs' | `/`, the front page, `/changelog` (`/changelog/` redirects there) with its entries' pages and its feed under it, `/changelog/*`, and their assets at `/_next/*`; the host's `/llms.txt`; the host's favicons at `/favicon.ico` and `/favicons/*`, which the console, the login UI and the docs link |
 | `cloud-functions` | Next.js; `turbo run build --filter=@zitadel/cloud-functions`, route handlers and the Workflow SDK's routes, no pages ([`apps/cloud-functions`](../../apps/cloud-functions/AGENTS.md), [ADR 084](../adrs/084-hosted-cloud-business-systems.md)); keyed by the deployment's ID, as the website's. Its systems are mocks, and production answers `503 cloud.not_live` | `/cloud/*`: the console add-on's calls (`/cloud/api/*`), the sign-in widget's calls through BotID's check (`/cloud/zitadel/*`), Stripe's webhooks (`/cloud/hooks/stripe`) and its cron routes (`/cloud/cron/*`, none scheduled yet) |
-| `schemas` | Static files: `turbo run schemas --filter=@zitadel/cloud` renders them with [`scripts/render-builtin-schemas.mjs`](../../scripts/render-builtin-schemas.mjs) into `apps/cloud/dist/cloud-schemas`. The service is rooted at `apps/cloud`, whose `package.json` has no dependencies, so Vercel detects no framework: a service takes no `framework: null`, and a framework dependency there would change how it builds | `/schemas/v1/*`: the [built-in schemas](#built-in-schemas), as `application/schema+json`, fresh for an hour and readable from any origin |
+| `schemas` | Static files: `turbo run schemas --filter=@zitadel/cloud` renders them with [`scripts/render-builtin-schemas.mjs`](../../scripts/render-builtin-schemas.mjs) into `apps/cloud/dist/cloud-schemas`. The service is rooted at `apps/cloud`, whose `package.json` has no framework dependencies, so Vercel detects no framework: a service takes no `framework: null`, and a framework dependency there would change how it builds | `/schemas/v1/*`: the [built-in schemas](#built-in-schemas), as `application/schema+json`, fresh for an hour and readable from any origin |
 
 The console lives on the same origin, at `/console/` rather than a
 self-hosted server's `/ui/console/`. The server's own console is switched
@@ -201,6 +201,7 @@ preview never holds the key that unwraps production's data
 ([ADR 029](../adrs/029-cryptography-secrets-and-key-lifecycle.md)).
 
 ```sh
+corepack pnpm install --frozen-lockfile
 sh apps/cloud/setup-secrets.sh --email admin@zitadel.com production preview
 ```
 
@@ -341,7 +342,10 @@ or garbled fails the build and the serving deployment stays.
 Every deployment is tested once Vercel built it, on its own URL
 (`cloud-<hash>-zitadel.vercel.app`, never a production alias):
 [`deployment-checks.yml`](../../.github/workflows/deployment-checks.yml) runs each
-service's contract suite against the deployment, today the docs'
+service's contract suite through
+[`deployment-suite.yml`](../../.github/workflows/deployment-suite.yml), which
+owns dependency installation, suite selection and screenshot uploads. The suites
+run against the deployment, today the docs'
 ([`apps/docs/AGENTS.md`](../../apps/docs/AGENTS.md)), the console's
 ([`e2e/console/README.md`](../../e2e/console/README.md)) and the built-in
 schemas' ([`e2e/schemas/`](../../e2e/schemas/)), and on a preview the CLI's
@@ -365,10 +369,8 @@ that adds it ([`bypass-proxy.ts`](../../e2e/cli/support/bypass-proxy.ts)).
 What starts it, and where the result lands, depends on the environment:
 
 - **A preview:** the `deployment_status` event Vercel posts to GitHub. The
-  checks land on the pull request: `deployment-checks / docs (Preview)`,
-  `deployment-checks / console (Preview)`,
-  `deployment-checks / schemas (Preview)` and
-  `deployment-checks / cli (Preview)`.
+  checks land on the pull request under each suite's caller (`docs`, `console`,
+  `schemas`, `cli`), with a nested `<suite> (Preview)` job.
 - **Production:** [`production-checks.yml`](../../.github/workflows/production-checks.yml),
   on the `vercel.deployment.ready` dispatch Vercel sends once the deployment
   is built, before its Deployment Checks run. It calls the same jobs and sets
@@ -414,10 +416,10 @@ What starts it, and where the result lands, depends on the environment:
   A flaky production run is run
   again from that run's page: it reports on the same commit again.
 - `gh workflow run deployment-checks.yml --ref <branch> -f url=https://cloud-….vercel.app`
-  runs the workflow without a new deployment; it reports `docs (dispatch)`,
-  `console (dispatch)` and `schemas (dispatch)`, never production's statuses,
-  and with `-f cli=true` `cli (dispatch)`: only for a preview's URL. A change to
-  `deployment-checks.yml` needs no dispatch: a `deployment_status` run uses
+  runs the workflow without a new deployment; it reports `docs / docs (dispatch)`,
+  `console / console (dispatch)` and `schemas / schemas (dispatch)`, never
+  production's statuses, and with `-f cli=true` `cli / cli (dispatch)`: only for
+  a preview's URL. A change to `deployment-checks.yml` needs no dispatch: a `deployment_status` run uses
   the file as it is on the deployed commit, so the branch's own preview
   checks it.
 - **Holding production back on it:** in the project's Build & Deployment
@@ -451,8 +453,9 @@ console's, the schemas' and the CLI's; a red check's summary names the command
 that runs its suite alone. The CLI's suite skips the production domain; never
 point it at a production deployment's own URL, where it would leave a project
 in production's database. A new suite is a turbo task that
-`check:cloud` lists, a job in `deployment-checks.yml` and, unless it writes to
-the deployment as the CLI's does, a status in `production-checks.yml`'s
+`check:cloud` lists, a caller job in `deployment-checks.yml`, a selection arm in
+`deployment-suite.yml` and, unless it writes to the deployment as the CLI's
+does, a status in `production-checks.yml`'s
 `SUITES`.
 
 ## Running the cloud locally

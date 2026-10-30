@@ -57,7 +57,7 @@ launcher) and `migrate`. None of the three is cached: the launcher runs with
 the deployment's secrets, and any branch's build can write the team's cache.
 `migrate` sees the deployment's whole environment. The `schemas` service
 runs `schemas` and is rooted here, where `package.json` has no
-dependencies, so Vercel detects no framework (a service takes no
+framework dependencies, so Vercel detects no framework (a service takes no
 `framework: null`); a framework dependency in it would change how that
 service builds. Moon has no project for the package: the launcher's Go
 tests run in the server's `test`.

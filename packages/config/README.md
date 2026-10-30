@@ -28,3 +28,11 @@ how to edit it (`defaults/README-schemas.md`, `README-flows.md`,
 files). Those files are
 yours to edit; `zitadel plan` / `zitadel apply` reconcile them with the
 server, and edits publish new revisions rather than mutating state in place.
+
+## Node-only bootstrap documents
+
+`@zitadel/config/bootstrap-user` exports `bootstrapUserDocument`, shared by the
+CLI and hosted-cloud setup. Pass `email`, `password`, `user_id`, `team_id`,
+`project_id` and `schema_url`; the returned document contains a salted password
+hash and no plaintext password. This entry uses Node crypto and ships directly,
+so setup scripts need no build step. Keep it out of browser bundles.
