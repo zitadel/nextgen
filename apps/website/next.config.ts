@@ -15,6 +15,21 @@ if (sampleRate && !(Number(sampleRate) >= 0 && Number(sampleRate) <= 1)) {
 
 const policy = (directives: string[]) => directives.join("; ");
 const enforcedPolicy = [
+  // csp-adapter.mjs replaces this fallback with the prerendered 404's policy,
+  // and gives each prerendered page's URL its own, both with script hashes.
+  // Scriptless stays if the build prerendered no 404.
+  // next dev has no prerender adapter and needs its development runtime.
+  ...(process.env.NODE_ENV === "development"
+    ? []
+    : [
+        "default-src 'self'",
+        "script-src 'none'",
+        "style-src 'self' 'unsafe-inline'",
+        "img-src 'self' data:",
+        "connect-src 'self'",
+        "frame-src 'none'",
+        "form-action 'self'",
+      ]),
   "object-src 'none'",
   "base-uri 'self'",
   "frame-ancestors 'none'",
@@ -32,7 +47,7 @@ const config: NextConfig = {
   // Keeps `next dev` from writing Next's agent rules into AGENTS.md when an
   // AI coding agent runs it (apps/AGENTS.md).
   agentRules: false,
-  // Adds each prerendered page's report-only policy, with its inline
+  // Adds each prerendered page's enforced policy, with its inline
   // scripts' hashes, once the build has written the page.
   adapterPath: fileURLToPath(new URL("./csp-adapter.mjs", import.meta.url)),
   async headers() {
@@ -43,9 +58,8 @@ const config: NextConfig = {
       {
         source: "/:path*",
         headers: [
-          // Enforced: nothing frames the website, embeds a plugin or moves its
-          // base URL. Each prerendered page also carries a report-only policy
-          // that allows its inline scripts by hash (csp-adapter.mjs).
+          // The prerendered 404's hash policy once csp-adapter.mjs has run;
+          // a prerendered page's URL gets its own (enforcedPolicy).
           { key: "Content-Security-Policy", value: policy(enforcedPolicy) },
         ],
       },

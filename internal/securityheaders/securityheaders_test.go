@@ -32,6 +32,8 @@ func TestMiddlewareSetsTheHeadersBeforeTheHandler(t *testing.T) {
 	assert.Equal(t, "nosniff", rec.Header().Get("X-Content-Type-Options"))
 	assert.Equal(t, "strict-origin-when-cross-origin", rec.Header().Get("Referrer-Policy"))
 	assert.Equal(t, "DENY", rec.Header().Get("X-Frame-Options"))
+	assert.Equal(t, "camera=(), microphone=(), geolocation=()", seen.Get("Permissions-Policy"))
+	assert.Equal(t, seen.Get("Permissions-Policy"), rec.Header().Get("Permissions-Policy"))
 	assert.Equal(t, "default-src 'none'; frame-ancestors 'none'", seen.Get(securityheaders.PolicyHeader))
 	assert.Equal(t, "script-src 'self'", rec.Header().Get(securityheaders.PolicyHeader))
 }
