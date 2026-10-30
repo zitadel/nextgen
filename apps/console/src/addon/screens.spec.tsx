@@ -1,3 +1,4 @@
+import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import { Receipt } from "lucide-react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -5,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AddonScreenProps } from "@/addon/contract";
 import { scopedPath } from "@/test/project-scope.fixture";
 import { makeTestSession } from "@/test/session.fixture";
+import { createAppRouter } from "../router";
 
 // The `_authed` layout guards every screen behind `GET /sessions/me`
 // (Console ADR 0003); mock the auth module so routes render as signed in,
@@ -42,10 +44,6 @@ vi.mock("@/addon", () => ({
 }));
 
 async function renderAt(path: string) {
-  const [{ RouterProvider, createMemoryHistory }, { createAppRouter }] = await Promise.all([
-    import("@tanstack/react-router"),
-    import("../router"),
-  ]);
   const router = createAppRouter({
     history: createMemoryHistory({ initialEntries: [scopedPath(path)] }),
   });
