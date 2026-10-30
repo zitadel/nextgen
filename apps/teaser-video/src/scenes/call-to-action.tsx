@@ -18,8 +18,8 @@ import { Easing, interpolate } from "remotion";
 
 import { HEIGHT, WIDTH } from "../timeline";
 
-// The call to action, before the logo: "Try it out" and the command that
-// does, the one the video opened on (apps/website/app/commands.ts); above,
+// The call to action, before the logo: the promise and the command that
+// keeps it, the one the video opened on (apps/website/app/commands.ts); above,
 // the frameworks `setup` scaffolds (apps/cli/src/lib/orca/scaffolders), and
 // below, over the rising glow, the coding agents the README names. Each mark
 // comes into focus after the one before. The marks are Simple Icons'
@@ -100,7 +100,7 @@ export function CallToAction({ frame, leave }: { frame: number; leave: number })
       <div
         style={{
           position: "absolute",
-          top: 150,
+          top: 110,
           width: "100%",
           display: "flex",
           flexDirection: "column",
@@ -129,20 +129,20 @@ export function CallToAction({ frame, leave }: { frame: number; leave: number })
           flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          gap: 36,
+          gap: 64,
         }}
       >
         <span
           style={{
             fontFamily: FONT,
             fontWeight: 500,
-            fontSize: 72,
+            fontSize: 64,
             letterSpacing: "-0.01em",
             transform: `scale(${1.04 - words * 0.04})`,
             ...focused(words, leave),
           }}
         >
-          Try it out
+          Build your login in under a minute
         </span>
         <span
           style={{
@@ -163,7 +163,7 @@ export function CallToAction({ frame, leave }: { frame: number; leave: number })
       <div
         style={{
           position: "absolute",
-          bottom: 130,
+          bottom: 100,
           width: "100%",
           display: "flex",
           flexDirection: "column",
