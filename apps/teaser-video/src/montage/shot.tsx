@@ -98,7 +98,7 @@ export function Scene({
   brand: Brand;
   length: number;
   push?: number;
-  /** Over this many last frames, the scene blurs away into the dark. */
+  /** Over this many last frames, the scene blurs away into black. */
   blurOut?: number;
   children: ReactNode;
 }) {
@@ -122,11 +122,12 @@ export function Scene({
           height: HEIGHT,
           transform: `scale(${zoom})`,
           filter: gone ? `blur(${gone * 28}px)` : undefined,
-          opacity: 1 - gone,
         }}
       >
         {children}
       </div>
+      {/* Into black, whatever the scene's own ground, light or dark. */}
+      {gone > 0 && <AbsoluteFill style={{ background: "#000", opacity: gone }} />}
     </LoginSurface>
   );
 }
