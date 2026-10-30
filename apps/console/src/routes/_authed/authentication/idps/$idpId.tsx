@@ -11,7 +11,7 @@ import { SECTION_HEADING } from "@/components/typography";
 import { CopyButton } from "@/components/ui/copy-button";
 import { Separator } from "@/components/ui/separator";
 import { formatDate } from "@/lib/date";
-import { flowDisplayName } from "@/lib/flow-definition";
+import { fetchAllFlows, flowDisplayName } from "@/lib/flow-definition";
 import { flowsUsingIdp, type IdpReference, idpClientId, schemasUsingIdp } from "@/lib/idp";
 import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
 import { fetchAllSchemas } from "@/lib/schema";
@@ -26,7 +26,7 @@ export const Route = createFileRoute("/_authed/authentication/idps/$idpId")({
     const [idp, schemas, flows] = await Promise.all([
       api.getIdpById(params.idpId, { project_id: projectId }),
       fetchAllSchemas(projectId),
-      api.listFlowDefinitions.all({ project_id: projectId, revisions: "latest", limit: 100 }),
+      fetchAllFlows(projectId),
     ]);
     return {
       idp,

@@ -75,7 +75,6 @@ function operationOf(path: string, method: string, item: PathItem, operation: Op
     auth: authentication(operation.security ?? []),
     parameters,
     body: body ? (body.required === true ? "required" : "optional") : null,
-    arguments: argumentsOf(path, parameters, body),
     paging: paging(
       parameters,
       body?.content?.["application/json"]?.schema,
@@ -161,8 +160,18 @@ function properties(schema: Schema | undefined): Map<string, Schema> {
 }
 
 /** The argument of the generated function that carries `page_token`. */
-function pagingArgument(operation: ReturnType<typeof operationOf>): number {
-  return operation.arguments.findIndex((argument) => argument.in === operation.paging?.token);
+export function pagingArgument(
+  operation: Pick<ReturnType<typeof operationOf>, "id" | "path" | "parameters" | "body" | "paging">,
+): number {
+  const index = argumentsOf(
+    operation.path,
+    operation.parameters,
+    operation.body === null ? undefined : { required: operation.body === "required" },
+  ).findIndex((argument) => argument.in === operation.paging?.token);
+  if (index === -1) {
+    throw new Error(`${operation.id} has no argument to carry its page_token`);
+  }
+  return index;
 }
 
 function pagingSource(operations: readonly ReturnType<typeof operationOf>[]): string {
@@ -196,12 +205,6 @@ export type ApiParameter = Readonly<{
   required: boolean;
 }>;
 
-/** One argument of a client function: a path parameter, the body, or the query parameters. */
-export type ApiArgument = Readonly<
-  | { in: "path"; name: string; required: true }
-  | { in: "body" | "query"; required: boolean }
->;
-
 /** One operation of the Zitadel API, as the OpenAPI document declares it. */
 export type ApiOperation = Readonly<{
   /** The \`operationId\`, which names the client's function. */
@@ -220,12 +223,6 @@ export type ApiOperation = Readonly<{
   parameters: readonly ApiParameter[];
   /** Whether it takes a JSON body, and whether the body is required. */
   body: "required" | "optional" | null;
-  /**
-   * The client function's arguments, in orval's order: path parameters, the
-   * body and the query parameters as one object, optional ones last. The
-   * request options orval adds after them are not listed.
-   */
-  arguments: readonly ApiArgument[];
   /**
    * How it pages (ADR 027): whether its \`page_token\` goes in the query or the
    * body, and the response field that holds the page. \`null\` when it does not.

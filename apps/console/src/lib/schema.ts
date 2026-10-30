@@ -1,6 +1,7 @@
 import { ApiError } from "@zitadel/api/runtime/fetch";
 
 import { api } from "@/api/zitadel";
+import { readAllPages } from "./paging";
 import { field } from "./record";
 import { titleCase } from "./text";
 
@@ -30,13 +31,17 @@ function listUserSchemas(
   projectId: string,
   options: { revisions: "latest" | "all"; objectType?: string; inUse?: boolean },
 ) {
-  return api.listSchemas.all({
-    project_id: projectId,
-    kind: "user-schema",
-    revisions: options.revisions,
-    ...(options.objectType ? { object_type: options.objectType } : {}),
-    ...(options.inUse ? { expand: ["in_use" as const] } : {}),
-    limit: 100,
+  return readAllPages(async (pageToken) => {
+    const page = await api.listSchemas({
+      project_id: projectId,
+      kind: "user-schema",
+      revisions: options.revisions,
+      ...(options.objectType ? { object_type: options.objectType } : {}),
+      ...(options.inUse ? { expand: ["in_use" as const] } : {}),
+      limit: 100,
+      page_token: pageToken,
+    });
+    return { items: page.schemas, next: page.next_page_token };
   });
 }
 

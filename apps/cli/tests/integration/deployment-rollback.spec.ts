@@ -126,6 +126,50 @@ describe("deployment rollback", () => {
         );
       });
 
+      it("re-applies the deployment before the last when it sits beyond the first page", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        await app.addOrigin("https://*-acme.vercel.app", "preview");
+        const first = await app.deployData();
+        await app.editUserSchema((schema) => {
+          schema.properties.one = { type: "string" };
+        });
+        await app.deployData();
+        await app.previewData("https://x-acme.vercel.app");
+        platform.pagesDeploymentsOneAtATime();
+
+        const result = await app.run([
+          "deployment",
+          "rollback",
+          "--force",
+          "--non-interactive",
+          "--json",
+        ]);
+
+        expect(app.envelopeOf<{ release_id: string }>(result).data.release_id).toBe(
+          first.release_id,
+        );
+      });
+
+      it("stops reading the history once it has the deployment to re-apply", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        await app.deployData();
+        await app.editUserSchema((schema) => {
+          schema.properties.one = { type: "string" };
+        });
+        await app.deployData();
+        await app.editUserSchema((schema) => {
+          schema.properties.two = { type: "string" };
+        });
+        await app.deployData();
+        const reads = platform.pagesDeploymentsOneAtATime();
+
+        await app.run(["deployment", "rollback", "--force", "--non-interactive", "--json"]);
+
+        expect(reads.count).toBe(2);
+      });
+
       it("rolls back nothing on a dry run, needing no --force", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin();

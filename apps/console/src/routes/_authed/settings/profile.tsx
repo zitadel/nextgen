@@ -24,8 +24,8 @@ import { UserAvatar, avatarSeed } from "@/components/user-avatar";
 import { api } from "@/api/zitadel";
 import { consoleSessionProject, refreshSession } from "@/auth/session";
 import { useSubmit } from "@/hooks/use-submit";
-import { fetchAllIdps } from "@/lib/idp";
-import { fetchMyPasswordSetAt, passwordState } from "@/lib/sign-in-methods";
+import { fetchAllIdps, fetchMyIdentityLinks } from "@/lib/idp";
+import { fetchMyPasskeys, fetchMyPasswordSetAt, passwordState } from "@/lib/sign-in-methods";
 import { displayValue, field } from "@/lib/record";
 import { type SchemaField, attributeValue, inputAttributes, schemaFields } from "@/lib/schema";
 import { readOwnUserSchema } from "@/lib/user-schema";
@@ -58,12 +58,8 @@ export const Route = createFileRoute("/_authed/settings/profile")({
       readOwnUserSchema().catch(() => undefined),
       // `null`: no password; `undefined`: it could not be read.
       fetchMyPasswordSetAt().catch(() => undefined),
-      // Read with the session alone (`/users/me/*`): no grant needed, so they
-      // answer for a platform user who holds none.
-      api.listMyPasskeys.all({ limit: 100, ...consoleSessionProject() }).catch(() => undefined),
-      api.listMyIdentityLinks
-        .all({ limit: 100, ...consoleSessionProject() })
-        .catch(() => undefined),
+      fetchMyPasskeys().catch(() => undefined),
+      fetchMyIdentityLinks().catch(() => undefined),
     ]);
     // A link names its connection by id; the connections give it a name. They
     // need `idp.read` in the person's own project, which a platform user does

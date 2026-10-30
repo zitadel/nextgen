@@ -65,9 +65,9 @@ export default class DeploymentRollback extends Promptable(EnvironmentCommand) {
       for await (const deployment of client.listDeployments.items({ project_id: projectId })) {
         if (servesPrimary(deployment)) {
           history.push(deployment);
-        }
-        if (history.length === 2) {
-          break;
+          if (history.length === 2) {
+            break;
+          }
         }
       }
       const [latest, prior] = history;
