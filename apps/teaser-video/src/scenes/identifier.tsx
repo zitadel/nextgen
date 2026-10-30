@@ -22,6 +22,8 @@ type Geometry = {
   text: Point;
   font: string;
   fontSize: number;
+  /** The input's letter spacing, which the canvas measures with too. */
+  letterSpacing: string;
 };
 
 /**
@@ -53,16 +55,18 @@ function measure(stage: HTMLElement, field: ZlField): Geometry {
     },
     font: computed.font,
     fontSize: Number.parseFloat(computed.fontSize),
+    letterSpacing: computed.letterSpacing === "normal" ? "0px" : computed.letterSpacing,
   };
 }
 
 let context: CanvasRenderingContext2D | null = null;
-function textWidth(text: string, font: string): number {
+function textWidth(text: string, font: string, letterSpacing: string): number {
   context ??= document.createElement("canvas").getContext("2d");
   if (!context) {
     return 0;
   }
   context.font = font;
+  context.letterSpacing = letterSpacing;
   return context.measureText(text).width;
 }
 
@@ -79,9 +83,12 @@ export function IdentifierShot({
   field: { label, type, placeholder, subtitle },
   text,
   keys,
+  look,
 }: {
   /** The brand around the step; without one, the design system's own dark look. */
   brand?: Brand;
+  /** A rule restyling the field, `&` standing for it (montage/identifiers.ts). */
+  look?: string;
   field: IdentifierField;
   /** What is typed, one character on each of `keys`, in frames from the shot's start. */
   text: string;
@@ -125,8 +132,10 @@ export function IdentifierShot({
   const focus = geometry?.text ?? { x: WIDTH / 2, y: HEIGHT / 2 };
   return (
     <LoginSurface theme={brand?.theme} brand={brand && brandProperties(brand)}>
+      {look && <style>{look.replaceAll("&", ".identifier-shot zl-field")}</style>}
       <div
         ref={stage}
+        className="identifier-shot"
         style={{
           position: "absolute",
           width: WIDTH,
@@ -162,7 +171,7 @@ export function IdentifierShot({
           <div
             style={{
               position: "absolute",
-              left: geometry.text.x + textWidth(typed, geometry.font),
+              left: geometry.text.x + textWidth(typed, geometry.font, geometry.letterSpacing),
               top: geometry.text.y - geometry.fontSize * 0.62,
               width: 1.5,
               height: geometry.fontSize * 1.24,
