@@ -23,6 +23,8 @@ moon run teaser-video:render   # dist/teaser.mp4
   before a render. Its cut points are track beats in `src/soundtrack.tsx`.
 - Check a cut by ear in the `TeaserWithMetronome` composition, which plays the
   beat grid over the music.
+- `src/fonts/APK-Futural-Regular.woff2` is the website's licensed heading
+  face, licensed for the video too; never move it into a published package.
 - `src/logo.tsx` is a copy of the website's logo
   ([rule](../website/AGENTS.md#the-logo-and-the-favicons)).
 - `src/brands.ts` follows the website's

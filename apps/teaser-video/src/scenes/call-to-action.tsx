@@ -55,6 +55,8 @@ const ROW_GAP = 230;
 const ROW: CSSProperties = { display: "flex", alignItems: "center", height: 56 };
 
 const FONT = "Arimo, system-ui, sans-serif";
+/** Zitadel's heading face, as the website's headings use it (fonts.css). */
+const HEADING = '"APK Futural", Arimo, system-ui, sans-serif';
 const MONO = 'ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace';
 
 const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
@@ -125,9 +127,10 @@ export function CallToAction({ frame, leave }: { frame: number; leave: number })
         >
           <span
             style={{
-              fontWeight: 500,
-              fontSize: 76,
-              letterSpacing: "-0.015em",
+              fontFamily: HEADING,
+              fontWeight: 400,
+              fontSize: 80,
+              letterSpacing: "-0.01em",
               transform: `scale(${1.04 - words * 0.04})`,
               ...focused(words, leave),
             }}

@@ -1,0 +1,11 @@
+/* APK Futural, the face of Zitadel's own headings, a copy of
+   apps/website/app/fonts/APK-Futural-Regular.woff2. It is licensed to
+   Zitadel, for its sites and its video, and never ships: keep it out of
+   anything published (docs/adrs/025-default-brand-font-loading.md). Regular
+   is the only weight licensed. */
+@font-face {
+  font-family: "APK Futural";
+  src: url("./fonts/APK-Futural-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+}

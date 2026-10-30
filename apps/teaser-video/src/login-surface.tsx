@@ -1,6 +1,7 @@
 import "@fontsource/arimo/400.css";
 import "@fontsource/arimo/500.css";
 import "@fontsource/arimo/600.css";
+import "./fonts.css";
 import "./freeze-motion";
 import "@zitadel/components/atoms";
 import "./login-surface.css";
@@ -34,9 +35,10 @@ const ARIMO = "Arimo, system-ui, sans-serif";
 const FACES = { "--zl-font-family-sans": ARIMO, "--zl-font-family-heading": ARIMO };
 
 // Every frame waits for the faces, so no frame shows a fallback font.
-export const fontsLoaded = Promise.all(
-  ["400", "500", "600"].map((weight) => document.fonts.load(`${weight} 16px Arimo`)),
-);
+export const fontsLoaded = Promise.all([
+  ...["400", "500", "600"].map((weight) => document.fonts.load(`${weight} 16px Arimo`)),
+  document.fonts.load('400 16px "APK Futural"'),
+]);
 
 /** Holds the frame until the faces have loaded, and fails the render if they cannot. */
 export function useFonts() {
