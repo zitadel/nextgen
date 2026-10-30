@@ -9,8 +9,8 @@ import { BPM, FPS, MONTAGE_DROP, SECTIONS, beats } from "./timeline";
 // - the song's calm opening pad from the video's start, under the terminal,
 //   the cold open and the first identifiers;
 // - blending into the riser, which climbs into the drop as the montage speeds
-//   up, after which the song simply plays on to the end, under the blackout,
-//   the call to action and the logo, fading out with the scroll.
+//   up, after which the song simply plays on to the end, under the call to
+//   action and the logo, fading out with the scroll.
 
 /**
  * The track and its beat grid, measured from the audio: a beat every half

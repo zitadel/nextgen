@@ -178,7 +178,7 @@ const closeUp = (
 });
 
 const CLOSE_UPS: ShotSpec[] = [
-  closeUp({ theme: "dark", corners: "soft", headings: "sans" }, 5, () => (
+  closeUp({ theme: "dark", corners: "soft", headings: "sans" }, 3.8, () => (
     <Card
       title="Sign in"
       subtitle="Enter your email to continue"
@@ -194,7 +194,7 @@ const CLOSE_UPS: ShotSpec[] = [
       nav={SIGN_UP}
     />
   )),
-  closeUp({ theme: "dark", color: COLORS.blue, corners: "soft", headings: "sans" }, 6, () => (
+  closeUp({ theme: "dark", color: COLORS.blue, corners: "soft", headings: "sans" }, 4.4, () => (
     <Card
       title="Sign in"
       subtitle="Enter your password"
@@ -211,7 +211,7 @@ const CLOSE_UPS: ShotSpec[] = [
   )),
   closeUp(
     { theme: "light", color: COLORS.orange, corners: "round", headings: "sans" },
-    6,
+    4.4,
     (frame) => (
       <Card
         title="Sign in"
@@ -233,36 +233,41 @@ const CLOSE_UPS: ShotSpec[] = [
       />
     ),
   ),
-  closeUp({ theme: "dark", color: COLORS.green, corners: "soft", headings: "sans" }, 7, (frame) => (
-    <Card
-      title="Sign in"
-      subtitle="Enter your email to continue"
-      fields={
-        <>
-          <zl-field label="Email" type="email" value={ADA} autocomplete="off" />
-          {/* Shrunk to the box and its label, so the camera holds on them, not the row. */}
-          <div data-focus style={{ display: "inline-block", alignSelf: "flex-start" }}>
-            <zl-checkbox label="Remember me" checked={frame >= 6} />
-          </div>
-        </>
-      }
-      actions={primary("Continue")}
-      nav={SIGN_UP}
-    />
-  )),
-  closeUp({ theme: "light", color: COLORS.blue, corners: "soft", headings: "sans" }, 6, (frame) => (
-    <Card
-      title="Sign in"
-      subtitle="Enter your password"
-      account
-      fields={<zl-field label="Password" type="password" value={PASSWORD} autocomplete="off" />}
-      actions={<div data-focus>{primary("Sign in", frame >= 6)}</div>}
-      nav={SIGN_UP}
-    />
-  )),
+  closeUp(
+    { theme: "dark", color: COLORS.green, corners: "soft", headings: "sans" },
+    4.6,
+    (frame) => (
+      <Card
+        title="Sign in"
+        subtitle="Enter your email to continue"
+        fields={
+          <>
+            <zl-field label="Email" type="email" value={ADA} autocomplete="off" />
+            <zl-checkbox data-focus label="Remember me" checked={frame >= 6} />
+          </>
+        }
+        actions={primary("Continue")}
+        nav={SIGN_UP}
+      />
+    ),
+  ),
+  closeUp(
+    { theme: "light", color: COLORS.blue, corners: "soft", headings: "sans" },
+    4.4,
+    (frame) => (
+      <Card
+        title="Sign in"
+        subtitle="Enter your password"
+        account
+        fields={<zl-field label="Password" type="password" value={PASSWORD} autocomplete="off" />}
+        actions={<div data-focus>{primary("Sign in", frame >= 6)}</div>}
+        nav={SIGN_UP}
+      />
+    ),
+  ),
   closeUp(
     { theme: "light", color: COLORS.green, corners: "sharp", headings: "serif" },
-    5.5,
+    4.2,
     (frame) => (
       <Card
         title="Sign in faster next time"
@@ -276,7 +281,7 @@ const CLOSE_UPS: ShotSpec[] = [
         }
       />
     ),
-    { x: 0.5, y: 0.58 },
+    { x: 0.5, y: 0.66 },
   ),
 ];
 
@@ -293,7 +298,7 @@ const IN_APPS: ShotSpec[] = (
 ).map(([App, brand], index, apps) => ({
   beats: 1,
   scene: (length: number) => (
-    // The last blurs away into the blackout before the outro.
+    // The last blurs away into the dark the outro comes out of.
     <Scene brand={brand} length={length} blurOut={index === apps.length - 1 ? 20 : 0}>
       <App />
     </Scene>

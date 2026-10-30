@@ -19,15 +19,14 @@ type Section = { from: number; length: number };
 /**
  * The sections, in beats. The terminal sets the login up over the first four
  * bars; the cold open's Enter lands on the downbeat of bar 7, where the
- * montage starts; the montage runs six bars, the blackout the first two beats
- * of bar 13, and the outro starts on its third.
+ * montage starts; the montage runs six bars, its last shot blurring into the
+ * dark, and the outro starts on bar 13's downbeat, coming into focus out of it.
  */
 export const SECTIONS = {
   cli: { from: 0, length: 16 },
   coldOpen: { from: 16, length: 8 },
   montage: { from: 24, length: 24 },
-  blackout: { from: 48, length: 2 },
-  outro: { from: 50, length: 7.5 },
+  outro: { from: 48, length: 7.5 },
 } satisfies Record<string, Section>;
 
 /**

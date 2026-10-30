@@ -4,7 +4,7 @@ import { useFonts } from "../login-surface";
 import { Logo } from "../logo";
 import { HEIGHT, OUTRO, WIDTH, beats } from "../timeline";
 
-// The outro: out of the blackout, the curved glow of a horizon rises into the
+// The outro: out of the dark, the curved glow of a horizon rises into the
 // dark frame's bottom edge, as a planet's rim looks from orbit, and "Try it
 // out" comes into focus in the middle. On the last hit the logo replaces the
 // words and plays as it does in the website's nav; then the frame scrolls up,
@@ -68,7 +68,7 @@ const SOFTNESS = 70;
  * atmosphere over a lit surface. The lobes make its rim uneven, and a heavy
  * blur leaves no edge between the colors. The layer overhangs the frame, so
  * the blur's own soft border never shows. `arrive` runs from 0 to 1 as it
- * comes in out of the blackout.
+ * comes in out of the dark.
  */
 function Page({ seconds, arrive }: { seconds: number; arrive: number }) {
   const breathe = 0.02 * HEIGHT * Math.sin((2 * Math.PI * seconds) / 7);
@@ -118,7 +118,7 @@ export function Outro() {
   );
   // The logo blurs away, gone by the time the scroll is halfway.
   const logoOut = interpolate(scroll, [0, 0.5], [0, 1], clamp);
-  // Out of the blackout, the gradient rises and the words come into focus.
+  // Out of the dark, the gradient rises and the words come into focus.
   const arrive = interpolate(frame, [0, beats(OUTRO.logo)], [0, 1], {
     ...clamp,
     easing: Easing.out(Easing.cubic),

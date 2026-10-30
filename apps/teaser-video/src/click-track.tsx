@@ -69,7 +69,7 @@ function cues(metronome: boolean): Cue[] {
   if (!metronome) {
     return list;
   }
-  for (let beat = 0; beat < SECTIONS.blackout.from; beat++) {
+  for (let beat = 0; beat < SECTIONS.outro.from; beat++) {
     const downbeat = beat % BEATS_PER_BAR === 0;
     const gain = beat < SECTIONS.montage.from ? 0.12 : 0.35;
     list.push({ frame: beats(beat), sound: click(downbeat ? 1600 : 1000, gain) });
