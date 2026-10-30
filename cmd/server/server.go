@@ -278,23 +278,13 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	)
 
 	// Bootstrap runs here rather than straight after the migrations because it
-	// now seeds a usable project (keys, user schema, login flows) and so needs
-	// the project service, which needs the key service. It must still precede
-	// the user import: that import creates a bare, unseeded project row for any
-	// project id a bootstrap user names, and a project row that already exists
-	// would make this a no-op and leave the platform project unseeded.
+	// creates the project's keys and so needs the project service, which needs
+	// the key service. It must still precede the user import: that import
+	// creates a bare project row for any project id a bootstrap user names, and
+	// a project row that already exists would make this a no-op and leave the
+	// platform project without keys.
 	if err := platform.Ensure(ctx, projectService, serviceDBPool, cfg.Platform.BootstrapProject); err != nil {
 		return fmt.Errorf("failed to bootstrap platform project: %w", err)
-	}
-
-	if err := users.Import(ctx, serviceDBPool, passwordHasher, users.DialectFromConfig(cfg.Database.Raw), builtinBases, userFiles); err != nil {
-		return fmt.Errorf("failed to bootstrap users: %w", err)
-	}
-
-	// After the import, so a bootstrap admin named in platform.operators
-	// exists by the time it is granted (ADR 075 §4).
-	if err := platform.ReconcileOperators(ctx, serviceDBPool, cfg.Platform.ResolvedProjectID(), cfg.Platform.Operators); err != nil {
-		return fmt.Errorf("failed to reconcile platform operators: %w", err)
 	}
 
 	schemaService := service.NewSchemaService(serviceDBPool, schemaResolverWithHTTP, schemaValidator, builtinBases)
@@ -345,6 +335,28 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		policyService,
 		builtinBases,
 	)
+	// The console signs operators in to the platform project from the public
+	// base, the first console origin, so that project serves a deployed release
+	// there like any other project. Before the user import, which needs the
+	// platform user schema this release stores.
+	if cfg.Platform.BootstrapProject {
+		if err := platform.EnsureDeployed(ctx, cfg.Schema.BuiltinPublicBase, build.Date(), consoleHosts[0], projectService, releaseService, deploymentService); err != nil {
+			return fmt.Errorf("failed to deploy the platform project: %w", err)
+		}
+		for _, origin := range consoleHosts[1:] {
+			slog.Info("console origin can preview a project's login but not sign in to the platform project", slog.String("origin", origin))
+		}
+	}
+
+	if err := users.Import(ctx, serviceDBPool, passwordHasher, users.DialectFromConfig(cfg.Database.Raw), builtinBases, userFiles); err != nil {
+		return fmt.Errorf("failed to bootstrap users: %w", err)
+	}
+
+	// After the import, so a bootstrap admin named in platform.operators
+	// exists by the time it is granted (ADR 075 §4).
+	if err := platform.ReconcileOperators(ctx, serviceDBPool, cfg.Platform.ResolvedProjectID(), cfg.Platform.Operators); err != nil {
+		return fmt.Errorf("failed to reconcile platform operators: %w", err)
+	}
 	passwordPolicy, err := service.NewPasswordPolicy(policyEngine, policyService, passwordHasher, serviceDBPool)
 	if err != nil {
 		return err
