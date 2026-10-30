@@ -22,20 +22,17 @@ type Hooks = Readonly<{
  */
 export function paged(send: (...args: unknown[]) => unknown, shape: PagingShape, hooks: Hooks) {
   async function* walk<T>(args: unknown[], take: (page: unknown) => readonly T[]) {
-    const raw = pages(
-      async (token) => {
-        if (token === undefined) {
-          return send(...args);
-        }
-        // Built fresh rather than with `Array.prototype.with`, which throws when
-        // the caller left an optional argument at `shape.arg` off.
-        const pageArgs = Array.from({ length: Math.max(args.length, shape.arg + 1) }, (_, i) =>
-          i === shape.arg ? { ...(args[i] as object | undefined), page_token: token } : args[i],
-        );
-        return send(...pageArgs);
-      },
-      { start: (args[shape.arg] as { page_token?: string } | undefined)?.page_token },
-    );
+    const raw = pages(async (token) => {
+      if (token === undefined) {
+        return send(...args);
+      }
+      // Built fresh rather than with `Array.prototype.with`, which throws when
+      // the caller left an optional argument at `shape.arg` off.
+      const pageArgs = Array.from({ length: Math.max(args.length, shape.arg + 1) }, (_, i) =>
+        i === shape.arg ? { ...(args[i] as object | undefined), page_token: token } : args[i],
+      );
+      return send(...pageArgs);
+    });
     try {
       for await (const page of raw) {
         for (const value of take(await hooks.respond(page))) {

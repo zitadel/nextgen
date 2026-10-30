@@ -183,7 +183,8 @@ describe("createZitadelClient", () => {
   it("types every paged function's items", () => {
     // A list field the generated types lost or renamed fails here, naming the function.
     type Untyped = {
-      [K in keyof Paging]: [ItemOf<K>] extends [never] ? K : never;
+      // A missing field leaves the items `unknown`, a field that is not an array `never`.
+      [K in keyof Paging]: [ItemOf<K>] extends [never] ? K : unknown extends ItemOf<K> ? K : never;
     }[keyof Paging];
 
     expectTypeOf<Untyped>().toBeNever();

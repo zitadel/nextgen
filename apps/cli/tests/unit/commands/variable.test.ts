@@ -4,10 +4,7 @@ import { join } from "node:path";
 import { Readable } from "node:stream";
 
 import { HttpResponse, http } from "msw";
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { setupServer } from "msw/node";
-
-import { resetPlatformStore, setupPlatformHandlers } from "@zitadel/api-mock/platform";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@clack/prompts", async () => (await import("../../helpers/clack")).clackDouble());
 
@@ -16,17 +13,11 @@ import { cancel, confirm, isCancel, text } from "@clack/prompts";
 import VariableRm from "../../../src/commands/variable/rm";
 import VariableSet from "../../../src/commands/variable/set";
 import { DEFAULT_SERVER } from "../../../src/lib/server";
+import { usePlatformServer } from "../../helpers/platform-project";
 import { parseJson, runCliForTest } from "../../helpers/run-cli";
 import { asTerminal as asPerson } from "../../helpers/terminal";
 
-const server = setupServer(...setupPlatformHandlers());
-
-beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
-afterAll(() => server.close());
-afterEach(() => {
-  server.resetHandlers(...setupPlatformHandlers());
-  resetPlatformStore();
-});
+const { server } = usePlatformServer();
 
 async function makeProject(): Promise<string> {
   const cwd = await mkdtemp(join(tmpdir(), "zitadel-variables-"));

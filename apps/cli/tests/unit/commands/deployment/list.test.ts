@@ -1,25 +1,14 @@
-import { rm } from "node:fs/promises";
+import { describe, expect, it } from "vitest";
 
-import { resetPlatformStore, setupPlatformHandlers } from "@zitadel/api-mock/platform";
-import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-
-import { aProjectWithTwoDeploys, PLATFORM_URL } from "../../../helpers/platform-project";
+import {
+  aProjectWithTwoDeploys,
+  PLATFORM_URL,
+  usePlatformServer,
+} from "../../../helpers/platform-project";
 import { runCliForTest } from "../../../helpers/run-cli";
 
 const SERVER = PLATFORM_URL;
-const server = setupServer(...setupPlatformHandlers());
-const dirs: string[] = [];
-
-beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
-afterAll(() => server.close());
-afterEach(async () => {
-  server.resetHandlers();
-  resetPlatformStore();
-  for (const dir of dirs.splice(0)) {
-    await rm(dir, { recursive: true, force: true });
-  }
-});
+const { dirs } = usePlatformServer();
 
 /** A project on the mock with two deploys to one primary origin, and its directory. */
 async function twoDeploys(): Promise<string> {

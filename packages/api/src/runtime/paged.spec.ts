@@ -68,13 +68,13 @@ describe("paged", () => {
     ]);
   });
 
-  it("starts at the page_token among its arguments, and refuses a server that hands it back", async () => {
-    const call = vi.fn(async () => ({ rows: ["c"], next_page_token: "c3" }));
+  it("starts at the page_token among its arguments", async () => {
+    const call = vi.fn(async () => ({ rows: ["c"], next_page_token: "" }));
 
-    await expect(
-      paged(call, { items: "rows", arg: 1 }, asIs).all("user_1", { page_token: "c3" }),
-    ).rejects.toThrow("The server returned the same page cursor twice");
-    expect(call).toHaveBeenCalledTimes(1);
+    expect(
+      await paged(call, { items: "rows", arg: 1 }, asIs).all("user_1", { page_token: "c3" }),
+    ).toEqual(["c"]);
+    expect(call.mock.calls).toEqual([["user_1", { page_token: "c3" }]]);
   });
 
   it("hands every failure of the walk to its error hook once", async () => {

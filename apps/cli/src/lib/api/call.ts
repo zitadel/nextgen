@@ -97,23 +97,13 @@ export const sendAll = async (
   }
   let last: ApiResponse = { status: 200, body: undefined };
   const { items } = await collectPages(
-    pages(
-      async (cursor) => {
-        last = await send(server, token, pageOf(request, cursor));
-        return last.body;
-      },
-      {
-        // The page the caller asked for, so a server that hands it back is refused.
-        start:
-          paging.token === "query"
-            ? request.query.find(([name]) => name === "page_token")?.[1]
-            : (request.body as { page_token?: string } | undefined)?.page_token,
-      },
-    ),
+    pages(async (cursor) => {
+      last = await send(server, token, pageOf(request, cursor));
+      return last.body;
+    }),
     {
       items: (body) => itemsOf(body, paging.items),
       all: true,
-      onePage: "-F limit=<n> and -F page_token=<token>",
     },
   );
   return {

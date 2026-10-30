@@ -1,7 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import { RepeatedCursorError } from "@zitadel/api/runtime/paging";
-
 import { collectPages } from "../../../../../src/lib/oclif/crud";
 
 type Page = { users: number[]; next_page_token?: string; next_cursor?: string };
@@ -75,17 +73,19 @@ describe("collectPages", () => {
     });
   });
 
-  it("names the caller's way to read one page when the server repeats a cursor", async () => {
-    async function* looping() {
-      yield { users: [1], next_page_token: "p2" };
-      throw new RepeatedCursorError("p2");
-    }
+  it("fails a page it cannot read with a message even when the reader throws a non-Error", async () => {
+    const { walk } = source({ users: [1] });
     await expect(
-      collectPages(looping(), { items: (page) => page.users, all: true, onePage: "-F page_token" }),
+      collectPages(walk, {
+        items: () => {
+          throw "unreadable";
+        },
+        all: false,
+      }),
     ).rejects.toMatchObject({
       code: "E_VALIDATION",
-      hint: "Fetch one page at a time with -F page_token.",
-      details: { cursor: "p2", pages_fetched: 1 },
+      message: "Unexpected list response",
+      details: { response: { users: [1] } },
     });
   });
 });

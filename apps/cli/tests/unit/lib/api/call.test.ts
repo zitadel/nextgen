@@ -178,21 +178,4 @@ describe("sendAll", () => {
 
     expect(response.body).toMatchObject({ users: ["d", "e", "f", "g"] });
   });
-
-  it("refuses a server that hands back the page it started from", async () => {
-    const asked: Array<string | null> = [];
-    server.use(
-      http.get(`${SERVER}/users/user_1/passkeys`, ({ request }) => {
-        asked.push(new URL(request.url).searchParams.get("page_token"));
-        return HttpResponse.json({ passkeys: ["d"], next_page_token: "cursor-3" });
-      }),
-    );
-
-    await expect(
-      sendAll(SERVER, "s", requestFor("listUserPasskeys", ["page_token=cursor-3"], ["user_1"])),
-    ).rejects.toMatchObject({
-      hint: "Fetch one page at a time with -F limit=<n> and -F page_token=<token>.",
-    });
-    expect(asked).toEqual(["cursor-3"]);
-  });
 });

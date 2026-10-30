@@ -1,6 +1,10 @@
 /**
  * Cursor paging (ADR 027): a page carries `next_page_token` while more remain,
  * and the next request sends it back as `page_token`.
+ *
+ * The walk trusts that contract. A server that repeats a cursor, skips one or
+ * answers a page in a different shape is an upstream bug to fix in the server,
+ * not something the client detects or works around; do not add guards for it.
  */
 
 /** Fetches the page a cursor names; `undefined` asks for the first page. */
@@ -24,20 +28,6 @@ export function itemsOf(page: unknown, field: string): readonly unknown[] {
   return list;
 }
 
-/** A server answered a cursor it had already issued, so the walk would never end. */
-export class RepeatedCursorError extends Error {
-  readonly cursor: string;
-
-  constructor(cursor: string) {
-    super(
-      "The server returned the same page cursor twice, so the list would never end. " +
-        "Read it one page at a time instead.",
-    );
-    this.name = "RepeatedCursorError";
-    this.cursor = cursor;
-  }
-}
-
 /**
  * Every page, fetched only when the loop asks for the next one, so a caller
  * that stops early never reads the rest. The walk begins at the cursor `start`
@@ -48,8 +38,6 @@ export async function* pages<P>(
   fetchPage: FetchPage<P>,
   { start, next = nextToken }: { start?: string; next?: (page: P) => string | undefined } = {},
 ): AsyncGenerator<P, void, undefined> {
-  // A server that answers a cursor it already issued would be walked forever.
-  const seen = new Set(start === undefined ? [] : [start]);
   let token = start;
   for (;;) {
     const page = await fetchPage(token);
@@ -60,9 +48,5 @@ export async function* pages<P>(
     if (token === undefined) {
       return;
     }
-    if (seen.has(token)) {
-      throw new RepeatedCursorError(token);
-    }
-    seen.add(token);
   }
 }

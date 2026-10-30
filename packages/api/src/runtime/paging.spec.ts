@@ -44,20 +44,6 @@ describe("pages", () => {
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
-  it("refuses a cursor the server already issued", async () => {
-    const fetch = fetchPage({ "": { rows: ["a"], next: "t1" }, t1: { rows: ["b"], next: "t1" } });
-
-    await expect(async () => {
-      for await (const _ of pages(fetch));
-    }).rejects.toMatchObject({
-      name: "RepeatedCursorError",
-      cursor: "t1",
-      message:
-        "The server returned the same page cursor twice, so the list would never end. " +
-        "Read it one page at a time instead.",
-    });
-  });
-
   it("begins at the cursor it is given", async () => {
     const fetch = fetchPage({ t1: { rows: ["b"], next: "t2" }, t2: { rows: ["c"] } });
 
@@ -66,15 +52,6 @@ describe("pages", () => {
 
     expect(rows).toEqual(["b", "c"]);
     expect(fetch.mock.calls).toEqual([["t1"], ["t2"]]);
-  });
-
-  it("refuses the cursor it started from without fetching that page again", async () => {
-    const fetch = fetchPage({ t1: { rows: ["b"], next: "t1" } });
-
-    await expect(async () => {
-      for await (const _ of pages(fetch, { start: "t1" }));
-    }).rejects.toThrow("The server returned the same page cursor twice");
-    expect(fetch).toHaveBeenCalledTimes(1);
   });
 
   it("follows the cursor the reader it is given names", async () => {
