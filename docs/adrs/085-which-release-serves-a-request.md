@@ -9,8 +9,9 @@
 > console's exemption), [ADR 066](066-operation-policies.md) (pinned
 > policies) and [ADR 068](068-project-is-the-data-boundary.md) (a target
 > serves its newest deployment).
-> **Implemented by:** #2393 (default target), #2394 (pinned revisions only),
-> #2465 (the CLI deploys the default target), #2469 (the platform project).
+> **Implemented by:** #2393 (default target), #2535 (refusals), #2394 (pinned
+> revisions only), #2465 (the CLI deploys the default target), #2469 (the
+> platform project).
 
 ## Context
 
