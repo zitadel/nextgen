@@ -5,7 +5,8 @@ import { HEIGHT, WIDTH } from "../timeline";
 import { APPLE, GITHUB, GOOGLE, primary, providers } from "./atoms";
 
 // The login inside apps of every kind, each placed the way such an app would
-// place it: a wide desktop sign-in card, a split screen beside a travel
+// place it, some over a picture of their own, drawn here rather than
+// photographed: a wide desktop sign-in card, a split screen beside a travel
 // picture, a dialog over a dashboard whose session ran out, a landing page's
 // sign-up, a phone app, a photo wall. The apps, their names and their content
 // are invented; everything paints with the --zl-* properties of the app's
@@ -73,17 +74,123 @@ function Large({ scale, children }: { scale: number; children: ReactNode }) {
   return <div style={{ transform: `scale(${scale})` }}>{children}</div>;
 }
 
+/** Fills the frame behind a scene's content, slightly out of focus, like a photo behind a page. */
+function Backdrop({ children }: { children: ReactNode }) {
+  return (
+    <svg
+      viewBox="0 0 1920 1080"
+      preserveAspectRatio="xMidYMid slice"
+      role="presentation"
+      style={{
+        position: "absolute",
+        inset: -12,
+        width: WIDTH + 24,
+        height: HEIGHT + 24,
+        filter: "blur(3px)",
+      }}
+    >
+      {children}
+    </svg>
+  );
+}
+
+// A skyline's towers: left edge, width and height, in px of the frame.
+const TOWERS = [
+  [0, 150, 420],
+  [140, 110, 560],
+  [240, 170, 380],
+  [400, 120, 640],
+  [510, 160, 470],
+  [660, 100, 720],
+  [750, 190, 520],
+  [930, 130, 600],
+  [1050, 170, 430],
+  [1210, 110, 690],
+  [1310, 180, 500],
+  [1480, 120, 580],
+  [1590, 160, 410],
+  [1740, 190, 540],
+];
+
+/** A city at dusk: the towers dark against the last light, a scatter of windows lit. */
+function CityAtDusk() {
+  return (
+    <Backdrop>
+      <defs>
+        <linearGradient id="dusk" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#0b1640" />
+          <stop offset="0.55" stopColor="#3b4fa8" />
+          <stop offset="0.8" stopColor="#f0a07a" />
+          <stop offset="1" stopColor="#ffd9a8" />
+        </linearGradient>
+      </defs>
+      <rect width="1920" height="1080" fill="url(#dusk)" />
+      {TOWERS.map(([left = 0, width = 0, height = 0], tower) => (
+        <g key={left}>
+          <rect x={left} y={1080 - height} width={width} height={height} fill="#0d1330" />
+          {Array.from({ length: Math.floor(height / 34) }, (_, row) =>
+            Array.from({ length: Math.floor(width / 26) }, (_, column) =>
+              // A fixed scatter: about a third of the windows lit.
+              (tower * 7 + row * 5 + column * 3) % 3 === 0 ? (
+                <rect
+                  // biome-ignore lint/suspicious/noArrayIndexKey: a fixed grid, never reordered
+                  key={`${row}-${column}`}
+                  x={left + 10 + column * 26}
+                  y={1080 - height + 14 + row * 34}
+                  width={12}
+                  height={16}
+                  fill="#ffd27a"
+                  opacity={0.85}
+                />
+              ) : null,
+            ),
+          )}
+        </g>
+      ))}
+    </Backdrop>
+  );
+}
+
+/** Hills in the morning: a pale sky, the sun low, the hills fading back into the haze. */
+function MorningHills() {
+  return (
+    <Backdrop>
+      <defs>
+        <linearGradient id="morning" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#dbe7ff" />
+          <stop offset="0.6" stopColor="#f7e8f7" />
+          <stop offset="1" stopColor="#fff4e6" />
+        </linearGradient>
+      </defs>
+      <rect width="1920" height="1080" fill="url(#morning)" />
+      <circle cx="1460" cy="420" r="120" fill="#fff6d8" />
+      <path
+        d="M0 640 C 380 520, 700 600, 1000 560 S 1600 520, 1920 600 L1920 1080 L0 1080 Z"
+        fill="#d6c8f2"
+      />
+      <path
+        d="M0 760 C 300 680, 640 760, 980 700 S 1560 680, 1920 740 L1920 1080 L0 1080 Z"
+        fill="#b9a6e8"
+      />
+      <path
+        d="M0 880 C 360 820, 760 900, 1120 840 S 1700 830, 1920 870 L1920 1080 L0 1080 Z"
+        fill="#9b86d8"
+      />
+    </Backdrop>
+  );
+}
+
 /** A bank's sign-in, laid out as desktop sign-in pages lay it out: one wide card, the app and the title on the left, the field and the way on to the right. */
 export function BankSignIn() {
   return (
     <Frame
       style={{
-        background: tint(7),
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
       }}
     >
+      <CityAtDusk />
       <Large scale={1.3}>
         <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
           <div
@@ -135,7 +242,7 @@ export function BankSignIn() {
               display: "flex",
               justifyContent: "space-between",
               fontSize: 13,
-              color: faint(60),
+              color: "rgb(255 255 255 / 0.85)",
               padding: "0 8px",
             }}
           >
@@ -580,11 +687,11 @@ export function PhoneApp() {
   return (
     <Frame
       style={{
-        background: `radial-gradient(80% 90% at 50% 100%, ${tint(22)}, var(--zl-background))`,
         display: "grid",
         placeItems: "center",
       }}
     >
+      <MorningHills />
       <Notice
         icon="✓"
         title="Your lab results are ready"

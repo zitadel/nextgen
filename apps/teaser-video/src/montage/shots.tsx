@@ -13,6 +13,7 @@ import {
   TravelSplit,
 } from "./app-scenes";
 import { AvatarShot } from "./avatar-shot";
+import { FocusShot } from "./focus-shot";
 import { Scene } from "./shot";
 import { IDENTIFIER_BEATS, IDENTIFIERS } from "./identifiers";
 
@@ -46,9 +47,6 @@ const PASSWORD = "correct-horse-battery";
 
 /** A field shaken off a wrong entry: a quick tremor that dies out in a few frames. */
 const shake = (frame: number) => 12 * Math.sin(frame * 1.9) * Math.exp(-frame / 5);
-
-/** A close-up's width before it is scaled: a card's content column. */
-const PART = { width: 336 };
 
 const SCREENS: ShotSpec[] = [
   {
@@ -166,60 +164,120 @@ const SCREENS: ShotSpec[] = [
   },
 ];
 
-const half = { beats: 0.5, push: 0.08 };
+/** A close look at one part of a screen, half a beat long (focus-shot.tsx). */
+const closeUp = (
+  brand: Brand,
+  scale: number,
+  render: (frame: number) => ReactNode,
+  anchor?: { x: number; y: number },
+): ShotSpec => ({
+  beats: 0.5,
+  scene: (length) => (
+    <FocusShot brand={brand} length={length} scale={scale} anchor={anchor} render={render} />
+  ),
+});
 
 const CLOSE_UPS: ShotSpec[] = [
-  {
-    ...half,
-    brand: { theme: "dark", corners: "soft", headings: "sans" },
-    scale: 3.6,
-    content: () => <div style={PART}>{providers([GOOGLE])}</div>,
-  },
-  {
-    ...half,
-    brand: { theme: "light", corners: "sharp", headings: "sans" },
-    scale: 3.6,
-    content: () => <div style={PART}>{providers([GITHUB])}</div>,
-  },
-  {
-    ...half,
-    brand: { theme: "dark", color: COLORS.blue, corners: "soft", headings: "sans" },
-    scale: 3.2,
-    content: () => (
-      <div style={PART}>
-        <zl-alert severity="info">Waiting for your passkey…</zl-alert>
-      </div>
+  closeUp({ theme: "dark", corners: "soft", headings: "sans" }, 5, () => (
+    <Card
+      title="Sign in"
+      subtitle="Enter your email to continue"
+      fields={
+        <zl-field label="Email" type="email" placeholder="you@example.com" autocomplete="off" />
+      }
+      actions={
+        <>
+          {primary("Continue")}
+          <div data-focus>{providers([GOOGLE, GITHUB, APPLE])}</div>
+        </>
+      }
+      nav={SIGN_UP}
+    />
+  )),
+  closeUp({ theme: "dark", color: COLORS.blue, corners: "soft", headings: "sans" }, 6, () => (
+    <Card
+      title="Sign in"
+      subtitle="Enter your password"
+      account
+      actions={
+        <>
+          <div data-focus>
+            <zl-alert severity="info">Waiting for your passkey…</zl-alert>
+          </div>
+          {secondary("Cancel")}
+        </>
+      }
+    />
+  )),
+  closeUp(
+    { theme: "light", color: COLORS.orange, corners: "round", headings: "sans" },
+    6,
+    (frame) => (
+      <Card
+        title="Sign in"
+        subtitle="Enter your email to continue"
+        fields={
+          <div data-focus style={{ transform: `translateX(${shake(frame)}px)` }}>
+            <zl-field
+              label="Email"
+              type="email"
+              value="ada@zitadel"
+              autocomplete="off"
+              error="Please enter a valid email"
+              invalid
+            />
+          </div>
+        }
+        actions={primary("Continue")}
+        nav={SIGN_UP}
+      />
     ),
-  },
-  {
-    ...half,
-    brand: { theme: "light", color: COLORS.orange, corners: "round", headings: "sans" },
-    scale: 3.2,
-    content: (frame) => (
-      <div style={{ ...PART, transform: `translateX(${shake(frame)}px)` }}>
-        <zl-field
-          label="Email"
-          type="email"
-          value="ada@zitadel"
-          autocomplete="off"
-          error="Please enter a valid email"
-          invalid
-        />
-      </div>
+  ),
+  closeUp({ theme: "dark", color: COLORS.green, corners: "soft", headings: "sans" }, 7, (frame) => (
+    <Card
+      title="Sign in"
+      subtitle="Enter your email to continue"
+      fields={
+        <>
+          <zl-field label="Email" type="email" value={ADA} autocomplete="off" />
+          {/* Shrunk to the box and its label, so the camera holds on them, not the row. */}
+          <div data-focus style={{ display: "inline-block", alignSelf: "flex-start" }}>
+            <zl-checkbox label="Remember me" checked={frame >= 6} />
+          </div>
+        </>
+      }
+      actions={primary("Continue")}
+      nav={SIGN_UP}
+    />
+  )),
+  closeUp({ theme: "light", color: COLORS.blue, corners: "soft", headings: "sans" }, 6, (frame) => (
+    <Card
+      title="Sign in"
+      subtitle="Enter your password"
+      account
+      fields={<zl-field label="Password" type="password" value={PASSWORD} autocomplete="off" />}
+      actions={<div data-focus>{primary("Sign in", frame >= 6)}</div>}
+      nav={SIGN_UP}
+    />
+  )),
+  closeUp(
+    { theme: "light", color: COLORS.green, corners: "sharp", headings: "serif" },
+    5.5,
+    (frame) => (
+      <Card
+        title="Sign in faster next time"
+        subtitle="No password needed ever again. Sign in with Face ID, Touch ID, or PIN."
+        account
+        actions={
+          <>
+            <div data-focus>{primary("Set up passkey", frame >= 6)}</div>
+            {secondary("Skip for now")}
+          </>
+        }
+      />
     ),
-  },
-  {
-    ...half,
-    brand: { theme: "dark", color: COLORS.green, corners: "soft", headings: "sans" },
-    scale: 5,
-    content: (frame) => <zl-checkbox label="Remember me" checked={frame >= 6} />,
-  },
-  {
-    ...half,
-    brand: { theme: "light", color: COLORS.blue, corners: "soft", headings: "sans" },
-    scale: 4,
-    content: (frame) => <div style={PART}>{primary("Sign in", frame >= 6)}</div>,
-  },
+    { x: 0.5, y: 0.58 },
+  ),
 ];
 
 /** The login inside apps of every kind (app-scenes.tsx), a beat each, so their surroundings read. */
@@ -232,10 +290,11 @@ const IN_APPS: ShotSpec[] = (
     [PhoneApp, { theme: "light", color: COLORS.purple, corners: "round", headings: "sans" }],
     [PhotoWall, { theme: "dark", color: COLORS.green, corners: "round", headings: "mono" }],
   ] as const
-).map(([App, brand]) => ({
+).map(([App, brand], index, apps) => ({
   beats: 1,
   scene: (length: number) => (
-    <Scene brand={brand} length={length}>
+    // The last blurs away into the blackout before the outro.
+    <Scene brand={brand} length={length} blurOut={index === apps.length - 1 ? 20 : 0}>
       <App />
     </Scene>
   ),

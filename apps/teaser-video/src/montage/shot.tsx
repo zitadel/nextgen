@@ -22,7 +22,7 @@ const ROOM = 0.86;
  * Holds each frame until every atom under `root` has rendered, then calls
  * `rendered` with it, still inside the hold.
  */
-function useAtomsRendered(
+export function useAtomsRendered(
   root: RefObject<HTMLElement | null>,
   frame: number,
   rendered?: (root: HTMLElement) => void,
@@ -92,22 +92,38 @@ export function Scene({
   brand,
   length,
   push = 0.03,
+  blurOut = 0,
   children,
 }: {
   brand: Brand;
   length: number;
   push?: number;
+  /** Over this many last frames, the scene blurs away into the dark. */
+  blurOut?: number;
   children: ReactNode;
 }) {
   const frame = useCurrentFrame();
   const content = useRef<HTMLDivElement>(null);
   useAtomsRendered(content, frame);
   const zoom = interpolate(frame, [0, length], [1, 1 + push]);
+  const gone = blurOut
+    ? interpolate(frame, [length - blurOut, length], [0, 1], {
+        extrapolateLeft: "clamp",
+        extrapolateRight: "clamp",
+      })
+    : 0;
   return (
     <LoginSurface theme={brand.theme} brand={brandProperties(brand)}>
       <div
         ref={content}
-        style={{ position: "absolute", width: WIDTH, height: HEIGHT, transform: `scale(${zoom})` }}
+        style={{
+          position: "absolute",
+          width: WIDTH,
+          height: HEIGHT,
+          transform: `scale(${zoom})`,
+          filter: gone ? `blur(${gone * 28}px)` : undefined,
+          opacity: 1 - gone,
+        }}
       >
         {children}
       </div>

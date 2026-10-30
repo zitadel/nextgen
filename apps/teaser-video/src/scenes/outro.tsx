@@ -4,11 +4,12 @@ import { useFonts } from "../login-surface";
 import { Logo } from "../logo";
 import { HEIGHT, OUTRO, WIDTH, beats } from "../timeline";
 
-// The outro: out of the blackout, a dark frame with the curved glow of a
-// horizon along its bottom edge, as a planet's rim looks from orbit, and "Try
-// it out" in the middle. On the last hit the logo replaces the words and plays
-// as it does in the website's nav; then the frame scrolls up, as if coming
-// down through the atmosphere, the logo fading, until the glow fills it.
+// The outro: out of the blackout, the curved glow of a horizon rises into the
+// dark frame's bottom edge, as a planet's rim looks from orbit, and "Try it
+// out" comes into focus in the middle. On the last hit the logo replaces the
+// words and plays as it does in the website's nav; then the frame scrolls up,
+// as if coming down through the atmosphere, the logo fading, until the glow
+// fills it.
 
 /**
  * Zitadel's orange with a deeper ember, and the website's lilac with a deeper
@@ -66,9 +67,10 @@ const SOFTNESS = 70;
  * at its rim, so from the top the colors run purple to orange, like an
  * atmosphere over a lit surface. The lobes make its rim uneven, and a heavy
  * blur leaves no edge between the colors. The layer overhangs the frame, so
- * the blur's own soft border never shows.
+ * the blur's own soft border never shows. `arrive` runs from 0 to 1 as it
+ * comes in out of the blackout.
  */
-function Page({ seconds }: { seconds: number }) {
+function Page({ seconds, arrive }: { seconds: number; arrive: number }) {
   const breathe = 0.02 * HEIGHT * Math.sin((2 * Math.PI * seconds) / 7);
   // The layer's left edge sits a tenth of a frame left of the frame's.
   const middle = 0.6 * WIDTH;
@@ -84,7 +86,10 @@ function Page({ seconds }: { seconds: number }) {
         top: 0,
         width: 1.2 * WIDTH,
         height: 2.2 * HEIGHT,
-        filter: `blur(${SOFTNESS}px)`,
+        // Arriving, it comes up out of a far heavier blur, rising a little.
+        filter: `blur(${SOFTNESS + (1 - arrive) * 120}px)`,
+        opacity: arrive,
+        transform: `translateY(${(1 - arrive) * 140}px)`,
         background: [
           ...lobes,
           `radial-gradient(ellipse ${1.3 * WIDTH}px ${1.38 * HEIGHT + breathe}px at ${middle}px ${2 * HEIGHT}px in oklab, ${EMBER} 0%, ${ORANGE} 40%, ${ORANGE} 58%, ${MAGENTA} 72%, ${VIOLET} 86%, ${LILAC}66 94%, ${LILAC}00 100%)`,
@@ -113,7 +118,15 @@ export function Outro() {
   );
   // The logo blurs away, gone by the time the scroll is halfway.
   const logoOut = interpolate(scroll, [0, 0.5], [0, 1], clamp);
-  const wordsIn = interpolate(frame, [0, 8], [0, 1], clamp);
+  // Out of the blackout, the gradient rises and the words come into focus.
+  const arrive = interpolate(frame, [0, beats(OUTRO.logo)], [0, 1], {
+    ...clamp,
+    easing: Easing.out(Easing.cubic),
+  });
+  const wordsIn = interpolate(frame, [4, 34], [0, 1], {
+    ...clamp,
+    easing: Easing.out(Easing.cubic),
+  });
 
   return (
     <AbsoluteFill style={{ background: GROUND, overflow: "hidden" }}>
@@ -125,7 +138,7 @@ export function Outro() {
           transform: `translateY(${-scroll * SCROLL_DISTANCE}px)`,
         }}
       >
-        <Page seconds={seconds} />
+        <Page seconds={seconds} arrive={arrive} />
         <div
           style={{
             position: "absolute",
@@ -146,6 +159,8 @@ export function Outro() {
                 fontSize: 64,
                 letterSpacing: "-0.01em",
                 opacity: wordsIn,
+                filter: `blur(${(1 - wordsIn) * 24}px)`,
+                transform: `scale(${1.04 - wordsIn * 0.04})`,
               }}
             >
               {CALL_TO_ACTION}
