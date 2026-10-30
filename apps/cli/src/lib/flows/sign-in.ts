@@ -104,9 +104,9 @@ export function offeredSignInMethods(
 
 /**
  * Outcomes the engine answers by switching from login to register without a
- * `purpose` on the transition: the validator's flip table, plus
- * `sso_user_not_found`, which it leaves out of that table on purpose but
- * which routes to registration the same way.
+ * `purpose` on the transition (`applyOutcomeFlip` in flow_state_machine.go):
+ * the identifier one {@link PURPOSE_FLIP_TARGETS} holds, plus
+ * `sso_user_not_found`.
  */
 const LOGIN_LEAVING_OUTCOMES = new Set([
   ...Object.keys(PURPOSE_FLIP_TARGETS.login ?? {}),

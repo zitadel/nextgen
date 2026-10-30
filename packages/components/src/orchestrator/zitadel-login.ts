@@ -33,7 +33,7 @@ import type { ResolvedTheme } from "./theme-controller.js";
 import type { Branding } from "./branding.js";
 import { stampExportparts } from "./exportparts.js";
 import { createLiquidEngine, localiseFlowErrorKeys } from "./liquid.js";
-import { localeFor, type Locale } from "./locales/index.js";
+import { isHidden, localeFor, type Locale } from "./locales/index.js";
 import { patchMandatoryGates } from "./mandatory-gates.js";
 import { resolveApi } from "./resolve-api.js";
 import { returnPathFromLocation } from "./return-path.js";
@@ -359,9 +359,6 @@ export class ZitadelLogin extends ZitadelSurface {
 
   private engine: Liquid | null = null;
 
-  /** The locale dictionary the Liquid engine was built with. */
-  private locale: Locale = {};
-
   /**
    * The theme the last commit rendered with. The template output carries the
    * resolved side's mark, so a theme change rewrites the string and
@@ -477,22 +474,27 @@ export class ZitadelLogin extends ZitadelSurface {
   /**
    * Resolves the effective locale dictionary for the resolved language, with
    * the `locales` map merged over the built-in copy ({@link localeFor}).
-   *
-   * Priority: explicit `lang` attr → `navigator.language` (user preference)
-   * → `document.documentElement.lang` (page default).
    */
   private resolveLocale(): Locale {
-    const code =
+    return localeFor(this.resolveLanguage(), this.locales);
+  }
+
+  /**
+   * The language tag the widget renders in. Priority: explicit `lang` attr →
+   * `navigator.language` (user preference) → `document.documentElement.lang`
+   * (page default).
+   */
+  private resolveLanguage(): string {
+    return (
       this.lang ||
       (typeof navigator !== "undefined" ? navigator.language : "") ||
-      (typeof document !== "undefined" ? document.documentElement.lang : "");
-    return localeFor(code, this.locales);
+      (typeof document !== "undefined" ? document.documentElement.lang : "")
+    );
   }
 
   override willUpdate(changed: PropertyValues<this>): void {
     if (!this.engine || changed.has("locales") || changed.has("lang")) {
-      this.locale = this.resolveLocale();
-      this.engine = createLiquidEngine({ locale: this.locale });
+      this.engine = createLiquidEngine({ locale: this.resolveLocale() });
     }
     if (changed.has("previewState") && this.previewState && !this.preview) {
       console.warn(
@@ -1143,9 +1145,9 @@ export class ZitadelLogin extends ZitadelSurface {
       identifier: step.identifier ?? null,
       // Why the flow moved between sign-in and sign-up without being asked,
       // on the step right after the move. A host that sets the notice's text
-      // to "" in `locales` opts out of it.
+      // to "" in `locales` opts out of it ({@link isHidden}).
       messages:
-        step.notice && this.locale[step.notice] !== ""
+        step.notice && !isHidden(this.resolveLanguage(), this.locales, step.notice)
           ? [{ level: "info", text_key: step.notice }]
           : [],
       identity: this.deriveIdentity(),

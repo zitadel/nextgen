@@ -85,8 +85,8 @@ func TestContent_TransitionRoundTrip_PreservesActionAndPurpose(t *testing.T) {
 	assert.Nil(t, plain.Action)
 	assert.Nil(t, plain.Purpose)
 
-	// A purpose-only transition is stored as written, without a target, so
-	// reading the definition back gives the author's file unchanged.
+	// A purpose-only transition is stored without a "target" key; it decodes
+	// to an empty Target either way.
 	assert.NotContains(t, string(raw), `"target":""`)
 	register, ok := got.FindStep("register")
 	require.True(t, ok)

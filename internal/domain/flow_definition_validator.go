@@ -314,9 +314,6 @@ func validateSteps(steps []FlowDefinitionStep) error {
 					"step %q: transition %q is an sso outcome and cannot declare purpose or action", step.Name, transitionKey), nil)
 			}
 		}
-
-		// todo (grvijayan): a step with an identifier field (a property carrying
-		// a non-empty x-unique scope) defines a user_not_found transition or return an error
 	}
 	return nil
 }

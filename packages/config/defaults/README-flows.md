@@ -75,8 +75,12 @@ Typical edits:
   optional. Remove one, and that email stays on its step with an error
   instead (`error.user_not_found`, `error.user_already_exists`); the
   "Sign up" and "Sign in" links keep working. `zitadel deploy --dry-run`
-  warns about a removed one, and never refuses it. To serve only one
-  purpose, list only it in `purposes`.
+  warns about a removed one and still deploys, except on a step that
+  offers a provider that creates users: there a provider's sign-in raises
+  `user_already_exists` too, so `deploy` requires it (and
+  `sso_user_not_found`), and `auth-method sso enable` points it at the
+  step that resolves the collision. To serve only one purpose, list only
+  it in `purposes`.
 - **Change or hide the switch notice** — after an automatic switch the
   login shows a notice saying why (`notice.user_not_found`,
   `notice.user_already_exists`, `notice.sso_user_not_found`). Change its

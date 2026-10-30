@@ -343,6 +343,21 @@ describe("meta-schemas", () => {
         },
         true,
       ],
+      [
+        "transition with a purpose and no target",
+        { fields: ["email"], transitions: { submit: { purpose: "register" } } },
+        true,
+      ],
+      [
+        "transition with neither a target nor a purpose",
+        { fields: ["email"], transitions: { submit: {} } },
+        false,
+      ],
+      [
+        "transition with a null purpose and no target",
+        { fields: ["email"], transitions: { submit: { purpose: null } } },
+        false,
+      ],
     ];
     for (const [name, step, valid] of cases) {
       expect(check(withStep(step)), `${name}: ${JSON.stringify(check.errors)}`).toBe(valid);

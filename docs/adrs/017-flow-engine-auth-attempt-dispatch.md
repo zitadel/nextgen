@@ -317,7 +317,7 @@ linking journey.
 See
 [Resolution Branches](../design/idp/3-social-login-flow.md#resolution-branches).
 
-**Amendment (#2235, optional switch).** The switch stays automatic, but wiring
+**Amendment (2026-10-30, #2235, optional switch).** The switch stays automatic, but wiring
 it is the author's choice. A definition that serves both `login` and
 `register` no longer has to wire `user_not_found` on the login entry step or
 `user_already_exists` on the register entry step. Some flows should sign in
@@ -325,7 +325,9 @@ only existing users even though they also offer sign-up through a link, and the
 requirement made them impossible. Without the transition the outcome shows its
 step error (`error.user_not_found`, `error.user_already_exists`), as on any
 other step that leaves an outcome unwired. The CLI's `deploy --dry-run` warns
-about it, saying what the flow does instead, and never refuses it.
+about it, saying what the flow does instead. One exception: a step that offers
+a provider that creates users must still route `user_already_exists`, which a
+provider's sign-in raises too, and the CLI refuses it without (`sso/outcome-routing`).
 
 "The author must still wire the outcome's transition, otherwise the engine
 errors" above now means exactly that: an unwired outcome is a step error, not

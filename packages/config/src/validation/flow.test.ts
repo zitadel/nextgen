@@ -368,6 +368,16 @@ describe("graph / cycles / switch", () => {
     );
   });
 
+  it("reports only the unserved purpose for a purpose switch with no target, as Go does", () => {
+    const def = flow();
+    step(def, "identifier").transitions.register = { purpose: "recovery" };
+    const found = messages(validateFlowDefinition(def));
+    expect(found).toContain(
+      'step "identifier": transition "register" re-purposes to "recovery", which this definition does not serve',
+    );
+    expect(found.filter((m) => m.includes("unknown step"))).toEqual([]);
+  });
+
   it("rejects a purposed transition that misses the purpose's entry step", () => {
     const def = flow();
     step(def, "identifier").transitions.register = {
@@ -515,7 +525,7 @@ describe("graph / cycles / switch", () => {
     const issues = validateFlowDefinition(def, schema);
     expect(errors(issues)).toEqual([]);
     expect(messages(warnings(issues))).toContain(
-      'purpose "recovery" is reserved: the engine has no behavior of its own for it yet',
+      'purpose "recovery" is reserved: the engine does not run its journey yet',
     );
   });
 });

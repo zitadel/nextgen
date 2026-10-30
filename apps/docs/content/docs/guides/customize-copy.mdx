@@ -32,7 +32,7 @@ A key starts with the name of the step that shows the text, as your flow file, `
 | Button | the action's `text_key` in the flow file, or `<step>.action.<action>` if it has none |
 | Back button | `<step>.action.back`, or `action.back` if the step has none |
 | Error message | `error.<code>`, such as `error.invalid_credentials` |
-| Notice that a sign-in went on as a sign-up, or the reverse | `notice.<reason>`, such as `notice.user_not_found`; set it to `""` to show no notice |
+| Notice that a sign-in went on as a sign-up, or the reverse | `notice.<reason>`, such as `notice.user_not_found`; set it to `""` to show no notice, under `en` for every language |
 
 `<field>` is the field's name in the step's `fields`; a sign-in method field such as `x-auth-methods#password` uses the method, `password`. The flows `zitadel setup` creates give every button a `text_key`, so the email screen's Continue button, for example, is `identifier.action.continue`, not `identifier.action.submit`. Every built-in key and its English text is in the [English dictionary](https://github.com/zitadel/nextgen/blob/main/packages/components/src/orchestrator/locales/en.ts). Keep any placeholder in braces, such as `{0}` or `{name}`, in a text you replace: the login fills it in, with a field's label or a provider's name.
 

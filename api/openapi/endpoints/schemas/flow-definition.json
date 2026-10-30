@@ -466,7 +466,7 @@
         },
         "transitions": {
           "type": "object",
-          "description": "Maps action and outcome names to where the flow goes next.\n\nA key is either the `name` of an action in `actions` (the user chose\nit) or an outcome the engine raises on its own:\n\n- `user_not_found`: an identifier with no account. The engine also\n  switches the flow to `register` when it serves that purpose.\n- `user_already_exists`: an identifier that has an account, on a\n  sign-up. The engine also switches the flow to `login` when it serves\n  that purpose.\n- `sso_authenticated`: a provider's sign-in matched an account.\n- `sso_user_not_found`: a provider's sign-in matched no account.\n\nEach action needs its transition, and a step that offers\n`sso_providers` needs `sso_authenticated`; every other outcome is\noptional. An outcome the\nstep has no transition for leaves the user on the step with that\noutcome's error (for example `error.user_not_found`), so a flow that\nleaves out `user_not_found` signs in only users that already exist.\n",
+          "description": "Maps action and outcome names to where the flow goes next.\n\nA key is either the `name` of an action in `actions` (the user chose\nit) or an outcome the engine raises on its own:\n\n- `user_not_found`: an identifier with no account. Following this\n  transition also switches the flow to `register`.\n- `user_already_exists`: an identifier that has an account, typed on\n  a sign-up or returned by a provider's sign-in. Following this\n  transition also switches the flow to `login`.\n- `sso_authenticated`: a provider's sign-in matched an account.\n- `sso_user_not_found`: a provider's sign-in matched no account.\n\nEach action needs its transition, and a step that offers\n`sso_providers` needs `sso_authenticated`; the server requires no\nother outcome. `zitadel deploy` also requires `sso_user_not_found` and\n`user_already_exists` on a step that offers a provider that creates\nusers, since a provider's sign-in can raise both. An outcome the step\nhas no transition for leaves the user on the step with that outcome's\nerror (for example `error.user_not_found`), so a flow that leaves out\n`user_not_found` signs in only users that already exist.\n",
           "additionalProperties": {
             "type": "object",
             "description": "Where the flow goes: a step (`target`), or the entry step of another\npurpose (`purpose`). Set at least one of them.\n",
@@ -515,18 +515,34 @@
             },
             "additionalProperties": false,
             "not": {
-              "required": [
-                "purpose",
-                "action"
-              ],
-              "properties": {
-                "purpose": {
-                  "type": "string"
+              "anyOf": [
+                {
+                  "required": [
+                    "purpose",
+                    "action"
+                  ],
+                  "properties": {
+                    "purpose": {
+                      "type": "string"
+                    },
+                    "action": {
+                      "type": "string"
+                    }
+                  }
                 },
-                "action": {
-                  "type": "string"
+                {
+                  "not": {
+                    "required": [
+                      "target"
+                    ]
+                  },
+                  "properties": {
+                    "purpose": {
+                      "type": "null"
+                    }
+                  }
                 }
-              }
+              ]
             }
           },
           "examples": [

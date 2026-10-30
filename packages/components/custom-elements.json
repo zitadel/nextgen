@@ -6989,6 +6989,36 @@
             }
           ],
           "description": "The dictionary for a BCP 47 language tag. Its layers, strongest first: the\nintegrator's `locales` entries for the tag's primary subtag, the built-in\ndictionary for it, their `en` entries, and the built-in English.\n\nThe integrator's English is thus the fallback for every language: a key a\nlanguage has no text for, such as one for a step they added, shows their\nEnglish rather than the raw key, while a built-in translation still beats it."
+        },
+        {
+          "kind": "function",
+          "name": "isHidden",
+          "return": {
+            "type": {
+              "text": "boolean"
+            }
+          },
+          "parameters": [
+            {
+              "name": "tag",
+              "type": {
+                "text": "string"
+              }
+            },
+            {
+              "name": "locales",
+              "type": {
+                "text": "Readonly<Record<string, Partial<Locale>>> | undefined"
+              }
+            },
+            {
+              "name": "key",
+              "type": {
+                "text": "string"
+              }
+            }
+          ],
+          "description": "Whether the integrator hid a key's text by setting it to `\"\"`: for the tag's\nlanguage or, when they wrote no text of their own for it there, in `en`.\nUnlike localeFor, a built-in translation does not override an\nEnglish `\"\"`, so one entry hides the text in every language."
         }
       ],
       "exports": [
@@ -7053,6 +7083,14 @@
           "name": "localeFor",
           "declaration": {
             "name": "localeFor",
+            "module": "src/orchestrator/locales/index.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "isHidden",
+          "declaration": {
+            "name": "isHidden",
             "module": "src/orchestrator/locales/index.ts"
           }
         }
@@ -8329,16 +8367,6 @@
             },
             {
               "kind": "field",
-              "name": "locale",
-              "type": {
-                "text": "Locale"
-              },
-              "privacy": "private",
-              "default": "{}",
-              "description": "The locale dictionary the Liquid engine was built with."
-            },
-            {
-              "kind": "field",
               "name": "lastRenderedTheme",
               "type": {
                 "text": "ResolvedTheme | null"
@@ -8399,7 +8427,18 @@
                   "text": "Locale"
                 }
               },
-              "description": "Resolves the effective locale dictionary for the resolved language, with\nthe `locales` map merged over the built-in copy (localeFor).\n\nPriority: explicit `lang` attr → `navigator.language` (user preference)\n→ `document.documentElement.lang` (page default)."
+              "description": "Resolves the effective locale dictionary for the resolved language, with\nthe `locales` map merged over the built-in copy (localeFor)."
+            },
+            {
+              "kind": "method",
+              "name": "resolveLanguage",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "string"
+                }
+              },
+              "description": "The language tag the widget renders in. Priority: explicit `lang` attr →\n`navigator.language` (user preference) → `document.documentElement.lang`\n(page default)."
             },
             {
               "kind": "method",

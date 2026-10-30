@@ -304,7 +304,8 @@ submit. A heading follows `step.purpose`, `login` or `register`: the login
 switches between them by itself when an email does or does not have an account,
 and then shows the visitor a notice saying why. To hide the notice, set its text
 to `""` in `locales` (`notice.user_not_found`, `notice.user_already_exists`,
-`notice.sso_user_not_found`).
+`notice.sso_user_not_found`). An `""` under `en` hides it in every language,
+unless that language has its own text for it.
 
 `zitadel-flow-redirect` fires when a step hands the browser to an identity
 provider, carrying the URL to send it to. The widget then navigates there

@@ -100,7 +100,7 @@ This app's login is managed by Zitadel. Local config is the source of truth for 
 
 The golden path:
 
-1. Start the dev server and open ${ctx.issuer}/register to create the first user — **exactly this origin, not 127.0.0.1**. Passkeys and the origin allowlist are bound to it. Returning users sign in at /login. (Freshly scaffolded apps also redirect / there; pre-existing apps keep their homepage.)
+1. Start the dev server and open ${ctx.issuer}/register to create the first user — **exactly this origin, not 127.0.0.1**. Passkeys and the origin allowlist are bound to it. Returning users sign in at /login. (Freshly scaffolded apps also redirect / to /login; pre-existing apps keep their homepage.)
    - Port taken (\`EADDRINUSE\`) or another port wanted: run \`${movePort}\`. It moves the dev script or dev-server config, \`ZITADEL_ISSUER\` and the project's allowed origin together; changing only one of them breaks sign-in.
 2. Prove the loop in a real browser: register a user → sign out → sign in → /profile shows signed in.${passkeyVerifyNote}
 3. Customize by editing local config:

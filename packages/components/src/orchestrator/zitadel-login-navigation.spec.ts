@@ -238,14 +238,17 @@ describe("<zitadel-login> purpose navigation", () => {
     expectNoBanner();
   });
 
-  it("shows no notice when the host sets its text to an empty string", async () => {
+  it("shows no notice in any language when the host sets its English text to an empty string", async () => {
     element.locales = { en: { "notice.user_not_found": "" } };
-    element.lang = "en";
+    element.lang = "de";
     await mount();
     enter("email", "new@example.com");
     await transition(submitForm);
-    expectEntry("register");
-    expect(steps.at(-1)?.notice).toBe("notice.user_not_found");
+    expect(steps.at(-1)).toMatchObject({
+      name: "register",
+      purpose: "register",
+      notice: "notice.user_not_found",
+    });
     expect(root().querySelector("zl-alert[data-zl-step-message]")).toBeNull();
   });
 

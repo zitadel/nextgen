@@ -68,7 +68,7 @@ const UNWIRED_SWITCH_EFFECTS: Readonly<Record<string, string>> = {
     "an identifier that has an account stays on the step with error.user_already_exists instead of continuing as a sign-in",
 };
 
-/** Purposes a definition may declare that the engine has no behavior of its own for yet. */
+/** Purposes a definition may declare whose journeys the engine does not run yet. */
 const RESERVED_PURPOSES = new Set(["recovery", "profiling", "reauth", "link_account"]);
 
 /** Action kinds a flow author may declare; `back` is engine-injected. */
@@ -122,7 +122,7 @@ export function validateFlowDefinition(flow: object, schema?: object): FlowValid
       issues.push(
         warning(
           "warn/reserved-purpose",
-          `purpose ${q(purpose)} is reserved: the engine has no behavior of its own for it yet`,
+          `purpose ${q(purpose)} is reserved: the engine does not run its journey yet`,
         ),
       );
     }
@@ -528,7 +528,10 @@ function validateGraph(def: FlowDef, stepNames: Set<string>): FlowValidationIssu
           ),
         );
       } else if (isCurrentFlow(t)) {
-        if (!stepNames.has(transitionTarget(def, t))) {
+        // A purpose-only transition to a purpose the flow does not serve has
+        // no target; that error is reported above, and Go stops at it.
+        const target = transitionTarget(def, t);
+        if (target !== "" && !stepNames.has(target)) {
           issues.push(
             error(
               "graph",

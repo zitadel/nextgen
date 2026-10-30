@@ -27027,19 +27027,21 @@ type FlowDefinitionStep struct {
 	// Maps action and outcome names to where the flow goes next.
 	// A key is either the `name` of an action in `actions` (the user chose
 	// it) or an outcome the engine raises on its own:
-	// - `user_not_found`: an identifier with no account. The engine also
-	// switches the flow to `register` when it serves that purpose.
-	// - `user_already_exists`: an identifier that has an account, on a
-	// sign-up. The engine also switches the flow to `login` when it serves
-	// that purpose.
+	// - `user_not_found`: an identifier with no account. Following this
+	// transition also switches the flow to `register`.
+	// - `user_already_exists`: an identifier that has an account, typed on
+	// a sign-up or returned by a provider's sign-in. Following this
+	// transition also switches the flow to `login`.
 	// - `sso_authenticated`: a provider's sign-in matched an account.
 	// - `sso_user_not_found`: a provider's sign-in matched no account.
 	// Each action needs its transition, and a step that offers
-	// `sso_providers` needs `sso_authenticated`; every other outcome is
-	// optional. An outcome the
-	// step has no transition for leaves the user on the step with that
-	// outcome's error (for example `error.user_not_found`), so a flow that
-	// leaves out `user_not_found` signs in only users that already exist.
+	// `sso_providers` needs `sso_authenticated`; the server requires no
+	// other outcome. `zitadel deploy` also requires `sso_user_not_found` and
+	// `user_already_exists` on a step that offers a provider that creates
+	// users, since a provider's sign-in can raise both. An outcome the step
+	// has no transition for leaves the user on the step with that outcome's
+	// error (for example `error.user_not_found`), so a flow that leaves out
+	// `user_not_found` signs in only users that already exist.
 	Transitions OptFlowDefinitionStepTransitions `json:"transitions"`
 }
 
@@ -27233,19 +27235,21 @@ func (s *FlowDefinitionStepOnSuccess) UnmarshalText(data []byte) error {
 // Maps action and outcome names to where the flow goes next.
 // A key is either the `name` of an action in `actions` (the user chose
 // it) or an outcome the engine raises on its own:
-// - `user_not_found`: an identifier with no account. The engine also
-// switches the flow to `register` when it serves that purpose.
-// - `user_already_exists`: an identifier that has an account, on a
-// sign-up. The engine also switches the flow to `login` when it serves
-// that purpose.
+// - `user_not_found`: an identifier with no account. Following this
+// transition also switches the flow to `register`.
+// - `user_already_exists`: an identifier that has an account, typed on
+// a sign-up or returned by a provider's sign-in. Following this
+// transition also switches the flow to `login`.
 // - `sso_authenticated`: a provider's sign-in matched an account.
 // - `sso_user_not_found`: a provider's sign-in matched no account.
 // Each action needs its transition, and a step that offers
-// `sso_providers` needs `sso_authenticated`; every other outcome is
-// optional. An outcome the
-// step has no transition for leaves the user on the step with that
-// outcome's error (for example `error.user_not_found`), so a flow that
-// leaves out `user_not_found` signs in only users that already exist.
+// `sso_providers` needs `sso_authenticated`; the server requires no
+// other outcome. `zitadel deploy` also requires `sso_user_not_found` and
+// `user_already_exists` on a step that offers a provider that creates
+// users, since a provider's sign-in can raise both. An outcome the step
+// has no transition for leaves the user on the step with that outcome's
+// error (for example `error.user_not_found`), so a flow that leaves out
+// `user_not_found` signs in only users that already exist.
 type FlowDefinitionStepTransitions map[string]FlowDefinitionStepTransitionsItem
 
 func (s *FlowDefinitionStepTransitions) init() FlowDefinitionStepTransitions {
