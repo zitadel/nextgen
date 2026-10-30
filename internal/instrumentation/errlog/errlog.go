@@ -57,8 +57,7 @@ func LogLevel(ctx context.Context, level slog.Level, err error, attrs ...slog.At
 	if level < slog.LevelError {
 		logged = domErr.Brief()
 	}
-	args := make([]any, 0, 1+len(attrs))
-	args = append(args, slog.Any(zlog.ErrorAttributeKey, logged))
+	args := []any{slog.Any(zlog.ErrorAttributeKey, logged)}
 	for _, attr := range attrs {
 		args = append(args, attr)
 	}
