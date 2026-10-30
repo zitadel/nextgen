@@ -22,7 +22,7 @@ not run them.
 
 ## Layout
 
-One Vercel deployment, five [services](https://vercel.com/docs/services):
+One Vercel deployment, six [services](https://vercel.com/docs/services):
 
 | Service | Built by | Serves |
 |---|---|---|
@@ -308,7 +308,7 @@ or garbled fails the build and the serving deployment stays.
   (a single `*` would stop at the branch's second `/` and match nothing).
   The pull request already has its preview, and the commit the queue lands
   on `main` deploys as production. A preview per queue branch would build
-  all four services again and leave one more database behind for every
+  every service again and leave one more database behind for every
   queued pull request.
 - **Migrations must be expand/contract.** The previous deployment serves on
   the new schema until the new one is live, and Instant Rollback promotes

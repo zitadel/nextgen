@@ -7,7 +7,7 @@ except the Changesets version PR's `changeset-release/*` branch and the merge
 queue's `gh-readonly-queue/**` branches.
 
 The repo-root [`vercel.json`](../../vercel.json) defines the Vercel
-deployment as five [services](https://vercel.com/docs/services):
+deployment as six [services](https://vercel.com/docs/services):
 
 | Service | Root | What it is | Paths |
 |---|---|---|---|
@@ -15,6 +15,7 @@ deployment as five [services](https://vercel.com/docs/services):
 | `console` | `apps/console` | the console SPA, built for `/console/` with Vercel Web Analytics and Speed Insights | `/console/*` |
 | `docs` | `apps/docs` | the docs site, Fumadocs on Next.js, with Vercel Web Analytics and Speed Insights | `/docs`, `/docs/*` |
 | `website` | `apps/website` | the front page and the changelog, on Next.js, with Vercel Web Analytics and Speed Insights | `/`, `/changelog`, `/changelog/*`, `/llms.txt`, `/_next/*`, `/favicon.ico`, `/favicons/*` |
+| `cloud-functions` | `apps/cloud-functions` | the hosted cloud's backend on Next.js: the console add-on's calls, BotID's check in front of the sign-in widget, Stripe's webhooks and the workflows ([ADR 083](../../docs/adrs/083-hosted-cloud-business-systems.md)) | `/cloud/*` |
 | `schemas` | `apps/cloud` | the built-in schemas, static files that [`scripts/render-builtin-schemas.mjs`](../../scripts/render-builtin-schemas.mjs) renders from the server's embedded copies | `/schemas/v1/*` |
 
 The console is served on the same origin, so the session cookie and CSRF work
