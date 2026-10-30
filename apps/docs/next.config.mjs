@@ -23,6 +23,20 @@ if (sampleRate && !(Number(sampleRate) >= 0 && Number(sampleRate) <= 1)) {
 
 const policy = (directives) => directives.join("; ");
 const enforcedPolicy = [
+  // Prerendered page URLs replace this fallback with their script hashes.
+  // Other responses, including unknown docs URLs, stay scriptless.
+  // next dev has no prerender adapter and needs its development runtime.
+  ...(process.env.NODE_ENV === "development"
+    ? []
+    : [
+        "default-src 'self'",
+        "script-src 'none'",
+        "style-src 'self' 'unsafe-inline'",
+        "img-src 'self' data:",
+        "connect-src 'self'",
+        "frame-src 'none'",
+        "form-action 'self'",
+      ]),
   "object-src 'none'",
   "base-uri 'self'",
   "frame-ancestors 'none'",
@@ -43,7 +57,7 @@ const config = {
   // service worker the package ships beside itself
   // (app/docs/mock-service-worker.js).
   serverExternalPackages: ["@zitadel/api-mock"],
-  // Adds each prerendered page's report-only policy, with its inline
+  // Adds each prerendered page's enforced policy, with its inline
   // scripts' hashes, once the build has written the page.
   adapterPath: fileURLToPath(new URL("./csp-adapter.mjs", import.meta.url)),
   async headers() {
@@ -54,9 +68,8 @@ const config = {
       {
         source: "/:path*",
         headers: [
-          // Enforced: nothing frames the docs, embeds a plugin or moves their
-          // base URL. Each prerendered page also carries a report-only policy
-          // that allows its inline scripts by hash (csp-adapter.mjs).
+          // Fail closed for on-demand HTML; csp-adapter.mjs gives each
+          // prerendered page its own enforced policy with script hashes.
           { key: "Content-Security-Policy", value: policy(enforcedPolicy) },
         ],
       },

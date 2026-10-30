@@ -314,7 +314,10 @@ test("every CLI command shows its usage, in tables whose rows keep their cells",
 });
 
 test("a page that does not exist is a 404, as HTML and as Markdown", async ({ request }) => {
-  expect((await request.get("/docs/no-such-page")).status()).toBe(404);
+  const missing = await request.get("/docs/no-such-page");
+  expect(missing.status()).toBe(404);
+  expect(missing.headers()["content-security-policy"]).toContain("script-src 'none'");
+  expect(missing.headers()["content-security-policy"]).toContain("frame-ancestors 'none'");
   expect((await request.get("/docs/no-such-page.md")).status()).toBe(404);
   const negotiated = await request.get("/docs/no-such-page", {
     headers: { Accept: "text/markdown" },

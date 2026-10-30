@@ -1,3 +1,12 @@
-// A path no route matches, such as one under /docs/api/: the docs' 404,
-// outside their layout.
-export { default } from "./docs/not-found";
+import DocsLayout from "./docs/layout";
+import NotFound from "./docs/not-found";
+
+// Unknown docs slugs and unmatched routes share this prerendered 404. Keep
+// the docs' chrome while serving complete HTML under the scriptless CSP.
+export default function RootNotFound() {
+  return (
+    <DocsLayout>
+      <NotFound />
+    </DocsLayout>
+  );
+}

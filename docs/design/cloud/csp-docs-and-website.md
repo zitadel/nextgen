@@ -1,7 +1,7 @@
 # Inline scripts under the docs' and the website's Content-Security-Policy
 
-> **Status:** decided, 2026-10-29: hashes, report-only first. Next.js 16.4.1
-> on Vercel (project `cloud`), after zitadel/nextgen#2480. Each app's
+> **Status:** decided, 2026-10-29: enforced hashes with a scriptless fallback.
+> Next.js 16.4.1 on Vercel (project `cloud`), after zitadel/nextgen#2480. Each app's
 > `csp-adapter.mjs` implements it.
 > **Question:** how can the docs (`apps/docs`) and the website
 > (`apps/website`) stop allowing inline script, and what does each way cost?
@@ -171,22 +171,33 @@ about 70 lines) sends the hashes in the report-only policy. On its preview:
   navigation and the live examples' service worker included. Their only
   violation was Vercel's toolbar (`vercel.live`), which #2480 now allows.
 
-What remains before enforcing:
+### Enforcement and the fallback
 
-- **HTML rendered on demand gets no hashes.** On the docs that's an unknown
-  slug's 404, which renders inside the docs' layout. `dynamicParams = false`
-  would serve the prerendered root 404 instead and lose that layout. Such a
-  page needs a fallback policy without inline script, under which it runs
-  without script.
-- **Two enforced policies on one page:** once the adapter's policy is
-  enforced, it shares its header name with `next.config`'s. Whether Vercel
-  then serves both is untested. Today the adapter's policy is the only
-  report-only one, so nothing collides.
-- **Vercel's toolbar:** keep #2480's `https://vercel.live`. A hash policy
-  has no `'strict-dynamic'`, so the host allowlist still counts.
-- **The adapter is a seam:** if Vercel stops injecting its adapter through
-  `NEXT_ADAPTER_PATH`, ours would wrap nothing. The tests below catch that
-  on the next deployment.
+The adapters append one `Content-Security-Policy` header rule per
+prerendered page, to the platform's routing and `next start`'s build manifest.
+These rules override the earlier fallback. A policy in `initialHeaders` or
+`.meta` appends a second header on `next start`, so a restrictive fallback
+there would also block the hashed scripts. `next.config` supplies a restrictive
+fallback for responses without a prerendered policy: `script-src 'none'`,
+same-origin styles with style attributes, images, fonts and connections,
+and no framing. `next dev` retains only the base policy because it has no
+prerender hashes and needs its development runtime.
+
+`dynamicParams = false` sends an unknown docs slug to the prerendered root
+404, which wraps the same docs layout. This produces complete, readable HTML
+without hydration: Next's on-demand error response can require inline script
+just to reveal its content. The link back home works without JavaScript;
+the error page's search button appears only after hydration, when it can work. A full
+navigation back to a known page loads that page's hashed policy.
+
+The URL-based checks inspect the **enforced** policy, including every
+inline script's hash, and browser checks verify hydration, navigation,
+inline-script blocking and the docs 404. The same suites run against a
+Vercel deployment to catch routing/header precedence differences.
+
+Keep `https://vercel.live` for the toolbar. The adapter still wraps
+`NEXT_ADAPTER_PATH`; if Vercel changes that seam, the deployment checks
+must catch a missing or overridden hash policy.
 
 ## Staying as is
 
@@ -200,13 +211,13 @@ next bug.
 ## Recommendation
 
 1. Add the adapter to the docs and the website, report-only, keeping
-   `https://vercel.live`. Done: `next start` serves the policy too, since
-   the adapter also writes it into each page's `.meta`.
+   `https://vercel.live`. Done in the initial rollout; enforcement now uses
+   header rules so the fallback and the page policy cannot intersect.
 2. Assert, on every deployment, that every inline script carries a hash in
    its page's policy: the docs' `tests/` for every docs page, the cloud's
    `e2e/console/src-deployment/routes.spec.ts` for the website's. Done.
-3. Once reports stay quiet, give on-demand HTML its fallback policy and
-   enforce the hash policy.
+3. Enforce the hash policy and give on-demand HTML its scriptless fallback.
+   Validate both against the local build and the deployed artifact.
 
 ## How it was measured
 

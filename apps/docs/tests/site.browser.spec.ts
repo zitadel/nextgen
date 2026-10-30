@@ -29,6 +29,40 @@ test("a page renders, navigates client-side and logs no errors", async ({ page }
   expect(violations, "policy violations").toEqual([]);
 });
 
+test("a page blocks an inline script absent from its CSP hashes", async ({ page }) => {
+  const violations = await recordPolicyViolations(page);
+  // This suite also runs against deployments; keep the deliberate violation
+  // out of the server's production logs.
+  await page.route("**/csp-report", (route) => route.fulfill({ status: 204 }));
+  await page.goto("/docs/get-started/quickstart");
+  await expect(page.getByRole("heading", { level: 1, name: "Quickstart" })).toBeVisible();
+
+  await page.evaluate(() => {
+    const script = document.createElement("script");
+    script.textContent = 'document.documentElement.dataset.untrustedScript = "ran"';
+    document.head.append(script);
+  });
+  await expect
+    .poll(() =>
+      violations.some((violation) => violation.startsWith("enforce script-src-elem inline")),
+    )
+    .toBe(true);
+  await expect(page.locator("html")).not.toHaveAttribute("data-untrusted-script", "ran");
+});
+
+test("an unknown docs URL stays readable under its scriptless fallback", async ({ page }) => {
+  const response = await page.goto("/docs/no-such-page");
+  expect(response?.status()).toBe(404);
+  expect(response?.headers()["content-security-policy"]).toContain("script-src 'none'");
+  await expect(page.getByRole("heading", { level: 1, name: "Page not found" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Search the docs", exact: true })).toHaveCount(0);
+  await page.getByRole("link", { name: "Go to the docs home" }).click();
+  await expect(page).toHaveURL(/\/docs$/);
+  // The link performs a full navigation, so the destination's hashed policy
+  // replaces the fallback and the page hydrates again.
+  await expect(page.locator("html")).toHaveAttribute("data-theme", /light|dark/);
+});
+
 test("a link to a file the docs serve opens it, without fetching it as a page", async ({
   page,
 }) => {

@@ -46,13 +46,13 @@ MCP, `llms.txt`, Open Graph images, `.md` pages) live under `/docs` here.
 
 ## Content-Security-Policy
 
-- The enforced policy is `next.config.mjs`'; the report-only one is
-  `csp-adapter.mjs`', with each prerendered page's inline scripts by hash.
+- `csp-adapter.mjs` enforces each prerendered page's script hashes;
+  `next.config.mjs` supplies the scriptless fallback for other URLs.
 - Never give a page a nonce or `'unsafe-inline'`: pages stay prerendered
   ([why](../../docs/design/cloud/csp-docs-and-website.md)).
 - `csp-adapter.mjs` copies `apps/website/csp-adapter.mjs` but for the policy:
-  change both. `next dev` runs no adapter, so dev pages report nothing.
-- Load nothing from another origin without widening the report-only policy
+  change both. `next dev` keeps only the base policy for its runtime.
+- Load nothing from another origin without widening the enforced policy
   in the same change; `tests/` fail on a violation or an unhashed script.
 
 ## Content
