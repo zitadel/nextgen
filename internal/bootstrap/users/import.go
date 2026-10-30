@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"strings"
 
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -195,10 +194,10 @@ func storedSchemaURL(ctx context.Context, stmts service.AllStatements, builtinBa
 	}
 	// A project that deployed the default schema stores it under an id the
 	// release build minted: the built-in URL names it by its objectType.
-	if rel, ok := builtinBases.RelPath(h.SchemaURL); ok && strings.TrimPrefix(rel, "/") == defaultSchemaPath {
-		deployed, err := newestSchemaOfType(ctx, stmts, h.ProjectID, defaultSchemaObjectType)
+	if rel, ok := builtinBases.RelPath(h.SchemaURL); ok && rel == defaultSchemaPath {
+		deployed, err := service.LatestSchemaByObjectType(ctx, stmts, h.ProjectID, defaultSchemaObjectType)
 		if err != nil {
-			return "", err
+			return "", fmt.Errorf("look up the %s schema: %w", defaultSchemaObjectType, err)
 		}
 		if deployed != nil {
 			return deployed.URL, nil
@@ -214,31 +213,6 @@ const (
 	// defaultSchemaObjectType is the objectType that schema declares.
 	defaultSchemaObjectType = "human-user"
 )
-
-// newestSchemaOfType is the project's newest schema declaring objectType, nil
-// when it has none.
-func newestSchemaOfType(ctx context.Context, stmts service.AllStatements, projectID, objectType string) (*domain.JSONSchema, error) {
-	result, err := stmts.ListJSONSchemas(service.WithAuthzListUnrestricted(ctx), &database.ListOptions[domain.JSONSchemaField]{
-		Filter: database.And(
-			database.Equal(database.Col(domain.JSONSchemaFieldProjectID), projectID),
-			database.Equal(database.Col(domain.JSONSchemaFieldObjectType), objectType),
-		),
-		Pagination: database.Page[domain.JSONSchemaField]{
-			Limit: 1,
-			OrderBy: database.OrderBy[domain.JSONSchemaField]{
-				Columns:   []database.Column[domain.JSONSchemaField]{database.Col(domain.JSONSchemaFieldCreatedAt)},
-				Direction: database.OrderDesc,
-			},
-		},
-	}, service.JSONSchemaQueryOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("list %s schemas: %w", objectType, err)
-	}
-	if len(result.Items) == 0 {
-		return nil, nil
-	}
-	return result.Items[0], nil
-}
 
 // loadUserSchema reads the user's schema document so attribute uniqueness can
 // follow its `x-unique` annotations. The row always exists by now:

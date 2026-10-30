@@ -6,6 +6,7 @@ import (
 	"context"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -30,7 +31,7 @@ func TestPlatformProjectSignsInFromTheConsole(t *testing.T) {
 		_, _ = harness.EnsureServiceDB(t).Statements().DeleteProjectByID(context.Background(), domain.PlatformProjectID)
 	})
 	deploy := func() error {
-		return platformbootstrap.EnsureDeployed(t.Context(), harness.EnsureServiceDB(t), helpers.BuiltinSchemaBaseURL, "1.0.0",
+		return platformbootstrap.EnsureDeployed(t.Context(), helpers.BuiltinSchemaBaseURL, time.Now(),
 			helpers.ConsoleOrigin, projects, harness.EnsureReleaseService(t), harness.EnsureDeploymentService(t))
 	}
 	served := func() []domain.OriginDeployment {

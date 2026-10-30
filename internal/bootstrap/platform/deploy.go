@@ -3,11 +3,11 @@ package platform
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
-
-	"golang.org/x/mod/semver"
+	"time"
 
 	"github.com/zitadel/nextgen/api/openapi/endpoints/flow_definitions"
 	"github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
@@ -16,58 +16,37 @@ import (
 	configdefaults "github.com/zitadel/nextgen/packages/config/defaults"
 )
 
-// platformReleasePrefix starts the platform release's message, which ends in
-// the version of the server that built it.
-const platformReleasePrefix = "Platform configuration of server "
-
-// platformUserSchema is the platform user schema as a bundle carries it, with
-// no $id: a bundled schema is identified by its objectType.
-func platformUserSchema(builtinBase string) ([]byte, error) {
-	document, err := schemas.PlatformHumanUserSchema(builtinBase)
-	if err != nil {
-		return nil, fmt.Errorf("platform user schema: %w", err)
-	}
-	var schema map[string]any
-	if err := json.Unmarshal(document, &schema); err != nil {
-		return nil, fmt.Errorf("platform user schema: %w", err)
-	}
-	delete(schema, "$id")
-	return json.Marshal(schema)
-}
+// platformDeployPrefix starts the message of a platform deployment, which ends
+// in when the server that made it was built.
+const platformDeployPrefix = "Platform configuration built "
 
 // EnsureDeployed deploys the platform project the way the CLI deploys any
-// project: consoleOrigin, where the console signs operators in, is a primary
-// origin of it, and the configuration this server ships (the platform user
-// schema, the default login flows and the recommended password policy) is
-// built into one release and deployed
-// to its primary origins. It runs on every start, so an upgrade's defaults go
-// live; a start that changes nothing builds back to the same release and
-// deploys nothing, and a server older than the one that built the live release
-// leaves it alone.
+// project: the configuration this server ships (the platform user schema, the
+// default login flows and the recommended password policy) is built into one
+// release and deployed to consoleOrigin, the project's one primary origin. It
+// runs on every start, so an upgrade's defaults go live. A start that changes
+// nothing deploys nothing, and a server built before the one that made the live
+// deployment leaves it alone.
 func EnsureDeployed(
 	ctx context.Context,
-	pool service.StatementPool,
 	builtinBase string,
-	serverVersion string,
+	builtAt time.Time,
 	consoleOrigin string,
 	projects service.ProjectService,
 	releases service.ReleaseService,
 	deployments *service.DeploymentService,
 ) error {
 	ctx = service.WithAuthzListUnrestricted(ctx)
-	newer, err := newerServerDeployed(ctx, pool, releases, serverVersion, consoleOrigin)
+	live, err := deployments.List(ctx, service.ListDeploymentsInput{ProjectID: domain.PlatformProjectID, Live: true})
 	if err != nil {
-		return err
+		return fmt.Errorf("read the platform deployment: %w", err)
 	}
-	if newer {
-		slog.Info("platform bootstrap: a newer server deployed the platform project", slog.String("version", serverVersion))
+	if deployedByNewerBuild(live.Items, builtAt) {
+		slog.Info("platform bootstrap: a newer server deployed the platform project")
 		return nil
 	}
-	if err := ownPrimaryOrigin(ctx, projects, consoleOrigin); err != nil {
-		return err
-	}
 
-	bundle, err := platformBundle(builtinBase, serverVersion)
+	bundle, err := platformBundle(builtinBase)
 	if err != nil {
 		return err
 	}
@@ -80,44 +59,51 @@ func EnsureDeployed(
 	if err != nil {
 		return fmt.Errorf("build platform release: %w", err)
 	}
-	if _, err := deployments.Deploy(ctx, service.DeployInput{
+
+	// Last, and together: an origin with nothing deployed to it refuses sign-in.
+	if err := ownPrimaryOrigin(ctx, projects, consoleOrigin); err != nil {
+		return err
+	}
+	message := platformDeployPrefix + builtAt.UTC().Format(time.RFC3339)
+	_, err = deployments.Deploy(ctx, service.DeployInput{
 		ProjectID: domain.PlatformProjectID,
 		ReleaseID: built.Release.ID,
 		Targets:   []string{domain.DeploymentTargetPrimary},
 		Reason:    domain.DeploymentReasonDeploy,
-	}); err != nil {
+		Message:   &message,
+	})
+	if errors.Is(err, domain.ErrReleaseRevoked()) {
+		// Content someone revoked builds back to that release. What serves now
+		// keeps serving, which beats a server that cannot start.
+		slog.Warn("platform bootstrap: this server's configuration is a revoked release", slog.String("release_id", built.Release.ID))
+		return nil
+	}
+	if err != nil {
 		return fmt.Errorf("deploy platform release: %w", err)
 	}
 	return nil
 }
 
-// newerServerDeployed reports whether the release the console is served came
-// from a server newer than this one: an older binary still starting, in a
-// rollout or on an old deployment's own URL, must not take the console back.
-func newerServerDeployed(ctx context.Context, pool service.StatementPool, releases service.ReleaseService, serverVersion, consoleOrigin string) (bool, error) {
-	serving, err := pool.Statements().GetNewestPerOrigin(ctx, domain.PlatformProjectID, []string{consoleOrigin})
-	if err != nil {
-		return false, fmt.Errorf("read the platform deployment: %w", err)
+// deployedByNewerBuild reports whether the newest primary deployment came from
+// a server built after builtAt: an older binary still starting, in a rollout or
+// on an old deployment's own URL, must not take the console back. A build with
+// no date, such as a development one, always deploys.
+func deployedByNewerBuild(live []*domain.Deployment, builtAt time.Time) bool {
+	for _, deployment := range live {
+		if deployment.OriginKind != domain.DeploymentOriginKindPrimary {
+			continue
+		}
+		if deployment.Metadata.Message == nil || builtAt.IsZero() {
+			return false
+		}
+		stamp, ok := strings.CutPrefix(*deployment.Metadata.Message, platformDeployPrefix)
+		if !ok {
+			return false
+		}
+		deployedBy, err := time.Parse(time.RFC3339, stamp)
+		return err == nil && deployedBy.After(builtAt)
 	}
-	if len(serving) == 0 {
-		return false, nil
-	}
-	live, err := releases.Get(ctx, domain.PlatformProjectID, serving[0].ReleaseID)
-	if err != nil {
-		return false, fmt.Errorf("read the platform release: %w", err)
-	}
-	if live.Metadata.Message == nil {
-		return false, nil
-	}
-	liveVersion, ok := strings.CutPrefix(*live.Metadata.Message, platformReleasePrefix)
-	return ok && newerVersion(liveVersion, serverVersion), nil
-}
-
-// newerVersion reports whether live is a later version than own. A build with
-// no version, such as `dev`, compares to nothing, so it always deploys.
-func newerVersion(live, own string) bool {
-	live, own = "v"+live, "v"+own
-	return semver.IsValid(live) && semver.IsValid(own) && semver.Compare(live, own) > 0
+	return false
 }
 
 // ownPrimaryOrigin makes consoleOrigin the platform project's one primary
@@ -145,10 +131,10 @@ func ownPrimaryOrigin(ctx context.Context, projects service.ProjectService, cons
 // platformBundle is the configuration this server ships for the platform
 // project, as a release bundle: the documents a `.zitadel/` directory would
 // hold, so the build stores them under ids it mints, as for any project.
-func platformBundle(builtinBase, serverVersion string) (service.BuildReleaseInput, error) {
-	schema, err := platformUserSchema(builtinBase)
+func platformBundle(builtinBase string) (service.BuildReleaseInput, error) {
+	schema, err := schemas.PlatformHumanUserSchema(builtinBase)
 	if err != nil {
-		return service.BuildReleaseInput{}, err
+		return service.BuildReleaseInput{}, fmt.Errorf("platform user schema: %w", err)
 	}
 	flows, err := flow_definitions.DefaultLoginFlowDefinitions(builtinBase, domain.PlatformProjectID)
 	if err != nil {
@@ -161,12 +147,10 @@ func platformBundle(builtinBase, serverVersion string) (service.BuildReleaseInpu
 	if err := json.Unmarshal(configdefaults.DefaultPasswordPolicy(), &policy); err != nil {
 		return service.BuildReleaseInput{}, fmt.Errorf("platform password policy: %w", err)
 	}
-	message := platformReleasePrefix + serverVersion
 	bundle := service.BuildReleaseInput{
 		ProjectID: domain.PlatformProjectID,
-		Schemas:   []service.BuildSchema{{Index: 0, Document: schema}},
-		Policies:  []service.BuildPolicy{{Index: 0, Operation: policy.Operation, Config: policy.Config}},
-		Message:   &message,
+		Schemas:   []service.BuildSchema{{Document: schema}},
+		Policies:  []service.BuildPolicy{{Operation: policy.Operation, Config: policy.Config}},
 	}
 	for i, flow := range flows {
 		purposes := make(map[string]string, len(flow.Purposes))
@@ -176,11 +160,9 @@ func platformBundle(builtinBase, serverVersion string) (service.BuildReleaseInpu
 		bundle.FlowDefinitions = append(bundle.FlowDefinitions, service.BuildFlowDefinition{
 			Index: i,
 			Request: service.FlowDefinitionRequest{
-				ProjectID:     domain.PlatformProjectID,
 				Name:          flow.Name,
 				Status:        flow.Status.String(),
 				SchemaVersion: "1.0.0",
-				FlowSchemaURI: configdefaults.DefaultFlowSchemaURI,
 				UserSchema:    flow.UserSchema,
 				Purposes:      purposes,
 				Audience:      flow.Audience,

@@ -339,7 +339,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	// there like any other project. Before the user import, which needs the
 	// platform user schema this release stores.
 	if cfg.Platform.BootstrapProject {
-		if err := platform.EnsureDeployed(ctx, serviceDBPool, cfg.Schema.BuiltinPublicBase, build.Version(), consoleHosts[0], projectService, releaseService, deploymentService); err != nil {
+		if err := platform.EnsureDeployed(ctx, cfg.Schema.BuiltinPublicBase, build.Date(), consoleHosts[0], projectService, releaseService, deploymentService); err != nil {
 			return fmt.Errorf("failed to deploy the platform project: %w", err)
 		}
 	}

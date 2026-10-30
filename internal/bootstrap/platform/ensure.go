@@ -66,8 +66,9 @@ func Ensure(ctx context.Context, projects ProjectCreator, pool service.Statement
 // the case at hand, not a full health check — it does not verify the signing
 // key. Everything this bootstrap creates shares one transaction, so a project
 // it created has all of them or none, and a project it did not create is the
-// bare row. A project assembled some other way could still pass; validating each resource belongs with in-place seeding
-// (#527's provisioner), which is the real fix and is not implemented here.
+// bare row. A project assembled some other way could still pass; validating
+// each resource belongs with in-place seeding (#527's provisioner), which is the
+// real fix and is not implemented here.
 func confirmSeeded(ctx context.Context, pool service.StatementPool) error {
 	_, err := pool.Statements().GetEncryptionKey(ctx, database.And(
 		database.Equal(database.Col(domain.EncryptionKeyFieldProjectID), domain.PlatformProjectID),

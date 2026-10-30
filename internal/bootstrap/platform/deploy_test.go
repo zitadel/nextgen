@@ -2,6 +2,7 @@ package platform
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -10,22 +11,32 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
-func TestNewerVersion(t *testing.T) {
+func TestDeployedByNewerBuild(t *testing.T) {
+	earlier := time.Date(2026, 10, 1, 12, 0, 0, 0, time.UTC)
+	later := earlier.Add(time.Hour)
+	primary := func(message string) *domain.Deployment {
+		return &domain.Deployment{OriginKind: domain.DeploymentOriginKindPrimary, Metadata: domain.DeploymentMetadata{Message: &message}}
+	}
+	builtAt := func(when time.Time) string { return platformDeployPrefix + when.Format(time.RFC3339) }
+	preview := &domain.Deployment{OriginKind: domain.DeploymentOriginKindPreview}
+
 	for _, tt := range []struct {
 		name string
-		live string
-		own  string
+		live []*domain.Deployment
+		own  time.Time
 		want bool
 	}{
-		{"a later release", "0.4.0", "0.3.0", true},
-		{"the same release", "0.3.0", "0.3.0", false},
-		{"an earlier release", "0.2.0", "0.3.0", false},
-		{"a release after its prerelease", "0.3.0", "0.3.0-alpha.1", true},
-		{"a development build always deploys", "0.3.0", "dev", false},
-		{"a release replaces a development build", "dev", "0.3.0", false},
+		{"nothing is live", nil, earlier, false},
+		{"a later build is live", []*domain.Deployment{primary(builtAt(later))}, earlier, true},
+		{"the same build is live", []*domain.Deployment{primary(builtAt(earlier))}, earlier, false},
+		{"an earlier build is live", []*domain.Deployment{primary(builtAt(earlier))}, later, false},
+		{"a development build always deploys", []*domain.Deployment{primary(builtAt(later))}, time.Time{}, false},
+		{"a release replaces a development build", []*domain.Deployment{primary(builtAt(time.Time{}))}, earlier, false},
+		{"a deployment of someone else's says nothing", []*domain.Deployment{primary("by hand")}, earlier, false},
+		{"a preview is not what the console is served", []*domain.Deployment{preview, primary(builtAt(later))}, earlier, true},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, newerVersion(tt.live, tt.own))
+			assert.Equal(t, tt.want, deployedByNewerBuild(tt.live, tt.own))
 		})
 	}
 }
@@ -33,12 +44,10 @@ func TestNewerVersion(t *testing.T) {
 func TestPlatformBundleIsTheServersDefaults(t *testing.T) {
 	const builtinBase = "https://example.com/api/schemas"
 
-	bundle, err := platformBundle(builtinBase, "1.2.3")
+	bundle, err := platformBundle(builtinBase)
 	require.NoError(t, err)
 
 	assert.Equal(t, domain.PlatformProjectID, bundle.ProjectID)
-	require.NotNil(t, bundle.Message)
-	assert.Equal(t, platformReleasePrefix+"1.2.3", *bundle.Message)
 	require.Len(t, bundle.Schemas, 1, "the platform user schema")
 	assert.False(t, domain.SchemaDocumentHasTopLevelID(bundle.Schemas[0].Document), "a bundled schema carries no $id")
 

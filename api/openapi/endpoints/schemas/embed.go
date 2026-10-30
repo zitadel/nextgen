@@ -31,8 +31,8 @@ const platformDisplayNameMaxLength = 200
 
 // PlatformHumanUserSchema is the platform project's user schema: the default
 // plus an optional display name, so the people operating Zitadel can name
-// themselves. Derived from the default so the two cannot drift; it keeps the
-// default's `$id`, which the admin seed documents point at.
+// themselves. Derived from the default so the two cannot drift, without its
+// `$id`: it is a bundled document, stored under an id the release build mints.
 func PlatformHumanUserSchema(serverURL string) ([]byte, error) {
 	var doc map[string]any
 	if err := json.Unmarshal(DefaultHumanUserSchema(serverURL), &doc); err != nil {
@@ -48,6 +48,7 @@ func PlatformHumanUserSchema(serverURL string) ([]byte, error) {
 		"description": "The user's name, shown in place of their email.",
 	}
 	doc["x-display"] = []any{PlatformDisplayNameProperty}
+	delete(doc, "$id")
 	return json.MarshalIndent(doc, "", "  ")
 }
 
