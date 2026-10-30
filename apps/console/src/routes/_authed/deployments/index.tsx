@@ -4,7 +4,7 @@ import { useState } from "react";
 
 import { DeploySheet } from "@/components/deploy-sheet";
 import { DeploymentStatusBadge } from "@/components/deployment-status-badge";
-import { OriginLink } from "@/components/origin-link";
+import { TargetLink } from "@/components/origin-link";
 import { RollbackSheet } from "@/components/rollback-sheet";
 
 import {
@@ -39,6 +39,7 @@ import {
   listProjectDeployments,
   releaseRevoked,
   livePrimaryReleaseId,
+  targetName,
 } from "@/lib/deployment";
 import {
   projectScopeDeps,
@@ -234,7 +235,7 @@ function DeploymentRowItem({
  * count. The count opens the list: each origin opens its target and copies.
  */
 function Targets({ deployment }: { deployment: Deployment }) {
-  const origins = deployment.targets.map((target) => target.origin);
+  const { targets } = deployment;
   return (
     <div className="flex min-w-0 flex-col">
       <Popover>
@@ -246,21 +247,27 @@ function Targets({ deployment }: { deployment: Deployment }) {
             size="xs"
             className="h-5 w-fit px-0! text-sm font-normal text-foreground"
           >
-            {origins.length} {origins.length === 1 ? "origin" : "origins"}
+            {targets.length} {targets.length === 1 ? "target" : "targets"}
           </Button>
         </PopoverTrigger>
         {/* Each origin opens what it serves, and copies in full: a preview
             URL is long, and the one on screen is the one to paste. */}
         <PopoverContent align="start" className="w-auto max-w-96 p-2">
           <ul className="flex flex-col gap-1">
-            {origins.map((origin) => (
-              <li key={origin} className="flex min-w-0 items-center gap-1">
-                <OriginLink
-                  origin={origin}
+            {targets.map((target) => (
+              <li key={targetName(target)} className="flex min-w-0 items-center gap-1">
+                <TargetLink
+                  target={target}
                   className="min-w-0 text-xs font-normal text-foreground"
                   iconClassName="text-muted-foreground"
                 />
-                <CopyButton value={origin} label={`Copy ${origin}`} className="size-6 shrink-0" />
+                {target.type === "origin" ? (
+                  <CopyButton
+                    value={target.origin}
+                    label={`Copy ${target.origin}`}
+                    className="size-6 shrink-0"
+                  />
+                ) : null}
               </li>
             ))}
           </ul>

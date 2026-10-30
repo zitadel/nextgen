@@ -38,17 +38,17 @@ func releaseInUseResponse(err error) (*api.RevokeReleaseConflict, bool) {
 	if !ok {
 		return nil, false
 	}
-	origins := make([]api.RevokeReleaseConflictDetailsOriginsItem, len(details.Origins))
+	targets := make([]api.RevokeReleaseConflictDetailsTargetsItem, len(details.Origins))
 	for i, origin := range details.Origins {
-		origins[i] = api.RevokeReleaseConflictDetailsOriginsItem{
-			Origin:       api.DeploymentTargetOrigin(origin.Origin),
+		targets[i] = api.RevokeReleaseConflictDetailsTargetsItem{
+			Target:       toAPIDeploymentTarget(origin.Origin),
 			DeploymentID: api.DeploymentID(origin.DeploymentID),
 		}
 	}
 	return &api.RevokeReleaseConflict{
 		Code:    api.ErrorCode(de.Code),
 		Message: de.Message,
-		Details: api.RevokeReleaseConflictDetails{Origins: origins},
+		Details: api.RevokeReleaseConflictDetails{Targets: targets},
 	}, true
 }
 

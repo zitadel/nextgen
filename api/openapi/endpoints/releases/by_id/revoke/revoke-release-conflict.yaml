@@ -15,20 +15,20 @@ properties:
   details:
     type: object
     required:
-      - origins
+      - targets
     properties:
-      origins:
+      targets:
         type: array
         minItems: 1
-        description: Every origin that still serves the release.
+        description: Every target that still serves the release.
         items:
           type: object
           required:
-            - origin
+            - target
             - deployment_id
           properties:
-            origin:
-              $ref: ../../../deployments/deployment-target-origin.yaml
+            target:
+              $ref: ../../../deployments/deployment-target.yaml
             deployment_id:
               $ref: ../../../../components/schemas/deployment-id.yaml
-              description: The newest deployment to the origin, which pins the release.
+              description: The newest deployment to the target, which pins the release.

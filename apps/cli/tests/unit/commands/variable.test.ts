@@ -1258,7 +1258,7 @@ describe("variable resolve", () => {
   it("reads the frozen map of the newest live deployment", async () => {
     const cwd = await makeProject();
     server.use(
-      live([{ id: "dep_1", targets: [{ origin: "https://app.acme.com" }] }]),
+      live([{ id: "dep_1", targets: [{ type: "origin", origin: "https://app.acme.com" }] }]),
       http.get("*/deployments/:id/variables", ({ params }) => {
         expect(String(params.id)).toBe("dep_1");
         return HttpResponse.json({ API_URL: "https://api.acme.com", TOKEN: { secret: true } });
@@ -1289,8 +1289,8 @@ describe("variable resolve", () => {
     let variablesRequested = false;
     server.use(
       live([
-        { id: "dep_a", targets: [{ origin: "https://app.acme.com" }] },
-        { id: "dep_b", targets: [{ origin: "https://admin.acme.com" }] },
+        { id: "dep_a", targets: [{ type: "origin", origin: "https://app.acme.com" }] },
+        { id: "dep_b", targets: [{ type: "origin", origin: "https://admin.acme.com" }] },
       ]),
       http.get("*/deployments/:id/variables", () => {
         variablesRequested = true;
@@ -1313,7 +1313,7 @@ describe("variable resolve", () => {
     let origin: string | null = "unset";
     server.use(
       http.get("*/deployments", ({ request }) => {
-        origin = new URL(request.url).searchParams.get("origin");
+        origin = new URL(request.url).searchParams.get("target");
         return HttpResponse.json({ deployments: [{ id: "dep_2", targets: [] }] });
       }),
       http.get("*/deployments/:id/variables", () => HttpResponse.json({})),

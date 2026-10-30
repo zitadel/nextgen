@@ -14,6 +14,7 @@ import {
   type StepContext,
   validateStep,
   worktreeIsDirty,
+  targetName,
 } from "../lib/release";
 import { ApiError } from "@zitadel/api/runtime/fetch";
 
@@ -156,7 +157,7 @@ export default class Deploy extends EnvironmentCommand {
     // server refuses with 409 rather than overwriting that deploy unseen (#538).
     const live = await listLiveDeployments(client, projectId);
     const observed = live.find((deployment) =>
-      deployment.targets.some((entry) => landing.includes(entry.origin)),
+      deployment.targets.some((entry) => landing.includes(targetName(entry))),
     )?.id;
     const targets = ["primary"];
     let deployment: Awaited<ReturnType<typeof createDeployment>>;
@@ -205,7 +206,7 @@ export default class Deploy extends EnvironmentCommand {
       );
     }
 
-    const servedOrigins = deployment.targets.map((target) => target.origin);
+    const servedOrigins = deployment.targets.map(targetName);
     this.recordTelemetry({ origin_count: servedOrigins.length });
     return this.emit({
       status: "ok",

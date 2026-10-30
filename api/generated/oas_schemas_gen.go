@@ -21056,8 +21056,9 @@ type Deployment struct {
 	// when the request named the release by `content_hash`.
 	ReleaseID ReleaseID      `json:"release_id"`
 	Kind      DeploymentKind `json:"kind"`
-	// The resolved origins, sorted. For `primary`, the project's primary
-	// origins at creation. The live view lists only the targets still served.
+	// The resolved targets, sorted. For `primary`, the project's primary
+	// origins at creation, and the default target when the deployment named
+	// it. The live view lists only the targets still served.
 	Targets []DeploymentTarget `json:"targets"`
 	Status  DeploymentStatus   `json:"status"`
 	// When the deployment was created.
@@ -21776,6 +21777,22 @@ func (s *DeploymentCreatedPayload) SetRollbackTo(val OptString) {
 	s.RollbackTo = val
 }
 
+// The project's default target, the one a caller with no origin is served.
+// Ref: #
+type DeploymentDefaultTarget struct {
+	Type string `json:"type"`
+}
+
+// GetType returns the value of Type.
+func (s *DeploymentDefaultTarget) GetType() string {
+	return s.Type
+}
+
+// SetType sets the value of Type.
+func (s *DeploymentDefaultTarget) SetType(val string) {
+	s.Type = val
+}
+
 // A related object to embed on each returned deployment.
 // - `release`: the release this deployment made live, as `release` on each
 // deployment — the same representation `GET /releases/{release_id}` serves.
@@ -21875,7 +21892,8 @@ func (s *DeploymentGuardConflictDetails) SetDeployment(val NilDeployment) {
 
 type DeploymentID string
 
-// `primary` for the project's primary origins, `preview` for preview URLs.
+// `preview` for preview URLs. `primary` for the project's primary origins, its
+// default target, or both: read `targets` to see which.
 // Ref: #
 type DeploymentKind string
 
@@ -22039,6 +22057,46 @@ func (s *DeploymentMetadataDeployedByType) UnmarshalText(data []byte) error {
 	}
 }
 
+// A web origin a deployment made its release live on.
+// Ref: #
+type DeploymentOriginTarget struct {
+	Type   string `json:"type"`
+	Origin Origin `json:"origin"`
+	// Preview URLs only: the expiry this deployment set. A later deployment
+	// to the URL records its own.
+	ExpiresAt OptDateTime `json:"expires_at"`
+}
+
+// GetType returns the value of Type.
+func (s *DeploymentOriginTarget) GetType() string {
+	return s.Type
+}
+
+// GetOrigin returns the value of Origin.
+func (s *DeploymentOriginTarget) GetOrigin() Origin {
+	return s.Origin
+}
+
+// GetExpiresAt returns the value of ExpiresAt.
+func (s *DeploymentOriginTarget) GetExpiresAt() OptDateTime {
+	return s.ExpiresAt
+}
+
+// SetType sets the value of Type.
+func (s *DeploymentOriginTarget) SetType(val string) {
+	s.Type = val
+}
+
+// SetOrigin sets the value of Origin.
+func (s *DeploymentOriginTarget) SetOrigin(val Origin) {
+	s.Origin = val
+}
+
+// SetExpiresAt sets the value of ExpiresAt.
+func (s *DeploymentOriginTarget) SetExpiresAt(val OptDateTime) {
+	s.ExpiresAt = val
+}
+
 // Why the deployment was created: `deploy`, or `rollback` when an earlier
 // release goes live again. The rollback operation always records `rollback`;
 // `POST /deployments` may too, and then `rollback_to` is null.
@@ -22130,36 +22188,80 @@ func (s *DeploymentStatus) UnmarshalText(data []byte) error {
 	}
 }
 
-// One origin a deployment made its release live on.
+// One target a deployment made its release live on. Discriminate on `type`.
+// - `origin`: a web origin, named by `origin`.
+// - `default`: the project's default target, the one a caller with no origin is
+// served. It has no origin.
 // Ref: #
+// DeploymentTarget represents sum type.
 type DeploymentTarget struct {
-	Origin DeploymentTargetOrigin `json:"origin"`
-	// Preview URLs only: the expiry this deployment set. A later deployment
-	// to the URL records its own.
-	ExpiresAt OptDateTime `json:"expires_at"`
+	Type                    DeploymentTargetType // switch on this field
+	DeploymentOriginTarget  DeploymentOriginTarget
+	DeploymentDefaultTarget DeploymentDefaultTarget
 }
 
-// GetOrigin returns the value of Origin.
-func (s *DeploymentTarget) GetOrigin() DeploymentTargetOrigin {
-	return s.Origin
+// DeploymentTargetType is oneOf type of DeploymentTarget.
+type DeploymentTargetType string
+
+// Possible values for DeploymentTargetType.
+const (
+	DeploymentOriginTargetDeploymentTarget  DeploymentTargetType = "origin"
+	DeploymentDefaultTargetDeploymentTarget DeploymentTargetType = "default"
+)
+
+// IsDeploymentOriginTarget reports whether DeploymentTarget is DeploymentOriginTarget.
+func (s DeploymentTarget) IsDeploymentOriginTarget() bool {
+	return s.Type == DeploymentOriginTargetDeploymentTarget
 }
 
-// GetExpiresAt returns the value of ExpiresAt.
-func (s *DeploymentTarget) GetExpiresAt() OptDateTime {
-	return s.ExpiresAt
+// IsDeploymentDefaultTarget reports whether DeploymentTarget is DeploymentDefaultTarget.
+func (s DeploymentTarget) IsDeploymentDefaultTarget() bool {
+	return s.Type == DeploymentDefaultTargetDeploymentTarget
 }
 
-// SetOrigin sets the value of Origin.
-func (s *DeploymentTarget) SetOrigin(val DeploymentTargetOrigin) {
-	s.Origin = val
+// SetDeploymentOriginTarget sets DeploymentTarget to DeploymentOriginTarget.
+func (s *DeploymentTarget) SetDeploymentOriginTarget(v DeploymentOriginTarget) {
+	s.Type = DeploymentOriginTargetDeploymentTarget
+	s.DeploymentOriginTarget = v
 }
 
-// SetExpiresAt sets the value of ExpiresAt.
-func (s *DeploymentTarget) SetExpiresAt(val OptDateTime) {
-	s.ExpiresAt = val
+// GetDeploymentOriginTarget returns DeploymentOriginTarget and true boolean if DeploymentTarget is DeploymentOriginTarget.
+func (s DeploymentTarget) GetDeploymentOriginTarget() (v DeploymentOriginTarget, ok bool) {
+	if !s.IsDeploymentOriginTarget() {
+		return v, false
+	}
+	return s.DeploymentOriginTarget, true
 }
 
-type DeploymentTargetOrigin string
+// NewDeploymentOriginTargetDeploymentTarget returns new DeploymentTarget from DeploymentOriginTarget.
+func NewDeploymentOriginTargetDeploymentTarget(v DeploymentOriginTarget) DeploymentTarget {
+	var s DeploymentTarget
+	s.SetDeploymentOriginTarget(v)
+	return s
+}
+
+// SetDeploymentDefaultTarget sets DeploymentTarget to DeploymentDefaultTarget.
+func (s *DeploymentTarget) SetDeploymentDefaultTarget(v DeploymentDefaultTarget) {
+	s.Type = DeploymentDefaultTargetDeploymentTarget
+	s.DeploymentDefaultTarget = v
+}
+
+// GetDeploymentDefaultTarget returns DeploymentDefaultTarget and true boolean if DeploymentTarget is DeploymentDefaultTarget.
+func (s DeploymentTarget) GetDeploymentDefaultTarget() (v DeploymentDefaultTarget, ok bool) {
+	if !s.IsDeploymentDefaultTarget() {
+		return v, false
+	}
+	return s.DeploymentDefaultTarget, true
+}
+
+// NewDeploymentDefaultTargetDeploymentTarget returns new DeploymentTarget from DeploymentDefaultTarget.
+func NewDeploymentDefaultTargetDeploymentTarget(v DeploymentDefaultTarget) DeploymentTarget {
+	var s DeploymentTarget
+	s.SetDeploymentDefaultTarget(v)
+	return s
+}
+
+type DeploymentTargetName string
 
 type DeploymentTargetsRequest []string
 
@@ -51581,38 +51683,38 @@ func (o OptDeploymentReason) Or(d DeploymentReason) DeploymentReason {
 	return d
 }
 
-// NewOptDeploymentTargetOrigin returns new OptDeploymentTargetOrigin with value set to v.
-func NewOptDeploymentTargetOrigin(v DeploymentTargetOrigin) OptDeploymentTargetOrigin {
-	return OptDeploymentTargetOrigin{
+// NewOptDeploymentTargetName returns new OptDeploymentTargetName with value set to v.
+func NewOptDeploymentTargetName(v DeploymentTargetName) OptDeploymentTargetName {
+	return OptDeploymentTargetName{
 		Value: v,
 		Set:   true,
 	}
 }
 
-// OptDeploymentTargetOrigin is optional DeploymentTargetOrigin.
-type OptDeploymentTargetOrigin struct {
-	Value DeploymentTargetOrigin
+// OptDeploymentTargetName is optional DeploymentTargetName.
+type OptDeploymentTargetName struct {
+	Value DeploymentTargetName
 	Set   bool
 }
 
-// IsSet returns true if OptDeploymentTargetOrigin was set.
-func (o OptDeploymentTargetOrigin) IsSet() bool { return o.Set }
+// IsSet returns true if OptDeploymentTargetName was set.
+func (o OptDeploymentTargetName) IsSet() bool { return o.Set }
 
 // Reset unsets value.
-func (o *OptDeploymentTargetOrigin) Reset() {
-	var v DeploymentTargetOrigin
+func (o *OptDeploymentTargetName) Reset() {
+	var v DeploymentTargetName
 	o.Value = v
 	o.Set = false
 }
 
 // SetTo sets value to v.
-func (o *OptDeploymentTargetOrigin) SetTo(v DeploymentTargetOrigin) {
+func (o *OptDeploymentTargetName) SetTo(v DeploymentTargetName) {
 	o.Set = true
 	o.Value = v
 }
 
 // Get returns value and boolean that denotes whether value was set.
-func (o OptDeploymentTargetOrigin) Get() (v DeploymentTargetOrigin, ok bool) {
+func (o OptDeploymentTargetName) Get() (v DeploymentTargetName, ok bool) {
 	if !o.Set {
 		return v, false
 	}
@@ -51620,7 +51722,7 @@ func (o OptDeploymentTargetOrigin) Get() (v DeploymentTargetOrigin, ok bool) {
 }
 
 // Or returns value if set, or given parameter if does not.
-func (o OptDeploymentTargetOrigin) Or(d DeploymentTargetOrigin) DeploymentTargetOrigin {
+func (o OptDeploymentTargetName) Or(d DeploymentTargetName) DeploymentTargetName {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -81042,43 +81144,43 @@ func (s *RevokeReleaseConflict) SetDetails(val RevokeReleaseConflictDetails) {
 func (*RevokeReleaseConflict) revokeReleaseRes() {}
 
 type RevokeReleaseConflictDetails struct {
-	// Every origin that still serves the release.
-	Origins []RevokeReleaseConflictDetailsOriginsItem `json:"origins"`
+	// Every target that still serves the release.
+	Targets []RevokeReleaseConflictDetailsTargetsItem `json:"targets"`
 }
 
-// GetOrigins returns the value of Origins.
-func (s *RevokeReleaseConflictDetails) GetOrigins() []RevokeReleaseConflictDetailsOriginsItem {
-	return s.Origins
+// GetTargets returns the value of Targets.
+func (s *RevokeReleaseConflictDetails) GetTargets() []RevokeReleaseConflictDetailsTargetsItem {
+	return s.Targets
 }
 
-// SetOrigins sets the value of Origins.
-func (s *RevokeReleaseConflictDetails) SetOrigins(val []RevokeReleaseConflictDetailsOriginsItem) {
-	s.Origins = val
+// SetTargets sets the value of Targets.
+func (s *RevokeReleaseConflictDetails) SetTargets(val []RevokeReleaseConflictDetailsTargetsItem) {
+	s.Targets = val
 }
 
-type RevokeReleaseConflictDetailsOriginsItem struct {
-	Origin DeploymentTargetOrigin `json:"origin"`
-	// The newest deployment to the origin, which pins the release.
+type RevokeReleaseConflictDetailsTargetsItem struct {
+	Target DeploymentTarget `json:"target"`
+	// The newest deployment to the target, which pins the release.
 	DeploymentID DeploymentID `json:"deployment_id"`
 }
 
-// GetOrigin returns the value of Origin.
-func (s *RevokeReleaseConflictDetailsOriginsItem) GetOrigin() DeploymentTargetOrigin {
-	return s.Origin
+// GetTarget returns the value of Target.
+func (s *RevokeReleaseConflictDetailsTargetsItem) GetTarget() DeploymentTarget {
+	return s.Target
 }
 
 // GetDeploymentID returns the value of DeploymentID.
-func (s *RevokeReleaseConflictDetailsOriginsItem) GetDeploymentID() DeploymentID {
+func (s *RevokeReleaseConflictDetailsTargetsItem) GetDeploymentID() DeploymentID {
 	return s.DeploymentID
 }
 
-// SetOrigin sets the value of Origin.
-func (s *RevokeReleaseConflictDetailsOriginsItem) SetOrigin(val DeploymentTargetOrigin) {
-	s.Origin = val
+// SetTarget sets the value of Target.
+func (s *RevokeReleaseConflictDetailsTargetsItem) SetTarget(val DeploymentTarget) {
+	s.Target = val
 }
 
 // SetDeploymentID sets the value of DeploymentID.
-func (s *RevokeReleaseConflictDetailsOriginsItem) SetDeploymentID(val DeploymentID) {
+func (s *RevokeReleaseConflictDetailsTargetsItem) SetDeploymentID(val DeploymentID) {
 	s.DeploymentID = val
 }
 

@@ -8,7 +8,12 @@ import type {
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope, nonBlankArg } from "../../lib/oclif";
 import { collectPages } from "../../lib/oclif/crud/paging";
 import { renderTable } from "../../lib/oclif/crud/table";
-import { listLiveDeployments, rollbackDeployment, servesPrimary } from "../../lib/release";
+import {
+  listLiveDeployments,
+  rollbackDeployment,
+  servesPrimary,
+  targetName,
+} from "../../lib/release";
 import { toZitadelError, ZitadelError } from "../../lib/errors";
 import { Promptable } from "../../lib/oclif/promptable";
 import { reportWarning } from "../../lib/warnings";
@@ -135,7 +140,7 @@ export default class DeploymentRollback extends Promptable(EnvironmentCommand) {
       );
     }
 
-    const origins = deployment.targets.map((target) => target.origin);
+    const origins = deployment.targets.map(targetName);
     return this.emit({
       status: "ok",
       data: {

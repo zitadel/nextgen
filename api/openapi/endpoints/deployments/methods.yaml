@@ -87,8 +87,10 @@ post:
                 release_id: rel_01KX3RG8A7F0N9WD3P2E4YM5C1
                 kind: primary
                 targets:
-                  - origin: https://app.acme.com
-                  - origin: https://www.acme.com
+                  - type: origin
+                    origin: https://app.acme.com
+                  - type: origin
+                    origin: https://www.acme.com
                 status: live
                 deployed_at: '2026-10-01T09:30:00Z'
                 metadata:
@@ -114,8 +116,10 @@ post:
                 release_id: rel_01KX3RG8A7F0N9WD3P2E4YM5C1
                 kind: primary
                 targets:
-                  - origin: https://app.acme.com
-                  - origin: https://www.acme.com
+                  - type: origin
+                    origin: https://app.acme.com
+                  - type: origin
+                    origin: https://www.acme.com
                 status: live
                 deployed_at: '2026-10-02T14:52:00Z'
                 metadata:
@@ -133,9 +137,11 @@ post:
                 release_id: rel_01KX3RG8A7F0N9WD3P2E4YM5C1
                 kind: preview
                 targets:
-                  - origin: https://acme-git-sso-acmeinc.vercel.app
+                  - type: origin
+                    origin: https://acme-git-sso-acmeinc.vercel.app
                     expires_at: '2026-10-09T14:10:00Z'
-                  - origin: https://acme-k3x9v2-acmeinc.vercel.app
+                  - type: origin
+                    origin: https://acme-k3x9v2-acmeinc.vercel.app
                     expires_at: '2026-10-09T14:10:00Z'
                 status: live
                 deployed_at: '2026-10-02T14:10:00Z'
@@ -229,8 +235,10 @@ post:
                     release_id: rel_01KX2QF7Z6D0F0N9WD3P2E4YM40
                     kind: primary
                     targets:
-                      - origin: https://app.acme.com
-                      - origin: https://www.acme.com
+                      - type: origin
+                        origin: https://app.acme.com
+                      - type: origin
+                        origin: https://www.acme.com
                     status: live
                     deployed_at: '2026-10-02T15:03:00Z'
                     metadata:
@@ -270,7 +278,7 @@ get:
     - Deployments
   parameters:
     - $ref: ../../components/parameters/project-id.yaml
-    - $ref: ../../components/parameters/origin-filter.yaml
+    - $ref: ../../components/parameters/deployment-target-filter.yaml
     - name: live
       in: query
       required: false
@@ -318,8 +326,10 @@ get:
                     release_id: rel_01KX2QF7Z6D0F0N9WD3P2E4YM40
                     kind: primary
                     targets:
-                      - origin: https://app.acme.com
-                      - origin: https://www.acme.com
+                      - type: origin
+                        origin: https://app.acme.com
+                      - type: origin
+                        origin: https://www.acme.com
                     status: live
                     deployed_at: '2026-10-02T15:03:00Z'
                     metadata:
@@ -333,7 +343,8 @@ get:
                     release_id: rel_01KX3RG8A7F0N9WD3P2E4YM5C1
                     kind: preview
                     targets:
-                      - origin: https://acme-git-sso-acmeinc.vercel.app
+                      - type: origin
+                        origin: https://acme-git-sso-acmeinc.vercel.app
                         expires_at: '2026-10-09T14:58:00Z'
                     status: live
                     deployed_at: '2026-10-02T14:58:00Z'
@@ -348,8 +359,10 @@ get:
                     release_id: rel_01KX3RG8A7F0N9WD3P2E4YM5C1
                     kind: primary
                     targets:
-                      - origin: https://app.acme.com
-                      - origin: https://www.acme.com
+                      - type: origin
+                        origin: https://app.acme.com
+                      - type: origin
+                        origin: https://www.acme.com
                     status: inactive
                     deployed_at: '2026-10-02T14:52:00Z'
                     metadata:
@@ -363,8 +376,10 @@ get:
                     release_id: rel_01KX2QF7Z6D0F0N9WD3P2E4YM40
                     kind: primary
                     targets:
-                      - origin: https://app.acme.com
-                      - origin: https://www.acme.com
+                      - type: origin
+                        origin: https://app.acme.com
+                      - type: origin
+                        origin: https://www.acme.com
                     status: inactive
                     deployed_at: '2026-10-01T09:30:00Z'
                     metadata:
@@ -383,8 +398,10 @@ get:
                     release_id: rel_01KX2QF7Z6D0F0N9WD3P2E4YM40
                     kind: primary
                     targets:
-                      - origin: https://app.acme.com
-                      - origin: https://www.acme.com
+                      - type: origin
+                        origin: https://app.acme.com
+                      - type: origin
+                        origin: https://www.acme.com
                     status: live
                     deployed_at: '2026-10-02T15:03:00Z'
                     metadata:
@@ -398,7 +415,8 @@ get:
                     release_id: rel_01KX3RG8A7F0N9WD3P2E4YM5C1
                     kind: preview
                     targets:
-                      - origin: https://acme-git-sso-acmeinc.vercel.app
+                      - type: origin
+                        origin: https://acme-git-sso-acmeinc.vercel.app
                         expires_at: '2026-10-09T14:58:00Z'
                     status: live
                     deployed_at: '2026-10-02T14:58:00Z'
@@ -418,8 +436,10 @@ get:
                     release_id: rel_01KX3RG8A7F0N9WD3P2E4YM5C1
                     kind: primary
                     targets:
-                      - origin: https://app.acme.com
-                      - origin: https://www.acme.com
+                      - type: origin
+                        origin: https://app.acme.com
+                      - type: origin
+                        origin: https://www.acme.com
                     status: inactive
                     deployed_at: '2026-10-02T14:52:00Z'
                     metadata:

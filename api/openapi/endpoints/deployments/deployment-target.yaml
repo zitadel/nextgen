@@ -1,15 +1,15 @@
 title: DeploymentTarget
-type: object
-description: One origin a deployment made its release live on.
-required:
-  - origin
-properties:
-  origin:
-    $ref: deployment-target-origin.yaml
-  expires_at:
-    type: string
-    format: date-time
-    description: |
-      Preview URLs only: the expiry this deployment set. A later deployment
-      to the URL records its own.
-    example: '2026-10-09T14:10:00Z'
+description: |
+  One target a deployment made its release live on. Discriminate on `type`.
+
+  - `origin`: a web origin, named by `origin`.
+  - `default`: the project's default target, the one a caller with no origin is
+    served. It has no origin.
+oneOf:
+  - $ref: deployment-origin-target.yaml
+  - $ref: deployment-default-target.yaml
+discriminator:
+  propertyName: type
+  mapping:
+    origin: deployment-origin-target.yaml
+    default: deployment-default-target.yaml

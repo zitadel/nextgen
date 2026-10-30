@@ -108,7 +108,7 @@ func TestDefaultTarget(t *testing.T) {
 
 	history, err := fixture.client.ListDeployments(t.Context(), api.ListDeploymentsParams{
 		ProjectID: api.ProjectID(fixture.project),
-		Origin:    api.NewOptDeploymentTargetOrigin(domain.DeploymentTargetDefault),
+		Target:    api.NewOptDeploymentTargetName(domain.DeploymentTargetDefault),
 	})
 	require.NoError(t, err)
 	require.IsType(t, &api.ListDeploymentsResponse{}, history, helpers.MustMarshal(t, history))

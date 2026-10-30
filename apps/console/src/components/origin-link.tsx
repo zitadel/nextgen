@@ -1,6 +1,7 @@
 import { Link as LinkIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import type { DeploymentTarget } from "@/lib/deployment";
 import { cn } from "@/lib/utils";
 
 /**
@@ -25,4 +26,23 @@ export function OriginLink({
       </a>
     </Button>
   );
+}
+
+/**
+ * A deployment's target: its origin as a link, or the default target, which has
+ * no address to open.
+ */
+export function TargetLink({
+  target,
+  className,
+  iconClassName,
+}: {
+  target: DeploymentTarget;
+  className?: string;
+  iconClassName?: string;
+}) {
+  if (target.type === "default") {
+    return <span className={cn("text-xs", className)}>Default target</span>;
+  }
+  return <OriginLink origin={target.origin} className={className} iconClassName={iconClassName} />;
 }

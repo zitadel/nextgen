@@ -1,5 +1,6 @@
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope, nonBlankArg } from "../../lib/oclif";
 import { frozenVariables, toVariableRows } from "../../lib/variables";
+import { targetName } from "../../lib/release";
 
 /**
  * `zitadel deployment get <deployment_id>` — read one deployment record: the
@@ -27,7 +28,7 @@ export default class DeploymentGet extends EnvironmentCommand {
       this.jsonEnabled() ? undefined : client.getDeploymentVariables(args.deployment_id, scope),
     ]);
 
-    const origins = deployment.targets.map((target) => target.origin);
+    const origins = deployment.targets.map(targetName);
     return this.emit({
       status: "ok",
       data: deployment,

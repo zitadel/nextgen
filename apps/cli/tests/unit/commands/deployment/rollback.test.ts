@@ -42,7 +42,7 @@ describe("deployment rollback", () => {
                 {
                   id: "dep_landed_since",
                   release_id: "rel_x",
-                  targets: [{ origin: "https://app.acme.com", expires_at: null }],
+                  targets: [{ type: "origin", origin: "https://app.acme.com", expires_at: null }],
                   reason: "deploy",
                   deployed_at: "2026-01-02T00:00:00.000Z",
                 },

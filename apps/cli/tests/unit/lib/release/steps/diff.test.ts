@@ -13,7 +13,7 @@ import type { SuggestedCommand } from "../../../../../src/lib/suggestion";
 const run = promisify(execFile);
 
 type Live = {
-  targets: { origin: string; expires_at: string | null }[];
+  targets: { type: "origin"; origin: string; expires_at: string | null }[];
   sha?: string;
   release?: string;
   dirty?: boolean;
@@ -80,9 +80,9 @@ function editSchema(): Promise<void> {
   return writeFile(join(cwd, ".zitadel", "schemas", "user.json"), '{ "type": "string" }\n');
 }
 
-const PRIMARY = { origin: "https://app.acme.com", expires_at: null };
-const SECOND_PRIMARY = { origin: "https://www.acme.com", expires_at: null };
-const PREVIEW = { origin: "https://pr-7.acme.com", expires_at: "2026-12-01T00:00:00Z" };
+const PRIMARY = { type: "origin" as const, origin: "https://app.acme.com", expires_at: null };
+const SECOND_PRIMARY = { type: "origin" as const, origin: "https://www.acme.com", expires_at: null };
+const PREVIEW = { type: "origin" as const, origin: "https://pr-7.acme.com", expires_at: "2026-12-01T00:00:00Z" };
 
 describe("diffStep", () => {
   it("says there is nothing to diff against before the first deploy", async () => {

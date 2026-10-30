@@ -104,7 +104,11 @@ func (f releaseFixture) createDeployment(t *testing.T, req *api.CreateDeployment
 func origins(targets []api.DeploymentTarget) []string {
 	out := make([]string, len(targets))
 	for i, target := range targets {
-		out[i] = string(target.Origin)
+		if origin, ok := target.GetDeploymentOriginTarget(); ok {
+			out[i] = string(origin.Origin)
+			continue
+		}
+		out[i] = domain.DeploymentTargetDefault
 	}
 	return out
 }
@@ -367,12 +371,12 @@ func TestRevokeRelease(t *testing.T) {
 		require.IsType(t, &api.RevokeReleaseConflict{}, resp, helpers.MustMarshal(t, resp))
 		conflict := resp.(*api.RevokeReleaseConflict)
 		assert.Equal(t, api.ErrorCode(domain.ErrReleaseInUse(domain.ReleaseInUseDetails{}).Code), conflict.Code)
-		var served []string
-		for _, origin := range conflict.Details.Origins {
-			assert.Equal(t, live.ID, origin.DeploymentID)
-			served = append(served, string(origin.Origin))
+		served := make([]api.DeploymentTarget, len(conflict.Details.Targets))
+		for i, item := range conflict.Details.Targets {
+			assert.Equal(t, live.ID, item.DeploymentID)
+			served[i] = item.Target
 		}
-		assert.Equal(t, origins(live.Targets), served)
+		assert.Equal(t, live.Targets, served)
 	})
 
 	other := fixture.otherRelease(t)
@@ -384,9 +388,9 @@ func TestRevokeRelease(t *testing.T) {
 		resp := revoke(t, fixture.release.ID)
 		require.IsType(t, &api.RevokeReleaseConflict{}, resp, helpers.MustMarshal(t, resp))
 		conflict := resp.(*api.RevokeReleaseConflict)
-		require.Len(t, conflict.Details.Origins, 1)
-		assert.Equal(t, api.DeploymentTargetOrigin(previewOrigin), conflict.Details.Origins[0].Origin)
-		assert.Equal(t, api.DeploymentID(preview.Deployment.ID), conflict.Details.Origins[0].DeploymentID)
+		require.Len(t, conflict.Details.Targets, 1)
+		assert.Equal(t, []string{previewOrigin}, origins([]api.DeploymentTarget{conflict.Details.Targets[0].Target}))
+		assert.Equal(t, api.DeploymentID(preview.Deployment.ID), conflict.Details.Targets[0].DeploymentID)
 
 		// The preview moves on to the other release, so nothing serves it.
 		fixture.deployPreview(t, other)
@@ -516,7 +520,7 @@ func TestDeploymentReads(t *testing.T) {
 	})
 
 	t.Run("the history of one origin", func(t *testing.T) {
-		assert.Equal(t, []api.DeploymentID{second.ID, first.ID}, ids(list(t, api.ListDeploymentsParams{Origin: api.NewOptDeploymentTargetOrigin(wwwOrigin)})))
+		assert.Equal(t, []api.DeploymentID{second.ID, first.ID}, ids(list(t, api.ListDeploymentsParams{Target: api.NewOptDeploymentTargetName(wwwOrigin)})))
 	})
 
 	t.Run("the live view is the newest primary deployment", func(t *testing.T) {
@@ -536,9 +540,9 @@ func TestDeploymentReads(t *testing.T) {
 	t.Run("a primary origin added since serves nothing", func(t *testing.T) {
 		const added = "https://acme.com"
 		fixture.addOrigin(t, domain.Origin{Pattern: added, Kind: domain.OriginKindPrimary})
-		assert.Empty(t, list(t, api.ListDeploymentsParams{Origin: api.NewOptDeploymentTargetOrigin(added), Live: api.NewOptBool(true)}))
+		assert.Empty(t, list(t, api.ListDeploymentsParams{Target: api.NewOptDeploymentTargetName(added), Live: api.NewOptBool(true)}))
 		assert.Equal(t, []api.DeploymentID{second.ID},
-			ids(list(t, api.ListDeploymentsParams{Origin: api.NewOptDeploymentTargetOrigin(appOrigin), Live: api.NewOptBool(true)})))
+			ids(list(t, api.ListDeploymentsParams{Target: api.NewOptDeploymentTargetName(appOrigin), Live: api.NewOptBool(true)})))
 	})
 
 	t.Run("a removed primary origin drops out of the live view", func(t *testing.T) {

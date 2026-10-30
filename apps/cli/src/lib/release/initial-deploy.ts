@@ -2,7 +2,7 @@ import type { ZitadelClient } from "@zitadel/api/client";
 
 import type { SuggestedCommand } from "../suggestion";
 import { buildBundle } from "./bundle";
-import { createDeployment } from "./deployment";
+import { createDeployment, targetName } from "./deployment";
 import { headSha, worktreeIsDirty } from "./git";
 import { runSteps, type StepContext } from "./pipeline";
 import { createReleaseFromBundle } from "./release";
@@ -64,6 +64,6 @@ export async function deployInitialRelease(input: {
     releaseId: release.id,
     contentHash: release.content_hash,
     deploymentId: deployment.id,
-    origins: deployment.targets.map((target) => target.origin),
+    origins: deployment.targets.map(targetName),
   };
 }

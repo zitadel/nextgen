@@ -228,10 +228,11 @@ export default class Preview extends PreviewCommand {
       ...(ttl === undefined ? {} : { ttl: ttl.iso }),
     });
 
-    const previews = deployment.targets.map((target) => ({
-      url: target.origin,
-      expires_at: target.expires_at ?? null,
-    }));
+    const previews = deployment.targets.flatMap((target) =>
+      target.type === "origin"
+        ? [{ url: target.origin, expires_at: target.expires_at ?? null }]
+        : [],
+    );
     return this.emit({
       status: "ok",
       data: {

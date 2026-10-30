@@ -71,7 +71,7 @@ function deployment(id: string, overrides: Record<string, unknown> = {}) {
     project_id: "proj_test",
     release_id: "rel_1",
     kind: "primary",
-    targets: [{ origin: "https://app.acme.com" }, { origin: "https://www.acme.com" }],
+    targets: [{ type: "origin", origin: "https://app.acme.com" }, { type: "origin", origin: "https://www.acme.com" }],
     status: "live",
     deployed_at: DEPLOYED_AT,
     metadata: { reason: "deploy", message: null, rollback_to: null, deployed_by: null },
@@ -210,7 +210,7 @@ describe("release detail", () => {
     servePointers();
     const preview = deployment("dep_2", {
       kind: "preview",
-      targets: [{ origin: "https://acme-k3x9v2.vercel.app", expires_at: "2026-10-09T14:52:00Z" }],
+      targets: [{ type: "origin", origin: "https://acme-k3x9v2.vercel.app", expires_at: "2026-10-09T14:52:00Z" }],
       deployed_at: "2026-10-03T09:00:00Z",
     });
     // The history also holds another release's deployment, which the card

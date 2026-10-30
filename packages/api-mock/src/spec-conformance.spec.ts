@@ -2263,7 +2263,7 @@ describe("api-mock releases and deployments", () => {
       targets: { origin: string }[];
       release_id: string;
     };
-    expect(deployment.targets).toEqual([{ origin: "https://app.acme.com" }]);
+    expect(deployment.targets).toEqual([{ type: "origin", origin: "https://app.acme.com" }]);
 
     const again = await createDeployment(project.id, project.secret, {
       release_id: release.id,

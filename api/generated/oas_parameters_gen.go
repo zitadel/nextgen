@@ -5807,10 +5807,10 @@ func decodeListBrandingParams(args [0]string, argsEscaped bool, r *http.Request)
 type ListDeploymentsParams struct {
 	// The unique identifier of the project.
 	ProjectID ProjectID
-	// Narrows the list to the deployments that targeted this origin, or
-	// `default` for the default target, given exactly as the deployment records
-	// it. An origin no deployment targeted answers an empty list, not an error.
-	Origin OptDeploymentTargetOrigin `json:",omitempty,omitzero"`
+	// Narrows the list to the deployments that targeted this web origin, given
+	// exactly as the deployment records it, or `default` for the default target.
+	// A target no deployment named answers an empty list, not an error.
+	Target OptDeploymentTargetName `json:",omitempty,omitzero"`
 	// Lists what each target serves now instead of the history. Defaults
 	// to `false`.
 	Live OptBool `json:",omitempty,omitzero"`
@@ -5835,11 +5835,11 @@ func unpackListDeploymentsParams(packed middleware.Parameters) (params ListDeplo
 	}
 	{
 		key := middleware.ParameterKey{
-			Name: "origin",
+			Name: "target",
 			In:   "query",
 		}
 		if v, ok := packed[key]; ok {
-			params.Origin = v.(OptDeploymentTargetOrigin)
+			params.Target = v.(OptDeploymentTargetName)
 		}
 	}
 	{
@@ -5934,19 +5934,19 @@ func decodeListDeploymentsParams(args [0]string, argsEscaped bool, r *http.Reque
 			Err:  err,
 		}
 	}
-	// Decode query: origin.
+	// Decode query: target.
 	if err := func() error {
 		cfg := uri.QueryParameterDecodingConfig{
-			Name:    "origin",
+			Name:    "target",
 			Style:   uri.QueryStyleForm,
 			Explode: true,
 		}
 
 		if err := q.HasParam(cfg); err == nil {
 			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
-				var paramsDotOriginVal DeploymentTargetOrigin
+				var paramsDotTargetVal DeploymentTargetName
 				if err := func() error {
-					var paramsDotOriginValVal string
+					var paramsDotTargetValVal string
 					if err := func() error {
 						val, err := d.DecodeValue()
 						if err != nil {
@@ -5958,23 +5958,23 @@ func decodeListDeploymentsParams(args [0]string, argsEscaped bool, r *http.Reque
 							return err
 						}
 
-						paramsDotOriginValVal = c
+						paramsDotTargetValVal = c
 						return nil
 					}(); err != nil {
 						return err
 					}
-					paramsDotOriginVal = DeploymentTargetOrigin(paramsDotOriginValVal)
+					paramsDotTargetVal = DeploymentTargetName(paramsDotTargetValVal)
 					return nil
 				}(); err != nil {
 					return err
 				}
-				params.Origin.SetTo(paramsDotOriginVal)
+				params.Target.SetTo(paramsDotTargetVal)
 				return nil
 			}); err != nil {
 				return err
 			}
 			if err := func() error {
-				if value, ok := params.Origin.Get(); ok {
+				if value, ok := params.Target.Get(); ok {
 					if err := func() error {
 						if err := value.Validate(); err != nil {
 							return err
@@ -5992,7 +5992,7 @@ func decodeListDeploymentsParams(args [0]string, argsEscaped bool, r *http.Reque
 		return nil
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
-			Name: "origin",
+			Name: "target",
 			In:   "query",
 			Err:  err,
 		}

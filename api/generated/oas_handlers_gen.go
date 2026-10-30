@@ -11965,9 +11965,9 @@ func (s *Server) handleListDeploymentsRequest(args [0]string, argsEscaped bool, 
 					In:   "query",
 				}: params.ProjectID,
 				{
-					Name: "origin",
+					Name: "target",
 					In:   "query",
-				}: params.Origin,
+				}: params.Target,
 				{
 					Name: "live",
 					In:   "query",

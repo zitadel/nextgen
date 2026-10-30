@@ -32109,6 +32109,102 @@ func (s *DeploymentCreatedPayload) UnmarshalJSON(data []byte) error {
 }
 
 // Encode implements json.Marshaler.
+func (s *DeploymentDefaultTarget) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *DeploymentDefaultTarget) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("type")
+		e.Str("default")
+	}
+}
+
+var jsonFieldsNameOfDeploymentDefaultTarget = [1]string{
+	0: "type",
+}
+
+// Decode decodes DeploymentDefaultTarget from json.
+func (s *DeploymentDefaultTarget) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode DeploymentDefaultTarget to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "type":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.Type = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"type\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode DeploymentDefaultTarget")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000001,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfDeploymentDefaultTarget) {
+					name = jsonFieldsNameOfDeploymentDefaultTarget[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *DeploymentDefaultTarget) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *DeploymentDefaultTarget) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
 func (s *DeploymentGuardConflict) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
@@ -32616,6 +32712,134 @@ func (s *DeploymentMetadataDeployedByType) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode implements json.Marshaler.
+func (s *DeploymentOriginTarget) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *DeploymentOriginTarget) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("type")
+		e.Str("origin")
+	}
+	{
+		e.FieldStart("origin")
+		s.Origin.Encode(e)
+	}
+	{
+		if s.ExpiresAt.Set {
+			e.FieldStart("expires_at")
+			s.ExpiresAt.Encode(e, json.EncodeDateTime)
+		}
+	}
+}
+
+var jsonFieldsNameOfDeploymentOriginTarget = [3]string{
+	0: "type",
+	1: "origin",
+	2: "expires_at",
+}
+
+// Decode decodes DeploymentOriginTarget from json.
+func (s *DeploymentOriginTarget) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode DeploymentOriginTarget to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "type":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.Type = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"type\"")
+			}
+		case "origin":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				if err := s.Origin.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"origin\"")
+			}
+		case "expires_at":
+			if err := func() error {
+				s.ExpiresAt.Reset()
+				if err := s.ExpiresAt.Decode(d, json.DecodeDateTime); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"expires_at\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode DeploymentOriginTarget")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000011,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfDeploymentOriginTarget) {
+					name = jsonFieldsNameOfDeploymentOriginTarget[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *DeploymentOriginTarget) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *DeploymentOriginTarget) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes DeploymentReason as json.
 func (s DeploymentReason) Encode(e *jx.Encoder) {
 	e.Str(string(s))
@@ -32696,30 +32920,35 @@ func (s *DeploymentStatus) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode implements json.Marshaler.
-func (s *DeploymentTarget) Encode(e *jx.Encoder) {
+// Encode encodes DeploymentTarget as json.
+func (s DeploymentTarget) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
 	e.ObjEnd()
 }
 
-// encodeFields encodes fields.
-func (s *DeploymentTarget) encodeFields(e *jx.Encoder) {
-	{
-		e.FieldStart("origin")
-		s.Origin.Encode(e)
-	}
-	{
-		if s.ExpiresAt.Set {
-			e.FieldStart("expires_at")
-			s.ExpiresAt.Encode(e, json.EncodeDateTime)
+func (s DeploymentTarget) encodeFields(e *jx.Encoder) {
+	switch s.Type {
+	case DeploymentOriginTargetDeploymentTarget:
+		e.FieldStart("type")
+		e.Str("origin")
+		{
+			s := s.DeploymentOriginTarget
+			{
+				e.FieldStart("origin")
+				s.Origin.Encode(e)
+			}
+			{
+				if s.ExpiresAt.Set {
+					e.FieldStart("expires_at")
+					s.ExpiresAt.Encode(e, json.EncodeDateTime)
+				}
+			}
 		}
+	case DeploymentDefaultTargetDeploymentTarget:
+		e.FieldStart("type")
+		e.Str("default")
 	}
-}
-
-var jsonFieldsNameOfDeploymentTarget = [2]string{
-	0: "origin",
-	1: "expires_at",
 }
 
 // Decode decodes DeploymentTarget from json.
@@ -32727,75 +32956,60 @@ func (s *DeploymentTarget) Decode(d *jx.Decoder) error {
 	if s == nil {
 		return errors.New("invalid: unable to decode DeploymentTarget to nil")
 	}
-	var requiredBitSet [1]uint8
+	// Sum type discriminator.
+	if typ := d.Next(); typ != jx.Object {
+		return errors.Errorf("unexpected json type %q", typ)
+	}
 
-	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
-		switch string(k) {
-		case "origin":
-			requiredBitSet[0] |= 1 << 0
-			if err := func() error {
-				if err := s.Origin.Decode(d); err != nil {
+	var found bool
+	if err := d.Capture(func(d *jx.Decoder) error {
+		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
+			if found {
+				return d.Skip()
+			}
+			switch string(key) {
+			case "type":
+				typ, err := d.Str()
+				if err != nil {
 					return err
 				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"origin\"")
-			}
-		case "expires_at":
-			if err := func() error {
-				s.ExpiresAt.Reset()
-				if err := s.ExpiresAt.Decode(d, json.DecodeDateTime); err != nil {
-					return err
+				switch typ {
+				case "origin":
+					s.Type = DeploymentOriginTargetDeploymentTarget
+					found = true
+				case "default":
+					s.Type = DeploymentDefaultTargetDeploymentTarget
+					found = true
+				default:
+					return errors.Errorf("unknown type %s", typ)
 				}
 				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"expires_at\"")
 			}
-		default:
 			return d.Skip()
-		}
-		return nil
+		})
 	}); err != nil {
-		return errors.Wrap(err, "decode DeploymentTarget")
+		return errors.Wrap(err, "capture")
 	}
-	// Validate required fields.
-	var failures []validate.FieldError
-	for i, mask := range [1]uint8{
-		0b00000001,
-	} {
-		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
-			// Mask only required fields and check equality to mask using XOR.
-			//
-			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
-			// Bits of fields which would be set are actually bits of missed fields.
-			missed := bits.OnesCount8(result)
-			for bitN := 0; bitN < missed; bitN++ {
-				bitIdx := bits.TrailingZeros8(result)
-				fieldIdx := i*8 + bitIdx
-				var name string
-				if fieldIdx < len(jsonFieldsNameOfDeploymentTarget) {
-					name = jsonFieldsNameOfDeploymentTarget[fieldIdx]
-				} else {
-					name = strconv.Itoa(fieldIdx)
-				}
-				failures = append(failures, validate.FieldError{
-					Name:  name,
-					Error: validate.ErrFieldRequired,
-				})
-				// Reset bit.
-				result &^= 1 << bitIdx
-			}
+	if !found {
+		return errors.New("unable to detect sum type variant")
+	}
+	switch s.Type {
+	case DeploymentOriginTargetDeploymentTarget:
+		if err := s.DeploymentOriginTarget.Decode(d); err != nil {
+			return err
 		}
+	case DeploymentDefaultTargetDeploymentTarget:
+		if err := s.DeploymentDefaultTarget.Decode(d); err != nil {
+			return err
+		}
+	default:
+		return errors.Errorf("inferred invalid type: %s", s.Type)
 	}
-	if len(failures) > 0 {
-		return &validate.Error{Fields: failures}
-	}
-
 	return nil
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s *DeploymentTarget) MarshalJSON() ([]byte, error) {
+func (s DeploymentTarget) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
@@ -32803,46 +33017,6 @@ func (s *DeploymentTarget) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *DeploymentTarget) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes DeploymentTargetOrigin as json.
-func (s DeploymentTargetOrigin) Encode(e *jx.Encoder) {
-	unwrapped := string(s)
-
-	e.Str(unwrapped)
-}
-
-// Decode decodes DeploymentTargetOrigin from json.
-func (s *DeploymentTargetOrigin) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode DeploymentTargetOrigin to nil")
-	}
-	var unwrapped string
-	if err := func() error {
-		v, err := d.Str()
-		unwrapped = string(v)
-		if err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = DeploymentTargetOrigin(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s DeploymentTargetOrigin) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *DeploymentTargetOrigin) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -116456,9 +116630,9 @@ func (s *RevokeReleaseConflictDetails) Encode(e *jx.Encoder) {
 // encodeFields encodes fields.
 func (s *RevokeReleaseConflictDetails) encodeFields(e *jx.Encoder) {
 	{
-		e.FieldStart("origins")
+		e.FieldStart("targets")
 		e.ArrStart()
-		for _, elem := range s.Origins {
+		for _, elem := range s.Targets {
 			elem.Encode(e)
 		}
 		e.ArrEnd()
@@ -116466,7 +116640,7 @@ func (s *RevokeReleaseConflictDetails) encodeFields(e *jx.Encoder) {
 }
 
 var jsonFieldsNameOfRevokeReleaseConflictDetails = [1]string{
-	0: "origins",
+	0: "targets",
 }
 
 // Decode decodes RevokeReleaseConflictDetails from json.
@@ -116478,23 +116652,23 @@ func (s *RevokeReleaseConflictDetails) Decode(d *jx.Decoder) error {
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
-		case "origins":
+		case "targets":
 			requiredBitSet[0] |= 1 << 0
 			if err := func() error {
-				s.Origins = make([]RevokeReleaseConflictDetailsOriginsItem, 0)
+				s.Targets = make([]RevokeReleaseConflictDetailsTargetsItem, 0)
 				if err := d.Arr(func(d *jx.Decoder) error {
-					var elem RevokeReleaseConflictDetailsOriginsItem
+					var elem RevokeReleaseConflictDetailsTargetsItem
 					if err := elem.Decode(d); err != nil {
 						return err
 					}
-					s.Origins = append(s.Origins, elem)
+					s.Targets = append(s.Targets, elem)
 					return nil
 				}); err != nil {
 					return err
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"origins\"")
+				return errors.Wrap(err, "decode field \"targets\"")
 			}
 		default:
 			return d.Skip()
@@ -116553,17 +116727,17 @@ func (s *RevokeReleaseConflictDetails) UnmarshalJSON(data []byte) error {
 }
 
 // Encode implements json.Marshaler.
-func (s *RevokeReleaseConflictDetailsOriginsItem) Encode(e *jx.Encoder) {
+func (s *RevokeReleaseConflictDetailsTargetsItem) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
 	e.ObjEnd()
 }
 
 // encodeFields encodes fields.
-func (s *RevokeReleaseConflictDetailsOriginsItem) encodeFields(e *jx.Encoder) {
+func (s *RevokeReleaseConflictDetailsTargetsItem) encodeFields(e *jx.Encoder) {
 	{
-		e.FieldStart("origin")
-		s.Origin.Encode(e)
+		e.FieldStart("target")
+		s.Target.Encode(e)
 	}
 	{
 		e.FieldStart("deployment_id")
@@ -116571,29 +116745,29 @@ func (s *RevokeReleaseConflictDetailsOriginsItem) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfRevokeReleaseConflictDetailsOriginsItem = [2]string{
-	0: "origin",
+var jsonFieldsNameOfRevokeReleaseConflictDetailsTargetsItem = [2]string{
+	0: "target",
 	1: "deployment_id",
 }
 
-// Decode decodes RevokeReleaseConflictDetailsOriginsItem from json.
-func (s *RevokeReleaseConflictDetailsOriginsItem) Decode(d *jx.Decoder) error {
+// Decode decodes RevokeReleaseConflictDetailsTargetsItem from json.
+func (s *RevokeReleaseConflictDetailsTargetsItem) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode RevokeReleaseConflictDetailsOriginsItem to nil")
+		return errors.New("invalid: unable to decode RevokeReleaseConflictDetailsTargetsItem to nil")
 	}
 	var requiredBitSet [1]uint8
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
-		case "origin":
+		case "target":
 			requiredBitSet[0] |= 1 << 0
 			if err := func() error {
-				if err := s.Origin.Decode(d); err != nil {
+				if err := s.Target.Decode(d); err != nil {
 					return err
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"origin\"")
+				return errors.Wrap(err, "decode field \"target\"")
 			}
 		case "deployment_id":
 			requiredBitSet[0] |= 1 << 1
@@ -116610,7 +116784,7 @@ func (s *RevokeReleaseConflictDetailsOriginsItem) Decode(d *jx.Decoder) error {
 		}
 		return nil
 	}); err != nil {
-		return errors.Wrap(err, "decode RevokeReleaseConflictDetailsOriginsItem")
+		return errors.Wrap(err, "decode RevokeReleaseConflictDetailsTargetsItem")
 	}
 	// Validate required fields.
 	var failures []validate.FieldError
@@ -116627,8 +116801,8 @@ func (s *RevokeReleaseConflictDetailsOriginsItem) Decode(d *jx.Decoder) error {
 				bitIdx := bits.TrailingZeros8(result)
 				fieldIdx := i*8 + bitIdx
 				var name string
-				if fieldIdx < len(jsonFieldsNameOfRevokeReleaseConflictDetailsOriginsItem) {
-					name = jsonFieldsNameOfRevokeReleaseConflictDetailsOriginsItem[fieldIdx]
+				if fieldIdx < len(jsonFieldsNameOfRevokeReleaseConflictDetailsTargetsItem) {
+					name = jsonFieldsNameOfRevokeReleaseConflictDetailsTargetsItem[fieldIdx]
 				} else {
 					name = strconv.Itoa(fieldIdx)
 				}
@@ -116649,14 +116823,14 @@ func (s *RevokeReleaseConflictDetailsOriginsItem) Decode(d *jx.Decoder) error {
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s *RevokeReleaseConflictDetailsOriginsItem) MarshalJSON() ([]byte, error) {
+func (s *RevokeReleaseConflictDetailsTargetsItem) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *RevokeReleaseConflictDetailsOriginsItem) UnmarshalJSON(data []byte) error {
+func (s *RevokeReleaseConflictDetailsTargetsItem) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }

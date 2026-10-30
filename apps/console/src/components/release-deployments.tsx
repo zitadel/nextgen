@@ -2,10 +2,10 @@ import { Fragment } from "react";
 
 import { DeploymentStatusBadge } from "@/components/deployment-status-badge";
 import { DetailRow, DetailSection } from "@/components/detail-page";
-import { OriginLink } from "@/components/origin-link";
+import { TargetLink } from "@/components/origin-link";
 import { Separator } from "@/components/ui/separator";
 import { formatDateTime } from "@/lib/date";
-import { type Deployment, KIND_LABEL } from "@/lib/deployment";
+import { type Deployment, KIND_LABEL, targetName } from "@/lib/deployment";
 
 /**
  * The card under a release's pointers: every deployment of the release, newest
@@ -45,11 +45,11 @@ function DeploymentRow({ deployment }: { deployment: Deployment }) {
     >
       <ul className="flex min-w-0 flex-1 flex-col gap-1">
         {deployment.targets.map((target) => (
-          <li key={target.origin} className="flex min-w-0">
+          <li key={targetName(target)} className="flex min-w-0">
             {/* Foreground, not the link colour: the design draws it as text
                 with a glyph, flush with the column. */}
-            <OriginLink
-              origin={target.origin}
+            <TargetLink
+              target={target}
               className="text-sm font-normal text-foreground"
               iconClassName="text-muted-foreground"
             />

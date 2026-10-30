@@ -1219,7 +1219,7 @@ async function startCreateProjectCaptureServer(
         JSON.stringify({
           id: "dep_test",
           release_id: deployment.release_id,
-          targets: [{ origin: "http://localhost:3000" }],
+          targets: [{ type: "origin", origin: "http://localhost:3000" }],
           deployed_at: "2026-06-01T00:00:00.000Z",
         }),
       );

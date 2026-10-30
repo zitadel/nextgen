@@ -160,8 +160,8 @@ func (h *Handler) ListDeployments(ctx context.Context, params api.ListDeployment
 		PageToken:       string(params.PageToken.Value),
 		Limit:           int(params.Limit.Value),
 	}
-	if origin, ok := params.Origin.Get(); ok {
-		input.Origin = new(string(origin))
+	if target, ok := params.Target.Get(); ok {
+		input.Origin = new(string(target))
 	}
 	result, err := h.deploymentService.List(ctx, input)
 	if err != nil {
@@ -295,6 +295,15 @@ func toAPIDeploymentStatus(live bool) api.DeploymentStatus {
 	return api.DeploymentStatusInactive
 }
 
+// toAPIDeploymentTarget names a stored origin on the wire, where the default
+// target has no origin.
+func toAPIDeploymentTarget(origin string) api.DeploymentTarget {
+	if origin == domain.DeploymentTargetDefault {
+		return api.NewDeploymentDefaultTargetDeploymentTarget(api.DeploymentDefaultTarget{Type: "default"})
+	}
+	return api.NewDeploymentOriginTargetDeploymentTarget(api.DeploymentOriginTarget{Type: "origin", Origin: api.Origin(origin)})
+}
+
 // toAPIDeployment converts a deployment.
 func toAPIDeployment(entity *domain.Deployment, status api.DeploymentStatus) api.Deployment {
 	resp := api.Deployment{
@@ -310,7 +319,7 @@ func toAPIDeployment(entity *domain.Deployment, status api.DeploymentStatus) api
 		},
 	}
 	for i, target := range entity.Targets {
-		resp.Targets[i] = api.DeploymentTarget{Origin: api.DeploymentTargetOrigin(target.Origin)}
+		resp.Targets[i] = toAPIDeploymentTarget(target.Origin)
 	}
 	m := entity.Metadata
 	if m.Message != nil {

@@ -16,6 +16,14 @@ import { api } from "@/api/zitadel";
 /** One entry of `GET /deployments`. */
 export type Deployment = ListDeployments200DeploymentsItem;
 
+/** Where a deployment went: a web origin, or the project's default target. */
+export type DeploymentTarget = Deployment["targets"][number];
+
+/** A target as one string, unique within a deployment. */
+export function targetName(target: DeploymentTarget): string {
+  return target.type === "default" ? "default" : target.origin;
+}
+
 /** What the screens call each kind. */
 export const KIND_LABEL: Record<Deployment["kind"], string> = {
   primary: "Primary",

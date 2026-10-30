@@ -1,0 +1,19 @@
+title: DeploymentOriginTarget
+type: object
+description: A web origin a deployment made its release live on.
+required:
+  - type
+  - origin
+properties:
+  type:
+    type: string
+    const: origin
+  origin:
+    $ref: ../../components/schemas/origin.yaml
+  expires_at:
+    type: string
+    format: date-time
+    description: |
+      Preview URLs only: the expiry this deployment set. A later deployment
+      to the URL records its own.
+    example: '2026-10-09T14:10:00Z'

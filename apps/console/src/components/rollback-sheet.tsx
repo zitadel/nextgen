@@ -11,7 +11,7 @@ import {
   SHEET_LEGEND,
   SHEET_SECTION,
 } from "@/components/form-sheet";
-import { OriginLink } from "@/components/origin-link";
+import { TargetLink } from "@/components/origin-link";
 import { Field, FieldContent, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
 import { FieldOptionalIndicator } from "@/components/ui/field-optional-indicator";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -26,6 +26,7 @@ import {
   type RollbackTargets,
   listRollbackTargets,
   rollbackDeployment,
+  targetName,
 } from "@/lib/deployment";
 import { useRequiredProjectScope } from "@/lib/project-scope";
 
@@ -242,8 +243,8 @@ function DeploymentFacts({
           </span>
         </li>
         {deployment.targets.map((target) => (
-          <li key={target.origin} className="flex min-w-0">
-            <OriginLink origin={target.origin} className="text-muted-foreground" />
+          <li key={targetName(target)} className="flex min-w-0">
+            <TargetLink target={target} className="text-muted-foreground" />
           </li>
         ))}
       </ul>

@@ -1,7 +1,7 @@
 import { Flags } from "@oclif/core";
 
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../../lib/oclif";
-import { createDeployment } from "../../lib/release";
+import { createDeployment, targetName } from "../../lib/release";
 
 /**
  * `zitadel deployment create --release <id>` — make an existing release live.
@@ -48,7 +48,7 @@ export default class DeploymentCreate extends EnvironmentCommand {
       message: flags.message,
     });
 
-    const origins = deployment.targets.map((target) => target.origin);
+    const origins = deployment.targets.map(targetName);
     return this.emit({
       status: "ok",
       data: {

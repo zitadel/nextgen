@@ -32,7 +32,7 @@ function deployment(id: string, overrides: Record<string, unknown> = {}) {
     project_id: "proj_test",
     release_id: "rel_1",
     kind: "primary",
-    targets: [{ origin: "https://app.acme.com" }, { origin: "https://www.acme.com" }],
+    targets: [{ type: "origin", origin: "https://app.acme.com" }, { type: "origin", origin: "https://www.acme.com" }],
     status: "live",
     deployed_at: DEPLOYED_AT,
     metadata: { reason: "deploy", message: null, rollback_to: null, deployed_by: null },
@@ -112,7 +112,7 @@ describe("deployments list", () => {
     const preview = deployment("dep_2", {
       release_id: "rel_2",
       kind: "preview",
-      targets: [{ origin: "https://acme-k3x9v2.vercel.app", expires_at: "2026-10-09T14:52:00Z" }],
+      targets: [{ type: "origin", origin: "https://acme-k3x9v2.vercel.app", expires_at: "2026-10-09T14:52:00Z" }],
       deployed_at: "2026-10-03T09:00:00Z",
     });
     serveDeployments([preview, deployment("dep_1", { status: "inactive" })]);
@@ -130,7 +130,7 @@ describe("deployments list", () => {
     );
     expect(first.getByRole("button", { name: "Copy release ID rel_2" })).toBeInTheDocument();
     // The origins are counted, with the kind under the count.
-    expect(first.getByRole("button", { name: "1 origin" })).toBeInTheDocument();
+    expect(first.getByRole("button", { name: "1 target" })).toBeInTheDocument();
     expect(first.getByText("Preview")).toBeInTheDocument();
     expect(first.getByText("live")).toBeInTheDocument();
 
@@ -146,7 +146,7 @@ describe("deployments list", () => {
     serveDeployments([deployment("dep_1")]);
     await renderAt("/deployments");
 
-    const trigger = await screen.findByRole("button", { name: "2 origins" });
+    const trigger = await screen.findByRole("button", { name: "2 targets" });
     expect(screen.queryByText("https://www.acme.com")).not.toBeInTheDocument();
     await userEvent.click(trigger);
     const first = await screen.findByRole("link", { name: "https://app.acme.com" });

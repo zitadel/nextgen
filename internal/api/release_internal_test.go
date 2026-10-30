@@ -143,10 +143,10 @@ func TestReleaseInUseResponseCarriesOrigins(t *testing.T) {
 	}}))
 	require.True(t, ok)
 	assert.Equal(t, api.ErrorCode(domain.ErrReleaseInUse(domain.ReleaseInUseDetails{}).Code), resp.Code)
-	assert.Equal(t, []api.RevokeReleaseConflictDetailsOriginsItem{
-		{Origin: "https://app.acme.com", DeploymentID: "dep_1"},
-		{Origin: "default", DeploymentID: "dep_2"},
-	}, resp.Details.Origins)
+	assert.Equal(t, []api.RevokeReleaseConflictDetailsTargetsItem{
+		{Target: toAPIDeploymentTarget("https://app.acme.com"), DeploymentID: "dep_1"},
+		{Target: toAPIDeploymentTarget(domain.DeploymentTargetDefault), DeploymentID: "dep_2"},
+	}, resp.Details.Targets)
 }
 
 // Without the origins the 409 cannot name them, so the generic envelope answers.

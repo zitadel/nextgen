@@ -69,7 +69,7 @@ func TestDeploymentConflictRendersTheDeployment(t *testing.T) {
 		ProjectID:  "proj_1",
 		ReleaseID:  "rel_1",
 		Kind:       api.DeploymentKindPrimary,
-		Targets:    []api.DeploymentTarget{{Origin: "https://app.acme.com"}},
+		Targets:    []api.DeploymentTarget{toAPIDeploymentTarget("https://app.acme.com")},
 		Status:     api.DeploymentStatusLive,
 		DeployedAt: time.Date(2026, 10, 2, 14, 52, 0, 0, time.UTC),
 		Metadata: api.DeploymentMetadata{
@@ -80,7 +80,7 @@ func TestDeploymentConflictRendersTheDeployment(t *testing.T) {
 	}), resp.DeploymentGuardConflict.Details.Deployment)
 }
 
-func TestDeploymentTargetRendersTheDefaultToken(t *testing.T) {
+func TestDeploymentTargetRendersTheDefaultTarget(t *testing.T) {
 	newest := &domain.Deployment{
 		ProjectID:  "proj_1",
 		ID:         "dep_1",
@@ -93,7 +93,9 @@ func TestDeploymentTargetRendersTheDefaultToken(t *testing.T) {
 	resp, ok := deploymentConflictResponse(domain.ErrDeploymentConflict(domain.DeploymentConflictDetails{Deployment: newest}))
 	require.True(t, ok)
 	require.Len(t, resp.DeploymentGuardConflict.Details.Deployment.Value.Targets, 1)
-	assert.Equal(t, "default", string(resp.DeploymentGuardConflict.Details.Deployment.Value.Targets[0].Origin))
+	body, err := resp.DeploymentGuardConflict.Details.Deployment.Value.Targets[0].MarshalJSON()
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"type":"default"}`, string(body), "the default target has no origin")
 }
 
 // A revoked release is the other member of the 409 union.

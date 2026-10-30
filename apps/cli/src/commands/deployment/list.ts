@@ -10,6 +10,7 @@ import { collectPages } from "../../lib/oclif/crud/paging";
 import { renderList } from "../../lib/oclif/crud/table";
 import { listData } from "../../lib/oclif/envelope";
 import { shellArg } from "../../lib/shell";
+import { type ListedDeployment, targetName } from "../../lib/release";
 
 /** The columns `list` renders, in order. */
 const COLUMNS = ["id", "release_id", "reason", "origins", "deployed_at"] as const;
@@ -19,7 +20,7 @@ type DeploymentRow = {
   id: string;
   release_id: string;
   metadata: { reason?: string };
-  targets: { origin: string }[];
+  targets: ListedDeployment["targets"];
   deployed_at: string;
 };
 
@@ -71,7 +72,7 @@ export default class DeploymentList extends EnvironmentCommand {
     const request = (token?: string): Promise<unknown> =>
       client.listDeployments({
         project_id: projectId,
-        ...(flags.origin === undefined ? {} : { origin: flags.origin }),
+        ...(flags.origin === undefined ? {} : { target: flags.origin }),
         ...(flags.live ? { live: true } : {}),
         ...(flags.limit === undefined ? {} : { limit: flags.limit }),
         ...(token === undefined ? {} : { page_token: token }),
@@ -90,7 +91,7 @@ export default class DeploymentList extends EnvironmentCommand {
       id: deployment.id,
       release_id: deployment.release_id,
       reason: deployment.metadata.reason ?? "deploy",
-      origins: deployment.targets.map((target) => target.origin).join(", "),
+      origins: deployment.targets.map(targetName).join(", "),
       deployed_at: deployment.deployed_at,
     }));
 

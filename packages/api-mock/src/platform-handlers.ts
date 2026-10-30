@@ -1532,6 +1532,18 @@ function deploymentStatus(deployment: DeploymentRecord): "live" | "inactive" {
     : "inactive";
 }
 
+/** The wire shape of a target: the default target has no origin. */
+function targetResponse(origin: string, expiresAt: string | null = null): Record<string, unknown> {
+  if (origin === "default") {
+    return { type: "default" };
+  }
+  return {
+    type: "origin",
+    origin,
+    ...(expiresAt === null ? {} : { expires_at: expiresAt }),
+  };
+}
+
 /** The wire shape of a deployment, optionally over a restricted target set. */
 function deploymentResponse(
   deployment: DeploymentRecord,
@@ -1542,11 +1554,7 @@ function deploymentResponse(
     id: deployment.id,
     project_id: deployment.projectId,
     release_id: deployment.releaseId,
-    targets: targets.map((target) =>
-      target.expiresAt === null
-        ? { origin: target.origin }
-        : { origin: target.origin, expires_at: target.expiresAt },
-    ),
+    targets: targets.map((target) => targetResponse(target.origin, target.expiresAt)),
     kind: deploymentKind(deployment),
     status: deploymentStatus(deployment),
     deployed_at: deployment.deployedAt,
@@ -1951,7 +1959,12 @@ export function setupPlatformHandlers() {
       if (servedBy.length > 0) {
         return HttpResponse.json(
           errorBody("rel.in_use", "release: still served by an origin", {
-            origins: servedBy.sort((a, b) => a.origin.localeCompare(b.origin)),
+            targets: servedBy
+              .sort((a, b) => a.origin.localeCompare(b.origin))
+              .map(({ origin, deployment_id }) => ({
+                target: targetResponse(origin),
+                deployment_id,
+              })),
           }),
           { status: 409 },
         );
@@ -2182,7 +2195,7 @@ export function setupPlatformHandlers() {
       if (!query.ok) {
         return query.response;
       }
-      const origin = record.origin;
+      const origin = record.target;
       const live = liveRaw === "true";
 
       let deployments = [...store.deployments.values()]

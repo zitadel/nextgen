@@ -1,0 +1,9 @@
+name: target
+in: query
+required: false
+description: |
+  Narrows the list to the deployments that targeted this web origin, given
+  exactly as the deployment records it, or `default` for the default target.
+  A target no deployment named answers an empty list, not an error.
+schema:
+  $ref: '../../endpoints/deployments/deployment-target-name.yaml'

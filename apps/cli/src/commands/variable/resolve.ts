@@ -4,7 +4,12 @@ import type { ZitadelClient } from "@zitadel/api/client";
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../../lib/oclif";
 import { renderRows, renderTable } from "../../lib/oclif/crud/table";
 import { listData } from "../../lib/oclif/envelope";
-import { DEPLOY_ARGS, listLiveDeployments, originMatchesPattern } from "../../lib/release";
+import {
+  DEPLOY_ARGS,
+  listLiveDeployments,
+  originMatchesPattern,
+  targetName,
+} from "../../lib/release";
 import { ZitadelError } from "../../lib/errors";
 import { shellArg } from "../../lib/shell";
 import { toVariableRows, variableCells } from "../../lib/variables";
@@ -63,7 +68,7 @@ export default class VariableResolve extends EnvironmentCommand {
     // first (#1617).
     if (origin === undefined && deployments.length > 1) {
       const origins = [
-        ...new Set(deployments.flatMap((deployment) => deployment.targets.map((t) => t.origin))),
+        ...new Set(deployments.flatMap((deployment) => deployment.targets.map(targetName))),
       ].sort();
       throw new ZitadelError(
         "E_VALIDATION",
@@ -84,7 +89,7 @@ export default class VariableResolve extends EnvironmentCommand {
     // The live list narrows each deployment to the origins it still serves, so
     // this names exactly what the resolved map runs on — the chosen origin,
     // stated in the output.
-    const servedOrigins = live.targets.map((target) => target.origin).sort();
+    const servedOrigins = live.targets.map(targetName).sort();
     const where = servedOrigins.join(", ");
 
     const rows = toVariableRows(

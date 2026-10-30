@@ -9958,15 +9958,15 @@ func (c *Client) sendListDeployments(ctx context.Context, params ListDeployments
 		}
 	}
 	{
-		// Encode "origin" parameter.
+		// Encode "target" parameter.
 		cfg := uri.QueryParameterEncodingConfig{
-			Name:    "origin",
+			Name:    "target",
 			Style:   uri.QueryStyleForm,
 			Explode: true,
 		}
 
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			if val, ok := params.Origin.Get(); ok {
+			if val, ok := params.Target.Get(); ok {
 				if unwrapped := string(val); true {
 					return e.EncodeValue(conv.StringToString(unwrapped))
 				}

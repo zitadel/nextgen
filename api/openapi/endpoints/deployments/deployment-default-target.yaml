@@ -1,0 +1,9 @@
+title: DeploymentDefaultTarget
+type: object
+description: The project's default target, the one a caller with no origin is served.
+required:
+  - type
+properties:
+  type:
+    type: string
+    const: default

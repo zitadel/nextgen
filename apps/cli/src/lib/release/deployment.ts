@@ -28,6 +28,11 @@ export type RolledBackDeployment = RollbackDeployment200 | RollbackDeployment201
 /** One row of the deployment list. */
 export type ListedDeployment = ListDeployments200DeploymentsItem;
 
+/** A target as one string: its origin, or `default`. */
+export function targetName(target: ListedDeployment["targets"][number]): string {
+  return target.type === "default" ? "default" : target.origin;
+}
+
 /**
  * Every live deployment of the project, newest first, drained across pages: one
  * live preview per open pull request can push the primary origins' deployment
@@ -44,7 +49,7 @@ export async function listLiveDeployments(
       client.listDeployments({
         project_id: projectId,
         live: true,
-        ...(options.origin === undefined ? {} : { origin: options.origin }),
+        ...(options.origin === undefined ? {} : { target: options.origin }),
         ...(options.withRelease ? { expand: ["release"] } : {}),
         ...(token === undefined ? {} : { page_token: token }),
       }),
@@ -59,9 +64,7 @@ export async function listLiveDeployments(
  * rollback undoes. Neither is one that reaches only the default target.
  */
 export function servesPrimary(deployment: Pick<ListedDeployment, "targets">): boolean {
-  return deployment.targets.some(
-    (target) => target.expires_at == null && target.origin !== "default",
-  );
+  return deployment.targets.some((target) => target.type === "origin" && target.expires_at == null);
 }
 
 /** What target a deploy goes to: every primary origin, or one exact origin. */

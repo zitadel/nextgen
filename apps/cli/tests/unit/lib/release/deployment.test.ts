@@ -37,20 +37,20 @@ describe("listLiveDeployments", () => {
     expect(seen[0]).toMatchObject({
       project_id: "proj_1",
       live: true,
-      origin: "https://app.acme.com",
+      target: "https://app.acme.com",
     });
   });
 });
 
 describe("servesPrimary", () => {
   it("is true for a deployment with an unexpiring target", () => {
-    expect(servesPrimary({ targets: [{ origin: "https://a", expires_at: null }] } as never)).toBe(
+    expect(servesPrimary({ targets: [{ type: "origin", origin: "https://a", expires_at: null }] } as never)).toBe(
       true,
     );
   });
 
   it("is false for a deployment to the default target alone", () => {
-    expect(servesPrimary({ targets: [{ origin: "default", expires_at: null }] } as never)).toBe(
+    expect(servesPrimary({ targets: [{ type: "default" }] } as never)).toBe(
       false,
     );
   });
@@ -59,8 +59,8 @@ describe("servesPrimary", () => {
     expect(
       servesPrimary({
         targets: [
-          { origin: "default", expires_at: null },
-          { origin: "https://a", expires_at: null },
+          { type: "default" },
+          { type: "origin", origin: "https://a", expires_at: null },
         ],
       } as never),
     ).toBe(true);
@@ -69,7 +69,7 @@ describe("servesPrimary", () => {
   it("is false for a preview deployment", () => {
     expect(
       servesPrimary({
-        targets: [{ origin: "https://pr-1", expires_at: "2026-12-01T00:00:00Z" }],
+        targets: [{ type: "origin", origin: "https://pr-1", expires_at: "2026-12-01T00:00:00Z" }],
       } as never),
     ).toBe(false);
   });
