@@ -37,7 +37,6 @@ import {
   type SuggestedCommand,
   unscopedCommand,
 } from "../lib/suggestion";
-import { nextCommandsData } from "../lib/oclif/envelope";
 import { DEPLOY_ARGS } from "../lib/release";
 
 /**
@@ -113,9 +112,8 @@ export default class Status extends EnvironmentCommand {
           },
         },
         project,
-        next_actions: nextActions,
-        ...nextCommandsData(nextCommands),
       },
+      next: { actions: nextActions, commands: nextCommands },
       footer: exploreAllCommands(this.meta.cliVersion),
     });
   }
