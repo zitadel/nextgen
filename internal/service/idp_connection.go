@@ -225,7 +225,10 @@ func (s *idpConnectionService) validate(document []byte) (string, error) {
 		return "", domain.ErrRequestInvalid().WithParent(err)
 	}
 	if err := schema.Validate(doc); err != nil {
-		return "", domain.ErrRequestInvalid().WithDetails(domain.FlattenValidationErrors(err)).WithParent(err)
+		// The validator's messages quote the rejected value, and a secret
+		// pasted where its variable reference belongs is one: the log gets
+		// the failures' locations only.
+		return "", domain.ErrRequestInvalid().WithDetails(domain.FlattenValidationErrors(err)).WithParent(domain.SchemaValidationCause(err))
 	}
 	if _, err := idp.ParseConnection("", document); err != nil {
 		if de, ok := errors.AsType[domain.Error](err); ok && de.Code == domain.ErrIDPEndpointsPartial(nil).Code {

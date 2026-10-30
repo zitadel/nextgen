@@ -583,8 +583,10 @@ project and imports the root admin.
   started the instance answers 500, and its lines end with the launcher's
   error and `the user server exited during startup`. An error outside a
   request, such as a failed flush of the request audit events, has no
-  status to find it by: search the messages for the word, which also
-  matches the 4xx `api error` lines, and keep the `ERROR` ones:
+  request line to find it by: search the messages for the word, which also
+  matches the `api error` lines of refused requests, and keep the `ERROR`
+  ones (an `api error` line's status is on the `request served` line with
+  the same `request_id`):
 
   ```sh
   npx -y vercel@64.5.0 logs --scope team_IDtOs36TGPOejsKm40wr1p3C \

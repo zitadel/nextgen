@@ -69,12 +69,15 @@ func (e Error) LogValue() slog.Value {
 }
 
 // BriefLogValue is the shape of an error logged below Error level: code,
-// message and the cause chain. Location and stack stay on Error lines
-// (ADR 030).
+// message, the cause chain and where the error was raised, in every log
+// format. The stack stays on Error lines (ADR 030).
 func (e Error) BriefLogValue() slog.Value {
 	attrs := []slog.Attr{
 		slog.String("code", e.Code),
 		slog.String("message", e.Message),
+	}
+	if loc := e.ReportLocation(); loc != nil {
+		attrs = append(attrs, slog.Any("reportLocation", loc))
 	}
 	var parent Error
 	switch {
@@ -90,7 +93,7 @@ func (e Error) BriefLogValue() slog.Value {
 }
 
 // Brief returns e as an error that logs through BriefLogValue and exposes
-// no location or stack, for lines below Error level (ADR 030).
+// no stack, for lines below Error level (ADR 030).
 func (e Error) Brief() error { return briefError{e} }
 
 type briefError struct{ e Error } // a field, not embedded: Origin's methods must not be promoted

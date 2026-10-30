@@ -466,6 +466,10 @@ func TestFlowStateMachine_Process_LoginInvalidPassword(t *testing.T) {
 	require.Equal(t, "credentials", result.Step.Name)
 	require.NotNil(t, result.Step.Error)
 	assert.Equal(t, domain.FlowStepErrorInvalidCredentials, *result.Step.Error)
+	// The key travels with the rejection that produced it, for the log.
+	require.NotNil(t, result.Step.Failure)
+	assert.Equal(t, domain.FlowStepErrorInvalidCredentials, result.Step.Failure.Key)
+	assert.ErrorIs(t, result.Step.Failure.Cause, domain.ErrAuthAttemptProofRejected(nil))
 }
 
 // A collision on a step that declares create_user never runs the mutation,
@@ -603,6 +607,12 @@ func TestFlowStateMachine_Process_OmittedRequiredFieldKeepsStep(t *testing.T) {
 	if assert.NotNil(t, result.Step.Error) {
 		assert.Equal(t, "error.email_required", *result.Step.Error)
 	}
+	// No error produced the key: the log gets a refusal naming it, with the
+	// violations as its cause.
+	require.NotNil(t, result.Step.Failure)
+	assert.ErrorIs(t, result.Step.Failure.Cause, domain.ErrFlowStepRefused("error.email_required"))
+	var violations domain.FlowFieldValidationErrors
+	assert.ErrorAs(t, result.Step.Failure.Cause, &violations)
 }
 
 // The passkey-register issue leg collects the step's fields, so an omitted
@@ -1283,6 +1293,8 @@ func TestFlowStateMachine_Process_PasskeyProofRejectedKeepsStep(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, rejected.Step.Error)
 	assert.Equal(t, domain.FlowStepErrorPasskeyInvalid, *rejected.Step.Error)
+	require.NotNil(t, rejected.Step.Failure)
+	assert.ErrorIs(t, rejected.Step.Failure.Cause, domain.ErrAuthAttemptProofRejected(nil))
 	assert.Nil(t, rejected.State.PendingChallenge)
 	assert.Equal(t, "authenticate", rejected.State.CurrentStep)
 }
@@ -5230,16 +5242,16 @@ func unlinkedParked(claims map[string]any, verified map[string]bool) *domain.Flo
 // x-unique ones verified.
 func completeClaims() (map[string]any, map[string]bool) {
 	return map[string]any{
-			"email":       "alice@example.com",
-			"username":    "alice",
-			"given_name":  "Alice",
-			"family_name": "Liddell",
-			"badge":       "b-7",
-		}, map[string]bool{
-			"email":    true,
-			"username": true,
-			"badge":    true,
-		}
+		"email":       "alice@example.com",
+		"username":    "alice",
+		"given_name":  "Alice",
+		"family_name": "Liddell",
+		"badge":       "b-7",
+	}, map[string]bool{
+		"email":    true,
+		"username": true,
+		"badge":    true,
+	}
 }
 
 // withSSOOutcomeSteps routes the two creation outcomes to their own steps.

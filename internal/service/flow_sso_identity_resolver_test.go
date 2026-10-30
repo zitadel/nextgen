@@ -379,7 +379,9 @@ func TestFlowSSOIdentityResolver_LoadParked_LinkMissIsNil(t *testing.T) {
 	assert.Equal(t, "idp-1", got.ConnectionID, "the link is looked up by the stable connection id")
 }
 
-func TestFlowSSOIdentityResolver_LoadParked_OtherSchemaRestartsAndLogsBoth(t *testing.T) {
+// The restart names both schemas in its cause, for the line the handler
+// writes, and neither in its message. Nothing is logged here.
+func TestFlowSSOIdentityResolver_LoadParked_OtherSchemaRestartsNamingBoth(t *testing.T) {
 	t.Parallel()
 	const otherSchemaURL = "https://example.test/staff.schema.json"
 	f := newSSOResolverFixture(t)
@@ -392,10 +394,15 @@ func TestFlowSSOIdentityResolver_LoadParked_OtherSchemaRestartsAndLogsBoth(t *te
 
 	_, err := f.resolver.LoadParked(ctx, loadInput())
 	require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
-	assert.Contains(t, logged.String(), ssoSchemaURL)
-	assert.Contains(t, logged.String(), otherSchemaURL)
+	require.ErrorIs(t, err, domain.ErrSSOParkedIdentityUnusable)
+	var restart domain.Error
+	require.ErrorAs(t, err, &restart)
+	require.NotNil(t, restart.Parent)
+	assert.Contains(t, restart.Parent.Error(), ssoSchemaURL)
+	assert.Contains(t, restart.Parent.Error(), otherSchemaURL)
 	assert.NotContains(t, err.Error(), ssoSchemaURL)
 	assert.NotContains(t, err.Error(), otherSchemaURL)
+	assert.Empty(t, logged.String())
 }
 
 // A user keeps the revision it was created under, and the flow runs against
@@ -510,8 +517,13 @@ func TestFlowSSOIdentityResolver_RevisionMissingRestarts(t *testing.T) {
 
 			_, err := tc.load(f.resolver, ctx, tc.in)
 			require.ErrorIs(t, err, domain.ErrFlowRestartRequired())
-			assert.Contains(t, logged.String(), ssoProjectID)
-			assert.Contains(t, logged.String(), ssoRevisionID)
+			// The cause names the revision for the line the handler writes;
+			// nothing is logged here.
+			require.ErrorIs(t, err, domain.ErrSSOParkedIdentityUnusable)
+			var restart domain.Error
+			require.ErrorAs(t, err, &restart)
+			assert.Contains(t, restart.Parent.Error(), ssoRevisionID)
+			assert.Empty(t, logged.String())
 		})
 	}
 }
@@ -873,9 +885,10 @@ func TestFlowSSOIdentityResolver_CreateLinked_RefusesAttempt(t *testing.T) {
 	}
 }
 
-// Values that fail the user schema are logged by where they failed, never by
-// value: the validator's messages quote them.
-func TestFlowSSOIdentityResolver_CreateLinked_InvalidUserLogsLocations(t *testing.T) {
+// Values that fail the user schema reach the step's line through the error's
+// cause, which names the schema and where they failed, never a value: the
+// validator's messages quote them. Nothing is logged here.
+func TestFlowSSOIdentityResolver_CreateLinked_InvalidUserNamesLocations(t *testing.T) {
 	t.Parallel()
 	f := newSSOResolverFixture(t)
 	f.stmts.EXPECT().NewManagedID(string(domain.PrefixUser)).Return("user_new", nil)
@@ -890,9 +903,16 @@ func TestFlowSSOIdentityResolver_CreateLinked_InvalidUserLogsLocations(t *testin
 	_, err := f.resolver.CreateLinked(ctx, in)
 	require.ErrorIs(t, err, domain.ErrUserAttributesInvalid(nil))
 	assert.True(t, domain.IsUserInvalid(err))
-	assert.Contains(t, logged.String(), "level=WARN")
-	assert.Contains(t, logged.String(), "/email")
-	assert.NotContains(t, logged.String(), "secret-value")
+	assert.NotEmpty(t, domain.ValidationFailures(err))
+	var chain []string
+	for e := err; e != nil; e = errors.Unwrap(e) {
+		chain = append(chain, e.Error())
+	}
+	cause := strings.Join(chain, " | ")
+	assert.Contains(t, cause, ssoSchemaURL)
+	assert.Contains(t, cause, "/email")
+	assert.NotContains(t, cause, "secret-value")
+	assert.Empty(t, logged.String())
 }
 
 // A lost attribute race is a failed user creation, audited like one created

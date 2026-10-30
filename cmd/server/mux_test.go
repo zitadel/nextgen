@@ -1,7 +1,10 @@
 package server
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -12,6 +15,7 @@ import (
 
 	"github.com/zitadel/nextgen/internal/api"
 	"github.com/zitadel/nextgen/internal/audit"
+	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/securityheaders"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/staticui/console"
@@ -303,4 +307,26 @@ func TestBuildHTTPMuxTakesPolicyReports(t *testing.T) {
 
 	assert.Equal(t, http.StatusNoContent, rec.Code)
 	assert.Empty(t, rec.Header().Get("X-Test-Handler"))
+}
+
+// The runtime document is served behind the request chain: a request gets an
+// id and a request line, which the error line of a failed resolve joins.
+func TestBuildHTTPMuxLogsTheConsoleRuntimeRequest(t *testing.T) {
+	t.Parallel()
+	var logs bytes.Buffer
+	ctx := zlog.WithLoggingContext(t.Context(), slog.New(slog.NewJSONHandler(&logs, nil)))
+	req := httptest.NewRequestWithContext(ctx, http.MethodGet, consoleRuntimePath, nil)
+	rec := httptest.NewRecorder()
+
+	newTestMux(t, uiConfig(false)).ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	var record map[string]any
+	require.NoError(t, json.Unmarshal(logs.Bytes(), &record), "one line: %q", logs.String())
+	assert.Equal(t, "request served", record["msg"])
+	assert.NotEmpty(t, record["request_id"])
+	request, ok := record["request"].(map[string]any)
+	require.True(t, ok, "the request fields are grouped: %v", record)
+	assert.Equal(t, consoleRuntimePath, request["path"])
+	assert.EqualValues(t, http.StatusOK, request["status"])
 }

@@ -30,9 +30,12 @@ func ErrUserInvalid() Error {
 	return newError(PrefixUser.ErrorCodePrefix("invalid"), "user invalid", nil, nil)
 }
 
+// ErrUserAttributesInvalid carries the validator's failures as its parent,
+// as [SchemaValidationCause] renders them: a user's values never reach the
+// log (ADR 030).
 func ErrUserAttributesInvalid(validationErr error) Error {
 	return newError(PrefixUser.ErrorCodePrefix("attributes_invalid"),
-		"the user's attributes do not satisfy the user schema", nil, validationErr)
+		"the user's attributes do not satisfy the user schema", nil, SchemaValidationCause(validationErr))
 }
 
 func IsUserInvalid(err error) bool {
