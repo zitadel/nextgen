@@ -8,7 +8,7 @@ export interface Provisioning {
 }
 
 /**
- * A new person's records in HubSpot and Stripe (root ADR 083 §3): their
+ * A new person's records in HubSpot and Stripe (root ADR 084 §3): their
  * contact, with what they ticked at sign-up; a company per team, with them
  * on it; and a Stripe customer per team, with no subscription. Each step
  * finds what an earlier attempt made, so a retried step or a second run

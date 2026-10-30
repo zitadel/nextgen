@@ -36,7 +36,7 @@ import { screen } from "./screen";
 
 /**
  * Settings → Billing: each team the person administers, its plan, this
- * period's usage, its invoices and how it pays (root ADR 083 §6). Payment
+ * period's usage, its invoices and how it pays (root ADR 084 §6). Payment
  * details never pass through the console: changing them, or the plan, opens
  * Stripe's own pages. While the functions bill no one (`cloud.not_live`), it
  * says the cloud is free during the preview.

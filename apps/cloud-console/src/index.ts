@@ -11,7 +11,7 @@ import { VercelInsights } from "./vercel-insights";
 
 /**
  * What waits for its functions to go live or for its check on a preview
- * (root ADR 083 §9): previews and local runs get it, production does not.
+ * (root ADR 084 §9): previews and local runs get it, production does not.
  * Billing and Support are in both, since each shows its preview state while
  * the functions answer `cloud.not_live`; Email has none, as nothing sends
  * marketing email yet. Sign-up calls no function, so production has it too.

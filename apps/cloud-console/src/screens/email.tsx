@@ -23,7 +23,7 @@ import { screen } from "./screen";
 
 /**
  * Settings → Email: the person's marketing subscriptions, which HubSpot holds
- * (root ADR 083 §7). The same switch as an email's unsubscribe link: either
+ * (root ADR 084 §7). The same switch as an email's unsubscribe link: either
  * one changes the subscription in HubSpot, and this screen reads it back.
  * Account, security, billing and support email is not marketing and always
  * goes out.

@@ -217,13 +217,13 @@ What a guard does not count:
 
 ### 5. Layer 4: one challenge contract, several signals
 
-> **Proposed amendment (2026-10-29), [ADR 083](083-hosted-cloud-business-systems.md) §5.**
+> **Proposed amendment (2026-10-29), [ADR 084](084-hosted-cloud-business-systems.md) §5.**
 > The hosted cloud's own sign-in takes the option this section leaves open:
 > its console routes the sign-in widget's calls through a JavaScript function
 > (`apps/cloud-functions`), which runs `checkBotId()` on the two flow writes,
 > as a customer app on Vercel would. Until ADR 019's runtime reads the risk
 > signal, that function refuses a bad verdict, a block on the cloud's edge
-> where this section allows only a signal; ADR 083 keeps the choice open.
+> where this section allows only a signal; ADR 084 keeps the choice open.
 
 - ADR 019 stands. Its built-in Altcha proof-of-work is the default everywhere
   and the whole answer for a self-hoster: no third-party account, no data

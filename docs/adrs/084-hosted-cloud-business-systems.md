@@ -1,4 +1,4 @@
-# ADR 083: The Hosted Cloud's Business Systems Run Beside the Server
+# ADR 084: The Hosted Cloud's Business Systems Run Beside the Server
 
 > **Status:** Proposed (scaffolded: every system answers from mocks; open
 > questions 1 to 4 decided 2026-10-29)

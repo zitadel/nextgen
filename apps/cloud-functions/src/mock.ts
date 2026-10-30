@@ -2,7 +2,7 @@ import type { EmailPreferences, Plan, TeamBilling, Ticket } from "./contract";
 import type { Billing, Caller, Crm, Directory, Systems, Team, UsageRecord } from "./ports";
 
 /**
- * Every system in memory (root ADR 083 §9), for local runs, previews and
+ * Every system in memory (root ADR 084 §9), for local runs, previews and
  * tests: what a call changes is kept for the life of the process, so a
  * created ticket is listed and a saved preference reads back. On Vercel a
  * workflow step can run in another instance than the request that started

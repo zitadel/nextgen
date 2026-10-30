@@ -12,7 +12,7 @@ let ensured: Promise<unknown> | undefined;
 /**
  * The cloud's root on every page: Vercel's insights, and, once the person is
  * signed in, the request that provisions their account in Stripe and HubSpot
- * (root ADR 083 §3). It is idempotent and never blocks the console: a failure
+ * (root ADR 084 §3). It is idempotent and never blocks the console: a failure
  * is asked again on the next page load, and the functions' reconciler catches
  * whoever never comes back.
  */

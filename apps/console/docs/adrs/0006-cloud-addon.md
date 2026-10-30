@@ -6,7 +6,7 @@
 > `track`, `screens`, `signedOutScreens` and `signInApiBase`, the component
 > kit and the add-on's Vite plugin. The cloud's Billing, Support and Email
 > screens are scaffolded against `apps/cloud-functions`, whose systems are
-> mocks (root [ADR 083](../../../../docs/adrs/083-hosted-cloud-business-systems.md)),
+> mocks (root [ADR 084](../../../../docs/adrs/084-hosted-cloud-business-systems.md)),
 > and its sign-up page is its signed-out screen.
 > Menu, help and banner slots are not built; the first screen that needs one
 > adds it (§2).
@@ -60,7 +60,7 @@ the builds that leave it empty nothing:
   sanitized and sends a visitor who is signed in on to it;
 - `signInApiBase`, where the sign-in widget (login, sign-up, claim) sends its
   calls instead of the API base; the cloud routes them through its bot check
-  (root ADR 083 §5).
+  (root ADR 084 §5).
 
 A slot is added to the contract in the change whose screen needs it: entries
 in the account menu or the project switcher, help, banners.

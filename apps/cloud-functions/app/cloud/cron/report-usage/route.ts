@@ -6,7 +6,7 @@ import { reportUsage } from "@/workflows/report-usage";
 
 /**
  * Vercel Cron, hourly (repo-root vercel.json): starts the usage report for
- * the hours before now (root ADR 083 §6). Cron runs in production only and
+ * the hours before now (root ADR 084 §6). Cron runs in production only and
  * may skip or repeat a run; the report re-sends recent hours, so neither
  * matters.
  */

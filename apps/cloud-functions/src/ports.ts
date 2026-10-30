@@ -1,7 +1,7 @@
 import type { EmailPreferences, NewTicket, Plan, TeamBilling, Ticket } from "./contract";
 
 /**
- * The three systems the functions sit between (root ADR 083 §2), each behind
+ * The three systems the functions sit between (root ADR 084 §2), each behind
  * an interface so a route or a workflow names what it needs, never a vendor
  * SDK. `src/mock.ts` answers all three in memory; the live ones replace it
  * system by system, in the order of the ADR's sequence.

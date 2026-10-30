@@ -3,7 +3,7 @@ import { currentSystems } from "../systems";
 
 /**
  * What a team may do, after Stripe changed its subscription or an invoice
- * (root ADR 083 §6): the plan the subscription is on now, written to Zitadel
+ * (root ADR 084 §6): the plan the subscription is on now, written to Zitadel
  * as the limits the server enforces. It reads Stripe's current state rather
  * than the event's, so events out of order or delivered twice end the same.
  */

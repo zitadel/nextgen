@@ -31,7 +31,7 @@ const HOP_HEADERS = [
 
 /**
  * One of the sign-in widget's calls, forwarded to the Zitadel server with its
- * cookies, `Origin` and body (root ADR 083 §5), after BotID's check for a flow
+ * cookies, `Origin` and body (root ADR 084 §5), after BotID's check for a flow
  * write. Deployed, the server answers on the same origin; behind a dev proxy
  * (the console's dev server, or `vercel dev` in `workspace:cloud`) that origin
  * is the functions' own, so both local loops name the server in

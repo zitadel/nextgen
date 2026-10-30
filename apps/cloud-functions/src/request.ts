@@ -12,7 +12,7 @@ export function failure(status: number, code: string, message: string): Response
 }
 
 /**
- * The person calling an RPC (root ADR 083 §4), or the answer refusing them.
+ * The person calling an RPC (root ADR 084 §4), or the answer refusing them.
  *
  * The console's session cookie is the only credential: Zitadel says whose it
  * is (`GET /sessions/me`), so the functions hold no session of their own and

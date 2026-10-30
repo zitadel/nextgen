@@ -1,7 +1,7 @@
 /**
  * What the hosted cloud's functions answer the console's add-on
  * (`apps/cloud-console`), imported as `@zitadel/cloud-functions/contract`
- * (root ADR 083). Both deploy from `main` together, so a change to a shape
+ * (root ADR 084). Both deploy from `main` together, so a change to a shape
  * changes both sides in one commit. Fields are `snake_case`, as on Zitadel's
  * own wire.
  *

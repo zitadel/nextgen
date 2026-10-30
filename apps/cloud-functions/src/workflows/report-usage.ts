@@ -10,7 +10,7 @@ export const HOURS_PER_RUN = 3;
 
 /**
  * Every team's usage of the last complete hours before `until`, read from
- * Zitadel and sent to Stripe's meters (root ADR 083 §6). Pulled as counts,
+ * Zitadel and sent to Stripe's meters (root ADR 084 §6). Pulled as counts,
  * never pushed per sign-in. `until` comes from the cron route, so a replayed
  * run reports the same hours.
  */

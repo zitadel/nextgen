@@ -36,7 +36,7 @@ import { screen } from "./screen";
 
 /**
  * Settings → Support: write to us, and the requests already written (root ADR
- * 083 §7). Each is a HubSpot ticket on the person's contact and their team's
+ * 084 §7). Each is a HubSpot ticket on the person's contact and their team's
  * company; replies arrive by email, which HubSpot sends. While the functions
  * file no tickets (`cloud.not_live`), it points to Zitadel's GitHub issues.
  */

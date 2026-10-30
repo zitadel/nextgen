@@ -1,6 +1,6 @@
 # Agent Instructions — `apps/cloud-functions`
 
-The hosted cloud's backend ([root ADR 083](../../docs/adrs/083-hosted-cloud-business-systems.md)):
+The hosted cloud's backend ([root ADR 084](../../docs/adrs/084-hosted-cloud-business-systems.md)):
 a Next.js app of route handlers, no pages, served under `/cloud/` on the
 cloud's origin (repo-root [`vercel.json`](../../vercel.json)). It answers the
 console add-on's RPC, checks BotID in front of the sign-in widget's calls,

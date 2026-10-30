@@ -4,7 +4,7 @@ import type { Systems } from "./ports";
 /** Production asked for a system that only exists as a mock so far. */
 export class NotLiveError extends Error {
   constructor() {
-    super("The cloud's functions only answer from mocks so far (root ADR 083 §9).");
+    super("The cloud's functions only answer from mocks so far (root ADR 084 §9).");
     this.name = "NotLiveError";
   }
 }
@@ -12,7 +12,7 @@ export class NotLiveError extends Error {
 let systems: Systems | undefined;
 
 /**
- * The systems this deployment talks to (root ADR 083 §2). Only the mocks
+ * The systems this deployment talks to (root ADR 084 §2). Only the mocks
  * exist yet; the live adapters replace them system by system. Production
  * refuses to answer from them, since billing no one and dropping tickets
  * would look like it worked.

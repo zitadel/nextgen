@@ -2,7 +2,7 @@ import type { ErrorBody } from "@zitadel/cloud-functions/contract";
 
 /**
  * The cloud's functions (`apps/cloud-functions`), on the console's own origin,
- * so the session cookie rides along and no CORS is involved (root ADR 083).
+ * so the session cookie rides along and no CORS is involved (root ADR 084).
  * The console's dev server proxies the prefix to the functions' dev server
  * (`vite.ts`).
  */
@@ -31,7 +31,7 @@ export type Live<T> = { live: true; data: T } | { live: false };
 /**
  * A read that a screen shows in its preview state while the functions answer
  * `cloud.not_live`, as production does until a system's live adapter ships
- * (root ADR 083 §9). Any other failure still reaches the console's error
+ * (root ADR 084 §9). Any other failure still reaches the console's error
  * state.
  */
 export async function whenLive<T>(read: Promise<T>): Promise<Live<T>> {

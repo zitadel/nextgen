@@ -16,7 +16,7 @@ const CHANGES_ENTITLEMENTS = new Set([
 ]);
 
 /**
- * Stripe's webhooks (root ADR 083 §6). Answered at once: the work is a
+ * Stripe's webhooks (root ADR 084 §6). Answered at once: the work is a
  * workflow, which reads Stripe's current state, so a redelivered or
  * reordered event ends the same. Every other event is acknowledged and
  * ignored, which keeps `invoice.created` from holding up finalization.
