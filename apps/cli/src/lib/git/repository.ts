@@ -104,7 +104,10 @@ export class Repository {
    * or read-only disk) leaves a half-made repository that every later git
    * command would trip over. When `dir` had no `.git` before, a failed
    * `git init` removes it again, so a caller gets either a working repository
-   * or an error, never something in between.
+   * or an error, never something in between. The error is always git's: if
+   * the removal fails too, its own failure is dropped, since git's message
+   * names the real cause. This assumes nothing else creates a repository in
+   * `dir` at the same time.
    */
   static async create(dir: string): Promise<Repository> {
     const gitDir = join(dir, ".git");
@@ -113,7 +116,7 @@ export class Repository {
       await new Git(dir).run(["init", "--quiet"]);
     } catch (error) {
       if (!hadOne) {
-        await rm(gitDir, { recursive: true, force: true });
+        await rm(gitDir, { recursive: true, force: true }).catch(() => undefined);
       }
       throw error;
     }

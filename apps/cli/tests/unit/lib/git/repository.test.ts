@@ -40,11 +40,21 @@ const OPTIONS = {
 };
 
 /** A `git` on PATH that starts a repository and then fails, as a full disk would. Returns its directory. */
-async function halfInitGit(): Promise<string> {
+async function gitThatFailsHalfwayThroughInit(): Promise<string> {
+  return fakeGitRunning("/bin/mkdir -p .git/objects");
+}
+
+/** {@link gitThatFailsHalfwayThroughInit}, leaving a `.git` nobody may read, so it cannot be removed. */
+async function gitThatLeavesAnUnremovableRepository(): Promise<string> {
+  return fakeGitRunning("/bin/mkdir -p .git/objects && /bin/chmod 000 .git");
+}
+
+/** A `git` on PATH that runs `script`, then fails with "could not write config". Returns its directory. */
+async function fakeGitRunning(script: string): Promise<string> {
   const bin = await scratch.directory();
   await writeFile(
     join(bin, "git"),
-    "#!/bin/sh\n/bin/mkdir -p .git/objects\necho 'fatal: could not write config' >&2\nexit 1\n",
+    `#!/bin/sh\n${script}\necho 'fatal: could not write config' >&2\nexit 1\n`,
   );
   await chmod(join(bin, "git"), 0o755);
   return bin;
@@ -151,7 +161,7 @@ describe("Repository.create", () => {
 
   it("leaves no half-made repository behind when git init fails", async () => {
     const cwd = await scratch.directory();
-    vi.stubEnv("PATH", await halfInitGit());
+    vi.stubEnv("PATH", await gitThatFailsHalfwayThroughInit());
 
     await Repository.create(cwd).catch(() => undefined);
 
@@ -161,7 +171,7 @@ describe("Repository.create", () => {
   it("keeps a .git that was there before when git init fails", async () => {
     const cwd = await scratch.directory();
     await mkdir(join(cwd, ".git"));
-    vi.stubEnv("PATH", await halfInitGit());
+    vi.stubEnv("PATH", await gitThatFailsHalfwayThroughInit());
 
     await Repository.create(cwd).catch(() => undefined);
 
@@ -170,9 +180,19 @@ describe("Repository.create", () => {
 
   it("throws git's message when git init fails", async () => {
     const cwd = await scratch.directory();
-    vi.stubEnv("PATH", await halfInitGit());
+    vi.stubEnv("PATH", await gitThatFailsHalfwayThroughInit());
 
     await expect(Repository.create(cwd)).rejects.toThrow("fatal: could not write config");
+  });
+
+  it("throws git's message even when the half-made repository cannot be removed", async () => {
+    const cwd = await scratch.directory();
+    vi.stubEnv("PATH", await gitThatLeavesAnUnremovableRepository());
+    try {
+      await expect(Repository.create(cwd)).rejects.toThrow("fatal: could not write config");
+    } finally {
+      await chmod(join(cwd, ".git"), 0o755);
+    }
   });
 });
 
