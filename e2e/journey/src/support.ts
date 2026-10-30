@@ -140,7 +140,13 @@ export async function logout(page: Page): Promise<void> {
     await logout.waitFor({ state: "visible", timeout: 5_000 });
   }
   await logout.click();
-  const loggedOutUrl = expectsProtectedRouteRedirect ? loginUrl : /\/(?:login)?(?:[/?#]|$)/;
+  // Anchored after the host: unanchored, the pattern for "/" also matches the
+  // "//" of "http://" and passes while the page is still on /profile. The next
+  // `page.goto("/login")` then races the app's own post-logout navigation and
+  // can hang waiting for a `load` that never fires.
+  const loggedOutUrl = expectsProtectedRouteRedirect
+    ? loginUrl
+    : /^[a-z]+:\/\/[^/]+\/(?:login)?(?:[/?#]|$)/;
   await expect(page).toHaveURL(loggedOutUrl);
   await expectSessionCleared(page);
 }
