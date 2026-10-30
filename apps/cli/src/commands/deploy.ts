@@ -8,8 +8,8 @@ import {
   createReleaseFromBundle,
   diffStep,
   headSha,
-  newestPrimaryDeployments,
   runSteps,
+  servesPrimary,
   type StepContext,
   validateStep,
   worktreeIsDirty,
@@ -195,14 +195,12 @@ export default class Deploy extends EnvironmentCommand {
         );
       }
       // The deployment that raced in on a primary origin, not a live preview.
-      const [current] = await newestPrimaryDeployments(
-        client,
-        {
+      const current = (
+        await client.listDeployments.all({
           project_id: projectId,
           live: true,
-        },
-        1,
-      );
+        })
+      ).find(servesPrimary);
       throw new ZitadelError(
         "E_CONFLICT",
         "Another deploy changed the targets since this one was prepared",

@@ -67,11 +67,13 @@ describe("preview list", () => {
         expect(result).toSay(CREDENTIALS[PREVIEW_CREDENTIAL]);
       });
 
-      it("reads no further when a page comes back empty without --all", async () => {
+      it("fails rather than reading every page when one comes back empty", async () => {
         const app = await anAppWithTwoPreviews();
         platform.answersTheNextListWithNothing("previews");
 
-        expect(await app.run(["preview", "list", "--limit", "1", "--json"])).toFail();
+        expect(await app.run(["preview", "list", "--limit", "1", "--json"])).toFailWith(
+          "E_VALIDATION",
+        );
       });
 
       it("is empty on a project with no previews", async () => {

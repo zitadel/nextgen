@@ -51,13 +51,15 @@ describe("deployment list", () => {
         expect(data.next_page_token).toBeNull();
       });
 
-      it("reads no further when a page comes back empty without --all", async () => {
+      it("fails rather than reading every page when one comes back empty", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin();
         await app.deployData();
         platform.answersTheNextListWithNothing("deployments");
 
-        expect(await app.run(["deployment", "list", "--limit", "1", "--json"])).toFail();
+        expect(await app.run(["deployment", "list", "--limit", "1", "--json"])).toFailWith(
+          "E_VALIDATION",
+        );
       });
 
       it("drains the history with --all", async () => {

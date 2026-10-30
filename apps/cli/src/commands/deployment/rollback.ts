@@ -3,7 +3,7 @@ import type { GetReleaseById200PointersItem } from "@zitadel/api/generated/model
 
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope, nonBlankArg } from "../../lib/oclif";
 import { renderTable } from "../../lib/oclif/crud/table";
-import { newestPrimaryDeployments, rollbackDeployment } from "../../lib/release";
+import { rollbackDeployment, servesPrimary } from "../../lib/release";
 import { toZitadelError, ZitadelError } from "../../lib/errors";
 import { Promptable } from "../../lib/oclif/promptable";
 import { reportWarning } from "../../lib/warnings";
@@ -58,13 +58,11 @@ export default class DeploymentRollback extends Promptable(EnvironmentCommand) {
       // A preview deployment is never the deploy a bare rollback undoes, nor
       // one it can restore: the server refuses to roll one back. Primary
       // deployments make one history for the project, newest first.
-      const [latest, prior] = await newestPrimaryDeployments(
-        client,
-        {
+      const [latest, prior] = (
+        await client.listDeployments.all({
           project_id: projectId,
-        },
-        2,
-      );
+        })
+      ).filter(servesPrimary);
       if (!latest) {
         throw new ZitadelError("E_VALIDATION", "There is no deployment to roll back", {
           hint: `Nothing has been deployed yet; check \`zitadel deployment list${this.environmentSelector()}\`.`,
@@ -97,18 +95,14 @@ export default class DeploymentRollback extends Promptable(EnvironmentCommand) {
     // write in non-interactive mode) makes the server answer 409 rather than
     // letting the rollback overwrite a change the caller never saw. Omitted
     // when nothing is live there, which an optional id cannot stand in for.
-    const [current] =
-      bareGuard === undefined
-        ? await newestPrimaryDeployments(
-            client,
-            {
-              project_id: projectId,
-              live: true,
-            },
-            1,
-          )
-        : [];
-    const expectedDeploymentId = bareGuard ?? current?.id;
+    const expectedDeploymentId =
+      bareGuard ??
+      (
+        await client.listDeployments.all({
+          project_id: projectId,
+          live: true,
+        })
+      ).find(servesPrimary)?.id;
 
     const confirmed = await this.input({
       kind: "confirm",

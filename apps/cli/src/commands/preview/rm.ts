@@ -1,5 +1,4 @@
 import { Flags } from "@oclif/core";
-import type { ZitadelClient } from "@zitadel/api/client";
 
 import { CommandGroups, type JsonEnvelope, nonBlankArg, PreviewCommand } from "../../lib/oclif";
 import { dryRunResult } from "../../lib/oclif/crud/shared";
@@ -56,7 +55,8 @@ export default class PreviewRm extends Promptable(PreviewCommand) {
     // The server answers 204 whether or not the URL was live, so a typo would
     // otherwise read as a removal. Checked before asking, so nobody confirms
     // removing what is not there.
-    if (!(await isLivePreview(client, projectId, url))) {
+    const previews = await client.listPreviews.all(projectId);
+    if (!previews.some((preview) => preview.origin === url)) {
       return this.emit({
         status: "skipped",
         reason: "not-live",
@@ -83,16 +83,4 @@ export default class PreviewRm extends Promptable(PreviewCommand) {
       pretty: `Stopped serving ${url}`,
     });
   }
-}
-
-/** Whether `url` is one of the project's live previews, read no further than its page. */
-async function isLivePreview(client: ZitadelClient, projectId: string, url: string) {
-  for await (const preview of client.listPreviews.items(projectId, {
-    limit: 100,
-  })) {
-    if (preview.origin === url) {
-      return true;
-    }
-  }
-  return false;
 }

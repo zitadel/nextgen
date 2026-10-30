@@ -22,7 +22,7 @@ import { paging } from "../generated/paging";
 import { setApiAuthToken } from "./auth";
 import { setProxyPath } from "./base-url";
 import { setRequestPolicy } from "./fetch";
-import { paged, type PagingShape } from "./paged";
+import { paged } from "./paged";
 
 type Endpoints = typeof endpoints;
 type Paging = typeof paging;
@@ -93,15 +93,6 @@ export type ZitadelClientOptions = {
   onError?: (error: unknown) => never;
 };
 
-/** `call`, with {@link Paged} added when `name` is a function that pages. */
-function withPaging(name: PropertyKey, call: (...args: unknown[]) => Promise<unknown>) {
-  if (!Object.hasOwn(paging, name)) {
-    return call;
-  }
-  const shape: PagingShape = paging[name as PagedOperation];
-  return Object.assign(call, paged(call, shape));
-}
-
 /**
  * Build a typed Zitadel client pre-bound to a base URL and (optionally)
  * a bearer token. Every method on the returned object mirrors a
@@ -128,17 +119,19 @@ export function createZitadelClient(opts: ZitadelClientOptions): ZitadelClient {
       if (!bound.has(prop)) {
         // Every page goes through this call, so each one sets this client's
         // base URL and token again: another client may have run between pages.
+        const call = (...args: unknown[]) => {
+          setProxyPath(baseUrl);
+          setApiAuthToken(opts.token);
+          setRequestPolicy({ signal: opts.signal, timeoutMs: opts.timeoutMs });
+          const result = (value as (...a: unknown[]) => unknown)(...args);
+          // The URL builders orval exports beside the requests return strings.
+          return result instanceof Promise ? result.then(opts.onResponse, opts.onError) : result;
+        };
         bound.set(
           prop,
-          withPaging(prop, (...args: unknown[]) => {
-            setProxyPath(baseUrl);
-            setApiAuthToken(opts.token);
-            setRequestPolicy({ signal: opts.signal, timeoutMs: opts.timeoutMs });
-            return (value as (...a: unknown[]) => Promise<unknown>)(...args).then(
-              opts.onResponse,
-              opts.onError,
-            );
-          }),
+          Object.hasOwn(paging, prop)
+            ? Object.assign(call, paged(call, paging[prop as PagedOperation]))
+            : call,
         );
       }
       return bound.get(prop);

@@ -108,6 +108,14 @@ describe("createZitadelClient", () => {
     expectTypeOf<Misplaced>().toBeNever();
   });
 
+  it("builds a URL against its own base URL", () => {
+    const client = createZitadelClient({ baseUrl: "http://127.0.0.1:1/" });
+
+    expect(client.getListDeploymentsUrl({ project_id: "proj_1" })).toBe(
+      "http://127.0.0.1:1/deployments?project_id=proj_1",
+    );
+  });
+
   it("leaves paging off a function that does not page", () => {
     const client = createZitadelClient({ baseUrl: "http://127.0.0.1:1" });
 

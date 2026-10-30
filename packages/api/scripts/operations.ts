@@ -84,32 +84,6 @@ function operationOf(path: string, method: string, item: PathItem, operation: Op
   };
 }
 
-/**
- * The client function's arguments, in the order orval writes them: path
- * parameters in the path's order, the body, then the query parameters as one
- * object, with every optional argument moved after the required ones, as
- * TypeScript wants them. The request options orval adds last are left out.
- */
-function argumentsOf(
-  path: string,
-  parameters: readonly { name: string; in: string; required: boolean }[],
-  body: { required?: boolean } | undefined,
-) {
-  const query = parameters.filter((parameter) => parameter.in === "query");
-  const slots = [
-    ...[...path.matchAll(/\{([^}]+)\}/g)].map(([, name]) => ({
-      in: "path",
-      name,
-      required: true,
-    })),
-    ...(body ? [{ in: "body", required: body.required === true }] : []),
-    ...(query.length > 0
-      ? [{ in: "query", required: query.some((parameter) => parameter.required) }]
-      : []),
-  ];
-  return [...slots.filter((slot) => slot.required), ...slots.filter((slot) => !slot.required)];
-}
-
 /** How an operation is authenticated, in the docs' vocabulary (apps/docs/lib/sdk-sample.ts). */
 function authentication(requirements: Record<string, unknown>[]) {
   if (requirements.length === 0 || requirements.some((item) => Object.keys(item).length === 0)) {
@@ -159,15 +133,28 @@ function properties(schema: Schema | undefined): Map<string, Schema> {
   return found;
 }
 
-/** The argument of the generated function that carries `page_token`. */
+/**
+ * The argument of the generated function that carries `page_token`. orval
+ * writes the path parameters, the body, then the query parameters as one
+ * object, and moves every optional one after the required ones.
+ */
 export function pagingArgument(
   operation: Pick<ReturnType<typeof operationOf>, "id" | "path" | "parameters" | "body" | "paging">,
 ): number {
-  const index = argumentsOf(
-    operation.path,
-    operation.parameters,
-    operation.body === null ? undefined : { required: operation.body === "required" },
-  ).findIndex((argument) => argument.in === operation.paging?.token);
+  const query = operation.parameters.filter((parameter) => parameter.in === "query");
+  const slots = [
+    ...[...operation.path.matchAll(/\{[^}]+\}/g)].map(() => ({ in: "path", required: true })),
+    ...(operation.body === null ? [] : [{ in: "body", required: operation.body === "required" }]),
+    ...(query.length > 0
+      ? [{ in: "query", required: query.some((parameter) => parameter.required) }]
+      : []),
+  ];
+  const index = [
+    ...slots.filter((slot) => slot.required),
+    ...slots.filter((slot) => !slot.required),
+  ]
+    .map((slot) => slot.in)
+    .indexOf(operation.paging?.token ?? "");
   if (index === -1) {
     throw new Error(`${operation.id} has no argument to carry its page_token`);
   }

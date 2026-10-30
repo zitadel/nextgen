@@ -29,42 +29,11 @@ export type ListedDeployment = ListDeployments200DeploymentsItem;
 /**
  * Whether a deployment serves a primary origin. A preview deployment's targets
  * carry an expiry; it is never the baseline, the guard or the thing a bare
- * rollback undoes. Look past the first page for it ({@link
- * newestPrimaryDeployments}): one live preview per open pull request can push
- * it off the first.
+ * rollback undoes. Look for it across every page (`listDeployments.all`): one
+ * live preview per open pull request can push it off the first.
  */
 export function servesPrimary(deployment: Pick<ListedDeployment, "targets">): boolean {
   return deployment.targets.some((target) => target.expires_at == null);
-}
-
-/**
- * The newest primary deployments the query lists, at most `count`, newest
- * first: from the project's history, or with `live` from what it serves now.
- * The list is read page by page and no further than they take: a primary
- * deployment can sit beyond the first page behind live previews.
- */
-export async function newestPrimaryDeployments(
-  client: ZitadelClient,
-  query: Readonly<{ project_id: string; live?: boolean }>,
-  count: number,
-): Promise<ListedDeployment[]> {
-  const found: ListedDeployment[] = [];
-  if (count <= 0) {
-    return found;
-  }
-  // The largest page the server allows, so a long history takes few requests.
-  for await (const deployment of client.listDeployments.items({
-    ...query,
-    limit: 100,
-  })) {
-    if (servesPrimary(deployment)) {
-      found.push(deployment);
-      if (found.length === count) {
-        break;
-      }
-    }
-  }
-  return found;
 }
 
 /** What target a deploy goes to: every primary origin, or one exact origin. */
