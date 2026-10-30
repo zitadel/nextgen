@@ -17,15 +17,17 @@ export const beats = (count: number) => Math.round(count * FRAMES_PER_BEAT);
 type Section = { from: number; length: number };
 
 /**
- * The sections, in beats. The cold open's Enter lands on the downbeat of bar
- * 3, where the montage starts; the montage runs six bars, the blackout
- * the first two beats of bar 9, and the outro starts on its third.
+ * The sections, in beats. The terminal sets the login up over the first four
+ * bars; the cold open's Enter lands on the downbeat of bar 7, where the
+ * montage starts; the montage runs six bars, the blackout the first two beats
+ * of bar 13, and the outro starts on its third.
  */
 export const SECTIONS = {
-  coldOpen: { from: 0, length: 8 },
-  montage: { from: 8, length: 24 },
-  blackout: { from: 32, length: 2 },
-  outro: { from: 34, length: 7.5 },
+  cli: { from: 0, length: 16 },
+  coldOpen: { from: 16, length: 8 },
+  montage: { from: 24, length: 24 },
+  blackout: { from: 48, length: 2 },
+  outro: { from: 50, length: 7.5 },
 } satisfies Record<string, Section>;
 
 /**

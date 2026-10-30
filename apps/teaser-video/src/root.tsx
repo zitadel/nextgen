@@ -1,6 +1,7 @@
 import { AbsoluteFill, Composition, Sequence } from "remotion";
 
 import { ClickTrack } from "./click-track";
+import { Cli } from "./scenes/cli";
 import { ColdOpen } from "./scenes/cold-open";
 import { Outro } from "./scenes/outro";
 import { Montage } from "./scenes/montage";
@@ -21,9 +22,12 @@ function Sound({ metronome = false }: { metronome?: boolean }) {
 }
 
 function Teaser({ metronome = false }: { metronome?: boolean }) {
-  const { coldOpen, montage, outro } = SECTIONS;
+  const { cli, coldOpen, montage, outro } = SECTIONS;
   return (
     <AbsoluteFill style={{ background: "#000" }}>
+      <Sequence from={beats(cli.from)} durationInFrames={beats(cli.length)} name="Terminal">
+        <Cli />
+      </Sequence>
       <Sequence
         from={beats(coldOpen.from)}
         durationInFrames={beats(coldOpen.length)}
@@ -68,6 +72,16 @@ export function Root() {
         id="TeaserWithMetronome"
         component={() => <Teaser metronome />}
         durationInFrames={beats(TOTAL_BEATS)}
+        {...video}
+      />
+      <Composition
+        id="Terminal"
+        component={() => (
+          <Section name="cli">
+            <Cli />
+          </Section>
+        )}
+        durationInFrames={beats(SECTIONS.cli.length)}
         {...video}
       />
       <Composition

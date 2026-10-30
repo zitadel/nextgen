@@ -7,8 +7,9 @@ import { BPM, FPS, MONTAGE_DROP, OUTRO, SECTIONS, beats } from "./timeline";
 // place. It runs at 120 BPM, the grid's own tempo, and the edit follows the
 // song's own build, with no silence anywhere:
 //
-// - the song's calm opening pad, uninterrupted, under the cold open and the
-//   montage's first slow cuts;
+// - the song's calm opening pad, uninterrupted, under the terminal, the cold
+//   open and the montage's first slow cuts (it runs 15 seconds before the
+//   bass comes in);
 // - the riser's last bar, where it climbs, under the rest of the slow cuts,
 //   into the drop as the cuts speed up, and on into the groove;
 // - the riser's last bar again under the blackout and the call to action;
@@ -38,14 +39,14 @@ const sourceFrame = (beat: number) => Math.round((TRACK.firstBeat + (beat * 60) 
 /** One piece of the edit: where it plays in the video and which track beat it starts on, both in beats. */
 type Piece = { name: string; at: number; length: number; from: number };
 
-const { coldOpen, montage, blackout, outro } = SECTIONS;
+const { cli, montage, blackout, outro } = SECTIONS;
 const drop = montage.from + MONTAGE_DROP;
 const riser = drop - TRACK.riser;
 const logo = outro.from + OUTRO.logo;
 const end = outro.from + outro.length;
 
 const PIECES: Piece[] = [
-  { name: "Opening pad", at: coldOpen.from, length: riser - coldOpen.from, from: TRACK.pad },
+  { name: "Opening pad", at: cli.from, length: riser - cli.from, from: TRACK.pad },
   {
     name: "Riser into the drop",
     at: riser,

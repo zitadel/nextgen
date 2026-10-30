@@ -2,13 +2,14 @@ import { useMemo } from "react";
 import { Audio, random } from "remotion";
 
 import { IDENTIFIER_BEATS, IDENTIFIERS } from "./montage/identifiers";
+import { CLI_KEYS } from "./scenes/cli";
 import { CUTS } from "./scenes/montage";
 import { ENTER, KEYSTROKES } from "./scenes/typing";
 import { BEATS_PER_BAR, FPS, OUTRO, SECTIONS, TOTAL_BEATS, beats } from "./timeline";
 
 // The sounds the video makes itself, over the music (soundtrack.tsx): the
-// keystrokes of the cold open and of the identifiers after it, and the cold
-// open's Enter. With `metronome`, also the grid the
+// keystrokes and Enters of the terminal's commands, of the cold open and of
+// the identifiers after it. With `metronome`, also the grid the
 // music is cut to, for checking a cut by ear: a click on every beat (higher on
 // each bar's downbeat), soft under the cold open, a tick on every montage cut
 // between the beats, and a low hit as the logo replaces the call to action.
@@ -49,6 +50,12 @@ type Cue = { frame: number; sound: Sound };
 
 function cues(metronome: boolean): Cue[] {
   const list: Cue[] = [];
+  for (const { keys, enter: enterAt } of CLI_KEYS) {
+    for (const frame of keys) {
+      list.push({ frame: beats(SECTIONS.cli.from) + frame, sound: key(0.25) });
+    }
+    list.push({ frame: beats(SECTIONS.cli.from) + enterAt, sound: enter });
+  }
   for (const frame of KEYSTROKES) {
     list.push({ frame: beats(SECTIONS.coldOpen.from) + frame, sound: key(0.35) });
   }
