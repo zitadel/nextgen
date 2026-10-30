@@ -36,6 +36,28 @@ export function servesPrimary(deployment: Pick<ListedDeployment, "targets">): bo
   return deployment.targets.some((target) => target.expires_at == null);
 }
 
+/**
+ * The project's newest primary deployments, at most `count`, newest first. The
+ * history is read page by page and no further than they take: a deployment
+ * further back can sit beyond the first page behind live previews.
+ */
+export async function newestPrimaryDeployments(
+  client: ZitadelClient,
+  projectId: string,
+  count: number,
+): Promise<ListedDeployment[]> {
+  const found: ListedDeployment[] = [];
+  for await (const deployment of client.listDeployments.items({ project_id: projectId })) {
+    if (servesPrimary(deployment)) {
+      found.push(deployment);
+      if (found.length === count) {
+        break;
+      }
+    }
+  }
+  return found;
+}
+
 /** What target a deploy goes to: every primary origin, or one exact origin. */
 export type DeployTargets = ["primary"] | [string];
 

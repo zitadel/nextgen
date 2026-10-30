@@ -83,9 +83,9 @@ export interface PlatformMock {
 
   /**
    * Answers the deployment list one deployment per page, as a project whose
-   * history runs past a page does, and records every page read.
+   * history runs past a page does. A request that names its own `limit` keeps it.
    */
-  pagesDeploymentsOneAtATime(): Captured<string>;
+  pagesDeploymentsOneAtATime(): void;
 }
 
 /** Starts the mock platform for a spec file and resets it between tests. */
@@ -233,12 +233,10 @@ export function usePlatformMock(): PlatformMock {
     },
 
     pagesDeploymentsOneAtATime() {
-      const reads: string[] = [];
       server.use(
         http.get("*/deployments", ({ request }) => {
           const url = new URL(request.url);
           if (url.searchParams.has("limit")) {
-            reads.push(url.searchParams.get("page_token") ?? "");
             return undefined;
           }
           // Asked again with a page of one, which the platform then answers.
@@ -246,17 +244,6 @@ export function usePlatformMock(): PlatformMock {
           return HttpResponse.redirect(url.toString(), 307);
         }),
       );
-      return {
-        get all() {
-          return reads;
-        },
-        get count() {
-          return reads.length;
-        },
-        get last() {
-          return reads.at(-1);
-        },
-      };
     },
 
     capturesRollbacks() {

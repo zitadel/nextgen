@@ -3,7 +3,7 @@ import type { GetReleaseById200PointersItem } from "@zitadel/api/generated/model
 
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope, nonBlankArg } from "../../lib/oclif";
 import { renderTable } from "../../lib/oclif/crud/table";
-import { type ListedDeployment, rollbackDeployment, servesPrimary } from "../../lib/release";
+import { newestPrimaryDeployments, rollbackDeployment, servesPrimary } from "../../lib/release";
 import { toZitadelError, ZitadelError } from "../../lib/errors";
 import { Promptable } from "../../lib/oclif/promptable";
 import { reportWarning } from "../../lib/warnings";
@@ -58,19 +58,7 @@ export default class DeploymentRollback extends Promptable(EnvironmentCommand) {
       // A preview deployment is never the deploy a bare rollback undoes, nor
       // one it can restore: the server refuses to roll one back. Primary
       // deployments make one history for the project, newest first.
-      //
-      // The prior primary can sit beyond the first page behind live previews,
-      // so the history is read page by page until it turns up, and no further.
-      const history: ListedDeployment[] = [];
-      for await (const deployment of client.listDeployments.items({ project_id: projectId })) {
-        if (servesPrimary(deployment)) {
-          history.push(deployment);
-          if (history.length === 2) {
-            break;
-          }
-        }
-      }
-      const [latest, prior] = history;
+      const [latest, prior] = await newestPrimaryDeployments(client, projectId, 2);
       if (!latest) {
         throw new ZitadelError("E_VALIDATION", "There is no deployment to roll back", {
           hint: `Nothing has been deployed yet; check \`zitadel deployment list${this.environmentSelector()}\`.`,
