@@ -20,8 +20,9 @@ import { HEIGHT, WIDTH } from "../timeline";
 
 // The call to action, before the logo: the promise and the command that
 // keeps it, the one the video opened on (apps/website/app/commands.ts); above,
-// the frameworks `setup` scaffolds (apps/cli/src/lib/orca/scaffolders), and
-// below, over the rising glow, the coding agents the README names. Each mark
+// unlabelled, the frameworks `setup` scaffolds
+// (apps/cli/src/lib/orca/scaffolders), and below, over the rising glow, the
+// coding agents the README names. Each mark
 // comes into focus after the one before. The marks are Simple Icons'
 // (simple-icons, CC0), and their owners' trademarks: check each owner's rules
 // before the video goes out. OpenAI publishes no mark there, so Codex shows
@@ -71,23 +72,6 @@ function Mark({ icon, size }: { icon: SimpleIcon; size: number }) {
   );
 }
 
-function Label({ children, style }: { children: string; style: CSSProperties }) {
-  return (
-    <div
-      style={{
-        fontFamily: FONT,
-        fontSize: 18,
-        letterSpacing: 5,
-        textTransform: "uppercase",
-        color: "rgb(255 255 255 / 0.55)",
-        ...style,
-      }}
-    >
-      {children}
-    </div>
-  );
-}
-
 /**
  * The screen `frame` frames into the outro; `leave` runs from 0 to 1 as it
  * blurs away for the logo.
@@ -100,7 +84,7 @@ export function CallToAction({ frame, leave }: { frame: number; leave: number })
       <div
         style={{
           position: "absolute",
-          top: 110,
+          top: 160,
           width: "100%",
           display: "flex",
           flexDirection: "column",
@@ -108,7 +92,6 @@ export function CallToAction({ frame, leave }: { frame: number; leave: number })
           gap: 30,
         }}
       >
-        <Label style={focused(focusIn(frame, 6), leave)}>Works with your framework</Label>
         <div style={{ display: "flex", gap: 64 }}>
           {FRAMEWORKS.map((icon, index) => (
             <span
@@ -142,7 +125,7 @@ export function CallToAction({ frame, leave }: { frame: number; leave: number })
             ...focused(words, leave),
           }}
         >
-          Build your login in under a minute
+          Your login in a minute
         </span>
         <span
           style={{
@@ -163,7 +146,7 @@ export function CallToAction({ frame, leave }: { frame: number; leave: number })
       <div
         style={{
           position: "absolute",
-          bottom: 100,
+          bottom: 140,
           width: "100%",
           display: "flex",
           flexDirection: "column",
@@ -171,7 +154,6 @@ export function CallToAction({ frame, leave }: { frame: number; leave: number })
           gap: 30,
         }}
       >
-        <Label style={focused(focusIn(frame, 24), leave)}>Built for AI agents</Label>
         <div style={{ display: "flex", gap: 72, fontFamily: FONT, fontSize: 30, fontWeight: 500 }}>
           {AGENTS.map(({ name, icon }, index) => (
             <span
