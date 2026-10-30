@@ -31,6 +31,7 @@ func newIdentifierScopeFixture(t *testing.T) *identifierScopeFixture {
 	t.Helper()
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
+	deployDefaultTarget(t, project.ID)
 	team, err := harness.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{
 		ProjectID: project.ID,
 		Name:      helpers.TeamName(),

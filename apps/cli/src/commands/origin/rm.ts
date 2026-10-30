@@ -67,9 +67,9 @@ export default class OriginRm extends Promptable(EnvironmentCommand) {
 
     await client.removeOrigin(projectId, { pattern });
 
-    // An empty list admits every origin, so removing the last pattern opens the
-    // project up rather than closing it: said aloud, since it is the opposite
-    // of what removing one pattern otherwise does.
+    // An empty list admits no origin except a loopback origin, so removing the
+    // last pattern closes the project rather than opening it: said aloud,
+    // since it is the opposite of what removing one pattern otherwise does.
     // The pattern is already removed, so a failed read of what is left is said
     // aloud rather than reported as a failed removal.
     const remaining = await client.getProject(projectId).then(
@@ -86,7 +86,7 @@ export default class OriginRm extends Promptable(EnvironmentCommand) {
         // Named in the text, not as a next command: the URL is the developer's
         // to fill in, and a `<url>` placeholder is a shell redirection. The
         // selector keeps it on the environment that was just opened up.
-        `${pattern} was the project's last origin, so the project now admits every origin. Add the ones it should admit with \`zitadel origin add <url> --kind primary${this.environmentSelector()}\`.`,
+        `${pattern} was the project's last origin, so the project now admits no origin except a loopback origin. Add the ones it should admit with \`zitadel origin add <url> --kind primary${this.environmentSelector()}\`.`,
       );
     }
 
@@ -95,7 +95,7 @@ export default class OriginRm extends Promptable(EnvironmentCommand) {
       data: deletedData({ pattern }),
       pretty:
         remaining?.length === 0
-          ? `Removed ${pattern}; the project has no origins left and admits every origin`
+          ? `Removed ${pattern}; the project has no origins left and admits no origin except a loopback origin`
           : `Removed ${pattern} from the project's origins`,
     });
   }

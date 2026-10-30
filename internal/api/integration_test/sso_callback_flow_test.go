@@ -132,7 +132,21 @@ func newSSOCallbackFixture(t *testing.T) *ssoCallbackFixture {
 			{Name: "GOOGLE_CLIENT_ID", Value: "client-1"},
 			{Name: "GOOGLE_SECRET", Value: ssoTestClientSecret, IsSecret: true},
 		}))
+	// A deployment freezes the variables, so these need one of their own.
+	deployDefaultTarget(t, f.project.ID)
+	admitLoginOrigin(t, f.project.ID)
 	return &ssoCallbackFixture{ssoResolutionFixture: f, provider: provider}
+}
+
+// admitLoginOrigin registers the origin the SSO submit sends. An empty
+// allowlist admits nothing, and the redirect URI these tests assert is this host.
+func admitLoginOrigin(t *testing.T, projectID string) {
+	t.Helper()
+	_, err := harness.EnsureProjectService(t).AddOrigin(t.Context(), projectID, domain.Origin{
+		Pattern: "https://login.example.test",
+		Kind:    domain.OriginKindPrimary,
+	})
+	require.NoError(t, err)
 }
 
 // submitSSO submits the sso action and returns the authorize URL the step

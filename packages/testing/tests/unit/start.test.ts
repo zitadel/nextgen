@@ -20,6 +20,8 @@ const okHandlers = [
   http.post(`${BASE}/flow_definitions`, () =>
     HttpResponse.json({ id: "flowdef_1" }, { status: 201 }),
   ),
+  http.post(`${BASE}/releases`, () => HttpResponse.json({ id: "rel_1" }, { status: 201 })),
+  http.post(`${BASE}/deployments`, () => HttpResponse.json({ id: "dep_1" }, { status: 201 })),
 ];
 
 const server = setupServer(...okHandlers);

@@ -29,6 +29,7 @@ func TestPostCreateUserPasskeyUpsell(t *testing.T) {
 
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
+	deployDefaultTarget(t, project.ID)
 
 	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
 
@@ -178,6 +179,7 @@ func TestPostCreateUserPasskeyUpsell(t *testing.T) {
 func TestPostCreateUserPasskeyUpsell_SkipsToDone(t *testing.T) {
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
+	deployDefaultTarget(t, project.ID)
 
 	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
 
