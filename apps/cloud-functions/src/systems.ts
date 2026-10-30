@@ -31,7 +31,7 @@ export interface Onboarding {
 }
 
 /**
- * What `provision-account` writes to (root ADR 084 §3, §9). Production takes
+ * What onboarding's workflows write to (root ADR 084 §3, §9). Production takes
  * the recorders of `src/mock.ts` too, which send nothing to HubSpot or
  * Stripe: sign-up has no call to action yet, so its runs show what onboarding
  * will write while no third party sees it. The live adapters replace them in

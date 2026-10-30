@@ -159,8 +159,9 @@ server's catch-all.
   `zitadel apply`. It adds one field to the `register` step: a required terms
   checkbox (`const: true`). This needs §8.1. Product news needs no checkbox
   (§7), but the sign-up page says that it comes and how to leave it.
-- **Provisioning** (`provision-account`) gives each new person, as HubSpot
-  models it natively and the legacy cloud does:
+- **Provisioning**, a workflow per system (`provision-crm`,
+  `provision-billing`), so neither system's failure holds up the other, gives
+  each new person, as HubSpot models it natively and the legacy cloud does:
   - a HubSpot contact keyed by `zitadel_user_id`. A contact HubSpot already
     has for the email, from a form or the legacy cloud, takes the id rather
     than getting a second;
@@ -176,13 +177,15 @@ server's catch-all.
   idempotency key, and returns the calls it made, which the run shows.
   Sign-up never waits on Stripe or HubSpot.
 - **Today's trigger.** The add-on calls `POST /cloud/api/account/ensure` on
-  the first signed-in page. The function starts the workflow unless every
-  team of the person's already has a Stripe customer.
+  the first signed-in page. The function starts `provision-billing` unless
+  every team of the person's already has a Stripe customer, and
+  `provision-crm` once per instance, whose lookups find what exists: HubSpot
+  never waits on Stripe's answer.
 - **The target trigger.** A cron route reads the platform project's
   `GET /events` (`user.created`, `team.created`) for the last minutes, with
   the project secret §8.1 gives the cloud, as a customer would read theirs.
-  This also catches people who never open the console. The workflow is the
-  same either way.
+  This also catches people who never open the console. The workflows are
+  the same either way.
 - **No email verification exists.** Until it does, every contact is
   unverified, no marketing email goes to an address nobody verified, and
   public sign-up waits for §5 and ADR 078's guards. Verification is §8.2.

@@ -15,8 +15,10 @@ import { authenticate, failure, json } from "./request";
 export interface Runtime {
   systems: Systems;
   /**
-   * Starts the person's provisioning (`src/workflows/provision-account.ts`)
-   * unless every team of theirs has a Stripe customer already: `false` then.
+   * Starts the person's onboarding, a workflow per system: the CRM's
+   * (`src/workflows/provision-crm.ts`) once per instance, and billing's
+   * (`src/workflows/provision-billing.ts`) unless every team of theirs has a
+   * Stripe customer already. `false` when neither started.
    */
   provisionOnce(person: Caller, teams: Team[]): Promise<boolean>;
 }

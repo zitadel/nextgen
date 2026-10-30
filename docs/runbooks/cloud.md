@@ -565,8 +565,9 @@ project and imports the root admin.
 
 ## Operating
 
-- **Onboarding runs:** each signed-in person starts `provision-account`. Its
-  steps return the HubSpot calls they would make, which nothing sends yet:
+- **Onboarding runs:** each signed-in person starts `provision-crm`, and
+  `provision-billing` for a team without a Stripe customer. The CRM's steps
+  return the HubSpot calls they would make, which nothing sends yet:
   read them in Vercel → Observability → Workflows, a run, then Decrypt
   (permission to read the project's environment variables). From
   `apps/cloud-functions`, with the Vercel CLI linked:
