@@ -5,7 +5,7 @@
 import { pages } from "./paging";
 
 /** How a generated function pages: the field holding its items, and the argument carrying `page_token`. */
-export type PagingShape = Readonly<{ items: string; arg: number }>;
+type PagingShape = Readonly<{ items: string; arg: number }>;
 
 /**
  * `pages`, `items` and `all` for one generated function. Each takes the

@@ -195,12 +195,11 @@ export default class Deploy extends EnvironmentCommand {
         );
       }
       // The deployment that raced in on a primary origin, not a live preview.
-      const current = (
-        await client.listDeployments.all({
-          project_id: projectId,
-          live: true,
-        })
-      ).find(servesPrimary);
+      const deployments = await client.listDeployments.all({
+        project_id: projectId,
+        live: true,
+      });
+      const current = deployments.find(servesPrimary);
       throw new ZitadelError(
         "E_CONFLICT",
         "Another deploy changed the targets since this one was prepared",

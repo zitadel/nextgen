@@ -58,11 +58,10 @@ export default class DeploymentRollback extends Promptable(EnvironmentCommand) {
       // A preview deployment is never the deploy a bare rollback undoes, nor
       // one it can restore: the server refuses to roll one back. Primary
       // deployments make one history for the project, newest first.
-      const [latest, prior] = (
-        await client.listDeployments.all({
-          project_id: projectId,
-        })
-      ).filter(servesPrimary);
+      const history = await client.listDeployments.all({
+        project_id: projectId,
+      });
+      const [latest, prior] = history.filter(servesPrimary);
       if (!latest) {
         throw new ZitadelError("E_VALIDATION", "There is no deployment to roll back", {
           hint: `Nothing has been deployed yet; check \`zitadel deployment list${this.environmentSelector()}\`.`,
@@ -95,14 +94,14 @@ export default class DeploymentRollback extends Promptable(EnvironmentCommand) {
     // write in non-interactive mode) makes the server answer 409 rather than
     // letting the rollback overwrite a change the caller never saw. Omitted
     // when nothing is live there, which an optional id cannot stand in for.
-    const expectedDeploymentId =
-      bareGuard ??
-      (
-        await client.listDeployments.all({
-          project_id: projectId,
-          live: true,
-        })
-      ).find(servesPrimary)?.id;
+    const live =
+      bareGuard === undefined
+        ? await client.listDeployments.all({
+            project_id: projectId,
+            live: true,
+          })
+        : [];
+    const expectedDeploymentId = bareGuard ?? live.find(servesPrimary)?.id;
 
     const confirmed = await this.input({
       kind: "confirm",

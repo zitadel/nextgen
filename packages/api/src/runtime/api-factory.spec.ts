@@ -45,10 +45,16 @@ describe("createZitadelClient", () => {
     const other = createZitadelClient({ baseUrl: elsewhere.base, token: "other" });
 
     const ids = [];
-    for await (const deployment of client.listDeployments.items({ project_id: "proj_1" })) {
+    for await (const deployment of client.listDeployments.items({
+      project_id: "proj_1",
+    })) {
       ids.push(deployment.id);
       // Another client's call between two pages must not redirect the next one.
-      if (ids.length === 1) await other.listDeployments({ project_id: "proj_2" });
+      if (ids.length === 1) {
+        await other.listDeployments({
+          project_id: "proj_2",
+        });
+      }
     }
 
     expect(ids).toEqual(["dep_1", "dep_2"]);
@@ -79,9 +85,11 @@ describe("createZitadelClient", () => {
       }),
     });
 
-    const ids = (await client.listDeployments.all({ project_id: "proj_1" })).map((d) => d.id);
+    const listed = await client.listDeployments.all({
+      project_id: "proj_1",
+    });
 
-    expect(ids).toEqual(["DEP_1", "DEP_2"]);
+    expect(listed.map((deployment) => deployment.id)).toEqual(["DEP_1", "DEP_2"]);
   });
 
   it("hands every failure to its error hook", async () => {
@@ -92,7 +100,11 @@ describe("createZitadelClient", () => {
       },
     });
 
-    await expect(client.listDeployments.all({ project_id: "proj_1" })).rejects.toThrow("handled");
+    const listed = client.listDeployments.all({
+      project_id: "proj_1",
+    });
+
+    await expect(listed).rejects.toThrow("handled");
   });
 
   it("puts every paged function's page_token in an argument that takes one", () => {
@@ -111,9 +123,11 @@ describe("createZitadelClient", () => {
   it("builds a URL against its own base URL", () => {
     const client = createZitadelClient({ baseUrl: "http://127.0.0.1:1/" });
 
-    expect(client.getListDeploymentsUrl({ project_id: "proj_1" })).toBe(
-      "http://127.0.0.1:1/deployments?project_id=proj_1",
-    );
+    const url = client.getListDeploymentsUrl({
+      project_id: "proj_1",
+    });
+
+    expect(url).toBe("http://127.0.0.1:1/deployments?project_id=proj_1");
   });
 
   it("leaves paging off a function that does not page", () => {
