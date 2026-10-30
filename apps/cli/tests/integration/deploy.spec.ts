@@ -43,14 +43,14 @@ describe("deploy", () => {
 
   describe("against a valid server", () => {
     describe("--json", () => {
-      it("deploys the config to every primary origin", async () => {
+      it("deploys the config to every primary origin and the default target", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin("https://app.acme.com");
 
         const data = await app.deployData();
 
         expect(data.content_hash).toMatch(/^sha256:[0-9a-f]{64}$/);
-        expect(data.origins).toEqual([SETUP_ORIGIN.pattern, "https://app.acme.com"]);
+        expect(data.origins).toEqual(["default", SETUP_ORIGIN.pattern, "https://app.acme.com"]);
       });
 
       it("re-deploys the same release when nothing changed", async () => {

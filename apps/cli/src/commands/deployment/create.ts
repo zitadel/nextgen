@@ -1,14 +1,14 @@
 import { Flags } from "@oclif/core";
 
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../../lib/oclif";
-import { createDeployment } from "../../lib/release";
+import { createDeployment, PROJECT_TARGETS } from "../../lib/release";
 
 /**
  * `zitadel deployment create --release <id>` — make an existing release live.
  *
  * The low-level counterpart of `deploy`: it deploys a release that already
- * exists rather than assembling one from `.zitadel/`. By default it targets
- * every primary origin: primary origins are never named one by one. Deploying
+ * exists rather than assembling one from `.zitadel/`. It targets every primary
+ * origin, which are never named one by one, and the default target. Deploying
  * the release a target already serves changes nothing.
  */
 export default class DeploymentCreate extends EnvironmentCommand {
@@ -26,7 +26,7 @@ export default class DeploymentCreate extends EnvironmentCommand {
     const { flags } = await this.parse(DeploymentCreate);
     await this.toMeta(flags);
 
-    const targets = ["primary"];
+    const targets = [...PROJECT_TARGETS];
 
     // A dry run makes no request, so it answers before the connection — the
     // order `origin add`/`deploy` use, which keeps the no-mutation promise

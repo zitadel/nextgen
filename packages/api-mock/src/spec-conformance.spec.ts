@@ -2272,6 +2272,33 @@ describe("api-mock releases and deployments", () => {
     expect(again.status).toBe(200);
   });
 
+  test("deploys to the default target beside the primary origins, never with a preview URL", async () => {
+    const project = await newProject("deploy-default");
+    await addPrimary(project.id, project.secret, "https://app.acme.com");
+    await addPreview(project.id, project.secret, "https://*-acmeinc.vercel.app");
+    const release = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      id: string;
+    };
+
+    const both = await createDeployment(project.id, project.secret, {
+      release_id: release.id,
+      targets: ["primary", "default"],
+    });
+    expect(both.status).toBe(201);
+    expect(((await both.json()) as { targets: { origin: string }[] }).targets).toEqual([
+      { origin: "default" },
+      { origin: "https://app.acme.com" },
+    ]);
+
+    const mixed = await createDeployment(project.id, project.secret, {
+      release_id: release.id,
+      targets: ["default", "https://acme-git-sso-acmeinc.vercel.app"],
+      ttl: "PT168H",
+    });
+    expect(mixed.status).toBe(400);
+    expect(((await mixed.json()) as { code: string }).code).toBe("dep.invalid");
+  });
+
   test("rejects primary with no primary origin, and an unknown origin", async () => {
     const project = await newProject("deploy-no-primary");
     const release = (await (await createRelease(project.id, project.secret, rel1)).json()) as {

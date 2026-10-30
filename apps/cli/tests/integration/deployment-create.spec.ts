@@ -51,7 +51,7 @@ describe("deployment create", () => {
         expect(result).toSucceed();
         const data = app.envelopeOf<{ release_id: string; origins: string[] }>(result).data;
         expect(data.release_id).toBe(releaseId);
-        expect(data.origins).toEqual([SETUP_ORIGIN.pattern, "https://app.acme.com"]);
+        expect(data.origins).toEqual(["default", SETUP_ORIGIN.pattern, "https://app.acme.com"]);
       });
 
       it("writes no deployment on a dry run", async () => {

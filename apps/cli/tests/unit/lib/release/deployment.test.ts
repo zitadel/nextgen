@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { listLiveDeployments, servesPrimary } from "../../../../src/lib/release/deployment";
+import {
+  listLiveDeployments,
+  newestDeploymentTo,
+  rollbackOrigins,
+  servesPrimary,
+} from "../../../../src/lib/release/deployment";
 
 /** A client whose live list is split over pages of one deployment each. */
 function pagedClient(ids: string[]) {
@@ -72,5 +77,64 @@ describe("servesPrimary", () => {
         targets: [{ origin: "https://pr-1", expires_at: "2026-12-01T00:00:00Z" }],
       } as never),
     ).toBe(false);
+  });
+
+  it("is false for a deployment to the default target alone", () => {
+    expect(servesPrimary({ targets: [{ origin: "default", expires_at: null }] } as never)).toBe(
+      false,
+    );
+  });
+
+  it("is true for a deployment to a primary origin and the default target", () => {
+    expect(
+      servesPrimary({
+        targets: [
+          { origin: "default", expires_at: null },
+          { origin: "https://a", expires_at: null },
+        ],
+      } as never),
+    ).toBe(true);
+  });
+});
+
+describe("newestDeploymentTo", () => {
+  const newestFirst = [
+    { id: "dep_preview", targets: [{ origin: "https://pr-1" }] },
+    { id: "dep_default", targets: [{ origin: "default" }] },
+    { id: "dep_primary", targets: [{ origin: "https://a" }] },
+  ];
+
+  it("is the newest deployment to any of the origins", () => {
+    expect(newestDeploymentTo(newestFirst, ["https://a", "default"])).toBe("dep_default");
+    expect(newestDeploymentTo(newestFirst, ["https://a"])).toBe("dep_primary");
+  });
+
+  it("is undefined when nothing went to the origins", () => {
+    expect(newestDeploymentTo(newestFirst, ["https://b"])).toBeUndefined();
+  });
+});
+
+describe("rollbackOrigins", () => {
+  const primaries = ["https://a", "https://b"];
+
+  it("is the current primary origins and the default target for a deployment that served both", () => {
+    expect(
+      rollbackOrigins(
+        { targets: [{ origin: "default" }, { origin: "https://a" }] } as never,
+        primaries,
+      ),
+    ).toEqual(["https://a", "https://b", "default"]);
+  });
+
+  it("leaves the default target out for a deployment that did not serve it", () => {
+    expect(rollbackOrigins({ targets: [{ origin: "https://a" }] } as never, primaries)).toEqual(
+      primaries,
+    );
+  });
+
+  it("is the default target alone for a deployment that served only it", () => {
+    expect(rollbackOrigins({ targets: [{ origin: "default" }] } as never, primaries)).toEqual([
+      "default",
+    ]);
   });
 });

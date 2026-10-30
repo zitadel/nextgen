@@ -8,7 +8,14 @@ import type {
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope, nonBlankArg } from "../../lib/oclif";
 import { collectPages } from "../../lib/oclif/crud/paging";
 import { renderTable } from "../../lib/oclif/crud/table";
-import { listLiveDeployments, rollbackDeployment, servesPrimary } from "../../lib/release";
+import {
+  type ListedDeployment,
+  listLiveDeployments,
+  newestDeploymentTo,
+  rollbackDeployment,
+  rollbackOrigins,
+  servesPrimary,
+} from "../../lib/release";
 import { toZitadelError, ZitadelError } from "../../lib/errors";
 import { Promptable } from "../../lib/oclif/promptable";
 import { reportWarning } from "../../lib/warnings";
@@ -88,7 +95,10 @@ export default class DeploymentRollback extends Promptable(EnvironmentCommand) {
         });
       }
       targetId = prior.id;
-      bareGuard = latest.id;
+      bareGuard = newestDeploymentTo(
+        items as ListDeployments200DeploymentsItem[],
+        rollbackOrigins(prior, await primaryOrigins(client, projectId)),
+      );
     }
 
     // A dry run re-applies nothing, so it stops once the target is resolved,
@@ -102,14 +112,14 @@ export default class DeploymentRollback extends Promptable(EnvironmentCommand) {
       });
     }
 
-    // The deployment the caller currently sees live: the project's newest
-    // primary deployment, which is what the server compares against. Read before the
-    // confirmation gate and passed through as the optimistic guard, so a
+    // The deployment the caller currently sees live: the newest one to the
+    // targets the rollback writes, which is what the server compares against.
+    // Read before the confirmation gate and passed through as the optimistic guard, so a
     // deploy that lands while the prompt is open (or between this read and the
     // write in non-interactive mode) makes the server answer 409 rather than
     // letting the rollback overwrite a change the caller never saw. Omitted
     // when nothing is live there, which an optional id cannot stand in for.
-    const expectedDeploymentId = bareGuard ?? (await liveGuard(client, projectId));
+    const expectedDeploymentId = bareGuard ?? (await liveGuard(client, projectId, targetId));
 
     const confirmed = await this.input({
       kind: "confirm",
@@ -157,7 +167,26 @@ export default class DeploymentRollback extends Promptable(EnvironmentCommand) {
   }
 }
 
-/** The project's newest primary deployment, which a rollback is guarded by. */
-async function liveGuard(client: ZitadelClient, projectId: string): Promise<string | undefined> {
-  return (await listLiveDeployments(client, projectId)).find(servesPrimary)?.id;
+/**
+ * The newest live deployment to the targets a rollback to targetId writes,
+ * which the rollback is guarded by.
+ */
+async function liveGuard(
+  client: ZitadelClient,
+  projectId: string,
+  targetId: string,
+): Promise<string | undefined> {
+  const target: Pick<ListedDeployment, "targets"> = await client.getDeploymentById(targetId, {
+    project_id: projectId,
+  });
+  return newestDeploymentTo(
+    await listLiveDeployments(client, projectId),
+    rollbackOrigins(target, await primaryOrigins(client, projectId)),
+  );
+}
+
+/** The project's primary origins, which a rollback re-applies a release to. */
+async function primaryOrigins(client: ZitadelClient, projectId: string): Promise<string[]> {
+  const origins = (await client.getProject(projectId)).origins ?? [];
+  return origins.filter((entry) => entry.kind === "primary").map((entry) => entry.pattern);
 }
