@@ -5,8 +5,7 @@ import { HEIGHT, WIDTH } from "../timeline";
 import { APPLE, GITHUB, GOOGLE, primary, providers } from "./atoms";
 
 // The login inside apps of every kind, each placed the way such an app would
-// place it, some over a picture of their own, drawn here rather than
-// photographed: a wide desktop sign-in card, a split screen beside a travel
+// place it: a wide desktop sign-in card, a split screen beside a travel
 // picture, a dialog over a dashboard whose session ran out, a landing page's
 // sign-up, a concert hall's tickets, a store's checkout. The apps, their names and their content
 // are invented; everything paints with the --zl-* properties of the app's
@@ -74,94 +73,18 @@ function Large({ scale, children }: { scale: number; children: ReactNode }) {
   return <div style={{ transform: `scale(${scale})` }}>{children}</div>;
 }
 
-/** Fills the frame behind a scene's content, slightly out of focus, like a photo behind a page. */
-function Backdrop({ children }: { children: ReactNode }) {
-  return (
-    <svg
-      viewBox="0 0 1920 1080"
-      preserveAspectRatio="xMidYMid slice"
-      role="presentation"
-      style={{
-        position: "absolute",
-        inset: -12,
-        width: WIDTH + 24,
-        height: HEIGHT + 24,
-        filter: "blur(3px)",
-      }}
-    >
-      {children}
-    </svg>
-  );
-}
-
-// A skyline's towers: left edge, width and height, in px of the frame.
-const TOWERS = [
-  [0, 150, 420],
-  [140, 110, 560],
-  [240, 170, 380],
-  [400, 120, 640],
-  [510, 160, 470],
-  [660, 100, 720],
-  [750, 190, 520],
-  [930, 130, 600],
-  [1050, 170, 430],
-  [1210, 110, 690],
-  [1310, 180, 500],
-  [1480, 120, 580],
-  [1590, 160, 410],
-  [1740, 190, 540],
-];
-
-/** A city at dusk: the towers dark against the last light, a scatter of windows lit. */
-function CityAtDusk() {
-  return (
-    <Backdrop>
-      <defs>
-        <linearGradient id="dusk" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#0b1640" />
-          <stop offset="0.55" stopColor="#3b4fa8" />
-          <stop offset="0.8" stopColor="#f0a07a" />
-          <stop offset="1" stopColor="#ffd9a8" />
-        </linearGradient>
-      </defs>
-      <rect width="1920" height="1080" fill="url(#dusk)" />
-      {TOWERS.map(([left = 0, width = 0, height = 0], tower) => (
-        <g key={left}>
-          <rect x={left} y={1080 - height} width={width} height={height} fill="#0d1330" />
-          {Array.from({ length: Math.floor(height / 34) }, (_, row) =>
-            Array.from({ length: Math.floor(width / 26) }, (_, column) =>
-              // A fixed scatter: about a third of the windows lit.
-              (tower * 7 + row * 5 + column * 3) % 3 === 0 ? (
-                <rect
-                  // biome-ignore lint/suspicious/noArrayIndexKey: a fixed grid, never reordered
-                  key={`${row}-${column}`}
-                  x={left + 10 + column * 26}
-                  y={1080 - height + 14 + row * 34}
-                  width={12}
-                  height={16}
-                  fill="#ffd27a"
-                  opacity={0.85}
-                />
-              ) : null,
-            ),
-          )}
-        </g>
-      ))}
-    </Backdrop>
-  );
-}
-
 /** A bank's sign-in, laid out as desktop sign-in pages lay it out: one wide card, the app and the title on the left, the field and the way on to the right. */
 export function BankSignIn() {
   return (
     <Frame
       style={{
+        // A solid ground in the bank's deep navy, as its sign-in page would be.
+        background: "#10213f",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
       }}
     >
-      <CityAtDusk />
       <Large scale={1.3}>
         <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
           <div
@@ -232,6 +155,28 @@ export function BankSignIn() {
 
 /** A travel app's sign-up, split: a destination on the left, the login on the right. */
 export function TravelSplit() {
+  // Ridges fading into the haze: each farther one paler, softer and higher,
+  // as distance does it in a photograph, never a hard cut-out shape.
+  const ridges = [
+    {
+      d: "M0 690 C 160 600 300 640 430 560 S 700 600 960 520 L960 1080 L0 1080 Z",
+      fill: "#6b5566",
+      blur: 10,
+      opacity: 0.55,
+    },
+    {
+      d: "M0 790 C 200 700 360 760 520 680 S 800 720 960 650 L960 1080 L0 1080 Z",
+      fill: "#3d2f3e",
+      blur: 5,
+      opacity: 0.8,
+    },
+    {
+      d: "M0 900 C 220 830 420 880 600 820 S 860 850 960 800 L960 1080 L0 1080 Z",
+      fill: "#1e1820",
+      blur: 2,
+      opacity: 1,
+    },
+  ];
   return (
     <Frame style={{ display: "grid", gridTemplateColumns: "1fr 1fr" }}>
       <div style={{ position: "relative", overflow: "hidden" }}>
@@ -242,35 +187,82 @@ export function TravelSplit() {
           role="presentation"
         >
           <defs>
-            <linearGradient id="travel-sky" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0" stopColor="#1b1340" />
-              <stop offset="0.45" stopColor="#6d28d9" />
-              <stop offset="0.72" stopColor="#f97316" />
-              <stop offset="0.86" stopColor="#fbbf24" />
+            <linearGradient id="travel-dusk" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stopColor="#1d1a23" />
+              <stop offset="0.45" stopColor="#4a3a4c" />
+              <stop offset="0.7" stopColor="#a47c74" />
+              <stop offset="0.85" stopColor="#d8b597" />
             </linearGradient>
+            <filter id="travel-sun">
+              <feGaussianBlur stdDeviation="18" />
+            </filter>
           </defs>
-          <rect width="960" height="1080" fill="url(#travel-sky)" />
-          <circle cx="600" cy="700" r="110" fill="#fde68a" opacity="0.9" />
-          <path
-            d="M0 760 L160 600 L300 720 L470 520 L640 700 L800 580 L960 690 L960 1080 L0 1080 Z"
-            fill="#3b1d5e"
-            opacity="0.85"
+          <rect width="960" height="1080" fill="url(#travel-dusk)" />
+          <circle
+            cx="640"
+            cy="600"
+            r="70"
+            fill="#f3dcc0"
+            opacity="0.75"
+            filter="url(#travel-sun)"
           />
-          <path
-            d="M0 860 L200 720 L380 830 L560 690 L760 840 L960 760 L960 1080 L0 1080 Z"
-            fill="#25123f"
-          />
-          <path d="M0 960 L240 870 L520 950 L760 880 L960 940 L960 1080 L0 1080 Z" fill="#140a26" />
+          {ridges.map(({ d, fill, blur, opacity }) => (
+            <path
+              key={d}
+              d={d}
+              fill={fill}
+              opacity={opacity}
+              style={{ filter: `blur(${blur}px)` }}
+            />
+          ))}
         </svg>
-        <div style={{ position: "absolute", top: 56, left: 64 }}>
-          <Logo name="Orbitly" size={44} color="#fff" />
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            background: "linear-gradient(to top, rgb(0 0 0 / 0.55), transparent 45%)",
+          }}
+        />
+        <div
+          style={{
+            position: "absolute",
+            top: 56,
+            left: 72,
+            color: "#fff",
+            ...heading,
+            fontSize: 30,
+            letterSpacing: 8,
+          }}
+        >
+          ORBITLY
         </div>
-        <div style={{ position: "absolute", left: 64, bottom: 80, color: "#fff" }}>
-          <div style={{ fontSize: 18, letterSpacing: 4, opacity: 0.8 }}>TRENDING THIS WEEK</div>
-          <h2 style={{ ...heading, fontSize: 84, fontWeight: 600, margin: "10px 0" }}>
+        <div style={{ position: "absolute", left: 72, right: 72, bottom: 88, color: "#fff" }}>
+          <div style={{ fontSize: 16, letterSpacing: 5, opacity: 0.75 }}>
+            TRAVEL JOURNAL · Nº 14
+          </div>
+          <h2
+            style={{
+              ...heading,
+              fontSize: 96,
+              fontWeight: 400,
+              lineHeight: 1,
+              margin: "18px 0 26px",
+            }}
+          >
             Kyoto in spring
           </h2>
-          <div style={{ fontSize: 24, opacity: 0.85 }}>Return flights from CHF 642 · 12 h</div>
+          <div style={{ height: 1, background: "rgb(255 255 255 / 0.35)", marginBottom: 20 }} />
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              fontSize: 21,
+              opacity: 0.85,
+            }}
+          >
+            <span>Return flights from Zürich</span>
+            <span>from CHF 642</span>
+          </div>
         </div>
       </div>
       <div style={{ display: "grid", placeItems: "center" }}>

@@ -301,7 +301,7 @@ const IN_APPS: ShotSpec[] = (
   [
     [BankSignIn, { theme: "light", color: COLORS.blue, corners: "round", headings: "sans" }],
     [Tickets, { theme: "dark", corners: "soft", headings: "serif" }],
-    [TravelSplit, { theme: "dark", color: COLORS.purple, corners: "round", headings: "sans" }],
+    [TravelSplit, { theme: "dark", corners: "soft", headings: "serif" }],
     [LandingSignUp, { theme: "light", color: COLORS.green, corners: "sharp", headings: "serif" }],
     [DashboardSession, { theme: "dark", color: COLORS.orange, corners: "sharp", headings: "mono" }],
     [Checkout, { theme: "light", corners: "soft", headings: "serif" }],
