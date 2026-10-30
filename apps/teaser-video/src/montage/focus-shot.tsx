@@ -5,7 +5,6 @@ import { useCurrentFrame } from "remotion";
 import { type Brand, brandProperties } from "../brands";
 import { handheld, push } from "../camera";
 import { LoginSurface } from "../login-surface";
-import { Pointer } from "../pointer";
 import { HEIGHT, WIDTH } from "../timeline";
 import { useAtomsRendered } from "./shot";
 
@@ -23,7 +22,6 @@ export function FocusShot({
   scale,
   anchor = { x: 0.5, y: 0.5 },
   pushBy = 0.06,
-  pointer,
   render,
 }: {
   brand: Brand;
@@ -36,11 +34,6 @@ export function FocusShot({
   anchor?: Point;
   /** How much closer the camera ends than it starts. */
   pushBy?: number;
-  /**
-   * Where a pointer moves in and clicks (pointer.tsx), as an offset in the
-   * screen's own pixels from the focused element's centre.
-   */
-  pointer?: Point;
   /** The screen `frame` frames in, one element of it marked `data-focus`. */
   render: (frame: number) => ReactNode;
 }) {
@@ -85,9 +78,6 @@ export function FocusShot({
         }}
       >
         {render(frame)}
-        {focus && pointer && (
-          <Pointer x={focus.x + pointer.x} y={focus.y + pointer.y} frame={frame} />
-        )}
       </div>
     </LoginSurface>
   );

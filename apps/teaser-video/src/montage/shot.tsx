@@ -1,4 +1,5 @@
-import { type ReactNode, type RefObject, useLayoutEffect, useRef } from "react";
+import { type ReactNode, type RefObject, useLayoutEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { AbsoluteFill, continueRender, delayRender, interpolate, useCurrentFrame } from "remotion";
 
 import { type Brand, brandProperties } from "../brands";
@@ -7,9 +8,14 @@ import { fontsLoaded, LoginSurface } from "../login-surface";
 import { HEIGHT, WIDTH } from "../timeline";
 
 // What every montage shot shares: the wait that holds each frame until the
-// atoms have rendered what it set, and the scene, a shot whose content lays
-// out the whole frame in a brand, under a camera that pushes in and drifts
-// as if held.
+// atoms have rendered what it set; a screen, centred and scaled to fill most
+// of the frame's height; and a scene, whose content lays out the whole frame.
+// Both in a brand, under a camera that pushes in and drifts as if held.
+
+/** A screen never grows past this, however short it is. */
+const MOST = 2.2;
+/** The share of the frame a screen may fill. */
+const ROOM = 0.86;
 
 /**
  * Holds each frame until every atom under `root` has rendered, then calls
@@ -35,6 +41,50 @@ export function useAtomsRendered(
       continueRender(handle);
     });
   }, [frame]);
+}
+
+/** A whole screen of the login, centred on the frame in its brand. */
+export function ScreenShot({
+  brand,
+  length,
+  seed,
+  pushBy = 0.04,
+  render,
+}: {
+  brand: Brand;
+  length: number;
+  /** Which shot this is, so its camera drifts its own way. */
+  seed: number;
+  pushBy?: number;
+  /** The screen `frame` frames in. */
+  render: (frame: number) => ReactNode;
+}) {
+  const frame = useCurrentFrame();
+  const content = useRef<HTMLDivElement>(null);
+  const [fit, setFit] = useState<number>();
+  useAtomsRendered(content, frame, (root) => {
+    if (fit === undefined) {
+      flushSync(() =>
+        setFit(
+          Math.min(MOST, (ROOM * HEIGHT) / root.offsetHeight, (ROOM * WIDTH) / root.offsetWidth),
+        ),
+      );
+    }
+  });
+  return (
+    <LoginSurface theme={brand.theme} brand={brandProperties(brand)}>
+      <AbsoluteFill
+        style={{ alignItems: "center", justifyContent: "center", transform: handheld(frame, seed) }}
+      >
+        <div
+          ref={content}
+          style={{ transform: `scale(${(fit ?? 1) * push(frame, length, pushBy)})` }}
+        >
+          {render(frame)}
+        </div>
+      </AbsoluteFill>
+    </LoginSurface>
+  );
 }
 
 /** A shot whose content lays out the whole frame, 1920 by 1080, in a brand. */

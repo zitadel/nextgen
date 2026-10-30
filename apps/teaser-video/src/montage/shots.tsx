@@ -2,7 +2,6 @@ import type { ReactNode } from "react";
 
 import { type Brand, COLORS } from "../brands";
 import { ADA, Card, SIGN_IN, SIGN_UP } from "../card";
-import { CLICK } from "../pointer";
 import { IdentifierShot } from "../scenes/identifier";
 import { ACME, APPLE, GITHUB, GOOGLE, primary, providers, secondary } from "./atoms";
 import {
@@ -14,9 +13,8 @@ import {
   TravelSplit,
 } from "./app-scenes";
 import { AvatarShot } from "./avatar-shot";
-import { BrowserShot } from "./browser-shot";
 import { FocusShot } from "./focus-shot";
-import { Scene } from "./shot";
+import { Scene, ScreenShot } from "./shot";
 import { IDENTIFIER_BEATS, IDENTIFIERS } from "./identifiers";
 import { FPS, seconds } from "../timeline";
 
@@ -36,14 +34,15 @@ export type ShotSpec = {
   scene: (length: number, seed: number) => ReactNode;
 };
 
-/** A whole screen, in its brand, as a browser on a desktop shows it (browser-shot.tsx). */
+/** A whole screen, in its brand (ScreenShot in shot.tsx). */
 type Screen = {
   beats: number;
   brand: Brand;
-  url: string;
-  title: string;
   content: (frame: number) => ReactNode;
 };
+
+/** When a close-up's button presses or its box ticks, in seconds into it. */
+const CLICK = 0.12;
 
 const PASSWORD = "correct-horse-battery";
 
@@ -56,8 +55,6 @@ const shake = (frame: number) => {
 const SCREENS: Screen[] = [
   {
     beats: 1,
-    url: "localhost:3000/login",
-    title: "Sign in · myapp",
     brand: { theme: "dark", color: COLORS.purple, corners: "round", headings: "sans" },
     content: () => (
       <Card
@@ -78,8 +75,6 @@ const SCREENS: Screen[] = [
   },
   {
     beats: 1,
-    url: "localhost:3000/login",
-    title: "Sign in · myapp",
     brand: { theme: "light", color: COLORS.blue, corners: "soft", headings: "sans" },
     content: () => (
       <Card
@@ -107,8 +102,6 @@ const SCREENS: Screen[] = [
   },
   {
     beats: 1,
-    url: "localhost:3000/login",
-    title: "Sign in · myapp",
     brand: { theme: "light", color: COLORS.orange, corners: "round", headings: "sans" },
     content: (frame) => (
       <Card
@@ -134,8 +127,6 @@ const SCREENS: Screen[] = [
   },
   {
     beats: 1,
-    url: "localhost:3000/login",
-    title: "Sign in · myapp",
     brand: { theme: "light", color: COLORS.green, corners: "sharp", headings: "serif" },
     content: () => (
       <Card
@@ -153,8 +144,6 @@ const SCREENS: Screen[] = [
   },
   {
     beats: 1,
-    url: "localhost:3000/register",
-    title: "Create account · myapp",
     brand: { theme: "dark", color: COLORS.orange, corners: "sharp", headings: "mono" },
     content: () => (
       <Card
@@ -179,18 +168,12 @@ const SCREENS: Screen[] = [
   },
 ];
 
-/**
- * A close look at one part of a screen, half a beat long (focus-shot.tsx),
- * with a pointer clicking it where `pointer` says.
- */
+/** A close look at one part of a screen, half a beat long (focus-shot.tsx). */
 const closeUp = (
   brand: Brand,
   scale: number,
   render: (frame: number) => ReactNode,
-  {
-    anchor,
-    pointer,
-  }: { anchor?: { x: number; y: number }; pointer?: { x: number; y: number } } = {},
+  { anchor }: { anchor?: { x: number; y: number } } = {},
 ): ShotSpec => ({
   beats: 0.5,
   scene: (length, seed) => (
@@ -200,34 +183,28 @@ const closeUp = (
       seed={seed}
       scale={scale}
       anchor={anchor}
-      pointer={pointer}
       render={render}
     />
   ),
 });
 
 const CLOSE_UPS: ShotSpec[] = [
-  closeUp(
-    { theme: "dark", corners: "soft", headings: "sans" },
-    3.8,
-    () => (
-      <Card
-        title="Sign in"
-        subtitle="Enter your email to continue"
-        fields={
-          <zl-field label="Email" type="email" placeholder="you@example.com" autocomplete="off" />
-        }
-        actions={
-          <>
-            {primary("Continue")}
-            <div data-focus>{providers([GOOGLE, GITHUB, APPLE])}</div>
-          </>
-        }
-        nav={SIGN_UP}
-      />
-    ),
-    { pointer: { x: -40, y: -40 } },
-  ),
+  closeUp({ theme: "dark", corners: "soft", headings: "sans" }, 3.8, () => (
+    <Card
+      title="Sign in"
+      subtitle="Enter your email to continue"
+      fields={
+        <zl-field label="Email" type="email" placeholder="you@example.com" autocomplete="off" />
+      }
+      actions={
+        <>
+          {primary("Continue")}
+          <div data-focus>{providers([GOOGLE, GITHUB, APPLE])}</div>
+        </>
+      }
+      nav={SIGN_UP}
+    />
+  )),
   closeUp({ theme: "dark", color: COLORS.blue, corners: "soft", headings: "sans" }, 4.4, () => (
     <Card
       title="Sign in"
@@ -284,7 +261,6 @@ const CLOSE_UPS: ShotSpec[] = [
         nav={SIGN_UP}
       />
     ),
-    { pointer: { x: -159, y: 0 } },
   ),
   closeUp(
     { theme: "light", color: COLORS.blue, corners: "soft", headings: "sans" },
@@ -299,7 +275,6 @@ const CLOSE_UPS: ShotSpec[] = [
         nav={SIGN_UP}
       />
     ),
-    { pointer: { x: 24, y: 2 } },
   ),
   closeUp(
     { theme: "light", color: COLORS.green, corners: "sharp", headings: "serif" },
@@ -317,7 +292,7 @@ const CLOSE_UPS: ShotSpec[] = [
         }
       />
     ),
-    { anchor: { x: 0.5, y: 0.66 }, pointer: { x: -24, y: 2 } },
+    { anchor: { x: 0.5, y: 0.66 } },
   ),
 ];
 
@@ -351,17 +326,10 @@ const IDENTIFIER_SHOTS: ShotSpec[] = IDENTIFIERS.map((identifier) => ({
   scene: () => <IdentifierShot {...identifier} />,
 }));
 
-const IN_BROWSER: ShotSpec[] = SCREENS.map(({ beats, brand, url, title, content }) => ({
+const SCREEN_SHOTS: ShotSpec[] = SCREENS.map(({ beats, brand, content }) => ({
   beats,
   scene: (length, seed) => (
-    <BrowserShot
-      brand={brand}
-      url={url}
-      title={title}
-      length={length}
-      seed={seed}
-      render={content}
-    />
+    <ScreenShot brand={brand} length={length} seed={seed} render={content} />
   ),
 }));
 
@@ -378,7 +346,7 @@ const AVATAR: ShotSpec = {
 
 export const SHOTS: ShotSpec[] = [
   ...IDENTIFIER_SHOTS,
-  ...IN_BROWSER,
+  ...SCREEN_SHOTS,
   AVATAR,
   ...CLOSE_UPS,
   ...IN_APPS,

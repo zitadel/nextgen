@@ -1,4 +1,4 @@
-import { type Brand, COLORS } from "../brands";
+import type { Brand } from "../brands";
 import type { IdentifierField } from "../scenes/identifier";
 import { keystrokes } from "../scenes/typing";
 import { beats, seconds } from "../timeline";
@@ -36,9 +36,11 @@ const identifier = (
   keys: keystrokes(text, seconds(0.05), beats(IDENTIFIER_BEATS) - seconds(0.23), `id-${text}`),
 });
 
+// All four stay in the cold open's dark, without a brand colour, so the change
+// reads as the identifier and the finish of the field, not as a new palette.
 export const IDENTIFIERS: Identifier[] = [
   identifier(
-    { theme: "light", color: COLORS.blue, corners: "soft", headings: "serif" },
+    { theme: "dark", corners: "soft", headings: "serif" },
     {
       label: "Username",
       type: "text",
@@ -46,11 +48,15 @@ export const IDENTIFIERS: Identifier[] = [
       subtitle: "Enter your username to continue",
     },
     "ada.lovelace",
-    // A soft glow in the brand's blue instead of the grey ring.
-    `& { --zl-ring-outline: color-mix(in srgb, ${COLORS.blue} 30%, transparent); }`,
+    // Filled, without a border or a ring.
+    `&::part(input-wrap) {
+      border-color: transparent;
+      box-shadow: none;
+      background: rgb(255 255 255 / 0.07);
+    }`,
   ),
   identifier(
-    { theme: "dark", color: COLORS.green, corners: "round", headings: "sans" },
+    { theme: "dark", corners: "sharp", headings: "sans" },
     {
       label: "Phone",
       type: "tel",
@@ -58,15 +64,18 @@ export const IDENTIFIERS: Identifier[] = [
       subtitle: "Enter your phone number to continue",
     },
     "079 123 45 67",
-    // A filled pill: no border, no ring, the brand's green as its fill.
+    // An underline alone.
     `&::part(input-wrap) {
-      border-color: transparent;
+      border-width: 0 0 1px;
+      border-color: rgb(255 255 255 / 0.35);
+      border-radius: 0;
       box-shadow: none;
-      background: color-mix(in srgb, ${COLORS.green} 18%, transparent);
+      background: transparent;
+      padding-inline: 0;
     }`,
   ),
   identifier(
-    { theme: "light", color: COLORS.purple, corners: "sharp", headings: "mono" },
+    { theme: "dark", corners: "soft", headings: "mono" },
     {
       label: "Employee ID",
       type: "text",
@@ -74,14 +83,10 @@ export const IDENTIFIERS: Identifier[] = [
       subtitle: "Enter your employee ID",
     },
     "EMP-1815",
-    // An underline alone, and a small capital label above it.
+    // A thin outline, no ring, and a small capital label.
     `&::part(input-wrap) {
-      border-width: 0 0 2px;
-      border-color: ${COLORS.purple};
-      border-radius: 0;
+      border-color: rgb(255 255 255 / 0.22);
       box-shadow: none;
-      background: transparent;
-      padding-inline: 0;
     }
     &::part(label) {
       font-size: 11px;
@@ -90,7 +95,7 @@ export const IDENTIFIERS: Identifier[] = [
     }`,
   ),
   identifier(
-    { theme: "dark", color: COLORS.orange, corners: "soft", headings: "serif" },
+    { theme: "dark", corners: "round", headings: "sans" },
     {
       label: "Customer number",
       type: "text",
@@ -98,14 +103,16 @@ export const IDENTIFIERS: Identifier[] = [
       subtitle: "Enter your customer number",
     },
     "4021 7788",
-    // A heavy border with a wide halo, and larger, spaced digits.
+    // A pill, faintly filled, its digits a little apart.
     `&::part(input-wrap) {
-      border: 2px solid ${COLORS.orange};
-      box-shadow: 0 0 0 6px color-mix(in srgb, ${COLORS.orange} 22%, transparent);
+      border-radius: 999px;
+      border-color: rgb(255 255 255 / 0.16);
+      box-shadow: none;
+      background: rgb(255 255 255 / 0.04);
+      padding-inline: 18px;
     }
     &::part(input) {
-      font-size: 17px;
-      letter-spacing: 0.08em;
+      letter-spacing: 0.05em;
     }`,
   ),
 ];
