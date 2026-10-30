@@ -121,6 +121,9 @@ func ownPrimaryOrigin(ctx context.Context, projects service.ProjectService, cons
 		if origin.Kind != domain.OriginKindPrimary || origin.Pattern == consoleOrigin {
 			continue
 		}
+		// Every start of a server with another public base would do this too:
+		// one database has one public base.
+		slog.Warn("platform bootstrap: removing an origin this server's public base replaced", slog.String("origin", origin.Pattern))
 		if err := projects.RemoveOrigin(ctx, domain.PlatformProjectID, origin.Pattern); err != nil {
 			return fmt.Errorf("remove %s from the platform project: %w", origin.Pattern, err)
 		}
