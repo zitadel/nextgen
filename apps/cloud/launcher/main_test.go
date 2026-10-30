@@ -2,12 +2,8 @@ package main
 
 import (
 	"context"
-	"crypto/rand"
-	"crypto/rsa"
-	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
-	"encoding/pem"
 	"fmt"
 	"net/url"
 	"os"
@@ -26,16 +22,65 @@ import (
 	"github.com/zitadel/nextgen/internal/audit"
 )
 
-// Test-only keys are generated once; the launcher now uses the real RSA parser.
-var testPEM = testPrivateKey()
+// Public test-only key: never use it outside tests.
+const testPEM = `-----BEGIN RSA PRIVATE KEY-----
+MIIEowIBAAKCAQEAqWhiG3cN1Na+l60PId3oH+f4cdlEWWJlmaeQ3LPO2BYzgWB+
+ok5b3PS40Ut35oKTBWSvc3VZpsrW3GAnbAb5iM9Cmv6b4kYpeSx81rpSyRPxyY63
+k8qohO5ucy+S9bb7/0ttS7X174tjTsGNDYo/5iyxNCpBfV6Z1urWvznVBbcxcEeU
+RKXJY+qCPGTjVHt6DX83GIBlndiwu23eV73wPP60/PHrA/PhjwIwbPvdHer+BPaA
+HyADVqec2+jeBen6bj/5a0mZBzXpTGcTNmTMPp2q7KAwuIKxgcUpj1O/BooX6dzg
+7CkVQaqAEub5ZdfeZFWbSth0Z8Twv+lAnAp2IwIDAQABAoIBADopICWVxiXgZCbm
+v189NEhf96f+k7ysT31lThK3mLgPRzePzWojxN4jFqCkbFGzWo5rduEI1PKyiPm3
++VDZRCp4HcHgz9vrgqmbYHDIH0vxkP1GBjizRw/8W+cn2iiJ3hJT7v4jRoArNrj/
+MlIHuNBpX50tNLa6F871aSzVyhDfuAKuUBXtkC9wgOTy5gTSSJxK/vPEPC03M0yR
+sXx++rXnoOhe3osiXjyyoi+LobDke+xD01hPsC+6DJd/uWg2HwrF4LiblN5pUV/X
+j08Ul+r3XKqlbYySZHLpgiI+sRijXO84uoDz93lM4SPj17N3m361GsNEm3bz953W
+wc9J4GECgYEA63PhAahDjDIXr6BiZPa7ldi36Tq6aJfcd+XBeMGgFls1eaSkvqzH
+rLOVSc4LM6Ow683SOPdxtPNHjoyWsHgEeuGtHoCLWuFjyn8B9Ul+2r62XtXoRsgN
+VuCPKT/8UFe1ky04HSLmalan6nEA+ZZPEvvV91LHS0F3yqKvtOBrluUCgYEAuDEH
+1SU3howQcOFqooFV+IUzfh9F67ZwXEpaRXnk+KMuge7Dg7L1TfHC7fgHuNqvhqt4
+kae28plTchkdGgffIprx17PxvppZkFbfmNIjiAKHUYb4ckSQSPTiNA8SCRByPfuz
+/cswdVZGmIlPrkM7QWRlUX+m3HfoxISNsyrxwGcCgYEAvOugyfyiHlZ/LNtKt+pF
+f6mBf7EwqwXWz5lZkLQD6IxMrwsNaTUnjgoWKj8aO9gG+F2QZUceRGvDqbximLvk
+FFkJ2GSZ7FTXBj68an0LPSczG4sVMd4I3gGWvSlrIWgO+EWbNb2wFfjsCK+dcaZK
+UlghSa5w3JBuNvgsdbxwd4UCgYBXxwX0jcfoVtd+8+3dg8V0qgXgFQc9TbQ+RzC9
+61kzJJEFWsPR/3bnrk83GPyVG6KKiyzqPQLymh8qQM2dmiK8WxrlsNuD+gq0vrHQ
+IlTMfGgAclH0IrigDBPAu23c4/mNkGY2jJ6LTJJYHxfZ9DBI+Y9PR4Y9iudiv8jH
+ma+cAQKBgA1Er8mPGinNyos8MncNeOywAJJTeNqrIW54L8O0yAp/fZvAyBy8r0Xr
+wz2/5YL+agjxRBUJ4t1VCqgC64jy61FirbdfEv0dsxhibSsvVeiTTqtRw5k6bRuE
+K/D7/IQqWot48pYboihh2o1v55aQeueKd4LUqvHThIiJpmZm7CP4
+-----END RSA PRIVATE KEY-----
+`
 
-func testPrivateKey() string {
-	key, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		panic(err)
-	}
-	return string(pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)}))
-}
+// A distinct public test-only key for the rotation case.
+const testPreviousPEM = `-----BEGIN RSA PRIVATE KEY-----
+MIIEowIBAAKCAQEA1W3ksxA11GR+tX2CkPwoczTWREV/JfX7b1uxtMuduYyaGCz8
+OUsTCtlylI7jdOftt/LxwnsvbbUzlkRFrPej3FgzS2dGYk/NpoZlcS22cI32UgeW
+2Gv2vKQkOQI0cPvLXLYAmjh4XvjJhEtarYrWPvAvEslQZp1cFLBB/v4us46xv5U8
+SmohpkQC1szvQW3AVjATvK1glavT/5cbTRYZvgv7KtmihSor/gtG6BHEJVIsbYXm
+UII2+URxai25lDZmssT0V27/bOD/ZIKZVyxpM9ImwRAS1Q3UXEGGcG7n+VjsglgK
+CuC0Yt1yPSlcKX4IsNcF4KQwHmpU4AVFVQA90wIDAQABAoIBAAIifMCbv2YV8TyA
+el9X3lG0rBX3uftXuAGXobHkvXmfIeVvAcDS8uhPX3mD6lt/fF20JN3knIdU4iS1
+HxtJSM7J5Q1yhX4zPSPWwUn+Ao6ipN2SLNySS9/8Jk6ZqoucwR52xY/FU9LjWySj
+Gk+VDWqIvXfLIq48EbE1SBu0UCREmu4VFc9Gk32/FRIx7jBlnztT98fMVG+NQA41
+vV9dcnDYovne2rGKqIMyMBQnUqMaNAaGA+/edT4QtrNF+g2Xt8I0+ygnC2Xwf8HE
+oMDoiMtp7V8uO2t5Q9N3mZtWAuNRhGXZ2GVFXk3pWE5yYNNnFrH50Oo1z5w9gwzc
+FY0LkkUCgYEA7+OgYO6JNEUlE3lV9HPgoFfwZWweKETV8N4/xJ+rkIUWU6sZGsci
+nk3b/PjzB1JZkCrYmBrS0ApAhkUpeAod7C6auuJ5sgZq3lpTU0ROPecLhAgfAwcF
+QGIZnh4xoRTHyzK2PfUxreGZGeaGANO3XHkeujJEdeQvRokEs6zaVscCgYEA48NY
+rrI7n7scqb2Jk2B3/Eczuh9O4nFfguCXWu61ApD/GMDX8A679mkHJqboiLdOFs1N
+o2SXVxuN3wr5+XUYiWLgEyGxuAY7qpny7TYZc8P/7wf8WSVxUkaJH5uddT0PxsHF
+PX3a7pKWeA264Mpi2eLFz96EgiortiCqGVHKZJUCgYAvNhtAOHHkSZ9sX7rc61lP
+9T6ol0iwICwCxZrDNbFsNeUY/llofbyAb05WUSBzVm+uAeCyvsSykPH1+vKYX1VY
+QCvPj/bnZH/v1tMDVjQX1rrbd0WzMNSFwUjNZ5/Y1eAkS4y2UOVAFWAuSsIgs4oo
+tuWnO3FhylDLjvfP7LrjzQKBgQCwiye/adn7iv7Bt2/fM6RtgQdgWoo7zaM6ADpx
+upvF3HxPRJNcuR8K9ggb9r5B0swNsp9eakdAttP2MjznFtOpEmIbkj9+JB61s1Tw
+d8Gs0R0du7PnqbU4EAKT5HxddrI23tWzP02nJSrK7eGQAnAy8atg39sYRfXR22nd
+7F8ULQKBgFywzJfaILr8JCaO4xdilPTJugJLxzBIbqqVd43QyJLkvXWn1B0oFkUF
+Y4xy2fHAv82sC6/ublYOrjHIHldujn3JmaH27PZ4QiBfexfogrGr1xO1hffjvLFe
+3bcEqH6sjjR78O3M85YiteVwgZN5fj9qE+92Isl5tAVSyt8i//88
+-----END RSA PRIVATE KEY-----
+`
 
 const (
 	pooledURL   = "postgresql://cloud-server.abc123:secret@eu-central.pg.psdb.cloud:6432/postgres?sslmode=verify-full&sslrootcert=system"
@@ -164,7 +209,7 @@ func TestPrepareServerRendersThePreviousMasterKeyForDecryption(t *testing.T) {
 	dataDir := t.TempDir()
 	setLauncherEnv(t, dataDir)
 	t.Setenv("CRON_SECRET", "")
-	previousPEM := testPrivateKey()
+	previousPEM := testPreviousPEM
 	t.Setenv("MASTER_KEY_PREVIOUS_PEM_B64", base64.StdEncoding.EncodeToString([]byte(previousPEM)))
 	t.Setenv("MASTER_KEY_PREVIOUS_ID", "cloud-2026-09")
 

@@ -47,6 +47,16 @@ jobs:
       # Playwright sets FORCE_COLOR; avoid conflicting NO_COLOR warnings.
       NO_COLOR: ""
     steps:
+      - name: Name the deployment in the run's summary
+        env:
+          ENVIRONMENT: ${{ inputs.environment }}
+          COMMIT: ${{ startsWith(inputs.sha, 'refs/') && github.sha || inputs.sha }}
+        run: |
+          {
+            echo "- Deployment: $CLOUD_URL ($ENVIRONMENT, commit ${COMMIT:0:8})"
+            echo "- Suite: $SUITE"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - uses: actions/checkout@v6
         with:
           ref: ${{ inputs.sha }}
@@ -58,11 +68,13 @@ jobs:
         run: |
           package=@zitadel/e2e
           results=
+          browser=false
           case "$SUITE" in
             docs)
-              task=e2e-deployment package=@zitadel/docs results=apps/docs/test-results
+              task=e2e-deployment package=@zitadel/docs results=apps/docs/test-results browser=true
               ;;
             console)
+              browser=true
               if [ -f e2e/console/playwright.deployment.config.mts ]; then
                 task=console-deployment results=e2e/console/test-results
               elif [ -f apps/console-e2e/playwright.deployment.config.mts ]; then
@@ -80,7 +92,7 @@ jobs:
               task=schemas-deployment
               ;;
             cli)
-              task=cli-deployment results=e2e/cli/test-results
+              task=cli-deployment results=e2e/cli/test-results browser=true
               ;;
             *) echo "::error::Unknown deployment suite: $SUITE"; exit 1 ;;
           esac
@@ -89,22 +101,16 @@ jobs:
             echo "task=$task"
             echo "package=$package"
             echo "results=$results"
+            echo "browser=$browser"
           } >> "$GITHUB_OUTPUT"
 
-      - name: Name the deployment in the run's summary
+      - name: Show how to reproduce the suite
+        if: steps.suite.outputs.present == 'true'
         env:
-          ENVIRONMENT: ${{ inputs.environment }}
-          COMMIT: ${{ inputs.sha }}
           SUITE_TASK: ${{ steps.suite.outputs.task }}
           SUITE_PACKAGE: ${{ steps.suite.outputs.package }}
         run: |
-          {
-            echo "- Deployment: $CLOUD_URL ($ENVIRONMENT, commit ${COMMIT:0:8})"
-            echo "- Suite: $SUITE"
-            if [ -n "$SUITE_TASK" ]; then
-              echo "- Reproduce: \`CLOUD_URL=$CLOUD_URL VERCEL_AUTOMATION_BYPASS_SECRET=… pnpm exec turbo run $SUITE_TASK --filter=$SUITE_PACKAGE\`"
-            fi
-          } >> "$GITHUB_STEP_SUMMARY"
+          echo "- Reproduce: \`CLOUD_URL=$CLOUD_URL VERCEL_AUTOMATION_BYPASS_SECRET=… pnpm exec turbo run $SUITE_TASK --filter=$SUITE_PACKAGE\`" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Check the bypass secret is set
         if: steps.suite.outputs.present == 'true'
@@ -134,14 +140,14 @@ jobs:
         run: echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
 
       - name: Cache Playwright browsers
-        if: steps.suite.outputs.results != ''
+        if: steps.suite.outputs.browser == 'true'
         uses: actions/cache@v5
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install Playwright Chromium
-        if: steps.suite.outputs.results != ''
+        if: steps.suite.outputs.browser == 'true'
         env:
           SUITE_PACKAGE: ${{ steps.suite.outputs.package }}
         run: corepack pnpm --filter "$SUITE_PACKAGE" exec playwright install chromium

@@ -66,6 +66,10 @@ done
 for tool in openssl node jq; do
   command -v "$tool" >/dev/null 2>&1 || { echo "setup-secrets: $tool is required" >&2; exit 69; }
 done
+(cd "$here" && node -e 'import("@zitadel/config/bootstrap-user")') >/dev/null 2>&1 || {
+  echo "setup-secrets: run corepack pnpm install --frozen-lockfile from the repository root first" >&2
+  exit 69
+}
 
 vc() { npx --yes vercel@64.5.0 "$@" --project "$project" --scope "$team"; }
 keys='["MASTER_KEY_PEM_B64","MASTER_KEY_ID","MASTER_KEY_PREVIOUS_PEM_B64","MASTER_KEY_PREVIOUS_ID","BOOTSTRAP_ADMIN_USER_JSON_B64"]'
@@ -76,6 +80,15 @@ requested="$(printf '%s\n' $targets | jq -R . | jq -sc .)"
 envs=
 if [ -z "$skip_vercel" ]; then
   envs="$(vc env ls --json)"
+  overrides="$(printf '%s' "$envs" | jq -r --argjson req "$requested" '
+    .envs[] | select(.gitBranch != null and (.key | startswith("MASTER_KEY_"))
+        and ((.target - (.target - $req)) | length > 0))
+    | "  \(.key) (branch \(.gitBranch))"')"
+  if [ -n "$overrides" ]; then
+    echo "setup-secrets: remove branch-specific master-key overrides in the Vercel dashboard before setup:" >&2
+    echo "$overrides" >&2
+    exit 65
+  fi
   shared="$(printf '%s' "$envs" | jq -r --argjson keys "$keys" --argjson req "$requested" '
     .envs[] | select(.gitBranch == null)
     | select((.key as $k | $keys | index($k) != null)
@@ -152,7 +165,7 @@ done
 # Upsert one variable at a time; a failed update never deletes the existing
 # configuration. Values reach the CLI only over stdin, never as arguments.
 add() { # name type file target
-  vc env add "$1" "$4" --force --yes --type "$2" < "$3" >/dev/null
+  printf '%s' "$(cat "$3")" | vc env add "$1" "$4" --force --yes --type "$2" >/dev/null
 }
 for target in $targets; do
   dir="$out/$target"
@@ -169,7 +182,7 @@ for target in $targets; do
 done
 
 # Remove stale rotation variables only after every replacement succeeded.
-# Branch overrides are not part of an environment-wide setup.
+# The preflight above rules out branch-specific master-key overrides.
 for target in $targets; do
   eval "previous=\"\$previous_$target\""
   [ -z "$previous" ] || continue

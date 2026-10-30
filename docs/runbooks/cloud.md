@@ -202,11 +202,6 @@ corepack pnpm install --frozen-lockfile
 sh apps/cloud/setup-secrets.sh --email admin@zitadel.com production preview
 ```
 
-Setup uses the shared `@zitadel/config/bootstrap-user` builder directly, without
-a package build. Vercel's `env add --force` updates each variable with its value
-on stdin. Rotation writes the previous key first; stale rotation variables are
-removed only after every replacement succeeds. Branch overrides are left alone.
-
 [`setup-secrets.sh`](../../apps/cloud/setup-secrets.sh) mints, per
 environment, an RSA 4096 master key with the id `cloud-<environment>-<year>-<month>`
 and a root admin ([`admin-document.mjs`](../../apps/cloud/admin-document.mjs):
@@ -418,10 +413,10 @@ What starts it, and where the result lands, depends on the environment:
   A flaky production run is run
   again from that run's page: it reports on the same commit again.
 - `gh workflow run deployment-checks.yml --ref <branch> -f url=https://cloud-….vercel.app`
-  runs the workflow without a new deployment; it reports `docs (dispatch)`,
-  `console (dispatch)` and `schemas (dispatch)`, never production's statuses,
-  and with `-f cli=true` `cli (dispatch)`: only for a preview's URL. A change to
-  `deployment-checks.yml` needs no dispatch: a `deployment_status` run uses
+  runs the workflow without a new deployment; it reports `docs / docs (dispatch)`,
+  `console / console (dispatch)` and `schemas / schemas (dispatch)`, never
+  production's statuses, and with `-f cli=true` `cli / cli (dispatch)`: only for
+  a preview's URL. A change to `deployment-checks.yml` needs no dispatch: a `deployment_status` run uses
   the file as it is on the deployed commit, so the branch's own preview
   checks it.
 - **Holding production back on it:** in the project's Build & Deployment
@@ -455,8 +450,9 @@ console's, the schemas' and the CLI's; a red check's summary names the command
 that runs its suite alone. The CLI's suite skips the production domain; never
 point it at a production deployment's own URL, where it would leave a project
 in production's database. A new suite is a turbo task that
-`check:cloud` lists, a job in `deployment-checks.yml` and, unless it writes to
-the deployment as the CLI's does, a status in `production-checks.yml`'s
+`check:cloud` lists, a caller job in `deployment-checks.yml`, a selection arm in
+`deployment-suite.yml` and, unless it writes to the deployment as the CLI's
+does, a status in `production-checks.yml`'s
 `SUITES`.
 
 ## Running the cloud locally
