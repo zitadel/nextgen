@@ -18,8 +18,8 @@ import { Easing, interpolate } from "remotion";
 
 import { HEIGHT, WIDTH } from "../timeline";
 
-// The call to action, before the logo: the promise and the command that
-// keeps it, the one the video opened on (apps/website/app/commands.ts); above,
+// The call to action, before the logo: "Meet the new Zitadel", the promise
+// under it and the command that keeps it, the one the video opened on (apps/website/app/commands.ts); above,
 // unlabelled, the frameworks `setup` scaffolds
 // (apps/cli/src/lib/orca/scaffolders), and below, over the rising glow, the
 // coding agents the README names. Each mark
@@ -77,8 +77,10 @@ function Mark({ icon, size }: { icon: SimpleIcon; size: number }) {
  * blurs away for the logo.
  */
 export function CallToAction({ frame, leave }: { frame: number; leave: number }) {
+  // The name first, the promise under it, then the command that keeps it.
   const words = focusIn(frame, 4, 30);
-  const command = focusIn(frame, 14, 24);
+  const promise = focusIn(frame, 14, 26);
+  const command = focusIn(frame, 24, 24);
   return (
     <div style={{ position: "absolute", width: WIDTH, height: HEIGHT, color: "#fafafa" }}>
       <div
@@ -115,18 +117,36 @@ export function CallToAction({ frame, leave }: { frame: number; leave: number })
           gap: 64,
         }}
       >
-        <span
+        <div
           style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 22,
             fontFamily: FONT,
-            fontWeight: 500,
-            fontSize: 64,
-            letterSpacing: "-0.01em",
-            transform: `scale(${1.04 - words * 0.04})`,
-            ...focused(words, leave),
           }}
         >
-          Your login in a minute
-        </span>
+          <span
+            style={{
+              fontWeight: 500,
+              fontSize: 76,
+              letterSpacing: "-0.015em",
+              transform: `scale(${1.04 - words * 0.04})`,
+              ...focused(words, leave),
+            }}
+          >
+            Meet the new Zitadel
+          </span>
+          <span
+            style={{
+              fontSize: 34,
+              color: "rgb(255 255 255 / 0.7)",
+              ...focused(promise, leave),
+            }}
+          >
+            Build your login in under a minute
+          </span>
+        </div>
         <span
           style={{
             fontFamily: MONO,
