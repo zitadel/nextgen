@@ -1,5 +1,7 @@
 import { useCurrentFrame } from "remotion";
 
+import { GLASS } from "../glass";
+
 import { FRAMES_PER_BEAT, HEIGHT, WIDTH, beats, seconds } from "../timeline";
 import { keystrokes } from "./typing";
 
@@ -64,8 +66,6 @@ export const CLI_KEYS = STEPS.map(({ command, typing: [from, to] }) => ({
 /** The website's terminal colours (apps/website/app/globals.css). */
 const COLORS = {
   ground: "#050505",
-  window: "#141417",
-  bar: "#18181c",
   edge: "rgb(255 255 255 / 0.08)",
   text: "#f4f4f6",
   muted: "#82829c",
@@ -118,6 +118,7 @@ export function Cli() {
   return (
     <div
       style={{
+        position: "relative",
         width: WIDTH,
         height: HEIGHT,
         background: COLORS.ground,
@@ -126,13 +127,24 @@ export function Cli() {
         justifyContent: "center",
       }}
     >
+      {/* A soft glow in Zitadel's orange and lilac, for the glass to lift. */}
       <div
         style={{
+          position: "absolute",
+          inset: 0,
+          background: [
+            "radial-gradient(38% 45% at 30% 70%, rgb(242 85 67 / 0.28), transparent 70%)",
+            "radial-gradient(40% 50% at 72% 30%, rgb(187 165 228 / 0.24), transparent 70%)",
+          ].join(", "),
+        }}
+      />
+      <div
+        style={{
+          position: "relative",
           width: 1560,
           height: 900,
           borderRadius: 20,
-          background: COLORS.window,
-          border: `1px solid ${COLORS.edge}`,
+          ...GLASS,
           overflow: "hidden",
           display: "flex",
           flexDirection: "column",
@@ -141,7 +153,7 @@ export function Cli() {
         <div
           style={{
             height: 56,
-            background: COLORS.bar,
+            background: "rgb(255 255 255 / 0.03)",
             borderBottom: `1px solid ${COLORS.edge}`,
             display: "flex",
             alignItems: "center",

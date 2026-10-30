@@ -1,12 +1,13 @@
 import type { CSSProperties, ReactNode } from "react";
 
 import { Card, SIGN_IN } from "../card";
+import { GLASS_CARD, GLASS_CARD_RULE } from "../glass";
 import { HEIGHT, WIDTH } from "../timeline";
 import { APPLE, GITHUB, GOOGLE, primary, providers } from "./atoms";
 
 // The login inside apps of every kind, each placed the way such an app would
 // place it: a wide desktop sign-in card, a split screen beside a travel
-// picture, a dialog over a dashboard whose session ran out, a landing page's
+// picture, a confirmation over a dashboard before a deploy, a landing page's
 // sign-up, a concert hall's tickets, a store's checkout. The apps, their names and their content
 // are invented; everything paints with the --zl-* properties of the app's
 // brand, so the login and its app read as one product.
@@ -350,7 +351,7 @@ function Sparkline({ points }: { points: number[] }) {
   );
 }
 
-/** A developer dashboard, sharp behind a dimmed dialog: the session ran out mid-deploy. */
+/** A developer dashboard, sharp behind a glass dialog that asks to confirm it is you before a deploy. */
 export function DashboardSession() {
   const stats = [
     { label: "Requests (24h)", value: "1.28M", points: [0.3, 0.4, 0.35, 0.6, 0.55, 0.8, 0.7, 0.9] },
@@ -457,12 +458,18 @@ export function DashboardSession() {
           ))}
         </div>
       </main>
-      <div style={{ position: "absolute", inset: 0, background: "rgb(0 0 0 / 0.58)" }} />
-      <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center" }}>
-        <Large scale={1.35}>
+      <div style={{ position: "absolute", inset: 0, background: "rgb(0 0 0 / 0.3)" }} />
+      <style>{GLASS_CARD_RULE}</style>
+      <div
+        className={GLASS_CARD}
+        style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center" }}
+      >
+        {/* Laid out at size rather than scaled: a scaled backdrop filter
+            is drawn small and then enlarged, which blurs the card's text. */}
+        <div style={{ zoom: 1.35 }}>
           <Card
-            title="Session expired"
-            subtitle="Sign in again to keep deploying"
+            title="Confirm it's you"
+            subtitle="Sign in again before you deploy to production"
             fields={
               <zl-field
                 label="Work email"
@@ -479,7 +486,7 @@ export function DashboardSession() {
               </>
             }
           />
-        </Large>
+        </div>
       </div>
     </Frame>
   );

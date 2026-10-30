@@ -37,8 +37,8 @@ const identifier = (
 });
 
 // All four stay in the cold open's dark, each with a muted, deep brand colour
-// on its button, so the change reads as the identifier and the finish of the
-// field, not as a new palette.
+// on its button and a lighter tone of it on the field's ring, so the change
+// reads as the identifier and the finish of the field, not as a new palette.
 const MUTED = {
   purple: "#4a2f6b",
   olive: "#4d5b3a",
@@ -56,10 +56,12 @@ export const IDENTIFIERS: Identifier[] = [
       subtitle: "Enter your username to continue",
     },
     "ada.lovelace",
-    // Filled, without a border or a ring.
-    `&::part(input-wrap) {
-      border-color: transparent;
-      box-shadow: none;
+    // Filled, ringed in the brand's purple.
+    `& {
+      --zl-ring: #8a6bb8;
+      --zl-ring-outline: rgb(138 107 184 / 0.4);
+    }
+    &::part(input-wrap) {
       background: rgb(255 255 255 / 0.07);
     }`,
   ),
@@ -72,14 +74,14 @@ export const IDENTIFIERS: Identifier[] = [
       subtitle: "Enter your phone number to continue",
     },
     "079 123 45 67",
-    // An underline alone.
+    // A thick underline in the brand's olive, glowing faintly beneath.
     `&::part(input-wrap) {
-      border-width: 0 0 1px;
-      border-color: rgb(255 255 255 / 0.35);
+      border-width: 0 0 2px;
+      border-color: #8a9c6a;
       border-radius: 0;
-      box-shadow: none;
-      background: transparent;
-      padding-inline: 0;
+      box-shadow: 0 10px 14px -10px rgb(138 156 106 / 0.7);
+      background: linear-gradient(to top, rgb(138 156 106 / 0.12), transparent);
+      padding-inline: 10px;
     }`,
   ),
   identifier(
@@ -91,10 +93,13 @@ export const IDENTIFIERS: Identifier[] = [
       subtitle: "Enter your employee ID",
     },
     "EMP-1815",
-    // A thin outline, no ring, and a small capital label.
+    // A thin outline and, apart from it, a second ring in the brand's slate;
+    // a small capital label.
     `&::part(input-wrap) {
-      border-color: rgb(255 255 255 / 0.22);
-      box-shadow: none;
+      border-color: #6f87a6;
+      box-shadow:
+        0 0 0 3px var(--zl-card),
+        0 0 0 5px #6f87a6;
     }
     &::part(label) {
       font-size: 11px;
@@ -111,11 +116,11 @@ export const IDENTIFIERS: Identifier[] = [
       subtitle: "Enter your customer number",
     },
     "4021 7788",
-    // A pill, faintly filled, its digits a little apart.
+    // A pill with a wide ring in the brand's burgundy, its digits apart.
     `&::part(input-wrap) {
       border-radius: 999px;
-      border-color: rgb(255 255 255 / 0.16);
-      box-shadow: none;
+      border-color: #b25a66;
+      box-shadow: 0 0 0 5px rgb(178 90 102 / 0.35);
       background: rgb(255 255 255 / 0.04);
       padding-inline: 18px;
     }

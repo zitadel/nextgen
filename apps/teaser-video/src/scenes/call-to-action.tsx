@@ -16,6 +16,7 @@ import {
 } from "simple-icons";
 import { Easing, interpolate } from "remotion";
 
+import { GLASS } from "../glass";
 import { HEIGHT, WIDTH, seconds } from "../timeline";
 
 // The call to action, before the logo: "Meet the new Zitadel", the promise
@@ -26,7 +27,8 @@ import { HEIGHT, WIDTH, seconds } from "../timeline";
 // comes into focus after the one before. The marks are Simple Icons'
 // (simple-icons, CC0), and their owners' trademarks: check each owner's rules
 // before the video goes out. OpenAI publishes no mark there, so Codex shows
-// as its name alone.
+// as its name alone. The rows and the command sit on the website's glass
+// (glass.ts), which the outro's glow shows through.
 
 const COMMAND = "npx @zitadel/cli@latest start";
 
@@ -51,8 +53,15 @@ const AGENTS: { name: string; icon?: SimpleIcon }[] = [
 
 /** The space between each row of marks and the words, the same above and below. */
 const ROW_GAP = 230;
-/** Both rows of marks take the same height, so the gaps measure alike. */
-const ROW: CSSProperties = { display: "flex", alignItems: "center", height: 56 };
+/** Both rows of marks sit on a capsule of glass of the same height, so the gaps measure alike. */
+const ROW: CSSProperties = {
+  ...GLASS,
+  display: "flex",
+  alignItems: "center",
+  height: 92,
+  padding: "0 44px",
+  borderRadius: 999,
+};
 
 const FONT = "Arimo, system-ui, sans-serif";
 /** Zitadel's heading face, as the website's headings use it (fonts.css). */
@@ -159,8 +168,7 @@ export function CallToAction({ frame, leave }: { frame: number; leave: number })
             fontSize: 30,
             padding: "18px 30px",
             borderRadius: 14,
-            background: "rgb(255 255 255 / 0.06)",
-            border: "1px solid rgb(255 255 255 / 0.14)",
+            ...GLASS,
             ...focused(command, leave),
           }}
         >
