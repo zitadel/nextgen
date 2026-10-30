@@ -19,6 +19,17 @@
         "!$TURBO_ROOT$/.cursor/**",
         "!$TURBO_ROOT$/.agents/**",
         "!$TURBO_ROOT$/.vercel/**",
+        "!$TURBO_ROOT$/.opencode/**",
+        "!$TURBO_ROOT$/.go/**",
+        "!$TURBO_ROOT$/vendor/**",
+        "!$TURBO_ROOT$/tmp/**",
+        "!$TURBO_ROOT$/.tmp/**",
+        "!$TURBO_ROOT$/dist/**",
+        "!$TURBO_ROOT$/tools/oidc-mock/**",
+        "!$TURBO_ROOT$/**/*_test.go",
+        "!$TURBO_ROOT$/**/testdata/**",
+        "!**/*_test.go",
+        "!**/testdata/**",
         "$TURBO_ROOT$/go.mod",
         "$TURBO_ROOT$/go.sum",
         "$TURBO_ROOT$/api/openapi/endpoints/schemas/*.json",
@@ -27,14 +38,18 @@
     },
     // Tracked Go files only, as the server project checks them.
     "format": {
+      "cache": false,
       "inputs": ["**/*.go"]
     },
     // Compiles the root module's generated Go (api/generated, the enumer and
     // mock files) through the replace directive, which the server's
     // generation rewrites mid-graph; the edge keeps vet behind it, as the
-    // server's own vet is. build and test are ordered through vet.
+    // server's own vet is. Test waits through vet; build waits directly on
+    // generation so a test-only change does not select a production build.
     "vet": {
+      "cache": false,
       "dependsOn": ["go-sources", "@zitadel/server#check-generate"],
+      "inputs": ["$TURBO_DEFAULT$"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"]
     },
     // The JavaScript k6 scenarios go through Biome like the server launcher.
@@ -42,11 +57,14 @@
       "inputs": ["scripts/**/*.js", "$TURBO_ROOT$/biome.json", "$TURBO_ROOT$/biome-plugins/*.grit"]
     },
     "build": {
-      "dependsOn": ["go-sources", "vet"],
+      "cache": false,
+      "dependsOn": ["go-sources", "@zitadel/server#check-generate"],
+      "inputs": ["$TURBO_EXTENDS$", "!**/*_test.go", "!**/testdata/**"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       "outputs": ["dist/k6"]
     },
     "test": {
+      "cache": false,
       "dependsOn": ["go-sources", "format", "vet"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"]
     },

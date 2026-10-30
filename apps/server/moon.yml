@@ -6,8 +6,10 @@ stack: "backend"
 fileGroups:
   serverInputs:
     - "/**/*.go"
-    # Embedded goose migrations (//go:embed sql/*.sql); without these Moon can
-    # cache-hit test/build after schema-only changes while Go would rebuild.
+    - "!/tools/bench/**"
+    - "!/tools/oidc-mock/**"
+    # Embedded goose migrations (//go:embed sql/*.sql) select the Go tasks
+    # even when no Go source changes.
     - "/**/*.sql"
     - "/go.mod"
     - "/go.sum"
@@ -15,14 +17,12 @@ fileGroups:
     - "/api/**/*.json"
     # Also compiled in through //go:embed or read by tests: the config defaults
     # (incl. presets), the error page and the design tokens it inlines, the
-    # integration-test fixtures, the events catalog and the product analytics
-    # catalog.
+    # integration-test fixtures and the events catalog.
     - "/packages/config/defaults/**/*"
     - "/internal/errorpage/*"
     - "/packages/design-tokens/src/generated/tokens.css"
     - "/internal/**/*.json"
     - "/docs/design/api/events-catalog.md"
-    - "/docs/product-analytics-events.yaml"
     - "/api/.ogen.yaml"
     - "/scripts/check-go-generate.mjs"
     - "/scripts/generate-meta-schemas.ts"
@@ -30,11 +30,26 @@ fileGroups:
     - "package.json"
     - "bin/**"
 
+  serverTests:
+    - "/**/testdata/**"
+    - "!/tools/bench/**"
+    - "!/tools/oidc-mock/**"
+    - "/docs/product-analytics-events.yaml"
+    - "/vercel.json"
+    - "/apps/cloud/build-launcher.sh"
+    - "/apps/console/index.html"
+
+# Go's own cache accounts for the effective compiler and target defaults.
+# Runner result caches do not; native commands must run when selected.
+# Generation stays cached: go.mod pins its toolchain, and its output does not
+# depend on the host or the commit.
 tasks:
   openapi:
     command: "node scripts/lint-openapi.mjs"
     inputs:
       - "@group(serverInputs)"
+      - "!/**/*_test.go"
+      - "!/**/testdata/**"
       - "/scripts/lint-openapi.mjs"
       # Without these a lint-config change still cache-hits.
       - "/redocly.yaml"
@@ -44,7 +59,7 @@ tasks:
 
   format:
     script: |
-      unformatted="$(git ls-files -z -- '*.go' | xargs -0 gofmt -l)"
+      unformatted="$(git ls-files -z -- '*.go' ':!tools/bench/**' ':!tools/oidc-mock/**' | xargs -0 gofmt -l)"
       if [ -n "$unformatted" ]; then
         echo "error: gofmt would rewrite the following files:" >&2
         printf '%s\n' "$unformatted" >&2
@@ -53,7 +68,9 @@ tasks:
       fi
     inputs:
       - "@group(serverInputs)"
+      - "@group(serverTests)"
     options:
+      cache: false
       runFromWorkspaceRoot: true
 
   generate:
@@ -64,6 +81,8 @@ tasks:
     command: "node scripts/go-generate.mjs"
     inputs:
       - "@group(serverInputs)"
+      - "!/**/*_test.go"
+      - "!/**/testdata/**"
       - "/scripts/go-generate.mjs"
       - "/scripts/dev-process.mjs"
     # Mirrored by GENERATED_GLOBS in scripts/generated-outputs.mjs, which is
@@ -104,6 +123,8 @@ tasks:
     command: "node scripts/check-go-generate.mjs"
     inputs:
       - "@group(serverInputs)"
+      - "!/**/*_test.go"
+      - "!/**/testdata/**"
       - "/scripts/go-generate.mjs"
       - "/scripts/dev-process.mjs"
       # Imported at module scope, not only under --prune: GENERATED_GLOBS is
@@ -124,6 +145,8 @@ tasks:
     command: "node scripts/check-go-generate.mjs --prune"
     inputs:
       - "@group(serverInputs)"
+      - "!/**/*_test.go"
+      - "!/**/testdata/**"
       - "/scripts/go-generate.mjs"
       - "/scripts/clean-generated.mjs"
       - "/scripts/generated-outputs.mjs"
@@ -141,7 +164,9 @@ tasks:
       - "console:build"
     inputs:
       - "@group(serverInputs)"
+      - "@group(serverTests)"
     options:
+      cache: false
       runFromWorkspaceRoot: true
 
   # Custom go/analysis checks, run directly rather than through go vet so the
@@ -171,10 +196,12 @@ tasks:
       - "console:build"
     inputs:
       - "@group(serverInputs)"
+      - "@group(serverTests)"
       # The Biome config the launcher check runs against, and its plugins.
       - "/biome.json"
       - "/biome-plugins/*.grit"
     options:
+      cache: false
       runFromWorkspaceRoot: true
 
   test:
@@ -192,18 +219,13 @@ tasks:
       - "lint"
       # The test binary embeds the console's dist (//go:embed all:dist). Listed here
       # and not only reached through vet: vet has no outputs, so moon would not
-      # hash these builds through it and a UI change would replay a cached run.
+      # propagate these builds through it for affected-task selection.
       - "console:build"
     inputs:
       - "@group(serverInputs)"
-      # Read by the cloud launcher's tests (apps/cloud/launcher), which hold
-      # the deployment's configuration together, and by the console's
-      # (internal/staticui/console), which hold the cloud's console headers to
-      # its page. Scoped to test: nothing the server compiles reads them.
-      - "/vercel.json"
-      - "/apps/cloud/build-launcher.sh"
-      - "/apps/console/index.html"
+      - "@group(serverTests)"
     options:
+      cache: false
       runFromWorkspaceRoot: true
 
   test-postgres:
@@ -240,6 +262,7 @@ tasks:
       - "console:build"
     inputs:
       - "@group(serverInputs)"
+      - "@group(serverTests)"
     options:
       runFromWorkspaceRoot: true
       # See the -count=1 note above: moon's own cache would skip the process
@@ -299,6 +322,7 @@ tasks:
       - "console:build"
     inputs:
       - "@group(serverInputs)"
+      - "@group(serverTests)"
       # Belt-and-braces, not the thing protecting this lane: with cache: false
       # below, the task hash is never consulted, so nothing can be replayed from
       # it and this entry changes no outcome today. It is kept because the target
@@ -343,6 +367,7 @@ tasks:
       - "console:build"
     inputs:
       - "@group(serverInputs)"
+      - "@group(serverTests)"
     options:
       runFromWorkspaceRoot: true
       # See the -count=1 note above: moon's own cache would skip the process
@@ -364,20 +389,17 @@ tasks:
       - "console:build"
     inputs:
       - "@group(serverInputs)"
-      # The embedded dist bytes participate in the hash directly, so staticui
-      # changes made outside this task's deps still invalidate the cached
-      # binary. Scoped to build rather than serverInputs: only the binary
-      # artifact depends on dist content — test/vet/format must not re-run on
-      # UI-only changes.
-      - "/internal/staticui/**"
-      # Same scoping argument: the build script and its process helper decide
+      - "!/**/*_test.go"
+      - "!/**/testdata/**"
+      # The build script and its process helper decide
       # what this task produces, but nothing about how the Go sources lint or
       # test. dev-process.mjs is listed because server-build.mjs imports it —
-      # without it, editing the helper cache-hits a stale binary.
+      # without it, editing the helper would not select this build.
       - "/scripts/server-build.mjs"
       - "/scripts/dev-process.mjs"
     outputs:
       - "/dist/server/nextgen"
       - "/dist/server/metadata.json"
     options:
+      cache: false
       runFromWorkspaceRoot: true

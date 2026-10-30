@@ -7,6 +7,7 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 import { sessionCookieName } from "@zitadel/testing/playwright";
 
 import { frameworkForId } from "../scripts/frameworks.mjs";
+import { isLoggedOutUrl } from "../scripts/navigation.mjs";
 
 /**
  * A variable the journey runner sets for the suites (JOURNEY_OUTPUT_DIR,
@@ -140,14 +141,7 @@ export async function logout(page: Page): Promise<void> {
     await logout.waitFor({ state: "visible", timeout: 5_000 });
   }
   await logout.click();
-  // Anchored after the host: unanchored, the pattern for "/" also matches the
-  // "//" of "http://" and passes while the page is still on /profile. The next
-  // `page.goto("/login")` then races the app's own post-logout navigation and
-  // can hang waiting for a `load` that never fires.
-  const loggedOutUrl = expectsProtectedRouteRedirect
-    ? loginUrl
-    : /^[a-z]+:\/\/[^/]+\/(?:login)?(?:[/?#]|$)/;
-  await expect(page).toHaveURL(loggedOutUrl);
+  await expect(page).toHaveURL((url) => isLoggedOutUrl(url, expectsProtectedRouteRedirect));
   await expectSessionCleared(page);
 }
 
