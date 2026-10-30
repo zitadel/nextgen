@@ -245,6 +245,12 @@ Each invocation prints one JSON object:
   `--origin`, which selects targets but never authorizes a preview deploy. A CI
   build other than Vercel or Netlify must set `ZITADEL_ENV=preview`, or it is
   skipped too. `preview list` and `preview rm <url>` read and end live previews.
+- `deploy` and `preview` record `-m` on the release and the deployment. Omitted,
+  they use a GitHub pull request's title, Vercel's commit message, or a clean
+  worktree's commit subject; with none, a non-interactive `deploy` fails. A
+  blank `-m` is refused. A release keeps the message of
+  the run that first built its content, usually the pull request's `preview`.
+  `deployment rollback -m` records why on the rollback.
 - `deployment get <id>` emits the deployment as the API serves it; on a
   terminal it also shows the variables the deployment froze, secrets masked.
   Read them as JSON with `variable resolve`.

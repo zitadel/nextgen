@@ -51,6 +51,29 @@ describe("deployment rollback", () => {
         );
       });
 
+      it("records -m on the rollback", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        await app.deployData();
+        await app.editUserSchema((schema) => {
+          schema.properties.company = { type: "string" };
+        });
+        await app.deployData();
+
+        const result = await app.run([
+          "deployment",
+          "rollback",
+          "--force",
+          "-m",
+          "company broke sign-up",
+          "--non-interactive",
+          "--json",
+        ]);
+
+        const { deployment_id } = app.envelopeOf<{ deployment_id: string }>(result).data;
+        expect(await app.deploymentMessage(deployment_id)).toBe("company broke sign-up");
+      });
+
       it("guards a bare rollback with the deployment it undoes", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin();

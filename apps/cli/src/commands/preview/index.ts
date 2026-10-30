@@ -14,7 +14,9 @@ import {
   buildBundle,
   createDeployment,
   createReleaseFromBundle,
+  deployMessage,
   headSha,
+  messageFlag,
   runSteps,
   type StepContext,
   validateStep,
@@ -56,9 +58,13 @@ export default class Preview extends PreviewCommand {
     "<%= config.bin %> preview",
     "<%= config.bin %> preview --origin https://acme-git-sso-acmeinc.vercel.app",
     "<%= config.bin %> preview --ttl 24h",
+    "<%= config.bin %> preview -m 'add phone_number to human-user'",
   ];
   static override flags = {
     ...previewFlags,
+    message: messageFlag(
+      "A short summary of what this release changes. Defaults to the pull request's title or the current commit's subject.",
+    ),
     // Preview-only: `preview list` and `preview rm` share the credential but
     // have no deploy to make strict, so this lives here, not in `previewFlags`.
     strict: Flags.boolean({
@@ -216,13 +222,18 @@ export default class Preview extends PreviewCommand {
       });
     }
 
+    // The release keeps the message of whichever run built it first, usually
+    // this one, so the deploy after merge reuses it rather than adding its own.
+    const message = await deployMessage(flags.message, cwd, env);
     const release = await createReleaseFromBundle(client, projectId, bundle, {
+      message,
       gitSha: await headSha(cwd),
       gitDirty: await worktreeIsDirty(cwd),
     });
     const deployment = await createDeployment(client, projectId, {
       releaseId: release.id,
       targets: urls,
+      message,
       // The wire takes an ISO-8601 duration; `--ttl` keeps the `7d`/`12h`
       // spelling a person writes (create-deployment-request.yaml).
       ...(ttl === undefined ? {} : { ttl: ttl.iso }),

@@ -18,6 +18,11 @@ export async function headSha(cwd: string): Promise<string | null> {
   return Repository.answer(cwd, (repository) => repository.currentCommit(), null);
 }
 
+/** The current commit's subject line, or null when there is no repo or no commit yet. */
+export async function headSubject(cwd: string): Promise<string | null> {
+  return Repository.answer(cwd, (repository) => repository.currentSubject(), null);
+}
+
 /**
  * Whether the repository's working tree has any uncommitted change, anywhere —
  * not only under `.zitadel/`. A release records the provenance of the whole
