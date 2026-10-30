@@ -19,13 +19,13 @@ Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
 
 ## Content-Security-Policy
 
-- The enforced policy is `next.config.ts`'; the report-only one is
-  `csp-adapter.mjs`', with each prerendered page's inline scripts by hash.
+- `csp-adapter.mjs` enforces each prerendered page's script hashes, and the
+  404's for other URLs in place of `next.config.ts`' scriptless fallback.
 - Never give a page a nonce or `'unsafe-inline'`: pages, the changelog too,
   stay prerendered ([why](../../docs/design/cloud/csp-docs-and-website.md)).
 - `csp-adapter.mjs` copies `apps/docs/csp-adapter.mjs` but for the policy:
   change both.
-- Load nothing from another origin without widening the report-only policy
+- Load nothing from another origin without widening the enforced policy
   in the same change.
 - The cloud's deployment checks (`e2e/console/src-deployment/routes.spec.ts`)
   fail a page with an unhashed inline script.
