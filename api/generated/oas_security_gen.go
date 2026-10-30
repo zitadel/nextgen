@@ -16,7 +16,12 @@ type SecurityHandler interface {
 	// HandleOAuth2 handles oauth2 security.
 	HandleOAuth2(ctx context.Context, operationName OperationName, t OAuth2) (context.Context, error)
 	// HandleSessionCookie handles sessionCookie security.
-	// The __nextgen_session cookie issued at session creation or superseding handoff exchange.
+	// The session cookie issued at session creation or superseding handoff exchange.
+	// A browser holds it as `__Host-zitadel_session`, with `Secure`. Over plain
+	// http to a loopback host (`localhost`, `127.0.0.1`, `::1`) the server sets it
+	// as `zitadel_session` instead, without `Secure` or the prefix, so that Safari
+	// keeps it, and accepts that name there too; `__Host-zitadel_session` takes
+	// precedence. A program sends `__Host-zitadel_session` over any transport.
 	// A missing or invalid cookie yields `401` with code `auth.unauthorized` and the message
 	// `Missing or invalid session token.`
 	// Cross-site request forgery (ADR 053 §5): a state-changing request that this
@@ -405,7 +410,7 @@ func (s *Server) securityOAuth2(ctx context.Context, operationName OperationName
 
 func (s *Server) securitySessionCookie(ctx context.Context, operationName OperationName, req *http.Request) (context.Context, bool, error) {
 	var t SessionCookie
-	const parameterName = "__nextgen_session"
+	const parameterName = "__Host-zitadel_session"
 	var value string
 	switch cookie, err := req.Cookie(parameterName); {
 	case err == nil: // if NO error
@@ -431,7 +436,12 @@ type SecuritySource interface {
 	// OAuth2 provides oauth2 security value.
 	OAuth2(ctx context.Context, operationName OperationName) (OAuth2, error)
 	// SessionCookie provides sessionCookie security value.
-	// The __nextgen_session cookie issued at session creation or superseding handoff exchange.
+	// The session cookie issued at session creation or superseding handoff exchange.
+	// A browser holds it as `__Host-zitadel_session`, with `Secure`. Over plain
+	// http to a loopback host (`localhost`, `127.0.0.1`, `::1`) the server sets it
+	// as `zitadel_session` instead, without `Secure` or the prefix, so that Safari
+	// keeps it, and accepts that name there too; `__Host-zitadel_session` takes
+	// precedence. A program sends `__Host-zitadel_session` over any transport.
 	// A missing or invalid cookie yields `401` with code `auth.unauthorized` and the message
 	// `Missing or invalid session token.`
 	// Cross-site request forgery (ADR 053 §5): a state-changing request that this
@@ -459,7 +469,7 @@ func (s *Client) securitySessionCookie(ctx context.Context, operationName Operat
 		return errors.Wrap(err, "security source \"SessionCookie\"")
 	}
 	req.AddCookie(&http.Cookie{
-		Name:  "__nextgen_session",
+		Name:  "__Host-zitadel_session",
 		Value: t.APIKey,
 	})
 	return nil

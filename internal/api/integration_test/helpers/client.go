@@ -34,7 +34,7 @@ func (f FakeSecuritySource) OAuth2(ctx context.Context, operationName api.Operat
 	}, nil
 }
 
-// SessionCookie provides the __nextgen_session cookie. With an empty
+// SessionCookie provides the session cookie. With an empty
 // SessionToken the scheme is skipped and the generated client fails fast with
 // "security requirement is not satisfied" instead of sending the request —
 // to exercise the server's missing-credential path, send a raw HTTP request
@@ -101,7 +101,7 @@ func (c csrfTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	switch req.Method {
 	case http.MethodGet, http.MethodHead, http.MethodOptions:
 	default:
-		if cookie, err := req.Cookie("__nextgen_session"); err == nil && !c.source.OmitCSRF &&
+		if cookie, err := req.Cookie("__Host-zitadel_session"); err == nil && !c.source.OmitCSRF &&
 			req.Header.Get(internalapi.CSRFHeader) == "" {
 			req = req.Clone(req.Context())
 			req.Header.Set(internalapi.CSRFHeader, internalapi.CSRFToken(cookie.Value))

@@ -3,7 +3,7 @@ post:
   summary: Complete a project claim
   description: |
     Called by the browser after the developer authenticates on the claim page.
-    Authenticated by the `__nextgen_session` cookie, it attaches the project to
+    Authenticated by the session cookie, it attaches the project to
     the developer's personal team using the `challenge_id` from the claim URL as
     its single-use, browser-safe authorization.
   tags:

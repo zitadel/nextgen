@@ -52,7 +52,7 @@ delete:
     Permanently deletes the session, terminating it immediately.
 
     This is the operator revoke path and requires the `session.delete` scope on a
-    project-bound credential. End-user logout with the `__nextgen_session` cookie is
+    project-bound credential. End-user logout with the session cookie is
     `DELETE /sessions/me` (`sessionCookie` scheme).
 
     Idempotent: deleting a session that does not exist (or was already deleted)

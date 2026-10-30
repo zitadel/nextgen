@@ -8,7 +8,7 @@ import { createContext, use, useEffect, useSyncExternalStore } from "react";
 // reader's own session. On the cloud the docs, the Console and the API share
 // one origin (vercel.json), the spec's server is that origin, and the
 // playground's fetch keeps the browser's same-origin credentials, so the
-// browser sends the Console's HttpOnly `__nextgen_session` itself. Nothing
+// browser sends the Console's HttpOnly session cookie itself. Nothing
 // reads or writes the cookie here, and nothing goes through a proxy: Fumadocs'
 // proxy omits credentials.
 

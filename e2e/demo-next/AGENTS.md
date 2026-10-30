@@ -25,8 +25,9 @@ On each framework, the lanes prove that:
   `dynamic({ ssr: false })`, Nuxt's `<ClientOnly>`);
 - the orchestrator's `POST /sessions/exchange` passes the SDK's `/__nextgen`
   proxy;
-- the demo project's session cookie (`__nextgen_session_proj_demo`, the
-  server's cookie renamed by the SDK proxy, ADR 073) is set on the demo origin
+- the demo project's session cookie (`zitadel_session_proj_demo`, the
+  server's cookie renamed by the SDK proxy, ADR 073, without the `__Host-`
+  prefix on loopback http, ADR 083) is set on the demo origin
   and survives the full-page navigation to `post-sign-in-url`;
 - the SDK's middleware accepts it on the next request and sends
   unauthenticated traffic back to `/login`.

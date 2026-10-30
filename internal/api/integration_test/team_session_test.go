@@ -89,7 +89,7 @@ func TestQueryTeamsSessionAuthorization(t *testing.T) {
 }
 
 // TestTeamReadsAcceptSession pins #1227: after a claim the Console lands on
-// /teams holding only __nextgen_session, so queryTeams and getTeam must accept
+// /teams holding only its session cookie, so queryTeams and getTeam must accept
 // that cookie as a user principal. createTeam and updateTeam joined them with
 // #1300 (TestConsoleManagementAcceptsSession); deleteTeam stays secret-only --
 // this is not a blanket "sessions may call everything".
@@ -175,7 +175,7 @@ func TestTeamReadsAcceptSession(t *testing.T) {
 
 		req, err := http.NewRequestWithContext(t.Context(), http.MethodDelete, base+"/teams/"+claimerTeamID, nil)
 		require.NoError(t, err)
-		req.AddCookie(&http.Cookie{Name: "__nextgen_session", Value: cookie})
+		req.AddCookie(&http.Cookie{Name: "__Host-zitadel_session", Value: cookie})
 
 		resp, err := harness.EnsureHttpClient(t).Do(req)
 		require.NoError(t, err)

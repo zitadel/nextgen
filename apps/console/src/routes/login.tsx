@@ -26,7 +26,7 @@ import { useTheme } from "@/theme";
  * project id, so attribute-level config would lose to that global and the
  * widget would refuse to start a flow. The widget drives the flow API at
  * the same-origin API base, and on a terminal step exchanges its
- * `handoff_token` for the `__nextgen_session` HttpOnly cookie before
+ * `handoff_token` for the HttpOnly session cookie before
  * navigating to `postSignInUrl` — a full-document navigation, so the app
  * reboots with the cookie in place.
  *
@@ -82,7 +82,7 @@ function isLoopbackConsole(): boolean {
 }
 
 /**
- * Exchanges a sign-in link's handoff token for the `__nextgen_session`
+ * Exchanges a sign-in link's handoff token for the session
  * cookie, the same `POST /sessions/exchange` the widget calls at the end of a
  * login flow. Failures fall through to the normal sign-in widget.
  */
