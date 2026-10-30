@@ -85,6 +85,8 @@ tasks:
       - "/.github/semantic.yml"
       - "/Dockerfile"
       - "/docs/design/idp/schemas/**/*"
+      # The bundle's test checks every skill it ships is under an MIT path.
+      - "/LICENSING.md"
     options:
       # The built oclif commands import @zitadel/{api,config,sdk-next} from
       # those packages' dist/ at runtime. Their build-release tasks rewrite
