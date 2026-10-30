@@ -1,48 +1,19 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { createZitadelClient } from "@zitadel/api/client";
-import { ZitadelLogin } from "@zitadel/sdk-react";
 
 import { apiBase } from "@/api/zitadel";
 import { fetchSession, sanitizeNextPath } from "@/auth/session";
-import { NoProjectYet, StandaloneScreen } from "@/components/standalone-screen";
-import { InlineCode } from "@/components/ui/inline-code";
-import { useConsoleProject } from "@/hooks/use-console-project";
-import { withBasePath } from "@/lib/base-path";
+import { SignInScreen } from "@/components/sign-in-screen";
 import { stringParam } from "@/lib/search-params";
 import { getConsoleProjectId, getPublishableKey } from "@/runtime/runtime";
-import { useTheme } from "@/theme";
 
 /**
- * Console sign-in screen (Console ADR 0003).
- *
- * Renders the embedded `<zitadel-login>` widget via `@zitadel/sdk-react`,
- * passing a per-element `project` **handle** built from the runtime-discovered
- * project id (Console ADR 0004 §3: the runtime document, in development as in
- * production). The handle — not discrete `projectId`/`proxyPath` props — is
- * required here: the widget's config precedence is element `project`
- * property → global `configureZitadel()` → declarative attributes
- * (`resolve-api.ts`), and the console's app-wide `configureZitadel()` call
- * (which binds the API client's base URL at import time) carries an empty
- * project id, so attribute-level config would lose to that global and the
- * widget would refuse to start a flow. The widget drives the flow API at
- * the same-origin API base, and on a terminal step exchanges its
- * `handoff_token` for the HttpOnly session cookie before
- * navigating to `postSignInUrl` — a full-document navigation, so the app
- * reboots with the cookie in place.
+ * Console sign-in screen (Console ADR 0003): the widget on its `login`
+ * purpose (`SignInScreen`, which says how the widget is configured).
  *
  * `?next=` carries the router-relative path the `_authed` guard intercepted;
- * it is sanitized against open redirects and re-joined with the Vite
- * `BASE_URL` so the widget's document-level navigation lands inside the
- * deployed prefix (`/ui/console` in production, `/` in dev). The widget would
- * otherwise return to the page's `next` itself, which here lacks the prefix,
- * so `forcePostSignInUrl` keeps it on `postSignInUrl`.
- *
- * The widget resolves its own colour mode (element `theme` → tenant branding
- * → dark) and, in the widget variant, paints no surface of its own. A page
- * that fixes its background — as this one does with `bg-background` — must
- * therefore declare the mode on the element, or the widget's text lands on a
- * surface it wasn't coloured for. We pass the console's *resolved* theme so
- * the sign-in screen follows the same preference as the rest of the console.
+ * it is sanitized against open redirects before the screen joins it with the
+ * deployment prefix.
  */
 export const Route = createFileRoute("/login")({
   validateSearch: (search: Record<string, unknown>): { next?: string; handoff?: string } => ({
@@ -104,44 +75,12 @@ async function exchangeLinkHandoff(handoffToken: string): Promise<void> {
 
 function LoginScreen() {
   const { next } = Route.useSearch();
-  const { resolved: theme } = useTheme();
-  const postSignInUrl = withBasePath(next ?? "/") || "/";
-
-  // With the runtime-discovered publishable key the widget sends the
-  // public-plane bearer itself, so the handoff exchange needs no server-side
-  // secret injection.
-  const project = useConsoleProject();
-
   return (
-    <StandaloneScreen heading="Sign in to the Zitadel console">
-      {project ? (
-        <ZitadelLogin
-          project={project}
-          purpose="login"
-          theme={theme}
-          postSignInUrl={postSignInUrl}
-          forcePostSignInUrl
-        />
-      ) : (
-        <NoProjectSetupHint />
-      )}
-    </StandaloneScreen>
-  );
-}
-
-/**
- * Rendered while the deployment has no project. Under Console ADR 0004 §2's
- * transitional cutover rule, the server still discovers the first-created or
- * explicitly pinned project until a human-usable seed transport replaces that
- * fallback. Refreshing after `zitadel setup` picks the new project up via the
- * runtime document.
- */
-function NoProjectSetupHint() {
-  return (
-    <NoProjectYet>
-      This deployment has no project to sign in to. Create one from your application with{" "}
-      <InlineCode>npx @zitadel/cli setup</InlineCode> — the first project becomes the console&apos;s
-      default. Then refresh this page.
-    </NoProjectYet>
+    <SignInScreen
+      purpose="login"
+      title="Sign in to the Zitadel console"
+      description="Where you manage your Zitadel projects. Your app's users sign in through your app, not here."
+      next={next}
+    />
   );
 }

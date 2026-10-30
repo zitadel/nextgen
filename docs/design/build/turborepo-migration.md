@@ -177,7 +177,7 @@ as they were.
 | cli | `test` (inputs + `/apps/server/bin/**`, mutex public-dist) | `#test` | inputs `$TURBO_ROOT$/apps/server/bin/**`; the mutex becomes an edge: the release builds start after it |
 | cli | `build-release` (runDepsInParallel false, dep test) | `#build-release` | **new** script; `dependsOn: ["test", "@zitadel/sdk-next#build-release"]` |
 | cli | `readme` | `#readme` | existing; `outputs: ["README.md"]` |
-| console | `build` (outputs staticui, env input) | `#build` | `env: ["CONSOLE_VERCEL_INSIGHTS"]`, outputs `$TURBO_ROOT$/internal/staticui/console/dist/**` |
+| console | `build` (outputs staticui, env input) | `#build` | `env: ["CONSOLE_ADDON"]`, outputs `$TURBO_ROOT$/internal/staticui/console/dist/**` |
 | console | `build-release` | `#build-release` | **new** `vite build`; waits for the public packages' release builds |
 | console | `dev`, `preview` (persistent) | `#dev`, `#preview` | existing |
 | console | `dev-real`, `dev-claim` (persistent) | `#dev:real`, `#dev:claim` | existing; the script builds the server through the selected runner, and under turbo the task also depends on `@zitadel/server#build`, so that build is a cache hit |
@@ -189,7 +189,7 @@ as they were.
 | docs | `build` (`next build`, mergeArgs replace) | `#build` | the script is `next build`, as moon's command; the Vercel docs service runs the task, keyed by the deployment's ID (`VERCEL_DEPLOYMENT_ID`) |
 | docs | `dev`, `start` | same | existing |
 | docs | `e2e` (dep build), `e2e-deployment` (its own Playwright config, which requires `CLOUD_URL`) | same | **new** scripts; the root's `check:cloud` runs `e2e-deployment` with the e2e package's `console-deployment` |
-| console | `build` env inputs `$CONSOLE_VERCEL_INSIGHTS`, `$CONSOLE_SPEED_INSIGHTS_SAMPLE_RATE` | `#build` `env` | both listed: strict mode would otherwise hide them from vite.config.ts. Neither is `VITE_`-prefixed: Vite inference would hash a prefixed one into every Vite package of the cloud's console build (as `VITE_CONSOLE_VERCEL_INSIGHTS`, it had `components` built twice per deployment) |
+| console | `build` env inputs `$CONSOLE_ADDON`, `$CONSOLE_SPEED_INSIGHTS_SAMPLE_RATE` | `#build` `env` | both listed: strict mode would otherwise hide them from vite.config.ts. Neither is `VITE_`-prefixed: Vite inference would hash a prefixed one into every Vite package of the cloud's console build (as `VITE_CONSOLE_VERCEL_INSIGHTS`, it had `components` built twice per deployment) |
 | storybook | `test` (mutex, retry) | `#test` | guarded script |
 | storybook | `dev` | `#dev` | existing |
 | website | `lint`, `typecheck`, `build`, `dev`, `start` | same | **new** `lint` script; `typecheck` depends on `build` (`next typegen` and `next build` both write `.next/types`), and so does moon's since it dropped its `website-next` mutex, which held only while a command ran, not while a cache hit restored `.next`; `build` outputs `.next/**` without its cache |

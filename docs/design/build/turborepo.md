@@ -135,7 +135,7 @@ contributor scripts build through moon, or through turbo with
   `GITHUB_ACTIONS`, `RUNNER_TEMP`, `VERCEL`, `COREPACK_*`, `TURBO_*`, what
   framework inference adds (`VITE_*` for Vite packages, `NEXT_*` for Next.js)
   and what the task lists. `env` names variables that change the output and
-  are hashed (`CONSOLE_VERCEL_INSIGHTS`, `GOFLAGS`); `passThroughEnv`
+  are hashed (`CONSOLE_ADDON`, `GOFLAGS`); `passThroughEnv`
   names variables a task reads at run time without affecting its output
   (`NEXTGEN_*` for the e2e lanes, `DOCKER_*` for the database lanes). The Go
   cache locations pass through globally.

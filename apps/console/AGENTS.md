@@ -26,6 +26,11 @@ one, update the ADR in the same change.
   - An unreadable runtime document is an error, not a mode: keep it apart
     from "no project yet", and never fall back to `standalone` silently.
     Backend-less runs opt in with `VITE_CONSOLE_RUNTIME_FALLBACK`.
+- [0006 Cloud add-on](docs/adrs/0006-cloud-addon.md): put what only the hosted
+  cloud needs (its analytics, sign-up, billing, support) in its add-on,
+  [`apps/cloud-console`](../cloud-console/AGENTS.md), never behind a build flag
+  here. The console reaches it only through `src/addon/contract.ts`; a
+  component an add-on screen needs is exported from `src/addon/ui.ts`.
 
 ## Building UI
 

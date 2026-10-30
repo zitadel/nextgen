@@ -6,12 +6,14 @@
       "dependsOn": ["@zitadel/sdk-react#build"]
     },
     // Builds into the server's embed directory, outside the package. The
-    // hosted cloud's build bakes its base path, Vercel's insights, their
-    // sample rate and the commit its events report in (vite.config.ts,
-    // src/vite-env.d.ts), so the variables are part of the cache key and
-    // visible to the build. The commit makes that build miss on every
-    // deployment, which costs its own two-second `vite build`, never its
-    // dependencies'. None has the VITE_
+    // hosted cloud's build bakes its base path, its add-on, and what the
+    // add-on's plugin reads (the sample rate, the commit its events report,
+    // the Vercel environment; apps/cloud-console/vite.ts), so the variables
+    // are part of the cache key and visible to the build. The
+    // commit makes that build miss on every deployment, which costs its own
+    // two-second `vite build`, never its dependencies'; it is also why the
+    // add-on's files are no inputs here, and the build the server embeds
+    // never compiles them in. None has the VITE_
     // prefix: Vite's framework inference would hash a prefixed one into every
     // Vite package of the run, the console's dependencies too
     // (vite.config.ts), and strict mode hides an unprefixed one unless it is
@@ -27,8 +29,9 @@
       "dependsOn": ["@zitadel/sdk-react#build"],
       "env": [
         "CONSOLE_BASE_PATH",
-        "CONSOLE_VERCEL_INSIGHTS",
+        "CONSOLE_ADDON",
         "CONSOLE_SPEED_INSIGHTS_SAMPLE_RATE",
+        "VERCEL_ENV",
         "VERCEL_GIT_COMMIT_SHA"
       ],
       "inputs": ["$TURBO_EXTENDS$", ".env*"],
@@ -40,7 +43,7 @@
     // reaches components'.
     "build-release": {
       "dependsOn": ["@zitadel/sdk-react#build-release", "@zitadel/release#build-public-packages"],
-      "env": ["CONSOLE_BASE_PATH", "CONSOLE_VERCEL_INSIGHTS", "CONSOLE_SPEED_INSIGHTS_SAMPLE_RATE"],
+      "env": ["CONSOLE_BASE_PATH", "CONSOLE_ADDON", "CONSOLE_SPEED_INSIGHTS_SAMPLE_RATE"],
       "outputs": ["$TURBO_ROOT$/internal/staticui/console/dist/**"]
     },
     "test": {
