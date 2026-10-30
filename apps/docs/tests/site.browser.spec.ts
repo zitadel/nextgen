@@ -29,6 +29,39 @@ test("a page renders, navigates client-side and logs no errors", async ({ page }
   expect(violations, "policy violations").toEqual([]);
 });
 
+test("a page blocks an inline script absent from its CSP hashes", async ({ page }) => {
+  const violations = await recordPolicyViolations(page);
+  // This suite also runs against deployments; keep the deliberate violation
+  // out of the server's production logs.
+  await page.route("**/csp-report", (route) => route.fulfill({ status: 204 }));
+  await page.goto("/docs/get-started/quickstart");
+  await expect(page.getByRole("heading", { level: 1, name: "Quickstart" })).toBeVisible();
+
+  await page.evaluate(() => {
+    const script = document.createElement("script");
+    script.textContent = 'document.documentElement.dataset.untrustedScript = "ran"';
+    document.head.append(script);
+  });
+  await expect
+    .poll(() =>
+      violations.some((violation) => violation.startsWith("enforce script-src-elem inline")),
+    )
+    .toBe(true);
+  await expect(page.locator("html")).not.toHaveAttribute("data-untrusted-script", "ran");
+});
+
+test("an unknown docs URL hydrates under the 404's hash policy", async ({ page }) => {
+  const violations = await recordPolicyViolations(page);
+  const response = await page.goto("/docs/no-such-page");
+  expect(response?.status()).toBe(404);
+  await expect(page.getByRole("heading", { level: 1, name: "Page not found" })).toBeVisible();
+  // The theme's inline script ran, and the search opens: the page hydrated.
+  await expect(page.locator("html")).toHaveAttribute("data-theme", /light|dark/);
+  await page.getByRole("button", { name: "Search the docs", exact: true }).click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  expect(violations, "policy violations").toEqual([]);
+});
+
 test("a link to a file the docs serve opens it, without fetching it as a page", async ({
   page,
 }) => {

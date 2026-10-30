@@ -91,7 +91,7 @@ test("a path no service answers: a page for a browser, the envelope for a progra
   expect(await envelope.json()).toEqual({ code: "req.not_found", message: expect.any(String) });
 });
 
-// The edge sets the same three headers on every response, whichever service
+// The edge sets the same shared headers on every response, whichever service
 // answers it, the Mixpanel proxy's too; only vercel.json's own redirects,
 // which have no body, go without. A service that sets one as well sends the
 // same value, so a header may arrive twice, never two ways.
@@ -111,6 +111,7 @@ test("every service's responses carry the security headers", async ({ request })
     "x-content-type-options": "nosniff",
     "referrer-policy": "strict-origin-when-cross-origin",
     "x-frame-options": "DENY",
+    "permissions-policy": "camera=(), microphone=(), geolocation=()",
   };
 
   const wrong: string[] = [];
@@ -118,7 +119,15 @@ test("every service's responses carry the security headers", async ({ request })
     const response = await request.get(path, { maxRedirects: 0 });
     for (const [name, value] of Object.entries(want)) {
       const got = response.headers()[name];
-      if (!got || got.split(/,\s*/).some((each) => each !== value)) {
+      // An edge and service can repeat the same header. Permissions-Policy
+      // itself is a comma-separated list, so compare whole repetitions.
+      const expected = value.split(/,\s*/);
+      const actual = got?.split(/,\s*/);
+      if (
+        !actual ||
+        actual.length % expected.length !== 0 ||
+        actual.some((each, index) => each !== expected[index % expected.length])
+      ) {
         wrong.push(`${path}: ${name} ${got ?? "(none)"}, want ${value}`);
       }
     }
@@ -138,7 +147,7 @@ test("no service's page may be framed", async ({ request }) => {
   expect(wrong).toEqual([]);
 });
 
-// The website's pages stay prerendered, so their report-only policy allows
+// The website's pages stay prerendered, so their enforced policy allows
 // each page's inline scripts by hash (apps/website/csp-adapter.mjs) rather
 // than all of them. The docs' own suite checks every docs page the same way.
 test("the website's pages list a hash for each of their inline scripts", async ({ request }) => {
@@ -148,7 +157,7 @@ test("the website's pages list a hash for each of their inline scripts", async (
   const wrong: string[] = [];
   for (const path of ["/", "/changelog", entry ?? ""]) {
     const response = await request.get(path, { headers: { accept: "text/html" } });
-    const policy = response.headers()["content-security-policy-report-only"] ?? "";
+    const policy = response.headers()["content-security-policy"] ?? "";
     const unlisted = unlistedInlineScripts(await response.text(), policy);
     if (response.status() !== 200 || unlisted.length) {
       wrong.push(`${path}: ${response.status()}, ${unlisted.length} inline scripts without a hash`);

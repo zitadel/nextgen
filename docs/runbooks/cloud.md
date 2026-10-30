@@ -57,16 +57,19 @@ Every service shares the origin, and with it a signed-in user's session, so
 each response carries security headers:
 
 - `vercel.json`'s top-level `headers` reach every service's responses (not
-  its own redirects): `nosniff`, `Referrer-Policy` and `X-Frame-Options`.
-- Each service sends its own Content-Security-Policy, enforced and
-  report-only: the console's in its service's `headers` (a server test holds
+  its own redirects): `nosniff`, `Referrer-Policy`, `X-Frame-Options` and a
+  `Permissions-Policy` disabling camera, microphone and geolocation.
+  Passkeys and clipboard remain available.
+- Each service sends its own Content-Security-Policy: the console's enforced
+  and report-only policies in its service's `headers` (a server test holds
   them to the server's policy for the same page, plus Vercel's toolbar), the
   docs' and the website's from their `next.config` and, per prerendered page,
   their build adapter (`csp-adapter.mjs`), the server's from the Go code.
   Violations go to the server's `/csp-report`.
 - The console's enforced policy covers inline script. The docs' and the
-  website's report-only policies list each page's inline scripts by hash;
-  their enforced ones do not cover script yet.
+  website's enforced policies list each prerendered page's inline scripts by
+  hash. Every other URL gets the prerendered 404's policy, so the 404
+  hydrates; unknown docs slugs reach that 404, in the docs layout.
 - HSTS is Vercel's default: zitadel.com is on the preload list with its
   subdomains, so the cloud's host needs no `includeSubDomains` or `preload`
   of its own.
