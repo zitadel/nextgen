@@ -13,17 +13,20 @@ import {
   sessionAuthProvider,
   sessionFirst,
   useSessionUser,
-  withCsrfToken,
+  withReaderSession,
 } from "./session-auth";
 
 // The playground sends with the reader's session, and opens on it once the
-// page knows the reader is signed in (components/session-auth.tsx).
+// page knows the reader is signed in (components/session-auth.tsx). The order
+// follows whether, not who: a switch to another account keeps the document, so
+// the playground keeps what the reader typed.
 export function OpenAPIPage(props: OpenAPIPageProps_Spec) {
   const user = useSessionUser();
+  const signedIn = Boolean(user);
   const { payload } = props;
   const readerPayload = useMemo(
-    () => (user ? { ...payload, bundled: sessionFirst(payload.bundled) } : payload),
-    [payload, user],
+    () => (signedIn ? { ...payload, bundled: sessionFirst(payload.bundled) } : payload),
+    [payload, signedIn],
   );
   return (
     <SessionUserContext value={user}>
@@ -41,7 +44,7 @@ const OperationPage = createOpenAPIPage({
   shikiOptions: codeOptions,
   playground: {
     authProviders: [sessionAuthProvider],
-    fetchOptions: { onRequestInit: withCsrfToken },
+    fetchOptions: { onRequestInit: withReaderSession },
   },
   codeUsages: createCodeUsageGeneratorRegistry(),
   generateCodeSamples: ({ operation, path, pathItem }) => [

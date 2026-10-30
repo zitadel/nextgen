@@ -121,7 +121,7 @@ test("the playground uses the reader's session after visiting a live example", a
 
   await expect
     .poll(() => calls)
-    .toEqual(["GET /sessions/me", "GET /sessions/me/csrf", "POST /teams"]);
+    .toEqual(["GET /sessions/me", "GET /sessions/me/csrf", "GET /sessions/me", "POST /teams"]);
   expect(writeCsrf).toBe(csrfToken);
 });
 
