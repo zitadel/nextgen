@@ -359,7 +359,7 @@ export class ZitadelLogin extends ZitadelSurface {
 
   private engine: Liquid | null = null;
 
-  /** The dictionary {@link engine} was built with. */
+  /** The locale dictionary the Liquid engine was built with. */
   private locale: Locale = {};
 
   /**

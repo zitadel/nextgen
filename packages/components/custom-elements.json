@@ -8329,6 +8329,16 @@
             },
             {
               "kind": "field",
+              "name": "locale",
+              "type": {
+                "text": "Locale"
+              },
+              "privacy": "private",
+              "default": "{}",
+              "description": "The locale dictionary the Liquid engine was built with."
+            },
+            {
+              "kind": "field",
               "name": "lastRenderedTheme",
               "type": {
                 "text": "ResolvedTheme | null"
