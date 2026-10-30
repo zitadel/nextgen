@@ -5,8 +5,8 @@ import { baseTest } from "@zitadel/vitest-config";
 import viteConfig from "./vite.config";
 
 // Keep test defaults out of the production build's imports and cache key.
-export default defineConfig((env) =>
-  mergeConfig(viteConfig(env), {
+export default defineConfig(async (env) =>
+  mergeConfig(await viteConfig(env), {
     test: {
       ...baseTest,
       name: "@zitadel/console",
@@ -19,7 +19,7 @@ export default defineConfig((env) =>
         VITE_CONSOLE_RUNTIME_FALLBACK: "",
       },
       unstubEnvs: true,
-      // Above RTL's 5s async timeout and the cold router import under CI load.
+      // Above RTL's 5s async timeout; test setup loads the router before tests.
       testTimeout: 30_000,
     },
   }),

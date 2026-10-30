@@ -906,7 +906,7 @@ describe("setup command", () => {
         `${local}/sessions/exchange`,
         () =>
           new HttpResponse(null, {
-            headers: { "set-cookie": "__nextgen_session=admin_session; Path=/; HttpOnly" },
+            headers: { "set-cookie": "zitadel_session=admin_session; Path=/; HttpOnly" },
           }),
       ),
       http.post(`${local}/projects/:projectId/claim/init`, () =>

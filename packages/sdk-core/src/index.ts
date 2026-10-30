@@ -17,6 +17,7 @@ export {
   resolveSession,
   SESSION_PROJECT_MISMATCH,
   SERVER_SESSION_COOKIE,
+  serverSessionCookieName,
   sessionCookieName,
   serializeSessionCookie,
   proxySessionCookies,

@@ -43,7 +43,7 @@ web components' `project` property.
 ### CSRF token for session-cookie writes
 
 A browser app that authenticates management calls with the
-`__nextgen_session` cookie (the Console does) must send the session's CSRF
+session cookie (the Console does) must send the session's CSRF
 token on state-changing requests. Load it once per session from
 `GET /sessions/me/csrf`, passing your project as `project_id` so that a session
 of another app on the same host gets none, and hand it to

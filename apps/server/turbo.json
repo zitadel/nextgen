@@ -64,7 +64,8 @@
         "!$TURBO_ROOT$/tools/oidc-mock/**",
         "$TURBO_ROOT$/docs/product-analytics-events.yaml",
         "$TURBO_ROOT$/vercel.json",
-        "$TURBO_ROOT$/apps/cloud/build-launcher.sh"
+        "$TURBO_ROOT$/apps/cloud/build-launcher.sh",
+        "$TURBO_ROOT$/apps/console/index.html"
       ]
     },
     "openapi": {

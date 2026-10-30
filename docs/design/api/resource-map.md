@@ -213,8 +213,8 @@ POST   /sessions                         # optional anonymous pre-auth shell
 POST   /sessions/query                   # operator list — structured filters + cursor pagination
 GET    /sessions/{id}                    # operator get
 DELETE /sessions/{id}                    # operator revoke (not logout; idempotent 204)
-GET    /sessions/me                      # end-user get (`nextgenSession` cookie)
-DELETE /sessions/me                      # end-user logout (`nextgenSession` cookie)
+GET    /sessions/me                      # end-user get (`sessionCookie` scheme)
+DELETE /sessions/me                      # end-user logout (`sessionCookie` scheme)
 ```
 
 Sessions carry factors + `assurance_levels[]`. Clients read and revoke

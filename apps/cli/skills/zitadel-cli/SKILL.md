@@ -574,6 +574,15 @@ missing or outdated (after an upgrade that changed a dialect), and
 `@zitadel/*` version (run that version's `doctor --fix`) or a symlink is on
 the path; `deploy --dry-run` validates without them either way.
 
+An SPA's dev proxy (`vite.config.*`, Angular's `proxy.conf.cjs`) keeps the
+app's session in a cookie of its own project, `zitadel_session_<project id>`
+on `http://localhost` and `__Host-zitadel_session_<project id>` over https.
+`doctor` fails (`managed-files`, `outdated managed config wiring`) on the
+session-cookie hooks a CLI wrote before these names: the server no longer
+reads the cookies they keep. `doctor --fix` replaces hooks that are as the CLI
+wrote them; ones changed by hand must be updated by hand, which the failure
+says. Browsers signed in before the change sign in again.
+
 ## Claiming a project
 
 A project on a hosted server stays temporary until a person claims it, within

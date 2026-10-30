@@ -146,19 +146,20 @@ export async function logout(page: Page): Promise<void> {
 }
 
 /**
- * The cookie the app keeps its session in: every scaffold's proxy, a server
- * SDK's or the dev proxy setup writes for an SPA, keeps it under the app's
- * project's name (ADR 073). setup records the project in `.zitadel/secret`.
+ * The cookie the app at `url` keeps its session in: every scaffold's proxy, a
+ * server SDK's or the dev proxy setup writes for an SPA, keeps it under the
+ * app's project's name (ADR 073), without the `__Host-` prefix on loopback
+ * http (ADR 083). setup records the project in `.zitadel/secret`.
  */
-export async function appSessionCookieName(): Promise<string> {
+export async function appSessionCookieName(url: string): Promise<string> {
   const secret = JSON.parse(
     await readFile(join(requiredEnv("JOURNEY_APP_DIR"), ".zitadel/secret"), "utf8"),
   ) as { project_id: string };
-  return sessionCookieName(secret.project_id);
+  return sessionCookieName(secret.project_id, url);
 }
 
 async function expectSessionCleared(page: Page): Promise<void> {
-  const name = await appSessionCookieName();
+  const name = await appSessionCookieName(page.url());
   await expect
     .poll(async () => (await page.context().cookies()).some((cookie) => cookie.name === name), {
       timeout: 5000,

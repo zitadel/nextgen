@@ -37,6 +37,7 @@ fileGroups:
     - "/docs/product-analytics-events.yaml"
     - "/vercel.json"
     - "/apps/cloud/build-launcher.sh"
+    - "/apps/console/index.html"
 
 # Go's own cache accounts for the effective compiler and target defaults.
 # Runner result caches do not; native commands must run when selected.

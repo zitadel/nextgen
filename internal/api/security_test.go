@@ -190,7 +190,7 @@ func TestHandleOAuth2(t *testing.T) {
 	}
 }
 
-func TestHandleNextgenSession(t *testing.T) {
+func TestHandleSessionCookie(t *testing.T) {
 	t.Parallel()
 
 	t.Run("valid token is stashed in context", func(t *testing.T) {
@@ -208,7 +208,7 @@ func TestHandleNextgenSession(t *testing.T) {
 		tokenService.EXPECT().IntrospectToken(gomock.Any(), "raw-cookie").Return(token, nil)
 
 		handler := NewSecurityHandler(tokenService)
-		ctx, err := handler.HandleNextgenSession(safeRequestContext(t), api.GetMySessionOperation, api.NextgenSession{APIKey: "raw-cookie"})
+		ctx, err := handler.HandleSessionCookie(safeRequestContext(t), api.GetMySessionOperation, api.SessionCookie{APIKey: "raw-cookie"})
 		require.NoError(t, err)
 
 		got, ok := sessionTokenFromContext(ctx)
@@ -245,7 +245,7 @@ func TestHandleNextgenSession(t *testing.T) {
 				tokenService.EXPECT().IntrospectToken(gomock.Any(), "raw-cookie").Return(token, nil)
 
 				handler := NewSecurityHandler(tokenService)
-				ctx, err := handler.HandleNextgenSession(safeRequestContext(t), api.GetMySessionOperation, api.NextgenSession{APIKey: "raw-cookie"})
+				ctx, err := handler.HandleSessionCookie(safeRequestContext(t), api.GetMySessionOperation, api.SessionCookie{APIKey: "raw-cookie"})
 				require.NoError(t, err)
 
 				scope, ok := GetScopeContext(ctx)
@@ -286,7 +286,7 @@ func TestHandleNextgenSession(t *testing.T) {
 		tokenService.EXPECT().IntrospectToken(gomock.Any(), "raw-cookie").Return(token, nil)
 
 		handler := NewSecurityHandler(tokenService)
-		ctx, err := handler.HandleNextgenSession(safeRequestContext(t), api.QueryUsersOperation, api.NextgenSession{APIKey: "raw-cookie"})
+		ctx, err := handler.HandleSessionCookie(safeRequestContext(t), api.QueryUsersOperation, api.SessionCookie{APIKey: "raw-cookie"})
 		require.NoError(t, err)
 
 		scope, ok := GetScopeContext(ctx)
@@ -335,7 +335,7 @@ func TestHandleNextgenSession(t *testing.T) {
 				tokenService.EXPECT().IntrospectToken(gomock.Any(), "raw-cookie").Return(token, nil)
 
 				handler := NewSecurityHandler(tokenService)
-				ctx, err := handler.HandleNextgenSession(safeRequestContext(t), op, api.NextgenSession{APIKey: "raw-cookie"})
+				ctx, err := handler.HandleSessionCookie(safeRequestContext(t), op, api.SessionCookie{APIKey: "raw-cookie"})
 				require.ErrorIs(t, err, ogenerrors.ErrSkipServerSecurity)
 				_, ok := GetScopeContext(ctx)
 				require.False(t, ok)
@@ -352,7 +352,7 @@ func TestHandleNextgenSession(t *testing.T) {
 			tokenService.EXPECT().IntrospectToken(gomock.Any(), "raw-cookie").Return(nil, tc.err)
 
 			handler := NewSecurityHandler(tokenService)
-			_, err := handler.HandleNextgenSession(safeRequestContext(t), api.GetMySessionOperation, api.NextgenSession{APIKey: "raw-cookie"})
+			_, err := handler.HandleSessionCookie(safeRequestContext(t), api.GetMySessionOperation, api.SessionCookie{APIKey: "raw-cookie"})
 			require.Equal(t, tc.err, err)
 		})
 	}
@@ -366,7 +366,7 @@ func TestHandleNextgenSession(t *testing.T) {
 		tokenService.EXPECT().IntrospectToken(gomock.Any(), "garbage").Return(nil, unclassified)
 
 		handler := NewSecurityHandler(tokenService)
-		_, err := handler.HandleNextgenSession(safeRequestContext(t), api.GetMySessionOperation, api.NextgenSession{APIKey: "garbage"})
+		_, err := handler.HandleSessionCookie(safeRequestContext(t), api.GetMySessionOperation, api.SessionCookie{APIKey: "garbage"})
 		require.NotErrorIs(t, err, ogenerrors.ErrSecurityRequirementIsNotSatisfied)
 		require.ErrorIs(t, err, domain.ErrInternal(nil))
 		require.ErrorIs(t, err, unclassified)
@@ -381,7 +381,7 @@ func TestHandleNextgenSession(t *testing.T) {
 			tokenService.EXPECT().IntrospectToken(gomock.Any(), "raw-cookie").Return(nil, tc.err)
 
 			handler := NewSecurityHandler(tokenService)
-			_, err := handler.HandleNextgenSession(safeRequestContext(t), api.GetMySessionOperation, api.NextgenSession{APIKey: "raw-cookie"})
+			_, err := handler.HandleSessionCookie(safeRequestContext(t), api.GetMySessionOperation, api.SessionCookie{APIKey: "raw-cookie"})
 			require.ErrorIs(t, err, ogenerrors.ErrSecurityRequirementIsNotSatisfied)
 		})
 	}
@@ -404,7 +404,7 @@ func TestHandleNextgenSession(t *testing.T) {
 		handler := NewSecurityHandler(tokenService)
 		ctx, err := handler.HandleOAuth2(t.Context(), api.QueryUsersOperation, api.OAuth2{Token: "raw-bearer"})
 		require.NoError(t, err)
-		ctx, err = handler.HandleNextgenSession(ctx, api.QueryUsersOperation, api.NextgenSession{APIKey: "raw-cookie"})
+		ctx, err = handler.HandleSessionCookie(ctx, api.QueryUsersOperation, api.SessionCookie{APIKey: "raw-cookie"})
 		require.NoError(t, err)
 
 		scope, ok := GetScopeContext(ctx)
@@ -443,7 +443,7 @@ func TestHandleNextgenSession(t *testing.T) {
 		handler := NewSecurityHandler(tokenService)
 		ctx, err := handler.HandleOAuth2(t.Context(), api.CreateTeamOperation, api.OAuth2{Token: "raw-bearer"})
 		require.NoError(t, err)
-		ctx, err = handler.HandleNextgenSession(ctx, api.CreateTeamOperation, api.NextgenSession{APIKey: "garbage"})
+		ctx, err = handler.HandleSessionCookie(ctx, api.CreateTeamOperation, api.SessionCookie{APIKey: "garbage"})
 		require.NoError(t, err)
 
 		scope, ok := GetScopeContext(ctx)
@@ -467,7 +467,7 @@ func TestHandleNextgenSession(t *testing.T) {
 		handler := NewSecurityHandler(tokenService)
 		ctx, err := handler.HandleOAuth2(t.Context(), api.QueryUsersOperation, api.OAuth2{Token: "raw-bearer"})
 		require.NoError(t, err)
-		ctx, err = handler.HandleNextgenSession(ctx, api.QueryUsersOperation, api.NextgenSession{APIKey: "raw-cookie"})
+		ctx, err = handler.HandleSessionCookie(ctx, api.QueryUsersOperation, api.SessionCookie{APIKey: "raw-cookie"})
 		require.NoError(t, err)
 
 		scope, ok := GetScopeContext(ctx)
@@ -493,7 +493,7 @@ func TestHandleNextgenSession(t *testing.T) {
 		tokenService.EXPECT().IntrospectToken(gomock.Any(), "raw-cookie").Return(token, nil)
 
 		handler := NewSecurityHandler(tokenService)
-		_, err := handler.HandleNextgenSession(safeRequestContext(t), api.GetMySessionOperation, api.NextgenSession{APIKey: "raw-cookie"})
+		_, err := handler.HandleSessionCookie(safeRequestContext(t), api.GetMySessionOperation, api.SessionCookie{APIKey: "raw-cookie"})
 		require.ErrorIs(t, err, ogenerrors.ErrSecurityRequirementIsNotSatisfied)
 	})
 }

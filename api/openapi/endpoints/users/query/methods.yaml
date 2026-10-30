@@ -9,8 +9,8 @@ post:
     project is listed.
 
     Accepts either a project secret (`oauth2`) or a user-bound Console
-    session cookie (`nextgenSession`). Cookie-authenticated requests
-    follow the scheme's CSRF rules (`nextgenSession`).
+    session cookie (`sessionCookie`). Cookie-authenticated requests
+    follow the scheme's CSRF rules (`sessionCookie`).
   tags:
     - Users
   # user.read alone: scopes in one requirement are ANDed, and the expansion
@@ -22,7 +22,7 @@ post:
   security:
     - oauth2:
         - user.read
-    - nextgenSession: []
+    - sessionCookie: []
   parameters:
     - $ref: ../../../components/parameters/project-id-query.yaml
   requestBody:
