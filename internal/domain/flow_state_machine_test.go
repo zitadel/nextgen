@@ -17,9 +17,9 @@ import (
 
 	cryptomock "github.com/zitadel/nextgen/internal/crypto/mock"
 	"github.com/zitadel/nextgen/internal/domain"
+	domainmock "github.com/zitadel/nextgen/internal/domain/mock"
 	"github.com/zitadel/nextgen/internal/errreport"
 	"github.com/zitadel/sloggcp"
-	domainmock "github.com/zitadel/nextgen/internal/domain/mock"
 )
 
 func containsFieldName(fields []domain.FlowField, name string) bool {
