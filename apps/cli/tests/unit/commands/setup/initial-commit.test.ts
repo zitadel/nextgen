@@ -221,7 +221,11 @@ describe("ensureInitialCommit", () => {
 
       const outcome = await ensureInitialCommit(dir);
 
-      expect(outcome).toEqual({ kind: "unavailable", reason: "there was nothing to commit" });
+      expect(outcome).toEqual({
+        kind: "unavailable",
+        reason: "there was nothing to commit",
+        createdRepository: true,
+      });
     });
   });
 
@@ -555,7 +559,11 @@ describe("ensureInitialCommit when git cannot run", () => {
       try {
         const outcome = await ensureInitialCommit(cwd);
 
-        expect(outcome).toEqual({ kind: "unavailable", reason: "git: not available" });
+        expect(outcome).toEqual({
+          kind: "unavailable",
+          reason: "git: not available",
+          createdRepository: false,
+        });
       } finally {
         vi.unstubAllEnvs();
       }
@@ -589,7 +597,11 @@ describe("ensureInitialCommit when git explains at length", () => {
     await chmod(join(binDir, "git"), 0o755);
     vi.stubEnv("PATH", binDir);
     try {
-      expect(await ensureInitialCommit(cwd)).toEqual({ kind: "unavailable", reason: "fatal: one" });
+      expect(await ensureInitialCommit(cwd)).toEqual({
+        kind: "unavailable",
+        reason: "fatal: one",
+        createdRepository: false,
+      });
     } finally {
       vi.unstubAllEnvs();
     }
@@ -603,5 +615,17 @@ describe("assertCleanWorktree with a directory named like the local server's", (
     await writeFile(join(cwd, ".Zitadel/Local/notes.md"), "mine\n");
 
     await expect(assertCleanWorktree(cwd)).rejects.toMatchObject({ code: "E_CONFLICT" });
+  });
+});
+
+describe("ensureInitialCommit when the commit fails in a repository it existed in", () => {
+  it("reports that it did not create the repository", async () => {
+    const cwd = await aRepository();
+    await writeFile(join(cwd, ".env"), "SECRET=1\n");
+
+    expect(await ensureInitialCommit(cwd)).toMatchObject({
+      kind: "unavailable",
+      createdRepository: false,
+    });
   });
 });

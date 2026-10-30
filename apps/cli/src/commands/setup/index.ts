@@ -1026,10 +1026,13 @@ export default class Setup extends Promptable(BaseCommand) {
         install: installOutcome.install,
         // Whether setup created the repository, and the commit it made.
         // `initialized` is false when the project was already in one, which it
-        // is still committed into; the commit is `null` only under `--no-git`
+        // is still committed into, and true whenever setup ran `git init`, even
+        // if the commit then failed; the commit is `null` only under `--no-git`
         // or when git could not be used.
         git: {
-          initialized: commit.kind === "created",
+          initialized:
+            commit.kind === "created" ||
+            (commit.kind === "unavailable" && commit.createdRepository),
           commit: commit.kind === "created" || commit.kind === "committed" ? commit.sha : null,
         },
         // The provider enabled during scaffolding, or null. `secret` reports

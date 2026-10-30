@@ -28,7 +28,12 @@ export type InitialCommitOutcome =
   /** `--no-git`, or a dry run. */
   | { readonly kind: "skipped" }
   /** git is missing, or init/add/commit failed, or a secret would have been committed. */
-  | { readonly kind: "unavailable"; readonly reason: string };
+  /** No commit; `createdRepository` says whether setup ran `git init` before it failed. */
+  | {
+      readonly kind: "unavailable";
+      readonly reason: string;
+      readonly createdRepository: boolean;
+    };
 
 /**
  * Paths the CLI writes itself, which therefore do not count as the
@@ -127,19 +132,21 @@ function plural(list: readonly unknown[]): string {
  *
  * Nothing here prompts, so it behaves the same interactively and in CI, and no
  * failure is fatal: the worst case is the first release carrying no commit,
- * which is what happened before this existed. The reason is git's first line,
- * since it goes into a one-line warning.
+ * which is what happened before this existed. When the commit fails after
+ * setup ran `git init`, the outcome says so, since the repository now exists.
  */
 export async function ensureInitialCommit(cwd: string): Promise<InitialCommitOutcome> {
   try {
     const existing = await Repository.open(cwd);
     const repository = existing ?? (await Repository.create(cwd));
-    const outcome = await repository.commitAll(INITIAL_COMMIT_SUBJECT, {
-      except: isSecretPath,
-      authorIfGitHasNone: FALLBACK_AUTHOR,
-    });
+    const outcome = await repository
+      .commitAll(INITIAL_COMMIT_SUBJECT, {
+        except: isSecretPath,
+        authorIfGitHasNone: FALLBACK_AUTHOR,
+      })
+      .catch((error: unknown) => ({ committed: false as const, reason: firstLineOf(error) }));
     if (!outcome.committed) {
-      return { kind: "unavailable", reason: outcome.reason };
+      return { kind: "unavailable", reason: outcome.reason, createdRepository: existing === null };
     }
     const commit = {
       sha: outcome.sha,
@@ -151,8 +158,13 @@ export async function ensureInitialCommit(cwd: string): Promise<InitialCommitOut
     }
     return { kind: "committed", ...commit };
   } catch (error) {
-    return { kind: "unavailable", reason: messageOf(error).split("\n")[0] ?? "" };
+    return { kind: "unavailable", reason: firstLineOf(error), createdRepository: false };
   }
+}
+
+/** git's first line, since the reason goes into a one-line warning. */
+function firstLineOf(error: unknown): string {
+  return messageOf(error).split("\n")[0] ?? "";
 }
 
 /** git's own message, so the warning names the real cause. */
