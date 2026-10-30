@@ -15,6 +15,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+
+	"github.com/zitadel/nextgen/internal/storage/dialect/postgres/migration"
 )
 
 // The database contract, the same variable names in both Vercel targets:
@@ -121,23 +123,17 @@ func checkServedThroughPooler(servingDSN, migratorDSN string) error {
 // ensureDatabase is ensurePreviewDatabase; tests replace it.
 var ensureDatabase = ensurePreviewDatabase
 
-// dropDatabase is dropPreviewDatabase; tests replace it.
-var dropDatabase = dropPreviewDatabase
+// dropDatabase is dropPreviewDatabases; tests replace it.
+var dropDatabase = dropPreviewDatabases
 
-// ensurePreviewDatabase creates the preview's database unless it exists and
-// stamps it with the branch and the time of this deployment, so a cleanup can
-// later drop what no deployment touched for a while. The connecting role
-// needs CREATEDB or membership in PlanetScale's default role (see
-// createDatabase); either way it may change the database, which the
-// migrations need (they set options on it). A failed stamp is logged, not
-// fatal: it only feeds the cleanup.
-func ensurePreviewDatabase(ctx context.Context, baseDSN, name, ref string, now time.Time) error {
-	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
-	defer cancel()
+// listDatabases is listPreviewDatabases; tests replace it.
+var listDatabases = listPreviewDatabases
 
+// connectPreviewCluster opens one connection through a preview's base URL.
+func connectPreviewCluster(ctx context.Context, baseDSN string) (*pgx.Conn, error) {
 	config, err := pgx.ParseConfig(baseDSN)
 	if err != nil {
-		return fmt.Errorf("parse %s: %w", migratorDatabaseURLVar, err)
+		return nil, fmt.Errorf("parse %s: %w", migratorDatabaseURLVar, err)
 	}
 	// A pgxpool parameter would reach Postgres as an unknown setting.
 	for key := range config.RuntimeParams {
@@ -147,9 +143,57 @@ func ensurePreviewDatabase(ctx context.Context, baseDSN, name, ref string, now t
 	}
 	conn, err := pgx.ConnectConfig(ctx, config)
 	if err != nil {
-		return fmt.Errorf("connect to the preview cluster: %w", err)
+		return nil, fmt.Errorf("connect to the preview cluster: %w", err)
+	}
+	return conn, nil
+}
+
+// previewLockClass is the first key of the session advisory lock held on a
+// preview database's name while ensurePreviewDatabase looks at and stamps it
+// and while a drop rereads its stamp and drops it: "prev" in hex. The second
+// key is the name's hashtext; two names that share one only wait for each
+// other. Advisory locks are per database, and both sides connect to the
+// preview cluster's base database through the same URL.
+const previewLockClass = 0x70726576
+
+// lockPreviewDatabase takes the lock on name for the connection's session and
+// returns what releases it. It needs the direct URL, as the migrations' own
+// lock does: a transaction pooler could hand the session's later statements
+// to another server connection.
+func lockPreviewDatabase(ctx context.Context, conn *pgx.Conn, name string) (func(), error) {
+	if _, err := conn.Exec(ctx, "SELECT pg_advisory_lock($1::int, hashtext($2::text))", previewLockClass, name); err != nil {
+		return nil, fmt.Errorf("lock preview database %s: %w", name, err)
+	}
+	return func() {
+		_, _ = conn.Exec(context.WithoutCancel(ctx), "SELECT pg_advisory_unlock($1::int, hashtext($2::text))", previewLockClass, name)
+	}, nil
+}
+
+// ensurePreviewDatabase creates the preview's database unless it exists and
+// stamps it with the branch and the time of this deployment, so a cleanup can
+// later drop what no deployment touched for a while. The connecting role
+// needs CREATEDB or membership in PlanetScale's default role (see
+// createDatabase); either way it may change the database, which the
+// migrations need (they set options on it). A failed stamp is logged, not
+// fatal: it only feeds the cleanup.
+//
+// It holds the database's lock throughout, so an idle sweep either drops the
+// database before this looks (and this creates it again) or reads the new
+// stamp and keeps it.
+func ensurePreviewDatabase(ctx context.Context, baseDSN, name, ref string, now time.Time) error {
+	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
+
+	conn, err := connectPreviewCluster(ctx, baseDSN)
+	if err != nil {
+		return err
 	}
 	defer func() { _ = conn.Close(context.WithoutCancel(ctx)) }()
+	unlock, err := lockPreviewDatabase(ctx, conn, name)
+	if err != nil {
+		return err
+	}
+	defer unlock()
 
 	var exists bool
 	if err := conn.QueryRow(ctx, "SELECT EXISTS (SELECT 1 FROM pg_database WHERE datname = $1)", name).Scan(&exists); err != nil {
@@ -179,44 +223,146 @@ func ensurePreviewDatabase(ctx context.Context, baseDSN, name, ref string, now t
 	return nil
 }
 
-// dropPreviewDatabase drops a preview database so the next ensurePreviewDatabase
-// call recreates it empty. Used when goose refuses to migrate because the
-// sticky preview still carries an older version set (for example after a
-// migration was renumbered on the branch). Production never calls this.
+// dropPreviewDatabases drops the preview databases named that exist, through
+// one connection. runMigrate drops one so the next ensurePreviewDatabase call
+// recreates it empty, when goose refuses to migrate because the sticky
+// preview still carries an older version set (for example after a migration
+// was renumbered on the branch); runDropPreview drops a merged branch's, or
+// every idle one, for good. Production never calls this. A failed drop does
+// not stop the others; the errors come back together.
 //
-// Preview databases are often owned by adminRole (createDatabase elevates when
-// the migrator lacks CREATEDB), so DROP mirrors that elevation: try as the
-// connecting role, then once as adminRole on insufficient_privilege.
-func dropPreviewDatabase(ctx context.Context, baseDSN, name string) error {
-	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+// With a non-zero idleBefore, a database goes only if its stamp, read again
+// under the lock ensurePreviewDatabase holds, is still older than that: a
+// deployment that stamped it after the sweep listed it keeps it.
+//
+// Preview databases are owned by adminRole, which createDatabase acts as, or,
+// made before it did, by the role that created them, so DROP runs as adminRole
+// first and then as the connecting role.
+func dropPreviewDatabases(ctx context.Context, baseDSN string, idleBefore time.Time, names ...string) error {
+	connectCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
-
-	config, err := pgx.ParseConfig(baseDSN)
+	conn, err := connectPreviewCluster(connectCtx, baseDSN)
 	if err != nil {
-		return fmt.Errorf("parse %s: %w", migratorDatabaseURLVar, err)
-	}
-	for key := range config.RuntimeParams {
-		if strings.HasPrefix(key, "pool_") {
-			delete(config.RuntimeParams, key)
-		}
-	}
-	conn, err := pgx.ConnectConfig(ctx, config)
-	if err != nil {
-		return fmt.Errorf("connect to the preview cluster: %w", err)
+		return err
 	}
 	defer func() { _ = conn.Close(context.WithoutCancel(ctx)) }()
+	if err := checkPreviewClusterBase(connectCtx, conn); err != nil {
+		return err
+	}
 
+	var errs []error
+	for _, name := range names {
+		if err := dropPreviewDatabase(ctx, conn, name, idleBefore); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
+}
+
+func dropPreviewDatabase(ctx context.Context, conn *pgx.Conn, name string, idleBefore time.Time) error {
+	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
+	unlock, err := lockPreviewDatabase(ctx, conn, name)
+	if err != nil {
+		return err
+	}
+	defer unlock()
+
+	var stamp string
+	err = conn.QueryRow(ctx, "SELECT coalesce(shobj_description(oid, 'pg_database'), '') FROM pg_database WHERE datname = $1", name).Scan(&stamp)
+	if errors.Is(err, pgx.ErrNoRows) {
+		fmt.Fprintf(os.Stderr, "launcher: no preview database %s to drop\n", name)
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("look up preview database %s: %w", name, err)
+	}
+	if !idleBefore.IsZero() {
+		if _, deployedAt, ok := parseStamp(stamp); !ok || !deployedAt.Before(idleBefore) {
+			fmt.Fprintf(os.Stderr, "launcher: keeping preview database %s: its stamp changed since the sweep listed it\n", name)
+			return nil
+		}
+	}
 	identifier := pgx.Identifier{name}.Sanitize()
 	if err := dropDatabaseAsConnectingOrAdmin(ctx, conn, identifier); err != nil {
 		return fmt.Errorf("drop preview database %s: %w", name, err)
 	}
-	fmt.Fprintf(os.Stderr, "launcher: dropped preview database %s to remigrate from an empty schema\n", name)
+	fmt.Fprintf(os.Stderr, "launcher: dropped preview database %s\n", name)
+	return nil
+}
+
+// previewDatabase is a preview database and the stamp its last deployment
+// left (ensurePreviewDatabase), empty when it has none.
+type previewDatabase struct {
+	name, stamp string
+}
+
+// parseStamp reads what ensurePreviewDatabase stamped. ok is false for a
+// stamp without a deployment time, which a failed stamp leaves.
+func parseStamp(stamp string) (branch string, deployedAt time.Time, ok bool) {
+	var s struct {
+		Branch     string    `json:"branch"`
+		DeployedAt time.Time `json:"deployed_at"`
+	}
+	if json.Unmarshal([]byte(stamp), &s) != nil || s.DeployedAt.IsZero() {
+		return "", time.Time{}, false
+	}
+	return s.Branch, s.DeployedAt, true
+}
+
+// listPreviewDatabases lists the preview cluster's preview databases with
+// their stamps, after the same check a drop makes.
+func listPreviewDatabases(ctx context.Context, baseDSN string) ([]previewDatabase, error) {
+	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
+	conn, err := connectPreviewCluster(ctx, baseDSN)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = conn.Close(context.WithoutCancel(ctx)) }()
+	if err := checkPreviewClusterBase(ctx, conn); err != nil {
+		return nil, err
+	}
+
+	rows, err := conn.Query(ctx, `SELECT datname, coalesce(shobj_description(oid, 'pg_database'), '')
+		FROM pg_database WHERE datname LIKE 'preview\_%' ORDER BY datname`)
+	if err != nil {
+		return nil, fmt.Errorf("list preview databases: %w", err)
+	}
+	databases, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (previewDatabase, error) {
+		var db previewDatabase
+		err := row.Scan(&db.name, &db.stamp)
+		return db, err
+	})
+	if err != nil {
+		return nil, fmt.Errorf("list preview databases: %w", err)
+	}
+	return databases, nil
+}
+
+// checkPreviewClusterBase refuses a connection to a database that holds the
+// server's schema, before anything is listed or dropped through it. A drop has to
+// connect to the preview cluster's base database, which holds no deployment;
+// production's database holds its schema. The value is easy to take from
+// the wrong place: Vercel's Production and Preview targets name the variable
+// alike, and the PlanetScale database `preview` has a production branch of
+// its own (`main`), which is still the preview cluster.
+func checkPreviewClusterBase(ctx context.Context, conn *pgx.Conn) error {
+	var deployment bool
+	if err := conn.QueryRow(ctx, "SELECT EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = $1)", migration.SchemaName).Scan(&deployment); err != nil {
+		return fmt.Errorf("look up the %s schema: %w", migration.SchemaName, err)
+	}
+	if deployment {
+		return fmt.Errorf("%s reaches database %s, which holds the %s schema: it must name the preview cluster's base database, Vercel's Preview value, never Production's",
+			migratorDatabaseURLVar, conn.Config().Database, migration.SchemaName)
+	}
 	return nil
 }
 
 func dropDatabaseAsConnectingOrAdmin(ctx context.Context, conn *pgx.Conn, identifier string) error {
 	drop := "DROP DATABASE IF EXISTS " + identifier + " WITH (FORCE)"
-	// Prefer adminRole first: createDatabase often owns the DB as postgres.
+	// adminRole first: it owns what createDatabase makes. A database made
+	// before createDatabase acted as adminRole is the connecting role's.
 	if _, setErr := conn.Exec(ctx, "SET ROLE "+pgx.Identifier{adminRole}.Sanitize()); setErr == nil {
 		_, err := conn.Exec(ctx, drop)
 		_, _ = conn.Exec(context.WithoutCancel(ctx), "RESET ROLE")
@@ -233,24 +379,34 @@ func dropDatabaseAsConnectingOrAdmin(ctx context.Context, conn *pgx.Conn, identi
 // may create databases through that membership.
 const adminRole = "postgres"
 
-// createDatabase runs CREATE DATABASE as the connecting role and, when that
-// role lacks the CREATEDB attribute, once more as adminRole. Postgres never
-// passes attributes on through membership, so a role that may create
-// databases only as a member of the default role has to act as it for this
-// one statement. Either way the connecting role can reach the result: it owns
-// the database or is a member of its owner.
+// createDatabase runs CREATE DATABASE as adminRole, so adminRole owns the
+// result and every role that inherits it may drop it: the preview builds'
+// role, the cleanup workflow's and an operator's alike. Owned by the role
+// that happened to create it, a database could be dropped only with that
+// role's credentials, since PlanetScale grants no superuser and makes no role
+// a member of another dashboard role. The connecting role still reaches what
+// adminRole owns through the same inheritance, so it stamps and migrates it.
+//
+// A role that cannot act as adminRole, or acts as one that may not create
+// databases, creates it as itself and then needs CREATEDB of its own. Postgres
+// never passes that attribute on through membership. Only that role can drop
+// such a database, so the build log says so.
 func createDatabase(ctx context.Context, conn *pgx.Conn, identifier string) error {
-	_, err := conn.Exec(ctx, "CREATE DATABASE "+identifier)
-	var pgErr *pgconn.PgError
-	if !errors.As(err, &pgErr) || pgErr.Code != "42501" { // insufficient_privilege
+	create := "CREATE DATABASE " + identifier
+	if _, setErr := conn.Exec(ctx, "SET ROLE "+pgx.Identifier{adminRole}.Sanitize()); setErr == nil {
+		_, err := conn.Exec(ctx, create)
+		_, _ = conn.Exec(context.WithoutCancel(ctx), "RESET ROLE")
+		var pgErr *pgconn.PgError
+		if !errors.As(err, &pgErr) || pgErr.Code != "42501" { // insufficient_privilege
+			return err
+		}
+	}
+	if _, err := conn.Exec(ctx, create); err != nil {
 		return err
 	}
-	if _, setErr := conn.Exec(ctx, "SET ROLE "+pgx.Identifier{adminRole}.Sanitize()); setErr != nil {
-		return fmt.Errorf("%w; the role has no CREATEDB and cannot act as %s: %v", err, adminRole, setErr)
-	}
-	defer func() { _, _ = conn.Exec(context.WithoutCancel(ctx), "RESET ROLE") }()
-	_, err = conn.Exec(ctx, "CREATE DATABASE "+identifier)
-	return err
+	fmt.Fprintf(os.Stderr, "launcher: warning: created %s as %s, not as %s: only %s can drop it, the preview cleanup cannot (docs/runbooks/cloud.md, \"Database\")\n",
+		identifier, conn.Config().User, adminRole, conn.Config().User)
+	return nil
 }
 
 // quoteLiteral quotes a string as a SQL literal for a statement that takes no

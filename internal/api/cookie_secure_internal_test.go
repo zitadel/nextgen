@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCookieSecureFromContext(t *testing.T) {
@@ -92,27 +93,161 @@ func TestFlowSetCookie_SecureFollowsScheme(t *testing.T) {
 	}
 }
 
-func TestSessionCookie_SecureFollowsScheme(t *testing.T) {
+// The session cookie is __Host-zitadel_session wherever it is Secure, and
+// zitadel_session over plain http to a loopback host (ADR 083); set and
+// cleared alike, with the attributes the prefix requires.
+func TestSessionCookie_NameAndSecureFollowScheme(t *testing.T) {
 	t.Parallel()
 
-	httpCtx := context.WithValue(context.Background(), requestHostKey{}, "http://localhost:3000")
-	httpsCtx := context.WithValue(context.Background(), requestHostKey{}, "https://app.example.com")
+	cases := []struct {
+		origin string
+		name   string
+		secure bool
+	}{
+		{origin: "http://localhost:3000", name: "zitadel_session", secure: false},
+		{origin: "http://127.0.0.1:8080", name: "zitadel_session", secure: false},
+		{origin: "https://app.example.com", name: "__Host-zitadel_session", secure: true},
+		{origin: "https://localhost:8443", name: "__Host-zitadel_session", secure: true},
+		{origin: "http://app.example.com", name: "__Host-zitadel_session", secure: true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.origin, func(t *testing.T) {
+			t.Parallel()
+			ctx := context.WithValue(context.Background(), requestHostKey{}, tc.origin)
+			for kind, setCookie := range map[string]string{
+				"set":     sessionCookie(ctx, "tok", 60),
+				"cleared": deleteSessionCookie(ctx),
+			} {
+				cookie, err := http.ParseSetCookie(setCookie)
+				require.NoError(t, err, kind)
+				assert.Equal(t, tc.name, cookie.Name, kind)
+				assert.Equal(t, tc.secure, cookie.Secure, kind)
+				assert.Equal(t, "/", cookie.Path, kind)
+				assert.Empty(t, cookie.Domain, kind)
+				assert.True(t, cookie.HttpOnly, kind)
+				assert.Equal(t, http.SameSiteLaxMode, cookie.SameSite, kind)
+			}
+		})
+	}
+}
 
-	httpCookie, err := http.ParseSetCookie(sessionCookie(httpCtx, "tok", 60))
-	if err != nil {
-		t.Fatalf("parse http session cookie: %v", err)
-	}
-	if httpCookie.Secure {
-		t.Fatalf("http session cookie must omit Secure, got %+v", httpCookie)
-	}
+// The generated reader reads only the canonical name. Over plain http to a
+// loopback host the browser holds zitadel_session, which the middleware hands
+// it under that name; everywhere else, and for the old names everywhere, the
+// reader finds no session.
+func TestWithLoopbackSessionCookie(t *testing.T) {
+	t.Parallel()
 
-	httpsCookie, err := http.ParseSetCookie(sessionCookie(httpsCtx, "tok", 60))
-	if err != nil {
-		t.Fatalf("parse https session cookie: %v", err)
+	cases := []struct {
+		name    string
+		url     string
+		proto   string
+		cookies string
+		want    string // what the generated reader finds; empty for nothing
+	}{
+		{
+			name:    "loopback http hands the loopback name over",
+			url:     "http://localhost:8080/sessions/me",
+			cookies: "zitadel_session=loopback",
+			want:    "loopback",
+		},
+		{
+			name:    "loopback ip hands the loopback name over",
+			url:     "http://127.0.0.1:8080/sessions/me",
+			cookies: "other=1; zitadel_session=loopback",
+			want:    "loopback",
+		},
+		{
+			name:    "the canonical name wins on loopback http",
+			url:     "http://localhost:8080/sessions/me",
+			cookies: "zitadel_session=loopback; __Host-zitadel_session=canonical",
+			want:    "canonical",
+		},
+		{
+			name:    "the canonical name is read on loopback http",
+			url:     "http://localhost:8080/sessions/me",
+			cookies: "__Host-zitadel_session=canonical",
+			want:    "canonical",
+		},
+		{
+			name:    "https ignores the loopback name",
+			url:     "https://app.example.com/sessions/me",
+			cookies: "zitadel_session=planted",
+		},
+		{
+			name:    "forwarded https ignores the loopback name",
+			url:     "http://localhost:8080/sessions/me",
+			proto:   "https",
+			cookies: "zitadel_session=planted",
+		},
+		{
+			name:    "non-loopback http ignores the loopback name",
+			url:     "http://app.example.com/sessions/me",
+			cookies: "zitadel_session=planted",
+		},
+		{
+			name:    "the old name is ignored on loopback http",
+			url:     "http://localhost:8080/sessions/me",
+			cookies: "__nextgen_session=old",
+		},
+		{
+			name:    "the old name is ignored on https",
+			url:     "https://app.example.com/sessions/me",
+			cookies: "__nextgen_session=old; __nextgen_session_proj_1=old",
+		},
+		{
+			name:    "the old name before the canonical one is ignored",
+			url:     "https://app.example.com/sessions/me",
+			cookies: "__nextgen_session=old; __Host-zitadel_session=canonical",
+			want:    "canonical",
+		},
+		{
+			name:    "the old name before the loopback one is ignored",
+			url:     "http://localhost:8080/sessions/me",
+			cookies: "__nextgen_session=old; zitadel_session=loopback",
+			want:    "loopback",
+		},
 	}
-	if !httpsCookie.Secure {
-		t.Fatalf("https session cookie must include Secure, got %+v", httpsCookie)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			var found string
+			handler := WithRequestHostMiddleware(WithLoopbackSessionCookie(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+				if cookie, err := r.Cookie(sessionCookieName); err == nil {
+					found = cookie.Value
+				}
+			})))
+			req := httptest.NewRequest(http.MethodGet, tc.url, nil)
+			if tc.proto != "" {
+				req.Header.Set("X-Forwarded-Proto", tc.proto)
+			}
+			req.Header.Set("Cookie", tc.cookies)
+
+			handler.ServeHTTP(httptest.NewRecorder(), req)
+
+			assert.Equal(t, tc.want, found)
+			assert.Equal(t, tc.cookies, req.Header.Get("Cookie"), "the caller's request keeps its header")
+		})
 	}
+}
+
+// A request with its cookies on several lines keeps every one of them.
+func TestWithLoopbackSessionCookie_KeepsEveryCookieLine(t *testing.T) {
+	t.Parallel()
+
+	var cookies []string
+	handler := WithRequestHostMiddleware(WithLoopbackSessionCookie(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		for _, cookie := range r.Cookies() {
+			cookies = append(cookies, cookie.Name+"="+cookie.Value)
+		}
+	})))
+	req := httptest.NewRequest(http.MethodGet, "http://localhost:8080/sessions/me", nil)
+	req.Header.Add("Cookie", "a=1")
+	req.Header.Add("Cookie", "zitadel_session=loopback; b=2")
+
+	handler.ServeHTTP(httptest.NewRecorder(), req)
+
+	assert.Equal(t, []string{"a=1", "zitadel_session=loopback", "b=2", "__Host-zitadel_session=loopback"}, cookies)
 }
 
 func TestWithRequestHostMiddleware_DrivesCookieSecure(t *testing.T) {

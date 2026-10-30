@@ -4,14 +4,17 @@ post:
   summary: Query teams
   description: |
     Returns the teams of a project, paginated with a cursor.
+
+    `project_id` names the project to list; without it, the credential's own
+    project is listed.
   tags:
     - Teams
   security:
     - oauth2:
         - team.read
-    - nextgenSession: []
+    - sessionCookie: []
   parameters:
-    - $ref: ../../../components/parameters/project-id.yaml
+    - $ref: ../../../components/parameters/project-id-query.yaml
   requestBody:
     description: Request to query the teams of a project.
     required: true

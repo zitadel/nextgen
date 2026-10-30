@@ -17,7 +17,7 @@ get:
   security:
     - oauth2:
         - policy.read
-    - nextgenSession: []
+    - sessionCookie: []
   responses:
     '200':
       description: The revisions were returned.

@@ -19,15 +19,15 @@ post:
     identifier and display.
 
     Accepts either a project secret (`oauth2`) or a user-bound Console
-    session cookie (`nextgenSession`). Session callers are authorized as
+    session cookie (`sessionCookie`). Session callers are authorized as
     the human against the target project (home may differ). Cookie-authenticated
-    requests follow the scheme's CSRF rules (`nextgenSession`).
+    requests follow the scheme's CSRF rules (`sessionCookie`).
   tags:
     - Grants
   security:
     - oauth2:
         - project.write
-    - nextgenSession: []
+    - sessionCookie: []
   parameters:
     - $ref: ../../components/parameters/project-id.yaml
   requestBody:

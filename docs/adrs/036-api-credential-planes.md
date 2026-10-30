@@ -319,13 +319,23 @@ origin in `server.console_origins`. The hosted cloud's launcher adds the URLs
 Vercel serves the deployment at to that list; the server reads no hosting
 provider's environment itself.
 
-## Amendment (2026-10-29): an empty allowlist admits nothing
+## Amendment (2026-10-30): the console signs in only at the public base
+
+The exemption for the console's origins opens a flow and nothing more. The
+platform project, which the console signs operators in to, lists the origin of
+`server.public_base` as its one primary origin. So the console signs in there
+and on a loopback origin; at any other console origin a sign-in opens and its
+first submit is refused, while previewing a project's login keeps working.
+
+## Amendment (2026-10-30): an empty allowlist admits nothing
 
 A project with no origin pattern no longer admits every origin. A loopback
 origin is still always admitted. A request with no `Origin`, and one from a
 console origin the project does not list, is served the deployment to the
 `default` target. When platform bootstrap is enabled, startup deploys the
-platform project's current schemas and login flows to that target. No such
-deployment answers `409` with `rel.no_default`. A listed origin, a loopback
-origin, or a live preview with nothing deployed answers `409` with
-`rel.not_deployed`.
+platform project to its primary origin and to that target, so a console origin
+it does not list still opens a flow. No such deployment answers `409` with
+`rel.no_default`. A listed origin, a loopback origin, or a live preview with
+nothing deployed answers `409` with `rel.not_deployed`. So the console signs in
+to the platform project on a loopback origin only when that origin is its
+public base.

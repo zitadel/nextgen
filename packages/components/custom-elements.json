@@ -5907,7 +5907,7 @@
               }
             }
           ],
-          "description": "Exchange a terminal-flow `handoff_token` for an authenticated session.\nThe server sets the `__nextgen_session` HttpOnly cookie on success.\n\nUses the generated `exchangeHandoff` client which handles the\n`project_id` query parameter via ExchangeHandoffParams."
+          "description": "Exchange a terminal-flow `handoff_token` for an authenticated session.\nThe server sets the HttpOnly session cookie on success.\n\nUses the generated `exchangeHandoff` client which handles the\n`project_id` query parameter via ExchangeHandoffParams."
         },
         {
           "kind": "function",
@@ -5931,7 +5931,7 @@
               }
             }
           ],
-          "description": "Reads the current session (`GET /sessions/me`) with credentials so the\n`__nextgen_session` cookie authenticates the request. Used by the\norchestrator's signed-in surfaces to render the user's identity.\n\nThe read names the element's project. A session of another project on the\nsame server, which the server refuses (`403 sess.project_mismatch`) or a\nserver that predates the parameter answers for, resolves to `null`: it is\nlive, but not this app's. Any other failure rejects."
+          "description": "Reads the current session (`GET /sessions/me`) with credentials so the\nsession cookie authenticates the request. Used by the\norchestrator's signed-in surfaces to render the user's identity.\n\nThe read names the element's project. A session of another project on the\nsame server, which the server refuses (`403 sess.project_mismatch`) or a\nserver that predates the parameter answers for, resolves to `null`: it is\nlive, but not this app's. Any other failure rejects."
         },
         {
           "kind": "function",

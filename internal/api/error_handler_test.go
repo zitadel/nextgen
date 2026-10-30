@@ -533,7 +533,7 @@ func TestErrorResponse_serverFaultsAre5xx(t *testing.T) {
 func TestOgenErrorHandlerLogsTheCSRFErrorItWasGiven(t *testing.T) {
 	records := recordLogs(t)
 	err := &ogenerrors.SecurityError{
-		Security: "NextgenSession",
+		Security: "SessionCookie",
 		Err:      domain.ErrAuthCSRFInvalid().WithParent(errors.New("origin mismatch")),
 	}
 	rec := httptest.NewRecorder()
@@ -552,7 +552,7 @@ func TestOgenErrorHandlerLogsTheCSRFErrorItWasGiven(t *testing.T) {
 func TestOgenErrorHandlerSecurityInternalErrorIs500(t *testing.T) {
 	t.Parallel()
 	err := &ogenerrors.SecurityError{
-		Security: "NextgenSession",
+		Security: "SessionCookie",
 		Err:      domain.ErrInternal(errors.New("WithCSRFRequest is not wired")),
 	}
 	rec := httptest.NewRecorder()

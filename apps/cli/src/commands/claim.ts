@@ -13,7 +13,6 @@ import { requireValue } from "../lib/environment";
 import { ZitadelError } from "../lib/errors";
 import { isObject } from "../lib/json";
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../lib/oclif";
-import { nextCommandsData } from "../lib/oclif/envelope";
 import { hasZitadelSecret, readZitadelSecret, writeZitadelSecret } from "../lib/project";
 import { isLoopbackUrl } from "../lib/server";
 import { reportWarning } from "../lib/warnings";
@@ -194,11 +193,13 @@ export default class Claim extends EnvironmentCommand {
               ? `${action}, then record the owning team in .zitadel/secret.`
               : `${action}.`,
         },
-        nextCommands: [
-          challengeId === undefined
-            ? startOver
-            : this.suggest(`claim --challenge-id ${challengeId}`),
-        ],
+        next: {
+          commands: [
+            challengeId === undefined
+              ? startOver
+              : this.suggest(`claim --challenge-id ${challengeId}`),
+          ],
+        },
       });
     }
 
@@ -313,11 +314,10 @@ export default class Claim extends EnvironmentCommand {
         team_id: completed.team_id,
         claimed_at: completed.claimed_at,
         dashboard_url: completed.dashboard_url,
-        // Two entries so the pretty renderer puts the URL on its own line.
-        next_actions: [
-          "Manage your Project and collaborate in the Console:",
-          completed.dashboard_url,
-        ],
+      },
+      // Two entries so the URL is printed on its own line.
+      next: {
+        actions: ["Manage your Project and collaborate in the Console:", completed.dashboard_url],
       },
     });
   }
@@ -412,14 +412,14 @@ export default class Claim extends EnvironmentCommand {
         claim_url: challenge.claim_url,
         challenge_id: challenge.challenge_id,
         expires_at: challenge.expires_at,
-        next_actions: ["Wait for the browser step to finish with:"],
+      },
+      next: {
+        actions: ["Wait for the browser step to finish with:"],
         // The id comes from the server, so it reaches a command an agent may
         // run only in the contract's own shape, which a shell reads as one word.
-        ...nextCommandsData(
-          isChallengeId(challenge.challenge_id)
-            ? [this.suggest(`claim --challenge-id ${challenge.challenge_id}`)]
-            : [],
-        ),
+        commands: isChallengeId(challenge.challenge_id)
+          ? [this.suggest(`claim --challenge-id ${challenge.challenge_id}`)]
+          : [],
       },
     });
   }

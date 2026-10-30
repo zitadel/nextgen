@@ -22,7 +22,8 @@
     // standing in for moon's mutex of the same name.
     // The packed-CLI helpers and the journey's registry scripts import the
     // root release scripts; the harness's unit tests (`test`) also read the
-    // CLI's skill, the mock OIDC provider's users and the built-in schemas.
+    // CLI's skill and the router skill, the mock OIDC provider's users and the
+    // built-in schemas.
     "typecheck": {
       "dependsOn": ["@zitadel/testing#build"],
       "inputs": ["$TURBO_EXTENDS$", "$TURBO_ROOT$/scripts/*.mjs", "$TURBO_ROOT$/scripts/*.d.mts"]
@@ -32,6 +33,7 @@
         "$TURBO_EXTENDS$",
         "$TURBO_ROOT$/scripts/*.mjs",
         "$TURBO_ROOT$/apps/cli/skills/**",
+        "$TURBO_ROOT$/skills/zitadel/**",
         "$TURBO_ROOT$/tools/oidc-mock/users.json",
         "$TURBO_ROOT$/api/openapi/endpoints/schemas/*.json"
       ]
