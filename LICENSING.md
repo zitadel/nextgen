@@ -60,6 +60,7 @@ LICENSING.md
 VISION.md
 api/
 docs/
+skills/
 apps/cli/
 apps/docs/
 apps/demo-next/

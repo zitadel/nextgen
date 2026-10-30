@@ -12,8 +12,32 @@
         "$TURBO_ROOT$/e2e/journey/scripts/*.mjs"
       ]
     },
+    // It copies every public agent skill into dist/skills
+    // (src/lib/skills/bundle.ts) for `zitadel skills add`: its own, which the
+    // shared shape leaves out, and those of the root and the other packages.
     "build": {
-      "dependsOn": ["@zitadel/sdk-next#build"]
+      "dependsOn": ["@zitadel/sdk-next#build"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "!**/README.md",
+        "!**/AGENTS.md",
+        "!**/CLAUDE.md",
+        "!**/CHANGELOG.md",
+        "!**/LICENSE",
+        "!**/LICENSE.md",
+        "!docs/**",
+        "!**/*.test.{ts,tsx,mts,cts,js,jsx,mjs,cjs}",
+        "!**/*.spec.{ts,tsx,mts,cts,js,jsx,mjs,cjs}",
+        "!**/__tests__/**",
+        "!**/__snapshots__/**",
+        "!tests/**",
+        "!test/**",
+        "!**/vitest.config.*",
+        "!**/vitest.*.config.*",
+        "$TURBO_ROOT$/skills/**",
+        "$TURBO_ROOT$/apps/*/skills/**",
+        "$TURBO_ROOT$/packages/*/skills/**"
+      ]
     },
     // It runs the normal tests first, and the public packages' release builds
     // wait for those tests (through api's release build) before they clean
@@ -34,7 +58,8 @@
     // .github/semantic.yml), and the release manifest's test reads
     // .changeset/config.json, .moon/workspace.yml and every package's
     // package.json and moon.yml. The local runtime's launcher test reads the
-    // Dockerfile, the IdP document tests the design docs' scaffold schemas.
+    // Dockerfile, the IdP document tests the design docs' scaffold schemas,
+    // and the skills bundle's test LICENSING.md's MIT paths.
     "test": {
       "dependsOn": ["build", "@zitadel/api-mock#build"],
       "inputs": [
@@ -53,6 +78,7 @@
         "$TURBO_ROOT$/.github/semantic.yml",
         "$TURBO_ROOT$/Dockerfile",
         "$TURBO_ROOT$/docs/design/idp/schemas/**",
+        "$TURBO_ROOT$/LICENSING.md",
         "$TURBO_ROOT$/.changeset/config.json",
         "$TURBO_ROOT$/.moon/workspace.yml",
         "$TURBO_ROOT$/{apps,packages}/*/package.json",

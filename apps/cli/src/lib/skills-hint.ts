@@ -5,21 +5,23 @@ import consola from "consola";
 import * as rosie from "rosie-skills";
 
 import { command } from "./box";
+import { publicCliCommand } from "./public-cli";
 import { telemetryConfigDir } from "./telemetry/identity";
 
 export type SkillsHintInput = {
   env: NodeJS.ProcessEnv;
   /** False for `--json`, `--non-interactive`, or a non-TTY stream. */
   interactive: boolean;
+  /** The running CLI's, whose skills the named command adds. */
+  cliVersion: string;
 };
 
 const SHOWN_FILE = "skills-hint.json";
-const INSTALL_COMMAND = "npx skills add zitadel/nextgen --full-depth";
 
 /**
  * Tell a developer who has AI coding agents installed how to give them the
  * Zitadel skills, once per machine and after the command's own next steps.
- * The CLI never installs anything itself: it names the command and the
+ * The note adds nothing itself: it names `zitadel skills add` and the
  * developer runs it. Modelled on Wrangler's skills suggestion, minus the prompt.
  *
  * The marker lives in the user's CLI config directory (`telemetryConfigDir`),
@@ -32,7 +34,11 @@ const INSTALL_COMMAND = "npx skills add zitadel/nextgen --full-depth";
  * fail the command the user actually ran, and losing the race to create the marker
  * (`EEXIST`) just means another run is showing the note.
  */
-export async function showSkillsHint({ env, interactive }: SkillsHintInput): Promise<void> {
+export async function showSkillsHint({
+  env,
+  interactive,
+  cliVersion,
+}: SkillsHintInput): Promise<void> {
   try {
     if (!interactive || isCI(env) || isOptedOut(env)) {
       return;
@@ -61,9 +67,9 @@ export async function showSkillsHint({ env, interactive }: SkillsHintInput): Pro
         [
           "",
           "Using an AI coding agent?",
-          "Install Zitadel skills to help your agent work with Zitadel’s CLI and authentication integrations:",
+          "Add the Zitadel skills to your project to help your agent work with Zitadel’s CLI and authentication integrations:",
           "",
-          `  ${command(INSTALL_COMMAND)}`,
+          `  ${command(publicCliCommand("skills add", cliVersion))}`,
           "",
           "Optional. You can continue without installing skills.",
         ].join("\n"),
