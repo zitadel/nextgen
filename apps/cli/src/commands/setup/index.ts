@@ -108,7 +108,9 @@ import { installDependenciesForSetup } from "./install";
 import {
   assertCleanWorktree,
   ensureInitialCommit,
+  gitReport,
   type InitialCommitOutcome,
+  unavailableWarning,
 } from "./initial-commit";
 import { moveDevPort } from "./move-dev-port";
 import {
@@ -1061,14 +1063,7 @@ export default class Setup extends Promptable(BaseCommand) {
         })),
         files_skipped: result.filesSkipped.map((file) => relativeDisplay(cwd, file)),
         install: installOutcome.install,
-        // Whether setup created the repository, and the commit it made.
-        // `initialized` is false when the project was already in one, which it
-        // is still committed into; the commit is `null` only under `--no-git`
-        // or when git could not be used.
-        git: {
-          initialized: commit.kind === "created",
-          commit: commit.kind === "created" || commit.kind === "committed" ? commit.sha : null,
-        },
+        git: gitReport(commit),
         // The provider enabled during scaffolding, or null. `secret` reports
         // where the value went, never the value itself — `published` is the
         // one that decides whether the provider button works.
@@ -1185,9 +1180,7 @@ export default class Setup extends Promptable(BaseCommand) {
       }
     }
     if (outcome.kind === "unavailable") {
-      reportWarning(
-        `Could not commit the scaffolded project (${outcome.reason}); the first release records no commit, so the next deploy cannot show a diff.`,
-      );
+      reportWarning(unavailableWarning(outcome));
     }
     return outcome;
   }

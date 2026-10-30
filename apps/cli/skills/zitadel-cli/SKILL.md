@@ -401,17 +401,22 @@ it.
 Setup refuses with `E_CONFLICT` when the repository already has uncommitted
 work, untracked files included, which `details.untracked` lists separately
 from `details.modified`. The commit covers the project directory, so it can
-only tell its own files from yours when the tree starts clean. Commit or stash
+only tell its own files from yours when the tree starts clean. It never
+commits `.env*` files (other than `.env.example`), `.zitadel/secret` or
+`.zitadel/local/`, whatever their case. Commit or stash
 first, then rerun. Only what `start` leaves is exempt: `.zitadel/local/` and
 the `.gitignore` line that ignores it. A connection under `.zitadel/idps/` is
-yours and is not exempt.
+yours and is not exempt. During a merge, rebase, cherry-pick, revert or bisect,
+or on a detached HEAD, setup refuses with `E_CONFLICT` before it writes
+anything, naming what stops the commit.
 
 Setup deploys nothing, and it does not need to: a project with no release
 resolves the newest revisions, which are the ones setup just uploaded, so
 sign-in already runs on `.zitadel/`. Deploying pins them into a release, which
 is what the server will require once that fallback goes (#1616). The publish
-step says so and names the command. `data.git` reports what setup did
-(`initialized`, and the `commit`, or null). `--no-git` skips both the refusal
+step says so and names the command. `data.git` reports what setup did:
+`initialized` when it ran `git init`, even if the commit then failed, and the
+`commit`, or null. `--no-git` skips both the refusal
 and the commit, and nothing prompts, so this is the same interactively and in
 CI.
 
