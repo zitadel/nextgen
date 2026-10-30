@@ -35,12 +35,7 @@ async function staged(staging: StagingArea): Promise<string[]> {
   return staging.git.stagedFiles();
 }
 
-const IDENTITY = {
-  GIT_AUTHOR_NAME: "Someone",
-  GIT_AUTHOR_EMAIL: "someone@example.com",
-  GIT_COMMITTER_NAME: "Someone",
-  GIT_COMMITTER_EMAIL: "someone@example.com",
-};
+const AUTHOR = { name: "Someone", email: "someone@example.com" };
 
 /** Where `staging` keeps its index. */
 async function indexOf(staging: StagingArea): Promise<string> {
@@ -132,10 +127,43 @@ describe("StagingArea", () => {
     await StagingArea.temporary(new Git(cwd), async (staging) => {
       await staging.startFromHead();
       await staging.addAll(() => false);
-      await staging.commit("add b", IDENTITY);
+      await staging.commit("add b", AUTHOR);
     });
 
     expect(await headChanges(cwd)).toEqual(["b.txt"]);
+  });
+
+  it("leaves the author to git when given none", async () => {
+    const cwd = await scratch.committed({ "a.txt": "a\n" });
+    await git(cwd, "config", "user.name", "Dev");
+    await git(cwd, "config", "user.email", "dev@example.com");
+    await write(cwd, { "b.txt": "b\n" });
+
+    await StagingArea.temporary(new Git(cwd), async (staging) => {
+      await staging.startFromHead();
+      await staging.addAll(() => false);
+      await staging.commit("add b", null);
+    });
+
+    expect((await git(cwd, "log", "-1", "--format=%an <%ae>")).trim()).toBe(
+      "Dev <dev@example.com>",
+    );
+  });
+
+  it("names its author even over an inherited empty name", async () => {
+    const cwd = await scratch.committed({ "a.txt": "a\n" });
+    await write(cwd, { "b.txt": "b\n" });
+    vi.stubEnv("GIT_AUTHOR_NAME", "");
+
+    await StagingArea.temporary(new Git(cwd), async (staging) => {
+      await staging.startFromHead();
+      await staging.addAll(() => false);
+      await staging.commit("add b", AUTHOR);
+    });
+
+    expect((await git(cwd, "log", "-1", "--format=%an <%ae> / %cn <%ce>")).trim()).toBe(
+      "Someone <someone@example.com> / Someone <someone@example.com>",
+    );
   });
 
   it("commits with the message it is given", async () => {
@@ -145,7 +173,7 @@ describe("StagingArea", () => {
     await StagingArea.temporary(new Git(cwd), async (staging) => {
       await staging.startFromHead();
       await staging.addAll(() => false);
-      await staging.commit("add b", IDENTITY);
+      await staging.commit("add b", AUTHOR);
     });
 
     expect((await git(cwd, "log", "-1", "--format=%s")).trim()).toBe("add b");
@@ -319,7 +347,7 @@ describe("StagingArea", () => {
     await StagingArea.temporary(new Git(cwd), async (staging) => {
       await staging.startFromHead();
       await staging.addAll(() => false);
-      await staging.commit("add b", IDENTITY);
+      await staging.commit("add b", AUTHOR);
     });
 
     expect((await git(cwd, "log", "-1", "--format=%an <%ae>")).trim()).toBe(
@@ -349,7 +377,7 @@ describe("StagingArea", () => {
     await StagingArea.temporary(new Git(cwd), async (staging) => {
       await staging.startFromHead();
       await staging.addAll(() => false);
-      await staging.commit("add b", IDENTITY);
+      await staging.commit("add b", AUTHOR);
     });
 
     expect(await headChanges(cwd)).toEqual(["b.txt"]);
@@ -366,7 +394,7 @@ describe("StagingArea", () => {
     await StagingArea.temporary(new Git(cwd), async (staging) => {
       await staging.startFromHead();
       await staging.addAll(() => false);
-      await staging.commit("add b", IDENTITY);
+      await staging.commit("add b", AUTHOR);
     });
 
     expect(await headChanges(cwd)).toEqual(["b.txt"]);

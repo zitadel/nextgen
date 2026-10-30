@@ -51,12 +51,16 @@ export class CommitAll implements Operation<CommitOutcome> {
   /**
    * Stages everything but the excluded files, checks, and commits.
    *
+   * The caller's fallback author is named only where git cannot build an
+   * identity at all; a commit with no author would leave nothing to diff a
+   * later deploy against.
+   *
    * What is about to be committed is checked rather than trusted, since a
    * file committed once cannot be taken out of history. The reset of the developer's staging
    * area afterwards is best effort, since the commit has already landed.
    */
   async run(git: Git): Promise<CommitOutcome> {
-    const author = await AuthorIdentity.of(git, this.options.authorIfGitHasNone);
+    const identity = await AuthorIdentity.of(git);
     return StagingArea.temporary(git, async (staging) => {
       await staging.startFromHead();
       await staging.addAll(this.options.except);
@@ -67,13 +71,17 @@ export class CommitAll implements Operation<CommitOutcome> {
       if (problem !== null) {
         return this.refused(problem);
       }
-      await staging.commit(this.message, author.environment());
+      if (identity.source === "fallback") {
+        await staging.commit(this.message, this.options.authorIfGitHasNone);
+      } else {
+        await staging.commit(this.message, null);
+      }
       const sha = await new CurrentCommit().run(git);
       if (sha === null) {
         throw new RepositoryError("the commit left no HEAD to record");
       }
       await git.run(["reset", "--quiet", "--", "."]).catch(() => undefined);
-      return { committed: true, sha, author: author.source };
+      return { committed: true, sha, author: identity.source };
     });
   }
 }

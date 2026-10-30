@@ -6,7 +6,7 @@ import { dirname, join, resolve } from "node:path";
 import type { Git } from "./git";
 import type { Check } from "./operation";
 import { CurrentCommit } from "./operations/current-commit";
-import type { PathFilter } from "./types";
+import type { Author, PathFilter } from "./types";
 
 /**
  * A temporary staging area (`GIT_INDEX_FILE`), so a commit or a diff is put
@@ -125,14 +125,19 @@ export class StagingArea {
   }
 
   /**
-   * Commits what is staged with `message`, with `identity` added to git's environment.
+   * Commits what is staged with `message`, naming `author` as author and committer when given.
+   *
+   * Without `author`, git names whoever it would. An author is set through
+   * the environment rather than `-c user.*`: an inherited empty
+   * `GIT_AUTHOR_NAME=`, as some CI runners leave it, outranks `-c`, and git
+   * would refuse the commit with "empty ident name".
    *
    * Signing is turned off, so a configured key cannot block on a passphrase
    * prompt. `--no-verify` skips the pre-commit and commit-msg hooks, which a
    * scaffolded app's linter would otherwise fail; post-commit hooks still run,
    * as they always did.
    */
-  async commit(message: string, identity: NodeJS.ProcessEnv): Promise<void> {
+  async commit(message: string, author: Author | null): Promise<void> {
     const commit = [
       "-c",
       "commit.gpgsign=false",
@@ -141,6 +146,16 @@ export class StagingArea {
       "--no-verify",
       `--message=${message}`,
     ];
-    await this.git.with(identity).run(commit);
+    if (author === null) {
+      await this.git.run(commit);
+    } else {
+      const named = this.git.with({
+        GIT_AUTHOR_NAME: author.name,
+        GIT_AUTHOR_EMAIL: author.email,
+        GIT_COMMITTER_NAME: author.name,
+        GIT_COMMITTER_EMAIL: author.email,
+      });
+      await named.run(commit);
+    }
   }
 }

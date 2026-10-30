@@ -21,7 +21,7 @@ Zitadel: callers say what to leave out and whom to name as author.
 - Assume a modern git (2.25 or later); add no fallbacks or workarounds for
   older versions.
 - Throw `RepositoryError` with git's own message; the caller decides whether a
-  failure is fatal.
+  failure is fatal, and uses `Repository.answer` when it should mean no answer.
 
 ## Gotchas
 

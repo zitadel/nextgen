@@ -97,6 +97,37 @@ describe("Repository.open", () => {
   });
 });
 
+describe("Repository.answer", () => {
+  it("gives what the question answers", async () => {
+    const cwd = await scratch.committed({ "a.txt": "a\n" });
+
+    expect(await Repository.answer(cwd, (repository) => repository.currentCommit(), "none")).toBe(
+      (await git(cwd, "rev-parse", "HEAD")).trim(),
+    );
+  });
+
+  it("gives the default outside any repository", async () => {
+    const cwd = await scratch.directory();
+
+    expect(await Repository.answer(cwd, (repository) => repository.isDirty(), null)).toBeNull();
+  });
+
+  it("gives the default when git fails", async () => {
+    const cwd = await scratch.repository();
+    vi.stubEnv("PATH", await scratch.brokenGit("fatal: refused", 128));
+
+    expect(await Repository.answer(cwd, (repository) => repository.isDirty(), null)).toBeNull();
+  });
+
+  it("gives the default when the question fails", async () => {
+    const cwd = await scratch.committed({ "a.txt": "a\n" });
+
+    expect(await Repository.answer(cwd, () => Promise.reject(new Error("failed")), "none")).toBe(
+      "none",
+    );
+  });
+});
+
 describe("Repository.create", () => {
   it("creates a repository", async () => {
     const cwd = await scratch.directory();

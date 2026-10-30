@@ -15,7 +15,7 @@ const CONFIG_PATHS = [
 
 /** The current commit, or null when there is no repo or no commit yet. */
 export async function headSha(cwd: string): Promise<string | null> {
-  return quietly(async () => (await Repository.open(cwd))?.currentCommit() ?? null, null);
+  return Repository.answer(cwd, (repository) => repository.currentCommit(), null);
 }
 
 /**
@@ -25,7 +25,7 @@ export async function headSha(cwd: string): Promise<string | null> {
  * the config depends on, say) makes that provenance just as inexact.
  */
 export async function worktreeIsDirty(cwd: string): Promise<boolean> {
-  return quietly(async () => (await Repository.open(cwd))?.isDirty() ?? false, false);
+  return Repository.answer(cwd, (repository) => repository.isDirty(), false);
 }
 
 /**
@@ -45,10 +45,7 @@ export async function diffConfigAgainst(
   referenced: readonly string[] = [],
 ): Promise<string | null> {
   const paths = [...CONFIG_PATHS, ...referenced];
-  return quietly(
-    async () => (await Repository.open(cwd))?.diffSince(sha, paths, { color }) ?? null,
-    null,
-  );
+  return Repository.answer(cwd, (repository) => repository.diffSince(sha, paths, { color }), null);
 }
 
 /**
@@ -62,17 +59,5 @@ export async function diffConfigFilesAgainst(
   referenced: readonly string[] = [],
 ): Promise<DiffedFile[] | null> {
   const paths = [...CONFIG_PATHS, ...referenced];
-  return quietly(
-    async () => (await Repository.open(cwd))?.diffFilesSince(sha, paths) ?? null,
-    null,
-  );
-}
-
-/** What `read` returns, or `fallback` when git fails: a release records what git can tell, no more. */
-async function quietly<T>(read: () => Promise<T>, fallback: T): Promise<T> {
-  try {
-    return await read();
-  } catch {
-    return fallback;
-  }
+  return Repository.answer(cwd, (repository) => repository.diffFilesSince(sha, paths), null);
 }

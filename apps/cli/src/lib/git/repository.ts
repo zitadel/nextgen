@@ -71,6 +71,30 @@ export class Repository {
     return new Repository(dir, result.text());
   }
 
+  /**
+   * What `question` answers about the repository `dir` is in, or `otherwise` when there is none or git cannot answer.
+   *
+   * For a caller that records what git can tell and must never fail because
+   * of it, such as one that notes a commit when there is one: every failure,
+   * a missing git included, becomes `otherwise`. A caller that needs to know
+   * why git failed uses {@link open} and the methods directly.
+   */
+  static async answer<T>(
+    dir: string,
+    question: (repository: Repository) => Promise<T>,
+    otherwise: T,
+  ): Promise<T> {
+    try {
+      const repository = await Repository.open(dir);
+      if (repository === null) {
+        return otherwise;
+      }
+      return await question(repository);
+    } catch {
+      return otherwise;
+    }
+  }
+
   /** A new repository in `dir`. */
   static async create(dir: string): Promise<Repository> {
     await new Git(dir).run(["init", "--quiet"]);
