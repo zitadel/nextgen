@@ -97,15 +97,21 @@ export type FileOp =
        * Reads the wiring's state for the doctor, for a transform whose output
        * cannot tell "applied" from "cannot be applied here": one that leaves a
        * file it does not recognize as it is, so that the run does not fail.
-       * Returns `applied`, `detached`, or why the file cannot be checked
-       * (reported as `unknown`, a warning). Without it, the doctor runs the
-       * transform and reads an unchanged file as applied.
+       * Returns `applied`, `detached`, why the file cannot be checked
+       * (reported as `unknown`, a warning), or why what it holds is outdated
+       * (reported as `outdated`, a failure whatever the wiring's class).
+       * Without it, the doctor runs the transform and reads an unchanged file
+       * as applied.
        */
       readonly verify?: (source: string) => WiringVerdict;
     };
 
 /** A wiring's state as an edit's own {@link FileOp} `verify` reads it. */
-export type WiringVerdict = "applied" | "detached" | { readonly unknown: string };
+export type WiringVerdict =
+  | "applied"
+  | "detached"
+  | { readonly unknown: string }
+  | { readonly outdated: string };
 
 /**
  * A rule-based patcher's plan: the ordered file operations to apply plus a

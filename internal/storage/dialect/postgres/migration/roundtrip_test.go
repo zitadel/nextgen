@@ -89,7 +89,7 @@ func snapshot(t *testing.T, db *sql.DB) migrationtest.Schema {
 
 	for _, r := range migrationtest.Rows(t, db, `
 		SELECT table_name, table_type FROM information_schema.tables
-		WHERE table_schema = $1 AND table_name <> 'goose_db_version'`, schemaName) {
+		WHERE table_schema = $1 AND table_name <> 'goose_db_version'`, SchemaName) {
 		s.Add(t, migrationtest.Key("table", r[0]), r[1])
 	}
 	for _, r := range migrationtest.Rows(t, db, `
@@ -97,7 +97,7 @@ func snapshot(t *testing.T, db *sql.DB) migrationtest.Schema {
 			format_type(a.atttypid, a.atttypmod), is_nullable, column_default, is_identity, is_generated, generation_expression
 		FROM information_schema.columns c
 		JOIN pg_attribute a ON a.attrelid = format('%I.%I', c.table_schema, c.table_name)::regclass AND a.attname = c.column_name
-		WHERE table_schema = $1 AND table_name <> 'goose_db_version'`, schemaName) {
+		WHERE table_schema = $1 AND table_name <> 'goose_db_version'`, SchemaName) {
 		s.Add(t, migrationtest.Key("column", r[0], r[1]),
 			r[2]+" nullable="+r[3]+" default="+r[4]+" identity="+r[5]+" generated="+r[6]+" "+r[7])
 	}
@@ -106,12 +106,12 @@ func snapshot(t *testing.T, db *sql.DB) migrationtest.Schema {
 		FROM pg_constraint con
 		JOIN pg_class rel ON rel.oid = con.conrelid
 		JOIN pg_namespace n ON n.oid = rel.relnamespace
-		WHERE n.nspname = $1 AND rel.relname <> 'goose_db_version'`, schemaName) {
+		WHERE n.nspname = $1 AND rel.relname <> 'goose_db_version'`, SchemaName) {
 		s.Add(t, migrationtest.Key("constraint", r[0], r[1]), r[2])
 	}
 	for _, r := range migrationtest.Rows(t, db, `
 		SELECT indexname, indexdef FROM pg_indexes
-		WHERE schemaname = $1 AND tablename <> 'goose_db_version'`, schemaName) {
+		WHERE schemaname = $1 AND tablename <> 'goose_db_version'`, SchemaName) {
 		s.Add(t, migrationtest.Key("index", r[0]), r[1])
 	}
 	for _, r := range migrationtest.Rows(t, db, `
@@ -121,13 +121,13 @@ func snapshot(t *testing.T, db *sql.DB) migrationtest.Schema {
 		JOIN pg_namespace n ON n.oid = t.typnamespace
 		LEFT JOIN pg_enum e ON e.enumtypid = t.oid
 		WHERE n.nspname = $1 AND t.typtype IN ('e', 'd')
-		GROUP BY t.oid, t.typname, t.typtype, t.typbasetype, t.typtypmod`, schemaName) {
+		GROUP BY t.oid, t.typname, t.typtype, t.typbasetype, t.typtypmod`, SchemaName) {
 		s.Add(t, migrationtest.Key("type", r[0]), r[1]+" "+r[2]+" "+r[3])
 	}
 	for _, r := range migrationtest.Rows(t, db, `
 		SELECT p.oid::regprocedure::text, pg_get_functiondef(p.oid)
 		FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
-		WHERE n.nspname = $1`, schemaName) {
+		WHERE n.nspname = $1`, SchemaName) {
 		s.Add(t, migrationtest.Key("function", r[0]), r[1])
 	}
 	for _, r := range migrationtest.Rows(t, db, `
@@ -135,15 +135,15 @@ func snapshot(t *testing.T, db *sql.DB) migrationtest.Schema {
 		FROM pg_trigger tg
 		JOIN pg_class rel ON rel.oid = tg.tgrelid
 		JOIN pg_namespace n ON n.oid = rel.relnamespace
-		WHERE n.nspname = $1 AND NOT tg.tgisinternal`, schemaName) {
+		WHERE n.nspname = $1 AND NOT tg.tgisinternal`, SchemaName) {
 		s.Add(t, migrationtest.Key("trigger", r[0]), r[1])
 	}
 	for _, r := range migrationtest.Rows(t, db, `
-		SELECT viewname, definition FROM pg_views WHERE schemaname = $1`, schemaName) {
+		SELECT viewname, definition FROM pg_views WHERE schemaname = $1`, SchemaName) {
 		s.Add(t, migrationtest.Key("view", r[0]), r[1])
 	}
 	for _, r := range migrationtest.Rows(t, db, `
-		SELECT sequencename, data_type::text, increment_by FROM pg_sequences WHERE schemaname = $1`, schemaName) {
+		SELECT sequencename, data_type::text, increment_by FROM pg_sequences WHERE schemaname = $1`, SchemaName) {
 		s.Add(t, migrationtest.Key("sequence", r[0]), r[1]+" by "+r[2])
 	}
 	return s

@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/zitadel/nextgen/internal/api"
 	"github.com/zitadel/nextgen/internal/audit"
+	"github.com/zitadel/nextgen/internal/securityheaders"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/staticui/console"
 	"github.com/zitadel/nextgen/internal/storage/dialect/idgen"
@@ -52,7 +54,7 @@ func idpCallbackEcho() http.Handler {
 	})
 }
 
-func newTestMux(t *testing.T, cfg ServerConfig) *http.ServeMux {
+func newTestMux(t *testing.T, cfg ServerConfig) http.Handler {
 	t.Helper()
 	mux, err := buildHTTPMux(cfg, idgen.NewULID(), apiEcho(), idpCallbackEcho(),
 		staticResolver(consoleRuntime{Mode: ConsoleModeStandalone, ConsoleProjectID: "proj_first"}, nil),
@@ -68,7 +70,7 @@ func uiConfig(consoleEnabled bool) ServerConfig {
 	}
 }
 
-func get(t *testing.T, mux *http.ServeMux, path string) *httptest.ResponseRecorder {
+func get(t *testing.T, mux http.Handler, path string) *httptest.ResponseRecorder {
 	t.Helper()
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
@@ -227,4 +229,78 @@ func TestBuildHTTPMuxRecordsCSRFRequestState(t *testing.T) {
 	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/teams", nil))
 	require.Equal(t, http.StatusTeapot, rec.Code, "the request must reach the API handler")
 	require.True(t, recorded, "api.WithCSRFRequest must wrap the API handler")
+}
+
+// The generated reader knows only __Host-zitadel_session. A browser on a
+// loopback http server holds zitadel_session, which reaches it only through
+// api.WithLoopbackSessionCookie, and only after api.WithRequestHostMiddleware
+// has said the request is loopback http; pinned so neither can drop out of
+// the chain or swap places unnoticed.
+func TestBuildHTTPMuxHandsTheAPITheLoopbackSessionCookie(t *testing.T) {
+	t.Parallel()
+	var found string
+	mux, err := buildHTTPMux(uiConfig(false), idgen.NewULID(),
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			found = ""
+			if cookie, err := r.Cookie("__Host-zitadel_session"); err == nil {
+				found = cookie.Value
+			}
+			w.WriteHeader(http.StatusTeapot)
+		}),
+		idpCallbackEcho(),
+		staticResolver(consoleRuntime{Mode: ConsoleModeStandalone, ConsoleProjectID: "proj_first"}, nil),
+		nil, nil)
+	require.NoError(t, err)
+
+	loopback := httptest.NewRequest(http.MethodGet, "http://localhost:8080/sessions/me", nil)
+	loopback.Header.Set("Cookie", "zitadel_session=tok")
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, loopback)
+	require.Equal(t, http.StatusTeapot, rec.Code, "the request must reach the API handler")
+	assert.Equal(t, "tok", found, "loopback http hands the API the loopback cookie")
+
+	forwarded := httptest.NewRequest(http.MethodGet, "http://localhost:8080/sessions/me", nil)
+	forwarded.Header.Set("X-Forwarded-Proto", "https")
+	forwarded.Header.Set("Cookie", "zitadel_session=tok")
+	mux.ServeHTTP(httptest.NewRecorder(), forwarded)
+	assert.Empty(t, found, "https leaves the loopback cookie unread")
+}
+
+// Every response carries the security headers, and each surface its own
+// policy: the console the pair its page needs, everything else the policy of
+// a response that is no page.
+func TestBuildHTTPMuxSendsTheSecurityHeaders(t *testing.T) {
+	requireEmbeddedUI(t)
+	mux := newTestMux(t, uiConfig(true))
+
+	for _, path := range []string{"/ui/console/", "/ui/console/assets/missing.js", "/users", consoleRuntimePath} {
+		header := get(t, mux, path).Header()
+		assert.Equal(t, "nosniff", header.Get("X-Content-Type-Options"), path)
+		assert.Equal(t, "strict-origin-when-cross-origin", header.Get("Referrer-Policy"), path)
+		assert.Equal(t, "DENY", header.Get("X-Frame-Options"), path)
+		assert.Contains(t, header.Get(securityheaders.PolicyHeader), "frame-ancestors 'none'", path)
+	}
+
+	console := get(t, mux, "/ui/console/").Header()
+	assert.Contains(t, console.Get(securityheaders.PolicyHeader), "script-src 'self' 'sha256-")
+	assert.Contains(t, console.Get(securityheaders.ReportOnlyPolicyHeader), "default-src 'self'")
+	api := get(t, mux, "/users").Header()
+	assert.Equal(t, "default-src 'none'; frame-ancestors 'none'", api.Get(securityheaders.PolicyHeader))
+	assert.Empty(t, api.Get(securityheaders.ReportOnlyPolicyHeader))
+}
+
+// Browsers post policy violations without a session or the CSRF token, so
+// the report path is a mount of its own, ahead of the API.
+func TestBuildHTTPMuxTakesPolicyReports(t *testing.T) {
+	mux := newTestMux(t, uiConfig(false))
+
+	r := httptest.NewRequest(http.MethodPost, securityheaders.ReportPath,
+		strings.NewReader(`{"csp-report":{"effective-directive":"script-src-elem","blocked-uri":"inline"}}`))
+	r.Header.Set("Content-Type", "application/csp-report")
+	r.Header.Set("Sec-Fetch-Site", "same-origin")
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, r)
+
+	assert.Equal(t, http.StatusNoContent, rec.Code)
+	assert.Empty(t, rec.Header().Get("X-Test-Handler"))
 }

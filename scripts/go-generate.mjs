@@ -40,7 +40,7 @@
  * costs ~0.3s and removes the class.
  */
 import { availableParallelism } from "node:os";
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -57,12 +57,20 @@ const SKIP_DIRS = new Set([
   ".git",
   ".moon",
   ".claude",
+  ".codex",
+  ".cursor",
+  ".agents",
+  ".opencode",
+  ".vercel",
   ".go",
   "vendor",
   "dist",
   "target",
   ".next",
   ".turbo",
+  "testdata",
+  "tmp",
+  ".tmp",
 ]);
 
 // Runs alone, between the enumer and mockgen phases — see the module comment.
@@ -185,30 +193,32 @@ async function runPhase(dirs, phase, log) {
  * `zotel` and `zlog`) does not run them a second time — which would otherwise
  * put two processes on the same output file concurrently.
  */
-function findGeneratePackages() {
+export function findGeneratePackages(root = ROOT) {
   const found = new Map();
 
   const walk = (dir) => {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
       if (entry.isDirectory()) {
-        if (!SKIP_DIRS.has(entry.name)) {
+        // A nested module owns its generation; test fixtures are not packages
+        // whose directives the root build should execute.
+        if (!SKIP_DIRS.has(entry.name) && !existsSync(join(dir, entry.name, "go.mod"))) {
           walk(join(dir, entry.name));
         }
         continue;
       }
-      if (!entry.name.endsWith(".go")) {
+      if (!entry.name.endsWith(".go") || entry.name.endsWith("_test.go")) {
         continue;
       }
       const directives = readFileSync(join(dir, entry.name), "utf8").match(DIRECTIVE);
       if (!directives) {
         continue;
       }
-      const pkg = relative(ROOT, dir);
+      const pkg = relative(root, dir);
       found.set(pkg, [...(found.get(pkg) ?? []), ...directives]);
     }
   };
 
-  walk(ROOT);
+  walk(root);
   return new Map([...found].sort(([a], [b]) => a.localeCompare(b)));
 }
 

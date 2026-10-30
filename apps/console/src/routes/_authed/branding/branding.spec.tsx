@@ -1,9 +1,11 @@
+import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it, vi } from "vitest";
 import { scopedPath } from "@/test/project-scope.fixture";
 import { server } from "@/test/msw";
+import { createAppRouter } from "../../../router";
 
 // The `_authed` layout guards every screen behind `GET /sessions/me`
 // (Console ADR 0003); mock the auth module so routes render as signed in.
@@ -84,10 +86,6 @@ function serveRevision(branding: unknown = PUBLISHED) {
 }
 
 async function renderAt(path: string) {
-  const [{ RouterProvider, createMemoryHistory }, { createAppRouter }] = await Promise.all([
-    import("@tanstack/react-router"),
-    import("../../../router"),
-  ]);
   const router = createAppRouter({
     history: createMemoryHistory({ initialEntries: [scopedPath(path)] }),
   });
@@ -226,7 +224,7 @@ describe("branding screen", () => {
     const router = await renderAt("/branding");
     expect(await screen.findByLabelText("Previewed flow")).toHaveTextContent("Acme login");
 
-    await act(() => router.history.push(scopedPath("/branding", "proj_other")));
+    await act(() => router.navigate({ to: "/branding", search: { project: "proj_other" } }));
 
     await waitFor(() =>
       expect(screen.getByLabelText("Previewed flow")).toHaveTextContent("Default login"),

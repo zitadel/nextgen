@@ -1,0 +1,79 @@
+name: preview-cleanup
+
+# Drops preview databases from the PlanetScale database `preview`
+# (docs/runbooks/cloud.md, "Database"). A preview keeps one database per Git
+# branch across pushes, and nothing else removes it:
+#
+# - once a pull request merges, its branch's database, by the name the
+#   branch's builds gave it (`launcher drop-preview <branch>`);
+# - every day, every database no deployment stamped for 30 days
+#   (`launcher drop-preview --idle-days 30`): branches closed unmerged or
+#   without a pull request, names from an earlier previewSchemaEpoch, and
+#   open pull requests nobody pushed to, whose next push starts them empty.
+#   A manual run lists them and drops nothing unless told to.
+#
+# pull_request_target, so a merge runs this file as it is on main, with the
+# repository secret; it never checks out the pull request's code, and the
+# branch name reaches the launcher only as an argument. Pull requests from
+# forks are skipped: their branch is the fork's, and its name may be one of
+# this repository's branches.
+on:
+  pull_request_target:
+    types: [closed]
+  schedule:
+    - cron: "17 4 * * *"
+  workflow_dispatch:
+    inputs:
+      drop:
+        description: "Drop the idle databases (unset: only list them)"
+        type: boolean
+        default: false
+
+permissions: {}
+
+# A merge and the sweep may overlap: each skips a database already gone.
+jobs:
+  drop-databases:
+    if: >-
+      github.event_name != 'pull_request_target' || (
+        github.event.pull_request.merged &&
+        github.event.pull_request.head.repo.full_name == github.repository
+      )
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      # A role that inherits `postgres` on the PlanetScale database
+      # `preview`, its `main` branch (a production branch to PlanetScale,
+      # still the preview cluster), database `postgres`, port 5432, as
+      # Vercel's Preview CLOUD_MIGRATOR_DATABASE_URL is. It may drop what
+      # `postgres` owns (docs/runbooks/cloud.md, "Database"). Never
+      # production's: the launcher refuses a database that holds the
+      # server's schema, which production's does.
+      CLOUD_MIGRATOR_DATABASE_URL: ${{ secrets.CLOUD_PREVIEW_MIGRATOR_DATABASE_URL }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      # No cache: a run is rare enough to compile the launcher from scratch,
+      # and an entry of this job's would only take space from CI's.
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      # The console stays out of the build, as in build-launcher.sh: its
+      # embed directory is empty in a checkout.
+      - name: Drop the merged branch's preview database
+        if: github.event_name == 'pull_request_target'
+        env:
+          BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: go run -tags noconsole ./apps/cloud/launcher drop-preview -- "$BRANCH"
+
+      - name: Drop preview databases idle for 30 days
+        if: github.event_name != 'pull_request_target'
+        env:
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && !inputs.drop && '--dry-run' || '' }}
+        run: go run -tags noconsole ./apps/cloud/launcher drop-preview $DRY_RUN --idle-days 30

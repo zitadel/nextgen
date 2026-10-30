@@ -1,7 +1,9 @@
+import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
 import { render, screen } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it, vi } from "vitest";
 import { server } from "@/test/msw";
+import { createAppRouter } from "../../../router";
 
 // The `_authed` layout guards every screen behind `GET /sessions/me`
 // (Console ADR 0003); mock the auth module so routes render as signed in.
@@ -15,10 +17,6 @@ vi.mock("@/auth/session", async (importOriginal) => {
 const READY_URL = "http://localhost/api/readyz";
 
 async function renderSystem() {
-  const [{ RouterProvider, createMemoryHistory }, { createAppRouter }] = await Promise.all([
-    import("@tanstack/react-router"),
-    import("../../../router"),
-  ]);
   const router = createAppRouter({ history: createMemoryHistory({ initialEntries: ["/system"] }) });
   render(<RouterProvider router={router} />);
   return router;

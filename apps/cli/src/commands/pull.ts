@@ -8,7 +8,6 @@ import { ZitadelError } from "../lib/errors";
 import { FLOWS_DIR } from "../lib/flows";
 import { readJsonDirEntries } from "../lib/json-dir";
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../lib/oclif";
-import { nextCommandsData } from "../lib/oclif/envelope";
 import { DEPLOY_ARGS, listLiveDeployments, servesPrimary } from "../lib/release";
 import { writeBackResource } from "../lib/sync";
 import { SCHEMAS_DIR } from "../lib/user-schema";
@@ -176,8 +175,8 @@ export default class Pull extends EnvironmentCommand {
         pulled,
         skipped,
         ...(dryRun ? { dry_run: true } : {}),
-        ...nextCommandsData(nextCommands),
       },
+      next: { commands: nextCommands },
       pretty: dryRun
         ? `Would write ${pulled.length} file${pulled.length === 1 ? "" : "s"} from ${release.id} (dry run).\n${summary}`
         : `Pulled ${pulled.length} file${pulled.length === 1 ? "" : "s"} from ${release.id}.\n${summary}`,

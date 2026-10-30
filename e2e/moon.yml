@@ -73,13 +73,14 @@ tasks:
       - "/scripts/*.mjs"
       - "/scripts/*.d.mts"
 
-  # The journey harness's unit tests, which also read the CLI's skill, the
-  # mock OIDC provider's users and the built-in schemas.
+  # The journey harness's unit tests, which also read the CLI's skill and the
+  # router skill, the mock OIDC provider's users and the built-in schemas.
   test:
     inputs:
       - "**/*"
       - "/scripts/*.mjs"
       - "/apps/cli/skills/**/*"
+      - "/skills/zitadel/**/*"
       - "/tools/oidc-mock/users.json"
       - "/api/openapi/endpoints/schemas/*.json"
 

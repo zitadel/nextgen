@@ -152,6 +152,27 @@ describe("setup", () => {
         });
       });
 
+      it("reports the repository it created when it could not commit", async () => {
+        const app = await anApp();
+
+        const result = await app.setupWithGitThatCannotCommit();
+
+        expect(app.envelopeOf<SetupGitData>(result).data.git).toEqual({
+          initialized: true,
+          commit: null,
+        });
+      });
+
+      it("warns that it could not commit and left a new repository", async () => {
+        const app = await anApp();
+
+        const result = await app.setupWithGitThatCannotCommit();
+
+        expect(app.envelopeOf(result).warnings?.join("\n")).toContain(
+          "Setup created a new, empty git repository here.",
+        );
+      });
+
       it("keeps the project secret it wrote out of the commit it makes", async () => {
         const app = await anApp();
 
@@ -204,6 +225,16 @@ describe("setup", () => {
         const app = await anApp();
         await app.underVersionControl();
         await app.withUncommittedWork();
+
+        const result = await app.setup();
+
+        expect(result).toFailWith("E_CONFLICT");
+      });
+
+      it("refuses a detached HEAD, where its commit would be on no branch", async () => {
+        const app = await anApp();
+        await app.underVersionControl();
+        await app.onADetachedHead();
 
         const result = await app.setup();
 

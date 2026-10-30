@@ -18,8 +18,8 @@ change; the GitHub Releases keep every change of every version. The cloud runs
 preview.zitadel.com when it merges, and the CLI, the SDKs, the login
 components and a self-hosted server get it with the release that ships it.
 
-`metadata.internal` keeps this skill out of `npx skills add zitadel/nextgen`,
-which installs the users' skills.
+`metadata.internal` keeps this skill out of `npx skills add zitadel/nextgen`
+and `zitadel skills add`, which install the users' skills.
 
 ## Pick the changes
 

@@ -14,7 +14,7 @@ get:
   parameters:
     - $ref: ../../../components/parameters/session-project-id.yaml
   security:
-    - nextgenSession: []
+    - sessionCookie: []
   responses:
     '200':
       description: Current user information retrieved successfully
@@ -58,7 +58,7 @@ patch:
   parameters:
     - $ref: ../../../components/parameters/session-project-id.yaml
   security:
-    - nextgenSession: []
+    - sessionCookie: []
   requestBody:
     description: The changes to merge into the user.
     required: true
@@ -98,7 +98,7 @@ patch:
         `project_id`. The user is not changed.
 
         `auth.csrf_invalid`: the request came from another site, or did not carry
-        the session's `X-Zitadel-CSRF` token (see the `nextgenSession` scheme).
+        the session's `X-Zitadel-CSRF` token (see the `sessionCookie` scheme).
         It is refused before the session is looked at.
       content:
         application/json:

@@ -10,11 +10,11 @@ import { configureZitadel, getApi } from "@zitadel/api/config";
  * - **Dev** — Vite serves the console on :5174 and the API lives on :8080,
  *   so requests target `/api`, which the dev-server proxy strips and
  *   forwards without adding a credential (`vite.config.ts`, #1300): the
- *   `__nextgen_session` cookie rides along, as in production.
+ *   session cookie rides along, as in production.
  * - **Production** — the built console is embedded in the Go binary, which
  *   serves the ogen API at the origin root (`buildHTTPMux`). The base is
  *   therefore `""`: requests go straight to `/flow`, `/sessions/me`, … on
- *   the same origin, carrying the `__nextgen_session` cookie and (on
+ *   the same origin, carrying the session cookie and (on
  *   public-plane calls) the runtime-discovered publishable key.
  *
  * Nothing is mounted at `/api` in the binary (Console ADR 0002 §4); the
