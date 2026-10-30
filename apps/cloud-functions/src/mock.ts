@@ -28,11 +28,14 @@ const PLANS: Record<Plan["id"], Plan> = {
   enterprise: { id: "enterprise", name: "Enterprise", base_amount: 0, currency: "usd" },
 };
 
+/** The server's session cookie: `__Host-zitadel_session`, or `zitadel_session` on a loopback origin (root ADR 083). */
+const SESSION_COOKIE = /(?:^|;\s*)(?:__Host-)?zitadel_session=/;
+
 /** Any session cookie is the mock person; none is no one. */
 function mockDirectory(plans: Map<string, Plan["id"]>): Directory {
   return {
     async caller(cookie) {
-      return cookie.includes("__nextgen_session") ? MOCK_PERSON : undefined;
+      return SESSION_COOKIE.test(cookie) ? MOCK_PERSON : undefined;
     },
     async administeredTeams() {
       return [MOCK_TEAM];

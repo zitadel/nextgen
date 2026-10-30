@@ -38,22 +38,22 @@ describe("the sign-in widget's calls", () => {
       async () =>
         new Response("{}", {
           status: 200,
-          headers: { "set-cookie": "__nextgen_session=new; Path=/" },
+          headers: { "set-cookie": "__Host-zitadel_session=new; Path=/; Secure" },
         }),
     );
     vi.stubGlobal("fetch", upstream);
     const answer = await forwardSignIn(
       new Request("https://cloud.example/cloud/zitadel/flow/flw_1/submit?x=1", {
         method: "POST",
-        headers: { cookie: "__nextgen_flow=f", origin: "https://cloud.example" },
+        headers: { cookie: "__Host-zitadel_session=old", origin: "https://cloud.example" },
         body: "{}",
       }),
       human,
     );
     const [url, init] = upstream.mock.calls[0] as unknown as [URL, RequestInit];
     expect(url.href).toBe("https://cloud.example/flow/flw_1/submit?x=1");
-    expect(new Headers(init.headers).get("cookie")).toBe("__nextgen_flow=f");
-    expect(answer.headers.getSetCookie()).toEqual(["__nextgen_session=new; Path=/"]);
+    expect(new Headers(init.headers).get("cookie")).toBe("__Host-zitadel_session=old");
+    expect(answer.headers.getSetCookie()).toEqual(["__Host-zitadel_session=new; Path=/; Secure"]);
   });
 
   it.each([

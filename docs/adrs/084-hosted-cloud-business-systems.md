@@ -179,7 +179,7 @@ server's catch-all.
 
 ### 4. The RPC trusts the console's session and nothing else
 
-- The session cookie (`__nextgen_session`, `Path=/`, `SameSite=Lax`) reaches
+- The session cookie (`__Host-zitadel_session`, ADR 083; `Path=/`, `SameSite=Lax`) reaches
   `/cloud/api/*` on the same origin. The function forwards it to Zitadel
   (`GET /sessions/me`, `GET /users/me`, `GET /users/me/teams`) to learn who
   the person is and which teams they actively belong to. It keeps no session

@@ -12,7 +12,7 @@ function call(method: string, path: string, init: { body?: unknown; headers?: He
   const request = new Request(`${ORIGIN}${path}`, {
     method,
     headers: {
-      cookie: "__nextgen_session=s",
+      cookie: "__Host-zitadel_session=s",
       ...(init.body === undefined ? {} : { "content-type": "application/json", origin: ORIGIN }),
       ...init.headers,
     },
@@ -25,6 +25,15 @@ describe("the add-on's RPC", () => {
   it("answers 401 without a session", async () => {
     const { response } = call("GET", "/cloud/api/billing", { headers: { cookie: "" } });
     expect((await response).status).toBe(401);
+  });
+
+  it.each([
+    ["__Host-zitadel_session=s", 200],
+    ["theme=dark; zitadel_session=s", 200],
+    ["__nextgen_session=s", 401],
+  ])("knows the session by the cookie the server sets: %s", async (cookie, status) => {
+    const { response } = call("GET", "/cloud/api/billing", { headers: { cookie } });
+    expect((await response).status).toBe(status);
   });
 
   it("refuses a write from another origin, which the cookie alone would let through", async () => {
