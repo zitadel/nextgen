@@ -692,7 +692,10 @@ describe("env add asked on a terminal", () => {
       ),
       http.post(`${SERVER}/deployments`, () =>
         HttpResponse.json(
-          { id: "dep_1", targets: [{ type: "origin", origin: "https://app.acme.com", expires_at: null }] },
+          {
+            id: "dep_1",
+            targets: [{ type: "origin", origin: "https://app.acme.com", expires_at: null }],
+          },
           { status: 201 },
         ),
       ),

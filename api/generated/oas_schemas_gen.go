@@ -21058,7 +21058,9 @@ type Deployment struct {
 	Kind      DeploymentKind `json:"kind"`
 	// The resolved targets, sorted. For `primary`, the project's primary
 	// origins at creation, and the default target when the deployment named
-	// it. The live view lists only the targets still served.
+	// it. The live view lists only the targets still served, so a deployment
+	// that covered both can read as the default target alone once its origins
+	// move on.
 	Targets []DeploymentTarget `json:"targets"`
 	Status  DeploymentStatus   `json:"status"`
 	// When the deployment was created.

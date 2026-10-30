@@ -81,8 +81,16 @@ function editSchema(): Promise<void> {
 }
 
 const PRIMARY = { type: "origin" as const, origin: "https://app.acme.com", expires_at: null };
-const SECOND_PRIMARY = { type: "origin" as const, origin: "https://www.acme.com", expires_at: null };
-const PREVIEW = { type: "origin" as const, origin: "https://pr-7.acme.com", expires_at: "2026-12-01T00:00:00Z" };
+const SECOND_PRIMARY = {
+  type: "origin" as const,
+  origin: "https://www.acme.com",
+  expires_at: null,
+};
+const PREVIEW = {
+  type: "origin" as const,
+  origin: "https://pr-7.acme.com",
+  expires_at: "2026-12-01T00:00:00Z",
+};
 
 describe("diffStep", () => {
   it("says there is nothing to diff against before the first deploy", async () => {

@@ -44,24 +44,21 @@ describe("listLiveDeployments", () => {
 
 describe("servesPrimary", () => {
   it("is true for a deployment with an unexpiring target", () => {
-    expect(servesPrimary({ targets: [{ type: "origin", origin: "https://a", expires_at: null }] } as never)).toBe(
-      true,
-    );
+    expect(
+      servesPrimary({
+        targets: [{ type: "origin", origin: "https://a", expires_at: null }],
+      } as never),
+    ).toBe(true);
   });
 
   it("is false for a deployment to the default target alone", () => {
-    expect(servesPrimary({ targets: [{ type: "default" }] } as never)).toBe(
-      false,
-    );
+    expect(servesPrimary({ targets: [{ type: "default" }] } as never)).toBe(false);
   });
 
   it("is true for a deployment to primary and default", () => {
     expect(
       servesPrimary({
-        targets: [
-          { type: "default" },
-          { type: "origin", origin: "https://a", expires_at: null },
-        ],
+        targets: [{ type: "default" }, { type: "origin", origin: "https://a", expires_at: null }],
       } as never),
     ).toBe(true);
   });
