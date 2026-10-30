@@ -1,9 +1,10 @@
-import { pbkdf2Sync, randomBytes } from "node:crypto";
+import { randomBytes } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
 import { defaultHumanUserSchemaUrl } from "@zitadel/config";
+import { bootstrapUserDocument } from "@zitadel/config/bootstrap-user";
 
 import { ZitadelError } from "../errors";
 import { enforceMode } from "../fs-safe";
@@ -35,8 +36,6 @@ export const LOCAL_ADMIN_EMAIL = "admin@zitadel.localhost";
 
 const ADMIN_USER_ID = "user_localadmin";
 const ADMIN_TEAM_ID = "team_localadmin";
-
-const PBKDF2_ROUNDS = 210_000;
 
 export type LocalAdmin = {
   email: string;
@@ -164,7 +163,7 @@ export async function ensureLocalAdmin(
   const staging = `${userFile}.${randomBytes(6).toString("hex")}.tmp`;
   await writeFile(
     staging,
-    `${JSON.stringify(bootstrapUserDocument(admin, schemaUrl), null, 2)}\n`,
+    `${JSON.stringify(bootstrapUserDocument({ ...admin, project_id: PLATFORM_PROJECT_ID, schema_url: schemaUrl }), null, 2)}\n`,
     {
       mode: 0o644,
     },
@@ -205,39 +204,4 @@ async function writePrivateIfAbsent(path: string, content: string): Promise<bool
   }
   await enforceMode(path, 0o600);
   return true;
-}
-
-function bootstrapUserDocument(admin: LocalAdmin, schemaUrl: string) {
-  return {
-    header: {
-      project_id: PLATFORM_PROJECT_ID,
-      team_id: admin.team_id,
-      schema_url: schemaUrl,
-      id: admin.user_id,
-    },
-    attributes: {
-      username: admin.email,
-      email: admin.email,
-      "zitadel.source": "cli",
-      "zitadel.default_user": true,
-    },
-    authenticators: {
-      password: { encoded_hash: pbkdf2Hash(admin.password), change_required: false },
-    },
-  };
-}
-
-/**
- * passlib's `$pbkdf2-sha256$rounds$salt$hash`, which passwap verifies on the
- * server (`internal/crypto/passwap.go`). Salt and digest use passlib's adapted
- * base64: `+` becomes `.` and the padding is dropped.
- */
-function pbkdf2Hash(password: string): string {
-  const salt = randomBytes(16);
-  const hash = pbkdf2Sync(password, salt, PBKDF2_ROUNDS, 32, "sha256");
-  return `$pbkdf2-sha256$${String(PBKDF2_ROUNDS)}$${ab64(salt)}$${ab64(hash)}`;
-}
-
-function ab64(bytes: Buffer): string {
-  return bytes.toString("base64").replace(/=+$/, "").replaceAll("+", ".");
 }

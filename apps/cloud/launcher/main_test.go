@@ -2,14 +2,19 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -21,7 +26,16 @@ import (
 	"github.com/zitadel/nextgen/internal/audit"
 )
 
-const testPEM = "-----BEGIN RSA PRIVATE KEY-----\nMIIBOgIBAAJBAKj34GkxFhD90vcNLYLInFEX6Ppy1tPf9Cnzj4p4WGeKLs1Pt8Qu\n-----END RSA PRIVATE KEY-----\n"
+// Test-only keys are generated once; the launcher now uses the real RSA parser.
+var testPEM = testPrivateKey()
+
+func testPrivateKey() string {
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		panic(err)
+	}
+	return string(pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)}))
+}
 
 const (
 	pooledURL   = "postgresql://cloud-server.abc123:secret@eu-central.pg.psdb.cloud:6432/postgres?sslmode=verify-full&sslrootcert=system"
@@ -109,15 +123,12 @@ func TestPrepareServerRendersTheMasterKeyIntoTheConfig(t *testing.T) {
 
 	config, err := os.ReadFile(configPath)
 	require.NoError(t, err)
-	assert.Equal(t, "server:\n"+
+	assert.YAMLEq(t, "server:\n"+
 		"  generate_master_key: false\n"+
 		"  master_keys:\n"+
 		"    cloud-2026-10:\n"+
 		"      use_for_encryption: true\n"+
-		"      private_key: |\n"+
-		"        -----BEGIN RSA PRIVATE KEY-----\n"+
-		"        MIIBOgIBAAJBAKj34GkxFhD90vcNLYLInFEX6Ppy1tPf9Cnzj4p4WGeKLs1Pt8Qu\n"+
-		"        -----END RSA PRIVATE KEY-----\n", string(config))
+		"      private_key: "+strconv.Quote(testPEM), string(config))
 	info, err := os.Stat(configPath)
 	require.NoError(t, err)
 	assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
@@ -132,14 +143,17 @@ func TestPrepareServerNormalizesThePEM(t *testing.T) {
 	setLauncherEnv(t, dataDir)
 	// Pasted keys arrive with carriage returns, blank lines and indentation.
 	t.Setenv("MASTER_KEY_PEM_B64", base64.StdEncoding.EncodeToString([]byte(
-		"  -----BEGIN RSA PRIVATE KEY-----\r\n\r\n   MIIBOgIBAAJBAKj34GkxFhD90vcNLYLInFEX6Ppy1tPf9Cnzj4p4WGeKLs1Pt8Qu\r\n-----END RSA PRIVATE KEY-----\r\n")))
+		"  "+strings.ReplaceAll(testPEM, "\n", "\r\n\r\n   "))))
 
 	_, err := prepareServer(nil)
 	require.NoError(t, err)
 
 	config, err := os.ReadFile(filepath.Join(dataDir, "nextgen.yaml"))
 	require.NoError(t, err)
-	assert.Contains(t, string(config), "        -----BEGIN RSA PRIVATE KEY-----\n        MIIBOg")
+	var decoded map[string]any
+	require.NoError(t, yaml.Unmarshal(config, &decoded))
+	keys := decoded["server"].(map[string]any)["master_keys"].(map[string]any)
+	assert.Equal(t, testPEM, keys["cloud-2026-10"].(map[string]any)["private_key"])
 	assert.NotContains(t, string(config), "\r")
 	assert.Equal(t, ":8080", os.Getenv("NEXTGEN_SERVER_ADDRESS"), "PORT defaults to 8080")
 }
@@ -150,7 +164,7 @@ func TestPrepareServerRendersThePreviousMasterKeyForDecryption(t *testing.T) {
 	dataDir := t.TempDir()
 	setLauncherEnv(t, dataDir)
 	t.Setenv("CRON_SECRET", "")
-	const previousPEM = "-----BEGIN RSA PRIVATE KEY-----\nOLDKEY\n-----END RSA PRIVATE KEY-----\n"
+	previousPEM := testPrivateKey()
 	t.Setenv("MASTER_KEY_PREVIOUS_PEM_B64", base64.StdEncoding.EncodeToString([]byte(previousPEM)))
 	t.Setenv("MASTER_KEY_PREVIOUS_ID", "cloud-2026-09")
 
@@ -159,21 +173,15 @@ func TestPrepareServerRendersThePreviousMasterKeyForDecryption(t *testing.T) {
 
 	config, err := os.ReadFile(filepath.Join(dataDir, "nextgen.yaml"))
 	require.NoError(t, err)
-	assert.Equal(t, "server:\n"+
+	assert.YAMLEq(t, "server:\n"+
 		"  generate_master_key: false\n"+
 		"  master_keys:\n"+
 		"    cloud-2026-10:\n"+
 		"      use_for_encryption: true\n"+
-		"      private_key: |\n"+
-		"        -----BEGIN RSA PRIVATE KEY-----\n"+
-		"        MIIBOgIBAAJBAKj34GkxFhD90vcNLYLInFEX6Ppy1tPf9Cnzj4p4WGeKLs1Pt8Qu\n"+
-		"        -----END RSA PRIVATE KEY-----\n"+
+		"      private_key: "+strconv.Quote(testPEM)+"\n"+
 		"    cloud-2026-09:\n"+
 		"      use_for_encryption: false\n"+
-		"      private_key: |\n"+
-		"        -----BEGIN RSA PRIVATE KEY-----\n"+
-		"        OLDKEY\n"+
-		"        -----END RSA PRIVATE KEY-----\n", string(config))
+		"      private_key: "+strconv.Quote(previousPEM), string(config))
 	assert.Empty(t, os.Getenv("MASTER_KEY_PREVIOUS_PEM_B64"), "the previous key leaves the environment too")
 }
 
@@ -595,14 +603,14 @@ func TestPrepareServerRefusesBadInput(t *testing.T) {
 		"a key that is not a PEM block": func(t *testing.T) {
 			t.Setenv("MASTER_KEY_PEM_B64", base64.StdEncoding.EncodeToString([]byte("not a key")))
 			_, err := prepareServer(nil)
-			assert.ErrorContains(t, err, "does not decode to a PEM block")
+			assert.ErrorContains(t, err, "is not an RSA private key")
 		},
 		"a missing key id, which would orphan the wrapped keys on the next change": func(t *testing.T) {
 			t.Setenv("MASTER_KEY_ID", "")
 			_, err := prepareServer(nil)
 			assert.ErrorContains(t, err, "MASTER_KEY_ID must be set")
 		},
-		"a key id that cannot be written into YAML unquoted": func(t *testing.T) {
+		"an invalid key id": func(t *testing.T) {
 			t.Setenv("MASTER_KEY_ID", "bad id:")
 			_, err := prepareServer(nil)
 			assert.ErrorContains(t, err, "MASTER_KEY_ID must be set and match")
@@ -654,7 +662,7 @@ func TestPrepareServerRefusesBadInput(t *testing.T) {
 			t.Setenv("MASTER_KEY_PREVIOUS_PEM_B64", base64.StdEncoding.EncodeToString([]byte("not a key")))
 			t.Setenv("MASTER_KEY_PREVIOUS_ID", "cloud-2026-09")
 			_, err := prepareServer(nil)
-			assert.ErrorContains(t, err, "MASTER_KEY_PREVIOUS_PEM_B64 does not decode to a PEM block")
+			assert.ErrorContains(t, err, "MASTER_KEY_PREVIOUS_PEM_B64 is not an RSA private key")
 		},
 		"a bootstrap document that is not one": func(t *testing.T) {
 			t.Setenv("BOOTSTRAP_ADMIN_USER_JSON_B64", base64.StdEncoding.EncodeToString([]byte(`{"user":"x"}`)))
@@ -941,18 +949,20 @@ func TestPrepareMigrationRefusesWhatTheFunctionWouldRefuse(t *testing.T) {
 		set    map[string]string
 		reason string
 	}{
-		"a missing master key":          {map[string]string{"MASTER_KEY_PEM_B64": ""}, "MASTER_KEY_PEM_B64 must be set"},
-		"a garbled master key":          {map[string]string{"MASTER_KEY_PEM_B64": base64.StdEncoding.EncodeToString([]byte("not a key"))}, "does not decode to a PEM block"},
-		"a bad key id":                  {map[string]string{"MASTER_KEY_ID": "bad id:"}, "MASTER_KEY_ID must be set and match"},
-		"no database to serve":          {map[string]string{"CLOUD_DATABASE_URL": ""}, "CLOUD_DATABASE_URL must be set"},
-		"a broken admin document":       {map[string]string{"BOOTSTRAP_ADMIN_USER_JSON_B64": "%%%"}, "BOOTSTRAP_ADMIN_USER_JSON_B64 is not base64"},
-		"a previous key without its id": {map[string]string{"MASTER_KEY_PREVIOUS_PEM_B64": base64.StdEncoding.EncodeToString([]byte(testPEM))}, "go together"},
-		"no cron secret":                {map[string]string{"CRON_SECRET": ""}, "CRON_SECRET must be set"},
+		"a missing master key":                  {map[string]string{"MASTER_KEY_PEM_B64": ""}, "MASTER_KEY_PEM_B64 must be set"},
+		"a garbled master key":                  {map[string]string{"MASTER_KEY_PEM_B64": base64.StdEncoding.EncodeToString([]byte("not a key"))}, "is not an RSA private key"},
+		"a PEM envelope containing invalid DER": {map[string]string{"MASTER_KEY_PEM_B64": base64.StdEncoding.EncodeToString([]byte("-----BEGIN RSA PRIVATE KEY-----\nZm9v\n-----END RSA PRIVATE KEY-----\n"))}, "MASTER_KEY_PEM_B64 is not an RSA private key"},
+		"an invalid previous key":               {map[string]string{"MASTER_KEY_PREVIOUS_ID": "old", "MASTER_KEY_PREVIOUS_PEM_B64": base64.StdEncoding.EncodeToString([]byte("-----BEGIN RSA PRIVATE KEY-----\nZm9v\n-----END RSA PRIVATE KEY-----\n"))}, "MASTER_KEY_PREVIOUS_PEM_B64 is not an RSA private key"},
+		"a bad key id":                          {map[string]string{"MASTER_KEY_ID": "bad id:"}, "MASTER_KEY_ID must be set and match"},
+		"no database to serve":                  {map[string]string{"CLOUD_DATABASE_URL": ""}, "CLOUD_DATABASE_URL must be set"},
+		"a broken admin document":               {map[string]string{"BOOTSTRAP_ADMIN_USER_JSON_B64": "%%%"}, "BOOTSTRAP_ADMIN_USER_JSON_B64 is not base64"},
+		"a previous key without its id":         {map[string]string{"MASTER_KEY_PREVIOUS_PEM_B64": base64.StdEncoding.EncodeToString([]byte(testPEM))}, "go together"},
+		"no cron secret":                        {map[string]string{"CRON_SECRET": ""}, "CRON_SECRET must be set"},
 	}
 	for _, env := range []string{"production", "preview"} {
 		for name, tc := range cases {
 			t.Run(env+"/"+name, func(t *testing.T) {
-				stubEnsureDatabase(t)
+				calls := stubEnsureDatabase(t)
 				setLauncherEnv(t, t.TempDir())
 				t.Setenv("VERCEL_ENV", env)
 				t.Setenv("VERCEL_GIT_COMMIT_REF", "main")
@@ -965,6 +975,7 @@ func TestPrepareMigrationRefusesWhatTheFunctionWouldRefuse(t *testing.T) {
 				_, err := prepareMigration(nil)
 				assert.ErrorContains(t, err, "the serving function would refuse to start", "the build fails, the serving deployment stays")
 				assert.ErrorContains(t, err, tc.reason)
+				assert.Empty(t, *calls, "bad configuration is rejected before preview database creation")
 			})
 		}
 	}
@@ -1058,6 +1069,24 @@ func TestPrepareMigrationRefusesToServeThroughTheDirectPort(t *testing.T) {
 			t.Setenv("CLOUD_DATABASE_URL", pooledURL)
 			_, err = prepareMigration(nil)
 			assert.NoError(t, err)
+		})
+	}
+}
+
+func TestPrepareServerPreservesStringKeyIDs(t *testing.T) {
+	for _, id := range []string{"true", "0123", "null"} {
+		t.Run(id, func(t *testing.T) {
+			dataDir := t.TempDir()
+			setLauncherEnv(t, dataDir)
+			t.Setenv("MASTER_KEY_ID", id)
+			_, err := prepareServer(nil)
+			require.NoError(t, err)
+			raw, err := os.ReadFile(filepath.Join(dataDir, "nextgen.yaml"))
+			require.NoError(t, err)
+			var decoded map[string]any
+			require.NoError(t, yaml.Unmarshal(raw, &decoded))
+			keys := decoded["server"].(map[string]any)["master_keys"].(map[string]any)
+			assert.Contains(t, keys, id)
 		})
 	}
 }
