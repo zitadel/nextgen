@@ -1,4 +1,8 @@
 "use client";
+import type {
+  ListMyProjects200 as ProjectPage,
+  ListMyProjects200ProjectsItem,
+} from "@zitadel/api/generated/model";
 import { useServer } from "fumadocs-openapi";
 import {
   type OperationParameter,
@@ -6,17 +10,19 @@ import {
   useOperation,
 } from "fumadocs-openapi/operation";
 import { Custom } from "fumadocs-openapi/ui/playground/client";
-import { createContext, type ReactNode, use, useEffect, useId, useRef, useState } from "react";
+import {
+  createContext,
+  type ReactNode,
+  use,
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
-interface Project {
-  id: string;
-  name: string;
-}
-
-interface ProjectPage {
-  projects: Project[];
-  next_page_token?: string | null;
-}
+type Project = Pick<ListMyProjects200ProjectsItem, "id" | "name">;
 
 interface Selection {
   owner: string;
@@ -32,16 +38,13 @@ const SelectionsContext = createContext<{
 // auth. On a later account change, only that value is cleared, not other edits.
 export function ProjectPickerProvider({ children }: { children: ReactNode }) {
   const [selections, setSelections] = useState<Record<string, Selection | undefined>>({});
-  return (
-    <SelectionsContext
-      value={{
-        selections,
-        remember: (key, selection) => setSelections((before) => ({ ...before, [key]: selection })),
-      }}
-    >
-      {children}
-    </SelectionsContext>
+  const remember = useCallback(
+    (key: string, selection: Selection | undefined) =>
+      setSelections((before) => ({ ...before, [key]: selection })),
+    [],
   );
+  const value = useMemo(() => ({ selections, remember }), [selections, remember]);
+  return <SelectionsContext value={value}>{children}</SelectionsContext>;
 }
 
 interface PickerProps {
@@ -116,6 +119,7 @@ function ProjectPicker({
     if (!cursor) setPage(undefined);
     const timer = window.setTimeout(
       async () => {
+        const timeout = AbortSignal.timeout(10_000);
         try {
           const url = new URL(target);
           url.searchParams.set("limit", "20");
@@ -126,19 +130,26 @@ function ProjectPicker({
           const init = await beforeRequest({
             method: "GET",
             cache: "no-store",
-            signal: AbortSignal.any([controller.signal, AbortSignal.timeout(10_000)]),
+            signal: AbortSignal.any([controller.signal, timeout]),
           });
           const response = await fetch(url, init);
-          if (!response.ok) throw new Error(`Projects could not be loaded (${response.status}).`);
-          const next: ProjectPage = await response.json();
+          const next: ProjectPage | undefined = response.ok ? await response.json() : undefined;
           if (controller.signal.aborted) return;
+          if (!next) {
+            setError(`Projects could not be loaded (${response.status}).`);
+            return;
+          }
           setPage((previous) => ({
             ...next,
             projects: cursor ? [...(previous?.projects ?? []), ...next.projects] : next.projects,
           }));
-        } catch (cause) {
+        } catch {
           if (controller.signal.aborted) return;
-          setError(cause instanceof Error ? cause.message : "Projects could not be loaded.");
+          // Not the browser's wording ("Failed to fetch", "signal timed out"),
+          // which reads as no sentence beside the hint below.
+          setError(
+            timeout.aborted ? "Projects took too long to load." : "Projects could not be loaded.",
+          );
         } finally {
           if (!controller.signal.aborted) setLoading(false);
         }
@@ -164,7 +175,7 @@ function ProjectPicker({
   }
 
   return (
-    <div className="border-b px-4 py-3 text-xs">
+    <div className="border-b px-4 py-3 text-xs last:border-b-0">
       <div className="flex flex-wrap items-center gap-2">
         <span className="font-medium">Target project</span>
         <button
@@ -192,7 +203,8 @@ function ProjectPicker({
           ? "Using the signed-in session’s project."
           : "Choose a project you can access, or enter its ID in the request below."}
       </p>
-      {accountChanged && (
+      {/* Until a project is set again, picked or entered by hand. */}
+      {accountChanged && value === undefined && (
         <p role="status" className="mt-2">
           Your account changed. Choose a project again.
         </p>

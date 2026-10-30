@@ -26,6 +26,11 @@ async function stubApi(context: BrowserContext, baseURL: string) {
         await route.fulfill({ json: { csrf_token: "csrf-picker-test" } });
       } else if (url.pathname === "/users/me/projects") {
         state.listed.push(url);
+        // Status 0: the request fails without an answer.
+        if (state.status === 0) {
+          await route.abort("failed");
+          return;
+        }
         const more = url.searchParams.has("page_token");
         await route.fulfill({
           status: state.status,
@@ -117,9 +122,15 @@ test("errors and empty results keep manual entry usable and allow retry", async 
   baseURL,
 }) => {
   const state = await stubApi(context, baseURL!);
-  state.status = 503;
+  state.status = 0;
   const playground = await openPlayground(page);
   await playground.getByRole("button", { name: "Choose project…" }).click();
+  // The picker's own sentence, not the browser's "Failed to fetch".
+  await expect(playground.getByRole("alert")).toContainText(
+    "Projects could not be loaded. You can still enter an ID manually.",
+  );
+  state.status = 503;
+  await playground.getByRole("button", { name: "Retry", exact: true }).click();
   await expect(playground.getByRole("alert")).toContainText("503");
   await playground.getByRole("textbox", { name: "project_id", exact: true }).fill("proj_manual");
   state.status = 200;
@@ -151,11 +162,16 @@ test("account changes discard a picked project and load the new account's projec
   state.reader = grace;
   state.projects = [store];
   await playground.getByRole("button", { name: /^Send/ }).click();
-  await expect(playground.getByText("Your account changed. Choose a project again.")).toBeVisible();
+  const changed = playground.getByText("Your account changed. Choose a project again.");
+  await expect(changed).toBeVisible();
   await expect(
     playground.getByText("Sent with your session, signed in as", { exact: false }),
   ).toContainText(grace.display);
   expect(state.sent).toEqual([]);
+  // An ID entered by hand sets the project again too.
+  const project = playground.getByRole("textbox", { name: "project_id", exact: true });
+  await project.fill("proj_manual");
+  await expect(changed).toBeHidden();
   await playground.getByRole("button", { name: "Choose project…" }).click();
   await expect(
     playground.getByRole("button", { name: "Store proj_picker_store", exact: true }),
