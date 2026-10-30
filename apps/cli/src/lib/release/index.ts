@@ -29,4 +29,4 @@ export { originMatchesPattern, type ProjectOriginEntry } from "./origins";
  * run, so a suggested deploy carries one for the reader to fill in.
  */
 export const DEPLOY_ARGS = "deploy -m '<what changed>'";
-export { type ListedDeployment, servesPrimary } from "./deployment";
+export { servesPrimary } from "./deployment";

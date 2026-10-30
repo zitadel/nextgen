@@ -50,8 +50,8 @@ describe("pages", () => {
     await expect(async () => {
       for await (const _ of pages(fetch));
     }).rejects.toThrow(
-      "The server repeated a page cursor, so the list would never end. " +
-        "Read it one page at a time instead, and report the repeated cursor.",
+      "The server returned the same page cursor twice, so the list would never end. " +
+        "Read it one page at a time instead.",
     );
   });
 
@@ -70,7 +70,7 @@ describe("pages", () => {
 
     await expect(async () => {
       for await (const _ of pages(fetch, { start: "t1" }));
-    }).rejects.toThrow("The server repeated a page cursor");
+    }).rejects.toThrow("The server returned the same page cursor twice");
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
@@ -82,5 +82,27 @@ describe("pages", () => {
     for await (const _ of pages(fetch, { next: (page) => nextToken(page, "next_cursor") }));
 
     expect(fetch.mock.calls).toEqual([[undefined], ["c2"]]);
+  });
+
+  it("ends at an empty cursor the reader it is given returns", async () => {
+    const fetch = vi.fn(async (token: string | undefined) =>
+      token === undefined ? { next_cursor: "c2" } : { next_cursor: "" },
+    );
+
+    for await (const _ of pages(fetch, { next: (page) => page.next_cursor }));
+
+    expect(fetch.mock.calls).toEqual([[undefined], ["c2"]]);
+  });
+
+  it("follows the cursor a page arrived with, whatever the loop does to it", async () => {
+    const fetch = fetchPage({ "": { rows: ["a"], next: "t1" }, t1: { rows: ["b"] } });
+
+    const rows = [];
+    for await (const page of pages(fetch)) {
+      rows.push(...page.rows);
+      delete (page as { next_page_token?: string }).next_page_token;
+    }
+
+    expect(rows).toEqual(["a", "b"]);
   });
 });

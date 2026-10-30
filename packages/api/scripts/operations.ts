@@ -1,4 +1,4 @@
-import { writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -9,6 +9,7 @@ const repoRoot = resolve(packageRoot, "../..");
 const input = resolve(repoRoot, "api/openapi/openapi-spec.yaml");
 const output = resolve(packageRoot, "src/generated/operations.ts");
 const pagingOutput = resolve(packageRoot, "src/generated/paging.ts");
+const endpointsOutput = resolve(packageRoot, "src/generated/endpoints/zitadelNextGen.ts");
 
 const METHODS = ["get", "put", "post", "delete", "patch"] as const;
 
@@ -52,7 +53,7 @@ export async function writeOperations(): Promise<void> {
     }),
   );
   await writeFile(output, source(operations));
-  await writeFile(pagingOutput, pagingSource(operations));
+  await writeFile(pagingOutput, pagingSource(operations, await readFile(endpointsOutput, "utf8")));
 }
 
 function operationOf(path: string, method: string, item: PathItem, operation: Operation) {
@@ -134,38 +135,44 @@ function properties(schema: Schema | undefined): Map<string, Schema> {
 }
 
 /**
- * The argument of the generated function that carries `page_token`. orval
- * writes the path parameters, the body, then the query parameters as one
- * object, and moves every optional one after the required ones.
+ * The argument of the generated function that carries `page_token`, read from
+ * the signature orval wrote for it in `endpoints`: the body for a token the
+ * body carries, the query parameters otherwise.
  */
 export function pagingArgument(
-  operation: Pick<ReturnType<typeof operationOf>, "id" | "path" | "parameters" | "body" | "paging">,
+  endpoints: string,
+  operation: Pick<ReturnType<typeof operationOf>, "id" | "paging">,
 ): number {
-  const query = operation.parameters.filter((parameter) => parameter.in === "query");
-  const slots = [
-    ...[...operation.path.matchAll(/\{[^}]+\}/g)].map(() => ({ in: "path", required: true })),
-    ...(operation.body === null ? [] : [{ in: "body", required: operation.body === "required" }]),
-    ...(query.length > 0
-      ? [{ in: "query", required: query.some((parameter) => parameter.required) }]
-      : []),
-  ];
-  const index = [
-    ...slots.filter((slot) => slot.required),
-    ...slots.filter((slot) => !slot.required),
-  ]
-    .map((slot) => slot.in)
-    .indexOf(operation.paging?.token ?? "");
+  const name = operation.id.charAt(0).toLowerCase() + operation.id.slice(1);
+  const signature = new RegExp(`export const ${name} = async \\(([^)]*)\\)`).exec(endpoints)?.[1];
+  if (signature === undefined) {
+    throw new Error(`${operation.id} has no generated function`);
+  }
+  const index = signature
+    .split(/,\s*(?=\w+\??:)/)
+    .map((parameter) => parameter.trim().split(/\??:/)[0] ?? "")
+    .findIndex((parameter) =>
+      operation.paging?.token === "body" ? parameter.endsWith("Body") : parameter === "params",
+    );
   if (index === -1) {
     throw new Error(`${operation.id} has no argument to carry its page_token`);
   }
   return index;
 }
 
-function pagingSource(operations: readonly ReturnType<typeof operationOf>[]): string {
+function pagingSource(
+  operations: readonly ReturnType<typeof operationOf>[],
+  endpoints: string,
+): string {
   const table = Object.fromEntries(
     operations.flatMap((operation) =>
       operation.paging
-        ? [[operation.id, { items: operation.paging.items, arg: pagingArgument(operation) }]]
+        ? [
+            [
+              operation.id,
+              { items: operation.paging.items, arg: pagingArgument(endpoints, operation) },
+            ],
+          ]
         : [],
     ),
   );

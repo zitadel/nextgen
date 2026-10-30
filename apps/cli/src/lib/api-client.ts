@@ -171,7 +171,8 @@ export type SanitizeOptions = {
  * `timeoutMs`.
  */
 export function createZitadelClient(
-  opts: ZitadelClientOptions,
+  // The CLI sets both hooks itself, so a caller's would be silently replaced.
+  opts: Omit<ZitadelClientOptions, "onResponse" | "onError">,
   sanitize: SanitizeOptions = {},
 ): ZitadelClient {
   // The client applies both to every call, each page of a paged one included.

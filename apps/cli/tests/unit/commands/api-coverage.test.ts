@@ -229,10 +229,12 @@ const PIPELINE_SOURCES: readonly string[] = [
  * commands reach their operations through the pipeline modules above.
  */
 const standaloneCommandOperations = async (): Promise<ReadonlyMap<string, ReadonlySet<string>>> => {
-  const callsIn = async (path: string): Promise<string[]> =>
-    [
-      ...(await readFile(path, "utf8")).matchAll(/\bclient\.(\w+)(?:\.(?:all|items|pages))?\(/g),
-    ].map((m) => m[1] as string);
+  const callsIn = async (path: string): Promise<string[]> => {
+    const source = await readFile(path, "utf8");
+    return [...source.matchAll(/\bclient\.(\w+)(?:\.(?:all|items|pages))?\(/g)].map(
+      (m) => m[1] as string,
+    );
+  };
   const pipeline = (
     await Promise.all(
       PIPELINE_SOURCES.map((file) => callsIn(join(import.meta.dirname, "../../../src", file))),

@@ -23,16 +23,15 @@ export type Deployment = CreateDeployment200 | CreateDeployment201;
  */
 export type RolledBackDeployment = RollbackDeployment200 | RollbackDeployment201;
 
-/** One row of the deployment list. */
-export type ListedDeployment = ListDeployments200DeploymentsItem;
-
 /**
  * Whether a deployment serves a primary origin. A preview deployment's targets
  * carry an expiry; it is never the baseline, the guard or the thing a bare
  * rollback undoes. Look for it across every page (`listDeployments.all`): one
  * live preview per open pull request can push it off the first.
  */
-export function servesPrimary(deployment: Pick<ListedDeployment, "targets">): boolean {
+export function servesPrimary(
+  deployment: Pick<ListDeployments200DeploymentsItem, "targets">,
+): boolean {
   return deployment.targets.some((target) => target.expires_at == null);
 }
 

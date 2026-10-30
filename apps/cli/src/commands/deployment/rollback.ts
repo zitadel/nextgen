@@ -53,15 +53,15 @@ export default class DeploymentRollback extends Promptable(EnvironmentCommand) {
     // The bare form decides from one read of the history, so its guard comes
     // from that same read: a deploy landing after it is one the caller never
     // saw, and must make the server refuse rather than become the expected one.
-    let bareGuard: string | undefined;
+    let expectedDeploymentId: string | undefined;
     if (targetId === undefined) {
       // A preview deployment is never the deploy a bare rollback undoes, nor
       // one it can restore: the server refuses to roll one back. Primary
       // deployments make one history for the project, newest first.
-      const history = await client.listDeployments.all({
+      const deployments = await client.listDeployments.all({
         project_id: projectId,
       });
-      const [latest, prior] = history.filter(servesPrimary);
+      const [latest, prior] = deployments.filter(servesPrimary);
       if (!latest) {
         throw new ZitadelError("E_VALIDATION", "There is no deployment to roll back", {
           hint: `Nothing has been deployed yet; check \`zitadel deployment list${this.environmentSelector()}\`.`,
@@ -73,7 +73,7 @@ export default class DeploymentRollback extends Promptable(EnvironmentCommand) {
         });
       }
       targetId = prior.id;
-      bareGuard = latest.id;
+      expectedDeploymentId = latest.id;
     }
 
     // A dry run re-applies nothing, so it stops once the target is resolved,
@@ -94,14 +94,13 @@ export default class DeploymentRollback extends Promptable(EnvironmentCommand) {
     // write in non-interactive mode) makes the server answer 409 rather than
     // letting the rollback overwrite a change the caller never saw. Omitted
     // when nothing is live there, which an optional id cannot stand in for.
-    const live =
-      bareGuard === undefined
-        ? await client.listDeployments.all({
-            project_id: projectId,
-            live: true,
-          })
-        : [];
-    const expectedDeploymentId = bareGuard ?? live.find(servesPrimary)?.id;
+    if (expectedDeploymentId === undefined) {
+      const deployments = await client.listDeployments.all({
+        project_id: projectId,
+        live: true,
+      });
+      expectedDeploymentId = deployments.find(servesPrimary)?.id;
+    }
 
     const confirmed = await this.input({
       kind: "confirm",
@@ -119,8 +118,10 @@ export default class DeploymentRollback extends Promptable(EnvironmentCommand) {
 
     let pointers: readonly GetReleaseById200PointersItem[] | undefined;
     try {
-      pointers = (await client.getReleaseById(deployment.release_id, { project_id: projectId }))
-        .pointers;
+      const release = await client.getReleaseById(deployment.release_id, {
+        project_id: projectId,
+      });
+      pointers = release.pointers;
     } catch (error) {
       reportWarning(
         `Rolled back, but the revisions ${deployment.release_id} pins could not be read: ${toZitadelError(error).message}`,

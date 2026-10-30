@@ -92,6 +92,66 @@ describe("createZitadelClient", () => {
     expect(listed.map((deployment) => deployment.id)).toEqual(["DEP_1", "DEP_2"]);
   });
 
+  it("applies its hooks when the global Promise has been replaced", async () => {
+    const { base } = await deployments();
+    const seen: unknown[] = [];
+    const client = createZitadelClient({
+      baseUrl: base,
+      onResponse: (body) => {
+        seen.push(body);
+        return body;
+      },
+    });
+    const Native = globalThis.Promise;
+    // As zone.js does: a subclass the engine's own promises are not instances of.
+    globalThis.Promise = class extends Native<unknown> {} as PromiseConstructor;
+    try {
+      await client.listDeployments({
+        project_id: "proj_1",
+      });
+    } finally {
+      globalThis.Promise = Native;
+    }
+
+    expect(seen).toHaveLength(1);
+  });
+
+  it("walks every page when its response hook reshapes them", async () => {
+    const { base } = await deployments();
+    const client = createZitadelClient({
+      baseUrl: base,
+      onResponse: (body) => {
+        const { next_page_token: nextPageToken, ...rest } = body as Record<string, unknown>;
+        return { ...rest, nextPageToken };
+      },
+    });
+
+    const listed = await client.listDeployments.all({
+      project_id: "proj_1",
+    });
+
+    expect(listed).toHaveLength(2);
+  });
+
+  it("hands its response hook's failures to its error hook", async () => {
+    const { base } = await deployments();
+    const client = createZitadelClient({
+      baseUrl: base,
+      onResponse: () => {
+        throw new Error("hook");
+      },
+      onError: () => {
+        throw new Error("handled");
+      },
+    });
+
+    const listed = client.listDeployments({
+      project_id: "proj_1",
+    });
+
+    await expect(listed).rejects.toThrow("handled");
+  });
+
   it("hands every failure to its error hook", async () => {
     const client = createZitadelClient({
       baseUrl: "http://127.0.0.1:1",
@@ -110,10 +170,10 @@ describe("createZitadelClient", () => {
   it("puts every paged function's page_token in an argument that takes one", () => {
     // A wrong index in the generated table fails here, naming the function.
     type Misplaced = {
-      [K in keyof Paging]: "page_token" extends keyof NonNullable<
-        Parameters<Endpoints[K]>[Paging[K]["arg"]]
-      >
-        ? never
+      [K in keyof Paging]: `${Paging[K]["arg"]}` extends keyof Parameters<Endpoints[K]>
+        ? "page_token" extends keyof NonNullable<Parameters<Endpoints[K]>[Paging[K]["arg"]]>
+          ? never
+          : K
         : K;
     }[keyof Paging];
 

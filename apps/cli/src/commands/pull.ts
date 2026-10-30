@@ -199,9 +199,9 @@ export default class Pull extends EnvironmentCommand {
       return classified.id;
     }
     if (classified.kind === "deployment") {
-      const deployment = (await client.getDeploymentById(classified.id, {
+      const deployment = await client.getDeploymentById(classified.id, {
         project_id: projectId,
-      })) as { release_id: string };
+      });
       return deployment.release_id;
     }
     if (classified.kind === "latest") {

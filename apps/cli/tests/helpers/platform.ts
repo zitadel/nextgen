@@ -66,9 +66,6 @@ export interface PlatformMock {
    */
   racesTheNextDeploy(): void;
 
-  /** Answers the next read of the deployment or preview list with an empty body. */
-  answersTheNextListWithNothing(list: "deployments" | "previews"): void;
-
   /** Drops any arranged failure, so the platform answers normally again. */
   recovers(): void;
 
@@ -144,11 +141,6 @@ export function usePlatformMock(): PlatformMock {
           }),
         );
       });
-    },
-
-    answersTheNextListWithNothing(list) {
-      const path = list === "deployments" ? "*/deployments" : "*/projects/:projectId/previews";
-      server.use(http.get(path, () => new HttpResponse(null, { status: 204 }), { once: true }));
     },
 
     racesTheNextDeploy() {

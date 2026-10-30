@@ -1,5 +1,4 @@
 import { Flags } from "@oclif/core";
-import { nextToken } from "@zitadel/api/runtime/paging";
 
 import {
   CommandGroups,
@@ -7,6 +6,7 @@ import {
   type JsonEnvelope,
   nonBlankString,
 } from "../../lib/oclif";
+import { collectPages } from "../../lib/oclif/crud/paging";
 import { renderList } from "../../lib/oclif/crud/table";
 import { listData } from "../../lib/oclif/envelope";
 import { shellArg } from "../../lib/shell";
@@ -60,24 +60,19 @@ export default class DeploymentList extends EnvironmentCommand {
     const { client, projectId } = await this.connect();
 
     // One page unless `--all`, whose drain leaves no next page to report.
-    const page = flags.all
-      ? {
-          deployments: await client.listDeployments.all({
-            project_id: projectId,
-            origin: flags.origin,
-            live: flags.live,
-            limit: flags.limit,
-          }),
-        }
-      : await client.listDeployments({
-          project_id: projectId,
-          origin: flags.origin,
-          live: flags.live,
-          limit: flags.limit,
-          page_token: flags["page-token"],
-        });
-    const { deployments } = page;
-    const next = nextToken(page);
+    const { items: deployments, next } = await collectPages(
+      client.listDeployments.pages({
+        project_id: projectId,
+        origin: flags.origin,
+        live: flags.live,
+        limit: flags.limit,
+        page_token: flags["page-token"],
+      }),
+      {
+        items: (page) => page.deployments,
+        all: flags.all === true,
+      },
+    );
 
     // Flatten each deployment's targets to one `origins` cell for the table.
     const rows = deployments.map((deployment) => ({

@@ -2,6 +2,14 @@ import { describe, expect, it, vi } from "vitest";
 
 import { paged } from "./paged";
 
+/** Hooks that leave every page and failure as they are. */
+const asIs = {
+  respond: (body: unknown) => body,
+  fail: (error: unknown): never => {
+    throw error;
+  },
+};
+
 describe("paged", () => {
   /** A generated function taking `(id, params)`, answering two pages. */
   function endpoint() {
@@ -16,7 +24,7 @@ describe("paged", () => {
   it("puts the cursor in the argument the shape names", async () => {
     const call = endpoint();
 
-    await paged(call, { items: "rows", arg: 1 }).all("user_1", { limit: 1 });
+    await paged(call, { items: "rows", arg: 1 }, asIs).all("user_1", { limit: 1 });
 
     expect(call.mock.calls).toEqual([
       ["user_1", { limit: 1 }],
@@ -27,19 +35,49 @@ describe("paged", () => {
   it("adds the argument when the caller left it off", async () => {
     const call = endpoint();
 
-    await paged(call, { items: "rows", arg: 1 }).all("user_1");
+    await paged(call, { items: "rows", arg: 1 }, asIs).all("user_1");
 
     expect(call.mock.calls[1]).toEqual(["user_1", { page_token: "t1" }]);
   });
 
   it("collects every page's items in order", async () => {
-    expect(await paged(endpoint(), { items: "rows", arg: 1 }).all("user_1")).toEqual(["a", "b"]);
+    expect(await paged(endpoint(), { items: "rows", arg: 1 }, asIs).all("user_1")).toEqual([
+      "a",
+      "b",
+    ]);
+  });
+
+  it("reads the cursor before its response hook sees the page", async () => {
+    const reshape = {
+      ...asIs,
+      respond: (body: unknown) => ({ rows: (body as { rows: string[] }).rows, renamed: true }),
+    };
+
+    expect(await paged(endpoint(), { items: "rows", arg: 1 }, reshape).all("user_1")).toEqual([
+      "a",
+      "b",
+    ]);
+  });
+
+  it("hands every failure of the walk to its error hook once", async () => {
+    const seen: unknown[] = [];
+    const call = vi.fn(async () => ({ next_page_token: "" }));
+    const record = {
+      ...asIs,
+      fail: (error: unknown): never => {
+        seen.push(error);
+        throw new Error("handled");
+      },
+    };
+
+    await expect(paged(call, { items: "rows", arg: 0 }, record).all()).rejects.toThrow("handled");
+    expect(seen).toHaveLength(1);
   });
 
   it("refuses a page without its items array", async () => {
     const call = vi.fn(async () => ({ next_page_token: "" }));
 
-    await expect(paged(call, { items: "rows", arg: 0 }).all()).rejects.toThrow(
+    await expect(paged(call, { items: "rows", arg: 0 }, asIs).all()).rejects.toThrow(
       'Unexpected list response: missing "rows" array',
     );
   });

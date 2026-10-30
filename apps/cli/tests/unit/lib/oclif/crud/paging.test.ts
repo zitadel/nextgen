@@ -1,76 +1,59 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
-import { collectPages, DEFAULT_WIRE } from "../../../../../src/lib/oclif/crud";
+import { collectPages } from "../../../../../src/lib/oclif/crud";
 
-const cursor = { nextPageToken: DEFAULT_WIRE.nextPageToken };
+type Page = { users: number[]; next_page_token?: string; next_cursor?: string };
+
+/** The pages a walk hands out, and how many of them the caller pulled. */
+function source(...pages: Page[]) {
+  const pulled = { count: 0 };
+  async function* walk() {
+    for (const page of pages) {
+      pulled.count += 1;
+      yield page;
+    }
+  }
+  return { walk: walk(), pulled };
+}
 
 describe("collectPages", () => {
-  it("fetches one page and reports its next token", async () => {
-    const request = vi.fn(async () => ({ users: [1, 2], next_page_token: "p2" }));
-    await expect(collectPages(request, { items: "users", all: false, ...cursor })).resolves.toEqual(
-      {
-        items: [1, 2],
-        next: "p2",
-      },
-    );
-    expect(request).toHaveBeenCalledWith(undefined);
+  it("reads one page and reports its next token", async () => {
+    const { walk, pulled } = source({ users: [1, 2], next_page_token: "p2" }, { users: [3] });
+    await expect(collectPages(walk, { items: (page) => page.users, all: false })).resolves.toEqual({
+      items: [1, 2],
+      next: "p2",
+    });
+    expect(pulled.count).toBe(1);
   });
 
-  it("starts from the given token", async () => {
-    const request = vi.fn(async () => ({ users: [3] }));
-    await expect(
-      collectPages(request, { items: "users", all: false, token: "p2", ...cursor }),
-    ).resolves.toEqual({
+  it("reports no next token on the last page", async () => {
+    const { walk } = source({ users: [3] });
+    await expect(collectPages(walk, { items: (page) => page.users, all: false })).resolves.toEqual({
       items: [3],
       next: null,
     });
-    expect(request).toHaveBeenCalledWith("p2");
   });
 
-  it("drains every page in order with all", async () => {
-    const pages: Record<string, unknown> = {
-      first: { users: [1], next_page_token: "p2" },
-      p2: { users: [2], next_page_token: "p3" },
-      p3: { users: [3] },
-    };
-    const request = vi.fn(async (token?: string) => pages[token ?? "first"]);
-    await expect(collectPages(request, { items: "users", all: true, ...cursor })).resolves.toEqual({
+  it("reads every page in order with all", async () => {
+    const { walk } = source(
+      { users: [1], next_page_token: "p2" },
+      { users: [2], next_page_token: "p3" },
+      { users: [3] },
+    );
+    await expect(collectPages(walk, { items: (page) => page.users, all: true })).resolves.toEqual({
       items: [1, 2, 3],
       next: null,
     });
-    expect(request.mock.calls.map(([token]) => token)).toEqual([undefined, "p2", "p3"]);
   });
 
-  it("rejects a response without the items array", async () => {
+  it("reads the cursor the caller names", async () => {
+    const { walk } = source({ users: [1], next_page_token: "ignored", next_cursor: "c2" });
     await expect(
-      collectPages(async () => ({ nope: [] }), { items: "users", all: false, ...cursor }),
-    ).rejects.toMatchObject({
-      code: "E_VALIDATION",
-      message: 'Unexpected list response: missing "users" array',
-    });
-  });
-});
-
-describe("a platform that spells its cursor differently", () => {
-  it("reads the property the caller named, not this API's", async () => {
-    // The factory carries no API's vocabulary: a platform whose cursor is
-    // `next_cursor` says so, and the drain follows it.
-    const pages: Record<string, unknown> = {
-      first: { rows: [1], next_cursor: "c2" },
-      c2: { rows: [2] },
-    };
-    const request = vi.fn(async (token?: string) => pages[token ?? "first"]);
-
-    await expect(
-      collectPages(request, { items: "rows", all: true, nextPageToken: "next_cursor" }),
-    ).resolves.toEqual({ items: [1, 2], next: null });
-    expect(request.mock.calls.map(([token]) => token)).toEqual([undefined, "c2"]);
-  });
-
-  it("ignores a cursor under this API's name when told to read another", async () => {
-    const request = vi.fn(async () => ({ rows: [1], next_page_token: "ignored" }));
-    await expect(
-      collectPages(request, { items: "rows", all: false, nextPageToken: "next_cursor" }),
-    ).resolves.toEqual({ items: [1], next: null });
+      collectPages(walk, {
+        items: (page) => page.users,
+        all: false,
+        next: (page) => page.next_cursor,
+      }),
+    ).resolves.toEqual({ items: [1], next: "c2" });
   });
 });

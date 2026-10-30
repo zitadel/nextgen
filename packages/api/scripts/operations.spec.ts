@@ -2,53 +2,36 @@ import { describe, expect, it } from "vitest";
 
 import { pagingArgument } from "./operations";
 
-/** An operation that pages its `page_token` through `token`. */
-function operation(
-  path: string,
-  token: "query" | "body",
-  {
-    body = null,
-    query = "optional",
-  }: { body?: "required" | "optional" | null; query?: "required" | "optional" } = {},
-) {
-  return {
-    id: "listThings",
-    path,
-    parameters: [
-      ...[...path.matchAll(/\{([^}]+)\}/g)].map(([, name]) => ({
-        name: name ?? "",
-        in: "path",
-        required: true,
-      })),
-      { name: "page_token", in: "query", required: query === "required" },
-    ],
-    body,
-    paging: { token, items: "things" },
-  };
-}
+/** Signatures as orval writes them, one per argument order a paged function can have. */
+const endpoints = `
+export const listThings = async (params?: ListThingsParams, options?: Parameters<typeof customFetch>[1]): Promise<ListThings200> => {
+export const listUserThings = async (userId: string,
+    params?: ListUserThingsParams, options?: Parameters<typeof customFetch>[1]): Promise<ListUserThings200> => {
+export const queryThings = async (queryThingsBody: QueryThingsBody,
+    params: QueryThingsParams, options?: Parameters<typeof customFetch>[1]): Promise<QueryThings200> => {
+export const searchThings = async (params: SearchThingsParams,
+    searchThingsBody?: SearchThingsBody, options?: Parameters<typeof customFetch>[1]): Promise<SearchThings200> => {
+`;
 
 describe("pagingArgument", () => {
   it.each([
-    ["the query after the path parameters", operation("/users/{user_id}/things", "query"), 1],
-    ["the query after a required body", operation("/things", "query", { body: "required" }), 1],
-    [
-      "the required query before an optional body",
-      operation("/things", "query", { body: "optional", query: "required" }),
-      0,
-    ],
-    ["the body before the query", operation("/things/query", "body", { body: "required" }), 0],
-    [
-      "an optional body after the required query",
-      operation("/things/query", "body", { body: "optional", query: "required" }),
-      1,
-    ],
-  ])("finds %s", (_, op, expected) => {
-    expect(pagingArgument(op)).toBe(expected);
+    ["the query parameters alone", "listThings", "query", 0],
+    ["the query parameters after a path parameter", "listUserThings", "query", 1],
+    ["the body before the query parameters", "queryThings", "body", 0],
+    ["the body after required query parameters", "searchThings", "body", 1],
+  ] as const)("finds %s", (_, id, token, expected) => {
+    expect(pagingArgument(endpoints, { id, paging: { token, items: "things" } })).toBe(expected);
+  });
+
+  it("refuses an operation orval wrote no function for", () => {
+    expect(() =>
+      pagingArgument(endpoints, { id: "listOthers", paging: { token: "query", items: "x" } }),
+    ).toThrow("listOthers has no generated function");
   });
 
   it("refuses an operation with no argument for its page_token", () => {
-    expect(() => pagingArgument(operation("/things", "body"))).toThrow(
-      "listThings has no argument to carry its page_token",
-    );
+    expect(() =>
+      pagingArgument(endpoints, { id: "listThings", paging: { token: "body", items: "things" } }),
+    ).toThrow("listThings has no argument to carry its page_token");
   });
 });

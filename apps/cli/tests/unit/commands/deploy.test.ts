@@ -1,11 +1,36 @@
-import { describe, expect, it } from "vitest";
+import { mkdir, rm, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+
+import { DEFAULT_SCHEMA_CONFIG_PATH, getDefaultHumanUserSchema } from "@zitadel/config/defaults";
+import { resetPlatformStore, setupPlatformHandlers } from "@zitadel/api-mock/platform";
+import { http } from "msw";
+import { setupServer } from "msw/node";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { noPrimaryOriginError } from "../../../src/commands/deploy";
 import { environmentSelectorSuffix } from "../../../src/lib/oclif/environment-flags";
-import { cliVersion, expectedPublicCliCommand } from "../../helpers/run-cli";
+import {
+  aProjectWithTwoDeploys,
+  liveAcrossTwoPages,
+  PLATFORM_URL,
+} from "../../helpers/platform-project";
+import { cliVersion, expectedPublicCliCommand, runCliForTest } from "../../helpers/run-cli";
 
 const ISSUER = "http://localhost:3000";
 const PREVIEW_ISSUER = [{ pattern: ISSUER, kind: "preview" }];
+
+const server = setupServer(...setupPlatformHandlers());
+const dirs: string[] = [];
+
+beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
+afterAll(() => server.close());
+afterEach(async () => {
+  server.resetHandlers();
+  resetPlatformStore();
+  for (const dir of dirs.splice(0)) {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
 
 function errorFor(
   input: Partial<Parameters<typeof noPrimaryOriginError>[0]>,
@@ -84,5 +109,39 @@ describe("noPrimaryOriginError", () => {
     const error = errorFor({ issuer: undefined });
 
     expect(error.nextCommands).toEqual([expectedPublicCliCommand("origin list")]);
+  });
+});
+
+describe("deploy", () => {
+  it("guards the deploy with the primary that is live, past the first page", async () => {
+    const project = await aProjectWithTwoDeploys("zitadel-deploy-");
+    dirs.push(project.cwd);
+    await mkdir(join(project.cwd, ".zitadel/schemas"), { recursive: true });
+    await writeFile(
+      join(project.cwd, DEFAULT_SCHEMA_CONFIG_PATH),
+      JSON.stringify(getDefaultHumanUserSchema()),
+    );
+    server.use(liveAcrossTwoPages({ id: "dep_live_primary", release_id: "rel_live" }));
+    const guards: unknown[] = [];
+    server.use(
+      http.post(`${PLATFORM_URL}/deployments`, async ({ request }) => {
+        const body = (await request.clone().json()) as Record<string, unknown>;
+        guards.push(body.expected_deployment_id);
+        return undefined;
+      }),
+    );
+
+    await runCliForTest([
+      "deploy",
+      "-m",
+      "test",
+      "--cwd",
+      project.cwd,
+      "--server",
+      PLATFORM_URL,
+      "--json",
+    ]);
+
+    expect(guards).toEqual(["dep_live_primary"]);
   });
 });

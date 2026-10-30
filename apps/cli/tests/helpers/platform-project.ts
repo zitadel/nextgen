@@ -2,6 +2,8 @@ import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { HttpResponse, http } from "msw";
+
 import { DEFAULT_SERVER } from "../../src/lib/server";
 
 /** The platform the unit tests' msw server answers for. */
@@ -71,4 +73,45 @@ export async function aProjectWithTwoDeploys(
     undone = deployment.id as string;
   }
   return { cwd: await aProjectDirectory(prefix, { id, secret }), undone };
+}
+
+/**
+ * Answers the live deployment list in two pages: a live preview first, and
+ * `primary` only behind the cursor, so a read of the first page alone misses it.
+ */
+export function liveAcrossTwoPages(primary: { id: string; release_id: string }) {
+  return http.get(`${PLATFORM_URL}/deployments`, ({ request }) => {
+    const query = new URL(request.url).searchParams;
+    if (query.get("live") !== "true") {
+      return undefined;
+    }
+    return HttpResponse.json(
+      query.get("page_token") === "p2"
+        ? {
+            deployments: [
+              {
+                ...primary,
+                targets: [{ origin: "https://app.acme.com", expires_at: null }],
+                reason: "deploy",
+                deployed_at: "2026-01-01T00:00:00.000Z",
+              },
+            ],
+            next_page_token: null,
+          }
+        : {
+            deployments: [
+              {
+                id: "dep_preview",
+                release_id: "rel_preview",
+                targets: [
+                  { origin: "https://pr-1.acme.com", expires_at: "2027-01-01T00:00:00.000Z" },
+                ],
+                reason: "deploy",
+                deployed_at: "2026-01-02T00:00:00.000Z",
+              },
+            ],
+            next_page_token: "p2",
+          },
+    );
+  });
 }

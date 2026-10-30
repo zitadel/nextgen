@@ -86,10 +86,15 @@ export type ZitadelClientOptions = {
   timeoutMs?: number;
   /**
    * Applied to every response this client resolves with, each page of a
-   * paged function's included, before the caller sees it.
+   * paged function's included, before the caller sees it. A paged function
+   * reads its cursor from the page as the server sent it, and its items from
+   * what this returns under the same field.
    */
   onResponse?: (body: unknown) => unknown;
-  /** Applied to every failure, each page's included; it rethrows what the caller sees. */
+  /**
+   * Applied to every failure of a call: the request's, `onResponse`'s, and a
+   * paged function's own. It throws what the caller sees.
+   */
   onError?: (error: unknown) => never;
 };
 
@@ -108,33 +113,48 @@ export function createZitadelClient(opts: ZitadelClientOptions): ZitadelClient {
   while (baseUrl.endsWith("/")) {
     baseUrl = baseUrl.slice(0, -1);
   }
+  const hooks = {
+    respond: (body: unknown) => (opts.onResponse ? opts.onResponse(body) : body),
+    fail: (error: unknown): never => {
+      opts.onError?.(error);
+      throw error;
+    },
+  };
+  const hooked = opts.onResponse !== undefined || opts.onError !== undefined;
   // Built once per function, not on every property read.
   const bound = new Map<PropertyKey, unknown>();
   return new Proxy(endpoints as unknown as ZitadelClient, {
     get(target, prop, receiver) {
+      const known = bound.get(prop);
+      if (known !== undefined) {
+        return known;
+      }
       const value = Reflect.get(target, prop, receiver);
       if (typeof value !== "function") {
         return value;
       }
-      if (!bound.has(prop)) {
-        // Every page goes through this call, so each one sets this client's
-        // base URL and token again: another client may have run between pages.
-        const call = (...args: unknown[]) => {
-          setProxyPath(baseUrl);
-          setApiAuthToken(opts.token);
-          setRequestPolicy({ signal: opts.signal, timeoutMs: opts.timeoutMs });
-          const result = (value as (...a: unknown[]) => unknown)(...args);
-          // The URL builders orval exports beside the requests return strings.
-          return result instanceof Promise ? result.then(opts.onResponse, opts.onError) : result;
-        };
-        bound.set(
-          prop,
-          Object.hasOwn(paging, prop)
-            ? Object.assign(call, paged(call, paging[prop as PagedOperation]))
-            : call,
-        );
-      }
-      return bound.get(prop);
+      // Every request, each page included, sets this client's base URL and
+      // token again: another client may have run in between.
+      const send = (...args: unknown[]) => {
+        setProxyPath(baseUrl);
+        setApiAuthToken(opts.token);
+        setRequestPolicy({ signal: opts.signal, timeoutMs: opts.timeoutMs });
+        return (value as (...a: unknown[]) => unknown)(...args);
+      };
+      // The URL builders orval exports beside the requests return strings, so
+      // only a pending result is hooked. A then-check rather than `instanceof`,
+      // which a replaced global `Promise` (zone.js) would fail.
+      const call = (...args: unknown[]) => {
+        const result = send(...args);
+        return hooked && typeof (result as { then?: unknown } | null)?.then === "function"
+          ? Promise.resolve(result).then(hooks.respond).catch(hooks.fail)
+          : result;
+      };
+      const fn = Object.hasOwn(paging, prop)
+        ? Object.assign(call, paged(send, paging[prop as PagedOperation], hooks))
+        : call;
+      bound.set(prop, fn);
+      return fn;
     },
   });
 }

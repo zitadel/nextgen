@@ -1,4 +1,5 @@
 import { ApiError, request as fetchWithPolicy } from "@zitadel/api/runtime/fetch";
+import { itemsOf, pages } from "@zitadel/api/runtime/paging";
 
 import { REQUEST_TIMEOUT_MS, sanitizeRejection, sanitizeResponse } from "../api-client";
 import { interruptSignal } from "../interrupt";
@@ -96,19 +97,22 @@ export const sendAll = async (
   }
   let last: ApiResponse = { status: 200, body: undefined };
   const { items } = await collectPages(
-    async (cursor) => {
-      last = await send(server, token, pageOf(request, cursor));
-      return last.body;
-    },
+    pages(
+      async (cursor) => {
+        last = await send(server, token, pageOf(request, cursor));
+        return last.body;
+      },
+      {
+        // The page the caller asked for, so a server that hands it back is refused.
+        start:
+          paging.token === "query"
+            ? request.query.find(([name]) => name === "page_token")?.[1]
+            : (request.body as { page_token?: string } | undefined)?.page_token,
+      },
+    ),
     {
-      items: paging.items,
+      items: (body) => itemsOf(body, paging.items),
       all: true,
-      // The page the caller asked for, so a server that hands it back is refused.
-      token:
-        paging.token === "body"
-          ? (request.body as { page_token?: string } | undefined)?.page_token
-          : request.query.find(([name]) => name === "page_token")?.[1],
-      nextPageToken: "next_page_token",
     },
   );
   return {

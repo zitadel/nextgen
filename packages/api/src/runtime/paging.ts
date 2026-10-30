@@ -15,10 +15,20 @@ export function nextToken(page: unknown, field = "next_page_token"): string | un
   return typeof token === "string" && token !== "" ? token : undefined;
 }
 
+/** The array `field` names on a page; a page without one is not a page of that list. */
+export function itemsOf(page: unknown, field: string): readonly unknown[] {
+  const list = (page as Record<string, unknown> | null)?.[field];
+  if (!Array.isArray(list)) {
+    throw new TypeError(`Unexpected list response: missing "${field}" array`);
+  }
+  return list;
+}
+
 /**
  * Every page, fetched only when the loop asks for the next one, so a caller
  * that stops early never reads the rest. The walk begins at the cursor `start`
- * names, or at the first page without one; `next` reads a page's cursor.
+ * names, or at the first page without one; `next` reads a page's cursor, and
+ * an empty one ends the walk like none.
  */
 export async function* pages<P>(
   fetchPage: FetchPage<P>,
@@ -27,18 +37,21 @@ export async function* pages<P>(
   // A server that answers a cursor it already issued would be walked forever.
   const seen = new Set(start === undefined ? [] : [start]);
   let token = start;
-  do {
+  for (;;) {
     const page = await fetchPage(token);
+    // Read before the page is handed out, so a loop that changes the page
+    // cannot change where the walk goes.
+    token = next(page) || undefined;
     yield page;
-    token = next(page);
-    if (token !== undefined) {
-      if (seen.has(token)) {
-        throw new Error(
-          "The server repeated a page cursor, so the list would never end. " +
-            "Read it one page at a time instead, and report the repeated cursor.",
-        );
-      }
-      seen.add(token);
+    if (token === undefined) {
+      return;
     }
-  } while (token !== undefined);
+    if (seen.has(token)) {
+      throw new Error(
+        "The server returned the same page cursor twice, so the list would never end. " +
+          "Read it one page at a time instead.",
+      );
+    }
+    seen.add(token);
+  }
 }

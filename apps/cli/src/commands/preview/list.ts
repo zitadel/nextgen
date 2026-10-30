@@ -1,7 +1,7 @@
 import { Flags } from "@oclif/core";
-import { nextToken } from "@zitadel/api/runtime/paging";
 
 import { CommandGroups, type JsonEnvelope, nonBlankString, PreviewCommand } from "../../lib/oclif";
+import { collectPages } from "../../lib/oclif/crud/paging";
 import { renderList } from "../../lib/oclif/crud/table";
 import { listData } from "../../lib/oclif/envelope";
 import { shellArg } from "../../lib/shell";
@@ -52,18 +52,16 @@ export default class PreviewList extends PreviewCommand {
     const { client, projectId } = await this.connect();
 
     // One page unless `--all`, whose drain leaves no next page to report.
-    const page = flags.all
-      ? {
-          previews: await client.listPreviews.all(projectId, {
-            limit: flags.limit,
-          }),
-        }
-      : await client.listPreviews(projectId, {
-          limit: flags.limit,
-          page_token: flags["page-token"],
-        });
-    const { previews } = page;
-    const next = nextToken(page);
+    const { items: previews, next } = await collectPages(
+      client.listPreviews.pages(projectId, {
+        limit: flags.limit,
+        page_token: flags["page-token"],
+      }),
+      {
+        items: (page) => page.previews,
+        all: flags.all === true,
+      },
+    );
 
     const rows = previews.map((preview) => ({
       url: preview.origin,

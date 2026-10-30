@@ -1,5 +1,6 @@
 import { spinner } from "@clack/prompts";
 import { Flags } from "@oclif/core";
+import { itemsOf, nextToken, pages } from "@zitadel/api/runtime/paging";
 
 import { nonBlankString } from "../../flags";
 
@@ -181,18 +182,32 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
     // The spinner owns the cursor and a SIGINT handler until it is stopped, so a
     // page that fails mid-drain has to stop it too; otherwise the error prints
     // under a live spinner and the handler outlives the command.
+    const cursorOf = (response: unknown) => nextToken(response, wire.nextPageToken);
     const { items, next } = await collectPages(
-      async (token) => {
-        const page = await request(token);
-        fetched += 1;
-        progress?.message(`Fetching ${topic} — page ${fetched}`);
-        return page;
-      },
+      pages(
+        async (token) => {
+          const page = await request(token);
+          fetched += 1;
+          progress?.message(`Fetching ${topic} — page ${fetched}`);
+          return page;
+        },
+        {
+          start: paged && typeof flags["page-token"] === "string" ? flags["page-token"] : undefined,
+          next: cursorOf,
+        },
+      ),
       {
-        items: spec.items,
+        // A wrapped page names its list; an endpoint that answers with the
+        // collection itself has nothing to name.
+        items: (response) => {
+          const list = spec.items === undefined ? response : itemsOf(response, spec.items);
+          if (!Array.isArray(list)) {
+            throw new TypeError("Unexpected list response: expected an array");
+          }
+          return list as readonly unknown[];
+        },
         all,
-        nextPageToken: wire.nextPageToken,
-        token: paged && typeof flags["page-token"] === "string" ? flags["page-token"] : undefined,
+        next: cursorOf,
       },
     )
       .then((page) => {

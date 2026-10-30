@@ -51,15 +51,14 @@ describe("deployment list", () => {
         expect(data.next_page_token).toBeNull();
       });
 
-      it("fails rather than reading every page when one comes back empty", async () => {
+      it("suggests the next page, repeating the limit", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin();
         await app.deployData();
-        platform.answersTheNextListWithNothing("deployments");
 
-        expect(await app.run(["deployment", "list", "--limit", "1", "--json"])).toFailWith(
-          "E_VALIDATION",
-        );
+        const result = await app.run(["deployment", "list", "--limit", "1", "--json"]);
+
+        expect(result).toSuggest("deployment list --limit 1 --page-token");
       });
 
       it("drains the history with --all", async () => {

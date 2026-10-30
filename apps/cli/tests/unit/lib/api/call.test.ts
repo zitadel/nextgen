@@ -148,7 +148,7 @@ describe("sendAll", () => {
     expect(response.body).toEqual({ users: LETTERS, next_page_token: "" });
   });
 
-  it("starts from the page the caller named", async () => {
+  it("starts from the page the caller named in the query", async () => {
     server.use(
       http.get(`${SERVER}/users/user_1/passkeys`, ({ request }) => {
         const { items, next } = pageAt(new URL(request.url).searchParams.get("page_token"));
@@ -165,6 +165,20 @@ describe("sendAll", () => {
     expect(response.body).toMatchObject({ passkeys: ["d", "e", "f", "g"] });
   });
 
+  it("starts from the page the caller named in the body", async () => {
+    server.use(
+      http.post(`${SERVER}/users/query`, async ({ request }) => {
+        const body = (await request.json()) as { page_token?: string };
+        const { items, next } = pageAt(body.page_token ?? null);
+        return HttpResponse.json({ users: items, next_page_token: next });
+      }),
+    );
+
+    const response = await sendAll(SERVER, "s", requestFor("queryUsers", ["page_token=cursor-3"]));
+
+    expect(response.body).toMatchObject({ users: ["d", "e", "f", "g"] });
+  });
+
   it("refuses a server that hands back the page it started from", async () => {
     const asked: Array<string | null> = [];
     server.use(
@@ -176,7 +190,7 @@ describe("sendAll", () => {
 
     await expect(
       sendAll(SERVER, "s", requestFor("listUserPasskeys", ["page_token=cursor-3"], ["user_1"])),
-    ).rejects.toThrow("The server repeated a page cursor");
+    ).rejects.toThrow("The server returned the same page cursor twice");
     expect(asked).toEqual(["cursor-3"]);
   });
 });
