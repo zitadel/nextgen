@@ -18,6 +18,11 @@ tasks:
     inputs:
       # Declaring inputs drops the default project folder, so it is restated.
       - "**/*"
+      - "file://.env?optional"
+      - "file://.env.local?optional"
+      - "file://.env.production?optional"
+      - "file://.env.production.local?optional"
+      - "$VITE_*"
       # The hosted cloud's build bakes its base path, its add-on, and what the
       # add-on's plugin reads (the sample rate, the commit its events report,
       # the Vercel environment; apps/cloud-console/vite.ts), so the variables

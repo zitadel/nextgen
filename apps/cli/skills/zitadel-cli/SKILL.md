@@ -258,7 +258,8 @@ Each invocation prints one JSON object:
   shows, against the live release's commit (`diff.against`): `diff.files` holds
   one `{path, status, previous_path?, patch}` per changed file (`status` is
   `added`, `modified`, `deleted`, `renamed` or `copied`; `patch` is its unified
-  diff). Review it before you deploy. `files` is `[]` when nothing changed and
+  diff), including rapid same-size edits and untracked configuration files.
+  Review it before you deploy. `files` is `[]` when nothing changed and
   `null` when there is nothing to diff against, with `diff.note` saying why.
 - A write verb's `--dry-run` reports what it would send without calling the
   platform, so you can preview a mutation before making it.
