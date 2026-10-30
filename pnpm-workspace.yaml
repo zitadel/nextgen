@@ -120,6 +120,7 @@ catalog:
   semver: ^7.7.3
   sharp: ^0.35.5
   shiki: ^4.2.0
+  simple-icons: ^16.36.0
   sonner: ^2.0.7
   storybook: ^10.3.6
   tailwind-merge: ^3.6.0

@@ -19,7 +19,8 @@
     "@zitadel/components": "workspace:*",
     "react": "catalog:",
     "react-dom": "catalog:",
-    "remotion": "catalog:"
+    "remotion": "catalog:",
+    "simple-icons": "catalog:"
   },
   "devDependencies": {
     "@types/react": "catalog:",

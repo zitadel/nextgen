@@ -2,14 +2,15 @@ import { AbsoluteFill, Easing, interpolate, useCurrentFrame, useVideoConfig } fr
 
 import { useFonts } from "../login-surface";
 import { Logo } from "../logo";
-import { HEIGHT, OUTRO, WIDTH, beats } from "../timeline";
+import { HEIGHT, OUTRO, SECTIONS, WIDTH, beats } from "../timeline";
+import { CallToAction } from "./call-to-action";
 
 // The outro: out of the dark, the curved glow of a horizon rises into the
-// dark frame's bottom edge, as a planet's rim looks from orbit, and "Try it
-// out" comes into focus in the middle. On the last hit the logo replaces the
-// words and plays as it does in the website's nav; then the frame scrolls up,
-// as if coming down through the atmosphere, the logo fading, until the glow
-// fills it.
+// dark frame's bottom edge, as a planet's rim looks from orbit, and the call
+// to action comes into focus (call-to-action.tsx). On the downbeat after it
+// the logo replaces it and plays as it does in the website's nav; then the
+// frame scrolls up, as if coming down through the atmosphere, the logo
+// fading, until the glow fills it, and it all fades to black.
 
 /**
  * Zitadel's orange with a deeper ember, and the website's lilac with a deeper
@@ -25,7 +26,6 @@ const GROUND = "#0f0f11";
 
 /** The logo's width, in px of the 1920-wide frame. */
 const LOGO_WIDTH = 260;
-const CALL_TO_ACTION = "Try it out";
 
 /**
  * How far the frame scrolls: far enough to carry the logo out of it, short of
@@ -123,10 +123,14 @@ export function Outro() {
     ...clamp,
     easing: Easing.out(Easing.cubic),
   });
-  const wordsIn = interpolate(frame, [4, 34], [0, 1], {
-    ...clamp,
-    easing: Easing.out(Easing.cubic),
-  });
+  // The call to action blurs away over the frames before the logo's downbeat.
+  const leave = interpolate(frame, [logoFrom - 8, logoFrom], [0, 1], clamp);
+  const black = interpolate(
+    frame,
+    [beats(OUTRO.black), beats(SECTIONS.outro.length)],
+    [0, 1],
+    clamp,
+  );
 
   return (
     <AbsoluteFill style={{ background: GROUND, overflow: "hidden" }}>
@@ -152,19 +156,7 @@ export function Outro() {
           }}
         >
           {frame < logoFrom ? (
-            <span
-              style={{
-                fontFamily: "Arimo, system-ui, sans-serif",
-                fontWeight: 500,
-                fontSize: 64,
-                letterSpacing: "-0.01em",
-                opacity: wordsIn,
-                filter: `blur(${(1 - wordsIn) * 24}px)`,
-                transform: `scale(${1.04 - wordsIn * 0.04})`,
-              }}
-            >
-              {CALL_TO_ACTION}
-            </span>
+            <CallToAction frame={frame} leave={leave} />
           ) : (
             <Logo
               id="outro"
@@ -180,6 +172,7 @@ export function Outro() {
           )}
         </div>
       </div>
+      <AbsoluteFill style={{ background: "#000", opacity: black }} />
     </AbsoluteFill>
   );
 }

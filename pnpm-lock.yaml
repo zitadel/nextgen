@@ -449,6 +449,9 @@ catalogs:
     shiki:
       specifier: ^4.2.0
       version: 4.2.0
+    simple-icons:
+      specifier: ^16.36.0
+      version: 16.36.0
     sonner:
       specifier: ^2.0.7
       version: 2.0.7
@@ -1155,6 +1158,9 @@ importers:
       remotion:
         specifier: 'catalog:'
         version: 4.0.539(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      simple-icons:
+        specifier: 'catalog:'
+        version: 16.36.0
     devDependencies:
       '@types/react':
         specifier: ^19.2.14
@@ -14930,6 +14936,10 @@ packages:
   signal-exit@4.1.0:
     resolution: {integrity: sha512-bzyZ1e88w9O1iNJbKnOlvYTrWPDl46O1bG0D3XInv+9tkPrxrN8jUUTiFlDkkmKWgn1M6CfIA13SuGqOa9Korw==}
     engines: {node: '>=14'}
+
+  simple-icons@16.36.0:
+    resolution: {integrity: sha512-+VNPPkqSOLidFeSgBKUWX4n50WPpDC09hav+BgS26anIF1oQOlGBb8LvwGR+6fYRjo+B6CiKzNBceMPkSVXANQ==}
+    engines: {node: '>=0.12.18'}
 
   siphash@1.2.0:
     resolution: {integrity: sha512-zGo/O5A0Nr4oSteEAMlhemqQpCBbVTRaTjUQdO+QFUqe1iofq/NNPe2W1RxJreh89fIk6NhQcNi41UeTGCvr+g==}
@@ -32231,6 +32241,8 @@ snapshots:
   signal-exit@3.0.7: {}
 
   signal-exit@4.1.0: {}
+
+  simple-icons@16.36.0: {}
 
   siphash@1.2.0: {}
 
