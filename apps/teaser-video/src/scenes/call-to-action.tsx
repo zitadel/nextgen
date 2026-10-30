@@ -50,7 +50,7 @@ const AGENTS: { name: string; icon?: SimpleIcon }[] = [
 ];
 
 /** The space between each row of marks and the words, the same above and below. */
-const ROW_GAP = 150;
+const ROW_GAP = 230;
 /** Both rows of marks take the same height, so the gaps measure alike. */
 const ROW: CSSProperties = { display: "flex", alignItems: "center", height: 56 };
 
