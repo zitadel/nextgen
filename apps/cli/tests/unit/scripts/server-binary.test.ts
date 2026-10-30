@@ -1,6 +1,17 @@
-import { access, readFile } from "node:fs/promises";
+import {
+  access,
+  copyFile,
+  mkdir,
+  mkdtemp,
+  readFile,
+  realpath,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { createRequire } from "node:module";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { pathToFileURL } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
@@ -47,10 +58,29 @@ describe("@zitadel/server binary resolver", () => {
     expect(serverBinaryPath()).toMatch(/server-[a-z0-9-]+\/bin\/nextgen(\.exe)?$/);
   });
 
-  it("refuses a binary that is not there", () => {
-    expect(() => resolveServerBinary("win32", "x64")).toThrow(
-      /Missing (Zitadel server binary at|@zitadel\/server-win32-x64)/,
-    );
+  it("refuses a binary that is not there", async () => {
+    // release:pack builds every platform, so the checkout cannot stand in for
+    // an installation whose optional package is present but lacks its binary.
+    const root = await realpath(await mkdtemp(join(tmpdir(), "zitadel-missing-server-binary-")));
+    try {
+      const packageDir = join(root, "node_modules/@zitadel/server-win32-x64");
+      await mkdir(packageDir, { recursive: true });
+      await writeFile(
+        join(packageDir, "package.json"),
+        JSON.stringify({ name: "@zitadel/server-win32-x64" }),
+      );
+      const resolver = join(root, "binary.mjs");
+      await copyFile(createRequire(import.meta.url).resolve("@zitadel/server/binary"), resolver);
+      const isolated = (await import(
+        pathToFileURL(resolver).href
+      )) as typeof import("@zitadel/server/binary");
+
+      expect(() => isolated.resolveServerBinary("win32", "x64")).toThrow(
+        `Missing Zitadel server binary at ${join(packageDir, "bin/nextgen.exe")}`,
+      );
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   });
 
   it("refuses a platform the server is not built for", () => {

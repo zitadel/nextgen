@@ -20,6 +20,17 @@ if (totals.errors > 0) {
   throw new Error(`bundling ${input} failed with ${totals.errors} error(s)`);
 }
 
+// Fumadocs uses parameter examples as live form defaults. An optional
+// project_id should address the reader's own project, not the fictional
+// example project. Keep the schema's example and required parameters intact;
+// only the docs bundle (also read by Markdown and sample checks) changes.
+for (const parameter of Object.values(result.parsed.components?.parameters ?? {})) {
+  if (parameter.in === "query" && parameter.name === "project_id" && !parameter.required) {
+    delete parameter.example;
+    delete parameter.examples;
+  }
+}
+
 // lib/openapi.ts imports the bundle as a module, so it ships inside the
 // build instead of being read from a build-machine path at runtime. The
 // declaration types it as the OpenAPI document it is, instead of the literal

@@ -123,7 +123,7 @@ jobs:
       id-token: write
     env:
       # check-generate-pruned runs in a step of its own before them.
-      GATE_TASKS: lint typecheck build test check-adrs check-moon-graph
+      GATE_TASKS: lint typecheck build test check-typecheck check-openapi-rules check-adrs check-moon-graph
     steps:
       # Write dirty pages back early so Docker's container creates do not
       # wait for a backlog of dirty pages.
@@ -166,7 +166,14 @@ jobs:
             echo "::warning::internal/storage/testdb/postgres.go has no containerImage constant; nothing to pull"
             exit 0
           fi
-          nohup docker pull --quiet "$image" </dev/null >"$RUNNER_TEMP/postgres-image-pull.log" 2>&1 &
+          # Both registries serve the same official image and version.
+          nohup bash -c '
+            if ! docker pull --quiet "$1"; then
+              fallback="docker.io/${1#public.ecr.aws/docker/}"
+              docker pull --quiet "$fallback" &&
+                docker tag "$fallback" "$1"
+            fi
+          ' -- "$image" </dev/null >"$RUNNER_TEMP/postgres-image-pull.log" 2>&1 &
 
       # Cache Go's build and module caches through GitHub Actions, keyed on
       # every module's go.sum.

@@ -6,7 +6,7 @@ import { useMemo } from "react";
 
 import { cliCommand, cliSample } from "@/lib/cli-sample";
 import { codeOptions } from "@/lib/code-theme";
-import { sdkSample } from "@/lib/sdk-sample";
+import { authentication, sdkSample } from "@/lib/sdk-sample";
 
 import {
   SessionUserContext,
@@ -52,7 +52,8 @@ const OperationPage = createOpenAPIPage({
       id: "typescript",
       lang: "ts",
       label: "TypeScript",
-      source: (request) => sdkSample(operation, path, pathItem, request),
+      source: (request) =>
+        sdkSample(operation, path, pathItem, request, authentication(operation, request)),
     },
     ...(cliCommand(operation, pathItem)
       ? [

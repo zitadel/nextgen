@@ -180,7 +180,7 @@ as they were.
 | console | `build` (outputs staticui, env input) | `#build` | `env: ["CONSOLE_ADDON"]`, outputs `$TURBO_ROOT$/internal/staticui/console/dist/**` |
 | console | `build-release` | `#build-release` | **new** `vite build`; waits for the public packages' release builds |
 | console | `dev`, `preview` (persistent) | `#dev`, `#preview` | existing |
-| console | `dev-real`, `dev-claim` (persistent) | `#dev:real`, `#dev:claim` | existing; the script builds the server through the selected runner, and under turbo the task also depends on `@zitadel/server#build`, so that build is a cache hit |
+| console | `dev-real`, `dev-claim` (persistent) | `#dev:real`, `#dev:claim` | existing; the script builds the server through the selected runner, and under turbo the task also depends on `@zitadel/server#build`, with Go's compiler cache keeping a repeated build incremental |
 | demo-next | `build` (outputs .next) | `#build` | outputs `.next/**`, `!.next/cache/**` |
 | demo-next, demo-nuxt | `dev`, `start` | same | existing |
 | demo-nuxt | `build` (outputs .output, mutex sdk-nuxt-dist) | `#build` | outputs `.output/**` |
@@ -308,12 +308,11 @@ builds in parallel on their package edges (2026-10-14), turbo has the same
 edges: the release builds start after `cli#test` (`api#build-release`
 depends on it, the rest reach `api`'s), each depends on the release builds of
 the packages its dev build depends on, and the two UI release builds wait for
-all of them. One race remains: in `snapshot`, the server's tests run
-alongside the release builds, and the console release build rewrites the
-embedded dist they compile. Go compiles the embed package once and caches it,
-so in practice the tests see one dist; the clean fix is for release builds to
-write somewhere other than the dev `dist/` (open decision 5). The order check
-(`release:check-graph`) asserts these edges after its port.
+all of them. The console release build also waits for `server#test` before
+rewriting the embedded dist that Go compiles; in moon, `snapshot` is the only
+release entry point with Go tasks, and its serial dependencies order them.
+`scripts/task-graph.test.mjs` checks the resulting order in both runners. Separate release output directories remain open decision 5; the
+full release order check (`release:check-graph`) still needs its Turbo port.
 
 ## Script ports
 
@@ -568,13 +567,12 @@ the release graph.
 
 1. **The release graph.** Moon orders it with serial dependencies and the
    release builds' package edges; turbo's edges reproduce that order for
-   `snapshot`, `pack` and `publish`, but the
-   server-tests-versus-console-release-build overlap in `snapshot` is not
-   fully ordered. Mitigation: run `snapshot` in the dual run whenever the
-   journey runs and watch for embed mismatches; fix properly by separating
-   release output directories (decision 5). Its job runs beside the gate's,
-   so the server's tests run in it whenever the gate has not cached them
-   yet, and the overlap is no longer only in principle.
+   `snapshot`, `pack` and `publish`. The console release build waits for the
+   server tests in both runners, checked by the task-graph regression suite;
+   under turbo that edge makes `pack` and `publish` run the Go tests too.
+   Separate release output directories (decision 5) would drop the edge and
+   isolate independent runner invocations that currently share a checkout. The full
+   release graph checker still needs its Turbo port before cutover.
 2. **Selection.** `--affected` follows task inputs and task edges only with
    `futureFlags.affectedUsingTaskInputs` (root `turbo.json`);
    `--filter=…[ref]` still selects packages and drops the artifact edges. It
