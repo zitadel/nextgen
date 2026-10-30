@@ -95,6 +95,8 @@ Fumadocs stories (`components/examples/`).
   once per page: every login on a page walks the same mock flow.
 - Never widen the mock's worker's scope beyond `/docs/`: on the cloud's host
   it would answer for the console.
+- Keep the mock's request guard in `mock.ts`: only same-origin
+  `/docs/mock-api/` calls may reach its handlers; worker scope limits pages, not requests.
 - A page's Markdown leaves its examples out (`lib/source.ts`): write the prose
   around one so it reads without it.
 - Type an atom an example renders in `elements.d.ts`, from the example's props.
@@ -115,6 +117,8 @@ moon run docs:e2e     # tests/ against the local build
 CLOUD_URL=https://cloud-….vercel.app moon run docs:e2e-deployment
 ```
 
+- Try the API playground on `moon run workspace:cloud`: it sends to its page's
+  origin with the reader's session, and no API answers on the docs' port 3003.
 - Vercel builds with `turbo run build --filter=@zitadel/docs`, never moon:
   moon cannot archive the symlinks Vercel's Next.js adapter writes into
   `.next/output`. The build's key holds the deployment's ID, so Vercel never
