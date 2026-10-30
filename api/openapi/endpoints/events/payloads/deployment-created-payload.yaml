@@ -8,7 +8,7 @@ properties:
     type: string
   targets:
     type: array
-    description: The origins the release went live on, sorted.
+    description: The origins the release went live on, sorted; `default` is the default target.
     items:
       type: string
   reason:

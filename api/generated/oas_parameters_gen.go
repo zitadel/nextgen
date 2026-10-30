@@ -5807,10 +5807,10 @@ func decodeListBrandingParams(args [0]string, argsEscaped bool, r *http.Request)
 type ListDeploymentsParams struct {
 	// The unique identifier of the project.
 	ProjectID ProjectID
-	// Narrows the list to the deployments that targeted this origin, given
-	// exactly as the deployment records it. An origin no deployment targeted
-	// answers an empty list, not an error.
-	Origin OptOrigin `json:",omitempty,omitzero"`
+	// Narrows the list to the deployments that targeted this origin, or
+	// `default` for the default target, given exactly as the deployment records
+	// it. An origin no deployment targeted answers an empty list, not an error.
+	Origin OptDeploymentTargetOrigin `json:",omitempty,omitzero"`
 	// Lists what each target serves now instead of the history. Defaults
 	// to `false`.
 	Live OptBool `json:",omitempty,omitzero"`
@@ -5839,7 +5839,7 @@ func unpackListDeploymentsParams(packed middleware.Parameters) (params ListDeplo
 			In:   "query",
 		}
 		if v, ok := packed[key]; ok {
-			params.Origin = v.(OptOrigin)
+			params.Origin = v.(OptDeploymentTargetOrigin)
 		}
 	}
 	{
@@ -5944,7 +5944,7 @@ func decodeListDeploymentsParams(args [0]string, argsEscaped bool, r *http.Reque
 
 		if err := q.HasParam(cfg); err == nil {
 			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
-				var paramsDotOriginVal Origin
+				var paramsDotOriginVal DeploymentTargetOrigin
 				if err := func() error {
 					var paramsDotOriginValVal string
 					if err := func() error {
@@ -5963,7 +5963,7 @@ func decodeListDeploymentsParams(args [0]string, argsEscaped bool, r *http.Reque
 					}(); err != nil {
 						return err
 					}
-					paramsDotOriginVal = Origin(paramsDotOriginValVal)
+					paramsDotOriginVal = DeploymentTargetOrigin(paramsDotOriginValVal)
 					return nil
 				}(); err != nil {
 					return err
@@ -12071,8 +12071,9 @@ func decodeQuerySessionsParams(args [0]string, argsEscaped bool, r *http.Request
 
 // QueryTeamsParams is parameters of queryTeams operation.
 type QueryTeamsParams struct {
-	// The unique identifier of the project.
-	ProjectID ProjectID
+	// The project the request addresses. Omit it to address the credential's own
+	// project.
+	ProjectID OptProjectID `json:",omitempty,omitzero"`
 }
 
 func unpackQueryTeamsParams(packed middleware.Parameters) (params QueryTeamsParams) {
@@ -12081,7 +12082,9 @@ func unpackQueryTeamsParams(packed middleware.Parameters) (params QueryTeamsPara
 			Name: "project_id",
 			In:   "query",
 		}
-		params.ProjectID = packed[key].(ProjectID)
+		if v, ok := packed[key]; ok {
+			params.ProjectID = v.(OptProjectID)
+		}
 	}
 	return params
 }
@@ -12098,38 +12101,50 @@ func decodeQueryTeamsParams(args [0]string, argsEscaped bool, r *http.Request) (
 
 		if err := q.HasParam(cfg); err == nil {
 			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
-				var paramsDotProjectIDVal string
+				var paramsDotProjectIDVal ProjectID
 				if err := func() error {
-					val, err := d.DecodeValue()
-					if err != nil {
+					var paramsDotProjectIDValVal string
+					if err := func() error {
+						val, err := d.DecodeValue()
+						if err != nil {
+							return err
+						}
+
+						c, err := conv.ToString(val)
+						if err != nil {
+							return err
+						}
+
+						paramsDotProjectIDValVal = c
+						return nil
+					}(); err != nil {
 						return err
 					}
-
-					c, err := conv.ToString(val)
-					if err != nil {
-						return err
-					}
-
-					paramsDotProjectIDVal = c
+					paramsDotProjectIDVal = ProjectID(paramsDotProjectIDValVal)
 					return nil
 				}(); err != nil {
 					return err
 				}
-				params.ProjectID = ProjectID(paramsDotProjectIDVal)
+				params.ProjectID.SetTo(paramsDotProjectIDVal)
 				return nil
 			}); err != nil {
 				return err
 			}
 			if err := func() error {
-				if err := params.ProjectID.Validate(); err != nil {
-					return err
+				if value, ok := params.ProjectID.Get(); ok {
+					if err := func() error {
+						if err := value.Validate(); err != nil {
+							return err
+						}
+						return nil
+					}(); err != nil {
+						return err
+					}
 				}
 				return nil
 			}(); err != nil {
 				return err
 			}
-		} else {
-			return err
 		}
 		return nil
 	}(); err != nil {

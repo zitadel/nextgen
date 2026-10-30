@@ -17,6 +17,10 @@ func (h *Handler) resolveRuntime(ctx context.Context, projectID, origin string) 
 	if err != nil {
 		return ctx, err
 	}
+	// Service deferred: nothing deployed where this request can be served.
+	if resolution == nil {
+		return ctx, nil
+	}
 	return service.WithRuntimeResolution(ctx, resolution), nil
 }
 

@@ -25,7 +25,6 @@ import { readZitadelSecret } from "../lib/project";
 import { shellArg } from "../lib/shell";
 import { type EnvironmentSelector, projectCommand } from "../lib/suggestion";
 import { reportWarning } from "../lib/warnings";
-import { nextCommandsData } from "../lib/oclif/envelope";
 
 /**
  * `zitadel deploy` — publish `.zitadel/` to the project's primary origins and
@@ -223,8 +222,8 @@ export default class Deploy extends EnvironmentCommand {
         resources: resourceCount,
         origins: servedOrigins,
         ...reported,
-        ...nextCommandsData([this.suggest("deployment list")]),
       },
+      next: { commands: [this.suggest("deployment list")] },
       pretty: [
         `Deployed ${release.content_hash}`,
         `  ${resourceCount} resource${resourceCount === 1 ? "" : "s"} to ${servedOrigins.length} target${servedOrigins.length === 1 ? "" : "s"}`,

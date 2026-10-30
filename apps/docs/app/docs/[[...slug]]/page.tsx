@@ -18,6 +18,12 @@ import { Operations } from "@/components/operations";
 import { getPageImageUrl, getPageMarkdownUrl, gitConfig } from "@/lib/shared";
 import { openapiPageProps, operationTable, source } from "@/lib/source";
 
+// Every docs page is known at build time. Unknown slugs must use the
+// prerendered root 404, whose inline scripts the fallback policy lists by
+// hash: a 404 rendered on demand carries scripts no policy lists, and can
+// need one just to reveal its content.
+export const dynamicParams = false;
+
 export default async function Page(props: PageProps<"/docs/[[...slug]]">) {
   const params = await props.params;
   const page = source.getPage(params.slug);

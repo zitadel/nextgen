@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"slices"
 	"time"
 
 	"github.com/zitadel/nextgen/internal/audit"
@@ -197,23 +198,14 @@ func (s *DeploymentService) Rollback(ctx context.Context, input RollbackDeployme
 }
 
 // rollbackTargets rebuilds the keywords a primary deployment was created
-// with. Concrete web origins fold back into primary; the empty origin is the
-// default target.
+// with. Concrete web origins fold back into primary.
 func rollbackTargets(previous *domain.Deployment) []string {
-	targets := make([]string, 0, 2)
-	coversWeb := false
-	coversDefault := false
-	for _, origin := range previous.Origins() {
-		if origin == domain.DefaultTargetOrigin {
-			coversDefault = true
-			continue
-		}
-		coversWeb = true
-	}
-	if coversWeb {
+	var targets []string
+	origins := previous.Origins()
+	if slices.ContainsFunc(origins, func(origin string) bool { return origin != domain.DeploymentTargetDefault }) {
 		targets = append(targets, domain.DeploymentTargetPrimary)
 	}
-	if coversDefault {
+	if slices.Contains(origins, domain.DeploymentTargetDefault) {
 		targets = append(targets, domain.DeploymentTargetDefault)
 	}
 	return targets

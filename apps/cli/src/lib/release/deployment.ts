@@ -68,8 +68,8 @@ export const PROJECT_TARGETS: readonly string[] = ["primary", DEFAULT_TARGET];
 
 /**
  * Whether a deployment serves a primary origin. A preview deployment's targets
- * carry an expiry, and a deployment to the default target alone serves no web
- * origin; neither is the baseline or the thing a bare rollback undoes.
+ * carry an expiry; it is never the baseline, the guard or the thing a bare
+ * rollback undoes. Neither is one that reaches only the default target.
  */
 export function servesPrimary(deployment: Pick<ListedDeployment, "targets">): boolean {
   return deployment.targets.some(

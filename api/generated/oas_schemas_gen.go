@@ -14471,7 +14471,6 @@ type CreateFlowErrorResponse struct {
 	ProjNotFound           ProjNotFound
 	ProjOriginNotAllowed   ProjOriginNotAllowed
 	ProjPreviewNotLive     ProjPreviewNotLive
-	RelNoDefault           RelNoDefault
 	RelNotDeployed         RelNotDeployed
 	RelNotFound            RelNotFound
 	RelRevoked             RelRevoked
@@ -14501,7 +14500,6 @@ const (
 	ProjNotFoundCreateFlowErrorResponse           CreateFlowErrorResponseType = "proj.not_found"
 	ProjOriginNotAllowedCreateFlowErrorResponse   CreateFlowErrorResponseType = "proj.origin_not_allowed"
 	ProjPreviewNotLiveCreateFlowErrorResponse     CreateFlowErrorResponseType = "proj.preview_not_live"
-	RelNoDefaultCreateFlowErrorResponse           CreateFlowErrorResponseType = "rel.no_default"
 	RelNotDeployedCreateFlowErrorResponse         CreateFlowErrorResponseType = "rel.not_deployed"
 	RelNotFoundCreateFlowErrorResponse            CreateFlowErrorResponseType = "rel.not_found"
 	RelRevokedCreateFlowErrorResponse             CreateFlowErrorResponseType = "rel.revoked"
@@ -14586,11 +14584,6 @@ func (s CreateFlowErrorResponse) IsProjOriginNotAllowed() bool {
 // IsProjPreviewNotLive reports whether CreateFlowErrorResponse is ProjPreviewNotLive.
 func (s CreateFlowErrorResponse) IsProjPreviewNotLive() bool {
 	return s.Type == ProjPreviewNotLiveCreateFlowErrorResponse
-}
-
-// IsRelNoDefault reports whether CreateFlowErrorResponse is RelNoDefault.
-func (s CreateFlowErrorResponse) IsRelNoDefault() bool {
-	return s.Type == RelNoDefaultCreateFlowErrorResponse
 }
 
 // IsRelNotDeployed reports whether CreateFlowErrorResponse is RelNotDeployed.
@@ -14956,27 +14949,6 @@ func (s CreateFlowErrorResponse) GetProjPreviewNotLive() (v ProjPreviewNotLive, 
 func NewProjPreviewNotLiveCreateFlowErrorResponse(v ProjPreviewNotLive) CreateFlowErrorResponse {
 	var s CreateFlowErrorResponse
 	s.SetProjPreviewNotLive(v)
-	return s
-}
-
-// SetRelNoDefault sets CreateFlowErrorResponse to RelNoDefault.
-func (s *CreateFlowErrorResponse) SetRelNoDefault(v RelNoDefault) {
-	s.Type = RelNoDefaultCreateFlowErrorResponse
-	s.RelNoDefault = v
-}
-
-// GetRelNoDefault returns RelNoDefault and true boolean if CreateFlowErrorResponse is RelNoDefault.
-func (s CreateFlowErrorResponse) GetRelNoDefault() (v RelNoDefault, ok bool) {
-	if !s.IsRelNoDefault() {
-		return v, false
-	}
-	return s.RelNoDefault, true
-}
-
-// NewRelNoDefaultCreateFlowErrorResponse returns new CreateFlowErrorResponse from RelNoDefault.
-func NewRelNoDefaultCreateFlowErrorResponse(v RelNoDefault) CreateFlowErrorResponse {
-	var s CreateFlowErrorResponse
-	s.SetRelNoDefault(v)
 	return s
 }
 
@@ -20197,6 +20169,10 @@ type DeleteTeamUnauthorized ErrorDetails
 
 func (*DeleteTeamUnauthorized) deleteTeamRes() {}
 
+type DeleteUserByIDConflict ErrorDetails
+
+func (*DeleteUserByIDConflict) deleteUserByIDRes() {}
+
 // DeleteUserByIDErrorResponse represents sum type.
 type DeleteUserByIDErrorResponse struct {
 	Type                 DeleteUserByIDErrorResponseType // switch on this field
@@ -20205,6 +20181,7 @@ type DeleteUserByIDErrorResponse struct {
 	EvtInvalid           EvtInvalid
 	Internal             Internal
 	NotImplemented       NotImplemented
+	ProjLastOwner        ProjLastOwner
 	ReqInvalid           ReqInvalid
 	Unavailable          Unavailable
 	UserNotFound         UserNotFound
@@ -20221,6 +20198,7 @@ const (
 	EvtInvalidDeleteUserByIDErrorResponse           DeleteUserByIDErrorResponseType = "evt.invalid"
 	InternalDeleteUserByIDErrorResponse             DeleteUserByIDErrorResponseType = "internal"
 	NotImplementedDeleteUserByIDErrorResponse       DeleteUserByIDErrorResponseType = "not_implemented"
+	ProjLastOwnerDeleteUserByIDErrorResponse        DeleteUserByIDErrorResponseType = "proj.last_owner"
 	ReqInvalidDeleteUserByIDErrorResponse           DeleteUserByIDErrorResponseType = "req.invalid"
 	UnavailableDeleteUserByIDErrorResponse          DeleteUserByIDErrorResponseType = "unavailable"
 	UserNotFoundDeleteUserByIDErrorResponse         DeleteUserByIDErrorResponseType = "user.not_found"
@@ -20250,6 +20228,11 @@ func (s DeleteUserByIDErrorResponse) IsInternal() bool {
 // IsNotImplemented reports whether DeleteUserByIDErrorResponse is NotImplemented.
 func (s DeleteUserByIDErrorResponse) IsNotImplemented() bool {
 	return s.Type == NotImplementedDeleteUserByIDErrorResponse
+}
+
+// IsProjLastOwner reports whether DeleteUserByIDErrorResponse is ProjLastOwner.
+func (s DeleteUserByIDErrorResponse) IsProjLastOwner() bool {
+	return s.Type == ProjLastOwnerDeleteUserByIDErrorResponse
 }
 
 // IsReqInvalid reports whether DeleteUserByIDErrorResponse is ReqInvalid.
@@ -20374,6 +20357,27 @@ func (s DeleteUserByIDErrorResponse) GetNotImplemented() (v NotImplemented, ok b
 func NewNotImplementedDeleteUserByIDErrorResponse(v NotImplemented) DeleteUserByIDErrorResponse {
 	var s DeleteUserByIDErrorResponse
 	s.SetNotImplemented(v)
+	return s
+}
+
+// SetProjLastOwner sets DeleteUserByIDErrorResponse to ProjLastOwner.
+func (s *DeleteUserByIDErrorResponse) SetProjLastOwner(v ProjLastOwner) {
+	s.Type = ProjLastOwnerDeleteUserByIDErrorResponse
+	s.ProjLastOwner = v
+}
+
+// GetProjLastOwner returns ProjLastOwner and true boolean if DeleteUserByIDErrorResponse is ProjLastOwner.
+func (s DeleteUserByIDErrorResponse) GetProjLastOwner() (v ProjLastOwner, ok bool) {
+	if !s.IsProjLastOwner() {
+		return v, false
+	}
+	return s.ProjLastOwner, true
+}
+
+// NewProjLastOwnerDeleteUserByIDErrorResponse returns new DeleteUserByIDErrorResponse from ProjLastOwner.
+func NewProjLastOwnerDeleteUserByIDErrorResponse(v ProjLastOwner) DeleteUserByIDErrorResponse {
+	var s DeleteUserByIDErrorResponse
+	s.SetProjLastOwner(v)
 	return s
 }
 
@@ -21715,7 +21719,7 @@ func (s *DeploymentCreatedEventDelegationType) UnmarshalText(data []byte) error 
 // Ref: #
 type DeploymentCreatedPayload struct {
 	ReleaseID OptString `json:"release_id"`
-	// The origins the release went live on, sorted.
+	// The origins the release went live on, sorted; `default` is the default target.
 	Targets    []string  `json:"targets"`
 	Reason     OptString `json:"reason"`
 	Message    OptString `json:"message"`
@@ -32898,6 +32902,7 @@ type GetFlowStepErrorResponse struct {
 	Internal                    Internal
 	TknInvalid                  TknInvalid
 	NotImplemented              NotImplemented
+	ProjLastOwner               ProjLastOwner
 	RelNotFound                 RelNotFound
 	RelRevoked                  RelRevoked
 	ReqInvalid                  ReqInvalid
@@ -32942,6 +32947,7 @@ const (
 	InternalGetFlowStepErrorResponse                    GetFlowStepErrorResponseType = "internal"
 	TknInvalidGetFlowStepErrorResponse                  GetFlowStepErrorResponseType = "tkn.invalid"
 	NotImplementedGetFlowStepErrorResponse              GetFlowStepErrorResponseType = "not_implemented"
+	ProjLastOwnerGetFlowStepErrorResponse               GetFlowStepErrorResponseType = "proj.last_owner"
 	RelNotFoundGetFlowStepErrorResponse                 GetFlowStepErrorResponseType = "rel.not_found"
 	RelRevokedGetFlowStepErrorResponse                  GetFlowStepErrorResponseType = "rel.revoked"
 	ReqInvalidGetFlowStepErrorResponse                  GetFlowStepErrorResponseType = "req.invalid"
@@ -33079,6 +33085,11 @@ func (s GetFlowStepErrorResponse) IsTknInvalid() bool {
 // IsNotImplemented reports whether GetFlowStepErrorResponse is NotImplemented.
 func (s GetFlowStepErrorResponse) IsNotImplemented() bool {
 	return s.Type == NotImplementedGetFlowStepErrorResponse
+}
+
+// IsProjLastOwner reports whether GetFlowStepErrorResponse is ProjLastOwner.
+func (s GetFlowStepErrorResponse) IsProjLastOwner() bool {
+	return s.Type == ProjLastOwnerGetFlowStepErrorResponse
 }
 
 // IsRelNotFound reports whether GetFlowStepErrorResponse is RelNotFound.
@@ -33663,6 +33674,27 @@ func (s GetFlowStepErrorResponse) GetNotImplemented() (v NotImplemented, ok bool
 func NewNotImplementedGetFlowStepErrorResponse(v NotImplemented) GetFlowStepErrorResponse {
 	var s GetFlowStepErrorResponse
 	s.SetNotImplemented(v)
+	return s
+}
+
+// SetProjLastOwner sets GetFlowStepErrorResponse to ProjLastOwner.
+func (s *GetFlowStepErrorResponse) SetProjLastOwner(v ProjLastOwner) {
+	s.Type = ProjLastOwnerGetFlowStepErrorResponse
+	s.ProjLastOwner = v
+}
+
+// GetProjLastOwner returns ProjLastOwner and true boolean if GetFlowStepErrorResponse is ProjLastOwner.
+func (s GetFlowStepErrorResponse) GetProjLastOwner() (v ProjLastOwner, ok bool) {
+	if !s.IsProjLastOwner() {
+		return v, false
+	}
+	return s.ProjLastOwner, true
+}
+
+// NewProjLastOwnerGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from ProjLastOwner.
+func NewProjLastOwnerGetFlowStepErrorResponse(v ProjLastOwner) GetFlowStepErrorResponse {
+	var s GetFlowStepErrorResponse
+	s.SetProjLastOwner(v)
 	return s
 }
 
@@ -48576,31 +48608,6 @@ type ListUserTeamsUnauthorized ErrorDetails
 
 func (*ListUserTeamsUnauthorized) listUserTeamsRes() {}
 
-type NextgenSession struct {
-	APIKey string
-	Roles  []string
-}
-
-// GetAPIKey returns the value of APIKey.
-func (s *NextgenSession) GetAPIKey() string {
-	return s.APIKey
-}
-
-// GetRoles returns the value of Roles.
-func (s *NextgenSession) GetRoles() []string {
-	return s.Roles
-}
-
-// SetAPIKey sets the value of APIKey.
-func (s *NextgenSession) SetAPIKey(val string) {
-	s.APIKey = val
-}
-
-// SetRoles sets the value of Roles.
-func (s *NextgenSession) SetRoles(val []string) {
-	s.Roles = val
-}
-
 // NewNilDateTime returns new NilDateTime with value set to v.
 func NewNilDateTime(v time.Time) NilDateTime {
 	return NilDateTime{
@@ -51568,6 +51575,52 @@ func (o OptDeploymentReason) Get() (v DeploymentReason, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptDeploymentReason) Or(d DeploymentReason) DeploymentReason {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptDeploymentTargetOrigin returns new OptDeploymentTargetOrigin with value set to v.
+func NewOptDeploymentTargetOrigin(v DeploymentTargetOrigin) OptDeploymentTargetOrigin {
+	return OptDeploymentTargetOrigin{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptDeploymentTargetOrigin is optional DeploymentTargetOrigin.
+type OptDeploymentTargetOrigin struct {
+	Value DeploymentTargetOrigin
+	Set   bool
+}
+
+// IsSet returns true if OptDeploymentTargetOrigin was set.
+func (o OptDeploymentTargetOrigin) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptDeploymentTargetOrigin) Reset() {
+	var v DeploymentTargetOrigin
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptDeploymentTargetOrigin) SetTo(v DeploymentTargetOrigin) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptDeploymentTargetOrigin) Get() (v DeploymentTargetOrigin, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptDeploymentTargetOrigin) Or(d DeploymentTargetOrigin) DeploymentTargetOrigin {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -59632,52 +59685,6 @@ func (o OptNotImplementedDetails) Or(d NotImplementedDetails) NotImplementedDeta
 	return d
 }
 
-// NewOptOrigin returns new OptOrigin with value set to v.
-func NewOptOrigin(v Origin) OptOrigin {
-	return OptOrigin{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptOrigin is optional Origin.
-type OptOrigin struct {
-	Value Origin
-	Set   bool
-}
-
-// IsSet returns true if OptOrigin was set.
-func (o OptOrigin) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptOrigin) Reset() {
-	var v Origin
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptOrigin) SetTo(v Origin) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptOrigin) Get() (v Origin, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptOrigin) Or(d Origin) Origin {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
 // NewOptOriginAddedEventDelegationType returns new OptOriginAddedEventDelegationType with value set to v.
 func NewOptOriginAddedEventDelegationType(v OriginAddedEventDelegationType) OptOriginAddedEventDelegationType {
 	return OptOriginAddedEventDelegationType{
@@ -60828,6 +60835,52 @@ func (o OptProjClaimWindowExpiredDetails) Or(d ProjClaimWindowExpiredDetails) Pr
 	return d
 }
 
+// NewOptProjLastOwnerDetails returns new OptProjLastOwnerDetails with value set to v.
+func NewOptProjLastOwnerDetails(v ProjLastOwnerDetails) OptProjLastOwnerDetails {
+	return OptProjLastOwnerDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptProjLastOwnerDetails is optional ProjLastOwnerDetails.
+type OptProjLastOwnerDetails struct {
+	Value ProjLastOwnerDetails
+	Set   bool
+}
+
+// IsSet returns true if OptProjLastOwnerDetails was set.
+func (o OptProjLastOwnerDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptProjLastOwnerDetails) Reset() {
+	var v ProjLastOwnerDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptProjLastOwnerDetails) SetTo(v ProjLastOwnerDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptProjLastOwnerDetails) Get() (v ProjLastOwnerDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptProjLastOwnerDetails) Or(d ProjLastOwnerDetails) ProjLastOwnerDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptProjMismatchDetails returns new OptProjMismatchDetails with value set to v.
 func NewOptProjMismatchDetails(v ProjMismatchDetails) OptProjMismatchDetails {
 	return OptProjMismatchDetails{
@@ -61742,52 +61795,6 @@ func (o OptRelInvalidDetails) Get() (v RelInvalidDetails, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptRelInvalidDetails) Or(d RelInvalidDetails) RelInvalidDetails {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
-// NewOptRelNoDefaultDetails returns new OptRelNoDefaultDetails with value set to v.
-func NewOptRelNoDefaultDetails(v RelNoDefaultDetails) OptRelNoDefaultDetails {
-	return OptRelNoDefaultDetails{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptRelNoDefaultDetails is optional RelNoDefaultDetails.
-type OptRelNoDefaultDetails struct {
-	Value RelNoDefaultDetails
-	Set   bool
-}
-
-// IsSet returns true if OptRelNoDefaultDetails was set.
-func (o OptRelNoDefaultDetails) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptRelNoDefaultDetails) Reset() {
-	var v RelNoDefaultDetails
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptRelNoDefaultDetails) SetTo(v RelNoDefaultDetails) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptRelNoDefaultDetails) Get() (v RelNoDefaultDetails, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptRelNoDefaultDetails) Or(d RelNoDefaultDetails) RelNoDefaultDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -71738,6 +71745,59 @@ func (s *ProjClaimWindowExpiredDetails) init() ProjClaimWindowExpiredDetails {
 
 // Merged schema.
 // Ref: #
+type ProjLastOwner struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptProjLastOwnerDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *ProjLastOwner) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *ProjLastOwner) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *ProjLastOwner) GetDetails() OptProjLastOwnerDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *ProjLastOwner) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *ProjLastOwner) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *ProjLastOwner) SetDetails(val OptProjLastOwnerDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type ProjLastOwnerDetails map[string]jx.Raw
+
+func (s *ProjLastOwnerDetails) init() ProjLastOwnerDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
 type ProjMismatch struct {
 	// Merged property.
 	Code string `json:"code"`
@@ -77317,59 +77377,6 @@ func (s *RelInvalidDetails) init() RelInvalidDetails {
 
 // Merged schema.
 // Ref: #
-type RelNoDefault struct {
-	// Merged property.
-	Code string `json:"code"`
-	// Human-readable explanation of the error.
-	Message string `json:"message"`
-	// Additional error-specific context.
-	Details OptRelNoDefaultDetails `json:"details"`
-}
-
-// GetCode returns the value of Code.
-func (s *RelNoDefault) GetCode() string {
-	return s.Code
-}
-
-// GetMessage returns the value of Message.
-func (s *RelNoDefault) GetMessage() string {
-	return s.Message
-}
-
-// GetDetails returns the value of Details.
-func (s *RelNoDefault) GetDetails() OptRelNoDefaultDetails {
-	return s.Details
-}
-
-// SetCode sets the value of Code.
-func (s *RelNoDefault) SetCode(val string) {
-	s.Code = val
-}
-
-// SetMessage sets the value of Message.
-func (s *RelNoDefault) SetMessage(val string) {
-	s.Message = val
-}
-
-// SetDetails sets the value of Details.
-func (s *RelNoDefault) SetDetails(val OptRelNoDefaultDetails) {
-	s.Details = val
-}
-
-// Additional error-specific context.
-type RelNoDefaultDetails map[string]jx.Raw
-
-func (s *RelNoDefaultDetails) init() RelNoDefaultDetails {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
-}
-
-// Merged schema.
-// Ref: #
 type RelNotDeployed struct {
 	// Merged property.
 	Code string `json:"code"`
@@ -81050,13 +81057,13 @@ func (s *RevokeReleaseConflictDetails) SetOrigins(val []RevokeReleaseConflictDet
 }
 
 type RevokeReleaseConflictDetailsOriginsItem struct {
-	Origin Origin `json:"origin"`
+	Origin DeploymentTargetOrigin `json:"origin"`
 	// The newest deployment to the origin, which pins the release.
 	DeploymentID DeploymentID `json:"deployment_id"`
 }
 
 // GetOrigin returns the value of Origin.
-func (s *RevokeReleaseConflictDetailsOriginsItem) GetOrigin() Origin {
+func (s *RevokeReleaseConflictDetailsOriginsItem) GetOrigin() DeploymentTargetOrigin {
 	return s.Origin
 }
 
@@ -81066,7 +81073,7 @@ func (s *RevokeReleaseConflictDetailsOriginsItem) GetDeploymentID() DeploymentID
 }
 
 // SetOrigin sets the value of Origin.
-func (s *RevokeReleaseConflictDetailsOriginsItem) SetOrigin(val Origin) {
+func (s *RevokeReleaseConflictDetailsOriginsItem) SetOrigin(val DeploymentTargetOrigin) {
 	s.Origin = val
 }
 
@@ -84116,6 +84123,31 @@ func (s *SessTokenCreationFailedDetails) init() SessTokenCreationFailedDetails {
 	return m
 }
 
+type SessionCookie struct {
+	APIKey string
+	Roles  []string
+}
+
+// GetAPIKey returns the value of APIKey.
+func (s *SessionCookie) GetAPIKey() string {
+	return s.APIKey
+}
+
+// GetRoles returns the value of Roles.
+func (s *SessionCookie) GetRoles() []string {
+	return s.Roles
+}
+
+// SetAPIKey sets the value of APIKey.
+func (s *SessionCookie) SetAPIKey(val string) {
+	s.APIKey = val
+}
+
+// SetRoles sets the value of Roles.
+func (s *SessionCookie) SetRoles(val []string) {
+	s.Roles = val
+}
+
 // SessionDeleted2XX is 2XX pattern response for SessionDeleted operation.
 type SessionDeleted2XX struct {
 	StatusCode int
@@ -86262,6 +86294,7 @@ type SubmitFlowStepErrorResponse struct {
 	Internal                    Internal
 	TknInvalid                  TknInvalid
 	NotImplemented              NotImplemented
+	ProjLastOwner               ProjLastOwner
 	ProjOriginNotAllowed        ProjOriginNotAllowed
 	ProjPreviewNotLive          ProjPreviewNotLive
 	RelNotFound                 RelNotFound
@@ -86308,6 +86341,7 @@ const (
 	InternalSubmitFlowStepErrorResponse                    SubmitFlowStepErrorResponseType = "internal"
 	TknInvalidSubmitFlowStepErrorResponse                  SubmitFlowStepErrorResponseType = "tkn.invalid"
 	NotImplementedSubmitFlowStepErrorResponse              SubmitFlowStepErrorResponseType = "not_implemented"
+	ProjLastOwnerSubmitFlowStepErrorResponse               SubmitFlowStepErrorResponseType = "proj.last_owner"
 	ProjOriginNotAllowedSubmitFlowStepErrorResponse        SubmitFlowStepErrorResponseType = "proj.origin_not_allowed"
 	ProjPreviewNotLiveSubmitFlowStepErrorResponse          SubmitFlowStepErrorResponseType = "proj.preview_not_live"
 	RelNotFoundSubmitFlowStepErrorResponse                 SubmitFlowStepErrorResponseType = "rel.not_found"
@@ -86447,6 +86481,11 @@ func (s SubmitFlowStepErrorResponse) IsTknInvalid() bool {
 // IsNotImplemented reports whether SubmitFlowStepErrorResponse is NotImplemented.
 func (s SubmitFlowStepErrorResponse) IsNotImplemented() bool {
 	return s.Type == NotImplementedSubmitFlowStepErrorResponse
+}
+
+// IsProjLastOwner reports whether SubmitFlowStepErrorResponse is ProjLastOwner.
+func (s SubmitFlowStepErrorResponse) IsProjLastOwner() bool {
+	return s.Type == ProjLastOwnerSubmitFlowStepErrorResponse
 }
 
 // IsProjOriginNotAllowed reports whether SubmitFlowStepErrorResponse is ProjOriginNotAllowed.
@@ -87041,6 +87080,27 @@ func (s SubmitFlowStepErrorResponse) GetNotImplemented() (v NotImplemented, ok b
 func NewNotImplementedSubmitFlowStepErrorResponse(v NotImplemented) SubmitFlowStepErrorResponse {
 	var s SubmitFlowStepErrorResponse
 	s.SetNotImplemented(v)
+	return s
+}
+
+// SetProjLastOwner sets SubmitFlowStepErrorResponse to ProjLastOwner.
+func (s *SubmitFlowStepErrorResponse) SetProjLastOwner(v ProjLastOwner) {
+	s.Type = ProjLastOwnerSubmitFlowStepErrorResponse
+	s.ProjLastOwner = v
+}
+
+// GetProjLastOwner returns ProjLastOwner and true boolean if SubmitFlowStepErrorResponse is ProjLastOwner.
+func (s SubmitFlowStepErrorResponse) GetProjLastOwner() (v ProjLastOwner, ok bool) {
+	if !s.IsProjLastOwner() {
+		return v, false
+	}
+	return s.ProjLastOwner, true
+}
+
+// NewProjLastOwnerSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from ProjLastOwner.
+func NewProjLastOwnerSubmitFlowStepErrorResponse(v ProjLastOwner) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetProjLastOwner(v)
 	return s
 }
 

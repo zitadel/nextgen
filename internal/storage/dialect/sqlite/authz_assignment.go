@@ -393,3 +393,39 @@ func (s authzAssignmentStatements) ListProjectAdmins(ctx context.Context, projec
 	}
 	return &database.ListResult[*domain.ProjectAdminRecord]{Items: admins, NextCursor: next}, nil
 }
+
+// ListProjectsOwnedThroughMember implements [service.AuthzAssignmentStatements].
+func (s authzAssignmentStatements) ListProjectsOwnedThroughMember(ctx context.Context, userID string) ([]string, error) {
+	return s.listOwnerProjects(ctx, userID, false)
+}
+
+// ListProjectsLosingLastOwner implements [service.AuthzAssignmentStatements].
+func (s authzAssignmentStatements) ListProjectsLosingLastOwner(ctx context.Context, userID string) ([]string, error) {
+	return s.listOwnerProjects(ctx, userID, true)
+}
+
+func (s authzAssignmentStatements) listOwnerProjects(ctx context.Context, userID string, losing bool) ([]string, error) {
+	var c statementCompiler
+	if losing {
+		authz.WriteProjectsLosingLastOwner(&c, sqliteAuthzEnv(), userID)
+	} else {
+		authz.WriteProjectsOwnedThroughMember(&c, sqliteAuthzEnv(), userID)
+	}
+	rows, err := s.client.Query(ctx, c.String(), c.args...)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	defer rows.Close()
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, wrapError(err)
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, wrapError(err)
+	}
+	return ids, nil
+}

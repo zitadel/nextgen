@@ -8,6 +8,8 @@
 - `command-reference.json` is the docs site's CLI reference, generated from
   `COMMANDS`, `FLAG_VARIABLES` and `EXIT_CODES`: after a change to any of them,
   rerun `tests/unit/lib/oclif/reference.test.ts` with `--update`.
+- Running git, and why every call goes through one module:
+  [`src/lib/git/AGENTS.md`](src/lib/git/AGENTS.md).
 - Tests: [`tests/AGENTS.md`](tests/AGENTS.md). Read it before adding or moving
   a test.
 - `start`, `stop`, `status`, `logs`, `reset`, `console`, `doctor` and how
@@ -19,8 +21,8 @@
   (`src/lib/scaffold-manifest.ts`).
 - Claim: [ADR 046](../../docs/adrs/046-claim-lifecycle-v2.md).
 - The fresh-app journey: [`e2e/journey/AGENTS.md`](../../e2e/journey/AGENTS.md).
-- A command the CLI suggests running next (`nextCommands` on a result or an
-  error, `next_commands` in data, an input question's `retry`) is a
+- A command the CLI suggests running next (`next.commands` on a result,
+  `nextCommands` on an error, an input question's `retry`) is a
   `SuggestedCommand` from `src/lib/suggestion.ts`, and only its builders make
   one: `this.suggest(args)` on an `EnvironmentCommand` appends the run's
   `--env`/`--env-file`/`--server`; `this.suggestUnscoped(args)` /
@@ -29,10 +31,13 @@
   `EnvironmentSelector`, which only `environmentSelectorSuffix` makes;
   `shellCommand` is for anything that is not the CLI, and `inShell` adds a pipe
   or redirection around a suggestion. A raw string does not typecheck there, so
-  a retry cannot silently fall back to the default project (#1689). Data
-  carries its suggestions through `nextCommandsData()`; a GritQL rule
-  (`biome-plugins/no-raw-next-commands.grit`) rejects a hand-written
-  `next_commands:` key under `apps/cli/src`.
+  a retry cannot silently fall back to the default project (#1689).
+- Pass a result's next steps as `next` (`src/lib/oclif/next-steps.ts`), never
+  in its data: `emit` writes them to the envelope and prints every one.
+- A GritQL rule (`biome-plugins/no-raw-next-commands.grit`) rejects a
+  hand-written `next_commands:` or `next_actions:` key under `apps/cli/src`.
+- Set `nextShown` only when the result's own output showed the steps
+  (`setup`'s box), and `machineReadable` when `pretty` is data a script reads.
 
 ## Command code
 

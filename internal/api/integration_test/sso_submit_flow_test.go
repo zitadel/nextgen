@@ -25,7 +25,6 @@ import (
 func TestFlowSSOSubmitRedirectsToProvider(t *testing.T) {
 	t.Parallel()
 	f := newIdpFixture(t)
-	admitLoginOrigin(t, f.project.ID)
 	// Static endpoints: the client is built without a discovery fetch.
 	connection := helpers.OIDCConnection("google")
 	oidcConn := connection.Oidc.Value

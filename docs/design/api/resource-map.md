@@ -66,10 +66,11 @@ Teams live inside projects. A team in the platform project is a paying developer
 /teams/{id}/api_keys
 ```
 
-Create/list with explicit scope:
+Create takes an explicit `project_id`; the list takes an optional one,
+defaulting to the credential's project like `POST /users/query`:
 
 ```http
-POST /teams                     # body: { project_id, name, ... }
+POST /teams?project_id=…        # body: { name, ... }
 POST /teams/query               # structured filters + cursor pagination (ADR 031)
 GET  /users/{user_id}/teams     # the teams a user belongs to
 ```
@@ -212,8 +213,8 @@ POST   /sessions                         # optional anonymous pre-auth shell
 POST   /sessions/query                   # operator list — structured filters + cursor pagination
 GET    /sessions/{id}                    # operator get
 DELETE /sessions/{id}                    # operator revoke (not logout; idempotent 204)
-GET    /sessions/me                      # end-user get (`nextgenSession` cookie)
-DELETE /sessions/me                      # end-user logout (`nextgenSession` cookie)
+GET    /sessions/me                      # end-user get (`sessionCookie` scheme)
+DELETE /sessions/me                      # end-user logout (`sessionCookie` scheme)
 ```
 
 Sessions carry factors + `assurance_levels[]`. Clients read and revoke

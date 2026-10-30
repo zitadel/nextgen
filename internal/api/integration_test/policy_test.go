@@ -69,7 +69,6 @@ func TestPolicies(t *testing.T) {
 
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
-	deployDefaultTarget(t, project.ID)
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
 	harness.SetProjectSecretOnApiClient(t, client, project)
@@ -165,7 +164,6 @@ func TestPolicies(t *testing.T) {
 	t.Run("a project without a policy lists none", func(t *testing.T) {
 		empty, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 		require.NoError(t, err)
-		deployDefaultTarget(t, empty.ID)
 		emptyClient, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 		require.NoError(t, err)
 		harness.SetProjectSecretOnApiClient(t, emptyClient, empty)
@@ -218,7 +216,6 @@ func TestPolicies(t *testing.T) {
 	t.Run("another project's credentials cannot publish", func(t *testing.T) {
 		other, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 		require.NoError(t, err)
-		deployDefaultTarget(t, other.ID)
 		otherClient, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 		require.NoError(t, err)
 		harness.SetProjectSecretOnApiClient(t, otherClient, other)
@@ -242,7 +239,6 @@ func TestPolicies(t *testing.T) {
 	t.Run("a revision of another project is not found", func(t *testing.T) {
 		other, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 		require.NoError(t, err)
-		deployDefaultTarget(t, other.ID)
 		otherClient, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 		require.NoError(t, err)
 		harness.SetProjectSecretOnApiClient(t, otherClient, other)
@@ -261,7 +257,6 @@ func TestPolicies(t *testing.T) {
 	t.Run("the project's own credentials naming another project get not found", func(t *testing.T) {
 		other, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 		require.NoError(t, err)
-		deployDefaultTarget(t, other.ID)
 
 		for name, projectID := range map[string]string{"another project": other.ID, "an unknown project": "proj_unknown"} {
 			t.Run(name, func(t *testing.T) {
@@ -283,7 +278,6 @@ func TestPolicies(t *testing.T) {
 	t.Run("a policy of another project is not found", func(t *testing.T) {
 		other, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 		require.NoError(t, err)
-		deployDefaultTarget(t, other.ID)
 		otherClient, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 		require.NoError(t, err)
 		harness.SetProjectSecretOnApiClient(t, otherClient, other)
@@ -315,7 +309,6 @@ func TestPasswordPolicyEnforced(t *testing.T) {
 
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
-	deployDefaultTarget(t, project.ID)
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
 	harness.SetProjectSecretOnApiClient(t, client, project)
@@ -398,7 +391,6 @@ func TestPasswordPolicyFollowsTheRelease(t *testing.T) {
 	const origin = "https://policy.acme.test"
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
-	deployDefaultTarget(t, project.ID)
 	_, err = harness.EnsureProjectService(t).AddOrigin(t.Context(), project.ID, domain.Origin{Pattern: origin, Kind: domain.OriginKindPrimary})
 	require.NoError(t, err)
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)

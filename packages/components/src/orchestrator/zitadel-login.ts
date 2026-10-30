@@ -1408,10 +1408,12 @@ export class ZitadelLogin extends ZitadelSurface {
   /** Secondary navigation rows (`data-action` on `.zl-card-nav__link`). */
   private handleDelegatedAction = (event: Event): void => {
     const target = (event.target as HTMLElement | null)?.closest<HTMLElement>("[data-action]");
-    if (!target || target.closest("zl-button") || this.loading) return;
+    if (!target || target.closest("zl-button")) return;
     const action = target.getAttribute("data-action");
     if (!action) return;
+    // An ignored click still must not follow href="#" and change history.
     event.preventDefault();
+    if (this.loading) return;
     void this.submit(action);
   };
 

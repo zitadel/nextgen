@@ -32,8 +32,8 @@ func mustInitClaim(t *testing.T, client *helpers.ApiClient, projectID string) *a
 	return resp.(*api.InitClaimResponse)
 }
 
-// exchangeForSessionCookie trades a handoff token for the __nextgen_session
-// cookie over the real /sessions/exchange endpoint (session_me_test pattern).
+// exchangeForSessionCookie trades a handoff token for the session cookie
+// over the real /sessions/exchange endpoint (session_me_test pattern).
 func exchangeForSessionCookie(t *testing.T, projectID, projectSecret, handoffToken string) *http.Cookie {
 	t.Helper()
 
@@ -53,11 +53,11 @@ func exchangeForSessionCookie(t *testing.T, projectID, projectSecret, handoffTok
 	require.Equal(t, http.StatusOK, resp.StatusCode, string(raw))
 
 	for _, cookie := range resp.Cookies() {
-		if cookie.Name == "__nextgen_session" {
+		if cookie.Name == "__Host-zitadel_session" {
 			return cookie
 		}
 	}
-	t.Fatal("exchange must set the __nextgen_session cookie")
+	t.Fatal("exchange must set the __Host-zitadel_session cookie")
 	return nil
 }
 
@@ -93,7 +93,7 @@ func sessionCookieIn(t *testing.T, project *domain.Project, userID string) *http
 	require.NoError(t, err)
 	token, err := session.Token(crypter)
 	require.NoError(t, err)
-	return &http.Cookie{Name: "__nextgen_session", Value: token}
+	return &http.Cookie{Name: "__Host-zitadel_session", Value: token}
 }
 
 // TestClaimHappyPath is the ticket's end-to-end leg: init → pending status →
@@ -130,7 +130,6 @@ func TestClaimHappyPath(t *testing.T) {
 	// The human on the platform project: their earliest active membership is
 	// the personal team the claim lands on.
 	platform := harness.EnsurePlatformProject(t)
-	deployDefaultTarget(t, platform.ID)
 	team, err := harness.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{
 		ProjectID: platform.ID,
 		Name:      helpers.TeamName(),

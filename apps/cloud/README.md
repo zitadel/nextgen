@@ -7,7 +7,7 @@ except the Changesets version PR's `changeset-release/*` branch and the merge
 queue's `gh-readonly-queue/**` branches.
 
 The repo-root [`vercel.json`](../../vercel.json) defines the Vercel
-deployment as five [services](https://vercel.com/docs/services):
+deployment as six [services](https://vercel.com/docs/services):
 
 | Service | Root | What it is | Paths |
 |---|---|---|---|
@@ -15,6 +15,7 @@ deployment as five [services](https://vercel.com/docs/services):
 | `console` | `apps/console` | the console SPA, built for `/console/` with Vercel Web Analytics and Speed Insights | `/console/*` |
 | `docs` | `apps/docs` | the docs site, Fumadocs on Next.js, with Vercel Web Analytics and Speed Insights | `/docs`, `/docs/*` |
 | `website` | `apps/website` | the front page and the changelog, on Next.js, with Vercel Web Analytics and Speed Insights | `/`, `/changelog`, `/changelog/*`, `/llms.txt`, `/_next/*`, `/favicon.ico`, `/favicons/*` |
+| `cloud-functions` | `apps/cloud-functions` | the hosted cloud's backend on Next.js: the console add-on's calls, BotID's check in front of the sign-in widget, Stripe's webhooks and the workflows ([ADR 084](../../docs/adrs/084-hosted-cloud-business-systems.md)) | `/cloud/*` |
 | `schemas` | `apps/cloud` | the built-in schemas, static files that [`scripts/render-builtin-schemas.mjs`](../../scripts/render-builtin-schemas.mjs) renders from the server's embedded copies | `/schemas/v1/*` |
 
 The console is served on the same origin, so the session cookie and CSRF work
@@ -63,7 +64,7 @@ tests run in the server's `test`.
 
 | File | Role |
 |---|---|
-| [`launcher/`](launcher/) | the function binary: maps `CLOUD_DATABASE_URL` / `CLOUD_MIGRATOR_DATABASE_URL`, the master key, `CRON_SECRET` (the token of the cron job that purges expired audit events), Vercel's `PORT` and its `x-vercel-id` request ID onto the server's configuration; at build time it creates a preview's database, checks the function's configuration and migrates |
+| [`launcher/`](launcher/) | the function binary: maps `CLOUD_DATABASE_URL` / `CLOUD_MIGRATOR_DATABASE_URL`, the master key, `CRON_SECRET` (the token of the cron job that purges expired audit events), Vercel's `PORT` and its `x-vercel-id` request ID onto the server's configuration; at build time it creates a preview's database, checks the function's configuration and migrates; `drop-preview` drops a merged branch's database, or every idle one |
 | [`build-launcher.sh`](build-launcher.sh) | the `build` task: compiles the launcher, without the console, into `dist/nextgen-launcher`; it stamps in the branch, which picks a preview's database |
 | [`deploy.sh`](deploy.sh) | the `deploy` task, last in the `server` service's build: copies the migrated launcher to `$VERCEL_OUTPUT_FILE` |
 | [`setup-secrets.sh`](setup-secrets.sh) | mints an environment's master key and root admin (with [`admin-document.mjs`](admin-document.mjs)) and sets them on the Vercel project; the originals go to 1Password |

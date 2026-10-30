@@ -10,6 +10,11 @@ test("shows the bootstrapped project in the list and detail views", async ({
   zitadel,
   seed,
 }) => {
+  // The dev server includes the router devtools, which unit tests and the
+  // production build omit. Catch incompatible router/devtools dependencies.
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+
   // The list is the projects this person can act on (`GET /users/me/projects`),
   // so the operator needs a grant on the project before it shows up — being
   // able to sign in to it is not access to it.
@@ -37,6 +42,7 @@ test("shows the bootstrapped project in the list and detail views", async ({
   await expect(page).toHaveURL(new RegExp(`/project\\?project=${zitadel.handle.projectId}$`));
   await expect(page.getByText(zitadel.handle.projectId, { exact: true })).toBeVisible();
   await expectNoErrorBoundary(page);
+  expect(pageErrors).toEqual([]);
 });
 
 test("searches the projects on the server", async ({ page, zitadel, seed }) => {

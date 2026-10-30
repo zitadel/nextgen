@@ -16,8 +16,6 @@ interface Captured {
   schemaAuth?: string | null;
   flowBody?: Record<string, unknown>;
   flowAuth?: string | null;
-  releaseBody?: Record<string, unknown>;
-  deploymentBody?: Record<string, unknown>;
 }
 
 const captured: Captured = {};
@@ -47,14 +45,6 @@ const server = setupServer(
     captured.flowAuth = request.headers.get("authorization");
     return HttpResponse.json({ id: "flowdef_1" }, { status: 201 });
   }),
-  http.post(`${BASE}/releases`, async ({ request }) => {
-    captured.releaseBody = (await request.json()) as Record<string, unknown>;
-    return HttpResponse.json({ id: "rel_1" }, { status: 201 });
-  }),
-  http.post(`${BASE}/deployments`, async ({ request }) => {
-    captured.deploymentBody = (await request.json()) as Record<string, unknown>;
-    return HttpResponse.json({ id: "dep_1" }, { status: 201 });
-  }),
 );
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
@@ -83,7 +73,7 @@ describe("bootstrapProject", () => {
 
     expect(captured.projectBody).toMatchObject({
       name: "zitadel-testing",
-      origins: [{ pattern: "http://localhost:3002", kind: "primary" }],
+      origins: [{ pattern: "http://localhost:3002", kind: "preview" }],
       seed_defaults: false,
     });
 
@@ -100,16 +90,6 @@ describe("bootstrapProject", () => {
     });
     expect(flowDefinition.user_schema).toBe("human-user");
     expect(captured.flowAuth).toBe("Bearer secret_1");
-    expect(captured.releaseBody).toMatchObject({
-      pointers: [
-        { kind: "schema", revision_id: "sch_1" },
-        { kind: "flow_definition", revision_id: "flowdef_1" },
-      ],
-    });
-    expect(captured.deploymentBody).toMatchObject({
-      release_id: "rel_1",
-      targets: ["primary", "default"],
-    });
   });
 
   it("propagates API errors with status", async () => {

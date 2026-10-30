@@ -54,6 +54,23 @@ describe("servesPrimary", () => {
     );
   });
 
+  it("is false for a deployment to the default target alone", () => {
+    expect(servesPrimary({ targets: [{ origin: "default", expires_at: null }] } as never)).toBe(
+      false,
+    );
+  });
+
+  it("is true for a deployment to primary and default", () => {
+    expect(
+      servesPrimary({
+        targets: [
+          { origin: "default", expires_at: null },
+          { origin: "https://a", expires_at: null },
+        ],
+      } as never),
+    ).toBe(true);
+  });
+
   it("is false for a preview deployment", () => {
     expect(
       servesPrimary({

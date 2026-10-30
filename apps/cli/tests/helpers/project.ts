@@ -277,6 +277,17 @@ export class ScaffoldedApp {
   }
 
   /**
+   * Runs setup with a git that does everything but commit, as a full disk or a
+   * broken git would: setup creates the repository and then cannot commit.
+   */
+  async setupWithGitThatCannotCommit(): Promise<CliResult> {
+    const git = await gitThatCannotCommit();
+    return this.cli(["setup", "--non-interactive", "--json", "--skip-install"], {
+      PATH: `${git}:${process.env.PATH ?? ""}`,
+    });
+  }
+
+  /**
    * Puts the app under version control with everything committed, the state a
    * developer who already uses git is in before they run setup.
    */
@@ -299,6 +310,11 @@ export class ScaffoldedApp {
       ],
       { cwd: this.path },
     );
+  }
+
+  /** Detaches HEAD from its branch, as a checkout of a tag or a CI job's checkout does. */
+  async onADetachedHead(): Promise<void> {
+    await execFileAsync("git", ["checkout", "--quiet", "--detach"], { cwd: this.path });
   }
 
   /** Leaves a file nobody has committed, as a developer mid-change would. */
@@ -1590,6 +1606,18 @@ process.stderr.write("fake npm stderr\\n");
   );
   await chmod(binPath, 0o755);
   return { binDir, logPath };
+}
+
+/** A `git` on PATH that runs the real one for everything but `commit`, which it refuses. Returns its directory. */
+async function gitThatCannotCommit(): Promise<string> {
+  const binDir = await mkdtemp(join(tmpdir(), "zitadel-git-no-commit-"));
+  const { stdout } = await execFileAsync("sh", ["-c", "command -v git"]);
+  await writeFile(
+    join(binDir, "git"),
+    `#!/bin/sh\nfor arg in "$@"; do\n  if [ "$arg" = "commit" ]; then\n    echo "fatal: cannot commit" >&2\n    exit 1\n  fi\ndone\nexec "${stdout.trim()}" "$@"\n`,
+  );
+  await chmod(join(binDir, "git"), 0o755);
+  return binDir;
 }
 
 /** A fake `docker` on PATH, so doctor's runtime probe needs no daemon. */

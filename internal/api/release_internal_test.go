@@ -131,7 +131,6 @@ func decodeBuildReleaseRequest(body string) (api.BuildReleaseRequest, error) {
 func TestReleaseErrorResponseConflicts(t *testing.T) {
 	assert.Equal(t, http.StatusConflict, releaseErrorResponse(domain.ErrReleaseRevoked()).StatusCode)
 	assert.Equal(t, http.StatusConflict, releaseErrorResponse(domain.ErrReleaseNotDeployed(nil)).StatusCode)
-	assert.Equal(t, http.StatusConflict, releaseErrorResponse(domain.ErrReleaseNoDefault()).StatusCode)
 	assert.Equal(t, http.StatusConflict, releaseErrorResponse(domain.ErrReleaseInUse(domain.ReleaseInUseDetails{})).StatusCode)
 }
 
@@ -140,11 +139,13 @@ func TestReleaseErrorResponseConflicts(t *testing.T) {
 func TestReleaseInUseResponseCarriesOrigins(t *testing.T) {
 	resp, ok := releaseInUseResponse(domain.ErrReleaseInUse(domain.ReleaseInUseDetails{Origins: []domain.ReleaseInUseOrigin{
 		{Origin: "https://app.acme.com", DeploymentID: "dep_1"},
+		{Origin: domain.DeploymentTargetDefault, DeploymentID: "dep_2"},
 	}}))
 	require.True(t, ok)
 	assert.Equal(t, api.ErrorCode(domain.ErrReleaseInUse(domain.ReleaseInUseDetails{}).Code), resp.Code)
 	assert.Equal(t, []api.RevokeReleaseConflictDetailsOriginsItem{
 		{Origin: "https://app.acme.com", DeploymentID: "dep_1"},
+		{Origin: "default", DeploymentID: "dep_2"},
 	}, resp.Details.Origins)
 }
 

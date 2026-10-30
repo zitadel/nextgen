@@ -47,6 +47,13 @@ by declared range or installed release, with `E_UNSUPPORTED_PROJECT_SHAPE`
 left the project untouched. The message names the minimum and the hint says to
 upgrade, so upgrade the app and rerun rather than retrying.
 
+The CLI ships this skill and the other Zitadel skills. `skills add` puts the
+ones of the version that runs it into the project's `.agents/skills/`, and into
+`.claude/skills/` when Claude Code is installed or the project has a `.claude/`
+folder, replacing older copies. After moving the app to a newer CLI, run it
+with that version so the skills describe it. It talks to no server and asks
+nothing; `data.skills` and `data.directories` say what it added where.
+
 ## Using the CLI
 
 - **Drive it non-interactively.** Always pass `--non-interactive --json` (short:
@@ -100,11 +107,10 @@ upgrade, so upgrade the app and rerun rather than retrying.
   and `origin rm <url>` manage the URLs a project serves: a `primary` origin is
   where the app is served, a `preview` pattern (it may hold a `*`) is where
   pull-request builds run. They need the project secret, not the preview token.
-  An empty list admits no origin except a loopback origin. A caller with no
-  `Origin`, and the server's own origin when the project does not list it,
-  is served the `default` deployment target; `origin rm` asks first and needs
-  `--force` when non-interactive. Removing a preview pattern leaves its live
-  previews served until they expire.
+  An empty list admits every origin, so removing the last one opens the project
+  up. A caller with no `Origin` is served the `default` deployment target when
+  one is deployed; `origin rm` asks first and needs `--force` when non-interactive. Removing
+  a preview pattern leaves its live previews served until they expire.
   `deploy` lands on every primary origin and the `default` target, and fails
   with `E_VALIDATION` without a primary origin; its `next_commands` name the
   step that gives the project one. `setup`
@@ -255,7 +261,8 @@ Each invocation prints one JSON object:
   shows, against the live release's commit (`diff.against`): `diff.files` holds
   one `{path, status, previous_path?, patch}` per changed file (`status` is
   `added`, `modified`, `deleted`, `renamed` or `copied`; `patch` is its unified
-  diff). Review it before you deploy. `files` is `[]` when nothing changed and
+  diff), including rapid same-size edits and untracked configuration files.
+  Review it before you deploy. `files` is `[]` when nothing changed and
   `null` when there is nothing to diff against, with `diff.note` saying why.
 - A write verb's `--dry-run` reports what it would send without calling the
   platform, so you can preview a mutation before making it.
@@ -281,7 +288,11 @@ Common error codes point at their own fix in `next_commands`:
   that process or choose another port.
 
 In human mode the output follows the terminal (TTY table, or tab-separated lines
-when piped or `--plain`); `--json` is unaffected and remains the contract.
+when piped or `--plain`); `--json` is unaffected and remains the contract. A
+human run lists its next steps under `Next:` after its result (`setup` shows
+them in its summary box instead); where stdout is data a script reads (a piped
+or `--plain` list, a resource's created or updated JSON) they go to stderr, so
+stdout holds only that data.
 
 Text the server returns is escaped before it is printed, in `--json` as in human
 mode, so a stored value cannot drive the reader's terminal. Control, format and
@@ -397,17 +408,22 @@ it.
 Setup refuses with `E_CONFLICT` when the repository already has uncommitted
 work, untracked files included, which `details.untracked` lists separately
 from `details.modified`. The commit covers the project directory, so it can
-only tell its own files from yours when the tree starts clean. Commit or stash
+only tell its own files from yours when the tree starts clean. It never
+commits `.env*` files (other than `.env.example`), `.zitadel/secret` or
+`.zitadel/local/`, whatever their case. Commit or stash
 first, then rerun. Only what `start` leaves is exempt: `.zitadel/local/` and
 the `.gitignore` line that ignores it. A connection under `.zitadel/idps/` is
-yours and is not exempt.
+yours and is not exempt. During a merge, rebase, cherry-pick, revert or bisect,
+or on a detached HEAD, setup refuses with `E_CONFLICT` before it writes
+anything, naming what stops the commit.
 
 Setup deploys nothing, and it does not need to: a project with no release
 resolves the newest revisions, which are the ones setup just uploaded, so
 sign-in already runs on `.zitadel/`. Deploying pins them into a release, which
 is what the server will require once that fallback goes (#1616). The publish
-step says so and names the command. `data.git` reports what setup did
-(`initialized`, and the `commit`, or null). `--no-git` skips both the refusal
+step says so and names the command. `data.git` reports what setup did:
+`initialized` when it ran `git init`, even if the commit then failed, and the
+`commit`, or null. `--no-git` skips both the refusal
 and the commit, and nothing prompts, so this is the same interactively and in
 CI.
 
@@ -569,6 +585,15 @@ missing or outdated (after an upgrade that changed a dialect), and
 `doctor --fix` writes the current ones, unless the project pins a newer
 `@zitadel/*` version (run that version's `doctor --fix`) or a symlink is on
 the path; `deploy --dry-run` validates without them either way.
+
+An SPA's dev proxy (`vite.config.*`, Angular's `proxy.conf.cjs`) keeps the
+app's session in a cookie of its own project, `zitadel_session_<project id>`
+on `http://localhost` and `__Host-zitadel_session_<project id>` over https.
+`doctor` fails (`managed-files`, `outdated managed config wiring`) on the
+session-cookie hooks a CLI wrote before these names: the server no longer
+reads the cookies they keep. `doctor --fix` replaces hooks that are as the CLI
+wrote them; ones changed by hand must be updated by hand, which the failure
+says. Browsers signed in before the change sign in again.
 
 ## Claiming a project
 

@@ -1,4 +1,10 @@
-import { ApiError, apiErrorCode, apiErrorMessage, NetworkError } from "@zitadel/api/runtime/fetch";
+import {
+  ApiError,
+  apiErrorCode,
+  apiErrorMessage,
+  NetworkError,
+  type NetworkErrorReason,
+} from "@zitadel/api/runtime/fetch";
 import type { SuggestedCommand } from "./suggestion";
 
 /**
@@ -82,6 +88,15 @@ export class ZitadelError extends Error {
     return EXIT_CODES[this.code] ?? 1;
   }
 }
+
+/** What to do about a request that got no usable response, by its reason. */
+const NETWORK_HINTS: Record<NetworkErrorReason, string> = {
+  unreachable: "Check your connection and the server URL (ZITADEL_URL or --server).",
+  timeout:
+    "The server accepted the connection but did not answer in time. Check that it is healthy, then retry.",
+  unreadable:
+    "The server answered, but its response could not be read. Check any proxy between you and the server, then retry.",
+};
 
 /**
  * Normalises any thrown value into a {@link ZitadelError}. Inspection is
@@ -195,10 +210,7 @@ export function toZitadelError(error: unknown): ZitadelError {
 
   if (error instanceof NetworkError) {
     return new ZitadelError("E_NETWORK", error.message, {
-      hint:
-        error.reason === "timeout"
-          ? "The server accepted the connection but did not answer in time. Check that it is healthy, then retry."
-          : "Check your connection and the server URL (ZITADEL_URL or --server).",
+      hint: NETWORK_HINTS[error.reason],
       details: { url: error.url, reason: error.reason },
     });
   }

@@ -26,6 +26,11 @@ one, update the ADR in the same change.
   - An unreadable runtime document is an error, not a mode: keep it apart
     from "no project yet", and never fall back to `standalone` silently.
     Backend-less runs opt in with `VITE_CONSOLE_RUNTIME_FALLBACK`.
+- [0006 Cloud add-on](docs/adrs/0006-cloud-addon.md): put what only the hosted
+  cloud needs (its analytics, sign-up, billing, support) in its add-on,
+  [`apps/cloud-console`](../cloud-console/AGENTS.md), never behind a build flag
+  here. The console reaches it only through `src/addon/contract.ts`; a
+  component an add-on screen needs is exported from `src/addon/ui.ts`.
 
 ## Building UI
 
@@ -65,6 +70,15 @@ between files are the sign the component is missing.
 - In specs, assert on `router.state.resolvedLocation`, never
   `router.state.location`: ending on `location` can leave a loader's request
   in flight, which MSW reports as unhandled in a later test.
+- In specs, import `createAppRouter` at the top of the file, never inside a
+  test: the router mock in `src/test-setup.ts` fails a spec that does.
+
+## Content-Security-Policy
+
+- The console's policy allows its bundle and `index.html`'s inline script
+  by hash. A change to that script changes the hash the cloud sends
+  (repo-root `vercel.json`): `internal/staticui/console`'s test names the
+  value to set.
 
 ## Analytics
 

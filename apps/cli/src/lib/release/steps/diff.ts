@@ -1,5 +1,6 @@
 import { brandingReferencePaths } from "../../branding";
-import { type ConfigDiffFile, diffConfigAgainst, diffConfigFilesAgainst } from "../git";
+import type { DiffedFile } from "../../git";
+import { diffConfigAgainst, diffConfigFilesAgainst } from "../git";
 import type { Step, StepContext, StepReport } from "../pipeline";
 import { listLiveDeployments, servesPrimary } from "../deployment";
 
@@ -14,7 +15,7 @@ export interface ConfigDiff {
    * One entry per changed file: empty when nothing changed, null when no diff
    * can be shown, with `note` saying why.
    */
-  readonly files: readonly ConfigDiffFile[] | null;
+  readonly files: readonly DiffedFile[] | null;
   /** The line the terminal prints instead of the diff, or above it. */
   readonly note?: string;
 }

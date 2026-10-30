@@ -26,7 +26,6 @@ import (
 func TestPasswordLoginFlow(t *testing.T) {
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
-	deployDefaultTarget(t, project.ID)
 
 	team, err := harness.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{
 		ProjectID: project.ID,
@@ -130,7 +129,6 @@ func TestPasswordLoginFlow(t *testing.T) {
 func TestPasswordLoginFlow_UnknownEmail(t *testing.T) {
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
-	deployDefaultTarget(t, project.ID)
 
 	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
 
@@ -182,7 +180,6 @@ func TestPasswordLoginFlow_UnknownEmail(t *testing.T) {
 func TestPasswordRegisterFlow(t *testing.T) {
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
-	deployDefaultTarget(t, project.ID)
 
 	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
 
@@ -259,7 +256,6 @@ func TestPasswordRegisterFlow(t *testing.T) {
 func TestPasswordRegisterFlow_PasswordOverTheCap(t *testing.T) {
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
-	deployDefaultTarget(t, project.ID)
 	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
 
 	server := harness.EnsureTestServer(t)
@@ -322,7 +318,6 @@ func TestPasswordRegisterFlow_PasswordOverTheCap(t *testing.T) {
 func TestPasswordRegisterFlow_DuplicateEmail(t *testing.T) {
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
-	deployDefaultTarget(t, project.ID)
 
 	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
 

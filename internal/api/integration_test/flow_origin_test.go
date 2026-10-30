@@ -35,7 +35,6 @@ func TestFlowOrigins(t *testing.T) {
 	project, ok := created.(*api.CreateProjectResponse)
 	require.True(t, ok, helpers.MustMarshal(t, created))
 	harness.CleanupProject(t, project.ID)
-	deployDefaultTarget(t, string(project.ID))
 
 	t.Run("an origin the project does not list cannot open a flow", func(t *testing.T) {
 		resp, body := openFlow(t, project.ID, "https://evil.example.test")
@@ -74,8 +73,6 @@ func TestDefaultTarget(t *testing.T) {
 	t.Parallel()
 
 	fixture := newDeploymentFixture(t)
-	assertFlowCode(t, fixture.project, "", domain.ErrReleaseNoDefault().Code)
-	assertFlowCode(t, fixture.project, helpers.ConsoleOrigin, domain.ErrReleaseNoDefault().Code)
 	assertFlowCode(t, fixture.project, appOrigin, domain.ErrReleaseNotDeployed(nil).Code)
 
 	listResp, err := fixture.client.ListFlowDefinitions(t.Context(), api.ListFlowDefinitionsParams{
@@ -108,6 +105,14 @@ func TestDefaultTarget(t *testing.T) {
 		require.Equal(t, http.StatusCreated, resp.StatusCode, "Origin %q: %s", origin, body)
 	}
 	assertFlowCode(t, fixture.project, appOrigin, domain.ErrReleaseNotDeployed(nil).Code)
+
+	history, err := fixture.client.ListDeployments(t.Context(), api.ListDeploymentsParams{
+		ProjectID: api.ProjectID(fixture.project),
+		Origin:    api.NewOptDeploymentTargetOrigin(domain.DeploymentTargetDefault),
+	})
+	require.NoError(t, err)
+	require.IsType(t, &api.ListDeploymentsResponse{}, history, helpers.MustMarshal(t, history))
+	assert.Len(t, history.(*api.ListDeploymentsResponse).Deployments, 1, "the default target's history is reachable")
 }
 
 // releaseID is the id of a created release. The same pointer set answers 200

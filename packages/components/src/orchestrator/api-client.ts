@@ -11,7 +11,7 @@
  * - `DELETE /sessions/me`       — `revokeMySession`
  *
  * The wrappers exist for one reason: every API call must run with
- * `credentials: "include"` so the stateless `_zflow` / `__nextgen_session`
+ * `credentials: "include"` so the stateless `_zflow` and session
  * HttpOnly cookies round-trip. Centralising that here keeps every call site
  * honest.
  *
@@ -75,7 +75,7 @@ export async function getCurrentStep(api: ZitadelApi, id: string): Promise<Creat
 
 /**
  * Exchange a terminal-flow `handoff_token` for an authenticated session.
- * The server sets the `__nextgen_session` HttpOnly cookie on success.
+ * The server sets the HttpOnly session cookie on success.
  *
  * Uses the generated `exchangeHandoff` client which handles the
  * `project_id` query parameter via {@link ExchangeHandoffParams}.
@@ -90,7 +90,7 @@ export async function exchangeSession(
 
 /**
  * Reads the current session (`GET /sessions/me`) with credentials so the
- * `__nextgen_session` cookie authenticates the request. Used by the
+ * session cookie authenticates the request. Used by the
  * orchestrator's signed-in surfaces to render the user's identity.
  *
  * The read names the element's project. A session of another project on the
