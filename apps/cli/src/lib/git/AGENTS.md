@@ -18,6 +18,8 @@ Zitadel: callers say what to leave out and whom to name as author.
   each is unit-tested against every answer git can give.
 - Keep Zitadel out: pass knowledge in (`except`, `authorIfGitHasNone`), never
   import from the rest of the CLI.
+- Assume a modern git (2.25 or later); add no fallbacks or workarounds for
+  older versions.
 - Throw `RepositoryError` with git's own message; the caller decides whether a
   failure is fatal.
 

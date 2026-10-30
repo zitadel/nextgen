@@ -77,22 +77,23 @@ export class StagingArea {
    * list goes through a file beside the staging area rather than the command
    * line, which a project of thousands of files would overflow. A file that is
    * already tracked and excluded keeps what the last commit has.
+   *
+   * The list is read and written back byte for byte: a name that is not
+   * valid UTF-8, which Linux allows, would otherwise come back changed and
+   * match nothing. `except` sees each name as UTF-8.
    */
   async addAll(except: PathFilter): Promise<void> {
-    const listed = await this.git.run([
-      "ls-files",
-      "-z",
-      "--modified",
-      "--deleted",
-      "--others",
-      "--exclude-standard",
-      "--",
-      ".",
-    ]);
-    const kept = listed.paths().filter((path) => !except(path));
+    const listed = await this.git.run(
+      ["ls-files", "-z", "--modified", "--deleted", "--others", "--exclude-standard", "--", "."],
+      [],
+      "latin1",
+    );
+    const kept = listed
+      .paths()
+      .filter((path) => !except(Buffer.from(path, "latin1").toString("utf8")));
     if (kept.length > 0) {
       const list = join(dirname(this.index), "paths");
-      await writeFile(list, kept.join("\0"));
+      await writeFile(list, Buffer.from(kept.join("\0"), "latin1"));
       await this.git.run(["add", "--all", `--pathspec-from-file=${list}`, "--pathspec-file-nul"]);
     }
   }

@@ -89,12 +89,20 @@ export class Git {
    * - Output is capped at 16 MB and a call at five minutes, so a stuck or
    *   runaway git cannot hang the CLI.
    *
+   * Output is read as UTF-8 unless `encoding` says otherwise; `latin1` keeps
+   * every byte as one character, for a path list that must go back to git
+   * unchanged.
+   *
    * An allowed exit code is an answer, not a failure. Only a git that ran and
    * exited has one, so no allow list can mistake a missing git for an answer;
    * that throws {@link GitDidNotStartError}. Every other failure carries git's
    * own message, or Node's when git wrote nothing.
    */
-  run(args: readonly string[], allow: readonly number[] = []): Promise<GitResult> {
+  run(
+    args: readonly string[],
+    allow: readonly number[] = [],
+    encoding: "utf8" | "latin1" = "utf8",
+  ): Promise<GitResult> {
     const inherited = { ...process.env };
     for (const name of ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE"]) {
       delete inherited[name];
@@ -104,7 +112,7 @@ export class Git {
       execFile(
         "git",
         ["--literal-pathspecs", ...args],
-        { cwd: this.dir, env, maxBuffer: 16 * 1024 * 1024, timeout: 5 * 60 * 1000 },
+        { cwd: this.dir, env, encoding, maxBuffer: 16 * 1024 * 1024, timeout: 5 * 60 * 1000 },
         (error, stdout, stderr) => {
           const failure = error as (NodeJS.ErrnoException & { killed?: boolean }) | null;
           if (failure === null) {

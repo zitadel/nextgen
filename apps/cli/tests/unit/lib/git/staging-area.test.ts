@@ -1,6 +1,8 @@
+import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
 import { chmod, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
+import { promisify } from "node:util";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -16,6 +18,8 @@ import {
   stagedFiles,
   write,
 } from "../../../helpers/git-repo";
+
+const exec = promisify(execFile);
 
 const scratch = new GitScratch();
 
@@ -213,6 +217,38 @@ describe("StagingArea", () => {
     });
 
     expect(files).toEqual([]);
+  });
+
+  it("stages a file whose name is not valid UTF-8", async () => {
+    const cwd = await scratch.committed({ "a.txt": "a\n" });
+    const blob = (await git(cwd, "hash-object", "-w", "a.txt")).trim();
+    await exec(
+      "sh",
+      ["-c", `git update-index --add --cacheinfo "100644,${blob},$(printf 'caf\\351.txt')"`],
+      { cwd },
+    );
+    await git(cwd, "commit", "--quiet", "--message=latin1");
+
+    const files = await StagingArea.temporary(new Git(cwd), async (staging) => {
+      await staging.startFromHead();
+      await staging.addAll(() => false);
+      return staged(staging);
+    });
+
+    expect(files).toHaveLength(1);
+  });
+
+  it("names each file to `except` as UTF-8", async () => {
+    const cwd = await scratch.committed({ "a.txt": "a\n" });
+    await write(cwd, { "café.txt": "secret\n", "b.txt": "b\n" });
+
+    const files = await StagingArea.temporary(new Git(cwd), async (staging) => {
+      await staging.startFromHead();
+      await staging.addAll((path) => path === "café.txt");
+      return staged(staging);
+    });
+
+    expect(files).toEqual(["b.txt"]);
   });
 
   it("stages a deletion", async () => {
