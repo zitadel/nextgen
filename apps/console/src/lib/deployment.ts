@@ -37,15 +37,29 @@ export function releaseRevoked(deployment: Deployment): boolean {
 }
 
 /**
- * Where a release went, newest first. `GET /deployments` has no filter by
- * release, so the project's whole history is read and filtered here; a
- * release's own history is a handful.
+ * Every deployment the filter matches, across pages. A release's own history
+ * is a handful, so walking the pages is the honest read while
+ * `GET /deployments` has no filter by release.
  */
+async function listAllDeployments(
+  params: Omit<ListDeploymentsParams, "limit" | "page_token">,
+): Promise<Deployment[]> {
+  const all: Deployment[] = [];
+  let pageToken: string | undefined;
+  do {
+    const page = await api.listDeployments({ ...params, limit: PAGE_SIZE, page_token: pageToken });
+    all.push(...page.deployments);
+    pageToken = page.next_page_token ?? undefined;
+  } while (pageToken);
+  return all;
+}
+
+/** Where a release went, newest first. */
 export async function listReleaseDeployments(
   projectId: string,
   releaseId: string,
 ): Promise<Deployment[]> {
-  const history = await api.listDeployments.all({ project_id: projectId, limit: PAGE_SIZE });
+  const history = await listAllDeployments({ project_id: projectId });
   return history.filter((deployment) => deployment.release_id === releaseId);
 }
 
@@ -88,11 +102,7 @@ export async function listPrimaryOrigins(projectId: string): Promise<string[]> {
  * nothing.
  */
 export async function livePrimaryDeployment(projectId: string): Promise<Deployment | undefined> {
-  const live = await api.listDeployments.all({
-    project_id: projectId,
-    live: true,
-    limit: PAGE_SIZE,
-  });
+  const live = await listAllDeployments({ project_id: projectId, live: true });
   return live.find((deployment) => deployment.kind === "primary" && deployment.status === "live");
 }
 
@@ -137,11 +147,7 @@ export interface RollbackTargets {
 }
 
 export async function listRollbackTargets(projectId: string): Promise<RollbackTargets> {
-  const history = await api.listDeployments.all({
-    project_id: projectId,
-    expand: EXPAND_RELEASE,
-    limit: PAGE_SIZE,
-  });
+  const history = await listAllDeployments({ project_id: projectId, expand: EXPAND_RELEASE });
   const primary = history.filter((deployment) => deployment.kind === "primary");
   const current = primary.find((deployment) => deployment.status === "live");
   const options = primary.filter(
