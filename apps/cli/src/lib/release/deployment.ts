@@ -29,8 +29,9 @@ export type ListedDeployment = ListDeployments200DeploymentsItem;
 /**
  * Whether a deployment serves a primary origin. A preview deployment's targets
  * carry an expiry; it is never the baseline, the guard or the thing a bare
- * rollback undoes. Look for it across every page (`listDeployments.all`): one
- * live preview per open pull request can push it off the first.
+ * rollback undoes. Look past the first page for it ({@link
+ * newestPrimaryDeployments}): one live preview per open pull request can push
+ * it off the first.
  */
 export function servesPrimary(deployment: Pick<ListedDeployment, "targets">): boolean {
   return deployment.targets.some((target) => target.expires_at == null);
@@ -47,6 +48,9 @@ export async function newestPrimaryDeployments(
   count: number,
 ): Promise<ListedDeployment[]> {
   const found: ListedDeployment[] = [];
+  if (count <= 0) {
+    return found;
+  }
   for await (const deployment of client.listDeployments.items({ project_id: projectId })) {
     if (servesPrimary(deployment)) {
       found.push(deployment);

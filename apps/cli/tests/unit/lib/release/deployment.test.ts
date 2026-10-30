@@ -38,6 +38,14 @@ describe("newestPrimaryDeployments", () => {
     expect(read.count).toBe(2);
   });
 
+  it("reads nothing when asked for none", async () => {
+    const { client, read } = history(PRIMARY, PRIMARY);
+
+    await newestPrimaryDeployments(client, "proj_1", 0);
+
+    expect(read.count).toBe(0);
+  });
+
   it("returns what there is when the history runs out first", async () => {
     const { client } = history(PRIMARY, PREVIEW);
 
