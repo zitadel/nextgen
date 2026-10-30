@@ -1,5 +1,35 @@
 # @zitadel/cli
 
+## 0.4.0
+
+### Minor Changes
+
+- [#2464](https://github.com/zitadel/nextgen/pull/2464) [`3481a07`](https://github.com/zitadel/nextgen/commit/3481a07fcfc471fb326eeca87d17f638ea67fa73) - `zitadel deploy` and `zitadel preview` record a message when `-m` is omitted: a GitHub pull request's title, Vercel's commit message, or the current commit's subject on a clean worktree, so a CI run no longer needs `-m`. `zitadel preview -m` and `zitadel deployment rollback -m` record a message of their own, and a blank or over-long `-m` is refused.
+
+- [#2439](https://github.com/zitadel/nextgen/pull/2439) [`d277b8f`](https://github.com/zitadel/nextgen/commit/d277b8f8eef7e24a64b40db3eb6f60d327cc3950) - `release list` shows when each release was created, `release get` shows the resources a release pins, and `deployment get` shows the variables the deployment froze.
+
+- [#2487](https://github.com/zitadel/nextgen/pull/2487) [`bf6ce2e`](https://github.com/zitadel/nextgen/commit/bf6ce2eb657078c261b7f9a3481073b10f85698c) - `zitadel skills add` gives your project's coding agents the Zitadel skills of the CLI version you run, for Claude Code and most other agents, and the note after `setup` now names it ([Agent setup](https://preview.zitadel.com/docs/get-started/agents)).
+
+- [#2488](https://github.com/zitadel/nextgen/pull/2488) [`db05fbb`](https://github.com/zitadel/nextgen/commit/db05fbb18b1bf33251694382787be8445da608da) - The session cookie is now `__Host-zitadel_session`, which a browser accepts only from Zitadel's own host over https, so another site under the same domain can no longer plant a session. On `http://localhost` it is `zitadel_session`, so sign-in keeps working in Safari. An app's own, behind a server SDK or dev proxy, adds `_<project id>`.
+  
+  **Breaking:** every browser signs in again: cookies named `__nextgen_session` are no longer read. Update the server, the server SDKs, the CLI and `@zitadel/testing` together; an SDK from before this release keeps no session with this server, nor the other way round. In `@zitadel/testing`, `SESSION_COOKIE_NAME` is `__Host-zitadel_session`, and `sessionCookieName(projectId, url)` and the new `browserSessionCookieName(url)` name the cookies for the app's URL. `zitadel doctor` fails on the dev proxy of a single-page app set up before this release until `zitadel doctor --fix` updates it.
+
+- [#2461](https://github.com/zitadel/nextgen/pull/2461) [`b2d9cb9`](https://github.com/zitadel/nextgen/commit/b2d9cb9033e6d91641af451886d04652b34ed721) - `zitadel setup` deploys `.zitadel/` to the app's origin once it has committed the project, so the sign-in it asks you to verify is served the release it built. `data.deployment` reports what it deployed, and a failed deploy is a warning whose `next_commands` lead with the `deploy` that fixes it.
+
+### Patch Changes
+
+- [#2523](https://github.com/zitadel/nextgen/pull/2523) [`9b1ef1e`](https://github.com/zitadel/nextgen/commit/9b1ef1ed0b0d1b8565a7da1e4e2e8d358482e877) - Every command now prints its suggested next steps at the end of a run, including `deploy`, `pull`, `origin add`, `release create`, `deployment create`, `env add` and the resource commands, which used to show them only under `--json`. `env add` lists its next commands once, in that block, instead of also spelling them out in its summary. Where stdout is data a script reads (a piped list's rows, a resource's JSON body) the next steps go to stderr instead. The `--json` output is unchanged.
+
+- [#2499](https://github.com/zitadel/nextgen/pull/2499) [`f34a0a5`](https://github.com/zitadel/nextgen/commit/f34a0a58fa0694f34d0b0ad09a2593d405a112bd) - `zitadel deploy` and `deploy --dry-run` no longer report an empty diff for rapid configuration edits that leave file sizes unchanged.
+
+- [#2495](https://github.com/zitadel/nextgen/pull/2495) [`1894af6`](https://github.com/zitadel/nextgen/commit/1894af64decaf46a8dd3c0d9fe6b4eba725b566e) - `zitadel setup` no longer commits local edits to files marked `skip-worktree` or `assume-unchanged`, never writes a secret's contents into `.git/objects`, and leaves `.env` files and `.zitadel/secret` out of its commit whatever their case. It refuses a merge, rebase or detached HEAD before writing anything. `deploy --json` keeps each file's patch with the right file when `diff.submodule` is set.
+
+- [#2503](https://github.com/zitadel/nextgen/pull/2503) [`665ea7d`](https://github.com/zitadel/nextgen/commit/665ea7db04c57c3abe2b9d60030fcd68f6339e15) - Fix sign-in behind a compressing edge failing with "got no response" after a successful exchange: the SDK proxies no longer forward `content-encoding` for a body `fetch` has already decoded, nor the browser's `accept-encoding`. A response whose body cannot be read now fails as a `NetworkError` with reason `unreadable` and says which status arrived, instead of claiming the server never answered.
+- Updated dependencies [[`8680159`](https://github.com/zitadel/nextgen/commit/8680159e6e483f92119ab3a32cd053c184d85db4), [`3f4da33`](https://github.com/zitadel/nextgen/commit/3f4da3399a755ee7c39430844bbba598ffe00c79), [`01ed930`](https://github.com/zitadel/nextgen/commit/01ed930a5a31665d01ad1190944535b56e63e6ae), [`3dd0da3`](https://github.com/zitadel/nextgen/commit/3dd0da3ff84c0b0739982625924e1ba5897d2783), [`26097dd`](https://github.com/zitadel/nextgen/commit/26097dd104c9b6fd6b9e8183921464b54f851a10), [`3b43b2c`](https://github.com/zitadel/nextgen/commit/3b43b2c3956fb4514cc5fde29bc9fe31bf0a493d), [`f34a0a5`](https://github.com/zitadel/nextgen/commit/f34a0a58fa0694f34d0b0ad09a2593d405a112bd), [`eaa07c3`](https://github.com/zitadel/nextgen/commit/eaa07c36f3c76a963214faa8a230f3befa2cff9b), [`665ea7d`](https://github.com/zitadel/nextgen/commit/665ea7db04c57c3abe2b9d60030fcd68f6339e15), [`2cd409d`](https://github.com/zitadel/nextgen/commit/2cd409d650e7ed792a768ff3ecf831518a4476ef), [`ff2f926`](https://github.com/zitadel/nextgen/commit/ff2f9266979a6882117a469ef2fbdd919f523655), [`db05fbb`](https://github.com/zitadel/nextgen/commit/db05fbb18b1bf33251694382787be8445da608da), [`d1ab5d2`](https://github.com/zitadel/nextgen/commit/d1ab5d27431bb966b166b25cabd5b8f00295283a)]:
+  - @zitadel/server@0.4.0
+  - @zitadel/api@0.4.0
+  - @zitadel/config@0.4.0
+
 ## 0.3.0
 
 ### Minor Changes

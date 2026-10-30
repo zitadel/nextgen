@@ -1,5 +1,12 @@
 # @zitadel/config
 
+## 0.4.0
+
+### Patch Changes
+
+- Updated dependencies [[`26097dd`](https://github.com/zitadel/nextgen/commit/26097dd104c9b6fd6b9e8183921464b54f851a10), [`eaa07c3`](https://github.com/zitadel/nextgen/commit/eaa07c36f3c76a963214faa8a230f3befa2cff9b), [`665ea7d`](https://github.com/zitadel/nextgen/commit/665ea7db04c57c3abe2b9d60030fcd68f6339e15), [`db05fbb`](https://github.com/zitadel/nextgen/commit/db05fbb18b1bf33251694382787be8445da608da)]:
+  - @zitadel/api@0.4.0
+
 ## 0.3.0
 
 ### Minor Changes
