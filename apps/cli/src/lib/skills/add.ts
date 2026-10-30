@@ -28,10 +28,21 @@ export async function bundledSkills(packageRoot: string): Promise<string[]> {
  * already has a `.claude/` folder, as one a teammate works on with it does.
  */
 export async function skillDirs(projectDir: string): Promise<string[]> {
-  const claude =
-    existsSync(join(projectDir, ".claude")) ||
-    (await rosie.agents()).some((agent) => agent.name === "claude" && agent.detected);
+  const claude = existsSync(join(projectDir, ".claude")) || (await claudeCodeInstalled());
   return claude ? [SHARED_SKILLS_DIR, CLAUDE_SKILLS_DIR] : [SHARED_SKILLS_DIR];
+}
+
+/**
+ * Whether Claude Code is installed on this machine. A detection that fails
+ * counts as no: it only decides the extra folder, never whether the skills
+ * are added.
+ */
+async function claudeCodeInstalled(): Promise<boolean> {
+  try {
+    return (await rosie.agents()).some((agent) => agent.name === "claude" && agent.detected);
+  } catch {
+    return false;
+  }
 }
 
 /**

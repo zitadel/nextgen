@@ -47,6 +47,12 @@ describe("skillDirs", () => {
     expect(await skillDirs(project)).toEqual([".agents/skills", ".claude/skills"]);
   });
 
+  it("still adds to the folder most agents read when agent detection fails", async () => {
+    rosie.agents.mockRejectedValue(new Error("boom"));
+
+    expect(await skillDirs(project)).toEqual([".agents/skills"]);
+  });
+
   it("adds to Claude Code's folder too when the project has one", async () => {
     await mkdir(join(project, ".claude"));
 
