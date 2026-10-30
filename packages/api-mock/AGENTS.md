@@ -60,7 +60,8 @@ which the server embeds (`configdefaults.DefaultLoginFlowDefinition()`).
 
 Emails that trigger error paths (`REGISTRATION_ERRORS`, `LOGIN_ERRORS`,
 `PASSKEY_UPSELL_ERRORS`) are in `src/lib/authn/authn-store.ts`; any other email
-takes the happy path.
+takes the happy path, unless `setupMockHandlers({ accounts })` opts into the
+default flow's switch between sign-in and sign-up (its JSDoc has the rules).
 
 ## The provider's return
 

@@ -29,7 +29,7 @@ get:
     Ordered by `user_id` and paginated with `page_token`.
 
     Accepts either a project secret (`oauth2`) or a user-bound Console
-    session cookie (`nextgenSession`) that can read the project.
+    session cookie (`sessionCookie`) that can read the project.
   tags:
     - Projects
   parameters:
@@ -46,7 +46,7 @@ get:
         # browser-plane preview secret, which must not list the people who
         # administer the project (same reasoning as getProject).
         - project.write
-    - nextgenSession: []
+    - sessionCookie: []
   responses:
     '200':
       description: The admins of the project were returned.

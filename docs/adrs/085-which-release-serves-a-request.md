@@ -1,4 +1,4 @@
-# ADR 083: Which Release Serves a Request
+# ADR 085: Which Release Serves a Request
 
 > **Status:** Accepted
 > **Date:** 2026-10-29
@@ -92,10 +92,11 @@ release:
 - Every CLI deploy goes to the project's primary origins and its `default`
   target, so callers with no `Origin` run what the web origins run.
 - The platform project, which the console signs operators in to, is served
-  like any project. With platform bootstrap on, every start lists
-  `server.public_base`'s origin as a primary origin of it if missing, and
-  deploys a release of its newest revisions to its primary origins and the
-  `default` target. A start that changes nothing deploys nothing.
+  like any project. With platform bootstrap on, every start makes
+  `server.public_base`'s origin its one primary origin and deploys the
+  configuration the server ships to its primary origins and the `default`
+  target. A start that changes nothing deploys nothing, and a server older
+  than the one that built the live release leaves it alone.
 
 ## Consequences
 
@@ -118,5 +119,9 @@ release:
   project.** It needs no stored origin, but it makes the platform project
   the one project that is not served through its own origins and
   deployments.
-- **Replace the platform project's origins at each start.** It would remove
-  origins added on purpose; bootstrap only adds what is missing.
+- **Deploy the platform project once, at deploy time.** It avoids replicas
+  racing and old servers deploying, but a local `zitadel start` or a
+  self-hosted server that does not run that step would have nothing deployed.
+- **Only add to the platform project's primary origins.** A public base the
+  deployment has left would stay admitted, and the list would grow towards the
+  deployment target limit.

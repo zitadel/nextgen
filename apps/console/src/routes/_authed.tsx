@@ -20,7 +20,7 @@ import {
  * Pathless layout route owning console authentication (Console ADR 0003).
  *
  * Every console screen lives under this layout, so the guard below runs
- * before any of them load: `fetchSession()` confirms the `__nextgen_session`
+ * before any of them load: `fetchSession()` confirms the session
  * cookie against `GET /sessions/me`, and an unauthenticated visitor is
  * redirected to `/login` with the originally requested path in `?next=` so
  * deep links survive the round trip.
