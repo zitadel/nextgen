@@ -19,6 +19,10 @@ import { isJwtShaped, verifyJwt } from "./jwt.js";
  * two directly connected peers and become invalid when proxied.
  */
 export const HOP_BY_HOP: ReadonlySet<string> = new Set([
+  // accept-encoding is not hop-by-hop per RFC 7230, but the browser's value
+  // must not reach the upstream: the proxy's fetch decodes the body it gets
+  // back, so only the codings that fetch advertises itself may be chosen.
+  "accept-encoding",
   "connection",
   // content-length is not hop-by-hop per RFC 7230, but it must be stripped: the
   // proxy re-sends a freshly buffered body, so the fetch implementation computes
@@ -185,9 +189,15 @@ function ontoThisApp(location: string, selfUrl: string | undefined): string | un
 }
 
 /**
- * Filters upstream response headers for proxying: strips hop-by-hop headers
- * and `set-cookie` (handled separately via `getSetCookie()`), and reduces
- * `location` to a redirect that can only land on this app.
+ * Filters upstream response headers for proxying: strips hop-by-hop headers,
+ * `content-encoding` and `set-cookie` (handled separately via `getSetCookie()`),
+ * and reduces `location` to a redirect that can only land on this app.
+ *
+ * `content-encoding` describes the bytes the upstream sent, but `fetch` has
+ * already decoded them, so the proxy passes on a plain body. Forwarding the
+ * header labels that body as compressed: the browser fails to decode it, and a
+ * `200` reaches the caller as a request that got no response. `content-length`
+ * goes for the same reason, as a hop-by-hop header.
  *
  * `location` was stripped outright until the identity-provider callback
  * needed it: the provider returns the browser to `/__nextgen/idp/{slug}/callback`,
@@ -207,7 +217,7 @@ export function filterResponseHeaders(upstream: Headers, selfUrl?: string): Head
   const filtered = new Headers();
   upstream.forEach((value, key) => {
     const name = key.toLowerCase();
-    if (HOP_BY_HOP.has(name) || name === "set-cookie") {
+    if (HOP_BY_HOP.has(name) || name === "content-encoding" || name === "set-cookie") {
       return;
     }
     if (name === "location") {
