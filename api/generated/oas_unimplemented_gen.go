@@ -421,7 +421,9 @@ func (UnimplementedHandler) DeleteTeam(ctx context.Context, params DeleteTeamPar
 // The user is removed, not deactivated, and the deletion emits `user.deleted`,
 // plus `authz.revoked` for each grant on that grant's project.
 // With a project secret the request is idempotent: deleting a user that exists
-// in no project succeeds without changing anything.
+// in no project succeeds without changing anything. Deleting the last active
+// member of a project's owning team returns 409 `proj.last_owner` and changes
+// nothing.
 //
 // DELETE /users/{user_id}
 func (UnimplementedHandler) DeleteUserByID(ctx context.Context, params DeleteUserByIDParams) (r DeleteUserByIDRes, _ error) {
