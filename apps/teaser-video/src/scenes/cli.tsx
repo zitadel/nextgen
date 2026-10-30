@@ -127,14 +127,15 @@ export function Cli() {
         justifyContent: "center",
       }}
     >
-      {/* A soft glow in Zitadel's orange and lilac, for the glass to lift. */}
+      {/* A soft glow in Zitadel's orange and lilac behind the window,
+          coming out around its edges, mostly at two opposite corners. */}
       <div
         style={{
           position: "absolute",
           inset: 0,
           background: [
-            "radial-gradient(38% 45% at 30% 70%, rgb(242 85 67 / 0.28), transparent 70%)",
-            "radial-gradient(40% 50% at 72% 30%, rgb(187 165 228 / 0.24), transparent 70%)",
+            "radial-gradient(34% 42% at 12% 86%, rgb(242 85 67 / 0.4), transparent 70%)",
+            "radial-gradient(36% 44% at 88% 14%, rgb(187 165 228 / 0.34), transparent 70%)",
           ].join(", "),
         }}
       />
@@ -145,6 +146,9 @@ export function Cli() {
           height: 900,
           borderRadius: 20,
           ...GLASS,
+          // Nearly opaque, so the glow stays behind the window and does not
+          // tint the text; the glass keeps its edge and its light.
+          background: "rgb(20 20 23 / 0.94)",
           overflow: "hidden",
           display: "flex",
           flexDirection: "column",
