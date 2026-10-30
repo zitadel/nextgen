@@ -69,10 +69,10 @@ func newSSOCollectionFixture(t *testing.T) *ssoCollectionFixture {
 					SSOProviders: []string{"google"},
 					Actions:      []api.StepAction{submit},
 					Transitions: api.NewOptFlowDefinitionStepTransitions(api.FlowDefinitionStepTransitions{
-						"submit":              api.FlowDefinitionStepTransitionsItem{Target: "done"},
-						"sso_authenticated":   api.FlowDefinitionStepTransitionsItem{Target: "done"},
-						"user_already_exists": api.FlowDefinitionStepTransitionsItem{Target: "identifier"},
-						"sso_user_not_found":  api.FlowDefinitionStepTransitionsItem{Target: "register-sso"},
+						"submit":              api.FlowDefinitionStepTransitionsItem{Target: api.NewOptString("done")},
+						"sso_authenticated":   api.FlowDefinitionStepTransitionsItem{Target: api.NewOptString("done")},
+						"user_already_exists": api.FlowDefinitionStepTransitionsItem{Target: api.NewOptString("identifier")},
+						"sso_user_not_found":  api.FlowDefinitionStepTransitionsItem{Target: api.NewOptString("register-sso")},
 					}),
 				},
 				{
@@ -81,8 +81,8 @@ func newSSOCollectionFixture(t *testing.T) *ssoCollectionFixture {
 					OnSuccess: api.NewOptFlowDefinitionStepOnSuccess(api.FlowDefinitionStepOnSuccessCreateUserWithSSO),
 					Actions:   []api.StepAction{submit},
 					Transitions: api.NewOptFlowDefinitionStepTransitions(api.FlowDefinitionStepTransitions{
-						"submit":              api.FlowDefinitionStepTransitionsItem{Target: "done"},
-						"user_already_exists": api.FlowDefinitionStepTransitionsItem{Target: "identifier"},
+						"submit":              api.FlowDefinitionStepTransitionsItem{Target: api.NewOptString("done")},
+						"user_already_exists": api.FlowDefinitionStepTransitionsItem{Target: api.NewOptString("identifier")},
 					}),
 				},
 				{

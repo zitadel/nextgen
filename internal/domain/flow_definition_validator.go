@@ -60,10 +60,9 @@ func ValidateFlowDefinition(userSchema *jsonschema.Schema, flowDefinition FlowDe
 		return nil, err
 	}
 
-	// 6. flip-table coverage + on_success manifest cross-check
-	if err := validateFlipTableCoverage(flowDefinition); err != nil {
-		return nil, err
-	}
+	// 6. on_success manifest cross-check. The automatic switch between
+	// login and register is not required: a flow that leaves out
+	// user_not_found or user_already_exists shows that outcome's error.
 	if err := validateOnSuccessManifests(flowDefinition, resolvedByStep); err != nil {
 		return nil, err
 	}
@@ -373,14 +372,18 @@ func validateGraph(flowDefinition FlowDefinition) ([]PivotingTarget, error) {
 					return nil, ErrFlowDefinitionInvalid(fmt.Sprintf(
 						"step %q: transition %q re-purposes to %q, which this definition does not serve", step.Name, key, t.Purpose.String()), nil)
 				}
-				if t.Target != entry {
+				if t.Target != "" && t.Target != entry {
 					return nil, ErrFlowDefinitionInvalid(fmt.Sprintf(
 						"step %q: transition %q re-purposes to %q but targets %q; it must target that purpose's entry step %q", step.Name, key, t.Purpose.String(), t.Target, entry), nil)
 				}
 			}
+			if t.Target == "" && t.Purpose == nil {
+				return nil, ErrFlowDefinitionInvalid(fmt.Sprintf(
+					"step %q: transition %q has neither a target nor a purpose", step.Name, key), nil)
+			}
 			if t.IsCurrentFlow() {
 				// target must be a step in this flow definition
-				if _, ok := stepNames[t.Target]; !ok {
+				if _, ok := stepNames[flowDefinition.TransitionTarget(t)]; !ok {
 					return nil, ErrFlowDefinitionInvalid(fmt.Sprintf(
 						"step %q: transition %q targets unknown step %q", step.Name, key, t.Target), nil)
 				}
@@ -413,7 +416,7 @@ func validateGraph(flowDefinition FlowDefinition) ([]PivotingTarget, error) {
 	for _, s := range flowDefinition.Steps {
 		for _, t := range s.Transitions {
 			if t.IsCurrentFlow() {
-				adj[s.Name] = append(adj[s.Name], t.Target)
+				adj[s.Name] = append(adj[s.Name], flowDefinition.TransitionTarget(t))
 			}
 		}
 	}
@@ -439,7 +442,8 @@ func validateCycles(flowDefinition FlowDefinition) error {
 	for _, s := range flowDefinition.Steps {
 		for _, t := range s.Transitions {
 			if t.IsCurrentFlow() {
-				reverseAdj[t.Target] = append(reverseAdj[t.Target], s.Name)
+				target := flowDefinition.TransitionTarget(t)
+				reverseAdj[target] = append(reverseAdj[target], s.Name)
 			}
 		}
 	}
@@ -508,58 +512,6 @@ func bfsReachable(start string, adj map[string][]string, reachable map[string]st
 	}
 }
 
-// validateFlipTableCoverage requires the counter-outcome transition on
-// an entry step iff the partner purpose is also wired (e.g. login entry
-// needs user_not_found only when register is also a purpose).
-func validateFlipTableCoverage(def FlowDefinition) error {
-	purposes := def.Purposes
-	for purpose, entryStepName := range purposes {
-		flipTargets, ok := purposeFlipTargets[purpose]
-		if !ok {
-			continue
-		}
-		entry, found := def.FindStep(entryStepName)
-		if !found {
-			continue
-		}
-		for outcome, targetPurpose := range flipTargets {
-			if _, partnerWired := purposes[targetPurpose]; !partnerWired {
-				continue
-			}
-			if _, ok := entry.Transitions[outcome]; !ok {
-				return ErrFlowDefinitionInvalid(fmt.Sprintf(
-					"step %q: entry step for purpose %q must wire %q transition because %q is also a purpose: without it, %s",
-					entry.Name, purpose, outcome, targetPurpose, flipOutcomeImpacts[outcome]), nil)
-			}
-		}
-	}
-	return nil
-}
-
-// purposeFlipTargets mirrors the identifier half of the engine's flip
-// table. Kept separate so the validator stays pure. sso_user_not_found also
-// flips login → register but comes only from SSO resolution, so it is
-// left out here: requiring it on every combined entry step would reject
-// the shipped default flow. A rule on steps carrying sso_providers is
-// future work (#1014).
-var purposeFlipTargets = map[FlowDefinitionPurpose]map[string]FlowDefinitionPurpose{
-	FlowDefinitionPurposeLogin: {
-		FlowImplicitOutcomeUserNotFound: FlowDefinitionPurposeRegister,
-	},
-	FlowDefinitionPurposeRegister: {
-		FlowImplicitOutcomeUserAlreadyExists: FlowDefinitionPurposeLogin,
-	},
-}
-
-// flipOutcomeImpacts spells out, per implicit outcome, who gets stuck
-// where when the entry step leaves it unwired — the flip-table violation
-// explains the user impact, not just the graph rule. Mirrored verbatim
-// in packages/config/src/validate.ts (drift-audited there).
-var flipOutcomeImpacts = map[string]string{
-	FlowImplicitOutcomeUserNotFound:      "someone without an account gets stuck at sign-in instead of being routed to registration",
-	FlowImplicitOutcomeUserAlreadyExists: "someone who already has an account gets stuck at registration instead of being routed to sign-in",
-}
-
 // validateOnSuccessManifests verifies that every kind in each step's
 // on_success manifest is collected on the step itself or upstream.
 func validateOnSuccessManifests(def FlowDefinition, resolvedByStep map[string]FlowResolvedFields) error {
@@ -570,7 +522,8 @@ func validateOnSuccessManifests(def FlowDefinition, resolvedByStep map[string]Fl
 	for _, s := range def.Steps {
 		for _, t := range s.Transitions {
 			if t.IsCurrentFlow() {
-				reverse[t.Target] = append(reverse[t.Target], s.Name)
+				target := def.TransitionTarget(t)
+				reverse[target] = append(reverse[target], s.Name)
 			}
 		}
 	}

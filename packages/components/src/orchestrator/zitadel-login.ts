@@ -359,6 +359,9 @@ export class ZitadelLogin extends ZitadelSurface {
 
   private engine: Liquid | null = null;
 
+  /** The dictionary {@link engine} was built with. */
+  private locale: Locale = {};
+
   /**
    * The theme the last commit rendered with. The template output carries the
    * resolved side's mark, so a theme change rewrites the string and
@@ -488,7 +491,8 @@ export class ZitadelLogin extends ZitadelSurface {
 
   override willUpdate(changed: PropertyValues<this>): void {
     if (!this.engine || changed.has("locales") || changed.has("lang")) {
-      this.engine = createLiquidEngine({ locale: this.resolveLocale() });
+      this.locale = this.resolveLocale();
+      this.engine = createLiquidEngine({ locale: this.locale });
     }
     if (changed.has("previewState") && this.previewState && !this.preview) {
       console.warn(
@@ -1138,8 +1142,12 @@ export class ZitadelLogin extends ZitadelSurface {
       challenge: this.loading || this.preview ? null : (step.challenge ?? null),
       identifier: step.identifier ?? null,
       // Why the flow moved between sign-in and sign-up without being asked,
-      // on the step right after the move.
-      messages: step.notice ? [{ level: "info", text_key: step.notice }] : [],
+      // on the step right after the move. A host that sets the notice's text
+      // to "" in `locales` opts out of it.
+      messages:
+        step.notice && this.locale[step.notice] !== ""
+          ? [{ level: "info", text_key: step.notice }]
+          : [],
       identity: this.deriveIdentity(),
       errors,
       branding: this.brandingForTemplate(),

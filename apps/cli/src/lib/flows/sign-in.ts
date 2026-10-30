@@ -53,7 +53,10 @@ export function checkFlow(
   }
   // The validator runs the schema rules only over a structurally sound flow,
   // so without this the change would always look harmless on a broken one.
-  const structural = validateFlowDefinition(flowAfter);
+  // A warning describes a flow that works, so it leaves the flow checkable.
+  const structural = validateFlowDefinition(flowAfter).filter(
+    (issue) => issue.severity === "error",
+  );
   if (structural.length > 0) {
     return { kind: "unchecked", issues: structural };
   }
@@ -140,15 +143,23 @@ function loginJourney(flow: Record<string, unknown>): Record<string, unknown> {
       // `action` goes to another flow, whose step names are not this flow's,
       // and one into another purpose (register, say) leaves the login
       // journey. A null `action` or `purpose` is the same as an absent one.
+      // A transition that names only `purpose: login` goes to the login entry.
       if (
         isObject(transition) &&
-        typeof transition.target === "string" &&
         (transition.action === undefined || transition.action === null) &&
         (transition.purpose === undefined ||
           transition.purpose === null ||
           transition.purpose === "login")
       ) {
-        queue.push(transition.target);
+        const target =
+          typeof transition.target === "string"
+            ? transition.target
+            : transition.purpose === "login"
+              ? entry
+              : undefined;
+        if (typeof target === "string") {
+          queue.push(target);
+        }
       }
     }
   }

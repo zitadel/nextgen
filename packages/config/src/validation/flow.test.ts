@@ -24,7 +24,7 @@ type TestStep = {
   name: string;
   fields: string[];
   actions: Array<{ name: string; kind: string; primary?: boolean; text_key?: string }>;
-  transitions: Record<string, { target: string; action?: string; purpose?: string }>;
+  transitions: Record<string, { target?: string; action?: string; purpose?: string }>;
   sso_providers?: string[];
   on_success?: string;
   complete?: string;
@@ -130,7 +130,7 @@ describe("validateFlowDefinition — valid flows", () => {
       action: "pivot",
     };
     step(def, "password").actions.push({ name: "recover", kind: "navigate" });
-    expect(validateFlowDefinition(def, schema)).toEqual([]);
+    expect(errors(validateFlowDefinition(def, schema))).toEqual([]);
   });
 
   it("accepts cycles that can reach a terminal step", () => {
@@ -316,9 +316,9 @@ describe("steps", () => {
   });
 });
 
-// ── phase 4: graph / cycles / flip table ─────────────────────────────────────
+// ── phase 4: graph / cycles / switch ─────────────────────────────────────────
 
-describe("graph / cycles / flip-table", () => {
+describe("graph / cycles / switch", () => {
   it("rejects a local transition to an unknown step", () => {
     const def = flow();
     step(def, "password").transitions.submit = { target: "nowhere" };
@@ -340,10 +340,8 @@ describe("graph / cycles / flip-table", () => {
     // identifier); the blanket valid-flow test covers this, but pin the
     // shape here so the graph rules keep accepting it explicitly.
     const def = flow();
-    expect(step(def, "identifier").transitions.register).toEqual({
-      target: "register",
-      purpose: "register",
-    });
+    expect(step(def, "identifier").transitions.register).toEqual({ purpose: "register" });
+    expect(step(def, "register").transitions.sign_in).toEqual({ purpose: "login" });
     expect(errors(validateFlowDefinition(def, schema))).toEqual([]);
   });
 
@@ -426,21 +424,98 @@ describe("graph / cycles / flip-table", () => {
     expect(msgs).toContain('step "loop-b" is trapped: no path to a terminal step or another flow');
   });
 
-  it("rejects a login entry without user_not_found when register is wired (codex regression)", () => {
+  it("warns, without rejecting, about a login entry without user_not_found when register is wired", () => {
     const def = flow();
     delete step(def, "identifier").transitions.user_not_found;
     const issues = validateFlowDefinition(def, schema);
-    expect(messages(issues)).toContain(
-      'step "identifier": entry step for purpose "login" must wire "user_not_found" transition because "register" is also a purpose: without it, someone without an account gets stuck at sign-in instead of being routed to registration',
-    );
-    expect(issues.find((i) => i.rule === "flip-table")).toBeDefined();
+    expect(errors(issues)).toEqual([]);
+    expect(warnings(issues)).toContainEqual({
+      severity: "warning",
+      rule: "warn/no-purpose-switch",
+      message:
+        'step "identifier": entry step for purpose "login" has no "user_not_found" transition although "register" is also a purpose: an identifier with no account stays on the step with error.user_not_found instead of continuing as a sign-up',
+      step: "identifier",
+    });
   });
 
-  it("rejects a register entry without user_already_exists when login is wired", () => {
+  it("warns, without rejecting, about a register entry without user_already_exists when login is wired", () => {
     const def = flow();
     delete step(def, "register").transitions.user_already_exists;
+    const issues = validateFlowDefinition(def, schema);
+    expect(errors(issues)).toEqual([]);
+    expect(messages(warnings(issues))).toContain(
+      'step "register": entry step for purpose "register" has no "user_already_exists" transition although "login" is also a purpose: an identifier that has an account stays on the step with error.user_already_exists instead of continuing as a sign-in',
+    );
+  });
+
+  it("does not warn about the switch on an entry step that collects nothing", () => {
+    const def = flow();
+    def.purposes.login = "passkey-first";
+    def.steps.push({
+      name: "passkey-first",
+      fields: [],
+      actions: [{ name: "email_fallback", kind: "navigate" }],
+      transitions: { email_fallback: { target: "identifier" } },
+    });
+    expect(validateFlowDefinition(def, schema)).toEqual([]);
+  });
+
+  it("does not warn about the switch on a flow that serves one purpose", () => {
+    const def = flow();
+    delete def.purposes.register;
+    delete step(def, "identifier").transitions.user_not_found;
+    def.steps = def.steps.filter((s) => s.name !== "register" && s.name !== "register-password");
+    step(def, "identifier").actions = step(def, "identifier").actions.filter(
+      (a) => a.name !== "register",
+    );
+    delete step(def, "identifier").transitions.register;
+    expect(validateFlowDefinition(def, schema)).toEqual([]);
+  });
+
+  it("accepts a purpose switch that leaves out the target", () => {
+    const def = flow();
+    step(def, "identifier").transitions.register = { purpose: "register" };
+    step(def, "register").transitions.sign_in = { purpose: "login" };
+    expect(validateFlowDefinition(def, schema)).toEqual([]);
+  });
+
+  it("still rejects a purpose switch whose target is not that purpose's entry step", () => {
+    const def = flow();
+    step(def, "identifier").transitions.register = { target: "password", purpose: "register" };
     expect(messages(validateFlowDefinition(def))).toContain(
-      'step "register": entry step for purpose "register" must wire "user_already_exists" transition because "login" is also a purpose: without it, someone who already has an account gets stuck at registration instead of being routed to sign-in',
+      'step "identifier": transition "register" re-purposes to "register" but targets "password"; it must target that purpose\'s entry step "register"',
+    );
+  });
+
+  it("rejects a transition with neither a target nor a purpose", () => {
+    const def = flow();
+    step(def, "identifier").transitions.register = {};
+    expect(messages(validateFlowDefinition(def))).toContain(
+      'step "identifier": transition "register" has neither a target nor a purpose',
+    );
+  });
+
+  it("warns, without rejecting, about a transition to another flow, which the engine does not run", () => {
+    const def = flow();
+    step(def, "identifier").transitions.register = { target: "other-flow", action: "switch" };
+    const issues = validateFlowDefinition(def);
+    expect(errors(issues)).toEqual([]);
+    expect(warnings(issues)).toContainEqual({
+      severity: "warning",
+      rule: "warn/cross-flow-transition",
+      message:
+        'step "identifier": transition "register" uses action "switch", which the engine does not run yet: taking it fails with flow.unsupported',
+      step: "identifier",
+    });
+  });
+
+  it("warns, without rejecting, about a reserved purpose", () => {
+    const def = flow();
+    def.purposes.recovery = "identifier";
+    const issues = validateFlowDefinition(def, schema);
+    expect(errors(issues)).toEqual([]);
+    expect(messages(warnings(issues))).toContain(
+      'purpose "recovery" is reserved: the engine has no behavior of its own for it yet',
     );
   });
 });
@@ -897,19 +972,32 @@ describe("drift audit (Go validator)", () => {
     expect(source).toContain(
       'offers passkey but "passkey" is not an enabled authentication method',
     );
-    // The flip-table impact suffixes must stay verbatim-identical.
-    expect(source).toContain(
-      "someone without an account gets stuck at sign-in instead of being routed to registration",
-    );
-    expect(source).toContain(
-      "someone who already has an account gets stuck at registration instead of being routed to sign-in",
-    );
-    // purposeFlipTargets: login→user_not_found→register, register→user_already_exists→login.
-    expect(source).toContain("FlowDefinitionPurposeLogin: {");
-    expect(source).toContain("FlowImplicitOutcomeUserNotFound: FlowDefinitionPurposeRegister");
-    expect(source).toContain("FlowImplicitOutcomeUserAlreadyExists: FlowDefinitionPurposeLogin");
-    expect(Object.keys(PURPOSE_FLIP_TARGETS)).toEqual(["login", "register"]);
   });
+
+  const stateMachineSource = join(
+    dirname(fileURLToPath(import.meta.url)),
+    "../../../..",
+    "internal/domain/flow_state_machine.go",
+  );
+
+  it.skipIf(!existsSync(stateMachineSource))(
+    "the switch outcomes match the engine's applyOutcomeFlip",
+    () => {
+      const source = readFileSync(stateMachineSource, "utf8");
+      const body = source.match(/func applyOutcomeFlip[\s\S]*?\n}/)?.[0] ?? "";
+      // login → user_not_found → register, register → user_already_exists → login.
+      expect(body).toMatch(
+        /CurrentPurpose == FlowDefinitionPurposeLogin &&[\s\S]*?FlowImplicitOutcomeUserNotFound[\s\S]*?CurrentPurpose = FlowDefinitionPurposeRegister/,
+      );
+      expect(body).toMatch(
+        /CurrentPurpose == FlowDefinitionPurposeRegister && outcome == FlowImplicitOutcomeUserAlreadyExists:\s*state\.CurrentPurpose = FlowDefinitionPurposeLogin/,
+      );
+      expect(PURPOSE_FLIP_TARGETS).toEqual({
+        login: { user_not_found: "register" },
+        register: { user_already_exists: "login" },
+      });
+    },
+  );
 
   const purposesSource = join(
     dirname(fileURLToPath(import.meta.url)),

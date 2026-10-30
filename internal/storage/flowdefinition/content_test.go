@@ -47,9 +47,11 @@ func TestContent_TransitionRoundTrip_PreservesActionAndPurpose(t *testing.T) {
 				Fields: []domain.Field{"email"},
 				Actions: []domain.FlowStepAction{
 					{Name: "submit", Kind: domain.FlowActionKindSubmit, Primary: true},
+					{Name: "sign_in", Kind: domain.FlowActionKindNavigate},
 				},
 				Transitions: map[string]domain.FlowStepTransition{
-					"submit": {Target: "done"},
+					"submit":  {Target: "done"},
+					"sign_in": {Purpose: gu.Ptr(domain.FlowDefinitionPurposeLogin)},
 				},
 			},
 			{Name: "done", Complete: gu.Ptr(domain.FlowStepCompleteShow)},
@@ -82,6 +84,16 @@ func TestContent_TransitionRoundTrip_PreservesActionAndPurpose(t *testing.T) {
 	plain := identifier.Transitions["submit"]
 	assert.Nil(t, plain.Action)
 	assert.Nil(t, plain.Purpose)
+
+	// A purpose-only transition is stored as written, without a target, so
+	// reading the definition back gives the author's file unchanged.
+	assert.NotContains(t, string(raw), `"target":""`)
+	register, ok := got.FindStep("register")
+	require.True(t, ok)
+	purposeOnly := register.Transitions["sign_in"]
+	require.NotNil(t, purposeOnly.Purpose)
+	assert.Equal(t, domain.FlowDefinitionPurposeLogin, *purposeOnly.Purpose)
+	assert.Empty(t, purposeOnly.Target)
 }
 
 // An unknown purpose string in stored JSON is a decode error, not a

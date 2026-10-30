@@ -261,6 +261,13 @@ Each invocation prints one JSON object:
   diff), including rapid same-size edits and untracked configuration files.
   Review it before you deploy. `files` is `[]` when nothing changed and
   `null` when there is nothing to diff against, with `diff.note` saying why.
+- `deploy --dry-run` and `deploy` check every flow definition with the rules
+  the server enforces: an error stops the deploy with `E_VALIDATION`, and a
+  warning goes to `warnings` and does not. A flow warns, for example, when it
+  serves `login` and `register` but leaves out the switch between them
+  (`user_not_found`, `user_already_exists`), uses a cross-flow `switch` or
+  `pivot` transition, which the engine does not run yet, or declares a reserved
+  purpose (`recovery`, `profiling`, `reauth`, `link_account`).
 - A write verb's `--dry-run` reports what it would send without calling the
   platform, so you can preview a mutation before making it.
 - `api` emits the response body as `data`, exactly as the API reference
@@ -495,8 +502,9 @@ them `data.sso[].callback_uri` from `setup`, or `data.callback_uri` from
 provider or an older CLI version does not work.
 
 After `setup`, follow `data.next_commands` to start the app. Prove the generated
-auth flow in a visible browser by registering a unique user, logging out, logging
-back in with the same email/password, and ending on the signed-in profile page.
+auth flow in a visible browser by registering a unique user at `/register`,
+logging out, logging back in at `/login` with the same email/password, and ending
+on the signed-in profile page.
 Do not treat a rendered login or registration form as completion.
 
 When a step against the local server fails without saying why (the login says a

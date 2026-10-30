@@ -62,7 +62,7 @@ describe("setup dependency installation", () => {
       command: "npm install",
     });
     expect(result.nextActions.join("\n")).toContain(
-      "Start your project: npm run dev (then open http://localhost:3000/login)",
+      "Start your project: npm run dev (then open http://localhost:3000/register)",
     );
     expect(result.nextActions.join("\n")).not.toContain(
       "Start your project: npm run dev (then open http://localhost:3000)",

@@ -115,8 +115,9 @@ flowchart TD
 - The "ancestor-chain" manifest pattern unlocks multi-step register flows
   with password credentials. The validator pass that enforces it is
   `validateOnSuccessManifests`.
-- The flip table is `purposeFlipTargets` in the validator. It mirrors the
-  engine's runtime flip behavior.
+- The automatic switch is `applyOutcomeFlip` in the engine. Wiring its
+  outcomes is optional: an entry step without `user_not_found` (or
+  `user_already_exists`) shows that outcome's error instead of switching.
 - Both terminal paths feed the same `done` step. Multiple terminal nodes are
   also fine; the engine doesn't care about layout, only that every
   non-terminal step has a path to one.
