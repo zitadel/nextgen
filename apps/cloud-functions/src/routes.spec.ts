@@ -59,7 +59,34 @@ describe("the add-on's RPC", () => {
     expect(runtime.provisionOnce).toHaveBeenCalledWith(
       expect.objectContaining({ user_id: "user_mock" }),
       [MOCK_TEAM],
+      undefined,
     );
+  });
+
+  it("hands provisioning the sign-up's source, as far as it holds up", async () => {
+    const { response, runtime } = call("POST", "/cloud/api/account/ensure", {
+      body: {
+        attribution: {
+          via: "console",
+          utm_source: " newsletter ",
+          utm_medium: "ada@example.com",
+          utm_campaign: 7,
+        },
+      },
+    });
+    expect((await response).status).toBe(200);
+    expect(vi.mocked(runtime.provisionOnce).mock.calls[0]?.[2]).toEqual({
+      via: "console",
+      utm_source: "newsletter",
+    });
+  });
+
+  it("still provisions when the source is not one it knows", async () => {
+    const { response, runtime } = call("POST", "/cloud/api/account/ensure", {
+      body: { attribution: { via: "fax", utm_source: "newsletter" } },
+    });
+    expect(await (await response).json()).toEqual({ state: "started" });
+    expect(vi.mocked(runtime.provisionOnce).mock.calls[0]?.[2]).toBeUndefined();
   });
 
   it("refuses a ticket without a message", async () => {

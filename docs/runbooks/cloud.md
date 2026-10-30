@@ -27,7 +27,7 @@ One Vercel deployment, six [services](https://vercel.com/docs/services):
 | Service | Built by | Serves |
 |---|---|---|
 | `server` | Go preset; the build command installs, because Vercel's Go builder runs no `installCommand`, and then runs `node_modules/.bin/turbo run deploy --filter=@zitadel/cloud`. turbo goes by its path because, unlike the JS builders, the Go builder puts no `node_modules/.bin` on `PATH`. `@zitadel/cloud`'s `build` compiles `apps/cloud/launcher` without the console (`-tags noconsole`), then `migrate` migrates and `deploy` hands the binary to the preset, none of them cached | every path except the console's, the docs', the website's, the cloud functions' and the Mixpanel proxy's, including `/console/runtime.json` |
-| `console` | Vite; `turbo run build` with `CONSOLE_BASE_PATH=/console/` and `CONSOLE_ADDON=../cloud-console`, which compiles in the cloud's add-on ([`apps/cloud-console`](../../apps/cloud-console/AGENTS.md)): it reports Vercel Web Analytics and Speed Insights, adds the unlisted sign-up page `/console/signup`, and adds Billing and Support to Settings, which until their systems are live say the cloud is free during the preview and point to GitHub issues, and starts onboarding on each signed-in page; in previews it also adds Email and sends the sign-in widget's calls through BotID's check in `cloud-functions`; the service serves the build where it lands, `internal/staticui/console/dist` | `/console/*` (bare `/console` redirects to the slash form; `/ui/console` and `/ui/console/*` redirect here with a 307) |
+| `console` | Vite; `turbo run build` with `CONSOLE_BASE_PATH=/console/` and `CONSOLE_ADDON=../cloud-console`, which compiles in the cloud's add-on ([`apps/cloud-console`](../../apps/cloud-console/AGENTS.md)): it reports Vercel Web Analytics and Speed Insights, adds the unlisted sign-up page `/console/signup`, and adds Billing and Support to Settings, which until their systems are live say the cloud is free during the preview and point to GitHub issues, starts onboarding on each signed-in page and on the CLI's claim page, and reports `signup_completed` when the sign-in widget makes an account; in previews it also adds Email and sends the sign-in widget's calls through BotID's check in `cloud-functions`; the service serves the build where it lands, `internal/staticui/console/dist` | `/console/*` (bare `/console` redirects to the slash form; `/ui/console` and `/ui/console/*` redirect here with a 307) |
 | `docs` | Next.js; `turbo run build --filter=@zitadel/docs`, after `@zitadel/components`, `@zitadel/api-mock` and the `@zitadel/api` client the mock calls, which the live examples render, and the docs' typecheck. The build's cache key holds the deployment's ID, which Skew Protection bakes into it, so it never comes from the cache; never moon, which cannot archive the symlinks Vercel's Next.js adapter writes | `/docs` and `/docs/*`: pages, assets (`/docs/_next/`), search, `llms.txt`, each page's `.md` and the MCP server |
 | `website` | Next.js; `turbo run build --filter=@zitadel/website`, after the atoms of `@zitadel/components` its showcase renders; keyed by the deployment's ID, as the docs' | `/`, the front page, `/changelog` (`/changelog/` redirects there) with its entries' pages and its feed under it, `/changelog/*`, and their assets at `/_next/*`; the host's `/llms.txt`; the host's favicons at `/favicon.ico` and `/favicons/*`, which the console, the login UI and the docs link |
 | `cloud-functions` | Next.js; `turbo run build --filter=@zitadel/cloud-functions`, route handlers and the Workflow SDK's routes, no pages ([`apps/cloud-functions`](../../apps/cloud-functions/AGENTS.md), [ADR 084](../adrs/084-hosted-cloud-business-systems.md)); keyed by the deployment's ID, as the website's. It reads Zitadel live; Stripe and HubSpot are mocks, which send nothing. Production runs onboarding on them and answers everything else `503 cloud.not_live` | `/cloud/*`: the console add-on's calls (`/cloud/api/*`), the sign-in widget's calls through BotID's check (`/cloud/zitadel/*`), Stripe's webhooks (`/cloud/hooks/stripe`) and its cron routes (`/cloud/cron/*`, none scheduled yet) |
@@ -565,15 +565,23 @@ project and imports the root admin.
 
 ## Operating
 
-- **Onboarding runs:** each signed-in person starts `provision-crm`, and
-  `provision-billing` for a team without a Stripe customer. Their steps
-  return the HubSpot and Stripe calls they would make, which nothing sends
-  yet: read them in Vercel → Observability → Workflows, a run, then Decrypt
+- **Onboarding runs:** each signed-in person, and each CLI sign-up on its
+  claim page, starts `provision-crm`, and `provision-billing` for a team
+  without a Stripe customer. A contact `provision-crm` makes or takes over
+  carries the sign-up's source in its `signup_*` properties (ADR 084 §3).
+  Their steps return the HubSpot and Stripe calls they would make, which
+  nothing sends yet: read them in Vercel → Observability → Workflows, a run, then Decrypt
   (permission to read the project's environment variables). From
   `apps/cloud-functions`, with the Vercel CLI linked:
   `npx workflow inspect runs --backend vercel --env preview --decrypt`, or
   `--env production`. The log lines start `hubspot (mock, not sent)` or
   `stripe (mock, not sent)`.
+- **Sign-ups by source:** Web Analytics → Events → `signup_completed`, or
+  with the Vercel CLI, grouping by `eventData/utm_source`, `eventData/page`
+  (`claim` is the CLI) or `eventData/referrer_host`:
+  `npx -y vercel@64.5.0 api "/v1/query/web-analytics/events/aggregate?projectId=cloud&teamId=team_IDtOs36TGPOejsKm40wr1p3C&since=<date>&until=<date>&by=eventData/utm_source&filter=eventName%20eq%20%27signup_completed%27"`.
+  The browser sends it, so a blocker drops a sign-up as it drops page views;
+  the contacts' `signup_*` count every sign-up that reached onboarding.
 - **Logs:** Vercel runtime logs of the `server` function (JSON). The
   launcher's first line names the database host and database it serves
   from. Add a log drain for retention. A line's `request_id` is Vercel's

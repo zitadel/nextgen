@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import type { SignupAttribution } from "../contract";
 import { MOCK_PERSON, MOCK_TEAM } from "../mock";
 import type { CrmRequest, CrmWrite } from "../ports";
 import { type HubspotAnswer, hubspotCrm } from "./crm";
@@ -54,6 +55,49 @@ describe("the person's contact", () => {
     expect(calls(write).at(-1)).toBe("PATCH /crm/v3/objects/contacts/contact_legacy");
     expect(write.requests.at(-1)?.body).toEqual({ properties: { zitadel_user_id: "user_mock" } });
     expect(write.contact_id).toBe("contact_legacy");
+  });
+});
+
+describe("the sign-up's source on the contact", () => {
+  const source: SignupAttribution = {
+    via: "console",
+    utm_source: "newsletter",
+    utm_medium: "email",
+  };
+  const written = {
+    signup_via: "console",
+    signup_utm_source: "newsletter",
+    signup_utm_medium: "email",
+  };
+
+  it("goes on a contact it creates", async () => {
+    const write = await hubspot().upsertContact(MOCK_PERSON, source);
+    expect(write.requests.at(-1)?.body).toEqual({
+      properties: { email: "ada@example.com", zitadel_user_id: "user_mock", ...written },
+    });
+  });
+
+  it("goes on the contact it takes over, which joined through a form before", async () => {
+    const write = await hubspot({ [CONTACT_BY_EMAIL]: { id: "contact_legacy" } }).upsertContact(
+      MOCK_PERSON,
+      source,
+    );
+    expect(write.requests.at(-1)?.body).toEqual({
+      properties: { zitadel_user_id: "user_mock", ...written },
+    });
+  });
+
+  it("is the first touch: a contact already keyed by the person's id keeps what it has", async () => {
+    const write = await hubspot({ [CONTACT_BY_ID]: { id: "contact_1" } }).upsertContact(
+      MOCK_PERSON,
+      { via: "cli", utm_source: "later" },
+    );
+    expect(calls(write)).toEqual([`GET ${CONTACT_BY_ID}`]);
+  });
+
+  it("names no campaign parameter in a label, which a log line shows", async () => {
+    const write = await hubspot().upsertContact(MOCK_PERSON, source);
+    for (const { label } of write.requests) expect(label).not.toContain("newsletter");
   });
 });
 

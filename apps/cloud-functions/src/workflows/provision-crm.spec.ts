@@ -16,4 +16,14 @@ describe("a person's CRM onboarding", () => {
     await expect(provisionCrm(MOCK_PERSON, [MOCK_TEAM])).rejects.toThrow("HubSpot refused");
     expect(ensureDeal).toHaveBeenCalledWith(MOCK_TEAM, "contact_mock_user_mock");
   });
+
+  it("writes the sign-up's source with the contact", async () => {
+    vi.spyOn(console, "info").mockImplementation(() => {});
+    const upsertContact = vi.spyOn(onboardingSystems().hubspot, "upsertContact");
+    await provisionCrm(MOCK_PERSON, [MOCK_TEAM], { via: "cli", utm_source: "newsletter" });
+    expect(upsertContact).toHaveBeenCalledWith(MOCK_PERSON, {
+      via: "cli",
+      utm_source: "newsletter",
+    });
+  });
 });

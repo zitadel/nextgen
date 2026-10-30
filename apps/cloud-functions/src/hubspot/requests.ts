@@ -1,3 +1,4 @@
+import type { SignupAttribution } from "../contract";
 import type { Caller, CrmRequest, Team } from "../ports";
 
 /**
@@ -42,22 +43,48 @@ export function findContactByEmail(person: Caller): CrmRequest {
   };
 }
 
-/** Puts the person's id on the contact their email already has. */
-export function adoptContact(contactId: string, person: Caller): CrmRequest {
+/** Puts the person's id, and their sign-up's source, on the contact their email already has. */
+export function adoptContact(
+  contactId: string,
+  person: Caller,
+  attribution?: SignupAttribution,
+): CrmRequest {
   return {
     label: `take over contact ${contactId} for ${person.user_id}`,
     method: "PATCH",
     path: `/crm/v3/objects/contacts/${encodeURIComponent(contactId)}`,
-    body: { properties: { zitadel_user_id: person.user_id } },
+    body: { properties: { zitadel_user_id: person.user_id, ...signupProperties(attribution) } },
   };
 }
 
-export function createContact(person: Caller): CrmRequest {
+export function createContact(person: Caller, attribution?: SignupAttribution): CrmRequest {
   return {
     label: `create the contact of ${person.user_id}`,
     method: "POST",
     path: "/crm/v3/objects/contacts",
-    body: { properties: { email: person.email, zitadel_user_id: person.user_id } },
+    body: {
+      properties: {
+        email: person.email,
+        zitadel_user_id: person.user_id,
+        ...signupProperties(attribution),
+      },
+    },
+  };
+}
+
+/**
+ * The sign-up's source in the portal's own properties (root ADR 084 §3, §9),
+ * never HubSpot's "Original Traffic Source", which its tracking script sets
+ * for contacts that came through zitadel.com's forms.
+ */
+function signupProperties(attribution?: SignupAttribution): Record<string, string> {
+  if (!attribution) return {};
+  const { via, utm_source, utm_medium, utm_campaign } = attribution;
+  return {
+    signup_via: via,
+    ...(utm_source ? { signup_utm_source: utm_source } : {}),
+    ...(utm_medium ? { signup_utm_medium: utm_medium } : {}),
+    ...(utm_campaign ? { signup_utm_campaign: utm_campaign } : {}),
   };
 }
 

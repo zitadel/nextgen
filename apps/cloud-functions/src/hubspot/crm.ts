@@ -51,17 +51,17 @@ export function hubspotCrm(
   }
 
   return {
-    async upsertContact(person) {
+    async upsertContact(person, attribution) {
       const { requests, call } = write();
       const known = await call(findContactByUserId(person));
       if (known.status !== 404) return { contact_id: idOf(known), requests };
       const existing = await call(findContactByEmail(person));
       if (existing.status !== 404) {
         const contactId = idOf(existing);
-        await call(adoptContact(contactId, person));
+        await call(adoptContact(contactId, person, attribution));
         return { contact_id: contactId, requests };
       }
-      return { contact_id: idOf(await call(createContact(person))), requests };
+      return { contact_id: idOf(await call(createContact(person, attribution))), requests };
     },
 
     async subscribe(person) {

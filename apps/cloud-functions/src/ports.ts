@@ -1,4 +1,11 @@
-import type { EmailPreferences, NewTicket, Plan, TeamBilling, Ticket } from "./contract";
+import type {
+  EmailPreferences,
+  NewTicket,
+  Plan,
+  SignupAttribution,
+  TeamBilling,
+  Ticket,
+} from "./contract";
 
 /**
  * The three systems the functions sit between (root ADR 084 §2), each behind
@@ -122,9 +129,14 @@ export interface Crm {
   /**
    * Finds the person's contact by their Zitadel id, else takes over the one
    * HubSpot already has for their email, else creates it. HubSpot's own
-   * workflow then sends the onboarding mail (§7).
+   * workflow then sends the onboarding mail (§7). A contact it takes over or
+   * creates gets `attribution`, the sign-up's first touch; one it finds by the
+   * id keeps what it has (§3).
    */
-  upsertContact(person: Caller): Promise<CrmWrite & { contact_id: string }>;
+  upsertContact(
+    person: Caller,
+    attribution?: SignupAttribution,
+  ): Promise<CrmWrite & { contact_id: string }>;
   /**
    * Subscribes the person to the newsletter and the security mail, which they
    * may unsubscribe from, wherever HubSpot holds no choice of theirs yet: an
