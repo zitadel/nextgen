@@ -12,9 +12,12 @@ export {
 } from "./release";
 export {
   createDeployment,
+  DEFAULT_TARGET,
+  newestDeploymentTo,
+  PROJECT_TARGETS,
   rollbackDeployment,
+  rollbackOrigins,
   type Deployment,
-  type DeployTargets,
 } from "./deployment";
 export { deployInitialRelease, type InitialDeployment } from "./initial-deploy";
 export { worktreeIsDirty, headSha } from "./git";

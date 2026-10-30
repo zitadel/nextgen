@@ -1193,8 +1193,8 @@ export default class Setup extends Promptable(BaseCommand) {
 
   /**
    * Deploy `.zitadel/` to the project setup just created, to its primary
-   * origin. Narrated but never fatal: the app is scaffolded and committed, and
-   * a failure leaves the deploy one command away.
+   * origin and the default target. Narrated but never fatal: the app is
+   * scaffolded and committed, and a failure leaves the deploy one command away.
    */
   private async deployScaffoldedProject(opts: {
     cwd: string;
@@ -1224,7 +1224,7 @@ export default class Setup extends Promptable(BaseCommand) {
         suggest: (args) => projectCommand(args, opts.selector, this.meta.cliVersion),
       });
       consola.success(
-        `Deployed ${deployment.contentHash} to ${deployment.origins.length} origin${deployment.origins.length === 1 ? "" : "s"}`,
+        `Deployed ${deployment.contentHash} to ${deployment.origins.length} target${deployment.origins.length === 1 ? "" : "s"}`,
       );
       return deployment;
     } catch (error) {

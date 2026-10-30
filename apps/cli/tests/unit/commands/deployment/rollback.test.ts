@@ -5,7 +5,11 @@ import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
-import { aProjectWithTwoDeploys, PLATFORM_URL } from "../../../helpers/platform-project";
+import {
+  aProjectWithTwoDeploys,
+  callPlatform,
+  PLATFORM_URL,
+} from "../../../helpers/platform-project";
 import { runCliForTest } from "../../../helpers/run-cli";
 
 const SERVER = PLATFORM_URL;
@@ -23,7 +27,7 @@ afterEach(async () => {
 });
 
 /** A project on the mock with two deploys to one primary origin, and its directory. */
-async function twoDeploys(): Promise<{ cwd: string; undone: string }> {
+async function twoDeploys(): Promise<Awaited<ReturnType<typeof aProjectWithTwoDeploys>>> {
   const project = await aProjectWithTwoDeploys("zitadel-rollback-");
   dirs.push(project.cwd);
   return project;
@@ -77,6 +81,42 @@ describe("deployment rollback", () => {
     ]);
 
     expect(guards).toEqual([undone]);
+  });
+
+  it("guards a rollback with the newest deployment to what it writes, not a newer default-only one", async () => {
+    const { cwd, first, undone, projectId, secret } = await twoDeploys();
+    const release = await callPlatform(`/releases?project_id=${projectId}`, secret, {
+      pointers: [{ kind: "schema", revision_id: "sch_c" }],
+    });
+    await callPlatform(`/deployments?project_id=${projectId}`, secret, {
+      release_id: release.id,
+      targets: ["default"],
+    });
+    const guards: unknown[] = [];
+    server.use(
+      http.post(`${SERVER}/deployments/:id/rollback`, async ({ request }) => {
+        guards.push(
+          (JSON.parse(await request.clone().text()) as Record<string, unknown>)
+            .expected_deployment_id,
+        );
+        return undefined;
+      }),
+    );
+
+    const { exitCode } = await runCliForTest([
+      "deployment",
+      "rollback",
+      first,
+      "--force",
+      "--cwd",
+      cwd,
+      "--server",
+      SERVER,
+      "--json",
+    ]);
+
+    expect(guards).toEqual([undone]);
+    expect(exitCode).toBe(0);
   });
 
   it("reports the revisions the restored release pins", async () => {

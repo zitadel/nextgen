@@ -4,13 +4,15 @@ import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../lib/ocl
 import {
   buildBundle,
   createDeployment,
+  DEFAULT_TARGET,
   DEPLOY_ARGS,
   createReleaseFromBundle,
   diffStep,
   headSha,
   listLiveDeployments,
+  newestDeploymentTo,
+  PROJECT_TARGETS,
   runSteps,
-  servesPrimary,
   type StepContext,
   validateStep,
   worktreeIsDirty,
@@ -25,13 +27,15 @@ import { type EnvironmentSelector, projectCommand } from "../lib/suggestion";
 import { reportWarning } from "../lib/warnings";
 
 /**
- * `zitadel deploy` — publish `.zitadel/` to the project's primary origins.
+ * `zitadel deploy` — publish `.zitadel/` to the project's primary origins and
+ * its default target.
  *
  * It assembles a release bundle from the files on disk, validates it and syncs
  * identity-provider connections, shows what changed since the live release as a
  * git diff, then creates the release and deploys it to every primary origin
- * (primary origins are never named one by one). `--dry-run` stops after the
- * diff, writing nothing to the server.
+ * (primary origins are never named one by one) and to the default target, which
+ * callers with no `Origin` are served. `--dry-run` stops after the diff,
+ * writing nothing to the server.
  *
  * It replaces `plan` and `apply`: a release is published as one immutable unit
  * and deployed, rather than each resource being synced in place.
@@ -126,7 +130,7 @@ export default class Deploy extends EnvironmentCommand {
         data: {
           dry_run: true,
           resources: resourceCount,
-          targets: ["primary"],
+          targets: [...PROJECT_TARGETS],
           ...reported,
         },
         pretty: `Validated ${resourceCount} resource${resourceCount === 1 ? "" : "s"}. Nothing was deployed (dry run).`,
@@ -150,15 +154,14 @@ export default class Deploy extends EnvironmentCommand {
     });
 
     // What the targets serve right now. The guard id is the newest deployment
-    // to any origin this deploy lands on — the contract's rule — so a live
-    // preview, which never targets a primary, is never it. It guards the
+    // to any origin this deploy lands on, the default target included — the
+    // contract's rule — so a live preview, which never targets either, is
+    // never it. It guards the
     // create against another deploy that raced in since we inspected: the
     // server refuses with 409 rather than overwriting that deploy unseen (#538).
-    const live = await listLiveDeployments(client, projectId);
-    const observed = live.find((deployment) =>
-      deployment.targets.some((entry) => landing.includes(entry.origin)),
-    )?.id;
-    const targets = ["primary"];
+    const guarded = [...landing, DEFAULT_TARGET];
+    const observed = newestDeploymentTo(await listLiveDeployments(client, projectId), guarded);
+    const targets = [...PROJECT_TARGETS];
     let deployment: Awaited<ReturnType<typeof createDeployment>>;
     try {
       deployment = await createDeployment(client, projectId, {
@@ -192,8 +195,11 @@ export default class Deploy extends EnvironmentCommand {
           },
         );
       }
-      // The deployment that raced in on a primary origin, not a live preview.
-      const current = (await listLiveDeployments(client, projectId)).find(servesPrimary);
+      // The deployment that raced in on a target this deploy writes, not a
+      // live preview.
+      const live = await listLiveDeployments(client, projectId);
+      const racedId = newestDeploymentTo(live, guarded);
+      const current = live.find((entry) => entry.id === racedId);
       throw new ZitadelError(
         "E_CONFLICT",
         "Another deploy changed the targets since this one was prepared",
@@ -220,7 +226,7 @@ export default class Deploy extends EnvironmentCommand {
       next: { commands: [this.suggest("deployment list")] },
       pretty: [
         `Deployed ${release.content_hash}`,
-        `  ${resourceCount} resource${resourceCount === 1 ? "" : "s"} to ${servedOrigins.length} origin${servedOrigins.length === 1 ? "" : "s"}`,
+        `  ${resourceCount} resource${resourceCount === 1 ? "" : "s"} to ${servedOrigins.length} target${servedOrigins.length === 1 ? "" : "s"}`,
         ...servedOrigins.map((served) => `  - ${served}`),
       ].join("\n"),
     });

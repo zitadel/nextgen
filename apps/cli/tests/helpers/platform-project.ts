@@ -47,11 +47,15 @@ export async function aProjectDirectory(
 
 /**
  * A project on the mock with two deploys to one primary origin, its
- * directory, and the second deployment's id. The caller removes the directory.
+ * directory, and both deployments' ids. The caller removes the directory.
  */
-export async function aProjectWithTwoDeploys(
-  prefix: string,
-): Promise<{ cwd: string; undone: string }> {
+export async function aProjectWithTwoDeploys(prefix: string): Promise<{
+  cwd: string;
+  first: string;
+  undone: string;
+  projectId: string;
+  secret: string;
+}> {
   const project = await callPlatform("/projects", "", { name: prefix });
   const id = project.id as string;
   const secret = project.project_secret as string;
@@ -59,7 +63,7 @@ export async function aProjectWithTwoDeploys(
     pattern: "https://app.acme.com",
     kind: "primary",
   });
-  let undone = "";
+  const deployed: string[] = [];
   for (const revision of ["sch_a", "sch_b"]) {
     const release = await callPlatform(`/releases?project_id=${id}`, secret, {
       pointers: [{ kind: "schema", revision_id: revision }],
@@ -68,7 +72,13 @@ export async function aProjectWithTwoDeploys(
       release_id: release.id,
       targets: ["primary"],
     });
-    undone = deployment.id as string;
+    deployed.push(deployment.id as string);
   }
-  return { cwd: await aProjectDirectory(prefix, { id, secret }), undone };
+  return {
+    cwd: await aProjectDirectory(prefix, { id, secret }),
+    first: deployed[0] as string,
+    undone: deployed[1] as string,
+    projectId: id,
+    secret,
+  };
 }
