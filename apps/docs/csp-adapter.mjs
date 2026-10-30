@@ -77,7 +77,7 @@ export default {
       const policy = pagePolicy(inlineScriptHashes(await readFile(fallback.filePath, "utf8")));
       // Escape literal path characters for Next's path-to-regexp source and
       // the adapter's already-compiled matcher; permit the trailing slash.
-      const source = pathname.replace(/[()*+?:{}]/g, "\\$&");
+      const source = pathname.replace(/[\\()*+?:{}]/g, "\\$&");
       const regex = `^${pathname.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/?$`;
       const headers = { "Content-Security-Policy": policy };
       // The platform's header rules, after next.config's fallback.
