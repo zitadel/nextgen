@@ -1,4 +1,4 @@
-import { type ReactNode, useLayoutEffect, useRef, useState } from "react";
+import { type ReactNode, type RefObject, useLayoutEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { AbsoluteFill, continueRender, delayRender, interpolate, useCurrentFrame } from "remotion";
 
@@ -6,16 +6,43 @@ import { type Brand, brandProperties } from "../brands";
 import { fontsLoaded, LoginSurface } from "../login-surface";
 import { HEIGHT, WIDTH } from "../timeline";
 
-// One shot of the montage: what it shows, in a brand, centred on the frame.
-// A whole screen is scaled to fill most of the frame's height; a close-up
-// gives its own scale. The camera pushes in a little over the shot, so even a
-// still screen moves with the cut. Every frame waits until the atoms have
-// rendered what it set.
+// One shot of the montage: what it shows, in a brand. A screen or a part of
+// one is centred on the frame: a whole screen scaled to fill most of the
+// frame's height, a close-up at its own scale. A scene lays out the whole
+// frame itself. Either way the camera pushes in a little over the shot, so
+// even a still frame moves with the cut, and every frame waits until the atoms
+// have rendered what it set.
 
 /** A screen never grows past this, however short it is. */
 const MOST = 2.2;
 /** The share of the frame a screen may fill. */
 const ROOM = 0.86;
+
+/**
+ * Holds each frame until every atom under `root` has rendered, then calls
+ * `rendered` with it, still inside the hold.
+ */
+function useAtomsRendered(
+  root: RefObject<HTMLElement | null>,
+  frame: number,
+  rendered?: (root: HTMLElement) => void,
+) {
+  useLayoutEffect(() => {
+    const element = root.current;
+    if (!element) {
+      return;
+    }
+    const handle = delayRender("Rendering the shot's atoms");
+    const atoms = [...element.querySelectorAll("*")].filter(
+      (node): node is HTMLElement & { updateComplete: Promise<unknown> } =>
+        "updateComplete" in node,
+    );
+    Promise.all([fontsLoaded, ...atoms.map((atom) => atom.updateComplete)]).then(() => {
+      rendered?.(element);
+      continueRender(handle);
+    });
+  }, [frame]);
+}
 
 export function Shot({
   brand,
@@ -37,27 +64,15 @@ export function Shot({
   const content = useRef<HTMLDivElement>(null);
   const [fit, setFit] = useState<number>();
 
-  useLayoutEffect(() => {
-    const root = content.current;
-    if (!root) {
-      return;
+  useAtomsRendered(content, frame, (root) => {
+    if (scale === undefined && fit === undefined) {
+      flushSync(() =>
+        setFit(
+          Math.min(MOST, (ROOM * HEIGHT) / root.offsetHeight, (ROOM * WIDTH) / root.offsetWidth),
+        ),
+      );
     }
-    const handle = delayRender("Rendering the shot's atoms");
-    const atoms = [...root.querySelectorAll("*")].filter(
-      (element): element is HTMLElement & { updateComplete: Promise<unknown> } =>
-        "updateComplete" in element,
-    );
-    Promise.all([fontsLoaded, ...atoms.map((atom) => atom.updateComplete)]).then(() => {
-      if (scale === undefined && fit === undefined) {
-        flushSync(() =>
-          setFit(
-            Math.min(MOST, (ROOM * HEIGHT) / root.offsetHeight, (ROOM * WIDTH) / root.offsetWidth),
-          ),
-        );
-      }
-      continueRender(handle);
-    });
-  }, [frame, scale, fit]);
+  });
 
   const base = scale ?? fit ?? 1;
   const zoom = base * interpolate(frame, [0, length], [1, 1 + push]);
@@ -68,6 +83,34 @@ export function Shot({
           {children}
         </div>
       </AbsoluteFill>
+    </LoginSurface>
+  );
+}
+
+/** A shot whose content lays out the whole frame, 1920 by 1080, in a brand. */
+export function Scene({
+  brand,
+  length,
+  push = 0.03,
+  children,
+}: {
+  brand: Brand;
+  length: number;
+  push?: number;
+  children: ReactNode;
+}) {
+  const frame = useCurrentFrame();
+  const content = useRef<HTMLDivElement>(null);
+  useAtomsRendered(content, frame);
+  const zoom = interpolate(frame, [0, length], [1, 1 + push]);
+  return (
+    <LoginSurface theme={brand.theme} brand={brandProperties(brand)}>
+      <div
+        ref={content}
+        style={{ position: "absolute", width: WIDTH, height: HEIGHT, transform: `scale(${zoom})` }}
+      >
+        {children}
+      </div>
     </LoginSurface>
   );
 }
