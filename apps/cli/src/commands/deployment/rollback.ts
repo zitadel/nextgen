@@ -8,7 +8,12 @@ import type {
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope, nonBlankArg } from "../../lib/oclif";
 import { collectPages } from "../../lib/oclif/crud/paging";
 import { renderTable } from "../../lib/oclif/crud/table";
-import { listLiveDeployments, rollbackDeployment, servesPrimary } from "../../lib/release";
+import {
+  listLiveDeployments,
+  messageFlag,
+  rollbackDeployment,
+  servesPrimary,
+} from "../../lib/release";
 import { toZitadelError, ZitadelError } from "../../lib/errors";
 import { Promptable } from "../../lib/oclif/promptable";
 import { reportWarning } from "../../lib/warnings";
@@ -43,6 +48,7 @@ export default class DeploymentRollback extends Promptable(EnvironmentCommand) {
       char: "f",
       description: "Roll back without the confirmation prompt. Required when non-interactive.",
     }),
+    message: messageFlag("A short summary of why this rolls back."),
   };
 
   async run(): Promise<JsonEnvelope> {
@@ -122,6 +128,7 @@ export default class DeploymentRollback extends Promptable(EnvironmentCommand) {
     }
 
     const deployment = await rollbackDeployment(client, projectId, targetId, {
+      ...(flags.message === undefined ? {} : { message: flags.message }),
       ...(expectedDeploymentId === undefined ? {} : { expectedDeploymentId }),
     });
 

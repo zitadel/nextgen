@@ -335,6 +335,12 @@ or garbled fails the build and the serving deployment stays.
   the new schema until the new one is live, and Instant Rollback promotes
   an older deployment without touching the schema.
 - **Startup never migrates:** the serving function refuses `--migrate`.
+- **The server's defaults must be expand/contract too.** The platform project
+  is deployed from them on every start, and a new deployment's checks start it
+  before the production domains move, so the previous deployment serves the
+  new defaults. Instant Rollback keeps them: a server never replaces a
+  deployment a newer build made. A default that turns out wrong is fixed by
+  shipping a corrected one.
 
 ## Deployment checks
 

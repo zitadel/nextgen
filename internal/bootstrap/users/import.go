@@ -181,19 +181,40 @@ func buildCreateAttributes(
 	return out, nil
 }
 
-// storedSchemaURL returns the URL the project stores the document's schema
-// under: the header's own when that row exists or none does, else the URL of
-// the row that names the same built-in under another base.
-func storedSchemaURL(ctx context.Context, stmts domain.JSONSchemaGetter, builtinBases domain.BuiltinSchemaBases, h Header) (string, error) {
+// storedSchemaURL returns the id the project stores the document's schema under:
+// the row at the header's URL or the same built-in under another base, else the
+// deployed default schema, else the header's own URL.
+func storedSchemaURL(ctx context.Context, stmts service.AllStatements, builtinBases domain.BuiltinSchemaBases, h Header) (string, error) {
 	stored, err := builtinBases.GetJSONSchema(ctx, stmts, h.ProjectID, h.SchemaURL)
-	if err == nil {
-		return stored.URL, nil
+	if _, missing := errors.AsType[*database.NoRowFoundError](err); missing {
+		stored, err = deployedDefaultSchema(ctx, stmts, builtinBases, h)
 	}
-	if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+	if err != nil {
+		return "", fmt.Errorf("look up json_schema %q: %w", h.SchemaURL, err)
+	}
+	if stored == nil {
 		return h.SchemaURL, nil
 	}
-	return "", fmt.Errorf("look up json_schema %q: %w", h.SchemaURL, err)
+	return stored.URL, nil
 }
+
+// deployedDefaultSchema finds the schema a document means by the built-in
+// default URL in a project that deployed it: a release stores that schema under
+// an id it mints, so only its objectType finds it. It is nil for any other URL.
+func deployedDefaultSchema(ctx context.Context, stmts service.AllStatements, builtinBases domain.BuiltinSchemaBases, h Header) (*domain.JSONSchema, error) {
+	if rel, ok := builtinBases.RelPath(h.SchemaURL); !ok || rel != defaultSchemaPath {
+		return nil, nil
+	}
+	return service.LatestSchemaByObjectType(ctx, stmts, h.ProjectID, defaultSchemaObjectType)
+}
+
+const (
+	// defaultSchemaPath is the default user schema's path under the built-in
+	// schema namespace.
+	defaultSchemaPath = "default-human-user.json"
+	// defaultSchemaObjectType is the objectType that schema declares.
+	defaultSchemaObjectType = "human-user"
+)
 
 // loadUserSchema reads the user's schema document so attribute uniqueness can
 // follow its `x-unique` annotations. The row always exists by now:

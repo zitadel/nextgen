@@ -1,4 +1,7 @@
 import { createSign, generateKeyPairSync } from "node:crypto";
+import { createServer, type Server } from "node:http";
+import type { AddressInfo } from "node:net";
+import { gzipSync } from "node:zlib";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { clearJwksCache } from "./jwt.js";
@@ -115,6 +118,15 @@ describe("filterResponseHeaders", () => {
     expect(filtered.has("set-cookie")).toBe(false);
     expect(filtered.has("connection")).toBe(false);
   });
+
+  it("strips content-encoding, because fetch has already decoded the body", () => {
+    const filtered = filterResponseHeaders(
+      upstream({ "content-type": "application/json", "content-encoding": "gzip" }),
+      CALLBACK,
+    );
+
+    expect(filtered.has("content-encoding")).toBe(false);
+  });
 });
 
 describe("matchesRoutes", () => {
@@ -213,6 +225,50 @@ describe("loginRedirectUrl", () => {
 describe("HOP_BY_HOP", () => {
   it("includes content-length, so a re-sent body gets the length the fetch implementation computes", () => {
     expect(HOP_BY_HOP.has("content-length")).toBe(true);
+  });
+
+  it("includes accept-encoding, so the upstream picks only a coding the proxy's fetch decodes", () => {
+    expect(HOP_BY_HOP.has("accept-encoding")).toBe(true);
+  });
+});
+
+describe("a compressed upstream answer", () => {
+  let server: Server;
+  let base: string;
+  const exchanged = { session: { user_id: "usr_1" }, padding: "x".repeat(2048) };
+
+  beforeEach(async () => {
+    server = createServer((_req, res) => {
+      const body = gzipSync(JSON.stringify(exchanged));
+      res.writeHead(200, {
+        "content-type": "application/json",
+        "content-encoding": "gzip",
+        "content-length": String(body.length),
+      });
+      res.end(body);
+    });
+    await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
+    base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  });
+
+  afterEach(async () => {
+    await new Promise((done) => server.close(done));
+  });
+
+  it("reaches the browser as the plain body fetch decoded, without a coding that claims otherwise", async () => {
+    // A successful handoff exchange behind a compressing edge: fetch decodes
+    // the body but keeps the header, so a forwarded `content-encoding: gzip`
+    // made the browser fail to decode a 200 (#2466).
+    const upstream = await fetch(`${base}/sessions/exchange`, { method: "POST" });
+    const proxied = new Response(upstream.body, {
+      status: upstream.status,
+      headers: filterResponseHeaders(upstream.headers, CALLBACK),
+    });
+
+    expect(proxied.headers.has("content-encoding")).toBe(false);
+    expect(proxied.headers.has("content-length")).toBe(false);
+    expect(proxied.headers.get("content-type")).toBe("application/json");
+    expect(await proxied.json()).toEqual(exchanged);
   });
 });
 

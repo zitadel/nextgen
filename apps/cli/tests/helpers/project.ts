@@ -48,8 +48,8 @@ export interface Envelope<T = Record<string, unknown>> {
 }
 
 /**
- * A non-interactive `deploy` needs a `-m` message, so the helpers default one
- * unless the spec already supplied its own.
+ * A non-interactive `deploy` outside a git repository, as `aSetUpApp` arranges,
+ * needs a `-m` message, so the helpers default one unless the spec supplied its own.
  */
 function withDeployMessage(extraArgs: readonly string[]): string[] {
   const hasMessage = extraArgs.some((arg) => arg === "-m" || arg === "--message");
@@ -745,6 +745,20 @@ export class ScaffoldedApp {
     const result = await this.cli(["deployment", "list", "--json"]);
     expect(result, "deployment list should have succeeded").toSucceed();
     return this.envelopeOf<{ count: number }>(result).data.count;
+  }
+
+  /** The message a release records, as `release get` reports it. */
+  async releaseMessage(releaseId: string): Promise<string | null> {
+    const result = await this.cli(["release", "get", releaseId, "--json"]);
+    expect(result, "release get should have succeeded").toSucceed();
+    return this.envelopeOf<{ metadata: { message: string | null } }>(result).data.metadata.message;
+  }
+
+  /** The message a deployment records, as `deployment get` reports it. */
+  async deploymentMessage(deploymentId: string): Promise<string | null> {
+    const result = await this.cli(["deployment", "get", deploymentId, "--json"]);
+    expect(result, "deployment get should have succeeded").toSucceed();
+    return this.envelopeOf<{ metadata: { message: string | null } }>(result).data.metadata.message;
   }
 
   /** Build a release from `.zitadel/` and deploy it to every primary origin. */
