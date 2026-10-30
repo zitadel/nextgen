@@ -3,18 +3,22 @@ import { onboardingSystems } from "../systems";
 
 /**
  * A person's records in the CRM (root ADR 084 §3, §7): their contact, to
- * which HubSpot's own workflow sends the onboarding mail; the newsletter and
- * security mail, which they may leave; and a deal for each of their teams,
- * with them on it. Each step looks for what an earlier attempt made before it
+ * which HubSpot's own workflow sends the onboarding mail; a deal for each of
+ * their teams, with them on it; and the newsletter and security mail, which
+ * they may leave. Each step looks for what an earlier attempt made before it
  * writes, so a retry or a second run changes nothing, and returns the calls it
  * made, which the run shows. Until the live adapter lands, those calls are
  * only recorded (§9). Sign-up never waits for this.
+ *
+ * The subscriptions come last: a step that runs out of retries fails the run
+ * and skips the steps after it, and a subscription HubSpot refuses must not
+ * cost a team its deal.
  */
 export async function provisionCrm(person: Caller, teams: Team[]): Promise<void> {
   "use workflow";
   const { contact_id } = await upsertContact(person);
-  await subscribe(person);
   for (const team of teams) await ensureDeal(team, contact_id);
+  await subscribe(person);
 }
 
 async function upsertContact(person: Caller): Promise<CrmWrite & { contact_id: string }> {

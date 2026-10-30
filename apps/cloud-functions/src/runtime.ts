@@ -21,15 +21,17 @@ export function workflowRuntime(request: Request): Runtime {
   return {
     systems: rpcSystems(liveDirectory(zitadelServer(request))),
     async provisionOnce(person, teams) {
-      const { stripe } = onboardingSystems();
       const crmKey = [person.user_id, ...teams.map((team) => team.id).sort()].join(" ");
       const crm = !crmStarted.has(crmKey);
-      const customers = await Promise.all(teams.map((team) => stripe.hasCustomer(team)));
-      const billing = !customers.every(Boolean);
       if (crm) {
         await start(provisionCrm, [person, teams]);
         crmStarted.add(crmKey);
       }
+      // Stripe is asked only once the CRM's run has started, so HubSpot never
+      // waits on its answer, nor fails with it.
+      const { stripe } = onboardingSystems();
+      const customers = await Promise.all(teams.map((team) => stripe.hasCustomer(team)));
+      const billing = !customers.every(Boolean);
       if (billing) await start(provisionBilling, [person, teams]);
       return crm || billing;
     },

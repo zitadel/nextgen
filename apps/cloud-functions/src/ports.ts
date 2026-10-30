@@ -70,8 +70,8 @@ export interface UsageRecord {
 export interface Billing {
   /** Whether the team has a customer yet: what tells a provisioned person from a new one. */
   hasCustomer(team: Team): Promise<boolean>;
-  /** Creates the team's customer, or finds the one an earlier attempt created. */
-  ensureCustomer(team: Team, owner: Caller): Promise<{ customer_id: string }>;
+  /** Finds the team's customer, or creates it, answering the calls it made. */
+  ensureCustomer(team: Team, owner: Caller): Promise<BillingWrite & { customer_id: string }>;
   overview(team: Team): Promise<TeamBilling>;
   /** Stripe's Customer Portal, where payment methods and invoices are managed. */
   portalUrl(team: Team, returnUrl: string): Promise<string>;
@@ -83,6 +83,26 @@ export interface Billing {
   parseWebhook(body: string, signature: string | null): Promise<BillingEvent | undefined>;
   /** The team a customer is for, and the plan its subscription is on now. */
   planOf(customerId: string): Promise<{ team_id: string; plan: Plan["id"] }>;
+}
+
+/**
+ * The calls a write made to Stripe, or, until its live adapter lands, would
+ * have made (§9). A workflow step returns them, so its run shows them.
+ */
+export interface BillingWrite {
+  requests: BillingRequest[];
+}
+
+/** One call to Stripe's HTTP API, on the one account its secret key names. */
+export interface BillingRequest {
+  /** What the call does, naming our ids and never an email: what a log line may show. */
+  label: string;
+  method: "GET" | "POST";
+  /** Path and query beneath the API's origin. */
+  path: string;
+  headers?: Record<string, string>;
+  /** Form fields, which the live client sends form-encoded, as Stripe takes them. */
+  body?: Record<string, string>;
 }
 
 /** The webhooks that change what a team may do: its subscription or an invoice. */

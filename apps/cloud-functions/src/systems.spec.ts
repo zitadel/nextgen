@@ -27,18 +27,22 @@ describe("production, until the live adapters land", () => {
     const contact = await hubspot.upsertContact(MOCK_PERSON);
     const subscriptions = await hubspot.subscribe(MOCK_PERSON);
     const deal = await hubspot.ensureDeal(MOCK_TEAM, contact.contact_id);
-    await stripe.ensureCustomer(MOCK_TEAM, MOCK_PERSON);
+    const customer = await stripe.ensureCustomer(MOCK_TEAM, MOCK_PERSON);
 
     expect(fetch).not.toHaveBeenCalled();
-    expect([contact, subscriptions, deal].map((write) => write.requests.at(-1)?.label)).toEqual([
+    expect(
+      [contact, subscriptions, deal, customer].map((write) => write.requests.at(-1)?.label),
+    ).toEqual([
       "create the contact of user_mock",
       "subscribe user_mock to security",
       "create the deal of team_mock with contact contact_mock_user_mock",
+      "create the customer of team_mock for user_mock",
     ]);
+    expect(customer.customer_id).toBe("cus_mock_team_mock");
     // The log says nothing was sent and names ids only; the email stays in the
     // run's encrypted record.
     const lines = log.mock.calls.map(([line]) => String(line));
-    expect(lines.every((line) => line.startsWith("hubspot (mock, not sent): "))).toBe(true);
+    expect(lines.every((line) => /^(hubspot|stripe) \(mock, not sent\): /.test(line))).toBe(true);
     expect(lines.join("\n")).not.toContain(MOCK_PERSON.email);
   });
 
