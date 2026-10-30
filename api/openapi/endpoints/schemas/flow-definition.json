@@ -38,7 +38,7 @@
     },
     "purposes": {
       "type": "object",
-      "description": "Maps each purpose this definition handles to its entry-point step.\nKeys are purpose names; values must match a `name` in `steps`. A\ndefinition can serve multiple purposes (e.g. a combined login/register\nflow) by listing one entry per purpose, or just one: a sign-in-only\nflow lists `login` alone.\n\n- `login`: verify an existing user.\n- `register`: create a user.\n- `recovery`, `profiling`, `reauth`, `link_account`: reserved. A\n  definition may declare them, but the engine has no behavior of its\n  own for them yet.\n",
+      "description": "Maps each purpose this definition handles to its entry-point step.\nKeys are purpose names; values must match a `name` in `steps`. A\ndefinition can serve multiple purposes (e.g. a combined login/register\nflow) by listing one entry per purpose, or just one: a sign-in-only\nflow lists `login` alone.\n\n- `login`: verify an existing user.\n- `register`: create a user.\n- `recovery`, `profiling`, `reauth`, `link_account`: reserved. A\n  definition may declare them, but the engine does not run their\n  journeys yet; `recovery` only asks a password field for a new\n  password.\n",
       "minProperties": 1,
       "propertyNames": {
         "type": "string",

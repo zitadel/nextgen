@@ -26680,8 +26680,9 @@ type FlowDefinition struct {
 	// - `login`: verify an existing user.
 	// - `register`: create a user.
 	// - `recovery`, `profiling`, `reauth`, `link_account`: reserved. A
-	// definition may declare them, but the engine has no behavior of its
-	// own for them yet.
+	// definition may declare them, but the engine does not run their
+	// journeys yet; `recovery` only asks a password field for a new
+	// password.
 	Purposes FlowDefinitionPurposes `json:"purposes"`
 	Audience OptFlowAudience        `json:"audience"`
 	// Ordered list of steps in this flow. The order is for human readability —
@@ -26839,8 +26840,9 @@ func (*FlowDefinitionListResponse) listFlowDefinitionsRes() {}
 // - `login`: verify an existing user.
 // - `register`: create a user.
 // - `recovery`, `profiling`, `reauth`, `link_account`: reserved. A
-// definition may declare them, but the engine has no behavior of its
-// own for them yet.
+// definition may declare them, but the engine does not run their
+// journeys yet; `recovery` only asks a password field for a new
+// password.
 type FlowDefinitionPurposes map[string]string
 
 func (s *FlowDefinitionPurposes) init() FlowDefinitionPurposes {
