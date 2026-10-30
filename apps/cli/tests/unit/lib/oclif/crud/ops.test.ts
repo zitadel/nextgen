@@ -322,6 +322,73 @@ describe("write results", () => {
   });
 });
 
+/** What a bound command prints, per stream, when run with these arguments. */
+async function printed(
+  command: unknown,
+  argv: string[],
+): Promise<{ stdout: string[]; stderr: string[] }> {
+  const prototype = (command as { prototype: BaseCommand }).prototype;
+  const stdout: string[] = [];
+  const stderr: string[] = [];
+  const log = vi.spyOn(prototype, "log").mockImplementation((message?: string) => {
+    stdout.push(message ?? "");
+  });
+  const logToStderr = vi.spyOn(prototype, "logToStderr").mockImplementation((message?: string) => {
+    stderr.push(message ?? "");
+  });
+  try {
+    await (command as { run(argv: string[]): Promise<unknown> }).run(argv);
+  } catch (error) {
+    throw new Error(`${String(error)}\n${stderr.join("\n")}`);
+  } finally {
+    log.mockRestore();
+    logToStderr.mockRestore();
+  }
+  return { stdout, stderr };
+}
+
+describe("output a script reads", () => {
+  const paged: ListSpec<Ctx> = {
+    ...list,
+    body: z.object({}).passthrough(),
+    call: async () => ({ teams: [{ id: "team_1", name: "a" }], next_page_token: "p2" }),
+  };
+  const created: CreateSpec<Ctx> = { schema, call: async () => ({ id: "team_1", name: "a" }) };
+
+  it("leaves a plain page's rows as the only thing on stdout", async () => {
+    const command = bindOperation(
+      ListOperation as OperationClass<Ctx, ListSpec<Ctx>>,
+      definition(paged),
+    );
+
+    const { stdout } = await printed(command, ["--plain"]);
+
+    expect(stdout).toEqual(["team_1\ta"]);
+  });
+
+  it("prints a plain page's next page on stderr", async () => {
+    const command = bindOperation(
+      ListOperation as OperationClass<Ctx, ListSpec<Ctx>>,
+      definition(paged),
+    );
+
+    const { stderr } = await printed(command, ["--plain"]);
+
+    expect(stderr.join("\n")).toContain("teams list --page-token p2 --json");
+  });
+
+  it("leaves a created resource's JSON body as the only thing on stdout", async () => {
+    const command = bindOperation(
+      CreateOperation as OperationClass<Ctx, CreateSpec<Ctx>>,
+      definition(created),
+    );
+
+    const { stdout } = await printed(command, ["--name", "a"]);
+
+    expect(stdout).toEqual([JSON.stringify({ id: "team_1", name: "a" }, null, 2)]);
+  });
+});
+
 describe("assembling a body", () => {
   const connection = z.object({
     slug: z.string(),

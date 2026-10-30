@@ -285,7 +285,11 @@ Common error codes point at their own fix in `next_commands`:
   that process or choose another port.
 
 In human mode the output follows the terminal (TTY table, or tab-separated lines
-when piped or `--plain`); `--json` is unaffected and remains the contract.
+when piped or `--plain`); `--json` is unaffected and remains the contract. A
+human run lists its next steps under `Next:` after its result (`setup` shows
+them in its summary box instead); where stdout is data a script reads (a piped
+or `--plain` list, a resource's created or updated JSON) they go to stderr, so
+stdout holds only that data.
 
 Text the server returns is escaped before it is printed, in `--json` as in human
 mode, so a stored value cannot drive the reader's terminal. Control, format and
