@@ -2013,11 +2013,12 @@ export function setupPlatformHandlers() {
       }
 
       const requested = data.targets as "primary" | string[];
+      const previewUrls = requested === "primary" ? [] : requested;
       const sawPreview = requested !== "primary";
       // The contract's preview URLs are unique items: a repeated one is a
       // malformed request, not something to fold quietly.
-      if (sawPreview && new Set(requested).size !== requested.length) {
-        return HttpResponse.json(errorBody("dep.invalid", "deployment: targets must be unique"), {
+      if (new Set(previewUrls).size !== previewUrls.length) {
+        return HttpResponse.json(errorBody("req.invalid", "deployment: targets must be unique"), {
           status: 400,
         });
       }
@@ -2029,7 +2030,7 @@ export function setupPlatformHandlers() {
         );
       }
       const resolved = new Set<string>(sawPreview ? [] : primaries);
-      for (const target of sawPreview ? requested : []) {
+      for (const target of previewUrls) {
         if (primaries.includes(target)) {
           return HttpResponse.json(
             errorBody(

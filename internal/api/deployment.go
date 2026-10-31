@@ -31,6 +31,8 @@ func (h *Handler) CreateDeployment(ctx context.Context, req *api.CreateDeploymen
 	}
 	if urls, ok := req.Targets.GetDeploymentPreviewUrls(); ok {
 		input.PreviewURLs = urls
+	} else {
+		input.Primary = true
 	}
 	if ttl, ok := req.TTL.Get(); ok {
 		input.TTL = new(time.Duration(ttl))

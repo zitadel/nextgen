@@ -1,5 +1,6 @@
 ---
 "@zitadel/server": minor
+"@zitadel/api": minor
 "@zitadel/cli": patch
 "@zitadel/testing": patch
 ---

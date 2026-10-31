@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-faster/jx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -184,4 +185,25 @@ func TestListPreviewsRefusesAPartialGrant(t *testing.T) {
 
 	_, err := h.ListPreviews(member, api.ListPreviewsParams{ProjectID: "proj_a"})
 	assertDomainCode(t, err, domain.ErrDeploymentPermissionDenied().Code)
+}
+
+// targets is exactly "primary" or a list of preview URLs, so an empty list or a
+// keyword among URLs never reaches the handler.
+func TestDeploymentTargetsRequestRefuses(t *testing.T) {
+	for _, body := range []string{
+		`["primary"]`,
+		`["primary", "https://acme-git-sso-acmeinc.vercel.app"]`,
+		`[]`,
+		`"foo"`,
+		`["https://a.example.com", "https://a.example.com"]`,
+	} {
+		t.Run(body, func(t *testing.T) {
+			var targets api.DeploymentTargetsRequest
+			err := targets.Decode(jx.DecodeStr(body))
+			if err == nil {
+				err = targets.Validate()
+			}
+			assert.Error(t, err)
+		})
+	}
 }
