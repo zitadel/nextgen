@@ -12,4 +12,6 @@ export const links = {
   releases: "https://github.com/zitadel/nextgen/releases",
   changelogFeed: "/changelog/feed.xml",
   zitadel: "https://zitadel.com",
+  // Where an Enterprise quote starts: the pricing page lists no Enterprise price.
+  contact: "https://zitadel.com/contact",
 } as const;

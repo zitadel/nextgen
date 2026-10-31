@@ -47,7 +47,7 @@ describe("the cloud's price list", () => {
     expect(free.limits.core_mau_sized_for).toBeGreaterThan(0);
     expect(pro.minimum.amount).toBeGreaterThan(0);
     expect(pro.annual.amount).toBeGreaterThan(0);
-    expect(Object.keys(enterprise.minimum.tiers_per_year).length).toBeGreaterThan(0);
+    expect(enterprise.support).not.toBe("");
     expect(catalog.self_hosted.pro.prices.length).toBeGreaterThan(0);
   });
 });
@@ -123,6 +123,15 @@ describe("licensedPrice", () => {
   it("names the interval and what it is per", () => {
     expect(licensedPrice(line({ amount: 50, per: "domain" }))).toBe("$50 a month per domain");
     expect(licensedPrice(line({ amount: 250, interval: "hour" }))).toBe("$250 an hour");
+  });
+
+  it("lists no price for a line only Enterprise takes", () => {
+    expect(licensedPrice(line({ amount: 800, plans: ["enterprise"] }))).toBe(
+      "In the Enterprise quote",
+    );
+    expect(licensedPrice(line({ amount: 1000, plans: ["pro", "enterprise"] }))).toBe(
+      "$1,000 a month",
+    );
   });
 
   it("falls back to the note when there is no amount", () => {

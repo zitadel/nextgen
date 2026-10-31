@@ -114,6 +114,9 @@ Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
 - `/pricing` shows the cloud's price list, which `app/pricing/catalog.ts`
   reads from `apps/cloud-functions/src/pricing/catalog.json` when the site
   builds; never type a price into the page.
+- Enterprise is quoted, never listed: its cards say Custom and link
+  `links.contact`, and a line only Enterprise takes shows no price
+  (`licensedPrice`).
 - A field the page reads gets a type in `catalog.ts`; `catalog.spec.ts` runs
   the page's formatting over the real file, so a reshaped catalog fails there.
 

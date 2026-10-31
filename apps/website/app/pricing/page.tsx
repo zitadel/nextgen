@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { CallToAction } from "../cta";
+import { links } from "../links";
 import og from "../og.jpg";
 import { SiteFooter } from "../site-footer";
 import { SiteHeader } from "../site-header";
@@ -94,8 +95,6 @@ export default function PricingPage() {
 /** The cloud's three plans, side by side. */
 function Plans({ catalog }: { catalog: Catalog }) {
   const { free, pro, enterprise } = catalog.plans;
-  const tiers = Object.entries(enterprise.minimum.tiers_per_year);
-  const amounts = tiers.map(([, amount]) => amount);
   return (
     <section aria-labelledby="plans" className="mt-16 md:mt-24">
       <h2 id="plans" className={H2}>
@@ -124,24 +123,29 @@ function Plans({ catalog }: { catalog: Catalog }) {
           ]}
           featured
         />
+        {/* Enterprise is quoted, never listed: no tier, minimum or rate. */}
         <Plan
           name={enterprise.label}
-          price={`From ${dollars(Math.min(...amounts))}`}
-          per="a year, all of it credit for the meters"
+          price="Custom"
+          per="A yearly commitment, all of it credit for the meters, at contract rates"
           line="For contracts, compliance and scale."
-          facts={[
-            `${tiers.map(([tier, amount]) => `${capitalize(tier)} ${dollars(amount)}`).join(", ")} a year`,
-            `${capitalize(enterprise.rates)}`,
-            ...common(enterprise),
-          ]}
+          facts={common(enterprise, { quoted: true })}
+          contact
         />
       </div>
     </section>
   );
 }
 
-/** What every plan states: retention, domains, delivery, the mark, support, the SLA and regions. */
-function common(plan: Catalog["plans"][keyof Catalog["plans"]]): string[] {
+/**
+ * What every plan states: retention, domains, delivery, the mark, support, the
+ * SLA and regions. A `quoted` plan leaves out the SLA's note, which names its
+ * tiers.
+ */
+function common(
+  plan: Catalog["plans"][keyof Catalog["plans"]],
+  { quoted = false }: { quoted?: boolean } = {},
+): string[] {
   const facts = [`${plan.event_retention_days} days of audit events`];
   if (plan.custom_domains_included) {
     facts.push(
@@ -164,7 +168,7 @@ function common(plan: Catalog["plans"][keyof Catalog["plans"]]): string[] {
   );
   if (plan.sla) {
     facts.push(
-      `${plan.sla.target_percent}% SLA${plan.sla.credits ? " with credits" : ""}${plan.sla.note ? `; ${plan.sla.note}` : ""}`,
+      `${plan.sla.target_percent}% SLA${plan.sla.credits ? " with credits" : ""}${plan.sla.note && !quoted ? `; ${plan.sla.note}` : ""}`,
     );
   }
   facts.push(
@@ -182,6 +186,7 @@ function Plan({
   line,
   facts,
   featured = false,
+  contact = false,
 }: {
   name: string;
   price: string;
@@ -189,6 +194,8 @@ function Plan({
   line: string;
   facts: string[];
   featured?: boolean;
+  /** Ends the card on the way to a quote. */
+  contact?: boolean;
 }) {
   return (
     <article className={`${CARD} ${featured ? "ring-1 ring-text-accent/40" : ""}`}>
@@ -219,6 +226,16 @@ function Plan({
           </li>
         ))}
       </ul>
+      {contact && (
+        <div className="mt-auto pt-8">
+          <a
+            href={links.contact}
+            className="flex h-11 items-center justify-center rounded-lg border border-window-border bg-tint/[0.03] px-5 font-semibold text-sm text-text-primary transition-colors hover:bg-tint/[0.07]"
+          >
+            Contact us
+          </a>
+        </div>
+      )}
     </article>
   );
 }
@@ -367,10 +384,11 @@ function SelfHosted({ catalog }: { catalog: Catalog }) {
         />
         <Plan
           name="Self-hosted Enterprise"
-          price={`From ${dollars(Math.min(...Object.values(catalog.plans.enterprise.minimum.tiers_per_year)))}`}
-          per="a year, on the cloud's Enterprise tiers"
+          price="Custom"
+          per="A yearly commitment, on the cloud's Enterprise terms"
           line="For contracts and compliance."
           facts={enterprise.includes.map(capitalize)}
+          contact
         />
       </div>
     </Section>

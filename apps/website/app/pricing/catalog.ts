@@ -33,7 +33,8 @@ export type Catalog = {
       annual: { amount: number; interval: string };
       limits: { core_mau_sized_for: number };
     };
-    enterprise: Plan & { minimum: { tiers_per_year: Record<string, number> }; rates: string };
+    // Quoted, never listed: the page reads none of its minimums or rates.
+    enterprise: Plan;
   };
   meters: Meter[];
   licensed: Licensed[];
@@ -186,8 +187,13 @@ function poolNoun(meter: Meter): string {
   return meter.label.replace(/ past the pool.*$/, "").toLowerCase();
 }
 
-/** A licensed line's price: `$1,000 a month`, `$50 a month per domain`, or its note when it has no amount. */
+/**
+ * A licensed line's price: `$1,000 a month`, `$50 a month per domain`, or its
+ * note when it has no amount. A line only Enterprise takes is quoted with the
+ * rest of its contract, never listed.
+ */
 export function licensedPrice(line: Licensed): string {
+  if (line.plans.every((plan) => plan === "enterprise")) return "In the Enterprise quote";
   if (line.amount === null) return line.note ?? "On request";
   return `${dollars(line.amount)} a${line.interval === "hour" ? "n" : ""} ${line.interval}${line.per ? ` per ${line.per}` : ""}`;
 }
