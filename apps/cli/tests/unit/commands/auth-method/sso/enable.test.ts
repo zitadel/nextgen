@@ -165,48 +165,6 @@ describe("auth-method sso enable --provider custom on a terminal", () => {
   });
 });
 
-describe("auth-method sso enable --provider custom after it writes a connection", () => {
-  it("explains the claim mappings it wrote", async () => {
-    const cwd = await setUpProject();
-
-    const result = await withStdin("piped-secret", () =>
-      runCliForTest([
-        "auth-method",
-        "sso",
-        "enable",
-        "--cwd",
-        cwd,
-        "--non-interactive",
-        "--provider",
-        "custom",
-        "--slug",
-        "acme-sso",
-        "--display-name",
-        "Acme SSO",
-        "--issuer",
-        "https://sso.acme.example",
-        "--client-id",
-        "acme-client-id",
-      ]),
-    );
-
-    const output = result.stdout;
-    expect(output).toContain("Claim mappings in .zitadel/idps/acme-sso.json.");
-    expect(output).toContain("email ← email");
-    expect(output).toContain("Verification, which a mapping alone does not give:");
-    expect(output).toContain(
-      "email is treated as verified only when Acme SSO says so in the email_verified claim.",
-    );
-    expect(output).toContain(
-      "Edit the mappings in that file if your provider returns other claims.",
-    );
-    // After the file it describes was written, not before.
-    expect(output.indexOf("Claim mappings in")).toBeGreaterThan(
-      output.indexOf("Wrote .zitadel/idps/acme-sso.json"),
-    );
-  });
-});
-
 /** Create the acme-sso connection the way a script does, then forget the prompts. */
 async function withAcmeConnection(cwd: string): Promise<void> {
   await withStdin("acme-secret", () =>

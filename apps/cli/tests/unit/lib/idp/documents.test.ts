@@ -13,6 +13,7 @@ import {
   applySsoToSchema,
   removeSsoFromFlow,
   removeSsoFromSchema,
+  schemaProviders,
   ssoEditRefusal,
 } from "../../../../src/lib/idp";
 
@@ -95,6 +96,27 @@ describe("applySsoToSchema", () => {
       unknown
     >;
     expect((methods.sso as { providers: string[] }).providers).toEqual(["google", "github"]);
+  });
+});
+
+describe("schemaProviders", () => {
+  it("reads the slugs a schema signs in through", () => {
+    const { document } = applySsoToSchema(
+      getDefaultHumanUserSchema({ useCase: "minimal" }),
+      slug("google"),
+    );
+
+    expect(schemaProviders(document)).toEqual(["google"]);
+  });
+
+  it("reports none when SSO is disabled", () => {
+    expect(
+      schemaProviders({ "x-auth-methods": { sso: { enabled: false, providers: ["google"] } } }),
+    ).toEqual([]);
+  });
+
+  it("reports none for a schema with no SSO method", () => {
+    expect(schemaProviders(getDefaultHumanUserSchema({ useCase: "minimal" }))).toEqual([]);
   });
 });
 

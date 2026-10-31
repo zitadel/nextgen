@@ -5,6 +5,7 @@ import {
   type IdpProvider,
   type ScaffoldOptions,
 } from "./provider.js";
+import { standardClaim } from "./standard-claims.js";
 import type { ConnectionSlug, DisplayName, Issuer, Scopes } from "./types.js";
 
 /**
@@ -50,11 +51,25 @@ export abstract class OidcProvider implements IdpProvider {
   /** Parameters the vendor wants on every authorization request. */
   protected readonly staticAuthorizeParameters: Readonly<Record<string, string>> = {};
 
+  /**
+   * The default mapping, narrowed to what can arrive: a property the schema
+   * defines, read from a claim the requested scopes return. A standard claim
+   * is only sent under its scope, so mapping `email` for a connection that
+   * does not ask for the `email` scope would write a row that never fills.
+   */
   claimMapping(schemaProperties: Iterable<string>): Record<string, string> {
     const defined = new Set(schemaProperties);
     return Object.fromEntries(
-      Object.entries(this.claimTable).filter(([property]) => defined.has(property)),
+      Object.entries(this.claimTable).filter(
+        ([property, claim]) => defined.has(property) && this.requests(claim),
+      ),
     );
+  }
+
+  /** Whether the requested scopes return this claim: always for a claim that is not a standard one. */
+  private requests(claim: string): boolean {
+    const scope = standardClaim(claim)?.scope;
+    return scope === undefined || (this.scopes as readonly string[]).includes(scope);
   }
 
   /**
@@ -77,9 +92,14 @@ export abstract class OidcProvider implements IdpProvider {
     const claimMapping = this.claimMapping(options.schemaProperties);
     // Verification is of a mapped value, so it narrows to what was mapped: a
     // schema without `email` gets no email mapping, and an `email` entry here
-    // would then claim to verify a value this connection never supplies.
+    // would then claim to verify a value this connection never supplies. It
+    // also narrows to the unique properties, the only ones it is read for.
+    const unique =
+      options.uniqueProperties === undefined ? undefined : new Set(options.uniqueProperties);
     const verifiedClaims = Object.fromEntries(
-      Object.entries(this.verifiedClaims).filter(([property]) => property in claimMapping),
+      Object.entries(this.verifiedClaims).filter(
+        ([property]) => property in claimMapping && (unique === undefined || unique.has(property)),
+      ),
     );
     const issuer = options.endpoints?.issuer;
     const variables = credentialVariables(slug);

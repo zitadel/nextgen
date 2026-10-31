@@ -1,3 +1,4 @@
+import { renderConnectionSummaries } from "../lib/idp";
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../lib/oclif";
 import {
   buildBundle,
@@ -119,6 +120,14 @@ export default class Deploy extends EnvironmentCommand {
     const reported = await runSteps([validateStep, diffStep], ctx);
 
     if (dryRun) {
+      // After the diff, show what each connection maps: the diff says which
+      // fields changed, this says what the sign-in will actually do. Human
+      // output only — `--json` carries nothing here and travels alone.
+      if (!json) {
+        for (const summary of await renderConnectionSummaries(cwd)) {
+          process.stdout.write(`${summary}\n`);
+        }
+      }
       return this.emit({
         status: "ok",
         data: {

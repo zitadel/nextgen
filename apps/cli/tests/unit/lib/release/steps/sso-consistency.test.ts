@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { ZitadelError } from "../../../../../src/lib/errors";
 import { validateSsoConsistency } from "../../../../../src/lib/release/steps/sso-consistency";
+import type { SuggestedCommand } from "../../../../../src/lib/suggestion";
 import { takeReportedWarnings } from "../../../../../src/lib/warnings";
 
 const SCHEMA = ".zitadel/schemas/staff.json";
@@ -51,9 +52,12 @@ async function write(path: string, body: object): Promise<void> {
   await writeFile(join(cwd, path), JSON.stringify(body));
 }
 
+/** Stands in for the command's own `suggest`, which adds the run's scope flags. */
+const suggest = (args: string) => `zitadel ${args}` as SuggestedCommand;
+
 async function failure(): Promise<ZitadelError | undefined> {
   try {
-    await validateSsoConsistency(cwd);
+    await validateSsoConsistency(cwd, suggest);
   } catch (error) {
     expect(error).toBeInstanceOf(ZitadelError);
     return error as ZitadelError;
@@ -126,6 +130,14 @@ describe("validateSsoConsistency", () => {
     const error = await failure();
 
     expect(error?.hint).toContain("no changes were made");
+  });
+
+  it("suggests the dry run that checks the files again once they are fixed", async () => {
+    await write(SCHEMA, schema(["acme"]));
+
+    const error = await failure();
+
+    expect(error?.nextCommands).toEqual(["zitadel deploy --dry-run"]);
   });
 
   describe("finding the schema a flow pins", () => {

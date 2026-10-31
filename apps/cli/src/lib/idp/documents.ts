@@ -259,6 +259,21 @@ export function applySsoToSchema(schema: object, slug: ConnectionSlug): SsoResul
 }
 
 /**
+ * The connection slugs a schema signs in through: the string entries of
+ * `x-auth-methods.sso.providers` when SSO is enabled. A schema with SSO off,
+ * or none configured, signs in through no connection, so the list is empty —
+ * which is what tells the summary a connection has no schema behind it.
+ */
+export function schemaProviders(schema: object): string[] {
+  const methods = (schema as Json)["x-auth-methods"];
+  const sso = isObject(methods) ? methods.sso : undefined;
+  if (!isObject(sso) || sso.enabled !== true || !Array.isArray(sso.providers)) {
+    return [];
+  }
+  return sso.providers.filter((provider): provider is string => typeof provider === "string");
+}
+
+/**
  * The properties this project collects when someone registers.
  *
  * Read from the register purpose's own entry step rather than from the schema:

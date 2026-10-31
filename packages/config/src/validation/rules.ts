@@ -53,6 +53,14 @@ export const VALIDATION_RULES = {
   "sso/unmapped-verification-key": { scope: "project", goRef: null },
   "sso/orphaned-mapping-target": { scope: "project", goRef: null },
   "sso/orphaned-verification-key": { scope: "project", goRef: null },
+  "sso/collection-misses-required": { scope: "project", goRef: null },
+  "sso/claim-needs-scope": { scope: "project", goRef: null },
+  "sso/duplicate-provider": { scope: "project", goRef: null },
+  "sso/unknown-connection-field": { scope: "project", goRef: null },
+  "sso/claim-name-whitespace": { scope: "project", goRef: null },
+  "sso/subject-claim-unstable": { scope: "project", goRef: null },
+  "sso/claim-type-mismatch": { scope: "project", goRef: null },
+  "sso/verification-source-not-boolean": { scope: "project", goRef: null },
 } as const satisfies Record<string, RuleSpec>;
 
 export type RuleId = keyof typeof VALIDATION_RULES;
