@@ -24,12 +24,17 @@ const ownOrigin = "https://zitadel.example.com"
 
 func newMockedRuntimeResolver(t *testing.T) (*service.RuntimeResolver, *servicemocks.MockAllStatements, *servicemocks.MockReleaseService) {
 	t.Helper()
+	return newRuntimeResolverOwning(t, ownOrigin)
+}
+
+func newRuntimeResolverOwning(t *testing.T, own string) (*service.RuntimeResolver, *servicemocks.MockAllStatements, *servicemocks.MockReleaseService) {
+	t.Helper()
 	ctrl := gomock.NewController(t)
 	pool := servicemocks.NewMockPool(ctrl)
 	statements := servicemocks.NewMockAllStatements(ctrl)
 	pool.EXPECT().Statements().Return(statements).AnyTimes()
 	releases := servicemocks.NewMockReleaseService(ctrl)
-	return service.NewRuntimeResolver(service.NewPool(pool), releases, ownOrigin), statements, releases
+	return service.NewRuntimeResolver(service.NewPool(pool), releases, own), statements, releases
 }
 
 func TestRuntimeResolver_Resolve(t *testing.T) {
@@ -133,6 +138,27 @@ func TestRuntimeResolver_Resolve(t *testing.T) {
 		_, err := resolver.Resolve(t.Context(), projectID, origin)
 		require.Error(t, err)
 		assert.True(t, errors.Is(err, domain.ErrProjectOriginNotAllowed(nil)))
+	})
+
+	t.Run("a console on a loopback origin the project does not list is served the newest primary deployment", func(t *testing.T) {
+		const console = "http://localhost:8080"
+		resolver, statements, releases := newRuntimeResolverOwning(t, console)
+		statements.EXPECT().GetProjectByID(gomock.Any(), projectID).Return(&domain.Project{
+			ID:      projectID,
+			Origins: []domain.Origin{{Pattern: "http://localhost:3000", Kind: domain.OriginKindPrimary}},
+		}, nil)
+		statements.EXPECT().ListDeployments(gomock.Any(), gomock.Any()).
+			Return(&database.ListResult[*domain.Deployment]{Items: []*domain.Deployment{{
+				ID: "dep_primary", ProjectID: projectID, ReleaseID: "rel_primary",
+			}}}, nil)
+		releases.EXPECT().Get(gomock.Any(), projectID, "rel_primary").Return(&domain.Release{
+			ID: "rel_primary", ProjectID: projectID,
+		}, nil)
+
+		got, err := resolver.Resolve(t.Context(), projectID, console)
+		require.NoError(t, err)
+		assert.Equal(t, "default", got.Source)
+		assert.Equal(t, console, got.Origin)
 	})
 
 	t.Run("loopback with no deployment is not deployed", func(t *testing.T) {

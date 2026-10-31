@@ -209,7 +209,7 @@ describe("env add", () => {
         expect(result).toPrint("Pipeline secret store");
       });
 
-      it("says the environment serves the server's defaults until it is deployed to", async () => {
+      it("says the environment refuses sign-in until it is deployed to", async () => {
         const app = await aSetUpApp();
 
         const result = await app.run(["env", "add", "production", "--non-interactive"]);
