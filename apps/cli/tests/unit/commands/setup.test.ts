@@ -1,13 +1,11 @@
-import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { type AddressInfo, createServer, type Server } from "node:net";
 import { join } from "node:path";
 
-import { resetPlatformStore, setupPlatformHandlers } from "@zitadel/api-mock/platform";
 import { DEFAULT_SETUP_PRESET, DEFAULT_SETUP_USE_CASE } from "@zitadel/config/defaults";
 import { http, HttpResponse } from "msw";
-import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@clack/prompts", async () => (await import("../../helpers/clack")).clackDouble());
 
@@ -33,15 +31,12 @@ import { LocalServer } from "../../../src/lib/local-server/server";
 import { unscopedCommand } from "../../../src/lib/suggestion";
 import Setup from "../../../src/commands/setup";
 import { aFakeAppGeneratorPath } from "../../helpers/app-generator";
+import { usePlatformServer } from "../../helpers/platform-project";
 import { expectedPublicCliCommand, parseJson, runCliForTest } from "../../helpers/run-cli";
 import { asTerminal } from "../../helpers/terminal";
 
-const tempDirs: string[] = [];
+const { server, dirs: tempDirs } = usePlatformServer();
 const held: Server[] = [];
-const server = setupServer(...setupPlatformHandlers());
-
-beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
-afterAll(() => server.close());
 
 function setup(cwd: string, extra: string[] = []) {
   return runCliForTest([
@@ -196,16 +191,8 @@ const FRAMEWORK_FIXTURES = [
 ] as const;
 
 afterEach(async () => {
-  server.resetHandlers();
-  resetPlatformStore();
   for (const holder of held.splice(0)) {
     await new Promise<void>((resolve) => holder.close(() => resolve()));
-  }
-  while (tempDirs.length > 0) {
-    const dir = tempDirs.pop();
-    if (dir) {
-      await rm(dir, { recursive: true, force: true });
-    }
   }
 });
 

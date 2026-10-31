@@ -303,7 +303,7 @@ describe("wire conventions", () => {
 });
 
 describe("write results", () => {
-  it("carries data in the envelope when the server answers without a body", async () => {
+  it("carries data and no next command when the server answers without a body", async () => {
     // `grants create` by identifier answers 202 with no body.
     const accepted: CreateSpec<Ctx> = { schema, call: async () => undefined };
     const command = bindOperation(
@@ -319,6 +319,23 @@ describe("write results", () => {
 
     // Round-tripped as printed: JSON drops a key whose value is undefined.
     expect(JSON.parse(JSON.stringify(envelope))).toHaveProperty("data", {});
+  });
+
+  it("suggests getting the resource an update answered with", async () => {
+    const updated: UpdateSpec<Ctx> = { schema, call: async () => ({ id: "team_1", name: "a" }) };
+    const command = bindOperation(
+      UpdateOperation as OperationClass<Ctx, UpdateSpec<Ctx>>,
+      definition(updated),
+    );
+
+    const envelope = (await (command as unknown as { run(argv: string[]): Promise<unknown> }).run([
+      "team_1",
+      "--name",
+      "a",
+      "--json",
+    ])) as { data: { next_commands: string[] } };
+
+    expect(envelope.data.next_commands[0]).toContain("teams get team_1 --json");
   });
 });
 
@@ -386,6 +403,27 @@ describe("output a script reads", () => {
     const { stdout } = await printed(command, ["--name", "a"]);
 
     expect(stdout).toEqual([JSON.stringify({ id: "team_1", name: "a" }, null, 2)]);
+  });
+});
+
+describe("list paging", () => {
+  it("asks for the page --page-token names first", async () => {
+    const sent: unknown[] = [];
+    const command = bindOperation(
+      ListOperation as OperationClass<Ctx, ListSpec<Ctx>>,
+      definition({
+        ...list,
+        body: z.object({}).passthrough(),
+        call: async (_ctx, body) => {
+          sent.push(body);
+          return { teams: [] };
+        },
+      }),
+    );
+
+    await printed(command, ["--page-token", "p2", "--plain"]);
+
+    expect(sent).toEqual([expect.objectContaining({ page_token: "p2" })]);
   });
 });
 

@@ -285,9 +285,16 @@ export function defaultHumanUserSchemaUrl(builtinSchemaBase = DEFAULT_BUILTIN_SC
   return `${trimTrailingSlash(builtinSchemaBase)}/default-human-user.json`;
 }
 
+/** A user schema document, as the create body carries one rather than a URL. */
+export type UserSchemaDocument = Extract<CreateSchemaBody, { kind: "user-schema" }>;
+
+/**
+ * The default human user schema: a create body, plus the template's `$id`,
+ * which names the schema in a file and is not part of what the server takes.
+ */
 export function getDefaultHumanUserSchema(
   options: DefaultConfigRenderOptions = {},
-): CreateSchemaBody {
+): UserSchemaDocument & { $id: string } {
   const builtinSchemaBase = trimTrailingSlash(
     options.builtinSchemaBase ?? DEFAULT_BUILTIN_SCHEMA_BASE,
   );
@@ -298,7 +305,7 @@ export function getDefaultHumanUserSchema(
   return applyUseCaseToSchema(
     rendered,
     options.useCase ?? DEFAULT_SETUP_USE_CASE,
-  ) as CreateSchemaBody;
+  ) as UserSchemaDocument & { $id: string };
 }
 
 /** The flow names its user schema by `objectType`, so no schema URL renders into it. */

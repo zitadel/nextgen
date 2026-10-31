@@ -1,26 +1,15 @@
-import { rm } from "node:fs/promises";
-
-import { resetPlatformStore, setupPlatformHandlers } from "@zitadel/api-mock/platform";
 import { HttpResponse, http } from "msw";
-import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
-import { aProjectDirectory, PLATFORM_URL } from "../../../helpers/platform-project";
+import {
+  aProjectDirectory,
+  PLATFORM_URL,
+  usePlatformServer,
+} from "../../../helpers/platform-project";
 import { runCliForTest } from "../../../helpers/run-cli";
 
 const SERVER = PLATFORM_URL;
-const server = setupServer(...setupPlatformHandlers());
-const dirs: string[] = [];
-
-beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
-afterAll(() => server.close());
-afterEach(async () => {
-  server.resetHandlers();
-  resetPlatformStore();
-  for (const dir of dirs.splice(0)) {
-    await rm(dir, { recursive: true, force: true });
-  }
-});
+const { server, dirs } = usePlatformServer();
 
 /** A project directory whose server answers with one page of previews and a cursor to the next. */
 async function aProjectWithTwoPagesOfPreviews(): Promise<string> {

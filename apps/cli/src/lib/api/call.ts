@@ -1,6 +1,8 @@
 import { ApiError, request as fetchWithPolicy } from "@zitadel/api/runtime/fetch";
+import { itemsOf, pages } from "@zitadel/api/runtime/paging";
 
 import { REQUEST_TIMEOUT_MS, sanitizeRejection, sanitizeResponse } from "../api-client";
+import { ZitadelError } from "../errors";
 import { interruptSignal } from "../interrupt";
 import { collectPages } from "../oclif/crud/paging";
 import { type ApiRequest, urlOf } from "./request";
@@ -83,8 +85,7 @@ const pageOf = (request: ApiRequest, token: string | undefined): ApiRequest => {
 /**
  * Send a paged request until the server's `next_page_token` runs out, and
  * answer the last page with the page field holding every page's items. The
- * walk is `collectPages`, the resource lists' `--all`, so a server that
- * repeats a cursor is caught the same way.
+ * walk is `collectPages`, the resource lists' `--all`.
  */
 export const sendAll = async (
   server: string,
@@ -97,15 +98,22 @@ export const sendAll = async (
   }
   let last: ApiResponse = { status: 200, body: undefined };
   const { items } = await collectPages(
-    async (cursor) => {
+    pages(async (cursor) => {
       last = await send(server, token, pageOf(request, cursor));
       return last.body;
-    },
+    }),
     {
-      items: paging.items,
+      // The one list read by a field named only at runtime, so the one checked.
+      items: (body) => {
+        try {
+          return itemsOf(body, paging.items);
+        } catch (error) {
+          throw new ZitadelError("E_VALIDATION", (error as TypeError).message, {
+            details: { response: body },
+          });
+        }
+      },
       all: true,
-      nextPageToken: "next_page_token",
-      flags: { all: "--paginate", onePage: "-F limit=<n> and -F page_token=<token>" },
     },
   );
   return {

@@ -9,13 +9,6 @@ import { shellArg } from "../../lib/shell";
 /** The columns `list` renders, in order. */
 const COLUMNS = ["url", "expires", "created"] as const;
 
-/** A preview as the list endpoint returns it, narrowed to what the table reads. */
-type PreviewRow = {
-  origin: string;
-  expires_at: string;
-  created_at: string;
-};
-
 /**
  * `zitadel preview list` — show the project's live previews.
  *
@@ -58,19 +51,17 @@ export default class PreviewList extends PreviewCommand {
     await this.toMeta(flags);
     const { client, projectId } = await this.connect();
 
-    const request = (token?: string): Promise<unknown> =>
-      client.listPreviews(projectId, {
-        ...(flags.limit === undefined ? {} : { limit: flags.limit }),
-        ...(token === undefined ? {} : { page_token: token }),
-      });
-
-    const { items, next } = await collectPages(request, {
-      items: "previews",
-      all: flags.all === true,
-      token: flags["page-token"],
-      nextPageToken: "next_page_token",
-    });
-    const previews = items as PreviewRow[];
+    // One page unless `--all`, whose drain leaves no next page to report.
+    const { items: previews, next } = await collectPages(
+      client.listPreviews.pages(projectId, {
+        limit: flags.limit,
+        page_token: flags["page-token"],
+      }),
+      {
+        items: (page) => page.previews,
+        all: flags.all === true,
+      },
+    );
 
     const rows = previews.map((preview) => ({
       url: preview.origin,

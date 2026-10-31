@@ -1,26 +1,16 @@
-import { rm } from "node:fs/promises";
-
-import { resetPlatformStore, setupPlatformHandlers } from "@zitadel/api-mock/platform";
 import { HttpResponse, http } from "msw";
-import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
-import { aProjectWithTwoDeploys, PLATFORM_URL } from "../../../helpers/platform-project";
+import {
+  aProjectWithTwoDeploys,
+  liveAcrossTwoPages,
+  PLATFORM_URL,
+  usePlatformServer,
+} from "../../../helpers/platform-project";
 import { runCliForTest } from "../../../helpers/run-cli";
 
 const SERVER = PLATFORM_URL;
-const server = setupServer(...setupPlatformHandlers());
-const dirs: string[] = [];
-
-beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
-afterAll(() => server.close());
-afterEach(async () => {
-  server.resetHandlers();
-  resetPlatformStore();
-  for (const dir of dirs.splice(0)) {
-    await rm(dir, { recursive: true, force: true });
-  }
-});
+const { server, dirs } = usePlatformServer();
 
 /** A project on the mock with two deploys to one primary origin, and its directory. */
 async function twoDeploys(): Promise<{ cwd: string; undone: string }> {
@@ -77,6 +67,33 @@ describe("deployment rollback", () => {
     ]);
 
     expect(guards).toEqual([undone]);
+  });
+
+  it("guards a rollback to a named deployment with the primary that is live, past the first page", async () => {
+    const { cwd, undone } = await twoDeploys();
+    server.use(liveAcrossTwoPages({ id: "dep_live_primary", release_id: "rel_live" }));
+    const guards: unknown[] = [];
+    server.use(
+      http.post(`${SERVER}/deployments/:id/rollback`, async ({ request }) => {
+        const body = (await request.clone().json()) as Record<string, unknown>;
+        guards.push(body.expected_deployment_id);
+        return undefined;
+      }),
+    );
+
+    await runCliForTest([
+      "deployment",
+      "rollback",
+      undone,
+      "--force",
+      "--cwd",
+      cwd,
+      "--server",
+      SERVER,
+      "--json",
+    ]);
+
+    expect(guards).toEqual(["dep_live_primary"]);
   });
 
   it("reports the revisions the restored release pins", async () => {

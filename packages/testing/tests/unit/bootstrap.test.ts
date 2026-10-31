@@ -100,11 +100,4 @@ describe("bootstrapProject", () => {
     );
     await expect(bootstrapProject({ baseUrl: BASE })).rejects.toMatchObject({ status: 400 });
   });
-
-  it("fails clearly when the server omits the project secret", async () => {
-    server.use(
-      http.post(`${BASE}/projects`, () => HttpResponse.json({ id: "proj_1" }, { status: 201 })),
-    );
-    await expect(bootstrapProject({ baseUrl: BASE })).rejects.toThrow(/project secret/);
-  });
 });

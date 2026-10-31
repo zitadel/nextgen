@@ -148,7 +148,21 @@ describe("sendAll", () => {
     expect(response.body).toEqual({ users: LETTERS, next_page_token: "" });
   });
 
-  it("starts from the page the caller named", async () => {
+  it("refuses a page without its list, carrying the response", async () => {
+    server.use(
+      http.get(`${SERVER}/users/user_1/passkeys`, () => HttpResponse.json({ next_page_token: "" })),
+    );
+
+    await expect(
+      sendAll(SERVER, "s", requestFor("listUserPasskeys", [], ["user_1"])),
+    ).rejects.toMatchObject({
+      code: "E_VALIDATION",
+      message: 'Unexpected list response: missing "passkeys" array',
+      details: { response: { next_page_token: "" } },
+    });
+  });
+
+  it("starts from the page the caller named in the query", async () => {
     server.use(
       http.get(`${SERVER}/users/user_1/passkeys`, ({ request }) => {
         const { items, next } = pageAt(new URL(request.url).searchParams.get("page_token"));
@@ -165,18 +179,17 @@ describe("sendAll", () => {
     expect(response.body).toMatchObject({ passkeys: ["d", "e", "f", "g"] });
   });
 
-  it("stops on a server that repeats a cursor", async () => {
+  it("starts from the page the caller named in the body", async () => {
     server.use(
-      http.get(`${SERVER}/users/user_1/passkeys`, () =>
-        HttpResponse.json({ passkeys: ["a"], next_page_token: "again" }),
-      ),
+      http.post(`${SERVER}/users/query`, async ({ request }) => {
+        const body = (await request.json()) as { page_token?: string };
+        const { items, next } = pageAt(body.page_token ?? null);
+        return HttpResponse.json({ users: items, next_page_token: next });
+      }),
     );
 
-    await expect(
-      sendAll(SERVER, "s", requestFor("listUserPasskeys", [], ["user_1"])),
-    ).rejects.toMatchObject({
-      message: "The server repeated a page cursor, so --paginate would never finish",
-      hint: "Fetch one page at a time with -F limit=<n> and -F page_token=<token>, and report the repeated cursor.",
-    });
+    const response = await sendAll(SERVER, "s", requestFor("queryUsers", ["page_token=cursor-3"]));
+
+    expect(response.body).toMatchObject({ users: ["d", "e", "f", "g"] });
   });
 });

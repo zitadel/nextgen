@@ -171,26 +171,17 @@ export type SanitizeOptions = {
  * `timeoutMs`.
  */
 export function createZitadelClient(
-  opts: ZitadelClientOptions,
+  // The CLI sets both hooks itself, so a caller's would be silently replaced.
+  opts: Omit<ZitadelClientOptions, "onResponse" | "onError">,
   sanitize: SanitizeOptions = {},
 ): ZitadelClient {
-  const onResolve = sanitize.verbatim ? <T>(value: T): T => value : sanitizeResponse;
-  const client = createRawClient({
+  // The client applies both to every call, each page of a paged one included.
+  return createRawClient({
     signal: interruptSignal(),
     timeoutMs: REQUEST_TIMEOUT_MS,
     ...opts,
-  });
-  return new Proxy(client, {
-    get(target, prop, receiver) {
-      const value = Reflect.get(target, prop, receiver);
-      if (typeof value !== "function") {
-        return value;
-      }
-      return (...args: unknown[]) => {
-        const result = (value as (...a: unknown[]) => unknown)(...args);
-        return result instanceof Promise ? result.then(onResolve, sanitizeRejection) : result;
-      };
-    },
+    ...(sanitize.verbatim ? {} : { onResponse: sanitizeResponse }),
+    onError: sanitizeRejection,
   });
 }
 

@@ -1,4 +1,4 @@
-import { createZitadelClient, type ZitadelClient } from "@zitadel/api/client";
+import { createZitadelClient } from "@zitadel/api/client";
 import {
   DEFAULT_FLOW_SCHEMA_URI,
   getDefaultHumanUserSchema,
@@ -40,49 +40,37 @@ export async function bootstrapProject(
 ): Promise<BootstrappedProject> {
   const { baseUrl } = options;
   const unauthenticated = createZitadelClient({ baseUrl });
-  const project = (await unauthenticated.createProject({
+  const project = await unauthenticated.createProject({
     name: options.projectName ?? DEFAULT_PROJECT_NAME,
     origins: (options.appOrigins ?? []).map((pattern) => ({
       pattern,
       kind: "preview" as const,
     })),
     seed_defaults: false,
-  } as Parameters<ZitadelClient["createProject"]>[0])) as Record<string, unknown>;
-  const projectId = requireString(project.id, "project id");
-  const projectSecret = requireString(project.project_secret, "project secret");
-  const previewSecret =
-    typeof project.preview_secret === "string" ? project.preview_secret : undefined;
+  });
+  const projectId = project.id;
+  const projectSecret = project.project_secret;
+  const previewSecret = project.preview_secret;
 
   const client = createZitadelClient({ baseUrl, token: projectSecret });
 
   const { $id: _templateId, ...schemaBody } = getDefaultHumanUserSchema({
     preset: options.preset,
     useCase: options.useCase,
-  }) as { $id?: string } & Record<string, unknown>;
+  });
   void _templateId;
-  const schema = (await client.createSchema(
-    schemaBody as Parameters<ZitadelClient["createSchema"]>[0],
-    { project_id: projectId },
-  )) as Record<string, unknown>;
-  const schemaId = requireString(schema.id, "schema id");
+  const schema = await client.createSchema(schemaBody, { project_id: projectId });
+  const schemaId = schema.id;
 
   const flowBody = getDefaultLoginFlow({
     preset: options.preset,
     useCase: options.useCase,
   });
-  const flow = (await client.createFlowDefinition({
+  const flow = await client.createFlowDefinition({
     project_id: projectId,
     schema_uri: DEFAULT_FLOW_SCHEMA_URI,
     flow_definition: flowBody,
-  } as Parameters<ZitadelClient["createFlowDefinition"]>[0])) as Record<string, unknown>;
-  const flowId = requireString(flow.id, "flow definition id");
+  });
 
-  return { projectId, projectSecret, previewSecret, schemaId, flowId };
-}
-
-export function requireString(value: unknown, label: string): string {
-  if (typeof value === "string" && value.length > 0) {
-    return value;
-  }
-  throw new Error(`Missing ${label} in server response.`);
+  return { projectId, projectSecret, previewSecret, schemaId, flowId: flow.id };
 }

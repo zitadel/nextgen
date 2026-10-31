@@ -1,6 +1,11 @@
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
+import { resetPlatformStore, setupPlatformHandlers } from "@zitadel/api-mock/platform";
+import { HttpResponse, http } from "msw";
+import { setupServer } from "msw/node";
+import { afterAll, afterEach, beforeAll } from "vitest";
 
 import { DEFAULT_SERVER } from "../../src/lib/server";
 
@@ -71,4 +76,64 @@ export async function aProjectWithTwoDeploys(
     undone = deployment.id as string;
   }
   return { cwd: await aProjectDirectory(prefix, { id, secret }), undone };
+}
+
+/**
+ * Answers the live deployment list in two pages: a live preview first, and
+ * `primary` only behind the cursor, so a read of the first page alone misses it.
+ */
+export function liveAcrossTwoPages(primary: { id: string; release_id: string }) {
+  return http.get(`${PLATFORM_URL}/deployments`, ({ request }) => {
+    const query = new URL(request.url).searchParams;
+    if (query.get("live") !== "true") {
+      return undefined;
+    }
+    return HttpResponse.json(
+      query.get("page_token") === "p2"
+        ? {
+            deployments: [
+              {
+                ...primary,
+                targets: [{ origin: "https://app.acme.com", expires_at: null }],
+                reason: "deploy",
+                deployed_at: "2026-01-01T00:00:00.000Z",
+              },
+            ],
+            next_page_token: null,
+          }
+        : {
+            deployments: [
+              {
+                id: "dep_preview",
+                release_id: "rel_preview",
+                targets: [
+                  { origin: "https://pr-1.acme.com", expires_at: "2027-01-01T00:00:00.000Z" },
+                ],
+                reason: "deploy",
+                deployed_at: "2026-01-02T00:00:00.000Z",
+              },
+            ],
+            next_page_token: "p2",
+          },
+    );
+  });
+}
+
+/**
+ * An msw server answering as the mock platform for the calling suite, and the
+ * project directories it removes after each test.
+ */
+export function usePlatformServer(): { server: ReturnType<typeof setupServer>; dirs: string[] } {
+  const server = setupServer(...setupPlatformHandlers());
+  const dirs: string[] = [];
+  beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
+  afterAll(() => server.close());
+  afterEach(async () => {
+    server.resetHandlers();
+    resetPlatformStore();
+    for (const dir of dirs.splice(0)) {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+  return { server, dirs };
 }

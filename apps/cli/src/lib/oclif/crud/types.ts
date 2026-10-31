@@ -13,7 +13,6 @@ import type { References } from "./secrets";
 export type Verb = "list" | "get" | "create" | "update" | "delete" | "revoke" | "deactivate";
 export type ResourceCommandId = `${string}:${Verb}`;
 export type Json = Readonly<Record<string, unknown>>;
-export type Page = Readonly<{ items: readonly unknown[]; next: string | null }>;
 
 /**
  * Structural subset of a Zod schema (a `ZodType<B>` satisfies it); keeps the
@@ -73,12 +72,13 @@ export type FilterField = Readonly<{
  * without it is sent as flat query parameters. Everything the caller sees —
  * the flags, the grammar, the envelope — is the same either way.
  */
-export type ListSpec<Ctx, B = Json> = Readonly<{
+export type ListSpec<Ctx, B = Json, P = unknown, I = string | undefined> = Readonly<{
   /**
    * Response property holding the page of items; omit when the response body
-   * is itself the array.
+   * is itself the array. The registry's `list` builder checks it against what
+   * `call` returns, by {@link ListPage}.
    */
-  items?: string;
+  items?: I;
   /**
    * Generated response schema. `--fields` is checked against the record shape
    * it describes, so the same arguments are valid whether a page came back
@@ -113,32 +113,60 @@ export type ListSpec<Ctx, B = Json> = Readonly<{
    * for an endpoint that orders by one implicit field.
    */
   sortParam?: string;
-  call(ctx: Ctx, request: B): Promise<unknown>;
+  call(ctx: Ctx, request: B): Promise<P>;
 }>;
 
-export type GetSpec<Ctx> = Readonly<{
-  call: (ctx: Ctx, id: string) => Promise<unknown>;
+/**
+ * The page a list's `items` promises: an object holding an array under that
+ * field, or the array itself when there is none. Constraining `call`'s result
+ * by it makes a field the response does not hold as an array a type error.
+ */
+export type ListPage<I> = I extends string
+  ? { readonly [K in I]: readonly unknown[] }
+  : readonly unknown[];
+
+/** One item of a page `P` whose list sits under `I`, or of `P` itself when there is none. */
+export type ListItem<P, I> = (I extends string ? P[I & keyof P] : P) extends readonly (infer T)[]
+  ? T
+  : never;
+
+/**
+ * Every dot-path into `T`: its fields, and the fields of the objects below
+ * them, stopping at arrays. What a resource's columns and detail may name.
+ */
+export type FieldPath<T> = T extends readonly unknown[]
+  ? never
+  : T extends object
+    ? {
+        [K in keyof T & string]: K | `${K}.${FieldPath<NonNullable<T[K]>>}`;
+      }[keyof T & string]
+    : never;
+
+// Method syntax for the same reason as `CreateSpec`: a spec typed by its
+// record `R` still assigns to the erased spec the registry holds.
+export type GetSpec<Ctx, R = unknown> = Readonly<{
+  call(ctx: Ctx, id: string): Promise<R>;
   /** Generated response schema of the record itself; see {@link QueryListSpec.response}. */
   response?: Schema;
   /**
    * Blocks a terminal shows under the fields, for a value that does not read
    * on one line (a release's pointers). Skipped when `--fields` picks the view.
    */
-  sections?: (item: unknown) => readonly string[];
+  sections?(item: R): readonly string[];
 }>;
 // Method syntax makes `body` bivariant, so a concrete-body spec still assigns to
 // the erased spec the registry and factory hold; the body/schema fit is checked
 // at the builder call site, not as bodies flow through the factory.
-export type CreateSpec<Ctx, B = Json> = Readonly<
+export type CreateSpec<Ctx, B = Json, C = unknown> = Readonly<
   WriteShape & {
     schema: Schema<B>;
-    call(ctx: Ctx, body: B): Promise<unknown>;
+    call(ctx: Ctx, body: B): Promise<C>;
   }
 >;
-export type UpdateSpec<Ctx, B = Json> = Readonly<
+export type UpdateSpec<Ctx, B = Json, U = unknown> = Readonly<
   WriteShape & {
     schema: Schema<B>;
-    call(ctx: Ctx, id: string, body: B): Promise<unknown>;
+    call(ctx: Ctx, id: string, body: B): Promise<U>;
   }
 >;
 
