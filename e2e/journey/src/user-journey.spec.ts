@@ -10,7 +10,6 @@ import {
   loginWithPassword,
   registerWithPasskey,
   registerWithPassword,
-  type ProfileEntry,
 } from "@zitadel/testing/playwright";
 
 import {
@@ -20,6 +19,7 @@ import {
   gotoLogin,
   loginUrl,
   logout,
+  registrationProfile,
 } from "./support";
 
 test.describe.configure({ mode: "serial" });
@@ -32,14 +32,6 @@ const framework = process.env.JOURNEY_FRAMEWORK ?? "next";
 // `??`: the runner passes an empty string for "default preset", and an
 // empty preset must still register the password-first journeys.
 const preset = process.env.JOURNEY_PRESET || "password-first";
-
-// Fields some presets require at registration; the kit fills them only when
-// the flow renders them.
-const registrationProfile: ProfileEntry[] = [
-  { field: "givenName", value: "Ada", label: /given.?name/i },
-  { field: "familyName", value: "Lovelace", label: /family.?name/i },
-  { field: "dateOfBirth", value: "1990-01-15", label: /date.?of.?birth/i },
-];
 
 if (preset === "password-first") {
   test(`password-only registration, logout, and password login work in a fresh ${framework} app`, async ({
