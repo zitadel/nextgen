@@ -99,6 +99,10 @@ export function liveDirectory(server: string): Directory {
       throw new NotLiveError();
     },
 
+    async usageByDay() {
+      throw new NotLiveError();
+    },
+
     async applyEntitlements() {
       throw new NotLiveError();
     },

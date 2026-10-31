@@ -55,3 +55,22 @@ describe("production, until the live adapters land", () => {
     await expect(systems.hubspot.tickets(MOCK_PERSON)).rejects.toBeInstanceOf(NotLiveError);
   });
 });
+
+describe("local runs and previews", () => {
+  it("read the caller and their teams live, and a team's usage from the mock", async () => {
+    vi.resetModules();
+    const { rpcSystems } = await import("./systems");
+    const live = {
+      caller: vi.fn(),
+      administeredTeams: vi.fn(),
+      usageByDay: vi.fn(),
+    } as unknown as Directory;
+    const { zitadel } = rpcSystems(live);
+    expect(zitadel.administeredTeams).toBe(live.administeredTeams);
+    const days = { start: "2026-10-01T00:00:00.000Z", end: "2026-10-02T00:00:00.000Z" };
+    const { projects, counts } = await zitadel.usageByDay(MOCK_TEAM, days);
+    expect(live.usageByDay).not.toHaveBeenCalled();
+    expect(projects).toHaveLength(2);
+    expect(counts.length).toBeGreaterThan(0);
+  });
+});

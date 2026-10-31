@@ -101,6 +101,55 @@ export interface UsageLine {
   amount: number;
 }
 
+/**
+ * `GET /cloud/api/usage`: each team the caller administers, with this
+ * period's usage by day and project at list prices (Settings → Usage).
+ */
+export interface UsageOverview {
+  teams: TeamUsage[];
+}
+
+export interface TeamUsage {
+  team_id: string;
+  team_name: string;
+  plan: Plan;
+  /** The current billing period, RFC 3339. */
+  period: { start: string; end: string };
+  projects: { id: string; name: string }[];
+  /** The period's days so far, oldest first. */
+  days: UsageDay[];
+  /** Each meter's period so far, as Billing lists it. */
+  usage: UsageLine[];
+  /**
+   * The plan's minimum, which usage draws on before anything else (Pro's
+   * $100 a month), and how much of it usage has drawn. Both 0 on Free.
+   */
+  credit: { amount: number; used: number };
+  /** Minor units of usage past the credit so far. */
+  on_demand_amount: number;
+  estimate: BillingEstimate;
+}
+
+/** One UTC day of the period. */
+export interface UsageDay {
+  /** The day's start, RFC 3339. */
+  date: string;
+  entries: UsageEntry[];
+}
+
+/** What one project's meter counted on a day, and what that added to the period's bill. */
+export interface UsageEntry {
+  project_id: string;
+  metric: string;
+  used: number;
+  /**
+   * Minor units at list price: the bill so far after the day less the one
+   * before it, this project's share of it by its count that day. A day costs
+   * nothing while its meter's allowance lasts.
+   */
+  amount: number;
+}
+
 /** This period's bill so far, at list prices. */
 export interface BillingEstimate {
   /** The plan the usage needs: `free` while nothing is past an allowance or Pro's only. */

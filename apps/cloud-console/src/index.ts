@@ -7,13 +7,15 @@ import { billingScreen } from "./screens/billing";
 import { emailScreen } from "./screens/email";
 import { signUpScreen } from "./screens/sign-up";
 import { supportScreen } from "./screens/support";
+import { usageScreen } from "./screens/usage";
 
 /**
  * What waits for its functions to go live or for its check on a preview
  * (root ADR 084 §9): previews and local runs get it, production does not.
  * Billing and Support are in both, since each shows its preview state while
  * the functions answer `cloud.not_live`; Email has none, as nothing sends
- * marketing email yet. Sign-up calls no function, and the provisioning call
+ * marketing email yet. Usage waits for the proposed pricing, whose meters it
+ * draws. Sign-up calls no function, and the provisioning call
  * only starts onboarding, which records what it would send, so production has
  * both too. The build inlines the stage, so a production bundle carries none
  * of what it leaves out.
@@ -37,7 +39,7 @@ export const addon: ConsoleAddon = unreleased
   ? {
       Root: CloudRoot,
       track,
-      screens: [billingScreen, supportScreen, emailScreen],
+      screens: [usageScreen, billingScreen, supportScreen, emailScreen],
       signedOutScreens: [signUpScreen],
       signInApiBase: "/cloud/zitadel",
     }

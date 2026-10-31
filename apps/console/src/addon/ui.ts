@@ -22,6 +22,13 @@ export {
   FieldTitle,
 } from "@/components/ui/field";
 export { Input } from "@/components/ui/input";
+export {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 export { Switch } from "@/components/ui/switch";
 export {
   Table,
@@ -31,6 +38,7 @@ export {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+export { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 export { Textarea } from "@/components/ui/textarea";
 // The toast the console's root `Toaster` shows: the add-on must not bring its own.
 export { toast } from "sonner";

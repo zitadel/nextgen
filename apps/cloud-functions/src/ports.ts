@@ -47,6 +47,11 @@ export interface Directory {
   administeredTeams(cookie: string): Promise<Team[]>;
   /** Every team's usage in one hour, as the cloud's operator reads it (§6, §8). */
   usage(hour: UsageWindow): Promise<UsageRecord[]>;
+  /**
+   * One team's counts per project and UTC day within `days`, as the server's
+   * hourly sums add up (§8.3): quantities only, which the cloud prices.
+   */
+  usageByDay(team: Team, days: UsageWindow): Promise<TeamDays>;
   /** Sets what a team's plan allows, which the server enforces and never asks Stripe (§6, §8). */
   applyEntitlements(teamId: string, entitlements: Entitlements): Promise<void>;
 }
@@ -83,6 +88,22 @@ export interface UsageRecord {
   at: string;
   /** `team:metric:hour`: Stripe counts a re-sent hour once. */
   identifier: string;
+}
+
+/** A team's projects, and what each counted per day; a day, project or metric that counted nothing is left out. */
+export interface TeamDays {
+  projects: { id: string; name: string }[];
+  counts: DayCount[];
+}
+
+/** One project's count of one metric on one UTC day; a user meter's is the users first seen that day. */
+export interface DayCount {
+  /** The day's start, RFC 3339. */
+  day: string;
+  project_id: string;
+  /** The Stripe meter's event name. */
+  metric: string;
+  value: number;
 }
 
 /** Stripe: a customer per team, its subscription, invoices and meters. */

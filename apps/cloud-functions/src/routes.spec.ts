@@ -1,6 +1,8 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { TeamUsage, UsageOverview } from "./contract";
 import { MOCK_TEAM, mockSystems } from "./mock";
+import { entitlementsFor } from "./pricing/catalog";
 import { type Runtime, routes } from "./routes";
 
 const ORIGIN = "https://cloud.example";
@@ -130,5 +132,58 @@ describe("the way back from Stripe", () => {
     expect(await back("https://elsewhere.example/phish")).toBe(
       `${ORIGIN}/console/settings/billing?mock=stripe-portal`,
     );
+  });
+});
+
+describe("Settings → Usage", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-31T12:00:00.000Z"));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  async function usage(runtime: Runtime): Promise<TeamUsage> {
+    const route = routes["GET /cloud/api/usage"];
+    if (!route) throw new Error("no usage route");
+    const request = new Request(`${ORIGIN}/cloud/api/usage`, {
+      headers: { cookie: "__Host-zitadel_session=s" },
+    });
+    const { teams } = (await (await route(request, runtime)).json()) as UsageOverview;
+    const [team] = teams;
+    if (!team) throw new Error("no team");
+    return team;
+  }
+
+  it("prices each day of the period so the days add up to its bill", async () => {
+    const team = await usage({ systems: mockSystems(), provisionOnce: vi.fn() });
+    const days = team.days.flatMap(({ entries }) => entries);
+    expect(team.days).toHaveLength(31);
+    expect(days.reduce((sum, entry) => sum + entry.amount, 0)).toBe(30_500);
+    expect(team.projects.map((project) => project.name)).toEqual([
+      "Customer portal",
+      "Partner API",
+    ]);
+  });
+
+  it("bills nothing on Free, saying what Pro would", async () => {
+    const team = await usage({ systems: mockSystems(), provisionOnce: vi.fn() });
+    expect(team).toMatchObject({
+      credit: { amount: 0, used: 0 },
+      on_demand_amount: 0,
+      estimate: { plan: "pro", total_amount: 30_500 },
+    });
+  });
+
+  it("draws Pro's minimum first, as credit, and bills the rest on demand", async () => {
+    const systems = mockSystems();
+    await systems.zitadel.applyEntitlements(MOCK_TEAM.id, entitlementsFor("pro"));
+    const team = await usage({ systems, provisionOnce: vi.fn() });
+    expect(team).toMatchObject({
+      credit: { amount: 10_000, used: 10_000 },
+      on_demand_amount: 20_500,
+    });
   });
 });

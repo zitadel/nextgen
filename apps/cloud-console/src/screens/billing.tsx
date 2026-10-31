@@ -32,6 +32,7 @@ import {
 } from "@zitadel/console/addon/ui";
 
 import { type Live, cloudGet, cloudSend, whenLive } from "../cloud-api";
+import { money, period } from "./format";
 import { screen } from "./screen";
 
 /**
@@ -44,7 +45,7 @@ import { screen } from "./screen";
  */
 export const billingScreen = screen({
   path: "/settings/billing",
-  nav: { label: "Billing", view: "settings", order: 2, icon: CreditCard },
+  nav: { label: "Billing", view: "settings", order: 3, icon: CreditCard },
   load: () => whenLive(cloudGet<BillingOverview>("/billing")),
   Screen: BillingScreen,
 });
@@ -204,15 +205,4 @@ function estimate({ plan, estimate }: TeamBilling): string {
   return plan.id === "free" && estimate.plan !== "free"
     ? `${total} on Pro, as this usage is past Free's allowances`
     : total;
-}
-
-function money(minor: number, currency: string): string {
-  return new Intl.NumberFormat(undefined, { style: "currency", currency }).format(minor / 100);
-}
-
-/** Stripe's period, in UTC as Stripe counts it; its end is exclusive, so the last day shows. */
-function period({ start, end }: TeamBilling["period"]): string {
-  const format = (at: number) =>
-    new Date(at).toLocaleDateString(undefined, { day: "numeric", month: "short", timeZone: "UTC" });
-  return `${format(Date.parse(start))} to ${format(Date.parse(end) - 1)}`;
 }

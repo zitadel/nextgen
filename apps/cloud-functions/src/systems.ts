@@ -48,13 +48,15 @@ export function onboardingSystems(): Onboarding {
  * rest as `currentSystems()` has them. Production, with no live Stripe or
  * HubSpot yet, refuses those call by call rather than the whole RPC, so
  * `account/ensure` starts onboarding while billing and support answer
- * `cloud.not_live`.
+ * `cloud.not_live`. Elsewhere the team's usage comes from the mock, since the
+ * server has no usage API yet (§8.3).
  */
 export function rpcSystems(zitadel: Directory): Systems {
   if (process.env.VERCEL_ENV === "production") {
     return { zitadel, stripe: notLive<Billing>(), hubspot: notLive<Crm>() };
   }
-  return { ...currentSystems(), zitadel };
+  const mocks = currentSystems();
+  return { ...mocks, zitadel: { ...zitadel, usageByDay: mocks.zitadel.usageByDay } };
 }
 
 /** A system whose every call refuses, as `currentSystems()` does in production. */
