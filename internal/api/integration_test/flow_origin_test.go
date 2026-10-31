@@ -123,6 +123,38 @@ func TestNoOriginServesNewestPrimaryDeployment(t *testing.T) {
 	}
 }
 
+// TestDeploymentFreezesOrigins serves a primary origin only while the newest
+// primary deployment names it and the project lists it. An origin added since
+// waits for a deploy, and one removed stops at once and stays out when it comes
+// back.
+func TestDeploymentFreezesOrigins(t *testing.T) {
+	t.Parallel()
+
+	const added = "https://added.acme.com"
+	assertOpens := func(t *testing.T, projectID, origin string) {
+		t.Helper()
+		resp, body := openFlow(t, projectID, origin)
+		require.Equal(t, http.StatusCreated, resp.StatusCode, "Origin %q: %s", origin, body)
+	}
+	fixture := newDeploymentFixture(t)
+	deployPrimary(t, fixture.project)
+	assertOpens(t, fixture.project, appOrigin)
+
+	fixture.addOrigin(t, domain.Origin{Pattern: added, Kind: domain.OriginKindPrimary})
+	assertFlowCode(t, fixture.project, added, domain.ErrReleaseNotDeployed(nil).Code)
+	deployPrimary(t, fixture.project)
+	assertOpens(t, fixture.project, added)
+
+	require.NoError(t, harness.EnsureProjectService(t).RemoveOrigin(t.Context(), fixture.project, appOrigin))
+	resp, body := openFlow(t, fixture.project, appOrigin)
+	assert.Equal(t, http.StatusForbidden, resp.StatusCode, string(body))
+	assert.Equal(t, domain.ErrProjectOriginNotAllowed(nil).Code, errorCode(body))
+
+	deployPrimary(t, fixture.project)
+	fixture.addOrigin(t, domain.Origin{Pattern: appOrigin, Kind: domain.OriginKindPrimary})
+	assertFlowCode(t, fixture.project, appOrigin, domain.ErrReleaseNotDeployed(nil).Code)
+}
+
 // releaseID is the id of a created release. The same pointer set answers 200
 // with the release that already pins it.
 func releaseID(t *testing.T, resp api.CreateReleaseRes) api.ReleaseID {

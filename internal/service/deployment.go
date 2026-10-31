@@ -172,8 +172,8 @@ func (s *DeploymentService) Deploy(ctx context.Context, input DeployInput) (_ *C
 	})
 }
 
-// Rollback re-deploys the release of a primary deployment to every current
-// primary origin.
+// Rollback re-deploys the release of a primary deployment to the origins it
+// froze.
 func (s *DeploymentService) Rollback(ctx context.Context, input RollbackDeploymentInput) (_ *CreateDeploymentOutput, err error) {
 	ctx, end := startSpan(ctx, "DeploymentService.Rollback")
 	defer end(&err)
@@ -185,9 +185,11 @@ func (s *DeploymentService) Rollback(ctx context.Context, input RollbackDeployme
 	if previous.OriginKind != domain.DeploymentOriginKindPrimary {
 		return nil, domain.ErrDeploymentInvalid().WithMessage("a deployment to preview URLs cannot be rolled back")
 	}
-	return s.Deploy(ctx, DeployInput{
+	return s.Create(ctx, CreateDeploymentInput{
 		ProjectID:            input.ProjectID,
 		ReleaseID:            previous.ReleaseID,
+		OriginKind:           domain.DeploymentOriginKindPrimary,
+		Origins:              previous.Origins(),
 		Reason:               domain.DeploymentReasonRollback,
 		Message:              input.Message,
 		RollbackTo:           &previous.ID,

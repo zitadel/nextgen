@@ -117,8 +117,9 @@ type DeploymentTarget struct {
 }
 
 // Deployment is an append-only record of a release going live on a set of
-// origins, sorted. All primary origins serve the newest primary deployment; a
-// preview URL serves its latest deployment until the preview expires.
+// origins, sorted, frozen with it. A primary origin serves the newest primary
+// deployment when that names it and the project still lists it; a preview URL
+// serves its latest deployment until the preview expires.
 type Deployment struct {
 	ProjectID  string               `json:"project_id"`
 	ID         string               `json:"id"`

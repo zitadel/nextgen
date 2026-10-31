@@ -76,7 +76,7 @@ func NewRuntimeResolver(v2Pool *DB, releases ReleaseService, ownOrigins ...strin
 }
 
 // Resolve walks the three layers: the gate refuses an origin no pattern
-// admits, the target is the newest deployment to that exact origin, and the
+// admits, the target is the deployment that origin serves, and the
 // release is that deployment's release unless it is revoked. A request with
 // no origin, and one from a console host the project does not list, is served
 // the newest primary deployment.
@@ -126,7 +126,7 @@ func (r *RuntimeResolver) resolve(ctx context.Context, projectID, origin string)
 		return r.resolutionForDefault(ctx, project, matched.origin)
 	}
 
-	dep, err := r.newestDeployment(ctx, projectID, matched.origin)
+	dep, err := r.deploymentOf(ctx, projectID, matched)
 	if err != nil {
 		return nil, err
 	}
@@ -165,6 +165,24 @@ func (r *RuntimeResolver) finish(ctx context.Context, project *domain.Project, o
 		Deployment: dep,
 		Release:    release,
 	}, nil
+}
+
+// deploymentOf is the deployment an admitted origin serves, nil for none. A
+// preview URL serves its own newest deployment. Any other origin serves the
+// newest primary deployment when that names it: a deployment freezes its
+// origins, so one added later waits for the next deploy.
+func (r *RuntimeResolver) deploymentOf(ctx context.Context, projectID string, matched *matchedOrigin) (*domain.Deployment, error) {
+	if matched.preview {
+		return r.newestDeployment(ctx, projectID, matched.origin)
+	}
+	dep, err := newestPrimary(ctx, r.v2Pool.Statements(), projectID)
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to read the newest primary deployment")
+	}
+	if dep == nil || !slices.Contains(dep.Origins(), matched.origin) {
+		return nil, nil
+	}
+	return dep, nil
 }
 
 func (r *RuntimeResolver) newestDeployment(ctx context.Context, projectID, origin string) (*domain.Deployment, error) {

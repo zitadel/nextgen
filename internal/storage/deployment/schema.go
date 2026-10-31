@@ -29,8 +29,8 @@ type Tables struct {
 }
 
 // RowServes reports whether a deployment is live on one of its origins at the
-// given time. All primary origins run the newest primary deployment; a preview
-// URL runs its latest deployment until the preview expires.
+// given time. A listed primary origin runs the newest primary deployment that
+// names it; a preview URL runs its latest deployment until the preview expires.
 func RowServes(tables Tables, placeholder string) string {
 	return `(` + primaryRowServes(tables) + ` OR ` + previewRowServes(tables, placeholder) + `)`
 }

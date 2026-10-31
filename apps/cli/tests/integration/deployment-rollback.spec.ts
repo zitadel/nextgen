@@ -89,7 +89,7 @@ describe("deployment rollback", () => {
         expect(rollbacks.last?.expected_deployment_id).toBe(undone.deployment_id);
       });
 
-      it("refuses re-applying a deployment to an origin since removed as a validation error", async () => {
+      it("re-applies a deployment to an origin since removed", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin("https://a.example.com");
         await app.addPrimaryOrigin("https://b.example.com");
@@ -105,7 +105,7 @@ describe("deployment rollback", () => {
           "--json",
         ]);
 
-        expect(result).toFailWith("E_VALIDATION");
+        expect(result).toSucceed();
       });
 
       it("takes no --origin, as every primary deployment is one history", async () => {

@@ -309,13 +309,13 @@ func TestRollbackDeployment(t *testing.T) {
 		assert.Equal(t, rolledBack.ID, newest.Value.ID)
 	})
 
-	t.Run("covers a primary origin added since", func(t *testing.T) {
+	t.Run("restores the origins it froze, not one added since", func(t *testing.T) {
 		fixture.addOrigin(t, domain.Origin{Pattern: "https://acme.com", Kind: domain.OriginKindPrimary})
 		resp := fixture.rollback(t, second.ID, api.RollbackDeploymentRequest{})
 		require.IsType(t, &api.RollbackDeploymentCreated{}, resp, helpers.MustMarshal(t, resp))
 		got := resp.(*api.RollbackDeploymentCreated)
 		assert.Equal(t, second.ReleaseID, got.ReleaseID)
-		assert.Equal(t, []string{"https://acme.com", appOrigin, wwwOrigin}, origins(got.Targets))
+		assert.Equal(t, []string{appOrigin, wwwOrigin}, origins(got.Targets))
 	})
 
 	t.Run("an unknown deployment", func(t *testing.T) {
@@ -323,17 +323,24 @@ func TestRollbackDeployment(t *testing.T) {
 		assertAuthzStatus(t, resp, http.StatusNotFound, domain.ErrDeploymentNotFound().Code)
 	})
 
-	t.Run("a project with no primary origin", func(t *testing.T) {
+	t.Run("a project with no primary origin left keeps the frozen origins", func(t *testing.T) {
 		alone := deploymentFixture{releaseFixture: newReleaseFixture(t)}
 		alone.addOrigin(t, domain.Origin{Pattern: appOrigin, Kind: domain.OriginKindPrimary})
 		created := alone.create(t, &api.CreateReleaseRequest{Pointers: alone.pointers()})
 		require.IsType(t, &api.CreateReleaseCreated{}, created, helpers.MustMarshal(t, created))
-		resp := alone.deploy(t, created.(*api.CreateReleaseCreated).ID)
+		firstRelease := created.(*api.CreateReleaseCreated).ID
+		resp := alone.deploy(t, firstRelease)
+		require.IsType(t, &api.CreateDeploymentCreated{}, resp, helpers.MustMarshal(t, resp))
+		earlier := resp.(*api.CreateDeploymentCreated).ID
+		resp = alone.deploy(t, alone.otherRelease(t))
 		require.IsType(t, &api.CreateDeploymentCreated{}, resp, helpers.MustMarshal(t, resp))
 		require.NoError(t, harness.EnsureProjectService(t).RemoveOrigin(t.Context(), alone.project, appOrigin))
 
-		rollback := alone.rollback(t, resp.(*api.CreateDeploymentCreated).ID, api.RollbackDeploymentRequest{})
-		assertAuthzError(t, rollback, domain.ErrDeploymentInvalid().Code)
+		rollback := alone.rollback(t, earlier, api.RollbackDeploymentRequest{})
+		require.IsType(t, &api.RollbackDeploymentCreated{}, rollback, helpers.MustMarshal(t, rollback))
+		got := rollback.(*api.RollbackDeploymentCreated)
+		assert.Equal(t, firstRelease, got.ReleaseID)
+		assert.Equal(t, []string{appOrigin}, origins(got.Targets))
 	})
 }
 

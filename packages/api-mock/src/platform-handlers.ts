@@ -2304,8 +2304,8 @@ export function setupPlatformHandlers() {
         });
       }
 
-      // Only a deployment to primary origins can be rolled back, and every
-      // target must still be a primary origin of the project.
+      // Only a deployment to primary origins can be rolled back. It restores
+      // the origins it froze, listed or not.
       if (target.targets.some((row) => row.expiresAt !== null)) {
         return HttpResponse.json(
           errorBody(
@@ -2313,17 +2313,6 @@ export function setupPlatformHandlers() {
             "deployment: a deployment to preview URLs cannot be rolled back",
           ),
           { status: 400 },
-        );
-      }
-      const primaries = primaryOrigins(project);
-      const removed = target.targets.find((row) => !primaries.includes(row.origin));
-      if (removed) {
-        return HttpResponse.json(
-          errorBody(
-            "proj.origin_not_allowed",
-            `project: ${removed.origin} is not a primary origin`,
-          ),
-          { status: 403 },
         );
       }
       const release = store.releases.get(target.releaseId);

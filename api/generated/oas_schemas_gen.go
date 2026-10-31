@@ -82169,25 +82169,24 @@ func (*RollbackDeploymentCreated) rollbackDeploymentRes() {}
 
 // RollbackDeploymentErrorResponse represents sum type.
 type RollbackDeploymentErrorResponse struct {
-	Type                 RollbackDeploymentErrorResponseType // switch on this field
-	AuthCsrfInvalid      AuthCsrfInvalid
-	AuthUnauthorized     AuthUnauthorized
-	DepConflict          DepConflict
-	DepInvalid           DepInvalid
-	DepNotFound          DepNotFound
-	DepPermissionDenied  DepPermissionDenied
-	DepVariablesMissing  DepVariablesMissing
-	EnvProjectNotFound   EnvProjectNotFound
-	EvtInvalid           EvtInvalid
-	Internal             Internal
-	NotImplemented       NotImplemented
-	ProjNotFound         ProjNotFound
-	ProjOriginNotAllowed ProjOriginNotAllowed
-	RelNotFound          RelNotFound
-	RelRevoked           RelRevoked
-	ReqInvalid           ReqInvalid
-	Unavailable          Unavailable
-	VarDocumentTooDeep   VarDocumentTooDeep
+	Type                RollbackDeploymentErrorResponseType // switch on this field
+	AuthCsrfInvalid     AuthCsrfInvalid
+	AuthUnauthorized    AuthUnauthorized
+	DepConflict         DepConflict
+	DepInvalid          DepInvalid
+	DepNotFound         DepNotFound
+	DepPermissionDenied DepPermissionDenied
+	DepVariablesMissing DepVariablesMissing
+	EnvProjectNotFound  EnvProjectNotFound
+	EvtInvalid          EvtInvalid
+	Internal            Internal
+	NotImplemented      NotImplemented
+	ProjNotFound        ProjNotFound
+	RelNotFound         RelNotFound
+	RelRevoked          RelRevoked
+	ReqInvalid          ReqInvalid
+	Unavailable         Unavailable
+	VarDocumentTooDeep  VarDocumentTooDeep
 }
 
 // RollbackDeploymentErrorResponseType is oneOf type of RollbackDeploymentErrorResponse.
@@ -82195,24 +82194,23 @@ type RollbackDeploymentErrorResponseType string
 
 // Possible values for RollbackDeploymentErrorResponseType.
 const (
-	AuthCsrfInvalidRollbackDeploymentErrorResponse      RollbackDeploymentErrorResponseType = "auth.csrf_invalid"
-	AuthUnauthorizedRollbackDeploymentErrorResponse     RollbackDeploymentErrorResponseType = "auth.unauthorized"
-	DepConflictRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "dep.conflict"
-	DepInvalidRollbackDeploymentErrorResponse           RollbackDeploymentErrorResponseType = "dep.invalid"
-	DepNotFoundRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "dep.not_found"
-	DepPermissionDeniedRollbackDeploymentErrorResponse  RollbackDeploymentErrorResponseType = "dep.permission_denied"
-	DepVariablesMissingRollbackDeploymentErrorResponse  RollbackDeploymentErrorResponseType = "dep.variables_missing"
-	EnvProjectNotFoundRollbackDeploymentErrorResponse   RollbackDeploymentErrorResponseType = "env.project_not_found"
-	EvtInvalidRollbackDeploymentErrorResponse           RollbackDeploymentErrorResponseType = "evt.invalid"
-	InternalRollbackDeploymentErrorResponse             RollbackDeploymentErrorResponseType = "internal"
-	NotImplementedRollbackDeploymentErrorResponse       RollbackDeploymentErrorResponseType = "not_implemented"
-	ProjNotFoundRollbackDeploymentErrorResponse         RollbackDeploymentErrorResponseType = "proj.not_found"
-	ProjOriginNotAllowedRollbackDeploymentErrorResponse RollbackDeploymentErrorResponseType = "proj.origin_not_allowed"
-	RelNotFoundRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "rel.not_found"
-	RelRevokedRollbackDeploymentErrorResponse           RollbackDeploymentErrorResponseType = "rel.revoked"
-	ReqInvalidRollbackDeploymentErrorResponse           RollbackDeploymentErrorResponseType = "req.invalid"
-	UnavailableRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "unavailable"
-	VarDocumentTooDeepRollbackDeploymentErrorResponse   RollbackDeploymentErrorResponseType = "var.document_too_deep"
+	AuthCsrfInvalidRollbackDeploymentErrorResponse     RollbackDeploymentErrorResponseType = "auth.csrf_invalid"
+	AuthUnauthorizedRollbackDeploymentErrorResponse    RollbackDeploymentErrorResponseType = "auth.unauthorized"
+	DepConflictRollbackDeploymentErrorResponse         RollbackDeploymentErrorResponseType = "dep.conflict"
+	DepInvalidRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "dep.invalid"
+	DepNotFoundRollbackDeploymentErrorResponse         RollbackDeploymentErrorResponseType = "dep.not_found"
+	DepPermissionDeniedRollbackDeploymentErrorResponse RollbackDeploymentErrorResponseType = "dep.permission_denied"
+	DepVariablesMissingRollbackDeploymentErrorResponse RollbackDeploymentErrorResponseType = "dep.variables_missing"
+	EnvProjectNotFoundRollbackDeploymentErrorResponse  RollbackDeploymentErrorResponseType = "env.project_not_found"
+	EvtInvalidRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "evt.invalid"
+	InternalRollbackDeploymentErrorResponse            RollbackDeploymentErrorResponseType = "internal"
+	NotImplementedRollbackDeploymentErrorResponse      RollbackDeploymentErrorResponseType = "not_implemented"
+	ProjNotFoundRollbackDeploymentErrorResponse        RollbackDeploymentErrorResponseType = "proj.not_found"
+	RelNotFoundRollbackDeploymentErrorResponse         RollbackDeploymentErrorResponseType = "rel.not_found"
+	RelRevokedRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "rel.revoked"
+	ReqInvalidRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "req.invalid"
+	UnavailableRollbackDeploymentErrorResponse         RollbackDeploymentErrorResponseType = "unavailable"
+	VarDocumentTooDeepRollbackDeploymentErrorResponse  RollbackDeploymentErrorResponseType = "var.document_too_deep"
 )
 
 // IsAuthCsrfInvalid reports whether RollbackDeploymentErrorResponse is AuthCsrfInvalid.
@@ -82273,11 +82271,6 @@ func (s RollbackDeploymentErrorResponse) IsNotImplemented() bool {
 // IsProjNotFound reports whether RollbackDeploymentErrorResponse is ProjNotFound.
 func (s RollbackDeploymentErrorResponse) IsProjNotFound() bool {
 	return s.Type == ProjNotFoundRollbackDeploymentErrorResponse
-}
-
-// IsProjOriginNotAllowed reports whether RollbackDeploymentErrorResponse is ProjOriginNotAllowed.
-func (s RollbackDeploymentErrorResponse) IsProjOriginNotAllowed() bool {
-	return s.Type == ProjOriginNotAllowedRollbackDeploymentErrorResponse
 }
 
 // IsRelNotFound reports whether RollbackDeploymentErrorResponse is RelNotFound.
@@ -82554,27 +82547,6 @@ func (s RollbackDeploymentErrorResponse) GetProjNotFound() (v ProjNotFound, ok b
 func NewProjNotFoundRollbackDeploymentErrorResponse(v ProjNotFound) RollbackDeploymentErrorResponse {
 	var s RollbackDeploymentErrorResponse
 	s.SetProjNotFound(v)
-	return s
-}
-
-// SetProjOriginNotAllowed sets RollbackDeploymentErrorResponse to ProjOriginNotAllowed.
-func (s *RollbackDeploymentErrorResponse) SetProjOriginNotAllowed(v ProjOriginNotAllowed) {
-	s.Type = ProjOriginNotAllowedRollbackDeploymentErrorResponse
-	s.ProjOriginNotAllowed = v
-}
-
-// GetProjOriginNotAllowed returns ProjOriginNotAllowed and true boolean if RollbackDeploymentErrorResponse is ProjOriginNotAllowed.
-func (s RollbackDeploymentErrorResponse) GetProjOriginNotAllowed() (v ProjOriginNotAllowed, ok bool) {
-	if !s.IsProjOriginNotAllowed() {
-		return v, false
-	}
-	return s.ProjOriginNotAllowed, true
-}
-
-// NewProjOriginNotAllowedRollbackDeploymentErrorResponse returns new RollbackDeploymentErrorResponse from ProjOriginNotAllowed.
-func NewProjOriginNotAllowedRollbackDeploymentErrorResponse(v ProjOriginNotAllowed) RollbackDeploymentErrorResponse {
-	var s RollbackDeploymentErrorResponse
-	s.SetProjOriginNotAllowed(v)
 	return s
 }
 
