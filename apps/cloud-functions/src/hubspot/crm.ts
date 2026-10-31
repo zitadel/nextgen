@@ -4,11 +4,10 @@ import {
   type Subscription,
   adoptContact,
   createContact,
-  createDeal,
+  createLead,
   findContactByEmail,
   findContactByUserId,
-  findDeal,
-  linkDeal,
+  findLead,
   readSubscriptions,
   subscribeTo,
 } from "./requests";
@@ -39,7 +38,7 @@ const SUBSCRIPTIONS: readonly Subscription[] = ["newsletter", "security"];
 export function hubspotCrm(
   send: Send,
   settings: HubspotSettings,
-): Pick<Crm, "upsertContact" | "subscribe" | "ensureDeal"> {
+): Pick<Crm, "upsertContact" | "subscribe" | "ensureLead"> {
   /** One write's calls, sent in order and kept for its answer. */
   function write() {
     const requests: CrmRequest[] = [];
@@ -77,15 +76,12 @@ export function hubspotCrm(
       return { requests };
     },
 
-    async ensureDeal(team, contactId) {
+    async ensureLead(person, contactId) {
       const { requests, call } = write();
-      const known = await call(findDeal(team));
-      if (known.status === 404) {
-        return { deal_id: idOf(await call(createDeal(team, contactId, settings))), requests };
-      }
-      const dealId = idOf(known);
-      await call(linkDeal(dealId, contactId));
-      return { deal_id: dealId, requests };
+      // A lead sales has qualified or closed is found too: a sign-up is a lead once.
+      const known = await call(findLead(person));
+      if (known.status !== 404) return { lead_id: idOf(known), requests };
+      return { lead_id: idOf(await call(createLead(person, contactId, settings))), requests };
     },
   };
 }
