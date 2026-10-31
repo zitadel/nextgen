@@ -3,9 +3,11 @@ description: |
   An immutable record of a release made live on a set of targets. Deploying
   and rolling back each append one, so the history is the audit trail.
 
-  All primary origins serve the project's newest primary deployment; one
-  added after it serves nothing until the next deployment to `primary`. A
-  preview URL serves the newest deployment to it while its preview is live.
+  A listed primary origin serves the project's newest primary deployment
+  while that deployment names it; one added after it serves nothing until the
+  next deployment to `primary`. A caller with no origin is served the same
+  deployment. A preview URL serves the newest deployment to it while its
+  preview is live.
 
   Every field is fixed at creation except `status`, which is read as of now.
 type: object

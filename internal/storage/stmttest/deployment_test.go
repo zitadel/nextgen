@@ -401,6 +401,14 @@ func addPrimaryOrigins(t *testing.T, stmts service.AllStatements, projectID stri
 	}
 }
 
+// Each dialect answers the lock, whether it takes one or already serializes.
+func TestDeploymentStatements_LockPrimaryDeploys(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID := ensureReleaseProject(t, d.stmts)
+		require.NoError(t, d.stmts.LockPrimaryDeploys(t.Context(), projectID))
+	})
+}
+
 // An origin no longer deployed to keeps its history.
 func TestDeploymentStatements_HistoryOutlivesTheOrigin(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {

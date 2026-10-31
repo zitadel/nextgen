@@ -262,6 +262,10 @@ Each invocation prints one JSON object:
 - `deployment rollback` emits `data.release_id` (the release live again),
   `data.origins` and `data.pointers`, the `{kind, handle, revision_id}`
   revisions that release pins; the `schema` one is what new registrations use.
+  It restores the origins that deployment froze: `data.dropped_origins` are
+  listed origins it leaves out, which refuse sign-in until the next `deploy`,
+  and `data.unserved_origins` are origins it names that the project no longer
+  lists.
   Users keep their schema revision and attributes: a rollback does not migrate
   them back. Without `data.pointers`, a warning says the release could not be
   read.

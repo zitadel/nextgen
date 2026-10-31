@@ -112,6 +112,12 @@ func (ds deploymentStatements) GetDeploymentByID(ctx context.Context, projectID,
 	return ds.getOne(ctx, nil, compiler.String(), compiler.args...)
 }
 
+// LockPrimaryDeploys implements [service.DeploymentStatements]: a write
+// transaction holds the database's one write lock from its start.
+func (ds deploymentStatements) LockPrimaryDeploys(context.Context, string) error {
+	return nil
+}
+
 // GetLiveDeployment implements [service.DeploymentStatements].
 func (ds deploymentStatements) GetLiveDeployment(ctx context.Context, projectID, origin string, now time.Time) (*domain.Deployment, error) {
 	return ds.getOne(ctx, &now, liveDeploymentStmt, projectID, origin, now.UnixNano())

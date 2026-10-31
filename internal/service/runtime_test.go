@@ -161,7 +161,7 @@ func TestRuntimeResolver_Resolve(t *testing.T) {
 		assert.Equal(t, console, got.Origin)
 	})
 
-	t.Run("loopback with no deployment is not deployed", func(t *testing.T) {
+	t.Run("a loopback origin the project does not list has no deployment", func(t *testing.T) {
 		resolver, statements, _ := newMockedRuntimeResolver(t)
 		loopback := "http://localhost:3000"
 		statements.EXPECT().GetProjectByID(gomock.Any(), projectID).Return(&domain.Project{
@@ -170,8 +170,6 @@ func TestRuntimeResolver_Resolve(t *testing.T) {
 				{Pattern: origin, Kind: domain.OriginKindPrimary},
 			},
 		}, nil)
-		statements.EXPECT().ListDeployments(gomock.Any(), gomock.Any()).
-			Return(&database.ListResult[*domain.Deployment]{}, nil)
 
 		_, err := resolver.Resolve(t.Context(), projectID, loopback)
 		require.Error(t, err)
@@ -302,10 +300,7 @@ func TestRuntimeResolver_Resolve(t *testing.T) {
 		statements.EXPECT().GetPreview(gomock.Any(), projectID, ownOrigin).Return(&domain.Preview{
 			ProjectID: projectID, Origin: ownOrigin, ExpiresAt: time.Now().Add(time.Hour),
 		}, nil)
-		statements.EXPECT().GetNewestPerOrigin(gomock.Any(), projectID, []string{ownOrigin}).Return([]domain.OriginDeployment{{
-			Origin: ownOrigin, DeploymentID: "dep_1", ReleaseID: "rel_1", DeployedAt: time.Now(),
-		}}, nil)
-		statements.EXPECT().GetDeploymentByID(gomock.Any(), projectID, "dep_1").Return(&domain.Deployment{
+		statements.EXPECT().GetLiveDeployment(gomock.Any(), projectID, ownOrigin, gomock.Any()).Return(&domain.Deployment{
 			ID: "dep_1", ProjectID: projectID, ReleaseID: "rel_1",
 		}, nil)
 		releases.EXPECT().Get(gomock.Any(), projectID, "rel_1").Return(&domain.Release{
@@ -412,10 +407,7 @@ func TestRuntimeResolver_Resolve(t *testing.T) {
 		statements.EXPECT().GetPreview(gomock.Any(), projectID, previewURL).Return(&domain.Preview{
 			ProjectID: projectID, Origin: previewURL, ExpiresAt: time.Now().Add(time.Hour),
 		}, nil)
-		statements.EXPECT().GetNewestPerOrigin(gomock.Any(), projectID, []string{previewURL}).Return([]domain.OriginDeployment{{
-			Origin: previewURL, DeploymentID: "dep_1", ReleaseID: "rel_1", DeployedAt: time.Now(),
-		}}, nil)
-		statements.EXPECT().GetDeploymentByID(gomock.Any(), projectID, "dep_1").Return(&domain.Deployment{
+		statements.EXPECT().GetLiveDeployment(gomock.Any(), projectID, previewURL, gomock.Any()).Return(&domain.Deployment{
 			ID: "dep_1", ProjectID: projectID, ReleaseID: "rel_1",
 		}, nil)
 		releases.EXPECT().Get(gomock.Any(), projectID, "rel_1").Return(&domain.Release{

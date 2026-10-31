@@ -317,6 +317,10 @@ type DeploymentStatements interface {
 	// ListLiveDeployments lists, with deployment.LiveListOptions, the
 	// deployments some origin serves at now, each narrowed to those origins.
 	ListLiveDeployments(ctx context.Context, now time.Time, filter *database.ListOptions[domain.DeploymentField]) (*database.ListResult[*domain.Deployment], error)
+	// LockPrimaryDeploys makes a primary deploy wait for any other in this
+	// transaction's project. Run it first: what follows reads what the other
+	// wrote. Dialects that already serialize these transactions do nothing.
+	LockPrimaryDeploys(ctx context.Context, projectID string) error
 	// GetLiveDeployment is the deployment origin serves at now, narrowed to the
 	// origins it still serves; a NoRowFoundError when it serves nothing,
 	// including after its preview expired.

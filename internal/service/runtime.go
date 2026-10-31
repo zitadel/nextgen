@@ -168,12 +168,23 @@ func (r *RuntimeResolver) finish(ctx context.Context, project *domain.Project, o
 }
 
 // deploymentOf is the deployment an admitted origin serves, nil for none. A
-// preview URL serves its own newest deployment. Any other origin serves the
-// newest primary deployment when that names it: a deployment freezes its
-// origins, so one added later waits for the next deploy.
+// preview URL serves what the live predicate says it does. A listed origin
+// serves the newest primary deployment when that names it: a deployment freezes
+// its origins, so one added later waits for the next deploy. A loopback origin
+// the project does not list has no deployment.
 func (r *RuntimeResolver) deploymentOf(ctx context.Context, projectID string, matched *matchedOrigin) (*domain.Deployment, error) {
 	if matched.preview {
-		return r.newestDeployment(ctx, projectID, matched.origin)
+		dep, err := r.v2Pool.Statements().GetLiveDeployment(ctx, projectID, matched.origin, r.now())
+		if err != nil {
+			if isNoRowFound(err) {
+				return nil, nil
+			}
+			return nil, domain.ErrInternal(err).WithMessage("failed to read the preview's deployment")
+		}
+		return dep, nil
+	}
+	if matched.pattern == "" {
+		return nil, nil
 	}
 	dep, err := newestPrimary(ctx, r.v2Pool.Statements(), projectID)
 	if err != nil {
@@ -181,26 +192,6 @@ func (r *RuntimeResolver) deploymentOf(ctx context.Context, projectID string, ma
 	}
 	if dep == nil || !slices.Contains(dep.Origins(), matched.origin) {
 		return nil, nil
-	}
-	return dep, nil
-}
-
-func (r *RuntimeResolver) newestDeployment(ctx context.Context, projectID, origin string) (*domain.Deployment, error) {
-	stmts := r.v2Pool.Statements()
-	serving, err := stmts.GetNewestPerOrigin(ctx, projectID, []string{origin})
-	if err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to read the origin's newest deployment")
-	}
-	newest := domain.NewestOriginDeployment(serving)
-	if newest == nil {
-		return nil, nil
-	}
-	dep, err := stmts.GetDeploymentByID(ctx, projectID, newest.DeploymentID)
-	if err != nil {
-		if isNoRowFound(err) {
-			return nil, nil
-		}
-		return nil, domain.ErrInternal(err).WithMessage("failed to read the origin's newest deployment")
 	}
 	return dep, nil
 }

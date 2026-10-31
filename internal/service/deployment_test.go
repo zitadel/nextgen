@@ -35,6 +35,7 @@ func newStrictDeploymentService(t *testing.T) (*service.DeploymentService, *serv
 	pool := servicemocks.NewMockPool(ctrl)
 	statements := servicemocks.NewMockAllStatements(ctrl)
 	statementer := servicemocks.NewMockStatementer[service.AllStatements](ctrl)
+	statements.EXPECT().LockPrimaryDeploys(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 	pool.EXPECT().Statements().Return(statements).AnyTimes()
 	pool.EXPECT().
 		Transaction(gomock.Any(), gomock.Any()).

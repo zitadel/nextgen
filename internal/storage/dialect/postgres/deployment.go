@@ -35,8 +35,9 @@ var (
 	originsQuery        = deployment.OriginsSelect(originsTable) + ` WHERE t.project_id = $1 AND t.deployment_id = ANY($2)`
 	newestPerOriginStmt = deployment.OriginsSelect(originsTable) +
 		` WHERE t.project_id = $1 AND t.origin = ANY($2) AND NOT ` + deployment.NewerOriginRowExists(originsTable)
-	liveOriginsStmt    = originsQuery + ` AND ` + deployment.RowServes(deploymentTables, "$3")
-	liveDeploymentStmt = deploymentQuery + ` WHERE project_id = $1 AND id = (SELECT t.deployment_id FROM ` + originsTable + ` t` +
+	liveOriginsStmt        = originsQuery + ` AND ` + deployment.RowServes(deploymentTables, "$3")
+	lockPrimaryDeploysStmt = `SELECT 1 FROM zitadel_nextgen.projects WHERE id = $1 FOR UPDATE`
+	liveDeploymentStmt     = deploymentQuery + ` WHERE project_id = $1 AND id = (SELECT t.deployment_id FROM ` + originsTable + ` t` +
 		` WHERE t.project_id = $1 AND t.origin = $2 AND ` + deployment.RowServes(deploymentTables, "$3") + `)`
 )
 
@@ -95,6 +96,12 @@ func (ds deploymentStatements) GetDeploymentByID(ctx context.Context, projectID,
 		return nil, err
 	}
 	return ds.getOne(ctx, nil, compiler.String(), compiler.args...)
+}
+
+// LockPrimaryDeploys implements [service.DeploymentStatements].
+func (ds deploymentStatements) LockPrimaryDeploys(ctx context.Context, projectID string) error {
+	_, err := ds.client.Exec(ctx, lockPrimaryDeploysStmt, projectID)
+	return wrapError(err)
 }
 
 // GetLiveDeployment implements [service.DeploymentStatements].

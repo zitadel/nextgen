@@ -4,6 +4,7 @@ package integration_test
 
 import (
 	"net/http"
+	"sync"
 	"testing"
 	"time"
 
@@ -61,8 +62,14 @@ func (f releaseFixture) addOrigin(t *testing.T, origin domain.Origin) {
 // otherRelease creates a second release with different content.
 func (f deploymentFixture) otherRelease(t *testing.T) api.ReleaseID {
 	t.Helper()
+	return f.otherReleaseWith(t, "v2")
+}
+
+// otherReleaseWith creates a release whose branding says version.
+func (f deploymentFixture) otherReleaseWith(t *testing.T, version string) api.ReleaseID {
+	t.Helper()
 	other := f.releaseFixture
-	other.brandingID = publishBranding(t, f.client, f.project, `<zl-page-shell>v2 {% mandatory_gates %}</zl-page-shell>`)
+	other.brandingID = publishBranding(t, f.client, f.project, `<zl-page-shell>`+version+` {% mandatory_gates %}</zl-page-shell>`)
 	created := other.create(t, &api.CreateReleaseRequest{Pointers: other.pointers()})
 	require.IsType(t, &api.CreateReleaseCreated{}, created, helpers.MustMarshal(t, created))
 	return created.(*api.CreateReleaseCreated).ID
@@ -342,6 +349,46 @@ func TestRollbackDeployment(t *testing.T) {
 		assert.Equal(t, firstRelease, got.ReleaseID)
 		assert.Equal(t, []string{appOrigin}, origins(got.Targets))
 	})
+}
+
+// TestPrimaryDeploysOnDisjointOriginsConflict races a rollback to one origin
+// against a deploy to another. They share no origin row, and both replace the
+// same deployment, so exactly one of them wins.
+func TestPrimaryDeploysOnDisjointOriginsConflict(t *testing.T) {
+	t.Parallel()
+
+	fixture := newDeploymentFixture(t)
+	require.NoError(t, harness.EnsureProjectService(t).RemoveOrigin(t.Context(), fixture.project, wwwOrigin))
+	resp := fixture.deploy(t, fixture.release.ID)
+	require.IsType(t, &api.CreateDeploymentCreated{}, resp, helpers.MustMarshal(t, resp))
+	first := resp.(*api.CreateDeploymentCreated)
+	fixture.addOrigin(t, domain.Origin{Pattern: wwwOrigin, Kind: domain.OriginKindPrimary})
+	resp = fixture.deploy(t, fixture.otherRelease(t))
+	require.IsType(t, &api.CreateDeploymentCreated{}, resp, helpers.MustMarshal(t, resp))
+	second := resp.(*api.CreateDeploymentCreated)
+	require.NoError(t, harness.EnsureProjectService(t).RemoveOrigin(t.Context(), fixture.project, appOrigin))
+	third := fixture.otherReleaseWith(t, "v3")
+
+	var rollback api.RollbackDeploymentRes
+	var deploy api.CreateDeploymentRes
+	var wg sync.WaitGroup
+	wg.Go(func() {
+		rollback = fixture.rollback(t, first.ID, api.RollbackDeploymentRequest{
+			ExpectedDeploymentID: api.NewOptDeploymentID(second.ID),
+		})
+	})
+	wg.Go(func() {
+		deploy = fixture.createDeployment(t, &api.CreateDeploymentRequest{
+			ReleaseID:            api.NewOptReleaseID(third),
+			Targets:              primaryTargets(),
+			ExpectedDeploymentID: api.NewOptDeploymentID(second.ID),
+		})
+	})
+	wg.Wait()
+
+	_, rolledBack := rollback.(*api.RollbackDeploymentCreated)
+	_, deployed := deploy.(*api.CreateDeploymentCreated)
+	assert.NotEqual(t, rolledBack, deployed, "rollback %s, deploy %s", helpers.MustMarshal(t, rollback), helpers.MustMarshal(t, deploy))
 }
 
 // TestRevokeRelease revokes a release once nothing serves it, refuses while
