@@ -4,7 +4,12 @@ import type { PatchContext, PatchView } from "../../types";
 import { AbstractRulePatcher } from "../base";
 import { PUBLIC_PROJECT_ID_VARIABLE } from "../public-project-id";
 import { assertMountsRootComponent, type RootMount, viteEntry } from "../root-component";
-import { type ViteSupport, buildViteProxyOp, buildViteSessionCookieOp } from "../vite-support";
+import {
+  type ViteSupport,
+  buildViteApiPrefixOp,
+  buildViteProxyOp,
+  buildViteSessionCookieOp,
+} from "../vite-support";
 import { appTemplate } from "./templates";
 
 const SDK_DEPENDENCY = "@zitadel/sdk-vue";
@@ -39,6 +44,10 @@ export class VuePatcher extends AbstractRulePatcher implements ViteSupport {
     return buildViteSessionCookieOp();
   }
 
+  viteApiPrefixOp(): FileOp {
+    return buildViteApiPrefixOp();
+  }
+
   protected override async preflight(_ctx: PatchContext, cwd: string): Promise<void> {
     await assertMountsRootComponent(cwd, await viteEntry(cwd), ROOT);
   }
@@ -52,6 +61,7 @@ export class VuePatcher extends AbstractRulePatcher implements ViteSupport {
       { kind: "write", path: ROOT.path, contents: appTemplate(ctx) },
       this.viteProxyOp(ctx.framework.devPort, ctx.server),
       this.viteSessionCookieOp(),
+      this.viteApiPrefixOp(),
       {
         kind: "merge-env",
         path: ".env.example",

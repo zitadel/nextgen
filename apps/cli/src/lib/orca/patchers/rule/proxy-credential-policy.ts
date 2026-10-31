@@ -1,8 +1,34 @@
+import { API_PREFIX } from "@zitadel/api/runtime/base-url";
+
 import { ZitadelError } from "../../../errors";
 import { PROXY_PATH } from "./proxy";
 
-/** Marker emitted after the exchange-only credential policy was introduced. */
-export const PROXY_CREDENTIAL_POLICY_MARKER = "zitadel:proxy:v2";
+/**
+ * Marker emitted with the exchange-only credential policy. Its v3 also attaches
+ * the secret to the exchange under the API prefix (ADR 077).
+ */
+export const PROXY_CREDENTIAL_POLICY_MARKER = "zitadel:proxy:v3";
+
+/** The marker of the exchange-only policy as it was before it knew the API prefix. */
+export const PROXY_CREDENTIAL_POLICY_V2_MARKER = "zitadel:proxy:v2";
+
+/** Whether `source` carries the credential-policy marker of either version. */
+export function hasProxyCredentialPolicyMarker(source: string): boolean {
+  return (
+    source.includes(PROXY_CREDENTIAL_POLICY_MARKER) ||
+    source.includes(PROXY_CREDENTIAL_POLICY_V2_MARKER)
+  );
+}
+
+/**
+ * The generated proxies' path check: the exchange with and without the API
+ * prefix, since the server answers both until 1.0.0 and an app's packages may
+ * call either.
+ */
+export const EXCHANGE_PATH_CHECK = `(pathname === "/sessions/exchange" || pathname === "${API_PREFIX}/sessions/exchange")`;
+
+/** The path check of a v2 proxy, which knew only the unprefixed exchange. */
+export const V2_EXCHANGE_PATH_CHECK = 'pathname === "/sessions/exchange"';
 
 /**
  * Rejects a browser-reachable proxy that still appears to attach the project
@@ -25,8 +51,61 @@ export function assertNoUnreviewedProjectSecretProxy(source: string, label: stri
     "E_VALIDATION",
     `${label} may forward ZITADEL_PROJECT_SECRET outside POST /sessions/exchange`,
     {
-      hint: "Review the proxy manually: restrict the bearer to the exact POST /sessions/exchange pathname and preserve caller-provided authorization.",
+      hint: `Review the proxy manually: restrict the bearer to the exact POST /sessions/exchange or ${API_PREFIX}/sessions/exchange pathname and preserve caller-provided authorization.`,
     },
+  );
+}
+
+/** `code` without whitespace, with double quotes, so a formatter's layout compares equal. */
+function normalized(code: string): string {
+  return code.replace(/\s+/g, "").replace(/'/g, '"');
+}
+
+/** The terms of the conditions a guard may be built from, normalized. */
+const POST_TERM = 'proxyReq.method==="POST"';
+const NO_OVERWRITE_TERM = '!proxyReq.getHeader("authorization")';
+const PATH_TERMS = new Set([
+  normalized(V2_EXCHANGE_PATH_CHECK),
+  normalized(EXCHANGE_PATH_CHECK),
+  normalized(
+    `(pathname === "${API_PREFIX}/sessions/exchange" || pathname === "/sessions/exchange")`,
+  ),
+]);
+
+/** `condition`'s terms joined by `&&` outside any parentheses. */
+function andTerms(condition: string): string[] {
+  const terms: string[] = [];
+  let depth = 0;
+  let start = 0;
+  for (let index = 0; index < condition.length; index++) {
+    const char = condition[index];
+    if (char === "(") {
+      depth++;
+    } else if (char === ")") {
+      depth--;
+    } else if (depth === 0 && condition.startsWith("&&", index)) {
+      terms.push(condition.slice(start, index));
+      start = index + 2;
+      index++;
+    }
+  }
+  terms.push(condition.slice(start));
+  return terms;
+}
+
+/**
+ * Whether an `if` condition holds the bearer to the exchange: exactly the POST
+ * check, the path check (the exchange, or both its spellings joined by `||`)
+ * and the no-overwrite check, in any order. Anything more could widen it, as
+ * `… || true` would, so it does not qualify.
+ */
+function isExchangeOnlyCondition(condition: string): boolean {
+  const terms = andTerms(normalized(condition));
+  return (
+    terms.length === 3 &&
+    terms.includes(POST_TERM) &&
+    terms.includes(NO_OVERWRITE_TERM) &&
+    terms.some((term) => PATH_TERMS.has(term))
   );
 }
 
@@ -42,9 +121,7 @@ function hasExchangeOnlyGuard(source: string): boolean {
   for (const match of source.matchAll(ifBlock)) {
     const [whole = "", condition = "", body = ""] = match;
     if (
-      !/proxyReq\s*\.\s*method\s*===\s*["']POST["']/i.test(condition) ||
-      !/pathname\s*===\s*["']\/sessions\/exchange["']/i.test(condition) ||
-      !/!\s*proxyReq\s*\.\s*getHeader\s*\(\s*["']authorization["']\s*\)/i.test(condition) ||
+      !isExchangeOnlyCondition(condition) ||
       !/proxyReq\s*\.\s*setHeader\s*\(\s*["']authorization["']\s*,/i.test(body)
     ) {
       continue;

@@ -10,12 +10,19 @@ export interface BotVerdict {
 }
 
 /**
+ * The prefix the server answers the API under (ADR 077). Until 1.0.0 it also
+ * answers the same operations at the root, so a widget may call either.
+ */
+const API_PREFIX = "/api/v1";
+
+/**
  * The widget's two calls that start or advance a sign-in or sign-up: what a
- * bot would script. Everything else under the prefix (sessions, CSRF, a
- * flow's state) passes unchecked.
+ * bot would script, with or without the API prefix. Everything else under
+ * the prefix (sessions, CSRF, a flow's state) passes unchecked.
  */
 export function isFlowWrite(method: string, path: string): boolean {
-  return method === "POST" && (path === "/flow" || /^\/flow\/[^/]+\/submit$/.test(path));
+  const operation = path.startsWith(`${API_PREFIX}/`) ? path.slice(API_PREFIX.length) : path;
+  return method === "POST" && (operation === "/flow" || /^\/flow\/[^/]+\/submit$/.test(operation));
 }
 
 /**

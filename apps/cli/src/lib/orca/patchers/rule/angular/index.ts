@@ -10,6 +10,8 @@ import { angularRoutesEdit } from "./angular-routes";
 import {
   appComponentTemplate,
   appTemplateHtml,
+  proxyConfApiPrefixEdit,
+  proxyConfApiPrefixVerdict,
   proxyConfEdit,
   proxyConfSessionCookieEdit,
   proxyConfSessionCookieVerdict,
@@ -127,6 +129,16 @@ export class AngularPatcher extends AbstractRulePatcher {
         // so the doctor only warns while it is missing.
         wiring: "convenience",
         verify: proxyConfSessionCookieVerdict,
+      },
+      {
+        kind: "edit",
+        path: "proxy.conf.cjs",
+        edit: proxyConfApiPrefixEdit(),
+        // A v2 proxy signs users in while the app's packages call the root
+        // paths; once they call /api/v1 (ADR 077) it no longer attaches the
+        // project secret to the exchange. Until then the doctor only warns.
+        wiring: "convenience",
+        verify: proxyConfApiPrefixVerdict,
       },
       {
         kind: "edit",
