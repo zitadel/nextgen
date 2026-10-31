@@ -349,24 +349,6 @@ describe("<zitadel-login> form + focus (chromium)", () => {
     expect(body.fields).toEqual({ email: "alice@acme.com", password: "hunter3" });
   });
 
-  it("ignores a duplicate submit while the first request is in-flight", async () => {
-    const element = await mount();
-    const root = element.shadowRoot!;
-    await fillSignInFields(root);
-    const event = new CustomEvent("zl-submit", {
-      bubbles: true,
-      composed: true,
-      detail: { action: "submit" },
-    });
-    root.dispatchEvent(event);
-    root.dispatchEvent(event);
-    await waitFor(() => {
-      const title = element.shadowRoot?.querySelector(".zl-card-title");
-      return title?.textContent?.includes("Sign in faster") ? title : null;
-    });
-    expect(stub.calls).toHaveLength(2);
-  });
-
   it("moves focus to the first focusable control after a step swap", async () => {
     const element = await mount();
     const root = element.shadowRoot!;

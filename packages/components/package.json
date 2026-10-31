@@ -91,6 +91,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.spec.json",
     "lint": "biome check .",
     "test:unit": "vitest run --project unit",
+    "test:login": "vitest run --project unit --project browser zitadel-login-confidence --outputFile.junit=test-output/login/junit.xml",
+    "watch:login": "vitest --watch --project unit --project browser zitadel-login-confidence --outputFile.junit=test-output/login/junit.xml",
     "build-release": "node ../../scripts/release-clean.mjs local-dist && pnpm run build && node scripts/check-standalone-artifact.mjs",
     "install-browsers": "playwright install chromium",
     "prepack": "publint --strict"

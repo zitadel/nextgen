@@ -37,6 +37,7 @@ This directory holds its design and architecture docs.
 | [Bot Detection](bot-detection.md) | Preliminary | Composable captcha, fingerprinting, and risk evaluation. Depends on policy engine. |
 | [Template Security](template-security.md) | In Review | XSS attack vectors, trust boundaries, and defense-in-depth for LiquidJS + innerHTML rendering. |
 | **Research / Proposals** | | |
+| [Testing zitadel-login for release confidence](login-release-confidence.md) | Proposal | Existing coverage, Flow API conformance, security invariants, SDK/browser matrix and release gates. |
 | [External Auth Factors](flow-engine-external-auth-factors.md) | Research | Generic extensibility for third-party MFA providers (Duo, Futurae, …). Not a design decision. |
 | [Capability Handshake](capability-handshake.md) | Research | Client/SDK ↔ server SemVer negotiation. Not implemented. |
 | **Tooling** | | |

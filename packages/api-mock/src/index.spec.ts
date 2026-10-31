@@ -1,11 +1,12 @@
 import { configureZitadel } from "@zitadel/api/config";
 import {
   createFlow,
+  exchangeHandoff,
   getFlowStep,
   submitFlowStep,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen";
 import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
 
 import type { MockHandle } from "./handlers.js";
 import {
@@ -64,6 +65,79 @@ afterEach(() => {
 });
 
 describe("setupMockHandlers", () => {
+  test("a one-shot submit refusal preserves the current step for retry", async () => {
+    const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
+    const password = await submitFlowStep(start.id, {
+      action: "submit",
+      fields: { email: "alice@example.com" },
+    });
+    mock.rejectNextSubmit("error.invalid_credentials");
+    await expect(
+      submitFlowStep(start.id, {
+        action: "submit",
+        fields: { [PASSWORD_FIELD]: "incorrect" },
+      }),
+    ).rejects.toMatchObject({
+      status: 400,
+      body: { step: { name: "password", error: "error.invalid_credentials" } },
+    });
+    expect((await getFlowStep(start.id)).step.name).toBe(password.step.name);
+    const done = await submitFlowStep(start.id, {
+      action: "submit",
+      fields: { [PASSWORD_FIELD]: "corrected" },
+    });
+    expect(done.step.complete).toBe("show");
+    expect(done.handoff_token).toBeTruthy();
+  });
+
+  test("a delayed submit is captured before it advances, and reset clears pending faults", async () => {
+    const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
+    let release!: () => void;
+    mock.delayNextSubmitUntil(
+      new Promise<void>((resolve) => {
+        release = resolve;
+      }),
+    );
+    const pending = submitFlowStep(start.id, {
+      action: "submit",
+      fields: { email: "alice@example.com" },
+    });
+    try {
+      await vi.waitFor(() =>
+        expect(mock.getCaptured().some((r) => r.kind === "submitFlowStep")).toBe(true),
+      );
+      expect((await getFlowStep(start.id)).step.name).toBe("identifier");
+    } finally {
+      release();
+    }
+    expect((await pending).step.name).toBe("password");
+
+    mock.rejectNextSubmit("error.invalid_credentials");
+    mock.failNextExchange();
+    mock.reset();
+    const fresh = await createFlow({ purpose: "login", project_id: PROJECT_ID });
+    expect(
+      (await submitFlowStep(fresh.id, { action: "submit", fields: { email: "alice@example.com" } }))
+        .step.name,
+    ).toBe("password");
+    await expect(
+      exchangeHandoff({ handoff_token: "mock-handoff" }, { project_id: PROJECT_ID }),
+    ).resolves.toBeDefined();
+  });
+
+  test("a one-shot exchange failure returns the server's unavailable envelope", async () => {
+    mock.failNextExchange();
+    await expect(
+      exchangeHandoff({ handoff_token: "mock-handoff" }, { project_id: PROJECT_ID }),
+    ).rejects.toMatchObject({
+      status: 503,
+      body: { code: "unavailable" },
+    });
+    await expect(
+      exchangeHandoff({ handoff_token: "mock-handoff" }, { project_id: PROJECT_ID }),
+    ).resolves.toBeDefined();
+  });
+
   test("walks the split sign-in: identifier -> password -> done", async () => {
     const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
     expect(start.step.name).toBe("identifier");

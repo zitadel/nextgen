@@ -2,6 +2,15 @@
   "$schema": "https://turborepo.dev/schema.json",
   "extends": ["//"],
   "tasks": {
+    "test:login": {
+      "dependsOn": ["install-browsers", "@zitadel/api-mock#build"],
+      "cache": false
+    },
+    "watch:login": {
+      "dependsOn": ["install-browsers", "@zitadel/api-mock#build"],
+      "cache": false,
+      "persistent": true
+    },
     "typecheck": {
       "dependsOn": ["build", "@zitadel/api-mock#build"]
     },
