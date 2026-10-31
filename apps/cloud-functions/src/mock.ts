@@ -1,7 +1,6 @@
 import type { EmailPreferences, Plan, TeamBilling, Ticket } from "./contract";
 import { type HubspotAnswer, type Send, hubspotCrm } from "./hubspot/crm";
 import type { HubspotSettings } from "./hubspot/requests";
-import { type Send as SendToStripe, stripeBilling } from "./stripe/billing";
 import type {
   Billing,
   BillingRequest,
@@ -9,10 +8,15 @@ import type {
   Crm,
   CrmRequest,
   Directory,
+  Entitlements,
   Systems,
   Team,
   UsageRecord,
+  UsageWindow,
 } from "./ports";
+import { type Usage, bill } from "./pricing/bill";
+import { CATALOG } from "./pricing/catalog";
+import { type Send as SendToStripe, stripeBilling } from "./stripe/billing";
 
 /**
  * Every system in memory (root ADR 084 §9), for local runs, previews and
@@ -24,8 +28,12 @@ import type {
  * `src/systems.ts`).
  */
 export function mockSystems(): Systems {
-  const plans = new Map<string, Plan["id"]>();
-  return { zitadel: mockDirectory(plans), stripe: mockBilling(plans), hubspot: mockCrm() };
+  const entitlements = new Map<string, Entitlements>();
+  return {
+    zitadel: mockDirectory(entitlements),
+    stripe: mockBilling(entitlements),
+    hubspot: mockCrm(),
+  };
 }
 
 export const MOCK_PERSON: Caller = {
@@ -36,17 +44,40 @@ export const MOCK_PERSON: Caller = {
 
 export const MOCK_TEAM: Team = { id: "team_mock", name: "Ada's team", personal: true };
 
+/** The plans at the price catalog's minimums, Enterprise at its first tier's by the month. */
 const PLANS: Record<Plan["id"], Plan> = {
-  free: { id: "free", name: "Free", base_amount: 0, currency: "usd" },
-  pro: { id: "pro", name: "Pro", base_amount: 10_000, currency: "usd" },
-  enterprise: { id: "enterprise", name: "Enterprise", base_amount: 0, currency: "usd" },
+  free: { id: "free", name: "Free", minimum_amount: 0, currency: CATALOG.currency },
+  pro: {
+    id: "pro",
+    name: "Pro",
+    minimum_amount: CATALOG.plans.pro.minimum.amount * 100,
+    currency: CATALOG.currency,
+  },
+  enterprise: {
+    id: "enterprise",
+    name: "Enterprise",
+    minimum_amount: ((CATALOG.plans.enterprise.minimum.tiers_per_year.essential ?? 0) * 100) / 12,
+    currency: CATALOG.currency,
+  },
+};
+
+/**
+ * The mock team's month: a growing B2B SaaS whose 20,000 users all sign in
+ * through SSO with MFA required, the pricing proposal's example bill, $305 on
+ * Pro.
+ */
+export const MOCK_MONTH: Usage = {
+  counts: { monthly_active_users: 20_000, sso_users: 20_000, policy_users: 20_000 },
 };
 
 /** The server's session cookie: `__Host-zitadel_session`, or `zitadel_session` on a loopback origin (root ADR 083). */
 const SESSION_COOKIE = /(?:^|;\s*)(?:__Host-)?zitadel_session=/;
 
-/** Any session cookie is the mock person; none is no one. */
-function mockDirectory(plans: Map<string, Plan["id"]>): Directory {
+/**
+ * Any session cookie is the mock person; none is no one. The mock team's
+ * usage is `MOCK_MONTH`, spread over the month's hours.
+ */
+function mockDirectory(entitlements: Map<string, Entitlements>): Directory {
   return {
     async caller(cookie) {
       return SESSION_COOKIE.test(cookie) ? MOCK_PERSON : undefined;
@@ -55,22 +86,32 @@ function mockDirectory(plans: Map<string, Plan["id"]>): Directory {
       return [MOCK_TEAM];
     },
     async usage(hour) {
-      const record: UsageRecord = {
-        team_id: MOCK_TEAM.id,
-        metric: "monthly_active_users",
-        value: 3,
-        at: hour.start,
-        identifier: `${MOCK_TEAM.id}:monthly_active_users:${hour.start}`,
-      };
-      return [record];
+      return Object.entries(MOCK_MONTH.counts).flatMap(([metric, month]): UsageRecord[] => {
+        const value = hourShare(month, hour);
+        if (value === 0) return [];
+        const identifier = `${MOCK_TEAM.id}:${metric}:${hour.start}`;
+        return [{ team_id: MOCK_TEAM.id, metric, value, at: hour.start, identifier }];
+      });
     },
-    async applyPlan(teamId, plan) {
-      plans.set(teamId, plan);
+    async applyEntitlements(teamId, next) {
+      entitlements.set(teamId, next);
     },
   };
 }
 
-function mockBilling(plans: Map<string, Plan["id"]>): Billing {
+/**
+ * The part of a month's count that falls into `hour`: an even spread whose
+ * hours add up to the month exactly, as first activities do (root ADR 084 §6).
+ */
+export function hourShare(month: number, hour: UsageWindow): number {
+  const at = new Date(hour.start);
+  const start = Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), 1);
+  const hours = (Date.UTC(at.getUTCFullYear(), at.getUTCMonth() + 1, 1) - start) / 3_600_000;
+  const index = (at.getTime() - start) / 3_600_000;
+  return Math.floor(month / hours) + (index < month % hours ? 1 : 0);
+}
+
+function mockBilling(entitlements: Map<string, Entitlements>): Billing {
   const customers = new Map<string, string>();
   const reported = new Map<string, UsageRecord>();
   const stripe = stripeBilling(recordingStripe());
@@ -84,26 +125,37 @@ function mockBilling(plans: Map<string, Plan["id"]>): Billing {
       customers.set(team.id, write.customer_id);
       return write;
     },
+    // This period's reported usage priced by the catalog; before the first
+    // report, the month the mock team is built from.
     async overview(team): Promise<TeamBilling> {
       const now = new Date();
       const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
       const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
-      const used = [...reported.values()]
-        .filter((record) => record.team_id === team.id && record.at >= start.toISOString())
-        .reduce((sum, record) => sum + record.value, 0);
+      const counts: Record<string, number> = {};
+      for (const record of reported.values()) {
+        if (record.team_id !== team.id || record.at < start.toISOString()) continue;
+        counts[record.metric] = (counts[record.metric] ?? 0) + record.value;
+      }
+      const month = bill(Object.keys(counts).length > 0 ? { counts } : MOCK_MONTH);
+      const plan = PLANS[entitlements.get(team.id)?.plan ?? "free"];
       return {
         team_id: team.id,
         team_name: team.name,
-        plan: PLANS[plans.get(team.id) ?? "free"],
+        plan,
         period: { start: start.toISOString(), end: end.toISOString() },
-        usage: [
-          {
-            metric: "monthly_active_users",
-            label: "Monthly active users",
-            used: used || 812,
-            included: 1000,
-          },
-        ],
+        usage: month.lines.map((line) => ({
+          metric: line.metric,
+          label: line.meter.label,
+          used: line.used,
+          included: line.included,
+          amount: line.amount,
+        })),
+        // A paid plan bills at least its minimum, whatever the usage needs.
+        estimate: {
+          plan: plan.id === "free" ? month.plan : plan.id,
+          total_amount: Math.max(plan.minimum_amount, month.total_amount),
+          currency: plan.currency,
+        },
         invoices: [],
       };
     },

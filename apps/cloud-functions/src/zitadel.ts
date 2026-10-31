@@ -99,7 +99,7 @@ export function liveDirectory(server: string): Directory {
       throw new NotLiveError();
     },
 
-    async applyPlan() {
+    async applyEntitlements() {
       throw new NotLiveError();
     },
   };

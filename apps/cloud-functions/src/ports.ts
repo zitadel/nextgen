@@ -47,8 +47,20 @@ export interface Directory {
   administeredTeams(cookie: string): Promise<Team[]>;
   /** Every team's usage in one hour, as the cloud's operator reads it (§6, §8). */
   usage(hour: UsageWindow): Promise<UsageRecord[]>;
-  /** Sets the limits a team's plan allows, which the server enforces (§6, §8). */
-  applyPlan(teamId: string, plan: Plan["id"]): Promise<void>;
+  /** Sets what a team's plan allows, which the server enforces and never asks Stripe (§6, §8). */
+  applyEntitlements(teamId: string, entitlements: Entitlements): Promise<void>;
+}
+
+/**
+ * What a team may use (§6, §8.3): its plan, and the allowance of each billed
+ * meter the plan offers, per month. A meter it does not list is one the plan
+ * lacks, such as managed delivery on Free. Caps are the owner's, kept in
+ * Zitadel, so Stripe's changes never carry them.
+ */
+export interface Entitlements {
+  plan: Plan["id"];
+  /** By the Stripe meter's event name, in the meter's unit. */
+  allowances: Record<string, number>;
 }
 
 /** One complete hour, RFC 3339 at both ends. */

@@ -71,7 +71,9 @@ export interface TeamBilling {
   plan: Plan;
   /** The current billing period, RFC 3339. */
   period: { start: string; end: string };
+  /** Each meter that counted something this period. */
   usage: UsageLine[];
+  estimate: BillingEstimate;
   /** Unset until a payment method is added through Stripe. */
   payment_method?: { brand: string; last4: string };
   invoices: Invoice[];
@@ -80,8 +82,11 @@ export interface TeamBilling {
 export interface Plan {
   id: "free" | "pro" | "enterprise";
   name: string;
-  /** Minor units of `currency` per month, before usage. */
-  base_amount: number;
+  /**
+   * Minor units of `currency` per month that usage is billed against: the
+   * invoice is the larger of the two, plus what is billed on top.
+   */
+  minimum_amount: number;
   currency: string;
 }
 
@@ -92,6 +97,17 @@ export interface UsageLine {
   used: number;
   /** What the plan includes before usage is charged; unset for none. */
   included?: number;
+  /** Minor units this period at list price, for what is past `included`. */
+  amount: number;
+}
+
+/** This period's bill so far, at list prices. */
+export interface BillingEstimate {
+  /** The plan the usage needs: `free` while nothing is past an allowance or Pro's only. */
+  plan: Plan["id"];
+  /** Minor units: the larger of the plan's minimum and the usage, plus what is billed on top. */
+  total_amount: number;
+  currency: string;
 }
 
 export interface Invoice {

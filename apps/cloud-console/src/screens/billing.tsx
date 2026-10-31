@@ -36,10 +36,11 @@ import { screen } from "./screen";
 
 /**
  * Settings → Billing: each team the person administers, its plan, this
- * period's usage, its invoices and how it pays (root ADR 084 §6). Payment
- * details never pass through the console: changing them, or the plan, opens
- * Stripe's own pages. While the functions bill no one (`cloud.not_live`), it
- * says the cloud is free during the preview.
+ * period's usage and what it comes to so far, its invoices and how it pays
+ * (root ADR 084 §6). Payment details never pass through the console:
+ * changing them, or the plan, opens Stripe's own pages. While the functions
+ * bill no one (`cloud.not_live`), it says the cloud is free during the
+ * preview.
  */
 export const billingScreen = screen({
   path: "/settings/billing",
@@ -114,7 +115,7 @@ function TeamBillingSections({ team }: { team: TeamBilling }) {
             <span className="flex items-center gap-2 text-sm">
               {team.plan.name}
               <Badge variant="secondary">
-                {money(team.plan.base_amount, team.plan.currency)} / month
+                {money(team.plan.minimum_amount, team.plan.currency)} / month
               </Badge>
             </span>
           </DetailRow>
@@ -125,9 +126,13 @@ function TeamBillingSections({ team }: { team: TeamBilling }) {
                 {line.included === undefined
                   ? ""
                   : ` of ${line.included.toLocaleString()} included`}
+                {line.amount > 0 ? `, ${money(line.amount, team.plan.currency)}` : ""}
               </span>
             </DetailRow>
           ))}
+          <DetailRow label="This month so far" align="center" divider>
+            <span className="text-sm">{estimate(team)}</span>
+          </DetailRow>
           <DetailRow label="Payment method" align="center" divider>
             <span className="text-sm">
               {team.payment_method
@@ -188,6 +193,17 @@ function TeamBillingSections({ team }: { team: TeamBilling }) {
       </SettingsSection>
     </>
   );
+}
+
+/**
+ * The period's bill so far at list prices. On Free, once usage is past an
+ * allowance, it is what Pro would bill instead.
+ */
+function estimate({ plan, estimate }: TeamBilling): string {
+  const total = money(estimate.total_amount, estimate.currency);
+  return plan.id === "free" && estimate.plan !== "free"
+    ? `${total} on Pro, as this usage is past Free's allowances`
+    : total;
 }
 
 function money(minor: number, currency: string): string {
