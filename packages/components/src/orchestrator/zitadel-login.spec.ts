@@ -613,6 +613,44 @@ describe("<zitadel-login> against the typed Flow API", () => {
     }
   });
 
+  it("reports a failed handoff exchange without navigating or showing the signed-in screen", async () => {
+    const assign = vi.fn();
+    const { location } = window;
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...location, assign },
+    });
+
+    try {
+      mock.failNextExchange();
+      const element = document.createElement("zitadel-login") as ZitadelLogin;
+      element.purpose = "login";
+      element.project = testProject;
+      element.postSignInUrl = "/admin";
+      const failed = vi.fn();
+      element.addEventListener("zitadel-flow-error", failed);
+      host.appendChild(element);
+      await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
+
+      await advanceMockLoginFlow(element);
+
+      await waitFor(() => (failed.mock.calls.length > 0 ? failed : null));
+      await element.updateComplete;
+      expect(failed).toHaveBeenCalledOnce();
+      expect(assign).not.toHaveBeenCalled();
+      expect(element.shadowRoot?.querySelector("zl-alert")?.textContent).toContain(
+        "Session exchange is temporarily unavailable.",
+      );
+      expect(element.shadowRoot?.textContent).not.toContain("You're signed in");
+      expect(element.getAttribute("aria-busy")).toBe("false");
+    } finally {
+      Object.defineProperty(window, "location", {
+        configurable: true,
+        value: location,
+      });
+    }
+  });
+
   it.each([
     [
       "the protected route the page's next names",
