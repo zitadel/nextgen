@@ -77,3 +77,12 @@ func (t tracedExecutor) ReadRow(ctx context.Context, table string, key spanner.K
 	end(err)
 	return row, err
 }
+
+// QueryStrong implements [queryExecutor]. The span and the timing cover
+// consume, where the rows are read.
+func (t tracedExecutor) QueryStrong(ctx context.Context, stmt spanner.Statement, consume func(*spanner.RowIterator) error) (time.Time, error) {
+	ctx, end := database.StartStatement(ctx, dbSystem)
+	readAt, err := t.next.QueryStrong(ctx, stmt, consume)
+	end(err)
+	return readAt, err
+}

@@ -37856,6 +37856,347 @@ type GetTeamUnauthorized ErrorDetails
 
 func (*GetTeamUnauthorized) getTeamRes() {}
 
+type GetUsageBadRequest ErrorDetails
+
+func (*GetUsageBadRequest) getUsageRes() {}
+
+// GetUsageErrorResponse represents sum type.
+type GetUsageErrorResponse struct {
+	Type                  GetUsageErrorResponseType // switch on this field
+	AuthUnauthorized      AuthUnauthorized
+	Internal              Internal
+	NotImplemented        NotImplemented
+	ReqInvalid            ReqInvalid
+	Unavailable           Unavailable
+	UsageDisabled         UsageDisabled
+	UsageInvalid          UsageInvalid
+	UsageNotFound         UsageNotFound
+	UsagePermissionDenied UsagePermissionDenied
+}
+
+// GetUsageErrorResponseType is oneOf type of GetUsageErrorResponse.
+type GetUsageErrorResponseType string
+
+// Possible values for GetUsageErrorResponseType.
+const (
+	AuthUnauthorizedGetUsageErrorResponse      GetUsageErrorResponseType = "auth.unauthorized"
+	InternalGetUsageErrorResponse              GetUsageErrorResponseType = "internal"
+	NotImplementedGetUsageErrorResponse        GetUsageErrorResponseType = "not_implemented"
+	ReqInvalidGetUsageErrorResponse            GetUsageErrorResponseType = "req.invalid"
+	UnavailableGetUsageErrorResponse           GetUsageErrorResponseType = "unavailable"
+	UsageDisabledGetUsageErrorResponse         GetUsageErrorResponseType = "usage.disabled"
+	UsageInvalidGetUsageErrorResponse          GetUsageErrorResponseType = "usage.invalid"
+	UsageNotFoundGetUsageErrorResponse         GetUsageErrorResponseType = "usage.not_found"
+	UsagePermissionDeniedGetUsageErrorResponse GetUsageErrorResponseType = "usage.permission_denied"
+)
+
+// IsAuthUnauthorized reports whether GetUsageErrorResponse is AuthUnauthorized.
+func (s GetUsageErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedGetUsageErrorResponse
+}
+
+// IsInternal reports whether GetUsageErrorResponse is Internal.
+func (s GetUsageErrorResponse) IsInternal() bool { return s.Type == InternalGetUsageErrorResponse }
+
+// IsNotImplemented reports whether GetUsageErrorResponse is NotImplemented.
+func (s GetUsageErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedGetUsageErrorResponse
+}
+
+// IsReqInvalid reports whether GetUsageErrorResponse is ReqInvalid.
+func (s GetUsageErrorResponse) IsReqInvalid() bool { return s.Type == ReqInvalidGetUsageErrorResponse }
+
+// IsUnavailable reports whether GetUsageErrorResponse is Unavailable.
+func (s GetUsageErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableGetUsageErrorResponse
+}
+
+// IsUsageDisabled reports whether GetUsageErrorResponse is UsageDisabled.
+func (s GetUsageErrorResponse) IsUsageDisabled() bool {
+	return s.Type == UsageDisabledGetUsageErrorResponse
+}
+
+// IsUsageInvalid reports whether GetUsageErrorResponse is UsageInvalid.
+func (s GetUsageErrorResponse) IsUsageInvalid() bool {
+	return s.Type == UsageInvalidGetUsageErrorResponse
+}
+
+// IsUsageNotFound reports whether GetUsageErrorResponse is UsageNotFound.
+func (s GetUsageErrorResponse) IsUsageNotFound() bool {
+	return s.Type == UsageNotFoundGetUsageErrorResponse
+}
+
+// IsUsagePermissionDenied reports whether GetUsageErrorResponse is UsagePermissionDenied.
+func (s GetUsageErrorResponse) IsUsagePermissionDenied() bool {
+	return s.Type == UsagePermissionDeniedGetUsageErrorResponse
+}
+
+// SetAuthUnauthorized sets GetUsageErrorResponse to AuthUnauthorized.
+func (s *GetUsageErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedGetUsageErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if GetUsageErrorResponse is AuthUnauthorized.
+func (s GetUsageErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedGetUsageErrorResponse returns new GetUsageErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedGetUsageErrorResponse(v AuthUnauthorized) GetUsageErrorResponse {
+	var s GetUsageErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets GetUsageErrorResponse to Internal.
+func (s *GetUsageErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalGetUsageErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if GetUsageErrorResponse is Internal.
+func (s GetUsageErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalGetUsageErrorResponse returns new GetUsageErrorResponse from Internal.
+func NewInternalGetUsageErrorResponse(v Internal) GetUsageErrorResponse {
+	var s GetUsageErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets GetUsageErrorResponse to NotImplemented.
+func (s *GetUsageErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedGetUsageErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if GetUsageErrorResponse is NotImplemented.
+func (s GetUsageErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedGetUsageErrorResponse returns new GetUsageErrorResponse from NotImplemented.
+func NewNotImplementedGetUsageErrorResponse(v NotImplemented) GetUsageErrorResponse {
+	var s GetUsageErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
+// SetReqInvalid sets GetUsageErrorResponse to ReqInvalid.
+func (s *GetUsageErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidGetUsageErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if GetUsageErrorResponse is ReqInvalid.
+func (s GetUsageErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidGetUsageErrorResponse returns new GetUsageErrorResponse from ReqInvalid.
+func NewReqInvalidGetUsageErrorResponse(v ReqInvalid) GetUsageErrorResponse {
+	var s GetUsageErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets GetUsageErrorResponse to Unavailable.
+func (s *GetUsageErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableGetUsageErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if GetUsageErrorResponse is Unavailable.
+func (s GetUsageErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableGetUsageErrorResponse returns new GetUsageErrorResponse from Unavailable.
+func NewUnavailableGetUsageErrorResponse(v Unavailable) GetUsageErrorResponse {
+	var s GetUsageErrorResponse
+	s.SetUnavailable(v)
+	return s
+}
+
+// SetUsageDisabled sets GetUsageErrorResponse to UsageDisabled.
+func (s *GetUsageErrorResponse) SetUsageDisabled(v UsageDisabled) {
+	s.Type = UsageDisabledGetUsageErrorResponse
+	s.UsageDisabled = v
+}
+
+// GetUsageDisabled returns UsageDisabled and true boolean if GetUsageErrorResponse is UsageDisabled.
+func (s GetUsageErrorResponse) GetUsageDisabled() (v UsageDisabled, ok bool) {
+	if !s.IsUsageDisabled() {
+		return v, false
+	}
+	return s.UsageDisabled, true
+}
+
+// NewUsageDisabledGetUsageErrorResponse returns new GetUsageErrorResponse from UsageDisabled.
+func NewUsageDisabledGetUsageErrorResponse(v UsageDisabled) GetUsageErrorResponse {
+	var s GetUsageErrorResponse
+	s.SetUsageDisabled(v)
+	return s
+}
+
+// SetUsageInvalid sets GetUsageErrorResponse to UsageInvalid.
+func (s *GetUsageErrorResponse) SetUsageInvalid(v UsageInvalid) {
+	s.Type = UsageInvalidGetUsageErrorResponse
+	s.UsageInvalid = v
+}
+
+// GetUsageInvalid returns UsageInvalid and true boolean if GetUsageErrorResponse is UsageInvalid.
+func (s GetUsageErrorResponse) GetUsageInvalid() (v UsageInvalid, ok bool) {
+	if !s.IsUsageInvalid() {
+		return v, false
+	}
+	return s.UsageInvalid, true
+}
+
+// NewUsageInvalidGetUsageErrorResponse returns new GetUsageErrorResponse from UsageInvalid.
+func NewUsageInvalidGetUsageErrorResponse(v UsageInvalid) GetUsageErrorResponse {
+	var s GetUsageErrorResponse
+	s.SetUsageInvalid(v)
+	return s
+}
+
+// SetUsageNotFound sets GetUsageErrorResponse to UsageNotFound.
+func (s *GetUsageErrorResponse) SetUsageNotFound(v UsageNotFound) {
+	s.Type = UsageNotFoundGetUsageErrorResponse
+	s.UsageNotFound = v
+}
+
+// GetUsageNotFound returns UsageNotFound and true boolean if GetUsageErrorResponse is UsageNotFound.
+func (s GetUsageErrorResponse) GetUsageNotFound() (v UsageNotFound, ok bool) {
+	if !s.IsUsageNotFound() {
+		return v, false
+	}
+	return s.UsageNotFound, true
+}
+
+// NewUsageNotFoundGetUsageErrorResponse returns new GetUsageErrorResponse from UsageNotFound.
+func NewUsageNotFoundGetUsageErrorResponse(v UsageNotFound) GetUsageErrorResponse {
+	var s GetUsageErrorResponse
+	s.SetUsageNotFound(v)
+	return s
+}
+
+// SetUsagePermissionDenied sets GetUsageErrorResponse to UsagePermissionDenied.
+func (s *GetUsageErrorResponse) SetUsagePermissionDenied(v UsagePermissionDenied) {
+	s.Type = UsagePermissionDeniedGetUsageErrorResponse
+	s.UsagePermissionDenied = v
+}
+
+// GetUsagePermissionDenied returns UsagePermissionDenied and true boolean if GetUsageErrorResponse is UsagePermissionDenied.
+func (s GetUsageErrorResponse) GetUsagePermissionDenied() (v UsagePermissionDenied, ok bool) {
+	if !s.IsUsagePermissionDenied() {
+		return v, false
+	}
+	return s.UsagePermissionDenied, true
+}
+
+// NewUsagePermissionDeniedGetUsageErrorResponse returns new GetUsageErrorResponse from UsagePermissionDenied.
+func NewUsagePermissionDeniedGetUsageErrorResponse(v UsagePermissionDenied) GetUsageErrorResponse {
+	var s GetUsageErrorResponse
+	s.SetUsagePermissionDenied(v)
+	return s
+}
+
+// GetUsageErrorResponseStatusCode wraps GetUsageErrorResponse with StatusCode.
+type GetUsageErrorResponseStatusCode struct {
+	StatusCode int
+	Response   GetUsageErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *GetUsageErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *GetUsageErrorResponseStatusCode) GetResponse() GetUsageErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *GetUsageErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *GetUsageErrorResponseStatusCode) SetResponse(val GetUsageErrorResponse) {
+	s.Response = val
+}
+
+func (*GetUsageErrorResponseStatusCode) getUsageRes() {}
+
+type GetUsageForbidden ErrorDetails
+
+func (*GetUsageForbidden) getUsageRes() {}
+
+type GetUsageGranularity string
+
+const (
+	GetUsageGranularityDay  GetUsageGranularity = "day"
+	GetUsageGranularityHour GetUsageGranularity = "hour"
+)
+
+// AllValues returns all GetUsageGranularity values.
+func (GetUsageGranularity) AllValues() []GetUsageGranularity {
+	return []GetUsageGranularity{
+		GetUsageGranularityDay,
+		GetUsageGranularityHour,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s GetUsageGranularity) MarshalText() ([]byte, error) {
+	switch s {
+	case GetUsageGranularityDay:
+		return []byte(s), nil
+	case GetUsageGranularityHour:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *GetUsageGranularity) UnmarshalText(data []byte) error {
+	switch GetUsageGranularity(data) {
+	case GetUsageGranularityDay:
+		*s = GetUsageGranularityDay
+		return nil
+	case GetUsageGranularityHour:
+		*s = GetUsageGranularityHour
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+type GetUsageUnauthorized ErrorDetails
+
+func (*GetUsageUnauthorized) getUsageRes() {}
+
 // GetUserByIDErrorResponse represents sum type.
 type GetUserByIDErrorResponse struct {
 	Type                 GetUserByIDErrorResponseType // switch on this field
@@ -54201,6 +54542,52 @@ func (o OptGateConfig) Or(d GateConfig) GateConfig {
 	return d
 }
 
+// NewOptGetUsageGranularity returns new OptGetUsageGranularity with value set to v.
+func NewOptGetUsageGranularity(v GetUsageGranularity) OptGetUsageGranularity {
+	return OptGetUsageGranularity{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptGetUsageGranularity is optional GetUsageGranularity.
+type OptGetUsageGranularity struct {
+	Value GetUsageGranularity
+	Set   bool
+}
+
+// IsSet returns true if OptGetUsageGranularity was set.
+func (o OptGetUsageGranularity) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptGetUsageGranularity) Reset() {
+	var v GetUsageGranularity
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptGetUsageGranularity) SetTo(v GetUsageGranularity) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptGetUsageGranularity) Get() (v GetUsageGranularity, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptGetUsageGranularity) Or(d GetUsageGranularity) GetUsageGranularity {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptGrantAlreadyExistsDetails returns new OptGrantAlreadyExistsDetails with value set to v.
 func NewOptGrantAlreadyExistsDetails(v GrantAlreadyExistsDetails) OptGrantAlreadyExistsDetails {
 	return OptGrantAlreadyExistsDetails{
@@ -64461,6 +64848,190 @@ func (o OptUnavailableDetails) Get() (v UnavailableDetails, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptUnavailableDetails) Or(d UnavailableDetails) UnavailableDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptUsageDisabledDetails returns new OptUsageDisabledDetails with value set to v.
+func NewOptUsageDisabledDetails(v UsageDisabledDetails) OptUsageDisabledDetails {
+	return OptUsageDisabledDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptUsageDisabledDetails is optional UsageDisabledDetails.
+type OptUsageDisabledDetails struct {
+	Value UsageDisabledDetails
+	Set   bool
+}
+
+// IsSet returns true if OptUsageDisabledDetails was set.
+func (o OptUsageDisabledDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptUsageDisabledDetails) Reset() {
+	var v UsageDisabledDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptUsageDisabledDetails) SetTo(v UsageDisabledDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptUsageDisabledDetails) Get() (v UsageDisabledDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptUsageDisabledDetails) Or(d UsageDisabledDetails) UsageDisabledDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptUsageInvalidDetails returns new OptUsageInvalidDetails with value set to v.
+func NewOptUsageInvalidDetails(v UsageInvalidDetails) OptUsageInvalidDetails {
+	return OptUsageInvalidDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptUsageInvalidDetails is optional UsageInvalidDetails.
+type OptUsageInvalidDetails struct {
+	Value UsageInvalidDetails
+	Set   bool
+}
+
+// IsSet returns true if OptUsageInvalidDetails was set.
+func (o OptUsageInvalidDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptUsageInvalidDetails) Reset() {
+	var v UsageInvalidDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptUsageInvalidDetails) SetTo(v UsageInvalidDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptUsageInvalidDetails) Get() (v UsageInvalidDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptUsageInvalidDetails) Or(d UsageInvalidDetails) UsageInvalidDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptUsageNotFoundDetails returns new OptUsageNotFoundDetails with value set to v.
+func NewOptUsageNotFoundDetails(v UsageNotFoundDetails) OptUsageNotFoundDetails {
+	return OptUsageNotFoundDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptUsageNotFoundDetails is optional UsageNotFoundDetails.
+type OptUsageNotFoundDetails struct {
+	Value UsageNotFoundDetails
+	Set   bool
+}
+
+// IsSet returns true if OptUsageNotFoundDetails was set.
+func (o OptUsageNotFoundDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptUsageNotFoundDetails) Reset() {
+	var v UsageNotFoundDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptUsageNotFoundDetails) SetTo(v UsageNotFoundDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptUsageNotFoundDetails) Get() (v UsageNotFoundDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptUsageNotFoundDetails) Or(d UsageNotFoundDetails) UsageNotFoundDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptUsagePermissionDeniedDetails returns new OptUsagePermissionDeniedDetails with value set to v.
+func NewOptUsagePermissionDeniedDetails(v UsagePermissionDeniedDetails) OptUsagePermissionDeniedDetails {
+	return OptUsagePermissionDeniedDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptUsagePermissionDeniedDetails is optional UsagePermissionDeniedDetails.
+type OptUsagePermissionDeniedDetails struct {
+	Value UsagePermissionDeniedDetails
+	Set   bool
+}
+
+// IsSet returns true if OptUsagePermissionDeniedDetails was set.
+func (o OptUsagePermissionDeniedDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptUsagePermissionDeniedDetails) Reset() {
+	var v UsagePermissionDeniedDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptUsagePermissionDeniedDetails) SetTo(v UsagePermissionDeniedDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptUsagePermissionDeniedDetails) Get() (v UsagePermissionDeniedDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptUsagePermissionDeniedDetails) Or(d UsagePermissionDeniedDetails) UsagePermissionDeniedDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -90546,6 +91117,332 @@ func (s *UpdateVariablesRequest) init() UpdateVariablesRequest {
 	}
 	return m
 }
+
+// What one meter counted in one day or hour.
+// Ref: #
+type UsageBucket struct {
+	// The meter's name.
+	Meter string `json:"meter"`
+	// The bucket's start, in UTC.
+	Start time.Time `json:"start"`
+	// What the meter counted in the bucket.
+	Value int64 `json:"value"`
+}
+
+// GetMeter returns the value of Meter.
+func (s *UsageBucket) GetMeter() string {
+	return s.Meter
+}
+
+// GetStart returns the value of Start.
+func (s *UsageBucket) GetStart() time.Time {
+	return s.Start
+}
+
+// GetValue returns the value of Value.
+func (s *UsageBucket) GetValue() int64 {
+	return s.Value
+}
+
+// SetMeter sets the value of Meter.
+func (s *UsageBucket) SetMeter(val string) {
+	s.Meter = val
+}
+
+// SetStart sets the value of Start.
+func (s *UsageBucket) SetStart(val time.Time) {
+	s.Start = val
+}
+
+// SetValue sets the value of Value.
+func (s *UsageBucket) SetValue(val int64) {
+	s.Value = val
+}
+
+// Merged schema.
+// Ref: #
+type UsageDisabled struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptUsageDisabledDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *UsageDisabled) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *UsageDisabled) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *UsageDisabled) GetDetails() OptUsageDisabledDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *UsageDisabled) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *UsageDisabled) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *UsageDisabled) SetDetails(val OptUsageDisabledDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type UsageDisabledDetails map[string]jx.Raw
+
+func (s *UsageDisabledDetails) init() UsageDisabledDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type UsageInvalid struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptUsageInvalidDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *UsageInvalid) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *UsageInvalid) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *UsageInvalid) GetDetails() OptUsageInvalidDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *UsageInvalid) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *UsageInvalid) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *UsageInvalid) SetDetails(val OptUsageInvalidDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type UsageInvalidDetails map[string]jx.Raw
+
+func (s *UsageInvalidDetails) init() UsageInvalidDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type UsageNotFound struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptUsageNotFoundDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *UsageNotFound) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *UsageNotFound) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *UsageNotFound) GetDetails() OptUsageNotFoundDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *UsageNotFound) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *UsageNotFound) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *UsageNotFound) SetDetails(val OptUsageNotFoundDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type UsageNotFoundDetails map[string]jx.Raw
+
+func (s *UsageNotFoundDetails) init() UsageNotFoundDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type UsagePermissionDenied struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptUsagePermissionDeniedDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *UsagePermissionDenied) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *UsagePermissionDenied) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *UsagePermissionDenied) GetDetails() OptUsagePermissionDeniedDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *UsagePermissionDenied) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *UsagePermissionDenied) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *UsagePermissionDenied) SetDetails(val OptUsagePermissionDeniedDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type UsagePermissionDeniedDetails map[string]jx.Raw
+
+func (s *UsagePermissionDeniedDetails) init() UsagePermissionDeniedDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// A project's usage per meter and bucket (ADR 086).
+// Ref: #
+type UsageResponse struct {
+	// One bucket per meter and day or hour that counted something, ordered
+	// by meter, then start.
+	Data []UsageBucket `json:"data"`
+	// The start of the first hour that is not sealed yet: every bucket that
+	// starts before it is final. Null until the project's events are first
+	// counted.
+	SealedThrough NilDateTime `json:"sealed_through"`
+	// The team that has claimed the project (ADR 046), which a hosted cloud
+	// bills the project's usage to. Null for a project nobody has claimed.
+	TeamID NilTeamID `json:"team_id"`
+}
+
+// GetData returns the value of Data.
+func (s *UsageResponse) GetData() []UsageBucket {
+	return s.Data
+}
+
+// GetSealedThrough returns the value of SealedThrough.
+func (s *UsageResponse) GetSealedThrough() NilDateTime {
+	return s.SealedThrough
+}
+
+// GetTeamID returns the value of TeamID.
+func (s *UsageResponse) GetTeamID() NilTeamID {
+	return s.TeamID
+}
+
+// SetData sets the value of Data.
+func (s *UsageResponse) SetData(val []UsageBucket) {
+	s.Data = val
+}
+
+// SetSealedThrough sets the value of SealedThrough.
+func (s *UsageResponse) SetSealedThrough(val NilDateTime) {
+	s.SealedThrough = val
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *UsageResponse) SetTeamID(val NilTeamID) {
+	s.TeamID = val
+}
+
+// UsageResponseHeaders wraps UsageResponse with response headers.
+type UsageResponseHeaders struct {
+	CacheControl OptString
+	Response     UsageResponse
+}
+
+// GetCacheControl returns the value of CacheControl.
+func (s *UsageResponseHeaders) GetCacheControl() OptString {
+	return s.CacheControl
+}
+
+// GetResponse returns the value of Response.
+func (s *UsageResponseHeaders) GetResponse() UsageResponse {
+	return s.Response
+}
+
+// SetCacheControl sets the value of CacheControl.
+func (s *UsageResponseHeaders) SetCacheControl(val OptString) {
+	s.CacheControl = val
+}
+
+// SetResponse sets the value of Response.
+func (s *UsageResponseHeaders) SetResponse(val UsageResponse) {
+	s.Response = val
+}
+
+func (*UsageResponseHeaders) getUsageRes() {}
 
 // A user represents an individual identity in the system. It can be used to
 // represent a human user, but also a service account or any other type of

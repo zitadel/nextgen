@@ -47,8 +47,26 @@ export interface Directory {
   administeredTeams(cookie: string): Promise<Team[]>;
   /** Every team's usage in one hour, as the cloud's operator reads it (§6, §8). */
   usage(hour: UsageWindow): Promise<UsageRecord[]>;
-  /** Sets the limits a team's plan allows, which the server enforces (§6, §8). */
-  applyPlan(teamId: string, plan: Plan["id"]): Promise<void>;
+  /**
+   * One team's counts per project and UTC day within `days`, read as the
+   * person (`GET /usage`, root ADR 086): the projects they can act on that
+   * the team has claimed. Quantities only, which the cloud prices.
+   */
+  usageByDay(cookie: string, team: Team, days: UsageWindow): Promise<TeamDays>;
+  /** Sets what a team's plan allows, which the server enforces and never asks Stripe (§6, §8). */
+  applyEntitlements(teamId: string, entitlements: Entitlements): Promise<void>;
+}
+
+/**
+ * What a team may use (§6, §8.3): its plan, and the allowance of each billed
+ * meter the plan offers, per month. A meter it does not list is one the plan
+ * lacks, such as managed delivery on Free. Caps are the owner's, kept in
+ * Zitadel, so Stripe's changes never carry them.
+ */
+export interface Entitlements {
+  plan: Plan["id"];
+  /** By the Stripe meter's event name, in the meter's unit. */
+  allowances: Record<string, number>;
 }
 
 /** One complete hour, RFC 3339 at both ends. */
@@ -71,6 +89,22 @@ export interface UsageRecord {
   at: string;
   /** `team:metric:hour`: Stripe counts a re-sent hour once. */
   identifier: string;
+}
+
+/** A team's projects, and what each counted per day; a day, project or metric that counted nothing is left out. */
+export interface TeamDays {
+  projects: { id: string; name: string }[];
+  counts: DayCount[];
+}
+
+/** One project's count of one metric on one UTC day; a user meter's is the users first seen that day. */
+export interface DayCount {
+  /** The day's start, RFC 3339. */
+  day: string;
+  project_id: string;
+  /** The Stripe meter's event name. */
+  metric: string;
+  value: number;
 }
 
 /** Stripe: a customer per team, its subscription, invoices and meters. */

@@ -674,6 +674,17 @@ project and imports the root admin.
       WHERE created_at < now() - interval '30 days' LIMIT 50000);
     ```
 
+- **Usage:** for the same reason a second Cron Job calls `/cron/usage`
+  every five minutes with `CRON_SECRET`, and the server counts each
+  project's new events into its usage rollups
+  ([ADR 086](../adrs/086-usage-rollups-and-api.md)).
+  - Each run logs `usage: counted events` with the projects it walked and
+    the events it counted, or `usage: count failed` with the cause, and
+    answers 500.
+  - While usage is counted the purge keeps every event a project's cursor
+    has not passed, so a count that keeps failing grows `events` instead of
+    losing usage. Start a run by hand as for the purge, with `/cron/usage`.
+
 - **Analytics:** the console reports page views and Web Vitals per route
   pattern (`/console/users/$userId`), the docs and the website per page,
   to the project's Analytics and Speed Insights tabs. Speed Insights samples

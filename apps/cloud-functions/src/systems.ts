@@ -44,11 +44,11 @@ export function onboardingSystems(): Onboarding {
 }
 
 /**
- * What the console's RPC answers from: Zitadel read live as the caller, the
- * rest as `currentSystems()` has them. Production, with no live Stripe or
- * HubSpot yet, refuses those call by call rather than the whole RPC, so
- * `account/ensure` starts onboarding while billing and support answer
- * `cloud.not_live`.
+ * What the console's RPC answers from: Zitadel read live as the caller,
+ * usage included (`GET /usage`, root ADR 086), the rest as `currentSystems()`
+ * has them. Production, with no live Stripe or HubSpot yet, refuses those
+ * call by call rather than the whole RPC, so `account/ensure` starts
+ * onboarding while billing and support answer `cloud.not_live`.
  */
 export function rpcSystems(zitadel: Directory): Systems {
   if (process.env.VERCEL_ENV === "production") {

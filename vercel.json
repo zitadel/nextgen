@@ -233,6 +233,10 @@
     {
       "path": "/cron/events-retention",
       "schedule": "17 * * * *"
+    },
+    {
+      "path": "/cron/usage",
+      "schedule": "*/5 * * * *"
     }
   ],
   "regions": ["iad1", "sfo1", "fra1", "sin1", "hnd1"],

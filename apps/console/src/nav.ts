@@ -35,7 +35,8 @@ export interface NavMeta {
  *
  *   - App groups   — needs ADR 034's app-group catalog (epic #419)
  *   - Applications — no application resource or endpoints exist
- *   - Analytics    — no aggregate or time-series endpoint exists
+ *   - Analytics    — beyond Usage's meters (`GET /usage`), no aggregate or
+ *                    time-series endpoint exists
  *   - Activity Log — no audit-log read API (#350)
  *
  * ```ts

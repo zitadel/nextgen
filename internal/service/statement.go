@@ -57,6 +57,7 @@ type AllStatements interface {
 	AuthzCatalogStatements
 	AuthzResolverStatements
 	EventStatements
+	UsageStatements
 	Statements
 }
 
@@ -921,4 +922,41 @@ type EventStatements interface {
 	// settled, because the dialect stamps events in commit order. Call it
 	// outside a transaction, or at READ COMMITTED, before the list it bounds.
 	EventsSettledBefore(ctx context.Context, projectID string) (time.Time, error)
+}
+
+// UsageStatements keep the usage rollups the projector counts from events
+// (ADR 086).
+type UsageStatements interface {
+	Statements
+	// ReadUsageEvents lists the project's settled events of the given types
+	// after the cursor, oldest first and at most limit of them, with the bound
+	// the list is complete to: no event of those types stamped after the
+	// cursor and before bound is missing unless the list is full, and none
+	// that commits later is stamped before bound. A nil cursor reads from the
+	// oldest event. Call it outside a transaction.
+	ReadUsageEvents(ctx context.Context, projectID string, after *domain.UsageCursor, types []domain.EventType, limit uint32) ([]*domain.Event, time.Time, error)
+	// GetUsageCursor returns (nil, nil) when the project has none yet.
+	GetUsageCursor(ctx context.Context, projectID string) (*domain.UsageCursor, error)
+	// AdvanceUsageCursor writes next if the stored cursor still equals prev,
+	// or if prev is nil and none is stored, and reports whether it did: a
+	// second run that read the same prev moves nothing.
+	AdvanceUsageCursor(ctx context.Context, prev *domain.UsageCursor, next domain.UsageCursor) (bool, error)
+	// SeenUsageUsers returns those of userIDs the meter already counted in
+	// the month.
+	SeenUsageUsers(ctx context.Context, projectID, meter string, month time.Time, userIDs []string) ([]string, error)
+	// InsertUsageFirstSeen records userIDs as counted by the meter in the
+	// month. None of them may be recorded yet.
+	InsertUsageFirstSeen(ctx context.Context, projectID, meter string, month time.Time, userIDs []string) error
+	// AddUsageHours adds each hour's value to what the project's row for
+	// that meter and hour holds, creating it at zero. Each meter and hour may
+	// appear once.
+	AddUsageHours(ctx context.Context, projectID string, hours []domain.UsageHour) error
+	// ReadUsageHours returns the project's rows for the meters in [from, to),
+	// ordered by meter, then hour.
+	ReadUsageHours(ctx context.Context, projectID string, meters []string, from, to time.Time) ([]domain.UsageHour, error)
+	// DeleteCountedEventsOlderThan is DeleteEventsOlderThan for a deployment
+	// that counts usage: it keeps every event stamped at or after its
+	// project's CountedBefore, so the purge never deletes one the projector
+	// has not counted. A project with no cursor purges by age alone.
+	DeleteCountedEventsOlderThan(ctx context.Context, createdBefore time.Time) (int64, error)
 }

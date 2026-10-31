@@ -706,6 +706,25 @@ type Invoker interface {
 	//
 	// GET /teams/{team_id}
 	GetTeam(ctx context.Context, params GetTeamParams) (GetTeamRes, error)
+	// GetUsage invokes getUsage operation.
+	//
+	// A project's usage per meter, by UTC day or hour, in `[from, to)`: counts
+	// only, which the hosted cloud prices and a self-hosted deployment reads as
+	// they are (ADR 086). A `users` meter such as `monthly_active_users` counts
+	// each user once a month, in the hour of their first activity, so a month's
+	// buckets add up to its count.
+	// A bucket that counted nothing is left out. One that starts at or after
+	// `sealed_through` is still open and may grow; the ones before it never
+	// change. A project nobody has claimed answers its usage too, with no
+	// `team_id`: the counts carry no event content.
+	// Failures:
+	// - `400 usage.invalid`: `from` or `to` is not on a UTC day boundary (`day`)
+	// or hour boundary (`hour`), `to` is not after `from`, they are more than
+	// 31 days apart, or a `meter` is unknown.
+	// - `404 usage.disabled`: this deployment does not count usage.
+	//
+	// GET /usage
+	GetUsage(ctx context.Context, params GetUsageParams) (GetUsageRes, error)
 	// GetUserByID invokes GetUserByID operation.
 	//
 	// Returns a user by its id, with the attributes its schema defines.
@@ -8788,6 +8807,230 @@ func (c *Client) sendGetTeam(ctx context.Context, params GetTeamParams) (res Get
 
 	stage = "DecodeResponse"
 	result, err := decodeGetTeamResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// GetUsage invokes getUsage operation.
+//
+// A project's usage per meter, by UTC day or hour, in `[from, to)`: counts
+// only, which the hosted cloud prices and a self-hosted deployment reads as
+// they are (ADR 086). A `users` meter such as `monthly_active_users` counts
+// each user once a month, in the hour of their first activity, so a month's
+// buckets add up to its count.
+// A bucket that counted nothing is left out. One that starts at or after
+// `sealed_through` is still open and may grow; the ones before it never
+// change. A project nobody has claimed answers its usage too, with no
+// `team_id`: the counts carry no event content.
+// Failures:
+// - `400 usage.invalid`: `from` or `to` is not on a UTC day boundary (`day`)
+// or hour boundary (`hour`), `to` is not after `from`, they are more than
+// 31 days apart, or a `meter` is unknown.
+// - `404 usage.disabled`: this deployment does not count usage.
+//
+// GET /usage
+func (c *Client) GetUsage(ctx context.Context, params GetUsageParams) (GetUsageRes, error) {
+	res, err := c.sendGetUsage(ctx, params)
+	return res, err
+}
+
+func (c *Client) sendGetUsage(ctx context.Context, params GetUsageParams) (res GetUsageRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("getUsage"),
+		semconv.HTTPRequestMethodKey.String("GET"),
+		semconv.URLTemplateKey.String("/usage"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, GetUsageOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [1]string
+	pathParts[0] = "/usage"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if unwrapped := string(params.ProjectID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "from" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "from",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			return e.EncodeValue(conv.DateTimeToString(params.From))
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "to" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "to",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			return e.EncodeValue(conv.DateTimeToString(params.To))
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "granularity" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "granularity",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.Granularity.Get(); ok {
+				return e.EncodeValue(conv.StringToString(string(val)))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "meter" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "meter",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if params.Meter != nil {
+				return e.EncodeArray(func(e uri.Encoder) error {
+					for i, item := range params.Meter {
+						if err := func() error {
+							return e.EncodeValue(conv.StringToString(item))
+						}(); err != nil {
+							return errors.Wrapf(err, "[%d]", i)
+						}
+					}
+					return nil
+				})
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "GET", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, GetUsageOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
+		{
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, GetUsageOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+				{0b00000010},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeGetUsageResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}

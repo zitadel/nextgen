@@ -339,9 +339,11 @@ server's catch-all.
 2. **Email:** verification and sending.
 3. **Usage and limits.**
    - Usage aggregates per project and hour, counting active users by their
-     first activity in the month.
+     first activity in the month: [ADR 086](086-usage-rollups-and-api.md)
+     counts them and serves them per project (`GET /usage`).
    - A platform operator's machine credential that reads them for the whole
-     deployment.
+     deployment. ADR 086 proposes a secret-guarded feed instead, as operators
+     are users only (ADR 075).
    - Quotas per team, which a plan sets.
 4. **Team roles:** who may manage a team, billing included.
 5. **Team names a person reads.** A team's name stops being unique in its

@@ -5,6 +5,8 @@ import type {
   BillingOverview,
   BillingSessionResponse,
   TeamBilling,
+  TeamUsage,
+  UsageOverview,
 } from "@zitadel/cloud-functions/contract";
 import type { AddonScreenProps } from "@zitadel/console/addon";
 import {
@@ -32,23 +34,38 @@ import {
 } from "@zitadel/console/addon/ui";
 
 import { type Live, cloudGet, cloudSend, whenLive } from "../cloud-api";
+import { money, period } from "./format";
 import { screen } from "./screen";
 
 /**
  * Settings → Billing: each team the person administers, its plan, this
- * period's usage, its invoices and how it pays (root ADR 084 §6). Payment
- * details never pass through the console: changing them, or the plan, opens
- * Stripe's own pages. While the functions bill no one (`cloud.not_live`), it
- * says the cloud is free during the preview.
+ * period's usage and what it comes to so far, its invoices and how it pays
+ * (root ADR 084 §6). Payment details never pass through the console:
+ * changing them, or the plan, opens Stripe's own pages. The plan's credit
+ * and what is billed past it come from the team's usage, which the console's
+ * own Usage screen shows per project. While the functions bill no one
+ * (`cloud.not_live`), it says the cloud is free during the preview.
  */
 export const billingScreen = screen({
   path: "/settings/billing",
   nav: { label: "Billing", view: "settings", order: 2, icon: CreditCard },
-  load: () => whenLive(cloudGet<BillingOverview>("/billing")),
+  load: () =>
+    whenLive(
+      Promise.all([
+        cloudGet<BillingOverview>("/billing"),
+        // The credit bar only: a usage read that fails costs it, not the page.
+        cloudGet<UsageOverview>("/usage").catch(() => undefined),
+      ]).then(([billing, usage]): BillingData => ({ billing, usage })),
+    ),
   Screen: BillingScreen,
 });
 
-function BillingScreen({ data }: AddonScreenProps<Live<BillingOverview>>) {
+interface BillingData {
+  billing: BillingOverview;
+  usage?: UsageOverview;
+}
+
+function BillingScreen({ data }: AddonScreenProps<Live<BillingData>>) {
   return (
     <Page>
       <SettingsColumn>
@@ -57,12 +74,18 @@ function BillingScreen({ data }: AddonScreenProps<Live<BillingOverview>>) {
         </div>
         {!data.live ? (
           <BillingPreview />
-        ) : data.data.teams.length === 0 ? (
+        ) : data.data.billing.teams.length === 0 ? (
           <p className="mt-6 text-sm text-muted-foreground">
             You administer no team, so there is nothing to bill you for.
           </p>
         ) : (
-          data.data.teams.map((team) => <TeamBillingSections key={team.team_id} team={team} />)
+          data.data.billing.teams.map((team) => (
+            <TeamBillingSections
+              key={team.team_id}
+              team={team}
+              usage={data.data.usage?.teams.find((candidate) => candidate.team_id === team.team_id)}
+            />
+          ))
         )}
       </SettingsColumn>
     </Page>
@@ -88,7 +111,7 @@ function BillingPreview() {
   );
 }
 
-function TeamBillingSections({ team }: { team: TeamBilling }) {
+function TeamBillingSections({ team, usage }: { team: TeamBilling; usage?: TeamUsage }) {
   const [error, setError] = useState<string>();
   const openStripe = async (path: "/billing/portal" | "/billing/checkout") => {
     setError(undefined);
@@ -109,12 +132,13 @@ function TeamBillingSections({ team }: { team: TeamBilling }) {
         title={team.team_name}
         description={`The plan and usage for ${period(team.period)}.`}
       >
+        {usage && usage.credit.amount > 0 && <CreditSummary usage={usage} />}
         <SettingsCard>
           <DetailRow label="Plan" align="center">
             <span className="flex items-center gap-2 text-sm">
               {team.plan.name}
               <Badge variant="secondary">
-                {money(team.plan.base_amount, team.plan.currency)} / month
+                {money(team.plan.minimum_amount, team.plan.currency)} / month
               </Badge>
             </span>
           </DetailRow>
@@ -125,9 +149,13 @@ function TeamBillingSections({ team }: { team: TeamBilling }) {
                 {line.included === undefined
                   ? ""
                   : ` of ${line.included.toLocaleString()} included`}
+                {line.amount > 0 ? `, ${money(line.amount, team.plan.currency)}` : ""}
               </span>
             </DetailRow>
           ))}
+          <DetailRow label="This month so far" align="center" divider>
+            <span className="text-sm">{estimate(team)}</span>
+          </DetailRow>
           <DetailRow label="Payment method" align="center" divider>
             <span className="text-sm">
               {team.payment_method
@@ -190,13 +218,45 @@ function TeamBillingSections({ team }: { team: TeamBilling }) {
   );
 }
 
-function money(minor: number, currency: string): string {
-  return new Intl.NumberFormat(undefined, { style: "currency", currency }).format(minor / 100);
+/**
+ * The plan's credit and what is billed past it, as one bar: the credit usage
+ * drew, then on-demand charges, against the credit or the total, whichever
+ * is larger. Free has no credit, so it shows none.
+ */
+function CreditSummary({ usage }: { usage: TeamUsage }) {
+  const { credit, on_demand_amount: onDemand, plan } = usage;
+  const scale = Math.max(credit.amount, credit.used + onDemand);
+  return (
+    <Card className={`${DETAIL_CARD} mb-4`}>
+      <CardContent className="flex flex-col gap-4 px-6 py-5">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-sm text-muted-foreground">Included credit</p>
+            <p className="font-medium tabular-nums">
+              {money(credit.used, plan.currency)} / {money(credit.amount, plan.currency)}
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="text-sm text-muted-foreground">On-demand charges</p>
+            <p className="font-medium tabular-nums">{money(onDemand, plan.currency)}</p>
+          </div>
+        </div>
+        <div className="flex h-2 gap-0.5 overflow-hidden rounded-full bg-muted">
+          <div className="bg-chart-1" style={{ width: `${(credit.used / scale) * 100}%` }} />
+          <div className="bg-chart-4" style={{ width: `${(onDemand / scale) * 100}%` }} />
+        </div>
+      </CardContent>
+    </Card>
+  );
 }
 
-/** Stripe's period, in UTC as Stripe counts it; its end is exclusive, so the last day shows. */
-function period({ start, end }: TeamBilling["period"]): string {
-  const format = (at: number) =>
-    new Date(at).toLocaleDateString(undefined, { day: "numeric", month: "short", timeZone: "UTC" });
-  return `${format(Date.parse(start))} to ${format(Date.parse(end) - 1)}`;
+/**
+ * The period's bill so far at list prices. On Free, once usage is past an
+ * allowance, it is what Pro would bill instead.
+ */
+function estimate({ plan, estimate }: TeamBilling): string {
+  const total = money(estimate.total_amount, estimate.currency);
+  return plan.id === "free" && estimate.plan !== "free"
+    ? `${total} on Pro, as this usage is past Free's allowances`
+    : total;
 }

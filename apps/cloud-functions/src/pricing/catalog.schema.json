@@ -1,0 +1,231 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://zitadel.com/schemas/cloud-price-catalog.schema.json",
+  "title": "Zitadel price catalog",
+  "type": "object",
+  "required": ["id", "version", "status", "currency", "plans", "meters", "licensed", "self_hosted"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "id": { "type": "string" },
+    "version": { "type": "string", "description": "Date of the price list, plus a revision number" },
+    "status": { "enum": ["proposal", "decided", "live"] },
+    "source": { "type": "string", "format": "uri" },
+    "currency": { "const": "usd" },
+    "decided": { "type": "array", "items": { "type": "string" }, "description": "Paths of the entries the owner has settled" },
+    "conventions": { "type": "object", "additionalProperties": { "type": "string" } },
+    "plans": {
+      "type": "object",
+      "required": ["free", "pro", "enterprise"],
+      "additionalProperties": false,
+      "properties": {
+        "free": { "$ref": "#/$defs/plan" },
+        "pro": { "$ref": "#/$defs/plan" },
+        "enterprise": { "$ref": "#/$defs/plan" }
+      }
+    },
+    "meters": { "type": "array", "items": { "$ref": "#/$defs/meter" }, "minItems": 1 },
+    "licensed": { "type": "array", "items": { "$ref": "#/$defs/licensed" } },
+    "self_hosted": { "$ref": "#/$defs/self_hosted" },
+    "future": { "type": "array", "items": { "$ref": "#/$defs/future" } }
+  },
+  "$defs": {
+    "plan_id": { "enum": ["free", "pro", "enterprise"] },
+    "money": { "type": ["number", "null"], "minimum": 0 },
+    "plan": {
+      "type": "object",
+      "required": ["label", "minimum", "delivery_modes", "support"],
+      "properties": {
+        "label": { "type": "string" },
+        "minimum": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "required": ["is_credit", "credit_applies_to"],
+              "properties": {
+                "amount": { "$ref": "#/$defs/money" },
+                "interval": { "enum": ["month", "year"] },
+                "tiers_per_year": { "type": "object", "additionalProperties": { "type": "number" } },
+                "is_credit": { "type": "boolean" },
+                "credit_applies_to": { "const": "metered" }
+              }
+            }
+          ]
+        },
+        "annual": { "type": "object" },
+        "card_required": { "type": "boolean" },
+        "limits": { "type": "object" },
+        "over_allowance": { "type": "string" },
+        "event_retention_days": { "type": "integer" },
+        "attribution_mark": { "enum": ["shown", "hideable"] },
+        "custom_domains_included": { "type": "integer" },
+        "delivery_modes": { "type": "array", "items": { "enum": ["dev_inbox", "own_provider", "managed"] } },
+        "support": { "type": "string" },
+        "sla": { "type": ["object", "null"] },
+        "rates": { "type": "string" },
+        "regions": { "type": ["array", "string"] }
+      }
+    },
+    "price": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "required": ["model", "unit_amount"],
+          "properties": {
+            "model": { "const": "per_unit" },
+            "unit_amount": { "type": "number", "minimum": 0 },
+            "display": { "type": "string" },
+            "note": { "type": "string" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["model", "above", "size", "amount", "until", "opt_in"],
+          "properties": {
+            "model": { "const": "bands" },
+            "above": { "type": "integer" },
+            "size": { "type": "integer" },
+            "amount": { "type": "number" },
+            "until": { "type": "integer" },
+            "opt_in": { "type": "boolean" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["model", "bands"],
+          "properties": {
+            "model": { "const": "per_band" },
+            "bands": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["id", "per_user", "extra_message"],
+                "properties": {
+                  "id": { "type": "string" },
+                  "countries": { "type": "array", "items": { "type": "string", "pattern": "^[A-Z]{2}$" } },
+                  "per_user": { "$ref": "#/$defs/money" },
+                  "extra_message": { "$ref": "#/$defs/money" },
+                  "note": { "type": "string" }
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "meter": {
+      "type": "object",
+      "required": ["id", "label", "kind", "counts", "dedupe", "allowance", "price", "security", "source"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9_]+$", "description": "Also the Stripe meter's event name" },
+        "label": { "type": "string" },
+        "kind": { "enum": ["users", "activity", "gauge"] },
+        "counts": { "type": "string" },
+        "dedupe": {
+          "oneOf": [
+            { "type": "null" },
+            { "type": "array", "items": { "enum": ["project", "user", "policy", "band", "month"] }, "contains": { "const": "month" } }
+          ],
+          "description": "The key a subject is counted once by; null for activity meters"
+        },
+        "allowance": { "type": ["integer", "null"], "minimum": 0, "description": "Free per account and month, on every plan" },
+        "price": { "$ref": "#/$defs/price" },
+        "pool": {
+          "type": "object",
+          "required": ["meter", "per_user"],
+          "properties": { "meter": { "type": "string" }, "per_user": { "type": "integer", "minimum": 1 } },
+          "additionalProperties": false,
+          "description": "Activity included per counted user, pooled across the account"
+        },
+        "pool_of": { "type": "string", "description": "The user meter whose pool this activity meter draws on first" },
+        "plans": { "type": "array", "items": { "$ref": "#/$defs/plan_id" }, "description": "Plans that may use it; every plan when absent" },
+        "security": { "type": "boolean", "description": "A cap on it alerts and never switches enforcement off" },
+        "tag": { "enum": ["minimum spend", "metered feature", "delivered cost", "scale", "compliance", "certification", "support", null] },
+        "source": {
+          "type": "object",
+          "required": ["where", "exists"],
+          "properties": { "where": { "type": "string" }, "exists": { "type": "string" } }
+        },
+        "stripe": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "required": ["event_name", "aggregation", "price_lookup_key"],
+              "properties": {
+                "event_name": { "type": "string" },
+                "aggregation": { "const": "sum" },
+                "price_lookup_key": { "type": "string" }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "licensed": {
+      "type": "object",
+      "required": ["id", "label", "amount", "interval", "plans", "tag"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9_]+$" },
+        "label": { "type": "string" },
+        "amount": { "$ref": "#/$defs/money" },
+        "interval": { "enum": ["month", "year", "hour"] },
+        "per": { "type": "string" },
+        "plans": { "type": "array", "items": { "$ref": "#/$defs/plan_id" } },
+        "included_in": { "type": "array", "items": { "$ref": "#/$defs/plan_id" } },
+        "grants_credit": { "$ref": "#/$defs/money" },
+        "note": { "type": "string" },
+        "tag": { "enum": ["minimum spend", "metered feature", "delivered cost", "scale", "compliance", "certification", "support"] }
+      }
+    },
+    "self_hosted": {
+      "type": "object",
+      "required": ["unit", "metered", "free", "pro", "enterprise"],
+      "properties": {
+        "unit": { "type": "string" },
+        "metered": { "const": false, "description": "Rule 8: self-hosting is never metered" },
+        "free": { "type": "object" },
+        "pro": {
+          "type": "object",
+          "required": ["prices", "includes", "ticket_cap_per_year"],
+          "properties": {
+            "prices": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["installations_up_to", "amount", "interval"],
+                "properties": {
+                  "installations_up_to": { "type": "integer", "minimum": 1 },
+                  "amount": { "type": "number" },
+                  "interval": { "const": "year" }
+                }
+              }
+            },
+            "includes": { "type": "array", "items": { "type": "string" } },
+            "ticket_cap_per_year": { "type": "integer" },
+            "purchase": { "type": "string" }
+          }
+        },
+        "enterprise": { "type": "object" }
+      }
+    },
+    "future": {
+      "type": "object",
+      "required": ["id", "label", "price"],
+      "properties": {
+        "id": { "type": "string" },
+        "label": { "type": "string" },
+        "free_part": { "type": "string" },
+        "paid_part": { "type": "string" },
+        "price": { "$ref": "#/$defs/price" },
+        "needs": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}
