@@ -411,7 +411,7 @@ func TestDeploymentServiceDeployExpandsPrimary(t *testing.T) {
 	expectProjectOrigins(statements, appPrimary)
 	expectInsert(statements, expectServing(statements, nil), emptyVariableSet())
 
-	result, err := svc.Deploy(t.Context(), service.DeployInput{ProjectID: "proj_1", ReleaseID: "rel_1"})
+	result, err := svc.Deploy(t.Context(), service.DeployInput{ProjectID: "proj_1", ReleaseID: "rel_1", Primary: true})
 	require.NoError(t, err)
 	assert.True(t, result.Created)
 	assert.Equal(t, []string{appOrigin}, result.Deployment.Origins())
@@ -421,7 +421,7 @@ func TestDeploymentServiceDeployRejects(t *testing.T) {
 	t.Run("a ttl for primary origins", func(t *testing.T) {
 		svc, statements := newMockedDeploymentService(t)
 		expectProjectOrigins(statements, appPrimary)
-		_, err := svc.Deploy(t.Context(), service.DeployInput{ProjectID: "proj_1", ReleaseID: "rel_1", TTL: new(time.Hour)})
+		_, err := svc.Deploy(t.Context(), service.DeployInput{ProjectID: "proj_1", ReleaseID: "rel_1", Primary: true, TTL: new(time.Hour)})
 		assertServiceDomainCode(t, err, domain.ErrDeploymentInvalid().Code)
 		assert.ErrorContains(t, err, "ttl is only valid for preview URLs")
 	})
@@ -429,7 +429,7 @@ func TestDeploymentServiceDeployRejects(t *testing.T) {
 	t.Run("a ttl above the maximum for primary origins", func(t *testing.T) {
 		svc, statements := newMockedDeploymentService(t)
 		expectProjectOrigins(statements, appPrimary)
-		_, err := svc.Deploy(t.Context(), service.DeployInput{ProjectID: "proj_1", ReleaseID: "rel_1", TTL: new(domain.MaxPreviewTTL + time.Second)})
+		_, err := svc.Deploy(t.Context(), service.DeployInput{ProjectID: "proj_1", ReleaseID: "rel_1", Primary: true, TTL: new(domain.MaxPreviewTTL + time.Second)})
 		assertServiceDomainCode(t, err, domain.ErrDeploymentInvalid().Code)
 		assert.ErrorContains(t, err, "ttl is only valid for preview URLs")
 	})
@@ -459,7 +459,7 @@ func TestDeploymentServiceDeployRejects(t *testing.T) {
 	t.Run("a missing project", func(t *testing.T) {
 		svc, statements := newMockedDeploymentService(t)
 		statements.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(nil, database.NewNoRowFoundError(nil))
-		_, err := svc.Deploy(t.Context(), service.DeployInput{ProjectID: "proj_1", ReleaseID: "rel_1"})
+		_, err := svc.Deploy(t.Context(), service.DeployInput{ProjectID: "proj_1", ReleaseID: "rel_1", Primary: true})
 		assertServiceDomainCode(t, err, domain.ErrProjectNotFound().Code)
 	})
 }

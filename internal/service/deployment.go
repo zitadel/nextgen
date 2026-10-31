@@ -35,14 +35,15 @@ type CreateDeploymentOutput struct {
 	Created    bool
 }
 
-// DeployInput names where a release goes: PreviewURLs, or with none every
-// primary origin.
+// DeployInput names where a release goes: Primary for every primary origin, or
+// PreviewURLs.
 type DeployInput struct {
 	// TTL is the request's ttl, which only a preview deploy takes; nil uses
 	// domain.DefaultPreviewTTL.
 	TTL                  *time.Duration
 	ProjectID            string
 	ReleaseID            string
+	Primary              bool
 	PreviewURLs          []string
 	Reason               domain.DeploymentReason
 	Message              *string
@@ -146,7 +147,7 @@ func (s *DeploymentService) Deploy(ctx context.Context, input DeployInput) (_ *C
 	if err != nil {
 		return nil, err
 	}
-	kind, resolved, err := domain.ResolveDeploymentTargets(origins, input.PreviewURLs)
+	kind, resolved, err := domain.ResolveDeploymentTargets(origins, input.Primary, input.PreviewURLs)
 	if err != nil {
 		return nil, err
 	}

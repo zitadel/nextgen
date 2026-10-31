@@ -63,8 +63,8 @@ const KIND_HINT: Record<OriginKind, string> = {
  * the form sends what was typed and shows the refusal's own message inline
  * (ADR 030), so the console never forks the validation.
  *
- * **An empty list is a state, not a gap.** The API admits every origin until
- * the first pattern is added, so the line in place of the rows says so.
+ * **An empty list is a state, not a gap.** The API admits only loopback origins
+ * until the first pattern is added, so the line in place of the rows says so.
  */
 export function ProjectOrigins({
   projectId,
@@ -87,7 +87,7 @@ export function ProjectOrigins({
     >
       {rows.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          No origins yet. Every origin is admitted until the first pattern is added.
+          No origins yet. Only a loopback origin is admitted until the first pattern is added.
         </p>
       ) : (
         <ul className="flex flex-col">
@@ -365,8 +365,7 @@ function OriginForm({
  * original is put back and the refusal shown, so the project ends as it
  * began; should that fail too, the page is reloaded and the message says
  * what is left. Between the two requests the origin is absent for a moment,
- * and a project whose only origin this is admits every origin for that
- * moment.
+ * and a project whose only origin this is refuses it for that moment.
  */
 async function replaceOrigin(
   projectId: string,
@@ -393,8 +392,8 @@ async function replaceOrigin(
 /**
  * The remove confirmation. A primary origin's copy names the host whose
  * sign-ins stop; a preview pattern's says what can no longer register. The
- * project's only origin is different: without it the API admits every
- * origin, so the copy says that rather than promising a lockout.
+ * project's only origin is different: without it the API admits only loopback
+ * origins, so the copy says that.
  */
 function RemoveOriginDialog({
   projectId,
@@ -418,7 +417,7 @@ function RemoveOriginDialog({
       title="Remove origin?"
       description={
         last
-          ? "This is the project's only origin. Without it every origin is admitted, until the next one is added."
+          ? "This is the project's only origin. Without it only a loopback origin is admitted, until the next one is added."
           : origin.kind === "primary"
             ? `Sign-ins from this URL are rejected right away. Users on ${hostOf(origin.pattern)} can no longer log in.`
             : `Preview deploys can no longer register URLs under ${origin.pattern}. Live previews are untouched.`

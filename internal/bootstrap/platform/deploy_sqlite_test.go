@@ -139,6 +139,7 @@ func TestEnsureDeployedSQLiteStartsWhenItsContentIsRevoked(t *testing.T) {
 	_, err = deployments.Deploy(ctx, service.DeployInput{
 		ProjectID: domain.PlatformProjectID,
 		ReleaseID: other.Release.ID,
+		Primary:   true,
 		Reason:    domain.DeploymentReasonDeploy,
 	})
 	require.NoError(t, err)

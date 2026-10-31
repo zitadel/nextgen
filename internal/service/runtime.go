@@ -236,6 +236,10 @@ type matchedOrigin struct {
 func (r *RuntimeResolver) gateOpening(ctx context.Context, project *domain.Project, origin string) (*matchedOrigin, error) {
 	matched, err := r.Gate(ctx, project, origin)
 	if err == nil {
+		// Gate admits every loopback origin, the console's on a local server too.
+		if matched != nil && matched.pattern == "" && r.isOwnOrigin(origin) {
+			matched.miss = missDefault
+		}
 		return matched, nil
 	}
 	if !r.isOwnOrigin(origin) || !errors.Is(err, domain.ErrProjectOriginNotAllowed(nil)) {
@@ -273,10 +277,13 @@ func (r *RuntimeResolver) Gate(ctx context.Context, project *domain.Project, ori
 		return nil, domain.ErrProjectOriginNotAllowed(map[string]string{"origin": origin}).
 			WithMessage(origin + " is not an origin of this project")
 	}
+	entry, ok := domain.MatchOrigin(project.Origins, normalized)
 	if domain.IsLoopbackOrigin(normalized) {
+		if ok && entry.Kind == domain.OriginKindPrimary {
+			return &matchedOrigin{origin: normalized, pattern: entry.Pattern}, nil
+		}
 		return &matchedOrigin{origin: normalized}, nil
 	}
-	entry, ok := domain.MatchOrigin(project.Origins, normalized)
 	if !ok {
 		return nil, domain.ErrProjectOriginNotAllowed(map[string]string{"origin": normalized}).
 			WithMessage(normalized + " is not an origin of this project")
