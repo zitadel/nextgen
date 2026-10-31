@@ -8,6 +8,7 @@ import { cliCommand, cliSample } from "@/lib/cli-sample";
 import { codeOptions } from "@/lib/code-theme";
 import { authentication, sdkSample } from "@/lib/sdk-sample";
 
+import { ProjectPickerProvider } from "./project-picker";
 import {
   SessionUserContext,
   sessionAuthProvider,
@@ -30,7 +31,9 @@ export function OpenAPIPage(props: OpenAPIPageProps_Spec) {
   );
   return (
     <SessionUserContext value={user}>
-      <OperationPage {...props} payload={readerPayload} />
+      <ProjectPickerProvider>
+        <OperationPage {...props} payload={readerPayload} />
+      </ProjectPickerProvider>
     </SessionUserContext>
   );
 }

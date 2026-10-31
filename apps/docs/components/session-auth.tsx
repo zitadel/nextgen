@@ -4,6 +4,8 @@ import type { AuthProvider } from "fumadocs-openapi/playground";
 import { ShieldCheck } from "lucide-react";
 import { createContext, use, useEffect, useSyncExternalStore } from "react";
 
+import { SessionProjectPicker } from "./project-picker";
+
 // The playground sends a request that accepts the session cookie with the
 // reader's own session. On the cloud the docs, the Console and the API share
 // one origin (vercel.json), the spec's server is that origin, and the
@@ -119,27 +121,30 @@ function SessionNote() {
   const user = use(SessionUserContext);
 
   return (
-    <div className="flex gap-2 border-b px-4 py-2.5 text-xs text-fd-muted-foreground last:border-b-0">
-      <ShieldCheck className="mt-px size-3.5 shrink-0" />
-      <p className="min-w-0 flex-1 [&_a]:underline">
-        {user === undefined && "Checking your session…"}
-        {user === null && (
-          <>
-            Sign in to the <a href="/console/">Console</a> and this request is sent with your
-            session.
-          </>
-        )}
-        {user && (
-          <>
-            Sent with your session, signed in as{" "}
-            <span className="font-medium text-fd-foreground">
-              {user.display ?? user.identifier ?? user.user_id}
-            </span>
-            .
-          </>
-        )}
-      </p>
-    </div>
+    <>
+      <div className="flex gap-2 border-b px-4 py-2.5 text-xs text-fd-muted-foreground last:border-b-0">
+        <ShieldCheck className="mt-px size-3.5 shrink-0" />
+        <p className="min-w-0 flex-1 [&_a]:underline">
+          {user === undefined && "Checking your session…"}
+          {user === null && (
+            <>
+              Sign in to the <a href="/console/">Console</a> and this request is sent with your
+              session.
+            </>
+          )}
+          {user && (
+            <>
+              Sent with your session, signed in as{" "}
+              <span className="font-medium text-fd-foreground">
+                {user.display ?? user.identifier ?? user.user_id}
+              </span>
+              .
+            </>
+          )}
+        </p>
+      </div>
+      <SessionProjectPicker user={user} beforeRequest={withReaderSession} />
+    </>
   );
 }
 
