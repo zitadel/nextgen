@@ -90,6 +90,9 @@ export const update = <B, U>(
 const checked = Symbol("checked");
 type Checked = ResourceDescriptor<Platform> & { readonly [checked]: true };
 
+/** A registry of descriptors `resource()` checked: the type `RESOURCES` satisfies. */
+export type CheckedRegistry = ResourceRegistry<Platform> & Readonly<Record<string, Checked>>;
+
 // The fields a write answers with: any field when the resource has no such
 // write, and those of its body when it can also answer without one.
 type WrittenField<W> = unknown extends W ? PropertyKey : keyof Exclude<W, void>;
@@ -665,7 +668,7 @@ export const RESOURCES = {
       },
     }),
   }),
-} satisfies ResourceRegistry<Platform> & Readonly<Record<string, Checked>>;
+} satisfies CheckedRegistry;
 
 /**
  * The `<resource> <verb>` commands, ready for the explicit command table. They

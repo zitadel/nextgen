@@ -148,6 +148,20 @@ describe("sendAll", () => {
     expect(response.body).toEqual({ users: LETTERS, next_page_token: "" });
   });
 
+  it("refuses a page without its list, carrying the response", async () => {
+    server.use(
+      http.get(`${SERVER}/users/user_1/passkeys`, () => HttpResponse.json({ next_page_token: "" })),
+    );
+
+    await expect(
+      sendAll(SERVER, "s", requestFor("listUserPasskeys", [], ["user_1"])),
+    ).rejects.toMatchObject({
+      code: "E_VALIDATION",
+      message: 'Unexpected list response: missing "passkeys" array',
+      details: { response: { next_page_token: "" } },
+    });
+  });
+
   it("starts from the page the caller named in the query", async () => {
     server.use(
       http.get(`${SERVER}/users/user_1/passkeys`, ({ request }) => {

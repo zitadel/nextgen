@@ -1,7 +1,5 @@
 import { nextToken } from "@zitadel/api/runtime/paging";
 
-import { ZitadelError } from "../../errors";
-
 /**
  * The first page of `source`, or with `all` every page in order, as one list
  * of the items `items` takes from each page. `next` is the cursor to the page
@@ -24,15 +22,7 @@ export const collectPages = async <P, T>(
   // copy every record once per remaining page.
   const collected: T[] = [];
   for await (const page of source) {
-    try {
-      collected.push(...items(page));
-    } catch (error) {
-      throw new ZitadelError(
-        "E_VALIDATION",
-        error instanceof Error ? error.message : "Unexpected list response",
-        { details: { response: page } },
-      );
-    }
+    collected.push(...items(page));
     if (!all) {
       return { items: collected, next: next(page) ?? null };
     }

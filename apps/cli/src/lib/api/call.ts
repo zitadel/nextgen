@@ -2,6 +2,7 @@ import { ApiError, request as fetchWithPolicy } from "@zitadel/api/runtime/fetch
 import { itemsOf, pages } from "@zitadel/api/runtime/paging";
 
 import { REQUEST_TIMEOUT_MS, sanitizeRejection, sanitizeResponse } from "../api-client";
+import { ZitadelError } from "../errors";
 import { interruptSignal } from "../interrupt";
 import { collectPages } from "../oclif/crud/paging";
 import { type ApiRequest, urlOf } from "./request";
@@ -102,7 +103,16 @@ export const sendAll = async (
       return last.body;
     }),
     {
-      items: (body) => itemsOf(body, paging.items),
+      // The one list read by a field named only at runtime, so the one checked.
+      items: (body) => {
+        try {
+          return itemsOf(body, paging.items);
+        } catch (error) {
+          throw new ZitadelError("E_VALIDATION", (error as TypeError).message, {
+            details: { response: body },
+          });
+        }
+      },
       all: true,
     },
   );

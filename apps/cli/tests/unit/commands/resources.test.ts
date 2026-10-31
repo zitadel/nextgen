@@ -17,6 +17,7 @@ import {
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 
 import {
+  type CheckedRegistry,
   create,
   get,
   list,
@@ -2061,17 +2062,19 @@ describe("the registry builders", () => {
   });
 
   it("refuses an entry resource() did not check", () => {
-    // @ts-expect-error a plain descriptor skips every check above
-    const plain: ReturnType<typeof resource> = {
-      singular: "user",
-      idField: "id",
-      columns: ["id"],
-      heading: "identifier",
-      detail: ["id"],
-      list: users,
-      get: user,
-    };
+    const registry = {
+      // @ts-expect-error a plain descriptor skips every check above
+      users: {
+        singular: "user",
+        idField: "id",
+        columns: ["id"],
+        heading: "identifier",
+        detail: ["id"],
+        list: users,
+        get: user,
+      },
+    } satisfies CheckedRegistry;
 
-    expect(plain.singular).toBe("user");
+    expect(Object.keys(registry)).toEqual(["users"]);
   });
 });

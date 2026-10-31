@@ -56,36 +56,4 @@ describe("collectPages", () => {
       }),
     ).resolves.toEqual({ items: [1], next: "c2" });
   });
-
-  it("fails a page it cannot read as a validation error carrying the response", async () => {
-    const { walk } = source({ users: [1] });
-    await expect(
-      collectPages(walk, {
-        items: () => {
-          throw new TypeError("Unexpected list response");
-        },
-        all: false,
-      }),
-    ).rejects.toMatchObject({
-      code: "E_VALIDATION",
-      message: "Unexpected list response",
-      details: { response: { users: [1] } },
-    });
-  });
-
-  it("fails a page it cannot read with a message even when the reader throws a non-Error", async () => {
-    const { walk } = source({ users: [1] });
-    await expect(
-      collectPages(walk, {
-        items: () => {
-          throw "unreadable";
-        },
-        all: false,
-      }),
-    ).rejects.toMatchObject({
-      code: "E_VALIDATION",
-      message: "Unexpected list response",
-      details: { response: { users: [1] } },
-    });
-  });
 });
