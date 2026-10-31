@@ -441,5 +441,5 @@ the components README.
 There is no project default target, and a newest deployment to an origin here is
 the deployment that origin serves under
 [ADR 085](085-which-release-serves-a-request.md): for a primary origin, the
-project's newest primary deployment while that deployment names it. A client credentials
-request still never resolves from its `Origin` header.
+project's newest primary deployment while that deployment names it. A client
+credentials request still never resolves from its `Origin` header.

@@ -153,8 +153,8 @@ still read the newest revisions, because no release serves them.
   lists one anyway.
 - Callers with no `Origin` cannot stay on an older release than the web origins.
 - A rollback drops every listed origin the restored deployment does not name, and
-  those refuse until the next deploy. `zitadel deployment rollback` names them
-  before it asks.
+  those refuse until the next deploy. `zitadel deployment rollback` and the
+  console name them first.
 - A dev server on a loopback origin the project does not list, such as `:5173`
   with `:3000` listed, answers `409 rel.not_deployed`.
 - The console's login preview of a project it does not list shows the newest

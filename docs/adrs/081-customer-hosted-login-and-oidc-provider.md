@@ -577,5 +577,6 @@ components READMEs, the API spec's `hint.login_name` description, and the
 There is no project default target, and §10's newest deployment to an origin is
 the deployment that origin serves under
 [ADR 085](085-which-release-serves-a-request.md): for a primary origin, the
-project's newest primary deployment while that deployment names it. The token endpoint still
-takes its deployment from the code and never resolves from an `Origin`.
+project's newest primary deployment while that deployment names it. The token
+endpoint still takes its deployment from the code and never resolves from an
+`Origin`.
