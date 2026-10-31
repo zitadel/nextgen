@@ -9,7 +9,7 @@
 The same object is:
 
 - the request body of `POST /branding`, which publishes it as a new immutable revision ([`api/openapi/endpoints/branding/`](../../../api/openapi/endpoints/branding/));
-- a read-only projection on flow responses, carrying the project's latest revision and falling back to the maintained defaults;
+- a read-only projection on flow responses, carrying the revision the request's release pins and falling back to the maintained defaults;
 - the local `.zitadel/branding/` descriptor that `zitadel apply` publishes ([`templates.md`](templates.md) § Authoring workflow).
 
 It is written through the Branding API or `zitadel apply`, never through the Flow API. Audience overrides on the app → team → project ladder are a later resolution-rule evolution ([ADR 040](../../adrs/040-tenant-login-templates-editable-config.md)).

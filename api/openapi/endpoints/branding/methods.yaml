@@ -4,7 +4,8 @@ post:
   description: |
     Publishes a new immutable branding revision for the project. Branding
     revisions cannot be updated or deleted; every edit publishes a new
-    revision, and flow responses resolve the latest revision per project.
+    revision, and flow responses carry the revision the request's release
+    pins.
 
     The `liquid_template` is validated lexically on save (size, encoding,
     banned patterns such as `<script>` tags, inline event handlers, and the

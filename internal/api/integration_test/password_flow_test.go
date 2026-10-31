@@ -26,7 +26,6 @@ import (
 func TestPasswordLoginFlow(t *testing.T) {
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
-	deployPrimary(t, project.ID)
 
 	team, err := harness.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{
 		ProjectID: project.ID,
@@ -76,6 +75,7 @@ func TestPasswordLoginFlow(t *testing.T) {
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowDefinitionResponse{}, defResp, "create flow definition: %s", helpers.MustMarshal(t, defResp))
 
+	deployPrimary(t, project.ID)
 	createResp, err := client.CreateFlow(t.Context(), &api.CreateFlowRequest{
 		ProjectID: api.ProjectID(project.ID),
 		Purpose:   api.CreateFlowRequestPurposeLogin,
@@ -130,7 +130,6 @@ func TestPasswordLoginFlow(t *testing.T) {
 func TestPasswordLoginFlow_UnknownEmail(t *testing.T) {
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
-	deployPrimary(t, project.ID)
 
 	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
 
@@ -146,6 +145,7 @@ func TestPasswordLoginFlow_UnknownEmail(t *testing.T) {
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowDefinitionResponse{}, defResp, "create flow definition: %s", helpers.MustMarshal(t, defResp))
 
+	deployPrimary(t, project.ID)
 	createResp, err := client.CreateFlow(t.Context(), &api.CreateFlowRequest{
 		ProjectID: api.ProjectID(project.ID),
 		Purpose:   api.CreateFlowRequestPurposeLogin,
@@ -182,7 +182,6 @@ func TestPasswordLoginFlow_UnknownEmail(t *testing.T) {
 func TestPasswordRegisterFlow(t *testing.T) {
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
-	deployPrimary(t, project.ID)
 
 	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
 
@@ -198,6 +197,7 @@ func TestPasswordRegisterFlow(t *testing.T) {
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowDefinitionResponse{}, defResp, "create flow definition: %s", helpers.MustMarshal(t, defResp))
 
+	deployPrimary(t, project.ID)
 	createResp, err := client.CreateFlow(t.Context(), &api.CreateFlowRequest{
 		ProjectID: api.ProjectID(project.ID),
 		Purpose:   api.CreateFlowRequestPurposeRegister,
@@ -259,7 +259,6 @@ func TestPasswordRegisterFlow(t *testing.T) {
 func TestPasswordRegisterFlow_PasswordOverTheCap(t *testing.T) {
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
-	deployPrimary(t, project.ID)
 	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
 
 	server := harness.EnsureTestServer(t)
@@ -274,6 +273,7 @@ func TestPasswordRegisterFlow_PasswordOverTheCap(t *testing.T) {
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowDefinitionResponse{}, defResp)
 
+	deployPrimary(t, project.ID)
 	createResp, err := client.CreateFlow(t.Context(), &api.CreateFlowRequest{
 		ProjectID: api.ProjectID(project.ID),
 		Purpose:   api.CreateFlowRequestPurposeRegister,
@@ -322,7 +322,6 @@ func TestPasswordRegisterFlow_PasswordOverTheCap(t *testing.T) {
 func TestPasswordRegisterFlow_DuplicateEmail(t *testing.T) {
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
-	deployPrimary(t, project.ID)
 
 	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
 
@@ -356,6 +355,7 @@ func TestPasswordRegisterFlow_DuplicateEmail(t *testing.T) {
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowDefinitionResponse{}, defResp)
 
+	deployPrimary(t, project.ID)
 	createResp, err := client.CreateFlow(t.Context(), &api.CreateFlowRequest{
 		ProjectID: api.ProjectID(project.ID),
 		Purpose:   api.CreateFlowRequestPurposeRegister,

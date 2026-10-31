@@ -8336,7 +8336,7 @@ func (*BeginUserPasskeyRegistrationUnauthorized) beginUserPasskeyRegistrationRes
 // Branding configuration, used in two places with one shape: as the request
 // body of `POST /branding`, which publishes it as a new immutable revision,
 // and as a read-only projection on flow responses, which carries the
-// project's latest revision. Locally it is the `.zitadel/branding/` descriptor
+// revision the request's release pins. Locally it is the `.zitadel/branding/` descriptor
 // that `zitadel apply` publishes.
 // Every field is optional. An omitted key uses Zitadel's maintained default,
 // so a revision carrying one colour is as valid as one carrying the whole
@@ -12582,17 +12582,24 @@ func NewSchemaURLConfigurationBundleSchemasItem(v SchemaURL) ConfigurationBundle
 
 // CreateAuthAttemptErrorResponse represents sum type.
 type CreateAuthAttemptErrorResponse struct {
-	Type                CreateAuthAttemptErrorResponseType // switch on this field
-	AttInvalidRequest   AttInvalidRequest
-	AuthUnauthorized    AuthUnauthorized
-	EncKeyDecryptFailed EncKeyDecryptFailed
-	EvtInvalid          EvtInvalid
-	Internal            Internal
-	NotImplemented      NotImplemented
-	ProjMismatch        ProjMismatch
-	ReqInvalid          ReqInvalid
-	EncKeyUnknownAlg    EncKeyUnknownAlg
-	Unavailable         Unavailable
+	Type                 CreateAuthAttemptErrorResponseType // switch on this field
+	AttInvalidRequest    AttInvalidRequest
+	AuthUnauthorized     AuthUnauthorized
+	EncKeyDecryptFailed  EncKeyDecryptFailed
+	EvtInvalid           EvtInvalid
+	Internal             Internal
+	NotImplemented       NotImplemented
+	ProjMismatch         ProjMismatch
+	ProjNotFound         ProjNotFound
+	ProjOriginNotAllowed ProjOriginNotAllowed
+	ProjPreviewNotLive   ProjPreviewNotLive
+	RelNoDefault         RelNoDefault
+	RelNotDeployed       RelNotDeployed
+	RelNotFound          RelNotFound
+	RelRevoked           RelRevoked
+	ReqInvalid           ReqInvalid
+	EncKeyUnknownAlg     EncKeyUnknownAlg
+	Unavailable          Unavailable
 }
 
 // CreateAuthAttemptErrorResponseType is oneOf type of CreateAuthAttemptErrorResponse.
@@ -12600,16 +12607,23 @@ type CreateAuthAttemptErrorResponseType string
 
 // Possible values for CreateAuthAttemptErrorResponseType.
 const (
-	AttInvalidRequestCreateAuthAttemptErrorResponse   CreateAuthAttemptErrorResponseType = "att.invalid_request"
-	AuthUnauthorizedCreateAuthAttemptErrorResponse    CreateAuthAttemptErrorResponseType = "auth.unauthorized"
-	EncKeyDecryptFailedCreateAuthAttemptErrorResponse CreateAuthAttemptErrorResponseType = "enc_key.decrypt_failed"
-	EvtInvalidCreateAuthAttemptErrorResponse          CreateAuthAttemptErrorResponseType = "evt.invalid"
-	InternalCreateAuthAttemptErrorResponse            CreateAuthAttemptErrorResponseType = "internal"
-	NotImplementedCreateAuthAttemptErrorResponse      CreateAuthAttemptErrorResponseType = "not_implemented"
-	ProjMismatchCreateAuthAttemptErrorResponse        CreateAuthAttemptErrorResponseType = "proj.mismatch"
-	ReqInvalidCreateAuthAttemptErrorResponse          CreateAuthAttemptErrorResponseType = "req.invalid"
-	EncKeyUnknownAlgCreateAuthAttemptErrorResponse    CreateAuthAttemptErrorResponseType = "enc_key.unknown_alg"
-	UnavailableCreateAuthAttemptErrorResponse         CreateAuthAttemptErrorResponseType = "unavailable"
+	AttInvalidRequestCreateAuthAttemptErrorResponse    CreateAuthAttemptErrorResponseType = "att.invalid_request"
+	AuthUnauthorizedCreateAuthAttemptErrorResponse     CreateAuthAttemptErrorResponseType = "auth.unauthorized"
+	EncKeyDecryptFailedCreateAuthAttemptErrorResponse  CreateAuthAttemptErrorResponseType = "enc_key.decrypt_failed"
+	EvtInvalidCreateAuthAttemptErrorResponse           CreateAuthAttemptErrorResponseType = "evt.invalid"
+	InternalCreateAuthAttemptErrorResponse             CreateAuthAttemptErrorResponseType = "internal"
+	NotImplementedCreateAuthAttemptErrorResponse       CreateAuthAttemptErrorResponseType = "not_implemented"
+	ProjMismatchCreateAuthAttemptErrorResponse         CreateAuthAttemptErrorResponseType = "proj.mismatch"
+	ProjNotFoundCreateAuthAttemptErrorResponse         CreateAuthAttemptErrorResponseType = "proj.not_found"
+	ProjOriginNotAllowedCreateAuthAttemptErrorResponse CreateAuthAttemptErrorResponseType = "proj.origin_not_allowed"
+	ProjPreviewNotLiveCreateAuthAttemptErrorResponse   CreateAuthAttemptErrorResponseType = "proj.preview_not_live"
+	RelNoDefaultCreateAuthAttemptErrorResponse         CreateAuthAttemptErrorResponseType = "rel.no_default"
+	RelNotDeployedCreateAuthAttemptErrorResponse       CreateAuthAttemptErrorResponseType = "rel.not_deployed"
+	RelNotFoundCreateAuthAttemptErrorResponse          CreateAuthAttemptErrorResponseType = "rel.not_found"
+	RelRevokedCreateAuthAttemptErrorResponse           CreateAuthAttemptErrorResponseType = "rel.revoked"
+	ReqInvalidCreateAuthAttemptErrorResponse           CreateAuthAttemptErrorResponseType = "req.invalid"
+	EncKeyUnknownAlgCreateAuthAttemptErrorResponse     CreateAuthAttemptErrorResponseType = "enc_key.unknown_alg"
+	UnavailableCreateAuthAttemptErrorResponse          CreateAuthAttemptErrorResponseType = "unavailable"
 )
 
 // IsAttInvalidRequest reports whether CreateAuthAttemptErrorResponse is AttInvalidRequest.
@@ -12645,6 +12659,41 @@ func (s CreateAuthAttemptErrorResponse) IsNotImplemented() bool {
 // IsProjMismatch reports whether CreateAuthAttemptErrorResponse is ProjMismatch.
 func (s CreateAuthAttemptErrorResponse) IsProjMismatch() bool {
 	return s.Type == ProjMismatchCreateAuthAttemptErrorResponse
+}
+
+// IsProjNotFound reports whether CreateAuthAttemptErrorResponse is ProjNotFound.
+func (s CreateAuthAttemptErrorResponse) IsProjNotFound() bool {
+	return s.Type == ProjNotFoundCreateAuthAttemptErrorResponse
+}
+
+// IsProjOriginNotAllowed reports whether CreateAuthAttemptErrorResponse is ProjOriginNotAllowed.
+func (s CreateAuthAttemptErrorResponse) IsProjOriginNotAllowed() bool {
+	return s.Type == ProjOriginNotAllowedCreateAuthAttemptErrorResponse
+}
+
+// IsProjPreviewNotLive reports whether CreateAuthAttemptErrorResponse is ProjPreviewNotLive.
+func (s CreateAuthAttemptErrorResponse) IsProjPreviewNotLive() bool {
+	return s.Type == ProjPreviewNotLiveCreateAuthAttemptErrorResponse
+}
+
+// IsRelNoDefault reports whether CreateAuthAttemptErrorResponse is RelNoDefault.
+func (s CreateAuthAttemptErrorResponse) IsRelNoDefault() bool {
+	return s.Type == RelNoDefaultCreateAuthAttemptErrorResponse
+}
+
+// IsRelNotDeployed reports whether CreateAuthAttemptErrorResponse is RelNotDeployed.
+func (s CreateAuthAttemptErrorResponse) IsRelNotDeployed() bool {
+	return s.Type == RelNotDeployedCreateAuthAttemptErrorResponse
+}
+
+// IsRelNotFound reports whether CreateAuthAttemptErrorResponse is RelNotFound.
+func (s CreateAuthAttemptErrorResponse) IsRelNotFound() bool {
+	return s.Type == RelNotFoundCreateAuthAttemptErrorResponse
+}
+
+// IsRelRevoked reports whether CreateAuthAttemptErrorResponse is RelRevoked.
+func (s CreateAuthAttemptErrorResponse) IsRelRevoked() bool {
+	return s.Type == RelRevokedCreateAuthAttemptErrorResponse
 }
 
 // IsReqInvalid reports whether CreateAuthAttemptErrorResponse is ReqInvalid.
@@ -12806,6 +12855,153 @@ func (s CreateAuthAttemptErrorResponse) GetProjMismatch() (v ProjMismatch, ok bo
 func NewProjMismatchCreateAuthAttemptErrorResponse(v ProjMismatch) CreateAuthAttemptErrorResponse {
 	var s CreateAuthAttemptErrorResponse
 	s.SetProjMismatch(v)
+	return s
+}
+
+// SetProjNotFound sets CreateAuthAttemptErrorResponse to ProjNotFound.
+func (s *CreateAuthAttemptErrorResponse) SetProjNotFound(v ProjNotFound) {
+	s.Type = ProjNotFoundCreateAuthAttemptErrorResponse
+	s.ProjNotFound = v
+}
+
+// GetProjNotFound returns ProjNotFound and true boolean if CreateAuthAttemptErrorResponse is ProjNotFound.
+func (s CreateAuthAttemptErrorResponse) GetProjNotFound() (v ProjNotFound, ok bool) {
+	if !s.IsProjNotFound() {
+		return v, false
+	}
+	return s.ProjNotFound, true
+}
+
+// NewProjNotFoundCreateAuthAttemptErrorResponse returns new CreateAuthAttemptErrorResponse from ProjNotFound.
+func NewProjNotFoundCreateAuthAttemptErrorResponse(v ProjNotFound) CreateAuthAttemptErrorResponse {
+	var s CreateAuthAttemptErrorResponse
+	s.SetProjNotFound(v)
+	return s
+}
+
+// SetProjOriginNotAllowed sets CreateAuthAttemptErrorResponse to ProjOriginNotAllowed.
+func (s *CreateAuthAttemptErrorResponse) SetProjOriginNotAllowed(v ProjOriginNotAllowed) {
+	s.Type = ProjOriginNotAllowedCreateAuthAttemptErrorResponse
+	s.ProjOriginNotAllowed = v
+}
+
+// GetProjOriginNotAllowed returns ProjOriginNotAllowed and true boolean if CreateAuthAttemptErrorResponse is ProjOriginNotAllowed.
+func (s CreateAuthAttemptErrorResponse) GetProjOriginNotAllowed() (v ProjOriginNotAllowed, ok bool) {
+	if !s.IsProjOriginNotAllowed() {
+		return v, false
+	}
+	return s.ProjOriginNotAllowed, true
+}
+
+// NewProjOriginNotAllowedCreateAuthAttemptErrorResponse returns new CreateAuthAttemptErrorResponse from ProjOriginNotAllowed.
+func NewProjOriginNotAllowedCreateAuthAttemptErrorResponse(v ProjOriginNotAllowed) CreateAuthAttemptErrorResponse {
+	var s CreateAuthAttemptErrorResponse
+	s.SetProjOriginNotAllowed(v)
+	return s
+}
+
+// SetProjPreviewNotLive sets CreateAuthAttemptErrorResponse to ProjPreviewNotLive.
+func (s *CreateAuthAttemptErrorResponse) SetProjPreviewNotLive(v ProjPreviewNotLive) {
+	s.Type = ProjPreviewNotLiveCreateAuthAttemptErrorResponse
+	s.ProjPreviewNotLive = v
+}
+
+// GetProjPreviewNotLive returns ProjPreviewNotLive and true boolean if CreateAuthAttemptErrorResponse is ProjPreviewNotLive.
+func (s CreateAuthAttemptErrorResponse) GetProjPreviewNotLive() (v ProjPreviewNotLive, ok bool) {
+	if !s.IsProjPreviewNotLive() {
+		return v, false
+	}
+	return s.ProjPreviewNotLive, true
+}
+
+// NewProjPreviewNotLiveCreateAuthAttemptErrorResponse returns new CreateAuthAttemptErrorResponse from ProjPreviewNotLive.
+func NewProjPreviewNotLiveCreateAuthAttemptErrorResponse(v ProjPreviewNotLive) CreateAuthAttemptErrorResponse {
+	var s CreateAuthAttemptErrorResponse
+	s.SetProjPreviewNotLive(v)
+	return s
+}
+
+// SetRelNoDefault sets CreateAuthAttemptErrorResponse to RelNoDefault.
+func (s *CreateAuthAttemptErrorResponse) SetRelNoDefault(v RelNoDefault) {
+	s.Type = RelNoDefaultCreateAuthAttemptErrorResponse
+	s.RelNoDefault = v
+}
+
+// GetRelNoDefault returns RelNoDefault and true boolean if CreateAuthAttemptErrorResponse is RelNoDefault.
+func (s CreateAuthAttemptErrorResponse) GetRelNoDefault() (v RelNoDefault, ok bool) {
+	if !s.IsRelNoDefault() {
+		return v, false
+	}
+	return s.RelNoDefault, true
+}
+
+// NewRelNoDefaultCreateAuthAttemptErrorResponse returns new CreateAuthAttemptErrorResponse from RelNoDefault.
+func NewRelNoDefaultCreateAuthAttemptErrorResponse(v RelNoDefault) CreateAuthAttemptErrorResponse {
+	var s CreateAuthAttemptErrorResponse
+	s.SetRelNoDefault(v)
+	return s
+}
+
+// SetRelNotDeployed sets CreateAuthAttemptErrorResponse to RelNotDeployed.
+func (s *CreateAuthAttemptErrorResponse) SetRelNotDeployed(v RelNotDeployed) {
+	s.Type = RelNotDeployedCreateAuthAttemptErrorResponse
+	s.RelNotDeployed = v
+}
+
+// GetRelNotDeployed returns RelNotDeployed and true boolean if CreateAuthAttemptErrorResponse is RelNotDeployed.
+func (s CreateAuthAttemptErrorResponse) GetRelNotDeployed() (v RelNotDeployed, ok bool) {
+	if !s.IsRelNotDeployed() {
+		return v, false
+	}
+	return s.RelNotDeployed, true
+}
+
+// NewRelNotDeployedCreateAuthAttemptErrorResponse returns new CreateAuthAttemptErrorResponse from RelNotDeployed.
+func NewRelNotDeployedCreateAuthAttemptErrorResponse(v RelNotDeployed) CreateAuthAttemptErrorResponse {
+	var s CreateAuthAttemptErrorResponse
+	s.SetRelNotDeployed(v)
+	return s
+}
+
+// SetRelNotFound sets CreateAuthAttemptErrorResponse to RelNotFound.
+func (s *CreateAuthAttemptErrorResponse) SetRelNotFound(v RelNotFound) {
+	s.Type = RelNotFoundCreateAuthAttemptErrorResponse
+	s.RelNotFound = v
+}
+
+// GetRelNotFound returns RelNotFound and true boolean if CreateAuthAttemptErrorResponse is RelNotFound.
+func (s CreateAuthAttemptErrorResponse) GetRelNotFound() (v RelNotFound, ok bool) {
+	if !s.IsRelNotFound() {
+		return v, false
+	}
+	return s.RelNotFound, true
+}
+
+// NewRelNotFoundCreateAuthAttemptErrorResponse returns new CreateAuthAttemptErrorResponse from RelNotFound.
+func NewRelNotFoundCreateAuthAttemptErrorResponse(v RelNotFound) CreateAuthAttemptErrorResponse {
+	var s CreateAuthAttemptErrorResponse
+	s.SetRelNotFound(v)
+	return s
+}
+
+// SetRelRevoked sets CreateAuthAttemptErrorResponse to RelRevoked.
+func (s *CreateAuthAttemptErrorResponse) SetRelRevoked(v RelRevoked) {
+	s.Type = RelRevokedCreateAuthAttemptErrorResponse
+	s.RelRevoked = v
+}
+
+// GetRelRevoked returns RelRevoked and true boolean if CreateAuthAttemptErrorResponse is RelRevoked.
+func (s CreateAuthAttemptErrorResponse) GetRelRevoked() (v RelRevoked, ok bool) {
+	if !s.IsRelRevoked() {
+		return v, false
+	}
+	return s.RelRevoked, true
+}
+
+// NewRelRevokedCreateAuthAttemptErrorResponse returns new CreateAuthAttemptErrorResponse from RelRevoked.
+func NewRelRevokedCreateAuthAttemptErrorResponse(v RelRevoked) CreateAuthAttemptErrorResponse {
+	var s CreateAuthAttemptErrorResponse
+	s.SetRelRevoked(v)
 	return s
 }
 
@@ -26691,7 +26887,7 @@ type FlowDefinition struct {
 	Name   string               `json:"name"`
 	Status FlowDefinitionStatus `json:"status"`
 	// The user schema this flow operates on, named by its `objectType`. The
-	// flow runs against the project's newest revision of that schema, so
+	// flow runs against the revision of that schema its release pins, so
 	// publishing a schema revision needs no change to the flow. A schema id
 	// as returned by `POST /schemas` is also accepted and is stored as that
 	// schema's `objectType`; reading the definition back returns the
@@ -32929,6 +33125,7 @@ type GetFlowStepErrorResponse struct {
 	TknInvalid                  TknInvalid
 	NotImplemented              NotImplemented
 	ProjLastOwner               ProjLastOwner
+	RelNotDeployed              RelNotDeployed
 	RelNotFound                 RelNotFound
 	RelRevoked                  RelRevoked
 	ReqInvalid                  ReqInvalid
@@ -32974,6 +33171,7 @@ const (
 	TknInvalidGetFlowStepErrorResponse                  GetFlowStepErrorResponseType = "tkn.invalid"
 	NotImplementedGetFlowStepErrorResponse              GetFlowStepErrorResponseType = "not_implemented"
 	ProjLastOwnerGetFlowStepErrorResponse               GetFlowStepErrorResponseType = "proj.last_owner"
+	RelNotDeployedGetFlowStepErrorResponse              GetFlowStepErrorResponseType = "rel.not_deployed"
 	RelNotFoundGetFlowStepErrorResponse                 GetFlowStepErrorResponseType = "rel.not_found"
 	RelRevokedGetFlowStepErrorResponse                  GetFlowStepErrorResponseType = "rel.revoked"
 	ReqInvalidGetFlowStepErrorResponse                  GetFlowStepErrorResponseType = "req.invalid"
@@ -33116,6 +33314,11 @@ func (s GetFlowStepErrorResponse) IsNotImplemented() bool {
 // IsProjLastOwner reports whether GetFlowStepErrorResponse is ProjLastOwner.
 func (s GetFlowStepErrorResponse) IsProjLastOwner() bool {
 	return s.Type == ProjLastOwnerGetFlowStepErrorResponse
+}
+
+// IsRelNotDeployed reports whether GetFlowStepErrorResponse is RelNotDeployed.
+func (s GetFlowStepErrorResponse) IsRelNotDeployed() bool {
+	return s.Type == RelNotDeployedGetFlowStepErrorResponse
 }
 
 // IsRelNotFound reports whether GetFlowStepErrorResponse is RelNotFound.
@@ -33721,6 +33924,27 @@ func (s GetFlowStepErrorResponse) GetProjLastOwner() (v ProjLastOwner, ok bool) 
 func NewProjLastOwnerGetFlowStepErrorResponse(v ProjLastOwner) GetFlowStepErrorResponse {
 	var s GetFlowStepErrorResponse
 	s.SetProjLastOwner(v)
+	return s
+}
+
+// SetRelNotDeployed sets GetFlowStepErrorResponse to RelNotDeployed.
+func (s *GetFlowStepErrorResponse) SetRelNotDeployed(v RelNotDeployed) {
+	s.Type = RelNotDeployedGetFlowStepErrorResponse
+	s.RelNotDeployed = v
+}
+
+// GetRelNotDeployed returns RelNotDeployed and true boolean if GetFlowStepErrorResponse is RelNotDeployed.
+func (s GetFlowStepErrorResponse) GetRelNotDeployed() (v RelNotDeployed, ok bool) {
+	if !s.IsRelNotDeployed() {
+		return v, false
+	}
+	return s.RelNotDeployed, true
+}
+
+// NewRelNotDeployedGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from RelNotDeployed.
+func NewRelNotDeployedGetFlowStepErrorResponse(v RelNotDeployed) GetFlowStepErrorResponse {
+	var s GetFlowStepErrorResponse
+	s.SetRelNotDeployed(v)
 	return s
 }
 
@@ -85751,6 +85975,13 @@ type SetUserPasswordErrorResponse struct {
 	EvtInvalid                  EvtInvalid
 	Internal                    Internal
 	NotImplemented              NotImplemented
+	ProjNotFound                ProjNotFound
+	ProjOriginNotAllowed        ProjOriginNotAllowed
+	ProjPreviewNotLive          ProjPreviewNotLive
+	RelNoDefault                RelNoDefault
+	RelNotDeployed              RelNotDeployed
+	RelNotFound                 RelNotFound
+	RelRevoked                  RelRevoked
 	ReqInvalid                  ReqInvalid
 	Unavailable                 Unavailable
 	UserConflict                UserConflict
@@ -85771,6 +86002,13 @@ const (
 	EvtInvalidSetUserPasswordErrorResponse                  SetUserPasswordErrorResponseType = "evt.invalid"
 	InternalSetUserPasswordErrorResponse                    SetUserPasswordErrorResponseType = "internal"
 	NotImplementedSetUserPasswordErrorResponse              SetUserPasswordErrorResponseType = "not_implemented"
+	ProjNotFoundSetUserPasswordErrorResponse                SetUserPasswordErrorResponseType = "proj.not_found"
+	ProjOriginNotAllowedSetUserPasswordErrorResponse        SetUserPasswordErrorResponseType = "proj.origin_not_allowed"
+	ProjPreviewNotLiveSetUserPasswordErrorResponse          SetUserPasswordErrorResponseType = "proj.preview_not_live"
+	RelNoDefaultSetUserPasswordErrorResponse                SetUserPasswordErrorResponseType = "rel.no_default"
+	RelNotDeployedSetUserPasswordErrorResponse              SetUserPasswordErrorResponseType = "rel.not_deployed"
+	RelNotFoundSetUserPasswordErrorResponse                 SetUserPasswordErrorResponseType = "rel.not_found"
+	RelRevokedSetUserPasswordErrorResponse                  SetUserPasswordErrorResponseType = "rel.revoked"
 	ReqInvalidSetUserPasswordErrorResponse                  SetUserPasswordErrorResponseType = "req.invalid"
 	UnavailableSetUserPasswordErrorResponse                 SetUserPasswordErrorResponseType = "unavailable"
 	UserConflictSetUserPasswordErrorResponse                SetUserPasswordErrorResponseType = "user.conflict"
@@ -85800,6 +86038,41 @@ func (s SetUserPasswordErrorResponse) IsInternal() bool {
 // IsNotImplemented reports whether SetUserPasswordErrorResponse is NotImplemented.
 func (s SetUserPasswordErrorResponse) IsNotImplemented() bool {
 	return s.Type == NotImplementedSetUserPasswordErrorResponse
+}
+
+// IsProjNotFound reports whether SetUserPasswordErrorResponse is ProjNotFound.
+func (s SetUserPasswordErrorResponse) IsProjNotFound() bool {
+	return s.Type == ProjNotFoundSetUserPasswordErrorResponse
+}
+
+// IsProjOriginNotAllowed reports whether SetUserPasswordErrorResponse is ProjOriginNotAllowed.
+func (s SetUserPasswordErrorResponse) IsProjOriginNotAllowed() bool {
+	return s.Type == ProjOriginNotAllowedSetUserPasswordErrorResponse
+}
+
+// IsProjPreviewNotLive reports whether SetUserPasswordErrorResponse is ProjPreviewNotLive.
+func (s SetUserPasswordErrorResponse) IsProjPreviewNotLive() bool {
+	return s.Type == ProjPreviewNotLiveSetUserPasswordErrorResponse
+}
+
+// IsRelNoDefault reports whether SetUserPasswordErrorResponse is RelNoDefault.
+func (s SetUserPasswordErrorResponse) IsRelNoDefault() bool {
+	return s.Type == RelNoDefaultSetUserPasswordErrorResponse
+}
+
+// IsRelNotDeployed reports whether SetUserPasswordErrorResponse is RelNotDeployed.
+func (s SetUserPasswordErrorResponse) IsRelNotDeployed() bool {
+	return s.Type == RelNotDeployedSetUserPasswordErrorResponse
+}
+
+// IsRelNotFound reports whether SetUserPasswordErrorResponse is RelNotFound.
+func (s SetUserPasswordErrorResponse) IsRelNotFound() bool {
+	return s.Type == RelNotFoundSetUserPasswordErrorResponse
+}
+
+// IsRelRevoked reports whether SetUserPasswordErrorResponse is RelRevoked.
+func (s SetUserPasswordErrorResponse) IsRelRevoked() bool {
+	return s.Type == RelRevokedSetUserPasswordErrorResponse
 }
 
 // IsReqInvalid reports whether SetUserPasswordErrorResponse is ReqInvalid.
@@ -85928,6 +86201,153 @@ func (s SetUserPasswordErrorResponse) GetNotImplemented() (v NotImplemented, ok 
 func NewNotImplementedSetUserPasswordErrorResponse(v NotImplemented) SetUserPasswordErrorResponse {
 	var s SetUserPasswordErrorResponse
 	s.SetNotImplemented(v)
+	return s
+}
+
+// SetProjNotFound sets SetUserPasswordErrorResponse to ProjNotFound.
+func (s *SetUserPasswordErrorResponse) SetProjNotFound(v ProjNotFound) {
+	s.Type = ProjNotFoundSetUserPasswordErrorResponse
+	s.ProjNotFound = v
+}
+
+// GetProjNotFound returns ProjNotFound and true boolean if SetUserPasswordErrorResponse is ProjNotFound.
+func (s SetUserPasswordErrorResponse) GetProjNotFound() (v ProjNotFound, ok bool) {
+	if !s.IsProjNotFound() {
+		return v, false
+	}
+	return s.ProjNotFound, true
+}
+
+// NewProjNotFoundSetUserPasswordErrorResponse returns new SetUserPasswordErrorResponse from ProjNotFound.
+func NewProjNotFoundSetUserPasswordErrorResponse(v ProjNotFound) SetUserPasswordErrorResponse {
+	var s SetUserPasswordErrorResponse
+	s.SetProjNotFound(v)
+	return s
+}
+
+// SetProjOriginNotAllowed sets SetUserPasswordErrorResponse to ProjOriginNotAllowed.
+func (s *SetUserPasswordErrorResponse) SetProjOriginNotAllowed(v ProjOriginNotAllowed) {
+	s.Type = ProjOriginNotAllowedSetUserPasswordErrorResponse
+	s.ProjOriginNotAllowed = v
+}
+
+// GetProjOriginNotAllowed returns ProjOriginNotAllowed and true boolean if SetUserPasswordErrorResponse is ProjOriginNotAllowed.
+func (s SetUserPasswordErrorResponse) GetProjOriginNotAllowed() (v ProjOriginNotAllowed, ok bool) {
+	if !s.IsProjOriginNotAllowed() {
+		return v, false
+	}
+	return s.ProjOriginNotAllowed, true
+}
+
+// NewProjOriginNotAllowedSetUserPasswordErrorResponse returns new SetUserPasswordErrorResponse from ProjOriginNotAllowed.
+func NewProjOriginNotAllowedSetUserPasswordErrorResponse(v ProjOriginNotAllowed) SetUserPasswordErrorResponse {
+	var s SetUserPasswordErrorResponse
+	s.SetProjOriginNotAllowed(v)
+	return s
+}
+
+// SetProjPreviewNotLive sets SetUserPasswordErrorResponse to ProjPreviewNotLive.
+func (s *SetUserPasswordErrorResponse) SetProjPreviewNotLive(v ProjPreviewNotLive) {
+	s.Type = ProjPreviewNotLiveSetUserPasswordErrorResponse
+	s.ProjPreviewNotLive = v
+}
+
+// GetProjPreviewNotLive returns ProjPreviewNotLive and true boolean if SetUserPasswordErrorResponse is ProjPreviewNotLive.
+func (s SetUserPasswordErrorResponse) GetProjPreviewNotLive() (v ProjPreviewNotLive, ok bool) {
+	if !s.IsProjPreviewNotLive() {
+		return v, false
+	}
+	return s.ProjPreviewNotLive, true
+}
+
+// NewProjPreviewNotLiveSetUserPasswordErrorResponse returns new SetUserPasswordErrorResponse from ProjPreviewNotLive.
+func NewProjPreviewNotLiveSetUserPasswordErrorResponse(v ProjPreviewNotLive) SetUserPasswordErrorResponse {
+	var s SetUserPasswordErrorResponse
+	s.SetProjPreviewNotLive(v)
+	return s
+}
+
+// SetRelNoDefault sets SetUserPasswordErrorResponse to RelNoDefault.
+func (s *SetUserPasswordErrorResponse) SetRelNoDefault(v RelNoDefault) {
+	s.Type = RelNoDefaultSetUserPasswordErrorResponse
+	s.RelNoDefault = v
+}
+
+// GetRelNoDefault returns RelNoDefault and true boolean if SetUserPasswordErrorResponse is RelNoDefault.
+func (s SetUserPasswordErrorResponse) GetRelNoDefault() (v RelNoDefault, ok bool) {
+	if !s.IsRelNoDefault() {
+		return v, false
+	}
+	return s.RelNoDefault, true
+}
+
+// NewRelNoDefaultSetUserPasswordErrorResponse returns new SetUserPasswordErrorResponse from RelNoDefault.
+func NewRelNoDefaultSetUserPasswordErrorResponse(v RelNoDefault) SetUserPasswordErrorResponse {
+	var s SetUserPasswordErrorResponse
+	s.SetRelNoDefault(v)
+	return s
+}
+
+// SetRelNotDeployed sets SetUserPasswordErrorResponse to RelNotDeployed.
+func (s *SetUserPasswordErrorResponse) SetRelNotDeployed(v RelNotDeployed) {
+	s.Type = RelNotDeployedSetUserPasswordErrorResponse
+	s.RelNotDeployed = v
+}
+
+// GetRelNotDeployed returns RelNotDeployed and true boolean if SetUserPasswordErrorResponse is RelNotDeployed.
+func (s SetUserPasswordErrorResponse) GetRelNotDeployed() (v RelNotDeployed, ok bool) {
+	if !s.IsRelNotDeployed() {
+		return v, false
+	}
+	return s.RelNotDeployed, true
+}
+
+// NewRelNotDeployedSetUserPasswordErrorResponse returns new SetUserPasswordErrorResponse from RelNotDeployed.
+func NewRelNotDeployedSetUserPasswordErrorResponse(v RelNotDeployed) SetUserPasswordErrorResponse {
+	var s SetUserPasswordErrorResponse
+	s.SetRelNotDeployed(v)
+	return s
+}
+
+// SetRelNotFound sets SetUserPasswordErrorResponse to RelNotFound.
+func (s *SetUserPasswordErrorResponse) SetRelNotFound(v RelNotFound) {
+	s.Type = RelNotFoundSetUserPasswordErrorResponse
+	s.RelNotFound = v
+}
+
+// GetRelNotFound returns RelNotFound and true boolean if SetUserPasswordErrorResponse is RelNotFound.
+func (s SetUserPasswordErrorResponse) GetRelNotFound() (v RelNotFound, ok bool) {
+	if !s.IsRelNotFound() {
+		return v, false
+	}
+	return s.RelNotFound, true
+}
+
+// NewRelNotFoundSetUserPasswordErrorResponse returns new SetUserPasswordErrorResponse from RelNotFound.
+func NewRelNotFoundSetUserPasswordErrorResponse(v RelNotFound) SetUserPasswordErrorResponse {
+	var s SetUserPasswordErrorResponse
+	s.SetRelNotFound(v)
+	return s
+}
+
+// SetRelRevoked sets SetUserPasswordErrorResponse to RelRevoked.
+func (s *SetUserPasswordErrorResponse) SetRelRevoked(v RelRevoked) {
+	s.Type = RelRevokedSetUserPasswordErrorResponse
+	s.RelRevoked = v
+}
+
+// GetRelRevoked returns RelRevoked and true boolean if SetUserPasswordErrorResponse is RelRevoked.
+func (s SetUserPasswordErrorResponse) GetRelRevoked() (v RelRevoked, ok bool) {
+	if !s.IsRelRevoked() {
+		return v, false
+	}
+	return s.RelRevoked, true
+}
+
+// NewRelRevokedSetUserPasswordErrorResponse returns new SetUserPasswordErrorResponse from RelRevoked.
+func NewRelRevokedSetUserPasswordErrorResponse(v RelRevoked) SetUserPasswordErrorResponse {
+	var s SetUserPasswordErrorResponse
+	s.SetRelRevoked(v)
 	return s
 }
 
@@ -86422,6 +86842,7 @@ type SubmitFlowStepErrorResponse struct {
 	ProjLastOwner               ProjLastOwner
 	ProjOriginNotAllowed        ProjOriginNotAllowed
 	ProjPreviewNotLive          ProjPreviewNotLive
+	RelNotDeployed              RelNotDeployed
 	RelNotFound                 RelNotFound
 	RelRevoked                  RelRevoked
 	ReqInvalid                  ReqInvalid
@@ -86469,6 +86890,7 @@ const (
 	ProjLastOwnerSubmitFlowStepErrorResponse               SubmitFlowStepErrorResponseType = "proj.last_owner"
 	ProjOriginNotAllowedSubmitFlowStepErrorResponse        SubmitFlowStepErrorResponseType = "proj.origin_not_allowed"
 	ProjPreviewNotLiveSubmitFlowStepErrorResponse          SubmitFlowStepErrorResponseType = "proj.preview_not_live"
+	RelNotDeployedSubmitFlowStepErrorResponse              SubmitFlowStepErrorResponseType = "rel.not_deployed"
 	RelNotFoundSubmitFlowStepErrorResponse                 SubmitFlowStepErrorResponseType = "rel.not_found"
 	RelRevokedSubmitFlowStepErrorResponse                  SubmitFlowStepErrorResponseType = "rel.revoked"
 	ReqInvalidSubmitFlowStepErrorResponse                  SubmitFlowStepErrorResponseType = "req.invalid"
@@ -86621,6 +87043,11 @@ func (s SubmitFlowStepErrorResponse) IsProjOriginNotAllowed() bool {
 // IsProjPreviewNotLive reports whether SubmitFlowStepErrorResponse is ProjPreviewNotLive.
 func (s SubmitFlowStepErrorResponse) IsProjPreviewNotLive() bool {
 	return s.Type == ProjPreviewNotLiveSubmitFlowStepErrorResponse
+}
+
+// IsRelNotDeployed reports whether SubmitFlowStepErrorResponse is RelNotDeployed.
+func (s SubmitFlowStepErrorResponse) IsRelNotDeployed() bool {
+	return s.Type == RelNotDeployedSubmitFlowStepErrorResponse
 }
 
 // IsRelNotFound reports whether SubmitFlowStepErrorResponse is RelNotFound.
@@ -87268,6 +87695,27 @@ func (s SubmitFlowStepErrorResponse) GetProjPreviewNotLive() (v ProjPreviewNotLi
 func NewProjPreviewNotLiveSubmitFlowStepErrorResponse(v ProjPreviewNotLive) SubmitFlowStepErrorResponse {
 	var s SubmitFlowStepErrorResponse
 	s.SetProjPreviewNotLive(v)
+	return s
+}
+
+// SetRelNotDeployed sets SubmitFlowStepErrorResponse to RelNotDeployed.
+func (s *SubmitFlowStepErrorResponse) SetRelNotDeployed(v RelNotDeployed) {
+	s.Type = RelNotDeployedSubmitFlowStepErrorResponse
+	s.RelNotDeployed = v
+}
+
+// GetRelNotDeployed returns RelNotDeployed and true boolean if SubmitFlowStepErrorResponse is RelNotDeployed.
+func (s SubmitFlowStepErrorResponse) GetRelNotDeployed() (v RelNotDeployed, ok bool) {
+	if !s.IsRelNotDeployed() {
+		return v, false
+	}
+	return s.RelNotDeployed, true
+}
+
+// NewRelNotDeployedSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from RelNotDeployed.
+func NewRelNotDeployedSubmitFlowStepErrorResponse(v RelNotDeployed) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetRelNotDeployed(v)
 	return s
 }
 

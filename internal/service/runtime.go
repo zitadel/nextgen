@@ -283,9 +283,7 @@ func (r *RuntimeResolver) Gate(ctx context.Context, project *domain.Project, ori
 
 type runtimeResolutionKey struct{}
 
-// WithRuntimeResolution attaches the release that serves the request, so the
-// flow definition and branding resolve from what it pins rather than from
-// the newest revision.
+// WithRuntimeResolution attaches the release that serves the request.
 func WithRuntimeResolution(ctx context.Context, resolution *RuntimeResolution) context.Context {
 	if resolution == nil {
 		return ctx
@@ -300,37 +298,18 @@ func RuntimeResolutionFromContext(ctx context.Context) *RuntimeResolution {
 	return resolution
 }
 
-// ReleaseFromContext is the release the request resolved to, nil when there
-// is none.
-func ReleaseFromContext(ctx context.Context) *domain.Release {
+// runtimePins is handle → revision id for what the request's release pins of
+// one kind. A request with no release is not deployed.
+func runtimePins(ctx context.Context, kind domain.ReleasePointerKind) (map[string]string, error) {
 	resolution := RuntimeResolutionFromContext(ctx)
-	if resolution == nil {
-		return nil
+	if resolution == nil || resolution.Release == nil {
+		return nil, domain.ErrReleaseNotDeployed(nil)
 	}
-	return resolution.Release
-}
-
-// PinnedRevisions is handle → revision id for one release pointer kind.
-type PinnedRevisions map[string]string
-
-// ReleasePinsFlow reports whether the request's release pins at least one
-// flow definition. Schema, branding, identity providers and policies follow
-// that switch: they read the pinned revisions only then, and the newest
-// otherwise.
-func ReleasePinsFlow(ctx context.Context) bool {
-	return len(PinsFor(ReleaseFromContext(ctx), domain.ReleasePointerKindFlowDefinition)) > 0
-}
-
-// PinsFor returns the revision ids a release pins for one kind, keyed by handle.
-func PinsFor(release *domain.Release, kind domain.ReleasePointerKind) PinnedRevisions {
-	pinned := make(PinnedRevisions)
-	if release == nil {
-		return pinned
-	}
-	for _, pointer := range release.Pointers {
+	pinned := make(map[string]string)
+	for _, pointer := range resolution.Release.Pointers {
 		if pointer.Kind == kind {
 			pinned[pointer.Handle] = pointer.RevisionID
 		}
 	}
-	return pinned
+	return pinned, nil
 }

@@ -16,10 +16,10 @@ Validation runs in two layers:
 
 | Field | Required | Notes |
 |---|:-:|---|
-| `name` | ✓ | The handle that groups revisions; not unique. Every `POST` publishes a new revision under the name. Resolution by name prefers the highest active `schema_version`, then the newest revision of it. |
-| `schema_version` | ✓ | Monotonic per `(project_id, name)`. First key of resolution by name (see `name`); the server hard-codes it today, so the newest revision decides. |
+| `name` | ✓ | The handle that groups revisions; not unique. Every `POST` publishes a new revision under the name. A release pins one revision of a name, and resolution by name returns it. |
+| `schema_version` | ✓ | Monotonic per `(project_id, name)`. The server hard-codes it today. |
 | `status` | ✓ | `draft`, `active`, `deprecated`, `archived`. Only `active` is resolvable. |
-| `user_schema` | ✓ | `objectType` of the user schema this flow's `fields` resolve against; a schema id is accepted on write and stored as its `objectType`. The project's newest revision of it is captured into `FlowState.UserSchemaURL` at `Start` so mid-flow schema changes don't reshape in-flight data. |
+| `user_schema` | ✓ | `objectType` of the user schema this flow's `fields` resolve against; a schema id is accepted on write and stored as its `objectType`. The revision of it the release pins is captured into `FlowState.UserSchemaURL` at `Start` so mid-flow schema changes don't reshape in-flight data. |
 | `purposes` | ✓ | Map from purpose (`login`, `register`, `recovery`, `profiling`, `reauth`, `link_account`) to the name of that purpose's entry-point step. |
 | `audience` | optional | `app_ids[]`, `team_ids[]`. Empty = project default. Specificity for resolution is app > team > default. |
 | `steps` | ✓ | Ordered list of `FlowDefinitionStep`. Order doesn't drive runtime; transitions do. |

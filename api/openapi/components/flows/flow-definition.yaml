@@ -37,7 +37,7 @@ properties:
     type: string
     description: |
       The user schema this flow operates on, named by its `objectType`. The
-      flow runs against the project's newest revision of that schema, so
+      flow runs against the revision of that schema its release pins, so
       publishing a schema revision needs no change to the flow. A schema id
       as returned by `POST /schemas` is also accepted and is stored as that
       schema's `objectType`; reading the definition back returns the

@@ -13,8 +13,8 @@ post:
     project's newest revision of the same handle: unchanged content reuses
     that revision, changed content allocates a new one, and the request
     answers `201` with the new release. A policy whose config matches only an
-    older revision allocates a new one too, so a request that resolves no
-    release, which reads the newest revision, applies it as well. Metadata is excluded from the
+    older revision allocates a new one too, so the policy reads back as the
+    config the build carried. Metadata is excluded from the
     comparison, so the same content under a different `message` is the same
     release.
 

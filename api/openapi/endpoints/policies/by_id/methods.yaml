@@ -3,8 +3,7 @@ get:
   x-zitadel-cli: policies get
   summary: Get a policy
   description: |
-    Reads a policy as its newest revision, the one that applies the next time
-    its operation runs.
+    Reads a policy as its newest revision.
 
     The lookup is scoped to the project in `project_id`: a policy of another
     project answers not found exactly as an unknown id does.

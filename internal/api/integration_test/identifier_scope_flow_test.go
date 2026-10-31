@@ -31,7 +31,6 @@ func newIdentifierScopeFixture(t *testing.T) *identifierScopeFixture {
 	t.Helper()
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
-	deployPrimary(t, project.ID)
 	team, err := harness.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{
 		ProjectID: project.ID,
 		Name:      helpers.TeamName(),
@@ -101,6 +100,7 @@ func (f *identifierScopeFixture) submitIdentifier(t *testing.T, definition api.F
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowDefinitionResponse{}, defResp, helpers.MustMarshal(t, defResp))
 
+	deployPrimary(t, f.project.ID)
 	createResp, err := f.client.CreateFlow(t.Context(), &api.CreateFlowRequest{
 		ProjectID: api.ProjectID(f.project.ID),
 		Purpose:   api.CreateFlowRequestPurposeLogin,

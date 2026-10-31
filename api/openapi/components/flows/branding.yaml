@@ -4,7 +4,7 @@ description: |
   Branding configuration, used in two places with one shape: as the request
   body of `POST /branding`, which publishes it as a new immutable revision,
   and as a read-only projection on flow responses, which carries the
-  project's latest revision. Locally it is the `.zitadel/branding/` descriptor
+  revision the request's release pins. Locally it is the `.zitadel/branding/` descriptor
   that `zitadel apply` publishes.
 
   Every field is optional. An omitted key uses Zitadel's maintained default,

@@ -187,6 +187,7 @@ func attemptClient(t *testing.T, project *domain.Project) *helpers.ApiClient {
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
 	harness.SetProjectSecretOnApiClient(t, client, project)
+	deployPrimary(t, project.ID)
 	return client
 }
 

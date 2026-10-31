@@ -55,7 +55,7 @@ template referenced as `"liquid_template": { "$file": "./login.liquid" }`. Scaff
 interactive picker on a TTY); setup never scaffolds them. Branding is
 revisioned and immutable: every edit — including a `.liquid`-only edit —
 is published as part of the next release when you `deploy`, and the login
-serves the newest release. `deploy` validates templates with the authoritative
+serves the release deployed to its origin. `deploy` validates templates with the authoritative
 LiquidJS validator (and `deploy --dry-run` runs the same validation without
 publishing; `E_VALIDATION` lists rule ids such as `no-script-tag` and
 `mandatory-gates`; every template must keep a `{% mandatory_gates %}` tag,
@@ -71,16 +71,14 @@ Server-provisioned defaults remain a fallback for non-CLI project
 creation, but CLI-created projects are authored from local files first. Flows are
 revisioned like branding: an edit is published as a new immutable flow revision
 in the next `deploy`. A flow names its schema by `objectType` in `user_schema`
-and runs against the schema's newest revision, so a schema revise needs no
-change to `user_schema`; one that removes or renames a property a step
-collects needs that step's `fields` updated, and `deploy` checks each flow
-against the schema it names. A login pinned by `flow-name` serves that flow's
-newest active revision; an unpinned login serves the newest active unscoped
-revision for its purpose in the project, whatever its flow's name. Older
-revisions stay active, so an `audience` added after a flow was deployed
-without one doesn't take that earlier revision out of the running. Removing a
-flow file does not retire the
-flow. Operation policies live in `.zitadel/policies/`: one `<operation>.json`
+and runs against the revision the release pins, so a schema revise needs no
+change to `user_schema` and reaches sign-in with the next `deploy`; one that
+removes or renames a property a step collects needs that step's `fields`
+updated, and `deploy` checks each flow against the schema it names. A login
+pinned by `flow-name` serves the revision of that flow the release pins; an
+unpinned login serves the newest unscoped flow the release pins for its
+purpose, whatever its name. Removing a flow file leaves it out of the next
+release. Operation policies live in `.zitadel/policies/`: one `<operation>.json`
 per guarded operation, named after its `operation`, holding
 `{"$schema": "../meta/policy.json", "operation": "auth.factor.password.set",
 "config": {"min_length": 15}}`. `deploy` checks each file against
@@ -91,9 +89,10 @@ server's release build with `rel.invalid`, the policy's entry carrying
 `pol.invalid`. A changed file publishes a new revision of the same policy,
 which applies the next time a password is set. A setting left out is off, and
 `"config": {}` switches every rule off. A sign-in or sign-up uses the policy
-the deployed release carries, so deploying without the file switches it off
-there; a password set through the API, or before the first deploy, uses the
-newest revision, which only `"config": {}` switches off. `policies list` and
+the deployed release carries, and a password set through the API the one the
+newest primary deployment carries, so deploying without the file switches it
+off. With no primary deployment, that API call answers `409` with
+`rel.no_default`. `policies list` and
 `policies get <id|operation>` read them back. A policy's cases live beside it
 in `<operation>.test.json` (`.zitadel/meta/policy-test.json`): each names an
 `input` in the operation's terms (`{"password": "…"}`), optional `facts` the
@@ -107,8 +106,7 @@ release pins; a missing policy is tested as none. It fails with `E_VALIDATION`
 (exit 3) when a case does not hold, `data`/`details` carrying `source`,
 `operations[].cases[]` (`name`, `passed`, `expected`, `actual`), `passed` and
 `failed`; with no test files it is `skipped` (`no-policy-tests`). `deploy`
-never carries test files. Until #2331, a release that pins no flow is tested
-with a warning: its sign-ins use the newest revisions instead. Write cases from
+never carries test files. Write cases from
 what the user wants enforced; never invent expectations for them. `setup` writes and publishes
 the password policy with a `min_length` of 15; pass `--password-min-length <n>`
 only when the user asks for another value (`0` sets none). Managed files carry
