@@ -25,6 +25,7 @@ import type {
   ResourceCommandOptions,
   ResourceDescriptor,
   UpdateSpec,
+  WriteResult,
   WriteShape,
 } from "../types";
 import { objectOf, type ZodLike } from "../zod";
@@ -244,17 +245,16 @@ abstract class WriteOperation<
       });
     }
 
-    // The registry checks `idField` against what each write answers with. Some
-    // writes answer without a body (`grants create` by identifier answers
+    // Some writes answer without a body (`grants create` by identifier answers
     // 202), so there is no record to get, and `data` is still an object.
-    const result = (await this.send(await this.context(), body, id)) as Json | undefined;
+    const result = await this.send(await this.context(), body, id);
     return {
       status: "ok",
       data: result ?? {},
       ...(result && resource.get
         ? {
             next: {
-              commands: [this.suggest(`${topic} get ${String(result[resource.idField])} --json`)],
+              commands: [this.suggest(`${topic} get ${String(resource.idOf(result))} --json`)],
             },
           }
         : {}),
@@ -263,7 +263,7 @@ abstract class WriteOperation<
     };
   }
 
-  protected abstract send(ctx: Ctx, body: Json, id: string | undefined): Promise<unknown>;
+  protected abstract send(ctx: Ctx, body: Json, id: string | undefined): Promise<WriteResult>;
 }
 
 /** `<topic> create`. */
@@ -274,7 +274,7 @@ export class CreateOperation<Ctx> extends WriteOperation<Ctx, CreateSpec<Ctx>> {
 
   protected readonly verb = "create";
 
-  protected send(ctx: Ctx, body: Json): Promise<unknown> {
+  protected send(ctx: Ctx, body: Json): Promise<WriteResult> {
     return this.definition.spec.call(ctx, body);
   }
 }
@@ -287,7 +287,7 @@ export class UpdateOperation<Ctx> extends WriteOperation<Ctx, UpdateSpec<Ctx>> {
 
   protected readonly verb = "update";
 
-  protected send(ctx: Ctx, body: Json, id: string | undefined): Promise<unknown> {
+  protected send(ctx: Ctx, body: Json, id: string | undefined): Promise<WriteResult> {
     return this.definition.spec.call(ctx, id ?? "", body);
   }
 }

@@ -11,7 +11,7 @@ import { type ParsedFilter, parseFilter, parseSort } from "../query";
 import { parseOrThrow } from "../shared";
 import { chosenColumns } from "../columns";
 import { shellOption } from "../../../shell";
-import { fieldPaths, itemSchemaOf } from "../paths";
+import { fieldPaths } from "../paths";
 import { renderRows, renderTable } from "../table";
 import type { Json, ListSpec } from "../types";
 import {
@@ -109,7 +109,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
     const wire = wireOf(options.wire);
     // With a schema in hand the columns are known before any request, so a
     // typo fails without contacting the server at all.
-    const shape = fieldPaths(itemSchemaOf(spec.response, spec.items));
+    const shape = fieldPaths(spec.item);
     const early = shape ? chosenColumns(flags.fields, resource.columns, [], shape) : undefined;
     const ctx = await this.context();
     // An unpaged endpoint has no cursor flags to read and would reject the
@@ -196,13 +196,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
         { next: cursorOf },
       ),
       {
-        // A wrapped page names its list; an endpoint that answers with the
-        // collection itself has nothing to name. `list` in the registry checks
-        // both against the response type.
-        items: (response) =>
-          (spec.items === undefined
-            ? response
-            : (response as Json)[spec.items]) as readonly unknown[],
+        items: (response) => spec.items(response),
         all,
         next: cursorOf,
       },

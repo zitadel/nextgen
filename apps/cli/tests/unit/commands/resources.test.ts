@@ -1953,10 +1953,10 @@ describe("the release resource", () => {
 
 describe("the registry builders", () => {
   const users = list({
-    items: "users",
     body: QueryUsersBody,
-    response: QueryUsersResponse,
+    item: QueryUsersResponse.shape.users.element,
     call: ({ client }, body) => client.queryUsers(body),
+    items: (page) => page.users,
   });
   const user = get({
     call: ({ client }, id) => client.getUserByID(id),
@@ -1975,6 +1975,20 @@ describe("the registry builders", () => {
     });
 
     expect(checked.columns).toEqual(["id", "metadata.status"]);
+  });
+
+  it("reads the id a write answered with off its id field", () => {
+    const checked = resource({
+      singular: "user",
+      idField: "id",
+      columns: ["id"],
+      heading: "identifier",
+      detail: ["id"],
+      list: users,
+      get: user,
+    });
+
+    expect(checked.idOf({ id: "user_1", identifier: "a" })).toBe("user_1");
   });
 
   it("refuses a column a listed item does not have", () => {
@@ -2019,13 +2033,13 @@ describe("the registry builders", () => {
   it("refuses an id field the created resource does not answer with", () => {
     resource({
       singular: "user",
-      // @ts-expect-error the create below answers with `user_id`, not `id`
       idField: "id",
       columns: ["id"],
       heading: "identifier",
       detail: ["id"],
       list: users,
       get: user,
+      // @ts-expect-error this create answers with `user_id`, not the `id` field
       create: create(CreateUserBody, async () => ({ user_id: "user_1" })),
     });
   });
@@ -2033,23 +2047,33 @@ describe("the registry builders", () => {
   it("refuses an id field the updated resource does not answer with", () => {
     resource({
       singular: "user",
-      // @ts-expect-error the update below answers with `user_id`, not `id`
       idField: "id",
       columns: ["id"],
       heading: "identifier",
       detail: ["id"],
       list: users,
       get: user,
+      // @ts-expect-error this update answers with `user_id`, not the `id` field
       update: update(PatchUserByIDBody, async () => ({ user_id: "user_1" })),
     });
   });
 
-  it("refuses items the page does not hold as an array", () => {
+  it("refuses items the page does not hold", () => {
     list({
-      items: "user",
       body: QueryUsersBody,
-      // @ts-expect-error the page holds its users under `users`
       call: ({ client }, body) => client.queryUsers(body),
+      // @ts-expect-error the page holds its users under `users`
+      items: (page) => page.user,
+    });
+  });
+
+  it("refuses an item schema of another operation", () => {
+    list({
+      body: QueryUsersBody,
+      // @ts-expect-error a team's schema does not parse into a listed user
+      item: GetTeamResponse,
+      call: ({ client }, body) => client.queryUsers(body),
+      items: (page) => page.users,
     });
   });
 

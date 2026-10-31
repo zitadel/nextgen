@@ -72,19 +72,13 @@ export type FilterField = Readonly<{
  * without it is sent as flat query parameters. Everything the caller sees —
  * the flags, the grammar, the envelope — is the same either way.
  */
-export type ListSpec<Ctx, B = Json, P = unknown, I = string | undefined> = Readonly<{
+export type ListSpec<Ctx, B = Json, P = unknown, T = unknown> = Readonly<{
   /**
-   * Response property holding the page of items; omit when the response body
-   * is itself the array. The registry's `list` builder checks it against what
-   * `call` returns, by {@link ListPage}.
+   * Generated schema of one listed item. `--fields` is checked against the
+   * record shape it describes, so the same arguments are valid whether a page
+   * came back full or empty.
    */
-  items?: I;
-  /**
-   * Generated response schema. `--fields` is checked against the record shape
-   * it describes, so the same arguments are valid whether a page came back
-   * full or empty.
-   */
-  response?: Schema;
+  item?: Schema;
   /**
    * Whether the endpoint is cursor-paginated (ADR 027). Defaults to `true`.
    * A `false` endpoint returns its whole collection in one response, so the
@@ -114,21 +108,13 @@ export type ListSpec<Ctx, B = Json, P = unknown, I = string | undefined> = Reado
    */
   sortParam?: string;
   call(ctx: Ctx, request: B): Promise<P>;
+  /**
+   * The items a page holds, read off the page `call` answers with (or the page
+   * itself, for an endpoint that answers with the array). Method syntax, so a
+   * spec typed by its page still assigns to the erased spec the registry holds.
+   */
+  items(page: P): readonly T[];
 }>;
-
-/**
- * The page a list's `items` promises: an object holding an array under that
- * field, or the array itself when there is none. Constraining `call`'s result
- * by it makes a field the response does not hold as an array a type error.
- */
-export type ListPage<I> = I extends string
-  ? { readonly [K in I]: readonly unknown[] }
-  : readonly unknown[];
-
-/** One item of a page `P` whose list sits under `I`, or of `P` itself when there is none. */
-export type ListItem<P, I> = (I extends string ? P[I & keyof P] : P) extends readonly (infer T)[]
-  ? T
-  : never;
 
 /**
  * Every dot-path into `T`: its fields, and the fields of the objects below
@@ -169,16 +155,23 @@ export type GetSpec<Ctx, R = unknown> = Readonly<{
    */
   sections?(item: R): readonly string[];
 }>;
+/**
+ * What a write answers with: a record, or nothing for a write that answers
+ * without a body, which the generated client types as `void`.
+ */
+// biome-ignore lint/suspicious/noConfusingVoidType: the generated client's own type for an empty answer.
+export type WriteResult = Json | void;
+
 // Method syntax makes `body` bivariant, so a concrete-body spec still assigns to
 // the erased spec the registry and factory hold; the body/schema fit is checked
 // at the builder call site, not as bodies flow through the factory.
-export type CreateSpec<Ctx, B = Json, C = unknown> = Readonly<
+export type CreateSpec<Ctx, B = Json, C = WriteResult> = Readonly<
   WriteShape & {
     schema: Schema<B>;
     call(ctx: Ctx, body: B): Promise<C>;
   }
 >;
-export type UpdateSpec<Ctx, B = Json, U = unknown> = Readonly<
+export type UpdateSpec<Ctx, B = Json, U = WriteResult> = Readonly<
   WriteShape & {
     schema: Schema<B>;
     call(ctx: Ctx, id: string, body: B): Promise<U>;
@@ -235,6 +228,13 @@ export type ResourceDescriptor<Ctx> = Readonly<{
   groupOrder?: number;
   /** Property carrying the resource's own id on the wire. */
   idField: string;
+  /**
+   * The id a write answered with, read off its result. The registry's
+   * `resource` builder makes it from `idField`, typed against each write, so
+   * the write commands read no field by name. Method syntax, so a reader typed
+   * by its write still assigns to the erased descriptor.
+   */
+  idOf(written: Json): unknown;
   /**
    * Name of the positional argument the verbs take, and the word `--help`
    * shows. Defaults to `id`; a resource addressed by something else names it

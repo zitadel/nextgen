@@ -25,6 +25,7 @@ import {
   type DeleteSpec,
   GetOperation,
   type GetSpec,
+  type Json,
   ListOperation,
   type ListSpec,
   type OperationClass,
@@ -38,8 +39,7 @@ type Ctx = { token: string };
 
 const schema = z.object({ name: z.string() });
 const OPERATIONS = ["equals", "contains"] as const;
-const list: ListSpec<Ctx> = {
-  items: "teams",
+const list: ListSpec<Ctx, Json, { teams: readonly unknown[] }> = {
   body: schema,
   filters: [
     { field: "name", operations: OPERATIONS },
@@ -47,6 +47,7 @@ const list: ListSpec<Ctx> = {
   ],
   sorts: ["created_at"],
   call: async () => ({ teams: [] }),
+  items: (page) => page.teams,
 };
 const get: GetSpec<Ctx> = { call: async () => ({}) };
 const create: CreateSpec<Ctx> = { schema, call: async () => ({}) };
@@ -55,6 +56,7 @@ const remove: DeleteSpec<Ctx> = { outcome: "revoked", call: async () => undefine
 const resource: ResourceDescriptor<Ctx> = {
   singular: "team",
   idField: "id",
+  idOf: (written) => written.id,
   columns: ["id", "name"],
   list,
   get,
@@ -99,12 +101,12 @@ describe("operation statics", () => {
     // sees the one `--filter` grammar, not a flag per parameter.
     const statics = ListOperation.describe(
       definition({
-        items: "data",
         filters: [
           { field: "category", operations: ["equals"], values: ["a", "b"], combine: "or" as const },
           { field: "actor_id", operations: ["equals"] },
         ],
         call: async () => ({ data: [] }),
+        items: (page: { data: readonly unknown[] }) => page.data,
       }),
     );
     expect(Object.keys(statics.flags)).toEqual([
@@ -125,7 +127,11 @@ describe("operation statics", () => {
 
   it("omits the paging flags for an unpaginated list", () => {
     const statics = ListOperation.describe(
-      definition({ items: "data", paged: false, call: async () => ({ data: [] }) }),
+      definition({
+        paged: false,
+        call: async () => ({ data: [] }),
+        items: (page: { data: readonly unknown[] }) => page.data,
+      }),
     );
     expect(Object.keys(statics.flags)).toEqual(["fields", "plain", "extra"]);
   });
@@ -255,18 +261,24 @@ describe("wire conventions", () => {
     // were universal: a list is driven here with `cursor`/`next_cursor` and a
     // query body that nests its filters, and nothing in the factory objects.
     let sent: unknown;
-    const spec: ListSpec<Ctx> = {
-      items: "rows",
+    const spec: ListSpec<Ctx, Json, { rows: readonly unknown[] }> = {
       body: z.object({}).passthrough(),
       filters: [{ field: "state", operations: ["equals"] }],
       call: async (_ctx, request) => {
         sent = request;
         return { rows: [{ id: "r1" }], next_cursor: "c2" };
       },
+      items: (page) => page.rows,
     };
     const definition: OperationDefinition<Ctx, ListSpec<Ctx>> = {
       topic: "rows",
-      resource: { singular: "row", idField: "id", columns: ["id"], list: spec },
+      resource: {
+        singular: "row",
+        idField: "id",
+        idOf: (written) => written.id,
+        columns: ["id"],
+        list: spec,
+      },
       spec,
       options: {
         connect: async () => ({ token: "t" }),

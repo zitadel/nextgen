@@ -52,8 +52,6 @@ import {
   type FieldPath,
   type GetSpec,
   type Json,
-  type ListItem,
-  type ListPage,
   type ListSpec,
   renderTable,
   type ResourceDescriptor,
@@ -93,28 +91,25 @@ type Checked = ResourceDescriptor<Platform> & { readonly [checked]: true };
 /** A registry of descriptors `resource()` checked: the type `RESOURCES` satisfies. */
 export type CheckedRegistry = ResourceRegistry<Platform> & Readonly<Record<string, Checked>>;
 
-// The fields a write answers with: any field when the resource has no such
-// write, and those of its body when it can also answer without one.
-type WrittenField<W> = unknown extends W ? PropertyKey : keyof Exclude<W, void>;
-
 // The fields of `T`, each of any type: what a response schema must parse into
 // at least. A schema copied from another operation names other fields. The
 // types below them may differ: a schema applies the spec's defaults, and types
 // a recursive field as `unknown` where the generated type spells it out.
 type FieldsOf<T> = { [K in keyof T]: unknown };
 
-// Checks `call`'s response against `items`: it must hold an array under that
-// field, or be the array when there is none. Infers a structured query's
-// request type `B` from its `body` schema; a `GET` list has no body, so its
-// request stays `Json`.
-export const list = <
-  I extends string | undefined = undefined,
-  B = Json,
-  P extends ListPage<I> = ListPage<I>,
-  S extends FieldsOf<P> = FieldsOf<P>,
->(
-  spec: ListSpec<Platform, B, P, I> & { response?: Schema<S> },
-): NoInfer<ListSpec<Platform, B, P, I>> => spec;
+// What a write must answer with: a record carrying the resource's id under
+// `Id`, or nothing at all (`grants create` by identifier answers 202).
+// biome-ignore lint/suspicious/noConfusingVoidType: the generated client's own type for an empty answer.
+type Written<Id extends string> = Readonly<Record<Id, unknown>> | void;
+
+// Infers a list's page `P` from `call` and its item `T` from `items`, which
+// reads the list off that page, and checks `item` against `T`. Infers a
+// structured query's request type `B` from its `body` schema; a `GET` list has
+// no body, so its request stays `Json`. `items` comes after `call`, so the page
+// is known when `items` is read.
+export const list = <B = Json, P = unknown, T = unknown, S extends FieldsOf<T> = FieldsOf<T>>(
+  spec: ListSpec<Platform, B, P, T> & { item?: Schema<S> },
+): NoInfer<ListSpec<Platform, B, P, T>> => spec;
 
 // Infers the record `get` answers with, so `sections` reads it typed.
 export const get = <R, S extends FieldsOf<R> = FieldsOf<R>>(
@@ -123,32 +118,36 @@ export const get = <R, S extends FieldsOf<R> = FieldsOf<R>>(
 
 // Checks a resource's paths against what its verbs answer with: `columns` name
 // fields of a listed item, `heading` and `detail` fields of the record `get`
-// answers with, and `idField` a field of both and of what `create` and
-// `update` answer with, which is where a write reads the id it suggests `get` with.
+// answers with, and `idField` a field of both that `create` and `update`
+// answer with. It builds `idOf` from `idField`, the typed read a write's
+// suggested `get` takes its id from.
 export const resource = <
   P,
-  I extends string | undefined,
+  T,
   R,
   B extends Json,
   CB extends Json,
-  C,
   UB extends Json,
-  U,
+  Id extends keyof T & keyof R & string,
 >(
   descriptor: Omit<
     ResourceDescriptor<Platform>,
-    "list" | "get" | "create" | "update" | "idField" | "columns" | "heading" | "detail"
+    "list" | "get" | "create" | "update" | "idField" | "idOf" | "columns" | "heading" | "detail"
   > & {
-    list: ListSpec<Platform, B, P, I>;
+    list: ListSpec<Platform, B, P, T>;
     get: GetSpec<Platform, R>;
-    create?: CreateSpec<Platform, CB, C>;
-    update?: UpdateSpec<Platform, UB, U>;
-    idField: NoInfer<keyof ListItem<P, I> & keyof R & WrittenField<C> & WrittenField<U> & string>;
-    columns: readonly NoInfer<FieldPath<ListItem<P, I>>>[];
+    create?: CreateSpec<Platform, CB, Written<NoInfer<Id>>>;
+    update?: UpdateSpec<Platform, UB, Written<NoInfer<Id>>>;
+    idField: Id;
+    columns: readonly NoInfer<FieldPath<T>>[];
     heading: NoInfer<FieldPath<R>>;
     detail: readonly NoInfer<FieldPath<R>>[];
   },
-): Checked & { readonly get: GetSpec<Platform, R> } => ({ ...descriptor, [checked]: true });
+): Checked & { readonly get: GetSpec<Platform, R> } => ({
+  ...descriptor,
+  idOf: (written: Readonly<Record<Id, unknown>>) => written[descriptor.idField],
+  [checked]: true,
+});
 
 /** Filter operations of `POST /<resource>/query` endpoints (ADR 031). */
 const FILTER_OPERATIONS = [
@@ -203,9 +202,8 @@ export const RESOURCES = {
       "metadata.updated_at",
     ],
     list: list({
-      items: "users",
       body: QueryUsersBody,
-      response: QueryUsersResponse,
+      item: QueryUsersResponse.shape.users.element,
       filters: [
         { field: "created_at", operations: FILTER_OPERATIONS },
         { field: "id", operations: FILTER_OPERATIONS },
@@ -219,6 +217,7 @@ export const RESOURCES = {
       // No project_id: the users query defaults to the token's own project,
       // which is the only one a project secret can list.
       call: ({ client }, body) => client.queryUsers(body),
+      items: (page) => page.users,
     }),
     get: get({ call: ({ client }, id) => client.getUserByID(id), response: GetUserByIDResponse }),
     create: create(CreateUserBody, ({ client, projectId }, body) =>
@@ -237,9 +236,8 @@ export const RESOURCES = {
     heading: "name",
     detail: ["id", "status", "created_at", "updated_at"],
     list: list({
-      items: "teams",
       body: QueryTeamsBody,
-      response: QueryTeamsResponse,
+      item: QueryTeamsResponse.shape.teams.element,
       filters: [
         { field: "created_at", operations: FILTER_OPERATIONS },
         { field: "name", operations: FILTER_OPERATIONS },
@@ -247,6 +245,7 @@ export const RESOURCES = {
       ],
       sorts: ["created_at", "name", "status"],
       call: ({ client, projectId }, body) => client.queryTeams(body, { project_id: projectId }),
+      items: (page) => page.teams,
     }),
     get: get({ call: ({ client }, id) => client.getTeam(id), response: GetTeamResponse }),
     create: create(CreateTeamBody, ({ client, projectId }, body) =>
@@ -266,9 +265,8 @@ export const RESOURCES = {
     heading: "session_id",
     detail: ["project_id", "state", "user_id", "created_at", "expires_at"],
     list: list({
-      items: "sessions",
       body: QuerySessionsBody,
-      response: QuerySessionsResponse,
+      item: QuerySessionsResponse.shape.sessions.element,
       filters: [
         { field: "created_at", operations: FILTER_OPERATIONS },
         { field: "user_id", operations: FILTER_OPERATIONS },
@@ -277,6 +275,7 @@ export const RESOURCES = {
       ],
       sorts: ["created_at", "user_id"],
       call: ({ client, projectId }, body) => client.querySessions(body, { project_id: projectId }),
+      items: (page) => page.sessions,
     }),
     get: get({ call: ({ client }, id) => client.getSession(id), response: GetSessionResponse }),
     // The endpoint terminates the session rather than removing a record, so
@@ -301,8 +300,7 @@ export const RESOURCES = {
       "occurred_at",
     ],
     list: list({
-      items: "data",
-      response: ListEventsResponse,
+      item: ListEventsResponse.shape.data.element,
       // `GET /events` spells its filters as flat query parameters, and a range
       // as two of them. Declaring the parameter each operation travels as lets
       // the caller write the same `field=operation:value` they write for every
@@ -337,6 +335,7 @@ export const RESOURCES = {
       sortParam: "order",
       call: ({ client, projectId }, params) =>
         client.listEvents({ project_id: projectId, ...params }),
+      items: (page) => page.data,
     }),
     get: get({
       call: ({ client, projectId }, id) => client.getEvent(id, { project_id: projectId }),
@@ -352,9 +351,8 @@ export const RESOURCES = {
     heading: "id",
     detail: ["user.user_id", "team.team_id", "relation", "object_type", "created_at", "expires_at"],
     list: list({
-      items: "grants",
       body: QueryGrantsBody,
-      response: QueryGrantsResponse,
+      item: QueryGrantsResponse.shape.grants.element,
       filters: [
         { field: "created_at", operations: FILTER_OPERATIONS },
         { field: "user_id", operations: FILTER_OPERATIONS },
@@ -364,6 +362,7 @@ export const RESOURCES = {
       ],
       sorts: ["created_at", "expires_at", "id"],
       call: ({ client, projectId }, body) => client.queryGrants(body, { project_id: projectId }),
+      items: (page) => page.grants,
     }),
     get: get({
       call: ({ client, projectId }, id) => client.getGrant(id, { project_id: projectId }),
@@ -393,15 +392,15 @@ export const RESOURCES = {
     heading: "slug",
     detail: ["id", "revision_id", "slug", "created_at", "updated_at"],
     list: list({
-      items: "idps",
       body: QueryIdpsBody,
-      response: QueryIdpsResponse,
+      item: QueryIdpsResponse.shape.idps.element,
       filters: [
         { field: "slug", operations: FILTER_OPERATIONS },
         { field: "created_at", operations: FILTER_OPERATIONS },
       ],
       sorts: ["slug", "created_at"],
       call: ({ client, projectId }, body) => client.queryIdps(body, { project_id: projectId }),
+      items: (page) => page.idps,
     }),
     get: get({
       call: ({ client, projectId }, id) => client.getIdpById(id, { project_id: projectId }),
@@ -432,12 +431,12 @@ export const RESOURCES = {
     heading: "name",
     detail: ["id", "origins", "created_at", "updated_at"],
     list: list({
-      items: "projects",
       body: QueryProjectsBody,
-      response: QueryProjectsResponse,
+      item: QueryProjectsResponse.shape.projects.element,
       filters: [{ field: "created_at", operations: FILTER_OPERATIONS }],
       sorts: ["created_at"],
       call: ({ client }, body) => client.queryProjects(body),
+      items: (page) => page.projects,
     }),
     get: get({ call: ({ client }, id) => client.getProject(id), response: GetProjectResponse }),
     update: update(PatchProjectBody, ({ client }, id, body) => client.patchProject(id, body)),
@@ -459,8 +458,7 @@ export const RESOURCES = {
     heading: "schema.objectType",
     detail: ["id", "schema.objectType", "schema.kind", "metadata.created_at"],
     list: list({
-      items: "schemas",
-      response: ListSchemasResponse,
+      item: ListSchemasResponse.shape.schemas.element,
       filters: [
         { field: "object_type", operations: ["equals"] },
         { field: "kind", operations: ["equals"] },
@@ -477,6 +475,7 @@ export const RESOURCES = {
       ],
       call: ({ client, projectId }, params) =>
         client.listSchemas({ ...params, project_id: projectId }),
+      items: (page) => page.schemas,
     }),
     get: get({
       response: GetSchemaByIdResponse,
@@ -529,10 +528,10 @@ export const RESOURCES = {
       "metadata.git_dirty",
     ],
     list: list({
-      items: "releases",
-      response: ListReleasesResponse,
+      item: ListReleasesResponse.shape.releases.element,
       call: ({ client, projectId }, params) =>
         client.listReleases({ ...params, project_id: projectId }),
+      items: (page) => page.releases,
     }),
     get: get({
       call: ({ client, projectId }, id) => client.getReleaseById(id, { project_id: projectId }),
@@ -552,8 +551,7 @@ export const RESOURCES = {
     heading: "flow_definition.name",
     detail: ["id", "flow_definition.name", "flow_definition.status", "created_at", "updated_at"],
     list: list({
-      items: "flow_definitions",
-      response: ListFlowDefinitionsResponse,
+      item: ListFlowDefinitionsResponse.shape.flow_definitions.element,
       filters: [
         { field: "name", operations: ["equals"] },
         { field: "purpose", operations: ["equals"] },
@@ -572,6 +570,7 @@ export const RESOURCES = {
           ...params,
           project_id: projectId,
         }),
+      items: (page) => page.flow_definitions,
     }),
     get: get({
       response: GetFlowDefinitionResponse,
@@ -609,8 +608,9 @@ export const RESOURCES = {
       // `GET /branding` answers with the array itself and takes no cursor, so
       // the paging flags are not generated for it.
       paged: false,
-      response: ListBrandingResponse,
+      item: ListBrandingResponse.element,
       call: ({ client, projectId }) => client.listBranding({ project_id: projectId }),
+      items: (page) => page,
     }),
     get: get({
       call: ({ client }, id) => client.getBrandingById(id),
@@ -635,11 +635,11 @@ export const RESOURCES = {
     heading: "operation",
     detail: ["id", "operation", "config", "revision_id", "project_id", "created_at", "updated_at"],
     list: list({
-      items: "policies",
-      response: ListPoliciesResponse,
+      item: ListPoliciesResponse.shape.policies.element,
       filters: [{ field: "operation", operations: ["equals"] }],
       call: ({ client, projectId }, params) =>
         client.listPolicies({ ...params, project_id: projectId }),
+      items: (page) => page.policies,
     }),
     get: get({
       response: GetPolicyResponse,
