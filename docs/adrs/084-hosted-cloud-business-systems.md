@@ -2,7 +2,8 @@
 
 > **Status:** Proposed (scaffolded: Zitadel's reads are live, Stripe and
 > HubSpot answer from mocks; open questions 1 to 4 decided 2026-10-29;
-> HubSpot's records and email subscriptions decided 2026-10-30)
+> HubSpot's records and email subscriptions decided 2026-10-30, the
+> sign-up's lead 2026-10-31)
 > **Date:** 2026-10-29
 > **Context:** What the hosted cloud needs because we sell Zitadel (sign-up,
 > bot checks on its own sign-in, support, CRM and marketing consent, pricing
@@ -87,9 +88,8 @@ places:
   closes in general (§8), never as a platform-project case.
 - Zitadel holds identity, teams and projects, and what a person ticked when
   signing up. Stripe holds money, HubSpot the relationship. There is no store
-  of our own: Stripe customers carry `zitadel_team_id`, HubSpot contacts
-  `zitadel_user_id` and deals `zitadel_team_id`, and each record is found by
-  them.
+  of our own: Stripe customers carry `zitadel_team_id`, HubSpot contacts and
+  their sign-ups' leads `zitadel_user_id`, and each record is found by them.
 
 ### 2. One backend service: functions for answers, workflows for the rest
 
@@ -152,8 +152,9 @@ server's catch-all.
     choosing the team a claim lands in are Console ADR 0005 §4's open question.
     That question is now due, because billing is per team.
 
-  Each added team is provisioned like the first (Stripe customer, HubSpot
-  deal); today's trigger picks it up on the next signed-in page.
+  Each added team gets a Stripe customer like the first; today's trigger
+  picks it up on the next signed-in page. HubSpot hears of a team only once
+  it pays (§7).
 - What sign-up asks for is the platform project's configuration, kept where
   a customer keeps theirs: a `.zitadel/` folder in `apps/cloud`, applied with
   `zitadel apply`. It adds one field to the `register` step: a required terms
@@ -161,15 +162,16 @@ server's catch-all.
   (§7), but the sign-up page says that it comes and how to leave it.
 - **Provisioning**, a workflow per system (`provision-crm`,
   `provision-billing`), so neither system's failure holds up the other, gives
-  each new person, as HubSpot models it natively and the legacy cloud does:
+  each new person:
   - a HubSpot contact keyed by `zitadel_user_id`. A contact HubSpot already
     has for the email, from a form or the legacy cloud, takes the id rather
-    than getting a second;
+    than getting a second. HubSpot makes the company itself, from the email
+    domain ("Create and associate companies with contacts"), so a personal
+    team never becomes a company;
+  - a lead for the sign-up, on that contact and keyed by `zitadel_user_id`
+    too, in the lead pipeline's first stage with the lead source "Zitadel
+    Cloud", for sales to qualify (§7);
   - the newsletter and security subscriptions of §7;
-  - a deal for each team, keyed by `zitadel_team_id`, with the contact on it.
-    HubSpot makes the company itself, from the email domain ("Create and
-    associate companies with contacts"), so a personal team never becomes a
-    company;
   - a Stripe customer for each team, with no subscription. Stripe advises
     creating the customer at sign-up.
 
@@ -296,9 +298,16 @@ server's catch-all.
 
 ### 7. Support, the CRM and marketing consent (priority 3)
 
+- **Sales records** (decided 2026-10-31 with sales, as a first hypothesis).
+  A sign-up is a lead (§3), which sales qualifies in HubSpot's workspace;
+  onboarding makes no deal. A team that goes Pro becomes a HubSpot
+  subscription. HubSpot's API creates one only where the portal takes
+  payments through HubSpot Payments or Stripe payment processing, so how a
+  Stripe Billing subscription reaches it is still open (§6). An Enterprise
+  customer becomes a contract, which sales makes; the portal has no access
+  to HubSpot's contract object yet. Neither is scaffolded.
 - **Support.** Settings → Support files a HubSpot ticket on the person's
-  contact and their team's deal, and lists their own tickets. HubSpot sends
-  the replies by email.
+  contact, and lists their own tickets. HubSpot sends the replies by email.
 - **Subscriptions at sign-up** (decided 2026-10-30). Provisioning subscribes
   every new person to HubSpot's Newsletter (product news) and Security
   subscription types, with legal basis `LEGITIMATE_INTEREST_CLIENT`, as
@@ -386,16 +395,15 @@ server's catch-all.
   1. Sign-up: §8.1 and §8.5, the `.zitadel/` fields, accounts in the console
      (Console ADR 0005 §4), and the live HubSpot adapter. The website's link
      follows §8.2. The adapter needs, in HubSpot:
-     - unique-value properties `zitadel_user_id` (contacts) and
-       `zitadel_team_id` (deals);
+     - the unique-value property `zitadel_user_id`, on contacts and on leads;
      - the sign-up's source on contacts, in a "Cloud sign-up" group:
        `signup_via` (dropdown: `cli`, `console`) and `signup_utm_source`,
        `signup_utm_medium` and `signup_utm_campaign` (single-line text);
-     - the pipeline and first stage for a team's deal: "Cloud Pipeline", the
-       legacy cloud's, or one of its own;
+     - the lead pipeline and first stage for sign-ups: HubSpot's default
+       ("Lead pipeline", "New"), or one of sales' own;
      - the ids of the Newsletter and Security subscription types;
      - the onboarding workflow of §7, and the notices' segment;
-     - a private app with the contacts, deals and communication-preferences
+     - a private app with the contacts, leads and communication-preferences
        scopes, whose token only Production holds.
   2. BotID: verified on a preview, and open question 1 answered.
   3. Support and Email: HubSpot's tickets and subscriptions, live.
