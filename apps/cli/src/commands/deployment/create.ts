@@ -26,8 +26,6 @@ export default class DeploymentCreate extends EnvironmentCommand {
     const { flags } = await this.parse(DeploymentCreate);
     await this.toMeta(flags);
 
-    const targets = ["primary"];
-
     // A dry run makes no request, so it answers before the connection — the
     // order `origin add`/`deploy` use, which keeps the no-mutation promise
     // literal: deploying an existing release writes a deployment record, and a
@@ -35,8 +33,8 @@ export default class DeploymentCreate extends EnvironmentCommand {
     if (this.meta.dryRun) {
       return this.emit({
         status: "ok",
-        data: { dry_run: true, release_id: flags.release, targets },
-        pretty: `Would deploy ${flags.release} to ${targets.join(", ")}. Nothing was deployed (dry run).`,
+        data: { dry_run: true, release_id: flags.release, targets: ["primary"] },
+        pretty: `Would deploy ${flags.release} to primary. Nothing was deployed (dry run).`,
       });
     }
 
@@ -44,7 +42,7 @@ export default class DeploymentCreate extends EnvironmentCommand {
 
     const deployment = await createDeployment(client, projectId, {
       releaseId: flags.release,
-      targets,
+      targets: "primary",
       message: flags.message,
     });
 

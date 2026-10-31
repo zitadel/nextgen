@@ -126,7 +126,7 @@ export function deployToPrimary(
   return api.createDeployment(
     {
       release_id: releaseId,
-      targets: [PRIMARY_TARGET],
+      targets: PRIMARY_TARGET,
       ...(input.message ? { message: input.message } : {}),
       ...(input.expectedDeploymentId ? { expected_deployment_id: input.expectedDeploymentId } : {}),
     },

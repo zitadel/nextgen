@@ -156,12 +156,11 @@ export default class Deploy extends EnvironmentCommand {
     const observed = live.find((deployment) =>
       deployment.targets.some((entry) => landing.includes(entry.origin)),
     )?.id;
-    const targets = ["primary"];
     let deployment: Awaited<ReturnType<typeof createDeployment>>;
     try {
       deployment = await createDeployment(client, projectId, {
         releaseId: release.id,
-        targets,
+        targets: "primary",
         message,
         // On a project's first deploy nothing is live, so there is no
         // deployment to guard against: the field is omitted rather than sent

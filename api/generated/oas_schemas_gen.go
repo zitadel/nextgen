@@ -22261,6 +22261,44 @@ func (s *DeploymentMetadataDeployedByType) UnmarshalText(data []byte) error {
 	}
 }
 
+type DeploymentPreviewUrls []string
+
+// Every primary origin of the project.
+// Ref: #
+type DeploymentPrimaryTarget string
+
+const (
+	DeploymentPrimaryTargetPrimary DeploymentPrimaryTarget = "primary"
+)
+
+// AllValues returns all DeploymentPrimaryTarget values.
+func (DeploymentPrimaryTarget) AllValues() []DeploymentPrimaryTarget {
+	return []DeploymentPrimaryTarget{
+		DeploymentPrimaryTargetPrimary,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s DeploymentPrimaryTarget) MarshalText() ([]byte, error) {
+	switch s {
+	case DeploymentPrimaryTargetPrimary:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *DeploymentPrimaryTarget) UnmarshalText(data []byte) error {
+	switch DeploymentPrimaryTarget(data) {
+	case DeploymentPrimaryTargetPrimary:
+		*s = DeploymentPrimaryTargetPrimary
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
 // Why the deployment was created: `deploy`, or `rollback` when an earlier
 // release goes live again. The rollback operation always records `rollback`;
 // `POST /deployments` may too, and then `rollback_to` is null.
@@ -22381,7 +22419,76 @@ func (s *DeploymentTarget) SetExpiresAt(val OptDateTime) {
 	s.ExpiresAt = val
 }
 
-type DeploymentTargetsRequest []string
+// Where the release goes live: `primary`, every primary origin of the project,
+// or a list of preview URLs.
+// Ref: #
+// DeploymentTargetsRequest represents sum type.
+type DeploymentTargetsRequest struct {
+	Type                    DeploymentTargetsRequestType // switch on this field
+	DeploymentPrimaryTarget DeploymentPrimaryTarget
+	DeploymentPreviewUrls   DeploymentPreviewUrls
+}
+
+// DeploymentTargetsRequestType is oneOf type of DeploymentTargetsRequest.
+type DeploymentTargetsRequestType string
+
+// Possible values for DeploymentTargetsRequestType.
+const (
+	DeploymentPrimaryTargetDeploymentTargetsRequest DeploymentTargetsRequestType = "DeploymentPrimaryTarget"
+	DeploymentPreviewUrlsDeploymentTargetsRequest   DeploymentTargetsRequestType = "DeploymentPreviewUrls"
+)
+
+// IsDeploymentPrimaryTarget reports whether DeploymentTargetsRequest is DeploymentPrimaryTarget.
+func (s DeploymentTargetsRequest) IsDeploymentPrimaryTarget() bool {
+	return s.Type == DeploymentPrimaryTargetDeploymentTargetsRequest
+}
+
+// IsDeploymentPreviewUrls reports whether DeploymentTargetsRequest is DeploymentPreviewUrls.
+func (s DeploymentTargetsRequest) IsDeploymentPreviewUrls() bool {
+	return s.Type == DeploymentPreviewUrlsDeploymentTargetsRequest
+}
+
+// SetDeploymentPrimaryTarget sets DeploymentTargetsRequest to DeploymentPrimaryTarget.
+func (s *DeploymentTargetsRequest) SetDeploymentPrimaryTarget(v DeploymentPrimaryTarget) {
+	s.Type = DeploymentPrimaryTargetDeploymentTargetsRequest
+	s.DeploymentPrimaryTarget = v
+}
+
+// GetDeploymentPrimaryTarget returns DeploymentPrimaryTarget and true boolean if DeploymentTargetsRequest is DeploymentPrimaryTarget.
+func (s DeploymentTargetsRequest) GetDeploymentPrimaryTarget() (v DeploymentPrimaryTarget, ok bool) {
+	if !s.IsDeploymentPrimaryTarget() {
+		return v, false
+	}
+	return s.DeploymentPrimaryTarget, true
+}
+
+// NewDeploymentPrimaryTargetDeploymentTargetsRequest returns new DeploymentTargetsRequest from DeploymentPrimaryTarget.
+func NewDeploymentPrimaryTargetDeploymentTargetsRequest(v DeploymentPrimaryTarget) DeploymentTargetsRequest {
+	var s DeploymentTargetsRequest
+	s.SetDeploymentPrimaryTarget(v)
+	return s
+}
+
+// SetDeploymentPreviewUrls sets DeploymentTargetsRequest to DeploymentPreviewUrls.
+func (s *DeploymentTargetsRequest) SetDeploymentPreviewUrls(v DeploymentPreviewUrls) {
+	s.Type = DeploymentPreviewUrlsDeploymentTargetsRequest
+	s.DeploymentPreviewUrls = v
+}
+
+// GetDeploymentPreviewUrls returns DeploymentPreviewUrls and true boolean if DeploymentTargetsRequest is DeploymentPreviewUrls.
+func (s DeploymentTargetsRequest) GetDeploymentPreviewUrls() (v DeploymentPreviewUrls, ok bool) {
+	if !s.IsDeploymentPreviewUrls() {
+		return v, false
+	}
+	return s.DeploymentPreviewUrls, true
+}
+
+// NewDeploymentPreviewUrlsDeploymentTargetsRequest returns new DeploymentTargetsRequest from DeploymentPreviewUrls.
+func NewDeploymentPreviewUrlsDeploymentTargetsRequest(v DeploymentPreviewUrls) DeploymentTargetsRequest {
+	var s DeploymentTargetsRequest
+	s.SetDeploymentPreviewUrls(v)
+	return s
+}
 
 // The release references variables the project holds no value for.
 // Ref: #

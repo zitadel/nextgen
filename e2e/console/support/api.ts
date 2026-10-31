@@ -146,7 +146,7 @@ export async function deployToPrimary(
   await addPrimaryOrigin(zitadel, origin);
   return withErrorBody(
     zitadel.api.createDeployment(
-      { release_id: releaseId, targets: ["primary"] },
+      { release_id: releaseId, targets: "primary" },
       { project_id: zitadel.handle.projectId },
     ),
   );

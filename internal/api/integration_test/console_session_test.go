@@ -134,7 +134,7 @@ func TestConsoleManagementAcceptsSession(t *testing.T) {
 		require.NoError(t, err)
 		deployed, err := session.CreateDeployment(t.Context(), &api.CreateDeploymentRequest{
 			ReleaseID: api.NewOptReleaseID(created.ID),
-			Targets:   api.DeploymentTargetsRequest{"primary"},
+			Targets:   primaryTargets(),
 		}, api.CreateDeploymentParams{ProjectID: ownedID})
 		require.NoError(t, err)
 		require.IsType(t, &api.CreateDeploymentCreated{}, deployed, helpers.MustMarshal(t, deployed))
@@ -480,7 +480,7 @@ func TestConsoleManagementSessionWithoutAccess(t *testing.T) {
 		// Nor deploy there: the write stops at the project, as not found.
 		deployed, err := session.CreateDeployment(t.Context(), &api.CreateDeploymentRequest{
 			ReleaseID: api.NewOptReleaseID(created.ID),
-			Targets:   api.DeploymentTargetsRequest{"primary"},
+			Targets:   primaryTargets(),
 		}, api.CreateDeploymentParams{ProjectID: otherID})
 		require.NoError(t, err)
 		require.IsType(t, &api.CreateDeploymentNotFound{}, deployed, helpers.MustMarshal(t, deployed))

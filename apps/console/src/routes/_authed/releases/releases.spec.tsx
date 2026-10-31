@@ -527,7 +527,7 @@ describe("redeploy", () => {
     expect(screen.queryByText("Release redeployed")).not.toBeInTheDocument();
     expect(posted).toEqual({
       release_id: "rel_1",
-      targets: ["primary"],
+      targets: "primary",
       expected_deployment_id: "dep_live",
     });
   });

@@ -62,14 +62,14 @@ export function servesPrimary(deployment: Pick<ListedDeployment, "targets">): bo
   return deployment.targets.some((target) => target.expires_at == null);
 }
 
-/** What target a deploy goes to: every primary origin, or one exact origin. */
-export type DeployTargets = ["primary"] | [string];
+/** Where a deploy goes: every primary origin, or preview URLs. */
+export type DeployTargets = "primary" | string[];
 
 /**
  * Make a release live. The release is named by id or by content digest, never
- * both, and the targets are `primary` (every primary origin), one exact primary
- * origin, or the preview URLs a pull-request build registers. `ttl` sets how
- * long each preview stays live and is only valid with preview URLs. The server
+ * both, and the targets are `primary` (every primary origin) or the preview
+ * URLs a pull-request build registers. `ttl` sets how long each preview stays
+ * live and is only valid with preview URLs. The server
  * answers 201 when it wrote a deployment and 200 when every target already
  * served the release.
  */
@@ -79,7 +79,7 @@ export async function createDeployment(
   input: {
     releaseId?: string;
     contentHash?: string;
-    targets: string[];
+    targets: DeployTargets;
     message?: string;
     ttl?: string;
     /**

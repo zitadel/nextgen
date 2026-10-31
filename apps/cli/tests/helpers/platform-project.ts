@@ -66,7 +66,7 @@ export async function aProjectWithTwoDeploys(
     });
     const deployment = await callPlatform(`/deployments?project_id=${id}`, secret, {
       release_id: release.id,
-      targets: ["primary"],
+      targets: "primary",
     });
     undone = deployment.id as string;
   }
