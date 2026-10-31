@@ -125,8 +125,8 @@ func TestNoOriginServesNewestPrimaryDeployment(t *testing.T) {
 
 // TestDeploymentFreezesOrigins serves a primary origin only while the newest
 // primary deployment names it and the project lists it. An origin added since
-// waits for a deploy, and one removed stops at once and stays out when it comes
-// back.
+// waits for a deploy, one removed stops at once, and once a deploy has left it
+// out it stays out when it comes back.
 func TestDeploymentFreezesOrigins(t *testing.T) {
 	t.Parallel()
 
