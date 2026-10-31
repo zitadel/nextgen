@@ -35,6 +35,16 @@ func RowServes(tables Tables, placeholder string) string {
 	return `(` + primaryRowServes(tables) + ` OR ` + previewRowServes(tables, placeholder) + `)`
 }
 
+// OriginRowServes reports whether a deployment answers requests from the origin
+// of row t. It holds for at most one row of an origin: a listed primary origin
+// runs the newest primary deployment that names it, and any other origin its
+// latest preview deployment until the preview expires. RowServes can hold for a
+// primary and a preview row of one origin, because an origin the project stopped
+// listing can stay on the newest primary deployment.
+func OriginRowServes(tables Tables, placeholder string) string {
+	return `((` + primaryRowServes(tables) + ` AND ` + isPrimaryOrigin(tables) + `) OR ` + previewRowServes(tables, placeholder) + `)`
+}
+
 func primaryRowServes(tables Tables) string {
 	newerPrimary := `EXISTS (SELECT 1 FROM ` + tables.Deployments + ` np` +
 		` WHERE np.project_id = t.project_id AND np.origin_kind = 'primary'` +
@@ -47,7 +57,9 @@ func primaryRowServes(tables Tables) string {
 func previewRowServes(tables Tables, placeholder string) string {
 	previewLive := `EXISTS (SELECT 1 FROM ` + tables.Previews + ` p` +
 		` WHERE p.project_id = t.project_id AND p.origin = t.origin AND p.expires_at > ` + placeholder + `)`
-	return `(t.origin_kind = 'preview' AND NOT ` + NewerOriginRowExists(tables.Origins) +
+	newerPreview := `EXISTS (SELECT 1 FROM ` + tables.Origins + ` newer` +
+		` WHERE newer.project_id = t.project_id AND newer.origin = t.origin AND newer.seq > t.seq AND newer.origin_kind = 'preview')`
+	return `(t.origin_kind = 'preview' AND NOT ` + newerPreview +
 		` AND NOT ` + isPrimaryOrigin(tables) + ` AND ` + previewLive + `)`
 }
 
@@ -111,6 +123,6 @@ func NewSchema(tables Tables) database.Schema[domain.DeploymentField, domain.Dep
 		domain.DeploymentFieldOrigin: correlated(`EXISTS (` + ownOrigins + ` AND t.origin = ` + valueMarker + `)`),
 		domain.DeploymentFieldLive:   correlated(`EXISTS (` + ownOrigins + ` AND ` + RowServes(tables, valueMarker) + `)`),
 		domain.DeploymentFieldServesOrigin: correlated(`EXISTS (` + ownOrigins +
-			` AND t.origin = ` + valueMarker + ` AND ` + RowServes(tables, valueMarker) + `)`),
+			` AND t.origin = ` + valueMarker + ` AND ` + OriginRowServes(tables, valueMarker) + `)`),
 	})
 }

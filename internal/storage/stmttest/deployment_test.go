@@ -321,6 +321,48 @@ func TestDeploymentStatements_NewestPrimaryStaysLive(t *testing.T) {
 	})
 }
 
+// An origin the project stopped listing as primary can stay on the newest
+// primary deployment and take previews. Both are live, and the preview is what
+// the URL serves, whichever came first.
+func TestDeploymentStatements_PreviewOnAnOriginNoLongerPrimary(t *testing.T) {
+	serving := func(t *testing.T, d dialect, projectID, origin string) string {
+		t.Helper()
+		got, err := d.stmts.GetLiveDeployment(t.Context(), projectID, origin, time.Now())
+		require.NoError(t, err)
+		return got.ID
+	}
+
+	t.Run("deployed after the primary deployment", func(t *testing.T) {
+		forEachDialect(t, func(t *testing.T, d dialect) {
+			projectID := ensureReleaseProject(t, d.stmts)
+			addPrimaryOrigins(t, d.stmts, projectID, gitOrigin)
+			rel := createRelease(t, d.stmts, projectID, "0001", domain.ReleaseMetadata{})
+			primary := deploy(t, d.stmts, projectID, rel.ID, []string{gitOrigin}, deployArgs{})
+			_, _, err := d.stmts.DeleteOriginByPattern(t.Context(), projectID, gitOrigin)
+			require.NoError(t, err)
+
+			preview := deploy(t, d.stmts, projectID, rel.ID, []string{gitOrigin}, previewDeploy(time.Hour))
+
+			assert.Equal(t, preview.ID, serving(t, d, projectID, gitOrigin))
+			assert.Equal(t, []string{preview.ID, primary.ID}, deployment.DeploymentIDs(live(t, d.stmts, projectID, time.Now(), nil)))
+		})
+	})
+
+	t.Run("deployed before it", func(t *testing.T) {
+		forEachDialect(t, func(t *testing.T, d dialect) {
+			projectID := ensureReleaseProject(t, d.stmts)
+			rel := createRelease(t, d.stmts, projectID, "0001", domain.ReleaseMetadata{})
+			preview := deploy(t, d.stmts, projectID, rel.ID, []string{gitOrigin}, previewDeploy(time.Hour))
+			addPrimaryOrigins(t, d.stmts, projectID, gitOrigin)
+			deploy(t, d.stmts, projectID, rel.ID, []string{gitOrigin}, deployArgs{})
+			_, _, err := d.stmts.DeleteOriginByPattern(t.Context(), projectID, gitOrigin)
+			require.NoError(t, err)
+
+			assert.Equal(t, preview.ID, serving(t, d, projectID, gitOrigin))
+		})
+	})
+}
+
 // GetLiveDeployment checks the origin and its liveness on the same origin row:
 // app and www serve the newest primary deployment; once it stops covering www,
 // www serves nothing.
