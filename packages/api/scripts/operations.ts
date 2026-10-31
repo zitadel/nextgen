@@ -144,10 +144,18 @@ export function pagingArgument(
   operation: Pick<ReturnType<typeof operationOf>, "id" | "paging">,
 ): number {
   const name = operation.id.charAt(0).toLowerCase() + operation.id.slice(1);
-  const signature = new RegExp(`export const ${name} = async \\(([^)]*)\\)`).exec(endpoints)?.[1];
-  if (signature === undefined) {
+  const head = `export const ${name} = async (`;
+  const start = endpoints.indexOf(head);
+  if (start === -1) {
     throw new Error(`${operation.id} has no generated function`);
   }
+  // Read to the bracket that closes the parameter list, past any a type opens.
+  let depth = 1;
+  let end = start + head.length;
+  for (; depth > 0 && end < endpoints.length; end += 1) {
+    depth += endpoints[end] === "(" ? 1 : endpoints[end] === ")" ? -1 : 0;
+  }
+  const signature = endpoints.slice(start + head.length, end - 1);
   const index = signature
     .split(/,\s*(?=\w+\??:)/)
     .map((parameter) => parameter.trim().split(/\??:/)[0] ?? "")

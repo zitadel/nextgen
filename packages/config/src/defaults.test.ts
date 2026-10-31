@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   defaultHumanUserSchemaUrl,
   getDefaultHumanUserSchema,
+  getDefaultHumanUserSchemaBody,
   getDefaultLoginFlow,
 } from "./defaults";
 
@@ -29,5 +30,18 @@ describe("default config rendering", () => {
     });
     expect(flow.user_schema).toBe("human-user");
     expect(flow.status).toBe("active");
+  });
+
+  it("leaves the template's $id out of the schema's create body", () => {
+    const body = getDefaultHumanUserSchemaBody();
+
+    expect(body).not.toHaveProperty("$id");
+  });
+
+  it("keeps the rest of the template in the schema's create body", () => {
+    const { $id: _templateId, ...template } = getDefaultHumanUserSchema();
+    void _templateId;
+
+    expect(getDefaultHumanUserSchemaBody()).toEqual(template);
   });
 });

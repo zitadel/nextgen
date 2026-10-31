@@ -11,6 +11,8 @@ export const queryThings = async (queryThingsBody: QueryThingsBody,
     params: QueryThingsParams, options?: Parameters<typeof customFetch>[1]): Promise<QueryThings200> => {
 export const searchThings = async (params: SearchThingsParams,
     searchThingsBody?: SearchThingsBody, options?: Parameters<typeof customFetch>[1]): Promise<SearchThings200> => {
+export const sortThings = async (order: ("asc" | "desc")[],
+    params?: SortThingsParams, options?: Parameters<typeof customFetch>[1]): Promise<SortThings200> => {
 `;
 
 describe("pagingArgument", () => {
@@ -19,6 +21,7 @@ describe("pagingArgument", () => {
     ["the query parameters after a path parameter", "listUserThings", "query", 1],
     ["the body before the query parameters", "queryThings", "body", 0],
     ["the body after required query parameters", "searchThings", "body", 1],
+    ["the query parameters after a type in brackets", "sortThings", "query", 1],
   ] as const)("finds %s", (_, id, token, expected) => {
     expect(pagingArgument(endpoints, { id, paging: { token, items: "things" } })).toBe(expected);
   });

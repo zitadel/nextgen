@@ -308,6 +308,15 @@ export function getDefaultHumanUserSchema(
   ) as UserSchemaDocument & { $id: string };
 }
 
+/** The default human user schema as the create body takes it: without `$id`, which the server mints. */
+export function getDefaultHumanUserSchemaBody(
+  options: DefaultConfigRenderOptions = {},
+): UserSchemaDocument {
+  const { $id: _templateId, ...body } = getDefaultHumanUserSchema(options);
+  void _templateId;
+  return body;
+}
+
 /** The flow names its user schema by `objectType`, so no schema URL renders into it. */
 export type DefaultFlowRenderOptions = Omit<DefaultConfigRenderOptions, "userSchemaUrl">;
 

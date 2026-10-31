@@ -133,14 +133,24 @@ export type ListItem<P, I> = (I extends string ? P[I & keyof P] : P) extends rea
 /**
  * Every dot-path into `T`: its fields, and the fields of the objects below
  * them, stopping at arrays. What a resource's columns and detail may name.
+ *
+ * Only declared fields count: an index signature would let any name through.
+ * A union `T` (a `get` that answers with either of two records) names only the
+ * paths every member has, as `keyof` does.
  */
-export type FieldPath<T> = T extends readonly unknown[]
+export type FieldPath<T> = [T] extends [readonly unknown[]]
   ? never
-  : T extends object
-    ? {
-        [K in keyof T & string]: K | `${K}.${FieldPath<NonNullable<T[K]>>}`;
-      }[keyof T & string]
+  : [T] extends [object]
+    ? DeclaredPaths<T>[keyof DeclaredPaths<T>]
     : never;
+
+// Mapped over `keyof T` itself, which visits declared fields one by one even
+// beside an index signature; `keyof T & string` would collapse them into it.
+type DeclaredPaths<T> = {
+  [K in keyof T as K extends string ? (string extends K ? never : K) : never]-?: K extends string
+    ? K | `${K}.${FieldPath<NonNullable<T[K]>>}`
+    : never;
+};
 
 // Method syntax for the same reason as `CreateSpec`: a spec typed by its
 // record `R` still assigns to the erased spec the registry holds.

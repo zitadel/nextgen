@@ -1,7 +1,7 @@
 import { createZitadelClient } from "@zitadel/api/client";
 import {
   DEFAULT_FLOW_SCHEMA_URI,
-  getDefaultHumanUserSchema,
+  getDefaultHumanUserSchemaBody,
   getDefaultLoginFlow,
   type SetupPreset,
   type SetupUseCase,
@@ -48,29 +48,29 @@ export async function bootstrapProject(
     })),
     seed_defaults: false,
   });
-  const projectId = project.id;
-  const projectSecret = project.project_secret;
-  const previewSecret = project.preview_secret;
+  const client = createZitadelClient({ baseUrl, token: project.project_secret });
 
-  const client = createZitadelClient({ baseUrl, token: projectSecret });
-
-  const { $id: _templateId, ...schemaBody } = getDefaultHumanUserSchema({
+  const schemaBody = getDefaultHumanUserSchemaBody({
     preset: options.preset,
     useCase: options.useCase,
   });
-  void _templateId;
-  const schema = await client.createSchema(schemaBody, { project_id: projectId });
-  const schemaId = schema.id;
+  const schema = await client.createSchema(schemaBody, { project_id: project.id });
 
   const flowBody = getDefaultLoginFlow({
     preset: options.preset,
     useCase: options.useCase,
   });
   const flow = await client.createFlowDefinition({
-    project_id: projectId,
+    project_id: project.id,
     schema_uri: DEFAULT_FLOW_SCHEMA_URI,
     flow_definition: flowBody,
   });
 
-  return { projectId, projectSecret, previewSecret, schemaId, flowId: flow.id };
+  return {
+    projectId: project.id,
+    projectSecret: project.project_secret,
+    previewSecret: project.preview_secret,
+    schemaId: schema.id,
+    flowId: flow.id,
+  };
 }

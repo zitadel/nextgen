@@ -10,7 +10,7 @@ import {
   DEFAULT_SETUP_PRESET,
   DEFAULT_SETUP_USE_CASE,
   flowsReadmeContent,
-  getDefaultHumanUserSchema,
+  getDefaultHumanUserSchemaBody,
   getDefaultLoginFlow,
   policiesReadmeContent,
   schemasReadmeContent,
@@ -125,7 +125,7 @@ export async function materializeSetupResources(opts: {
   const filesWritten: string[] = [];
   const preset = opts.preset ?? DEFAULT_SETUP_PRESET;
   const useCase = opts.useCase ?? DEFAULT_SETUP_USE_CASE;
-  const schemaTemplate = defaultSchemaTemplate(preset, useCase);
+  const schemaTemplate = getDefaultHumanUserSchemaBody({ preset, useCase });
 
   // The connection goes first, and is created before the schema and flow that
   // name its slug: a Project should never be published claiming a provider the
@@ -332,21 +332,11 @@ export async function assertNoSetupResourceConflicts(opts: {
   useCase?: SetupUseCase;
   sso?: readonly { selection: ProviderSelection; endpoints?: ConnectionEndpoints }[];
 }): Promise<void> {
-  const schemaTemplate = defaultSchemaTemplate(
-    opts.preset ?? DEFAULT_SETUP_PRESET,
-    opts.useCase ?? DEFAULT_SETUP_USE_CASE,
-  );
-  await refuseResourceConflicts(opts.cwd, opts.force, planConnections(schemaTemplate, opts.sso));
-}
-
-/** The default human user schema for a preset and use case, without the template's `$id`. */
-function defaultSchemaTemplate(preset: SetupPreset, useCase: SetupUseCase): UserSchemaDocument {
-  const { $id: _templateId, ...schemaTemplate } = getDefaultHumanUserSchema({
-    preset,
-    useCase,
+  const schemaTemplate = getDefaultHumanUserSchemaBody({
+    preset: opts.preset ?? DEFAULT_SETUP_PRESET,
+    useCase: opts.useCase ?? DEFAULT_SETUP_USE_CASE,
   });
-  void _templateId;
-  return schemaTemplate;
+  await refuseResourceConflicts(opts.cwd, opts.force, planConnections(schemaTemplate, opts.sso));
 }
 
 type PlannedConnection = {

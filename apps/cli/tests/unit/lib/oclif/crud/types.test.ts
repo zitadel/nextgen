@@ -48,4 +48,16 @@ describe("FieldPath", () => {
   it("names nothing inside an array", () => {
     expectTypeOf<"teams.0">().not.toExtend<FieldPath<User>>();
   });
+
+  it("names no field an index signature would let through", () => {
+    type Open = { id: string; schema: { objectType: string; [key: string]: unknown } };
+
+    expectTypeOf<FieldPath<Open>>().toEqualTypeOf<"id" | "schema" | "schema.objectType">();
+  });
+
+  it("names only the paths every member of a union has", () => {
+    type Either = { id: string; updated_at: string } | { id: string };
+
+    expectTypeOf<FieldPath<Either>>().toEqualTypeOf<"id">();
+  });
 });
