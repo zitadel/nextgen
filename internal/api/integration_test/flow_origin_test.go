@@ -66,6 +66,65 @@ func TestFlowOrigins(t *testing.T) {
 	})
 }
 
+// TestNoOriginServesNewestPrimaryDeployment serves a caller with no Origin, and
+// one from a console origin the project does not list, from the newest primary
+// deployment.
+func TestNoOriginServesNewestPrimaryDeployment(t *testing.T) {
+	t.Parallel()
+
+	fixture := newDeploymentFixture(t)
+	assertFlowCode(t, fixture.project, appOrigin, domain.ErrReleaseNotDeployed(nil).Code)
+
+	listResp, err := fixture.client.ListFlowDefinitions(t.Context(), api.ListFlowDefinitionsParams{
+		ProjectID: api.ProjectID(fixture.project),
+	})
+	require.NoError(t, err)
+	require.IsType(t, &api.FlowDefinitionListResponse{}, listResp, helpers.MustMarshal(t, listResp))
+	pointers := fixture.pointers()
+	pinned := map[string]bool{fixture.flowdefID: true}
+	for _, definition := range listResp.(*api.FlowDefinitionListResponse).FlowDefinitions {
+		if pinned[definition.ID] {
+			continue
+		}
+		pointers = append(pointers, api.CreateReleasePointer{
+			Kind:       api.ReleasePointerKindFlowDefinition,
+			RevisionID: definition.ID,
+		})
+		pinned[definition.ID] = true
+	}
+	created := fixture.create(t, &api.CreateReleaseRequest{Pointers: pointers})
+	deployed := fixture.deploy(t, releaseID(t, created))
+	require.IsType(t, &api.CreateDeploymentCreated{}, deployed, helpers.MustMarshal(t, deployed))
+	assert.Equal(t, []string{appOrigin, wwwOrigin}, origins(deployed.(*api.CreateDeploymentCreated).Targets))
+
+	for _, origin := range []string{"", helpers.ConsoleOrigin, appOrigin} {
+		resp, body := openFlow(t, fixture.project, origin)
+		require.Equal(t, http.StatusCreated, resp.StatusCode, "Origin %q: %s", origin, body)
+	}
+}
+
+// releaseID is the id of a created release. The same pointer set answers 200
+// with the release that already pins it.
+func releaseID(t *testing.T, resp api.CreateReleaseRes) api.ReleaseID {
+	t.Helper()
+	switch created := resp.(type) {
+	case *api.CreateReleaseCreated:
+		return created.ID
+	case *api.CreateReleaseOK:
+		return created.ID
+	default:
+		require.FailNow(t, "create release refused", helpers.MustMarshal(t, resp))
+		return ""
+	}
+}
+
+func assertFlowCode(t *testing.T, projectID, origin, code string) {
+	t.Helper()
+	resp, body := openFlow(t, projectID, origin)
+	assert.Equal(t, http.StatusConflict, resp.StatusCode, "Origin %q: %s", origin, body)
+	assert.Equal(t, code, errorCode(body), "Origin %q: %s", origin, body)
+}
+
 // TestFlowSubmitFromLivePreview pins that submit admits a live preview Origin
 // through Gate (not primary-only validation). Primary-only would answer
 // req.invalid for a preview URL; Gate reaches the step when a preview row is live.

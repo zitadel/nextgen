@@ -1309,7 +1309,8 @@ func (s *Server) handleCreateBrandingRequest(args [0]string, argsEscaped bool, w
 // Name the release by exactly one of `release_id` or `content_hash`; it
 // must already exist in the project. `targets` is `primary` or preview
 // URLs. The deployment freezes the project's variable values for its kind,
-// with no fallback between primary and preview values.
+// with no fallback between primary and preview values. The newest primary
+// deployment also serves a caller with no origin.
 // A deployment to `primary` changes nothing when the project's newest
 // primary deployment has the same release and frozen values and covers
 // exactly the current primary origins: the call answers `200` with that
@@ -1561,10 +1562,11 @@ func (s *Server) handleCreateDeploymentRequest(args [0]string, argsEscaped bool,
 // pattern with no live preview answers `403` with `proj.preview_not_live`;
 // nothing deployed to the target answers `409` with `rel.not_deployed`; a
 // revoked release answers `409` with `rel.revoked`. A request with no
-// `Origin` passes the gate and still needs a deployment target. A loopback
-// origin passes it too, and so does the server's own origin, from which its
-// console previews a project's login; a step submitted from the server's
-// own origin is still refused unless the project lists it.
+// `Origin` passes the gate. A loopback origin passes it too, and so does a
+// console origin, from which the console previews a project's login; a step
+// submitted from a console origin is still refused unless the project lists
+// it. Any of these with nothing deployed to its origin is served the
+// project's newest primary deployment when there is one.
 // The response contains an `id` field — the flow handle. Use it as the path
 // parameter for all subsequent `/flow/{id}/submit` calls.
 // The response also sets an encrypted `HttpOnly` cookie (`_zflow`) containing

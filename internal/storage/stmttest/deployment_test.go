@@ -302,6 +302,26 @@ func TestDeploymentStatements_LiveView(t *testing.T) {
 	})
 }
 
+// With no primary origin left, the newest primary deployment alone stays live:
+// it still serves callers with no origin.
+func TestDeploymentStatements_LiveWithNoPrimaryOriginLeft(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID := ensureReleaseProject(t, d.stmts)
+		addPrimaryOrigins(t, d.stmts, projectID, appOrigin)
+		relA := createRelease(t, d.stmts, projectID, "0001", domain.ReleaseMetadata{})
+		relB := createRelease(t, d.stmts, projectID, "0002", domain.ReleaseMetadata{})
+
+		deploy(t, d.stmts, projectID, relA.ID, []string{appOrigin}, deployArgs{})
+		newest := deploy(t, d.stmts, projectID, relB.ID, []string{appOrigin}, deployArgs{})
+		_, _, err := d.stmts.DeleteOriginByPattern(t.Context(), projectID, appOrigin)
+		require.NoError(t, err)
+
+		got := live(t, d.stmts, projectID, time.Now(), nil)
+		require.Equal(t, []string{newest.ID}, deployment.DeploymentIDs(got))
+		assert.Equal(t, []string{appOrigin}, got[0].Origins())
+	})
+}
+
 // GetLiveDeployment checks the origin and its liveness on the same origin row:
 // app and www serve the newest primary deployment; once it stops covering www,
 // www serves nothing.

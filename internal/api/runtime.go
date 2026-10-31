@@ -13,16 +13,11 @@ func (h *Handler) resolveRuntime(ctx context.Context, projectID, origin string) 
 	if h.runtime == nil {
 		return ctx, nil
 	}
-	// TODO(#1616): resolve the project default target. Answer rel.not_deployed
-	// when that target has nothing deployed.
-	if origin == "" {
-		return ctx, nil
-	}
 	resolution, err := h.runtime.Resolve(ctx, projectID, origin)
 	if err != nil {
 		return ctx, err
 	}
-	// Service deferred: open admission, nothing deployed.
+	// Service deferred: nothing deployed where this request can be served.
 	if resolution == nil {
 		return ctx, nil
 	}

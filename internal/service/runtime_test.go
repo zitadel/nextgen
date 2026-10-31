@@ -36,12 +36,60 @@ func TestRuntimeResolver_Resolve(t *testing.T) {
 	const projectID = "proj_1"
 	const origin = "https://app.acme.com"
 
-	t.Run("absent origin is not deployed", func(t *testing.T) {
+	t.Run("absent origin with no primary deployment keeps pre-resolution path", func(t *testing.T) {
 		resolver, statements, _ := newMockedRuntimeResolver(t)
 		statements.EXPECT().GetProjectByID(gomock.Any(), projectID).Return(&domain.Project{ID: projectID}, nil)
-		_, err := resolver.Resolve(t.Context(), projectID, "")
-		require.Error(t, err)
-		assert.True(t, errors.Is(err, domain.ErrReleaseNotDeployed(nil)))
+		statements.EXPECT().ListDeployments(gomock.Any(), gomock.Any()).
+			Return(&database.ListResult[*domain.Deployment]{}, nil)
+
+		got, err := resolver.Resolve(t.Context(), projectID, "")
+		require.NoError(t, err)
+		assert.Nil(t, got)
+	})
+
+	t.Run("absent origin is served the newest primary deployment", func(t *testing.T) {
+		resolver, statements, releases := newMockedRuntimeResolver(t)
+		statements.EXPECT().GetProjectByID(gomock.Any(), projectID).Return(&domain.Project{ID: projectID}, nil)
+		statements.EXPECT().ListDeployments(gomock.Any(), gomock.Any()).
+			Return(&database.ListResult[*domain.Deployment]{Items: []*domain.Deployment{{
+				ID: "dep_primary", ProjectID: projectID, ReleaseID: "rel_primary",
+			}}}, nil)
+		releases.EXPECT().Get(gomock.Any(), projectID, "rel_primary").Return(&domain.Release{
+			ID: "rel_primary", ProjectID: projectID,
+		}, nil)
+
+		got, err := resolver.Resolve(t.Context(), projectID, "")
+		require.NoError(t, err)
+		require.NotNil(t, got)
+		assert.Equal(t, "default", got.Source)
+		assert.Equal(t, "rel_primary", got.Release.ID)
+		assert.Empty(t, got.Origin)
+	})
+
+	t.Run("own origin with no deployment is served the newest primary deployment", func(t *testing.T) {
+		resolver, statements, releases := newMockedRuntimeResolver(t)
+		statements.EXPECT().GetProjectByID(gomock.Any(), projectID).Return(&domain.Project{
+			ID: projectID,
+			Origins: []domain.Origin{
+				{Pattern: origin, Kind: domain.OriginKindPrimary},
+			},
+		}, nil)
+		statements.EXPECT().GetNewestPerOrigin(gomock.Any(), projectID, []string{ownOrigin}).
+			Return([]domain.OriginDeployment{}, nil)
+		statements.EXPECT().ListDeployments(gomock.Any(), gomock.Any()).
+			Return(&database.ListResult[*domain.Deployment]{Items: []*domain.Deployment{{
+				ID: "dep_primary", ProjectID: projectID, ReleaseID: "rel_primary",
+			}}}, nil)
+		releases.EXPECT().Get(gomock.Any(), projectID, "rel_primary").Return(&domain.Release{
+			ID: "rel_primary", ProjectID: projectID,
+		}, nil)
+
+		got, err := resolver.Resolve(t.Context(), projectID, ownOrigin)
+		require.NoError(t, err)
+		require.NotNil(t, got)
+		assert.Equal(t, "default", got.Source)
+		assert.Equal(t, ownOrigin, got.Origin)
+		assert.Empty(t, got.Target)
 	})
 
 	// The boundary line is the only line for a refused resolution, so the
@@ -109,6 +157,8 @@ func TestRuntimeResolver_Resolve(t *testing.T) {
 		}, nil)
 		statements.EXPECT().GetNewestPerOrigin(gomock.Any(), projectID, []string{origin}).
 			Return([]domain.OriginDeployment{}, nil)
+		statements.EXPECT().ListDeployments(gomock.Any(), gomock.Any()).
+			Return(&database.ListResult[*domain.Deployment]{}, nil)
 
 		got, err := resolver.Resolve(t.Context(), projectID, origin)
 		require.NoError(t, err)
@@ -126,6 +176,8 @@ func TestRuntimeResolver_Resolve(t *testing.T) {
 		}, nil)
 		statements.EXPECT().GetNewestPerOrigin(gomock.Any(), projectID, []string{loopback}).
 			Return([]domain.OriginDeployment{}, nil)
+		statements.EXPECT().ListDeployments(gomock.Any(), gomock.Any()).
+			Return(&database.ListResult[*domain.Deployment]{}, nil)
 
 		got, err := resolver.Resolve(t.Context(), projectID, loopback)
 		require.NoError(t, err)
@@ -142,6 +194,8 @@ func TestRuntimeResolver_Resolve(t *testing.T) {
 		}, nil)
 		statements.EXPECT().GetNewestPerOrigin(gomock.Any(), projectID, []string{ownOrigin}).
 			Return([]domain.OriginDeployment{}, nil)
+		statements.EXPECT().ListDeployments(gomock.Any(), gomock.Any()).
+			Return(&database.ListResult[*domain.Deployment]{}, nil)
 
 		got, err := resolver.Resolve(t.Context(), projectID, ownOrigin)
 		require.NoError(t, err)
@@ -163,6 +217,8 @@ func TestRuntimeResolver_Resolve(t *testing.T) {
 		}, nil)
 		statements.EXPECT().GetNewestPerOrigin(gomock.Any(), projectID, []string{other}).
 			Return([]domain.OriginDeployment{}, nil)
+		statements.EXPECT().ListDeployments(gomock.Any(), gomock.Any()).
+			Return(&database.ListResult[*domain.Deployment]{}, nil)
 
 		got, err := resolver.Resolve(t.Context(), projectID, other)
 		require.NoError(t, err)
@@ -255,6 +311,8 @@ func TestRuntimeResolver_Resolve(t *testing.T) {
 			Return(nil, &database.NoRowFoundError{})
 		statements.EXPECT().GetNewestPerOrigin(gomock.Any(), projectID, []string{ownOrigin}).
 			Return([]domain.OriginDeployment{}, nil)
+		statements.EXPECT().ListDeployments(gomock.Any(), gomock.Any()).
+			Return(&database.ListResult[*domain.Deployment]{}, nil)
 
 		got, err := resolver.Resolve(t.Context(), projectID, ownOrigin)
 		require.NoError(t, err)

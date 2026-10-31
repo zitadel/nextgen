@@ -39,7 +39,11 @@ func primaryRowServes(tables Tables) string {
 	newerPrimary := `EXISTS (SELECT 1 FROM ` + tables.Deployments + ` np` +
 		` WHERE np.project_id = t.project_id AND np.origin_kind = 'primary'` +
 		` AND (np.deployed_at > t.deployed_at OR (np.deployed_at = t.deployed_at AND np.id > t.deployment_id)))`
-	return `(t.origin_kind = 'primary' AND ` + isPrimaryOrigin(tables) + ` AND NOT ` + newerPrimary + `)`
+	// With no primary origin left, the newest primary deployment still serves
+	// callers with no origin, so it stays live on the origins it names.
+	noPrimaryOrigin := `NOT EXISTS (SELECT 1 FROM ` + tables.ProjectOrigins + ` po` +
+		` WHERE po.project_id = t.project_id AND po.kind = 'primary')`
+	return `(t.origin_kind = 'primary' AND (` + isPrimaryOrigin(tables) + ` OR ` + noPrimaryOrigin + `) AND NOT ` + newerPrimary + `)`
 }
 
 func previewRowServes(tables Tables, placeholder string) string {

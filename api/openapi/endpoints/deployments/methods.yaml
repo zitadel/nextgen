@@ -10,7 +10,8 @@ post:
     Name the release by exactly one of `release_id` or `content_hash`; it
     must already exist in the project. `targets` is `primary` or preview
     URLs. The deployment freezes the project's variable values for its kind,
-    with no fallback between primary and preview values.
+    with no fallback between primary and preview values. The newest primary
+    deployment also serves a caller with no origin.
 
     A deployment to `primary` changes nothing when the project's newest
     primary deployment has the same release and frozen values and covers
