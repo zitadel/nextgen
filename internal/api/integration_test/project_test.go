@@ -594,7 +594,7 @@ func TestProjectPasswordHashPolicyGovernsHashing(t *testing.T) {
 	setPassword := func(t *testing.T, projectID string) (userID, encodedHash string) {
 		t.Helper()
 		userID = harness.CreateUserWithTeam(t, projectID)
-		require.NoError(t, harness.EnsureUserService(t).SetPassword(t.Context(), service.SetPasswordInput{
+		require.NoError(t, harness.EnsureUserService(t).SetPassword(releaseContext(t), service.SetPasswordInput{
 			ProjectID: projectID,
 			UserID:    userID,
 			Password:  password,

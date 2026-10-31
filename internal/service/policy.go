@@ -40,8 +40,8 @@ var _ PolicyResolver = (*PolicyService)(nil)
 // Publish validates the instance against the operation's template and
 // appends it as the operation's newest revision, creating the policy on the
 // first publish. Which revision applies to an operation is ResolvePolicy's
-// to decide: a request served a release gets the revision it pins, any other
-// the newest. Nothing already stored (a password, a session) is re-evaluated.
+// to decide: a request gets the revision its release pins. Nothing already
+// stored (a password, a session) is re-evaluated.
 func (s *PolicyService) Publish(ctx context.Context, in PublishPolicyInput) (_ *domain.Policy, err error) {
 	ctx, end := startSpan(ctx, "PolicyService.Publish")
 	defer end(&err)
@@ -107,10 +107,9 @@ func (s *PolicyService) canonicalConfig(ctx context.Context, operation string, c
 // so a build that fails leaves no revision behind: the operation's newest
 // revision when it already holds config, otherwise a new revision of it (or
 // the policy's first). raw comes from canonicalConfig. Only the newest is
-// reused, never an older match as for IdP connections: a request that
-// resolves no release reads the newest revision (see ResolvePolicy), so going
-// back to an earlier config must append it for those requests to apply it
-// too. Equality is checked again under the lock, so a concurrent build that
+// reused, never an older match as for IdP connections, so a policy reads back
+// as the config the last build carried. Equality is checked again under the
+// lock, so a concurrent build that
 // wrote the same config first is not revised again. A lost unique index is the
 // conflict a publish answers; every other write failure goes back to the build
 // as is, which maps it as it does every bundled kind's (a missing project is
@@ -363,15 +362,8 @@ func (s *PolicyService) GetRevision(ctx context.Context, projectID, revisionID s
 	return entity, nil
 }
 
-// ResolvePolicy implements [PolicyResolver]: the policy revision that applies
-// to the request for the operation, or nil when there is none.
-//
-// A request whose release pins a flow reads the revision that release pins
-// for the operation, like the user schema, branding and identity providers
-// it serves; a release that pins none means no policy, never the newest
-// stored revision (ADR 066). Any other request, which resolved no release or
-// one that pins no flow, reads the newest revision until it resolves one
-// (#1616).
+// ResolvePolicy implements [PolicyResolver]: the revision the request's release
+// pins for the operation, or nil when it pins none (ADR 066).
 //
 // It reads through the pool, outside any transaction: the password gate runs
 // in Prepare, before the write transaction begins.
@@ -379,28 +371,20 @@ func (s *PolicyService) ResolvePolicy(ctx context.Context, projectID, operation 
 	ctx, end := startSpan(ctx, "PolicyService.ResolvePolicy")
 	defer end(&err)
 
-	stmts := s.v2Pool.Statements()
-	var entity *domain.Policy
-	if ReleasePinsFlow(ctx) {
-		revisionID, ok := PinsFor(ReleaseFromContext(ctx), domain.ReleasePointerKindPolicy)[operation]
-		if !ok {
-			return nil, nil
-		}
-		entity, err = stmts.GetPolicyRevision(ctx, projectID, revisionID)
-		if isNoRowFound(err) {
-			return nil, domain.ErrInternal(err).WithMessage(fmt.Sprintf("release pins a missing policy revision for %q", operation))
-		}
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		entity, err = stmts.GetPolicy(ctx, policystore.ByOperation(projectID, operation))
-		if err != nil {
-			if isNoRowFound(err) {
-				return nil, nil
-			}
-			return nil, err
-		}
+	pins, err := runtimePins(ctx, domain.ReleasePointerKindPolicy)
+	if err != nil {
+		return nil, err
+	}
+	revisionID, ok := pins[operation]
+	if !ok {
+		return nil, nil
+	}
+	entity, err := s.v2Pool.Statements().GetPolicyRevision(ctx, projectID, revisionID)
+	if isNoRowFound(err) {
+		return nil, domain.ErrInternal(err).WithMessage(fmt.Sprintf("release pins a missing policy revision for %q", operation))
+	}
+	if err != nil {
+		return nil, err
 	}
 	return policyInstance(entity.Operation, entity.Config)
 }

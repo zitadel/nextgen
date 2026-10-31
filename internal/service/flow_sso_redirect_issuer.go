@@ -33,7 +33,7 @@ func NewFlowSSORedirectIssuer(connections IDPConnectionService, attempts AuthAtt
 var _ domain.FlowSSORedirectIssuer = (*FlowSSORedirectIssuer)(nil)
 
 func (i *FlowSSORedirectIssuer) Issue(ctx context.Context, in domain.FlowIssueSSORedirectInput) (domain.FlowSSORedirectOutput, error) {
-	connection, err := i.connectionForSlug(ctx, in.ProjectID, in.ProviderSlug)
+	connection, err := pinnedIDPConnection(ctx, i.connections, in.ProjectID, in.ProviderSlug)
 	if err != nil {
 		return domain.FlowSSORedirectOutput{}, err
 	}
@@ -104,24 +104,17 @@ func resolveSSOClientID(ctx context.Context, variables VariableService, projectI
 	return nil
 }
 
-// ssoVariable is the variable name names for this sign-in. A sealed
-// deployment reads the set it froze. No deployment reads the live primary row.
+// ssoVariable is the variable name names for this sign-in, from the set its
+// deployment froze.
 func ssoVariable(ctx context.Context, variables VariableService, projectID, deploymentID, name string) (*domain.Variable, error) {
-	if deploymentID != "" {
-		set, err := variables.GetDeploymentVariables(ctx, projectID, deploymentID)
-		if err != nil {
-			return nil, err
-		}
-		return set.Variables()[name], nil
+	if deploymentID == "" {
+		return nil, domain.ErrReleaseNotDeployed(nil)
 	}
-	vars, err := variables.GetVariables(ctx, domain.VariableOwner{ProjectID: projectID}, new(domain.DeploymentOriginKindPrimary), name)
+	set, err := variables.GetDeploymentVariables(ctx, projectID, deploymentID)
 	if err != nil {
 		return nil, err
 	}
-	if len(vars) != 1 {
-		return nil, nil
-	}
-	return vars[0], nil
+	return set.Variables()[name], nil
 }
 
 // plainVariable is the string value of name that a browser may see. A
@@ -160,28 +153,6 @@ func sealedDeploymentID(ctx context.Context) string {
 		return ""
 	}
 	return resolution.Deployment.ID
-}
-
-func (i *FlowSSORedirectIssuer) connectionForSlug(ctx context.Context, projectID, slug string) (*domain.IDPConnection, error) {
-	if ReleasePinsFlow(ctx) {
-		revisionID, err := pinnedIDPRevision(ctx, slug)
-		if err != nil {
-			return nil, err
-		}
-		connection, err := i.connections.GetRevision(ctx, projectID, revisionID)
-		if err != nil {
-			return nil, pinnedIDPReadError(slug, err)
-		}
-		return connection, nil
-	}
-	connections, err := i.connections.GetBySlugs(ctx, projectID, []string{slug})
-	if err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to read identity provider connection")
-	}
-	if len(connections) == 0 {
-		return nil, domain.ErrIDPConnectionNotFound()
-	}
-	return connections[0], nil
 }
 
 // unavailable turns an engine rejection of the connection into the step

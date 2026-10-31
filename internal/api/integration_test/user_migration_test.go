@@ -368,12 +368,15 @@ func TestPatchUserMigrationKeepsIdentity(t *testing.T) {
 			}
 		}`, helpers.BuiltinSchemaBaseURL, migrationObjectType, helpers.MustMarshal(t, required), properties))
 	}
-	initialSchema := revision(t, []string{"email"}, `"color": {"type": "string"}`)
+	initialSchema := revision(t, []string{"email"}, `
+		"color": {"type": "string"},
+		"givenName": {"type": "string"}`)
 
 	// One definition offers every method. It names the schema by objectType,
-	// so flows run against its newest revision.
+	// so flows run against the revision the release pins.
 	definition := ssoLoginFlowDefinition(migrationObjectType)
 	definition.Name = "migration-login"
+	definition.Steps[0].Fields = []string{"email", "givenName"}
 	definition.Steps[0].Actions = append(definition.Steps[0].Actions,
 		api.StepAction{Name: "passkey", Kind: api.StepActionKindPasskey})
 	definition.Steps[0].Transitions.Value["passkey"] = api.FlowDefinitionStepTransitionsItem{Target: "done"}
@@ -464,6 +467,7 @@ func TestPatchUserMigrationKeepsIdentity(t *testing.T) {
 	require.NoError(t, err, "the identity link is still there")
 	assert.Equal(t, linkBefore, linkAfter)
 
+	deployPrimary(t, f.project.ID)
 	t.Run("signs in with the password", func(t *testing.T) {
 		attemptID := newAttempt(t, f.client, f.project)
 		identified := verifyAttemptProof(t, f.client, attemptID, api.ChallengeMethodIdentifier, identifierProof(email))

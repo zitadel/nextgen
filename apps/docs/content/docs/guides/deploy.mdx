@@ -63,7 +63,7 @@ Deploy it, then point the widget at it:
 
 (or `flow-name="kiosk-login"` on the plain `<zitadel-login>` element). An unknown name or a flow that doesn't serve the requested purpose surfaces as a startup error in the widget.
 
-Without `flowName`, the platform serves the newest active flow that has no `audience`. A flow scoped via `audience.app_ids` / `audience.team_ids` is selected only when the flow-start request's hints identify that app or team (app match beats team match) — it never captures the project default.
+Without `flowName`, the platform serves the newest flow the release pins that has no `audience`. A flow scoped via `audience.app_ids` / `audience.team_ids` is selected only when the flow-start request's hints identify that app or team (app match beats team match) — it never captures the project default.
 
 ## Releases, deployments and rollback
 

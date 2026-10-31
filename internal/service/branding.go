@@ -158,42 +158,24 @@ func (s *BrandingService) Get(ctx context.Context, projectID, id string) (_ *dom
 	return entity, nil
 }
 
-// GetLatest returns the newest revision for the project, or nil (no error)
-// when the project has none — callers fall back to built-in defaults.
-func (s *BrandingService) GetLatest(ctx context.Context, projectID string) (_ *domain.Branding, err error) {
-	ctx, end := startSpan(ctx, "BrandingService.GetLatest")
-	defer end(&err)
-
-	result, err := s.v2Pool.Statements().ListBrandings(WithAuthzListUnrestricted(ctx), branding.ListOptions(projectID, 1))
-	if err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to resolve latest branding revision")
-	}
-	if len(result.Items) == 0 {
-		return nil, nil
-	}
-	return result.Items[0], nil
-}
-
-// flowBrandingReader is the branding lookups a flow response needs.
+// flowBrandingReader is the branding lookup a flow response needs.
 type flowBrandingReader interface {
 	Get(ctx context.Context, projectID, id string) (*domain.Branding, error)
-	GetLatest(ctx context.Context, projectID string) (*domain.Branding, error)
 }
 
-// ResolveFlowBranding returns the branding revision a flow response should
-// carry. A release that pins a flow returns the revision it pins, or nil
-// when it pins none. Otherwise it returns the newest revision, or nil when
-// the project has none. The caller serves the built-in default for a nil
-// revision or a failed read.
+// ResolveFlowBranding returns the revision the request's release pins, or nil
+// when it pins none. The caller serves the built-in default for a nil revision
+// or a failed read.
 func ResolveFlowBranding(ctx context.Context, reader flowBrandingReader, projectID string) (*domain.Branding, error) {
-	if ReleasePinsFlow(ctx) {
-		id, ok := PinsFor(ReleaseFromContext(ctx), domain.ReleasePointerKindBranding)[domain.ReleaseBrandingHandle]
-		if !ok {
-			return nil, nil
-		}
-		return reader.Get(ctx, projectID, id)
+	pins, err := runtimePins(ctx, domain.ReleasePointerKindBranding)
+	if err != nil {
+		return nil, err
 	}
-	return reader.GetLatest(ctx, projectID)
+	id, ok := pins[domain.ReleaseBrandingHandle]
+	if !ok {
+		return nil, nil
+	}
+	return reader.Get(ctx, projectID, id)
 }
 
 // maxBrandingListRevisions caps the list response: revisions accumulate

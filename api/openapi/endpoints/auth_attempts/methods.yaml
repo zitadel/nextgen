@@ -11,10 +11,10 @@ post:
     also include session_id and that session's session_token to add factors to an existing session.
 
     The project comes from the project secret. A body `project_id` that disagrees
-    answers `403` with `proj.mismatch`. Sealed `deployment_id` / `release_id` are
-    filled only when create runs with a runtime resolution already on the
-    context (the flow create path); this HTTP entry point does not resolve
-    Origin or refuse a revoked release itself.
+    answers `403` with `proj.mismatch`. The attempt seals the project's newest
+    primary deployment, whatever the caller's `Origin`. With none it answers
+    `409` with `rel.no_default`, and a revoked release answers `409` with
+    `rel.revoked`.
   tags:
     - Authentication Attempts
   security:

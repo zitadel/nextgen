@@ -81,11 +81,13 @@ func ssoIssuer(t *testing.T, document []byte, attempts *fakeAuthAttempts, keys s
 	t.Helper()
 	ctrl := gomock.NewController(t)
 	connections := servicemocks.NewMockIDPConnectionService(ctrl)
-	var found []*domain.IDPConnection
 	if document != nil {
-		found = []*domain.IDPConnection{{Slug: "google", RevisionID: "idprev_1", Document: document}}
+		connections.EXPECT().GetRevision(gomock.Any(), "proj-1", "idprev_1").
+			Return(&domain.IDPConnection{Slug: "google", RevisionID: "idprev_1", Document: document}, nil)
+	} else {
+		connections.EXPECT().GetRevision(gomock.Any(), "proj-1", "idprev_1").
+			Return(nil, domain.ErrIDPConnectionNotFound())
 	}
-	connections.EXPECT().GetBySlugs(gomock.Any(), "proj-1", []string{"google"}).Return(found, nil)
 	if keys == nil {
 		keys = servicemocks.NewMockKeyService(ctrl)
 	}
@@ -96,6 +98,18 @@ func ssoIssuer(t *testing.T, document []byte, attempts *fakeAuthAttempts, keys s
 		client = &http.Client{}
 	}
 	return service.NewFlowSSORedirectIssuer(connections, attempts, keys, variables, client)
+}
+
+// ssoRuntime is a sign-in that sealed a deployment and a release pinning the
+// google connection the issuer tests read.
+func ssoRuntime(t *testing.T, ctx context.Context) context.Context {
+	t.Helper()
+	return service.WithRuntimeResolution(ctx, &service.RuntimeResolution{
+		Deployment: &domain.Deployment{ID: "dep_1"},
+		Release: &domain.Release{Pointers: []domain.ReleasePointer{
+			{Kind: domain.ReleasePointerKindIDP, Handle: "google", RevisionID: "idprev_1"},
+		}},
+	})
 }
 
 func TestFlowSSORedirectIssuer_Issue(t *testing.T) {
@@ -114,7 +128,7 @@ func TestFlowSSORedirectIssuer_Issue(t *testing.T) {
 			OIDCNonce:    "nonce-1",
 		}}
 
-		out, err := ssoIssuer(t, ssoConnectionDocument(true), attempts, keys, nil, nil).Issue(t.Context(), ssoIssueInput)
+		out, err := ssoIssuer(t, ssoConnectionDocument(true), attempts, keys, nil, nil).Issue(ssoRuntime(t, t.Context()), ssoIssueInput)
 		require.NoError(t, err)
 
 		assert.Equal(t, service.IssueSSOStateInput{
@@ -142,14 +156,15 @@ func TestFlowSSORedirectIssuer_Issue(t *testing.T) {
 		}, u.Query())
 	})
 
-	t.Run("a client_id reference is filled from the project variable", func(t *testing.T) {
+	t.Run("a client_id reference is filled from the deployment's frozen variables", func(t *testing.T) {
 		t.Parallel()
+		set, err := domain.NewVariableSet("proj-1", []*domain.Variable{{Name: "GOOGLE_CLIENT_ID", Value: "client-from-variable"}})
+		require.NoError(t, err)
 		variables := servicemocks.NewMockVariableService(gomock.NewController(t))
-		variables.EXPECT().GetVariables(gomock.Any(), domain.VariableOwner{ProjectID: "proj-1"}, new(domain.DeploymentOriginKindPrimary), "GOOGLE_CLIENT_ID").
-			Return([]*domain.Variable{{Name: "GOOGLE_CLIENT_ID", Value: "client-from-variable"}}, nil)
+		variables.EXPECT().GetDeploymentVariables(gomock.Any(), "proj-1", "dep_1").Return(set, nil)
 		attempts := &fakeAuthAttempts{issueSSOState: &domain.SSOState{State: "state-1", BindingNonce: "bind-1", OIDCNonce: "nonce-1"}}
 
-		out, err := ssoIssuer(t, ssoClientIDReferenceDocument, attempts, nil, variables, nil).Issue(t.Context(), ssoIssueInput)
+		out, err := ssoIssuer(t, ssoClientIDReferenceDocument, attempts, nil, variables, nil).Issue(ssoRuntime(t, t.Context()), ssoIssueInput)
 		require.NoError(t, err)
 
 		u, err := url.Parse(out.RedirectURL)
@@ -159,23 +174,26 @@ func TestFlowSSORedirectIssuer_Issue(t *testing.T) {
 
 	t.Run("a client_id reference with no variable is unavailable and issues no record", func(t *testing.T) {
 		t.Parallel()
+		set, err := domain.NewVariableSet("proj-1", nil)
+		require.NoError(t, err)
 		variables := servicemocks.NewMockVariableService(gomock.NewController(t))
-		variables.EXPECT().GetVariables(gomock.Any(), domain.VariableOwner{ProjectID: "proj-1"}, new(domain.DeploymentOriginKindPrimary), "GOOGLE_CLIENT_ID").Return(nil, nil)
+		variables.EXPECT().GetDeploymentVariables(gomock.Any(), "proj-1", "dep_1").Return(set, nil)
 		attempts := &fakeAuthAttempts{}
 
-		_, err := ssoIssuer(t, ssoClientIDReferenceDocument, attempts, nil, variables, nil).Issue(t.Context(), ssoIssueInput)
+		_, err = ssoIssuer(t, ssoClientIDReferenceDocument, attempts, nil, variables, nil).Issue(ssoRuntime(t, t.Context()), ssoIssueInput)
 		require.ErrorIs(t, err, domain.ErrFlowSSOUnavailable(nil))
 		assert.Empty(t, attempts.issueSSOStateIn.AttemptID)
 	})
 
 	t.Run("a client_id reference to a secret is unavailable and issues no record", func(t *testing.T) {
 		t.Parallel()
+		set, err := domain.NewVariableSet("proj-1", []*domain.Variable{{Name: "GOOGLE_CLIENT_ID", Value: "ciphertext", IsSecret: true}})
+		require.NoError(t, err)
 		variables := servicemocks.NewMockVariableService(gomock.NewController(t))
-		variables.EXPECT().GetVariables(gomock.Any(), domain.VariableOwner{ProjectID: "proj-1"}, new(domain.DeploymentOriginKindPrimary), "GOOGLE_CLIENT_ID").
-			Return([]*domain.Variable{{Name: "GOOGLE_CLIENT_ID", Value: "ciphertext", IsSecret: true}}, nil)
+		variables.EXPECT().GetDeploymentVariables(gomock.Any(), "proj-1", "dep_1").Return(set, nil)
 		attempts := &fakeAuthAttempts{}
 
-		_, err := ssoIssuer(t, ssoClientIDReferenceDocument, attempts, nil, variables, nil).Issue(t.Context(), ssoIssueInput)
+		_, err = ssoIssuer(t, ssoClientIDReferenceDocument, attempts, nil, variables, nil).Issue(ssoRuntime(t, t.Context()), ssoIssueInput)
 		require.ErrorIs(t, err, domain.ErrFlowSSOUnavailable(nil))
 		assert.Empty(t, attempts.issueSSOStateIn.AttemptID)
 	})
@@ -184,7 +202,7 @@ func TestFlowSSORedirectIssuer_Issue(t *testing.T) {
 		t.Parallel()
 		attempts := &fakeAuthAttempts{issueSSOState: &domain.SSOState{State: "state-1", BindingNonce: "bind-1", OIDCNonce: "nonce-1"}}
 
-		out, err := ssoIssuer(t, ssoConnectionDocument(false), attempts, nil, nil, nil).Issue(t.Context(), ssoIssueInput)
+		out, err := ssoIssuer(t, ssoConnectionDocument(false), attempts, nil, nil, nil).Issue(ssoRuntime(t, t.Context()), ssoIssueInput)
 		require.NoError(t, err)
 
 		assert.Nil(t, attempts.issueSSOStateIn.PKCEEncrypter)
@@ -198,8 +216,8 @@ func TestFlowSSORedirectIssuer_Issue(t *testing.T) {
 		t.Parallel()
 		attempts := &fakeAuthAttempts{}
 
-		_, err := ssoIssuer(t, nil, attempts, nil, nil, nil).Issue(t.Context(), ssoIssueInput)
-		require.ErrorIs(t, err, domain.ErrIDPConnectionNotFound())
+		_, err := ssoIssuer(t, nil, attempts, nil, nil, nil).Issue(ssoRuntime(t, t.Context()), ssoIssueInput)
+		require.ErrorIs(t, err, domain.ErrInternal(nil))
 		assert.Empty(t, attempts.issueSSOStateIn.AttemptID)
 	})
 
@@ -207,7 +225,7 @@ func TestFlowSSORedirectIssuer_Issue(t *testing.T) {
 		t.Parallel()
 		attempts := &fakeAuthAttempts{}
 
-		_, err := ssoIssuer(t, []byte(ssoDiscoveryDocument), attempts, nil, nil, &http.Client{Transport: failingTransport{}}).Issue(t.Context(), ssoIssueInput)
+		_, err := ssoIssuer(t, []byte(ssoDiscoveryDocument), attempts, nil, nil, &http.Client{Transport: failingTransport{}}).Issue(ssoRuntime(t, t.Context()), ssoIssueInput)
 		require.ErrorIs(t, err, domain.ErrFlowSSOUnavailable(nil))
 		require.ErrorIs(t, err, domain.ErrIDPDiscoveryFailed(nil))
 		assert.Empty(t, attempts.issueSSOStateIn.AttemptID)
@@ -217,7 +235,7 @@ func TestFlowSSORedirectIssuer_Issue(t *testing.T) {
 		t.Parallel()
 		doc := strings.Replace(ssoDiscoveryDocument, `["openid"]`, `["email"]`, 1)
 
-		_, err := ssoIssuer(t, []byte(doc), &fakeAuthAttempts{}, nil, nil, nil).Issue(t.Context(), ssoIssueInput)
+		_, err := ssoIssuer(t, []byte(doc), &fakeAuthAttempts{}, nil, nil, nil).Issue(ssoRuntime(t, t.Context()), ssoIssueInput)
 		require.ErrorIs(t, err, domain.ErrFlowSSOUnavailable(nil))
 		require.ErrorIs(t, err, domain.ErrIDPScopesMissingOpenID())
 	})
@@ -225,7 +243,7 @@ func TestFlowSSORedirectIssuer_Issue(t *testing.T) {
 	t.Run("undecodable document is internal, not unavailable", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := ssoIssuer(t, []byte(`{`), &fakeAuthAttempts{}, nil, nil, nil).Issue(t.Context(), ssoIssueInput)
+		_, err := ssoIssuer(t, []byte(`{`), &fakeAuthAttempts{}, nil, nil, nil).Issue(ssoRuntime(t, t.Context()), ssoIssueInput)
 		require.ErrorIs(t, err, domain.ErrInternal(nil))
 		assert.NotErrorIs(t, err, domain.ErrFlowSSOUnavailable(nil))
 	})
@@ -236,7 +254,7 @@ func TestFlowSSORedirectIssuer_Issue(t *testing.T) {
 		ctx, cancel := context.WithCancel(zlog.WithLoggingContext(t.Context(), slog.New(slog.NewTextHandler(&logs, nil))))
 		cancel()
 
-		_, err := ssoIssuer(t, []byte(ssoDiscoveryDocument), &fakeAuthAttempts{}, nil, nil, nil).Issue(ctx, ssoIssueInput)
+		_, err := ssoIssuer(t, []byte(ssoDiscoveryDocument), &fakeAuthAttempts{}, nil, nil, nil).Issue(ssoRuntime(t, ctx), ssoIssueInput)
 		require.ErrorIs(t, err, domain.ErrFlowSSOUnavailable(nil))
 		require.ErrorIs(t, err, context.Canceled)
 		assert.Empty(t, logs.String())
@@ -248,7 +266,7 @@ func TestFlowSSORedirectIssuer_Issue(t *testing.T) {
 		ctx, cancel := context.WithDeadline(zlog.WithLoggingContext(t.Context(), slog.New(slog.NewTextHandler(&logs, nil))), time.Now().Add(-time.Second))
 		defer cancel()
 
-		_, err := ssoIssuer(t, []byte(ssoDiscoveryDocument), &fakeAuthAttempts{}, nil, nil, nil).Issue(ctx, ssoIssueInput)
+		_, err := ssoIssuer(t, []byte(ssoDiscoveryDocument), &fakeAuthAttempts{}, nil, nil, nil).Issue(ssoRuntime(t, ctx), ssoIssueInput)
 		require.ErrorIs(t, err, domain.ErrFlowSSOUnavailable(nil))
 		assert.Contains(t, logs.String(), "sso provider unavailable")
 	})
@@ -257,25 +275,9 @@ func TestFlowSSORedirectIssuer_Issue(t *testing.T) {
 		t.Parallel()
 		attempts := &fakeAuthAttempts{issueSSOStateErr: domain.ErrAuthAttemptAlreadyHandedOff()}
 
-		_, err := ssoIssuer(t, ssoConnectionDocument(false), attempts, nil, nil, nil).Issue(t.Context(), ssoIssueInput)
+		_, err := ssoIssuer(t, ssoConnectionDocument(false), attempts, nil, nil, nil).Issue(ssoRuntime(t, t.Context()), ssoIssueInput)
 		require.ErrorIs(t, err, domain.ErrAuthAttemptAlreadyHandedOff())
 	})
-}
-
-func TestFlowSSORedirectIssuer_PinnedConnection(t *testing.T) {
-	t.Parallel()
-	ctrl := gomock.NewController(t)
-	connections := servicemocks.NewMockIDPConnectionService(ctrl)
-	connections.EXPECT().GetRevision(gomock.Any(), "proj-1", "idprev_v1").
-		Return(&domain.IDPConnection{Slug: "google", RevisionID: "idprev_v1", Document: ssoConnectionDocument(false)}, nil)
-	attempts := &fakeAuthAttempts{issueSSOState: &domain.SSOState{State: "state-1", BindingNonce: "bind-1", OIDCNonce: "nonce-1"}}
-	issuer := service.NewFlowSSORedirectIssuer(connections, attempts, servicemocks.NewMockKeyService(ctrl), servicemocks.NewMockVariableService(ctrl), &http.Client{})
-
-	_, err := issuer.Issue(pinnedFlowContext(t, domain.ReleasePointer{
-		Kind: domain.ReleasePointerKindIDP, Handle: "google", RevisionID: "idprev_v1",
-	}), ssoIssueInput)
-	require.NoError(t, err)
-	assert.Equal(t, "idprev_v1", attempts.issueSSOStateIn.ConnectionRevisionID)
 }
 
 func TestFlowSSORedirectIssuer_UnpinnedSlugIsInternal(t *testing.T) {
@@ -292,37 +294,14 @@ func TestFlowSSORedirectIssuer_UnpinnedSlugIsInternal(t *testing.T) {
 	assert.Empty(t, attempts.issueSSOStateIn.AttemptID)
 }
 
-func TestFlowSSORedirectIssuer_FrozenClientID(t *testing.T) {
-	t.Parallel()
-	set, err := domain.NewVariableSet("proj-1", []*domain.Variable{{
-		Name: "GOOGLE_CLIENT_ID", Value: "client-from-deployment",
-	}})
-	require.NoError(t, err)
-	variables := servicemocks.NewMockVariableService(gomock.NewController(t))
-	variables.EXPECT().GetDeploymentVariables(gomock.Any(), "proj-1", "dep_1").Return(set, nil)
-	attempts := &fakeAuthAttempts{issueSSOState: &domain.SSOState{State: "state-1", BindingNonce: "bind-1", OIDCNonce: "nonce-1"}}
-	ctx := service.WithRuntimeResolution(t.Context(), &service.RuntimeResolution{
-		Deployment: &domain.Deployment{ID: "dep_1"},
-	})
-
-	out, err := ssoIssuer(t, ssoClientIDReferenceDocument, attempts, nil, variables, nil).Issue(ctx, ssoIssueInput)
-	require.NoError(t, err)
-	u, err := url.Parse(out.RedirectURL)
-	require.NoError(t, err)
-	assert.Equal(t, "client-from-deployment", u.Query().Get("client_id"))
-}
-
 func TestFlowSSORedirectIssuer_SealedDeploymentWithoutVariablesIsUnavailable(t *testing.T) {
 	t.Parallel()
 	variables := servicemocks.NewMockVariableService(gomock.NewController(t))
 	variables.EXPECT().GetDeploymentVariables(gomock.Any(), "proj-1", "dep_1").
 		Return(nil, errors.New("deployment has no frozen variables"))
 	attempts := &fakeAuthAttempts{}
-	ctx := service.WithRuntimeResolution(t.Context(), &service.RuntimeResolution{
-		Deployment: &domain.Deployment{ID: "dep_1"},
-	})
 
-	_, err := ssoIssuer(t, ssoClientIDReferenceDocument, attempts, nil, variables, nil).Issue(ctx, ssoIssueInput)
+	_, err := ssoIssuer(t, ssoClientIDReferenceDocument, attempts, nil, variables, nil).Issue(ssoRuntime(t, t.Context()), ssoIssueInput)
 	require.ErrorIs(t, err, domain.ErrFlowSSOUnavailable(nil))
 	assert.Empty(t, attempts.issueSSOStateIn.AttemptID)
 }

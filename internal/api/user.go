@@ -414,6 +414,12 @@ func (h *Handler) SetUserPassword(ctx context.Context, req *api.SetUserPasswordR
 	if err != nil {
 		return nil, err
 	}
+	// The console sends its own Origin. The password gate follows the newest
+	// primary deployment, not that host.
+	ctx, err = h.resolveRuntime(ctx, projectID, "")
+	if err != nil {
+		return nil, err
+	}
 	err = h.userService.SetPassword(ctx, service.SetPasswordInput{
 		ProjectID: projectID,
 		UserID:    string(params.UserID),
