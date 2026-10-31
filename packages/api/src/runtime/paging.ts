@@ -36,15 +36,15 @@ export function itemsOf(page: unknown, field: string): readonly unknown[] {
 
 /**
  * Every page, fetched only when the loop asks for the next one, so a caller
- * that stops early never reads the rest. The walk begins at the cursor `start`
- * names, or at the first page without one; `next` reads a page's cursor, and
- * an empty one ends the walk like none.
+ * that stops early never reads the rest. The first page is the one
+ * `fetchPage(undefined)` answers; `next` reads a page's cursor, and an empty
+ * one ends the walk like none.
  */
 export async function* pages<P>(
   fetchPage: FetchPage<P>,
-  { start, next = nextToken }: { start?: string; next?: (page: P) => string | undefined } = {},
+  { next = nextToken }: { next?: (page: P) => string | undefined } = {},
 ): AsyncGenerator<P, void, undefined> {
-  let token = start;
+  let token: string | undefined;
   for (;;) {
     const page = await fetchPage(token);
     // Read before the page is handed out, so a loop that changes the page

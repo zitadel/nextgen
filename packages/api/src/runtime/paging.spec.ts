@@ -44,16 +44,6 @@ describe("pages", () => {
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
-  it("begins at the cursor it is given", async () => {
-    const fetch = fetchPage({ t1: { rows: ["b"], next: "t2" }, t2: { rows: ["c"] } });
-
-    const rows = [];
-    for await (const page of pages(fetch, { start: "t1" })) rows.push(...page.rows);
-
-    expect(rows).toEqual(["b", "c"]);
-    expect(fetch.mock.calls).toEqual([["t1"], ["t2"]]);
-  });
-
   it("follows the cursor the reader it is given names", async () => {
     const fetch = vi.fn(async (token: string | undefined) =>
       token === undefined ? { next_cursor: "c2" } : {},

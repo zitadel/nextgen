@@ -65,6 +65,33 @@ describe("createZitadelClient", () => {
     expect(elsewhere.requests).toEqual([["/deployments?project_id=proj_2", "Bearer other"]]);
   });
 
+  it("keeps two clients' walks apart while both are in flight", async () => {
+    const one = await deployments();
+    const two = await deployments();
+    const first = createZitadelClient({ baseUrl: one.base, token: "one" });
+    const second = createZitadelClient({ baseUrl: two.base, token: "two" });
+
+    await Promise.all([
+      first.listDeployments.all({
+        project_id: "proj_1",
+      }),
+      second.listDeployments.all({
+        project_id: "proj_2",
+      }),
+    ]);
+
+    expect([one.requests, two.requests]).toEqual([
+      [
+        ["/deployments?project_id=proj_1", "Bearer one"],
+        ["/deployments?project_id=proj_1&page_token=t1", "Bearer one"],
+      ],
+      [
+        ["/deployments?project_id=proj_2", "Bearer two"],
+        ["/deployments?project_id=proj_2&page_token=t1", "Bearer two"],
+      ],
+    ]);
+  });
+
   it("types a paged function's items as the response's list entries", () => {
     const client = createZitadelClient({ baseUrl: "http://127.0.0.1:1" });
 

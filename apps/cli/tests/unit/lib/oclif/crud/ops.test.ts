@@ -389,6 +389,27 @@ describe("output a script reads", () => {
   });
 });
 
+describe("list paging", () => {
+  it("asks for the page --page-token names first", async () => {
+    const sent: unknown[] = [];
+    const command = bindOperation(
+      ListOperation as OperationClass<Ctx, ListSpec<Ctx>>,
+      definition({
+        ...list,
+        body: z.object({}).passthrough(),
+        call: async (_ctx, body) => {
+          sent.push(body);
+          return { teams: [] };
+        },
+      }),
+    );
+
+    await printed(command, ["--page-token", "p2", "--plain"]);
+
+    expect(sent).toEqual([expect.objectContaining({ page_token: "p2" })]);
+  });
+});
+
 describe("assembling a body", () => {
   const connection = z.object({
     slug: z.string(),
