@@ -244,15 +244,19 @@ abstract class WriteOperation<
       });
     }
 
-    const result = await this.send(await this.context(), body, id);
-    const resultId = isObject(result) ? result[resource.idField] : undefined;
+    // The registry checks `idField` against what each write answers with. Some
+    // writes answer without a body (`grants create` by identifier answers
+    // 202), so there is no record to get, and `data` is still an object.
+    const result = (await this.send(await this.context(), body, id)) as Json | undefined;
     return {
       status: "ok",
-      // An ok envelope always carries `data`, also when the server accepts a
-      // write without a body (`grants create` by identifier answers 202).
       data: result ?? {},
-      ...(typeof resultId === "string" && resource.get
-        ? { next: { commands: [this.suggest(`${topic} get ${resultId} --json`)] } }
+      ...(result && resource.get
+        ? {
+            next: {
+              commands: [this.suggest(`${topic} get ${String(result[resource.idField])} --json`)],
+            },
+          }
         : {}),
       pretty: JSON.stringify(result, null, 2),
       machineReadable: true,

@@ -79,20 +79,20 @@ export const create = <B, C>(
   shape: WriteShape = {},
 ): NoInfer<CreateSpec<Platform, B, C>> => ({ ...shape, schema, call });
 
-const update = <B>(
+export const update = <B, U>(
   schema: Schema<B>,
-  call: (ctx: Platform, id: string, body: B) => Promise<unknown>,
+  call: (ctx: Platform, id: string, body: B) => Promise<U>,
   shape: WriteShape = {},
-): UpdateSpec<Platform, B> => ({ ...shape, schema, call });
+): NoInfer<UpdateSpec<Platform, B, U>> => ({ ...shape, schema, call });
 
 // Marks a descriptor `resource()` checked; `RESOURCES` takes no other, so an
 // entry written as a plain object cannot skip the checks.
 const checked = Symbol("checked");
 type Checked = ResourceDescriptor<Platform> & { readonly [checked]: true };
 
-// The fields a created resource answers with: any field when there is no
-// `create`, and those of its body when it can also answer without one.
-type CreatedField<C> = unknown extends C ? PropertyKey : keyof Exclude<C, void>;
+// The fields a write answers with: any field when the resource has no such
+// write, and those of its body when it can also answer without one.
+type WrittenField<W> = unknown extends W ? PropertyKey : keyof Exclude<W, void>;
 
 // The fields of `T`, each of any type: what a response schema must parse into
 // at least. A schema copied from another operation names other fields. The
@@ -120,17 +120,27 @@ export const get = <R, S extends FieldsOf<R> = FieldsOf<R>>(
 
 // Checks a resource's paths against what its verbs answer with: `columns` name
 // fields of a listed item, `heading` and `detail` fields of the record `get`
-// answers with, and `idField` a field of both and of what `create` answers
-// with, which is where a write reads the id it suggests `get` with.
-export const resource = <P, I extends string | undefined, R, B extends Json, CB extends Json, C>(
+// answers with, and `idField` a field of both and of what `create` and
+// `update` answer with, which is where a write reads the id it suggests `get` with.
+export const resource = <
+  P,
+  I extends string | undefined,
+  R,
+  B extends Json,
+  CB extends Json,
+  C,
+  UB extends Json,
+  U,
+>(
   descriptor: Omit<
     ResourceDescriptor<Platform>,
-    "list" | "get" | "create" | "idField" | "columns" | "heading" | "detail"
+    "list" | "get" | "create" | "update" | "idField" | "columns" | "heading" | "detail"
   > & {
     list: ListSpec<Platform, B, P, I>;
     get: GetSpec<Platform, R>;
     create?: CreateSpec<Platform, CB, C>;
-    idField: NoInfer<keyof ListItem<P, I> & keyof R & CreatedField<C> & string>;
+    update?: UpdateSpec<Platform, UB, U>;
+    idField: NoInfer<keyof ListItem<P, I> & keyof R & WrittenField<C> & WrittenField<U> & string>;
     columns: readonly NoInfer<FieldPath<ListItem<P, I>>>[];
     heading: NoInfer<FieldPath<R>>;
     detail: readonly NoInfer<FieldPath<R>>[];

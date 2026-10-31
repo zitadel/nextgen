@@ -163,10 +163,10 @@ export type CreateSpec<Ctx, B = Json, C = unknown> = Readonly<
     call(ctx: Ctx, body: B): Promise<C>;
   }
 >;
-export type UpdateSpec<Ctx, B = Json> = Readonly<
+export type UpdateSpec<Ctx, B = Json, U = unknown> = Readonly<
   WriteShape & {
     schema: Schema<B>;
-    call(ctx: Ctx, id: string, body: B): Promise<unknown>;
+    call(ctx: Ctx, id: string, body: B): Promise<U>;
   }
 >;
 

@@ -11,6 +11,7 @@ import {
   CreateUserBody,
   GetTeamResponse,
   GetUserByIDResponse,
+  PatchUserByIDBody,
   QueryUsersBody,
   QueryUsersResponse,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
@@ -23,6 +24,7 @@ import {
   RESOURCES,
   releasePointers,
   resource,
+  update,
 } from "../../../src/commands/resources";
 import { COMMANDS } from "../../../src/index";
 import {
@@ -2024,6 +2026,20 @@ describe("the registry builders", () => {
       list: users,
       get: user,
       create: create(CreateUserBody, async () => ({ user_id: "user_1" })),
+    });
+  });
+
+  it("refuses an id field the updated resource does not answer with", () => {
+    resource({
+      singular: "user",
+      // @ts-expect-error the update below answers with `user_id`, not `id`
+      idField: "id",
+      columns: ["id"],
+      heading: "identifier",
+      detail: ["id"],
+      list: users,
+      get: user,
+      update: update(PatchUserByIDBody, async () => ({ user_id: "user_1" })),
     });
   });
 
