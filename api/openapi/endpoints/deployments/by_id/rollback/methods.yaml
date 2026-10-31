@@ -48,8 +48,8 @@ post:
             $ref: ../../deployment.yaml
     '201':
       description: |
-        The rollback deployment was created and the origins it froze serve
-        the release again.
+        The rollback deployment was created. Each origin it froze that the
+        project still lists serves the release again.
       content:
         application/json:
           schema:

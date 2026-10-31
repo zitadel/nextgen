@@ -84,8 +84,9 @@ type ProjectStatements interface {
 	DeleteProjectByID(ctx context.Context, id string) (changed bool, err error)
 	// LockProject locks the project row until the transaction ends. Callers
 	// that lock several projects do it in project id order, one row at a time.
-	// Postgres and Spanner take FOR UPDATE; SQLite already holds the write lock
-	// from BEGIN IMMEDIATE, so its statement is a plain read. Returns
+	// Postgres takes FOR NO KEY UPDATE and Spanner FOR UPDATE; SQLite already
+	// holds the write lock from BEGIN IMMEDIATE, so its statement is a plain
+	// read. Returns
 	// [database.NoRowFoundError] when no project carries the id.
 	LockProject(ctx context.Context, id string) error
 }
@@ -317,10 +318,6 @@ type DeploymentStatements interface {
 	// ListLiveDeployments lists, with deployment.LiveListOptions, the
 	// deployments some origin serves at now, each narrowed to those origins.
 	ListLiveDeployments(ctx context.Context, now time.Time, filter *database.ListOptions[domain.DeploymentField]) (*database.ListResult[*domain.Deployment], error)
-	// LockPrimaryDeploys makes a primary deploy wait for any other in this
-	// transaction's project. Run it first: what follows reads what the other
-	// wrote. Dialects that already serialize these transactions do nothing.
-	LockPrimaryDeploys(ctx context.Context, projectID string) error
 	// GetLiveDeployment is the deployment origin serves at now, narrowed to the
 	// origins it still serves; a NoRowFoundError when it serves nothing,
 	// including after its preview expired.

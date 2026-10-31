@@ -144,10 +144,24 @@ export function deployToPrimary(
 export interface RollbackTargets {
   current?: Deployment;
   options: Deployment[];
+  primaryOrigins: string[];
+}
+
+/**
+ * The project's primary origins a rollback to the deployment leaves out. A
+ * rollback restores the origins that deployment froze, so these refuse sign-in
+ * until the next deploy.
+ */
+export function droppedOrigins(deployment: Deployment, primaryOrigins: string[]): string[] {
+  const frozen = deployment.targets.map((target) => target.origin);
+  return primaryOrigins.filter((origin) => !frozen.includes(origin));
 }
 
 export async function listRollbackTargets(projectId: string): Promise<RollbackTargets> {
-  const history = await listAllDeployments({ project_id: projectId, expand: EXPAND_RELEASE });
+  const [history, primaryOrigins] = await Promise.all([
+    listAllDeployments({ project_id: projectId, expand: EXPAND_RELEASE }),
+    listPrimaryOrigins(projectId),
+  ]);
   const primary = history.filter((deployment) => deployment.kind === "primary");
   const current = primary.find((deployment) => deployment.status === "live");
   const options = primary.filter(
@@ -156,7 +170,7 @@ export async function listRollbackTargets(projectId: string): Promise<RollbackTa
       deployment.release_id !== current?.release_id &&
       !releaseRevoked(deployment),
   );
-  return { current, options };
+  return { current, options, primaryOrigins };
 }
 
 /**

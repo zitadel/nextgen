@@ -93,7 +93,8 @@ func NewDeploymentService(v2Pool *DB, variables VariableService) *DeploymentServ
 // the optimistic lock.
 const maxDeployAttempts = 3
 
-// Create deploys a release to its origins with optimistic locking: it reads
+// Create deploys a release to its origins. Primary deploys of one project run
+// one at a time under the project lock. A preview deploy is optimistic: it reads
 // what each origin serves and writes without holding a lock, and a concurrent
 // deploy to one of the origins makes the write fail. A guarded deploy then
 // answers a conflict with the winner; an unguarded one retries on top of it.
@@ -246,7 +247,10 @@ func (s *DeploymentService) create(ctx context.Context, entity *domain.Deploymen
 		// Two primary deploys can name disjoint origins, so no origin row
 		// collides. They still replace one deployment.
 		if entity.OriginKind == domain.DeploymentOriginKindPrimary {
-			if err := stmts.LockPrimaryDeploys(ctx, entity.ProjectID); err != nil {
+			if err := stmts.LockProject(ctx, entity.ProjectID); err != nil {
+				if isNoRowFound(err) {
+					return domain.ErrProjectNotFound()
+				}
 				return err
 			}
 		}

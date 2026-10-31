@@ -119,12 +119,6 @@ func (ds deploymentStatements) GetDeploymentByID(ctx context.Context, projectID,
 	return entity, nil
 }
 
-// LockPrimaryDeploys implements [service.DeploymentStatements]: a read-write
-// transaction is serializable, so a racing deploy aborts and retries.
-func (ds deploymentStatements) LockPrimaryDeploys(context.Context, string) error {
-	return nil
-}
-
 // GetLiveDeployment implements [service.DeploymentStatements].
 func (ds deploymentStatements) GetLiveDeployment(ctx context.Context, projectID, origin string, now time.Time) (*domain.Deployment, error) {
 	var entity *domain.Deployment

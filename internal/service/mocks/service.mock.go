@@ -6131,44 +6131,6 @@ func (c *MockAllStatementsLockPolicyCall) DoAndReturn(f func(context.Context, st
 	return c
 }
 
-// LockPrimaryDeploys mocks base method.
-func (m *MockAllStatements) LockPrimaryDeploys(ctx context.Context, projectID string) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "LockPrimaryDeploys", ctx, projectID)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// LockPrimaryDeploys indicates an expected call of LockPrimaryDeploys.
-func (mr *MockAllStatementsMockRecorder) LockPrimaryDeploys(ctx, projectID any) *MockAllStatementsLockPrimaryDeploysCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LockPrimaryDeploys", reflect.TypeOf((*MockAllStatements)(nil).LockPrimaryDeploys), ctx, projectID)
-	return &MockAllStatementsLockPrimaryDeploysCall{Call: call}
-}
-
-// MockAllStatementsLockPrimaryDeploysCall wrap *gomock.Call
-type MockAllStatementsLockPrimaryDeploysCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockAllStatementsLockPrimaryDeploysCall) Return(arg0 error) *MockAllStatementsLockPrimaryDeploysCall {
-	c.Call = c.Call.Return(arg0)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsLockPrimaryDeploysCall) Do(f func(context.Context, string) error) *MockAllStatementsLockPrimaryDeploysCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsLockPrimaryDeploysCall) DoAndReturn(f func(context.Context, string) error) *MockAllStatementsLockPrimaryDeploysCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
 // LockProject mocks base method.
 func (m *MockAllStatements) LockProject(ctx context.Context, id string) error {
 	m.ctrl.T.Helper()
