@@ -193,6 +193,12 @@
       }
     },
     {
+      "source": "/pricing",
+      "destination": {
+        "service": "website"
+      }
+    },
+    {
       "source": "/_next/(.*)",
       "destination": {
         "service": "website"

@@ -155,7 +155,7 @@ test("the website's pages list a hash for each of their inline scripts", async (
   const entry = (await changelog.text()).match(/href="(\/changelog\/[^"/]+)"/)?.[1];
   expect(entry, "a changelog entry's link").toBeDefined();
   const wrong: string[] = [];
-  for (const path of ["/", "/changelog", entry ?? ""]) {
+  for (const path of ["/", "/changelog", entry ?? "", "/pricing"]) {
     const response = await request.get(path, { headers: { accept: "text/html" } });
     const policy = response.headers()["content-security-policy"] ?? "";
     const unlisted = unlistedInlineScripts(await response.text(), policy);

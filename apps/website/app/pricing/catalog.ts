@@ -1,0 +1,200 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
+// The pricing page's data: the cloud's proposed price list, read from the
+// repository when the site builds. apps/cloud-functions bills from the same
+// file (src/pricing/catalog.ts), so a changed price changes it in one place;
+// the page never types a price itself. Only the fields the page shows are
+// typed here. turbopackIgnore keeps Turbopack from tracing the repository
+// into the page, as in changelog/entries.ts.
+
+/** The catalog, from the repository's root. */
+const CATALOG = "apps/cloud-functions/src/pricing/catalog.json";
+
+export type PlanId = "free" | "pro" | "enterprise";
+
+export type Catalog = {
+  version: string;
+  /** `proposal` until the prices are final. */
+  status: string;
+  /** ISO 4217, lower case. */
+  currency: string;
+  conventions: Record<"period" | "user_meters" | "allowance" | "invoice" | "caps", string>;
+  plans: {
+    free: Plan & {
+      limits: {
+        requests_per_second_per_project: number;
+        requests_per_month_per_account: number;
+        core_mau_sized_for: number;
+      };
+    };
+    pro: Plan & {
+      minimum: { amount: number; interval: string };
+      annual: { amount: number; interval: string };
+      limits: { core_mau_sized_for: number };
+    };
+    enterprise: Plan & { minimum: { tiers_per_year: Record<string, number> }; rates: string };
+  };
+  meters: Meter[];
+  licensed: Licensed[];
+  self_hosted: {
+    unit: string;
+    free: { license: string; support: string };
+    pro: {
+      prices: { installations_up_to: number; amount: number; interval: string }[];
+      includes: string[];
+      ticket_cap_per_year: number;
+    };
+    enterprise: { includes: string[] };
+  };
+};
+
+type Plan = {
+  label: string;
+  event_retention_days: number;
+  attribution_mark: "shown" | "hideable";
+  custom_domains_included?: number;
+  delivery_modes: string[];
+  support: string;
+  sla: { target_percent: number; credits: boolean; note?: string } | null;
+  regions: string[] | string;
+};
+
+export type PerUnit = { model: "per_unit"; unit_amount: number; display?: string };
+export type Bands = {
+  model: "bands";
+  above: number;
+  size: number;
+  amount: number;
+  until: number;
+  opt_in: boolean;
+};
+export type PerBand = {
+  model: "per_band";
+  bands: {
+    id: string;
+    countries: string[];
+    per_user: number | null;
+    extra_message: number | null;
+  }[];
+};
+
+export type Meter = {
+  id: string;
+  label: string;
+  kind: "users" | "activity" | "gauge";
+  /** What one count is. */
+  counts: string;
+  /** What counts once a month: a `policy` in it bills a user once per policy. */
+  dedupe?: string[];
+  allowance: number | null;
+  price: PerUnit | Bands | PerBand | null;
+  /** Activity included per counted user, billed past the pool by `meter`. */
+  pool?: { meter: string; per_user: number };
+  /** The user meter whose pool this activity draws on. */
+  pool_of?: string;
+  /** The plans that may use it; every plan when unset. */
+  plans?: PlanId[];
+};
+
+/** A line billed on top of the minimum, never drawn from its credit. */
+export type Licensed = {
+  id: string;
+  label: string;
+  amount: number | null;
+  interval: string;
+  per?: string;
+  plans: PlanId[];
+  included_in?: PlanId[];
+  note?: string;
+  tag: string;
+};
+
+/** The catalog. `next build` runs in apps/website, two folders below the repository's root. */
+export function readCatalog(
+  root = join(/* turbopackIgnore: true */ process.cwd(), "..", ".."),
+): Catalog {
+  return JSON.parse(
+    readFileSync(/* turbopackIgnore: true */ join(root, CATALOG), "utf8"),
+  ) as Catalog;
+}
+
+const COUNT = new Intl.NumberFormat("en-US");
+const COMPACT = new Intl.NumberFormat("en-US", { notation: "compact" });
+const REGIONS = new Intl.DisplayNames(["en"], { type: "region" });
+
+/** A dollar amount as the page writes it: `$100`, `$36,000`, `$0.015`. */
+export function dollars(amount: number): string {
+  return `$${amount.toLocaleString("en-US", { maximumFractionDigits: 6 })}`;
+}
+
+/** A count as the page writes it: `1,000,000`. */
+export function count(value: number): string {
+  return COUNT.format(value);
+}
+
+/** Words as a phrase: `Pro`, `Pro and Enterprise`, `A, B and C`. */
+function and(words: string[]): string {
+  return words.length > 1
+    ? `${words.slice(0, -1).join(", ")} and ${words[words.length - 1]}`
+    : (words[0] ?? "");
+}
+
+/** The meters the page lists: those a price applies to, without the activity drawn from a pool. */
+export function listedMeters(catalog: Catalog): Meter[] {
+  return catalog.meters.filter((meter) => meter.price !== null && !meter.pool_of);
+}
+
+/** What a meter costs past its allowance, one line per part: the price, then its pool. */
+export function meterPrice(meter: Meter, catalog: Catalog): string[] {
+  const { price } = meter;
+  if (!price) return ["Never billed"];
+  switch (price.model) {
+    case "per_unit": {
+      const per = meter.dedupe?.includes("policy") ? "per user and policy" : "per user";
+      const lines = [price.display ?? `${dollars(price.unit_amount)} ${per}`];
+      const pooled = meter.pool && catalog.meters.find(({ id }) => id === meter.pool?.meter);
+      if (meter.pool && pooled?.price?.model === "per_unit") {
+        lines.push(
+          `${count(meter.pool.per_user)} ${poolNoun(pooled)} pooled per user, then ${pooled.price.display ?? dollars(pooled.price.unit_amount)}`,
+        );
+      }
+      return lines;
+    }
+    case "bands":
+      return [
+        `${dollars(price.amount)} per started ${COMPACT.format(price.size)} users above ${COMPACT.format(price.above)}, up to ${COMPACT.format(price.until)}`,
+        ...(price.opt_in ? ["Billed only after the owner opts in"] : []),
+      ];
+    case "per_band":
+      return price.bands.map((band) => {
+        const where =
+          band.countries.length > 0
+            ? and(band.countries.map((code) => REGIONS.of(code) ?? code))
+            : "Other countries";
+        if (band.per_user === null) return `${where}: not priced yet`;
+        const pool = meter.pool ? `, ${count(meter.pool.per_user)} texts pooled` : "";
+        const extra =
+          band.extra_message === null ? "" : `, then ${dollars(band.extra_message)} a text`;
+        return `${where}: ${dollars(band.per_user)} per user${pool}${extra}`;
+      });
+  }
+}
+
+/** What a pooled meter counts, from its label: "Emails past the pool" → "emails". */
+function poolNoun(meter: Meter): string {
+  return meter.label.replace(/ past the pool.*$/, "").toLowerCase();
+}
+
+/** A licensed line's price: `$1,000 a month`, `$50 a month per domain`, or its note when it has no amount. */
+export function licensedPrice(line: Licensed): string {
+  if (line.amount === null) return line.note ?? "On request";
+  return `${dollars(line.amount)} a${line.interval === "hour" ? "n" : ""} ${line.interval}${line.per ? ` per ${line.per}` : ""}`;
+}
+
+const PLAN_LABELS: Record<PlanId, string> = { free: "Free", pro: "Pro", enterprise: "Enterprise" };
+
+/** Plans as a phrase: `Pro`, `Pro and Enterprise`. */
+export function planList(plans: PlanId[]): string {
+  return and(plans.map((plan) => PLAN_LABELS[plan]));
+}

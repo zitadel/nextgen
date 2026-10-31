@@ -6,6 +6,7 @@ export const links = {
   quickstart: "/docs/get-started/quickstart",
   llms: "/llms.txt",
   changelog: "/changelog",
+  pricing: "/pricing",
   github: "https://github.com/zitadel/nextgen",
   issues: "https://github.com/zitadel/nextgen/issues",
   releases: "https://github.com/zitadel/nextgen/releases",

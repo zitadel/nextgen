@@ -109,6 +109,14 @@ Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
   of the users' installs, `zitadel skills add` and
   `npx skills add zitadel/nextgen --full-depth`.
 
+## The pricing page
+
+- `/pricing` shows the cloud's price list, which `app/pricing/catalog.ts`
+  reads from `apps/cloud-functions/src/pricing/catalog.json` when the site
+  builds; never type a price into the page.
+- A field the page reads gets a type in `catalog.ts`; `catalog.spec.ts` runs
+  the page's formatting over the real file, so a reshaped catalog fails there.
+
 ## Analytics
 
 - Send a custom event only through `app/analytics.ts`, and list it in
@@ -116,8 +124,8 @@ Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
 
 ## Routing
 
-The cloud routes only `/`, `/changelog`, `/changelog/*`, `/llms.txt`,
-`/_next/*`, `/favicon.ico` and `/favicons/*` here (repo-root
+The cloud routes only `/`, `/changelog`, `/changelog/*`, `/pricing`,
+`/llms.txt`, `/_next/*`, `/favicon.ico` and `/favicons/*` here (repo-root
 [`vercel.json`](../../vercel.json)).
 
 - A new page or `public/` file outside `/changelog/` needs a rewrite of its own
