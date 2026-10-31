@@ -850,9 +850,17 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
 
   test("POST /flow_definitions rejects an invalid definition with the server's flowdef.invalid envelope", async () => {
     const flowDefinition = validFlowDefinitionBody();
-    // Wire register as a purpose without the flip transition — the exact
-    // class of definition the real server rejects at apply time.
-    flowDefinition.purposes = { login: "identifier", register: "identifier" };
+    // A transition to a step the definition does not have — the exact class
+    // of definition the real server rejects at apply time.
+    flowDefinition.steps = [
+      {
+        name: "identifier",
+        fields: ["email"],
+        actions: [{ name: "submit", kind: "submit", text_key: "submit", primary: true }],
+        transitions: { submit: { target: "missing" } },
+      },
+      { name: "done", complete: "show" },
+    ];
     const res = await fetch(`${BASE}/flow_definitions`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -862,7 +870,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     const body = (await res.json()) as { code: string; message: string; details: string };
     expect(body.code).toBe("flowdef.invalid");
     expect(body.message).toBe("flow definition: invalid");
-    expect(body.details).toContain('must wire "user_not_found" transition');
+    expect(body.details).toContain('targets unknown step "missing"');
   });
 
   test("POST /flow_definitions with a repeated name publishes a new revision", async () => {

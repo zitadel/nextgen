@@ -30,7 +30,9 @@ export const VALIDATION_RULES = {
   steps: { scope: "flow", goRef: "validateSteps" },
   graph: { scope: "flow", goRef: "validateGraph" },
   cycles: { scope: "flow", goRef: "validateCycles" },
-  "flip-table": { scope: "flow", goRef: "validateFlipTableCoverage" },
+  "warn/no-purpose-switch": { scope: "flow", goRef: null },
+  "warn/cross-flow-transition": { scope: "flow", goRef: null },
+  "warn/reserved-purpose": { scope: "flow", goRef: null },
 
   // Flow definition against the schema it pins.
   "schema/required-fields": { scope: "flow-schema", goRef: "validateRequiredUserSchemaFields" },

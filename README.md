@@ -112,7 +112,7 @@ by their email address. Pass `--no-open` to print the link instead of opening
 a browser. For the admin credential file, how its password is handled, and
 how to turn the local admin off, see [apps/cli/skills/zitadel-cli/SKILL.md](apps/cli/skills/zitadel-cli/SKILL.md).
 
-Open http://localhost:3000/login and register your first user. That user is
+Open http://localhost:3000/register and register your first user. That user is
 an end user of your app, a different identity from the console admin above.
 `setup` walks through the scaffold choices (such as which framework and use
 case) and writes the app into the current directory; pass `--skip-install` if

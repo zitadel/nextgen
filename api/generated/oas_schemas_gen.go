@@ -26654,8 +26654,8 @@ type FlowDefinition struct {
 	// editor validates and autocompletes it. The CLI strips it before upload;
 	// the platform ignores it.
 	Schema OptString `json:"$schema"`
-	// Stable identifier for this flow, used as the target of cross-flow
-	// `switch` and `pivot` transitions. Every revision of a flow shares its
+	// Stable identifier for this flow, and the name a cross-flow `switch` or
+	// `pivot` transition will target once the engine runs them. Every revision of a flow shares its
 	// `name`; publishing a definition under an existing `name` adds a
 	// revision to that flow. Renaming is not supported — the `name` is part
 	// of the public contract another definition may reference. Acts as the
@@ -26675,7 +26675,14 @@ type FlowDefinition struct {
 	// Maps each purpose this definition handles to its entry-point step.
 	// Keys are purpose names; values must match a `name` in `steps`. A
 	// definition can serve multiple purposes (e.g. a combined login/register
-	// flow) by listing one entry per purpose.
+	// flow) by listing one entry per purpose, or just one: a sign-in-only
+	// flow lists `login` alone.
+	// - `login`: verify an existing user.
+	// - `register`: create a user.
+	// - `recovery`, `profiling`, `reauth`, `link_account`: reserved. A
+	// definition may declare them, but the engine does not run their
+	// journeys yet; `recovery` only asks a password field for a new
+	// password.
 	Purposes FlowDefinitionPurposes `json:"purposes"`
 	Audience OptFlowAudience        `json:"audience"`
 	// Ordered list of steps in this flow. The order is for human readability —
@@ -26828,7 +26835,14 @@ func (*FlowDefinitionListResponse) listFlowDefinitionsRes() {}
 // Maps each purpose this definition handles to its entry-point step.
 // Keys are purpose names; values must match a `name` in `steps`. A
 // definition can serve multiple purposes (e.g. a combined login/register
-// flow) by listing one entry per purpose.
+// flow) by listing one entry per purpose, or just one: a sign-in-only
+// flow lists `login` alone.
+// - `login`: verify an existing user.
+// - `register`: create a user.
+// - `recovery`, `profiling`, `reauth`, `link_account`: reserved. A
+// definition may declare them, but the engine does not run their
+// journeys yet; `recovery` only asks a password field for a new
+// password.
 type FlowDefinitionPurposes map[string]string
 
 func (s *FlowDefinitionPurposes) init() FlowDefinitionPurposes {
@@ -27012,11 +27026,24 @@ type FlowDefinitionStep struct {
 	// - redirect: navigate to redirect_uri (OIDC/SAML callback done)
 	// - show: render as a success/info screen.
 	Complete OptFlowDefinitionStepComplete `json:"complete"`
-	// Maps action/outcome names to their transition descriptor.
-	// Keys match action names from the `actions` array. Additional keys
-	// come from implicit outcomes based on schema annotations
-	// (e.g. `user_not_found` from `x-unique` fields) and engine
-	// events (e.g. `sso_authenticated`, `sso_user_not_found`).
+	// Maps action and outcome names to where the flow goes next.
+	// A key is either the `name` of an action in `actions` (the user chose
+	// it) or an outcome the engine raises on its own:
+	// - `user_not_found`: an identifier with no account. Following this
+	// transition also switches the flow to `register`.
+	// - `user_already_exists`: an identifier that has an account, typed on
+	// a sign-up or returned by a provider's sign-in. Following this
+	// transition also switches the flow to `login`.
+	// - `sso_authenticated`: a provider's sign-in matched an account.
+	// - `sso_user_not_found`: a provider's sign-in matched no account.
+	// Each action needs its transition, and a step that offers
+	// `sso_providers` needs `sso_authenticated`; the server requires no
+	// other outcome. `zitadel deploy` also requires `sso_user_not_found` and
+	// `user_already_exists` on a step that offers a provider that creates
+	// users, since a provider's sign-in can raise both. An outcome the step
+	// has no transition for leaves the user on the step with that outcome's
+	// error (for example `error.user_not_found`), so a flow that leaves out
+	// `user_not_found` signs in only users that already exist.
 	Transitions OptFlowDefinitionStepTransitions `json:"transitions"`
 }
 
@@ -27207,11 +27234,24 @@ func (s *FlowDefinitionStepOnSuccess) UnmarshalText(data []byte) error {
 	}
 }
 
-// Maps action/outcome names to their transition descriptor.
-// Keys match action names from the `actions` array. Additional keys
-// come from implicit outcomes based on schema annotations
-// (e.g. `user_not_found` from `x-unique` fields) and engine
-// events (e.g. `sso_authenticated`, `sso_user_not_found`).
+// Maps action and outcome names to where the flow goes next.
+// A key is either the `name` of an action in `actions` (the user chose
+// it) or an outcome the engine raises on its own:
+// - `user_not_found`: an identifier with no account. Following this
+// transition also switches the flow to `register`.
+// - `user_already_exists`: an identifier that has an account, typed on
+// a sign-up or returned by a provider's sign-in. Following this
+// transition also switches the flow to `login`.
+// - `sso_authenticated`: a provider's sign-in matched an account.
+// - `sso_user_not_found`: a provider's sign-in matched no account.
+// Each action needs its transition, and a step that offers
+// `sso_providers` needs `sso_authenticated`; the server requires no
+// other outcome. `zitadel deploy` also requires `sso_user_not_found` and
+// `user_already_exists` on a step that offers a provider that creates
+// users, since a provider's sign-in can raise both. An outcome the step
+// has no transition for leaves the user on the step with that outcome's
+// error (for example `error.user_not_found`), so a flow that leaves out
+// `user_not_found` signs in only users that already exist.
 type FlowDefinitionStepTransitions map[string]FlowDefinitionStepTransitionsItem
 
 func (s *FlowDefinitionStepTransitions) init() FlowDefinitionStepTransitions {
@@ -27223,33 +27263,38 @@ func (s *FlowDefinitionStepTransitions) init() FlowDefinitionStepTransitions {
 	return m
 }
 
+// Where the flow goes: a step (`target`), or the entry step of another
+// purpose (`purpose`). Set at least one of them.
 type FlowDefinitionStepTransitionsItem struct {
 	// Step name within this flow (when `action` is null), or the name
-	// of another flow (when `action` is `switch` or `pivot`).
-	Target string `json:"target"`
-	// How to interpret `target`:
-	// - null (omitted): transition to a step in the current flow.
+	// of another flow (when `action` is `switch` or `pivot`). Optional
+	// when `purpose` is set: the transition then goes to that purpose's
+	// entry step.
+	Target OptString `json:"target"`
+	// Reserved for transitions to another flow definition. The engine
+	// does not run them yet: taking one fails with `flow.unsupported`.
+	// Keep transitions within one flow definition, and use `purpose`
+	// to move between signing in and signing up.
+	// How `target` will be read:
+	// - null (omitted): a step in the current flow.
 	// - switch: replace the current flow with the target flow.
 	// No return — the current flow is discarded.
-	// Example: login ↔ register.
 	// - pivot: push the target flow onto the stack. The current flow
 	// is paused and resumes when the target flow completes (auto-pop).
-	// Example: login → recovery → back to login.
 	Action OptNilFlowDefinitionStepTransitionsItemAction `json:"action"`
-	// Local re-purposing. When set, taking this transition changes the
-	// flow's current purpose to this value — the dispatch mode a step's
-	// challenges run under — while the flow's original purpose stays
-	// pinned. Must be a purpose this definition serves, and `target`
-	// must be that purpose's entry step. Mutually exclusive with
-	// `action`: a transition either re-purposes within this flow or
-	// targets another flow, never both.
+	// Switches the flow to this purpose and goes to its entry step,
+	// starting it fresh: the user the flow found so far and the
+	// password collected for them are dropped. The flow's original
+	// purpose stays pinned. Must be a purpose this definition serves.
+	// `target` may be left out; when it is set it must name that
+	// purpose's entry step. Mutually exclusive with `action`.
 	// Example: a "Sign up" navigation on the login identifier step
-	// (`{ target: register, purpose: register }`).
+	// (`{ purpose: register }`).
 	Purpose OptNilFlowDefinitionStepTransitionsItemPurpose `json:"purpose"`
 }
 
 // GetTarget returns the value of Target.
-func (s *FlowDefinitionStepTransitionsItem) GetTarget() string {
+func (s *FlowDefinitionStepTransitionsItem) GetTarget() OptString {
 	return s.Target
 }
 
@@ -27264,7 +27309,7 @@ func (s *FlowDefinitionStepTransitionsItem) GetPurpose() OptNilFlowDefinitionSte
 }
 
 // SetTarget sets the value of Target.
-func (s *FlowDefinitionStepTransitionsItem) SetTarget(val string) {
+func (s *FlowDefinitionStepTransitionsItem) SetTarget(val OptString) {
 	s.Target = val
 }
 

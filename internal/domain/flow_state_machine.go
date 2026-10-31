@@ -1344,9 +1344,10 @@ func (r *FlowStateMachineRuntime) routeOutcome(pc *processCtx, resolved FlowReso
 		return FlowStepResult{}, fmt.Errorf("%w: cross-flow transitions", ErrFlowUnsupported())
 	}
 
-	nextStep, ok := pc.def.FindStep(transition.Target)
+	target := pc.def.TransitionTarget(transition)
+	nextStep, ok := pc.def.FindStep(target)
 	if !ok {
-		return FlowStepResult{}, fmt.Errorf("%w: transition target %q missing from definition", ErrFlowIntegrity(), transition.Target)
+		return FlowStepResult{}, fmt.Errorf("%w: transition target %q missing from definition", ErrFlowIntegrity(), target)
 	}
 
 	// Snapshot purpose before the flip so back can restore it.

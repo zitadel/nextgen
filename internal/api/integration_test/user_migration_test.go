@@ -376,7 +376,7 @@ func TestPatchUserMigrationKeepsIdentity(t *testing.T) {
 	definition.Name = "migration-login"
 	definition.Steps[0].Actions = append(definition.Steps[0].Actions,
 		api.StepAction{Name: "passkey", Kind: api.StepActionKindPasskey})
-	definition.Steps[0].Transitions.Value["passkey"] = api.FlowDefinitionStepTransitionsItem{Target: "done"}
+	definition.Steps[0].Transitions.Value["passkey"] = api.FlowDefinitionStepTransitionsItem{Target: api.NewOptString("done")}
 	defResp, err := f.client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID:      f.projectID(),
 		FlowDefinition: definition,

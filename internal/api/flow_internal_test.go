@@ -236,12 +236,12 @@ func TestMapFlowDefinitionRequest_NullTransitionActionAndPurpose(t *testing.T) {
 				Name: "identifier",
 				Transitions: apigen.NewOptFlowDefinitionStepTransitions(apigen.FlowDefinitionStepTransitions{
 					"next": {
-						Target:  "identifier",
+						Target:  apigen.NewOptString("identifier"),
 						Action:  apigen.OptNilFlowDefinitionStepTransitionsItemAction{Set: true, Null: true},
 						Purpose: apigen.OptNilFlowDefinitionStepTransitionsItemPurpose{Set: true, Null: true},
 					},
 					"purposed": {
-						Target: "identifier",
+						Target: apigen.NewOptString("identifier"),
 						Purpose: apigen.NewOptNilFlowDefinitionStepTransitionsItemPurpose(
 							apigen.FlowDefinitionStepTransitionsItemPurposeRegister,
 						),
@@ -262,4 +262,20 @@ func TestMapFlowDefinitionRequest_NullTransitionActionAndPurpose(t *testing.T) {
 	purposed := svcReq.Steps[0].Transitions["purposed"]
 	require.NotNil(t, purposed.Purpose)
 	require.Equal(t, domain.FlowDefinitionPurposeRegister, *purposed.Purpose)
+}
+
+// A purpose-only transition reads back without a target, as its author wrote
+// it, so the CLI's drift check sees no difference from the local file.
+func TestMapTransitionsToAPI_PurposeOnlyHasNoTarget(t *testing.T) {
+	t.Parallel()
+
+	register := domain.FlowDefinitionPurposeRegister
+	got := mapTransitionsToAPI(map[string]domain.FlowStepTransition{
+		"register": {Purpose: &register},
+		"submit":   {Target: "password"},
+	})
+
+	require.False(t, got["register"].Target.IsSet())
+	require.Equal(t, apigen.FlowDefinitionStepTransitionsItemPurposeRegister, got["register"].Purpose.Value)
+	require.Equal(t, apigen.NewOptString("password"), got["submit"].Target)
 }

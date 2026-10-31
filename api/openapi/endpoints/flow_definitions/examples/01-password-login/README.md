@@ -4,7 +4,7 @@ The minimal login flow. Collect an identifier, then a password, then complete.
 
 ## Capabilities exercised
 
-- Single-purpose definition (`login` only — no flip-table coverage required).
+- Single-purpose definition (`login` only, so there is no sign-up to switch to).
 - Identifier-shaped field (`email` is `x-unique` in the user schema) drives
   implicit identifier dispatch on submit.
 - Password-shaped field (the reserved `x-auth-methods#password` token) drives

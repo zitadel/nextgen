@@ -59,7 +59,7 @@ export function localeFor(
   tag: string,
   locales?: Readonly<Record<string, Partial<Locale>>>,
 ): Locale {
-  const language = (tag.split("-")[0] ?? "").toLowerCase();
+  const language = primaryLanguage(tag);
   const custom = locales?.[language];
   const fallback = locales?.en;
   if (language === "en" || !fallback) {
@@ -73,4 +73,22 @@ export function localeFor(
   const builtin = builtinLocales[language];
   const base = builtin ? mergeLocale(english, builtin) : english;
   return custom ? mergeLocale(base, custom) : base;
+}
+
+/**
+ * Whether the integrator hid a key's text by setting it to `""`: for the tag's
+ * language or, when they wrote no text of their own for it there, in `en`.
+ * Unlike {@link localeFor}, a built-in translation does not override an
+ * English `""`, so one entry hides the text in every language.
+ */
+export function isHidden(
+  tag: string,
+  locales: Readonly<Record<string, Partial<Locale>>> | undefined,
+  key: string,
+): boolean {
+  return (locales?.[primaryLanguage(tag)]?.[key] ?? locales?.en?.[key]) === "";
+}
+
+function primaryLanguage(tag: string): string {
+  return (tag.split("-")[0] ?? "").toLowerCase();
 }

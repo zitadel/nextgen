@@ -417,7 +417,7 @@ func passwordLoginFlowDefinition(userSchemaURL string) api.FlowDefinition {
 					{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)},
 				},
 				Transitions: api.NewOptFlowDefinitionStepTransitions(api.FlowDefinitionStepTransitions{
-					"submit": api.FlowDefinitionStepTransitionsItem{Target: "password"},
+					"submit": api.FlowDefinitionStepTransitionsItem{Target: api.NewOptString("password")},
 				}),
 			},
 			{
@@ -427,7 +427,7 @@ func passwordLoginFlowDefinition(userSchemaURL string) api.FlowDefinition {
 					{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)},
 				},
 				Transitions: api.NewOptFlowDefinitionStepTransitions(api.FlowDefinitionStepTransitions{
-					"submit": api.FlowDefinitionStepTransitionsItem{Target: "done"},
+					"submit": api.FlowDefinitionStepTransitionsItem{Target: api.NewOptString("done")},
 				}),
 			},
 			{
@@ -455,7 +455,7 @@ func passwordRegisterFlowDefinition(userSchemaURL string) api.FlowDefinition {
 					{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)},
 				},
 				Transitions: api.NewOptFlowDefinitionStepTransitions(api.FlowDefinitionStepTransitions{
-					"submit": api.FlowDefinitionStepTransitionsItem{Target: "done"},
+					"submit": api.FlowDefinitionStepTransitionsItem{Target: api.NewOptString("done")},
 				}),
 			},
 			{
@@ -482,8 +482,8 @@ func passwordLoginFlowWithNotFoundFlowDefinition(userSchemaURL string) api.FlowD
 					{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)},
 				},
 				Transitions: api.NewOptFlowDefinitionStepTransitions(api.FlowDefinitionStepTransitions{
-					"submit":         api.FlowDefinitionStepTransitionsItem{Target: "password"},
-					"user_not_found": api.FlowDefinitionStepTransitionsItem{Target: "not_found"},
+					"submit":         api.FlowDefinitionStepTransitionsItem{Target: api.NewOptString("password")},
+					"user_not_found": api.FlowDefinitionStepTransitionsItem{Target: api.NewOptString("not_found")},
 				}),
 			},
 			{
@@ -493,7 +493,7 @@ func passwordLoginFlowWithNotFoundFlowDefinition(userSchemaURL string) api.FlowD
 					{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)},
 				},
 				Transitions: api.NewOptFlowDefinitionStepTransitions(api.FlowDefinitionStepTransitions{
-					"submit": api.FlowDefinitionStepTransitionsItem{Target: "done"},
+					"submit": api.FlowDefinitionStepTransitionsItem{Target: api.NewOptString("done")},
 				}),
 			},
 			{

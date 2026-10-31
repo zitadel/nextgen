@@ -118,7 +118,7 @@ Run `preview` on pull requests and `deploy` on pushes to the main branch:
 
 ## How publishing works
 
-- **Flows are validated before the release is built** against the same rules the platform enforces — transition wiring, step reachability, schema field references, and cross-purpose invariants (e.g. a login entry step must wire `user_not_found` when `register` is also a purpose). Violations fail `deploy` before anything is uploaded, with the same error text the server would return. Non-blocking product guidance is reported as warnings.
+- **Flows are validated before the release is built** against the same rules the platform enforces — transition wiring, step reachability, schema field references, and cross-purpose invariants (e.g. a purpose switch must go to a purpose the flow serves). Violations fail `deploy` before anything is uploaded, with the same error text the server would return. Non-blocking product guidance is reported as warnings.
 - The release carries the resources as authored. The server reuses the revision it already holds when the content matches and allocates a new one otherwise, so an unchanged resource is never re-revisioned.
 - Every `${VAR}` and `*_env` reference is checked against the running environment before the release is built, so a missing variable fails locally rather than shipping a placeholder.
 - Flow files carry `"$schema": "../meta/flow-definition.json"` — a pointer at the flow dialect spec setup copies into `.zitadel/meta/`, so editors validate and autocomplete flow edits offline. It is local-only and stripped before upload.

@@ -24,7 +24,7 @@
         "standard-login",
         "combined-auth"
       ],
-      "description": "Stable identifier for this flow, used as the target of cross-flow\n`switch` and `pivot` transitions. Every revision of a flow shares its\n`name`; publishing a definition under an existing `name` adds a\nrevision to that flow. Renaming is not supported — the `name` is part\nof the public contract another definition may reference. Acts as the\nhuman display label as well; no separate slug.\n"
+      "description": "Stable identifier for this flow, and the name a cross-flow `switch` or\n`pivot` transition will target once the engine runs them. Every revision of a flow shares its\n`name`; publishing a definition under an existing `name` adds a\nrevision to that flow. Renaming is not supported — the `name` is part\nof the public contract another definition may reference. Acts as the\nhuman display label as well; no separate slug.\n"
     },
     "status": {
       "$ref": "#/$defs/FlowDefinitionStatus"
@@ -38,7 +38,7 @@
     },
     "purposes": {
       "type": "object",
-      "description": "Maps each purpose this definition handles to its entry-point step.\nKeys are purpose names; values must match a `name` in `steps`. A\ndefinition can serve multiple purposes (e.g. a combined login/register\nflow) by listing one entry per purpose.\n",
+      "description": "Maps each purpose this definition handles to its entry-point step.\nKeys are purpose names; values must match a `name` in `steps`. A\ndefinition can serve multiple purposes (e.g. a combined login/register\nflow) by listing one entry per purpose, or just one: a sign-in-only\nflow lists `login` alone.\n\n- `login`: verify an existing user.\n- `register`: create a user.\n- `recovery`, `profiling`, `reauth`, `link_account`: reserved. A\n  definition may declare them, but the engine does not run their\n  journeys yet; `recovery` only asks a password field for a new\n  password.\n",
       "minProperties": 1,
       "propertyNames": {
         "type": "string",
@@ -94,10 +94,6 @@
             "transitions": {
               "submit": {
                 "target": "authenticate"
-              },
-              "user_not_found": {
-                "target": "register",
-                "action": "switch"
               }
             }
           },
@@ -470,16 +466,14 @@
         },
         "transitions": {
           "type": "object",
-          "description": "Maps action/outcome names to their transition descriptor.\n\nKeys match action names from the `actions` array. Additional keys\ncome from implicit outcomes based on schema annotations\n(e.g. `user_not_found` from `x-unique` fields) and engine\nevents (e.g. `sso_authenticated`, `sso_user_not_found`).\n",
+          "description": "Maps action and outcome names to where the flow goes next.\n\nA key is either the `name` of an action in `actions` (the user chose\nit) or an outcome the engine raises on its own:\n\n- `user_not_found`: an identifier with no account. Following this\n  transition also switches the flow to `register`.\n- `user_already_exists`: an identifier that has an account, typed on\n  a sign-up or returned by a provider's sign-in. Following this\n  transition also switches the flow to `login`.\n- `sso_authenticated`: a provider's sign-in matched an account.\n- `sso_user_not_found`: a provider's sign-in matched no account.\n\nEach action needs its transition, and a step that offers\n`sso_providers` needs `sso_authenticated`; the server requires no\nother outcome. `zitadel deploy` also requires `sso_user_not_found` and\n`user_already_exists` on a step that offers a provider that creates\nusers, since a provider's sign-in can raise both. An outcome the step\nhas no transition for leaves the user on the step with that outcome's\nerror (for example `error.user_not_found`), so a flow that leaves out\n`user_not_found` signs in only users that already exist.\n",
           "additionalProperties": {
             "type": "object",
-            "required": [
-              "target"
-            ],
+            "description": "Where the flow goes: a step (`target`), or the entry step of another\npurpose (`purpose`). Set at least one of them.\n",
             "properties": {
               "target": {
                 "type": "string",
-                "description": "Step name within this flow (when `action` is null), or the name\nof another flow (when `action` is `switch` or `pivot`).\n",
+                "description": "Step name within this flow (when `action` is null), or the name\nof another flow (when `action` is `switch` or `pivot`). Optional\nwhen `purpose` is set: the transition then goes to that purpose's\nentry step.\n",
                 "examples": [
                   "password"
                 ]
@@ -497,7 +491,7 @@
                     "type": "null"
                   }
                 ],
-                "description": "How to interpret `target`:\n- null (omitted): transition to a step in the current flow.\n- switch: replace the current flow with the target flow.\n  No return — the current flow is discarded.\n  Example: login ↔ register.\n- pivot: push the target flow onto the stack. The current flow\n  is paused and resumes when the target flow completes (auto-pop).\n  Example: login → recovery → back to login.\n"
+                "description": "Reserved for transitions to another flow definition. The engine\ndoes not run them yet: taking one fails with `flow.unsupported`.\nKeep transitions within one flow definition, and use `purpose`\nto move between signing in and signing up.\n\nHow `target` will be read:\n- null (omitted): a step in the current flow.\n- switch: replace the current flow with the target flow.\n  No return — the current flow is discarded.\n- pivot: push the target flow onto the stack. The current flow\n  is paused and resumes when the target flow completes (auto-pop).\n"
               },
               "purpose": {
                 "oneOf": [
@@ -516,23 +510,39 @@
                     "type": "null"
                   }
                 ],
-                "description": "Local re-purposing. When set, taking this transition changes the\nflow's current purpose to this value — the dispatch mode a step's\nchallenges run under — while the flow's original purpose stays\npinned. Must be a purpose this definition serves, and `target`\nmust be that purpose's entry step. Mutually exclusive with\n`action`: a transition either re-purposes within this flow or\ntargets another flow, never both.\nExample: a \"Sign up\" navigation on the login identifier step\n(`{ target: register, purpose: register }`).\n"
+                "description": "Switches the flow to this purpose and goes to its entry step,\nstarting it fresh: the user the flow found so far and the\npassword collected for them are dropped. The flow's original\npurpose stays pinned. Must be a purpose this definition serves.\n`target` may be left out; when it is set it must name that\npurpose's entry step. Mutually exclusive with `action`.\nExample: a \"Sign up\" navigation on the login identifier step\n(`{ purpose: register }`).\n"
               }
             },
             "additionalProperties": false,
             "not": {
-              "required": [
-                "purpose",
-                "action"
-              ],
-              "properties": {
-                "purpose": {
-                  "type": "string"
+              "anyOf": [
+                {
+                  "required": [
+                    "purpose",
+                    "action"
+                  ],
+                  "properties": {
+                    "purpose": {
+                      "type": "string"
+                    },
+                    "action": {
+                      "type": "string"
+                    }
+                  }
                 },
-                "action": {
-                  "type": "string"
+                {
+                  "not": {
+                    "required": [
+                      "target"
+                    ]
+                  },
+                  "properties": {
+                    "purpose": {
+                      "type": "null"
+                    }
+                  }
                 }
-              }
+              ]
             }
           },
           "examples": [
@@ -540,13 +550,11 @@
               "submit": {
                 "target": "password"
               },
-              "recover": {
-                "target": "recovery",
-                "action": "pivot"
+              "user_not_found": {
+                "target": "register"
               },
               "register": {
-                "target": "register",
-                "action": "switch"
+                "purpose": "register"
               }
             }
           ]

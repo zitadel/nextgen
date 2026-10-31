@@ -227,6 +227,17 @@ func (d *FlowDefinition) FindStep(name string) (*FlowDefinitionStep, bool) {
 	return nil, false
 }
 
+// TransitionTarget is the step a current-flow transition goes to: its
+// Target, or, when only a Purpose is declared, that purpose's entry step.
+// The definition keeps what its author wrote, so a read returns it as
+// written and the target is resolved here, at every use.
+func (d *FlowDefinition) TransitionTarget(t FlowStepTransition) string {
+	if t.Target == "" && t.Purpose != nil {
+		return d.Purposes[*t.Purpose]
+	}
+	return t.Target
+}
+
 // FlowDefinitionAudience describes which requests this definition should be selected for.
 // Empty slices (or nil) mean "no restriction". Specificity for resolution
 // is app > team > project-wide (both empty).
@@ -355,19 +366,23 @@ type FlowSSOProvider struct {
 	ConnectionID string
 }
 
-// FlowStepTransition maps an action name to either a target step (regular) or a pivot purpose.
+// FlowStepTransition says where an action or outcome goes: a step of this
+// flow, the entry step of a purpose it serves, or another flow.
 type FlowStepTransition struct {
 	Action *FlowDefinitionTransitionAction
 	// Target is either a step in the current flow OR a new flow.
 	// When Action == nil, Target refers to a step in the current flow
 	// When Action != nil, Target refers to another flow.
+	// Empty when only Purpose is declared; read it through
+	// [FlowDefinition.TransitionTarget].
 	Target string
 	// Purpose, when non-nil, re-purposes the flow locally: taking this
 	// transition sets [FlowState.CurrentPurpose] to this purpose while the
 	// pinned [FlowState.Purpose] stays untouched. The purpose must be one
-	// the definition serves and Target must be that purpose's entry step
-	// (validated). Mutually exclusive with Action — a transition either
-	// pivots to another flow or re-purposes within this one, never both.
+	// the definition serves, and Target, when set, must be that purpose's
+	// entry step (validated). Mutually exclusive with Action — a transition
+	// either pivots to another flow or re-purposes within this one, never
+	// both.
 	Purpose *FlowDefinitionPurpose
 }
 

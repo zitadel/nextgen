@@ -158,14 +158,14 @@ function outcome(input: {
   const statusCommand = projectCommand("status", input.selector, input.cliVersion);
   const verifyActions = [
     ...(input.includeInstallCommand ? [`Install dependencies: ${input.installCommand}`] : []),
-    `Start your project: ${input.devCommand} (then open ${input.issuer}/login)`,
+    `Start your project: ${input.devCommand} (then open ${input.issuer}/register)`,
     verifyLoginAction(),
   ];
   const boxActions: BoxAction[] = [
     ...(input.includeInstallCommand
       ? [{ text: "Install dependencies:", command: input.installCommand }]
       : []),
-    { text: `Start your project (then open ${input.issuer}/login):`, command: input.devCommand },
+    { text: `Start your project (then open ${input.issuer}/register):`, command: input.devCommand },
     { text: verifyLoginAction() },
     // The dev server holds the terminal it starts in, and every later command
     // reads `.zitadel/` from this directory.

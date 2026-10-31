@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strings"
 	"testing"
 
 	"github.com/ianlancetaylor/jsonschema"
@@ -1205,11 +1204,12 @@ func assertErrorDetails(t *testing.T, err error, wantErr error) {
 	assert.Equal(t, wantDomainErr.Details, gotErr.Details)
 }
 
-// ---- Flip-table coverage ----
+// ---- The automatic switch between login and register ----
 
-// Combined login + register entry must wire the counter outcome
-// (user_not_found or user_already_exists).
-func TestValidator_FlipTable_CombinedLoginRegisterRequiresCounterOutcome(t *testing.T) {
+// A combined login + register definition may leave out the outcomes that
+// switch between them: the author chooses whether the flow switches, and an
+// unwired outcome shows its error instead.
+func TestValidator_CombinedLoginRegisterWithoutSwitch(t *testing.T) {
 	schema := mustSchema(t, userSchemaIDAndPassword)
 	createUser := domain.FlowOnSuccessCreateUser
 	def := domain.FlowDefinition{
@@ -1247,17 +1247,11 @@ func TestValidator_FlipTable_CombinedLoginRegisterRequiresCounterOutcome(t *test
 		},
 	}
 	_, err := domain.ValidateFlowDefinition(schema, def)
-	require.Error(t, err)
-	details := errorDetails(t, err)
-	// Map iteration order is non-deterministic; either missing flip
-	// outcome is a valid surfacing.
-	assert.True(t,
-		strings.Contains(details, "user_not_found") || strings.Contains(details, "user_already_exists"),
-		"want flip-coverage error, got: %s", details)
+	require.NoError(t, err)
 }
 
 // Solo-purpose login flow does NOT need user_not_found wired.
-func TestValidator_FlipTable_SoloLoginNoFlipRequired(t *testing.T) {
+func TestValidator_SoloLoginNoSwitchRequired(t *testing.T) {
 	schema := mustSchema(t, userSchemaIDAndPassword)
 	def := domain.FlowDefinition{
 		ProjectID:     "p",
@@ -1970,4 +1964,33 @@ func TestValidator_TransitionPurposeWrongTargetRejected(t *testing.T) {
 	_, err := domain.ValidateFlowDefinition(schema, def)
 	require.Error(t, err)
 	assert.Contains(t, errorDetails(t, err), `must target that purpose's entry step "register"`)
+}
+
+// A purpose alone names its step: the transition goes to that purpose's
+// entry step, so a definition whose only route to a step is such a
+// transition still reaches it.
+func TestValidator_TransitionPurposeWithoutTargetAccepted(t *testing.T) {
+	schema := mustSchema(t, userSchemaIDAndPassword)
+	def := purposedNavDef(func(tr *domain.FlowStepTransition) {
+		tr.Target = ""
+	})
+	// Only the purpose-only transition leads to "register" from the
+	// identifier step; the step stays reachable as the register entry.
+	delete(def.Steps[0].Transitions, domain.FlowImplicitOutcomeUserNotFound)
+	_, err := domain.ValidateFlowDefinition(schema, def)
+	require.NoError(t, err)
+	assert.Empty(t, def.Steps[0].Transitions["register"].Target, "validation keeps the transition as written")
+	assert.Equal(t, "register", def.TransitionTarget(def.Steps[0].Transitions["register"]))
+}
+
+// A transition must say where it goes.
+func TestValidator_TransitionWithoutTargetOrPurposeRejected(t *testing.T) {
+	schema := mustSchema(t, userSchemaIDAndPassword)
+	def := purposedNavDef(func(tr *domain.FlowStepTransition) {
+		tr.Target = ""
+		tr.Purpose = nil
+	})
+	_, err := domain.ValidateFlowDefinition(schema, def)
+	require.Error(t, err)
+	assert.Contains(t, errorDetails(t, err), `transition "register" has neither a target nor a purpose`)
 }

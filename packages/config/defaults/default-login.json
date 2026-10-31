@@ -35,7 +35,6 @@
           "target": "register"
         },
         "register": {
-          "target": "register",
           "purpose": "register"
         }
       }
@@ -86,7 +85,6 @@
           "target": "password"
         },
         "sign_in": {
-          "target": "identifier",
           "purpose": "login"
         }
       }

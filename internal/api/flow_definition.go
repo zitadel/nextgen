@@ -232,7 +232,7 @@ func mapCreateRequestToService(req *api.CreateFlowDefinitionRequest) (service.Fl
 				t := domain.FlowStepTransition{
 					Action:  transitionAction,
 					Purpose: transitionPurpose,
-					Target:  apiTransition.GetTarget(),
+					Target:  apiTransition.GetTarget().Or(""),
 				}
 				transitions[name] = t
 			}
@@ -413,7 +413,7 @@ func mapTransitionsToAPI(domainTransitions map[string]domain.FlowStepTransition)
 			purpose = transition.Purpose.String()
 		}
 		transitions[n] = api.FlowDefinitionStepTransitionsItem{
-			Target: transition.Target,
+			Target: api.OptString{Value: transition.Target, Set: transition.Target != ""},
 			Action: api.OptNilFlowDefinitionStepTransitionsItemAction{
 				Value: api.FlowDefinitionStepTransitionsItemAction(action),
 				Set:   transition.Action != nil,

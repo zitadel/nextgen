@@ -4014,6 +4014,48 @@ func TestFlowStateMachine_Process_NavigatePurposeSwitch_BothDirections(t *testin
 	assert.Nil(t, toLogin.Step.Notice)
 }
 
+// A purpose-only transition goes to that purpose's entry step, exactly as
+// one that also names the step does.
+func TestFlowStateMachine_Process_NavigatePurposeSwitchWithoutTarget(t *testing.T) {
+	t.Parallel()
+	w := newFlowTestWorld(t)
+	def := purposeNavDefinition()
+	login := domain.FlowDefinitionPurposeLogin
+	register := domain.FlowDefinitionPurposeRegister
+	def.Steps[0].Transitions["register"] = domain.FlowStepTransition{Purpose: &register}
+	def.Steps[2].Transitions["sign_in"] = domain.FlowStepTransition{Purpose: &login}
+
+	w.schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
+		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
+		AnyTimes()
+	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
+
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeLogin,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+
+	toRegister, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
+		Action: "register",
+		Fields: map[string]any{},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "register", toRegister.State.CurrentStep)
+	assert.Equal(t, domain.FlowDefinitionPurposeRegister, toRegister.State.CurrentPurpose)
+
+	toLogin, err := w.sm.Process(t.Context(), def, toRegister.State, domain.FlowSubmitInput{
+		Action: "sign_in",
+		Fields: map[string]any{},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "identifier", toLogin.State.CurrentStep)
+	assert.Equal(t, domain.FlowDefinitionPurposeLogin, toLogin.State.CurrentPurpose)
+}
+
 // Regression: back restoration across a purposed navigation is existing
 // behavior (FlowBackEntry snapshots the purpose) — navigating to register
 // and going back must land on identifier with CurrentPurpose login again.
