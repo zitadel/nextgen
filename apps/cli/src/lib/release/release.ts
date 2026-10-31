@@ -1,10 +1,12 @@
 import type { ZitadelClient } from "@zitadel/api/client";
+import { BuildReleaseBody as BuildReleaseBodySchema } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import type {
   BuildRelease200,
   BuildRelease201,
   BuildReleaseBody,
 } from "@zitadel/api/generated/model";
 
+import { ZitadelError } from "../errors";
 import type { ConfigurationBundle } from "./bundle";
 
 /**
@@ -33,15 +35,32 @@ export async function createReleaseFromBundle(
   bundle: ConfigurationBundle,
   source: ReleaseSource,
 ): Promise<Release> {
-  // The bundle is read from disk as loose JSON; the generated body types each
-  // resource strictly. The server re-validates every one, so cast at the edge.
   const body = {
     bundle,
     ...(source.message === undefined ? {} : { message: source.message }),
     ...(source.gitSha === null ? {} : { git_sha: source.gitSha }),
     git_dirty: source.gitDirty,
-  } as unknown as BuildReleaseBody;
+  };
+  // The bundle is read from disk as loose JSON, so it is checked against the
+  // body the API takes before it is sent, and sent as read: the check fills in
+  // no defaults.
+  if (!isBuildReleaseBody(body)) {
+    const { error } = BuildReleaseBodySchema.safeParse(body);
+    throw new ZitadelError(
+      "E_VALIDATION",
+      "The files in .zitadel/ do not make a release the API takes",
+      {
+        hint: "Each issue names the field the API refuses, as bundle.<kind>.<position>.<field>.",
+        details: { issues: error?.issues ?? [] },
+      },
+    );
+  }
   return client.buildRelease(body, { project_id: projectId });
+}
+
+/** Whether `body` has the shape `POST /releases/build` takes. */
+function isBuildReleaseBody(body: unknown): body is BuildReleaseBody {
+  return BuildReleaseBodySchema.safeParse(body).success;
 }
 
 /** Revoke a release so its content is never served again. Idempotent. */
