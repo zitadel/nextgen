@@ -117,7 +117,7 @@ function mockDirectory(entitlements: Map<string, Entitlements>): Directory {
         return [{ team_id: MOCK_TEAM.id, metric, value, at: hour.start, identifier }];
       });
     },
-    async usageByDay(_team, days) {
+    async usageByDay(_cookie, _team, days) {
       const end = Date.parse(days.end);
       const counts: DayCount[] = [];
       for (let day = Date.parse(days.start); day < end; day += DAY) {

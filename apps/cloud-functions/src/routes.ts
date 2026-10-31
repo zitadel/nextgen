@@ -85,7 +85,7 @@ export const routes: Record<string, Handler> = {
         teams.map(async (team) => {
           const billing = await systems.stripe.overview(team);
           const days = periodSoFar(billing.period, now);
-          return teamUsage(billing, await systems.zitadel.usageByDay(team, days));
+          return teamUsage(billing, await systems.zitadel.usageByDay(auth.cookie, team, days));
         }),
       ),
     };

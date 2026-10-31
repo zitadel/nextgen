@@ -48,10 +48,11 @@ export interface Directory {
   /** Every team's usage in one hour, as the cloud's operator reads it (§6, §8). */
   usage(hour: UsageWindow): Promise<UsageRecord[]>;
   /**
-   * One team's counts per project and UTC day within `days`, as the server's
-   * hourly sums add up (§8.3): quantities only, which the cloud prices.
+   * One team's counts per project and UTC day within `days`, read as the
+   * person (`GET /usage`, root ADR 086): the projects they can act on that
+   * the team has claimed. Quantities only, which the cloud prices.
    */
-  usageByDay(team: Team, days: UsageWindow): Promise<TeamDays>;
+  usageByDay(cookie: string, team: Team, days: UsageWindow): Promise<TeamDays>;
   /** Sets what a team's plan allows, which the server enforces and never asks Stripe (§6, §8). */
   applyEntitlements(teamId: string, entitlements: Entitlements): Promise<void>;
 }

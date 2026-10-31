@@ -52,7 +52,7 @@ export const Route = createFileRoute("/_authed/project/")({
   // Last: the list above it is the project's contents, this is the project.
   staticData: {
     scope: "project",
-    nav: { label: "Settings", order: 9, icon: Settings },
+    nav: { label: "Settings", order: 10, icon: Settings },
   },
   loaderDeps: projectScopeDeps,
   loader: async ({ deps }) => {

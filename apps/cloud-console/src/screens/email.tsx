@@ -30,7 +30,7 @@ import { screen } from "./screen";
  */
 export const emailScreen = screen({
   path: "/settings/email",
-  nav: { label: "Email", view: "settings", order: 5, icon: Mail },
+  nav: { label: "Email", view: "settings", order: 4, icon: Mail },
   load: () => cloudGet<EmailPreferences>("/account/preferences"),
   Screen: EmailScreen,
 });

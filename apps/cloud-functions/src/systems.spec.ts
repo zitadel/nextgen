@@ -57,7 +57,7 @@ describe("production, until the live adapters land", () => {
 });
 
 describe("local runs and previews", () => {
-  it("read the caller and their teams live, and a team's usage from the mock", async () => {
+  it("read Zitadel live, the caller's projects' usage included, and the rest from the mocks", async () => {
     vi.resetModules();
     const { rpcSystems } = await import("./systems");
     const live = {
@@ -65,12 +65,8 @@ describe("local runs and previews", () => {
       administeredTeams: vi.fn(),
       usageByDay: vi.fn(),
     } as unknown as Directory;
-    const { zitadel } = rpcSystems(live);
-    expect(zitadel.administeredTeams).toBe(live.administeredTeams);
-    const days = { start: "2026-10-01T00:00:00.000Z", end: "2026-10-02T00:00:00.000Z" };
-    const { projects, counts } = await zitadel.usageByDay(MOCK_TEAM, days);
-    expect(live.usageByDay).not.toHaveBeenCalled();
-    expect(projects).toHaveLength(2);
-    expect(counts.length).toBeGreaterThan(0);
+    const systems = rpcSystems(live);
+    expect(systems.zitadel).toBe(live);
+    await expect(systems.stripe.overview(MOCK_TEAM)).resolves.toBeDefined();
   });
 });

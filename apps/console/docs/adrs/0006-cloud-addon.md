@@ -1,12 +1,12 @@
 # Console ADR 0006: The hosted cloud's add-on
 
-> **Status:** Proposed (the seam with five slots; the cloud's screens on mocks)
+> **Status:** Proposed (the seam with six slots; the cloud's screens on mocks)
 > **Date:** 2026-10-29
 > **Implementation state:** §1 to §4 are implemented for the slots `Root`,
-> `track`, `screens`, `signedOutScreens` and `signInApiBase`, the component
-> kit and the add-on's Vite plugin. The cloud's Billing, Support and Email
-> screens are scaffolded against `apps/cloud-functions`, whose systems are
-> mocks (root [ADR 084](../../../../docs/adrs/084-hosted-cloud-business-systems.md)),
+> `track`, `screens`, `signedOutScreens`, `signInApiBase` and `usagePrices`,
+> the component kit and the add-on's Vite plugin. The cloud's Billing, Support
+> and Email screens are scaffolded against `apps/cloud-functions`, whose
+> systems are mocks (root [ADR 084](../../../../docs/adrs/084-hosted-cloud-business-systems.md)),
 > and its sign-up page is its signed-out screen.
 > Menu, help and banner slots are not built; the first screen that needs one
 > adds it (§2).
@@ -60,7 +60,12 @@ the builds that leave it empty nothing:
   sanitized and sends a visitor who is signed in on to it;
 - `signInApiBase`, where the sign-in widget (login, sign-up, claim) sends its
   calls instead of the API base; the cloud routes them through its bot check
-  (root ADR 084 §5).
+  (root ADR 084 §5);
+- `usagePrices`, which prices a project's usage for the console's own Usage
+  screen (root [ADR 086](../../../../docs/adrs/086-usage-rollups-and-api.md)).
+  Every build shows the counts; the cloud's adds what each day of them costs,
+  and a failed or empty answer leaves only the prices out. It is the first
+  slot that feeds a core screen rather than adding one.
 
 A slot is added to the contract in the change whose screen needs it: entries
 in the account menu or the project switcher, help, banners.

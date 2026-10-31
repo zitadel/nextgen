@@ -28,6 +28,35 @@ export interface ConsoleAddon {
    * server, as the hosted cloud's bot check does. Every other call stays direct.
    */
   signInApiBase?: `/${string}`;
+  /**
+   * Prices a project's usage for the Usage screen, which shows counts alone
+   * without it, as every build without a price list does. Resolves to
+   * `undefined` when there is nothing to price for this caller; a rejection
+   * leaves the prices out too, never the counts.
+   */
+  usagePrices?: (request: UsagePriceRequest) => Promise<UsagePrices | undefined>;
+}
+
+/** The usage the Usage screen asks prices for: one project, from `from` to `to`. */
+export interface UsagePriceRequest {
+  project_id: string;
+  /** RFC 3339, the first UTC day's start. */
+  from: string;
+  /** RFC 3339, exclusive. */
+  to: string;
+}
+
+/** What a project's usage costs, as the add-on prices it. */
+export interface UsagePrices {
+  /** ISO 4217, such as `USD`. */
+  currency: string;
+  /**
+   * What each UTC day (`2026-10-05`) added to the bill per meter, in the
+   * currency's minor unit; a day of nothing is left out.
+   */
+  days: readonly { date: string; meter: string; amount: number }[];
+  /** One line under the prices, such as the plan they come from. */
+  note?: string;
 }
 
 /**

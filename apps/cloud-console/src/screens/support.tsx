@@ -42,7 +42,7 @@ import { screen } from "./screen";
  */
 export const supportScreen = screen({
   path: "/settings/support",
-  nav: { label: "Support", view: "settings", order: 4, icon: LifeBuoy },
+  nav: { label: "Support", view: "settings", order: 3, icon: LifeBuoy },
   load: () => whenLive(cloudGet<TicketList>("/support/tickets")),
   Screen: SupportScreen,
 });
