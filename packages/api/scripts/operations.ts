@@ -172,8 +172,8 @@ export function pagingArgument(
     depth += "([{<".includes(char) ? 1 : ")]}>".includes(char) && !arrow ? -1 : 0;
   }
   const index = names.findIndex((parameter) =>
-      operation.paging?.token === "body" ? parameter.endsWith("Body") : parameter === "params",
-    );
+    operation.paging?.token === "body" ? parameter.endsWith("Body") : parameter === "params",
+  );
   if (index === -1) {
     throw new Error(`${operation.id} has no argument to carry its page_token`);
   }
