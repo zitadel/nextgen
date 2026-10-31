@@ -1,9 +1,14 @@
 package api
 
 import (
+	"bytes"
+	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -16,10 +21,14 @@ import (
 	"github.com/ogen-go/ogen/validate"
 	"github.com/stretchr/testify/require"
 	api "github.com/zitadel/nextgen/api/generated"
+	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/errorpage"
+	"github.com/zitadel/nextgen/internal/errreport"
+	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/service/mocks"
+	"github.com/zitadel/sloggcp"
 	"go.uber.org/mock/gomock"
 )
 
@@ -264,6 +273,13 @@ var dualSchemeRequests = []struct {
 	{"branding get", http.MethodGet, "/branding/brand_1?project_id=proj_1", ""},
 	{"idps query", http.MethodPost, "/idps/query?project_id=proj_1", `{}`},
 	{"idp get", http.MethodGet, "/idps/idp_1?project_id=proj_1", ""},
+	{"releases list", http.MethodGet, "/releases?project_id=proj_1", ""},
+	{"release get", http.MethodGet, "/releases/rel_1?project_id=proj_1", ""},
+	{"deployments list", http.MethodGet, "/deployments?project_id=proj_1", ""},
+	{"deployment get", http.MethodGet, "/deployments/dep_1?project_id=proj_1", ""},
+	{"deployment create", http.MethodPost, "/deployments?project_id=proj_1", `{"release_id":"rel_1","targets":["primary"]}`},
+	{"deployment rollback", http.MethodPost, "/deployments/dep_1/rollback?project_id=proj_1", `{}`},
+	{"release revoke", http.MethodPost, "/releases/rel_1/revoke?project_id=proj_1", ""},
 }
 
 func TestOgenErrorHandlerDualSchemeInvalidCookieStaysCredentialNeutral(t *testing.T) {
@@ -292,6 +308,13 @@ func TestOgenErrorHandlerDualSchemeInvalidCookieStaysCredentialNeutral(t *testin
 		api.GetBrandingByIdOperation,
 		api.QueryIdpsOperation,
 		api.GetIdpByIdOperation,
+		api.ListReleasesOperation,
+		api.GetReleaseByIdOperation,
+		api.ListDeploymentsOperation,
+		api.GetDeploymentByIdOperation,
+		api.CreateDeploymentOperation,
+		api.RollbackDeploymentOperation,
+		api.RevokeReleaseOperation,
 	} {
 		require.False(t, sessionCookieOperations[op], "%s must stay off the session-only 401 rewrite", op)
 	}
@@ -504,13 +527,32 @@ func TestErrorResponse_serverFaultsAre5xx(t *testing.T) {
 	}
 }
 
+// A CSRF refusal is logged as the error the check returned, not a fresh one
+// built in the error handler, so its cause and origin stay on the line. The
+// body keeps the stable code and message.
+func TestOgenErrorHandlerLogsTheCSRFErrorItWasGiven(t *testing.T) {
+	records := recordLogs(t)
+	err := &ogenerrors.SecurityError{
+		Security: "SessionCookie",
+		Err:      domain.ErrAuthCSRFInvalid().WithParent(errors.New("origin mismatch")),
+	}
+	rec := httptest.NewRecorder()
+	OgenErrorHandler(t.Context(), rec, httptest.NewRequest(http.MethodPost, "/teams", nil), err)
+
+	require.Equal(t, http.StatusForbidden, rec.Code)
+	want := domain.ErrAuthCSRFInvalid()
+	require.JSONEq(t, fmt.Sprintf(`{"code":%q,"message":%q}`, want.Code, want.Message), rec.Body.String())
+	require.Len(t, records(), 1)
+	require.Equal(t, "origin mismatch", records()[0]["error"].(map[string]any)["parent"])
+}
+
 // A security handler that cannot reach a decision (the CSRF request state is
 // missing because WithCSRFRequest is not wired) is a server fault: 500, not
 // the 401 a refused credential gets.
 func TestOgenErrorHandlerSecurityInternalErrorIs500(t *testing.T) {
 	t.Parallel()
 	err := &ogenerrors.SecurityError{
-		Security: "NextgenSession",
+		Security: "SessionCookie",
 		Err:      domain.ErrInternal(errors.New("WithCSRFRequest is not wired")),
 	}
 	rec := httptest.NewRecorder()
@@ -718,6 +760,321 @@ func TestOgenErrorHandlerMalformedCredentialHeader(t *testing.T) {
 	}
 }
 
+// errorStubHandler answers GET /livez with err, or panics with panicValue.
+type errorStubHandler struct {
+	api.UnimplementedHandler
+	err        error
+	panicValue any
+}
+
+func (h errorStubHandler) GetLive(context.Context) (api.GetLiveRes, error) {
+	if h.panicValue != nil {
+		panic(h.panicValue)
+	}
+	return nil, h.err
+}
+
+// serveAndRecordLogs serves req the way the production chain does (WithRecover
+// around the generated server, ogen's operation id middleware, a request
+// logger that carries the request id, as WithLogging sets it) and returns the
+// response and every record logged while serving it (see recordLogs). Not
+// parallel: it changes globals.
+func serveAndRecordLogs(t *testing.T, h api.Handler, tokenService service.TokenService, req *http.Request) (*httptest.ResponseRecorder, []map[string]any) {
+	t.Helper()
+	records := recordLogs(t)
+
+	srv, err := api.NewServer(h, NewSecurityHandler(tokenService),
+		api.WithErrorHandler(OgenErrorHandler),
+		api.WithMiddleware(middleware.AddOperationIdToContext()),
+	)
+	require.NoError(t, err)
+
+	ctx := middleware.WithRequestIDContext(req.Context(), "req_1")
+	ctx = zlog.WithLoggingContext(ctx, slog.Default().With("request_id", "req_1"))
+	ctx = middleware.WithOperationIDContext(ctx, "")
+	rec := httptest.NewRecorder()
+	WithRecover(srv).ServeHTTP(rec, req.WithContext(ctx))
+	return rec, records()
+}
+
+// recordLogs points slog.Default, which every logger lookup without a request
+// logger falls back to, at a JSON recorder, and returns a function reading
+// back every record logged so far. Not parallel: it changes globals.
+func recordLogs(t *testing.T) func() []map[string]any {
+	t.Helper()
+	defaultLogger := slog.Default()
+	t.Cleanup(func() { slog.SetDefault(defaultLogger) })
+
+	var logs bytes.Buffer
+	slog.SetDefault(slog.New(slog.NewJSONHandler(&logs, nil)))
+
+	return func() []map[string]any {
+		var records []map[string]any
+		for line := range bytes.Lines(logs.Bytes()) {
+			var record map[string]any
+			require.NoError(t, json.Unmarshal(line, &record))
+			records = append(records, record)
+		}
+		return records
+	}
+}
+
+// enableErrorOrigins turns on location and stack capture for the errors the
+// test builds, and turns it off again afterwards.
+func enableErrorOrigins(t *testing.T) {
+	t.Helper()
+	errreport.EnableLocation(true)
+	errreport.EnableStack(true)
+	t.Cleanup(func() {
+		errreport.EnableLocation(false)
+		errreport.EnableStack(false)
+	})
+}
+
+// A handler error answered with a 5xx is logged once, at Error, with the
+// request and operation it failed and where it was raised.
+func TestOgenErrorHandlerLogsServerFaultOnce(t *testing.T) {
+	enableErrorOrigins(t)
+	rec, records := serveAndRecordLogs(t, errorStubHandler{err: errors.New("disk on fire")}, nil,
+		httptest.NewRequest(http.MethodGet, "/livez", nil))
+
+	require.Equal(t, http.StatusInternalServerError, rec.Code)
+	require.Len(t, records, 1)
+	record := records[0]
+	require.Equal(t, "ERROR", record["level"])
+	require.Equal(t, "api error", record["msg"])
+	require.EqualValues(t, http.StatusInternalServerError, record["status"])
+	require.Equal(t, "getLive", record["operation_id"])
+	require.Equal(t, "req_1", record["request_id"])
+	logged, ok := record["error"].(map[string]any)
+	require.True(t, ok, "error must be logged as a group: %v", record["error"])
+	require.Equal(t, "internal", logged["code"])
+	require.Equal(t, "An unexpected error occurred.", logged["message"])
+	require.Equal(t, "disk on fire", logged["parent"])
+	require.NotEmpty(t, logged["reportLocation"])
+	require.NotEmpty(t, logged["stackTrace"])
+}
+
+// A handler error answered with a 4xx is logged once, at Info, with its code,
+// message and cause but without the location and stack it captured.
+func TestOgenErrorHandlerLogsClientErrorAtInfo(t *testing.T) {
+	enableErrorOrigins(t)
+	err := domain.ErrProjectNotFound().WithParent(errors.New("no rows in result set"))
+	rec, records := serveAndRecordLogs(t, errorStubHandler{err: err}, nil,
+		httptest.NewRequest(http.MethodGet, "/livez", nil))
+
+	require.Equal(t, http.StatusNotFound, rec.Code)
+	require.Len(t, records, 1)
+	require.Equal(t, "INFO", records[0]["level"])
+	require.EqualValues(t, http.StatusNotFound, records[0]["status"])
+	requireBriefError(t, records[0], err.Code, err.Message, "no rows in result set")
+}
+
+// requireBriefError asserts the record logs the error without its location
+// and stack, as every line below Error level does.
+func requireBriefError(t *testing.T, record map[string]any, code, message, parent string) {
+	t.Helper()
+	logged, ok := record["error"].(map[string]any)
+	require.True(t, ok, "error must be logged as a group: %v", record["error"])
+	require.Equal(t, code, logged["code"])
+	require.Equal(t, message, logged["message"])
+	require.Contains(t, logged["parent"], parent)
+	require.NotContains(t, logged, "reportLocation")
+	require.NotContains(t, logged, "stackTrace")
+}
+
+// A body ogen cannot decode is logged as a body decode failure, without
+// ogen's reason, which can quote the input. The client body keeps the stable
+// message.
+func TestOgenErrorHandlerLogsDecodeKind(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/projects", strings.NewReader(`{"name":`))
+	req.Header.Set("Content-Type", "application/json")
+	rec, records := serveAndRecordLogs(t, errorStubHandler{}, nil, req)
+
+	require.Equal(t, http.StatusBadRequest, rec.Code)
+	require.JSONEq(t, `{"code":"req.invalid","message":`+fmt.Sprintf("%q", domain.ErrRequestInvalid().Message)+`}`, rec.Body.String())
+	require.Len(t, records, 1)
+	require.Equal(t, "INFO", records[0]["level"])
+	require.Equal(t, "createProject", records[0]["operation_id"], "ogen fails before its middleware names the operation")
+	logged := records[0]["error"].(map[string]any)
+	require.Equal(t, "req.invalid", logged["code"])
+	require.Equal(t, "decode body", logged["parent"])
+}
+
+// ogen's validation text can quote the rejected value, and a body can hold a
+// secret: the log names the rejected field, never the value.
+func TestOgenErrorHandlerLogOmitsRejectedValue(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/projects",
+		strings.NewReader(`{"name":"p","origins":[{"pattern":"https://a.example","kind":"s3cr3t-value-xyz"}]}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec, records := serveAndRecordLogs(t, errorStubHandler{}, nil, req)
+
+	require.Equal(t, http.StatusBadRequest, rec.Code)
+	require.Contains(t, rec.Body.String(), `"fields":["origins.[0].kind"]`)
+	require.Len(t, records, 1)
+	logged, err := json.Marshal(records[0]["error"])
+	require.NoError(t, err)
+	require.NotContains(t, string(logged), "s3cr3t-value-xyz")
+	require.Contains(t, string(logged), "origins.[0].kind")
+}
+
+// Details are for the client: the log line never carries them.
+func TestOgenErrorHandlerLogOmitsDetails(t *testing.T) {
+	err := domain.ErrUserAlreadyExists().WithDetails(domain.UserAttributesDetails{Keys: []domain.AttributeKey{"email"}})
+	rec, records := serveAndRecordLogs(t, errorStubHandler{err: err}, nil,
+		httptest.NewRequest(http.MethodGet, "/livez", nil))
+
+	require.Equal(t, http.StatusConflict, rec.Code)
+	require.Contains(t, rec.Body.String(), "attributes.email")
+	require.Len(t, records, 1)
+	line, marshalErr := json.Marshal(records[0])
+	require.NoError(t, marshalErr)
+	require.NotContains(t, string(line), `"details"`)
+	require.NotContains(t, string(line), "email")
+}
+
+// A security handler that could not decide is logged once, at Error, with
+// the cause that kept it from deciding.
+func TestOgenErrorHandlerLogsSecurityInternalErrorOnce(t *testing.T) {
+	mock := gomock.NewController(t)
+	tokenService := mocks.NewMockTokenService(mock)
+	tokenService.EXPECT().IntrospectToken(gomock.Any(), "credential").
+		Return(nil, domain.ErrInternal(errors.New("connection refused")).WithMessage("failed to read token record"))
+	req := httptest.NewRequest(http.MethodGet, "/sessions/me", nil)
+	req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: "credential"})
+
+	rec, records := serveAndRecordLogs(t, errorStubHandler{}, tokenService, req)
+
+	require.Equal(t, http.StatusInternalServerError, rec.Code)
+	require.JSONEq(t, `{"code":"internal","message":"An unexpected error occurred."}`, rec.Body.String())
+	require.Len(t, records, 1)
+	record := records[0]
+	require.Equal(t, "ERROR", record["level"])
+	require.Equal(t, "api error", record["msg"])
+	require.Equal(t, "getMySession", record["operation_id"])
+	logged := record["error"].(map[string]any)
+	require.Equal(t, "internal", logged["code"])
+	require.Equal(t, "failed to read token record", logged["message"])
+	require.Equal(t, "connection refused", logged["parent"])
+}
+
+// A request the client gave up on is logged at Warn, not as a server fault,
+// though it still answers 500, whatever error its going away caused. A
+// canceled error on a live request stays an Error, and so does a request
+// net/http ended at the server's write deadline. Only the Error line carries
+// the location and stack.
+func TestOgenErrorHandlerLogsClientCancelAtWarn(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		cause     error
+		canceled  bool
+		wantLevel string
+	}{
+		{"client gone while the body is written", fmt.Errorf("write response: %w", &net.OpError{Op: "write", Net: "tcp", Err: errors.New("broken pipe")}), true, "WARN"},
+		{"canceled error on a live request", fmt.Errorf("query projects: %w", context.Canceled), false, "ERROR"},
+		{"server write deadline", fmt.Errorf("write response: %w", &net.OpError{Op: "write", Net: "tcp", Err: os.ErrDeadlineExceeded}), true, "ERROR"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			enableErrorOrigins(t)
+			err := domain.ErrInternal(tc.cause)
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			if tc.canceled {
+				cancel()
+			}
+			rec, records := serveAndRecordLogs(t, errorStubHandler{err: err}, nil,
+				httptest.NewRequestWithContext(ctx, http.MethodGet, "/livez", nil))
+
+			require.Equal(t, http.StatusInternalServerError, rec.Code)
+			require.Len(t, records, 1)
+			require.Equal(t, tc.wantLevel, records[0]["level"])
+			require.EqualValues(t, http.StatusInternalServerError, records[0]["status"])
+			if tc.wantLevel == "WARN" {
+				requireBriefError(t, records[0], err.Code, err.Message, "broken pipe")
+			} else {
+				require.Contains(t, records[0]["error"], "stackTrace")
+			}
+		})
+	}
+}
+
+// A line below Error level carries no location or stack in any mode. A text
+// or JSON handler reads the error through its log value; GCP error reporting
+// builds a report from any `error` attribute and reads the location and stack
+// through the error's interfaces, at every level. A 5xx keeps both.
+func TestLogAPIErrorBriefLinesCarryNoStackInGCPMode(t *testing.T) {
+	enableErrorOrigins(t)
+	notFound := domain.ErrProjectNotFound().WithParent(errors.New("no rows in result set"))
+	internal := domain.ErrInternal(errors.New("disk on fire"))
+
+	t.Run("plain mode", func(t *testing.T) {
+		logged := loggedErrorValue(t, logAPIErrorRecord(t, http.StatusNotFound, notFound)).Resolve()
+		require.Equal(t, slog.KindGroup, logged.Kind())
+		var keys []string
+		for _, attr := range logged.Group() {
+			keys = append(keys, attr.Key)
+		}
+		require.ElementsMatch(t, []string{"code", "message", "parent"}, keys)
+	})
+
+	t.Run("gcp mode", func(t *testing.T) {
+		errreport.GCPReporting(true)
+		t.Cleanup(func() { errreport.GCPReporting(false) })
+
+		brief := gcpReport(t, logAPIErrorRecord(t, http.StatusNotFound, notFound))
+		require.Contains(t, brief, notFound.Message)
+		require.NotContains(t, brief, "goroutine")
+		require.NotContains(t, brief, "unsupported type")
+
+		require.Contains(t, gcpReport(t, logAPIErrorRecord(t, http.StatusInternalServerError, internal)), "goroutine")
+	})
+}
+
+// logAPIErrorRecord returns the record logAPIError writes, before any handler
+// resolves its values.
+func logAPIErrorRecord(t *testing.T, status int, err domain.Error) slog.Record {
+	t.Helper()
+	var records []slog.Record
+	logAPIError(zlog.WithLoggingContext(t.Context(), slog.New(recordingHandler{records: &records})), status, err)
+	require.Len(t, records, 1)
+	return records[0]
+}
+
+func loggedErrorValue(t *testing.T, record slog.Record) slog.Value {
+	t.Helper()
+	var logged slog.Value
+	record.Attrs(func(a slog.Attr) bool {
+		if a.Key == zlog.ErrorAttributeKey {
+			logged = a.Value
+		}
+		return true
+	})
+	return logged
+}
+
+// gcpReport is what the GCP error reporting handler writes for record.
+func gcpReport(t *testing.T, record slog.Record) string {
+	t.Helper()
+	var out bytes.Buffer
+	require.NoError(t, sloggcp.NewErrorReportingHandler(&out, nil).Handle(t.Context(), record))
+	return out.String()
+}
+
+// recordingHandler keeps every record as logged, before any handler
+// resolves its values.
+type recordingHandler struct{ records *[]slog.Record }
+
+func (h recordingHandler) Enabled(context.Context, slog.Level) bool { return true }
+
+func (h recordingHandler) Handle(_ context.Context, r slog.Record) error {
+	*h.records = append(*h.records, r.Clone())
+	return nil
+}
+
+func (h recordingHandler) WithAttrs([]slog.Attr) slog.Handler { return h }
+
+func (h recordingHandler) WithGroup(string) slog.Handler { return h }
+
 // newRouterTestServer is newErrorHandlerTestServer with the answers to a path
 // or method no operation takes, as the server mounts them (ADR 076).
 func newRouterTestServer(t *testing.T, home *errorpage.Link) *api.Server {
@@ -835,6 +1192,28 @@ func TestOgenErrorHandlerNamesTheInvalidParameter(t *testing.T) {
 		`{"code":"req.invalid","message":"The request is invalid and fails base validation (missing required fields, wrong types, failed regex, etc.). Check the details for more information.","details":{"details":{"fields":["user_id"]}}}`,
 		rec.Body.String(),
 	)
+}
+
+// The log names the parameter that will not decode, never its value. Not
+// parallel: serveAndRecordLogs changes globals.
+func TestOgenErrorHandlerLogsTheInvalidParameterName(t *testing.T) {
+	mock := gomock.NewController(t)
+	tokenService := mocks.NewMockTokenService(mock)
+	tokenService.EXPECT().IntrospectToken(gomock.Any(), "credential").
+		Return(&domain.Token{Type: domain.TokenTypeProjectToken, ProjectID: "proj_1"}, nil)
+
+	req := httptest.NewRequest(http.MethodGet, "/users/s3cr3t-value-xyz", nil)
+	req.Header.Set("Authorization", "Bearer credential")
+	rec, records := serveAndRecordLogs(t, errorStubHandler{}, tokenService, req)
+
+	require.Equal(t, http.StatusBadRequest, rec.Code)
+	require.Contains(t, rec.Body.String(), `"fields":["user_id"]`)
+	require.Len(t, records, 1)
+	logged := records[0]["error"].(map[string]any)
+	require.Equal(t, "decode params: fields user_id", logged["parent"])
+	line, err := json.Marshal(logged)
+	require.NoError(t, err)
+	require.NotContains(t, string(line), "s3cr3t-value-xyz")
 }
 
 func TestInvalidRequestFields(t *testing.T) {

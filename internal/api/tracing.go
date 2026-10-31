@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/codes"
 	semconv "go.opentelemetry.io/otel/semconv/v1.39.0"
 	"go.opentelemetry.io/otel/trace"
@@ -13,6 +14,8 @@ import (
 	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/domain"
 )
+
+var tracer = otel.Tracer("github.com/zitadel/nextgen/internal/api")
 
 // NewOgenTracerProvider wraps the provider of the ogen server. ogen records
 // every failed request with RecordError, which stores the error message as a

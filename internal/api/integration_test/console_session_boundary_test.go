@@ -14,6 +14,7 @@ import (
 	internalapi "github.com/zitadel/nextgen/internal/api"
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 	"github.com/zitadel/nextgen/internal/api/integration_test/test_data"
+	"github.com/zitadel/nextgen/internal/domain"
 )
 
 // consoleCall sends one request with the session cookie, and the CSRF token on
@@ -187,6 +188,52 @@ func TestConsoleSessionFootholdWithoutPermissionIsForbidden(t *testing.T) {
 			}
 			require.NoError(t, json.Unmarshal([]byte(body), &refusal), body)
 			assert.True(t, strings.HasSuffix(refusal.Code, ".permission_denied"), body)
+		})
+	}
+}
+
+// TestConsoleSessionTeamScopedCannotProbeOtherTeams pins ADR 053 §7's third
+// clause inside one project (#2112): a session granted on team A, the B2B
+// shape of one team per business client, reads its own team, while team B
+// and a user in it answer exactly like ids that name nothing.
+func TestConsoleSessionTeamScopedCannotProbeOtherTeams(t *testing.T) {
+	t.Parallel()
+
+	_, operatorID, cookie := ownSessionUser(t)
+
+	customer, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+	_, teamA := harness.CreateUserOwnedByTeam(t, customer.ID)
+	userInB, teamB := harness.CreateUserOwnedByTeam(t, customer.ID)
+	asgn := &domain.AuthzAssignment{
+		ProjectID:     customer.ID,
+		CatalogID:     domain.SystemCatalogID,
+		PrincipalType: domain.AuthzPrincipalTypeUser,
+		PrincipalID:   operatorID,
+		ObjectType:    "project",
+		Relation:      "viewer",
+	}
+	asgn.ApplyScope(domain.NewTeamAssignmentScope(teamA))
+	require.NoError(t, harness.EnsureServiceDB(t).Statements().CreateAuthzAssignment(t.Context(), asgn))
+
+	status, body := consoleCall(t, cookie, http.MethodGet, "/teams/"+teamA, "")
+	require.Equal(t, http.StatusOK, status, body)
+
+	for name, tc := range map[string]struct{ method, real, unknown, body string }{
+		"get team B":      {http.MethodGet, "/teams/" + teamB, "/teams/" + unknownLike(teamB), ""},
+		"rename team B":   {http.MethodPatch, "/teams/" + teamB, "/teams/" + unknownLike(teamB), `{"name":"x"}`},
+		"get a user in B": {http.MethodGet, "/users/" + userInB, "/users/" + unknownLike(userInB), ""},
+		"list B's roster": {http.MethodGet, "/users/" + userInB + "/teams", "/users/" + unknownLike(userInB) + "/teams", ""},
+		// A session holds no operator scope, so delete gets no idempotent 204.
+		"delete a user in B": {http.MethodDelete, "/users/" + userInB, "/users/" + unknownLike(userInB), ""},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			realStatus, realBody := consoleCall(t, cookie, tc.method, tc.real, tc.body)
+			unknownStatus, unknownBody := consoleCall(t, cookie, tc.method, tc.unknown, tc.body)
+			assert.Equal(t, http.StatusNotFound, realStatus, realBody)
+			assert.Equal(t, unknownStatus, realStatus)
+			assert.JSONEq(t, unknownBody, realBody)
 		})
 	}
 }

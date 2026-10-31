@@ -18,13 +18,19 @@
 //     the server re-wraps every project key to the current one at startup.
 //   - The optional bootstrap admin document, BOOTSTRAP_ADMIN_USER_JSON_B64,
 //     becomes a --user-file.
+//   - The audit event purge. A function runs only while it serves a request,
+//     so the server's own hourly purge cannot run here: a Vercel Cron Job
+//     (repo-root vercel.json) calls the server's retention trigger instead,
+//     with CRON_SECRET as its bearer token, which becomes
+//     events.retention.trigger_secret in <data_dir>/nextgen.yaml.
 //   - The deployment's shape. The listen address follows PORT, the data dir
 //     is the function's writable /tmp, and the console is a service of its own
 //     (repo-root vercel.json). The platform project is bootstrapped, logs are
 //     JSON and the public base is the deployment's URL unless a NEXTGEN_*
-//     variable says otherwise.
+//     variable says otherwise. The URLs Vercel serves the deployment at are
+//     added to NEXTGEN_SERVER_CONSOLE_ORIGINS, whatever it already names.
 //
-// A deployment migrates at deploy time, never at startup: build.sh calls
+// A deployment migrates at deploy time, never at startup: a turbo task runs
 // `launcher migrate` after compiling, which creates a preview's database when
 // it is missing and runs the server's migrate command against the direct
 // URL. The serving invocation refuses --migrate, so a function cannot change
@@ -33,6 +39,10 @@
 // fails its build and never replaces the deployment that serves. A local run
 // without CLOUD_DATABASE_URL (`pnpm run cloud`, scripts/run-cloud.mjs) has no
 // build step, so it migrates its own database before serving.
+//
+// `launcher drop-preview` removes preview databases from the preview cluster:
+// a merged branch's, or every one no deployment stamped for a while
+// (.github/workflows/preview-cleanup.yml).
 package main
 
 import (
@@ -40,15 +50,18 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"flag"
 	"fmt"
 	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/zitadel/nextgen/cmd/server"
+	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/bootstrap/users"
 )
 
@@ -74,23 +87,178 @@ var servingParams = []struct{ key, value string }{
 var keyIDPattern = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
 
 func main() {
-	var args []string
-	var err error
 	if len(os.Args) > 1 && os.Args[1] == "migrate" {
-		args, err = prepareMigration(os.Args[2:])
-	} else {
-		args, err = prepareServer(os.Args[1:])
+		if err := runMigrate(os.Args[2:]); err != nil {
+			fmt.Fprintln(os.Stderr, "launcher:", err)
+			if errors.Is(err, errPrepareFailed) {
+				os.Exit(64)
+			}
+			os.Exit(1)
+		}
+		return
 	}
+	if len(os.Args) > 1 && os.Args[1] == "drop-preview" {
+		if err := runDropPreview(os.Args[2:]); err != nil {
+			fmt.Fprintln(os.Stderr, "launcher:", err)
+			os.Exit(1)
+		}
+		return
+	}
+	args, err := prepareServer(os.Args[1:])
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "launcher:", err)
 		os.Exit(64)
 	}
-	cmd := server.NewCommand()
-	cmd.SetArgs(args)
-	if err := cmd.Execute(); err != nil {
+	if err := executeServer(args); err != nil {
 		fmt.Fprintln(os.Stderr, "launcher:", err)
 		os.Exit(1)
 	}
+}
+
+// errPrepareFailed marks a prepareMigration/prepareServer failure (exit 64)
+// rather than a migrate/server execution failure (exit 1).
+var errPrepareFailed = errors.New("prepare failed")
+
+// executeServer runs the nextgen server command with args. Tests replace it.
+var executeServer = func(args []string) error {
+	cmd := server.NewCommand()
+	cmd.SetArgs(args)
+	return cmd.Execute()
+}
+
+// runMigrate prepares and runs deploy-time migrations. On a preview, when the
+// sticky branch database cannot remigrate after a version renumber (goose
+// out-of-order, or ADD COLUMN colliding with columns left under the old
+// version number), drop the preview database once, recreate it, and remigrate
+// from empty. Production is never dropped.
+func runMigrate(extra []string) error {
+	args, err := prepareMigration(extra)
+	if err != nil {
+		return fmt.Errorf("%w: %v", errPrepareFailed, err)
+	}
+	if err := executeServer(args); err == nil {
+		return nil
+	} else if os.Getenv("VERCEL_ENV") != "preview" || !shouldRecreatePreviewOnMigrateError(err) {
+		return err
+	}
+
+	ref := gitRef()
+	name, nameErr := previewDatabaseName(ref)
+	if nameErr != nil {
+		return err
+	}
+	baseDSN := os.Getenv(migratorDatabaseURLVar)
+	fmt.Fprintf(os.Stderr, "launcher: preview migrate hit a poisoned sticky schema; recreating %s\n", name)
+	if dropErr := dropDatabase(context.Background(), baseDSN, time.Time{}, name); dropErr != nil {
+		return fmt.Errorf("%v (also failed to drop preview database: %w)", err, dropErr)
+	}
+	args, err = prepareMigration(extra)
+	if err != nil {
+		return fmt.Errorf("%w: %v", errPrepareFailed, err)
+	}
+	return executeServer(args)
+}
+
+const dropPreviewUsage = "usage: launcher drop-preview [--dry-run] (--idle-days <n> | [--] <branch>...)"
+
+// runDropPreview drops preview databases for
+// .github/workflows/preview-cleanup.yml: each named branch's, once its pull
+// request has merged, or with --idle-days every one whose stamp is older than
+// that. It connects through the URL a preview build migrates through and
+// computes a branch's name as the build does, so the two never disagree. It
+// only ever drops a preview_* database, which the production cluster has
+// none of. --dry-run lists what it would drop instead.
+func runDropPreview(args []string) error {
+	flags := flag.NewFlagSet("drop-preview", flag.ContinueOnError)
+	idleDays := flags.Int("idle-days", 0, "drop every preview database no deployment stamped for this many days")
+	dryRun := flags.Bool("dry-run", false, "list what would be dropped and drop nothing")
+	if err := flags.Parse(args); err != nil {
+		return fmt.Errorf("%w; %s", err, dropPreviewUsage)
+	}
+	refs := flags.Args()
+	if *idleDays < 0 || (*idleDays > 0) == (len(refs) > 0) {
+		return errors.New(dropPreviewUsage)
+	}
+	dsn := os.Getenv(migratorDatabaseURLVar)
+	if dsn == "" {
+		return fmt.Errorf("%s must name the preview cluster's base database", migratorDatabaseURLVar)
+	}
+
+	var names []string
+	// Zero for named branches, which go whatever their stamp says.
+	var idleBefore time.Time
+	if *idleDays > 0 {
+		databases, err := listDatabases(context.Background(), dsn)
+		if err != nil {
+			return err
+		}
+		idleBefore = time.Now().Add(-time.Duration(*idleDays) * 24 * time.Hour)
+		idle, undated := idlePreviewDatabases(databases, idleBefore)
+		for _, name := range undated {
+			fmt.Fprintf(os.Stderr, "launcher: keeping preview database %s: its stamp says no deployment time\n", name)
+		}
+		for _, db := range idle {
+			fmt.Fprintf(os.Stderr, "launcher: preview database %s of %s last deployed %s\n",
+				db.name, db.branch, db.deployedAt.Format(time.RFC3339))
+			names = append(names, db.name)
+		}
+		fmt.Fprintf(os.Stderr, "launcher: %d of %d preview databases idle for over %d days\n", len(idle), len(databases), *idleDays)
+	} else {
+		for _, ref := range refs {
+			name, err := previewDatabaseName(ref)
+			if err != nil {
+				return err
+			}
+			names = append(names, name)
+		}
+	}
+	if *dryRun {
+		for _, name := range names {
+			fmt.Fprintf(os.Stderr, "launcher: would drop preview database %s\n", name)
+		}
+		return nil
+	}
+	// The list above is a snapshot; the drop reads each stamp again under the
+	// lock a deployment holds while it stamps.
+	return dropDatabase(context.Background(), dsn, idleBefore, names...)
+}
+
+// idlePreview is a preview database whose last deployment is older than a
+// cutoff.
+type idlePreview struct {
+	name, branch string
+	deployedAt   time.Time
+}
+
+// idlePreviewDatabases picks the databases whose stamp is older than cutoff,
+// oldest first. One without a stamp's deployment time, which a failed stamp
+// leaves, cannot be dated and is never picked; it comes back as undated.
+func idlePreviewDatabases(databases []previewDatabase, cutoff time.Time) (idle []idlePreview, undated []string) {
+	for _, db := range databases {
+		branch, deployedAt, ok := parseStamp(db.stamp)
+		if !ok {
+			undated = append(undated, db.name)
+			continue
+		}
+		if deployedAt.Before(cutoff) {
+			idle = append(idle, idlePreview{name: db.name, branch: branch, deployedAt: deployedAt})
+		}
+	}
+	slices.SortFunc(idle, func(a, b idlePreview) int { return a.deployedAt.Compare(b.deployedAt) })
+	return idle, undated
+}
+
+// shouldRecreatePreviewOnMigrateError reports migrate failures that a fresh
+// empty preview database would clear after a migration renumber on the branch:
+// goose out-of-order versions, or Postgres duplicate_column (42701) when the
+// sticky DB still has columns from the migration under its previous number.
+func shouldRecreatePreviewOnMigrateError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "missing (out-of-order) migration") ||
+		strings.Contains(msg, "SQLSTATE 42701")
 }
 
 // productionBranch is the branch production deploys from: main, unless
@@ -188,6 +356,10 @@ type serving struct {
 	// adminID is the user id admin names, the deployment's platform operator
 	// unless NEXTGEN_PLATFORM_OPERATORS says otherwise (ADR 075).
 	adminID string
+	// cronSecret is what the cron job that runs the audit event purge sends
+	// as its bearer token. Empty in a local run, which keeps the server's own
+	// purge loop.
+	cronSecret string
 }
 
 func parseServing(env string) (*serving, error) {
@@ -263,6 +435,18 @@ func parseServing(env string) (*serving, error) {
 		s.admin = doc
 		s.adminID = admin.Header.ID
 	}
+
+	// Without it a deployment would never purge: the cron job is the only
+	// caller of the purge, and the server refuses a call without the secret.
+	s.cronSecret = os.Getenv("CRON_SECRET")
+	if s.cronSecret == "" && deployed(env) {
+		return nil, fmt.Errorf("CRON_SECRET must be set for a %s deployment: the cron job that purges expired audit events authenticates with it", env)
+	}
+	if s.cronSecret != "" {
+		if err := audit.CheckTriggerSecret(s.cronSecret); err != nil {
+			return nil, fmt.Errorf("CRON_SECRET %w", err)
+		}
+	}
 	return s, nil
 }
 
@@ -301,6 +485,7 @@ func prepareServer(extra []string) ([]string, error) {
 	}
 	_ = os.Unsetenv("MASTER_KEY_PEM_B64")
 	_ = os.Unsetenv("MASTER_KEY_PREVIOUS_PEM_B64")
+	_ = os.Unsetenv("CRON_SECRET")
 	if s.previousID != "" {
 		fmt.Fprintf(os.Stderr, "launcher: master key %s, re-wrapping what %s wrapped; delete MASTER_KEY_PREVIOUS_PEM_B64 and MASTER_KEY_PREVIOUS_ID once this deployment has started\n", s.keyID, s.previousID)
 	}
@@ -356,7 +541,36 @@ func prepareServer(extra []string) ([]string, error) {
 			return nil, err
 		}
 	}
+	// Added to, not defaulted: a deployment names its custom domains there, and
+	// the URLs Vercel serves it at must stay console origins beside them.
+	if err := os.Setenv("NEXTGEN_SERVER_CONSOLE_ORIGINS", consoleOrigins(env, os.Getenv("NEXTGEN_SERVER_CONSOLE_ORIGINS"))); err != nil {
+		return nil, err
+	}
 	return append(args, extra...), nil
+}
+
+// consoleOrigins is configured, comma separated, followed by every host
+// Vercel serves this deployment at: a browser can open the console on the
+// deployment's own URL as well as on its branch alias and, in production, the
+// production domain, and a preview is reviewed on both. An origin already
+// listed is not added again, so a second call changes nothing.
+func consoleOrigins(env, configured string) string {
+	var origins []string
+	for _, origin := range strings.Split(configured, ",") {
+		if origin = strings.TrimSpace(origin); origin != "" {
+			origins = append(origins, origin)
+		}
+	}
+	keys := []string{"VERCEL_URL", "VERCEL_BRANCH_URL"}
+	if env == "production" {
+		keys = append(keys, "VERCEL_PROJECT_PRODUCTION_URL")
+	}
+	for _, key := range keys {
+		if host := os.Getenv(key); host != "" && !slices.Contains(origins, "https://"+host) {
+			origins = append(origins, "https://"+host)
+		}
+	}
+	return strings.Join(origins, ",")
 }
 
 // withParams adds each parameter the URL does not set yet. The server also
@@ -445,10 +659,11 @@ func decodePEM(name, b64 string) ([]string, error) {
 	return lines, nil
 }
 
-// renderConfig writes the one setting that cannot come from the environment:
-// the master keys as YAML block scalars under their ids. The current key
-// encrypts; a previous key, during a rotation, only decrypts until the
-// server has re-wrapped everything it wrapped.
+// renderConfig writes what cannot come from the environment or should not
+// stay in it: the master keys as YAML block scalars under their ids, and the
+// cron job's secret. The current key encrypts; a previous key, during a
+// rotation, only decrypts until the server has re-wrapped everything it
+// wrapped. With the secret, the server leaves the purge to the cron job.
 func renderConfig(s *serving) []byte {
 	var b strings.Builder
 	b.WriteString("server:\n")
@@ -465,6 +680,13 @@ func renderConfig(s *serving) []byte {
 	writeKey(s.keyID, s.pem, true)
 	if s.previousID != "" {
 		writeKey(s.previousID, s.previousPEM, false)
+	}
+	if s.cronSecret != "" {
+		// Single quotes: parseServing let through printable ASCII only, and a
+		// quote is the one character to escape.
+		b.WriteString("events:\n")
+		b.WriteString("  retention:\n")
+		b.WriteString("    trigger_secret: '" + strings.ReplaceAll(s.cronSecret, "'", "''") + "'\n")
 	}
 	return []byte(b.String())
 }

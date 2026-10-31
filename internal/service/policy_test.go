@@ -218,6 +218,52 @@ func TestPolicyService_ResolvePolicy(t *testing.T) {
 	assert.Error(t, err, "a storage failure is an error, so the gate fails closed")
 }
 
+func TestPolicyService_ResolvePolicyFollowsTheRelease(t *testing.T) {
+	flow := domain.ReleasePointer{Kind: domain.ReleasePointerKindFlowDefinition, Handle: "login", RevisionID: "flow_1"}
+	pinned := domain.ReleasePointer{Kind: domain.ReleasePointerKindPolicy, Handle: service.OperationPasswordSet, RevisionID: "polrev_1"}
+	served := func(t *testing.T, pointers ...domain.ReleasePointer) context.Context {
+		t.Helper()
+		return service.WithRuntimeResolution(t.Context(), &service.RuntimeResolution{Release: &domain.Release{Pointers: pointers}})
+	}
+
+	t.Run("a release that pins a flow serves the policy revision it pins", func(t *testing.T) {
+		f := newPolicyFixture(t)
+		f.statements.EXPECT().GetPolicyRevision(gomock.Any(), "proj_1", "polrev_1").
+			Return(&domain.Policy{Operation: service.OperationPasswordSet, Config: []byte(`{"min_length":10}`)}, nil)
+
+		inst, err := f.svc.ResolvePolicy(served(t, flow, pinned), "proj_1", service.OperationPasswordSet)
+		require.NoError(t, err)
+		require.NotNil(t, inst)
+		assert.Equal(t, json.Number("10"), inst.Config["min_length"])
+	})
+
+	t.Run("a release that pins a flow and no policy means no policy, not the newest", func(t *testing.T) {
+		f := newPolicyFixture(t)
+
+		inst, err := f.svc.ResolvePolicy(served(t, flow), "proj_1", service.OperationPasswordSet)
+		require.NoError(t, err)
+		assert.Nil(t, inst)
+	})
+
+	t.Run("a pinned revision the project no longer holds is an internal error", func(t *testing.T) {
+		f := newPolicyFixture(t)
+		f.statements.EXPECT().GetPolicyRevision(gomock.Any(), "proj_1", "polrev_1").Return(nil, new(database.NoRowFoundError))
+
+		_, err := f.svc.ResolvePolicy(served(t, flow, pinned), "proj_1", service.OperationPasswordSet)
+		assert.ErrorIs(t, err, domain.ErrInternal(nil))
+	})
+
+	t.Run("a release that pins no flow reads the newest revision", func(t *testing.T) {
+		f := newPolicyFixture(t)
+		f.statements.EXPECT().GetPolicy(gomock.Any(), policystore.ByOperation("proj_1", service.OperationPasswordSet)).
+			Return(&domain.Policy{Operation: service.OperationPasswordSet, Config: []byte(`{"min_length":12}`)}, nil)
+
+		inst, err := f.svc.ResolvePolicy(served(t, pinned), "proj_1", service.OperationPasswordSet)
+		require.NoError(t, err)
+		assert.Equal(t, json.Number("12"), inst.Config["min_length"])
+	})
+}
+
 func TestPolicyService_StoresCanonicalSettings(t *testing.T) {
 	f := newPolicyFixture(t)
 	f.statements.EXPECT().GetPolicy(gomock.Any(), gomock.Any()).Return(nil, new(database.NoRowFoundError))
@@ -232,4 +278,156 @@ func TestPolicyService_StoresCanonicalSettings(t *testing.T) {
 	var payload domain.PolicyPayload
 	require.NoError(t, json.Unmarshal(f.events[0].Payload, &payload))
 	assert.JSONEq(t, `{"min_length":12,"max_length":32}`, string(payload.Config))
+}
+
+func TestPolicyService_BuildReusesTheNewestRevisionOnlyWhenItHoldsTheConfig(t *testing.T) {
+	ctx := context.Background()
+	current := &domain.Policy{ProjectID: "proj_1", ID: "pol_1", RevisionID: "polrev_1", Config: []byte(`{"min_length": 12}`)}
+
+	t.Run("unchanged, without taking the lock", func(t *testing.T) {
+		f := newPolicyFixture(t)
+		f.statements.EXPECT().GetPolicy(gomock.Any(), policystore.ByOperation("proj_1", service.OperationPasswordSet)).Return(current, nil)
+
+		got, err := service.ResolveOrPublishPolicy(f.svc, ctx, f.statements, "proj_1", service.OperationPasswordSet, []byte(`{"min_length":12}`))
+		require.NoError(t, err)
+		assert.Equal(t, "polrev_1", got.RevisionID)
+		assert.Empty(t, f.events)
+	})
+
+	t.Run("written by a concurrent build while this one waited for the lock", func(t *testing.T) {
+		f := newPolicyFixture(t)
+		older := &domain.Policy{ProjectID: "proj_1", ID: "pol_1", RevisionID: "polrev_1", Config: []byte(`{"min_length": 10}`)}
+		winner := &domain.Policy{ProjectID: "proj_1", ID: "pol_1", RevisionID: "polrev_2", Config: []byte(`{"min_length": 12}`)}
+		gomock.InOrder(
+			f.statements.EXPECT().GetPolicy(gomock.Any(), gomock.Any()).Return(older, nil),
+			f.statements.EXPECT().LockPolicy(gomock.Any(), "proj_1", "pol_1").Return(nil),
+			f.statements.EXPECT().GetPolicy(gomock.Any(), gomock.Any()).Return(winner, nil),
+		)
+
+		got, err := service.ResolveOrPublishPolicy(f.svc, ctx, f.statements, "proj_1", service.OperationPasswordSet, []byte(`{"min_length":12}`))
+		require.NoError(t, err)
+		assert.Equal(t, "polrev_2", got.RevisionID, "the winner's revision, not a second identical one")
+		assert.Empty(t, f.events)
+	})
+
+	t.Run("a config the lock still finds different is revised on top of the locked read", func(t *testing.T) {
+		f := newPolicyFixture(t)
+		older := &domain.Policy{ProjectID: "proj_1", ID: "pol_1", RevisionID: "polrev_1", Operation: service.OperationPasswordSet, Config: []byte(`{"min_length": 10}`)}
+		other := &domain.Policy{ProjectID: "proj_1", ID: "pol_1", RevisionID: "polrev_2", Operation: service.OperationPasswordSet, Config: []byte(`{"min_length": 11}`)}
+		gomock.InOrder(
+			f.statements.EXPECT().GetPolicy(gomock.Any(), gomock.Any()).Return(older, nil),
+			f.statements.EXPECT().LockPolicy(gomock.Any(), "proj_1", "pol_1").Return(nil),
+			f.statements.EXPECT().GetPolicy(gomock.Any(), gomock.Any()).Return(other, nil),
+			f.statements.EXPECT().RevisePolicy(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, p *domain.Policy) error {
+				assert.Equal(t, "pol_1", p.ID)
+				assert.JSONEq(t, `{"min_length":12}`, string(p.Config))
+				p.RevisionID = "polrev_3"
+				return nil
+			}),
+		)
+
+		got, err := service.ResolveOrPublishPolicy(f.svc, ctx, f.statements, "proj_1", service.OperationPasswordSet, []byte(`{"min_length":12}`))
+		require.NoError(t, err)
+		assert.Equal(t, "polrev_3", got.RevisionID, "a revision after the concurrent build's, not a reuse of it")
+		require.Len(t, f.events, 1)
+		assert.Equal(t, domain.EventTypePolicyUpdated, f.events[0].EventType)
+	})
+
+	t.Run("a lost unique index is a conflict, any other write failure goes back to the build as is", func(t *testing.T) {
+		changed := []byte(`{"min_length":12}`)
+		older := &domain.Policy{ProjectID: "proj_1", ID: "pol_1", Operation: service.OperationPasswordSet, Config: []byte(`{"min_length": 10}`)}
+		down := errors.New("down")
+		for name, tc := range map[string]struct {
+			expect func(*servicemocks.MockAllStatements)
+			check  func(*testing.T, error)
+		}{
+			"creating, lost to a concurrent first publish": {
+				expect: func(s *servicemocks.MockAllStatements) {
+					s.EXPECT().GetPolicy(gomock.Any(), gomock.Any()).Return(nil, new(database.NoRowFoundError))
+					s.EXPECT().CreatePolicy(gomock.Any(), gomock.Any()).Return(new(database.UniqueError))
+				},
+				check: func(t *testing.T, err error) { assert.ErrorIs(t, err, domain.ErrPolicyRevisionConflict()) },
+			},
+			"creating, for a project that is gone": {
+				expect: func(s *servicemocks.MockAllStatements) {
+					s.EXPECT().GetPolicy(gomock.Any(), gomock.Any()).Return(nil, new(database.NoRowFoundError))
+					s.EXPECT().CreatePolicy(gomock.Any(), gomock.Any()).Return(new(database.ForeignKeyError))
+				},
+				check: func(t *testing.T, err error) {
+					_, isFK := errors.AsType[*database.ForeignKeyError](err)
+					assert.True(t, isFK, "the build maps it to rel.project_not_found")
+					_, isDomain := errors.AsType[domain.Error](err)
+					assert.False(t, isDomain, "not answered as a policy error")
+				},
+			},
+			"taking the lock": {
+				expect: func(s *servicemocks.MockAllStatements) {
+					s.EXPECT().GetPolicy(gomock.Any(), gomock.Any()).Return(older, nil)
+					s.EXPECT().LockPolicy(gomock.Any(), "proj_1", "pol_1").Return(down)
+				},
+				check: func(t *testing.T, err error) { assert.Same(t, down, err) },
+			},
+			"revising, lost to a concurrent revision": {
+				expect: func(s *servicemocks.MockAllStatements) {
+					s.EXPECT().GetPolicy(gomock.Any(), gomock.Any()).Return(older, nil).Times(2)
+					s.EXPECT().LockPolicy(gomock.Any(), "proj_1", "pol_1").Return(nil)
+					s.EXPECT().RevisePolicy(gomock.Any(), gomock.Any()).Return(new(database.UniqueError))
+				},
+				check: func(t *testing.T, err error) { assert.ErrorIs(t, err, domain.ErrPolicyRevisionConflict()) },
+			},
+			"revising": {
+				expect: func(s *servicemocks.MockAllStatements) {
+					s.EXPECT().GetPolicy(gomock.Any(), gomock.Any()).Return(older, nil).Times(2)
+					s.EXPECT().LockPolicy(gomock.Any(), "proj_1", "pol_1").Return(nil)
+					s.EXPECT().RevisePolicy(gomock.Any(), gomock.Any()).Return(down)
+				},
+				check: func(t *testing.T, err error) { assert.Same(t, down, err) },
+			},
+		} {
+			t.Run(name, func(t *testing.T) {
+				f := newPolicyFixture(t)
+				tc.expect(f.statements)
+
+				_, err := service.ResolveOrPublishPolicy(f.svc, ctx, f.statements, "proj_1", service.OperationPasswordSet, changed)
+				require.Error(t, err)
+				tc.check(t, err)
+				assert.Empty(t, f.events)
+			})
+		}
+	})
+
+	t.Run("a failed read is an internal error", func(t *testing.T) {
+		older := &domain.Policy{ProjectID: "proj_1", ID: "pol_1", Config: []byte(`{"min_length": 10}`)}
+		for name, expect := range map[string]func(*servicemocks.MockAllStatements){
+			"before the lock": func(s *servicemocks.MockAllStatements) {
+				s.EXPECT().GetPolicy(gomock.Any(), gomock.Any()).Return(nil, errors.New("down"))
+			},
+			"under the lock": func(s *servicemocks.MockAllStatements) {
+				gomock.InOrder(
+					s.EXPECT().GetPolicy(gomock.Any(), gomock.Any()).Return(older, nil),
+					s.EXPECT().LockPolicy(gomock.Any(), "proj_1", "pol_1").Return(nil),
+					s.EXPECT().GetPolicy(gomock.Any(), gomock.Any()).Return(nil, errors.New("down")),
+				)
+			},
+		} {
+			t.Run(name, func(t *testing.T) {
+				f := newPolicyFixture(t)
+				expect(f.statements)
+
+				_, err := service.ResolveOrPublishPolicy(f.svc, ctx, f.statements, "proj_1", service.OperationPasswordSet, []byte(`{"min_length":12}`))
+				assert.ErrorIs(t, err, domain.ErrInternal(nil))
+				assert.Empty(t, f.events)
+			})
+		}
+	})
+
+	t.Run("a stored config that does not decode is an internal error, not a change", func(t *testing.T) {
+		f := newPolicyFixture(t)
+		f.statements.EXPECT().GetPolicy(gomock.Any(), gomock.Any()).
+			Return(&domain.Policy{ProjectID: "proj_1", ID: "pol_1", Config: []byte(`{not json`)}, nil)
+
+		_, err := service.ResolveOrPublishPolicy(f.svc, ctx, f.statements, "proj_1", service.OperationPasswordSet, []byte(`{}`))
+		assert.ErrorIs(t, err, domain.ErrInternal(nil))
+		assert.Empty(t, f.events)
+	})
 }

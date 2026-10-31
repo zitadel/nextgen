@@ -21,12 +21,15 @@ import {
   GetReleaseByIdResponse,
   GetSchemaByIdResponse,
   GetIdpByIdResponse,
+  GetPolicyResponse,
   GetTeamResponse,
   GetUserByIDResponse,
   ListBrandingResponse,
   ListEventsResponse,
   ListFlowDefinitionsResponse,
+  ListPoliciesResponse,
   ListReleasesResponse,
+  PublishPolicyBody,
   ListSchemasResponse,
   QueryGrantsResponse,
   QueryIdpsBody,
@@ -46,6 +49,7 @@ import {
   buildResourceCommands,
   type CreateSpec,
   type ListSpec,
+  renderTable,
   type ResourceRegistry,
   type Schema,
   type UpdateSpec,
@@ -92,6 +96,18 @@ const FILTER_OPERATIONS = [
 
 const EVENT_CATEGORIES = ["request", "auth", "session", "admin", "entity", "signal"] as const;
 
+/** A release's pointers as an indented table, one pinned revision per row. */
+export const releasePointers = (release: unknown): string => {
+  const pointers = (release as { pointers?: readonly unknown[] }).pointers ?? [];
+  const table = renderTable(["kind", "handle", "revision_id"], pointers)
+    .split("\n")
+    .map((line) => `  ${line}`);
+  return ["resources", ...table].join("\n");
+};
+
+/** The operations a policy can guard, as the generated publish body names them. */
+const POLICY_OPERATIONS = PublishPolicyBody.shape.operation.options;
+
 /**
  * The runtime resources the CLI manages imperatively — one entry per topic.
  * Config resources (schemas, flows, branding, releases) are deliberately
@@ -101,7 +117,8 @@ const EVENT_CATEGORIES = ["request", "auth", "session", "admin", "entity", "sign
  */
 export const RESOURCES = {
   users: {
-    group: CommandGroups.resources,
+    group: CommandGroups.usersAndTeams,
+    groupOrder: 1,
     singular: "user",
     idField: "id",
     // `identifier` is the user's login handle (their email under the default
@@ -125,6 +142,7 @@ export const RESOURCES = {
         { field: "created_at", operations: FILTER_OPERATIONS },
         { field: "id", operations: FILTER_OPERATIONS },
         { field: "schema", operations: FILTER_OPERATIONS },
+        { field: "schema_object_type", operations: ["equals", "not_equals", "contains"] },
         { field: "status", operations: FILTER_OPERATIONS },
         { field: "team_id", operations: FILTER_OPERATIONS },
         { field: "lifecycle_owner_team_id", operations: FILTER_OPERATIONS },
@@ -143,7 +161,8 @@ export const RESOURCES = {
   },
 
   teams: {
-    group: CommandGroups.resources,
+    group: CommandGroups.usersAndTeams,
+    groupOrder: 2,
     singular: "team",
     idField: "id",
     columns: ["id", "name", "status", "created_at"],
@@ -172,7 +191,7 @@ export const RESOURCES = {
   },
 
   sessions: {
-    group: CommandGroups.resources,
+    group: CommandGroups.authentication,
     singular: "session",
     idField: "session_id",
     columns: ["session_id", "state", "user_id", "created_at", "expires_at"],
@@ -198,7 +217,7 @@ export const RESOURCES = {
   },
 
   events: {
-    group: CommandGroups.resources,
+    group: CommandGroups.diagnostics,
     singular: "event",
     idField: "id",
     columns: ["id", "event_type", "category", "actor_id", "occurred_at"],
@@ -255,7 +274,8 @@ export const RESOURCES = {
   },
 
   grants: {
-    group: CommandGroups.resources,
+    group: CommandGroups.usersAndTeams,
+    groupOrder: 3,
     singular: "grant",
     idField: "id",
     columns: ["id", "user.user_id", "team.team_id", "relation", "created_at", "expires_at"],
@@ -296,7 +316,7 @@ export const RESOURCES = {
   // The revision routes are not modelled here — the CLI has no grammar for a
   // sub-resource listing yet, so `idps revisions` is deliberately absent.
   idps: {
-    group: CommandGroups.resources,
+    group: CommandGroups.authentication,
     singular: "identity provider connection",
     idField: "id",
     columns: ["id", "slug", "definition.protocol", "definition.display_name", "created_at"],
@@ -335,7 +355,7 @@ export const RESOURCES = {
   },
 
   projects: {
-    group: CommandGroups.resources,
+    group: CommandGroups.configuration,
     singular: "project",
     idField: "id",
     columns: ["id", "name", "created_at"],
@@ -427,7 +447,7 @@ export const RESOURCES = {
     group: CommandGroups.configuration,
     singular: "release",
     idField: "id",
-    columns: ["id", "metadata.message", "metadata.git_sha", "revoked_at"],
+    columns: ["id", "metadata.message", "metadata.git_sha", "revoked_at", "metadata.created_at"],
     heading: "id",
     detail: [
       "id",
@@ -447,6 +467,7 @@ export const RESOURCES = {
     get: {
       call: ({ client, projectId }, id) => client.getReleaseById(id, { project_id: projectId }),
       response: GetReleaseByIdResponse,
+      sections: (release) => [releasePointers(release)],
     },
   },
 
@@ -524,6 +545,57 @@ export const RESOURCES = {
     get: {
       call: ({ client }, id) => client.getBrandingById(id),
       response: GetBrandingByIdResponse,
+    },
+  },
+
+  // Operation policies (ADR 066). Configuration: carried from
+  // .zitadel/policies/ by `deploy`, so only read here (`policies test` is a
+  // hand-written command). A project has one
+  // policy per operation, and the list shows each at its newest revision.
+  // The revision routes are not modelled, for the reason `idps` gives.
+  policies: {
+    group: CommandGroups.configuration,
+    singular: "policy",
+    idField: "id",
+    // Addressed by operation as well as by id: the operation is what the
+    // file is named after and what a developer knows the policy by.
+    idArg: "policy",
+    idDescription: "policy id or operation",
+    columns: ["id", "operation", "revision_id", "updated_at"],
+    heading: "operation",
+    detail: ["id", "operation", "config", "revision_id", "project_id", "created_at", "updated_at"],
+    list: {
+      items: "policies",
+      response: ListPoliciesResponse,
+      filters: [{ field: "operation", operations: ["equals"] }],
+      call: ({ client, projectId }, params) =>
+        client.listPolicies({ ...params, project_id: projectId }),
+    },
+    get: {
+      response: GetPolicyResponse,
+      // An id names the policy; a catalogued operation resolves through the
+      // list's filter, which answers with the operation's policy or nothing.
+      // Anything else names no policy: sending it as the filter would be
+      // refused as a malformed query rather than reported as not found.
+      call: async ({ client, projectId }, ref) => {
+        if (ref.startsWith("pol_")) {
+          return client.getPolicy(ref, { project_id: projectId });
+        }
+        const notFound = () =>
+          new ZitadelError("E_NOT_FOUND", `No policy for "${ref}"`, {
+            hint: `Run \`policies list\` to see the project's policies. A policy is addressed by its id or its operation (${POLICY_OPERATIONS.join(", ")}).`,
+          });
+        const operation = POLICY_OPERATIONS.find((known) => known === ref);
+        if (operation === undefined) {
+          throw notFound();
+        }
+        const page = await client.listPolicies({ project_id: projectId, operation, limit: 1 });
+        const current = page.policies[0];
+        if (!current) {
+          throw notFound();
+        }
+        return current;
+      },
     },
   },
 } satisfies ResourceRegistry<Platform>;

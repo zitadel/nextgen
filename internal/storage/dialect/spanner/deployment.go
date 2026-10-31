@@ -18,6 +18,12 @@ const (
 	originsTable    = "deployment_origins"
 	previewTable    = "previews"
 
+	// CURRENT_TIMESTAMP() is taken when the deployment insert runs. Origin
+	// rows copy that stamp: Spanner evaluates CURRENT_TIMESTAMP() per
+	// statement, so a default on those rows would land later.
+	createDeploymentStmt = `INSERT INTO deployments` +
+		` (project_id, id, release_id, origin_kind, metadata, deployed_at)` +
+		` VALUES (@p1, @p2, @p3, @p4, @p5, CURRENT_TIMESTAMP()) THEN RETURN deployed_at`
 	deploymentQuery = `SELECT project_id, id, release_id, origin_kind, metadata, deployed_at FROM deployments`
 )
 
@@ -62,20 +68,31 @@ func (ds deploymentStatements) CreateDeployment(ctx context.Context, entity *dom
 	}
 	var deployedAt time.Time
 	err = withTransaction(ctx, ds.db, func(ctx context.Context, tx queryExecutor) error {
-		deployedAt = deployment.Stamp(time.Now())
-		mutations := []*spanner.Mutation{
-			spanner.Insert(deploymentTable, deploymentColumns, []any{
-				entity.ProjectID, entity.ID, entity.ReleaseID, entity.OriginKind.String(), metadata, deployedAt,
-			}),
+		// A retry replays this callback, so the stamp stays local until the
+		// writes have landed. The deployment row is DML: the variable-set
+		// link that follows is SQL in this same transaction, and Spanner SQL
+		// cannot see a buffered mutation.
+		var stamped time.Time
+		stmt := buildStatement(createDeploymentStmt,
+			entity.ProjectID, entity.ID, entity.ReleaseID, entity.OriginKind.String(), metadata,
+		).statement()
+		if err := tx.Write(ctx, stmt, scanReturnedTimestamp(&stamped)); err != nil {
+			return err
 		}
+		// Origin rows are not read here and are not the link's foreign key,
+		// so one mutation applies them at commit.
 		origins := entity.Origins()
-		for i, seq := range deployment.NextSeqs(origins, read) {
-			mutations = append(mutations, spanner.Insert(originsTable, originColumns,
-				[]any{entity.ProjectID, entity.ID, origins[i], entity.ReleaseID, entity.OriginKind.String(), deployedAt, seq}))
+		seqs := deployment.NextSeqs(origins, read)
+		mutations := make([]*spanner.Mutation, 0, len(origins))
+		for i, origin := range origins {
+			mutations = append(mutations, spanner.Insert(originsTable, originColumns, []any{
+				entity.ProjectID, entity.ID, origin, entity.ReleaseID, entity.OriginKind.String(), stamped, seqs[i],
+			}))
 		}
 		if err := tx.BufferWrite(ctx, mutations); err != nil {
 			return err
 		}
+		deployedAt = stamped
 		rsi := newResourceScopeStatements(tx)
 		return rsi.UpsertResourceScope(ctx, domain.NewResourceScope(domain.ResourceKindDeployment, entity.ProjectID, entity.ID))
 	})

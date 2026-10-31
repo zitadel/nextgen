@@ -40,7 +40,7 @@ catalog:
   '@oclif/plugin-search': ^1.2.50
   '@oclif/plugin-version': ^2.2.46
   '@oclif/plugin-which': ^3.2.55
-  "@playwright/test": ^1.60.0
+  "@playwright/test": ^1.64.1
   # rc.3 (2026-10-13) is younger than the one-day minimumReleaseAge; one entry
   # so sdk-qwik and sdk-qwik-router build and test against the same Qwik.
   "@qwik.dev/core": ^2.0.0-rc.2
@@ -55,9 +55,9 @@ catalog:
   "@tailwindcss/vite": ^4.2.4
   "@tanstack/devtools-vite": ^0.6.0
   "@tanstack/react-devtools": ^0.10.2
-  "@tanstack/react-router": ^1.168.23
-  "@tanstack/react-router-devtools": ^1.166.13
-  "@tanstack/router-plugin": ^1.167.22
+  "@tanstack/react-router": ^1.170.46
+  "@tanstack/react-router-devtools": ^1.167.2
+  "@tanstack/router-plugin": ^1.168.48
   "@testing-library/jest-dom": ^6.9.1
   "@testing-library/react": ^16.3.2
   "@testing-library/user-event": ^14.6.1
@@ -77,6 +77,7 @@ catalog:
   "@vitest/browser-playwright": ^4.1.11
   "@vitest/coverage-v8": ^4.1.11
   ajv: ^8.20.0
+  botid: ^1.5.12
   class-variance-authority: ^0.7.1
   clsx: ^2.1.1
   cmdk: ^1.1.1
@@ -102,7 +103,7 @@ catalog:
   nuxt: ^4.5.1
   oclif: ^4.17.46
   orval: ^8.42.0
-  playwright: ^1.60.0
+  playwright: ^1.64.1
   publint: ^0.3.25
   radix-ui: ^1.6.4
   react: ^19.2.8
@@ -135,6 +136,7 @@ catalog:
   vitest: ^4.1.11
   vue: ^3.5.42
   vue-tsc: ^3.2.8
+  workflow: ^5.2.3
   xstate: ^5.31.1
   yaml: ^2.9.0
   zod: ^4.3.6
@@ -166,6 +168,7 @@ allowBuilds:
   "sharp": true
   "@parcel/watcher": false
   "@swc/core": false
+  "cbor-extract": false
   "lmdb": false
   "msgpackr-extract": false
   "msw": false

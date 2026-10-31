@@ -9,12 +9,22 @@
       "dependsOn": ["@zitadel/config#build"]
     },
     // The node `unit` and real-Chromium `browser` projects in one Vitest run.
-    // The script retries a failed suite (#1490).
+    // The script retries a failed suite (#1490). The redirect-target spec
+    // checks the mock against the server's own fixture.
     "test": {
-      "dependsOn": ["install-browsers", "@zitadel/config#build"]
+      "dependsOn": ["install-browsers", "@zitadel/config#build"],
+      "inputs": [
+        "$TURBO_EXTENDS$",
+        "$TURBO_ROOT$/scripts/task-guard.mjs",
+        "$TURBO_ROOT$/internal/httputil/testdata/redirect_targets.json"
+      ]
     },
     // bin/start.ts runs the source and imports api's generated client and config.
     "start": {
+      "dependsOn": ["@zitadel/config#build"]
+    },
+    // The same file under `tsx watch`.
+    "dev": {
       "dependsOn": ["@zitadel/config#build"]
     }
   }

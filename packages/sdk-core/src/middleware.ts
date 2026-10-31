@@ -19,6 +19,10 @@ import { isJwtShaped, verifyJwt } from "./jwt.js";
  * two directly connected peers and become invalid when proxied.
  */
 export const HOP_BY_HOP: ReadonlySet<string> = new Set([
+  // accept-encoding is not hop-by-hop per RFC 7230, but the browser's value
+  // must not reach the upstream: the proxy's fetch decodes the body it gets
+  // back, so only the codings that fetch advertises itself may be chosen.
+  "accept-encoding",
   "connection",
   // content-length is not hop-by-hop per RFC 7230, but it must be stripped: the
   // proxy re-sends a freshly buffered body, so the fetch implementation computes
@@ -185,9 +189,15 @@ function ontoThisApp(location: string, selfUrl: string | undefined): string | un
 }
 
 /**
- * Filters upstream response headers for proxying: strips hop-by-hop headers
- * and `set-cookie` (handled separately via `getSetCookie()`), and reduces
- * `location` to a redirect that can only land on this app.
+ * Filters upstream response headers for proxying: strips hop-by-hop headers,
+ * `content-encoding` and `set-cookie` (handled separately via `getSetCookie()`),
+ * and reduces `location` to a redirect that can only land on this app.
+ *
+ * `content-encoding` describes the bytes the upstream sent, but `fetch` has
+ * already decoded them, so the proxy passes on a plain body. Forwarding the
+ * header labels that body as compressed: the browser fails to decode it, and a
+ * `200` reaches the caller as a request that got no response. `content-length`
+ * goes for the same reason, as a hop-by-hop header.
  *
  * `location` was stripped outright until the identity-provider callback
  * needed it: the provider returns the browser to `/__nextgen/idp/{slug}/callback`,
@@ -207,7 +217,7 @@ export function filterResponseHeaders(upstream: Headers, selfUrl?: string): Head
   const filtered = new Headers();
   upstream.forEach((value, key) => {
     const name = key.toLowerCase();
-    if (HOP_BY_HOP.has(name) || name === "set-cookie") {
+    if (HOP_BY_HOP.has(name) || name === "content-encoding" || name === "set-cookie") {
       return;
     }
     if (name === "location") {
@@ -224,24 +234,51 @@ export function filterResponseHeaders(upstream: Headers, selfUrl?: string): Head
 
 // ─── Session cookies ─────────────────────────────────────────────────────────
 
-/** The cookie the server sets a session in and reads it from. */
-export const SERVER_SESSION_COOKIE = "__nextgen_session";
+/** The prefix a browser accepts only from this host, over a secure response (ADR 083). */
+const HOST_PREFIX = "__Host-";
 
-/** Every app's own session cookie starts with this. */
-const PROJECT_SESSION_COOKIE_PREFIX = `${SERVER_SESSION_COOKIE}_`;
+/** The session cookie's name without the prefix, as it goes over loopback http. */
+const LOOPBACK_SERVER_SESSION_COOKIE = "zitadel_session";
 
 /**
- * The cookie an app keeps its project's session in: the server's name with the
- * project id appended (ADR 073). A browser shares one cookie jar across every
- * port of a host, so under the server's name alone the Console of a local
- * server and every app on `localhost` would hold their sessions in one slot and
- * replace each other's.
+ * The server's session cookie under its canonical name, the one the server
+ * reads on every request (ADR 083). A proxy sends a session upstream under
+ * this name only, whichever transport it reaches the server over.
+ */
+export const SERVER_SESSION_COOKIE = `${HOST_PREFIX}${LOOPBACK_SERVER_SESSION_COOKIE}`;
+
+/**
+ * The session cookies before ADR 083, the server's and every app's own. They
+ * are never read, renamed or passed on: a proxy strips them on the way up and
+ * discards their `Set-Cookie` on the way back.
+ */
+const LEGACY_SESSION_COOKIE = "__nextgen_session";
+
+/**
+ * The name the server's session cookie has in a browser: the canonical
+ * {@link SERVER_SESSION_COOKIE} wherever it is `Secure`, and `zitadel_session`
+ * over plain http to a loopback host, where it has no `Secure` for Safari and
+ * so cannot carry the `__Host-` prefix (ADR 083). On `localhost` the Console of
+ * a local server keeps its session under this name.
+ */
+export function serverSessionCookieName(secure: boolean): string {
+  return secure ? SERVER_SESSION_COOKIE : LOOPBACK_SERVER_SESSION_COOKIE;
+}
+
+/**
+ * The cookie an app keeps its project's session in: the server's name for the
+ * app's scheme with the project id appended (ADR 073, ADR 083),
+ * `__Host-zitadel_session_<project id>` wherever it is `Secure` and
+ * `zitadel_session_<project id>` over plain http to a loopback host. A browser
+ * shares one cookie jar across every port of a host, so under the server's
+ * name alone the Console of a local server and every app on `localhost` would
+ * hold their sessions in one slot and replace each other's.
  *
  * Every byte of the id outside `[A-Za-z0-9_-]` is percent-encoded, so any
  * configured id makes a valid cookie name. Ids the server mints need none.
  */
-export function sessionCookieName(projectId: string): string {
-  let name = PROJECT_SESSION_COOKIE_PREFIX;
+export function sessionCookieName(projectId: string, secure: boolean): string {
+  let name = `${serverSessionCookieName(secure)}_`;
   for (const byte of new TextEncoder().encode(projectId)) {
     const char = String.fromCharCode(byte);
     name += /[A-Za-z0-9_-]/.test(char)
@@ -251,9 +288,20 @@ export function sessionCookieName(projectId: string): string {
   return name;
 }
 
-/** Whether `name` is a session cookie: the server's, or any app's own. */
+/** Whether `name` is one of the server's session cookie names, on either transport. */
+function isServerSessionCookie(name: string): boolean {
+  return name === SERVER_SESSION_COOKIE || name === LOOPBACK_SERVER_SESSION_COOKIE;
+}
+
+/**
+ * Whether `name` is a session cookie: the server's or any app's own, under
+ * either transport's name, or one from before ADR 083.
+ */
 function isSessionCookie(name: string): boolean {
-  return name === SERVER_SESSION_COOKIE || name.startsWith(PROJECT_SESSION_COOKIE_PREFIX);
+  const bare = name.startsWith(HOST_PREFIX) ? name.slice(HOST_PREFIX.length) : name;
+  return [LOOPBACK_SERVER_SESSION_COOKIE, LEGACY_SESSION_COOKIE].some(
+    (family) => bare === family || bare.startsWith(`${family}_`),
+  );
 }
 
 /**
@@ -362,7 +410,35 @@ function copiedToProjectCookie(
   maxAge: number | undefined,
   secure: boolean,
 ): SessionCookie {
-  return { name: sessionCookieName(projectId), value: token, maxAge, secure };
+  return { name: sessionCookieName(projectId, secure), value: token, maxAge, secure };
+}
+
+/**
+ * The app's own session cookie for a `Set-Cookie` of the server's, which sets
+ * or clears it: its value and expiry under `name`, with the attributes of the
+ * app's scheme rather than those the server chose for its own transport
+ * (ADR 083). `Max-Age` wins over `Expires`, as in a browser; an `Expires`
+ * alone becomes the `Max-Age` it amounts to.
+ */
+function projectSetCookie(setCookie: string, name: string, secure: boolean): string {
+  const [pair = "", ...attributes] = setCookie.split(";");
+  let maxAge: number | undefined;
+  let expiresAt: number | undefined;
+  for (const attribute of attributes) {
+    const index = attribute.indexOf("=");
+    const key = (index === -1 ? attribute : attribute.slice(0, index)).trim().toLowerCase();
+    const value = index === -1 ? "" : attribute.slice(index + 1).trim();
+    if (key === "max-age" && /^-?\d+$/.test(value)) {
+      maxAge = Math.max(0, Number(value));
+    } else if (key === "expires") {
+      expiresAt = Date.parse(value);
+    }
+  }
+  if (maxAge === undefined && expiresAt !== undefined && Number.isFinite(expiresAt)) {
+    maxAge = expiresAt <= Date.now() ? 0 : secondsUntil(expiresAt);
+  }
+  const value = pair.slice(pair.indexOf("=") + 1).trim();
+  return serializeSessionCookie({ name, value, maxAge, secure });
 }
 
 /** The pieces of a `Cookie` header, each with the name it carries. */
@@ -432,15 +508,23 @@ export interface ProxiedSessionCookies {
 }
 
 /**
- * The session cookies of a call the app proxies to the server (ADR 073). The
- * server knows one session cookie, `__nextgen_session`; the app keeps its
- * project's session in {@link sessionCookieName}, so it neither replaces nor
- * reads the session of another app or of the Console on the same host.
+ * The session cookies of a call the app proxies to the server (ADR 073,
+ * ADR 083). The server knows one session cookie,
+ * {@link serverSessionCookieName}; the app keeps its project's session in
+ * {@link sessionCookieName}, so it neither replaces nor reads the session of
+ * another app or of the Console on the same host. Both names follow the app's
+ * scheme: the `__Host-` names wherever the cookie is `Secure`, the unprefixed
+ * ones over plain http to a loopback host. The app reads only its scheme's.
  *
- * - On the way up, the app's own session cookie goes under the server's name,
- *   and every other session cookie stays behind. Other cookies pass unchanged.
- * - On the way back, a `Set-Cookie` of the server's session cookie, which sets
- *   or clears it, is renamed to the app's.
+ * - On the way up, the app's own session cookie goes once, under the server's
+ *   canonical {@link SERVER_SESSION_COOKIE}, and every other session cookie
+ *   stays behind: both names of the server's and of every app's, and those
+ *   from before ADR 083. Other cookies pass unchanged.
+ * - On the way back, a `Set-Cookie` of the server's session cookie under either
+ *   name, which sets or clears it, becomes one of the app's own for its scheme:
+ *   the value and expiry kept, `Path=/`, `HttpOnly`, `SameSite=Lax`, no
+ *   `Domain`, and `Secure` as the app's scheme needs. A `Set-Cookie` of any
+ *   other session cookie, one from before ADR 083 included, is dropped.
  * - A session kept under the server's name goes up to one call only, the
  *   session probe `GET /sessions/me?project_id=<project>`, which the server
  *   refuses for another project's session. When the answer signs a user of
@@ -475,11 +559,13 @@ export function proxySessionCookies(
     };
   }
 
-  const ownName = sessionCookieName(projectId);
+  const secure = secureFor(request);
+  const ownName = sessionCookieName(projectId, secure);
+  const serverName = serverSessionCookieName(secure);
   const pieces = cookiePieces(request.cookie);
   const own = cookieValue(pieces, ownName);
   // A session kept under the server's name, which goes up to the probe only.
-  const shared = cookieValue(pieces, SERVER_SESSION_COOKIE);
+  const shared = cookieValue(pieces, serverName);
   const method = request.method.toUpperCase();
   const isProbe =
     method === "GET" &&
@@ -488,7 +574,6 @@ export function proxySessionCookies(
   const signsIn = method === "POST" && request.path === "/sessions/exchange";
   const signsOut = method === "DELETE" && request.path === "/sessions/me";
   const probed = own === null && isProbe ? shared : null;
-  const secure = secureFor(request);
 
   const sent = pieces.filter(({ name }) => !isSessionCookie(name)).map(({ piece }) => piece);
   const session = own ?? probed;
@@ -500,19 +585,23 @@ export function proxySessionCookies(
     upstreamCookie: sent.length > 0 ? sent.join("; ") : null,
     async toBrowser(answer) {
       const upstreamSetCookies = answer.headers.getSetCookie?.() ?? [];
-      const setCookies = upstreamSetCookies.map((setCookie) =>
-        setCookieName(setCookie) === SERVER_SESSION_COOKIE
-          ? `${ownName}${setCookie.slice(setCookie.indexOf("="))}`
-          : setCookie,
-      );
+      const setCookies: string[] = [];
+      for (const setCookie of upstreamSetCookies) {
+        const name = setCookieName(setCookie);
+        if (isServerSessionCookie(name)) {
+          setCookies.push(projectSetCookie(setCookie, ownName, secure));
+        } else if (!isSessionCookie(name)) {
+          setCookies.push(setCookie);
+        }
+      }
       // A sign-in that set the app's session, or any sign-out: the session the
       // server's cookie still holds goes too, unless it is another project's.
-      const setsSession = upstreamSetCookies.some(
-        (setCookie) => setCookieName(setCookie) === SERVER_SESSION_COOKIE,
+      const setsSession = upstreamSetCookies.some((setCookie) =>
+        isServerSessionCookie(setCookieName(setCookie)),
       );
       if (shared !== null && (signsOut || (signsIn && answer.ok && setsSession))) {
         if (await retiresSharedSession(shared, projectId, upstream, signsOut)) {
-          setCookies.push(serializeSessionCookie(clearedCookie(SERVER_SESSION_COOKIE, secure)));
+          setCookies.push(serializeSessionCookie(clearedCookie(serverName, secure)));
         }
       }
       if (probed === null || answer.status !== 200) {
@@ -583,16 +672,51 @@ async function retiresSharedSession(
     return false;
   }
   if (signsOut) {
-    // Logout needs no CSRF token (ADR 053 §5); a call without an Origin is no
-    // cross-site request. A failed revoke still clears the cookie: the
-    // browser no longer holds the session.
-    await fetch(joinURL(upstream.url, "/sessions/me"), {
-      method: "DELETE",
-      headers: { cookie },
-      signal: AbortSignal.timeout(upstream.timeoutMs),
-    }).catch(() => undefined);
+    // A failed revoke still clears the cookie: the browser no longer holds the
+    // session.
+    await revokeSession(cookie, projectId, upstream);
   }
   return true;
+}
+
+/** The header the session's CSRF token travels in (ADR 053 §5). */
+const CSRF_HEADER = "X-Zitadel-CSRF";
+
+/**
+ * Ends the session `cookie` carries, as `@zitadel/components` ends its own.
+ * Sign-out is a write, so it carries the session's CSRF token (ADR 053 §5),
+ * read first from `GET /sessions/me/csrf` in this project: a call without an
+ * Origin passes the server's cross-site check, but not its token check.
+ * Without a token it sends no revoke, which the server would refuse.
+ */
+async function revokeSession(
+  cookie: string,
+  projectId: string,
+  upstream: ProxyUpstream,
+): Promise<void> {
+  try {
+    const res = await fetch(
+      `${joinURL(upstream.url, "/sessions/me/csrf")}?project_id=${encodeURIComponent(projectId)}`,
+      {
+        method: "GET",
+        headers: { cookie },
+        signal: AbortSignal.timeout(upstream.timeoutMs),
+      },
+    );
+    const answer = res.ok
+      ? (parsedJson(await res.text()) as { csrf_token?: unknown } | undefined)
+      : undefined;
+    if (typeof answer?.csrf_token !== "string") {
+      return;
+    }
+    await fetch(joinURL(upstream.url, "/sessions/me"), {
+      method: "DELETE",
+      headers: { cookie, [CSRF_HEADER]: answer.csrf_token },
+      signal: AbortSignal.timeout(upstream.timeoutMs),
+    });
+  } catch {
+    // No answer: the caller clears the cookie all the same.
+  }
 }
 
 /** `text` as JSON, or `undefined` when it is not JSON. */
@@ -687,9 +811,10 @@ export type NextgenMiddlewareOptions = {
    * alone.
    *
    * The app keeps its session in a cookie of its own,
-   * `__nextgen_session_<projectId>` ({@link sessionCookieName}), so signing in
+   * `__Host-zitadel_session_<projectId>`, or `zitadel_session_<projectId>` over
+   * plain http to a loopback host ({@link sessionCookieName}), so signing in
    * here neither replaces nor reads the session of another app or of the
-   * Console on the same host (ADR 073).
+   * Console on the same host (ADR 073, ADR 083).
    *
    * An opaque session token is checked by the backend
    * (`GET /sessions/me?project_id=…`) and against the project its answer names;
@@ -1114,6 +1239,15 @@ export interface ResolveSessionOptions {
   readonly allowedTokenTypes: readonly string[];
   readonly jwksTimeoutMs: number | undefined;
   readonly opaqueTokenTimeoutMs: number;
+  /**
+   * Whether an opaque session cookie is checked with the backend, a call to
+   * the server on every request. `false` leaves it to a render layer that
+   * checks the session itself, as sdk-next's `auth()` does: the result hands
+   * the token on as {@link ResolvedSession.unchecked}. A JWT is judged either
+   * way, without a call.
+   * @default true
+   */
+  readonly checkOpaqueSession?: boolean;
 }
 
 /** A request's session, as {@link resolveSession} judged it. */
@@ -1138,6 +1272,13 @@ export interface ResolvedSession {
    * request in, which was never judged.
    */
   readonly cookies: readonly SessionCookie[];
+  /**
+   * The opaque session token the backend was not asked about, when
+   * {@link ResolveSessionOptions.checkOpaqueSession} is `false`. The request
+   * counts as signed out here and its cookie is left as it is: whatever reads
+   * the session next checks the token itself.
+   */
+  readonly unchecked?: string;
 }
 
 function signedOut(): UnauthState {
@@ -1159,16 +1300,18 @@ function warnMissingProject(): void {
 }
 
 /**
- * The cookie a request's session is read from: the project's own
- * ({@link sessionCookieName}), else the server's `__nextgen_session`, where
- * this app kept its sessions before ADR 073 and where, on `localhost`, the
- * Console keeps its own.
+ * The cookie a request's session is read from, under the names of the
+ * request's scheme only: the project's own ({@link sessionCookieName}), else
+ * the server's ({@link serverSessionCookieName}), where, on `localhost`, the
+ * Console keeps its own. Over https an unprefixed cookie is never read: any
+ * sibling host can plant one.
  */
 function storedSession(
   cookie: SessionRequest["cookie"],
   projectId: string,
+  secure: boolean,
 ): { readonly name: string; readonly token: string } | null {
-  for (const name of [sessionCookieName(projectId), SERVER_SESSION_COOKIE]) {
+  for (const name of [sessionCookieName(projectId, secure), serverSessionCookieName(secure)]) {
     const token = cookie(name);
     if (token) {
       return { name, token };
@@ -1248,7 +1391,8 @@ async function judgeJwt(
  *   re-check JWT claims.
  * - Any other session cookie is checked by the backend
  *   ({@link checkOpaqueSessionToken}) and signs its user in when the session
- *   is live in this project.
+ *   is live in this project. With `checkOpaqueSession: false` it is not: the
+ *   result hands it on unchecked, and touches no cookie.
  * - Only a cookie that held a dead session is cleared: one the backend refused,
  *   or a JWT that fails verification or names no user of this project. When
  *   the backend gives no verdict, the result says so
@@ -1274,15 +1418,15 @@ export async function resolveSession(
     }
   }
 
-  const stored = storedSession(request.cookie, projectId);
+  const secure = secureFor(request);
+  const stored = storedSession(request.cookie, projectId, secure);
   if (!stored) {
     return { auth: signedOut(), undecided: false, cookies: [] };
   }
-  const secure = secureFor(request);
   // A session of this project in the server's cookie is copied to the
   // project's own once it signs a user in; one already there stays as it is.
   const moved = (maxAge: number | undefined): SessionCookie[] =>
-    stored.name === SERVER_SESSION_COOKIE
+    stored.name === serverSessionCookieName(secure)
       ? [copiedToProjectCookie(stored.token, projectId, maxAge, secure)]
       : [];
   const cleared = (): SessionCookie[] => [clearedCookie(stored.name, secure)];
@@ -1293,6 +1437,10 @@ export async function resolveSession(
       return { auth: judged.auth, undecided: false, cookies: moved(judged.maxAge) };
     }
     return { auth: signedOut(), undecided: false, cookies: judged.dead ? cleared() : [] };
+  }
+
+  if (options.checkOpaqueSession === false) {
+    return { auth: signedOut(), undecided: false, cookies: [], unchecked: stored.token };
   }
 
   const check = await checkOpaqueSessionToken(stored.token, url, opaqueTokenTimeoutMs, projectId);

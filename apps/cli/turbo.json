@@ -2,11 +2,42 @@
   "$schema": "https://turborepo.dev/schema.json",
   "extends": ["//"],
   "tasks": {
+    // The spec program type-checks the root scripts tests/unit/scripts imports.
     "typecheck": {
-      "dependsOn": ["@zitadel/api-mock#build", "@zitadel/sdk-next#build"]
+      "dependsOn": ["@zitadel/api-mock#build", "@zitadel/sdk-next#build"],
+      "inputs": [
+        "$TURBO_EXTENDS$",
+        "$TURBO_ROOT$/scripts/**/*.mjs",
+        "$TURBO_ROOT$/scripts/**/*.d.mts",
+        "$TURBO_ROOT$/e2e/journey/scripts/*.mjs"
+      ]
     },
+    // It copies every public agent skill into dist/skills
+    // (src/lib/skills/bundle.ts) for `zitadel skills add`: its own, which the
+    // shared shape leaves out, and those of the root and the other packages.
     "build": {
-      "dependsOn": ["@zitadel/sdk-next#build"]
+      "dependsOn": ["@zitadel/sdk-next#build"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "!**/README.md",
+        "!**/AGENTS.md",
+        "!**/CLAUDE.md",
+        "!**/CHANGELOG.md",
+        "!**/LICENSE",
+        "!**/LICENSE.md",
+        "!docs/**",
+        "!**/*.test.{ts,tsx,mts,cts,js,jsx,mjs,cjs}",
+        "!**/*.spec.{ts,tsx,mts,cts,js,jsx,mjs,cjs}",
+        "!**/__tests__/**",
+        "!**/__snapshots__/**",
+        "!tests/**",
+        "!test/**",
+        "!**/vitest.config.*",
+        "!**/vitest.*.config.*",
+        "$TURBO_ROOT$/skills/**",
+        "$TURBO_ROOT$/apps/*/skills/**",
+        "$TURBO_ROOT$/packages/*/skills/**"
+      ]
     },
     // It runs the normal tests first, and the public packages' release builds
     // wait for those tests (through api's release build) before they clean
@@ -20,20 +51,47 @@
     // names the api-coverage test checks against the commands, the product
     // analytics catalog the catalog test checks telemetry against, and the
     // cloud's rewrite the CLI's Mixpanel endpoint has to match.
+    //
+    // Its inputs replace the shared shape's: tests/unit/docs reads README.md
+    // and skills/, which the shape leaves out. tests/unit/scripts tests the
+    // root scripts (and the journey scripts they import; check-pr-title reads
+    // .github/semantic.yml), and the release manifest's test reads
+    // .changeset/config.json, .moon/workspace.yml and every package's
+    // package.json and moon.yml. The local runtime's launcher test reads the
+    // Dockerfile, the IdP document tests the design docs' scaffold schemas,
+    // and the skills bundle's test LICENSING.md's MIT paths.
     "test": {
       "dependsOn": ["build", "@zitadel/api-mock#build"],
       "inputs": [
         "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/packages/vitest-config/vitest.shared.mjs",
+        "$TURBO_ROOT$/packages/vitest-config/vitest.shared.d.mts",
+        "!**/AGENTS.md",
+        "!**/CLAUDE.md",
+        "!**/CHANGELOG.md",
+        "!LICENSE",
+        "!src/**/README.md",
         "$TURBO_ROOT$/apps/server/bin/**",
         "$TURBO_ROOT$/api/openapi/endpoints/**/methods.yaml",
         "$TURBO_ROOT$/docs/product-analytics-events.yaml",
-        "$TURBO_ROOT$/vercel.json"
+        "$TURBO_ROOT$/vercel.json",
+        "$TURBO_ROOT$/scripts/**/*.mjs",
+        "$TURBO_ROOT$/e2e/journey/scripts/*.mjs",
+        "$TURBO_ROOT$/.github/semantic.yml",
+        "$TURBO_ROOT$/Dockerfile",
+        "$TURBO_ROOT$/docs/design/idp/schemas/**",
+        "$TURBO_ROOT$/LICENSING.md",
+        "$TURBO_ROOT$/.changeset/config.json",
+        "$TURBO_ROOT$/.moon/workspace.yml",
+        "$TURBO_ROOT$/{apps,packages}/*/package.json",
+        "$TURBO_ROOT$/{apps,packages}/*/moon.yml"
       ]
     },
     // It asks the npm advisory database, whose answer changes when an
     // advisory is published, with no input changing.
     "check-advisories": {
-      "cache": false
+      "cache": false,
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/packages/vitest-config/vitest.shared.mjs", "$TURBO_ROOT$/packages/vitest-config/vitest.shared.d.mts"]
     },
     "readme": {
       "dependsOn": ["build"],

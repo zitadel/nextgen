@@ -106,8 +106,10 @@ and agent UIs may display stderr package-manager progress together with stdout.
 - `zitadel doctor`: verify the local runtime and generated project files
   (including scaffold drift and dependency-version alignment)
 - `zitadel status`: summarise the local runtime and project
-- `zitadel plan`: validate config and preview sync changes without mutation
-- `zitadel apply`: validate and upload repo config to Zitadel
+- `zitadel deploy`: build a release from `.zitadel/` and deploy it to the
+  project's primary origins (`--dry-run` validates and previews only)
+- `zitadel pull`: rebuild `.zitadel/` from the revisions a released snapshot
+  pins — the inverse of deploy — for `latest`, a release id, or a deployment id
 - `zitadel branding eject`: scaffold an editable login template from a design
 - `zitadel schemas list`: list the project's user schemas
 - `zitadel variable set|get|list|rm`: manage the project's variables and secrets
@@ -169,9 +171,15 @@ which ships in this package.
 * [`zitadel origin add PATTERN`](#zitadel-origin-add-pattern)
 * [`zitadel origin list`](#zitadel-origin-list)
 * [`zitadel origin rm PATTERN`](#zitadel-origin-rm-pattern)
+* [`zitadel policies get POLICY`](#zitadel-policies-get-policy)
+* [`zitadel policies list`](#zitadel-policies-list)
+* [`zitadel preview`](#zitadel-preview)
+* [`zitadel preview list`](#zitadel-preview-list)
+* [`zitadel preview rm URL`](#zitadel-preview-rm-url)
 * [`zitadel projects get ID`](#zitadel-projects-get-id)
 * [`zitadel projects list`](#zitadel-projects-list)
 * [`zitadel projects update ID`](#zitadel-projects-update-id)
+* [`zitadel pull [TARGET]`](#zitadel-pull-target)
 * [`zitadel release create`](#zitadel-release-create)
 * [`zitadel release get ID`](#zitadel-release-get-id)
 * [`zitadel release list`](#zitadel-release-list)
@@ -185,6 +193,7 @@ which ships in this package.
 * [`zitadel sessions list`](#zitadel-sessions-list)
 * [`zitadel sessions revoke ID`](#zitadel-sessions-revoke-id)
 * [`zitadel setup`](#zitadel-setup)
+* [`zitadel skills add`](#zitadel-skills-add)
 * [`zitadel start`](#zitadel-start)
 * [`zitadel status`](#zitadel-status)
 * [`zitadel stop`](#zitadel-stop)
@@ -319,8 +328,8 @@ Disable passkey sign-in for a user schema.
 
 ```
 USAGE
-  $ zitadel auth-method passkey disable [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--schema <value>] [-f]
+  $ zitadel auth-method passkey disable [-c <value>] [-s <value>] [-n] [--dry-run] [-v]
+    [--debug] [--color] [--telemetry] [--schema <value>] [-f]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -338,9 +347,6 @@ FLAGS
                          more than one.
       --[no-]telemetry   Send anonymous usage analytics. Disable with
                          --no-telemetry.
-
-GLOBAL FLAGS
-  --json  Format output as json.
 
 DESCRIPTION
   Disable passkey sign-in for a user schema.
@@ -357,8 +363,8 @@ Enable passkey sign-in for a user schema.
 
 ```
 USAGE
-  $ zitadel auth-method passkey enable [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--schema <value>]
+  $ zitadel auth-method passkey enable [-c <value>] [-s <value>] [-n] [--dry-run] [-v]
+    [--debug] [--color] [--telemetry] [--schema <value>]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -375,9 +381,6 @@ FLAGS
       --[no-]telemetry   Send anonymous usage analytics. Disable with
                          --no-telemetry.
 
-GLOBAL FLAGS
-  --json  Format output as json.
-
 DESCRIPTION
   Enable passkey sign-in for a user schema.
 
@@ -393,8 +396,8 @@ Disable password sign-in for a user schema.
 
 ```
 USAGE
-  $ zitadel auth-method password disable [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--schema <value>] [-f]
+  $ zitadel auth-method password disable [-c <value>] [-s <value>] [-n] [--dry-run] [-v]
+    [--debug] [--color] [--telemetry] [--schema <value>] [-f]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -413,9 +416,6 @@ FLAGS
       --[no-]telemetry   Send anonymous usage analytics. Disable with
                          --no-telemetry.
 
-GLOBAL FLAGS
-  --json  Format output as json.
-
 DESCRIPTION
   Disable password sign-in for a user schema.
 
@@ -431,8 +431,8 @@ Enable password sign-in for a user schema.
 
 ```
 USAGE
-  $ zitadel auth-method password enable [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--schema <value>]
+  $ zitadel auth-method password enable [-c <value>] [-s <value>] [-n] [--dry-run] [-v]
+    [--debug] [--color] [--telemetry] [--schema <value>]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -449,9 +449,6 @@ FLAGS
       --[no-]telemetry   Send anonymous usage analytics. Disable with
                          --no-telemetry.
 
-GLOBAL FLAGS
-  --json  Format output as json.
-
 DESCRIPTION
   Enable password sign-in for a user schema.
 
@@ -467,9 +464,9 @@ Remove an identity provider from a user schema.
 
 ```
 USAGE
-  $ zitadel auth-method sso disable [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--schema <value>]
-    [--provider <value>] [-f]
+  $ zitadel auth-method sso disable [-c <value>] [-s <value>] [-n] [--dry-run] [-v]
+    [--debug] [--color] [--telemetry] [--schema <value>] [--provider <value>]
+    [-f]
 
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
@@ -489,9 +486,6 @@ FLAGS
       --[no-]telemetry    Send anonymous usage analytics. Disable with
                           --no-telemetry.
 
-GLOBAL FLAGS
-  --json  Format output as json.
-
 DESCRIPTION
   Remove an identity provider from a user schema.
 
@@ -507,9 +501,9 @@ Add an identity provider to a user schema.
 
 ```
 USAGE
-  $ zitadel auth-method sso enable [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
-    <value>] [--schema <value>] [--provider google|custom] [--slug <value>]
+  $ zitadel auth-method sso enable [-c <value>] [-s <value>] [-n] [--dry-run] [-v]
+    [--debug] [--color] [--telemetry] [-e <value>] [--env-file <value>]
+    [--schema <value>] [--provider google|custom] [--slug <value>]
     [--display-name <value>] [--issuer <value>] [--scopes <value>] [--client-id
     <value>]
 
@@ -532,12 +526,13 @@ FLAGS
                               button.
       --dry-run               Preview without mutating files or the platform.
       --env-file=<value>      Read ZITADEL_* values from this file ahead of the
-                              process environment. Cannot be combined with
-                              --env.
+                              process environment. A relative path is read from
+                              the current directory, not from --cwd. Cannot be
+                              combined with --env.
       --issuer=<value>        Issuer URL of the custom provider. Its endpoints
                               are found by OIDC discovery.
-      --provider=<option>     Identity provider to enable, or "custom" for any
-                              other OpenID Connect provider.
+      --provider=<option>     Identity provider to enable, or "custom" for a
+                              custom OpenID Connect (OIDC) provider.
                               <options: google|custom>
       --schema=<value>        User schema to change. Required when the Project
                               has more than one.
@@ -548,9 +543,6 @@ FLAGS
                               refer to it by this.
       --[no-]telemetry        Send anonymous usage analytics. Disable with
                               --no-telemetry.
-
-GLOBAL FLAGS
-  --json  Format output as json.
 
 DESCRIPTION
   Add an identity provider to a user schema.
@@ -658,7 +650,9 @@ FLAGS
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the
-                          process environment. Cannot be combined with --env.
+                          process environment. A relative path is read from the
+                          current directory, not from --cwd. Cannot be combined
+                          with --env.
       --fields=<value>    Fields to show, comma-separated dot-paths. Defaults to
                           the resource's own; `--json` is unaffected.
       --[no-]telemetry    Send anonymous usage analytics. Disable with
@@ -700,7 +694,9 @@ FLAGS
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the
-                          process environment. Cannot be combined with --env.
+                          process environment. A relative path is read from the
+                          current directory, not from --cwd. Cannot be combined
+                          with --env.
       --fields=<value>    Columns to show, comma-separated dot-paths (e.g.
                           id,attributes.email). Defaults to the resource's own
                           columns; `--json` is unaffected.
@@ -727,28 +723,37 @@ Claim this project to make it permanent. Opens a browser to create an account or
 USAGE
   $ zitadel claim [--json] [-c <value>] [-s <value>] [-n]
     [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
-    <value>] [--no-open] [--timeout <value>]
+    <value>] [--no-open] [--no-wait | --challenge-id <value> | --timeout
+    <value>]
 
 FLAGS
-  -c, --cwd=<value>       Project directory to operate on.
-  -e, --env=<value>       Environment to run against, e.g. production. Defaults
-                          to ZITADEL_ENV, then the hosting platform's build
-                          (VERCEL_ENV, or Netlify's CONTEXT), then development.
-  -n, --non-interactive   Disable prompts. Required when scripting or running as
-                          an agent.
-  -s, --server=<value>    Override the resolved server URL.
-  -v, --verbose           Verbose logging.
-      --[no-]color        Colorize human output. Disable with --no-color;
-                          NO_COLOR and FORCE_COLOR are honored too.
-      --debug             Debug logging.
-      --dry-run           Preview without mutating files or the platform.
-      --env-file=<value>  Read ZITADEL_* values from this file ahead of the
-                          process environment. Cannot be combined with --env.
-      --no-open           Print the link instead of opening a browser.
-      --[no-]telemetry    Send anonymous usage analytics. Disable with
-                          --no-telemetry.
-      --timeout=<value>   Seconds to wait for the browser step. Defaults to the
-                          link's own expiry (10 minutes).
+  -c, --cwd=<value>           Project directory to operate on.
+  -e, --env=<value>           Environment to run against, e.g. production.
+                              Defaults to ZITADEL_ENV, then the hosting
+                              platform's build (VERCEL_ENV, or Netlify's
+                              CONTEXT), then development.
+  -n, --non-interactive       Disable prompts. Required when scripting or
+                              running as an agent.
+  -s, --server=<value>        Override the resolved server URL.
+  -v, --verbose               Verbose logging.
+      --challenge-id=<value>  Wait for the link a --no-wait run printed, instead
+                              of creating a new one.
+      --[no-]color            Colorize human output. Disable with --no-color;
+                              NO_COLOR and FORCE_COLOR are honored too.
+      --debug                 Debug logging.
+      --dry-run               Preview without mutating files or the platform.
+      --env-file=<value>      Read ZITADEL_* values from this file ahead of the
+                              process environment. A relative path is read from
+                              the current directory, not from --cwd. Cannot be
+                              combined with --env.
+      --no-open               Print the link instead of opening a browser.
+      --no-wait               Print the link and exit, without opening a browser
+                              or waiting for the browser step. The result names
+                              the command that waits for it.
+      --[no-]telemetry        Send anonymous usage analytics. Disable with
+                              --no-telemetry.
+      --timeout=<value>       Seconds to wait for the browser step. Defaults to
+                              the link's own expiry (10 minutes).
 
 GLOBAL FLAGS
   --json  Format output as json.
@@ -763,6 +768,10 @@ EXAMPLES
   $ zitadel claim --no-open
 
   $ zitadel claim --timeout 120
+
+  $ zitadel claim --no-wait
+
+  $ zitadel claim --challenge-id ch_01J0Z9KX7Y0Q2Y7JX5M9K2YF3C
 ```
 
 ## `zitadel commands`
@@ -797,7 +806,7 @@ _See code: [@oclif/plugin-commands](https://github.com/oclif/plugin-commands/blo
 
 ## `zitadel console`
 
-Open the local console, signed in as the local admin created by `zitadel start`.
+Open the local console, signed in as the local admin.
 
 ```
 USAGE
@@ -822,11 +831,11 @@ GLOBAL FLAGS
   --json  Format output as json.
 
 DESCRIPTION
-  Open the local console, signed in as the local admin created by `zitadel
-  start`.
+  Open the local console, signed in as the local admin.
 
-  Run it in the directory `zitadel start` ran in, or one inside it: the local
-  admin is read from the nearest `.zitadel/local/` on the way up.
+  The local admin is the one `zitadel start` created. Run this in the directory
+  `zitadel start` ran in, or one inside it: the local admin is read from the
+  nearest `.zitadel/local/` on the way up.
 
 EXAMPLES
   $ zitadel console
@@ -836,7 +845,7 @@ EXAMPLES
 
 ## `zitadel deploy`
 
-Build a release from .zitadel/ and deploy it to the project.
+Apply your local configuration to Zitadel.
 
 ```
 USAGE
@@ -859,7 +868,9 @@ FLAGS
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the
-                          process environment. Cannot be combined with --env.
+                          process environment. A relative path is read from the
+                          current directory, not from --cwd. Cannot be combined
+                          with --env.
       --[no-]telemetry    Send anonymous usage analytics. Disable with
                           --no-telemetry.
 
@@ -867,7 +878,10 @@ GLOBAL FLAGS
   --json  Format output as json.
 
 DESCRIPTION
-  Build a release from .zitadel/ and deploy it to the project.
+  Apply your local configuration to Zitadel.
+
+  Builds a release from .zitadel/ and deploys it to the project. Use --dry-run
+  to preview what would change.
 
 EXAMPLES
   $ zitadel deploy -m 'add phone_number to human-user'
@@ -900,7 +914,9 @@ FLAGS
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the
-                          process environment. Cannot be combined with --env.
+                          process environment. A relative path is read from the
+                          current directory, not from --cwd. Cannot be combined
+                          with --env.
       --release=<value>   (required) The release id to deploy.
       --[no-]telemetry    Send anonymous usage analytics. Disable with
                           --no-telemetry.
@@ -942,7 +958,9 @@ FLAGS
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the
-                          process environment. Cannot be combined with --env.
+                          process environment. A relative path is read from the
+                          current directory, not from --cwd. Cannot be combined
+                          with --env.
       --[no-]telemetry    Send anonymous usage analytics. Disable with
                           --no-telemetry.
 
@@ -983,7 +1001,9 @@ FLAGS
       --debug               Debug logging.
       --dry-run             Preview without mutating files or the platform.
       --env-file=<value>    Read ZITADEL_* values from this file ahead of the
-                            process environment. Cannot be combined with --env.
+                            process environment. A relative path is read from
+                            the current directory, not from --cwd. Cannot be
+                            combined with --env.
       --limit=<value>       Page size (server default 20, max 100).
       --live                What each target serves now, not the full history.
       --origin=<value>      Only deployments that targeted this origin.
@@ -1038,7 +1058,9 @@ FLAGS
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the
-                          process environment. Cannot be combined with --env.
+                          process environment. A relative path is read from the
+                          current directory, not from --cwd. Cannot be combined
+                          with --env.
       --[no-]telemetry    Send anonymous usage analytics. Disable with
                           --no-telemetry.
 
@@ -1080,7 +1102,9 @@ FLAGS
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the
-                          process environment. Cannot be combined with --env.
+                          process environment. A relative path is read from the
+                          current directory, not from --cwd. Cannot be combined
+                          with --env.
       --fix               Repair missing files and stale managed wiring.
       --image=<value>     Container image to check.
       --port=<value>      Local HTTP port to check. Defaults to the port this
@@ -1155,7 +1179,9 @@ FLAGS
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the
-                          process environment. Cannot be combined with --env.
+                          process environment. A relative path is read from the
+                          current directory, not from --cwd. Cannot be combined
+                          with --env.
       --[no-]telemetry    Send anonymous usage analytics. Disable with
                           --no-telemetry.
 
@@ -1242,7 +1268,9 @@ FLAGS
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the
-                          process environment. Cannot be combined with --env.
+                          process environment. A relative path is read from the
+                          current directory, not from --cwd. Cannot be combined
+                          with --env.
       --plain             Tab-separated rows with no header, for piping. Implied
                           when stdout is not a terminal.
       --[no-]telemetry    Send anonymous usage analytics. Disable with
@@ -1287,7 +1315,9 @@ FLAGS
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the
-                          process environment. Cannot be combined with --env.
+                          process environment. A relative path is read from the
+                          current directory, not from --cwd. Cannot be combined
+                          with --env.
       --fields=<value>    Fields to show, comma-separated dot-paths. Defaults to
                           the resource's own; `--json` is unaffected.
       --[no-]telemetry    Send anonymous usage analytics. Disable with
@@ -1348,8 +1378,9 @@ FLAGS
       Preview without mutating files or the platform.
 
   --env-file=<value>
-      Read ZITADEL_* values from this file ahead of the process environment.
-      Cannot be combined with --env.
+      Read ZITADEL_* values from this file ahead of the process environment. A
+      relative path is read from the current directory, not from --cwd. Cannot be
+      combined with --env.
 
   --fields=<value>
       Columns to show, comma-separated dot-paths (e.g. id,attributes.email).
@@ -1395,7 +1426,7 @@ EXAMPLES
 
 ## `zitadel flow-definitions get FLOW`
 
-Get one flow definition by id.
+Get one flow definition by flow name (newest revision) or revision id.
 
 ```
 USAGE
@@ -1420,7 +1451,9 @@ FLAGS
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the
-                          process environment. Cannot be combined with --env.
+                          process environment. A relative path is read from the
+                          current directory, not from --cwd. Cannot be combined
+                          with --env.
       --fields=<value>    Fields to show, comma-separated dot-paths. Defaults to
                           the resource's own; `--json` is unaffected.
       --[no-]telemetry    Send anonymous usage analytics. Disable with
@@ -1430,12 +1463,12 @@ GLOBAL FLAGS
   --json  Format output as json.
 
 DESCRIPTION
-  Get one flow definition by id.
+  Get one flow definition by flow name (newest revision) or revision id.
 
 EXAMPLES
-  $ zitadel flow-definitions get <id>
+  $ zitadel flow-definitions get <flow>
 
-  $ zitadel flow-definitions get <id> --json
+  $ zitadel flow-definitions get <flow> --json
 ```
 
 ## `zitadel flow-definitions list`
@@ -1465,7 +1498,9 @@ FLAGS
       --debug               Debug logging.
       --dry-run             Preview without mutating files or the platform.
       --env-file=<value>    Read ZITADEL_* values from this file ahead of the
-                            process environment. Cannot be combined with --env.
+                            process environment. A relative path is read from
+                            the current directory, not from --cwd. Cannot be
+                            combined with --env.
       --fields=<value>      Columns to show, comma-separated dot-paths (e.g.
                             id,attributes.email). Defaults to the resource's own
                             columns; `--json` is unaffected.
@@ -1520,7 +1555,9 @@ FLAGS
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the
-                          process environment. Cannot be combined with --env.
+                          process environment. A relative path is read from the
+                          current directory, not from --cwd. Cannot be combined
+                          with --env.
       --[no-]telemetry    Send anonymous usage analytics. Disable with
                           --no-telemetry.
 
@@ -1594,7 +1631,9 @@ FLAGS
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the
-                          process environment. Cannot be combined with --env.
+                          process environment. A relative path is read from the
+                          current directory, not from --cwd. Cannot be combined
+                          with --env.
       --[no-]telemetry    Send anonymous usage analytics. Disable with
                           --no-telemetry.
 
@@ -1635,7 +1674,9 @@ FLAGS
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the
-                          process environment. Cannot be combined with --env.
+                          process environment. A relative path is read from the
+                          current directory, not from --cwd. Cannot be combined
+                          with --env.
       --fields=<value>    Fields to show, comma-separated dot-paths. Defaults to
                           the resource's own; `--json` is unaffected.
       --[no-]telemetry    Send anonymous usage analytics. Disable with
@@ -1696,8 +1737,9 @@ FLAGS
       Preview without mutating files or the platform.
 
   --env-file=<value>
-      Read ZITADEL_* values from this file ahead of the process environment.
-      Cannot be combined with --env.
+      Read ZITADEL_* values from this file ahead of the process environment. A
+      relative path is read from the current directory, not from --cwd. Cannot be
+      combined with --env.
 
   --fields=<value>
       Columns to show, comma-separated dot-paths (e.g. id,attributes.email).
@@ -1799,7 +1841,9 @@ FLAGS
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the
-                          process environment. Cannot be combined with --env.
+                          process environment. A relative path is read from the
+                          current directory, not from --cwd. Cannot be combined
+                          with --env.
       --[no-]telemetry    Send anonymous usage analytics. Disable with
                           --no-telemetry.
 
@@ -1923,7 +1967,9 @@ FLAGS
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the
-                          process environment. Cannot be combined with --env.
+                          process environment. A relative path is read from the
+                          current directory, not from --cwd. Cannot be combined
+                          with --env.
       --fields=<value>    Fields to show, comma-separated dot-paths. Defaults to
                           the resource's own; `--json` is unaffected.
       --[no-]telemetry    Send anonymous usage analytics. Disable with
@@ -1984,8 +2030,9 @@ FLAGS
       Preview without mutating files or the platform.
 
   --env-file=<value>
-      Read ZITADEL_* values from this file ahead of the process environment.
-      Cannot be combined with --env.
+      Read ZITADEL_* values from this file ahead of the process environment. A
+      relative path is read from the current directory, not from --cwd. Cannot be
+      combined with --env.
 
   --fields=<value>
       Columns to show, comma-separated dot-paths (e.g. id,attributes.email).
@@ -2034,8 +2081,8 @@ Show local Zitadel server logs.
 ```
 USAGE
   $ zitadel logs [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--follow] [--tail
-    <value>]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--follow] [--level
+    debug|info|warn|error] [--tail <value>]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -2047,8 +2094,11 @@ FLAGS
                          NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
-      --follow           Follow logs.
-      --tail=<value>     [default: 200] Number of lines to show.
+      --follow           Keep printing lines as the server writes them.
+      --level=<option>   Show only lines at this level or above.
+                         <options: debug|info|warn|error>
+      --tail=<value>     [default: 200] Number of lines to show, counting only
+                         those --level shows.
       --[no-]telemetry   Send anonymous usage analytics. Disable with
                          --no-telemetry.
 
@@ -2057,6 +2107,15 @@ GLOBAL FLAGS
 
 DESCRIPTION
   Show local Zitadel server logs.
+
+  On a terminal, warnings are yellow and errors red. Run it in the directory
+  `zitadel start` ran in, or one inside it: the server is found from the nearest
+  `.zitadel/local/` on the way up.
+
+EXAMPLES
+  $ zitadel logs --follow
+
+  $ zitadel logs --level warn
 ```
 
 ## `zitadel origin add PATTERN`
@@ -2086,7 +2145,9 @@ FLAGS
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the
-                          process environment. Cannot be combined with --env.
+                          process environment. A relative path is read from the
+                          current directory, not from --cwd. Cannot be combined
+                          with --env.
       --kind=<option>     (required) What the pattern is for.
                           <options: primary|preview>
       --[no-]telemetry    Send anonymous usage analytics. Disable with
@@ -2128,7 +2189,9 @@ FLAGS
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the
-                          process environment. Cannot be combined with --env.
+                          process environment. A relative path is read from the
+                          current directory, not from --cwd. Cannot be combined
+                          with --env.
       --plain             Tab-separated rows with no header, for piping. Implied
                           when stdout is not a terminal.
       --[no-]telemetry    Send anonymous usage analytics. Disable with
@@ -2175,7 +2238,9 @@ FLAGS
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the
-                          process environment. Cannot be combined with --env.
+                          process environment. A relative path is read from the
+                          current directory, not from --cwd. Cannot be combined
+                          with --env.
       --[no-]telemetry    Send anonymous usage analytics. Disable with
                           --no-telemetry.
 
@@ -2189,6 +2254,257 @@ EXAMPLES
   $ zitadel origin rm https://app.acme.com
 
   $ zitadel origin rm https://app.acme.com --force
+```
+
+## `zitadel policies get POLICY`
+
+Get one policy by policy id or operation.
+
+```
+USAGE
+  $ zitadel policies get POLICY [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
+    <value>] [--fields <value>]
+
+ARGUMENTS
+  POLICY  policy id or operation
+
+FLAGS
+  -c, --cwd=<value>       Project directory to operate on.
+  -e, --env=<value>       Environment to run against, e.g. production. Defaults
+                          to ZITADEL_ENV, then the hosting platform's build
+                          (VERCEL_ENV, or Netlify's CONTEXT), then development.
+  -n, --non-interactive   Disable prompts. Required when scripting or running as
+                          an agent.
+  -s, --server=<value>    Override the resolved server URL.
+  -v, --verbose           Verbose logging.
+      --[no-]color        Colorize human output. Disable with --no-color;
+                          NO_COLOR and FORCE_COLOR are honored too.
+      --debug             Debug logging.
+      --dry-run           Preview without mutating files or the platform.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the
+                          process environment. A relative path is read from the
+                          current directory, not from --cwd. Cannot be combined
+                          with --env.
+      --fields=<value>    Fields to show, comma-separated dot-paths. Defaults to
+                          the resource's own; `--json` is unaffected.
+      --[no-]telemetry    Send anonymous usage analytics. Disable with
+                          --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Get one policy by policy id or operation.
+
+EXAMPLES
+  $ zitadel policies get <policy>
+
+  $ zitadel policies get <policy> --json
+```
+
+## `zitadel policies list`
+
+List policies.
+
+```
+USAGE
+  $ zitadel policies list [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
+    <value>] [--limit <value>] [-a | --page-token <value>] [--fields <value>]
+    [--plain] [--filter <value>...]
+
+FLAGS
+  -a, --all                 Fetch every page instead of one.
+  -c, --cwd=<value>         Project directory to operate on.
+  -e, --env=<value>         Environment to run against, e.g. production.
+                            Defaults to ZITADEL_ENV, then the hosting platform's
+                            build (VERCEL_ENV, or Netlify's CONTEXT), then
+                            development.
+  -n, --non-interactive     Disable prompts. Required when scripting or running
+                            as an agent.
+  -s, --server=<value>      Override the resolved server URL.
+  -v, --verbose             Verbose logging.
+      --[no-]color          Colorize human output. Disable with --no-color;
+                            NO_COLOR and FORCE_COLOR are honored too.
+      --debug               Debug logging.
+      --dry-run             Preview without mutating files or the platform.
+      --env-file=<value>    Read ZITADEL_* values from this file ahead of the
+                            process environment. A relative path is read from
+                            the current directory, not from --cwd. Cannot be
+                            combined with --env.
+      --fields=<value>      Columns to show, comma-separated dot-paths (e.g.
+                            id,attributes.email). Defaults to the resource's own
+                            columns; `--json` is unaffected.
+      --filter=<value>...   Filter as field=operation:value (operation defaults
+                            to equals). Fields: operation (equals).
+      --limit=<value>       Page size (server default 20, max 100).
+      --page-token=<value>  Continue from a previous page's next_page_token.
+      --plain               Tab-separated rows with no header, for piping.
+                            Implied when stdout is not a terminal.
+      --[no-]telemetry      Send anonymous usage analytics. Disable with
+                            --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  List policies.
+
+EXAMPLES
+  $ zitadel policies list --json
+
+  $ zitadel policies list --all --json
+
+  $ zitadel policies list --filter operation=equals:<value>
+```
+
+## `zitadel preview`
+
+Deploy a release from .zitadel/ to a pull-request build's preview URLs.
+
+```
+USAGE
+  $ zitadel preview [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
+    <value>] [--origin <value>...] [--ttl <value>] [--strict]
+
+FLAGS
+  -c, --cwd=<value>        Project directory to operate on.
+  -e, --env=<value>        Environment to run against, e.g. production. Defaults
+                           to ZITADEL_ENV, then the hosting platform's build
+                           (VERCEL_ENV, or Netlify's CONTEXT), then development.
+  -n, --non-interactive    Disable prompts. Required when scripting or running
+                           as an agent.
+  -s, --server=<value>     Override the resolved server URL.
+  -v, --verbose            Verbose logging.
+      --[no-]color         Colorize human output. Disable with --no-color;
+                           NO_COLOR and FORCE_COLOR are honored too.
+      --debug              Debug logging.
+      --dry-run            Preview without mutating files or the platform.
+      --env-file=<value>   Read ZITADEL_* values from this file ahead of the
+                           process environment. A relative path is read from the
+                           current directory, not from --cwd. Cannot be combined
+                           with --env.
+      --origin=<value>...  A preview URL to deploy to, instead of detecting them
+                           from the platform build. Repeatable.
+      --strict             Fail instead of warning when no preview credential
+                           (ZITADEL_PROJECT_SECRET) is set.
+      --[no-]telemetry     Send anonymous usage analytics. Disable with
+                           --no-telemetry.
+      --ttl=<value>        How long each preview stays live, e.g. 7d, 12h or
+                           90m. Between 60s and 365d. Omitted, the project's
+                           default applies.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Deploy a release from .zitadel/ to a pull-request build's preview URLs.
+
+EXAMPLES
+  $ zitadel preview
+
+  $ zitadel preview --origin https://acme-git-sso-acmeinc.vercel.app
+
+  $ zitadel preview --ttl 24h
+```
+
+## `zitadel preview list`
+
+List the project's live previews, newest first.
+
+```
+USAGE
+  $ zitadel preview list [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
+    <value>] [--limit <value>] [-a | --page-token <value>] [--plain]
+
+FLAGS
+  -a, --all                 Fetch every page instead of one.
+  -c, --cwd=<value>         Project directory to operate on.
+  -e, --env=<value>         Environment to run against, e.g. production.
+                            Defaults to ZITADEL_ENV, then the hosting platform's
+                            build (VERCEL_ENV, or Netlify's CONTEXT), then
+                            development.
+  -n, --non-interactive     Disable prompts. Required when scripting or running
+                            as an agent.
+  -s, --server=<value>      Override the resolved server URL.
+  -v, --verbose             Verbose logging.
+      --[no-]color          Colorize human output. Disable with --no-color;
+                            NO_COLOR and FORCE_COLOR are honored too.
+      --debug               Debug logging.
+      --dry-run             Preview without mutating files or the platform.
+      --env-file=<value>    Read ZITADEL_* values from this file ahead of the
+                            process environment. A relative path is read from
+                            the current directory, not from --cwd. Cannot be
+                            combined with --env.
+      --limit=<value>       Page size (server default 20, max 100).
+      --page-token=<value>  Continue from a previous page's next_page_token.
+      --plain               Tab-separated rows with no header, for piping.
+                            Implied when stdout is not a terminal.
+      --[no-]telemetry      Send anonymous usage analytics. Disable with
+                            --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  List the project's live previews, newest first.
+
+EXAMPLES
+  $ zitadel preview list
+
+  $ zitadel preview list --all
+
+  $ zitadel preview list --plain
+```
+
+## `zitadel preview rm URL`
+
+Remove a live preview from the project.
+
+```
+USAGE
+  $ zitadel preview rm URL [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
+    <value>] [-f]
+
+ARGUMENTS
+  URL  The preview URL to remove.
+
+FLAGS
+  -c, --cwd=<value>       Project directory to operate on.
+  -e, --env=<value>       Environment to run against, e.g. production. Defaults
+                          to ZITADEL_ENV, then the hosting platform's build
+                          (VERCEL_ENV, or Netlify's CONTEXT), then development.
+  -f, --force             Remove the preview without the confirmation prompt.
+                          Required when non-interactive.
+  -n, --non-interactive   Disable prompts. Required when scripting or running as
+                          an agent.
+  -s, --server=<value>    Override the resolved server URL.
+  -v, --verbose           Verbose logging.
+      --[no-]color        Colorize human output. Disable with --no-color;
+                          NO_COLOR and FORCE_COLOR are honored too.
+      --debug             Debug logging.
+      --dry-run           Preview without mutating files or the platform.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the
+                          process environment. A relative path is read from the
+                          current directory, not from --cwd. Cannot be combined
+                          with --env.
+      --[no-]telemetry    Send anonymous usage analytics. Disable with
+                          --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Remove a live preview from the project.
+
+EXAMPLES
+  $ zitadel preview rm https://acme-git-sso-acmeinc.vercel.app
+
+  $ zitadel preview rm https://acme-git-sso-acmeinc.vercel.app --force
 ```
 
 ## `zitadel projects get ID`
@@ -2218,7 +2534,9 @@ FLAGS
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the
-                          process environment. Cannot be combined with --env.
+                          process environment. A relative path is read from the
+                          current directory, not from --cwd. Cannot be combined
+                          with --env.
       --fields=<value>    Fields to show, comma-separated dot-paths. Defaults to
                           the resource's own; `--json` is unaffected.
       --[no-]telemetry    Send anonymous usage analytics. Disable with
@@ -2263,7 +2581,9 @@ FLAGS
       --debug               Debug logging.
       --dry-run             Preview without mutating files or the platform.
       --env-file=<value>    Read ZITADEL_* values from this file ahead of the
-                            process environment. Cannot be combined with --env.
+                            process environment. A relative path is read from
+                            the current directory, not from --cwd. Cannot be
+                            combined with --env.
       --fields=<value>      Columns to show, comma-separated dot-paths (e.g.
                             id,attributes.email). Defaults to the resource's own
                             columns; `--json` is unaffected.
@@ -2327,7 +2647,9 @@ FLAGS
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the
-                          process environment. Cannot be combined with --env.
+                          process environment. A relative path is read from the
+                          current directory, not from --cwd. Cannot be combined
+                          with --env.
       --[no-]telemetry    Send anonymous usage analytics. Disable with
                           --no-telemetry.
 
@@ -2371,6 +2693,56 @@ EXAMPLES
   $ zitadel projects update <id> --file ./project.json
 ```
 
+## `zitadel pull [TARGET]`
+
+Rebuild your .zitadel/ files from a release.
+
+```
+USAGE
+  $ zitadel pull [TARGET] [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
+    <value>]
+
+ARGUMENTS
+  [TARGET]  [default: latest] What to pull: 'latest' (the live release), a
+            release id (rel_…), or a deployment id (dep_…).
+
+FLAGS
+  -c, --cwd=<value>       Project directory to operate on.
+  -e, --env=<value>       Environment to run against, e.g. production. Defaults
+                          to ZITADEL_ENV, then the hosting platform's build
+                          (VERCEL_ENV, or Netlify's CONTEXT), then development.
+  -n, --non-interactive   Disable prompts. Required when scripting or running as
+                          an agent.
+  -s, --server=<value>    Override the resolved server URL.
+  -v, --verbose           Verbose logging.
+      --[no-]color        Colorize human output. Disable with --no-color;
+                          NO_COLOR and FORCE_COLOR are honored too.
+      --debug             Debug logging.
+      --dry-run           Preview without mutating files or the platform.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the
+                          process environment. A relative path is read from the
+                          current directory, not from --cwd. Cannot be combined
+                          with --env.
+      --[no-]telemetry    Send anonymous usage analytics. Disable with
+                          --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Rebuild your .zitadel/ files from a release.
+
+  Writes .zitadel/ from the revisions a released snapshot pins.
+
+EXAMPLES
+  $ zitadel pull
+
+  $ zitadel pull rel_01KX3RG8A7F0N9WD3P2E4YM5C1
+
+  $ zitadel pull dep_01KX5N7C9D2E7F0N9WD3P2E4YM6
+```
+
 ## `zitadel release create`
 
 Build a release from .zitadel/ without deploying it.
@@ -2396,7 +2768,9 @@ FLAGS
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the
-                          process environment. Cannot be combined with --env.
+                          process environment. A relative path is read from the
+                          current directory, not from --cwd. Cannot be combined
+                          with --env.
       --[no-]telemetry    Send anonymous usage analytics. Disable with
                           --no-telemetry.
 
@@ -2439,7 +2813,9 @@ FLAGS
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the
-                          process environment. Cannot be combined with --env.
+                          process environment. A relative path is read from the
+                          current directory, not from --cwd. Cannot be combined
+                          with --env.
       --fields=<value>    Fields to show, comma-separated dot-paths. Defaults to
                           the resource's own; `--json` is unaffected.
       --[no-]telemetry    Send anonymous usage analytics. Disable with
@@ -2484,7 +2860,9 @@ FLAGS
       --debug               Debug logging.
       --dry-run             Preview without mutating files or the platform.
       --env-file=<value>    Read ZITADEL_* values from this file ahead of the
-                            process environment. Cannot be combined with --env.
+                            process environment. A relative path is read from
+                            the current directory, not from --cwd. Cannot be
+                            combined with --env.
       --fields=<value>      Columns to show, comma-separated dot-paths (e.g.
                             id,attributes.email). Defaults to the resource's own
                             columns; `--json` is unaffected.
@@ -2536,7 +2914,9 @@ FLAGS
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the
-                          process environment. Cannot be combined with --env.
+                          process environment. A relative path is read from the
+                          current directory, not from --cwd. Cannot be combined
+                          with --env.
       --[no-]telemetry    Send anonymous usage analytics. Disable with
                           --no-telemetry.
 
@@ -2585,7 +2965,7 @@ DESCRIPTION
 
 ## `zitadel resources`
 
-List the resources this CLI manages and what can be done to each.
+List the resources this CLI manages.
 
 ```
 USAGE
@@ -2611,7 +2991,9 @@ GLOBAL FLAGS
   --json  Format output as json.
 
 DESCRIPTION
-  List the resources this CLI manages and what can be done to each.
+  List the resources this CLI manages.
+
+  Shows what can be done to each.
 
 EXAMPLES
   $ zitadel resources
@@ -2623,7 +3005,7 @@ EXAMPLES
 
 ## `zitadel schemas get SCHEMA`
 
-Get one schema by id.
+Get one schema by object type (current revision) or revision id.
 
 ```
 USAGE
@@ -2648,7 +3030,9 @@ FLAGS
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the
-                          process environment. Cannot be combined with --env.
+                          process environment. A relative path is read from the
+                          current directory, not from --cwd. Cannot be combined
+                          with --env.
       --fields=<value>    Fields to show, comma-separated dot-paths. Defaults to
                           the resource's own; `--json` is unaffected.
       --[no-]telemetry    Send anonymous usage analytics. Disable with
@@ -2658,12 +3042,12 @@ GLOBAL FLAGS
   --json  Format output as json.
 
 DESCRIPTION
-  Get one schema by id.
+  Get one schema by object type (current revision) or revision id.
 
 EXAMPLES
-  $ zitadel schemas get <id>
+  $ zitadel schemas get <schema>
 
-  $ zitadel schemas get <id> --json
+  $ zitadel schemas get <schema> --json
 ```
 
 ## `zitadel schemas list`
@@ -2693,7 +3077,9 @@ FLAGS
       --debug               Debug logging.
       --dry-run             Preview without mutating files or the platform.
       --env-file=<value>    Read ZITADEL_* values from this file ahead of the
-                            process environment. Cannot be combined with --env.
+                            process environment. A relative path is read from
+                            the current directory, not from --cwd. Cannot be
+                            combined with --env.
       --fields=<value>      Columns to show, comma-separated dot-paths (e.g.
                             id,attributes.email). Defaults to the resource's own
                             columns; `--json` is unaffected.
@@ -2765,7 +3151,9 @@ FLAGS
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the
-                          process environment. Cannot be combined with --env.
+                          process environment. A relative path is read from the
+                          current directory, not from --cwd. Cannot be combined
+                          with --env.
       --fields=<value>    Fields to show, comma-separated dot-paths. Defaults to
                           the resource's own; `--json` is unaffected.
       --[no-]telemetry    Send anonymous usage analytics. Disable with
@@ -2826,8 +3214,9 @@ FLAGS
       Preview without mutating files or the platform.
 
   --env-file=<value>
-      Read ZITADEL_* values from this file ahead of the process environment.
-      Cannot be combined with --env.
+      Read ZITADEL_* values from this file ahead of the process environment. A
+      relative path is read from the current directory, not from --cwd. Cannot be
+      combined with --env.
 
   --fields=<value>
       Columns to show, comma-separated dot-paths (e.g. id,attributes.email).
@@ -2902,7 +3291,9 @@ FLAGS
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the
-                          process environment. Cannot be combined with --env.
+                          process environment. A relative path is read from the
+                          current directory, not from --cwd. Cannot be combined
+                          with --env.
       --[no-]telemetry    Send anonymous usage analytics. Disable with
                           --no-telemetry.
 
@@ -2918,7 +3309,7 @@ EXAMPLES
 
 ## `zitadel setup`
 
-Create a Zitadel project and scaffold local auth.
+Create a Zitadel project and scaffold local auth. An interactive setup ends with a note about the Zitadel agent skills, shown once per machine; set NO_SKILLS_PROMPT=1 to hide it.
 
 ```
 USAGE
@@ -2927,9 +3318,9 @@ USAGE
     next|nuxt|tanstack-start|react|vue|solid-start|solid|sveltekit|svelte|qwik-r
     outer|qwik|angular] [--renderer react] [--dev-port <value>] [--skip-install]
     [--preset password-first|passkey-first] [--use-case
-    minimal|consumer|business] [--sso google|custom] [--sso-client-id <value>]
-    [--sso-slug <value>] [--sso-display-name <value>] [--sso-issuer <value>]
-    [--sso-scopes <value>]
+    minimal|consumer|business] [--password-min-length <value>] [--sso
+    google|custom] [--sso-client-id <value>] [--sso-slug <value>]
+    [--sso-display-name <value>] [--sso-issuer <value>] [--sso-scopes <value>]
 
 FLAGS
   -c, --cwd=<value>
@@ -2968,6 +3359,11 @@ FLAGS
       Framework to target.
       <options: next|nuxt|tanstack-start|react|vue|solid-start|solid|sveltekit|sve
       lte|qwik-router|qwik|angular>
+
+  --password-min-length=<value>
+      Minimum password length for the project's password policy, for example 12; 0
+      sets none. Without it, setup sets 15, the NIST minimum for password-only
+      sign-in; change it in .zitadel/policies/ later.
 
   --preset=<option>
       Sign-in preset for the scaffolded schema and login flow (default:
@@ -3018,12 +3414,52 @@ GLOBAL FLAGS
   --json  Format output as json.
 
 DESCRIPTION
-  Create a Zitadel project and scaffold local auth.
+  Create a Zitadel project and scaffold local auth. An interactive setup ends
+  with a note about the Zitadel agent skills, shown once per machine; set
+  NO_SKILLS_PROMPT=1 to hide it.
 
 EXAMPLES
   $ zitadel setup --framework next
 
   $ zitadel setup --framework react --dev-port 3000
+```
+
+## `zitadel skills add`
+
+Add the Zitadel agent skills to this project.
+
+```
+USAGE
+  $ zitadel skills add [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry]
+
+FLAGS
+  -c, --cwd=<value>      Project directory to operate on.
+  -n, --non-interactive  Disable prompts. Required when scripting or running as
+                         an agent.
+  -s, --server=<value>   Override the resolved server URL.
+  -v, --verbose          Verbose logging.
+      --[no-]color       Colorize human output. Disable with --no-color;
+                         NO_COLOR and FORCE_COLOR are honored too.
+      --debug            Debug logging.
+      --dry-run          Preview without mutating files or the platform.
+      --[no-]telemetry   Send anonymous usage analytics. Disable with
+                         --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Add the Zitadel agent skills to this project.
+
+  Adds the skills of this CLI's version to .agents/skills, which most coding
+  agents read, and to .claude/skills for Claude Code. Run it again after
+  updating the CLI to replace them with the new version's.
+
+EXAMPLES
+  $ zitadel skills add
+
+  $ zitadel skills add --cwd my-app
 ```
 
 ## `zitadel start`
@@ -3085,7 +3521,9 @@ FLAGS
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the
-                          process environment. Cannot be combined with --env.
+                          process environment. A relative path is read from the
+                          current directory, not from --cwd. Cannot be combined
+                          with --env.
       --[no-]telemetry    Send anonymous usage analytics. Disable with
                           --no-telemetry.
 
@@ -3152,7 +3590,9 @@ FLAGS
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the
-                          process environment. Cannot be combined with --env.
+                          process environment. A relative path is read from the
+                          current directory, not from --cwd. Cannot be combined
+                          with --env.
       --[no-]telemetry    Send anonymous usage analytics. Disable with
                           --no-telemetry.
 
@@ -3212,7 +3652,9 @@ FLAGS
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the
-                          process environment. Cannot be combined with --env.
+                          process environment. A relative path is read from the
+                          current directory, not from --cwd. Cannot be combined
+                          with --env.
       --[no-]telemetry    Send anonymous usage analytics. Disable with
                           --no-telemetry.
 
@@ -3253,7 +3695,9 @@ FLAGS
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the
-                          process environment. Cannot be combined with --env.
+                          process environment. A relative path is read from the
+                          current directory, not from --cwd. Cannot be combined
+                          with --env.
       --fields=<value>    Fields to show, comma-separated dot-paths. Defaults to
                           the resource's own; `--json` is unaffected.
       --[no-]telemetry    Send anonymous usage analytics. Disable with
@@ -3314,8 +3758,9 @@ FLAGS
       Preview without mutating files or the platform.
 
   --env-file=<value>
-      Read ZITADEL_* values from this file ahead of the process environment.
-      Cannot be combined with --env.
+      Read ZITADEL_* values from this file ahead of the process environment. A
+      relative path is read from the current directory, not from --cwd. Cannot be
+      combined with --env.
 
   --fields=<value>
       Columns to show, comma-separated dot-paths (e.g. id,attributes.email).
@@ -3387,7 +3832,9 @@ FLAGS
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the
-                          process environment. Cannot be combined with --env.
+                          process environment. A relative path is read from the
+                          current directory, not from --cwd. Cannot be combined
+                          with --env.
       --[no-]telemetry    Send anonymous usage analytics. Disable with
                           --no-telemetry.
 
@@ -3475,7 +3922,9 @@ FLAGS
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the
-                          process environment. Cannot be combined with --env.
+                          process environment. A relative path is read from the
+                          current directory, not from --cwd. Cannot be combined
+                          with --env.
       --[no-]telemetry    Send anonymous usage analytics. Disable with
                           --no-telemetry.
 
@@ -3539,7 +3988,9 @@ FLAGS
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the
-                          process environment. Cannot be combined with --env.
+                          process environment. A relative path is read from the
+                          current directory, not from --cwd. Cannot be combined
+                          with --env.
       --[no-]telemetry    Send anonymous usage analytics. Disable with
                           --no-telemetry.
 
@@ -3580,7 +4031,9 @@ FLAGS
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the
-                          process environment. Cannot be combined with --env.
+                          process environment. A relative path is read from the
+                          current directory, not from --cwd. Cannot be combined
+                          with --env.
       --fields=<value>    Fields to show, comma-separated dot-paths. Defaults to
                           the resource's own; `--json` is unaffected.
       --[no-]telemetry    Send anonymous usage analytics. Disable with
@@ -3641,8 +4094,9 @@ FLAGS
       Preview without mutating files or the platform.
 
   --env-file=<value>
-      Read ZITADEL_* values from this file ahead of the process environment.
-      Cannot be combined with --env.
+      Read ZITADEL_* values from this file ahead of the process environment. A
+      relative path is read from the current directory, not from --cwd. Cannot be
+      combined with --env.
 
   --fields=<value>
       Columns to show, comma-separated dot-paths (e.g. id,attributes.email).
@@ -3654,10 +4108,11 @@ FLAGS
       qual|greater_than|greater_than_or_equal), id (equals|not_equals|contains|not
       _contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal),
       schema (equals|not_equals|contains|not_contains|less_than|less_than_or_equal
-      |greater_than|greater_than_or_equal), status (equals|not_equals|contains|not
-      _contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal),
-      team_id (equals|not_equals|contains|not_contains|less_than|less_than_or_equa
-      l|greater_than|greater_than_or_equal), lifecycle_owner_team_id
+      |greater_than|greater_than_or_equal), schema_object_type
+      (equals|not_equals|contains), status (equals|not_equals|contains|not_contain
+      s|less_than|less_than_or_equal|greater_than|greater_than_or_equal), team_id
+      (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greate
+      r_than|greater_than_or_equal), lifecycle_owner_team_id
       (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greate
       r_than|greater_than_or_equal).
 
@@ -3720,7 +4175,9 @@ FLAGS
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the
-                          process environment. Cannot be combined with --env.
+                          process environment. A relative path is read from the
+                          current directory, not from --cwd. Cannot be combined
+                          with --env.
       --[no-]telemetry    Send anonymous usage analytics. Disable with
                           --no-telemetry.
 
@@ -3778,7 +4235,9 @@ FLAGS
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the
-                          process environment. Cannot be combined with --env.
+                          process environment. A relative path is read from the
+                          current directory, not from --cwd. Cannot be combined
+                          with --env.
       --preview           Read the preview value instead of the primary one.
       --[no-]telemetry    Send anonymous usage analytics. Disable with
                           --no-telemetry.
@@ -3821,7 +4280,9 @@ FLAGS
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the
-                          process environment. Cannot be combined with --env.
+                          process environment. A relative path is read from the
+                          current directory, not from --cwd. Cannot be combined
+                          with --env.
       --plain             Tab-separated rows with no header, for piping. Implied
                           when stdout is not a terminal.
       --preview           List the preview values instead of the primary ones.
@@ -3866,7 +4327,9 @@ FLAGS
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the
-                          process environment. Cannot be combined with --env.
+                          process environment. A relative path is read from the
+                          current directory, not from --cwd. Cannot be combined
+                          with --env.
       --origin=<value>    The origin whose live deployment to read.
       --plain             Tab-separated rows with no header, for piping. Implied
                           when stdout is not a terminal.
@@ -3916,7 +4379,9 @@ FLAGS
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the
-                          process environment. Cannot be combined with --env.
+                          process environment. A relative path is read from the
+                          current directory, not from --cwd. Cannot be combined
+                          with --env.
       --preview           Remove the preview value alone, leaving the primary
                           one standing.
       --[no-]telemetry    Send anonymous usage analytics. Disable with
@@ -3966,7 +4431,9 @@ FLAGS
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the
-                          process environment. Cannot be combined with --env.
+                          process environment. A relative path is read from the
+                          current directory, not from --cwd. Cannot be combined
+                          with --env.
       --preview           Write the preview value alone, leaving the primary one
                           as it is.
       --secret            Store the value encrypted. It can be replaced later

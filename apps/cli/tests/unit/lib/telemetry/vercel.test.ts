@@ -15,7 +15,7 @@ const sink = {
 };
 
 describe("vercelEventBody", () => {
-  it("prefixes the name and keeps only listed primitive values", () => {
+  it("keeps the event's name and only listed primitive values", () => {
     const body = JSON.parse(
       vercelEventBody(
         "cli_command_completed",
@@ -36,7 +36,7 @@ describe("vercelEventBody", () => {
       sdkn: "zitadel-cli",
       sdkv: "",
       r: "",
-      en: "poc_cli_command_completed",
+      en: "cli_command_completed",
       ed: { command: "setup", status: "ok" },
     });
   });
@@ -48,6 +48,15 @@ describe("vercelEventBody", () => {
       vercelEventBody("e", properties, { endpoint: VERCEL_ENDPOINT, keys }, 0),
     );
     expect(Object.keys(body.ed)).toEqual(keys.slice(0, VERCEL_MAX_PROPERTIES));
+  });
+
+  it("gives a key that holds no value's place to the next one", () => {
+    const keys = Array.from({ length: VERCEL_MAX_PROPERTIES + 1 }, (_, i) => `k${i}`);
+    const properties = Object.fromEntries(keys.map((key) => [key, key === "k1" ? "" : 1]));
+    const body = JSON.parse(
+      vercelEventBody("e", properties, { endpoint: VERCEL_ENDPOINT, keys }, 0),
+    );
+    expect(Object.keys(body.ed)).toEqual(keys.filter((key) => key !== "k1"));
   });
 });
 
@@ -79,20 +88,23 @@ describe("resolveVercelEndpoint", () => {
 });
 
 describe("Telemetry's Vercel copy", () => {
-  const client = {
-    track: (_event: string, _properties: unknown, callback?: Callback) => callback?.(undefined),
-    people: { set: () => undefined, set_once: () => undefined },
-  } as unknown as MixpanelClient;
-
   function create(
     vercelKeys: readonly string[] | undefined,
     { flag, env = {} }: { flag?: boolean; env?: NodeJS.ProcessEnv } = {},
   ) {
     const posts: { url: string; body: string }[] = [];
+    const tracked: string[] = [];
     const fetchFn = (async (url: string, init?: RequestInit) => {
       posts.push({ url, body: String(init?.body) });
       return new Response("OK");
     }) as typeof fetch;
+    const client = {
+      track: (event: string, _properties: unknown, callback?: Callback) => {
+        tracked.push(event);
+        callback?.(undefined);
+      },
+      people: { set: () => undefined, set_once: () => undefined },
+    } as unknown as MixpanelClient;
     const telemetry = Telemetry.create({
       env,
       flag,
@@ -101,16 +113,27 @@ describe("Telemetry's Vercel copy", () => {
       loadIdentity: () => ({ distinctId: "did-1", isFirstRun: false }),
       fetch: fetchFn,
     });
-    return { telemetry, posts };
+    return { telemetry, posts, tracked };
   }
 
-  it("posts one copy per tracked event to the intake", async () => {
+  it("posts one copy per tracked event to the intake, under the event's name", async () => {
     const { telemetry, posts } = create(["command"]);
     telemetry.track("cli_command_started", { command: "doctor" });
     await telemetry.shutdown();
     expect(posts).toHaveLength(1);
     expect(posts[0]?.url).toBe(VERCEL_ENDPOINT);
-    expect(JSON.parse(posts[0]?.body ?? "{}").ed).toEqual({ command: "doctor" });
+    expect(JSON.parse(posts[0]?.body ?? "{}")).toMatchObject({
+      en: "cli_command_started",
+      ed: { command: "doctor" },
+    });
+  });
+
+  it("sends the copy, and Mixpanel nothing, without a Mixpanel token", async () => {
+    const { telemetry, posts, tracked } = create(["command"]);
+    telemetry.track("cli_command_started", { command: "doctor" });
+    await telemetry.shutdown();
+    expect(posts).toHaveLength(1);
+    expect(tracked).toEqual([]);
   });
 
   it("sends no copy without keys", async () => {
@@ -128,12 +151,17 @@ describe("Telemetry's Vercel copy", () => {
   });
 
   it("sends no copy on the development channel", async () => {
-    const { telemetry, posts } = create(["command"], {
-      env: { ZITADEL_TELEMETRY_ENV: "development" },
+    const { telemetry, posts, tracked } = create(["command"], {
+      env: { ZITADEL_TELEMETRY_ENV: "development", ZITADEL_TELEMETRY_TOKEN: "tok" },
     });
     telemetry.track("cli_command_started", { command: "doctor" });
     await telemetry.shutdown();
-    expect(telemetry.enabled).toBe(true);
+    expect(tracked).toEqual(["cli_command_started"]);
     expect(posts).toHaveLength(0);
+  });
+
+  it("is off on the development channel without a Mixpanel token", () => {
+    const { telemetry } = create(["command"], { env: { ZITADEL_TELEMETRY_ENV: "development" } });
+    expect(telemetry.enabled).toBe(false);
   });
 });

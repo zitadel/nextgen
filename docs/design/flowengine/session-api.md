@@ -20,7 +20,7 @@ POST /auth_attempts/{id}/handoff          →  mint handoff_token
 POST /sessions/exchange { handoff_token }  →  receive { session, session_token }
 
 GET    /sessions/{id}                     →  read state, factors, assurance_levels[] (operator)
-DELETE /sessions/me                       →  end-user logout (__nextgen_session cookie)
+DELETE /sessions/me                       →  end-user logout (__Host-zitadel_session cookie)
 DELETE /sessions/{id}                     →  operator revoke (session.delete scope, idempotent 204)
 ```
 
@@ -296,8 +296,8 @@ Custom levels appear in `assurance_levels[]` alongside default NIST levels when 
 
 ```
 POST   /sessions                     Create anonymous session shell (pre-auth)
-GET    /sessions/me                  Get the caller's session (__nextgen_session cookie)
-DELETE /sessions/me                  End-user logout (__nextgen_session cookie)
+GET    /sessions/me                  Get the caller's session (__Host-zitadel_session cookie)
+DELETE /sessions/me                  End-user logout (__Host-zitadel_session cookie)
 GET    /sessions/{id}                Get session state, factors, assurance_levels[] (operator, session.read)
 DELETE /sessions/{id}                Operator revoke (session.delete; idempotent — 204 even if already gone)
 POST   /sessions/query               Query sessions (operator; cursor-paginated, structured filters)

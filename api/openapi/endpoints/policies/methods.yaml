@@ -1,5 +1,6 @@
 get:
   operationId: listPolicies
+  x-zitadel-cli: policies list
   summary: List policies
   description: |
     Lists the project's policies, one per operation, each as its newest
@@ -22,7 +23,7 @@ get:
   security:
     - oauth2:
         - policy.read
-    - nextgenSession: []
+    - sessionCookie: []
   responses:
     '200':
       description: The policies were returned.

@@ -13,9 +13,10 @@ function ctx(overrides: Partial<StepContext>): StepContext {
     dryRun: false,
     json: true,
     color: false,
-    bundle: { schemas: [], flow_definitions: [], idps: [] },
+    bundle: { schemas: [], flow_definitions: [], idps: [], policies: [] },
     brandingSources: [],
     idpFiles: [],
+    policyFiles: [],
     suggest: (args) => `${args} --env staging` as SuggestedCommand,
     ...overrides,
   };
@@ -57,5 +58,27 @@ describe("runSteps", () => {
     await runSteps([writes, reads], ctx({ dryRun: true }));
 
     expect(runs).toEqual(["reads"]);
+  });
+
+  it("returns what the steps report, for the command's --json data", async () => {
+    const runs: string[] = [];
+    const diff = recordingStep("diff", runs, { run: async () => ({ diff: { files: [] } }) });
+    const silent = recordingStep("silent", runs);
+
+    const report = await runSteps([diff, silent], ctx({}));
+
+    expect(report).toEqual({ diff: { files: [] } });
+  });
+
+  it("leaves out what a skipped step would have reported", async () => {
+    const runs: string[] = [];
+    const skipped = recordingStep("writes", runs, {
+      writes: true,
+      run: async () => ({ release: "rel_1" }),
+    });
+
+    const report = await runSteps([skipped], ctx({ dryRun: true }));
+
+    expect(report).toEqual({});
   });
 });

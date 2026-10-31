@@ -5,7 +5,7 @@
       "root": ".",
       "framework": "go",
       "entrypoint": "apps/cloud/launcher/main.go",
-      "buildCommand": "sh apps/cloud/build.sh",
+      "buildCommand": "pnpm install --os=current --cpu=current --optimistic-repeat-install && node_modules/.bin/turbo run deploy --filter=@zitadel/cloud",
       "functions": {
         "apps/cloud/launcher/main.go": {
           "regions": ["fra1"]
@@ -16,9 +16,24 @@
       "root": "apps/console",
       "framework": "vite",
       "installCommand": "pnpm install --os=current --cpu=current --optimistic-repeat-install",
-      "buildCommand": "CONSOLE_BASE_PATH=/console/ CONSOLE_VERCEL_INSIGHTS=1 turbo run build",
-      "devCommand": "NODE_ENV=production CONSOLE_BASE_PATH=/console/ vite build --outDir node_modules/.cloud-dev && vite preview --outDir node_modules/.cloud-dev --base / --port $PORT --strictPort",
+      "buildCommand": "CONSOLE_BASE_PATH=/console/ CONSOLE_ADDON=../cloud-console turbo run build",
+      "devCommand": "NODE_ENV=production CONSOLE_BASE_PATH=/console/ CONSOLE_ADDON=../cloud-console vite build --outDir node_modules/.cloud-dev && vite preview --outDir node_modules/.cloud-dev --base / --port $PORT --strictPort",
       "outputDirectory": "../../internal/staticui/console/dist",
+      "headers": [
+        {
+          "source": "/(.*)",
+          "headers": [
+            {
+              "key": "Content-Security-Policy",
+              "value": "script-src 'self' 'sha256-O+s6aqJ2uLXTyNZuD6aYTuuuGWE894WpAzDIYTy4PBY=' https://vercel.live; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; report-uri /csp-report"
+            },
+            {
+              "key": "Content-Security-Policy-Report-Only",
+              "value": "default-src 'self'; script-src 'self' 'sha256-O+s6aqJ2uLXTyNZuD6aYTuuuGWE894WpAzDIYTy4PBY=' https://vercel.live; style-src 'self' 'unsafe-inline' https://vercel.live; img-src 'self' data: https: blob:; font-src 'self' https://vercel.live https://assets.vercel.com; connect-src 'self' https://vercel.live wss://ws-us3.pusher.com; frame-src https://vercel.live; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; report-uri /csp-report"
+            }
+          ]
+        }
+      ],
       "rewrites": [
         {
           "source": "/console/:path(.*)?",
@@ -34,20 +49,26 @@
       "root": "apps/docs",
       "framework": "nextjs",
       "installCommand": "pnpm install --os=current --cpu=current --optimistic-repeat-install",
-      "buildCommand": "turbo run build --filter=@zitadel/api --filter=@zitadel/api-mock --filter=@zitadel/components && pnpm run build"
+      "buildCommand": "turbo run build --filter=@zitadel/docs"
     },
     "website": {
       "root": "apps/website",
       "framework": "nextjs",
       "installCommand": "pnpm install --os=current --cpu=current --optimistic-repeat-install",
-      "buildCommand": "turbo run build --filter=@zitadel/components && pnpm run build"
+      "buildCommand": "turbo run build --filter=@zitadel/website"
+    },
+    "cloud-functions": {
+      "root": "apps/cloud-functions",
+      "framework": "nextjs",
+      "installCommand": "pnpm install --os=current --cpu=current --optimistic-repeat-install",
+      "buildCommand": "turbo run build --filter=@zitadel/cloud-functions"
     },
     "schemas": {
       "root": "apps/cloud",
-      "installCommand": "true",
-      "buildCommand": "node ../../scripts/render-builtin-schemas.mjs",
+      "installCommand": "pnpm install --os=current --cpu=current --optimistic-repeat-install",
+      "buildCommand": "turbo run schemas --filter=@zitadel/cloud",
       "devCommand": "node ../../scripts/render-builtin-schemas.mjs --serve",
-      "outputDirectory": "../../dist/cloud-schemas",
+      "outputDirectory": "dist/cloud-schemas",
       "headers": [
         {
           "source": "/schemas/v1/(.*)",
@@ -63,12 +84,39 @@
             {
               "key": "Access-Control-Allow-Origin",
               "value": "*"
+            },
+            {
+              "key": "Content-Security-Policy",
+              "value": "default-src 'none'; frame-ancestors 'none'"
             }
           ]
         }
       ]
     }
   },
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(), microphone=(), geolocation=()"
+        }
+      ]
+    }
+  ],
   "redirects": [
     {
       "source": "/console",
@@ -139,6 +187,12 @@
       }
     },
     {
+      "source": "/changelog/(.*)",
+      "destination": {
+        "service": "website"
+      }
+    },
+    {
       "source": "/_next/(.*)",
       "destination": {
         "service": "website"
@@ -163,10 +217,22 @@
       }
     },
     {
+      "source": "/cloud/(.*)",
+      "destination": {
+        "service": "cloud-functions"
+      }
+    },
+    {
       "source": "/(.*)",
       "destination": {
         "service": "server"
       }
+    }
+  ],
+  "crons": [
+    {
+      "path": "/cron/events-retention",
+      "schedule": "17 * * * *"
     }
   ],
   "regions": ["iad1", "sfo1", "fra1", "sin1", "hnd1"],

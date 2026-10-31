@@ -108,8 +108,8 @@ Canonical examples:
 | --- | --- |
 | Nav chrome | `Sidebar` (`collapsible="icon"`; mobile = persistent icon rail) |
 | Org/project picker | `Popover` + `Badge` |
-| Users filters | `Tabs` |
-| Users table | `Table`, `Avatar`, `Badge`, `DropdownMenu`, `Button` |
+| Users filters | `Select` (schema, then revision), in `ResourceTitle`'s `filter` slot |
+| Users table | `Table`, `Avatar`, `Badge`, `DropdownMenu`, `Button`; `HoverCard` (identity), `Popover` (attributes) |
 | Panel around a screen's content | `Card` |
 | Attribute chip / CLI command in prose | `InlineCode` |
 | Any searchable picker | `Combobox` (`src/components/ui/combobox.tsx`) |
@@ -120,10 +120,25 @@ Canonical examples:
 | Row actions menu | `RowMenu` (`src/components/resource-list.tsx`) |
 | Screen outside the app shell (sign-in, claim, server unavailable) | `StandaloneScreen` + `StandaloneMessage` (`src/components/standalone-screen.tsx`) |
 
-Shared text styles (`PAGE_TITLE`, `OVERLINE`, `EYEBROW`, the panel table cells)
-live in `src/components/typography.ts`. A mutation's pending and error state
-comes from `useSubmit` (`src/hooks/use-submit.ts`), and cursor paging from
-`useLoadMore` (`src/hooks/use-load-more.ts`) with the `LoadMore` button.
+Shared text styles (`PAGE_TITLE`, `SECTION_HEADING`, `SUBSECTION_HEADING`,
+`OVERLINE`, `EYEBROW`, the panel table cells) live in
+`src/components/typography.ts`.
+
+- `SECTION_HEADING`, 16/20 (Figma `zitadel/section-heading`): every primary card
+  and section title, the project page's Project Detail, Origins and Variables
+  and Secrets cards included. `DetailSection` renders it as an `h2`; so do
+  Field definitions, Steps, Release content and the settings sections.
+- `SUBSECTION_HEADING`, 14/20 (`zitadel/subsection-heading`): a subordinate heading
+  inside a card body, such as Sign-in methods on a schema.
+- The overline is for meta labels, table heads and drill-down breadcrumbs,
+  never a section title.
+
+The Figma style names are not the `heading-*` tokens in the exported
+`4. Custom` collection, which are the larger marketing headings.
+
+A mutation's pending and error state comes from `useSubmit`
+(`src/hooks/use-submit.ts`), and cursor paging from `useLoadMore`
+(`src/hooks/use-load-more.ts`) with the `LoadMore` button.
 
 ## Page wrapper — one top for every screen
 
@@ -140,8 +155,12 @@ own. Do not add a per-screen wrapper with its own padding.
 | Title row | 36px, title centred — `PAGE_TITLE_ROW` in `typography.ts`, used by lists, details, settings and System |
 | Fill | `fill`: at `lg`, exactly the height under the 56px top bar, as a column; the part that should take the rest uses `flex-1 min-h-0` (Branding's preview). Never a `100vh` offset |
 
-`inset="panel"` is for the configuration-panel screens (User schemas, Login
-flows, Identity providers), whose single card the design insets by 24px on the
+Projects, the home, has no sidebar (D24), so its content sits in `HomeColumn`
+inside `Page`: capped and centred, so the table does not stretch across the
+window.
+
+`inset="panel"` is for the configuration-panel screens (Login flows, Identity
+providers, Releases), whose single card the design insets by 24px on the
 sides. It changes the sides only, never the top.
 
 ## Resource list layout — one shell for every list screen
@@ -153,7 +172,9 @@ compose it rather than restating the numbers per screen.
 Every list screen is a table on this shell, User schemas and Login flows
 included (D17; the earlier card of rows broke on narrow widths). A screen
 composes `Page`, `ResourceTitle` (with the Add button as its `action`,
-beside the title at every width, D19), then `ResourceHeaderRow` +
+beside the title at every width, D19, and any list filter as its `filter`,
+beside the action on one 36px row and on its own row under the title on a
+phone), then `ResourceHeaderRow` +
 `ResourceHeadCell`, `ResourceRow`, `ResourceEmptyRow` and `LoadMore`. A
 fractional grid takes `RESOURCE_TABLE_FIXED`, which scrolls the table inside
 its card below 576px rather than squeezing the cells.
@@ -173,9 +194,12 @@ Two things are deliberately **not** shared, because the designs genuinely differ
 
 - **Column widths.** Teams sits on a fixed 248px grid. Users and Projects
   clamp their name cell and let their ID column (`ResourceIdCell`) absorb the
-  slack and truncate (D20, D21). The Users table is schema-driven, so it has
-  no fixed grid to share: the default schema fits 1024px, and a schema with
-  more columns scrolls.
+  slack and truncate (D20, D21). The Users table takes the properties a viewer
+  pins, so it has no fixed grid to share, and bounds its width (D23): the
+  unpinned attributes share one 280px Attributes column, so the default
+  columns fit 1024px. Pinning enough columns scrolls the table under its
+  sticky row-menu column, and from 640px its sticky User column
+  (`RESOURCE_STICKY_END` / `RESOURCE_STICKY_START` with `useScrollEdges`).
 - **The header block above the table.** Each frame places its own toolbar, so
   the table's top margin stays with the screen.
 
@@ -198,11 +222,16 @@ Detail screens come in three compositions, and each has one shell:
   `src/components/detail-page.tsx`, then put the body under `DETAIL_BODY`. A
   body card with a titled section is a `DetailSection`; a single name field with
   its Save button is a `RenameCard` (`src/components/rename-card.tsx`). A body
-  card the design titles by name rather than an eyebrow (Users: the profile,
+  card the design titles by name rather than a section title (Users: the profile,
   under its schema's name) leads with `PanelTitle as="h2"`; the header owns the
   `h1`.
-- **Configuration panel** (User schemas, Login flows): the whole screen is one
-  `DetailPanel` headed by a `PanelTitle` (both in
+- **Resource detail, identity-line header** (User schemas): the resource
+  detail body under `DetailTitle` (`src/components/detail-page.tsx`) instead of
+  `DetailHeader`: the title over one 12/16 line with the id, its copy button
+  and the created date, no icon tile and no header card. The line stacks under
+  `sm`. Each tab is a `DetailSection`.
+- **Configuration panel** (Login flows, Identity providers, Releases): the whole
+  screen is one `DetailPanel` headed by a `PanelTitle` (both in
   `src/components/detail-page.tsx`), inside `<Page inset="panel">`
   (`src/components/layout.tsx`).
 - **Settings** (Profile): a bare title over one card of labelled rows, in a
@@ -212,9 +241,10 @@ Detail screens come in three compositions, and each has one shell:
   holding `Field` rows: 24px inset, 20px block, 16px between rows. No icon tile
   and no header card: a settings screen is not a resource with an id.
 
-The first two share the icon tile (`ICON_PLATE`) and the header card
-(`MetaCard`, holding `MetaValue`s split by `MetaRule`): the resource id,
-copyable, and the created date.
+Resource detail and the configuration panel share the icon tile (`ICON_PLATE`)
+and the header card (`MetaCard`, holding `MetaValue`s split by `MetaRule`): the
+resource id, copyable, and the created date. The identity-line header carries
+the same two values in one line instead.
 
 | Region        | Value                                                 |
 | ------------- | ----------------------------------------------------- |

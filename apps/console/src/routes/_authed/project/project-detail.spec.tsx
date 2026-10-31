@@ -1,9 +1,11 @@
+import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { scopedPath } from "@/test/project-scope.fixture";
 import { server } from "@/test/msw";
+import { createAppRouter } from "../../../router";
 
 // The `_authed` layout guards every screen behind `GET /sessions/me`
 // (Console ADR 0003); mock the auth module so routes render as signed in.
@@ -15,13 +17,19 @@ vi.mock("@/auth/session", async (importOriginal) => {
 
 const PROJECT_ID = "proj_1";
 const PROJECT_URL = `http://localhost/api/projects/${PROJECT_ID}`;
-// The page also reads the project's grants for its admins section (#1238); an
-// empty list keeps these tests about the project itself. The person can act on
-// the project, so the context switcher names it from their list rather than by
-// its id while its own read is in flight.
+// The page also reads the project's admins and grants for its admins tab (#1238,
+// #1462), its variables and its password policy; empty answers keep these tests
+// about the project itself. The person can act on the project, so the context
+// switcher names it from their list rather than by its id while its own read is
+// in flight.
 beforeEach(() =>
   server.use(
+    http.get(`${PROJECT_URL}/admins`, () => HttpResponse.json({ admins: [] })),
     http.post("http://localhost/api/grants/query", () => HttpResponse.json({ grants: [] })),
+    http.get("http://localhost/api/variables", () => HttpResponse.json({})),
+    http.get("http://localhost/api/policies", () =>
+      HttpResponse.json({ policies: [], next_page_token: null }),
+    ),
     http.get("http://localhost/api/users/me/projects", () =>
       HttpResponse.json({ projects: [{ id: PROJECT_ID, name: "River" }] }),
     ),
@@ -32,6 +40,7 @@ function project(overrides: Record<string, unknown> = {}) {
   return {
     id: PROJECT_ID,
     name: "River",
+    origins: [],
     created_at: "2026-07-08T09:00:00Z",
     updated_at: "2026-07-08T09:00:00Z",
     ...overrides,
@@ -39,10 +48,6 @@ function project(overrides: Record<string, unknown> = {}) {
 }
 
 async function renderDetail(path = scopedPath("/project", PROJECT_ID)) {
-  const [{ RouterProvider, createMemoryHistory }, { createAppRouter }] = await Promise.all([
-    import("@tanstack/react-router"),
-    import("../../../router"),
-  ]);
   const router = createAppRouter({
     history: createMemoryHistory({ initialEntries: [path] }),
   });

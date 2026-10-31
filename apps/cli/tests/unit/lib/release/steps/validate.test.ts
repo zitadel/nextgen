@@ -34,11 +34,13 @@ function ctx(
     brandingSources = [],
     cwd = "/tmp",
     idpFiles = [],
+    policyFiles = [],
   }: {
     env?: StepContext["env"];
     brandingSources?: StepContext["brandingSources"];
     cwd?: string;
     idpFiles?: StepContext["idpFiles"];
+    policyFiles?: StepContext["policyFiles"];
   } = {},
 ): StepContext {
   return {
@@ -50,9 +52,10 @@ function ctx(
     dryRun: false,
     json: true,
     color: false,
-    bundle: { schemas: [], flow_definitions: [], idps: [], ...bundle },
+    bundle: { schemas: [], flow_definitions: [], idps: [], policies: [], ...bundle },
     brandingSources,
     idpFiles,
+    policyFiles,
     suggest: (args) => args as SuggestedCommand,
   };
 }
@@ -146,6 +149,41 @@ describe("validate step", () => {
       };
 
       await expect(validateStep.run(ctx(bundle))).resolves.toBeUndefined();
+    });
+  });
+
+  describe("a policy file", () => {
+    const policy = { operation: "auth.factor.password.set", config: { min_length: 12 } };
+
+    it("passes when it is valid and named after its operation", async () => {
+      await expect(
+        validateStep.run(
+          ctx({ policies: [policy] }, { policyFiles: ["auth.factor.password.set.json"] }),
+        ),
+      ).resolves.toBeUndefined();
+    });
+
+    it("is refused for an unknown setting or a value outside its bounds, naming the file", async () => {
+      const bad = { operation: "auth.factor.password.set", config: { min_length: 0, colour: 1 } };
+      await expect(
+        validateStep.run(
+          ctx({ policies: [bad] }, { policyFiles: ["auth.factor.password.set.json"] }),
+        ),
+      ).rejects.toMatchObject({
+        code: "E_VALIDATION",
+        message: expect.stringContaining(".zitadel/policies/auth.factor.password.set.json: config"),
+      });
+    });
+
+    it("is refused when it is not named after its operation", async () => {
+      await expect(
+        validateStep.run(ctx({ policies: [policy] }, { policyFiles: ["password.json"] })),
+      ).rejects.toMatchObject({
+        code: "E_VALIDATION",
+        message: expect.stringContaining(
+          ".zitadel/policies/password.json holds the auth.factor.password.set policy, so it must be named auth.factor.password.set.json",
+        ),
+      });
     });
   });
 

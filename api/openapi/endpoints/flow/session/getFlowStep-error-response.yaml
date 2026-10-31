@@ -29,6 +29,9 @@ content:
         - $ref: '../../../components/schemas/errors/internal.yaml'
         - $ref: '../../../components/schemas/errors/tkn-invalid.yaml'
         - $ref: '../../../components/schemas/errors/not_implemented.yaml'
+        - $ref: '../../../components/schemas/errors/proj-last_owner.yaml'
+        - $ref: '../../../components/schemas/errors/rel-not_found.yaml'
+        - $ref: '../../../components/schemas/errors/rel-revoked.yaml'
         - $ref: '../../../components/schemas/errors/req-invalid.yaml'
         - $ref: '../../../components/schemas/errors/enc_key-unknown_alg.yaml'
         - $ref: '../../../components/schemas/errors/unavailable.yaml'
@@ -67,6 +70,9 @@ content:
           internal: '../../../components/schemas/errors/internal.yaml'
           tkn.invalid: '../../../components/schemas/errors/tkn-invalid.yaml'
           not_implemented: '../../../components/schemas/errors/not_implemented.yaml'
+          proj.last_owner: '../../../components/schemas/errors/proj-last_owner.yaml'
+          rel.not_found: '../../../components/schemas/errors/rel-not_found.yaml'
+          rel.revoked: '../../../components/schemas/errors/rel-revoked.yaml'
           req.invalid: '../../../components/schemas/errors/req-invalid.yaml'
           enc_key.unknown_alg: '../../../components/schemas/errors/enc_key-unknown_alg.yaml'
           unavailable: '../../../components/schemas/errors/unavailable.yaml'
@@ -203,6 +209,21 @@ content:
         value:
           code: not_implemented
           message: 'This feature is not implemented yet.'
+      proj.last_owner:
+        summary: proj.last_owner
+        value:
+          code: proj.last_owner
+          message: 'This user is the last active member of the team that owns a project. Add another member to that team, then try again.'
+      rel.not_found:
+        summary: rel.not_found
+        value:
+          code: rel.not_found
+          message: 'release: not found'
+      rel.revoked:
+        summary: rel.revoked
+        value:
+          code: rel.revoked
+          message: 'the release this attempt runs on was revoked'
       req.invalid:
         summary: req.invalid
         value:

@@ -5,7 +5,7 @@ import { AuthMethodCommand, CommandGroups, type JsonEnvelope } from "../../../li
 /** `auth-method password disable` (ADR 070). */
 export default class AuthMethodPasswordDisable extends AuthMethodCommand {
   static override description = "Disable password sign-in for a user schema.";
-  static override group = CommandGroups.configuration;
+  static override group = CommandGroups.authentication;
   static override examples = [
     "<%= config.bin %> auth-method password disable",
     "<%= config.bin %> auth-method password disable --schema customers",

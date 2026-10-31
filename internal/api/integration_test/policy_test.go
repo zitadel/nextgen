@@ -380,3 +380,189 @@ func TestPasswordPolicyEnforced(t *testing.T) {
 		assert.Equal(t, "error.x-auth-methods#password_min_length", errVal)
 	})
 }
+
+// TestPasswordPolicyFollowsTheRelease runs register flows the way a browser on
+// the project's origin does, so each resolves the release deployed there, and
+// reads the minimum the password step shows, which comes from the same
+// resolver the gate uses.
+func TestPasswordPolicyFollowsTheRelease(t *testing.T) {
+	t.Parallel()
+
+	const origin = "https://policy.acme.test"
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+	_, err = harness.EnsureProjectService(t).AddOrigin(t.Context(), project.ID, domain.Origin{Pattern: origin, Kind: domain.OriginKindPrimary})
+	require.NoError(t, err)
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	harness.SetProjectSecretOnApiClient(t, client, project)
+
+	deploy := func(t *testing.T, policies ...api.PublishPolicyRequest) {
+		t.Helper()
+		built, err := client.BuildRelease(t.Context(), &api.BuildReleaseRequest{
+			Bundle: api.ConfigurationBundle{
+				FlowDefinitions: []api.FlowDefinition{passwordRegisterFlowDefinition("human-user")},
+				Policies:        policies,
+			},
+		}, api.BuildReleaseParams{ProjectID: api.ProjectID(project.ID)})
+		require.NoError(t, err)
+		var releaseID api.ReleaseID
+		switch r := built.(type) {
+		case *api.BuildReleaseCreated:
+			releaseID = r.ID
+		case *api.BuildReleaseOK:
+			releaseID = r.ID
+		default:
+			require.Fail(t, "build refused", helpers.MustMarshal(t, built))
+		}
+		resp, err := client.CreateDeployment(t.Context(), &api.CreateDeploymentRequest{
+			ReleaseID: api.NewOptReleaseID(releaseID),
+			Targets:   api.DeploymentTargetsRequest{"primary"},
+		}, api.CreateDeploymentParams{ProjectID: api.ProjectID(project.ID)})
+		require.NoError(t, err)
+		switch resp.(type) {
+		case *api.CreateDeploymentCreated, *api.CreateDeploymentOK:
+		default:
+			require.Fail(t, "deploy refused", helpers.MustMarshal(t, resp))
+		}
+	}
+	// shownMinimum opens a register flow from from ("" for none) and returns
+	// the minimum its password step shows, 0 without a policy.
+	shownMinimum := func(t *testing.T, from string) int {
+		t.Helper()
+		body, err := json.Marshal(map[string]string{"project_id": project.ID, "purpose": "register"})
+		require.NoError(t, err)
+		resp, raw := postFlow(t, "/flow", body, from, nil)
+		require.Equal(t, http.StatusCreated, resp.StatusCode, string(raw))
+		var opened api.FlowResponse
+		require.NoError(t, opened.UnmarshalJSON(raw), string(raw))
+		for _, field := range opened.Step.Fields {
+			if field.Name == "x-auth-methods#password" {
+				return field.Validation.Or(api.FieldValidation{}).MinLength.Or(0)
+			}
+		}
+		require.Fail(t, "no password field", string(raw))
+		return 0
+	}
+	minimum := func(n int) api.PublishPolicyRequest {
+		return passwordPolicyRequest(api.PasswordSetConfig{MinLength: api.NewOptInt(n)})
+	}
+
+	deploy(t, minimum(12))
+	assert.Equal(t, 12, shownMinimum(t, origin), "the deployed release's policy applies")
+
+	// Building without deploying, or publishing on the side, changes the
+	// newest revision but not what the deployed release serves.
+	_, err = client.BuildRelease(t.Context(), &api.BuildReleaseRequest{
+		Bundle: api.ConfigurationBundle{
+			FlowDefinitions: []api.FlowDefinition{passwordRegisterFlowDefinition("human-user")},
+			Policies:        []api.PublishPolicyRequest{minimum(16)},
+		},
+	}, api.BuildReleaseParams{ProjectID: api.ProjectID(project.ID)})
+	require.NoError(t, err)
+	passwordSetPolicy(t, publishPolicy(t, client, project.ID, api.PasswordSetConfig{MinLength: api.NewOptInt(20)}))
+	assert.Equal(t, 12, shownMinimum(t, origin), "a release that was only built does not apply")
+	assert.Equal(t, 20, shownMinimum(t, ""), "a request that resolves no release gets the newest revision")
+
+	deploy(t)
+	assert.Equal(t, 0, shownMinimum(t, origin), "a release without the policy means no policy, not the newest")
+
+	deploy(t, minimum(12))
+	assert.Equal(t, 12, shownMinimum(t, origin), "deploying it again brings it back")
+}
+
+func evaluatePasswordPolicy(t *testing.T, client *helpers.ApiClient, projectID string, config api.PasswordSetConfig, password string, facts api.OptPasswordSetEvaluateFacts) api.EvaluatePolicyRes {
+	t.Helper()
+	resp, err := client.EvaluatePolicy(t.Context(), api.NewPasswordSetEvaluateRequestEvaluatePolicyRequest(api.PasswordSetEvaluateRequest{
+		Operation: api.PasswordSetEvaluateRequestOperationAuthFactorPasswordSet,
+		Config:    config,
+		Input:     api.PasswordSetEvaluateInput{Password: password},
+		Facts:     facts,
+	}), api.EvaluatePolicyParams{ProjectID: api.ProjectID(projectID)})
+	require.NoError(t, err)
+	return resp
+}
+
+// TestEvaluatePolicy covers the dry run: it answers what a password set would,
+// in the live error's terms, and stores nothing (ADR 066, #1445).
+func TestEvaluatePolicy(t *testing.T) {
+	t.Parallel()
+
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	harness.SetProjectSecretOnApiClient(t, client, project)
+	config := api.PasswordSetConfig{MinLength: api.NewOptInt(12), HistoryDepth: api.NewOptInt(2)}
+
+	decision := func(t *testing.T, resp api.EvaluatePolicyRes) *api.EvaluatePolicyResponse {
+		t.Helper()
+		require.IsType(t, &api.EvaluatePolicyResponse{}, resp, helpers.MustMarshal(t, resp))
+		return resp.(*api.EvaluatePolicyResponse)
+	}
+
+	t.Run("allowed", func(t *testing.T) {
+		got := decision(t, evaluatePasswordPolicy(t, client, project.ID, config, "a-long-enough-one", api.OptPasswordSetEvaluateFacts{}))
+		assert.True(t, got.Allowed)
+		assert.False(t, got.Code.IsSet())
+		assert.False(t, got.Violations.IsSet())
+	})
+
+	t.Run("refused with the live code and violations", func(t *testing.T) {
+		got := decision(t, evaluatePasswordPolicy(t, client, project.ID, config, "short1", api.OptPasswordSetEvaluateFacts{}))
+		assert.False(t, got.Allowed)
+		assert.Equal(t, "user.password_policy_violation", got.Code.Or(""))
+		violations, ok := got.Violations.Get()
+		require.True(t, ok)
+		assert.JSONEq(t, `12`, string(violations["min_length"]))
+	})
+
+	t.Run("the stated history counts for a user's own set", func(t *testing.T) {
+		facts := api.NewOptPasswordSetEvaluateFacts(api.PasswordSetEvaluateFacts{HistoryMatches: []bool{false, true}})
+		got := decision(t, evaluatePasswordPolicy(t, client, project.ID, config, "a-long-enough-one", facts))
+		assert.False(t, got.Allowed)
+		violations, _ := got.Violations.Get()
+		assert.Contains(t, violations, "history_depth")
+	})
+
+	t.Run("an empty password answers the live guard", func(t *testing.T) {
+		got := decision(t, evaluatePasswordPolicy(t, client, project.ID, config, "", api.OptPasswordSetEvaluateFacts{}))
+		assert.False(t, got.Allowed)
+		assert.Equal(t, "user.password_empty", got.Code.Or(""))
+	})
+
+	t.Run("an invalid config is refused as a publish refuses it", func(t *testing.T) {
+		resp := evaluatePasswordPolicy(t, client, project.ID,
+			api.PasswordSetConfig{MinLength: api.NewOptInt(20), MaxLength: api.NewOptInt(10)}, "x", api.OptPasswordSetEvaluateFacts{})
+		require.IsType(t, &api.EvaluatePolicyErrorResponseStatusCode{}, resp, helpers.MustMarshal(t, resp))
+		denied := resp.(*api.EvaluatePolicyErrorResponseStatusCode)
+		assert.Equal(t, http.StatusBadRequest, denied.StatusCode)
+		assert.True(t, denied.Response.IsPolInvalid(), helpers.MustMarshal(t, resp))
+	})
+
+	t.Run("an oversized body is refused before evaluating", func(t *testing.T) {
+		for name, req := range map[string]api.PasswordSetEvaluateRequest{
+			"a password above 4096 characters": {Input: api.PasswordSetEvaluateInput{Password: strings.Repeat("a", 4097)}},
+			"more history than any depth reads": {
+				Input: api.PasswordSetEvaluateInput{Password: "x"},
+				Facts: api.NewOptPasswordSetEvaluateFacts(api.PasswordSetEvaluateFacts{HistoryMatches: make([]bool, 5)}),
+			},
+		} {
+			t.Run(name, func(t *testing.T) {
+				req.Operation = api.PasswordSetEvaluateRequestOperationAuthFactorPasswordSet
+				req.Config = config
+				_, err := client.EvaluatePolicy(t.Context(), api.NewPasswordSetEvaluateRequestEvaluatePolicyRequest(req), api.EvaluatePolicyParams{ProjectID: api.ProjectID(project.ID)})
+				// The generated client validates its own request, so the bound
+				// is part of the contract both sides read.
+				require.Error(t, err)
+			})
+		}
+	})
+
+	t.Run("nothing is stored", func(t *testing.T) {
+		resp, err := client.ListPolicies(t.Context(), api.ListPoliciesParams{ProjectID: api.ProjectID(project.ID)})
+		require.NoError(t, err)
+		require.IsType(t, &api.ListPoliciesResponse{}, resp, helpers.MustMarshal(t, resp))
+		assert.Empty(t, resp.(*api.ListPoliciesResponse).Policies)
+	})
+}

@@ -17,7 +17,7 @@ import (
 )
 
 // TestGetMySession_Identity drives the HTTP path a signed-in app takes after
-// login: exchange a handoff token for the __nextgen_session cookie, then read
+// login: exchange a handoff token for the session cookie, then read
 // GET /sessions/me and assert the session identity payload carries the user's
 // resolved reference, derived from the schema's x-identifier/x-display
 // designations (ADR 058).
@@ -106,11 +106,11 @@ func TestGetMySession_Identity(t *testing.T) {
 
 	var sessionCookie *http.Cookie
 	for _, cookie := range exchangeResp.Cookies() {
-		if cookie.Name == "__nextgen_session" {
+		if cookie.Name == "__Host-zitadel_session" {
 			sessionCookie = cookie
 		}
 	}
-	require.NotNil(t, sessionCookie, "exchange must set the __nextgen_session cookie")
+	require.NotNil(t, sessionCookie, "exchange must set the __Host-zitadel_session cookie")
 
 	meReq, err := http.NewRequestWithContext(t.Context(), http.MethodGet, testServer.URL+"/sessions/me", nil)
 	require.NoError(t, err)
@@ -188,11 +188,11 @@ func TestGetMySession_ExpiredSessionIsSignedOut(t *testing.T) {
 
 	var sessionCookie *http.Cookie
 	for _, cookie := range exchangeResp.Cookies() {
-		if cookie.Name == "__nextgen_session" {
+		if cookie.Name == "__Host-zitadel_session" {
 			sessionCookie = cookie
 		}
 	}
-	require.NotNil(t, sessionCookie, "exchange must set the __nextgen_session cookie")
+	require.NotNil(t, sessionCookie, "exchange must set the __Host-zitadel_session cookie")
 
 	meReq, err := http.NewRequestWithContext(t.Context(), http.MethodGet, testServer.URL+"/sessions/me", nil)
 	require.NoError(t, err)
@@ -261,11 +261,11 @@ func TestMySession_HoldsTheSessionToTheNamedProject(t *testing.T) {
 
 	var sessionCookie *http.Cookie
 	for _, cookie := range exchangeResp.Cookies() {
-		if cookie.Name == "__nextgen_session" {
+		if cookie.Name == "__Host-zitadel_session" {
 			sessionCookie = cookie
 		}
 	}
-	require.NotNil(t, sessionCookie, "exchange must set the __nextgen_session cookie")
+	require.NotNil(t, sessionCookie, "exchange must set the __Host-zitadel_session cookie")
 
 	call := func(method, path, projectID string) *http.Response {
 		t.Helper()
@@ -327,7 +327,7 @@ func TestMySession_HoldsTheSessionToTheNamedProject(t *testing.T) {
 	require.Equal(t, http.StatusNoContent, signedOut.StatusCode)
 	var cleared bool
 	for _, cookie := range signedOut.Cookies() {
-		if cookie.Name == "__nextgen_session" && cookie.MaxAge < 0 {
+		if cookie.Name == "__Host-zitadel_session" && cookie.MaxAge < 0 {
 			cleared = true
 		}
 	}

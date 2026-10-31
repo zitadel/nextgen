@@ -2,7 +2,12 @@ import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
-import { connectZitadel, SESSION_COOKIE_NAME, sessionCookieName } from "../../src/index";
+import {
+  browserSessionCookieName,
+  connectZitadel,
+  SESSION_COOKIE_NAME,
+  sessionCookieName,
+} from "../../src/index";
 import type { InstanceHandle } from "../../src/types";
 
 const BASE = "http://zitadel-testing.invalid";
@@ -122,7 +127,7 @@ describe("seedSession", () => {
     expect(session.sessionToken).toBe("session-token-1");
     expect(session.expiresAt).toBe("2027-01-01T00:00:00Z");
     expect(session.cookie).toEqual({
-      name: "__nextgen_session",
+      name: "__Host-zitadel_session",
       value: "session-token-1",
       httpOnly: true,
       secure: true,
@@ -195,19 +200,37 @@ describe("seedSession", () => {
 });
 
 describe("session cookie names", () => {
-  // A direct call to the server uses the server's name, and so does an SPA
-  // whose dev proxy knows no project.
+  // A direct call to the server sends the canonical name over any transport.
   it("names the server's session cookie", () => {
-    expect(SESSION_COOKIE_NAME).toBe("__nextgen_session");
+    expect(SESSION_COOKIE_NAME).toBe("__Host-zitadel_session");
+  });
+
+  // The server leaves Secure, and with it the prefix, out over plain http to a
+  // loopback host, for Safari (ADR 083).
+  it.each([
+    [undefined, "zitadel_session"],
+    ["http://localhost:3000", "zitadel_session"],
+    ["http://127.0.0.1:3000/", "zitadel_session"],
+    ["http://[::1]:3000", "zitadel_session"],
+    ["https://localhost:3000", "__Host-zitadel_session"],
+    ["https://app.example.com", "__Host-zitadel_session"],
+    ["http://app.example.com", "__Host-zitadel_session"],
+  ])("names the server's session cookie as a browser at %s holds it", (url, name) => {
+    expect(browserSessionCookieName(url)).toBe(name);
   });
 
   // A server SDK keeps the session under its project's name (ADR 073), as
   // `sessionCookieName` in @zitadel/sdk-core spells it.
   it.each([
-    ["proj_01K7ZD3E", "__nextgen_session_proj_01K7ZD3E"],
-    ["proj_3f2b6c1e-8a4d", "__nextgen_session_proj_3f2b6c1e-8a4d"],
-    ["a b;c=ü", "__nextgen_session_a%20b%3Bc%3D%C3%BC"],
-  ])("names a server-SDK app's session cookie after its project %s", (projectId, name) => {
-    expect(sessionCookieName(projectId)).toBe(name);
-  });
+    ["proj_01K7ZD3E", undefined, "zitadel_session_proj_01K7ZD3E"],
+    ["proj_01K7ZD3E", "http://localhost:3000", "zitadel_session_proj_01K7ZD3E"],
+    ["proj_01K7ZD3E", "https://app.example.com", "__Host-zitadel_session_proj_01K7ZD3E"],
+    ["proj_3f2b6c1e-8a4d", "https://app.example.com", "__Host-zitadel_session_proj_3f2b6c1e-8a4d"],
+    ["a b;c=ü", undefined, "zitadel_session_a%20b%3Bc%3D%C3%BC"],
+  ])(
+    "names a server-SDK app's session cookie after its project %s at %s",
+    (projectId, url, name) => {
+      expect(sessionCookieName(projectId, url)).toBe(name);
+    },
+  );
 });

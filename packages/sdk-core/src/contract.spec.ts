@@ -467,6 +467,38 @@ describe("standard-attribute tests ↔ SDK specs", () => {
 });
 
 /**
+ * A published package's declaration map names its `../src` files, so it only
+ * resolves when the package publishes `src` as well; otherwise it is a file in
+ * every tarball that points at nothing.
+ */
+describe("published packages ↔ declaration maps", () => {
+  const packagesDir = `${resolve(process.cwd(), "..")}/`;
+  const published = readdirSync(packagesDir).filter((dir) => {
+    const path = `${packagesDir}${dir}/package.json`;
+    return (
+      existsSync(path) &&
+      (JSON.parse(readFileSync(path, "utf8")) as { private?: boolean }).private !== true
+    );
+  });
+
+  it("covers the published packages", () => {
+    expect(published).toEqual(expect.arrayContaining(["api", "components", "sdk-core"]));
+  });
+
+  it.each(published)("%s emits declaration maps only beside its sources", (dir) => {
+    const { files = [] } = JSON.parse(
+      readFileSync(`${packagesDir}${dir}/package.json`, "utf8"),
+    ) as {
+      files?: string[];
+    };
+    const tsconfig = `${packagesDir}${dir}/tsconfig.lib.json`;
+    const maps =
+      existsSync(tsconfig) && /"declarationMap"\s*:\s*true/.test(readFileSync(tsconfig, "utf8"));
+    expect(maps && !files.some((file) => file === "src" || file.startsWith("src/"))).toBe(false);
+  });
+});
+
+/**
  * Apps go through their SDK. Each SDK that renders the widgets lists
  * `@zitadel/components` as its own dependency, so the elements load from the SDK
  * and the app never installs or imports `components` by name; no SDK's docs tell
@@ -828,7 +860,7 @@ const edgeConfigProblems = (source: string): string[] => {
   const found: string[] = [];
   if (
     !lines.some((line) =>
-      /^import \{[^}]*\bedgeProject\b[^}]*\} from "\.\.\/\.\.\/vitest\.shared\.mjs";$/.test(line),
+      /^import \{[^}]*\bedgeProject\b[^}]*\} from "@zitadel\/vitest-config";$/.test(line),
     )
   ) {
     found.push("does not import edgeProject from the shared module");
@@ -904,7 +936,7 @@ describe("client SDK edge specs", () => {
   });
 
   describe("the config guard", () => {
-    const good = `import { baseTest, edgeProject } from "../../vitest.shared.mjs";\n${EDGE_COMMENT}\n      edgeProject({}),\n`;
+    const good = `import { baseTest, edgeProject } from "@zitadel/vitest-config";\n${EDGE_COMMENT}\n      edgeProject({}),\n`;
 
     it("accepts the shared import and comment", () => {
       expect(edgeConfigProblems(good)).toEqual([]);
@@ -1003,12 +1035,15 @@ describe("server SDK test titles", () => {
     "forwards upstream Set-Cookie headers",
     "passes cookies through to the backend when no project is configured",
     "names a proxied session cookie for this app's project",
+    "names a proxied session cookie for this app's project over https",
     "sends this project's session cookie upstream under the server's name",
     "keeps other projects' session cookies from the backend",
+    "drops the Set-Cookie of a session cookie from before ADR 083",
     "sends the shared session cookie only to this project's session probe",
     "copies this project's session out of the shared cookie on the session probe",
     "ends and clears a session of this project kept under the shared name on sign-out",
     "leaves the Console's session of another project under the shared name on sign-out",
+    "ends this app's session over https on sign-out",
     "forwards an upstream Location %s onto this app as %s",
     "keeps a caller-supplied credential on the handoff exchange",
     "appends the client IP to an existing X-Forwarded-For chain",
@@ -1027,7 +1062,7 @@ describe("server SDK test titles", () => {
     "keeps an anonymous session's cookie, since its sign-in may still complete",
     "treats a 200 session without a user as anonymous on a public route",
     "redirects a session whose answer has a null user id to login on a protected route",
-    "clears a dead session cookie on a public page",
+    "reads a dead session cookie as signed out on a public page",
     "clears a dead session cookie and redirects on a protected route",
     "clears the cookie of a session that is gone",
     "when the session check gets %s",
@@ -1038,6 +1073,8 @@ describe("server SDK test titles", () => {
     "keeps the cookie of another project's session",
     "reads the session from this project's cookie before the shared one",
     "ignores the session cookie of another project's app",
+    "reads no session from a cookie from before ADR 083",
+    "reads no unprefixed session cookie over https",
     "copies this project's session out of the shared cookie",
     "keeps a page that sets a session cookie out of shared caches",
     "copies with Secure behind a TLS proxy that talks to the app over loopback",

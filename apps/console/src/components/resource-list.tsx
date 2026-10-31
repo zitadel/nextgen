@@ -34,7 +34,8 @@ import { PAGE_TITLE, PAGE_TITLE_ROW } from "./typography";
  *
  * Column widths stay with each screen: Teams is a fixed 248px grid, while the
  * Users and Projects tables let their ID column take the slack
- * (`ResourceIdCell`); Users is schema-driven, so it has no fixed grid to share.
+ * (`ResourceIdCell`); Users takes the properties a viewer pins, so it has no
+ * fixed grid to share.
  */
 
 /**
@@ -58,14 +59,33 @@ export const RESOURCE_TITLE = PAGE_TITLE;
 
 /**
  * The title row of a list screen: the heading with, where the screen has one,
- * its primary action beside it at every width (D19). 36px tall with or without
- * the button (`PAGE_TITLE_ROW`).
+ * its primary action beside it at every width (D19), and any filter beside
+ * that. 36px tall (`PAGE_TITLE_ROW`), except on a phone with a filter, where
+ * the filter takes a second row under the title.
  */
-export function ResourceTitle({ children, action }: { children: ReactNode; action?: ReactNode }) {
+export function ResourceTitle({
+  children,
+  action,
+  filter,
+}: {
+  children: ReactNode;
+  action?: ReactNode;
+  /**
+   * Controls that narrow the list, beside the action and 8px from it. On a
+   * phone they drop to their own row under the title while the action keeps
+   * the title row (D19).
+   */
+  filter?: ReactNode;
+}) {
   return (
-    <div className={cn(RESOURCE_HEADER, PAGE_TITLE_ROW)}>
+    <div className={cn(RESOURCE_HEADER, PAGE_TITLE_ROW, "flex-wrap gap-x-2 gap-y-4")}>
       <h1 className={RESOURCE_TITLE}>{children}</h1>
-      {action}
+      {filter && (
+        <div className="order-3 flex basis-full items-center gap-2 sm:order-2 sm:ml-auto sm:basis-auto">
+          {filter}
+        </div>
+      )}
+      <div className="order-2 ml-auto sm:order-3 sm:ml-0">{action}</div>
     </div>
   );
 }
@@ -73,6 +93,42 @@ export function ResourceTitle({ children, action }: { children: ReactNode; actio
 /** The card the table sits on. */
 export const RESOURCE_TABLE_WRAP =
   "border-sidebar-border bg-card overflow-x-auto rounded-md border";
+
+/**
+ * The card of a table whose leading and trailing columns stay put while the
+ * rest scrolls under them. It is the `scroll` group the sticky cells read
+ * `data-scroll-start` / `data-scroll-end` from (`useScrollEdges`).
+ */
+export const RESOURCE_TABLE_SCROLL = "group/scroll";
+
+/**
+ * The leading column, pinned to the card's left edge from 640px. Its 1px
+ * divider shows only while a column is scrolled under it.
+ *
+ * Below 640px it scrolls with the rest: a phone's card is about 300px wide,
+ * and a pinned identity column (up to 280px) beside the pinned menu would
+ * leave no room for any column between them.
+ */
+export const RESOURCE_STICKY_START =
+  "sm:sticky sm:left-0 sm:z-10 bg-card sm:group-data-[scroll-start]/scroll:shadow-[inset_-1px_0_0_var(--color-border)]";
+
+/**
+ * The trailing column (the row menu), pinned to the card's right edge so the
+ * menu is reachable at any width. Its divider shows while columns run on
+ * under it.
+ */
+export const RESOURCE_STICKY_END =
+  "sticky right-0 z-10 bg-card group-data-[scroll-end]/scroll:shadow-[inset_1px_0_0_var(--color-border)]";
+
+/**
+ * A body cell of a sticky column. It must be opaque, or the scrolled cells
+ * show through it, so the row's translucent hover and open-menu fills
+ * (`ResourceRow`, `TableRow`) are mixed onto the card colour here rather than
+ * layered over it. The row needs the `group` class. It fades with the row's
+ * own `transition-colors`, or it would snap while the rest of the row fades.
+ */
+export const RESOURCE_STICKY_BODY =
+  "transition-colors bg-card group-hover:bg-[color-mix(in_oklab,var(--color-muted)_40%,var(--color-card))] group-has-aria-expanded:bg-[color-mix(in_oklab,var(--color-muted)_50%,var(--color-card))]";
 
 /** One body cell: 56px tall, inset 24px. */
 export const RESOURCE_CELL = "h-14 px-6 py-2";
@@ -202,6 +258,7 @@ export function ResourceEmptyRow({ colSpan, children }: { colSpan: number; child
 export function RowMenu({
   name,
   icon: Icon = Ellipsis,
+  size = "icon",
   className,
   contentClassName = "w-40",
   children,
@@ -209,6 +266,8 @@ export function RowMenu({
   /** The row's name, for the trigger's accessible name. */
   name: string;
   icon?: LucideIcon;
+  /** `icon-xs`: the 24px trigger a detail card's rows draw. */
+  size?: "icon" | "icon-xs";
   className?: string;
   contentClassName?: string;
   children: ReactNode;
@@ -218,7 +277,7 @@ export function RowMenu({
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
-          size="icon"
+          size={size}
           aria-label={`Actions for ${name}`}
           className={className}
         >

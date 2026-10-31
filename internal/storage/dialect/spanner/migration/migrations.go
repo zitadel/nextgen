@@ -81,17 +81,7 @@ func Migrate(ctx context.Context, db *sql.DB) (err error) {
 		err = errors.Join(err, releaseLease(ctx, db, holder))
 	}()
 
-	sqlFS, err := fs.Sub(sqlFiles, "sql")
-	if err != nil {
-		return err
-	}
-	// batchDDLFS brackets each run of consecutive DDL with START BATCH DDL /
-	// RUN BATCH, so those statements reach Spanner as one UpdateDatabaseDdl
-	// instead of one per statement (#973). goose just executes what it reads.
-	// See ddl_batch.go.
-	//
-	// WithIsolateDDL runs DDL statements outside transactions, which Spanner requires.
-	p, err := goose.NewProvider(goose.DialectSpanner, db, batchDDLFS{inner: sqlFS}, goose.WithIsolateDDL(true))
+	p, err := newProvider(db)
 	if err != nil {
 		return err
 	}
@@ -100,6 +90,22 @@ func Migrate(ctx context.Context, db *sql.DB) (err error) {
 		return errors.Join(upErr, fmt.Errorf("migration fenced off: %w", cause))
 	}
 	return upErr
+}
+
+// newProvider builds the goose provider over the embedded migrations. Shared
+// with the round-trip test, which walks the Down direction too.
+func newProvider(db *sql.DB) (*goose.Provider, error) {
+	sqlFS, err := fs.Sub(sqlFiles, "sql")
+	if err != nil {
+		return nil, err
+	}
+	// batchDDLFS brackets each run of consecutive DDL with START BATCH DDL /
+	// RUN BATCH, so those statements reach Spanner as one UpdateDatabaseDdl
+	// instead of one per statement (#973). goose just executes what it reads.
+	// See ddl_batch.go.
+	//
+	// WithIsolateDDL runs DDL statements outside transactions, which Spanner requires.
+	return goose.NewProvider(goose.DialectSpanner, db, batchDDLFS{inner: sqlFS}, goose.WithIsolateDDL(true))
 }
 
 // renewLease periodically re-stamps acquired_at for holder until ctx ends. If

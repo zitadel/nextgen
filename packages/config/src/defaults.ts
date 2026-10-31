@@ -17,7 +17,12 @@ import passkeyFirstLoginFlowTemplate from "../defaults/presets/passkey-first/log
   type: "json",
 };
 
-export { brandingReadmeContent, flowsReadmeContent, schemasReadmeContent } from "./readmes.js";
+export {
+  brandingReadmeContent,
+  flowsReadmeContent,
+  policiesReadmeContent,
+  schemasReadmeContent,
+} from "./readmes.js";
 
 export const DEFAULT_BUILTIN_SCHEMA_BASE = "https://zitadel.com/schemas/v1";
 export const DEFAULT_FLOW_SCHEMA_URI = `${DEFAULT_BUILTIN_SCHEMA_BASE}/flow-definition.json`;
@@ -220,20 +225,35 @@ function fieldBody(
 }
 
 /**
+ * The fields a user's display name is made of, in order. A schema designates
+ * those its use case collects as `x-display`, so a session names the user
+ * ("Ada Lovelace") rather than leaving the app only their email.
+ */
+const DISPLAY_FIELDS = ["givenName", "familyName"];
+
+/**
  * Narrow a rendered schema to the chosen use case: keep the preset-owned
  * header and `x-auth-methods`, but replace `properties`/`required` with the
- * use case's field set. `email` is the sole required property.
+ * use case's field set, and designate its name fields as `x-display`. `email`
+ * is the sole required property.
  */
 function applyUseCaseToSchema(
   schema: Record<string, unknown>,
   useCase: string,
 ): Record<string, unknown> {
   const templateProps = (schema.properties ?? {}) as Record<string, Record<string, unknown>>;
+  const fields = useCaseFields(useCase);
   const properties: Record<string, unknown> = {};
-  for (const field of useCaseFields(useCase)) {
+  for (const field of fields) {
     properties[field] = fieldBody(field, templateProps);
   }
-  return { ...schema, required: ["email"], properties };
+  const display = DISPLAY_FIELDS.filter((field) => fields.includes(field));
+  return {
+    ...schema,
+    required: ["email"],
+    properties,
+    ...(display.length > 0 ? { "x-display": display } : {}),
+  };
 }
 
 /**

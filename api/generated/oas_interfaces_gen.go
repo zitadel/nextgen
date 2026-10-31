@@ -149,6 +149,10 @@ type DeploymentCreatedRes interface {
 	deploymentCreatedRes()
 }
 
+type EvaluatePolicyRes interface {
+	evaluatePolicyRes()
+}
+
 type ExchangeHandoffRes interface {
 	exchangeHandoffRes()
 }
@@ -357,6 +361,10 @@ type ListPreviewsRes interface {
 	listPreviewsRes()
 }
 
+type ListProjectAdminsRes interface {
+	listProjectAdminsRes()
+}
+
 type ListReleasesRes interface {
 	listReleasesRes()
 }
@@ -403,6 +411,10 @@ type PolicyCreatedRes interface {
 
 type PolicyUpdatedRes interface {
 	policyUpdatedRes()
+}
+
+type PreviewRemovedRes interface {
+	previewRemovedRes()
 }
 
 type ProjectCreatedRes interface {

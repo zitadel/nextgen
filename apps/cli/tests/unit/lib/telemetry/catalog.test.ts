@@ -11,10 +11,11 @@ import {
   CLI_COMMAND_STARTED,
   commandEventProperties,
   deviceProfileProperties,
-  VERCEL_EVENT_KEYS,
+  VERCEL_COMMAND_DIMENSIONS,
+  vercelEventKeys,
 } from "../../../../src/lib/oclif/command-telemetry";
 import type { GlobalOptions } from "../../../../src/lib/oclif/types";
-import { VERCEL_EVENT_PREFIX, VERCEL_MAX_PROPERTIES } from "../../../../src/lib/telemetry/vercel";
+import { VERCEL_MAX_PROPERTIES } from "../../../../src/lib/telemetry/vercel";
 
 /**
  * `docs/product-analytics-events.yaml` is the contract for what the CLI may
@@ -49,7 +50,7 @@ type Component = {
   source: string;
   automatic?: string[];
   context?: string[];
-  vercel?: { prefix: string; properties?: string[] };
+  vercel?: { properties?: string[]; dimensions?: Record<string, string> };
   events: Record<string, EventDef>;
   dimensions?: Record<string, string[]>;
   profile?: { trigger: string; destinations: string[]; properties: string[] };
@@ -64,6 +65,9 @@ type Catalog = {
 async function loadCatalog(): Promise<Catalog> {
   return parse(await readFile(catalogPath, "utf8")) as Catalog;
 }
+
+/** Stands for a command's own dimension among the properties a Vercel copy keeps. */
+const DIMENSION = "<dimension>";
 
 /** The header `component` sends: `<surface>` stands for the component. */
 function headerOf(catalog: Catalog, component: string): string[] {
@@ -268,26 +272,25 @@ describe("product analytics catalog", () => {
     }
   });
 
-  it("names Vercel copies with a prefix and keeps the header within Vercel's limit", async () => {
+  it("keeps the header of every Vercel copy within Vercel's limit", async () => {
     const catalog = await loadCatalog();
     for (const [component, { events, vercel }] of Object.entries(catalog.components)) {
       const copied = Object.entries(events).filter(([, event]) =>
         event.destinations.includes("vercel"),
       );
-      if (copied.length === 0) {
-        continue;
-      }
-      expect(vercel?.prefix, `${component} sends to Vercel without a prefix`).toBeTruthy();
       for (const [name, event] of copied) {
         const kept = vercel?.properties ?? eventProperties(catalog, component, event);
-        expect(kept.length, `${component}.${name}'s Vercel copy`).toBeLessThanOrEqual(
-          VERCEL_MAX_PROPERTIES,
-        );
-        expect(kept, `${component}.${name}'s Vercel copy drops the header`).toEqual(
-          expect.arrayContaining(headerOf(catalog, component)),
-        );
+        // Only a command's own dimension may push a listed property out.
+        expect(
+          kept.filter((key) => key !== DIMENSION).length,
+          `${component}.${name}'s Vercel copy`,
+        ).toBeLessThanOrEqual(VERCEL_MAX_PROPERTIES);
+        expect(
+          kept.slice(0, VERCEL_MAX_PROPERTIES),
+          `${component}.${name}'s Vercel copy drops the header`,
+        ).toEqual(expect.arrayContaining(headerOf(catalog, component)));
       }
-      for (const key of vercel?.properties ?? []) {
+      for (const key of (vercel?.properties ?? []).filter((key) => key !== DIMENSION)) {
         expect(
           copied.some(([, event]) => eventProperties(catalog, component, event).includes(key)),
           `${component}'s Vercel copy keeps ${key}, which none of its events carry`,
@@ -364,8 +367,28 @@ describe("CLI telemetry against the catalog", () => {
     for (const [, event] of LIFECYCLE_EVENTS) {
       expect(events[event]?.destinations, event).toContain("vercel");
     }
-    expect([...VERCEL_EVENT_KEYS]).toEqual(vercel?.properties);
-    expect(VERCEL_EVENT_PREFIX).toBe(vercel?.prefix);
+    expect(Object.fromEntries(VERCEL_COMMAND_DIMENSIONS)).toEqual(vercel?.dimensions ?? {});
+    for (const command of [...VERCEL_COMMAND_DIMENSIONS.keys(), "variable:list"]) {
+      const dimension = VERCEL_COMMAND_DIMENSIONS.get(command);
+      const listed = (vercel?.properties ?? []).flatMap((key) =>
+        key !== DIMENSION ? [key] : dimension === undefined ? [] : [dimension],
+      );
+      expect(vercelEventKeys(command), command).toEqual(listed);
+    }
+  });
+
+  it("copies to Vercel only a dimension the command records, of a type the copy sends", async () => {
+    const catalog = await loadCatalog();
+    const cli = cliOf(catalog);
+    for (const [command, dimension] of Object.entries(cli.vercel?.dimensions ?? {})) {
+      expect(
+        cli.dimensions?.[command],
+        `${command} copies ${dimension} without recording it`,
+      ).toContain(dimension);
+      expect(["string", "number", "boolean"], `${command} copies ${dimension}`).toContain(
+        catalog.properties[dimension]?.type,
+      );
+    }
   });
 
   it("records only the dimensions the catalog lists for each command", async () => {

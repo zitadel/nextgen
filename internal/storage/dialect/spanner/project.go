@@ -7,6 +7,7 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/dialect/authz"
 	"github.com/zitadel/nextgen/internal/storage/dialect/pagination"
 	storageproject "github.com/zitadel/nextgen/internal/storage/project"
 )
@@ -19,6 +20,13 @@ const (
 	projectQuery          = "SELECT id, name, password_hash_policy, created_at, updated_at FROM projects"
 
 	setProjectPasswordHashPolicyStmt = `UPDATE projects SET password_hash_policy = @p2, updated_at = CURRENT_TIMESTAMP() WHERE id = @p1 THEN RETURN id`
+
+	// FOR UPDATE takes an exclusive lock on the project row. A plain read would
+	// take only a shared lock, which two changes can hold at once, so both
+	// could remove the project's last owner. With the exclusive lock a
+	// concurrent change of the same project aborts, and ReadWriteTransaction
+	// replays it after the first commits.
+	lockProjectStmt = `SELECT id FROM projects WHERE id = @p1 FOR UPDATE`
 )
 
 var projectColumns = []string{
@@ -177,9 +185,14 @@ func (ps projectStatements) hydrateOrigins(ctx context.Context, projects ...*dom
 }
 
 func (ps projectStatements) scanProject(row *spanner.Row) (*domain.Project, error) {
+	return ps.scanProjectWith(row)
+}
+
+// scanProjectWith scans a project row followed by the extra columns.
+func (ps projectStatements) scanProjectWith(row *spanner.Row, extra ...any) (*domain.Project, error) {
 	project := new(domain.Project)
 	var policyJSON spanner.NullJSON
-	if err := row.Columns(&project.ID, &project.Name, &policyJSON, &project.CreatedAt, &project.UpdatedAt); err != nil {
+	if err := row.Columns(append([]any{&project.ID, &project.Name, &policyJSON, &project.CreatedAt, &project.UpdatedAt}, extra...)...); err != nil {
 		return nil, err
 	}
 	policy, err := decodePasswordHashPolicy(policyJSON)
@@ -205,6 +218,54 @@ func decodePasswordHashPolicy(value spanner.NullJSON) (*domain.PasswordHashPolic
 		return nil, err
 	}
 	return storageproject.UnmarshalPasswordHashPolicy(raw)
+}
+
+// writeProjectWithOwningTeam reads one project with its owning team as an extra
+// column, in one round trip. GetProject runs it only when asked for the owning
+// team: GetProjectByID runs on hot paths and stays a plain read.
+func writeProjectWithOwningTeam(c *statementCompiler, id string) {
+	c.WriteString("SELECT id, name, password_hash_policy, created_at, updated_at, (")
+	authz.WriteActiveOwningTeamID(c, spannerAuthzEnv(), func(w authz.ArgWriter) { w.WriteString("projects.id") })
+	c.WriteString(") FROM projects WHERE id = ")
+	c.WriteArg(id)
+}
+
+// GetProject implements [service.ProjectStatements].
+func (ps projectStatements) GetProject(ctx context.Context, id string, opts service.ProjectQueryOptions) (*domain.Project, error) {
+	if !opts.OwningTeam {
+		return ps.GetProjectByID(ctx, id)
+	}
+	var project *domain.Project
+	var c statementCompiler
+	writeProjectWithOwningTeam(&c, id)
+	err := ps.db.Query(ctx, c.statement(), func(iter *spanner.RowIterator) error {
+		var err error
+		project, err = collectOneRow(iter, func(row *spanner.Row) (*domain.Project, error) {
+			var owningTeamID spanner.NullString
+			project, err := ps.scanProjectWith(row, &owningTeamID)
+			if err != nil {
+				return nil, err
+			}
+			project.OwningTeamID = owningTeamID.StringVal
+			return project, nil
+		})
+		return err
+	})
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	if err := ps.hydrateOrigins(ctx, project); err != nil {
+		return nil, err
+	}
+	return project, nil
+}
+
+// LockProject implements [service.ProjectStatements].
+func (ps projectStatements) LockProject(ctx context.Context, id string) error {
+	return ps.db.Query(ctx, buildStatement(lockProjectStmt, id).statement(), func(iter *spanner.RowIterator) error {
+		_, err := collectOneRow(iter, func(*spanner.Row) (struct{}, error) { return struct{}{}, nil })
+		return err
+	})
 }
 
 var _ service.ProjectStatements = (*projectStatements)(nil)

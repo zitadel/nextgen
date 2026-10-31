@@ -8,15 +8,36 @@ import { EYEBROW } from "./typography";
 
 /**
  * The card of labelled values (`MetaValue`, split by `MetaRule`) that identifies
- * a resource: stacked below `sm`, where the rule becomes a tick on its own row,
- * and in a row above it.
+ * what a detail screen shows: stacked below `sm`, where the rule becomes a tick
+ * on its own row, and in a row above it.
+ *
+ * A resource (user, team) draws the card. A configuration screen (login flow,
+ * identity provider, release) passes `bordered={false}` and sets the values on
+ * the page with no border or fill.
  *
  * `max-w-full` + `overflow-x-auto`: its width is set by the id, which is never
  * truncated, so a narrow screen scrolls the card rather than the page.
+ *
+ * `MetaValue`, not `MetaItem`: `@/components/ui/meta-item` owns that name for
+ * the small uppercase annotation beside a field label.
  */
-export function MetaCard({ children, className }: { children: ReactNode; className?: string }) {
+export function MetaCard({
+  children,
+  className,
+  bordered = true,
+}: {
+  children: ReactNode;
+  className?: string;
+  bordered?: boolean;
+}) {
   return (
-    <Card className={cn("max-w-full gap-0 overflow-x-auto py-0", className)}>
+    <Card
+      className={cn(
+        "max-w-full gap-0 overflow-x-auto py-0",
+        !bordered && "border-0 bg-transparent shadow-none",
+        className,
+      )}
+    >
       <CardContent className="flex flex-col px-5 py-3.5 sm:flex-row sm:flex-wrap sm:items-center">
         {children}
       </CardContent>
@@ -24,14 +45,23 @@ export function MetaCard({ children, className }: { children: ReactNode; classNa
   );
 }
 
-/** One labelled value in a detail header card, optionally copyable. */
+/** The value line: 13/19 on most headers, 12/16 where the frame draws the smaller card. */
+const VALUE_SIZE = {
+  md: "text-[13px] leading-[19px]",
+  sm: "text-xs leading-4",
+} as const;
+
+/** One labelled value in a detail header, optionally copyable. */
 export function MetaValue({
   label,
   value,
+  size = "md",
   copyable = false,
 }: {
   label: string;
   value: string;
+  /** `sm`: the 12/16 value, which makes the card 63px tall instead of 66. */
+  size?: keyof typeof VALUE_SIZE;
   copyable?: boolean;
 }) {
   return (
@@ -47,20 +77,17 @@ export function MetaValue({
     <div className="flex shrink-0 flex-col gap-0.75">
       <span className={EYEBROW}>{label}</span>
       <div className="flex items-center gap-1.5">
-        <span className="text-foreground shrink-0 font-mono text-[13px] leading-[19px] tracking-[-0.5px] whitespace-nowrap">
+        <span
+          className={cn(
+            "text-foreground shrink-0 font-mono tracking-[-0.5px] whitespace-nowrap",
+            VALUE_SIZE[size],
+          )}
+        >
           {value}
         </span>
-        {/* Sized under the 19px value line so the copy affordance never drives
-            the row height — the card is 66px tall in the design, and a 24px
-            button pushes it to 71. */}
-        {copyable && (
-          <CopyButton
-            value={value}
-            label={`Copy ${label}`}
-            size="icon-xs"
-            className="size-4 shrink-0"
-          />
-        )}
+        {/* Inline, under the 19px value line: the card is 66px tall in the
+            design, and a 24px button pushes it to 71. */}
+        {copyable && <CopyButton value={value} label={`Copy ${label}`} size="inline" />}
       </div>
     </div>
   );

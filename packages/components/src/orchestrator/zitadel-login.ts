@@ -1137,7 +1137,9 @@ export class ZitadelLogin extends ZitadelSurface {
       // preview renders none at all: the atom starts its ceremony on connect.
       challenge: this.loading || this.preview ? null : (step.challenge ?? null),
       identifier: step.identifier ?? null,
-      messages: [],
+      // Why the flow moved between sign-in and sign-up without being asked,
+      // on the step right after the move.
+      messages: step.notice ? [{ level: "info", text_key: step.notice }] : [],
       identity: this.deriveIdentity(),
       errors,
       branding: this.brandingForTemplate(),
@@ -1406,10 +1408,12 @@ export class ZitadelLogin extends ZitadelSurface {
   /** Secondary navigation rows (`data-action` on `.zl-card-nav__link`). */
   private handleDelegatedAction = (event: Event): void => {
     const target = (event.target as HTMLElement | null)?.closest<HTMLElement>("[data-action]");
-    if (!target || target.closest("zl-button") || this.loading) return;
+    if (!target || target.closest("zl-button")) return;
     const action = target.getAttribute("data-action");
     if (!action) return;
+    // An ignored click still must not follow href="#" and change history.
     event.preventDefault();
+    if (this.loading) return;
     void this.submit(action);
   };
 

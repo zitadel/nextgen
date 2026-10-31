@@ -145,6 +145,35 @@ describe("env add", () => {
         });
       });
 
+      it("deploys nothing to the environment it adds when nobody can be asked", async () => {
+        const app = await aSetUpApp();
+        await app.run(ADD);
+
+        const listed = await app.run(["deployment", "list", "--env", "production", "--json"]);
+
+        expect(app.envelopeOf<{ items: unknown[] }>(listed).data.items).toEqual([]);
+      });
+
+      it("tells the caller to deploy to the environment it added", async () => {
+        const app = await aSetUpApp();
+
+        const added = await app.run([...ADD, "--app-url", "https://app.example.com"]);
+
+        expect(added).toSuggest(
+          `deploy -m '<what changed>' --env-file ${app.path}/.env.production.local`,
+        );
+      });
+
+      it("offers no deploy to an environment with no origin for one to land on", async () => {
+        const app = await aSetUpApp();
+
+        const added = await app.run(ADD);
+
+        expect(added).not.toSuggest(
+          `deploy -m '<what changed>' --env-file ${app.path}/.env.production.local`,
+        );
+      });
+
       it("writes nothing on a dry run", async () => {
         const app = await aSetUpApp();
 
@@ -178,6 +207,14 @@ describe("env add", () => {
         const result = await app.run(["env", "add", "production", "--non-interactive"]);
 
         expect(result).toPrint("Pipeline secret store");
+      });
+
+      it("says the environment serves the server's defaults until it is deployed to", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run(["env", "add", "production", "--non-interactive"]);
+
+        expect(result).toPrint("Nothing is deployed to production yet");
       });
 
       it("never prints a secret", async () => {
