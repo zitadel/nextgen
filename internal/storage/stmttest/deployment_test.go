@@ -278,13 +278,6 @@ func TestDeploymentStatements_LiveView(t *testing.T) {
 		assert.Equal(t, []string{appOrigin, wwwOrigin}, got[1].Origins())
 		assert.Equal(t, []string{previews.ID}, deployment.DeploymentIDs(live(t, d.stmts, projectID, now, new(relB.ID))))
 
-		// An origin no longer primary drops out of the primary deployment.
-		_, _, err := d.stmts.DeleteOriginByPattern(t.Context(), projectID, wwwOrigin)
-		require.NoError(t, err)
-		got = live(t, d.stmts, projectID, now, nil)
-		require.Equal(t, []string{previews.ID, primaries.ID}, deployment.DeploymentIDs(got))
-		assert.Equal(t, []string{appOrigin}, got[1].Origins())
-
 		// A URL that became a primary origin is no preview any more.
 		addPrimaryOrigins(t, d.stmts, projectID, gitOrigin)
 		got = live(t, d.stmts, projectID, now, nil)
@@ -302,9 +295,9 @@ func TestDeploymentStatements_LiveView(t *testing.T) {
 	})
 }
 
-// With no primary origin left, the newest primary deployment alone stays live:
-// it still serves callers with no origin.
-func TestDeploymentStatements_LiveWithNoPrimaryOriginLeft(t *testing.T) {
+// The newest primary deployment alone stays live whatever the project lists: it
+// still serves callers with no origin.
+func TestDeploymentStatements_NewestPrimaryStaysLive(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID := ensureReleaseProject(t, d.stmts)
 		addPrimaryOrigins(t, d.stmts, projectID, appOrigin)
@@ -313,12 +306,18 @@ func TestDeploymentStatements_LiveWithNoPrimaryOriginLeft(t *testing.T) {
 
 		deploy(t, d.stmts, projectID, relA.ID, []string{appOrigin}, deployArgs{})
 		newest := deploy(t, d.stmts, projectID, relB.ID, []string{appOrigin}, deployArgs{})
+
+		// Another origin replaces the one it names, with no deploy.
+		addPrimaryOrigins(t, d.stmts, projectID, wwwOrigin)
 		_, _, err := d.stmts.DeleteOriginByPattern(t.Context(), projectID, appOrigin)
 		require.NoError(t, err)
-
 		got := live(t, d.stmts, projectID, time.Now(), nil)
 		require.Equal(t, []string{newest.ID}, deployment.DeploymentIDs(got))
 		assert.Equal(t, []string{appOrigin}, got[0].Origins())
+
+		_, _, err = d.stmts.DeleteOriginByPattern(t.Context(), projectID, wwwOrigin)
+		require.NoError(t, err)
+		assert.Equal(t, []string{newest.ID}, deployment.DeploymentIDs(live(t, d.stmts, projectID, time.Now(), nil)))
 	})
 }
 

@@ -29,8 +29,8 @@ type Tables struct {
 }
 
 // RowServes reports whether a deployment is live on one of its origins at the
-// given time. All primary origins run the newest primary deployment; a preview
-// URL runs its latest deployment until the preview expires.
+// given time. The newest primary deployment is always live; a preview URL runs
+// its latest deployment until the preview expires.
 func RowServes(tables Tables, placeholder string) string {
 	return `(` + primaryRowServes(tables) + ` OR ` + previewRowServes(tables, placeholder) + `)`
 }
@@ -39,11 +39,9 @@ func primaryRowServes(tables Tables) string {
 	newerPrimary := `EXISTS (SELECT 1 FROM ` + tables.Deployments + ` np` +
 		` WHERE np.project_id = t.project_id AND np.origin_kind = 'primary'` +
 		` AND (np.deployed_at > t.deployed_at OR (np.deployed_at = t.deployed_at AND np.id > t.deployment_id)))`
-	// With no primary origin left, the newest primary deployment still serves
-	// callers with no origin, so it stays live on the origins it names.
-	noPrimaryOrigin := `NOT EXISTS (SELECT 1 FROM ` + tables.ProjectOrigins + ` po` +
-		` WHERE po.project_id = t.project_id AND po.kind = 'primary')`
-	return `(t.origin_kind = 'primary' AND (` + isPrimaryOrigin(tables) + ` OR ` + noPrimaryOrigin + `) AND NOT ` + newerPrimary + `)`
+	// The newest primary deployment always serves callers with no origin, so it
+	// stays live on every origin it names, whatever the project lists now.
+	return `(t.origin_kind = 'primary' AND NOT ` + newerPrimary + `)`
 }
 
 func previewRowServes(tables Tables, placeholder string) string {
