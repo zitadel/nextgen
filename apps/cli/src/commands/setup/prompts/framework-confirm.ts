@@ -2,11 +2,18 @@ import { ZitadelError } from "../../../lib/errors";
 import type { PromptContext, SetupAnswers, SetupPrompt } from "./types";
 
 /**
- * "Detected `<framework>`. Proceed?" — the wizard's first question. Accepting
- * leaves answers unchanged; declining throws `E_UNSUPPORTED_PROJECT_SHAPE`
- * (the user should re-run with an explicit `--framework`). Skipped when the
- * developer already named the framework, by picking it to scaffold or with
- * `--framework`: detection then only read back their own answer.
+ * "Would you like to set up Zitadel in this `<framework>` app?" — the
+ * wizard's first question in an app setup found, asked before anything in it
+ * changes. Accepting leaves answers unchanged.
+ *
+ * Declining throws `E_UNSUPPORTED_PROJECT_SHAPE`, and the hint points at the
+ * one way to a different app: running setup in its directory. `--framework`
+ * is no way out, because setup refuses a framework other than the one it
+ * detects here (`E_CONFLICT`), so the hint does not offer it.
+ *
+ * Skipped when the developer already named the framework, by picking it to
+ * scaffold or with `--framework`: detection then only read back their own
+ * answer.
  */
 export class FrameworkConfirmPrompt implements SetupPrompt {
   async ask(answers: SetupAnswers, ctx: PromptContext): Promise<SetupAnswers> {
@@ -16,14 +23,16 @@ export class FrameworkConfirmPrompt implements SetupPrompt {
     const ack = await ctx.input({
       kind: "confirm",
       name: "confirm the framework",
-      message: `Detected ${ctx.framework.id}. Proceed?`,
+      message: `Would you like to set up Zitadel in this ${ctx.framework.displayName} app?`,
       initialValue: true,
     });
     if (ack === false) {
       throw new ZitadelError(
         "E_UNSUPPORTED_PROJECT_SHAPE",
-        "Setup stopped — the detected framework was declined",
-        { hint: `Re-run with --framework ${ctx.framework.id} when ready.` },
+        `Setup stopped before changing this ${ctx.framework.displayName} app`,
+        {
+          hint: "To set up another app, run setup in its directory, or pass --cwd with that directory.",
+        },
       );
     }
     return answers;

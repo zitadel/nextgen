@@ -142,10 +142,10 @@ describe("guidance content", () => {
 
   it("tells each framework how its own chrome reads session state", () => {
     // Next: the client helper (works on any page), plus the server-side
-    // auth() with its matcher precondition.
+    // auth(), which the every-route matcher lets read the session anywhere.
     const agents = agentsGuidanceSection(ctx);
     expect(agents).toContain("@zitadel/sdk-next/session");
-    expect(agents).toContain("`matcher`");
+    expect(agents).toContain("`matcher` covers every route");
     expect(agents).toContain("no-store");
     expect(agents).toContain("401/auth.unauthorized");
     expect(agents).toContain("403/sess.project_mismatch");
@@ -214,6 +214,23 @@ describe("guidance content", () => {
       "https://preview.zitadel.com/docs/guides/customize-design#style-the-login-from-your-app",
     );
     expect(agents).not.toContain("`--zl-font-family-heading`");
+  });
+
+  it("has a heading that replaces the widget's follow the login's steps", () => {
+    const agents = agentsGuidanceSection(ctx);
+
+    expect(agents).toContain("moves between sign-in and sign-up by itself");
+    expect(agents).toContain("must follow its `zitadel-flow-step` event");
+    expect(agents).toContain("`step.purpose` is `login` while it signs in");
+  });
+
+  it("says sign-in returns to the page's next parameter ahead of post-sign-in-url", () => {
+    const agents = agentsGuidanceSection(ctx);
+
+    expect(agents).toContain(
+      "the path in its page's `?next=` parameter, ahead of `post-sign-in-url`",
+    );
+    expect(agents).toContain("`force-post-sign-in-url` (SDK wrappers: `forcePostSignInUrl`)");
   });
 
   it("names the presentation knobs and, on Next, the shipped JSX types", () => {

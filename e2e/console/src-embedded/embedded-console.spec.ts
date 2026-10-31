@@ -1,6 +1,7 @@
 import { expect, test } from "@zitadel/testing/playwright";
 
 import { withErrorBody } from "../support/api";
+import { recordPolicyViolations } from "../support/policy";
 import { openAddTeam, uniqueName } from "../support/screens";
 import { EMBEDDED_LOGIN_URL, signIn } from "../support/sign-in";
 
@@ -21,6 +22,9 @@ import { EMBEDDED_LOGIN_URL, signIn } from "../support/sign-in";
 
 test("signs in end to end against the embedded API", async ({ page, seed }) => {
   const user = await seed.user();
+  // The binary sends the console's policies with every page of it; the
+  // sign-in and the shell break neither.
+  const violations = await recordPolicyViolations(page);
 
   await page.goto("/ui/console/");
 
@@ -46,7 +50,7 @@ test("signs in end to end against the embedded API", async ({ page, seed }) => {
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
 
   // Terminal step → `POST /sessions/exchange` with the runtime-discovered
-  // publishable key → `__nextgen_session` cookie → full-document navigation
+  // publishable key → session cookie → full-document navigation
   // back into the console, where the guard's `GET /sessions/me` now answers
   // 200. Four more calls that only resolve if the base is right.
   await page.waitForURL((url) => !url.pathname.endsWith("/login"));
@@ -62,9 +66,11 @@ test("signs in end to end against the embedded API", async ({ page, seed }) => {
   expect(new URL(page.url()).searchParams.get("project")).toBeNull();
 
   // The shell, not the screen: it is what shows the signed-in console was
-  // reached.
-  await expect(page.getByRole("navigation", { name: "Primary" })).toBeVisible();
+  // reached. Projects is the home, drawn without the sidebar.
+  await expect(page.getByRole("button", { name: /^Account:/ })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Primary" })).toHaveCount(0);
   await expect(page.getByText("No projects yet.")).toBeVisible();
+  expect(violations, "policy violations").toEqual([]);
 });
 
 test("manages the project with the session cookie alone", async ({ page, seed, zitadel }) => {
@@ -101,13 +107,13 @@ test("shows each user's team on the Users screen with the session cookie", async
   // #1300 §4: `expand: ["teams"]` needs team_membership.read, which a session
   // never carries; QueryUsers lets a session through once it may list the
   // project. Proven through the console, not only the API: without it the
-  // Users screen falls back to the unexpanded read and drops its Team column,
+  // Users screen falls back to the unexpanded read and drops its Member of column,
   // while every Go test stays green.
   const { projectId, schemaId } = zitadel.handle;
   const team = await withErrorBody(
     zitadel.api.createTeam({ name: uniqueName("Support") }, { project_id: projectId }),
   );
-  // Created straight into the team: the membership the Team column shows.
+  // Created straight into the team: the membership the Member of column shows.
   const member = seed.identity().email;
   await withErrorBody(
     zitadel.api.createUser(
@@ -118,7 +124,7 @@ test("shows each user's team on the Users screen with the session cookie", async
   await signIn(page, zitadel, await seed.user(), EMBEDDED_LOGIN_URL);
 
   await page.goto("/ui/console/users");
-  await expect(page.getByRole("columnheader", { name: "Team" })).toBeVisible();
+  await expect(page.getByRole("columnheader", { name: "Member of" })).toBeVisible();
   const row = page.getByRole("row").filter({ hasText: member });
   await expect(row.getByText(team.name, { exact: true })).toBeVisible();
 });

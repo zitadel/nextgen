@@ -1,6 +1,9 @@
+import { ApiError } from "@zitadel/api/runtime/fetch";
+
 import { api } from "@/api/zitadel";
 import { readAllPages } from "./paging";
 import { field } from "./record";
+import { titleCase } from "./text";
 
 /**
  * A user schema as the console reads it.
@@ -19,22 +22,72 @@ export interface SchemaEntry {
   createdAt: string;
 }
 
-/** Every user schema in the project, at its latest revision. */
-export async function fetchAllSchemas(projectId: string): Promise<SchemaEntry[]> {
-  const entries = await readAllPages(async (pageToken) => {
+/**
+ * Every page of the project's user schemas: the latest revision of each, or
+ * every revision, of every object type or one; `inUse` also asks whether any
+ * user is on each (`expand=in_use`).
+ */
+function listUserSchemas(
+  projectId: string,
+  options: { revisions: "latest" | "all"; objectType?: string; inUse?: boolean },
+) {
+  return readAllPages(async (pageToken) => {
     const page = await api.listSchemas({
       project_id: projectId,
       kind: "user-schema",
-      revisions: "latest",
+      revisions: options.revisions,
+      ...(options.objectType ? { object_type: options.objectType } : {}),
+      ...(options.inUse ? { expand: ["in_use" as const] } : {}),
       limit: 100,
       page_token: pageToken,
     });
     return { items: page.schemas, next: page.next_page_token };
   });
+}
+
+/** Every user schema in the project, at its latest revision. */
+export async function fetchAllSchemas(projectId: string): Promise<SchemaEntry[]> {
+  const entries = await listUserSchemas(projectId, { revisions: "latest" });
   return entries.map((entry) => ({
     id: entry.id,
     schema: entry.schema as UserSchema,
     createdAt: entry.metadata.created_at,
+  }));
+}
+
+/** One revision of a user schema: its own id, and when it was minted. */
+export interface SchemaRevision {
+  id: string;
+  createdAt: string;
+  /** Whether any user of the project is on it; only when asked for, and answered. */
+  inUse?: boolean;
+}
+
+/**
+ * Every revision of one schema, newest first. Schemas are immutable, so a
+ * revision is a schema of its own sharing the `objectType`; the history is the
+ * list filtered to that type with `revisions: all`, in the server's order
+ * (created at, then id, descending). The server calls a revision latest when
+ * none of its type was created after it, so the first row is the server's
+ * latest. `inUse` also asks whether any user is on each revision, which needs
+ * read on the whole project; refused, the plain history stands in.
+ */
+export async function fetchSchemaRevisions(
+  projectId: string,
+  objectType: string,
+  { inUse = false }: { inUse?: boolean } = {},
+): Promise<SchemaRevision[]> {
+  let entries: Awaited<ReturnType<typeof listUserSchemas>>;
+  try {
+    entries = await listUserSchemas(projectId, { revisions: "all", objectType, inUse });
+  } catch (cause) {
+    if (!inUse || !(cause instanceof ApiError) || cause.status !== 403) throw cause;
+    entries = await listUserSchemas(projectId, { revisions: "all", objectType });
+  }
+  return entries.map((entry) => ({
+    id: entry.id,
+    createdAt: entry.metadata.created_at,
+    ...(entry.metadata.in_use === undefined ? {} : { inUse: entry.metadata.in_use }),
   }));
 }
 
@@ -145,31 +198,6 @@ export function schemaFields(schema: UserSchema): SchemaField[] {
 }
 
 /**
- * The columns the users table shows, unioned across every schema the loaded
- * users actually reference.
- *
- * The design has no fixed column set: its `Filled` variant lists
- * Given name / Family name / Company name / Email while `Minimal` lists only
- * Email, because the user model is `additionalProperties: true` keyed on
- * `schema`. The design decisions log (D4) settles what to show — every
- * available field rather than a curated default — so this unions rather than
- * intersects: a project with both a `business` and a `minimal` schema shows the
- * business columns, and minimal users render blank in them.
- *
- * Order follows {@link schemaFields} within a schema, and first-seen order
- * across them, so adding a schema appends columns instead of reshuffling.
- */
-export function schemaColumns(schemas: UserSchema[]): SchemaField[] {
-  const columns = new Map<string, SchemaField>();
-  for (const schema of schemas) {
-    for (const entry of schemaFields(schema)) {
-      if (!columns.has(entry.key)) columns.set(entry.key, entry);
-    }
-  }
-  return [...columns.values()];
-}
-
-/**
  * Every property a schema declares, including the nested objects
  * {@link schemaFields} drops.
  *
@@ -219,6 +247,27 @@ export function resolveSchemaPath(schema: UserSchema, path: string[]): UserSchem
     node = next;
   }
   return node;
+}
+
+/**
+ * One property a schema node declares, or `undefined` where it declares none
+ * by that key (an attribute the schema does not describe).
+ */
+export function declaredProperty(
+  node: UserSchema | undefined,
+  key: string,
+): Record<string, unknown> | undefined {
+  if (!node) return undefined;
+  const properties = readProperties(node);
+  return Object.hasOwn(properties, key) ? properties[key] : undefined;
+}
+
+/**
+ * A property's label as the forms and columns show it: its `title`, else the
+ * key humanised. A key the schema does not declare keeps its own spelling.
+ */
+export function schemaPropertyLabel(key: string, property?: Record<string, unknown>): string {
+  return property ? propertyLabel(key, property) : key;
 }
 
 /** A sign-in method as the schema's `x-auth-methods` annotation declares it. */
@@ -309,6 +358,22 @@ const AUTH_METHOD_LABELS: Record<string, string> = {
   otp: "One-time code",
 };
 
+/**
+ * The keyword that designates a leaf property (ADR 058): `x-identifier`, one
+ * of the `x-display` parts, or nothing. Both name a leaf by its dot-joined
+ * attribute path, so a nested one is found by its full path.
+ */
+export function schemaDesignation(
+  schema: UserSchema,
+  path: string[],
+): "x-identifier" | "x-display" | undefined {
+  const joined = path.join(".");
+  if (field(schema, "x-identifier") === joined) return "x-identifier";
+  const display = schema["x-display"];
+  if (Array.isArray(display) && display.includes(joined)) return "x-display";
+  return undefined;
+}
+
 function readProperties(schema: UserSchema): Record<string, Record<string, unknown>> {
   const properties = schema.properties;
   if (!properties || typeof properties !== "object") return {};
@@ -341,7 +406,7 @@ function propertyTypeLabel(property: Record<string, unknown>): string {
       ? [type]
       : [];
   if (names.length === 0) return "—";
-  return names.map((name) => name.charAt(0).toUpperCase() + name.slice(1)).join(" | ");
+  return names.map(titleCase).join(" | ");
 }
 
 /**
@@ -361,7 +426,7 @@ function propertyLabel(key: string, property: Record<string, unknown>): string {
     .split(/\s+/);
   const [first, ...rest] = words;
   if (!first) return key;
-  return [first.charAt(0).toUpperCase() + first.slice(1), ...rest].join(" ");
+  return [titleCase(first), ...rest].join(" ");
 }
 
 /**

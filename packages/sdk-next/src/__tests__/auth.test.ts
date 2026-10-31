@@ -245,7 +245,7 @@ describe("auth()", () => {
       `${ISSUER}/api/v1/sessions/me?project_id=${PROJECT}`,
       expect.objectContaining({
         headers: expect.objectContaining({
-          cookie: "__nextgen_session=attacker-supplied-junk",
+          cookie: "__Host-zitadel_session=attacker-supplied-junk",
         }),
       }),
     );

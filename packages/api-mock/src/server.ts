@@ -91,7 +91,22 @@ const DEMO_DISPLAY_NAMES = new Map<string, string>([
 ]);
 const sessionStore = new Map<string, StoredSession>();
 
-/** What the request's `__nextgen_session` cookie names, if anything. */
+/**
+ * The session cookie's names (ADR 083): the canonical one, which the SDK
+ * proxies send upstream and the server reads over any transport, and the one
+ * the server sets over plain http to a loopback host, where the mock runs. The
+ * names before ADR 083 are neither read nor written.
+ */
+const SESSION_COOKIE = "__Host-zitadel_session";
+const LOOPBACK_SESSION_COOKIE = "zitadel_session";
+
+/** The request's session token: the canonical cookie's first, as the server on loopback http reads them. */
+function sessionToken(req: express.Request): string | undefined {
+  const cookies = req.cookies as Record<string, string | undefined>;
+  return cookies[SESSION_COOKIE] || cookies[LOOPBACK_SESSION_COOKIE] || undefined;
+}
+
+/** What the request's session cookie names, if anything. */
 type SessionLookup =
   | { status: "missing" }
   | { status: "unknown"; token: string }
@@ -104,7 +119,7 @@ type SessionLookup =
  * the failures in its own words; this only says which one it was.
  */
 function lookupSession(req: express.Request): SessionLookup {
-  const token = (req.cookies as Record<string, string>).__nextgen_session;
+  const token = sessionToken(req);
   if (!token) return { status: "missing" };
   const session = sessionStore.get(token);
   if (!session) return { status: "unknown", token };
@@ -356,7 +371,7 @@ export function createMockApp(options: { issuer: string }): express.Express {
       sessionStore.set(opaqueToken, sessionData);
 
       const setCookie = [
-        `__nextgen_session=${opaqueToken}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${SESSION_TTL_SECONDS}`,
+        `${LOOPBACK_SESSION_COOKIE}=${opaqueToken}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${SESSION_TTL_SECONDS}`,
         `_zflow=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`,
       ];
       res.setHeader("Set-Cookie", setCookie);
@@ -460,7 +475,7 @@ export function createMockApp(options: { issuer: string }): express.Express {
     if (refuseForProject(req, res, found.session)) return;
     sessionStore.delete(found.token);
     res.setHeader("Set-Cookie", [
-      `__nextgen_session=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`,
+      `${LOOPBACK_SESSION_COOKIE}=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`,
       `__nextgen_display=; Path=/; SameSite=Lax; Max-Age=0`,
       `_zflow=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`,
     ]);
@@ -469,7 +484,7 @@ export function createMockApp(options: { issuer: string }): express.Express {
 
   // POST /projects/:project_id/claim/complete — the browser leg of the claim
   // dance. A custom Express route (not an MSW handler) because it authenticates
-  // with the module-scoped __nextgen_session cookie, exactly like GET
+  // with the module-scoped session cookie, exactly like GET
   // /sessions/me. The challenge_id from the body is its browser-safe authorization.
   app.post(
     apiPaths("/projects/:project_id/claim/complete"),
@@ -524,12 +539,12 @@ export function createMockApp(options: { issuer: string }): express.Express {
 
   app.get("/auth/end-session", (req: express.Request, res: express.Response) => {
     // Clean up session from store when logging out
-    const token = (req.cookies as Record<string, string>).__nextgen_session;
+    const token = sessionToken(req);
     if (token) {
       sessionStore.delete(token);
     }
     res.setHeader("Set-Cookie", [
-      `__nextgen_session=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`,
+      `${LOOPBACK_SESSION_COOKIE}=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`,
       `__nextgen_display=; Path=/; SameSite=Lax; Max-Age=0`,
       `_zflow=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`,
     ]);

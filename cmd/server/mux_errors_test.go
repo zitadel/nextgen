@@ -23,7 +23,7 @@ func TestBuildHTTPMuxAnswersAPathNothingServes(t *testing.T) {
 	apiServers, err := api.NewServers(oasapi.UnimplementedHandler{}, api.NewSecurityHandler(nil),
 		apiServerOptions(muxTracerProvider, noop.NewMeterProvider(), consoleLink("/console"))...)
 	require.NoError(t, err)
-	mux, err := buildHTTPMux(ServerConfig{RequestIDHeader: "x-vercel-id"}, idgen.NewULID(), apiServers, idpCallbackEcho(), nil, nil)
+	mux, err := buildHTTPMux(ServerConfig{RequestIDHeader: "x-vercel-id"}, idgen.NewULID(), apiServers, idpCallbackEcho(), nil, nil, nil)
 	require.NoError(t, err)
 
 	const vercelRequestID = "2vxlh-1792820352212-3ce3eb4ad630"

@@ -665,6 +665,75 @@ describe("setup command pre-flight", () => {
     expect(capture.requests).toEqual([]);
   });
 
+  it("deploys .zitadel/ to the primary origin with the project secret", async () => {
+    const cwd = await makeNextApp();
+    const capture = await startCreateProjectCaptureServer();
+
+    const res = await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--server",
+      capture.url,
+      "--non-interactive",
+      "--json",
+      "--skip-install",
+      "--no-git",
+      "--dev-port",
+      "3000",
+    ]);
+
+    expect(res.exitCode).toBe(0);
+    expect(capture.deployments).toEqual([
+      {
+        body: expect.objectContaining({
+          release_id: "rel_test",
+          targets: ["primary"],
+        }),
+        authorization: `Bearer ${capture.projects[0]?.project_secret}`,
+      },
+    ]);
+    const json = parseJson(res.stdout) as { data: { deployment: unknown } };
+    expect(json.data.deployment).toEqual({
+      release_id: "rel_test",
+      content_hash: "sha256:test",
+      deployment_id: "dep_test",
+      origins: ["http://localhost:3000"],
+    });
+  });
+
+  it("warns, names the deploy and still succeeds when its first deploy fails", async () => {
+    const cwd = await makeNextApp();
+    const capture = await startCreateProjectCaptureServer();
+    capture.rejectsReleases();
+
+    const res = await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--server",
+      capture.url,
+      "--non-interactive",
+      "--json",
+      "--skip-install",
+      "--no-git",
+      "--dev-port",
+      "3000",
+    ]);
+
+    expect(res.exitCode).toBe(0);
+    const json = parseJson(res.stdout) as {
+      warnings: string[];
+      data: { deployment: unknown; next_commands: string[] };
+    };
+    expect(json.data.deployment).toBeNull();
+    expect(json.warnings).toEqual([
+      expect.stringContaining("The project was set up but its first deploy failed"),
+    ]);
+    expect(json.data.next_commands[0]).toContain("deploy -m");
+    expect(capture.deployments).toEqual([]);
+  });
+
   it("writes no login template and publishes no branding revision (#1039)", async () => {
     const cwd = await makeTempDir();
     await mkdir(join(cwd, "app"), { recursive: true });
@@ -683,6 +752,11 @@ describe("setup command pre-flight", () => {
       "--non-interactive",
       "--json",
       "--skip-install",
+      "--no-git",
+      // Setup warns when the app's port is taken, and whatever holds 3000 on
+      // the machine running the tests must not decide what it reports.
+      "--dev-port",
+      "3000",
     ]);
 
     expect(res.exitCode).toBe(0);
@@ -986,6 +1060,24 @@ describe("setup summary", () => {
       scaffoldRow({ scaffoldedFramework: false, scaffoldedBesideFiles: false }),
     ).toBeUndefined();
   });
+  it("points at each customizable folder setup wrote, the password policy included", () => {
+    const customize = buildSummary({
+      ...input,
+      scaffoldedFramework: false,
+      scaffoldedBesideFiles: false,
+      writtenRel: [
+        ".zitadel/schemas/default-human-user.json",
+        ".zitadel/flows/default-login.json",
+        ".zitadel/policies/auth.factor.password.set.json",
+      ],
+    }).find((section) => section.title === "Customize");
+
+    expect(customize?.rows.map((row) => row.label)).toEqual([
+      "User schema",
+      "Login flow",
+      "Password policy",
+    ]);
+  });
 });
 
 async function startHealthServer(): Promise<string> {
@@ -1035,9 +1127,18 @@ async function startCreateProjectCaptureServer(
   rejectsSchemaUploads(): void;
   /** Lets `POST /schemas` succeed again. */
   recovers(): void;
+  /** The body of each `POST /deployments`, and the token it carried. */
+  deployments: Array<{ body: Record<string, unknown>; authorization: string | undefined }>;
+  /** Makes `POST /releases/build` fail, so setup's first deploy fails. */
+  rejectsReleases(): void;
 }> {
   let body: Record<string, unknown> | null = null;
   let rejectsSchemas = false;
+  let rejectsBuilds = false;
+  const deployments: Array<{
+    body: Record<string, unknown>;
+    authorization: string | undefined;
+  }> = [];
   const requests: string[] = [];
   const projects: Array<{ id: string; project_secret: string }> = [];
   const server = createServer(async (req, res) => {
@@ -1088,6 +1189,56 @@ async function startCreateProjectCaptureServer(
       );
       return;
     }
+    if (req.method === "POST" && path === "/releases/build") {
+      if (rejectsBuilds) {
+        res
+          .writeHead(500, { "content-type": "application/json" })
+          .end(JSON.stringify({ code: "internal", message: "boom" }));
+        return;
+      }
+      res.writeHead(201, { "content-type": "application/json" }).end(
+        JSON.stringify({
+          id: "rel_test",
+          content_hash: "sha256:test",
+          created_at: "2026-06-01T00:00:00.000Z",
+        }),
+      );
+      return;
+    }
+    if (req.method === "POST" && path === "/deployments") {
+      const chunks: Buffer[] = [];
+      for await (const chunk of req) {
+        chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
+      }
+      const deployment = JSON.parse(Buffer.concat(chunks).toString("utf8")) as Record<
+        string,
+        unknown
+      >;
+      deployments.push({ body: deployment, authorization: req.headers.authorization });
+      res.writeHead(201, { "content-type": "application/json" }).end(
+        JSON.stringify({
+          id: "dep_test",
+          release_id: deployment.release_id,
+          targets: [{ origin: "http://localhost:3000" }],
+          deployed_at: "2026-06-01T00:00:00.000Z",
+        }),
+      );
+      return;
+    }
+    if (req.method === "POST" && path === "/policies") {
+      res.writeHead(201, { "content-type": "application/json" }).end(
+        JSON.stringify({
+          id: "pol_test",
+          revision_id: "polrev_test",
+          project_id: "proj_test",
+          operation: "auth.factor.password.set",
+          config: {},
+          created_at: "2026-06-01T00:00:00.000Z",
+          updated_at: "2026-06-01T00:00:00.000Z",
+        }),
+      );
+      return;
+    }
     res.writeHead(404).end();
   });
   servers.push(server);
@@ -1108,6 +1259,10 @@ async function startCreateProjectCaptureServer(
     },
     recovers() {
       rejectsSchemas = false;
+    },
+    deployments,
+    rejectsReleases() {
+      rejectsBuilds = true;
     },
   };
 }

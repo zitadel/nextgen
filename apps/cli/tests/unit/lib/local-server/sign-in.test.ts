@@ -116,23 +116,50 @@ describe("local admin sign-in", () => {
           body: await request.json(),
         };
         return new HttpResponse(null, {
-          headers: { "set-cookie": "__nextgen_session=sess_cookie_value; Path=/; HttpOnly" },
+          headers: { "set-cookie": "zitadel_session=sess_cookie_value; Path=/; HttpOnly" },
         });
       }),
     );
 
     const cookie = await adminSessionCookie(SERVER, admin);
 
-    expect(cookie).toBe("__nextgen_session=sess_cookie_value");
+    expect(cookie).toBe("zitadel_session=sess_cookie_value");
     expect(exchanged).toEqual({
       project: "proj_platform",
       body: { handoff_token: "handoff/one+time" },
     });
   });
 
-  it("fails when the exchange sets no session cookie", async () => {
+  // A server reached over https sets the prefixed name, and takes it back.
+  it("keeps the session cookie under the prefixed name an https server sets", async () => {
     server.use(
-      http.post(`${SERVER}/api/v1/sessions/exchange`, () => HttpResponse.json({}, { status: 200 })),
+      http.post(
+        `${SERVER}/api/v1/sessions/exchange`,
+        () =>
+          new HttpResponse(null, {
+            headers: {
+              "set-cookie": "__Host-zitadel_session=sess_cookie_value; Path=/; HttpOnly; Secure",
+            },
+          }),
+      ),
+    );
+
+    const cookie = await adminSessionCookie(SERVER, admin);
+
+    expect(cookie).toBe("__Host-zitadel_session=sess_cookie_value");
+  });
+
+  it.each([
+    ["sets no session cookie", {}],
+    [
+      "sets only a session cookie from before ADR 083",
+      { "set-cookie": "__nextgen_session=sess_cookie_value; Path=/; HttpOnly" },
+    ],
+  ])("fails when the exchange %s", async (_label, headers) => {
+    server.use(
+      http.post(`${SERVER}/api/v1/sessions/exchange`, () =>
+        HttpResponse.json({}, { status: 200, headers }),
+      ),
     );
 
     await expect(adminSessionCookie(SERVER, admin)).rejects.toThrow(

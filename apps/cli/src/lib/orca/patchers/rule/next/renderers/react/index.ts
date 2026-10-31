@@ -85,7 +85,9 @@ export const reactRenderer: RendererSpec = {
   // tokens).
   // If this page already carries its own heading, add suppressHeader to the
   // element to visually hide the widget's heading block — it stays in the
-  // accessibility tree, and the card keeps no blank header band.`
+  // accessibility tree, and the card keeps no blank header band. The login
+  // moves between sign-in and sign-up by itself, so that heading has to
+  // follow it, as AGENTS.md describes.`
         : `  // variant="page" makes the widget paint the full-page chrome itself
   // (viewport height, surface background) from design tokens; switch to
   // variant="widget" to embed the sign-in card inside a layout you own.

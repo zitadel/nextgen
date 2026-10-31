@@ -1,5 +1,6 @@
 get:
   operationId: getPolicy
+  x-zitadel-cli: policies get
   summary: Get a policy
   description: |
     Reads a policy as its newest revision, the one that applies the next time
@@ -15,7 +16,7 @@ get:
   security:
     - oauth2:
         - policy.read
-    - nextgenSession: []
+    - sessionCookie: []
   responses:
     '200':
       description: The policy was retrieved.

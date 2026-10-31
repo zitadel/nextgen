@@ -32,12 +32,20 @@ export interface StepContext {
    * name the file a bad connection came from.
    */
   readonly idpFiles: readonly string[];
+  /** The policy files' names, positional with `bundle.policies`, likewise. */
+  readonly policyFiles: readonly string[];
   /**
    * A command against the project this run addresses, carrying its
    * environment selector, for a step's error to suggest its own fix.
    */
   readonly suggest: (args: string) => SuggestedCommand;
 }
+
+/**
+ * What a step adds to its command's `--json` data, such as the diff step's
+ * `diff`. A step with nothing to add returns nothing.
+ */
+export type StepReport = Readonly<Record<string, unknown>>;
 
 /**
  * One stage of the publish pipeline. `runsFor` keeps a step out of the publishes
@@ -49,16 +57,18 @@ export interface Step {
   readonly name: string;
   readonly runsFor: readonly PipelineMode[];
   readonly writes?: boolean;
-  run(ctx: StepContext): Promise<void>;
+  run(ctx: StepContext): Promise<StepReport | undefined>;
 }
 
 /**
  * Run the before-release steps in order, skipping the ones that do not apply to
- * this publish or that write on a dry run. The command creates the release and
- * the deployment itself, between and after the step groups: before-release
- * steps → create release → before-deploy steps → create deployment.
+ * this publish or that write on a dry run, and return what they report, for the
+ * command's `--json` data. The command creates the release and the deployment
+ * itself, between and after the step groups: before-release steps → create
+ * release → before-deploy steps → create deployment.
  */
-export async function runSteps(steps: readonly Step[], ctx: StepContext): Promise<void> {
+export async function runSteps(steps: readonly Step[], ctx: StepContext): Promise<StepReport> {
+  let report: StepReport = {};
   for (const step of steps) {
     if (!step.runsFor.includes(ctx.mode)) {
       continue;
@@ -66,6 +76,10 @@ export async function runSteps(steps: readonly Step[], ctx: StepContext): Promis
     if (ctx.dryRun && step.writes) {
       continue;
     }
-    await step.run(ctx);
+    const reported = await step.run(ctx);
+    if (reported) {
+      report = { ...report, ...reported };
+    }
   }
+  return report;
 }

@@ -27,6 +27,7 @@ post:
   security:
     - oauth2:
         - release.write
+    - sessionCookie: []
   parameters:
     - $ref: ../../../../components/parameters/project-id.yaml
     - $ref: ../../../../components/parameters/release-id.yaml

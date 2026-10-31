@@ -9,10 +9,13 @@ import { InlineCode } from "@/components/ui/inline-code";
  * published package, invoked without installing it, from npm's `latest` tag
  * (docs/adrs/074-preview-releases-on-0x.md).
  */
-const CLI = "npx @zitadel/cli@latest";
+export const CLI = "npx @zitadel/cli@latest";
 
 /** `apply`: writes the local definitions to the project. */
 export const CLI_DEPLOY = `${CLI} deploy`;
+
+/** `variable set`: enters or changes a project's variables and secrets. */
+export const CLI_VARIABLE_SET = `${CLI} variable set`;
 
 /**
  * `setup`: creates a project and connects the app in the current directory.

@@ -42,7 +42,7 @@ const sessionHandlers = [
     `${SERVER}/api/v1/sessions/exchange`,
     () =>
       new HttpResponse(null, {
-        headers: { "set-cookie": "__nextgen_session=admin_session; Path=/; HttpOnly" },
+        headers: { "set-cookie": "zitadel_session=admin_session; Path=/; HttpOnly" },
       }),
   ),
 ];
@@ -54,7 +54,7 @@ const server = setupServer(
     return HttpResponse.json({ challenge_id: "claim_ch_1" }, { status: 201 });
   }),
   http.get(`${SERVER}/api/v1/sessions/me/csrf`, ({ request }) =>
-    request.headers.get("cookie")?.includes("__nextgen_session=admin_session")
+    request.headers.get("cookie")?.includes("zitadel_session=admin_session")
       ? HttpResponse.json({ csrf_token: "csrf_admin" })
       : HttpResponse.json({ code: "auth.unauthorized" }, { status: 401 }),
   ),
@@ -95,7 +95,7 @@ describe("claiming a project as the local admin", () => {
     expect(initAuth).toBe("Bearer sk_project");
     // The claim is completed by the admin's session, answering the challenge
     // claim/init just opened.
-    expect(complete?.cookie).toContain("__nextgen_session=admin_session");
+    expect(complete?.cookie).toContain("zitadel_session=admin_session");
     // A cookie-authenticated write carries the session's CSRF token (ADR 053 §5).
     expect(complete?.csrf).toBe("csrf_admin");
     expect(complete?.body).toEqual({ challenge_id: "claim_ch_1" });

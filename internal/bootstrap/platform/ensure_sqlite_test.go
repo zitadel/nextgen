@@ -9,8 +9,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/zitadel/nextgen/api/openapi/endpoints/flow_definitions"
-	"github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
 	"github.com/zitadel/nextgen/internal/cache"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -95,11 +93,10 @@ func TestEnsureSQLiteIdempotent(t *testing.T) {
 	require.Equal(t, created.CreatedAt, after.CreatedAt)
 }
 
-// TestEnsureSQLiteSeedsAUsableProject is the point of seeding: a bare project
-// row satisfies the foreign keys and nothing else, so a bootstrapped platform
-// project could not serve the registration the platform plane exists for. The
-// keys, the user schema, and the login flow definitions have to be there.
-func TestEnsureSQLiteSeedsAUsableProject(t *testing.T) {
+// TestEnsureSQLiteCreatesTheProjectWithUsableKeys: the keys are what a
+// session exchange needs before it can mint a token. The user schema and the
+// login flows are not seeded here: they are the release EnsureDeployed builds.
+func TestEnsureSQLiteCreatesTheProjectWithUsableKeys(t *testing.T) {
 	ctx := t.Context()
 
 	dbPool, stop, err := dbtest.SQLite(ctx)
@@ -124,28 +121,13 @@ func TestEnsureSQLiteSeedsAUsableProject(t *testing.T) {
 		assert.NoError(t, err, "missing or unusable %s encryption key", purpose)
 	}
 
-	// The user schema registrations validate against.
-	userSchema, err := pool.Statements().GetJSONSchemaByID(ctx, projectID, schemas.DefaultHumanUserSchemaURL(testSchemaBase))
-	require.NoError(t, err, "a project with no user schema cannot register anyone")
-
-	// The platform variant, not the default (its shape is pinned in
-	// platform_schema_test.go).
-	assert.Equal(t, []string{schemas.PlatformDisplayNameProperty}, domain.DesignatedDisplay(userSchema.Schema))
-
-	// The login flows the registration walks through. Their ids are minted at
-	// insert, so this counts them against the same defaults the seeding builds
-	// from rather than looking one up by a hand-copied id.
-	wantFlows, err := flow_definitions.DefaultLoginFlowDefinitions(testSchemaBase, projectID)
-	require.NoError(t, err)
-	require.NotEmpty(t, wantFlows, "the defaults themselves must define a login flow")
-
 	flows, err := pool.Statements().ListFlowDefinitions(
 		service.WithAuthzListUnrestricted(ctx),
 		&database.ListOptions[domain.FlowDefinitionField]{
 			Filter: database.Equal(database.Col(domain.FlowDefinitionFieldProjectID), projectID),
 		}, service.FlowDefinitionQueryOptions{})
 	require.NoError(t, err)
-	assert.Len(t, flows.Items, len(wantFlows), "a project with no login flow cannot serve a sign-in")
+	assert.Empty(t, flows.Items, "the login flows arrive with the release, not with the project")
 }
 
 // TestEnsureSQLiteDisabledCreatesNothing pins the default: no deployment gets a

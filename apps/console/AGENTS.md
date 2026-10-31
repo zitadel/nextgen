@@ -26,6 +26,11 @@ one, update the ADR in the same change.
   - An unreadable runtime document is an error, not a mode: keep it apart
     from "no project yet", and never fall back to `standalone` silently.
     Backend-less runs opt in with `VITE_CONSOLE_RUNTIME_FALLBACK`.
+- [0006 Cloud add-on](docs/adrs/0006-cloud-addon.md): put what only the hosted
+  cloud needs (its analytics, sign-up, billing, support) in its add-on,
+  [`apps/cloud-console`](../cloud-console/AGENTS.md), never behind a build flag
+  here. The console reaches it only through `src/addon/contract.ts`; a
+  component an add-on screen needs is exported from `src/addon/ui.ts`.
 
 ## Building UI
 
@@ -33,6 +38,14 @@ Read [`docs/styling.md`](docs/styling.md) before building any console UI: it
 decides the surface (shadcn with unprefixed utilities here; Lit atoms belong to
 the login surface) and owns the token rules. The atom recipe is in
 [`apps/storybook/AGENTS.md`](../storybook/AGENTS.md).
+
+Compose from the console's shared components before the primitives. A shape
+the console already draws (a confirmation, a row menu, a choice card, a dialog
+frame, a detail card) has one component under `src/components`; use it, and
+when it lacks something add a prop rather than re-creating it with class
+overrides. When no shared component exists yet, the screen that needs the
+shape makes it shared, and the next copy is a bug. Spacing constants copied
+between files are the sign the component is missing.
 
 ## Screens
 
@@ -46,16 +59,31 @@ the login surface) and owns the token rules. The atom recipe is in
   loaders, `useRequiredProjectScope` in components.
 - Never scope a management call with `getConsoleProjectId()`: that is the
   project the console signs into, not the one being managed.
-- The sidebar is Projects (the one unscoped entry), then the project's
-  screens, listed with or without a selection: without one, a screen asks
-  for a project first (Projects with `?next=`, D22). Screens outside every
-  project (account, billing, operators) go in the project switcher or
-  Settings, not the sidebar.
+- The sidebar is the project's screens, listed with or without a selection:
+  without one, a screen asks for a project first (Projects with `?next=`,
+  D22). Projects is the home, drawn without the sidebar, behind the logo and
+  the switcher's `All projects` (D24); never give it a `staticData.nav` row.
+- Screens outside every project (account, billing, operators) go in the
+  project switcher or Settings, not the sidebar.
 - Never hand-edit `src/routeTree.gen.ts`; the TanStack Router plugin
   regenerates it from `src/routes/`.
 - In specs, assert on `router.state.resolvedLocation`, never
   `router.state.location`: ending on `location` can leave a loader's request
   in flight, which MSW reports as unhandled in a later test.
+- In specs, import `createAppRouter` at the top of the file, never inside a
+  test: the router mock in `src/test-setup.ts` fails a spec that does.
+
+## Content-Security-Policy
+
+- The console's policy allows its bundle and `index.html`'s inline script
+  by hash. A change to that script changes the hash the cloud sends
+  (repo-root `vercel.json`): `internal/staticui/console`'s test names the
+  value to set.
+
+## Analytics
+
+- Send a custom event only through `src/lib/analytics.ts`, and list it in
+  [`docs/product-analytics-events.yaml`](../../docs/product-analytics-events.yaml) in the same change.
 
 ## Local loop
 

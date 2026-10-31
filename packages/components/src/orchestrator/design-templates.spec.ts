@@ -421,4 +421,22 @@ describe("branding design catalog", () => {
     expect(centered).toContain("<zl-card");
     expect(centered).toContain('src="https://cdn.example.com/logo.svg"');
   });
+
+  // The step after the flow moved between sign-in and sign-up by itself
+  // carries a notice, which <zitadel-login> lifts into `messages`.
+  it("every shipped design shows a notice, as information", () => {
+    const engine = createLiquidEngine({
+      locale: { ...locale, "notice.user_not_found": "No account" },
+    });
+    const withNotice = {
+      ...context,
+      messages: [{ level: "info", text_key: "notice.user_not_found" }],
+    };
+    for (const design of BRANDING_DESIGNS) {
+      const html = createSanitiser()(engine.parseAndRenderSync(templateFor(design), withNotice));
+      expect(html, design).toContain(
+        '<zl-alert severity="info" data-zl-step-message="">No account</zl-alert>',
+      );
+    }
+  });
 });

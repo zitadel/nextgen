@@ -13,13 +13,31 @@ import (
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api/ogenx"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/oidc/v3/pkg/op"
 )
 
 const (
-	sessionCookieName = "__nextgen_session"
+	// sessionCookieName is the session cookie's canonical name, the one the
+	// sessionCookie security scheme names (ADR 083). The `__Host-` prefix makes
+	// a browser refuse it from anywhere but this host over a secure response,
+	// so no sibling host can plant a session cookie the server reads.
+	sessionCookieName = "__Host-zitadel_session"
+	// loopbackSessionCookieName is the name over plain http to a loopback host,
+	// where the cookie has no Secure for Safari (see cookieSecureFromContext),
+	// and so cannot carry the prefix.
+	loopbackSessionCookieName = "zitadel_session"
 )
+
+// sessionCookieNameFor is the name a session cookie is set under, by whether
+// it is Secure, as ssoBindingCookieName decides the SSO binding's.
+func sessionCookieNameFor(secure bool) string {
+	if secure {
+		return sessionCookieName
+	}
+	return loopbackSessionCookieName
+}
 
 func (h Handler) CreateSession(ctx context.Context, req *api.CreateSessionRequest) (api.CreateSessionRes, error) {
 	input := service.CreateSessionInput{
@@ -78,7 +96,7 @@ func (h Handler) ExchangeHandoff(ctx context.Context, req *api.ExchangeRequest, 
 	// transaction only writes the grant and never creates a team or membership.
 	if h.personalTeams != nil && session.UserID != nil {
 		if err := h.personalTeams.EnsurePersonalTeam(ctx, session.ProjectID, *session.UserID); err != nil {
-			slog.WarnContext(ctx, "personal team ensure failed on session exchange",
+			zlog.Warn(ctx, "personal team ensure failed on session exchange",
 				slog.String("project_id", session.ProjectID),
 				slog.String("user_id", *session.UserID),
 				slog.Any("error", err))
@@ -249,8 +267,8 @@ func (h Handler) RevokeSession(ctx context.Context, params api.RevokeSessionPara
 		return nil, err
 	}
 	// No Set-Cookie: this operation revokes a session by id on behalf of an
-	// operator, so the caller's own __nextgen_session cookie is unrelated to the
-	// revoked session. Clearing it here signs the operator out. Cookie clearing
+	// operator, so the caller's own session cookie is unrelated to the revoked
+	// session. Clearing it here signs the operator out. Cookie clearing
 	// belongs to RevokeMySession, which acts on the cookie's own session.
 	return &api.RevokeSessionNoContent{}, nil
 }
@@ -412,13 +430,14 @@ func deleteSessionCookie(ctx context.Context) string {
 }
 
 func sessionCookie(ctx context.Context, token string, maxAge int) string {
+	// Secure follows the request scheme so Safari can keep the cookie on
+	// http://localhost (see cookieSecureFromContext), and the name with it.
+	secure := cookieSecureFromContext(ctx)
 	c := &http.Cookie{
-		Name:     sessionCookieName,
+		Name:     sessionCookieNameFor(secure),
 		Value:    token,
 		HttpOnly: true,
-		// Secure follows the request scheme so Safari can keep the cookie on
-		// http://localhost (see cookieSecureFromContext).
-		Secure:   cookieSecureFromContext(ctx),
+		Secure:   secure,
 		SameSite: http.SameSiteLaxMode,
 		Path:     "/",
 	}

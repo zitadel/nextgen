@@ -74,14 +74,27 @@ const PROJECT = "proj_app";
  */
 const OTHER_PROJECT = "proj_other";
 
-/** The cookie this app keeps its project's session in (ADR 073). */
-const SESSION = `__nextgen_session_${PROJECT}`;
+/**
+ * The cookie this app keeps its project's session in on a loopback http host
+ * (ADR 073, ADR 083).
+ */
+const SESSION = `zitadel_session_${PROJECT}`;
+
+/** The same cookie over https, where it carries the `__Host-` prefix (ADR 083). */
+const SECURE_SESSION = `__Host-zitadel_session_${PROJECT}`;
 
 /**
- * The cookie the server sets, which every project on a host shared before
- * ADR 073, and where the Console of a local server still keeps its session.
+ * The cookie the server sets on a loopback http host, which every project on
+ * that host would share, and where the Console of a local server keeps its
+ * session.
  */
-const SHARED = "__nextgen_session";
+const SHARED = "zitadel_session";
+
+/**
+ * The server's cookie under its canonical name: where it keeps a session over
+ * https, and the name every session goes upstream under (ADR 083).
+ */
+const SERVER_SESSION = "__Host-zitadel_session";
 
 /** Publishes the test key as the JWKS and returns a signer for tokens it verifies. */
 function signer() {
@@ -116,11 +129,14 @@ function captureFetch(response: () => Response = () => new Response("{}", { stat
   return calls;
 }
 
-/** Answers the opaque-session lookup (`GET /sessions/me`) with `response`. */
+/**
+ * Answers the opaque-session lookup (`GET /sessions/me`) with `response`, a
+ * copy each time: the middleware and `auth()` may both ask.
+ */
 function sessionsMe(response: Response): void {
   vi.stubGlobal(
     "fetch",
-    vi.fn(async () => response),
+    vi.fn(async () => response.clone()),
   );
 }
 
@@ -169,21 +185,25 @@ function expectCopied(headers: Headers, token: string): void {
 }
 
 /**
- * Answers the proxy's calls: the proxied sign-out, and a session check with
- * `check`. Records each call's method and the session cookie it sent.
+ * Answers the proxy's calls: the proxied sign-out, the session's CSRF token,
+ * and a session check with `check`. Records each call's method and the
+ * session cookie it sent.
  */
 function signOutBackend(check: () => Response): { method: string; cookie: string | null }[] {
   const calls: { method: string; cookie: string | null }[] = [];
   vi.stubGlobal(
     "fetch",
-    vi.fn(async (_url: string, init?: RequestInit) => {
+    vi.fn(async (url: string, init?: RequestInit) => {
       const method = init?.method ?? "GET";
       calls.push({ method, cookie: new Headers(init?.headers).get("cookie") });
-      return method === "DELETE"
-        ? new Response(null, {
-            status: 204,
-            headers: { "set-cookie": `${SHARED}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax` },
-          })
+      if (method === "DELETE") {
+        return new Response(null, {
+          status: 204,
+          headers: { "set-cookie": `${SHARED}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax` },
+        });
+      }
+      return new URL(url).pathname === "/sessions/me/csrf"
+        ? Response.json({ csrf_token: "csrf" })
         : check();
     }),
   );
@@ -235,11 +255,10 @@ async function serve(
       inbound.set(name.slice("x-middleware-request-".length), value);
     }
   }
-  const token = inbound.get("x-nextgen-auth-token");
+  // A server component reads the session with auth(), which checks the token
+  // the middleware handed on: off a protected route, an opaque one unchecked.
   const auth = continued
-    ? ((token
-        ? { isAuthenticated: true, session: { token } }
-        : { isAuthenticated: false, session: null }) as AuthResult)
+    ? await readAuth({ "x-nextgen-auth-token": inbound.get("x-nextgen-auth-token") ?? "" }, options)
     : undefined;
   return {
     answered: !continued,
@@ -262,13 +281,13 @@ function configureProject(configured?: string, environment?: string): ServeOptio
   return { projectId: configured };
 }
 
-async function readAuth(context: unknown): Promise<AuthResult> {
+async function readAuth(context: unknown, options: ServeOptions = {}): Promise<AuthResult> {
   mockHeaders.clear();
   for (const [name, value] of Object.entries((context ?? {}) as Record<string, string>)) {
     mockHeaders.set(name, value);
   }
   const { auth } = await import("../auth.js");
-  return auth();
+  return auth(options);
 }
 
 function expectHandlerType(): void {
@@ -571,6 +590,25 @@ describe("server middleware", () => {
     expect(served.headers.get("set-cookie")).toBe(`${SESSION}=abc; Path=/; HttpOnly; SameSite=Lax`);
   });
 
+  it("names a proxied session cookie for this app's project over https", async () => {
+    const upstream = new Headers();
+    upstream.append(
+      "set-cookie",
+      `${SERVER_SESSION}=abc; Path=/; Max-Age=60; HttpOnly; Secure; SameSite=Lax`,
+    );
+    captureFetch(() => new Response("{}", { status: 200, headers: upstream }));
+
+    const served = await serve(
+      "https://app.example.com/__nextgen/sessions/exchange",
+      { method: "POST" },
+      APP_PROXY,
+    );
+
+    expect(served.headers.get("set-cookie")).toBe(
+      `${SECURE_SESSION}=abc; Path=/; Max-Age=60; HttpOnly; SameSite=Lax; Secure`,
+    );
+  });
+
   it("sends this project's session cookie upstream under the server's name", async () => {
     const calls = captureFetch();
 
@@ -580,7 +618,7 @@ describe("server middleware", () => {
       APP_PROXY,
     );
 
-    expect(calls[0]?.headers.get("cookie")).toBe(`theme=dark; ${SHARED}=mine`);
+    expect(calls[0]?.headers.get("cookie")).toBe(`theme=dark; ${SERVER_SESSION}=mine`);
   });
 
   // The shared cookie may hold the Console's session, and another app's cookie
@@ -593,13 +631,36 @@ describe("server middleware", () => {
       {
         method: "DELETE",
         headers: {
-          cookie: `${SHARED}=console; __nextgen_session_${OTHER_PROJECT}=other; _zflow=f`,
+          cookie: [
+            `${SHARED}=console`,
+            `${SERVER_SESSION}=console`,
+            `zitadel_session_${OTHER_PROJECT}=other`,
+            `__Host-zitadel_session_${OTHER_PROJECT}=other`,
+            "__nextgen_session=old",
+            `__nextgen_session_${PROJECT}=old`,
+            "_zflow=f",
+          ].join("; "),
         },
       },
       APP_PROXY,
     );
 
     expect(calls[0]?.headers.get("cookie")).toBe("_zflow=f");
+  });
+
+  // ADR 083: a session cookie from before it is neither renamed nor passed on.
+  it("drops the Set-Cookie of a session cookie from before ADR 083", async () => {
+    const upstream = new Headers();
+    upstream.append("set-cookie", "__nextgen_session=abc; Path=/; HttpOnly; SameSite=Lax");
+    captureFetch(() => new Response("{}", { status: 200, headers: upstream }));
+
+    const served = await serve(
+      `${ORIGIN}/__nextgen/sessions/exchange`,
+      { method: "POST" },
+      APP_PROXY,
+    );
+
+    expect(served.headers.get("set-cookie")).toBeNull();
   });
 
   // A session kept under the shared name before ADR 073 reaches the backend
@@ -619,9 +680,9 @@ describe("server middleware", () => {
     // probe about it, to retire it.
     const probe = `${PROXY.url}/api/v1/sessions/me?project_id=${PROJECT}`;
     expect(calls.map((call) => [call.url, call.headers.get("cookie")])).toEqual([
-      [probe, `${SHARED}=old`],
+      [probe, `${SERVER_SESSION}=old`],
       [`${PROXY.url}/api/v1/sessions/me`, null],
-      [probe, `${SHARED}=old`],
+      [probe, `${SERVER_SESSION}=old`],
     ]);
   });
 
@@ -658,8 +719,8 @@ describe("server middleware", () => {
     expect(setCookies.some((cookie) => new RegExp(`^${SESSION}=;`).test(cookie))).toBe(true);
     expect(setCookies.some((cookie) => new RegExp(`^${SHARED}=;`).test(cookie))).toBe(true);
     expect(calls.filter(({ method }) => method === "DELETE")).toEqual([
-      { method: "DELETE", cookie: `${SHARED}=current` },
-      { method: "DELETE", cookie: `${SHARED}=earlier` },
+      { method: "DELETE", cookie: `${SERVER_SESSION}=current` },
+      { method: "DELETE", cookie: `${SERVER_SESSION}=earlier` },
     ]);
   });
 
@@ -678,8 +739,23 @@ describe("server middleware", () => {
       false,
     );
     expect(calls.filter(({ method }) => method === "DELETE")).toEqual([
-      { method: "DELETE", cookie: `${SHARED}=current` },
+      { method: "DELETE", cookie: `${SERVER_SESSION}=current` },
     ]);
+  });
+
+  it("ends this app's session over https on sign-out", async () => {
+    const calls = signOutBackend(() => Response.json({ project_id: PROJECT, user_id: "u1" }));
+
+    const served = await serve(
+      "https://app.example.com/__nextgen/sessions/me",
+      { method: "DELETE", headers: { cookie: `${SECURE_SESSION}=current` } },
+      APP_PROXY,
+    );
+
+    expect(served.headers.getSetCookie()).toEqual([
+      `${SECURE_SESSION}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax; Secure`,
+    ]);
+    expect(calls).toEqual([{ method: "DELETE", cookie: `${SERVER_SESSION}=current` }]);
   });
 
   // The IdP callback answers 303 back to the page sign-in started on: a
@@ -888,7 +964,9 @@ describe("server middleware", () => {
     expect(served.status).toBe(302);
   });
 
-  it("clears a dead session cookie on a public page", async () => {
+  // Off a protected route the middleware leaves an opaque session to auth(),
+  // so the cookie stays until a protected route finds it dead and clears it.
+  it("reads a dead session cookie as signed out on a public page", async () => {
     sessionsMe(new Response(null, { status: 401 }));
 
     const served = await serve(
@@ -897,8 +975,8 @@ describe("server middleware", () => {
       OPTIONS,
     );
 
-    expect(served.headers.get("set-cookie")).toMatch(new RegExp(`^${SESSION}=;`));
-    expect(served.headers.get("set-cookie")).toMatch(/Max-Age=0|expires=.*1970/i);
+    expect(served.auth).toEqual({ isAuthenticated: false, session: null });
+    expect(served.headers.get("set-cookie")).toBeNull();
   });
 
   it("clears a dead session cookie and redirects on a protected route", async () => {
@@ -915,6 +993,7 @@ describe("server middleware", () => {
     expect(served.headers.get("set-cookie")).toMatch(/Max-Age=0|expires=.*1970/i);
   });
 
+  // On a protected route: only there does the middleware ask about an opaque session.
   it("clears the cookie of a session that is gone", async () => {
     sessionsMe(
       Response.json(
@@ -924,7 +1003,7 @@ describe("server middleware", () => {
     );
 
     const served = await serve(
-      `${ORIGIN}/`,
+      `${ORIGIN}/admin`,
       { headers: { cookie: `${SESSION}=opaque-session-token` } },
       OPTIONS,
     );
@@ -1036,7 +1115,7 @@ describe("server middleware", () => {
     );
 
     expect(served.auth).toMatchObject({ isAuthenticated: true, session: { token: "mine" } });
-    expect(calls[0]?.headers.get("cookie")).toBe(`${SHARED}=mine`);
+    expect(calls[0]?.headers.get("cookie")).toBe(`${SERVER_SESSION}=mine`);
     expect(served.headers.get("set-cookie")).toBeNull();
   });
 
@@ -1045,13 +1124,43 @@ describe("server middleware", () => {
 
     const served = await serve(
       `${ORIGIN}/`,
-      { headers: { cookie: `__nextgen_session_${OTHER_PROJECT}=other` } },
+      { headers: { cookie: `zitadel_session_${OTHER_PROJECT}=other` } },
       OPTIONS,
     );
 
     expect(served.auth?.isAuthenticated).toBe(false);
     expect(calls).toHaveLength(0);
     expect(served.headers.get("set-cookie")).toBeNull();
+  });
+
+  // ADR 083: a session cookie from before it is no credential and no source of one.
+  it("reads no session from a cookie from before ADR 083", async () => {
+    const calls = captureFetch();
+
+    const served = await serve(
+      `${ORIGIN}/admin`,
+      { headers: { cookie: `__nextgen_session=old; __nextgen_session_${PROJECT}=old` } },
+      OPTIONS,
+    );
+
+    expect(served.status).toBe(302);
+    expect(calls).toHaveLength(0);
+    expect(served.headers.getSetCookie()).toEqual([]);
+  });
+
+  // Any sibling host can plant an unprefixed cookie, and an https app never
+  // sets one.
+  it("reads no unprefixed session cookie over https", async () => {
+    const calls = captureFetch();
+
+    const served = await serve(
+      "https://app.example.com/admin",
+      { headers: { cookie: `${SESSION}=planted; ${SHARED}=planted` } },
+      OPTIONS,
+    );
+
+    expect(served.status).toBe(302);
+    expect(calls).toHaveLength(0);
   });
 
   // A session this app's users signed in to before ADR 073 sits under the
@@ -1079,12 +1188,13 @@ describe("server middleware", () => {
   });
 
   // A shared cache must hand neither the cookie nor the session token in it to
-  // the next visitor.
+  // the next visitor. On a protected route: only there does the middleware ask
+  // about an opaque session.
   it("keeps a page that sets a session cookie out of shared caches", async () => {
     sessionsMe(Response.json({ project_id: PROJECT, user_id: "u1" }));
 
     const served = await serve(
-      `${ORIGIN}/`,
+      `${ORIGIN}/admin`,
       { headers: { cookie: `${SHARED}=opaque-session-token` } },
       OPTIONS,
     );
@@ -1093,14 +1203,15 @@ describe("server middleware", () => {
     expect(served.headers.get("cache-control")).toBe("private, no-store");
   });
 
+  // On a protected route: only there does the middleware ask about an opaque session.
   it("copies with Secure behind a TLS proxy that talks to the app over loopback", async () => {
     sessionsMe(Response.json({ project_id: PROJECT, user_id: "u1" }));
 
     const served = await serve(
-      "http://127.0.0.1:3000/",
+      "http://127.0.0.1:3000/admin",
       {
         headers: {
-          cookie: `${SHARED}=opaque-session-token`,
+          cookie: `${SERVER_SESSION}=opaque-session-token`,
           "x-forwarded-proto": "https",
           "x-forwarded-host": "app.example.com",
         },
@@ -1112,12 +1223,13 @@ describe("server middleware", () => {
   });
 
   // Safari drops a Secure cookie over plain http, and it would keep sending
-  // the dead one.
+  // the dead one. On a protected route: only there does the middleware ask
+  // about an opaque session.
   it("clears a dead session cookie without Secure over plain http to a loopback address", async () => {
     sessionsMe(new Response(null, { status: 401 }));
 
     const served = await serve(
-      "http://127.0.0.1:3000/",
+      "http://127.0.0.1:3000/admin",
       { headers: { cookie: `${SESSION}=opaque-session-token` } },
       OPTIONS,
     );
@@ -1127,14 +1239,15 @@ describe("server middleware", () => {
     expect(cleared).not.toMatch(/; Secure(;|$)/i);
   });
 
+  // On a protected route: only there does the middleware ask about an opaque session.
   it("clears only this project's dead session cookie", async () => {
     sessionsMe(new Response(null, { status: 401 }));
 
     const served = await serve(
-      `${ORIGIN}/`,
+      `${ORIGIN}/admin`,
       {
         headers: {
-          cookie: `${SHARED}=console; __nextgen_session_${OTHER_PROJECT}=other; ${SESSION}=dead`,
+          cookie: `${SHARED}=console; zitadel_session_${OTHER_PROJECT}=other; ${SESSION}=dead`,
         },
       },
       OPTIONS,

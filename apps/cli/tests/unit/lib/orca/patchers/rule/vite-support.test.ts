@@ -3,7 +3,12 @@ import { fileURLToPath } from "node:url";
 import ts from "typescript";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { SESSION_COOKIE_MARKER } from "../../../../../../src/lib/orca/patchers/rule/session-cookie";
+import {
+  indented,
+  SESSION_COOKIE_MARKER,
+  viteSessionCookieStatements,
+  viteSessionCookieStatementsV1,
+} from "../../../../../../src/lib/orca/patchers/rule/session-cookie";
 import {
   viteApiPrefixEdit,
   viteApiPrefixVerdict,
@@ -23,6 +28,30 @@ const BOTH_EXCHANGE_PATHS =
   '(pathname === "/sessions/exchange" || pathname === "/api/v1/sessions/exchange")';
 
 const BARE_CONFIG = 'import { defineConfig } from "vite";\n\nexport default defineConfig({});\n';
+
+/** `config` with the session-cookie hooks the CLI wrote before ADR 083 in place of the current ones. */
+function withV1Hooks(config: string): string {
+  const indent = new RegExp(`^([\\t ]*)/\\* ${SESSION_COOKIE_MARKER} \\*/`, "m").exec(config)?.[1];
+  const current = indented(viteSessionCookieStatements(), indent ?? "");
+  if (indent === undefined || !config.includes(current)) {
+    throw new Error("expected the current session-cookie hooks in the config");
+  }
+  return config.replace(current, indented(viteSessionCookieStatementsV1(), indent));
+}
+
+/**
+ * Every session cookie a browser on the app's host may hold but the app's own:
+ * the server's under both names, another project's app's, and those from
+ * before ADR 083.
+ */
+const OTHER_SESSION_COOKIES = [
+  "zitadel_session=console",
+  "__Host-zitadel_session=console",
+  "zitadel_session_proj_other=other",
+  "__Host-zitadel_session_proj_other=other",
+  "__nextgen_session=old",
+  "__nextgen_session_proj_spa=old",
+].join("; ");
 
 /**
  * What setup wrote into {@link BARE_CONFIG} before the proxy forwarded the
@@ -154,7 +183,7 @@ describe("viteProxyEdit", () => {
     expect(out).toContain(SESSION_COOKIE_MARKER);
     expect(out).toContain('loadEnv("development", process.cwd(), "ZITADEL_").ZITADEL_PROJECT_ID');
     // The listeners themselves, so Vite's types reach their parameters.
-    expect(out).toContain('proxy.on("proxyRes", (proxyRes) => {');
+    expect(out).toContain('proxy.on("proxyRes", (proxyRes, req) => {');
     expect(out).not.toMatch(/function \w+\(/);
   });
 
@@ -369,6 +398,35 @@ export default defineConfig({
     expect(sessionCookieEdit(current)).toBe(current);
   });
 
+  it("replaces the session-cookie hooks it wrote before ADR 083", () => {
+    const current = sessionCookieEdit(bearerOnly);
+
+    expect(sessionCookieEdit(withV1Hooks(current))).toBe(current);
+  });
+
+  // create-vue's Prettier drops semicolons and arrow parentheses and uses single quotes.
+  it("finds the hooks it wrote before ADR 083 whatever a formatter did to their layout", () => {
+    const formatted = withV1Hooks(sessionCookieEdit(bearerOnly))
+      .replace(/"/g, "'")
+      .replace(/;$/gm, "")
+      .replace(/\((\w+)\) =>/g, "$1 =>");
+
+    const out = sessionCookieEdit(formatted);
+
+    expect(out).toContain(SESSION_COOKIE_MARKER);
+    expect(out).not.toContain("__nextgen_session_");
+    expect(viteSessionCookieVerdict(out)).toBe("applied");
+  });
+
+  it("leaves hooks from before ADR 083 that were changed by hand alone", () => {
+    const changed = withV1Hooks(sessionCookieEdit(bearerOnly)).replace(
+      'const setCookies = proxyRes.headers["set-cookie"];',
+      'const setCookies = proxyRes.headers["set-cookie"];\n            console.debug(setCookies);',
+    );
+
+    expect(sessionCookieEdit(changed)).toBe(changed);
+  });
+
   it("throws E_VALIDATION when the config is missing", () => {
     expect(() => sessionCookieEdit(undefined)).toThrowError(/not found/);
   });
@@ -439,6 +497,24 @@ describe("viteSessionCookieVerdict", () => {
 
   it("reads a config without the CLI's entry as detached, since the proxy edit writes it with them", () => {
     expect(viteSessionCookieVerdict(BARE_CONFIG)).toBe("detached");
+  });
+
+  // They keep the session in cookies the server no longer reads.
+  it("reads the hooks it wrote before ADR 083 as outdated, for doctor --fix", () => {
+    expect(viteSessionCookieVerdict(withV1Hooks(edit(BARE_CONFIG)))).toEqual({
+      outdated: expect.stringContaining("doctor --fix updates them"),
+    });
+  });
+
+  it("reads hooks from before ADR 083 that were changed by hand as outdated, to update by hand", () => {
+    const changed = withV1Hooks(edit(BARE_CONFIG)).replace(
+      "if (appCookie && setCookies) {",
+      "if (appCookie && setCookies && setCookies.length > 0) {",
+    );
+
+    expect(viteSessionCookieVerdict(changed)).toEqual({
+      outdated: expect.stringContaining("must be updated by hand"),
+    });
   });
 
   // The edit leaves such an entry as it is, so its output says nothing.
@@ -621,6 +697,13 @@ describe("the generated vite.config.ts, type-checked as a create-vite TS templat
     expect(strictDiagnostics(upgraded)).toEqual([]);
   });
 
+  it("type-checks once doctor --fix replaced the hooks before ADR 083", { timeout: 60_000 }, () => {
+    const upgraded = sessionCookieEdit(withV1Hooks(edit(BARE_CONFIG)));
+
+    expect(upgraded).toContain(SESSION_COOKIE_MARKER);
+    expect(strictDiagnostics(upgraded)).toEqual([]);
+  });
+
   // Proves the check sees what a strict build sees.
   it("reports an untyped parameter", { timeout: 60_000 }, () => {
     const untyped = edit(BARE_CONFIG).replace(
@@ -713,19 +796,18 @@ describe("the generated proxy, run by Vite against a remote https server", () =>
     const { origin } = await serve(viteProxyEdit(5173, remote.url)(BARE_CONFIG), withProject);
 
     await fetch(`${origin}/__nextgen/users/me`, {
-      headers: {
-        cookie:
-          "theme=dark; __nextgen_session=console; __nextgen_session_proj_other=other; __nextgen_session_proj_spa=mine",
-      },
+      headers: { cookie: `theme=dark; ${OTHER_SESSION_COOKIES}; zitadel_session_proj_spa=mine` },
     });
 
-    expect(remote.requests.at(-1)?.headers.cookie).toBe("theme=dark; __nextgen_session=mine");
+    expect(remote.requests.at(-1)?.headers.cookie).toBe("theme=dark; __Host-zitadel_session=mine");
   });
 
+  // The remote server is https, so it sets the prefixed name with Secure; the
+  // app on loopback http keeps it without either.
   it("keeps the session cookie the server sets under the app's project's name", async () => {
     remote.answerWith({
       "set-cookie": [
-        "__nextgen_session=minted; Path=/; HttpOnly; SameSite=Lax",
+        "__Host-zitadel_session=minted; Path=/; Max-Age=60; HttpOnly; Secure; SameSite=Lax",
         "_zflow=; Path=/; Max-Age=0",
       ],
     });
@@ -734,36 +816,65 @@ describe("the generated proxy, run by Vite against a remote https server", () =>
     const response = await fetch(`${origin}/__nextgen/sessions/exchange`, { method: "POST" });
 
     expect(response.headers.getSetCookie()).toEqual([
-      "__nextgen_session_proj_spa=minted; Path=/; HttpOnly; SameSite=Lax",
+      "zitadel_session_proj_spa=minted; Path=/; Max-Age=60; HttpOnly; SameSite=Lax",
       "_zflow=; Path=/; Max-Age=0",
     ]);
   });
 
-  it("passes the cookies through when no project is configured", async () => {
+  it("drops a session cookie from before ADR 083 the server sets", async () => {
     remote.answerWith({ "set-cookie": "__nextgen_session=minted; Path=/" });
+    const { origin } = await serve(viteProxyEdit(5173, remote.url)(BARE_CONFIG), withProject);
+
+    const response = await fetch(`${origin}/__nextgen/sessions/exchange`, { method: "POST" });
+
+    expect(response.headers.getSetCookie()).toEqual([]);
+  });
+
+  it("passes the cookies through when no project is configured", async () => {
+    remote.answerWith({ "set-cookie": "__Host-zitadel_session=minted; Path=/; Secure" });
     const { origin } = await serve(viteProxyEdit(5173, remote.url)(BARE_CONFIG), {
       ...env,
       ZITADEL_PROJECT_ID: "",
     });
 
     const response = await fetch(`${origin}/__nextgen/sessions/me`, {
-      headers: { cookie: "__nextgen_session=tok" },
+      headers: { cookie: "zitadel_session=tok" },
     });
 
-    expect(remote.requests.at(-1)?.headers.cookie).toBe("__nextgen_session=tok");
-    expect(response.headers.getSetCookie()).toEqual(["__nextgen_session=minted; Path=/"]);
+    expect(remote.requests.at(-1)?.headers.cookie).toBe("zitadel_session=tok");
+    expect(response.headers.getSetCookie()).toEqual([
+      "__Host-zitadel_session=minted; Path=/; Secure",
+    ]);
   });
 
   it("keeps the session cookie per project once it gave the entry it wrote before the hooks", async () => {
-    remote.answerWith({ "set-cookie": "__nextgen_session=minted; Path=/" });
+    remote.answerWith({ "set-cookie": "__Host-zitadel_session=minted; Path=/; Secure" });
     const previous = edit(PREVIOUS_CONFIG.replace("https://zitadel.example.com", remote.url));
     const { origin } = await serve(sessionCookieEdit(previous), withProject);
 
     const response = await fetch(`${origin}/__nextgen/users/me`, {
-      headers: { cookie: "__nextgen_session=console; __nextgen_session_proj_spa=mine" },
+      headers: { cookie: "zitadel_session=console; zitadel_session_proj_spa=mine" },
     });
 
-    expect(remote.requests.at(-1)?.headers.cookie).toBe("__nextgen_session=mine");
-    expect(response.headers.getSetCookie()).toEqual(["__nextgen_session_proj_spa=minted; Path=/"]);
+    expect(remote.requests.at(-1)?.headers.cookie).toBe("__Host-zitadel_session=mine");
+    expect(response.headers.getSetCookie()).toEqual([
+      "zitadel_session_proj_spa=minted; Path=/; HttpOnly; SameSite=Lax",
+    ]);
+  });
+
+  it("keeps the session cookie per project once doctor --fix replaced the hooks before ADR 083", async () => {
+    remote.answerWith({ "set-cookie": "zitadel_session=minted; Path=/; Max-Age=0" });
+    const v1 = withV1Hooks(viteProxyEdit(5173, remote.url)(BARE_CONFIG));
+    const { origin } = await serve(sessionCookieEdit(v1), withProject);
+
+    const response = await fetch(`${origin}/__nextgen/sessions/me`, {
+      method: "DELETE",
+      headers: { cookie: "zitadel_session=console; zitadel_session_proj_spa=mine" },
+    });
+
+    expect(remote.requests.at(-1)?.headers.cookie).toBe("__Host-zitadel_session=mine");
+    expect(response.headers.getSetCookie()).toEqual([
+      "zitadel_session_proj_spa=minted; Path=/; Max-Age=0; HttpOnly; SameSite=Lax",
+    ]);
   });
 });

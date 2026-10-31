@@ -4,6 +4,7 @@ package integration_test
 
 import (
 	"bytes"
+	"encoding/json"
 	"net/http"
 	"testing"
 
@@ -125,10 +126,11 @@ func TestOriginsAddRemove(t *testing.T) {
 		assert.Equal(t, domain.ErrOriginPrimaryNotExact().Code, code)
 	})
 
-	// addOrigin / removeOrigin declare oauth2 only (no nextgenSession). The
-	// generated client cannot offer the cookie; a raw cookie-only request must
-	// still be refused at the security layer before any handler runs.
-	t.Run("add refuses a raw session cookie", func(t *testing.T) {
+	// addOrigin accepts the session cookie (#2320), so like every other
+	// session write it needs the CSRF token (ADR 053 §5). The generated client
+	// sends the token; a raw request carrying only the cookie must be refused
+	// at the security layer, before any handler runs.
+	t.Run("add refuses a session cookie without the CSRF token", func(t *testing.T) {
 		console := harness.EnsurePlatformProject(t)
 		claimerID, _ := harness.CreateUserOwnedByTeam(t, console.ID)
 		cookie := platformSessionCookie(t, claimerID).Value
@@ -139,12 +141,17 @@ func TestOriginsAddRemove(t *testing.T) {
 			base+"/projects/"+project.ID+"/origins", bytes.NewReader(body))
 		require.NoError(t, err)
 		req.Header.Set("Content-Type", "application/json")
-		req.AddCookie(&http.Cookie{Name: "__nextgen_session", Value: cookie})
+		req.AddCookie(&http.Cookie{Name: "__Host-zitadel_session", Value: cookie})
 
 		resp, err := harness.EnsureHttpClient(t).Do(req)
 		require.NoError(t, err)
 		defer resp.Body.Close()
-		assert.Equal(t, http.StatusUnauthorized, resp.StatusCode,
-			"a cookie-only POST /origins must be refused")
+		assert.Equal(t, http.StatusForbidden, resp.StatusCode,
+			"a cookie-only POST /origins without the CSRF token must be refused")
+		var parsed struct {
+			Code string `json:"code"`
+		}
+		require.NoError(t, json.NewDecoder(resp.Body).Decode(&parsed))
+		assert.Equal(t, domain.ErrAuthCSRFInvalid().Code, parsed.Code)
 	})
 }

@@ -96,20 +96,32 @@ func TestDeploymentsEqual(t *testing.T) {
 	primary, err := NewDeployment("proj_1", "rel_a", DeploymentOriginKindPrimary, origins, DeploymentMetadata{})
 	require.NoError(t, err)
 	current := *primary
-	assert.True(t, DeploymentsEqual(primary, &current))
-	assert.False(t, DeploymentsEqual(primary, nil), "nothing deployed yet is a change")
+	const setHash = "abc"
+	assert.True(t, DeploymentsEqual(primary, &current, setHash, setHash))
+	assert.False(t, DeploymentsEqual(primary, nil, setHash, setHash), "nothing deployed yet is a change")
+	assert.False(t, DeploymentsEqual(primary, &current, setHash, "other"), "a changed variable set is a new deployment")
 
 	added, err := NewDeployment("proj_1", "rel_a", DeploymentOriginKindPrimary, append(origins, "https://acme.com"), DeploymentMetadata{})
 	require.NoError(t, err)
-	assert.False(t, DeploymentsEqual(added, &current), "a primary origin added since is a change")
+	assert.False(t, DeploymentsEqual(added, &current, setHash, setHash), "a primary origin added since is a change")
 
 	other, err := NewDeployment("proj_1", "rel_b", DeploymentOriginKindPrimary, origins, DeploymentMetadata{})
 	require.NoError(t, err)
-	assert.False(t, DeploymentsEqual(other, &current))
+	assert.False(t, DeploymentsEqual(other, &current, setHash, setHash))
 
 	preview, err := NewDeployment("proj_1", "rel_a", DeploymentOriginKindPreview, origins, DeploymentMetadata{})
 	require.NoError(t, err)
-	assert.False(t, DeploymentsEqual(preview, &current), "a preview deploy renews, so it is always written")
+	assert.False(t, DeploymentsEqual(preview, &current, setHash, setHash), "a preview deploy renews, so it is always written")
+}
+
+func TestErrDeploymentVariablesMissingSortsNames(t *testing.T) {
+	err := ErrDeploymentVariablesMissing(DeploymentOriginKindPreview, []string{"GOOGLE_CLIENT_SECRET", "GOOGLE_CLIENT_ID"})
+	assert.Equal(t, "dep.variables_missing", err.Code)
+	assert.Equal(t, "deployment: the release references variables its kind has no value for", err.Message)
+	assert.Equal(t, DeploymentVariablesMissingDetails{
+		Kind:  "preview",
+		Names: []string{"GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"},
+	}, err.Details)
 }
 
 func TestCheckExpectedDeployment(t *testing.T) {
@@ -196,4 +208,22 @@ func TestResolveDeploymentTargets(t *testing.T) {
 			assert.ErrorIs(t, err, ErrProjectOriginNotAllowed(nil), target)
 		}
 	})
+}
+
+func TestResolvePreviewTTL(t *testing.T) {
+	got, err := ResolvePreviewTTL(nil)
+	require.NoError(t, err)
+	assert.Equal(t, DefaultPreviewTTL, got)
+
+	for _, ttl := range []time.Duration{time.Second, 7 * 24 * time.Hour, MaxPreviewTTL} {
+		got, err := ResolvePreviewTTL(&ttl)
+		require.NoError(t, err)
+		assert.Equal(t, ttl, got)
+	}
+	for _, ttl := range []time.Duration{0, -time.Hour, MaxPreviewTTL + time.Second} {
+		_, err := ResolvePreviewTTL(&ttl)
+		assert.ErrorIs(t, err, ErrDeploymentInvalid(), ttl)
+	}
+	_, err = ResolvePreviewTTL(new(MaxPreviewTTL + time.Second))
+	assert.ErrorContains(t, err, "at most 365 days")
 }

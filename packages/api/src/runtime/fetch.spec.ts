@@ -131,6 +131,26 @@ describe("customFetch", () => {
     expect((error as Error).message).toBe(`GET ${base}/api/v1/users/usr_1 returned 404`);
   });
 
+  it("rejects an answer whose body cannot be read as unreadable, not as no response", async () => {
+    // A proxy that forwards `content-encoding` over a body fetch already
+    // decoded: the status arrives, the body fails to decode (#2466).
+    const http = createHttpServer((_req, res) => {
+      res.writeHead(200, { "content-type": "application/json", "content-encoding": "gzip" });
+      res.end(JSON.stringify({ session: { user_id: "usr_1" } }));
+    });
+    const base = await listening(http as unknown as Server);
+
+    const error = await customFetch(`${base}/sessions/exchange`, { method: "POST" }).catch(
+      (e: unknown) => e,
+    );
+
+    expect(error).toBeInstanceOf(NetworkError);
+    expect(error).toMatchObject({ reason: "unreadable", url: `${base}/sessions/exchange` });
+    expect((error as Error).message).toMatch(
+      new RegExp(`^POST ${base}/sessions/exchange answered 200, but its body could not be read`),
+    );
+  });
+
   it("keeps the server's request ID on the ApiError", async () => {
     const http = createHttpServer((_req, res) => {
       res.writeHead(400, { "content-type": "application/json", "x-request-id": "req_01TEST" });

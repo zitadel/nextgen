@@ -131,24 +131,40 @@ func TestProjectHasherResolver(t *testing.T) {
 		assert.ErrorIs(t, err, assert.AnError)
 	})
 
-	// A policy is checked when it is written, so a stored one this deployment
-	// cannot build means the deployment changed under it. Refusing is the safe
-	// half: hashing with the default instead would quietly write a method the
-	// project rejected.
-	t.Run("refuses a policy this deployment can no longer build", func(t *testing.T) {
-		t.Parallel()
+	// A policy is checked when it is written, so a stored one that fails it now
+	// means the deployment changed under it. Refusing is the safe half: hashing
+	// with the default instead would quietly write a method the project rejected.
+	refused := map[string]struct {
+		policy *domain.PasswordHashPolicy
+		want   error // nil: no sentinel, only an error
+	}{
+		"refuses a policy this deployment can no longer build": {
+			policy: &domain.PasswordHashPolicy{Algorithm: crypto.HashName("no-such-algorithm")},
+		},
+		"refuses a method no configured verifier reads": {
+			policy: &domain.PasswordHashPolicy{Algorithm: crypto.HashNameScrypt, Params: map[string]any{"cost": float64(15)}},
+			want:   crypto.ErrAlgorithmNotSupported,
+		},
+		"refuses a cost outside the limits": {
+			policy: &domain.PasswordHashPolicy{Algorithm: crypto.HashNameBcrypt, Params: map[string]any{"cost": float64(4)}},
+			want:   crypto.ErrBoundsError,
+		},
+	}
+	for name, tt := range refused {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 
-		hashers, stmts := newMockedProjectHashers(t)
-		stmts.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(&domain.Project{
-			ID: "proj_1",
-			PasswordHashPolicy: &domain.PasswordHashPolicy{
-				Algorithm: crypto.HashName("no-such-algorithm"),
-			},
-		}, nil)
+			hashers, stmts := newMockedProjectHashers(t)
+			stmts.EXPECT().GetProjectByID(gomock.Any(), "proj_1").
+				Return(&domain.Project{ID: "proj_1", PasswordHashPolicy: tt.policy}, nil)
 
-		_, err := hashers.HasherForProject(t.Context(), "proj_1")
-		require.Error(t, err)
-	})
+			_, err := hashers.HasherForProject(t.Context(), "proj_1")
+			require.Error(t, err)
+			if tt.want != nil {
+				assert.ErrorIs(t, err, tt.want)
+			}
+		})
+	}
 }
 
 func TestFixedProjectHasherResolver(t *testing.T) {

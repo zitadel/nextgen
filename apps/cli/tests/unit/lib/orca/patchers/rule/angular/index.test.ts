@@ -16,7 +16,7 @@ import { SESSION_COOKIE_MARKER } from "../../../../../../../src/lib/orca/patcher
 import type { PatchContext } from "../../../../../../../src/lib/orca/patchers/types";
 import { MANAGED_MARKER } from "../../../../../../../src/lib/paths";
 import { REMOTE_HOST, useRemoteServer } from "../../../../../../helpers/remote-server";
-import { bearerOnlyProxyConf } from "../../../../../../helpers/proxy-conf";
+import { bearerOnlyProxyConf, v1ProxyConf } from "../../../../../../helpers/proxy-conf";
 import { aProxyConfApp, type DevApp } from "../../../../../../helpers/vite";
 
 /** The bearer hook setup writes: the exchange with and without the API prefix. */
@@ -308,6 +308,32 @@ describe("AngularPatcher.plan", () => {
     expect(sessionCookieEdit()(bearerOnlyProxyConf())).toBe(proxyConfigEdit()(undefined));
   });
 
+  it("replaces the session-cookie hooks it wrote before ADR 083", () => {
+    const out = sessionCookieEdit()(v1ProxyConf());
+
+    expect(out).toBe(proxyConfigEdit()(undefined));
+    expect(sessionCookieVerdict()(out)).toBe("applied");
+  });
+
+  // They keep the session in cookies the server no longer reads.
+  it("fails the doctor on the session-cookie hooks it wrote before ADR 083", () => {
+    expect(sessionCookieVerdict()(v1ProxyConf())).toEqual({
+      outdated: expect.stringContaining("doctor --fix updates them"),
+    });
+  });
+
+  it("leaves hooks from before ADR 083 that were changed by hand to the developer", () => {
+    const changed = v1ProxyConf().replace(
+      "function renameSessionCookie(proxyRes) {",
+      'function renameSessionCookie(proxyRes) {\n  console.debug("cookies");',
+    );
+
+    expect(sessionCookieEdit()(changed)).toBe(changed);
+    expect(sessionCookieVerdict()(changed)).toEqual({
+      outdated: expect.stringContaining("must be updated by hand"),
+    });
+  });
+
   it("leaves a managed proxy whose hooks were attached by hand alone", () => {
     const custom = bearerOnlyProxyConf().replace(
       "    onProxyReq: setBearer,\n",
@@ -501,6 +527,20 @@ describe("AngularPatcher.artifacts", () => {
   });
 });
 
+/**
+ * Every session cookie a browser on the app's host may hold but the app's own:
+ * the server's under both names, another project's app's, and those from
+ * before ADR 083.
+ */
+const OTHER_SESSION_COOKIES = [
+  "zitadel_session=console",
+  "__Host-zitadel_session=console",
+  "zitadel_session_proj_other=other",
+  "__Host-zitadel_session_proj_other=other",
+  "__nextgen_session=old",
+  "__nextgen_session_proj_spa=old",
+].join("; ");
+
 describe("the generated proxy.conf.cjs, run by Vite against a remote https server", () => {
   const remote = useRemoteServer();
   let app: DevApp | undefined;
@@ -581,36 +621,64 @@ describe("the generated proxy.conf.cjs, run by Vite against a remote https serve
     const { origin } = await serve(proxyConfigEdit()(undefined), "proj_spa");
 
     await fetch(`${origin}/__nextgen/users/me`, {
-      headers: {
-        cookie:
-          "theme=dark; __nextgen_session=console; __nextgen_session_proj_other=other; __nextgen_session_proj_spa=mine",
-      },
+      headers: { cookie: `theme=dark; ${OTHER_SESSION_COOKIES}; zitadel_session_proj_spa=mine` },
     });
 
-    expect(remote.requests.at(-1)?.headers.cookie).toBe("theme=dark; __nextgen_session=mine");
+    expect(remote.requests.at(-1)?.headers.cookie).toBe("theme=dark; __Host-zitadel_session=mine");
   });
 
+  // The remote server is https, so it sets the prefixed name with Secure; the
+  // app on loopback http keeps it without either.
   it("keeps the session cookie the server sets under the app's project's name", async () => {
-    remote.answerWith({ "set-cookie": "__nextgen_session=minted; Path=/; HttpOnly; SameSite=Lax" });
+    remote.answerWith({
+      "set-cookie":
+        "__Host-zitadel_session=minted; Path=/; Max-Age=60; HttpOnly; Secure; SameSite=Lax",
+    });
     const { origin } = await serve(proxyConfigEdit()(undefined), "proj_spa");
 
     const response = await fetch(`${origin}/__nextgen/sessions/exchange`, { method: "POST" });
 
     expect(response.headers.getSetCookie()).toEqual([
-      "__nextgen_session_proj_spa=minted; Path=/; HttpOnly; SameSite=Lax",
+      "zitadel_session_proj_spa=minted; Path=/; Max-Age=60; HttpOnly; SameSite=Lax",
     ]);
   });
 
-  it("passes the cookies through when no project is configured", async () => {
+  it("drops a session cookie from before ADR 083 the server sets", async () => {
     remote.answerWith({ "set-cookie": "__nextgen_session=minted; Path=/" });
+    const { origin } = await serve(proxyConfigEdit()(undefined), "proj_spa");
+
+    const response = await fetch(`${origin}/__nextgen/sessions/exchange`, { method: "POST" });
+
+    expect(response.headers.getSetCookie()).toEqual([]);
+  });
+
+  it("passes the cookies through when no project is configured", async () => {
+    remote.answerWith({ "set-cookie": "__Host-zitadel_session=minted; Path=/; Secure" });
     const { origin } = await serve(proxyConfigEdit()(undefined));
 
     const response = await fetch(`${origin}/__nextgen/sessions/me`, {
-      headers: { cookie: "__nextgen_session=tok" },
+      headers: { cookie: "zitadel_session=tok" },
     });
 
-    expect(remote.requests.at(-1)?.headers.cookie).toBe("__nextgen_session=tok");
-    expect(response.headers.getSetCookie()).toEqual(["__nextgen_session=minted; Path=/"]);
+    expect(remote.requests.at(-1)?.headers.cookie).toBe("zitadel_session=tok");
+    expect(response.headers.getSetCookie()).toEqual([
+      "__Host-zitadel_session=minted; Path=/; Secure",
+    ]);
+  });
+
+  it("keeps the session cookie per project once doctor --fix replaced the hooks before ADR 083", async () => {
+    remote.answerWith({ "set-cookie": "__Host-zitadel_session=minted; Path=/; Secure" });
+    const { origin } = await serve(sessionCookieEdit()(v1ProxyConf()), "proj_spa");
+
+    const response = await fetch(`${origin}/__nextgen/sessions/exchange`, {
+      method: "POST",
+      headers: { cookie: "zitadel_session=console; zitadel_session_proj_spa=mine" },
+    });
+
+    expect(remote.requests.at(-1)?.headers.cookie).toBe("__Host-zitadel_session=mine");
+    expect(response.headers.getSetCookie()).toEqual([
+      "zitadel_session_proj_spa=minted; Path=/; HttpOnly; SameSite=Lax",
+    ]);
   });
 });
 

@@ -120,6 +120,11 @@ export type GetSpec<Ctx> = Readonly<{
   call: (ctx: Ctx, id: string) => Promise<unknown>;
   /** Generated response schema of the record itself; see {@link QueryListSpec.response}. */
   response?: Schema;
+  /**
+   * Blocks a terminal shows under the fields, for a value that does not read
+   * on one line (a release's pointers). Skipped when `--fields` picks the view.
+   */
+  sections?: (item: unknown) => readonly string[];
 }>;
 // Method syntax makes `body` bivariant, so a concrete-body spec still assigns to
 // the erased spec the registry and factory hold; the body/schema fit is checked
@@ -183,6 +188,8 @@ export type ResourceDescriptor<Ctx> = Readonly<{
    * commands have no file to carry a `static group`, so the table says it.
    */
   group?: CommandGroup;
+  /** Position of the resource's row within its group on the root help, lowest first. */
+  groupOrder?: number;
   /** Property carrying the resource's own id on the wire. */
   idField: string;
   /**
@@ -196,6 +203,8 @@ export type ResourceDescriptor<Ctx> = Readonly<{
    * What the positional accepts, for `--help`. Defaults to
    * `<singular> <idArg>`, which reads well when the argument is an `id` or a
    * `name` but not when a resource takes more than one kind of reference.
+   * `get` also reads it into its summary, "Get one <singular> by …", so word
+   * it as a noun phrase that follows "by".
    */
   idDescription?: string;
   /** Dot-paths projected into the human-readable table; `--json` carries the full resource. */

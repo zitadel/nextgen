@@ -11,7 +11,13 @@ import {
   PROXY_CREDENTIAL_POLICY_V2_MARKER,
   V2_EXCHANGE_PATH_CHECK,
 } from "./proxy-credential-policy";
-import { indented, SESSION_COOKIE_MARKER, viteSessionCookieStatements } from "./session-cookie";
+import {
+  indented,
+  SESSION_COOKIE_MARKER,
+  SESSION_COOKIE_MARKER_V1,
+  viteSessionCookieStatements,
+  viteSessionCookieStatementsV1,
+} from "./session-cookie";
 import { lfText, withLfLineEnds } from "./utils/line-ends";
 import {
   ensureEditableObject,
@@ -41,7 +47,8 @@ import {
  * browser's `Origin`, which the proxy passes on untouched.
  *
  * The session cookie travels under the app's project's name in the browser and
- * the server's name upstream ({@link viteSessionCookieStatements}, ADR 073).
+ * the server's name upstream ({@link viteSessionCookieStatements}, ADR 073,
+ * ADR 083).
  */
 function proxyEntryCode(server: string): string {
   return `/* ${PROXY_CREDENTIAL_POLICY_MARKER} */ {
@@ -312,16 +319,46 @@ function cliEntry(source: string): CliEntry | undefined {
   return cliEntryOf(resolveDefaultExportObject(mod, VITE_CONFIG_LABEL), source);
 }
 
+/** How many statements the hooks before ADR 083 are: the project id, the cookie name and the two listeners. */
+const V1_HOOK_STATEMENTS = 4;
+
+/**
+ * `text` (LF line ends) with the session-cookie hooks the CLI wrote before
+ * ADR 083 replaced by the current ones, at their indentation, or `undefined`
+ * when the CLI's entry does not carry them as the CLI wrote them, whatever a
+ * formatter did to their layout.
+ */
+function withCurrentHooks(text: string): string | undefined {
+  const marker = text.indexOf(`/* ${SESSION_COOKIE_MARKER_V1} */`);
+  const statements = marker === -1 ? undefined : cliEntry(text)?.statements;
+  const first = statements?.findIndex((statement) => statement.start > marker) ?? -1;
+  const last = statements?.[first + V1_HOOK_STATEMENTS - 1];
+  if (first === -1 || !last) {
+    return undefined;
+  }
+  const lineStart = text.lastIndexOf("\n", marker - 1) + 1;
+  if (
+    fingerprint(text.slice(lineStart, last.end)) !==
+    fingerprint(viteSessionCookieStatementsV1().join("\n"))
+  ) {
+    return undefined;
+  }
+  const indent = /^[\t ]*/.exec(text.slice(lineStart, marker))?.[0] ?? "";
+  return `${text.slice(0, lineStart)}${indented(viteSessionCookieStatements(), indent)}${text.slice(last.end)}`;
+}
+
 /**
  * Builds the `edit` transform that gives the CLI's own `/__nextgen` entry the
- * session-cookie hooks (ADR 073), for apps set up before the entry carried
- * them: the hooks go after the last statement of its `configure(proxy)` body,
- * at that statement's indentation, and nothing else in the file changes. A
- * config whose entry carries them already, a hand-written entry, and one whose
- * bearer hook was changed are returned untouched; {@link viteSessionCookieVerdict}
- * tells the doctor which it is. Line ends are the file's own (CRLF or LF).
- * Throws `E_VALIDATION`, as {@link viteProxyEdit} does, when the file is absent
- * or unreadable.
+ * session-cookie hooks (ADR 073, ADR 083), for apps set up before the entry
+ * carried them: the hooks go after the last statement of its `configure(proxy)`
+ * body, at that statement's indentation, and nothing else in the file changes.
+ * The hooks the CLI wrote before ADR 083 are replaced where they stand. A
+ * config whose entry carries the current hooks already, a hand-written entry,
+ * one whose bearer hook was changed and one whose hooks before ADR 083 were
+ * changed are returned untouched; {@link viteSessionCookieVerdict} tells the
+ * doctor which it is. Line ends are the file's own (CRLF or LF). Throws
+ * `E_VALIDATION`, as {@link viteProxyEdit} does, when the file is absent or
+ * unreadable.
  */
 export function viteSessionCookieEdit(): (source: string | undefined) => string {
   return (source) => {
@@ -333,6 +370,9 @@ export function viteSessionCookieEdit(): (source: string | undefined) => string 
     return withLfLineEnds(source, (text) => {
       if (text.includes(SESSION_COOKIE_MARKER)) {
         return text;
+      }
+      if (text.includes(SESSION_COOKIE_MARKER_V1)) {
+        return withCurrentHooks(text) ?? text;
       }
       const last = cliEntry(text)?.statements.at(-1);
       if (!last) {
@@ -350,12 +390,22 @@ export function viteSessionCookieEdit(): (source: string | undefined) => string 
  * The CLI's entry without them is `detached` (`doctor --fix` adds them), and so
  * is a config without the CLI's entry, which the proxy edit writes with them.
  * An entry the CLI wrote whose bearer hook was changed by hand is `unknown`:
- * the edit cannot place the hooks there, and only the developer can.
+ * the edit cannot place the hooks there, and only the developer can. Hooks
+ * from before ADR 083 are `outdated`: they keep the session in cookies the
+ * server no longer reads.
  */
 export function viteSessionCookieVerdict(source: string): WiringVerdict {
   const text = lfText(source);
   if (text.includes(SESSION_COOKIE_MARKER)) {
     return "applied";
+  }
+  if (text.includes(SESSION_COOKIE_MARKER_V1)) {
+    return {
+      outdated:
+        withCurrentHooks(text) === undefined
+          ? "its session-cookie hooks name the session cookies before ADR 083 and were changed since zitadel setup wrote them, so they must be updated by hand"
+          : "its session-cookie hooks name the session cookies before ADR 083; doctor --fix updates them",
+    };
   }
   if (cliEntry(text)) {
     return "detached";
@@ -485,7 +535,8 @@ export function buildViteSessionCookieOp(): FileOp {
     edit: viteSessionCookieEdit(),
     // A session cookie per project (ADR 073) keeps the Console and the app
     // from signing each other out on localhost. Sign-in works without it, so
-    // the doctor only warns while it is missing.
+    // the doctor only warns while it is missing; hooks from before ADR 083
+    // fail it (`outdated`).
     wiring: "convenience",
     verify: viteSessionCookieVerdict,
   };

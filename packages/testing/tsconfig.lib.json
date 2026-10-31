@@ -9,8 +9,7 @@
     "types": [
       "node"
     ],
-    "declaration": true,
-    "declarationMap": true
+    "declaration": true
   },
   "include": [
     "src/**/*.ts",

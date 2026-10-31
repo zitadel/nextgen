@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -11,6 +12,8 @@ import (
 
 	oasapi "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api"
+	"github.com/zitadel/nextgen/internal/audit"
+	"github.com/zitadel/nextgen/internal/securityheaders"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/staticui/console"
 	"github.com/zitadel/nextgen/internal/storage/dialect/idgen"
@@ -75,11 +78,11 @@ func idpCallbackEcho() http.Handler {
 	})
 }
 
-func newTestMux(t *testing.T, cfg ServerConfig) *http.ServeMux {
+func newTestMux(t *testing.T, cfg ServerConfig) http.Handler {
 	t.Helper()
 	mux, err := buildHTTPMux(cfg, idgen.NewULID(), doubleServers(t, echo), idpCallbackEcho(),
 		staticResolver(consoleRuntime{Mode: ConsoleModeStandalone, ConsoleProjectID: "proj_first"}, nil),
-		nil)
+		nil, nil)
 	require.NoError(t, err)
 	return mux
 }
@@ -91,12 +94,12 @@ func uiConfig(consoleEnabled bool) ServerConfig {
 	}
 }
 
-func get(t *testing.T, mux *http.ServeMux, path string) *httptest.ResponseRecorder {
+func get(t *testing.T, mux http.Handler, path string) *httptest.ResponseRecorder {
 	t.Helper()
 	return serve(t, mux, http.MethodGet, path)
 }
 
-func serve(t *testing.T, mux *http.ServeMux, method, path string) *httptest.ResponseRecorder {
+func serve(t *testing.T, mux http.Handler, method, path string) *httptest.ResponseRecorder {
 	t.Helper()
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, httptest.NewRequest(method, path, nil))
@@ -207,7 +210,7 @@ func TestBuildHTTPMuxHandsTheCallbackItsConnectionSlug(t *testing.T) {
 		recorder := &slugRecorder{}
 		mux, err := buildHTTPMux(uiConfig(false), idgen.NewULID(), doubleServers(t, echo), api.NewIDPCallbackHandler(recorder),
 			staticResolver(consoleRuntime{Mode: ConsoleModeStandalone, ConsoleProjectID: "proj_first"}, nil),
-			nil)
+			nil, nil)
 		require.NoError(t, err)
 
 		rec := get(t, mux, path+"?state=s&code=c")
@@ -232,6 +235,33 @@ func TestBuildHTTPMuxServesRuntimeDocumentWithTheConsoleOff(t *testing.T) {
 	assert.Equal(t, "root", get(t, mux, "/ui/console/").Header().Get("X-Test-Handler"))
 }
 
+// The event retention trigger is a mount only when a scheduler outside the
+// process runs the purge; otherwise its path is the API's like any other. It
+// takes the request ID the proxy sent, so the scheduler's log and the
+// server's lines name the same run.
+func TestBuildHTTPMuxMountsTheRetentionTriggerOnlyWhenGiven(t *testing.T) {
+	cfg := ServerConfig{RequestIDHeader: "x-vercel-id"}
+	trigger := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("X-Test-Handler", "retention-trigger")
+	})
+	mux, err := buildHTTPMux(cfg, idgen.NewULID(), doubleServers(t, echo), idpCallbackEcho(),
+		staticResolver(consoleRuntime{Mode: ConsoleModeStandalone}, nil),
+		nil, trigger)
+	require.NoError(t, err)
+
+	r := httptest.NewRequest(http.MethodGet, audit.RetentionTriggerPath, nil)
+	r.Header.Set("x-vercel-id", "fra1::2vxlh-1792820352212-3ce3eb4ad630")
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, r)
+	assert.Equal(t, "retention-trigger", rec.Header().Get("X-Test-Handler"))
+	assert.Equal(t, "2vxlh-1792820352212-3ce3eb4ad630", rec.Header().Get("X-Request-Id"))
+	// A longer path is not the trigger and stays with the API's root alias.
+	assert.Equal(t, "root", get(t, mux, audit.RetentionTriggerPath+"/x").Header().Get("X-Test-Handler"))
+
+	assert.Equal(t, "root", get(t, newTestMux(t, cfg), audit.RetentionTriggerPath).Header().Get("X-Test-Handler"),
+		"without a trigger the path falls through to the API's root alias")
+}
+
 // checkSessionCSRF refuses every cookie-authenticated request that did not pass
 // through api.WithCSRFRequest, so a mux without it would lock the Console out;
 // pinned here, on every mount, so a refactor of the chain cannot drop it
@@ -248,7 +278,7 @@ func TestBuildHTTPMuxRecordsCSRFRequestState(t *testing.T) {
 		}),
 		idpCallbackEcho(),
 		staticResolver(consoleRuntime{Mode: ConsoleModeStandalone, ConsoleProjectID: "proj_first"}, nil),
-		nil)
+		nil, nil)
 	require.NoError(t, err)
 
 	for _, path := range []string{"/api/v1/teams", "/teams", "/livez"} {
@@ -257,4 +287,83 @@ func TestBuildHTTPMuxRecordsCSRFRequestState(t *testing.T) {
 	}
 	assert.Equal(t, map[string]bool{"api": true, "root": true, "probes": true}, recorded,
 		"api.WithCSRFRequest must wrap every mount of the API")
+}
+
+// The generated reader knows only __Host-zitadel_session. A browser on a
+// loopback http server holds zitadel_session, which reaches it only through
+// api.WithLoopbackSessionCookie, and only after api.WithRequestHostMiddleware
+// has said the request is loopback http; pinned so neither can drop out of
+// the chain or swap places unnoticed.
+func TestBuildHTTPMuxHandsTheAPITheLoopbackSessionCookie(t *testing.T) {
+	t.Parallel()
+	var found string
+	mux, err := buildHTTPMux(uiConfig(false), idgen.NewULID(),
+		doubleServers(t, func(string) http.HandlerFunc {
+			return func(w http.ResponseWriter, r *http.Request) {
+				found = ""
+				if cookie, err := r.Cookie("__Host-zitadel_session"); err == nil {
+					found = cookie.Value
+				}
+				w.WriteHeader(http.StatusTeapot)
+			}
+		}),
+		idpCallbackEcho(),
+		staticResolver(consoleRuntime{Mode: ConsoleModeStandalone, ConsoleProjectID: "proj_first"}, nil),
+		nil, nil)
+	require.NoError(t, err)
+
+	// Under the prefix and at the root alias (ADR 077).
+	for _, path := range []string{"/api/v1/sessions/me", "/sessions/me"} {
+		loopback := httptest.NewRequest(http.MethodGet, "http://localhost:8080"+path, nil)
+		loopback.Header.Set("Cookie", "zitadel_session=tok")
+		rec := httptest.NewRecorder()
+		mux.ServeHTTP(rec, loopback)
+		require.Equal(t, http.StatusTeapot, rec.Code, "%s must reach the API handler", path)
+		assert.Equal(t, "tok", found, "loopback http hands the API the loopback cookie at %s", path)
+
+		forwarded := httptest.NewRequest(http.MethodGet, "http://localhost:8080"+path, nil)
+		forwarded.Header.Set("X-Forwarded-Proto", "https")
+		forwarded.Header.Set("Cookie", "zitadel_session=tok")
+		mux.ServeHTTP(httptest.NewRecorder(), forwarded)
+		assert.Empty(t, found, "https leaves the loopback cookie unread at %s", path)
+	}
+}
+
+// Every response carries the security headers, and each surface its own
+// policy: the console the pair its page needs, everything else the policy of
+// a response that is no page.
+func TestBuildHTTPMuxSendsTheSecurityHeaders(t *testing.T) {
+	requireEmbeddedUI(t)
+	mux := newTestMux(t, uiConfig(true))
+
+	for _, path := range []string{"/ui/console/", "/ui/console/assets/missing.js", "/api/v1/users", "/users", consoleRuntimePath} {
+		header := get(t, mux, path).Header()
+		assert.Equal(t, "nosniff", header.Get("X-Content-Type-Options"), path)
+		assert.Equal(t, "strict-origin-when-cross-origin", header.Get("Referrer-Policy"), path)
+		assert.Equal(t, "DENY", header.Get("X-Frame-Options"), path)
+		assert.Contains(t, header.Get(securityheaders.PolicyHeader), "frame-ancestors 'none'", path)
+	}
+
+	console := get(t, mux, "/ui/console/").Header()
+	assert.Contains(t, console.Get(securityheaders.PolicyHeader), "script-src 'self' 'sha256-")
+	assert.Contains(t, console.Get(securityheaders.ReportOnlyPolicyHeader), "default-src 'self'")
+	api := get(t, mux, "/users").Header()
+	assert.Equal(t, "default-src 'none'; frame-ancestors 'none'", api.Get(securityheaders.PolicyHeader))
+	assert.Empty(t, api.Get(securityheaders.ReportOnlyPolicyHeader))
+}
+
+// Browsers post policy violations without a session or the CSRF token, so
+// the report path is a mount of its own, ahead of the API.
+func TestBuildHTTPMuxTakesPolicyReports(t *testing.T) {
+	mux := newTestMux(t, uiConfig(false))
+
+	r := httptest.NewRequest(http.MethodPost, securityheaders.ReportPath,
+		strings.NewReader(`{"csp-report":{"effective-directive":"script-src-elem","blocked-uri":"inline"}}`))
+	r.Header.Set("Content-Type", "application/csp-report")
+	r.Header.Set("Sec-Fetch-Site", "same-origin")
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, r)
+
+	assert.Equal(t, http.StatusNoContent, rec.Code)
+	assert.Empty(t, rec.Header().Get("X-Test-Handler"))
 }

@@ -11,22 +11,6 @@ interface ImportMetaEnv {
    */
   readonly VITE_CONSOLE_RUNTIME_FALLBACK?: string;
   /**
-   * `1` in the hosted cloud's build (repo-root `vercel.json`): the console
-   * then sends Vercel Web Analytics and Speed Insights, which only Vercel
-   * serves. Never set for the build the Go server embeds. Not VITE_-prefixed
-   * (vite.config.ts says why) and inlined there through `define`, an empty
-   * string when unset.
-   */
-  readonly CONSOLE_VERCEL_INSIGHTS: string;
-  /**
-   * The share of page loads that send Speed Insights in the hosted cloud's
-   * build, from `0` (none) to `1` (every one, the default when empty); set
-   * per environment on Vercel. Not VITE_-prefixed: vite.config.ts inlines it
-   * through `define`, an empty string when unset. Web Analytics has no
-   * sampling.
-   */
-  readonly CONSOLE_SPEED_INSIGHTS_SAMPLE_RATE: string;
-  /**
    * The Zitadel server's origin under the dev loop, where the page runs on
    * Vite's origin and reaches the server through its proxy. Inlined by
    * vite.config.ts through `define`; an empty string in a build.

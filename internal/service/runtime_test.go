@@ -1,7 +1,9 @@
 package service_test
 
 import (
+	"bytes"
 	"errors"
+	"log/slog"
 	"testing"
 	"time"
 
@@ -10,6 +12,8 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/errreport"
+	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/service"
 	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
 	"github.com/zitadel/nextgen/internal/storage/database"
@@ -40,7 +44,11 @@ func TestRuntimeResolver_Resolve(t *testing.T) {
 		assert.True(t, errors.Is(err, domain.ErrReleaseNotDeployed(nil)))
 	})
 
+	// The boundary line is the only line for a refused resolution, so the
+	// project and origin travel as the error's log-only parent.
 	t.Run("origin not allowed", func(t *testing.T) {
+		errreport.EnableLocation(true)
+		t.Cleanup(func() { errreport.EnableLocation(false) })
 		resolver, statements, _ := newMockedRuntimeResolver(t)
 		statements.EXPECT().GetProjectByID(gomock.Any(), projectID).Return(&domain.Project{
 			ID: projectID,
@@ -48,9 +56,34 @@ func TestRuntimeResolver_Resolve(t *testing.T) {
 				{Pattern: origin, Kind: domain.OriginKindPrimary},
 			},
 		}, nil)
-		_, err := resolver.Resolve(t.Context(), projectID, "https://evil.example")
-		require.Error(t, err)
-		assert.True(t, errors.Is(err, domain.ErrProjectOriginNotAllowed(nil)))
+		var logged bytes.Buffer
+		ctx := zlog.WithLoggingContext(t.Context(), slog.New(slog.NewTextHandler(&logged, nil)))
+
+		_, err := resolver.Resolve(ctx, projectID, " https://evil.example ")
+		require.ErrorIs(t, err, domain.ErrProjectOriginNotAllowed(nil))
+		assert.Empty(t, logged.String())
+		de, ok := errors.AsType[domain.Error](err)
+		require.True(t, ok)
+		require.NotNil(t, de.Parent)
+		assert.Equal(t, `project proj_1, origin "https://evil.example"`, de.Parent.Error())
+		// The location stays inside the resolver where the error was made. A
+		// new capture in Resolve would name Resolve or its caller.
+		require.NotNil(t, de.ReportLocation())
+		fn := de.ReportLocation().FunctionName
+		assert.Contains(t, fn, "internal/service.(*RuntimeResolver).")
+		assert.NotContains(t, fn, ".Resolve")
+	})
+
+	t.Run("server fault keeps its parent under project and origin", func(t *testing.T) {
+		resolver, statements, _ := newMockedRuntimeResolver(t)
+		dbErr := errors.New("connection reset")
+		statements.EXPECT().GetProjectByID(gomock.Any(), projectID).Return(nil, dbErr)
+
+		_, err := resolver.Resolve(t.Context(), projectID, origin)
+		de, ok := errors.AsType[domain.Error](err)
+		require.True(t, ok)
+		require.ErrorIs(t, de.Parent, dbErr)
+		assert.Equal(t, `project proj_1, origin "`+origin+`": connection reset`, de.Parent.Error())
 	})
 
 	t.Run("preview not live", func(t *testing.T) {
@@ -111,6 +144,27 @@ func TestRuntimeResolver_Resolve(t *testing.T) {
 			Return([]domain.OriginDeployment{}, nil)
 
 		got, err := resolver.Resolve(t.Context(), projectID, ownOrigin)
+		require.NoError(t, err)
+		assert.Nil(t, got)
+	})
+
+	t.Run("every console origin opens a flow the project's origins refuse", func(t *testing.T) {
+		const other = "https://console-abc123.example.com"
+		ctrl := gomock.NewController(t)
+		pool := servicemocks.NewMockPool(ctrl)
+		statements := servicemocks.NewMockAllStatements(ctrl)
+		pool.EXPECT().Statements().Return(statements).AnyTimes()
+		// Spelled as configured, not as a browser sends it: the resolver
+		// normalizes it as it does the request's origin.
+		resolver := service.NewRuntimeResolver(service.NewPool(pool), servicemocks.NewMockReleaseService(ctrl), ownOrigin, " HTTPS://Console-ABC123.example.com ")
+		statements.EXPECT().GetProjectByID(gomock.Any(), projectID).Return(&domain.Project{
+			ID:      projectID,
+			Origins: []domain.Origin{{Pattern: origin, Kind: domain.OriginKindPrimary}},
+		}, nil)
+		statements.EXPECT().GetNewestPerOrigin(gomock.Any(), projectID, []string{other}).
+			Return([]domain.OriginDeployment{}, nil)
+
+		got, err := resolver.Resolve(t.Context(), projectID, other)
 		require.NoError(t, err)
 		assert.Nil(t, got)
 	})

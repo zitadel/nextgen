@@ -1,9 +1,11 @@
+import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it, vi } from "vitest";
 import { _setRuntimeForTesting } from "@/runtime/runtime";
 import { server } from "@/test/msw";
+import { createAppRouter } from "../../../router";
 
 // The `_authed` layout guards every screen behind `GET /sessions/me`
 // (Console ADR 0003); mock the auth module so routes render as signed in.
@@ -33,10 +35,6 @@ function expectedDate(value: string): string {
 }
 
 async function renderProjects(path = "/projects") {
-  const [{ RouterProvider, createMemoryHistory }, { createAppRouter }] = await Promise.all([
-    import("@tanstack/react-router"),
-    import("../../../router"),
-  ]);
   const router = createAppRouter({
     history: createMemoryHistory({ initialEntries: [path] }),
   });
@@ -68,7 +66,7 @@ describe("projects screen", () => {
     expect(table.getByText(expectedDate("2026-07-08T09:00:00Z"))).toBeInTheDocument();
   });
 
-  it("opens New project on setup against this console's own server", async () => {
+  it("hands over setup against this console's own server", async () => {
     server.use(
       http.get(PROJECTS_URL, () =>
         HttpResponse.json({
@@ -85,14 +83,37 @@ describe("projects screen", () => {
     );
     await renderProjects();
 
-    await userEvent.click(await screen.findByRole("button", { name: "New project" }));
-    const drawer = within(await screen.findByRole("dialog", { name: "New project" }));
+    // A project is created from the app it connects, so the page hands over
+    // the command rather than offering a button.
+    const card = within(await screen.findByRole("region", { name: "Start a new project" }));
+    expect(screen.queryByRole("button", { name: "New project" })).not.toBeInTheDocument();
     // The specs' API base is http://localhost/api, so that is the server the
     // command names, not the CLI's hosted default.
     expect(
-      drawer.getByText("npx @zitadel/cli@latest setup --server http://localhost"),
+      card.getByText("npx @zitadel/cli@latest setup --server http://localhost"),
     ).toBeInTheDocument();
-    expect(drawer.getByRole("button", { name: "Copy the setup command" })).toBeInTheDocument();
+    expect(card.getByRole("button", { name: "Copy the setup command" })).toBeInTheDocument();
+  });
+
+  it("is the home: no sidebar, with how projects work beneath the list", async () => {
+    server.use(
+      http.get(PROJECTS_URL, () => HttpResponse.json({ projects: [listed("proj_1", "River")] })),
+    );
+    await renderProjects();
+
+    await screen.findByRole("link", { name: "River" });
+    // The sidebar is one project's screens; the home is above every project.
+    expect(screen.queryByRole("navigation", { name: "Primary" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Home" })).toHaveAttribute(
+      "href",
+      expect.stringMatching(/^\/projects\b/),
+    );
+    const guide = within(
+      screen.getByRole("region", { name: "From your app’s folder to production" }),
+    );
+    expect(
+      guide.getAllByRole("listitem").map((item) => within(item).getByRole("heading").textContent),
+    ).toEqual(["Set up", "Build locally", "Deploy", "Add environments", "OperateYou are here"]);
   });
 
   it("tells projects of one name apart by their host and id", async () => {
@@ -248,7 +269,7 @@ describe("projects screen", () => {
     await renderProjects();
 
     await userEvent.click(await screen.findByRole("button", { name: "Actions for River" }));
-    const item = await screen.findByRole("menuitem", { name: "Project settings" });
+    const item = await screen.findByRole("menuitem", { name: "View project" });
     expect(item).toHaveAttribute("href", "/project?project=proj_1");
   });
 
@@ -309,6 +330,10 @@ describe("projects screen", () => {
     // On the way to Teams, the page is named for it (D22).
     expect(await screen.findByRole("heading", { name: "Continue to Teams" })).toBeInTheDocument();
     expect(await screen.findByText("Choose a project to continue.")).toBeInTheDocument();
+    // The guide stays out of the way of the choice being asked for.
+    expect(
+      screen.queryByRole("region", { name: "From your app’s folder to production" }),
+    ).not.toBeInTheDocument();
     expect(await screen.findByRole("link", { name: "Delta" })).toHaveAttribute(
       "href",
       "/teams?status=deactivated&project=proj_2",
@@ -349,9 +374,9 @@ describe("projects screen", () => {
     await renderProjects();
 
     expect(await screen.findByText("No projects yet.")).toBeInTheDocument();
-    // Nothing to search, while New project stays.
+    // Nothing to search, while the way to a first project stays.
     expect(screen.queryByRole("searchbox", { name: "Search projects" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "New project" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Create your first project" })).toBeInTheDocument();
   });
 
   it("appends the next page and drops the button when the list is complete", async () => {
@@ -502,7 +527,7 @@ describe("projects screen", () => {
     expect(await screen.findByText("No projects match “zzz”.")).toBeInTheDocument();
   });
 
-  it("clears the search when Projects is opened from the sidebar", async () => {
+  it("clears the search when Projects is opened from the logo", async () => {
     server.use(
       http.get(PROJECTS_URL, () =>
         HttpResponse.json({
@@ -514,8 +539,7 @@ describe("projects screen", () => {
     const router = await renderProjects("/projects?q=zep");
     expect(await screen.findByRole("searchbox", { name: "Search projects" })).toHaveValue("zep");
 
-    const nav = within(screen.getByRole("navigation", { name: "Primary" }));
-    await userEvent.click(nav.getByRole("link", { name: "Projects" }));
+    await userEvent.click(screen.getByRole("link", { name: "Home" }));
 
     await waitFor(() => expect(router.state.resolvedLocation?.search.q).toBeUndefined());
     await waitFor(() =>

@@ -1,7 +1,7 @@
 import { format } from "node:util";
 
 import { cleanup, configure } from "@testing-library/react";
-import { afterAll, afterEach, beforeAll, beforeEach, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, expect, vi } from "vitest";
 import { _resetConfigForTesting } from "@zitadel/api/config";
 import "@testing-library/jest-dom/vitest";
 
@@ -79,7 +79,15 @@ for (const method of ["error", "warn"] as const) {
 // file's first test fails while the rest pass. So the mock imports every
 // screen's chunk before it hands out the router; the route objects keep them
 // loaded for every router the file builds.
+//
+// That load belongs to the file, so a spec imports `createAppRouter` at the
+// top and loads it before its first test. Imported inside a test, it counts
+// against that test's timeout, which a cold start on a busy CI runner outlasts;
+// the tests after it then import the router while this factory still runs,
+// and Vitest hands them the unmocked module (preload on, no screen loaded).
+// The wrapper below fails such a spec on every run instead.
 vi.mock("./router", async (importOriginal) => {
+  const importingTest = expect.getState().currentTestName;
   const actual = await importOriginal<typeof import("./router")>();
   const { createMemoryHistory } = await import("@tanstack/react-router");
   const preloadRouter = actual.createAppRouter({ history: createMemoryHistory() });
@@ -89,6 +97,12 @@ vi.mock("./router", async (importOriginal) => {
   return {
     ...actual,
     createAppRouter: (...args: Parameters<typeof actual.createAppRouter>) => {
+      if (importingTest !== undefined) {
+        throw new Error(
+          `"${importingTest}" imported the router inside the test. Import createAppRouter ` +
+            "at the top of the spec, so the file loads every screen before its first test.",
+        );
+      }
       const router = actual.createAppRouter(...args);
       router.update({ ...router.options, defaultPreload: false });
       return router;
@@ -117,6 +131,12 @@ if (typeof window !== "undefined" && !window.matchMedia) {
 // (used by the sidebar user menu). A no-op stub is enough for jsdom specs.
 if (typeof window !== "undefined" && !("ResizeObserver" in window)) {
   class ResizeObserverStub {
+    // The real constructor's signature, so `new ResizeObserver(callback)` in
+    // the code under test matches it. Kept, though jsdom specs never call it.
+    readonly callback: ResizeObserverCallback;
+    constructor(callback: ResizeObserverCallback) {
+      this.callback = callback;
+    }
     observe(): void {
       /* no-op: jsdom specs never lay out */
     }

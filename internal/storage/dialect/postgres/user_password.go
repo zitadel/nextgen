@@ -36,6 +36,9 @@ FROM zitadel_nextgen.user_passwords
 WHERE project_id = $2 AND user_id = $3
 RETURNING id`
 
+	updateUserPasswordHashStmt = `UPDATE zitadel_nextgen.user_passwords SET encoded_hash = $1` +
+		` WHERE project_id = $2 AND id = $3 AND encoded_hash = $4`
+
 	userPasswordColumns = `id, project_id, user_id, encoded_hash, created_at`
 
 	userPasswordQuery = `SELECT ` + userPasswordColumns + `
@@ -80,6 +83,12 @@ func (ps userPasswordStatements) SetUserPassword(ctx context.Context, pw *domain
 			pw.EncodedHash,
 		).Scan(&pw.ID))
 	})
+}
+
+// UpdateUserPasswordHash implements [service.UserPasswordStatements].
+func (ps userPasswordStatements) UpdateUserPasswordHash(ctx context.Context, pw *domain.UserPassword, updated string) error {
+	_, err := ps.client.Exec(ctx, updateUserPasswordHashStmt, updated, pw.ProjectID, pw.ID, pw.EncodedHash)
+	return wrapError(err)
 }
 
 // GetUserPassword implements [service.UserPasswordStatements].

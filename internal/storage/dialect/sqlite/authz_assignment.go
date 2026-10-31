@@ -72,6 +72,16 @@ SET revoked_at = ?, updated_at = ?
 WHERE project_id = ? AND id = ? AND revoked_at IS NULL
 RETURNING revoked_at, updated_at`
 
+	revokeAuthzAssignmentsByPrincipalStmt = `
+UPDATE authz_assignments
+SET revoked_at = ?, updated_at = ?
+WHERE principal_type = ? AND principal_id = ? AND revoked_at IS NULL
+RETURNING id, project_id, catalog_id,
+          principal_type, principal_id, object_type, relation,
+          scope_kind, scope_team_id, scope_resource_id,
+          grantor_type, grantor_id, delegation_id,
+          expires_at, revoked_at, created_at, updated_at`
+
 	getActiveOwningTeamGrantStmt = `
 SELECT id, project_id, catalog_id,
        principal_type, principal_id, object_type, relation,
@@ -222,6 +232,21 @@ func (s authzAssignmentStatements) RevokeAuthzAssignment(ctx context.Context, pr
 	return nil
 }
 
+// RevokeAuthzAssignmentsByPrincipal implements [service.AuthzAssignmentStatements].
+func (s authzAssignmentStatements) RevokeAuthzAssignmentsByPrincipal(ctx context.Context, principalType domain.AuthzPrincipalType, principalID string) ([]*domain.AuthzAssignment, error) {
+	now := nowUnixNano()
+	rows, err := s.client.Query(ctx, revokeAuthzAssignmentsByPrincipalStmt, now, now, principalType.String(), principalID)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	defer rows.Close()
+	assignments, err := collectRows(rows, scanAuthzAssignment)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	return assignments, nil
+}
+
 // GetActiveOwningTeamGrant implements [service.AuthzAssignmentStatements].
 func (s authzAssignmentStatements) GetActiveOwningTeamGrant(ctx context.Context, projectID string) (*domain.AuthzAssignment, error) {
 	rows, err := s.client.Query(ctx, getActiveOwningTeamGrantStmt, projectID)
@@ -334,3 +359,73 @@ func scanAuthzAssignment(rows *sql.Rows) (*domain.AuthzAssignment, error) {
 }
 
 var _ service.AuthzAssignmentStatements = (*authzAssignmentStatements)(nil)
+
+// ListProjectAdmins implements [service.AuthzAssignmentStatements].
+func (s authzAssignmentStatements) ListProjectAdmins(ctx context.Context, projectID, viewerUserID string, page database.Page[domain.ProjectAdminField]) (*database.ListResult[*domain.ProjectAdminRecord], error) {
+	afterUserID, err := authz.ProjectAdminsCursorUserID(page)
+	if err != nil {
+		return nil, err
+	}
+	admins, next, err := pagination.Page(page, authz.ProjectAdminSchema, func(limit uint32) ([]*domain.ProjectAdminRecord, error) {
+		var c statementCompiler
+		authz.WriteProjectAdminSources(&c, sqliteAuthzEnv(), projectID, viewerUserID, afterUserID, page.OrderBy.Direction == database.OrderDesc, limit)
+		rows, err := s.client.Query(ctx, c.String(), c.args...)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+		defer rows.Close()
+		sources, err := collectRows(rows, func(rows *sql.Rows) (authz.ProjectAdminSourceRow, error) {
+			var (
+				source   authz.ProjectAdminSourceRow
+				teamName sql.NullString
+			)
+			err := rows.Scan(&source.UserID, &source.HomeProjectID, &source.SourceRank, &source.GrantID, &source.TeamID, &teamName)
+			source.TeamName = teamName.String
+			return source, err
+		})
+		if err != nil {
+			return nil, wrapError(err)
+		}
+		return authz.GroupProjectAdminSourcesByUser(sources), nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &database.ListResult[*domain.ProjectAdminRecord]{Items: admins, NextCursor: next}, nil
+}
+
+// ListProjectsOwnedThroughMember implements [service.AuthzAssignmentStatements].
+func (s authzAssignmentStatements) ListProjectsOwnedThroughMember(ctx context.Context, userID string) ([]string, error) {
+	return s.listOwnerProjects(ctx, userID, false)
+}
+
+// ListProjectsLosingLastOwner implements [service.AuthzAssignmentStatements].
+func (s authzAssignmentStatements) ListProjectsLosingLastOwner(ctx context.Context, userID string) ([]string, error) {
+	return s.listOwnerProjects(ctx, userID, true)
+}
+
+func (s authzAssignmentStatements) listOwnerProjects(ctx context.Context, userID string, losing bool) ([]string, error) {
+	var c statementCompiler
+	if losing {
+		authz.WriteProjectsLosingLastOwner(&c, sqliteAuthzEnv(), userID)
+	} else {
+		authz.WriteProjectsOwnedThroughMember(&c, sqliteAuthzEnv(), userID)
+	}
+	rows, err := s.client.Query(ctx, c.String(), c.args...)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	defer rows.Close()
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, wrapError(err)
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, wrapError(err)
+	}
+	return ids, nil
+}

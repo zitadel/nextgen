@@ -8,8 +8,8 @@
    those standard names so shadcn/ui components drop in unchanged. */
 @import "@zitadel/design-tokens/css/shadcn.css";
 
-/* The generated avatar's gradient and motion (`.zl-avatar`), shared with the
-   login's `<zl-avatar>` so the two never drift (`components/user-avatar.tsx`). */
+/* The generated avatar, shared with the login's `<zl-avatar>` so the two never
+   drift (`components/user-avatar.tsx`). */
 @import "@zitadel/components/avatar.css";
 
 /* Self-hosted Arimo — the design's body typeface (`font-sans`). */
@@ -95,10 +95,15 @@ body {
 }
 
 /* Tailwind v4 Preflight sets no `cursor: pointer`; set it for genuinely
-   interactive elements. */
+   interactive elements. The menu and listbox items are the registry's, which
+   draw `cursor-default`; this unlayered rule outranks that utility. */
 button:not(:disabled):not([aria-disabled="true"]),
 [role="button"]:not([aria-disabled="true"]),
 [role="radio"]:not([aria-disabled="true"]),
+[role="menuitem"]:not([data-disabled]):not([aria-disabled="true"]),
+[role="menuitemcheckbox"]:not([data-disabled]):not([aria-disabled="true"]),
+[role="menuitemradio"]:not([data-disabled]):not([aria-disabled="true"]),
+[role="option"]:not([data-disabled]):not([aria-disabled="true"]),
 a[href] {
   cursor: pointer;
 }

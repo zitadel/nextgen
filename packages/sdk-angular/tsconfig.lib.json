@@ -9,7 +9,6 @@
     "experimentalDecorators": true,
     "useDefineForClassFields": false,
     "declaration": true,
-    "declarationMap": true,
     // `ngc -p tsconfig.lib.json` emits only the partial-Ivy `.d.ts`; the JS
     // comes from the vite build (tsconfig.lib.prod.json).
     "emitDeclarationOnly": true

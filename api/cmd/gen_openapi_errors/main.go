@@ -767,15 +767,13 @@ func buildErrorMapping(domainPath string) map[string]errorInfo {
 						if ident, ok := callExpr.Fun.(*ast.Ident); ok && ident.Name == "newError" {
 							if len(callExpr.Args) >= 2 {
 								code := extractCodeArgument(callExpr.Args[0], prefixes)
-								message := ""
-								if msgLit, ok := callExpr.Args[1].(*ast.BasicLit); ok {
-									message = strings.Trim(msgLit.Value, `"`)
+								msgLit, ok := callExpr.Args[1].(*ast.BasicLit)
+								if !ok || code == "" {
+									continue
 								}
-								if code != "" {
-									mapping["domain."+funcDecl.Name.Name] = errorInfo{
-										code:    code,
-										message: message,
-									}
+								mapping["domain."+funcDecl.Name.Name] = errorInfo{
+									code:    code,
+									message: strings.Trim(msgLit.Value, `"`),
 								}
 							}
 						}
@@ -912,14 +910,14 @@ var csrfErrors = []string{
 	"domain.ErrAuthCSRFInvalid",
 }
 
-// acceptsSessionCookie reports whether the operation lists the nextgenSession
+// acceptsSessionCookie reports whether the operation lists the sessionCookie
 // scheme among its security requirements.
 func acceptsSessionCookie(op methodsFileOperation) bool {
 	if op.Security == nil {
 		return false
 	}
 	for _, requirement := range *op.Security {
-		if _, ok := requirement["nextgenSession"]; ok {
+		if _, ok := requirement["sessionCookie"]; ok {
 			return true
 		}
 	}

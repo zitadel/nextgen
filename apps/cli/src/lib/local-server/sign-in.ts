@@ -47,10 +47,15 @@ export async function consoleSignInUrl(serverUrl: string, admin: LocalAdmin): Pr
   return `${serverUrl}/ui/console/login?handoff=${encodeURIComponent(handoffToken)}`;
 }
 
+/** The names the server sets its session cookie under (ADR 083), over plain http to a loopback host and over https. */
+const SESSION_COOKIES = ["zitadel_session", "__Host-zitadel_session"] as const;
+
 /**
- * Signs in and trades the handoff token for the `__nextgen_session` cookie —
- * the credential endpoints like `claim/complete` authenticate against, which a
- * bare handoff token cannot satisfy.
+ * Signs in and trades the handoff token for the session cookie — the
+ * credential endpoints like `claim/complete` authenticate against, which a bare
+ * handoff token cannot satisfy. It is `zitadel_session` from a server on
+ * loopback http and `__Host-zitadel_session` from one on https, and goes back
+ * under the name it came with.
  */
 export async function adminSessionCookie(serverUrl: string, admin: LocalAdmin): Promise<string> {
   const { handoffToken, publishableKey } = await signIn(serverUrl, admin);
@@ -72,8 +77,8 @@ export async function adminSessionCookie(serverUrl: string, admin: LocalAdmin): 
   );
   const cookie = res.headers
     .getSetCookie()
-    .find((value) => value.startsWith("__nextgen_session="))
-    ?.split(";", 1)[0];
+    .map((value) => value.split(";", 1)[0] ?? "")
+    .find((pair) => SESSION_COOKIES.some((name) => pair.startsWith(`${name}=`)));
   if (!res.ok || !cookie) {
     throw new ZitadelError(
       "E_AUTH",

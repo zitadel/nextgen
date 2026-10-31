@@ -1,3 +1,4 @@
+import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
@@ -5,6 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 import { formatDateTime } from "@/lib/date";
 import { TEST_PROJECT_ID, scopedPath } from "@/test/project-scope.fixture";
 import { server } from "@/test/msw";
+import { createAppRouter } from "../../../router";
 
 // The `_authed` layout guards every screen behind `GET /sessions/me`
 // (Console ADR 0003); mock the auth module so routes render as signed in.
@@ -87,10 +89,6 @@ function stub({
 }
 
 async function renderDetail(project?: string) {
-  const [{ RouterProvider, createMemoryHistory }, { createAppRouter }] = await Promise.all([
-    import("@tanstack/react-router"),
-    import("../../../router"),
-  ]);
   const router = createAppRouter({
     history: createMemoryHistory({ initialEntries: [scopedPath(`/users/${USER_ID}`, project)] }),
   });
@@ -160,6 +158,9 @@ describe("user detail", () => {
     const link = await panel.findByRole("link", { name: "Business sch_business" });
     // The `_authed` layout retains the selected project across navigation.
     expect(link).toHaveAttribute("href", scopedPath("/schemas/sch_business"));
+    // The schema's name sits beside the link, outside it.
+    expect(panel.getByText("Business")).toBeVisible();
+    expect(link).not.toHaveTextContent("Business");
   });
 
   it("shows a URI schema id verbatim and links to it encoded", async () => {
@@ -196,7 +197,9 @@ describe("user detail", () => {
     await renderDetail();
 
     const panel = within(await screen.findByRole("tabpanel"));
-    expect(await panel.findByRole("link", { name: "sch_business sch_business" })).toBeVisible();
+    expect(await panel.findByRole("link", { name: "sch_business" })).toBeVisible();
+    // The id is the name, so it is not printed again beside the link.
+    expect(panel.getAllByText("sch_business")).toHaveLength(1);
   });
 
   it("renders no revision link when the schema cannot be read", async () => {
@@ -238,8 +241,8 @@ describe("user detail", () => {
   });
 
   it("titles the profile card as the user's schema", async () => {
-    // The design names the card "User schema"; the schema's own name is the
-    // revision link beside it. The detail header owns the `h1`.
+    // The design names the card "User schema"; the schema's own name sits
+    // beside it, before the revision link. The detail header owns the `h1`.
     stub();
     await renderDetail();
 

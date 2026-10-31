@@ -19,6 +19,9 @@ var defaultHumanUserSchema []byte
 //go:embed default-login.json
 var defaultLoginFlowDefinition []byte
 
+//go:embed default-password-policy.json
+var defaultPasswordPolicy []byte
+
 //go:embed README-schemas.md
 var schemasReadme []byte
 
@@ -33,6 +36,12 @@ func DefaultHumanUserSchema() []byte {
 // DefaultLoginFlowDefinition returns a copy of the default login flow template.
 func DefaultLoginFlowDefinition() []byte {
 	return append([]byte(nil), defaultLoginFlowDefinition...)
+}
+
+// DefaultPasswordPolicy returns a copy of the recommended password policy:
+// the one `setup` writes when given no minimum, and the platform project's.
+func DefaultPasswordPolicy() []byte {
+	return append([]byte(nil), defaultPasswordPolicy...)
 }
 
 // SchemasReadme returns the README content the CLI copies to

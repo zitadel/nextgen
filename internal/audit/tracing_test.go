@@ -20,18 +20,23 @@ import (
 
 	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/instrumentation/metrics/metricstest"
 	"github.com/zitadel/nextgen/internal/instrumentation/zotel"
 )
 
 var spanExporter = tracetest.NewInMemoryExporter()
 
-// TestMain sets the global provider once: the package tracer delegates to the
-// first provider set in the process.
+// metricsReader collects what the package's inserts record; see TestMain.
+var metricsReader *metricstest.Reader
+
+// TestMain sets the global providers once: the package tracer and the
+// catalogue's instruments delegate to the first provider set in the process.
 func TestMain(m *testing.M) {
 	otel.SetTracerProvider(sdktrace.NewTracerProvider(
 		sdktrace.WithSyncer(spanExporter),
 		sdktrace.WithSampler(zotel.NewSampler(1.0)),
 	))
+	metricsReader = metricstest.Install()
 	os.Exit(m.Run())
 }
 
@@ -86,6 +91,30 @@ func TestRetentionJob_runIsTraced(t *testing.T) {
 			assert.Equal(t, tt.wantAttrs, span.Attributes)
 		})
 	}
+}
+
+// A run that a request starts is a job root like the loop's, sampled by the
+// job rule, even when the request carries a caller's trace context
+// (instrumentation.trace.trust_remote_spans).
+func TestRetentionJob_triggeredRunIsTraced(t *testing.T) {
+	spanExporter.Reset()
+	p := &tracedPurger{}
+	trigger := NewRetentionJob(p, RetentionConfig{Retention: time.Hour, Enabled: true, TriggerSecret: testTriggerSecret}).Trigger()
+	caller := trace.NewSpanContext(trace.SpanContextConfig{
+		TraceID:    trace.TraceID{1},
+		SpanID:     trace.SpanID{1},
+		TraceFlags: trace.FlagsSampled,
+		Remote:     true,
+	})
+	r := httptest.NewRequestWithContext(trace.ContextWithRemoteSpanContext(t.Context(), caller), http.MethodGet, RetentionTriggerPath, nil)
+	r.Header.Set("Authorization", "Bearer "+testTriggerSecret)
+
+	trigger.ServeHTTP(httptest.NewRecorder(), r)
+
+	span := jobSpan(t, "audit.PurgeExpiredEvents")
+	assert.Equal(t, span.SpanContext, p.seen, "the purge runs under the job span")
+	assert.NotEqual(t, caller.TraceID(), span.SpanContext.TraceID(), "the run does not join the caller's trace")
+	assert.Equal(t, []attribute.KeyValue{zotel.JobRoot}, span.Attributes)
 }
 
 // tracedExportSource records the span each call runs under, and fails a call

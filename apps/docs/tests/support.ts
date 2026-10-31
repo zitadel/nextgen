@@ -1,4 +1,6 @@
-import type { APIResponse } from "@playwright/test";
+import { createHash } from "node:crypto";
+
+import type { APIResponse, Page } from "@playwright/test";
 
 /**
  * A page as /docs/llms.txt lists it, `- [title](/docs/....md): description`:
@@ -113,6 +115,60 @@ function unescapeHtml(text: string): string {
 export function metaContent(html: string, key: string): string | undefined {
   const tag = html.match(new RegExp(`<meta (?:name|property)="${key}" content="([^"]*)"`));
   return tag ? unescapeHtml(tag[1] ?? "") : undefined;
+}
+
+/**
+ * What is wrong with a page's policies, if anything: the enforced one
+ * (csp-adapter.mjs) lets nothing frame it, keeps its requests on the docs'
+ * own origin and allows each inline script by hash.
+ */
+export function policyProblem(headers: Record<string, string>, html: string): string | undefined {
+  const enforced = headers["content-security-policy"] ?? "(none)";
+  if (!enforced.includes("frame-ancestors 'none'")) {
+    return `its policy ${enforced} lets another site frame it`;
+  }
+  if (!/(^|; )connect-src 'self'(;|$)/.test(enforced)) {
+    return `its enforced policy ${enforced} lets it connect elsewhere`;
+  }
+  const scripts = enforced.match(/(?:^|; )script-src ([^;]*)/)?.[1] ?? "";
+  if (scripts.includes("'unsafe-inline'")) return "its enforced policy allows any inline script";
+  const unlisted = inlineScripts(html).filter(
+    (script) =>
+      !scripts.includes(`'sha256-${createHash("sha256").update(script).digest("base64")}'`),
+  );
+  return unlisted.length
+    ? `its enforced policy lists no hash for ${unlisted.length} of its inline scripts, the first starting ${JSON.stringify(unlisted[0]?.slice(0, 60))}`
+    : undefined;
+}
+
+/** The bodies of a page's inline scripts. */
+function inlineScripts(html: string): string[] {
+  return [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\b[^>]*>/gi)]
+    .filter(([, attributes, body]) => body && !/\bsrc\s*=/i.test(attributes ?? ""))
+    .map(([, , body]) => body ?? "");
+}
+
+/**
+ * Records each violation of the page's policies, enforced or report-only,
+ * from before its first script and across navigations: first-party code
+ * breaks neither, so a spec expects the list to stay empty.
+ */
+export async function recordPolicyViolations(page: Page): Promise<string[]> {
+  const violations: string[] = [];
+  await page.exposeFunction("recordPolicyViolation", (violation: string) => {
+    violations.push(violation);
+  });
+  await page.addInitScript(() => {
+    const record = (window as unknown as { recordPolicyViolation(violation: string): void })
+      .recordPolicyViolation;
+    window.addEventListener("securitypolicyviolation", (event) => {
+      record(
+        `${event.disposition} ${event.effectiveDirective} ${event.blockedURI || "(none)"}` +
+          ` at ${event.sourceFile}:${event.lineNumber}`,
+      );
+    });
+  });
+  return violations;
 }
 
 /** Runs `fn` over `items`, at most `limit` at a time, keeping the order of the results. */

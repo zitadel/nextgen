@@ -26,7 +26,6 @@ type Person = { email: string; password: string };
 /** Logs the current person out in `page` and signs `person` in there. */
 async function switchTo(page: Page, person: Person): Promise<void> {
   await page.goto("/ui/console/");
-  await expect(page.getByRole("navigation", { name: "Primary" })).toBeVisible();
   await page.getByRole("button", { name: /^Account:/ }).click();
   await page.getByRole("menuitem", { name: "Log out" }).click();
   await expect(page).toHaveURL(/\/ui\/console\/login/);

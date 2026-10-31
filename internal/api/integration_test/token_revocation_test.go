@@ -27,7 +27,7 @@ func getMyUserStatus(t *testing.T, sessionToken string) (int, string) {
 	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet,
 		harness.APIBaseURL(t)+"/users/me", nil)
 	require.NoError(t, err)
-	req.AddCookie(&http.Cookie{Name: "__nextgen_session", Value: sessionToken})
+	req.AddCookie(&http.Cookie{Name: "__Host-zitadel_session", Value: sessionToken})
 
 	resp, err := harness.EnsureHttpClient(t).Do(req)
 	require.NoError(t, err)
@@ -171,7 +171,7 @@ func TestProjectSecretIsRevocable(t *testing.T) {
 
 	resp, err := operator.GetProject(t.Context(), api.GetProjectParams{ProjectID: api.ProjectID(project.ID)})
 	require.NoError(t, err)
-	require.IsType(t, &api.ProjectResponse{}, resp, helpers.MustMarshal(t, resp))
+	require.IsType(t, &api.ProjectDetailResponse{}, resp, helpers.MustMarshal(t, resp))
 
 	// The secret carries the id of its record, which is what makes it revocable.
 	parsed, err := harness.EnsureTokenService(t).IntrospectToken(t.Context(), project.ProjectSecret)

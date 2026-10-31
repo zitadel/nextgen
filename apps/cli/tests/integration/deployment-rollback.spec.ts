@@ -51,6 +51,29 @@ describe("deployment rollback", () => {
         );
       });
 
+      it("records -m on the rollback", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        await app.deployData();
+        await app.editUserSchema((schema) => {
+          schema.properties.company = { type: "string" };
+        });
+        await app.deployData();
+
+        const result = await app.run([
+          "deployment",
+          "rollback",
+          "--force",
+          "-m",
+          "company broke sign-up",
+          "--non-interactive",
+          "--json",
+        ]);
+
+        const { deployment_id } = app.envelopeOf<{ deployment_id: string }>(result).data;
+        expect(await app.deploymentMessage(deployment_id)).toBe("company broke sign-up");
+      });
+
       it("guards a bare rollback with the deployment it undoes", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin();
@@ -102,6 +125,30 @@ describe("deployment rollback", () => {
         expect(result).toFailWith("E_VALIDATION");
       });
 
+      it("undoes the last deploy, not a preview deployed after it", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        await app.addOrigin("https://*-acme.vercel.app", "preview");
+        const first = await app.deployData();
+        await app.editUserSchema((schema) => {
+          schema.properties.one = { type: "string" };
+        });
+        await app.deployData();
+        await app.previewData("https://x-acme.vercel.app");
+
+        const result = await app.run([
+          "deployment",
+          "rollback",
+          "--force",
+          "--non-interactive",
+          "--json",
+        ]);
+
+        expect(app.envelopeOf<{ release_id: string }>(result).data.release_id).toBe(
+          first.release_id,
+        );
+      });
+
       it("rolls back nothing on a dry run, needing no --force", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin();
@@ -110,6 +157,7 @@ describe("deployment rollback", () => {
           schema.properties.company = { type: "string" };
         });
         await app.deployData();
+        const before = await app.liveDeploymentCount();
 
         // A dry run is exempt from the destructive-confirm gate, so it succeeds
         // without --force even non-interactively.
@@ -123,16 +171,13 @@ describe("deployment rollback", () => {
 
         expect(result).toSucceed();
         expect(app.envelopeOf<{ dry_run: boolean }>(result).data.dry_run).toBe(true);
-        // No rollback deployment was written: the history still holds the two
-        // deploys and nothing more.
-        const listed = await app.run(["deployment", "list", "--json"]);
-        expect(app.envelopeOf<{ count: number }>(listed).data.count).toBe(2);
+        // No rollback deployment was written: the history holds what it held.
+        expect(await app.liveDeploymentCount()).toBe(before);
       });
 
       it("fails when there is no earlier deployment", async () => {
+        // Setup's deployment is the only one.
         const app = await aSetUpApp();
-        await app.addPrimaryOrigin();
-        await app.deployData();
 
         const result = await app.run([
           "deployment",

@@ -17,6 +17,7 @@ import (
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 
 	api "github.com/zitadel/nextgen/api/generated"
+	"github.com/zitadel/nextgen/internal/instrumentation/zotel"
 )
 
 // probeHandler answers the probes and no other operation, so a response
@@ -48,7 +49,7 @@ func newMountedAPI(t *testing.T) mountedAPI {
 		api.WithNotFound(OgenNotFound(nil)),
 		api.WithMethodNotAllowed(OgenMethodNotAllowed),
 		api.WithTracerProvider(sdktrace.NewTracerProvider(sdktrace.WithSyncer(spans))),
-		api.WithMeterProvider(sdkmetric.NewMeterProvider(sdkmetric.WithReader(metrics))),
+		api.WithMeterProvider(sdkmetric.NewMeterProvider(sdkmetric.WithReader(metrics), sdkmetric.WithView(zotel.MeterViews()...))),
 	)
 	require.NoError(t, err)
 	mux := http.NewServeMux()
@@ -143,7 +144,8 @@ func TestMountAPIAnswersAPreflightOnBothSpellings(t *testing.T) {
 
 // The traffic the alias still carries is counted before GA removes it: its
 // spans and its metrics carry RootPathAttribute, the prefix's and the root
-// probes' do not.
+// probes' do not. The metrics go through the views the server's meter
+// provider drops other attributes with.
 func TestMountAPIMarksRootPathTraffic(t *testing.T) {
 	t.Parallel()
 	m := newMountedAPI(t)

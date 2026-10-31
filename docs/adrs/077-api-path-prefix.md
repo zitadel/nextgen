@@ -152,15 +152,17 @@ has died down.
   ([ADR 073](073-session-cookie-per-project.md)), so a browser call becomes
   `/__nextgen/api/v1/…`. They also decide by path in one place: the project
   secret goes only to the session exchange, and the SDKs' handling of the
-  shared session cookie recognises the session reads. Until 1.0.0 every such
+  shared session cookie recognises the session reads. On the hosted cloud,
+  the functions in front of the sign-in widget check its flow writes for bots
+  ([ADR 084](084-hosted-cloud-business-systems.md)). Until 1.0.0 every such
   check accepts both spellings. A dev proxy an earlier CLI wrote knows only
   the root path: `zitadel doctor` reports it and `doctor --fix` rewrites it.
   A proxy written by hand, such as the production proxy an SPA needs, must
   accept the prefixed path before its app upgrades.
 - **Versions:** a client that calls the prefix needs a server that serves
-  it, so a self-hosted server is upgraded before its apps. The CLI checks
-  the version of a local server it finds running before it uses it, and a
-  client that gets `req.not_found` for an operation says the server may
+  it, so a self-hosted server is upgraded before its apps. `zitadel start`
+  and `zitadel setup` check the version of a local server they find running,
+  and a client that gets `req.not_found` for an operation says the server may
   predate the prefix.
 - **Cloud:** `vercel.json` routes `/api/*` to the server, and its catch-all
   stays on the server, as ADR 076 keeps it. ADR 076 rejected routing the

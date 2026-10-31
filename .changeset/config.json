@@ -1,6 +1,9 @@
 {
   "$schema": "https://unpkg.com/@changesets/config@latest/schema.json",
-  "changelog": ["@changesets/changelog-github", { "repo": "zitadel/nextgen" }],
+  "changelog": [
+    "@changesets/changelog-github",
+    { "repo": "zitadel/nextgen", "disableThanks": true }
+  ],
   "commit": false,
   "fixed": [
     [
@@ -40,10 +43,14 @@
   },
   "ignore": [
     "@zitadel/api-mock",
+    "@zitadel/cloud-console",
+    "@zitadel/cloud-functions",
     "@zitadel/console",
     "@zitadel/e2e",
     "@zitadel/demo-next",
     "@zitadel/demo-nuxt",
-    "@zitadel/storybook"
+    "@zitadel/docs",
+    "@zitadel/storybook",
+    "@zitadel/website"
   ]
 }

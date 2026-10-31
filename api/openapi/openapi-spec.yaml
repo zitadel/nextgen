@@ -178,6 +178,8 @@ paths:
     $ref: endpoints/projects/query/methods.yaml
   /projects/{project_id}:
     $ref: endpoints/projects/by_id/methods.yaml
+  /projects/{project_id}/admins:
+    $ref: endpoints/projects/by_id/admins/methods.yaml
   /projects/{project_id}/claim/init:
     $ref: endpoints/projects/by_id/claim/init/methods.yaml
   /projects/{project_id}/claim/status:
@@ -236,6 +238,8 @@ paths:
     $ref: endpoints/idps/revisions/by_id/methods.yaml
   /policies:
     $ref: endpoints/policies/methods.yaml
+  /policies/evaluate:
+    $ref: endpoints/policies/evaluate/methods.yaml
   /policies/{policy_id}:
     $ref: endpoints/policies/by_id/methods.yaml
   /policies/{policy_id}/revisions:
@@ -326,6 +330,8 @@ webhooks:
     $ref: endpoints/events/webhooks/policy-created.yaml
   policy.updated:
     $ref: endpoints/events/webhooks/policy-updated.yaml
+  preview.removed:
+    $ref: endpoints/events/webhooks/preview-removed.yaml
   project.created:
     $ref: endpoints/events/webhooks/project-created.yaml
   project.deleted:
@@ -367,5 +373,5 @@ components:
   securitySchemes:
     oauth2:
       $ref: security/oauth2.yaml
-    nextgenSession:
+    sessionCookie:
       $ref: security/session-cookie.yaml

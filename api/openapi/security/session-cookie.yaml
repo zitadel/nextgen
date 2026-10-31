@@ -1,8 +1,14 @@
 type: apiKey
 in: cookie
-name: __nextgen_session
+name: __Host-zitadel_session
 description: |
-  The __nextgen_session cookie issued at session creation or superseding handoff exchange.
+  The session cookie issued at session creation or superseding handoff exchange.
+
+  A browser holds it as `__Host-zitadel_session`, with `Secure`. Over plain
+  http to a loopback host (`localhost`, `127.0.0.1`, `::1`) the server sets it
+  as `zitadel_session` instead, without `Secure` or the prefix, so that Safari
+  keeps it, and accepts that name there too; `__Host-zitadel_session` takes
+  precedence. A program sends `__Host-zitadel_session` over any transport.
 
   A missing or invalid cookie yields `401` with code `auth.unauthorized` and the message
   `Missing or invalid session token.`

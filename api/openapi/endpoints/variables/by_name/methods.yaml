@@ -15,6 +15,7 @@ get:
   security:
     - oauth2:
         - variable.read
+    - sessionCookie: []
   responses:
     '200':
       description: The variable was retrieved successfully.

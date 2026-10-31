@@ -56,6 +56,10 @@ const shellHandlers = [
   http.get("*/api/v1/users/me/password", () => HttpResponse.json({})),
   http.get("*/api/v1/users/me/passkeys", () => HttpResponse.json({ passkeys: [] })),
   http.get("*/api/v1/users/me/identity_links", () => HttpResponse.json({ identity_links: [] })),
+  // The Users list, where the console lands, reads the project's schema
+  // lineages for its filter (#1669). None by default: the filter stays off
+  // the title row, and a spec about it serves its own list.
+  http.get("*/api/v1/schemas", () => HttpResponse.json({ schemas: [] })),
 ];
 
 export const server = setupServer(...shellHandlers);

@@ -66,6 +66,23 @@ tasks:
       # The real-instance configs and src-real specs import
       # @zitadel/testing/playwright.
       - "testing:build"
+    inputs:
+      - "**/*"
+      # The packed-CLI helpers and the journey's registry scripts import the
+      # root release scripts.
+      - "/scripts/*.mjs"
+      - "/scripts/*.d.mts"
+
+  # The journey harness's unit tests, which also read the CLI's skill and the
+  # router skill, the mock OIDC provider's users and the built-in schemas.
+  test:
+    inputs:
+      - "**/*"
+      - "/scripts/*.mjs"
+      - "/apps/cli/skills/**/*"
+      - "/skills/zitadel/**/*"
+      - "/tools/oidc-mock/users.json"
+      - "/api/openapi/endpoints/schemas/*.json"
 
   # The whole suite: moon counts `e2e:all` affected whenever a lane is (a lane's
   # dependency changed, or a file the lane lists), and running it runs every
@@ -192,6 +209,31 @@ tasks:
       - "@group(laneShared)"
       - "/scripts/render-builtin-schemas.mjs"
       - "/api/openapi/endpoints/schemas/*.json"
+    options:
+      cache: false
+      runInCI: false
+
+  # The packed CLI against a deployment of the hosted cloud, which CLOUD_URL
+  # names: setup from an empty directory, deploy, variables, origins,
+  # deployment list and rollback, and a claim a browser finishes. It packs
+  # @zitadel/cli and the packages it depends on (pnpm pack reruns the CLI's
+  # build into its dist), installs them outside the repo, and reaches a
+  # protected deployment through a local proxy that adds the bypass secret.
+  # Each run leaves a project in the deployment's database, so the
+  # deployment-checks workflow runs it on previews only, and it skips the
+  # production domain. testing:build also builds config and api, which the
+  # pack reads. Not a dependency of `all`: the config refuses to run without
+  # CLOUD_URL.
+  cli-deployment:
+    command: "corepack pnpm exec playwright test --config cli/playwright.deployment.config.mts"
+    inputs:
+      - "cli/**/*"
+      - "@group(laneShared)"
+      - "/scripts/release-artifacts.mjs"
+      - "/scripts/release-manifest.mjs"
+    deps:
+      - "cli:build"
+      - "testing:build"
     options:
       cache: false
       runInCI: false
