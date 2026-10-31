@@ -30,13 +30,13 @@ async function stubSession(
   await context.route(
     (url) =>
       url.origin === origin &&
-      ["/sessions/me", "/sessions/me/csrf", "/teams"].includes(url.pathname),
+      ["/api/v1/sessions/me", "/api/v1/sessions/me/csrf", "/api/v1/teams"].includes(url.pathname),
     async (route) => {
       const request = route.request();
       const path = new URL(request.url()).pathname;
-      if (path === "/sessions/me") {
+      if (path === "/api/v1/sessions/me") {
         await route.fulfill({ json: { user: reader() } });
-      } else if (path === "/sessions/me/csrf") {
+      } else if (path === "/api/v1/sessions/me/csrf") {
         if (csrf) await route.fulfill({ json: { csrf_token: `csrf-${reader().user_id}` } });
       } else {
         writes.push(request.headers()["x-zitadel-csrf"]);
@@ -107,7 +107,7 @@ test("optional project scope starts unset and can be set and unset explicitly", 
   const origin = new URL(baseURL!).origin;
   const projects: (string | null)[] = [];
   await context.route(
-    (url) => url.origin === origin && url.pathname === "/users/query",
+    (url) => url.origin === origin && url.pathname === "/api/v1/users/query",
     async (route) => {
       projects.push(new URL(route.request().url()).searchParams.get("project_id"));
       await route.fulfill({ json: { users: [] } });
@@ -202,7 +202,7 @@ test("a signed-out reader's sample starts with project-secret authentication", a
 }) => {
   const origin = new URL(baseURL!).origin;
   await context.route(
-    (url) => url.origin === origin && url.pathname === "/sessions/me",
+    (url) => url.origin === origin && url.pathname === "/api/v1/sessions/me",
     (route) => route.fulfill({ status: 401, json: { code: "auth.unauthorized" } }),
   );
   await page.goto("/docs/reference/api/users/queryUsers");

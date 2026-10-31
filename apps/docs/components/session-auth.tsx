@@ -6,14 +6,14 @@ import { createContext, use, useEffect, useSyncExternalStore } from "react";
 
 // The playground sends a request that accepts the session cookie with the
 // reader's own session. On the cloud the docs, the Console and the API share
-// one origin (vercel.json), the spec's server is that origin, and the
-// playground's fetch keeps the browser's same-origin credentials, so the
+// one origin (vercel.json), the spec's server is `/api/v1` on it (ADR 077),
+// and the playground's fetch keeps the browser's same-origin credentials, so the
 // browser sends the Console's HttpOnly session cookie itself. Nothing
 // reads or writes the cookie here, and nothing goes through a proxy: Fumadocs'
 // proxy omits credentials.
 
-/** The server the playground calls, the spec's: the page's own origin. */
-const server = "/";
+/** The server the playground calls, the spec's: `/api/v1` on the page's own origin. */
+const server = "/api/v1/";
 
 const sessionScheme = "sessionCookie";
 

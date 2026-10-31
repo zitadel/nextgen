@@ -82,16 +82,16 @@ test("the playground uses the reader's session after visiting a live example", a
   await context.route(
     (url) =>
       url.origin === origin &&
-      ["/sessions/me", "/sessions/me/csrf", "/teams"].includes(url.pathname),
+      ["/api/v1/sessions/me", "/api/v1/sessions/me/csrf", "/api/v1/teams"].includes(url.pathname),
     async (route) => {
       const request = route.request();
       const path = new URL(request.url()).pathname;
       calls.push(`${request.method()} ${path}`);
-      if (path === "/sessions/me") {
+      if (path === "/api/v1/sessions/me") {
         await route.fulfill({
           json: { user: { user_id: "usr_docs_test", display: "Docs regression reader" } },
         });
-      } else if (path === "/sessions/me/csrf") {
+      } else if (path === "/api/v1/sessions/me/csrf") {
         await route.fulfill({ json: { csrf_token: csrfToken } });
       } else {
         writeCsrf = request.headers()["x-zitadel-csrf"];
@@ -126,7 +126,12 @@ test("the playground uses the reader's session after visiting a live example", a
 
   await expect
     .poll(() => calls)
-    .toEqual(["GET /sessions/me", "GET /sessions/me/csrf", "GET /sessions/me", "POST /teams"]);
+    .toEqual([
+      "GET /api/v1/sessions/me",
+      "GET /api/v1/sessions/me/csrf",
+      "GET /api/v1/sessions/me",
+      "POST /api/v1/teams",
+    ]);
   expect(writeCsrf).toBe(csrfToken);
 });
 
