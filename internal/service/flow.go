@@ -96,8 +96,8 @@ type flowService struct {
 
 var _ FlowService = (*flowService)(nil)
 
-// Resolve picks the definition from the revisions the request's release pins:
-// by name, the one under that handle; by audience, the set scored by
+// Resolve picks the definition from the active revisions the request's release
+// pins: by name, the one under that handle; by audience, the set scored by
 // flowAudienceScore.
 func (s *flowService) Resolve(ctx context.Context, req ResolveFlowRequest) (_ *domain.FlowDefinition, err error) {
 	ctx, end := startSpan(ctx, "FlowService.Resolve")
@@ -118,6 +118,9 @@ func (s *flowService) Resolve(ctx context.Context, req ResolveFlowRequest) (_ *d
 				return nil, domain.ErrFlowDefinitionNotFound()
 			}
 			return nil, err
+		}
+		if def.Status != domain.FlowDefinitionStatusActive {
+			return nil, domain.ErrFlowDefinitionNotFound()
 		}
 		if req.SchemaVersion != nil && def.SchemaVersion != *req.SchemaVersion {
 			return nil, domain.ErrFlowDefinitionNotFound()
@@ -145,6 +148,9 @@ func (s *flowService) Resolve(ctx context.Context, req ResolveFlowRequest) (_ *d
 	var best *domain.FlowDefinition
 	bestScore := -1
 	for _, def := range result.Items {
+		if def.Status != domain.FlowDefinitionStatusActive {
+			continue
+		}
 		if req.SchemaVersion != nil && def.SchemaVersion != *req.SchemaVersion {
 			continue
 		}

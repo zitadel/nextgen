@@ -26,9 +26,8 @@ properties:
     items:
       $ref: project-origin.yaml
     description: |
-      The project's origins. An empty list means every origin is admitted
-      until the first pattern is added. Loopback origins are admitted without
-      a pattern.
+      The project's origins. An empty list admits no origin except a loopback
+      origin, which is admitted without a pattern.
   created_at:
     type: string
     format: date-time

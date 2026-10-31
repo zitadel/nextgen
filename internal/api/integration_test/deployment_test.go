@@ -534,11 +534,11 @@ func TestDeploymentReads(t *testing.T) {
 			ids(list(t, api.ListDeploymentsParams{Origin: api.NewOptOrigin(appOrigin), Live: api.NewOptBool(true)})))
 	})
 
-	t.Run("a removed primary origin drops out of the live view", func(t *testing.T) {
+	t.Run("a removed primary origin stays on the live deployment that names it", func(t *testing.T) {
 		require.NoError(t, harness.EnsureProjectService(t).RemoveOrigin(t.Context(), fixture.project, wwwOrigin))
 		got := list(t, api.ListDeploymentsParams{Live: api.NewOptBool(true)})
 		require.Len(t, got, 1)
-		assert.Equal(t, []string{appOrigin}, origins(got[0].Targets))
+		assert.Equal(t, []string{appOrigin, wwwOrigin}, origins(got[0].Targets))
 		assert.Equal(t, []string{appOrigin, wwwOrigin}, origins(get(t, second.ID).Targets), "the record keeps its origins")
 	})
 

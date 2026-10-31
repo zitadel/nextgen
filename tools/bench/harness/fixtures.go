@@ -94,6 +94,42 @@ func originsToAPI(in []FixtureOrigin) []api.ProjectOrigin {
 	return out
 }
 
+// deployProject deploys a release of the project's flows and schema to its
+// primary origins: nothing is served without one.
+func deployProject(ctx context.Context, c *api.Client, projectID, schema string) error {
+	listed, err := c.ListFlowDefinitions(ctx, api.ListFlowDefinitionsParams{ProjectID: api.ProjectID(projectID)})
+	if err != nil {
+		return fmt.Errorf("list flow definitions: %w", err)
+	}
+	flows, ok := listed.(*api.FlowDefinitionListResponse)
+	if !ok {
+		return fmt.Errorf("list flow definitions: unexpected response %T", listed)
+	}
+	pointers := []api.CreateReleasePointer{{Kind: api.ReleasePointerKindSchema, RevisionID: schema}}
+	for _, definition := range flows.FlowDefinitions {
+		pointers = append(pointers, api.CreateReleasePointer{Kind: api.ReleasePointerKindFlowDefinition, RevisionID: definition.ID})
+	}
+	created, err := c.CreateRelease(ctx, &api.CreateReleaseRequest{Pointers: pointers}, api.CreateReleaseParams{ProjectID: api.ProjectID(projectID)})
+	if err != nil {
+		return fmt.Errorf("create release: %w", err)
+	}
+	release, ok := created.(*api.CreateReleaseCreated)
+	if !ok {
+		return fmt.Errorf("create release: unexpected response %T", created)
+	}
+	deployed, err := c.CreateDeployment(ctx, &api.CreateDeploymentRequest{
+		ReleaseID: api.NewOptReleaseID(release.ID),
+		Targets:   api.DeploymentTargetsRequest{"primary"},
+	}, api.CreateDeploymentParams{ProjectID: api.ProjectID(projectID)})
+	if err != nil {
+		return fmt.Errorf("create deployment: %w", err)
+	}
+	if _, ok := deployed.(*api.CreateDeploymentCreated); !ok {
+		return fmt.Errorf("create deployment: unexpected response %T", deployed)
+	}
+	return nil
+}
+
 // Bootstrap applies a fixture to a running server through the generated
 // client — POST /projects mints the operator bearer, then the user and its
 // password — and proves the result by walking one login journey and one user
@@ -120,6 +156,10 @@ func Bootstrap(ctx context.Context, base, lane string, fx Fixture) (Target, erro
 		return Target{}, fmt.Errorf("create project: unexpected response %T", created)
 	}
 	creds.SetBearer(project.ProjectSecret)
+
+	if err := deployProject(ctx, c, project.ID, fx.User.Schema); err != nil {
+		return Target{}, err
+	}
 
 	email, err := json.Marshal(fx.User.Email)
 	if err != nil {
