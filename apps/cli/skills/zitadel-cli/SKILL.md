@@ -96,7 +96,7 @@ nothing; `data.skills` and `data.directories` say what it added where.
   the server is never read from `zitadel.json`. `zitadel env` shows what resolved and where
   each value came from; `zitadel env add <name>` binds another environment to a
   project. The project it creates has never had a release, so the environment
-  serves the server's own defaults until something is deployed to it: run the
+  refuses sign-in until something is deployed to it: run the
   `deploy` the result's `next_commands` names, against the file it wrote
   (`--env-file .env.<name>.local`). A person at a terminal is asked whether to
   deploy there and then; your runs never are, so they never deploy — run that
@@ -107,10 +107,11 @@ nothing; `data.skills` and `data.directories` say what it added where.
   and `origin rm <url>` manage the URLs a project serves: a `primary` origin is
   where the app is served, a `preview` pattern (it may hold a `*`) is where
   pull-request builds run. They need the project secret, not the preview token.
-  An empty list admits every origin, so removing the last one opens the project
-  up. A caller with no `Origin` is served the newest primary deployment;
-  `origin rm` asks first and needs `--force` when non-interactive. Removing
-  a preview pattern leaves its live previews served until they expire.
+  An empty list admits no origin except a loopback origin. A caller with no
+  `Origin`, and the server's own origin when the project does not list it,
+  is served the newest primary deployment; `origin rm` asks first and needs
+  `--force` when non-interactive. Removing a preview pattern leaves its live
+  previews served until they expire.
   `deploy` lands only on primary origins and fails with `E_VALIDATION` without
   one; its `next_commands` name the step that gives the project one. `setup`
   0.1.0 registered the app's URL (`ZITADEL_ISSUER`) as a `preview` origin,

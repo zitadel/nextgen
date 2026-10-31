@@ -7,8 +7,8 @@ description: |
   preview deploy may register; it may include at most one `*` inside a single
   host label (`*` matches one or more characters, none of them a dot). A
   literal beats a wildcard. Unknown hosts are accepted as written. An empty
-  list means every origin is admitted until the first pattern is added.
-  Loopback origins are admitted without a pattern.
+  list admits no origin except a loopback origin, which is admitted without a
+  pattern.
 required:
   - pattern
   - kind

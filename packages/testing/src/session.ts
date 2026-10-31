@@ -189,8 +189,9 @@ async function flowFetch(
   if (!response.ok || !parsed) {
     const detail = parsed && typeof parsed === "object" ? ` — ${JSON.stringify(parsed)}` : "";
     // An origin-allowlist rejection without an Origin header is a
-    // configuration gap, not a flow problem — say how to close it. (No eager
-    // check: a project with an empty allowlist may accept originless calls.)
+    // configuration gap, not a flow problem — say how to close it. A request
+    // with no Origin is served the newest primary deployment, which a project
+    // may not have.
     const hint =
       !origin && /origin/i.test(detail)
         ? "\nNo Origin header was sent: pass `origin` to seedSession() (the Playwright " +
