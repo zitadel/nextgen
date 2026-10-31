@@ -677,7 +677,7 @@ project and imports the root admin.
 - **Usage:** for the same reason a second Cron Job calls `/cron/usage`
   every five minutes with `CRON_SECRET`, and the server counts each
   project's new events into its usage rollups
-  ([ADR 086](../adrs/086-usage-rollups-and-api.md)).
+  ([ADR 085](../adrs/085-usage-rollups-and-api.md)).
   - Each run logs `usage: counted events` with the projects it walked and
     the events it counted, or `usage: count failed` with the cause, and
     answers 500.

@@ -96,7 +96,7 @@ tags:
       `event_type` with typed payloads per docs/design/api/events-catalog.md.
   - name: Usage
     description: |
-      A project's usage per meter, by UTC day or hour (ADR 086): counted from
+      A project's usage per meter, by UTC day or hour (ADR 085): counted from
       its events by the server's usage projector, kept after the events age
       out, and served as counts that a hosted cloud prices.
   - name: Event Webhooks

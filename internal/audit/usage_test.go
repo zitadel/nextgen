@@ -80,7 +80,9 @@ func signIn(id, user string, at time.Time) *domain.Event {
 }
 
 func TestUsageTouches_CountEachUserOncePerMonthAtTheirFirstHour(t *testing.T) {
-	oct := func(day, hour, minute int) time.Time { return time.Date(2026, time.October, day, hour, minute, 0, 0, time.UTC) }
+	oct := func(day, hour, minute int) time.Time {
+		return time.Date(2026, time.October, day, hour, minute, 0, 0, time.UTC)
+	}
 	nov := time.Date(2026, time.November, 1, 0, 5, 0, 0, time.UTC)
 	other := &domain.Event{ID: "evt-x", EventType: domain.EventTypeUserCreated, CreatedAt: oct(31, 9, 0), Payload: json.RawMessage(`{"user_id":"u9"}`)}
 	anonymous := &domain.Event{ID: "evt-y", EventType: domain.EventTypeSessionEstablished, CreatedAt: oct(31, 9, 1), Payload: json.RawMessage(`{}`)}

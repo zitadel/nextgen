@@ -30,7 +30,7 @@ type Config struct {
 	Instrumentation instrumentation.Config `mapstructure:"instrumentation"`
 	Platform        PlatformConfig         `mapstructure:"platform"`
 	Events          EventsConfig           `mapstructure:"events"`
-	// Usage configures the projector that counts usage from events (ADR 086).
+	// Usage configures the projector that counts usage from events (ADR 085).
 	Usage audit.UsageConfig `mapstructure:"usage"`
 	// HTTPClient configures the hardened egress client used for every fetch
 	// of a URL a platform user can inject (see the egress-policy ADR).

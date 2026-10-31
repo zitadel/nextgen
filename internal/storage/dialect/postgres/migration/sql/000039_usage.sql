@@ -1,5 +1,5 @@
 -- +goose Up
--- Usage rollups the projector counts from events (ADR 086). Only the cursor
+-- Usage rollups the projector counts from events (ADR 085). Only the cursor
 -- goes with its project: a deleted project's usage stays until it ages out.
 CREATE TABLE zitadel_nextgen.usage_first_seen (
     project_id  TEXT COLLATE "C" NOT NULL

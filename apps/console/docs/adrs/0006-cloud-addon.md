@@ -62,7 +62,7 @@ the builds that leave it empty nothing:
   calls instead of the API base; the cloud routes them through its bot check
   (root ADR 084 §5);
 - `usagePrices`, which prices a project's usage for the console's own Usage
-  screen (root [ADR 086](../../../../docs/adrs/086-usage-rollups-and-api.md)).
+  screen (root [ADR 085](../../../../docs/adrs/085-usage-rollups-and-api.md)).
   Every build shows the counts; the cloud's adds what each day of them costs,
   and a failed or empty answer leaves only the prices out. It is the first
   slot that feeds a core screen rather than adding one.

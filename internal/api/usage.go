@@ -9,7 +9,7 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 )
 
-// WithUsageService attaches the usage read (ADR 086); without it GetUsage
+// WithUsageService attaches the usage read (ADR 085); without it GetUsage
 // answers as unimplemented.
 func (h *Handler) WithUsageService(s *service.UsageService) *Handler {
 	h.usageService = s

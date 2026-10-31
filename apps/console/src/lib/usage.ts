@@ -5,7 +5,7 @@ import { api } from "@/api/zitadel";
 import { errorCode } from "@/lib/api-error";
 
 /**
- * What the server's meters are called on screen (ADR 086). A meter the
+ * What the server's meters are called on screen (ADR 085). A meter the
  * console does not know yet shows under its own name.
  */
 const METER_LABELS: Readonly<Record<string, string>> = {

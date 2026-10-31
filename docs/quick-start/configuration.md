@@ -144,7 +144,7 @@ The hosted cloud calls it from a Vercel Cron Job
 
 | YAML key               | Environment                    | Default | Description                                                             |
 | ---------------------- | ------------------------------ | ------- | ----------------------------------------------------------------------- |
-| `usage.enabled`        | `NEXTGEN_USAGE_ENABLED`        | `true`  | Count each project's usage from its events, for `GET /usage` (ADR 086)  |
+| `usage.enabled`        | `NEXTGEN_USAGE_ENABLED`        | `true`  | Count each project's usage from its events, for `GET /usage` (ADR 085)  |
 | `usage.interval`       | `NEXTGEN_USAGE_INTERVAL`       | `5m`    | How often the server counts; the first count runs as it starts          |
 | `usage.trigger_secret` | `NEXTGEN_USAGE_TRIGGER_SECRET` | (empty) | Leaves the schedule to a scheduler outside the server, as for the purge |
 

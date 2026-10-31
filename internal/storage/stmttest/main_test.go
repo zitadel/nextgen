@@ -77,7 +77,7 @@ type dialect struct {
 	// delete cascades to.
 	deleteProjectUsage func(ctx context.Context, projectID string) error
 	schemaNullability  []schematest.ColumnNullability
-	liveNullability      func(ctx context.Context) (map[string]map[string]bool, error)
+	liveNullability    func(ctx context.Context) (map[string]map[string]bool, error)
 }
 
 // dialects is populated by TestMain for every registered opener.

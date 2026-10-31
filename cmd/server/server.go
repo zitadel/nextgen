@@ -788,7 +788,7 @@ func readConfig(configPath string, overrides ...configOverride) (Config, error) 
 	v.SetDefault("events.export.enabled", false)
 	v.SetDefault("events.export.interval", 5*time.Second)
 	// On by default, self-hosted too: every deployment can read its usage
-	// (ADR 086).
+	// (ADR 085).
 	v.SetDefault("usage.enabled", true)
 	v.SetDefault("usage.interval", 5*time.Minute)
 	// Empty: the server counts on its own timer, not when a scheduler calls.
@@ -1001,7 +1001,7 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiH
 	mux.Handle(api.IDPCallbackUpstreamPattern, callback)
 	// The background jobs' triggers, by path, when a scheduler outside the
 	// process runs them: the purge (events.retention.trigger_secret, ADR 049)
-	// and the usage count (usage.trigger_secret, ADR 086). They are the
+	// and the usage count (usage.trigger_secret, ADR 085). They are the
 	// operator's, not the API's, so they take the request ID and the request
 	// line but none of the middleware a client's request passes. A nil
 	// handler is a job no trigger runs; its path stays the API's.

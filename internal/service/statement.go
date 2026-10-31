@@ -925,7 +925,7 @@ type EventStatements interface {
 }
 
 // UsageStatements keep the usage rollups the projector counts from events
-// (ADR 086).
+// (ADR 085).
 type UsageStatements interface {
 	Statements
 	// ReadUsageEvents lists the project's settled events of the given types

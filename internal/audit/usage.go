@@ -16,7 +16,7 @@ import (
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 )
 
-// UsageConfig controls the usage projector (ADR 086).
+// UsageConfig controls the usage projector (ADR 085).
 type UsageConfig struct {
 	Enabled  bool          `mapstructure:"enabled"`
 	Interval time.Duration `mapstructure:"interval"`
@@ -234,7 +234,7 @@ func (p *UsageProjector) countProject(ctx context.Context, projectID string) (in
 //   - The cursor never moves back: a later read can see an earlier bound
 //     while a writer is in flight.
 //   - With nothing new, it moves only when the bound enters another hour,
-//     which seals the hour before (ADR 086 §4): about one write per idle
+//     which seals the hour before (ADR 085 §4): about one write per idle
 //     project and hour.
 func nextUsageCursor(projectID string, prev *domain.UsageCursor, batch []*domain.Event, bound time.Time) (domain.UsageCursor, bool) {
 	if len(batch) == usageBatchLimit {

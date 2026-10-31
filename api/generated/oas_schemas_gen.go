@@ -91371,7 +91371,7 @@ func (s *UsagePermissionDeniedDetails) init() UsagePermissionDeniedDetails {
 	return m
 }
 
-// A project's usage per meter and bucket (ADR 086).
+// A project's usage per meter and bucket (ADR 085).
 // Ref: #
 type UsageResponse struct {
 	// One bucket per meter and day or hour that counted something, ordered

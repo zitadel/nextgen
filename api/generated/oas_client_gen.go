@@ -708,11 +708,12 @@ type Invoker interface {
 	GetTeam(ctx context.Context, params GetTeamParams) (GetTeamRes, error)
 	// GetUsage invokes getUsage operation.
 	//
-	// A project's usage per meter, by UTC day or hour, in `[from, to)`: counts
-	// only, which the hosted cloud prices and a self-hosted deployment reads as
-	// they are (ADR 086). A `users` meter such as `monthly_active_users` counts
-	// each user once a month, in the hour of their first activity, so a month's
-	// buckets add up to its count.
+	// Returns a project's usage per meter, by UTC day or hour, over a range of
+	// up to 31 days. The range starts at `from` and ends before `to`. These are
+	// counts only, which the hosted cloud prices and a self-hosted deployment
+	// reads as they are (ADR 085). A `users` meter such as
+	// `monthly_active_users` counts each user once a month, in the hour of their
+	// first activity, so a month's buckets add up to its count.
 	// A bucket that counted nothing is left out. One that starts at or after
 	// `sealed_through` is still open and may grow; the ones before it never
 	// change. A project nobody has claimed answers its usage too, with no
@@ -8816,11 +8817,12 @@ func (c *Client) sendGetTeam(ctx context.Context, params GetTeamParams) (res Get
 
 // GetUsage invokes getUsage operation.
 //
-// A project's usage per meter, by UTC day or hour, in `[from, to)`: counts
-// only, which the hosted cloud prices and a self-hosted deployment reads as
-// they are (ADR 086). A `users` meter such as `monthly_active_users` counts
-// each user once a month, in the hour of their first activity, so a month's
-// buckets add up to its count.
+// Returns a project's usage per meter, by UTC day or hour, over a range of
+// up to 31 days. The range starts at `from` and ends before `to`. These are
+// counts only, which the hosted cloud prices and a self-hosted deployment
+// reads as they are (ADR 085). A `users` meter such as
+// `monthly_active_users` counts each user once a month, in the hour of their
+// first activity, so a month's buckets add up to its count.
 // A bucket that counted nothing is left out. One that starts at or after
 // `sealed_through` is still open and may grow; the ones before it never
 // change. A project nobody has claimed answers its usage too, with no
