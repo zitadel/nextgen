@@ -326,3 +326,10 @@ platform project, which the console signs operators in to, lists the origin of
 `server.public_base` as its one primary origin. So the console signs in there
 and on a loopback origin; at any other console origin a sign-in opens and its
 first submit is refused, while previewing a project's login keeps working.
+
+## Amendment (2026-10-31): callers with no origin
+
+A request with no `Origin`, and one admitted without a project pattern with
+nothing deployed to its origin, is served the project's newest primary
+deployment when there is one. So a console origin the platform project does not
+list still opens a flow.

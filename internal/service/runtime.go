@@ -23,8 +23,10 @@ type RuntimeResolution struct {
 	// admission was open (empty allowlist, loopback or an origin of the
 	// deployment's console) rather than a stored pattern.
 	Target string
-	// Source is "origin" when a deployment to the exact origin answered, or
-	// empty when resolution refused before a target was found.
+	// Source is "origin" when a deployment to the exact origin answered,
+	// "default" when the newest primary deployment did for a request with no
+	// target of its own, or empty when resolution refused before a target was
+	// found.
 	Source     string
 	Deployment *domain.Deployment
 	Release    *domain.Release
@@ -76,8 +78,9 @@ func NewRuntimeResolver(v2Pool *DB, releases ReleaseService, ownOrigins ...strin
 
 // Resolve walks the three layers: the gate refuses an origin no pattern
 // admits, the target is the newest deployment to that exact origin, and the
-// release is that deployment's release unless it is revoked. There is no
-// project default target and no release pin in this path.
+// release is that deployment's release unless it is revoked. A request with
+// no origin, and one admitted openly with nothing deployed to its origin, is
+// served the newest primary deployment.
 func (r *RuntimeResolver) Resolve(ctx context.Context, projectID, origin string) (*RuntimeResolution, error) {
 	logger := getLoggingContext(ctx, "runtime").With(
 		slog.String("project_id", projectID),
@@ -99,7 +102,7 @@ func (r *RuntimeResolver) Resolve(ctx context.Context, projectID, origin string)
 		return nil, err
 	}
 	if resolution == nil {
-		logger.Info("runtime resolution deferred", slog.String("reason", "open_admission_no_deployment"))
+		logger.Info("runtime resolution deferred", slog.String("reason", "no_default_deployment"))
 		return nil, nil
 	}
 	logger.Info("runtime resolved", resolution.logAttrs()...)
@@ -115,44 +118,60 @@ func (r *RuntimeResolver) resolve(ctx context.Context, projectID, origin string)
 		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to read the project")
 	}
-	resolution := &RuntimeResolution{Project: project}
+	origin = strings.TrimSpace(origin)
+	if origin == "" {
+		return r.resolutionForDefault(ctx, project, "")
+	}
 
 	matched, err := r.gateOpening(ctx, project, origin)
 	if err != nil {
 		return nil, err
 	}
-	if matched == nil {
-		return nil, domain.ErrReleaseNotDeployed(nil).WithMessage("nothing is deployed to this origin")
-	}
 
-	resolution.Origin = matched.origin
-	resolution.Target = matched.pattern
 	dep, err := r.newestDeployment(ctx, projectID, matched.origin)
 	if err != nil {
 		return nil, err
 	}
-	if dep == nil {
-		// TODO(#1616): open admission with nothing deployed keeps the
-		// newest-revision path instead of rel.not_deployed.
-		if matched.open {
-			return nil, nil
-		}
-		return nil, domain.ErrReleaseNotDeployed(map[string]string{"origin": matched.origin}).
-			WithMessage("nothing is deployed to " + matched.origin)
+	if dep != nil {
+		return r.finish(ctx, project, matched.origin, matched.pattern, "origin", dep)
 	}
+	if matched.open {
+		return r.resolutionForDefault(ctx, project, matched.origin)
+	}
+	return nil, domain.ErrReleaseNotDeployed(map[string]string{"origin": matched.origin}).
+		WithMessage("nothing is deployed to " + matched.origin)
+}
 
-	resolution.Source = "origin"
-	resolution.Deployment = dep
+// resolutionForDefault serves the project's newest primary deployment. With no
+// primary deployment it answers nil, and the request runs the newest revisions.
+// TODO(#1616): refuse instead.
+func (r *RuntimeResolver) resolutionForDefault(ctx context.Context, project *domain.Project, requestOrigin string) (*RuntimeResolution, error) {
+	dep, err := newestPrimary(ctx, r.v2Pool.Statements(), project.ID)
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to read the newest primary deployment")
+	}
+	if dep == nil {
+		return nil, nil
+	}
+	return r.finish(ctx, project, requestOrigin, "", "default", dep)
+}
 
-	release, err := r.releases.Get(ctx, projectID, dep.ReleaseID)
+func (r *RuntimeResolver) finish(ctx context.Context, project *domain.Project, origin, target, source string, dep *domain.Deployment) (*RuntimeResolution, error) {
+	release, err := r.releases.Get(ctx, project.ID, dep.ReleaseID)
 	if err != nil {
 		return nil, err
 	}
 	if release.Revoked() {
 		return nil, domain.ErrReleaseRevoked()
 	}
-	resolution.Release = release
-	return resolution, nil
+	return &RuntimeResolution{
+		Project:    project,
+		Origin:     origin,
+		Target:     target,
+		Source:     source,
+		Deployment: dep,
+		Release:    release,
+	}, nil
 }
 
 func (r *RuntimeResolver) newestDeployment(ctx context.Context, projectID, origin string) (*domain.Deployment, error) {

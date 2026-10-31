@@ -29,23 +29,37 @@ type Tables struct {
 }
 
 // RowServes reports whether a deployment is live on one of its origins at the
-// given time. All primary origins run the newest primary deployment; a preview
-// URL runs its latest deployment until the preview expires.
+// given time. The newest primary deployment is always live; a preview URL runs
+// its latest deployment until the preview expires.
 func RowServes(tables Tables, placeholder string) string {
 	return `(` + primaryRowServes(tables) + ` OR ` + previewRowServes(tables, placeholder) + `)`
+}
+
+// OriginRowServes reports whether a deployment answers requests from the origin
+// of row t. It holds for at most one row of an origin: a listed primary origin
+// runs the newest primary deployment that names it, and any other origin its
+// latest preview deployment until the preview expires. RowServes can hold for a
+// primary and a preview row of one origin, because an origin the project stopped
+// listing can stay on the newest primary deployment.
+func OriginRowServes(tables Tables, placeholder string) string {
+	return `((` + primaryRowServes(tables) + ` AND ` + isPrimaryOrigin(tables) + `) OR ` + previewRowServes(tables, placeholder) + `)`
 }
 
 func primaryRowServes(tables Tables) string {
 	newerPrimary := `EXISTS (SELECT 1 FROM ` + tables.Deployments + ` np` +
 		` WHERE np.project_id = t.project_id AND np.origin_kind = 'primary'` +
 		` AND (np.deployed_at > t.deployed_at OR (np.deployed_at = t.deployed_at AND np.id > t.deployment_id)))`
-	return `(t.origin_kind = 'primary' AND ` + isPrimaryOrigin(tables) + ` AND NOT ` + newerPrimary + `)`
+	// The newest primary deployment always serves callers with no origin, so it
+	// stays live on every origin it names, whatever the project lists now.
+	return `(t.origin_kind = 'primary' AND NOT ` + newerPrimary + `)`
 }
 
 func previewRowServes(tables Tables, placeholder string) string {
 	previewLive := `EXISTS (SELECT 1 FROM ` + tables.Previews + ` p` +
 		` WHERE p.project_id = t.project_id AND p.origin = t.origin AND p.expires_at > ` + placeholder + `)`
-	return `(t.origin_kind = 'preview' AND NOT ` + NewerOriginRowExists(tables.Origins) +
+	newerPreview := `EXISTS (SELECT 1 FROM ` + tables.Origins + ` newer` +
+		` WHERE newer.project_id = t.project_id AND newer.origin = t.origin AND newer.seq > t.seq AND newer.origin_kind = 'preview')`
+	return `(t.origin_kind = 'preview' AND NOT ` + newerPreview +
 		` AND NOT ` + isPrimaryOrigin(tables) + ` AND ` + previewLive + `)`
 }
 
@@ -109,6 +123,6 @@ func NewSchema(tables Tables) database.Schema[domain.DeploymentField, domain.Dep
 		domain.DeploymentFieldOrigin: correlated(`EXISTS (` + ownOrigins + ` AND t.origin = ` + valueMarker + `)`),
 		domain.DeploymentFieldLive:   correlated(`EXISTS (` + ownOrigins + ` AND ` + RowServes(tables, valueMarker) + `)`),
 		domain.DeploymentFieldServesOrigin: correlated(`EXISTS (` + ownOrigins +
-			` AND t.origin = ` + valueMarker + ` AND ` + RowServes(tables, valueMarker) + `)`),
+			` AND t.origin = ` + valueMarker + ` AND ` + OriginRowServes(tables, valueMarker) + `)`),
 	})
 }
