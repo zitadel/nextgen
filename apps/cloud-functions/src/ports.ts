@@ -155,9 +155,10 @@ export interface BillingEvent {
 }
 
 /**
- * HubSpot: contacts, deals, email subscriptions and tickets. A person is a
- * contact and a team is a deal; HubSpot makes the company itself, from the
- * contact's email domain (§3).
+ * HubSpot: contacts, leads, email subscriptions and tickets. A person is a
+ * contact, and their sign-up a lead on it; HubSpot makes the company itself,
+ * from the contact's email domain (§3). A team reaches HubSpot only once it
+ * pays (§7).
  */
 export interface Crm {
   /**
@@ -177,8 +178,8 @@ export interface Crm {
    * unsubscribe is never undone (§7).
    */
   subscribe(person: Caller): Promise<CrmWrite>;
-  /** Finds the team's deal by the team's id, or creates it, with the contact on it. */
-  ensureDeal(team: Team, contactId: string): Promise<CrmWrite & { deal_id: string }>;
+  /** Finds the lead of the person's sign-up by their Zitadel id, or creates it on their contact. */
+  ensureLead(person: Caller, contactId: string): Promise<CrmWrite & { lead_id: string }>;
   emailPreferences(person: Caller): Promise<EmailPreferences>;
   setEmailPreferences(person: Caller, preferences: EmailPreferences): Promise<void>;
   tickets(person: Caller): Promise<Ticket[]>;
