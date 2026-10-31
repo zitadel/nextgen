@@ -56,6 +56,7 @@ export default class ZitadelHelp extends Help {
       await showSkillsHint({
         env: process.env,
         interactive: Boolean(process.stdout.isTTY && process.stdin.isTTY),
+        cliVersion: this.config.version,
       });
     }
     this.log(sections.join("\n\n"));

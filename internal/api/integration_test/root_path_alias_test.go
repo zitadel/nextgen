@@ -66,11 +66,11 @@ func TestRootPathAliasServesTheSignIn(t *testing.T) {
 	requireDeprecated(t, exchangeResp)
 	var sessionCookie *http.Cookie
 	for _, cookie := range exchangeResp.Cookies() {
-		if cookie.Name == "__nextgen_session" {
+		if cookie.Name == "__Host-zitadel_session" {
 			sessionCookie = cookie
 		}
 	}
-	require.NotNil(t, sessionCookie, "exchange must set the __nextgen_session cookie")
+	require.NotNil(t, sessionCookie, "exchange must set the __Host-zitadel_session cookie")
 
 	meReq, err := http.NewRequestWithContext(t.Context(), http.MethodGet, origin+"/sessions/me", nil)
 	require.NoError(t, err)

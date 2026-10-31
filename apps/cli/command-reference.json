@@ -346,6 +346,21 @@
       ]
     },
     {
+      "id": "skills add",
+      "group": "Getting started",
+      "description": "Add the Zitadel agent skills to this project.\n\nAdds the skills of this CLI's version to .agents/skills, which most coding agents read, and to .claude/skills for Claude Code. Run it again after updating the CLI to replace them with the new version's.",
+      "args": [],
+      "flags": [],
+      "examples": [
+        {
+          "command": "skills add"
+        },
+        {
+          "command": "skills add --cwd my-app"
+        }
+      ]
+    },
+    {
       "id": "console",
       "group": "Local development",
       "description": "Open the local console, signed in as the local admin.\n\nThe local admin is the one `zitadel start` created. Run this in the directory `zitadel start` ran in, or one inside it: the local admin is read from the nearest `.zitadel/local/` on the way up.",
@@ -1909,7 +1924,7 @@
         {
           "name": "message",
           "char": "m",
-          "description": "A short summary of what this release changes.",
+          "description": "A short summary of what this release changes. Defaults to the pull request's title or the current commit's subject.",
           "type": "option"
         },
         {
@@ -1951,6 +1966,12 @@
           "type": "option"
         },
         {
+          "name": "message",
+          "char": "m",
+          "description": "A short summary of what this release changes. Defaults to the pull request's title or the current commit's subject.",
+          "type": "option"
+        },
+        {
           "name": "strict",
           "description": "Fail instead of warning when no preview credential (ZITADEL_PROJECT_SECRET) is set.",
           "type": "boolean"
@@ -1976,6 +1997,9 @@
         },
         {
           "command": "preview --ttl 24h"
+        },
+        {
+          "command": "preview -m 'add phone_number to human-user'"
         }
       ]
     },
@@ -2257,6 +2281,12 @@
           "char": "f",
           "description": "Roll back without the confirmation prompt. Required when non-interactive.",
           "type": "boolean"
+        },
+        {
+          "name": "message",
+          "char": "m",
+          "description": "A short summary of why this rolls back.",
+          "type": "option"
         },
         {
           "name": "env",

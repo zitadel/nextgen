@@ -1,3 +1,5 @@
+import { fileURLToPath } from "node:url";
+
 import type { NextConfig } from "next";
 
 // The share of page loads that send Speed Insights (app/layout.tsx), from 0
@@ -11,6 +13,29 @@ if (sampleRate && !(Number(sampleRate) >= 0 && Number(sampleRate) <= 1)) {
   );
 }
 
+const policy = (directives: string[]) => directives.join("; ");
+const enforcedPolicy = [
+  // csp-adapter.mjs replaces this fallback with the prerendered 404's policy,
+  // and gives each prerendered page's URL its own, both with script hashes.
+  // Scriptless stays if the build prerendered no 404.
+  // next dev has no prerender adapter and needs its development runtime.
+  ...(process.env.NODE_ENV === "development"
+    ? []
+    : [
+        "default-src 'self'",
+        "script-src 'none'",
+        "style-src 'self' 'unsafe-inline'",
+        "img-src 'self' data:",
+        "connect-src 'self'",
+        "frame-src 'none'",
+        "form-action 'self'",
+      ]),
+  "object-src 'none'",
+  "base-uri 'self'",
+  "frame-ancestors 'none'",
+  "report-uri /csp-report",
+];
+
 // The cloud routes /, /_next/* and the favicons (/favicon.ico, /favicons/*)
 // to this app (repo-root vercel.json), so it needs no base path or asset
 // prefix: its other assets already load from /_next/.
@@ -22,6 +47,24 @@ const config: NextConfig = {
   // Keeps `next dev` from writing Next's agent rules into AGENTS.md when an
   // AI coding agent runs it (apps/AGENTS.md).
   agentRules: false,
+  // Adds each prerendered page's enforced policy, with its inline
+  // scripts' hashes, once the build has written the page.
+  adapterPath: fileURLToPath(new URL("./csp-adapter.mjs", import.meta.url)),
+  async headers() {
+    // Every response, the pages' and the other routes'. On the cloud's host
+    // the website shares an origin with the API and the console, so a script
+    // that runs here acts with a signed-in user's session.
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          // The prerendered 404's hash policy once csp-adapter.mjs has run;
+          // a prerendered page's URL gets its own (enforcedPolicy).
+          { key: "Content-Security-Policy", value: policy(enforcedPolicy) },
+        ],
+      },
+    ];
+  },
 };
 
 export default config;

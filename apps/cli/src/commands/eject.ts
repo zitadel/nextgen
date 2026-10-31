@@ -10,7 +10,6 @@ import { MANAGED_MARKER } from "../lib/paths";
 import { readRendererId, readZitadelConfig } from "../lib/project";
 import { shellArg } from "../lib/shell";
 import { shellCommand, type SuggestedCommand } from "../lib/suggestion";
-import { nextCommandsData } from "../lib/oclif/envelope";
 import { Promptable } from "../lib/oclif/promptable";
 
 /**
@@ -246,9 +245,9 @@ export default class Eject extends Promptable(BaseCommand) {
         files_removed: removed,
         files_preserved: preserved,
         backed_up: backedUp,
-        ...nextCommandsData(nextCommands),
         manual_steps: manualSteps,
       },
+      next: { commands: nextCommands },
     });
   }
 }

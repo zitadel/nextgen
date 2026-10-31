@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"time"
 
 	"github.com/pressly/goose/v3"
 )
@@ -14,7 +15,9 @@ import (
 //go:embed sql/*.sql
 var sqlFiles embed.FS
 
-const schemaName = "zitadel_nextgen"
+// SchemaName is the schema the migrations create and the server's tables live
+// in: a database that holds it is a deployment's.
+const SchemaName = "zitadel_nextgen"
 
 // migrationLockID keys the session advisory lock that serializes Migrate
 // across all connections and processes sharing one database. Arbitrary but
@@ -52,7 +55,7 @@ func newProvider(db *sql.DB) (*goose.Provider, error) {
 		return nil, err
 	}
 	return goose.NewProvider(goose.DialectPostgres, db, sqlFS,
-		goose.WithTableName(schemaName+".goose_db_version"),
+		goose.WithTableName(SchemaName+".goose_db_version"),
 		goose.WithSessionLocker(migrationSessionLocker{}),
 	)
 }
@@ -74,7 +77,7 @@ func createSchema(ctx context.Context, db *sql.DB, locker migrationSessionLocker
 		err = errors.Join(err, locker.SessionUnlock(context.WithoutCancel(ctx), conn))
 	}()
 
-	if _, err := conn.ExecContext(ctx, "CREATE SCHEMA IF NOT EXISTS "+schemaName); err != nil {
+	if _, err := conn.ExecContext(ctx, "CREATE SCHEMA IF NOT EXISTS "+SchemaName); err != nil {
 		return err
 	}
 	return nil
@@ -85,10 +88,25 @@ func createSchema(ctx context.Context, db *sql.DB, locker migrationSessionLocker
 type migrationSessionLocker struct{}
 
 func (migrationSessionLocker) SessionLock(ctx context.Context, conn *sql.Conn) error {
-	if _, err := conn.ExecContext(ctx, "SELECT pg_advisory_lock($1)", migrationLockID); err != nil {
-		return fmt.Errorf("acquire migration advisory lock: %w", err)
+	// A blocking pg_advisory_lock holds a transaction open while it waits.
+	// CREATE INDEX CONCURRENTLY in the lock holder can wait on that transaction,
+	// deadlocking both migrators. End each probe before waiting in Go instead.
+	retry := time.NewTicker(100 * time.Millisecond)
+	defer retry.Stop()
+	for {
+		var locked bool
+		if err := conn.QueryRowContext(ctx, "SELECT pg_try_advisory_lock($1)", migrationLockID).Scan(&locked); err != nil {
+			return fmt.Errorf("acquire migration advisory lock: %w", err)
+		}
+		if locked {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("acquire migration advisory lock: %w", ctx.Err())
+		case <-retry.C:
+		}
 	}
-	return nil
 }
 
 func (migrationSessionLocker) SessionUnlock(ctx context.Context, conn *sql.Conn) error {

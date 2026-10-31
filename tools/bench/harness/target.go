@@ -164,11 +164,11 @@ func (c *Credentials) OAuth2(context.Context, api.OperationName) (api.OAuth2, er
 	return api.OAuth2{Token: c.Bearer()}, nil
 }
 
-// NextgenSession implements api.SecuritySource. No session cookie is held;
+// SessionCookie implements api.SecuritySource. No session cookie is held;
 // skipping lets the client fall through to the bearer on operations that
 // accept either.
-func (c *Credentials) NextgenSession(context.Context, api.OperationName) (api.NextgenSession, error) {
-	return api.NextgenSession{}, ogenerrors.ErrSkipClientSecurity
+func (c *Credentials) SessionCookie(context.Context, api.OperationName) (api.SessionCookie, error) {
+	return api.SessionCookie{}, ogenerrors.ErrSkipClientSecurity
 }
 
 var _ api.SecuritySource = (*Credentials)(nil)

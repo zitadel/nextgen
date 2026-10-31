@@ -51,7 +51,7 @@ type csrfRequest struct {
 }
 
 // WithCSRFRequest records the request's method, cross-origin verdict and
-// CSRF header for HandleNextgenSession. It rejects nothing itself: whether a
+// CSRF header for HandleSessionCookie. It rejects nothing itself: whether a
 // check applies depends on the operation and on the credential that
 // authenticated it, which only the security handler knows.
 func WithCSRFRequest(next http.Handler) http.Handler {

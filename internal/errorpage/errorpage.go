@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/zitadel/nextgen/internal/api/middleware"
+	"github.com/zitadel/nextgen/internal/securityheaders"
 	designtokens "github.com/zitadel/nextgen/packages/design-tokens"
 )
 
@@ -82,6 +83,19 @@ var pageTemplate = template.Must(template.New("page").Parse(pageHTML))
 // never request data, which is what makes the template.CSS conversion safe.
 var styles = template.CSS(designtokens.TokensCSS + pageCSS)
 
+// policy lets the page run its own inline script and style, each by hash, and
+// load its favicons; nothing else.
+var policy = securityheaders.Policy(
+	"default-src 'none'",
+	"script-src "+strings.Join(securityheaders.InlineScriptHashes(pageHTML), " "),
+	"style-src "+securityheaders.Hash(string(styles)),
+	"img-src 'self'",
+	"base-uri 'none'",
+	"form-action 'none'",
+	"frame-ancestors 'none'",
+	"report-uri "+securityheaders.ReportPath,
+)
+
 // Write renders p with p.Status. The request ID the request-context middleware
 // minted is printed under it, so a person can quote it to whoever reads the
 // server's logs.
@@ -107,6 +121,7 @@ func Write(w http.ResponseWriter, r *http.Request, p Page) {
 	header := w.Header()
 	header.Set("Content-Type", "text/html; charset=utf-8")
 	header.Set("X-Content-Type-Options", "nosniff")
+	header.Set(securityheaders.PolicyHeader, policy)
 	// The request ID makes every page unique.
 	if header.Get("Cache-Control") == "" {
 		header.Set("Cache-Control", "no-store")

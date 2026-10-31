@@ -13,8 +13,9 @@ post:
     Creating a session is an app-plane operation on the project credential
     (`session.write`). The returned `session_token` is a session credential for the
     end-user client, not a management scope: it is delivered as the
-    `__nextgen_session` cookie and authorises the self-service operations
-    `GET /sessions/me` and `DELETE /sessions/me` (`nextgenSession` scheme). The
+    `__Host-zitadel_session` cookie (`zitadel_session` over plain http to a
+    loopback host) and authorises the self-service operations
+    `GET /sessions/me` and `DELETE /sessions/me` (`sessionCookie` scheme). The
     by-id operations `GET /sessions/{session_id}` and `DELETE /sessions/{session_id}`
     are operator endpoints and require `session.read` / `session.delete` instead.
 

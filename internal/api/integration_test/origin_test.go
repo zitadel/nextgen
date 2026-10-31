@@ -141,7 +141,7 @@ func TestOriginsAddRemove(t *testing.T) {
 			base+"/projects/"+project.ID+"/origins", bytes.NewReader(body))
 		require.NoError(t, err)
 		req.Header.Set("Content-Type", "application/json")
-		req.AddCookie(&http.Cookie{Name: "__nextgen_session", Value: cookie})
+		req.AddCookie(&http.Cookie{Name: "__Host-zitadel_session", Value: cookie})
 
 		resp, err := harness.EnsureHttpClient(t).Do(req)
 		require.NoError(t, err)

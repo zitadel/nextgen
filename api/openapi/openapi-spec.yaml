@@ -373,5 +373,5 @@ components:
   securitySchemes:
     oauth2:
       $ref: security/oauth2.yaml
-    nextgenSession:
+    sessionCookie:
       $ref: security/session-cookie.yaml

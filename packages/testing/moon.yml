@@ -50,6 +50,10 @@ tasks:
   # the runner's values.
   test-integration:
     command: "env -u CI -u GITHUB_ACTIONS corepack pnpm run test:integration"
+    inputs:
+      - "**/*"
+      - "/packages/vitest-config/vitest.shared.mjs"
+      - "/packages/vitest-config/vitest.shared.d.mts"
     deps:
       - "build"
       - "cli:build"
