@@ -27,6 +27,9 @@ const submit = () => page.getByTestId("zitadel-action-submit-button");
 const submissions = () => mock.current.getCaptured().filter((r) => r.kind === "submitFlowStep");
 
 async function expectPasswordFocus() {
+  // Let the browser assertion wait for the API-driven step to render before
+  // inspecting native focus; vi.waitFor's default 1s is not a network deadline.
+  await expect.element(password()).toBeVisible();
   // document.activeElement is the login host; focus crosses two shadow roots.
   await vi.waitFor(() => {
     expect(login.shadowRoot?.activeElement?.shadowRoot?.activeElement).toBe(password().element());
@@ -67,8 +70,8 @@ describe("login confidence", () => {
     await password().fill("corrected-password");
     await expect.element(page.getByRole("alert")).not.toBeInTheDocument();
     await userEvent.keyboard("{Enter}");
-    await vi.waitFor(() => expect(completed).toHaveBeenCalledOnce());
     await expect.element(page.getByText("You're signed in")).toBeVisible();
+    expect(completed).toHaveBeenCalledOnce();
 
     expect(submissions().map((r) => r.body.fields)).toEqual([
       { email: "alice@example.com" },
