@@ -4,14 +4,24 @@ package migration
 
 import (
 	"database/sql"
+	"fmt"
 	"strings"
 	"testing"
 
+	"github.com/pressly/goose/v3"
 	"github.com/stretchr/testify/require"
 
 	"github.com/zitadel/nextgen/internal/storage/migrationtest"
 	"github.com/zitadel/nextgen/internal/storage/testdb"
 )
+
+// roundTripShards is how many databases the walk is split across when each
+// SpannerDSN call provisions its own, as on Spanner Omni in CI. There every
+// schema change takes seconds, and a migration needs three (Up, Down, Up
+// again), so a single walk outlasts the lane's per-package timeout. Each shard
+// first applies the migrations before its range, one schema change each, so
+// the last shard takes longest.
+const roundTripShards = 4
 
 // TestMigrationsRoundTrip proves every Down restores the schema its Up
 // started from, and that the Up applies again after it; see
@@ -23,9 +33,29 @@ func TestMigrationsRoundTrip(t *testing.T) {
 	if testdb.SpannerSharesDatabase() {
 		t.Skip("the round trip tears the schema down, which the database ZITADEL_TEST_SPANNER_URL shares with other packages cannot afford; set ZITADEL_TEST_SPANNER_INSTANCE or neither")
 	}
-	ctx := t.Context()
+	if !testdb.SpannerProvisions() {
+		// The emulator makes a schema change in milliseconds, one at a time.
+		p, snap := openRoundTrip(t)
+		migrationtest.RoundTrip(t, p, snap, known)
+		return
+	}
+	for shard := range roundTripShards {
+		t.Run(fmt.Sprintf("shard %d of %d", shard+1, roundTripShards), func(t *testing.T) {
+			t.Parallel()
+			p, snap := openRoundTrip(t)
+			sources := p.ListSources()
+			first := sources[shard*len(sources)/roundTripShards].Version
+			last := sources[(shard+1)*len(sources)/roundTripShards-1].Version
+			migrationtest.RoundTripRange(t, p, snap, known, first, last)
+		})
+	}
+}
 
-	dsn, stop, err := testdb.SpannerDSN(ctx)
+// openRoundTrip provisions a database and returns a provider over it and the
+// snapshot of its schema.
+func openRoundTrip(t *testing.T) (*goose.Provider, func(t *testing.T) migrationtest.Schema) {
+	t.Helper()
+	dsn, stop, err := testdb.SpannerDSN(t.Context())
 	require.NoError(t, err)
 	t.Cleanup(stop)
 
@@ -36,10 +66,7 @@ func TestMigrationsRoundTrip(t *testing.T) {
 
 	p, err := newProvider(db)
 	require.NoError(t, err)
-
-	migrationtest.RoundTrip(t, p, func(t *testing.T) migrationtest.Schema {
-		return snapshot(t, db)
-	}, known)
+	return p, func(t *testing.T) migrationtest.Schema { return snapshot(t, db) }
 }
 
 // known: Spanner adds a NOT NULL column to an existing table only with a
