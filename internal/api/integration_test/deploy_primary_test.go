@@ -37,7 +37,6 @@ func deployPrimary(t *testing.T, projectID string) {
 	_, err = harness.EnsureDeploymentService(t).Deploy(t.Context(), service.DeployInput{
 		ProjectID: projectID,
 		ReleaseID: created.Release.ID,
-		Targets:   []string{domain.DeploymentTargetPrimary},
 		Reason:    domain.DeploymentReasonDeploy,
 	})
 	require.NoError(t, err)

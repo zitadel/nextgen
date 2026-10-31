@@ -2012,41 +2012,35 @@ export function setupPlatformHandlers() {
         return HttpResponse.json(errorBody("rel.revoked", "release: revoked"), { status: 409 });
       }
 
-      const requested = data.targets as string[];
-      // The contract's targets are unique items: a repeated one is a malformed
-      // request, not something to fold quietly.
-      if (new Set(requested).size !== requested.length) {
+      const requested = data.targets as "primary" | string[];
+      const sawPreview = requested !== "primary";
+      // The contract's preview URLs are unique items: a repeated one is a
+      // malformed request, not something to fold quietly.
+      if (sawPreview && new Set(requested).size !== requested.length) {
         return HttpResponse.json(errorBody("dep.invalid", "deployment: targets must be unique"), {
           status: 400,
         });
       }
       const primaries = primaryOrigins(project);
-      const resolved = new Set<string>();
-      let sawPreview = false;
-      let sawPrimary = false;
-      for (const target of requested) {
-        if (target === "primary") {
-          if (primaries.length === 0) {
-            return HttpResponse.json(
-              errorBody("dep.invalid", "deployment: the project has no primary origin"),
-              { status: 400 },
-            );
-          }
-          for (const origin of primaries) {
-            resolved.add(origin);
-          }
-          sawPrimary = true;
-          continue;
-        }
+      if (!sawPreview && primaries.length === 0) {
+        return HttpResponse.json(
+          errorBody("dep.invalid", "deployment: the project has no primary origin"),
+          { status: 400 },
+        );
+      }
+      const resolved = new Set<string>(sawPreview ? [] : primaries);
+      for (const target of sawPreview ? requested : []) {
         if (primaries.includes(target)) {
           return HttpResponse.json(
-            errorBody("dep.invalid", "deployment: deploy primary origins with the primary keyword"),
+            errorBody(
+              "dep.invalid",
+              "deployment: deploy to primary origins with the primary target",
+            ),
             { status: 400 },
           );
         }
         if (matchesPreviewPattern(project, target)) {
           resolved.add(target);
-          sawPreview = true;
           continue;
         }
         return HttpResponse.json(
@@ -2055,12 +2049,6 @@ export function setupPlatformHandlers() {
             `deployment: ${target} is neither a primary origin nor a preview URL of the project`,
           ),
           { status: 403 },
-        );
-      }
-      if (sawPreview && sawPrimary) {
-        return HttpResponse.json(
-          errorBody("dep.invalid", "deployment: primary origins and preview URLs cannot be mixed"),
-          { status: 400 },
         );
       }
       const requestedTtl = typeof data.ttl === "string" ? data.ttl : undefined;

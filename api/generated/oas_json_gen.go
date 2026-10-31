@@ -32800,6 +32800,96 @@ func (s *DeploymentMetadataDeployedByType) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes DeploymentPreviewUrls as json.
+func (s DeploymentPreviewUrls) Encode(e *jx.Encoder) {
+	unwrapped := []string(s)
+
+	e.ArrStart()
+	for _, elem := range unwrapped {
+		e.Str(elem)
+	}
+	e.ArrEnd()
+}
+
+// Decode decodes DeploymentPreviewUrls from json.
+func (s *DeploymentPreviewUrls) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode DeploymentPreviewUrls to nil")
+	}
+	var unwrapped []string
+	if err := func() error {
+		unwrapped = make([]string, 0)
+		if err := d.Arr(func(d *jx.Decoder) error {
+			var elem string
+			v, err := d.Str()
+			elem = string(v)
+			if err != nil {
+				return err
+			}
+			unwrapped = append(unwrapped, elem)
+			return nil
+		}); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = DeploymentPreviewUrls(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s DeploymentPreviewUrls) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *DeploymentPreviewUrls) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes DeploymentPrimaryTarget as json.
+func (s DeploymentPrimaryTarget) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes DeploymentPrimaryTarget from json.
+func (s *DeploymentPrimaryTarget) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode DeploymentPrimaryTarget to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch DeploymentPrimaryTarget(v) {
+	case DeploymentPrimaryTargetPrimary:
+		*s = DeploymentPrimaryTargetPrimary
+	default:
+		*s = DeploymentPrimaryTarget(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s DeploymentPrimaryTarget) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *DeploymentPrimaryTarget) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes DeploymentReason as json.
 func (s DeploymentReason) Encode(e *jx.Encoder) {
 	e.Str(string(s))
@@ -32993,13 +33083,12 @@ func (s *DeploymentTarget) UnmarshalJSON(data []byte) error {
 
 // Encode encodes DeploymentTargetsRequest as json.
 func (s DeploymentTargetsRequest) Encode(e *jx.Encoder) {
-	unwrapped := []string(s)
-
-	e.ArrStart()
-	for _, elem := range unwrapped {
-		e.Str(elem)
+	switch s.Type {
+	case DeploymentPrimaryTargetDeploymentTargetsRequest:
+		s.DeploymentPrimaryTarget.Encode(e)
+	case DeploymentPreviewUrlsDeploymentTargetsRequest:
+		s.DeploymentPreviewUrls.Encode(e)
 	}
-	e.ArrEnd()
 }
 
 // Decode decodes DeploymentTargetsRequest from json.
@@ -33007,26 +33096,21 @@ func (s *DeploymentTargetsRequest) Decode(d *jx.Decoder) error {
 	if s == nil {
 		return errors.New("invalid: unable to decode DeploymentTargetsRequest to nil")
 	}
-	var unwrapped []string
-	if err := func() error {
-		unwrapped = make([]string, 0)
-		if err := d.Arr(func(d *jx.Decoder) error {
-			var elem string
-			v, err := d.Str()
-			elem = string(v)
-			if err != nil {
-				return err
-			}
-			unwrapped = append(unwrapped, elem)
-			return nil
-		}); err != nil {
+	// Sum type type_discriminator.
+	switch t := d.Next(); t {
+	case jx.Array:
+		if err := s.DeploymentPreviewUrls.Decode(d); err != nil {
 			return err
 		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
+		s.Type = DeploymentPreviewUrlsDeploymentTargetsRequest
+	case jx.String:
+		if err := s.DeploymentPrimaryTarget.Decode(d); err != nil {
+			return err
+		}
+		s.Type = DeploymentPrimaryTargetDeploymentTargetsRequest
+	default:
+		return errors.Errorf("unexpected json type %q", t)
 	}
-	*s = DeploymentTargetsRequest(unwrapped)
 	return nil
 }
 

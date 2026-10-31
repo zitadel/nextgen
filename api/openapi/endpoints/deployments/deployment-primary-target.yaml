@@ -1,0 +1,5 @@
+title: DeploymentPrimaryTarget
+type: string
+enum:
+  - primary
+description: Every primary origin of the project.

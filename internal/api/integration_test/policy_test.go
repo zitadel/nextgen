@@ -508,7 +508,7 @@ func deployPolicies(t *testing.T, client *helpers.ApiClient, projectID string, p
 	}
 	resp, err := client.CreateDeployment(t.Context(), &api.CreateDeploymentRequest{
 		ReleaseID: api.NewOptReleaseID(releaseID),
-		Targets:   api.DeploymentTargetsRequest{"primary"},
+		Targets:   primaryTargets(),
 	}, api.CreateDeploymentParams{ProjectID: api.ProjectID(projectID)})
 	require.NoError(t, err)
 	switch resp.(type) {

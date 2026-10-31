@@ -411,7 +411,7 @@ func TestDeploymentServiceDeployExpandsPrimary(t *testing.T) {
 	expectProjectOrigins(statements, appPrimary)
 	expectInsert(statements, expectServing(statements, nil), emptyVariableSet())
 
-	result, err := svc.Deploy(t.Context(), service.DeployInput{ProjectID: "proj_1", ReleaseID: "rel_1", Targets: []string{"primary"}})
+	result, err := svc.Deploy(t.Context(), service.DeployInput{ProjectID: "proj_1", ReleaseID: "rel_1"})
 	require.NoError(t, err)
 	assert.True(t, result.Created)
 	assert.Equal(t, []string{appOrigin}, result.Deployment.Origins())
@@ -421,7 +421,7 @@ func TestDeploymentServiceDeployRejects(t *testing.T) {
 	t.Run("a ttl for primary origins", func(t *testing.T) {
 		svc, statements := newMockedDeploymentService(t)
 		expectProjectOrigins(statements, appPrimary)
-		_, err := svc.Deploy(t.Context(), service.DeployInput{ProjectID: "proj_1", ReleaseID: "rel_1", Targets: []string{"primary"}, TTL: new(time.Hour)})
+		_, err := svc.Deploy(t.Context(), service.DeployInput{ProjectID: "proj_1", ReleaseID: "rel_1", TTL: new(time.Hour)})
 		assertServiceDomainCode(t, err, domain.ErrDeploymentInvalid().Code)
 		assert.ErrorContains(t, err, "ttl is only valid for preview URLs")
 	})
@@ -429,7 +429,7 @@ func TestDeploymentServiceDeployRejects(t *testing.T) {
 	t.Run("a ttl above the maximum for primary origins", func(t *testing.T) {
 		svc, statements := newMockedDeploymentService(t)
 		expectProjectOrigins(statements, appPrimary)
-		_, err := svc.Deploy(t.Context(), service.DeployInput{ProjectID: "proj_1", ReleaseID: "rel_1", Targets: []string{"primary"}, TTL: new(domain.MaxPreviewTTL + time.Second)})
+		_, err := svc.Deploy(t.Context(), service.DeployInput{ProjectID: "proj_1", ReleaseID: "rel_1", TTL: new(domain.MaxPreviewTTL + time.Second)})
 		assertServiceDomainCode(t, err, domain.ErrDeploymentInvalid().Code)
 		assert.ErrorContains(t, err, "ttl is only valid for preview URLs")
 	})
@@ -437,7 +437,7 @@ func TestDeploymentServiceDeployRejects(t *testing.T) {
 	t.Run("a ttl above the maximum for preview URLs", func(t *testing.T) {
 		svc, statements := newMockedDeploymentService(t)
 		expectProjectOrigins(statements, previewPattern)
-		_, err := svc.Deploy(t.Context(), service.DeployInput{ProjectID: "proj_1", ReleaseID: "rel_1", Targets: []string{gitOrigin}, TTL: new(domain.MaxPreviewTTL + time.Second)})
+		_, err := svc.Deploy(t.Context(), service.DeployInput{ProjectID: "proj_1", ReleaseID: "rel_1", PreviewURLs: []string{gitOrigin}, TTL: new(domain.MaxPreviewTTL + time.Second)})
 		assertServiceDomainCode(t, err, domain.ErrDeploymentInvalid().Code)
 		assert.ErrorContains(t, err, "at most 365 days")
 	})
@@ -445,21 +445,21 @@ func TestDeploymentServiceDeployRejects(t *testing.T) {
 	t.Run("an exact primary origin", func(t *testing.T) {
 		svc, statements := newMockedDeploymentService(t)
 		expectProjectOrigins(statements, appPrimary)
-		_, err := svc.Deploy(t.Context(), service.DeployInput{ProjectID: "proj_1", ReleaseID: "rel_1", Targets: []string{appOrigin}})
+		_, err := svc.Deploy(t.Context(), service.DeployInput{ProjectID: "proj_1", ReleaseID: "rel_1", PreviewURLs: []string{appOrigin}})
 		assertServiceDomainCode(t, err, domain.ErrDeploymentInvalid().Code)
 	})
 
 	t.Run("a URL no preview pattern matches", func(t *testing.T) {
 		svc, statements := newMockedDeploymentService(t)
 		expectProjectOrigins(statements, appPrimary, previewPattern)
-		_, err := svc.Deploy(t.Context(), service.DeployInput{ProjectID: "proj_1", ReleaseID: "rel_1", Targets: []string{"https://acme.example"}})
+		_, err := svc.Deploy(t.Context(), service.DeployInput{ProjectID: "proj_1", ReleaseID: "rel_1", PreviewURLs: []string{"https://acme.example"}})
 		assertServiceDomainCode(t, err, domain.ErrProjectOriginNotAllowed(nil).Code)
 	})
 
 	t.Run("a missing project", func(t *testing.T) {
 		svc, statements := newMockedDeploymentService(t)
 		statements.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(nil, database.NewNoRowFoundError(nil))
-		_, err := svc.Deploy(t.Context(), service.DeployInput{ProjectID: "proj_1", ReleaseID: "rel_1", Targets: []string{"primary"}})
+		_, err := svc.Deploy(t.Context(), service.DeployInput{ProjectID: "proj_1", ReleaseID: "rel_1"})
 		assertServiceDomainCode(t, err, domain.ErrProjectNotFound().Code)
 	})
 }
@@ -836,7 +836,7 @@ func TestDeploymentServiceDeployPreview(t *testing.T) {
 		expectPreviewServing(statements, origins, nil, nil)
 		expectPreviewWrite(statements, origins, nil)
 
-		result, err := svc.Deploy(t.Context(), service.DeployInput{ProjectID: "proj_1", ReleaseID: "rel_1", Targets: []string{shaOrigin, gitOrigin}})
+		result, err := svc.Deploy(t.Context(), service.DeployInput{ProjectID: "proj_1", ReleaseID: "rel_1", PreviewURLs: []string{shaOrigin, gitOrigin}})
 		require.NoError(t, err)
 		assert.True(t, result.Created)
 		assert.Equal(t, domain.DeploymentOriginKindPreview, result.Deployment.OriginKind)
@@ -849,7 +849,7 @@ func TestDeploymentServiceDeployPreview(t *testing.T) {
 		expectPreviewServing(statements, []string{gitOrigin}, nil, nil)
 		expectPreviewWriteFor(statements, []string{gitOrigin}, nil, time.Hour)
 
-		_, err := svc.Deploy(t.Context(), service.DeployInput{ProjectID: "proj_1", ReleaseID: "rel_1", Targets: []string{gitOrigin}, TTL: new(time.Hour)})
+		_, err := svc.Deploy(t.Context(), service.DeployInput{ProjectID: "proj_1", ReleaseID: "rel_1", PreviewURLs: []string{gitOrigin}, TTL: new(time.Hour)})
 		require.NoError(t, err)
 	})
 
@@ -862,7 +862,7 @@ func TestDeploymentServiceDeployPreview(t *testing.T) {
 		expectPreviewServing(statements, []string{gitOrigin}, read, serving)
 		expectPreviewWrite(statements, []string{gitOrigin}, read)
 
-		result, err := svc.Deploy(t.Context(), service.DeployInput{ProjectID: "proj_1", ReleaseID: "rel_1", Targets: []string{gitOrigin}})
+		result, err := svc.Deploy(t.Context(), service.DeployInput{ProjectID: "proj_1", ReleaseID: "rel_1", PreviewURLs: []string{gitOrigin}})
 		require.NoError(t, err)
 		assert.True(t, result.Created)
 		assert.Equal(t, "dep_new", result.Deployment.ID)
@@ -881,13 +881,13 @@ func TestDeploymentServiceDeployPreview(t *testing.T) {
 		expectProjectOrigins(statements, previewPattern)
 		expectPreviewServing(statements, origins, read, newer)
 		expectPreviewWrite(statements, origins, read)
-		_, err := svc.Deploy(t.Context(), service.DeployInput{ProjectID: "proj_1", ReleaseID: "rel_1", Targets: origins, ExpectedDeploymentID: new(newer.ID)})
+		_, err := svc.Deploy(t.Context(), service.DeployInput{ProjectID: "proj_1", ReleaseID: "rel_1", PreviewURLs: origins, ExpectedDeploymentID: new(newer.ID)})
 		require.NoError(t, err)
 
 		svc, statements = newMockedDeploymentService(t)
 		expectProjectOrigins(statements, previewPattern)
 		expectPreviewServing(statements, origins, read, newer)
-		_, err = svc.Deploy(t.Context(), service.DeployInput{ProjectID: "proj_1", ReleaseID: "rel_1", Targets: origins, ExpectedDeploymentID: new(older.ID)})
+		_, err = svc.Deploy(t.Context(), service.DeployInput{ProjectID: "proj_1", ReleaseID: "rel_1", PreviewURLs: origins, ExpectedDeploymentID: new(older.ID)})
 		de := assertServiceDomainCode(t, err, domain.ErrDeploymentConflict(domain.DeploymentConflictDetails{}).Code)
 		assert.Equal(t, domain.DeploymentConflictDetails{Deployment: newer}, de.Details)
 	})

@@ -108,7 +108,7 @@ describe("bootstrapProject", () => {
     });
     expect(captured.deploymentBody).toMatchObject({
       release_id: "rel_1",
-      targets: ["primary"],
+      targets: "primary",
     });
   });
 

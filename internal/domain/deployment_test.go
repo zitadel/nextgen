@@ -155,7 +155,7 @@ var projectOrigins = []Origin{
 
 func TestResolveDeploymentTargets(t *testing.T) {
 	t.Run("primary covers every primary origin", func(t *testing.T) {
-		kind, origins, err := ResolveDeploymentTargets(projectOrigins, []string{DeploymentTargetPrimary})
+		kind, origins, err := ResolveDeploymentTargets(projectOrigins, nil)
 		require.NoError(t, err)
 		assert.Equal(t, DeploymentOriginKindPrimary, kind)
 		assert.Equal(t, []string{"https://www.acme.com", "https://app.acme.com"}, origins)
@@ -167,18 +167,8 @@ func TestResolveDeploymentTargets(t *testing.T) {
 	})
 
 	t.Run("primary with no primary origin", func(t *testing.T) {
-		_, _, err := ResolveDeploymentTargets(projectOrigins[2:], []string{DeploymentTargetPrimary})
+		_, _, err := ResolveDeploymentTargets(projectOrigins[2:], nil)
 		assert.ErrorIs(t, err, ErrDeploymentInvalid())
-	})
-
-	t.Run("primary and a preview URL mixed", func(t *testing.T) {
-		for _, targets := range [][]string{
-			{DeploymentTargetPrimary, "https://acme-git-sso-acmeinc.vercel.app"},
-			{"https://acme-git-sso-acmeinc.vercel.app", DeploymentTargetPrimary},
-		} {
-			_, _, err := ResolveDeploymentTargets(projectOrigins, targets)
-			assert.ErrorIs(t, err, ErrDeploymentInvalid(), targets)
-		}
 	})
 
 	t.Run("preview URLs matching a preview pattern", func(t *testing.T) {
