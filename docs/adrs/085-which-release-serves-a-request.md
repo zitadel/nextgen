@@ -5,8 +5,8 @@
 > **Builds on:** [ADR 035](035-configuration-environments.md) (releases and
 > deployments), [ADR 036](036-api-credential-planes.md) (origins),
 > [ADR 066](066-operation-policies.md) (policies) and
-> [ADR 068](068-project-is-the-data-boundary.md) (a target serves its newest
-> deployment).
+> [ADR 068](068-project-is-the-data-boundary.md) (a request resolves its release
+> from its `Origin`).
 > **Implemented by:** #2469, #2552, #2553, #2554, #2555, #2556.
 
 ## Context
@@ -45,15 +45,18 @@ they follow the newest primary deployment and ignore `Origin`.
 
 Primary origins deploy as a whole, so one deployment already describes what the
 project serves. It also serves callers with no `Origin`, and there is no other
-target to deploy to or keep in step. `targets` on `POST /deployments` is
-`"primary"` or a list of preview URLs.
+target to deploy to or keep in step. With every primary origin removed it keeps
+serving them, so it stays live and its release cannot be revoked. `targets` on
+`POST /deployments` is `"primary"` or a list of preview URLs.
 
 ### A deployment freezes its origins
 
 A deployment to `primary` records the project's primary origins, and a rollback
-restores the ones it recorded. An origin added later serves nothing until the
-next deploy. Removing an origin takes effect at once, because the origin check
-still reads the project's list.
+restores the ones it recorded. A primary origin is served only while the newest
+primary deployment names it and the project lists it. So an origin new to the
+project serves nothing until the next deploy. Removing an origin takes effect at
+once, because the origin check still reads the project's list, and adding it back
+before the next deploy restores it.
 
 ### A flow keeps its release
 
