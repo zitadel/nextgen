@@ -24,7 +24,8 @@ import { reportWarning } from "../lib/warnings";
  * is the id their read endpoint takes. A release also pins `branding` and `idp`,
  * but those pin a revision id the per-kind read endpoints do not accept yet, so
  * a release that carries them is pulled for the kinds it can and warns for the
- * rest — they gain a pull path when their reads are revision-addressable.
+ * rest — they gain a pull path when their reads are revision-addressable. A
+ * pinned `policy` is skipped the same way until pull learns to write one.
  */
 type Reconstructable = {
   readonly dir: string;
@@ -35,8 +36,8 @@ type Reconstructable = {
 /** The release-pointer kinds `pull` can rebuild on disk. */
 type ReconstructableKind = "schema" | "flow_definition";
 
-// Keyed by every kind a release pins, so a kind pull cannot rebuild yet (branding,
-// idp) looks up as missing.
+// Keyed by every kind a release pins, so a kind pull cannot rebuild yet
+// (branding, idp, policy) looks up as missing.
 export const RECONSTRUCTABLE: Readonly<Record<ReconstructableKind, Reconstructable>> &
   Readonly<Partial<Record<GetReleaseById200PointersItemKind, Reconstructable>>> = {
   schema: {

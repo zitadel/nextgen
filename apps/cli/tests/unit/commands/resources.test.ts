@@ -7,7 +7,23 @@ import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
-import { type Platform, RESOURCES, releasePointers } from "../../../src/commands/resources";
+import {
+  CreateUserBody,
+  GetTeamResponse,
+  GetUserByIDResponse,
+  QueryUsersBody,
+  QueryUsersResponse,
+} from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
+
+import {
+  create,
+  get,
+  list,
+  type Platform,
+  RESOURCES,
+  releasePointers,
+  resource,
+} from "../../../src/commands/resources";
 import { COMMANDS } from "../../../src/index";
 import {
   definitionOf,
@@ -1929,5 +1945,117 @@ describe("the release resource", () => {
         "  flow_definition  default-login  fd_1",
       ].join("\n"),
     );
+  });
+});
+
+describe("the registry builders", () => {
+  const users = list({
+    items: "users",
+    body: QueryUsersBody,
+    response: QueryUsersResponse,
+    call: ({ client }, body) => client.queryUsers(body),
+  });
+  const user = get({
+    call: ({ client }, id) => client.getUserByID(id),
+    response: GetUserByIDResponse,
+  });
+
+  it("takes paths the list and get answer with", () => {
+    const checked = resource({
+      singular: "user",
+      idField: "id",
+      columns: ["id", "metadata.status"],
+      heading: "identifier",
+      detail: ["id", "metadata.created_at"],
+      list: users,
+      get: user,
+    });
+
+    expect(checked.columns).toEqual(["id", "metadata.status"]);
+  });
+
+  it("refuses a column a listed item does not have", () => {
+    resource({
+      singular: "user",
+      idField: "id",
+      // @ts-expect-error a listed user has no `metadata.statu`
+      columns: ["id", "metadata.statu"],
+      heading: "identifier",
+      detail: ["id"],
+      list: users,
+      get: user,
+    });
+  });
+
+  it("refuses a heading the record does not have", () => {
+    resource({
+      singular: "user",
+      idField: "id",
+      columns: ["id"],
+      // @ts-expect-error a user has no `nam`
+      heading: "nam",
+      detail: ["id"],
+      list: users,
+      get: user,
+    });
+  });
+
+  it("refuses detail the record does not have", () => {
+    resource({
+      singular: "user",
+      idField: "id",
+      columns: ["id"],
+      heading: "identifier",
+      // @ts-expect-error a user has no `metadata.updated`
+      detail: ["id", "metadata.updated"],
+      list: users,
+      get: user,
+    });
+  });
+
+  it("refuses an id field the created resource does not answer with", () => {
+    resource({
+      singular: "user",
+      // @ts-expect-error the create below answers with `user_id`, not `id`
+      idField: "id",
+      columns: ["id"],
+      heading: "identifier",
+      detail: ["id"],
+      list: users,
+      get: user,
+      create: create(CreateUserBody, async () => ({ user_id: "user_1" })),
+    });
+  });
+
+  it("refuses items the page does not hold as an array", () => {
+    list({
+      items: "user",
+      body: QueryUsersBody,
+      // @ts-expect-error the page holds its users under `users`
+      call: ({ client }, body) => client.queryUsers(body),
+    });
+  });
+
+  it("refuses a response schema of another operation", () => {
+    get({
+      call: ({ client }, id) => client.getUserByID(id),
+      // @ts-expect-error a team's schema does not parse into a user
+      response: GetTeamResponse,
+    });
+  });
+
+  it("refuses an entry resource() did not check", () => {
+    // @ts-expect-error a plain descriptor skips every check above
+    const plain: ReturnType<typeof resource> = {
+      singular: "user",
+      idField: "id",
+      columns: ["id"],
+      heading: "identifier",
+      detail: ["id"],
+      list: users,
+      get: user,
+    };
+
+    expect(plain.singular).toBe("user");
   });
 });

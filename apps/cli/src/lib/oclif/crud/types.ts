@@ -75,8 +75,8 @@ export type FilterField = Readonly<{
 export type ListSpec<Ctx, B = Json, P = unknown, I = string | undefined> = Readonly<{
   /**
    * Response property holding the page of items; omit when the response body
-   * is itself the array. A spec built with {@link ListPage} has it checked
-   * against what `call` returns.
+   * is itself the array. The registry's `list` builder checks it against what
+   * `call` returns, by {@link ListPage}.
    */
   items?: I;
   /**
@@ -157,10 +157,10 @@ export type GetSpec<Ctx, R = unknown> = Readonly<{
 // Method syntax makes `body` bivariant, so a concrete-body spec still assigns to
 // the erased spec the registry and factory hold; the body/schema fit is checked
 // at the builder call site, not as bodies flow through the factory.
-export type CreateSpec<Ctx, B = Json> = Readonly<
+export type CreateSpec<Ctx, B = Json, C = unknown> = Readonly<
   WriteShape & {
     schema: Schema<B>;
-    call(ctx: Ctx, body: B): Promise<unknown>;
+    call(ctx: Ctx, body: B): Promise<C>;
   }
 >;
 export type UpdateSpec<Ctx, B = Json> = Readonly<

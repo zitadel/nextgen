@@ -73,11 +73,11 @@ export type Platform = Readonly<{ client: ZitadelClient; projectId: string }>;
 
 // Builders that infer a verb's body type from its Zod schema, so `call` gets
 // the typed body straight from `parseOrThrow` — no cast from `Json`.
-const create = <B>(
+export const create = <B, C>(
   schema: Schema<B>,
-  call: (ctx: Platform, body: B) => Promise<unknown>,
+  call: (ctx: Platform, body: B) => Promise<C>,
   shape: WriteShape = {},
-): CreateSpec<Platform, B> => ({ ...shape, schema, call });
+): NoInfer<CreateSpec<Platform, B, C>> => ({ ...shape, schema, call });
 
 const update = <B>(
   schema: Schema<B>,
@@ -85,37 +85,57 @@ const update = <B>(
   shape: WriteShape = {},
 ): UpdateSpec<Platform, B> => ({ ...shape, schema, call });
 
+// Marks a descriptor `resource()` checked; `RESOURCES` takes no other, so an
+// entry written as a plain object cannot skip the checks.
+const checked = Symbol("checked");
+type Checked = ResourceDescriptor<Platform> & { readonly [checked]: true };
+
+// The fields a created resource answers with: any field when there is no
+// `create`, and those of its body when it can also answer without one.
+type CreatedField<C> = unknown extends C ? PropertyKey : keyof Exclude<C, void>;
+
+// The fields of `T`, each of any type: what a response schema must parse into
+// at least. A schema copied from another operation names other fields. The
+// types below them may differ: a schema applies the spec's defaults, and types
+// a recursive field as `unknown` where the generated type spells it out.
+type FieldsOf<T> = { [K in keyof T]: unknown };
+
 // Checks `call`'s response against `items`: it must hold an array under that
 // field, or be the array when there is none. Infers a structured query's
 // request type `B` from its `body` schema; a `GET` list has no body, so its
 // request stays `Json`.
-const list = <
+export const list = <
   I extends string | undefined = undefined,
   B = Json,
   P extends ListPage<I> = ListPage<I>,
+  S extends FieldsOf<P> = FieldsOf<P>,
 >(
-  spec: ListSpec<Platform, B, P, I>,
+  spec: ListSpec<Platform, B, P, I> & { response?: Schema<S> },
 ): NoInfer<ListSpec<Platform, B, P, I>> => spec;
 
 // Infers the record `get` answers with, so `sections` reads it typed.
-const get = <R>(spec: GetSpec<Platform, R>): NoInfer<GetSpec<Platform, R>> => spec;
+export const get = <R, S extends FieldsOf<R> = FieldsOf<R>>(
+  spec: GetSpec<Platform, R> & { response?: Schema<S> },
+): NoInfer<GetSpec<Platform, R>> => spec;
 
 // Checks a resource's paths against what its verbs answer with: `columns` name
 // fields of a listed item, `heading` and `detail` fields of the record `get`
-// answers with, and `idField` a field of both.
-const resource = <P, I extends string | undefined, R, B extends Json>(
+// answers with, and `idField` a field of both and of what `create` answers
+// with, which is where a write reads the id it suggests `get` with.
+export const resource = <P, I extends string | undefined, R, B extends Json, CB extends Json, C>(
   descriptor: Omit<
     ResourceDescriptor<Platform>,
-    "list" | "get" | "idField" | "columns" | "heading" | "detail"
+    "list" | "get" | "create" | "idField" | "columns" | "heading" | "detail"
   > & {
     list: ListSpec<Platform, B, P, I>;
     get: GetSpec<Platform, R>;
-    idField: NoInfer<keyof ListItem<P, I> & keyof R & string>;
+    create?: CreateSpec<Platform, CB, C>;
+    idField: NoInfer<keyof ListItem<P, I> & keyof R & CreatedField<C> & string>;
     columns: readonly NoInfer<FieldPath<ListItem<P, I>>>[];
     heading: NoInfer<FieldPath<R>>;
     detail: readonly NoInfer<FieldPath<R>>[];
   },
-): ResourceDescriptor<Platform> & { readonly get: GetSpec<Platform, R> } => descriptor;
+): Checked & { readonly get: GetSpec<Platform, R> } => ({ ...descriptor, [checked]: true });
 
 /** Filter operations of `POST /<resource>/query` endpoints (ADR 031). */
 const FILTER_OPERATIONS = [
@@ -635,7 +655,7 @@ export const RESOURCES = {
       },
     }),
   }),
-} satisfies ResourceRegistry<Platform>;
+} satisfies ResourceRegistry<Platform> & Readonly<Record<string, Checked>>;
 
 /**
  * The `<resource> <verb>` commands, ready for the explicit command table. They
