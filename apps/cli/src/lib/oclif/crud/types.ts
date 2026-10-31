@@ -141,16 +141,21 @@ export type ListItem<P, I> = (I extends string ? P[I & keyof P] : P) extends rea
 export type FieldPath<T> = [T] extends [readonly unknown[]]
   ? never
   : [T] extends [object]
-    ? DeclaredPaths<T>[keyof DeclaredPaths<T>]
+    ? {
+        // Not mapped over `keyof T`, so a union is not split per member: each
+        // level recurses into the union of the members' fields.
+        [K in DeclaredKeys<T>]-?: K | `${K}.${FieldPath<NonNullable<T[K & keyof T]>>}`;
+      }[DeclaredKeys<T>]
     : never;
 
-// Mapped over `keyof T` itself, which visits declared fields one by one even
-// beside an index signature; `keyof T & string` would collapse them into it.
-type DeclaredPaths<T> = {
-  [K in keyof T as K extends string ? (string extends K ? never : K) : never]-?: K extends string
-    ? K | `${K}.${FieldPath<NonNullable<T[K]>>}`
-    : never;
-};
+// The named fields every member of `T` declares. Mapped over `keyof T` itself,
+// which visits declared fields one by one even beside an index signature
+// (`keyof T & string` would collapse them into it); `keyof` of the per-member
+// results keeps only the ones all members share.
+type DeclaredKeys<T> = keyof {
+  [K in keyof T as K extends string ? (string extends K ? never : K) : never]: unknown;
+} &
+  string;
 
 // Method syntax for the same reason as `CreateSpec`: a spec typed by its
 // record `R` still assigns to the erased spec the registry holds.

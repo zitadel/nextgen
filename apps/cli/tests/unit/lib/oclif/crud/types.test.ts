@@ -60,4 +60,10 @@ describe("FieldPath", () => {
 
     expectTypeOf<FieldPath<Either>>().toEqualTypeOf<"id">();
   });
+
+  it("names only the nested paths every member of a union has", () => {
+    type Either = { meta: { a: string; only: string } } | { meta: { a: string } };
+
+    expectTypeOf<FieldPath<Either>>().toEqualTypeOf<"meta" | "meta.a">();
+  });
 });

@@ -13,6 +13,9 @@ export const searchThings = async (params: SearchThingsParams,
     searchThingsBody?: SearchThingsBody, options?: Parameters<typeof customFetch>[1]): Promise<SearchThings200> => {
 export const sortThings = async (order: ("asc" | "desc")[],
     params?: SortThingsParams, options?: Parameters<typeof customFetch>[1]): Promise<SortThings200> => {
+export const watchThings = async (onPage: (page: Page, params: Cursor) => void,
+    labels: Record<string, string>, params?: WatchThingsParams): Promise<WatchThings200> => {
+export const brokenThings = async (params?: BrokenThingsParams
 `;
 
 describe("pagingArgument", () => {
@@ -22,6 +25,7 @@ describe("pagingArgument", () => {
     ["the body before the query parameters", "queryThings", "body", 0],
     ["the body after required query parameters", "searchThings", "body", 1],
     ["the query parameters after a type in brackets", "sortThings", "query", 1],
+    ["the query parameters after types with commas inside", "watchThings", "query", 2],
   ] as const)("finds %s", (_, id, token, expected) => {
     expect(pagingArgument(endpoints, { id, paging: { token, items: "things" } })).toBe(expected);
   });
@@ -30,6 +34,12 @@ describe("pagingArgument", () => {
     expect(() =>
       pagingArgument(endpoints, { id: "listOthers", paging: { token: "query", items: "x" } }),
     ).toThrow("listOthers has no generated function");
+  });
+
+  it("refuses a function whose parameter list never closes", () => {
+    expect(() =>
+      pagingArgument(endpoints, { id: "brokenThings", paging: { token: "query", items: "x" } }),
+    ).toThrow("brokenThings has an unterminated parameter list");
   });
 
   it("refuses an operation with no argument for its page_token", () => {

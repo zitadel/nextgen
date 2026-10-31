@@ -308,7 +308,10 @@ export function getDefaultHumanUserSchema(
   ) as UserSchemaDocument & { $id: string };
 }
 
-/** The default human user schema as the create body takes it: without `$id`, which the server mints. */
+/**
+ * The default human user schema as the create body takes it: without the
+ * template's `$id`, which the server does not take.
+ */
 export function getDefaultHumanUserSchemaBody(
   options: DefaultConfigRenderOptions = {},
 ): UserSchemaDocument {

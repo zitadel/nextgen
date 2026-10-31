@@ -149,17 +149,29 @@ export function pagingArgument(
   if (start === -1) {
     throw new Error(`${operation.id} has no generated function`);
   }
-  // Read to the bracket that closes the parameter list, past any a type opens.
-  let depth = 1;
-  let end = start + head.length;
-  for (; depth > 0 && end < endpoints.length; end += 1) {
-    depth += endpoints[end] === "(" ? 1 : endpoints[end] === ")" ? -1 : 0;
+  // The parameter names, read to the bracket that closes the list. A comma
+  // inside a bracket a type opens (a function, tuple, object or generic type)
+  // separates no parameter; the `>` of an arrow `=>` closes nothing.
+  const names: string[] = [];
+  let depth = 0;
+  let from = start + head.length;
+  for (let at = from; ; at += 1) {
+    const char = endpoints[at];
+    if (char === undefined) {
+      throw new Error(`${operation.id} has an unterminated parameter list`);
+    }
+    if (depth === 0 && (char === "," || char === ")")) {
+      names.push(endpoints.slice(from, at).trim().split(/\??:/)[0] ?? "");
+      from = at + 1;
+      if (char === ")") {
+        break;
+      }
+      continue;
+    }
+    const arrow = char === ">" && endpoints[at - 1] === "=";
+    depth += "([{<".includes(char) ? 1 : ")]}>".includes(char) && !arrow ? -1 : 0;
   }
-  const signature = endpoints.slice(start + head.length, end - 1);
-  const index = signature
-    .split(/,\s*(?=\w+\??:)/)
-    .map((parameter) => parameter.trim().split(/\??:/)[0] ?? "")
-    .findIndex((parameter) =>
+  const index = names.findIndex((parameter) =>
       operation.paging?.token === "body" ? parameter.endsWith("Body") : parameter === "params",
     );
   if (index === -1) {
