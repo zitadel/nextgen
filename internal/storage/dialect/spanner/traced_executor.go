@@ -2,6 +2,7 @@ package spanner
 
 import (
 	"context"
+	"time"
 
 	"cloud.google.com/go/spanner"
 
@@ -62,11 +63,11 @@ func (t tracedExecutor) Update(ctx context.Context, stmt spanner.Statement) (int
 }
 
 // BufferWrite implements [queryExecutor].
-func (t tracedExecutor) BufferWrite(ctx context.Context, ms []*spanner.Mutation) error {
+func (t tracedExecutor) BufferWrite(ctx context.Context, ms []*spanner.Mutation) (time.Time, error) {
 	ctx, end := database.StartStatement(ctx, dbSystem)
-	err := t.next.BufferWrite(ctx, ms)
+	commitTS, err := t.next.BufferWrite(ctx, ms)
 	end(err)
-	return err
+	return commitTS, err
 }
 
 // ReadRow implements [queryExecutor].
