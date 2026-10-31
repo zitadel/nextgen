@@ -70,7 +70,8 @@ CREATE TABLE zitadel_nextgen.user_attributes_part_3 PARTITION OF zitadel_nextgen
 
 -- This is a registry of unique user attributes.
 -- Values must be hashed with SHA-256 before storing them.
--- The primary key is the only index we need.
+-- The primary key serves a lookup with a team scope. 000039 adds the indexes
+-- for a lookup without one and for the cascade from users.
 -- An empty team ID basically makes an attribute unique within the project.
 -- This table is partitioned by key: it optimizes looking up a single unique attribute by its hash,
 -- returning the found user ID. The user ID can then be used to build the user object with
