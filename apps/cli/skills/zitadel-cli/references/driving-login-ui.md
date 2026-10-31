@@ -67,8 +67,9 @@ and is loaded only when the login runs as `variant="page"`, which setup
 generates only when it creates a Next.js or Nuxt app itself, in an empty
 directory. Keep exactly one descriptor in
 `.zitadel/branding/` — extra `*.json` files there fail the scan.
-Server-provisioned defaults remain a fallback for non-CLI project
-creation, but CLI-created projects are authored from local files first. Flows are
+A project created outside the CLI can start from server-provisioned defaults,
+which serve nothing until a deployed release pins them. CLI-created projects are
+authored from local files first. Flows are
 revisioned like branding: an edit is published as a new immutable flow revision
 in the next `deploy`. A flow names its schema by `objectType` in `user_schema`
 and runs against the revision the release pins, so a schema revise needs no

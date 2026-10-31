@@ -17231,11 +17231,10 @@ func (*CreateProjectErrorResponseStatusCode) createProjectRes() {}
 type CreateProjectRequest struct {
 	// The name of the project.
 	Name string `json:"name"`
-	// The origins the project starts with. An omitted or empty list means
-	// every origin is admitted until the first pattern is added. Loopback
-	// origins are admitted without a pattern.
+	// The origins the project starts with. An omitted or empty list admits no
+	// origin except a loopback origin, which is admitted without a pattern.
 	Origins []ProjectOrigin `json:"origins"`
-	// Whether the server should provision fallback default user schema and flow
+	// Whether the server should provision a default user schema and flow
 	// resources for the project. CLI-managed projects set this to false and
 	// upload their local .zitadel config files through the schema and flow APIs.
 	SeedDefaults OptBool `json:"seed_defaults"`
@@ -17281,9 +17280,8 @@ type CreateProjectResponse struct {
 	ProjectSecret string `json:"project_secret"`
 	// Secret which can be used for previewing and testing the project.
 	PreviewSecret string `json:"preview_secret"`
-	// The project's origins. An empty list means every origin is admitted
-	// until the first pattern is added. Loopback origins are admitted without
-	// a pattern.
+	// The project's origins. An empty list admits no origin except a loopback
+	// origin, which is admitted without a pattern.
 	Origins []ProjectOrigin `json:"origins"`
 	// The time when the project was created.
 	CreatedAt time.Time `json:"created_at"`
@@ -73732,9 +73730,8 @@ type ProjectDetailResponse struct {
 	ID string `json:"id"`
 	// The name of the project.
 	Name string `json:"name"`
-	// The project's origins. An empty list means every origin is admitted
-	// until the first pattern is added. Loopback origins are admitted without
-	// a pattern.
+	// The project's origins. An empty list admits no origin except a loopback
+	// origin, which is admitted without a pattern.
 	Origins []ProjectOrigin `json:"origins"`
 	// The time when the project was created.
 	CreatedAt time.Time `json:"created_at"`
@@ -73833,8 +73830,8 @@ type ProjectID string
 // preview deploy may register; it may include at most one `*` inside a single
 // host label (`*` matches one or more characters, none of them a dot). A
 // literal beats a wildcard. Unknown hosts are accepted as written. An empty
-// list means every origin is admitted until the first pattern is added.
-// Loopback origins are admitted without a pattern.
+// list admits no origin except a loopback origin, which is admitted without a
+// pattern.
 // Ref: #
 type ProjectOrigin struct {
 	Pattern string            `json:"pattern"`
@@ -73951,9 +73948,8 @@ type ProjectResponse struct {
 	ID string `json:"id"`
 	// The name of the project.
 	Name string `json:"name"`
-	// The project's origins. An empty list means every origin is admitted
-	// until the first pattern is added. Loopback origins are admitted without
-	// a pattern.
+	// The project's origins. An empty list admits no origin except a loopback
+	// origin, which is admitted without a pattern.
 	Origins []ProjectOrigin `json:"origins"`
 	// The time when the project was created.
 	CreatedAt time.Time `json:"created_at"`
