@@ -1957,6 +1957,7 @@ describe("the registry builders", () => {
     item: QueryUsersResponse.shape.users.element,
     call: ({ client }, body) => client.queryUsers(body),
     items: (page) => page.users,
+    next: (page) => page.next_page_token,
   });
   const user = get({
     call: ({ client }, id) => client.getUserByID(id),
@@ -2030,6 +2031,37 @@ describe("the registry builders", () => {
     });
   });
 
+  it("refuses an id field a listed item does not have", () => {
+    resource({
+      singular: "user",
+      // @ts-expect-error a listed user carries `user_id`, not `id`
+      idField: "id",
+      columns: ["user_id"],
+      heading: "identifier",
+      detail: ["id"],
+      list: list({
+        body: QueryUsersBody,
+        call: async () => ({ users: [{ user_id: "user_1" }] }),
+        items: (page) => page.users,
+        next: () => undefined,
+      }),
+      get: user,
+    });
+  });
+
+  it("refuses an id field the record does not have", () => {
+    resource({
+      singular: "user",
+      // @ts-expect-error the record carries `identifier`, not `id`
+      idField: "id",
+      columns: ["id"],
+      heading: "identifier",
+      detail: ["identifier"],
+      list: users,
+      get: get({ call: async () => ({ identifier: "a" }) }),
+    });
+  });
+
   it("refuses an id field the created resource does not answer with", () => {
     resource({
       singular: "user",
@@ -2064,6 +2096,7 @@ describe("the registry builders", () => {
       call: ({ client }, body) => client.queryUsers(body),
       // @ts-expect-error the page holds its users under `users`
       items: (page) => page.user,
+      next: (page) => page.next_page_token,
     });
   });
 
@@ -2074,6 +2107,7 @@ describe("the registry builders", () => {
       item: GetTeamResponse,
       call: ({ client }, body) => client.queryUsers(body),
       items: (page) => page.users,
+      next: (page) => page.next_page_token,
     });
   });
 

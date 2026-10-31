@@ -39,7 +39,7 @@ type Ctx = { token: string };
 
 const schema = z.object({ name: z.string() });
 const OPERATIONS = ["equals", "contains"] as const;
-const list: ListSpec<Ctx, Json, { teams: readonly unknown[] }> = {
+const list: ListSpec<Ctx, Json, { teams: readonly unknown[]; next_page_token?: string }> = {
   body: schema,
   filters: [
     { field: "name", operations: OPERATIONS },
@@ -48,6 +48,7 @@ const list: ListSpec<Ctx, Json, { teams: readonly unknown[] }> = {
   sorts: ["created_at"],
   call: async () => ({ teams: [] }),
   items: (page) => page.teams,
+  next: (page) => page.next_page_token,
 };
 const get: GetSpec<Ctx> = { call: async () => ({}) };
 const create: CreateSpec<Ctx> = { schema, call: async () => ({}) };
@@ -107,6 +108,7 @@ describe("operation statics", () => {
         ],
         call: async () => ({ data: [] }),
         items: (page: { data: readonly unknown[] }) => page.data,
+        next: () => undefined,
       }),
     );
     expect(Object.keys(statics.flags)).toEqual([
@@ -131,6 +133,7 @@ describe("operation statics", () => {
         paged: false,
         call: async () => ({ data: [] }),
         items: (page: { data: readonly unknown[] }) => page.data,
+        next: () => undefined,
       }),
     );
     expect(Object.keys(statics.flags)).toEqual(["fields", "plain", "extra"]);
@@ -261,7 +264,7 @@ describe("wire conventions", () => {
     // were universal: a list is driven here with `cursor`/`next_cursor` and a
     // query body that nests its filters, and nothing in the factory objects.
     let sent: unknown;
-    const spec: ListSpec<Ctx, Json, { rows: readonly unknown[] }> = {
+    const spec: ListSpec<Ctx, Json, { rows: readonly unknown[]; next_cursor?: string }> = {
       body: z.object({}).passthrough(),
       filters: [{ field: "state", operations: ["equals"] }],
       call: async (_ctx, request) => {
@@ -269,6 +272,7 @@ describe("wire conventions", () => {
         return { rows: [{ id: "r1" }], next_cursor: "c2" };
       },
       items: (page) => page.rows,
+      next: (page) => page.next_cursor,
     };
     const definition: OperationDefinition<Ctx, ListSpec<Ctx>> = {
       topic: "rows",

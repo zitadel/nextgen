@@ -70,6 +70,7 @@ export default class DeploymentList extends EnvironmentCommand {
       }),
       {
         items: (page) => page.deployments,
+        next: (page) => page.next_page_token,
         all: flags.all === true,
       },
     );

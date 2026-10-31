@@ -1,5 +1,5 @@
 import { ApiError, request as fetchWithPolicy } from "@zitadel/api/runtime/fetch";
-import { itemsOf, pages } from "@zitadel/api/runtime/paging";
+import { itemsOf, nextToken, pages } from "@zitadel/api/runtime/paging";
 
 import { REQUEST_TIMEOUT_MS, sanitizeRejection, sanitizeResponse } from "../api-client";
 import { ZitadelError } from "../errors";
@@ -114,6 +114,7 @@ export const sendAll = async (
         }
       },
       all: true,
+      next: nextToken,
     },
   );
   return {

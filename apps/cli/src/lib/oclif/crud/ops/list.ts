@@ -1,6 +1,6 @@
 import { spinner } from "@clack/prompts";
 import { Flags } from "@oclif/core";
-import { nextToken, pages } from "@zitadel/api/runtime/paging";
+import { pages } from "@zitadel/api/runtime/paging";
 
 import { nonBlankString } from "../../flags";
 
@@ -179,7 +179,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
     progress?.start(`Fetching ${topic}`);
     let fetched = 0;
     let drained = false;
-    const cursorOf = (response: unknown) => nextToken(response, wire.nextPageToken);
+    const cursorOf = (response: unknown) => spec.next(response) || undefined;
     // The walk begins at the page --page-token names, if any.
     const first = typeof flags["page-token"] === "string" ? flags["page-token"] : undefined;
     // The spinner owns the cursor and a SIGINT handler until it is stopped, so a

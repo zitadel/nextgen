@@ -114,6 +114,11 @@ export type ListSpec<Ctx, B = Json, P = unknown, T = unknown> = Readonly<{
    * spec typed by its page still assigns to the erased spec the registry holds.
    */
   items(page: P): readonly T[];
+  /**
+   * The cursor to the page after `page`, read off it the same way; empty or
+   * missing on the last page. An unpaged list answers nothing.
+   */
+  next(page: P): string | null | undefined;
 }>;
 
 /**

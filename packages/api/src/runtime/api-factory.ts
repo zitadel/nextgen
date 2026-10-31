@@ -35,9 +35,7 @@ export type PageOf<K extends PagedOperation> = Awaited<ReturnType<Endpoints[K]>>
 
 /** One item of a paged function's response. */
 export type ItemOf<K extends PagedOperation> =
-  NonNullable<PageOf<K>[Paging[K]["items"] & keyof PageOf<K>]> extends readonly (infer T)[]
-    ? T
-    : never;
+  ReturnType<Paging[K]["items"]> extends readonly (infer T)[] ? T : never;
 
 /**
  * What a paged function carries besides fetching one page. Each takes the

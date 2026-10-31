@@ -1,5 +1,3 @@
-import { nextToken } from "@zitadel/api/runtime/paging";
-
 /**
  * The first page of `source`, or with `all` every page in order, as one list
  * of the items `items` takes from each page. `next` is the cursor to the page
@@ -10,11 +8,11 @@ export const collectPages = async <P, T>(
   {
     items,
     all,
-    next = nextToken,
+    next,
   }: Readonly<{
     items: (page: P) => readonly T[];
     all: boolean;
-    next?: (page: P) => string | undefined;
+    next: (page: P) => string | null | undefined;
   }>,
 ): Promise<{ items: T[]; next: string | null }> => {
   // Accumulated in one array rather than by concatenating each page onto the
@@ -24,7 +22,7 @@ export const collectPages = async <P, T>(
   for await (const page of source) {
     collected.push(...items(page));
     if (!all) {
-      return { items: collected, next: next(page) ?? null };
+      return { items: collected, next: next(page) || null };
     }
   }
   return { items: collected, next: null };

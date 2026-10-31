@@ -2,6 +2,12 @@ import { describe, expect, it, vi } from "vitest";
 
 import { paged } from "./paged";
 
+/** Reads a page's `rows` and its cursor, as a generated table entry does. */
+const rows = {
+  items: (page: { rows: string[] }) => page.rows,
+  next: (page: { next_page_token?: string }) => page.next_page_token,
+};
+
 /** Hooks that leave every page and failure as they are. */
 const asIs = {
   respond: (body: unknown) => body,
@@ -24,7 +30,7 @@ describe("paged", () => {
   it("puts the cursor in the argument the shape names", async () => {
     const call = endpoint();
 
-    await paged(call, { items: "rows", arg: 1 }, asIs).all("user_1", { limit: 1 });
+    await paged(call, { ...rows, arg: 1 }, asIs).all("user_1", { limit: 1 });
 
     expect(call.mock.calls).toEqual([
       ["user_1", { limit: 1 }],
@@ -35,16 +41,13 @@ describe("paged", () => {
   it("adds the argument when the caller left it off", async () => {
     const call = endpoint();
 
-    await paged(call, { items: "rows", arg: 1 }, asIs).all("user_1");
+    await paged(call, { ...rows, arg: 1 }, asIs).all("user_1");
 
     expect(call.mock.calls[1]).toEqual(["user_1", { page_token: "t1" }]);
   });
 
   it("collects every page's items in order", async () => {
-    expect(await paged(endpoint(), { items: "rows", arg: 1 }, asIs).all("user_1")).toEqual([
-      "a",
-      "b",
-    ]);
+    expect(await paged(endpoint(), { ...rows, arg: 1 }, asIs).all("user_1")).toEqual(["a", "b"]);
   });
 
   it("reads the cursor before its response hook sees the page", async () => {
@@ -53,26 +56,20 @@ describe("paged", () => {
       respond: (body: unknown) => ({ rows: (body as { rows: string[] }).rows, renamed: true }),
     };
 
-    expect(await paged(endpoint(), { items: "rows", arg: 1 }, reshape).all("user_1")).toEqual([
-      "a",
-      "b",
-    ]);
+    expect(await paged(endpoint(), { ...rows, arg: 1 }, reshape).all("user_1")).toEqual(["a", "b"]);
   });
 
   it("waits for a response hook that answers later", async () => {
     const later = { ...asIs, respond: async (body: unknown) => body };
 
-    expect(await paged(endpoint(), { items: "rows", arg: 1 }, later).all("user_1")).toEqual([
-      "a",
-      "b",
-    ]);
+    expect(await paged(endpoint(), { ...rows, arg: 1 }, later).all("user_1")).toEqual(["a", "b"]);
   });
 
   it("starts at the page_token among its arguments", async () => {
     const call = vi.fn(async () => ({ rows: ["c"], next_page_token: "" }));
 
     expect(
-      await paged(call, { items: "rows", arg: 1 }, asIs).all("user_1", { page_token: "c3" }),
+      await paged(call, { ...rows, arg: 1 }, asIs).all("user_1", { page_token: "c3" }),
     ).toEqual(["c"]);
     expect(call.mock.calls).toEqual([["user_1", { page_token: "c3" }]]);
   });
@@ -90,7 +87,7 @@ describe("paged", () => {
       },
     };
 
-    await expect(paged(call, { items: "rows", arg: 0 }, record).all()).rejects.toThrow("handled");
+    await expect(paged(call, { ...rows, arg: 0 }, record).all()).rejects.toThrow("handled");
     expect(seen).toHaveLength(1);
   });
 });

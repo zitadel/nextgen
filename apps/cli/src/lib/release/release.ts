@@ -44,23 +44,23 @@ export async function createReleaseFromBundle(
   // The bundle is read from disk as loose JSON, so it is checked against the
   // body the API takes before it is sent, and sent as read: the check fills in
   // no defaults.
-  if (!isBuildReleaseBody(body)) {
-    const { error } = BuildReleaseBodySchema.safeParse(body);
+  assertBuildReleaseBody(body);
+  return client.buildRelease(body, { project_id: projectId });
+}
+
+/** Refuses a body `POST /releases/build` does not take, naming each field it refuses. */
+function assertBuildReleaseBody(body: unknown): asserts body is BuildReleaseBody {
+  const checked = BuildReleaseBodySchema.safeParse(body);
+  if (!checked.success) {
     throw new ZitadelError(
       "E_VALIDATION",
       "The files in .zitadel/ do not make a release the API takes",
       {
         hint: "Each issue names the field the API refuses, as bundle.<kind>.<position>.<field>.",
-        details: { issues: error?.issues ?? [] },
+        details: { issues: checked.error.issues },
       },
     );
   }
-  return client.buildRelease(body, { project_id: projectId });
-}
-
-/** Whether `body` has the shape `POST /releases/build` takes. */
-function isBuildReleaseBody(body: unknown): body is BuildReleaseBody {
-  return BuildReleaseBodySchema.safeParse(body).success;
 }
 
 /** Revoke a release so its content is never served again. Idempotent. */

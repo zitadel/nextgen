@@ -58,6 +58,7 @@ import {
   type ResourceRegistry,
   type Schema,
   type UpdateSpec,
+  type WriteResult,
   type WriteShape,
 } from "../lib/oclif/crud";
 
@@ -98,9 +99,9 @@ export type CheckedRegistry = ResourceRegistry<Platform> & Readonly<Record<strin
 type FieldsOf<T> = { [K in keyof T]: unknown };
 
 // What a write must answer with: a record carrying the resource's id under
-// `Id`, or nothing at all (`grants create` by identifier answers 202).
-// biome-ignore lint/suspicious/noConfusingVoidType: the generated client's own type for an empty answer.
-type Written<Id extends string> = Readonly<Record<Id, unknown>> | void;
+// `Id`, or the empty answer `WriteResult` allows (`grants create` by
+// identifier answers 202).
+type Written<Id extends string> = Readonly<Record<Id, unknown>> | Exclude<WriteResult, Json>;
 
 // Infers a list's page `P` from `call` and its item `T` from `items`, which
 // reads the list off that page, and checks `item` against `T`. Infers a
@@ -218,6 +219,7 @@ export const RESOURCES = {
       // which is the only one a project secret can list.
       call: ({ client }, body) => client.queryUsers(body),
       items: (page) => page.users,
+      next: (page) => page.next_page_token,
     }),
     get: get({ call: ({ client }, id) => client.getUserByID(id), response: GetUserByIDResponse }),
     create: create(CreateUserBody, ({ client, projectId }, body) =>
@@ -246,6 +248,7 @@ export const RESOURCES = {
       sorts: ["created_at", "name", "status"],
       call: ({ client, projectId }, body) => client.queryTeams(body, { project_id: projectId }),
       items: (page) => page.teams,
+      next: (page) => page.next_page_token,
     }),
     get: get({ call: ({ client }, id) => client.getTeam(id), response: GetTeamResponse }),
     create: create(CreateTeamBody, ({ client, projectId }, body) =>
@@ -276,6 +279,7 @@ export const RESOURCES = {
       sorts: ["created_at", "user_id"],
       call: ({ client, projectId }, body) => client.querySessions(body, { project_id: projectId }),
       items: (page) => page.sessions,
+      next: (page) => page.next_page_token,
     }),
     get: get({ call: ({ client }, id) => client.getSession(id), response: GetSessionResponse }),
     // The endpoint terminates the session rather than removing a record, so
@@ -336,6 +340,7 @@ export const RESOURCES = {
       call: ({ client, projectId }, params) =>
         client.listEvents({ project_id: projectId, ...params }),
       items: (page) => page.data,
+      next: (page) => page.next_page_token,
     }),
     get: get({
       call: ({ client, projectId }, id) => client.getEvent(id, { project_id: projectId }),
@@ -363,6 +368,7 @@ export const RESOURCES = {
       sorts: ["created_at", "expires_at", "id"],
       call: ({ client, projectId }, body) => client.queryGrants(body, { project_id: projectId }),
       items: (page) => page.grants,
+      next: (page) => page.next_page_token,
     }),
     get: get({
       call: ({ client, projectId }, id) => client.getGrant(id, { project_id: projectId }),
@@ -401,6 +407,7 @@ export const RESOURCES = {
       sorts: ["slug", "created_at"],
       call: ({ client, projectId }, body) => client.queryIdps(body, { project_id: projectId }),
       items: (page) => page.idps,
+      next: (page) => page.next_page_token,
     }),
     get: get({
       call: ({ client, projectId }, id) => client.getIdpById(id, { project_id: projectId }),
@@ -437,6 +444,7 @@ export const RESOURCES = {
       sorts: ["created_at"],
       call: ({ client }, body) => client.queryProjects(body),
       items: (page) => page.projects,
+      next: (page) => page.next_page_token,
     }),
     get: get({ call: ({ client }, id) => client.getProject(id), response: GetProjectResponse }),
     update: update(PatchProjectBody, ({ client }, id, body) => client.patchProject(id, body)),
@@ -476,6 +484,7 @@ export const RESOURCES = {
       call: ({ client, projectId }, params) =>
         client.listSchemas({ ...params, project_id: projectId }),
       items: (page) => page.schemas,
+      next: (page) => page.next_page_token,
     }),
     get: get({
       response: GetSchemaByIdResponse,
@@ -532,6 +541,7 @@ export const RESOURCES = {
       call: ({ client, projectId }, params) =>
         client.listReleases({ ...params, project_id: projectId }),
       items: (page) => page.releases,
+      next: (page) => page.next_page_token,
     }),
     get: get({
       call: ({ client, projectId }, id) => client.getReleaseById(id, { project_id: projectId }),
@@ -571,6 +581,7 @@ export const RESOURCES = {
           project_id: projectId,
         }),
       items: (page) => page.flow_definitions,
+      next: (page) => page.next_page_token,
     }),
     get: get({
       response: GetFlowDefinitionResponse,
@@ -611,6 +622,7 @@ export const RESOURCES = {
       item: ListBrandingResponse.element,
       call: ({ client, projectId }) => client.listBranding({ project_id: projectId }),
       items: (page) => page,
+      next: () => undefined,
     }),
     get: get({
       call: ({ client }, id) => client.getBrandingById(id),
@@ -640,6 +652,7 @@ export const RESOURCES = {
       call: ({ client, projectId }, params) =>
         client.listPolicies({ ...params, project_id: projectId }),
       items: (page) => page.policies,
+      next: (page) => page.next_page_token,
     }),
     get: get({
       response: GetPolicyResponse,

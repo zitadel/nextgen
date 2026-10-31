@@ -59,6 +59,7 @@ export default class PreviewList extends PreviewCommand {
       }),
       {
         items: (page) => page.previews,
+        next: (page) => page.next_page_token,
         all: flags.all === true,
       },
     );

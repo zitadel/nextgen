@@ -19,7 +19,13 @@ function source(...pages: Page[]) {
 describe("collectPages", () => {
   it("reads one page and reports its next token", async () => {
     const { walk, pulled } = source({ users: [1, 2], next_page_token: "p2" }, { users: [3] });
-    await expect(collectPages(walk, { items: (page) => page.users, all: false })).resolves.toEqual({
+    await expect(
+      collectPages(walk, {
+        items: (page) => page.users,
+        all: false,
+        next: (page) => page.next_page_token,
+      }),
+    ).resolves.toEqual({
       items: [1, 2],
       next: "p2",
     });
@@ -28,7 +34,13 @@ describe("collectPages", () => {
 
   it("reports no next token on the last page", async () => {
     const { walk } = source({ users: [3] });
-    await expect(collectPages(walk, { items: (page) => page.users, all: false })).resolves.toEqual({
+    await expect(
+      collectPages(walk, {
+        items: (page) => page.users,
+        all: false,
+        next: (page) => page.next_page_token,
+      }),
+    ).resolves.toEqual({
       items: [3],
       next: null,
     });
@@ -40,7 +52,13 @@ describe("collectPages", () => {
       { users: [2], next_page_token: "p3" },
       { users: [3] },
     );
-    await expect(collectPages(walk, { items: (page) => page.users, all: true })).resolves.toEqual({
+    await expect(
+      collectPages(walk, {
+        items: (page) => page.users,
+        all: true,
+        next: (page) => page.next_page_token,
+      }),
+    ).resolves.toEqual({
       items: [1, 2, 3],
       next: null,
     });
