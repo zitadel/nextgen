@@ -25,19 +25,20 @@ describe("production, until the live adapters land", () => {
     const { hubspot, stripe } = onboardingSystems();
 
     const contact = await hubspot.upsertContact(MOCK_PERSON);
+    const lead = await hubspot.ensureLead(MOCK_PERSON, contact.contact_id);
     const subscriptions = await hubspot.subscribe(MOCK_PERSON);
-    const deal = await hubspot.ensureDeal(MOCK_TEAM, contact.contact_id);
     const customer = await stripe.ensureCustomer(MOCK_TEAM, MOCK_PERSON);
 
     expect(fetch).not.toHaveBeenCalled();
     expect(
-      [contact, subscriptions, deal, customer].map((write) => write.requests.at(-1)?.label),
+      [contact, lead, subscriptions, customer].map((write) => write.requests.at(-1)?.label),
     ).toEqual([
       "create the contact of user_mock",
+      "create the lead of user_mock on contact contact_mock_user_mock",
       "subscribe user_mock to security",
-      "create the deal of team_mock with contact contact_mock_user_mock",
       "create the customer of team_mock for user_mock",
     ]);
+    expect(lead.lead_id).toBe("lead_mock_user_mock");
     expect(customer.customer_id).toBe("cus_mock_team_mock");
     // The log says nothing was sent and names ids only; the email stays in the
     // run's encrypted record.
