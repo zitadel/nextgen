@@ -97,7 +97,7 @@ The variables are the one thing `sso enable` publishes before `deploy`. When a c
 npx @zitadel/cli@latest variables set GOOGLE_CLIENT_SECRET --project-level --secret < secret.txt
 ```
 
-To remove a provider, run `auth-method sso disable --provider google`; a custom one is named by its slug, as in `--provider acme-sso`. Then `plan` and `apply`.
+To remove a provider, run `auth-method sso disable --provider google`; a custom one is named by its slug, as in `--provider acme-sso`. Then `deploy --dry-run` and `deploy`.
 
 ## Fields fixed after the first apply
 

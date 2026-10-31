@@ -1,4 +1,15 @@
-import { chmod, mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import {
+  chmod,
+  lstat,
+  mkdir,
+  mkdtemp,
+  readdir,
+  readFile,
+  rm,
+  stat,
+  symlink,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -13,6 +24,7 @@ import {
   FrameworkCheck,
   GitignoreCheck,
   ManagedFilesCheck,
+  MetaSchemasCheck,
   ProjectMatchCheck,
   SchemaCheck,
   SecretCheck,
@@ -22,7 +34,8 @@ import {
 import { loadPatchContext } from "../../../../src/commands/doctor/patch-context";
 import { createOrca } from "../../../../src/lib/orca";
 import { proxyConfTemplate } from "../../../../src/lib/orca/patchers/rule/angular/templates";
-import { bearerOnlyProxyConf } from "../../../helpers/proxy-conf";
+import { bearerOnlyProxyConf, v1ProxyConf } from "../../../helpers/proxy-conf";
+import { projectMetaSchemas } from "../../../../src/lib/meta-schemas";
 import { MANAGED_MARKER } from "../../../../src/lib/paths";
 import { hashScaffoldFile } from "../../../../src/lib/scaffold-manifest";
 import type { ScaffoldManifest } from "../../../../src/lib/sync/types";
@@ -341,6 +354,197 @@ describe("GitignoreCheck", () => {
   });
 });
 
+describe("MetaSchemasCheck", () => {
+  /** Writes every meta-schema as setup does for `cliVersion`. */
+  async function writeMetaSchemas(cwd: string, cliVersion = ctxFor(cwd).cliVersion): Promise<void> {
+    for (const file of projectMetaSchemas(cliVersion)) {
+      await mkdir(join(cwd, file.path, ".."), { recursive: true });
+      await writeFile(join(cwd, file.path), file.contents);
+    }
+  }
+
+  /** A meta-schema file the project holds, by name. */
+  const metaFile = (name: string) => `.zitadel/meta/${name}`;
+
+  it("passes when the project holds this CLI's schemas", async () => {
+    const cwd = await makeProject();
+    await writeMetaSchemas(cwd);
+
+    expect((await new MetaSchemasCheck().run(ctxFor(cwd))).status).toBe("pass");
+  });
+
+  it("warns on a missing schema and names doctor --fix", async () => {
+    const cwd = await makeProject();
+    await writeMetaSchemas(cwd);
+    await rm(join(cwd, metaFile("branding.json")));
+
+    const outcome = await new MetaSchemasCheck().run(ctxFor(cwd));
+
+    expect(outcome.status).toBe("warn");
+    expect(outcome.details).toEqual({ missing: [metaFile("branding.json")], outdated: [] });
+    expect(outcome.message).toContain("doctor --fix writes this version's");
+  });
+
+  it("passes schemas another CLI version wrote when only the version differs", async () => {
+    const cwd = await makeProject();
+    await writeMetaSchemas(cwd, "0.2.0");
+    const held = await readFile(join(cwd, metaFile("branding.json")), "utf8");
+    const current = projectMetaSchemas(ctxFor(cwd).cliVersion).find(
+      (meta) => meta.path === metaFile("branding.json"),
+    );
+    expect(held).not.toBe(current?.contents);
+
+    expect((await new MetaSchemasCheck().run(ctxFor(cwd))).status).toBe("pass");
+  });
+
+  it("reports a schema it cannot read, and fix leaves it alone", async () => {
+    const cwd = await makeProject();
+    await writeMetaSchemas(cwd);
+    await rm(join(cwd, metaFile("branding.json")));
+    await mkdir(join(cwd, metaFile("branding.json")));
+    const check = new MetaSchemasCheck();
+
+    await check.fix(ctxFor(cwd));
+    const outcome = await check.run(ctxFor(cwd));
+
+    expect(outcome.status).toBe("warn");
+    expect(outcome.details).toEqual({
+      missing: [],
+      outdated: [],
+      unreadable: [{ path: metaFile("branding.json"), reason: "EISDIR" }],
+    });
+    expect(outcome.message).not.toContain("doctor --fix");
+  });
+
+  it("reports a schema that is a symlink, and fix leaves its target alone", async () => {
+    const cwd = await makeProject();
+    await writeMetaSchemas(cwd);
+    await writeFile(join(cwd, ".zitadel/secret"), '{"project_secret": "sk_proj_test"}\n');
+    await rm(join(cwd, metaFile("branding.json")));
+    await symlink("../secret", join(cwd, metaFile("branding.json")));
+    const check = new MetaSchemasCheck();
+
+    await check.fix(ctxFor(cwd));
+    const outcome = await check.run(ctxFor(cwd));
+
+    expect(outcome.status).toBe("warn");
+    expect(outcome.details).toEqual({
+      missing: [],
+      outdated: [],
+      linked: [metaFile("branding.json")],
+    });
+    expect(outcome.message).toContain(`${metaFile("branding.json")} is a symbolic link`);
+    expect(await readFile(join(cwd, ".zitadel/secret"), "utf8")).toBe(
+      '{"project_secret": "sk_proj_test"}\n',
+    );
+    expect((await lstat(join(cwd, metaFile("branding.json")))).isSymbolicLink()).toBe(true);
+  });
+
+  it("writes nothing through a symlinked .zitadel/meta/", async () => {
+    const cwd = await makeProject();
+    const elsewhere = await makeProject();
+    await mkdir(join(cwd, ".zitadel"), { recursive: true });
+    await symlink(elsewhere, join(cwd, ".zitadel/meta"));
+    const before = await readdir(elsewhere);
+    const check = new MetaSchemasCheck();
+
+    await check.fix(ctxFor(cwd));
+    const outcome = await check.run(ctxFor(cwd));
+
+    expect(outcome.status).toBe("warn");
+    expect(outcome.details).toEqual({ missing: [], outdated: [], linked: [".zitadel/meta"] });
+    expect(await readdir(elsewhere)).toEqual(before);
+  });
+
+  it("passes a symlinked .zitadel/meta/ that holds this CLI's schemas", async () => {
+    const cwd = await makeProject();
+    const shared = await makeProject();
+    await writeMetaSchemas(shared);
+    await mkdir(join(cwd, ".zitadel"), { recursive: true });
+    await symlink(join(shared, ".zitadel/meta"), join(cwd, ".zitadel/meta"));
+
+    expect((await new MetaSchemasCheck().run(ctxFor(cwd))).status).toBe("pass");
+  });
+
+  it("writes nothing when the project pins a newer @zitadel/* version", async () => {
+    const cwd = await makeProject();
+    await writeMetaSchemas(cwd);
+    await writeFile(join(cwd, metaFile("flow-definition.json")), '{"title": "a newer dialect"}\n');
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({ dependencies: { "@zitadel/sdk-next": "0.2.0" } }),
+    );
+    const check = new MetaSchemasCheck();
+
+    await check.fix(ctxFor(cwd));
+    const outcome = await check.run(ctxFor(cwd));
+
+    expect(outcome.details).toMatchObject({
+      outdated: [metaFile("flow-definition.json")],
+      newer_pin: { name: "@zitadel/sdk-next", version: "0.2.0" },
+    });
+    expect(outcome.message).not.toContain("doctor --fix writes");
+    expect(await readFile(join(cwd, metaFile("flow-definition.json")), "utf8")).toBe(
+      '{"title": "a newer dialect"}\n',
+    );
+  });
+
+  it("warns on a schema that differs from this CLI's", async () => {
+    const cwd = await makeProject();
+    await writeMetaSchemas(cwd);
+    await writeFile(join(cwd, metaFile("flow-definition.json")), '{"title": "an older dialect"}\n');
+
+    const outcome = await new MetaSchemasCheck().run(ctxFor(cwd));
+
+    expect(outcome.status).toBe("warn");
+    expect(outcome.details).toMatchObject({ outdated: [metaFile("flow-definition.json")] });
+  });
+
+  it("passes a schema that only differs in key order or formatting", async () => {
+    const cwd = await makeProject();
+    await writeMetaSchemas(cwd);
+    const file = projectMetaSchemas(ctxFor(cwd).cliVersion).find(
+      (meta) => meta.path === metaFile("branding.json"),
+    );
+    const reordered = Object.fromEntries(Object.entries(file?.body ?? {}).reverse());
+    await writeFile(join(cwd, metaFile("branding.json")), JSON.stringify(reordered));
+
+    expect((await new MetaSchemasCheck().run(ctxFor(cwd))).status).toBe("pass");
+  });
+
+  it("fix writes the missing and outdated schemas and leaves other files alone", async () => {
+    const cwd = await makeProject();
+    await writeMetaSchemas(cwd);
+    await rm(join(cwd, metaFile("branding.json")));
+    await writeFile(join(cwd, metaFile("flow-definition.json")), "{}\n");
+    await writeFile(join(cwd, metaFile("mine.json")), '{"kept": true}\n');
+    const check = new MetaSchemasCheck();
+
+    await check.fix(ctxFor(cwd));
+
+    expect((await check.run(ctxFor(cwd))).status).toBe("pass");
+    expect(await readFile(join(cwd, metaFile("mine.json")), "utf8")).toBe('{"kept": true}\n');
+  });
+
+  it("fix creates .zitadel/meta/ when the project has none", async () => {
+    const cwd = await makeProject();
+    const check = new MetaSchemasCheck();
+
+    await check.fix(ctxFor(cwd));
+
+    expect((await check.run(ctxFor(cwd))).status).toBe("pass");
+  });
+
+  it("fix is a no-op under dryRun", async () => {
+    const cwd = await makeProject();
+    const check = new MetaSchemasCheck();
+
+    await check.fix(ctxFor(cwd, true));
+
+    expect((await check.run(ctxFor(cwd))).status).toBe("warn");
+  });
+});
+
 describe("EnvExampleCheck", () => {
   it("fails when a key is missing, then fix appends it", async () => {
     const cwd = await makeProject();
@@ -451,7 +655,7 @@ describe("DependencyCheck", () => {
     ["angular", { "@angular/core": "^20" }, "@zitadel/sdk-angular"],
     [
       "sveltekit",
-      { "@sveltejs/kit": "^2", svelte: "^5" },
+      { "@sveltejs/kit": "^3", svelte: "^5" },
       "@zitadel/sdk-sveltekit, @zitadel/sdk-svelte",
     ],
     [
@@ -992,6 +1196,43 @@ describe("ManagedFilesCheck", () => {
 
     expect(await readFile(proxyPath, "utf8")).toBe(proxyConfTemplate());
     expect((await check.run(ctxFor(cwd))).status).toBe("pass");
+  });
+
+  // Hooks from before ADR 083 keep the session in cookies the server no longer
+  // reads: there is no interval in which they count as compatible.
+  it("fails on the session-cookie hooks from before ADR 083, and --fix replaces them", async () => {
+    const cwd = await makeAngularProject();
+    const proxyPath = join(cwd, "proxy.conf.cjs");
+    await writeFile(proxyPath, v1ProxyConf());
+    const check = new ManagedFilesCheck();
+
+    const outcome = await check.run(ctxFor(cwd));
+    expect(outcome.status).toBe("fail");
+    expect(outcome.message).toContain("outdated managed config wiring: proxy.conf.cjs");
+    expect(outcome.message).toContain("doctor --fix updates them");
+
+    await check.fix(ctxFor(cwd));
+
+    expect(await readFile(proxyPath, "utf8")).toBe(proxyConfTemplate());
+    expect((await check.run(ctxFor(cwd))).status).toBe("pass");
+  });
+
+  it("fails on hooks from before ADR 083 changed by hand, and leaves them to the developer", async () => {
+    const cwd = await makeAngularProject();
+    const proxyPath = join(cwd, "proxy.conf.cjs");
+    const changed = v1ProxyConf().replace(
+      "function renameSessionCookie(proxyRes) {",
+      'function renameSessionCookie(proxyRes) {\n  console.debug("cookies");',
+    );
+    await writeFile(proxyPath, changed);
+    const check = new ManagedFilesCheck();
+
+    const outcome = await check.run(ctxFor(cwd));
+
+    expect(outcome.status).toBe("fail");
+    expect(outcome.message).toContain("must be updated by hand");
+    await check.fix(ctxFor(cwd));
+    expect(await readFile(proxyPath, "utf8")).toBe(changed);
   });
 
   // The edit leaves a managed proxy it cannot recognize as it is, so that

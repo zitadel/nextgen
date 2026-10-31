@@ -1,8 +1,10 @@
 description: |
-  Secure cookie holding the token of the latest session. 
+  The session cookie holding the token of the latest session:
+  `__Host-zitadel_session` with `Secure`, or `zitadel_session` without it over
+  plain http to a loopback host.
   Rotated on every session exchange and used by clients for authenticating API requests.
   And cleared on session revocation (logout).
 schema:
   type: string
-  example: __nextgen_session=<session-token>; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=<ttl-seconds>
+  example: __Host-zitadel_session=<session-token>; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=<ttl-seconds>
 required: true

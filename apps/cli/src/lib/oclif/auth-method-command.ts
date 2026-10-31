@@ -20,12 +20,12 @@ import { stableStringify } from "../json";
 import { optionArgs } from "../public-cli";
 import { flowsForSchema } from "../schema-flows";
 import { reportWarning } from "../warnings";
-import { nextCommandsData } from "./envelope";
 import { EnvironmentCommand } from "./environment-command";
 import { environmentFlags } from "./environment-flags";
 import { portableSuggestions, type SuggestedCommand } from "../suggestion";
 import { nonBlankString } from "./flags";
 import type { JsonEnvelope } from "./types";
+import { Promptable } from "./promptable";
 
 /** The message `deploy` needs, which only the caller can write. */
 const DEPLOY_MESSAGE = "<what changed>";
@@ -50,7 +50,7 @@ type Target = {
  * credentials. Every other edit is local, and `deploy` publishes it like any
  * configuration change.
  */
-export abstract class AuthMethodCommand extends EnvironmentCommand {
+export abstract class AuthMethodCommand extends Promptable(EnvironmentCommand) {
   // The environment flags are hidden here: most `auth-method` commands only
   // edit files and resolve no environment. The one that publishes credentials
   // to the project lists them among its own flags.
@@ -74,8 +74,10 @@ export abstract class AuthMethodCommand extends EnvironmentCommand {
    * @param options.resolveServer - Whether the command talks to a server.
    *   Off by default: a stopped local runtime must not block staging a change
    *   for a later `deploy`.
-   * @param options.preflight - Checks that must answer before the schema is
-   *   read, with whatever they read handed back as `preflight`.
+   * @param options.preflight - Checks of the flags that must answer before the
+   *   schema is read, with what they read handed back as `preflight`. It must
+   *   not ask a question, use the network or write anything: ask in the
+   *   command's own `run`, after `connect()`.
    */
   protected async target<T = undefined>(
     flags: { schema?: string; cwd?: string },
@@ -190,7 +192,8 @@ export abstract class AuthMethodCommand extends EnvironmentCommand {
 
   /**
    * The follow-up commands of a result, as strings when every argument is
-   * safe to run as written, and always as argument lists.
+   * safe to run as written (the result's `next` commands), and always as
+   * argument lists (its `next_args`).
    *
    * @param changed - Whether a file changed, which `deploy` then publishes.
    * @param cwdArgs - `--cwd` for `deploy`, from {@link target}.
@@ -201,7 +204,7 @@ export abstract class AuthMethodCommand extends EnvironmentCommand {
     changed: boolean,
     cwdArgs: string[],
     leading: string[][] = [],
-  ): { next_commands: readonly SuggestedCommand[]; next_args: string[][] } {
+  ): { commands: readonly SuggestedCommand[]; args: string[][] } {
     const args = [
       ...leading,
       ...(changed
@@ -214,8 +217,8 @@ export abstract class AuthMethodCommand extends EnvironmentCommand {
     return {
       // The message is a placeholder the caller fills in, so it is quoted in
       // the command string and listed as written in `next_args`.
-      ...nextCommandsData(portableSuggestions(args, this.meta.cliVersion, [DEPLOY_MESSAGE])),
-      next_args: args,
+      commands: portableSuggestions(args, this.meta.cliVersion, [DEPLOY_MESSAGE]),
+      args,
     };
   }
 
@@ -309,9 +312,11 @@ export abstract class AuthMethodCommand extends EnvironmentCommand {
       consola.info(`${method} is already ${verb}d for ${schema.name}`);
     }
     this.reportOutcome(outcome);
+    const followUps = this.followUps(change.changed, cwdArgs);
     return this.emit({
       status: "ok",
-      data: { ...data, ...this.followUps(change.changed, cwdArgs) },
+      data: { ...data, next_args: followUps.args },
+      next: { commands: followUps.commands },
       pretty: change.changed
         ? `${enabled ? "Enabled" : "Disabled"} ${method} for ${schema.name}`
         : `Nothing to ${verb} for ${schema.name}`,

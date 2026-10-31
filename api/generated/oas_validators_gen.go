@@ -3652,6 +3652,42 @@ func (s *ConfigurationBundle) Validate() error {
 		})
 	}
 	if err := func() error {
+		if s.Policies == nil {
+			return nil // optional
+		}
+		if err := (validate.Array{
+			MinLength:    0,
+			MinLengthSet: false,
+			MaxLength:    50,
+			MaxLengthSet: true,
+		}).ValidateLength(len(s.Policies)); err != nil {
+			return errors.Wrap(err, "array")
+		}
+		var failures []validate.FieldError
+		for i, elem := range s.Policies {
+			if err := func() error {
+				if err := elem.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				failures = append(failures, validate.FieldError{
+					Name:  fmt.Sprintf("[%d]", i),
+					Error: err,
+				})
+			}
+		}
+		if len(failures) > 0 {
+			return &validate.Error{Fields: failures}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "policies",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if value, ok := s.Branding.Get(); ok {
 			if err := func() error {
 				if err := value.Validate(); err != nil {
@@ -3812,24 +3848,6 @@ func (s *CreateDeploymentRequest) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "targets",
-			Error: err,
-		})
-	}
-	if err := func() error {
-		if value, ok := s.TTL.Get(); ok {
-			if err := func() error {
-				if err := value.Validate(); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return err
-			}
-		}
-		return nil
-	}(); err != nil {
-		failures = append(failures, validate.FieldError{
-			Name:  "ttl",
 			Error: err,
 		})
 	}
@@ -5155,6 +5173,18 @@ func (s *DeploymentVariablesMissingDetails) Validate() error {
 	return nil
 }
 
+func (s EvaluatePolicyRequest) Validate() error {
+	switch s.Type {
+	case PasswordSetEvaluateRequestEvaluatePolicyRequest:
+		if err := s.PasswordSetEvaluateRequest.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
 func (s Event) Validate() error {
 	switch s.Type {
 	case AuthAttemptCreatedEventEvent:
@@ -5279,6 +5309,11 @@ func (s Event) Validate() error {
 		return nil
 	case PolicyUpdatedEventEvent:
 		if err := s.PolicyUpdatedEvent.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case PreviewRemovedEventEvent:
+		if err := s.PreviewRemovedEvent.Validate(); err != nil {
 			return err
 		}
 		return nil
@@ -6370,6 +6405,24 @@ func (s *FlowStep) Validate() error {
 
 	var failures []validate.FieldError
 	if err := func() error {
+		if value, ok := s.Purpose.Get(); ok {
+			if err := func() error {
+				if err := value.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "purpose",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if value, ok := s.Complete.Get(); ok {
 			if err := func() error {
 				if err := value.Validate(); err != nil {
@@ -6613,6 +6666,25 @@ func (s FlowStepGates) Validate() error {
 		return &validate.Error{Fields: failures}
 	}
 	return nil
+}
+
+func (s FlowStepPurpose) Validate() error {
+	switch s {
+	case "login":
+		return nil
+	case "register":
+		return nil
+	case "recovery":
+		return nil
+	case "profiling":
+		return nil
+	case "reauth":
+		return nil
+	case "link_account":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
+	}
 }
 
 func (s *FlowSubmitRequest) Validate() error {
@@ -8834,6 +8906,46 @@ func (s *ListPreviewsResponse) Validate() error {
 	return nil
 }
 
+func (s *ListProjectAdminsResponse) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if s.Admins == nil {
+			return errors.New("nil is invalid value")
+		}
+		var failures []validate.FieldError
+		for i, elem := range s.Admins {
+			if err := func() error {
+				if err := elem.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				failures = append(failures, validate.FieldError{
+					Name:  fmt.Sprintf("[%d]", i),
+					Error: err,
+				})
+			}
+		}
+		if len(failures) > 0 {
+			return &validate.Error{Fields: failures}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "admins",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
 func (s *ListReleasesResponse) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
@@ -9851,6 +9963,144 @@ func (s *PasswordSetConfig) Validate() error {
 	return nil
 }
 
+func (s *PasswordSetEvaluateFacts) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if s.HistoryMatches == nil {
+			return nil // optional
+		}
+		if err := (validate.Array{
+			MinLength:    0,
+			MinLengthSet: false,
+			MaxLength:    4,
+			MaxLengthSet: true,
+		}).ValidateLength(len(s.HistoryMatches)); err != nil {
+			return errors.Wrap(err, "array")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "history_matches",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *PasswordSetEvaluateInput) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := (validate.String{
+			MinLength:     0,
+			MinLengthSet:  false,
+			MaxLength:     4096,
+			MaxLengthSet:  true,
+			Email:         false,
+			Hostname:      false,
+			Regex:         nil,
+			MinNumeric:    0,
+			MinNumericSet: false,
+			MaxNumeric:    0,
+			MaxNumericSet: false,
+		}).Validate(string(s.Password)); err != nil {
+			return errors.Wrap(err, "string")
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "password",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *PasswordSetEvaluateRequest) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Operation.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "operation",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := s.Config.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "config",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := s.Input.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "input",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if value, ok := s.Facts.Get(); ok {
+			if err := func() error {
+				if err := value.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "facts",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s PasswordSetEvaluateRequestOperation) Validate() error {
+	switch s {
+	case "auth.factor.password.set":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
+	}
+}
+
 func (s *PasswordSetPolicy) Validate() error {
 	if s == nil {
 		return validate.ErrNilPointer
@@ -10459,24 +10709,281 @@ func (s *Preview) Validate() error {
 	return nil
 }
 
-func (s PreviewTTL) Validate() error {
-	alias := (string)(s)
-	if err := (validate.String{
-		MinLength:     0,
-		MinLengthSet:  false,
-		MaxLength:     0,
-		MaxLengthSet:  false,
-		Email:         false,
-		Hostname:      false,
-		Regex:         regexMap["^[1-9][0-9]{0,5}[mhd]$"],
-		MinNumeric:    0,
-		MinNumericSet: false,
-		MaxNumeric:    0,
-		MaxNumericSet: false,
-	}).Validate(string(alias)); err != nil {
-		return errors.Wrap(err, "string")
+func (s *PreviewRemovedEvent) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.ProjectID.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "project_id",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := s.Category.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "category",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if value, ok := s.ActorType.Get(); ok {
+			if err := func() error {
+				if err := value.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "actor_type",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if value, ok := s.DelegationType.Get(); ok {
+			if err := func() error {
+				if err := value.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "delegation_type",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if value, ok := s.Metadata.Get(); ok {
+			if err := func() error {
+				if err := value.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "metadata",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
 	}
 	return nil
+}
+
+func (s PreviewRemovedEventActorType) Validate() error {
+	switch s {
+	case "human":
+		return nil
+	case "service":
+		return nil
+	case "system":
+		return nil
+	case "agent":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
+	}
+}
+
+func (s PreviewRemovedEventCategory) Validate() error {
+	switch s {
+	case "request":
+		return nil
+	case "auth":
+		return nil
+	case "session":
+		return nil
+	case "admin":
+		return nil
+	case "entity":
+		return nil
+	case "signal":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
+	}
+}
+
+func (s PreviewRemovedEventDelegationType) Validate() error {
+	switch s {
+	case "direct":
+		return nil
+	case "delegated":
+		return nil
+	case "pat_shared":
+		return nil
+	case "exchanged":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
+	}
+}
+
+func (s *ProjectAdmin) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.User.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "user",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if s.Sources == nil {
+			return errors.New("nil is invalid value")
+		}
+		if err := (validate.Array{
+			MinLength:    1,
+			MinLengthSet: true,
+			MaxLength:    0,
+			MaxLengthSet: false,
+		}).ValidateLength(len(s.Sources)); err != nil {
+			return errors.Wrap(err, "array")
+		}
+		var failures []validate.FieldError
+		for i, elem := range s.Sources {
+			if err := func() error {
+				if err := elem.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				failures = append(failures, validate.FieldError{
+					Name:  fmt.Sprintf("[%d]", i),
+					Error: err,
+				})
+			}
+		}
+		if len(failures) > 0 {
+			return &validate.Error{Fields: failures}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "sources",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s *ProjectAdminGrantSource) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Type.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "type",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s ProjectAdminGrantSourceType) Validate() error {
+	switch s {
+	case "grant":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
+	}
+}
+
+func (s *ProjectAdminOwningTeamSource) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Type.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "type",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s ProjectAdminOwningTeamSourceType) Validate() error {
+	switch s {
+	case "owning_team":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
+	}
+}
+
+func (s ProjectAdminSource) Validate() error {
+	switch s.Type {
+	case ProjectAdminOwningTeamSourceProjectAdminSource:
+		if err := s.ProjectAdminOwningTeamSource.Validate(); err != nil {
+			return err
+		}
+		return nil
+	case ProjectAdminGrantSourceProjectAdminSource:
+		if err := s.ProjectAdminGrantSource.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
 }
 
 func (s *ProjectCreatedEvent) Validate() error {
@@ -10762,6 +11269,82 @@ func (s ProjectDeletedEventDelegationType) Validate() error {
 	default:
 		return errors.Errorf("invalid value: %v", s)
 	}
+}
+
+func (s *ProjectDetailResponse) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if s.Origins == nil {
+			return errors.New("nil is invalid value")
+		}
+		var failures []validate.FieldError
+		for i, elem := range s.Origins {
+			if err := func() error {
+				if err := elem.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				failures = append(failures, validate.FieldError{
+					Name:  fmt.Sprintf("[%d]", i),
+					Error: err,
+				})
+			}
+		}
+		if len(failures) > 0 {
+			return &validate.Error{Fields: failures}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "origins",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if value, ok := s.PasswordHash.Get(); ok {
+			if err := func() error {
+				if err := value.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "password_hash",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if value, ok := s.OwningTeamID.Get(); ok {
+			if err := func() error {
+				if err := value.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "owning_team_id",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
 }
 
 func (s ProjectID) Validate() error {
@@ -12798,6 +13381,8 @@ func (s ReleasePointerKind) Validate() error {
 		return nil
 	case "idp":
 		return nil
+	case "policy":
+		return nil
 	default:
 		return errors.Errorf("invalid value: %v", s)
 	}
@@ -13700,6 +14285,15 @@ func (s SchemaDocument) Validate() error {
 		return nil
 	default:
 		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
+func (s SchemaExpand) Validate() error {
+	switch s {
+	case "in_use":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
 	}
 }
 
@@ -15438,6 +16032,8 @@ func (s UserFilterField) Validate() error {
 	case "id":
 		return nil
 	case "schema":
+		return nil
+	case "schema_object_type":
 		return nil
 	case "status":
 		return nil

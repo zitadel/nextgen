@@ -38,7 +38,7 @@ import { optionArgs } from "../../../lib/public-cli";
  */
 export default class AuthMethodSsoDisable extends AuthMethodCommand {
   static override description = "Remove an identity provider from a user schema.";
-  static override group = CommandGroups.configuration;
+  static override group = CommandGroups.authentication;
   static override examples = [
     "<%= config.bin %> auth-method sso disable --provider google",
     "<%= config.bin %> auth-method sso disable --provider google --schema customers",
@@ -160,9 +160,11 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
       consola.info(`${schema.name} does not offer ${provider}`);
     }
     this.reportOutcome(outcome);
+    const followUps = this.followUps(changed.length > 0, cwdArgs);
     return this.emit({
       status: "ok",
-      data: { ...data, ...this.followUps(changed.length > 0, cwdArgs) },
+      data: { ...data, next_args: followUps.args },
+      next: { commands: followUps.commands },
       pretty:
         changed.length > 0
           ? `Removed ${provider} from ${where}`

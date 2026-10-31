@@ -31,7 +31,7 @@ class Fake extends BaseCommand {
 function aCommand(statics: Record<string, unknown> = {}): typeof Fake {
   return Object.assign(class extends Fake {}, {
     description: "Do the thing.",
-    group: CommandGroups.project,
+    group: CommandGroups.gettingStarted,
     ...statics,
   });
 }
@@ -56,7 +56,7 @@ describe("cliReference", () => {
     const reference = cliReference(
       {
         zebra: aCommand(),
-        start: aCommand({ group: CommandGroups.localServer }),
+        start: aCommand({ group: CommandGroups.localDevelopment }),
         claim: aCommand({ groupOrder: 2 }),
         setup: aCommand({ groupOrder: 1 }),
       },
@@ -65,10 +65,10 @@ describe("cliReference", () => {
 
     expect(reference.groups).toEqual(Object.values(CommandGroups));
     expect(reference.commands.map(({ id, group }) => [id, group])).toEqual([
-      ["setup", CommandGroups.project],
-      ["claim", CommandGroups.project],
-      ["zebra", CommandGroups.project],
-      ["start", CommandGroups.localServer],
+      ["setup", CommandGroups.gettingStarted],
+      ["claim", CommandGroups.gettingStarted],
+      ["zebra", CommandGroups.gettingStarted],
+      ["start", CommandGroups.localDevelopment],
     ]);
   });
 

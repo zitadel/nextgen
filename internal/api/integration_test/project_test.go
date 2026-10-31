@@ -281,7 +281,7 @@ func TestGetProject(t *testing.T) {
 	}{
 		{
 			name: "ok",
-			want: &api.ProjectResponse{Name: project.Name, Origins: []api.ProjectOrigin{
+			want: &api.ProjectDetailResponse{Name: project.Name, OwningTeamID: api.NilTeamID{Null: true}, Origins: []api.ProjectOrigin{
 				{Pattern: "https://*.example.com", Kind: api.ProjectOriginKindPreview},
 				{Pattern: "http://localhost:3000", Kind: api.ProjectOriginKindPreview},
 			}},
@@ -333,13 +333,13 @@ func TestProjectSessionCaller(t *testing.T) {
 	t.Run("granted person opens the project", func(t *testing.T) {
 		resp, err := grantee.GetProject(t.Context(), params)
 		require.NoError(t, err)
-		assertProjectResponse(t, &api.ProjectResponse{Name: project.Name, Origins: []api.ProjectOrigin{}}, resp)
+		assertProjectResponse(t, &api.ProjectDetailResponse{Name: project.Name, OwningTeamID: api.NilTeamID{Null: true}, Origins: []api.ProjectOrigin{}}, resp)
 	})
 
 	t.Run("granted person renames the project", func(t *testing.T) {
 		resp, err := grantee.PatchProject(t.Context(), &api.PatchProjectRequest{Name: api.NewOptNilString(project.Name + " renamed")}, api.PatchProjectParams{ProjectID: api.ProjectID(project.ID)})
 		require.NoError(t, err)
-		require.IsType(t, &api.ProjectResponse{}, resp, helpers.MustMarshal(t, resp))
+		require.IsType(t, &api.ProjectDetailResponse{}, resp, helpers.MustMarshal(t, resp))
 	})
 
 	t.Run("viewer opens but cannot rename", func(t *testing.T) {
@@ -354,7 +354,7 @@ func TestProjectSessionCaller(t *testing.T) {
 
 		resp, err := viewer.GetProject(t.Context(), params)
 		require.NoError(t, err)
-		require.IsType(t, &api.ProjectResponse{}, resp, helpers.MustMarshal(t, resp))
+		require.IsType(t, &api.ProjectDetailResponse{}, resp, helpers.MustMarshal(t, resp))
 
 		patchResp, err := viewer.PatchProject(t.Context(), &api.PatchProjectRequest{Name: api.NewOptNilString("viewer rename")}, api.PatchProjectParams{ProjectID: api.ProjectID(project.ID)})
 		require.NoError(t, err)
@@ -409,13 +409,13 @@ func TestPatchProject(t *testing.T) {
 		{
 			name: "rename",
 			req:  &api.PatchProjectRequest{Name: api.NewOptNilString(renamed)},
-			want: &api.ProjectResponse{Name: renamed, Origins: []api.ProjectOrigin{}},
+			want: &api.ProjectDetailResponse{Name: renamed, OwningTeamID: api.NilTeamID{Null: true}, Origins: []api.ProjectOrigin{}},
 		},
 		{
 			name:    "origins are left untouched",
 			origins: keptOrigins,
 			req:     &api.PatchProjectRequest{Name: api.NewOptNilString(renamedKeep)},
-			want: &api.ProjectResponse{Name: renamedKeep, Origins: []api.ProjectOrigin{
+			want: &api.ProjectDetailResponse{Name: renamedKeep, OwningTeamID: api.NilTeamID{Null: true}, Origins: []api.ProjectOrigin{
 				{Pattern: "https://*.example.com", Kind: api.ProjectOriginKindPreview},
 				{Pattern: "http://localhost:3000", Kind: api.ProjectOriginKindPreview},
 			}},
@@ -496,7 +496,7 @@ func TestPatchProjectPasswordHash(t *testing.T) {
 	t.Run("a new project reads back no method of its own", func(t *testing.T) {
 		got, err := client.GetProject(t.Context(), api.GetProjectParams{ProjectID: api.ProjectID(project.ID)})
 		require.NoError(t, err)
-		response, ok := got.(*api.ProjectResponse)
+		response, ok := got.(*api.ProjectDetailResponse)
 		require.True(t, ok, helpers.MustMarshal(t, got))
 		assert.True(t, response.PasswordHash.IsNull(), "no method chosen reads back as null")
 	})
@@ -506,7 +506,7 @@ func TestPatchProjectPasswordHash(t *testing.T) {
 			PasswordHash: api.NewOptNilPasswordHashPolicy(argon2id),
 		}, api.PatchProjectParams{ProjectID: api.ProjectID(project.ID)})
 		require.NoError(t, err)
-		patched, ok := got.(*api.ProjectResponse)
+		patched, ok := got.(*api.ProjectDetailResponse)
 		require.True(t, ok, helpers.MustMarshal(t, got))
 
 		policy, ok := patched.PasswordHash.Get()
@@ -516,7 +516,7 @@ func TestPatchProjectPasswordHash(t *testing.T) {
 
 		read, err := client.GetProject(t.Context(), api.GetProjectParams{ProjectID: api.ProjectID(project.ID)})
 		require.NoError(t, err)
-		reread, ok := read.(*api.ProjectResponse)
+		reread, ok := read.(*api.ProjectDetailResponse)
 		require.True(t, ok, helpers.MustMarshal(t, read))
 		assert.Equal(t, patched.PasswordHash, reread.PasswordHash, "a GET reads back what the PATCH set")
 	})
@@ -526,7 +526,7 @@ func TestPatchProjectPasswordHash(t *testing.T) {
 			Name: api.NewOptNilString(helpers.ProjectName()),
 		}, api.PatchProjectParams{ProjectID: api.ProjectID(project.ID)})
 		require.NoError(t, err)
-		renamed, ok := got.(*api.ProjectResponse)
+		renamed, ok := got.(*api.ProjectDetailResponse)
 		require.True(t, ok, helpers.MustMarshal(t, got))
 		assert.False(t, renamed.PasswordHash.IsNull(), "a body that says nothing about hashing changes nothing")
 	})
@@ -536,7 +536,7 @@ func TestPatchProjectPasswordHash(t *testing.T) {
 			PasswordHash: api.OptNilPasswordHashPolicy{Set: true, Null: true},
 		}, api.PatchProjectParams{ProjectID: api.ProjectID(project.ID)})
 		require.NoError(t, err)
-		cleared, ok := got.(*api.ProjectResponse)
+		cleared, ok := got.(*api.ProjectDetailResponse)
 		require.True(t, ok, helpers.MustMarshal(t, got))
 		assert.True(t, cleared.PasswordHash.IsNull())
 	})
@@ -602,6 +602,24 @@ func TestProjectPasswordHashPolicyGovernsHashing(t *testing.T) {
 		return userID, hashOf(t, projectID, userID)
 	}
 
+	signIn := func(t *testing.T, project *domain.Project, userID string) {
+		t.Helper()
+		user, err := harness.EnsureUserFixture(t).GetByID(t.Context(), project.ID, userID)
+		require.NoError(t, err)
+		attributes, err := user.Attributes.ToMap()
+		require.NoError(t, err)
+		email, ok := attributes["email"].(string)
+		require.True(t, ok, "the user has an email to sign in with")
+
+		client := attemptClient(t, project)
+		attemptID := newAttempt(t, client, project)
+		verifyAttemptProof(t, client, attemptID, api.ChallengeMethodIdentifier, identifierProof(email))
+		passworded := verifyAttemptProof(t, client, attemptID, api.ChallengeMethodPassword, &api.VerifyChallengeRequest{
+			OneOf: api.NewPasswordProofVerifyChallengeRequestSum(api.PasswordProof{Password: password}),
+		})
+		require.Contains(t, completedMethods(passworded), api.FactorMethodPassword)
+	}
+
 	deploymentDefault, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 	ownMethod, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
@@ -632,8 +650,14 @@ func TestProjectPasswordHashPolicyGovernsHashing(t *testing.T) {
 	assert.NoError(t, verifier.VerifyHash(defaultHash, password))
 	assert.NoError(t, verifier.VerifyHash(ownHash, password))
 
-	// Handing the project back to the default moves the next password written,
-	// not the one already stored.
+	// The deployment default is bcrypt, so this proves the sign-in verifies
+	// with the project's hasher.
+	signIn(t, ownMethod, ownUserID)
+	assert.Equal(t, ownHash, hashOf(t, ownMethod.ID, ownUserID),
+		"a sign-in keeps a hash written by the project's method")
+
+	// Handing the project back to the default does not rewrite the stored hash.
+	// The next sign-in does, and so does the next password written.
 	var cleared *domain.PasswordHashPolicy
 	_, err = harness.EnsureProjectService(t).Update(t.Context(), service.UpdateProjectRequest{
 		ID:                 ownMethod.ID,
@@ -643,6 +667,13 @@ func TestProjectPasswordHashPolicyGovernsHashing(t *testing.T) {
 
 	assert.True(t, strings.HasPrefix(hashOf(t, ownMethod.ID, ownUserID), argon2.Prefix),
 		"the stored hash is not rewritten by a policy change")
+	signIn(t, ownMethod, ownUserID)
+	migrated := hashOf(t, ownMethod.ID, ownUserID)
+	assert.True(t, strings.HasPrefix(migrated, bcrypt.Prefix),
+		"the next sign-in moves the stored hash to the deployment default: %q", migrated)
+	signIn(t, ownMethod, ownUserID)
+	assert.Equal(t, migrated, hashOf(t, ownMethod.ID, ownUserID),
+		"a sign-in with a current hash does not rewrite it")
 	_, afterClearing := setPassword(t, ownMethod.ID)
 	assert.True(t, strings.HasPrefix(afterClearing, bcrypt.Prefix),
 		"the next password written goes back to the deployment default")
@@ -757,8 +788,9 @@ func TestQueryProjects(t *testing.T) {
 	}
 }
 
-// assertProjectResponse covers every operation answering with the shared
-// project body: getProject, patchProject, and each item of queryProjects.
+// assertProjectResponse covers every operation answering with a project body:
+// getProject and patchProject (the detail body), and each item of
+// queryProjects.
 func assertProjectResponse(t *testing.T, want, got any) {
 	t.Helper()
 	if !assert.IsType(t, want, got, helpers.MustMarshal(t, got)) {
@@ -773,6 +805,16 @@ func assertProjectResponse(t *testing.T, want, got any) {
 		assert.NotEmpty(t, actual.ID)
 		assert.Equal(t, expected.Name, actual.Name)
 		assert.Equal(t, expected.Origins, actual.Origins)
+		assert.NotEmpty(t, actual.CreatedAt)
+		assert.False(t, actual.UpdatedAt.Before(actual.CreatedAt))
+	case *api.ProjectDetailResponse:
+		require.IsType(t, &api.ProjectDetailResponse{}, got, helpers.MustMarshal(t, got))
+		actual := got.(*api.ProjectDetailResponse)
+
+		assert.NotEmpty(t, actual.ID)
+		assert.Equal(t, expected.Name, actual.Name)
+		assert.Equal(t, expected.Origins, actual.Origins)
+		assert.Equal(t, expected.OwningTeamID, actual.OwningTeamID)
 		assert.NotEmpty(t, actual.CreatedAt)
 		assert.False(t, actual.UpdatedAt.Before(actual.CreatedAt))
 	case *api.QueryProjectsResponse:

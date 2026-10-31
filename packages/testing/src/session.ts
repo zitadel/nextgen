@@ -5,24 +5,62 @@ import type { SeedContext } from "./seed";
 import type { InstanceHandle, MintedSession, SeededUser } from "./types";
 
 /**
- * Mirrors the server's session cookie (internal/api/session.go): the name a
- * direct call to the server sends, and the one an app keeps behind a proxy that
- * passes the server's cookie through, such as an SPA's in production.
+ * The server's session cookie under its canonical name
+ * (internal/api/session.go, ADR 083): the name a direct call to the server
+ * sends, over any transport. A browser holds it under
+ * {@link browserSessionCookieName}.
  */
-export const SESSION_COOKIE_NAME = "__nextgen_session";
+export const SESSION_COOKIE_NAME = "__Host-zitadel_session";
 
 /**
- * The cookie an app keeps its session in on its own origin behind a server SDK
- * (Next.js, Nuxt, SvelteKit, SolidStart, TanStack Start, Qwik Router) or the dev
- * proxy `zitadel setup` writes for an SPA: `__nextgen_session_<projectId>`. The
- * proxy renames the server's cookie, so the apps and the Console on one host
- * keep a session each (ADR 073).
+ * Whether a session cookie a browser holds for `url` is `Secure`, and so
+ * carries the `__Host-` prefix: always, but over plain http to a loopback host,
+ * where the server leaves `Secure` out for Safari. Without a URL, a local dev
+ * server's answer: no.
+ */
+export function secureSessionCookie(url?: string | URL): boolean {
+  if (url === undefined) {
+    return false;
+  }
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return true;
+  }
+  const host = parsed.hostname.toLowerCase();
+  return (
+    parsed.protocol !== "http:" ||
+    !(host === "localhost" || host === "[::1]" || /^127(?:\.\d{1,3}){3}$/.test(host))
+  );
+}
+
+/**
+ * The server's session cookie as a browser at `url` holds it: the canonical
+ * `__Host-zitadel_session`, or `zitadel_session` over plain http to a loopback
+ * host (ADR 083). Without a URL, the loopback name. An app behind a proxy that
+ * passes the server's cookie through, such as an SPA's in production, keeps
+ * its session under this name.
+ */
+export function browserSessionCookieName(url?: string | URL): string {
+  return secureSessionCookie(url) ? SESSION_COOKIE_NAME : "zitadel_session";
+}
+
+/**
+ * The cookie an app at `url` keeps its session in on its own origin behind a
+ * server SDK (Next.js, Nuxt, SvelteKit, SolidStart, TanStack Start, Qwik
+ * Router) or the dev proxy `zitadel setup` writes for an SPA: the browser's
+ * name of the server's cookie with the project id appended,
+ * `zitadel_session_<projectId>` over plain http to a loopback host and
+ * `__Host-zitadel_session_<projectId>` otherwise. Without a URL, the loopback
+ * name. The proxy renames the server's cookie, so the apps and the Console on
+ * one host keep a session each (ADR 073, ADR 083).
  *
  * Mirrors `sessionCookieName` in `@zitadel/sdk-core`, including the
  * percent-encoding of every byte outside `[A-Za-z0-9_-]`.
  */
-export function sessionCookieName(projectId: string): string {
-  let name = `${SESSION_COOKIE_NAME}_`;
+export function sessionCookieName(projectId: string, url?: string | URL): string {
+  let name = `${browserSessionCookieName(url)}_`;
   for (const byte of new TextEncoder().encode(projectId)) {
     const char = String.fromCharCode(byte);
     name += /[A-Za-z0-9_-]/.test(char)

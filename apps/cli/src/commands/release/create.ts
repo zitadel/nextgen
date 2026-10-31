@@ -10,7 +10,6 @@ import {
   validateStep,
   worktreeIsDirty,
 } from "../../lib/release";
-import { nextCommandsData } from "../../lib/oclif/envelope";
 import { ZitadelError } from "../../lib/errors";
 
 /**
@@ -43,7 +42,8 @@ export default class ReleaseCreate extends EnvironmentCommand {
     const json = this.jsonEnabled();
 
     const { client, projectId } = await this.connect();
-    const { bundle, resourceCount, brandingSources, idpFiles } = await buildBundle(cwd);
+    const { bundle, resourceCount, brandingSources, idpFiles, policyFiles } =
+      await buildBundle(cwd);
 
     const ctx: StepContext = {
       cwd,
@@ -57,6 +57,7 @@ export default class ReleaseCreate extends EnvironmentCommand {
       bundle,
       brandingSources,
       idpFiles,
+      policyFiles,
       suggest: (args) => this.suggest(args),
     };
     // The IdP connections sync before the build, as `deploy` does: a release
@@ -99,8 +100,8 @@ export default class ReleaseCreate extends EnvironmentCommand {
         release_id: release.id,
         content_hash: release.content_hash,
         resources: resourceCount,
-        ...nextCommandsData([this.suggest(`deployment create --release ${release.id}`)]),
       },
+      next: { commands: [this.suggest(`deployment create --release ${release.id}`)] },
       pretty: `Created ${release.id} (${release.content_hash})`,
     });
   }

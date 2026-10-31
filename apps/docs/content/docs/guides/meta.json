@@ -3,6 +3,7 @@
   "pages": [
     "local-runtime",
     "deploy",
+    "migrate-user-schema",
     "social-sign-in",
     "customize-design",
     "customize-copy",

@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/components",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "Lit-based atomic web components and the <zitadel-login> orchestrator for the Zitadel auth UI.",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/components#readme",
   "bugs": {
@@ -113,6 +113,7 @@
     "@zitadel/api": "workspace:*",
     "@zitadel/api-mock": "workspace:*",
     "@zitadel/design-tokens": "workspace:*",
+    "@zitadel/vitest-config": "workspace:*",
     "jsdom": "catalog:",
     "lightningcss": "catalog:",
     "msw": "catalog:",

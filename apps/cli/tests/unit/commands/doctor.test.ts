@@ -1,12 +1,13 @@
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
 import { failureAdvice } from "../../../src/commands/doctor";
 import type { LocalServers } from "../../../src/lib/local-server/processes";
+import { projectMetaSchemas } from "../../../src/lib/meta-schemas";
 import { publicCliCommand } from "../../../src/lib/public-cli";
 import { MANAGED_MARKER } from "../../../src/lib/paths";
 import { advisoryForWarnings } from "../../../src/commands/doctor/index";
@@ -55,18 +56,83 @@ async function doctor(cwd: string, extra: string[] = []) {
   );
 }
 
+/** `doctor` as setup's next steps run it: no flag about the local runtime. */
+async function doctorWithoutPort(cwd: string) {
+  const fake = await fakeDocker();
+  return runCliForTest(
+    ["doctor", "--cwd", cwd, "--json", "--server", "https://api.zitadel.cloud"],
+    { PATH: `${fake.binDir}:${process.env.PATH ?? ""}`, DOCKER_LOG: fake.logPath },
+  );
+}
+
+/** The checks that look at the machine's local runtime rather than the project. */
+const LOCAL_RUNTIME_CHECKS = new Set([
+  "server-binary",
+  "docker-cli",
+  "image",
+  "state-dir",
+  "port",
+  "runtime",
+  "managed-runtime-processes",
+]);
+
+/** The names of the checks a doctor run reported, whether it passed or failed. */
+function checkNamesOf(stdout: string): string[] {
+  const json = parseJson(stdout) as {
+    data?: { checks: Check[] };
+    details?: { checks: Check[] };
+  };
+  return (json.data ?? json.details)?.checks.map((check) => check.name) ?? [];
+}
+
+/** Points the project's `zitadel.json` at another server, as setup records it. */
+async function setProjectServer(cwd: string, server: string): Promise<void> {
+  const path = join(cwd, "zitadel.json");
+  const config = JSON.parse(await readFile(path, "utf8")) as Record<string, unknown>;
+  await writeFile(path, JSON.stringify({ ...config, server }));
+}
+
+/** Records a healthy local server in `dir`, as `zitadel start` does, and returns its port. */
+async function recordStartedServer(dir: string): Promise<number> {
+  const serverUrl = await startHealthServer();
+  const port = Number(new URL(serverUrl).port);
+  await mkdir(join(dir, ".zitadel/local"), { recursive: true });
+  await writeFile(
+    join(dir, ".zitadel/local/runtime.json"),
+    JSON.stringify({
+      schema_version: 1,
+      backend: "binary",
+      port,
+      server_url: serverUrl,
+      data_dir: join(dir, ".zitadel/local/nextgen-data"),
+      created_at: new Date().toISOString(),
+      cli_version: "0.0.0",
+      pid: 999_999,
+      command: "zitadel-server",
+      log_path: join(dir, ".zitadel/local/server.log"),
+      server_package: "@zitadel/server",
+      server_version: "0.0.0",
+    }),
+  );
+  return port;
+}
+
 /**
  * Builds a well-formed managed project that should pass every doctor check
  * runnable without the platform: config/secret parse + match, 0600 secret,
  * gitignore + env.example coverage, a Next.js framework signature, a valid
- * user schema, a Zitadel SDK dependency, and an owning team recorded by
- * `zitadel claim` (without it the claim check warns, which is its own test
- * below).
+ * user schema, a Zitadel SDK dependency, the editor meta-schemas this CLI
+ * writes, and an owning team recorded by `zitadel claim` (without it the
+ * claim check warns, which is its own test below).
  */
 async function makeHealthyProject(): Promise<string> {
   const cwd = await mkdtemp(join(tmpdir(), "zitadel-doctor-"));
   tempDirs.push(cwd);
   await mkdir(join(cwd, ".zitadel/schemas"), { recursive: true });
+  await mkdir(join(cwd, ".zitadel/meta"), { recursive: true });
+  for (const file of projectMetaSchemas(cliVersion.version)) {
+    await writeFile(join(cwd, file.path), file.contents);
+  }
   await mkdir(join(cwd, "app/login"), { recursive: true });
   await mkdir(join(cwd, "app/register"), { recursive: true });
   await mkdir(join(cwd, "app/profile"), { recursive: true });
@@ -291,7 +357,7 @@ describe("doctor command", () => {
       (parseJson(res.stdout) as { data: { next_commands?: string[] } }).data.next_commands,
     ).toContain(
       expectedPublicCliCommand(
-        `claim --env-file .env.development.local --server https://api.zitadel.cloud --cwd ${cwd}`,
+        `claim --env-file ${cwd}/.env.development.local --server https://api.zitadel.cloud --cwd ${cwd}`,
       ),
     );
   });
@@ -484,43 +550,83 @@ console.log(["p4242", "cnode", "n127.0.0.1:" + process.env.LSOF_FIXTURE_PORT].jo
     expect(json.hint).toContain(json.next_commands?.[0]);
   });
 
+  // A project `setup --server <hosted>` created runs no local server, so the
+  // local runtime says nothing about it, and a port another app holds must not
+  // fail it.
+  describe("for a project set up against a hosted server", () => {
+    it("checks no local runtime", async () => {
+      const cwd = await makeHealthyProject();
+
+      const res = await doctorWithoutPort(cwd);
+
+      expect(checkNamesOf(res.stdout).filter((name) => LOCAL_RUNTIME_CHECKS.has(name))).toEqual([]);
+    });
+
+    it("reports no local port", async () => {
+      const cwd = await makeHealthyProject();
+
+      const res = await doctorWithoutPort(cwd);
+
+      expect((parseJson(res.stdout) as { data: { port?: number } }).data.port).toBeUndefined();
+    });
+
+    it("reports the project's server as its source", async () => {
+      const cwd = await makeHealthyProject();
+      await setProjectServer(cwd, "https://hosted.example.com");
+
+      const res = await doctorWithoutPort(cwd);
+
+      expect((parseJson(res.stdout) as { source: string }).source).toBe(
+        "https://hosted.example.com",
+      );
+    });
+
+    it("checks the local runtime a flag asks about", async () => {
+      const cwd = await makeHealthyProject();
+
+      const res = await doctor(cwd);
+
+      expect(checkNamesOf(res.stdout)).toContain("port");
+    });
+
+    it("checks a local server started in its directory", async () => {
+      const cwd = await makeHealthyProject();
+      await recordStartedServer(cwd);
+
+      const res = await doctorWithoutPort(cwd);
+
+      expect(checkNamesOf(res.stdout)).toContain("runtime");
+    });
+  });
+
+  it("checks the local runtime of a project set up against a local server", async () => {
+    const cwd = await makeHealthyProject();
+    await setProjectServer(cwd, `http://localhost:${String(nextPort())}`);
+
+    const res = await doctorWithoutPort(cwd);
+
+    expect(checkNamesOf(res.stdout)).toContain("port");
+  });
+
+  it("checks the local runtime before setup", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "zitadel-doctor-empty-"));
+    tempDirs.push(cwd);
+
+    const res = await doctorWithoutPort(cwd);
+
+    expect(checkNamesOf(res.stdout)).toContain("port");
+  });
+
   // `zitadel start` tells developers to run setup in the directory it ran in,
   // or one inside it; doctor must check that server, not the default port.
   describe("in an app inside the directory a local server was started in", () => {
     async function appUnderStartedServer(): Promise<{ app: string; port: number }> {
       const parent = await mkdtemp(join(tmpdir(), "zitadel-doctor-parent-"));
       tempDirs.push(parent);
-      const serverUrl = await startHealthServer();
-      const port = Number(new URL(serverUrl).port);
-      await mkdir(join(parent, ".zitadel/local"), { recursive: true });
-      await writeFile(
-        join(parent, ".zitadel/local/runtime.json"),
-        JSON.stringify({
-          schema_version: 1,
-          backend: "binary",
-          port,
-          server_url: serverUrl,
-          data_dir: join(parent, ".zitadel/local/nextgen-data"),
-          created_at: new Date().toISOString(),
-          cli_version: "0.0.0",
-          pid: 999_999,
-          command: "zitadel-server",
-          log_path: join(parent, ".zitadel/local/server.log"),
-          server_package: "@zitadel/server",
-          server_version: "0.0.0",
-        }),
-      );
+      const port = await recordStartedServer(parent);
       const app = join(parent, "app");
       await mkdir(app);
       return { app, port };
-    }
-
-    async function doctorWithoutPort(cwd: string) {
-      const fake = await fakeDocker();
-      return runCliForTest(
-        ["doctor", "--cwd", cwd, "--json", "--server", "https://api.zitadel.cloud"],
-        { PATH: `${fake.binDir}:${process.env.PATH ?? ""}`, DOCKER_LOG: fake.logPath },
-      );
     }
 
     it("checks that server's port", async () => {
@@ -541,6 +647,17 @@ console.log(["p4242", "cnode", "n127.0.0.1:" + process.env.LSOF_FIXTURE_PORT].jo
         status: "pass",
         message: expect.stringContaining("is healthy"),
       });
+    });
+
+    it("names the parent folder the healthy server was started in", async () => {
+      const { app } = await appUnderStartedServer();
+
+      const res = await doctorWithoutPort(app);
+
+      const checks = (parseJson(res.stdout) as { data: { checks: Check[] } }).data.checks;
+      expect(checks.find((check) => check.name === "runtime")?.message).toContain(
+        `(server started in the parent folder ${dirname(app)})`,
+      );
     });
 
     it("points at that server's log", async () => {
@@ -847,6 +964,7 @@ describe("advisoryForWarnings", () => {
       [claimWarning],
       cliVersion.version,
       environmentSelectorSuffix({ server: "https://a.example" }),
+      environmentSelectorSuffix({}),
     );
 
     expect(advice?.nextCommands).toEqual([
@@ -859,9 +977,90 @@ describe("advisoryForWarnings", () => {
       [claimWarning],
       cliVersion.version,
       environmentSelectorSuffix({}),
+      environmentSelectorSuffix({}),
     );
 
     expect(advice?.nextCommands).toEqual([expectedPublicCliCommand("claim")]);
+  });
+
+  it("suggests doctor --fix for outdated editor schemas in the directory doctor checked", () => {
+    const metaWarning = {
+      name: "meta-schemas",
+      status: "warn" as const,
+      message: "outdated",
+      details: { missing: [], outdated: [".zitadel/meta/branding.json"] },
+    };
+
+    const advice = advisoryForWarnings(
+      [metaWarning],
+      cliVersion.version,
+      undefined,
+      environmentSelectorSuffix({ cwd: "apps/web" }),
+    );
+
+    expect(advice?.nextCommands).toEqual([expectedPublicCliCommand("doctor --fix --cwd apps/web")]);
+  });
+
+  it("does not suggest doctor --fix for an editor schema it cannot read", () => {
+    const metaWarning = {
+      name: "meta-schemas",
+      status: "warn" as const,
+      message: "unreadable",
+      details: {
+        missing: [],
+        outdated: [],
+        unreadable: [{ path: ".zitadel/meta/branding.json", reason: "EACCES" }],
+      },
+    };
+
+    const advice = advisoryForWarnings(
+      [metaWarning],
+      cliVersion.version,
+      undefined,
+      environmentSelectorSuffix({}),
+    );
+
+    expect(advice).toBeUndefined();
+  });
+
+  it("does not suggest this CLI's doctor --fix when the project pins a newer version", () => {
+    const metaWarning = {
+      name: "meta-schemas",
+      status: "warn" as const,
+      message: "newer",
+      details: {
+        missing: [],
+        outdated: [".zitadel/meta/branding.json"],
+        newer_pin: { name: "@zitadel/sdk-next", version: "9.9.9" },
+      },
+    };
+
+    const advice = advisoryForWarnings(
+      [metaWarning],
+      cliVersion.version,
+      undefined,
+      environmentSelectorSuffix({}),
+    );
+
+    expect(advice).toBeUndefined();
+  });
+
+  it("suggests doctor --fix for an issuer held as a preview origin, in the directory doctor checked", () => {
+    const issuerWarning = {
+      name: "issuer-origin",
+      status: "warn" as const,
+      message: "preview",
+      details: { pattern: "http://localhost:3000", server: "https://api.zitadel.cloud" },
+    };
+
+    const advice = advisoryForWarnings(
+      [issuerWarning],
+      cliVersion.version,
+      undefined,
+      environmentSelectorSuffix({ cwd: "apps/web" }),
+    );
+
+    expect(advice?.nextCommands).toEqual([expectedPublicCliCommand("doctor --fix --cwd apps/web")]);
   });
 });
 
@@ -882,9 +1081,10 @@ describe("failureAdvice for a runtime found in a parent directory", () => {
       dir,
     );
 
-    expect(advice.nextCommands).toEqual([]);
+    expect(advice.nextCommands).toEqual([publicCliCommand("start", "1.0.0")]);
     expect(advice.suggestedArgs).toEqual([
       ["start", "--cwd", dir],
+      ["start"],
       ["reset", "--force", "--cwd", dir],
     ]);
     expect(advice.hint).toContain("details.suggested_args");
@@ -904,7 +1104,61 @@ describe("failureAdvice for a runtime found in a parent directory", () => {
 
     expect(advice.nextCommands).toEqual([
       publicCliCommand("start --cwd /home/dev/app", "1.0.0"),
+      publicCliCommand("start", "1.0.0"),
       publicCliCommand("reset --force --cwd /home/dev/app", "1.0.0"),
+    ]);
+  });
+
+  it("says the server is the parent's and that a reset deletes the parent's data", () => {
+    const advice = failureAdvice(
+      failed,
+      "image",
+      8080,
+      "1.0.0",
+      environmentSelectorSuffix({}),
+      "/home/dev/app",
+    );
+
+    expect(advice.hint).toContain("This folder has no Zitadel server of its own");
+    expect(advice.hint).toContain("the parent folder, /home/dev/app");
+    expect(advice.hint).toContain("Resetting deletes the local data in /home/dev/app");
+    expect(advice.hint).toContain("run start here");
+  });
+
+  it("starts a server in doctor's own --cwd, not the shell's directory", () => {
+    const advice = failureAdvice(
+      failed,
+      "image",
+      8080,
+      "1.0.0",
+      environmentSelectorSuffix({}),
+      "/home/dev/app",
+      "/home/dev/app/child",
+    );
+
+    expect(advice.suggestedArgs?.[1]).toEqual(["start", "--cwd", "/home/dev/app/child"]);
+  });
+
+  it("keeps the hint to one line", () => {
+    const advice = failureAdvice(
+      failed,
+      "image",
+      8080,
+      "1.0.0",
+      environmentSelectorSuffix({}),
+      "/home/dev/app",
+    );
+
+    expect(advice.hint).not.toContain("\n");
+  });
+
+  it("keeps the plain advice for a runtime in the working directory", () => {
+    const advice = failureAdvice(failed, "image", 8080, "1.0.0", environmentSelectorSuffix({}));
+
+    expect(advice.hint).not.toContain("parent folder");
+    expect(advice.nextCommands).toEqual([
+      publicCliCommand("start", "1.0.0"),
+      publicCliCommand("reset --force", "1.0.0"),
     ]);
   });
 });

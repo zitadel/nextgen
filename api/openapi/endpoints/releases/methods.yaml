@@ -169,6 +169,7 @@ get:
   security:
     - oauth2:
         - release.read
+    - sessionCookie: []
   responses:
     '200':
       description: The releases were retrieved successfully.

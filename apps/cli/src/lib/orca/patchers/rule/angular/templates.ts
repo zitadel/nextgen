@@ -12,7 +12,9 @@ import {
 import {
   indented,
   proxyConfSessionCookieStatements,
+  proxyConfSessionCookieStatementsV1,
   SESSION_COOKIE_MARKER,
+  SESSION_COOKIE_MARKER_V1,
 } from "../session-cookie";
 import { lfText, withLfLineEnds } from "../utils/line-ends";
 
@@ -130,7 +132,8 @@ export function appTemplateHtml(ctx: PatchContext): string {
  * backend by its own name (`changeOrigin`), which a remote https server
  * requires, and forwards the app's origin in `X-Forwarded-Host` and
  * `X-Forwarded-Proto` (`xfwd`), and it keeps the session cookie under the
- * app's project's name in the browser (`ZITADEL_PROJECT_ID`, ADR 073).
+ * app's project's name in the browser (`ZITADEL_PROJECT_ID`, ADR 073,
+ * ADR 083).
  */
 export function proxyConfTemplate(): string {
   return `${MANAGED_MARKER}
@@ -216,18 +219,37 @@ function bearerIn(text: string): string | undefined {
   return [EXCHANGE_ONLY_BEARER, V2_EXCHANGE_ONLY_BEARER].find((bearer) => text.includes(bearer));
 }
 
-/** The session-cookie hooks' functions, after the bearer hook (ADR 073). */
+/** The session-cookie hooks' functions, after the bearer hook (ADR 073, ADR 083). */
 const SESSION_COOKIE_FUNCTIONS = indented(proxyConfSessionCookieStatements(), "");
+
+/** The session-cookie hooks' functions as the CLI wrote them before ADR 083. */
+const SESSION_COOKIE_FUNCTIONS_V1 = indented(proxyConfSessionCookieStatementsV1(), "");
 
 /** How the managed entry attached its hooks before it carried the session-cookie ones. */
 const BEARER_ONLY_HOOKS = `    onProxyReq: setBearer,
     configure: (proxy) => proxy.on("proxyReq", setBearer),
 `;
 
-/** How the managed entry attaches the bearer and the session-cookie hooks. */
-const SESSION_COOKIE_HOOKS = `    onProxyReq: (proxyReq) => {
+/** How the managed entry attached the bearer and the session-cookie hooks before ADR 083. */
+const SESSION_COOKIE_HOOKS_V1 = `    onProxyReq: (proxyReq) => {
       setBearer(proxyReq);
       forwardSessionCookie(proxyReq);
+    },
+    onProxyRes: renameSessionCookie,
+    configure: (proxy) => {
+      proxy.on("proxyReq", setBearer);
+      proxy.on("proxyReq", forwardSessionCookie);
+      proxy.on("proxyRes", renameSessionCookie);
+    },
+`;
+
+/**
+ * How the managed entry attaches the bearer and the session-cookie hooks. Each
+ * cookie hook takes the browser's request too, whose scheme names the cookie.
+ */
+const SESSION_COOKIE_HOOKS = `    onProxyReq: (proxyReq, req) => {
+      setBearer(proxyReq);
+      forwardSessionCookie(proxyReq, req);
     },
     onProxyRes: renameSessionCookie,
     configure: (proxy) => {
@@ -290,14 +312,24 @@ function hasBearerOnlyHooks(text: string): boolean {
   );
 }
 
+/** Whether `text` (LF line ends) is the managed proxy with the session-cookie hooks the CLI wrote before ADR 083. */
+function hasV1Hooks(text: string): boolean {
+  return (
+    text.includes(MANAGED_MARKER) &&
+    text.includes(SESSION_COOKIE_FUNCTIONS_V1) &&
+    text.includes(SESSION_COOKIE_HOOKS_V1)
+  );
+}
+
 /**
- * Gives the managed proxy the session-cookie hooks (ADR 073) when it is the
- * exact file an earlier CLI wrote: the hook functions go after the bearer hook,
- * and the entry attaches them beside it. A file that carries them already, an
- * unmanaged one, and a managed one whose hooks were changed by hand are left as
- * they are; {@link proxyConfSessionCookieVerdict} tells the doctor which it is.
- * Line ends are the file's own (CRLF or LF). Creates the managed proxy when it
- * is absent, as {@link proxyConfEdit} does.
+ * Gives the managed proxy the session-cookie hooks (ADR 073, ADR 083) when it
+ * is the exact file an earlier CLI wrote: the hook functions go after the
+ * bearer hook, and the entry attaches them beside it; the hooks from before
+ * ADR 083 are replaced where they stand. A file that carries the current hooks
+ * already, an unmanaged one, and a managed one whose hooks were changed by
+ * hand are left as they are; {@link proxyConfSessionCookieVerdict} tells the
+ * doctor which it is. Line ends are the file's own (CRLF or LF). Creates the
+ * managed proxy when it is absent, as {@link proxyConfEdit} does.
  */
 export function proxyConfSessionCookieEdit(): (source: string | undefined) => string {
   return (source) => {
@@ -305,12 +337,20 @@ export function proxyConfSessionCookieEdit(): (source: string | undefined) => st
       return proxyConfTemplate();
     }
     return withLfLineEnds(source, (text) => {
+      if (text.includes(SESSION_COOKIE_MARKER)) {
+        return text;
+      }
+      if (hasV1Hooks(text)) {
+        return text
+          .replace(SESSION_COOKIE_FUNCTIONS_V1, SESSION_COOKIE_FUNCTIONS)
+          .replace(SESSION_COOKIE_HOOKS_V1, SESSION_COOKIE_HOOKS);
+      }
       const bearer = bearerIn(text);
-      return text.includes(SESSION_COOKIE_MARKER) || !bearer || !hasBearerOnlyHooks(text)
+      return bearer && hasBearerOnlyHooks(text)
         ? text
-        : text
             .replace(bearer, `${bearer}\n\n${SESSION_COOKIE_FUNCTIONS}`)
-            .replace(BEARER_ONLY_HOOKS, SESSION_COOKIE_HOOKS);
+            .replace(BEARER_ONLY_HOOKS, SESSION_COOKIE_HOOKS)
+        : text;
     });
   };
 }
@@ -320,11 +360,20 @@ export function proxyConfSessionCookieEdit(): (source: string | undefined) => st
  * The managed file as an earlier CLI wrote it is `detached` (`doctor --fix`
  * adds them). One the edit cannot place them in, a managed file changed by
  * hand or a proxy of the developer's own, is `unknown`: only the developer can.
+ * Hooks from before ADR 083 are `outdated`: they keep the session in cookies
+ * the server no longer reads.
  */
 export function proxyConfSessionCookieVerdict(source: string): WiringVerdict {
   const text = lfText(source);
   if (text.includes(SESSION_COOKIE_MARKER)) {
     return "applied";
+  }
+  if (text.includes(SESSION_COOKIE_MARKER_V1)) {
+    return {
+      outdated: hasV1Hooks(text)
+        ? "its session-cookie hooks name the session cookies before ADR 083; doctor --fix updates them"
+        : "its session-cookie hooks name the session cookies before ADR 083 and were changed since zitadel setup wrote them, so they must be updated by hand",
+    };
   }
   if (hasBearerOnlyHooks(text)) {
     return "detached";

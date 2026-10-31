@@ -1,11 +1,22 @@
 import { Flags } from "@oclif/core";
 import type { ZitadelClient } from "@zitadel/api/client";
-import type { ListDeployments200DeploymentsItem } from "@zitadel/api/generated/model";
+import type {
+  GetReleaseById200PointersItem,
+  ListDeployments200DeploymentsItem,
+} from "@zitadel/api/generated/model";
 
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope, nonBlankArg } from "../../lib/oclif";
 import { collectPages } from "../../lib/oclif/crud/paging";
-import { listLiveDeployments, rollbackDeployment, servesPrimary } from "../../lib/release";
-import { ZitadelError } from "../../lib/errors";
+import { renderTable } from "../../lib/oclif/crud/table";
+import {
+  listLiveDeployments,
+  messageFlag,
+  rollbackDeployment,
+  servesPrimary,
+} from "../../lib/release";
+import { toZitadelError, ZitadelError } from "../../lib/errors";
+import { Promptable } from "../../lib/oclif/promptable";
+import { reportWarning } from "../../lib/warnings";
 
 /**
  * `zitadel deployment rollback [<deployment_id>]` — re-apply an earlier
@@ -14,9 +25,11 @@ import { ZitadelError } from "../../lib/errors";
  * Bare, it undoes the last deploy: it re-applies the deployment that was live
  * before the current one. Given a `<deployment_id>`, it re-applies exactly that
  * one. A rollback re-serves an earlier release, so it takes the `--force`-or-confirm
- * gate the destructive commands use.
+ * gate the destructive commands use. It reports the revisions that release
+ * pins, and that users keep theirs: configuration rolls back, user data does
+ * not.
  */
-export default class DeploymentRollback extends EnvironmentCommand {
+export default class DeploymentRollback extends Promptable(EnvironmentCommand) {
   static override description = "Roll back to an earlier deployment.";
   static override group = CommandGroups.configuration;
   static override examples = [
@@ -35,6 +48,7 @@ export default class DeploymentRollback extends EnvironmentCommand {
       char: "f",
       description: "Roll back without the confirmation prompt. Required when non-interactive.",
     }),
+    message: messageFlag("A short summary of why this rolls back."),
   };
 
   async run(): Promise<JsonEnvelope> {
@@ -114,8 +128,19 @@ export default class DeploymentRollback extends EnvironmentCommand {
     }
 
     const deployment = await rollbackDeployment(client, projectId, targetId, {
+      ...(flags.message === undefined ? {} : { message: flags.message }),
       ...(expectedDeploymentId === undefined ? {} : { expectedDeploymentId }),
     });
+
+    let pointers: readonly GetReleaseById200PointersItem[] | undefined;
+    try {
+      pointers = (await client.getReleaseById(deployment.release_id, { project_id: projectId }))
+        .pointers;
+    } catch (error) {
+      reportWarning(
+        `Rolled back, but the revisions ${deployment.release_id} pins could not be read: ${toZitadelError(error).message}`,
+      );
+    }
 
     const origins = deployment.targets.map((target) => target.origin);
     return this.emit({
@@ -125,8 +150,16 @@ export default class DeploymentRollback extends EnvironmentCommand {
         release_id: deployment.release_id,
         rolled_back_to: deployment.metadata.rollback_to,
         origins,
+        ...(pointers === undefined ? {} : { pointers }),
       },
-      pretty: `Rolled back to ${deployment.release_id} on ${origins.join(", ")}`,
+      pretty: [
+        `Rolled back to ${deployment.release_id} on ${origins.join(", ")}`,
+        ...(pointers === undefined
+          ? []
+          : ["", renderTable(["kind", "handle", "revision_id"], pointers)]),
+        "",
+        "Users keep the schema revision and attributes they have: a rollback does not migrate them back.",
+      ].join("\n"),
     });
   }
 }

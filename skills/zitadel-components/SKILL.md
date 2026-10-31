@@ -90,7 +90,10 @@ Theming levers (strongest-first resolution, documented in the README):
   exposed).
 - **`suppress-header`** (boolean attribute, reflected) hides the widget's own
   heading — use it when the host page already shows a title and you want to
-  avoid a duplicate. Otherwise control chrome through `variant` and tokens.
+  avoid a duplicate. The login moves between sign-in and sign-up by itself, so
+  that title must follow its `zitadel-flow-step` event: `step.purpose` is
+  `login` or `register`.
+  Otherwise control chrome through `variant` and tokens.
 - **`suppress-password-toggle`** (boolean attribute) hides the show/hide button
   the login shows on password fields by default. It applies to custom Liquid
   templates too; templates have nothing to wire.

@@ -80,7 +80,39 @@ revision for its purpose in the project, whatever its flow's name. Older
 revisions stay active, so an `audience` added after a flow was deployed
 without one doesn't take that earlier revision out of the running. Removing a
 flow file does not retire the
-flow. Managed files carry a marker comment; `eject` removes only
+flow. Operation policies live in `.zitadel/policies/`: one `<operation>.json`
+per guarded operation, named after its `operation`, holding
+`{"$schema": "../meta/policy.json", "operation": "auth.factor.password.set",
+"config": {"min_length": 15}}`. `deploy` checks each file against
+`.zitadel/meta/policy.json` (known operation, only the template's settings,
+within their bounds) and its name before anything is sent; settings that
+contradict each other (a `min_length` above `max_length`) are refused by the
+server's release build with `rel.invalid`, the policy's entry carrying
+`pol.invalid`. A changed file publishes a new revision of the same policy,
+which applies the next time a password is set. A setting left out is off, and
+`"config": {}` switches every rule off. A sign-in or sign-up uses the policy
+the deployed release carries, so deploying without the file switches it off
+there; a password set through the API, or before the first deploy, uses the
+newest revision, which only `"config": {}` switches off. `policies list` and
+`policies get <id|operation>` read them back. A policy's cases live beside it
+in `<operation>.test.json` (`.zitadel/meta/policy-test.json`): each names an
+`input` in the operation's terms (`{"password": "…"}`), optional `facts` the
+operation would look up (`self_service`, `history_matches`), and the expected
+decision (`allowed`, optionally `code` and exactly the `violations`). The
+decision and rules hold in the login too; `code` is the API's answer, and a
+flow shows each rule as `error.x-auth-methods#password_<rule>` instead.
+`policies test [operation]` evaluates every case on the server against the
+sibling policy file, or with `--release <id>` against the revision that
+release pins; a missing policy is tested as none. It fails with `E_VALIDATION`
+(exit 3) when a case does not hold, `data`/`details` carrying `source`,
+`operations[].cases[]` (`name`, `passed`, `expected`, `actual`), `passed` and
+`failed`; with no test files it is `skipped` (`no-policy-tests`). `deploy`
+never carries test files. Until #2331, a release that pins no flow is tested
+with a warning: its sign-ins use the newest revisions instead. Write cases from
+what the user wants enforced; never invent expectations for them. `setup` writes and publishes
+the password policy with a `min_length` of 15; pass `--password-min-length <n>`
+only when the user asks for another value (`0` sets none). Managed files carry
+a marker comment; `eject` removes only
 files that still carry it, preserving anything the user replaced. For app-local
 development, `--server local` resolves through `.zitadel/local/runtime.json` and
 requires a healthy

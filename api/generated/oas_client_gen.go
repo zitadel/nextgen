@@ -57,7 +57,9 @@ type Invoker interface {
 	// allocates nothing, however long ago it was built. Otherwise every resource is compared against the
 	// project's newest revision of the same handle: unchanged content reuses
 	// that revision, changed content allocates a new one, and the request
-	// answers `201` with the new release. Metadata is excluded from the
+	// answers `201` with the new release. A policy whose config matches only an
+	// older revision allocates a new one too, so a request that resolves no
+	// release, which reads the newest revision, applies it as well. Metadata is excluded from the
 	// comparison, so the same content under a different `message` is the same
 	// release.
 	// A structurally malformed request is refused while decoding with
@@ -69,8 +71,9 @@ type Invoker interface {
 	// `rel.unresolved_reference`, naming the pointer and the handle.
 	// Building writes revisions, so besides `release.write` it needs the write
 	// scope of every kind the bundle carries a resource of: `schema.write`,
-	// `flow_definition.write`, `branding.write` and `idp.write`, as the
-	// per-kind create endpoints do. A missing scope answers `403` with `rel.permission_denied`,
+	// `flow_definition.write`, `branding.write`, `idp.write` and
+	// `policy.write`, as the per-kind create endpoints do. A missing scope answers `403` with `rel.
+	// permission_denied`,
 	// naming the kind. An empty kind needs no scope.
 	// Building a release does not deploy it. A release is not tied to an
 	// origin, and the same release can later be deployed to any number of
@@ -81,7 +84,7 @@ type Invoker interface {
 	// CompleteClaim invokes completeClaim operation.
 	//
 	// Called by the browser after the developer authenticates on the claim page.
-	// Authenticated by the `__nextgen_session` cookie, it attaches the project to
+	// Authenticated by the session cookie, it attaches the project to
 	// the developer's personal team using the `challenge_id` from the claim URL as
 	// its single-use, browser-safe authorization.
 	//
@@ -132,7 +135,7 @@ type Invoker interface {
 	// - `400 dep.invalid`: both or neither of `release_id` and `content_hash`;
 	// a primary origin named exactly; `primary` mixed with preview URLs;
 	// `primary` on a project with no primary origin; `ttl` with `primary`;
-	// `ttl` above the project's maximum.
+	// `ttl` above 365 days (`P365D`).
 	// - `400 dep.variables_missing`: a referenced variable has no value for
 	// the kind; `details` names the kind and every missing variable.
 	// - `403 proj.origin_not_allowed`: a preview URL matches no preview
@@ -204,9 +207,9 @@ type Invoker interface {
 	// `grant.invalid` on either user locator. Read the grant back for
 	// identifier and display.
 	// Accepts either a project secret (`oauth2`) or a user-bound Console
-	// session cookie (`nextgenSession`). Session callers are authorized as
+	// session cookie (`sessionCookie`). Session callers are authorized as
 	// the human against the target project (home may differ). Cookie-authenticated
-	// requests follow the scheme's CSRF rules (`nextgenSession`).
+	// requests follow the scheme's CSRF rules (`sessionCookie`).
 	//
 	// POST /grants
 	CreateGrant(ctx context.Context, request *CreateGrantRequest, params CreateGrantParams) (CreateGrantRes, error)
@@ -310,8 +313,9 @@ type Invoker interface {
 	// Creating a session is an app-plane operation on the project credential
 	// (`session.write`). The returned `session_token` is a session credential for the
 	// end-user client, not a management scope: it is delivered as the
-	// `__nextgen_session` cookie and authorises the self-service operations
-	// `GET /sessions/me` and `DELETE /sessions/me` (`nextgenSession` scheme). The
+	// `__Host-zitadel_session` cookie (`zitadel_session` over plain http to a
+	// loopback host) and authorises the self-service operations
+	// `GET /sessions/me` and `DELETE /sessions/me` (`sessionCookie` scheme). The
 	// by-id operations `GET /sessions/{session_id}` and `DELETE /sessions/{session_id}`
 	// are operator endpoints and require `session.read` / `session.delete` instead.
 	// The `session_token` is superseded when a handoff exchange completes — clients must
@@ -345,8 +349,8 @@ type Invoker interface {
 	// return 404. The row is not un-revoked. Expired grants can still be
 	// revoked so the unique binding can be reused.
 	// Accepts either a project secret (`oauth2`) or a user-bound Console
-	// session cookie (`nextgenSession`). Cookie-authenticated requests
-	// follow the scheme's CSRF rules (`nextgenSession`).
+	// session cookie (`sessionCookie`). Cookie-authenticated requests
+	// follow the scheme's CSRF rules (`sessionCookie`).
 	//
 	// DELETE /grants/{id}
 	DeleteGrant(ctx context.Context, params DeleteGrantParams) (DeleteGrantRes, error)
@@ -367,10 +371,14 @@ type Invoker interface {
 	DeleteTeam(ctx context.Context, params DeleteTeamParams) (DeleteTeamRes, error)
 	// DeleteUserByID invokes DeleteUserByID operation.
 	//
-	// Deletes a user and removes them from every team they belong to.
-	// The user is removed, not deactivated, and the deletion emits `user.deleted`.
+	// Deletes a user, removes them from every team they belong to, and revokes
+	// every grant they hold, on any project.
+	// The user is removed, not deactivated, and the deletion emits `user.deleted`,
+	// plus `authz.revoked` for each grant on that grant's project.
 	// With a project secret the request is idempotent: deleting a user that exists
-	// in no project succeeds without changing anything.
+	// in no project succeeds without changing anything. Deleting the last active
+	// member of a project's owning team returns 409 `proj.last_owner` and changes
+	// nothing.
 	//
 	// DELETE /users/{user_id}
 	DeleteUserByID(ctx context.Context, params DeleteUserByIDParams) (DeleteUserByIDRes, error)
@@ -382,6 +390,28 @@ type Invoker interface {
 	//
 	// DELETE /variables/{variable_name}
 	DeleteVariable(ctx context.Context, params DeleteVariableParams) (DeleteVariableRes, error)
+	// EvaluatePolicy invokes evaluatePolicy operation.
+	//
+	// Evaluates a policy config against one request, without side effects, and
+	// answers the decision the operation would reach. Nothing is read from or
+	// written to the project: the config is the one in the body, checked
+	// exactly as a publish checks it, so an invalid config answers `pol.invalid`
+	// with the same violations.
+	// `input` is what the operation's request carries, in the operation's own
+	// terms (a password, not its length): the server derives what the policy
+	// checks with the code the live operation runs, guards included. `facts`
+	// states what the operation would look up at runtime, such as whether the
+	// candidate matches one of the user's kept passwords.
+	// The decision and the names of the failed rules hold wherever the
+	// operation runs. `code` and `violations` are what an API call answers; a
+	// login flow shows the same rules as field errors on the password field
+	// (`error.x-auth-methods#password_<rule>` in `step.error`).
+	// Which policy a project or release applies is not decided here: read it
+	// and pass its config.
+	// The caller needs read access to the project in `project_id`.
+	//
+	// POST /policies/evaluate
+	EvaluatePolicy(ctx context.Context, request EvaluatePolicyRequest, params EvaluatePolicyParams) (EvaluatePolicyRes, error)
 	// ExchangeHandoff invokes exchangeHandoff operation.
 	//
 	// Consumes a one-time `handoff_token` minted by `POST /auth_attempts/{id}/handoff`
@@ -516,8 +546,8 @@ type Invoker interface {
 	// secrets. A user-bound Console session that already passed the project
 	// Check may expand without those scopes.
 	// Accepts either a project secret (`oauth2`) or a user-bound Console
-	// session cookie (`nextgenSession`). Cookie-authenticated requests
-	// follow the scheme's CSRF rules (`nextgenSession`).
+	// session cookie (`sessionCookie`). Cookie-authenticated requests
+	// follow the scheme's CSRF rules (`sessionCookie`).
 	//
 	// GET /grants/{id}
 	GetGrant(ctx context.Context, params GetGrantParams) (GetGrantRes, error)
@@ -572,7 +602,7 @@ type Invoker interface {
 	// Returns the session-bound token for cross-site request forgery protection
 	// (ADR 053 §5). Browser code sends it in the `X-Zitadel-CSRF` header on the
 	// state-changing requests the session cookie authenticates that require it
-	// — see the `nextgenSession` scheme. It authorizes nothing on its own: the
+	// — see the `sessionCookie` scheme. It authorizes nothing on its own: the
 	// HttpOnly cookie is still the credential, and a cross-site page cannot
 	// read this response. It stays the same for the life of the session, so a
 	// client fetches it once per session.
@@ -859,6 +889,34 @@ type Invoker interface {
 	//
 	// GET /projects/{project_id}/previews
 	ListPreviews(ctx context.Context, params ListPreviewsParams) (ListPreviewsRes, error)
+	// ListProjectAdmins invokes listProjectAdmins operation.
+	//
+	// Lists the people who can administer the project, and how each of them
+	// gets that access. A person appears once, with one entry in `sources` per
+	// way they hold it:
+	// - `owning_team`: an active member of the team that owns the project
+	// (ADR 054 §2). Removing a grant does not remove this access; it ends
+	// only when the person leaves the team or the project changes owner.
+	// - `grant`: an unexpired `admin` grant on the project, either to the
+	// person (`grant_id` only) or to a team they are an active member of
+	// (`grant_id` and `team`). Revoking that grant removes this source.
+	// The list follows the authorization check: team membership is read from
+	// the same membership projection the check expands, so a person who left a
+	// team, or whose team or user was deactivated, is not listed through it.
+	// Grants that expired or carry a lower role are left out. A person whose
+	// only access is a `viewer` or `editor` grant is not an admin and is not
+	// listed. Like the check, the list does not look at a person's user status
+	// beyond that, so a direct grant to a suspended person is listed.
+	// A person whose access comes only through teams the caller is not a
+	// member of is left out, and a team the caller is not in is named by
+	// `team_id` only. The grant to such a team still shows in the project's
+	// grants.
+	// Ordered by `user_id` and paginated with `page_token`.
+	// Accepts either a project secret (`oauth2`) or a user-bound Console
+	// session cookie (`sessionCookie`) that can read the project.
+	//
+	// GET /projects/{project_id}/admins
+	ListProjectAdmins(ctx context.Context, params ListProjectAdminsParams) (ListProjectAdminsRes, error)
 	// ListReleases invokes listReleases operation.
 	//
 	// Lists the project's releases, newest first.
@@ -968,8 +1026,8 @@ type Invoker interface {
 	// body-conditional). A user-bound Console session that already passed
 	// the project Check may expand without those scopes.
 	// Accepts either a project secret (`oauth2`) or a user-bound Console
-	// session cookie (`nextgenSession`). Cookie-authenticated requests
-	// follow the scheme's CSRF rules (`nextgenSession`).
+	// session cookie (`sessionCookie`). Cookie-authenticated requests
+	// follow the scheme's CSRF rules (`sessionCookie`).
 	//
 	// POST /grants/query
 	QueryGrants(ctx context.Context, request *QueryGrantsRequest, params QueryGrantsParams) (QueryGrantsRes, error)
@@ -1001,6 +1059,8 @@ type Invoker interface {
 	// QueryTeams invokes queryTeams operation.
 	//
 	// Returns the teams of a project, paginated with a cursor.
+	// `project_id` names the project to list; without it, the credential's own
+	// project is listed.
 	//
 	// POST /teams/query
 	QueryTeams(ctx context.Context, request *QueryTeamsRequest, params QueryTeamsParams) (QueryTeamsRes, error)
@@ -1010,8 +1070,8 @@ type Invoker interface {
 	// `project_id` names the project to list; without it, the credential's own
 	// project is listed.
 	// Accepts either a project secret (`oauth2`) or a user-bound Console
-	// session cookie (`nextgenSession`). Cookie-authenticated requests
-	// follow the scheme's CSRF rules (`nextgenSession`).
+	// session cookie (`sessionCookie`). Cookie-authenticated requests
+	// follow the scheme's CSRF rules (`sessionCookie`).
 	//
 	// POST /users/query
 	QueryUsers(ctx context.Context, request *QueryUsersRequest, params QueryUsersParams) (QueryUsersRes, error)
@@ -1039,7 +1099,7 @@ type Invoker interface {
 	// RevokeMySession invokes revokeMySession operation.
 	//
 	// Logs out by permanently deleting the session.
-	// The `__nextgen_session` cookie issued at creation (or superseded by a handoff
+	// The session cookie issued at creation (or superseded by a handoff
 	// exchange) is required, with the session's token from `GET /sessions/me/csrf`
 	// in the `X-Zitadel-CSRF` header. Idempotent: if the session is already gone
 	// this still returns 204. Any tokens derived from the session are invalidated,
@@ -1074,8 +1134,8 @@ type Invoker interface {
 	//
 	// Permanently deletes the session, terminating it immediately.
 	// This is the operator revoke path and requires the `session.delete` scope on a
-	// project-bound credential. End-user logout with the `__nextgen_session` cookie is
-	// `DELETE /sessions/me` (`nextgenSession` scheme).
+	// project-bound credential. End-user logout with the session cookie is
+	// `DELETE /sessions/me` (`sessionCookie` scheme).
 	// Idempotent: deleting a session that does not exist (or was already deleted)
 	// still returns 204. After deletion, any tokens derived from the session are
 	// invalidated.
@@ -1345,11 +1405,23 @@ func (c *Client) sendAddOrigin(ctx context.Context, request *ProjectOrigin, para
 				return res, errors.Wrap(err, "security \"OAuth2\"")
 			}
 		}
+		{
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, AddOriginOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
+			}
+		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -1536,7 +1608,9 @@ func (c *Client) sendBeginUserPasskeyRegistration(ctx context.Context, request *
 // allocates nothing, however long ago it was built. Otherwise every resource is compared against the
 // project's newest revision of the same handle: unchanged content reuses
 // that revision, changed content allocates a new one, and the request
-// answers `201` with the new release. Metadata is excluded from the
+// answers `201` with the new release. A policy whose config matches only an
+// older revision allocates a new one too, so a request that resolves no
+// release, which reads the newest revision, applies it as well. Metadata is excluded from the
 // comparison, so the same content under a different `message` is the same
 // release.
 // A structurally malformed request is refused while decoding with
@@ -1548,8 +1622,9 @@ func (c *Client) sendBeginUserPasskeyRegistration(ctx context.Context, request *
 // `rel.unresolved_reference`, naming the pointer and the handle.
 // Building writes revisions, so besides `release.write` it needs the write
 // scope of every kind the bundle carries a resource of: `schema.write`,
-// `flow_definition.write`, `branding.write` and `idp.write`, as the
-// per-kind create endpoints do. A missing scope answers `403` with `rel.permission_denied`,
+// `flow_definition.write`, `branding.write`, `idp.write` and
+// `policy.write`, as the per-kind create endpoints do. A missing scope answers `403` with `rel.
+// permission_denied`,
 // naming the kind. An empty kind needs no scope.
 // Building a release does not deploy it. A release is not tied to an
 // origin, and the same release can later be deployed to any number of
@@ -1694,7 +1769,7 @@ func (c *Client) sendBuildRelease(ctx context.Context, request *BuildReleaseRequ
 // CompleteClaim invokes completeClaim operation.
 //
 // Called by the browser after the developer authenticates on the claim page.
-// Authenticated by the `__nextgen_session` cookie, it attaches the project to
+// Authenticated by the session cookie, it attaches the project to
 // the developer's personal team using the `challenge_id` from the claim URL as
 // its single-use, browser-safe authorization.
 //
@@ -1789,14 +1864,14 @@ func (c *Client) sendCompleteClaim(ctx context.Context, request *CompleteClaimRe
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			stage = "Security:NextgenSession"
-			switch err := c.securityNextgenSession(ctx, CompleteClaimOperation, r); {
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, CompleteClaimOperation, r); {
 			case err == nil: // if NO error
 				satisfied[0] |= 1 << 0
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
-				return res, errors.Wrap(err, "security \"NextgenSession\"")
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
 			}
 		}
 
@@ -2127,7 +2202,7 @@ func (c *Client) sendCreateBranding(ctx context.Context, request *Branding, para
 // - `400 dep.invalid`: both or neither of `release_id` and `content_hash`;
 // a primary origin named exactly; `primary` mixed with preview URLs;
 // `primary` on a project with no primary origin; `ttl` with `primary`;
-// `ttl` above the project's maximum.
+// `ttl` above 365 days (`P365D`).
 // - `400 dep.variables_missing`: a referenced variable has no value for
 // the kind; `details` names the kind and every missing variable.
 // - `403 proj.origin_not_allowed`: a preview URL matches no preview
@@ -2237,11 +2312,23 @@ func (c *Client) sendCreateDeployment(ctx context.Context, request *CreateDeploy
 				return res, errors.Wrap(err, "security \"OAuth2\"")
 			}
 		}
+		{
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, CreateDeploymentOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
+			}
+		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -2543,9 +2630,9 @@ func (c *Client) sendCreateFlowDefinition(ctx context.Context, request *CreateFl
 // `grant.invalid` on either user locator. Read the grant back for
 // identifier and display.
 // Accepts either a project secret (`oauth2`) or a user-bound Console
-// session cookie (`nextgenSession`). Session callers are authorized as
+// session cookie (`sessionCookie`). Session callers are authorized as
 // the human against the target project (home may differ). Cookie-authenticated
-// requests follow the scheme's CSRF rules (`nextgenSession`).
+// requests follow the scheme's CSRF rules (`sessionCookie`).
 //
 // POST /grants
 func (c *Client) CreateGrant(ctx context.Context, request *CreateGrantRequest, params CreateGrantParams) (CreateGrantRes, error) {
@@ -2648,14 +2735,14 @@ func (c *Client) sendCreateGrant(ctx context.Context, request *CreateGrantReques
 			}
 		}
 		{
-			stage = "Security:NextgenSession"
-			switch err := c.securityNextgenSession(ctx, CreateGrantOperation, r); {
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, CreateGrantOperation, r); {
 			case err == nil: // if NO error
 				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
-				return res, errors.Wrap(err, "security \"NextgenSession\"")
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
 			}
 		}
 
@@ -3437,8 +3524,9 @@ func (c *Client) sendCreateSchema(ctx context.Context, request CreateSchemaReq, 
 // Creating a session is an app-plane operation on the project credential
 // (`session.write`). The returned `session_token` is a session credential for the
 // end-user client, not a management scope: it is delivered as the
-// `__nextgen_session` cookie and authorises the self-service operations
-// `GET /sessions/me` and `DELETE /sessions/me` (`nextgenSession` scheme). The
+// `__Host-zitadel_session` cookie (`zitadel_session` over plain http to a
+// loopback host) and authorises the self-service operations
+// `GET /sessions/me` and `DELETE /sessions/me` (`sessionCookie` scheme). The
 // by-id operations `GET /sessions/{session_id}` and `DELETE /sessions/{session_id}`
 // are operator endpoints and require `session.read` / `session.delete` instead.
 // The `session_token` is superseded when a handoff exchange completes — clients must
@@ -3668,14 +3756,14 @@ func (c *Client) sendCreateTeam(ctx context.Context, request *CreateTeamRequest,
 			}
 		}
 		{
-			stage = "Security:NextgenSession"
-			switch err := c.securityNextgenSession(ctx, CreateTeamOperation, r); {
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, CreateTeamOperation, r); {
 			case err == nil: // if NO error
 				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
-				return res, errors.Wrap(err, "security \"NextgenSession\"")
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
 			}
 		}
 
@@ -3843,14 +3931,14 @@ func (c *Client) sendCreateUser(ctx context.Context, request *CreateUserRequest,
 			}
 		}
 		{
-			stage = "Security:NextgenSession"
-			switch err := c.securityNextgenSession(ctx, CreateUserOperation, r); {
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, CreateUserOperation, r); {
 			case err == nil: // if NO error
 				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
-				return res, errors.Wrap(err, "security \"NextgenSession\"")
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
 			}
 		}
 
@@ -3897,8 +3985,8 @@ func (c *Client) sendCreateUser(ctx context.Context, request *CreateUserRequest,
 // return 404. The row is not un-revoked. Expired grants can still be
 // revoked so the unique binding can be reused.
 // Accepts either a project secret (`oauth2`) or a user-bound Console
-// session cookie (`nextgenSession`). Cookie-authenticated requests
-// follow the scheme's CSRF rules (`nextgenSession`).
+// session cookie (`sessionCookie`). Cookie-authenticated requests
+// follow the scheme's CSRF rules (`sessionCookie`).
 //
 // DELETE /grants/{id}
 func (c *Client) DeleteGrant(ctx context.Context, params DeleteGrantParams) (DeleteGrantRes, error) {
@@ -4007,14 +4095,14 @@ func (c *Client) sendDeleteGrant(ctx context.Context, params DeleteGrantParams) 
 			}
 		}
 		{
-			stage = "Security:NextgenSession"
-			switch err := c.securityNextgenSession(ctx, DeleteGrantOperation, r); {
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, DeleteGrantOperation, r); {
 			case err == nil: // if NO error
 				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
-				return res, errors.Wrap(err, "security \"NextgenSession\"")
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
 			}
 		}
 
@@ -4193,10 +4281,14 @@ func (c *Client) sendDeleteTeam(ctx context.Context, params DeleteTeamParams) (r
 
 // DeleteUserByID invokes DeleteUserByID operation.
 //
-// Deletes a user and removes them from every team they belong to.
-// The user is removed, not deactivated, and the deletion emits `user.deleted`.
+// Deletes a user, removes them from every team they belong to, and revokes
+// every grant they hold, on any project.
+// The user is removed, not deactivated, and the deletion emits `user.deleted`,
+// plus `authz.revoked` for each grant on that grant's project.
 // With a project secret the request is idempotent: deleting a user that exists
-// in no project succeeds without changing anything.
+// in no project succeeds without changing anything. Deleting the last active
+// member of a project's owning team returns 409 `proj.last_owner` and changes
+// nothing.
 //
 // DELETE /users/{user_id}
 func (c *Client) DeleteUserByID(ctx context.Context, params DeleteUserByIDParams) (DeleteUserByIDRes, error) {
@@ -4287,14 +4379,14 @@ func (c *Client) sendDeleteUserByID(ctx context.Context, params DeleteUserByIDPa
 			}
 		}
 		{
-			stage = "Security:NextgenSession"
-			switch err := c.securityNextgenSession(ctx, DeleteUserByIDOperation, r); {
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, DeleteUserByIDOperation, r); {
 			case err == nil: // if NO error
 				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
-				return res, errors.Wrap(err, "security \"NextgenSession\"")
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
 			}
 		}
 
@@ -4495,6 +4587,174 @@ func (c *Client) sendDeleteVariable(ctx context.Context, params DeleteVariablePa
 
 	stage = "DecodeResponse"
 	result, err := decodeDeleteVariableResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// EvaluatePolicy invokes evaluatePolicy operation.
+//
+// Evaluates a policy config against one request, without side effects, and
+// answers the decision the operation would reach. Nothing is read from or
+// written to the project: the config is the one in the body, checked
+// exactly as a publish checks it, so an invalid config answers `pol.invalid`
+// with the same violations.
+// `input` is what the operation's request carries, in the operation's own
+// terms (a password, not its length): the server derives what the policy
+// checks with the code the live operation runs, guards included. `facts`
+// states what the operation would look up at runtime, such as whether the
+// candidate matches one of the user's kept passwords.
+// The decision and the names of the failed rules hold wherever the
+// operation runs. `code` and `violations` are what an API call answers; a
+// login flow shows the same rules as field errors on the password field
+// (`error.x-auth-methods#password_<rule>` in `step.error`).
+// Which policy a project or release applies is not decided here: read it
+// and pass its config.
+// The caller needs read access to the project in `project_id`.
+//
+// POST /policies/evaluate
+func (c *Client) EvaluatePolicy(ctx context.Context, request EvaluatePolicyRequest, params EvaluatePolicyParams) (EvaluatePolicyRes, error) {
+	res, err := c.sendEvaluatePolicy(ctx, request, params)
+	return res, err
+}
+
+func (c *Client) sendEvaluatePolicy(ctx context.Context, request EvaluatePolicyRequest, params EvaluatePolicyParams) (res EvaluatePolicyRes, err error) {
+	// Validate request before sending.
+	if err := func() error {
+		if err := request.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return res, errors.Wrap(err, "validate")
+	}
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("evaluatePolicy"),
+		semconv.HTTPRequestMethodKey.String("POST"),
+		semconv.URLTemplateKey.String("/policies/evaluate"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, EvaluatePolicyOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [1]string
+	pathParts[0] = "/policies/evaluate"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if unwrapped := string(params.ProjectID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "POST", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+	if err := encodeEvaluatePolicyRequest(request, r); err != nil {
+		return res, errors.Wrap(err, "encode request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, EvaluatePolicyOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
+		{
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, EvaluatePolicyOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+				{0b00000010},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeEvaluatePolicyResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}
@@ -5046,14 +5306,14 @@ func (c *Client) sendGetBrandingById(ctx context.Context, params GetBrandingById
 			}
 		}
 		{
-			stage = "Security:NextgenSession"
-			switch err := c.securityNextgenSession(ctx, GetBrandingByIdOperation, r); {
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, GetBrandingByIdOperation, r); {
 			case err == nil: // if NO error
 				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
-				return res, errors.Wrap(err, "security \"NextgenSession\"")
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
 			}
 		}
 
@@ -5489,11 +5749,23 @@ func (c *Client) sendGetDeploymentById(ctx context.Context, params GetDeployment
 				return res, errors.Wrap(err, "security \"OAuth2\"")
 			}
 		}
+		{
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, GetDeploymentByIdOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
+			}
+		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -5916,14 +6188,14 @@ func (c *Client) sendGetFlowDefinition(ctx context.Context, params GetFlowDefini
 			}
 		}
 		{
-			stage = "Security:NextgenSession"
-			switch err := c.securityNextgenSession(ctx, GetFlowDefinitionOperation, r); {
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, GetFlowDefinitionOperation, r); {
 			case err == nil: // if NO error
 				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
-				return res, errors.Wrap(err, "security \"NextgenSession\"")
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
 			}
 		}
 
@@ -6090,8 +6362,8 @@ func (c *Client) sendGetFlowStep(ctx context.Context, params GetFlowStepParams) 
 // secrets. A user-bound Console session that already passed the project
 // Check may expand without those scopes.
 // Accepts either a project secret (`oauth2`) or a user-bound Console
-// session cookie (`nextgenSession`). Cookie-authenticated requests
-// follow the scheme's CSRF rules (`nextgenSession`).
+// session cookie (`sessionCookie`). Cookie-authenticated requests
+// follow the scheme's CSRF rules (`sessionCookie`).
 //
 // GET /grants/{id}
 func (c *Client) GetGrant(ctx context.Context, params GetGrantParams) (GetGrantRes, error) {
@@ -6226,14 +6498,14 @@ func (c *Client) sendGetGrant(ctx context.Context, params GetGrantParams) (res G
 			}
 		}
 		{
-			stage = "Security:NextgenSession"
-			switch err := c.securityNextgenSession(ctx, GetGrantOperation, r); {
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, GetGrantOperation, r); {
 			case err == nil: // if NO error
 				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
-				return res, errors.Wrap(err, "security \"NextgenSession\"")
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
 			}
 		}
 
@@ -6386,14 +6658,14 @@ func (c *Client) sendGetIdpById(ctx context.Context, params GetIdpByIdParams) (r
 			}
 		}
 		{
-			stage = "Security:NextgenSession"
-			switch err := c.securityNextgenSession(ctx, GetIdpByIdOperation, r); {
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, GetIdpByIdOperation, r); {
 			case err == nil: // if NO error
 				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
-				return res, errors.Wrap(err, "security \"NextgenSession\"")
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
 			}
 		}
 
@@ -6546,14 +6818,14 @@ func (c *Client) sendGetIdpRevisionById(ctx context.Context, params GetIdpRevisi
 			}
 		}
 		{
-			stage = "Security:NextgenSession"
-			switch err := c.securityNextgenSession(ctx, GetIdpRevisionByIdOperation, r); {
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, GetIdpRevisionByIdOperation, r); {
 			case err == nil: // if NO error
 				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
-				return res, errors.Wrap(err, "security \"NextgenSession\"")
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
 			}
 		}
 
@@ -6759,14 +7031,14 @@ func (c *Client) sendGetMyPasswordState(ctx context.Context, params GetMyPasswor
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			stage = "Security:NextgenSession"
-			switch err := c.securityNextgenSession(ctx, GetMyPasswordStateOperation, r); {
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, GetMyPasswordStateOperation, r); {
 			case err == nil: // if NO error
 				satisfied[0] |= 1 << 0
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
-				return res, errors.Wrap(err, "security \"NextgenSession\"")
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
 			}
 		}
 
@@ -6895,14 +7167,14 @@ func (c *Client) sendGetMySession(ctx context.Context, params GetMySessionParams
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			stage = "Security:NextgenSession"
-			switch err := c.securityNextgenSession(ctx, GetMySessionOperation, r); {
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, GetMySessionOperation, r); {
 			case err == nil: // if NO error
 				satisfied[0] |= 1 << 0
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
-				return res, errors.Wrap(err, "security \"NextgenSession\"")
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
 			}
 		}
 
@@ -6946,7 +7218,7 @@ func (c *Client) sendGetMySession(ctx context.Context, params GetMySessionParams
 // Returns the session-bound token for cross-site request forgery protection
 // (ADR 053 §5). Browser code sends it in the `X-Zitadel-CSRF` header on the
 // state-changing requests the session cookie authenticates that require it
-// — see the `nextgenSession` scheme. It authorizes nothing on its own: the
+// — see the `sessionCookie` scheme. It authorizes nothing on its own: the
 // HttpOnly cookie is still the credential, and a cross-site page cannot
 // read this response. It stays the same for the life of the session, so a
 // client fetches it once per session.
@@ -7034,14 +7306,14 @@ func (c *Client) sendGetMySessionCsrfToken(ctx context.Context, params GetMySess
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			stage = "Security:NextgenSession"
-			switch err := c.securityNextgenSession(ctx, GetMySessionCsrfTokenOperation, r); {
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, GetMySessionCsrfTokenOperation, r); {
 			case err == nil: // if NO error
 				satisfied[0] |= 1 << 0
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
-				return res, errors.Wrap(err, "security \"NextgenSession\"")
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
 			}
 		}
 
@@ -7169,14 +7441,14 @@ func (c *Client) sendGetMyUser(ctx context.Context, params GetMyUserParams) (res
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			stage = "Security:NextgenSession"
-			switch err := c.securityNextgenSession(ctx, GetMyUserOperation, r); {
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, GetMyUserOperation, r); {
 			case err == nil: // if NO error
 				satisfied[0] |= 1 << 0
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
-				return res, errors.Wrap(err, "security \"NextgenSession\"")
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
 			}
 		}
 
@@ -7302,14 +7574,14 @@ func (c *Client) sendGetMyUserSchema(ctx context.Context, params GetMyUserSchema
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			stage = "Security:NextgenSession"
-			switch err := c.securityNextgenSession(ctx, GetMyUserSchemaOperation, r); {
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, GetMyUserSchemaOperation, r); {
 			case err == nil: // if NO error
 				satisfied[0] |= 1 << 0
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
-				return res, errors.Wrap(err, "security \"NextgenSession\"")
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
 			}
 		}
 
@@ -7465,14 +7737,14 @@ func (c *Client) sendGetPolicy(ctx context.Context, params GetPolicyParams) (res
 			}
 		}
 		{
-			stage = "Security:NextgenSession"
-			switch err := c.securityNextgenSession(ctx, GetPolicyOperation, r); {
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, GetPolicyOperation, r); {
 			case err == nil: // if NO error
 				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
-				return res, errors.Wrap(err, "security \"NextgenSession\"")
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
 			}
 		}
 
@@ -7628,14 +7900,14 @@ func (c *Client) sendGetPolicyRevision(ctx context.Context, params GetPolicyRevi
 			}
 		}
 		{
-			stage = "Security:NextgenSession"
-			switch err := c.securityNextgenSession(ctx, GetPolicyRevisionOperation, r); {
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, GetPolicyRevisionOperation, r); {
 			case err == nil: // if NO error
 				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
-				return res, errors.Wrap(err, "security \"NextgenSession\"")
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
 			}
 		}
 
@@ -7768,14 +8040,14 @@ func (c *Client) sendGetProject(ctx context.Context, params GetProjectParams) (r
 			}
 		}
 		{
-			stage = "Security:NextgenSession"
-			switch err := c.securityNextgenSession(ctx, GetProjectOperation, r); {
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, GetProjectOperation, r); {
 			case err == nil: // if NO error
 				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
-				return res, errors.Wrap(err, "security \"NextgenSession\"")
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
 			}
 		}
 
@@ -8014,11 +8286,23 @@ func (c *Client) sendGetReleaseById(ctx context.Context, params GetReleaseByIdPa
 				return res, errors.Wrap(err, "security \"OAuth2\"")
 			}
 		}
+		{
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, GetReleaseByIdOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
+			}
+		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -8192,14 +8476,14 @@ func (c *Client) sendGetSchemaById(ctx context.Context, params GetSchemaByIdPara
 			}
 		}
 		{
-			stage = "Security:NextgenSession"
-			switch err := c.securityNextgenSession(ctx, GetSchemaByIdOperation, r); {
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, GetSchemaByIdOperation, r); {
 			case err == nil: // if NO error
 				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
-				return res, errors.Wrap(err, "security \"NextgenSession\"")
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
 			}
 		}
 
@@ -8464,14 +8748,14 @@ func (c *Client) sendGetTeam(ctx context.Context, params GetTeamParams) (res Get
 			}
 		}
 		{
-			stage = "Security:NextgenSession"
-			switch err := c.securityNextgenSession(ctx, GetTeamOperation, r); {
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, GetTeamOperation, r); {
 			case err == nil: // if NO error
 				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
-				return res, errors.Wrap(err, "security \"NextgenSession\"")
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
 			}
 		}
 
@@ -8630,14 +8914,14 @@ func (c *Client) sendGetUserByID(ctx context.Context, params GetUserByIDParams) 
 			}
 		}
 		{
-			stage = "Security:NextgenSession"
-			switch err := c.securityNextgenSession(ctx, GetUserByIDOperation, r); {
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, GetUserByIDOperation, r); {
 			case err == nil: // if NO error
 				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
-				return res, errors.Wrap(err, "security \"NextgenSession\"")
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
 			}
 		}
 
@@ -8773,14 +9057,14 @@ func (c *Client) sendGetUserPasswordState(ctx context.Context, params GetUserPas
 			}
 		}
 		{
-			stage = "Security:NextgenSession"
-			switch err := c.securityNextgenSession(ctx, GetUserPasswordStateOperation, r); {
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, GetUserPasswordStateOperation, r); {
 			case err == nil: // if NO error
 				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
-				return res, errors.Wrap(err, "security \"NextgenSession\"")
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
 			}
 		}
 
@@ -8952,11 +9236,23 @@ func (c *Client) sendGetVariable(ctx context.Context, params GetVariableParams) 
 				return res, errors.Wrap(err, "security \"OAuth2\"")
 			}
 		}
+		{
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, GetVariableOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
+			}
+		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -9100,11 +9396,23 @@ func (c *Client) sendGetVariables(ctx context.Context, params GetVariablesParams
 				return res, errors.Wrap(err, "security \"OAuth2\"")
 			}
 		}
+		{
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, GetVariablesOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
+			}
+		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -9511,14 +9819,14 @@ func (c *Client) sendListBranding(ctx context.Context, params ListBrandingParams
 			}
 		}
 		{
-			stage = "Security:NextgenSession"
-			switch err := c.securityNextgenSession(ctx, ListBrandingOperation, r); {
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, ListBrandingOperation, r); {
 			case err == nil: // if NO error
 				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
-				return res, errors.Wrap(err, "security \"NextgenSession\"")
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
 			}
 		}
 
@@ -9764,11 +10072,23 @@ func (c *Client) sendListDeployments(ctx context.Context, params ListDeployments
 				return res, errors.Wrap(err, "security \"OAuth2\"")
 			}
 		}
+		{
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, ListDeploymentsOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
+			}
+		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -10444,14 +10764,14 @@ func (c *Client) sendListFlowDefinitions(ctx context.Context, params ListFlowDef
 			}
 		}
 		{
-			stage = "Security:NextgenSession"
-			switch err := c.securityNextgenSession(ctx, ListFlowDefinitionsOperation, r); {
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, ListFlowDefinitionsOperation, r); {
 			case err == nil: // if NO error
 				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
-				return res, errors.Wrap(err, "security \"NextgenSession\"")
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
 			}
 		}
 
@@ -10808,14 +11128,14 @@ func (c *Client) sendListMyIdentityLinks(ctx context.Context, params ListMyIdent
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			stage = "Security:NextgenSession"
-			switch err := c.securityNextgenSession(ctx, ListMyIdentityLinksOperation, r); {
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, ListMyIdentityLinksOperation, r); {
 			case err == nil: // if NO error
 				satisfied[0] |= 1 << 0
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
-				return res, errors.Wrap(err, "security \"NextgenSession\"")
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
 			}
 		}
 
@@ -10983,14 +11303,14 @@ func (c *Client) sendListMyPasskeys(ctx context.Context, params ListMyPasskeysPa
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			stage = "Security:NextgenSession"
-			switch err := c.securityNextgenSession(ctx, ListMyPasskeysOperation, r); {
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, ListMyPasskeysOperation, r); {
 			case err == nil: // if NO error
 				satisfied[0] |= 1 << 0
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
-				return res, errors.Wrap(err, "security \"NextgenSession\"")
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
 			}
 		}
 
@@ -11184,14 +11504,14 @@ func (c *Client) sendListMyProjects(ctx context.Context, params ListMyProjectsPa
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			stage = "Security:NextgenSession"
-			switch err := c.securityNextgenSession(ctx, ListMyProjectsOperation, r); {
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, ListMyProjectsOperation, r); {
 			case err == nil: // if NO error
 				satisfied[0] |= 1 << 0
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
-				return res, errors.Wrap(err, "security \"NextgenSession\"")
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
 			}
 		}
 
@@ -11357,14 +11677,14 @@ func (c *Client) sendListMyTeams(ctx context.Context, params ListMyTeamsParams) 
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			stage = "Security:NextgenSession"
-			switch err := c.securityNextgenSession(ctx, ListMyTeamsOperation, r); {
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, ListMyTeamsOperation, r); {
 			case err == nil: // if NO error
 				satisfied[0] |= 1 << 0
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
-				return res, errors.Wrap(err, "security \"NextgenSession\"")
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
 			}
 		}
 
@@ -11557,14 +11877,14 @@ func (c *Client) sendListPolicies(ctx context.Context, params ListPoliciesParams
 			}
 		}
 		{
-			stage = "Security:NextgenSession"
-			switch err := c.securityNextgenSession(ctx, ListPoliciesOperation, r); {
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, ListPoliciesOperation, r); {
 			case err == nil: // if NO error
 				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
-				return res, errors.Wrap(err, "security \"NextgenSession\"")
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
 			}
 		}
 
@@ -11762,14 +12082,14 @@ func (c *Client) sendListPolicyRevisions(ctx context.Context, params ListPolicyR
 			}
 		}
 		{
-			stage = "Security:NextgenSession"
-			switch err := c.securityNextgenSession(ctx, ListPolicyRevisionsOperation, r); {
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, ListPolicyRevisionsOperation, r); {
 			case err == nil: // if NO error
 				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
-				return res, errors.Wrap(err, "security \"NextgenSession\"")
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
 			}
 		}
 
@@ -11984,6 +12304,213 @@ func (c *Client) sendListPreviews(ctx context.Context, params ListPreviewsParams
 	return result, nil
 }
 
+// ListProjectAdmins invokes listProjectAdmins operation.
+//
+// Lists the people who can administer the project, and how each of them
+// gets that access. A person appears once, with one entry in `sources` per
+// way they hold it:
+// - `owning_team`: an active member of the team that owns the project
+// (ADR 054 §2). Removing a grant does not remove this access; it ends
+// only when the person leaves the team or the project changes owner.
+// - `grant`: an unexpired `admin` grant on the project, either to the
+// person (`grant_id` only) or to a team they are an active member of
+// (`grant_id` and `team`). Revoking that grant removes this source.
+// The list follows the authorization check: team membership is read from
+// the same membership projection the check expands, so a person who left a
+// team, or whose team or user was deactivated, is not listed through it.
+// Grants that expired or carry a lower role are left out. A person whose
+// only access is a `viewer` or `editor` grant is not an admin and is not
+// listed. Like the check, the list does not look at a person's user status
+// beyond that, so a direct grant to a suspended person is listed.
+// A person whose access comes only through teams the caller is not a
+// member of is left out, and a team the caller is not in is named by
+// `team_id` only. The grant to such a team still shows in the project's
+// grants.
+// Ordered by `user_id` and paginated with `page_token`.
+// Accepts either a project secret (`oauth2`) or a user-bound Console
+// session cookie (`sessionCookie`) that can read the project.
+//
+// GET /projects/{project_id}/admins
+func (c *Client) ListProjectAdmins(ctx context.Context, params ListProjectAdminsParams) (ListProjectAdminsRes, error) {
+	res, err := c.sendListProjectAdmins(ctx, params)
+	return res, err
+}
+
+func (c *Client) sendListProjectAdmins(ctx context.Context, params ListProjectAdminsParams) (res ListProjectAdminsRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("listProjectAdmins"),
+		semconv.HTTPRequestMethodKey.String("GET"),
+		semconv.URLTemplateKey.String("/projects/{project_id}/admins"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, ListProjectAdminsOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [3]string
+	pathParts[0] = "/projects/"
+	{
+		// Encode "project_id" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "project_id",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			if unwrapped := string(params.ProjectID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[1] = encoded
+	}
+	pathParts[2] = "/admins"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "limit" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "limit",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.Limit.Get(); ok {
+				if unwrapped := int(val); true {
+					return e.EncodeValue(conv.IntToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "page_token" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "page_token",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.PageToken.Get(); ok {
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "GET", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, ListProjectAdminsOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
+		{
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, ListProjectAdminsOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+				{0b00000010},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeListProjectAdminsResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
 // ListReleases invokes listReleases operation.
 //
 // Lists the project's releases, newest first.
@@ -12144,11 +12671,23 @@ func (c *Client) sendListReleases(ctx context.Context, params ListReleasesParams
 				return res, errors.Wrap(err, "security \"OAuth2\"")
 			}
 		}
+		{
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, ListReleasesOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
+			}
+		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -12342,6 +12881,32 @@ func (c *Client) sendListSchemas(ctx context.Context, params ListSchemasParams) 
 			return res, errors.Wrap(err, "encode query")
 		}
 	}
+	{
+		// Encode "expand" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "expand",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if params.Expand != nil {
+				return e.EncodeArray(func(e uri.Encoder) error {
+					for i, item := range params.Expand {
+						if err := func() error {
+							return e.EncodeValue(conv.StringToString(string(item)))
+						}(); err != nil {
+							return errors.Wrapf(err, "[%d]", i)
+						}
+					}
+					return nil
+				})
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
 	u.RawQuery = q.Values().Encode()
 
 	stage = "EncodeRequest"
@@ -12365,14 +12930,14 @@ func (c *Client) sendListSchemas(ctx context.Context, params ListSchemasParams) 
 			}
 		}
 		{
-			stage = "Security:NextgenSession"
-			switch err := c.securityNextgenSession(ctx, ListSchemasOperation, r); {
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, ListSchemasOperation, r); {
 			case err == nil: // if NO error
 				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
-				return res, errors.Wrap(err, "security \"NextgenSession\"")
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
 			}
 		}
 
@@ -12551,14 +13116,14 @@ func (c *Client) sendListUserIdentityLinks(ctx context.Context, params ListUserI
 			}
 		}
 		{
-			stage = "Security:NextgenSession"
-			switch err := c.securityNextgenSession(ctx, ListUserIdentityLinksOperation, r); {
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, ListUserIdentityLinksOperation, r); {
 			case err == nil: // if NO error
 				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
-				return res, errors.Wrap(err, "security \"NextgenSession\"")
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
 			}
 		}
 
@@ -12739,14 +13304,14 @@ func (c *Client) sendListUserPasskeys(ctx context.Context, params ListUserPasske
 			}
 		}
 		{
-			stage = "Security:NextgenSession"
-			switch err := c.securityNextgenSession(ctx, ListUserPasskeysOperation, r); {
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, ListUserPasskeysOperation, r); {
 			case err == nil: // if NO error
 				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
-				return res, errors.Wrap(err, "security \"NextgenSession\"")
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
 			}
 		}
 
@@ -12929,14 +13494,14 @@ func (c *Client) sendListUserTeams(ctx context.Context, params ListUserTeamsPara
 			}
 		}
 		{
-			stage = "Security:NextgenSession"
-			switch err := c.securityNextgenSession(ctx, ListUserTeamsOperation, r); {
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, ListUserTeamsOperation, r); {
 			case err == nil: // if NO error
 				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
-				return res, errors.Wrap(err, "security \"NextgenSession\"")
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
 			}
 		}
 
@@ -13077,14 +13642,14 @@ func (c *Client) sendPatchMyUser(ctx context.Context, request *PatchMyUserReques
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			stage = "Security:NextgenSession"
-			switch err := c.securityNextgenSession(ctx, PatchMyUserOperation, r); {
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, PatchMyUserOperation, r); {
 			case err == nil: // if NO error
 				satisfied[0] |= 1 << 0
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
-				return res, errors.Wrap(err, "security \"NextgenSession\"")
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
 			}
 		}
 
@@ -13228,14 +13793,14 @@ func (c *Client) sendPatchProject(ctx context.Context, request *PatchProjectRequ
 			}
 		}
 		{
-			stage = "Security:NextgenSession"
-			switch err := c.securityNextgenSession(ctx, PatchProjectOperation, r); {
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, PatchProjectOperation, r); {
 			case err == nil: // if NO error
 				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
-				return res, errors.Wrap(err, "security \"NextgenSession\"")
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
 			}
 		}
 
@@ -13383,14 +13948,14 @@ func (c *Client) sendPatchUserByID(ctx context.Context, request *PatchUserReques
 			}
 		}
 		{
-			stage = "Security:NextgenSession"
-			switch err := c.securityNextgenSession(ctx, PatchUserByIDOperation, r); {
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, PatchUserByIDOperation, r); {
 			case err == nil: // if NO error
 				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
-				return res, errors.Wrap(err, "security \"NextgenSession\"")
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
 			}
 		}
 
@@ -13600,8 +14165,8 @@ func (c *Client) sendPublishPolicy(ctx context.Context, request PublishPolicyReq
 // body-conditional). A user-bound Console session that already passed
 // the project Check may expand without those scopes.
 // Accepts either a project secret (`oauth2`) or a user-bound Console
-// session cookie (`nextgenSession`). Cookie-authenticated requests
-// follow the scheme's CSRF rules (`nextgenSession`).
+// session cookie (`sessionCookie`). Cookie-authenticated requests
+// follow the scheme's CSRF rules (`sessionCookie`).
 //
 // POST /grants/query
 func (c *Client) QueryGrants(ctx context.Context, request *QueryGrantsRequest, params QueryGrantsParams) (QueryGrantsRes, error) {
@@ -13704,14 +14269,14 @@ func (c *Client) sendQueryGrants(ctx context.Context, request *QueryGrantsReques
 			}
 		}
 		{
-			stage = "Security:NextgenSession"
-			switch err := c.securityNextgenSession(ctx, QueryGrantsOperation, r); {
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, QueryGrantsOperation, r); {
 			case err == nil: // if NO error
 				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
-				return res, errors.Wrap(err, "security \"NextgenSession\"")
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
 			}
 		}
 
@@ -13857,14 +14422,14 @@ func (c *Client) sendQueryIdps(ctx context.Context, request *QueryIdpsRequest, p
 			}
 		}
 		{
-			stage = "Security:NextgenSession"
-			switch err := c.securityNextgenSession(ctx, QueryIdpsOperation, r); {
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, QueryIdpsOperation, r); {
 			case err == nil: // if NO error
 				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
-				return res, errors.Wrap(err, "security \"NextgenSession\"")
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
 			}
 		}
 
@@ -14172,6 +14737,8 @@ func (c *Client) sendQuerySessions(ctx context.Context, request *QuerySessionsRe
 // QueryTeams invokes queryTeams operation.
 //
 // Returns the teams of a project, paginated with a cursor.
+// `project_id` names the project to list; without it, the credential's own
+// project is listed.
 //
 // POST /teams/query
 func (c *Client) QueryTeams(ctx context.Context, request *QueryTeamsRequest, params QueryTeamsParams) (QueryTeamsRes, error) {
@@ -14240,8 +14807,11 @@ func (c *Client) sendQueryTeams(ctx context.Context, request *QueryTeamsRequest,
 		}
 
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			if unwrapped := string(params.ProjectID); true {
-				return e.EncodeValue(conv.StringToString(unwrapped))
+			if val, ok := params.ProjectID.Get(); ok {
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
 			}
 			return nil
 		}); err != nil {
@@ -14274,14 +14844,14 @@ func (c *Client) sendQueryTeams(ctx context.Context, request *QueryTeamsRequest,
 			}
 		}
 		{
-			stage = "Security:NextgenSession"
-			switch err := c.securityNextgenSession(ctx, QueryTeamsOperation, r); {
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, QueryTeamsOperation, r); {
 			case err == nil: // if NO error
 				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
-				return res, errors.Wrap(err, "security \"NextgenSession\"")
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
 			}
 		}
 
@@ -14327,8 +14897,8 @@ func (c *Client) sendQueryTeams(ctx context.Context, request *QueryTeamsRequest,
 // `project_id` names the project to list; without it, the credential's own
 // project is listed.
 // Accepts either a project secret (`oauth2`) or a user-bound Console
-// session cookie (`nextgenSession`). Cookie-authenticated requests
-// follow the scheme's CSRF rules (`nextgenSession`).
+// session cookie (`sessionCookie`). Cookie-authenticated requests
+// follow the scheme's CSRF rules (`sessionCookie`).
 //
 // POST /users/query
 func (c *Client) QueryUsers(ctx context.Context, request *QueryUsersRequest, params QueryUsersParams) (QueryUsersRes, error) {
@@ -14434,14 +15004,14 @@ func (c *Client) sendQueryUsers(ctx context.Context, request *QueryUsersRequest,
 			}
 		}
 		{
-			stage = "Security:NextgenSession"
-			switch err := c.securityNextgenSession(ctx, QueryUsersOperation, r); {
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, QueryUsersOperation, r); {
 			case err == nil: // if NO error
 				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
-				return res, errors.Wrap(err, "security \"NextgenSession\"")
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
 			}
 		}
 
@@ -14580,11 +15150,23 @@ func (c *Client) sendRemoveOrigin(ctx context.Context, request *RemoveOriginReq,
 				return res, errors.Wrap(err, "security \"OAuth2\"")
 			}
 		}
+		{
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, RemoveOriginOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
+			}
+		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -14766,7 +15348,7 @@ func (c *Client) sendRemovePreview(ctx context.Context, request *RemovePreviewRe
 // RevokeMySession invokes revokeMySession operation.
 //
 // Logs out by permanently deleting the session.
-// The `__nextgen_session` cookie issued at creation (or superseded by a handoff
+// The session cookie issued at creation (or superseded by a handoff
 // exchange) is required, with the session's token from `GET /sessions/me/csrf`
 // in the `X-Zitadel-CSRF` header. Idempotent: if the session is already gone
 // this still returns 204. Any tokens derived from the session are invalidated,
@@ -14855,14 +15437,14 @@ func (c *Client) sendRevokeMySession(ctx context.Context, params RevokeMySession
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			stage = "Security:NextgenSession"
-			switch err := c.securityNextgenSession(ctx, RevokeMySessionOperation, r); {
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, RevokeMySessionOperation, r); {
 			case err == nil: // if NO error
 				satisfied[0] |= 1 << 0
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
-				return res, errors.Wrap(err, "security \"NextgenSession\"")
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
 			}
 		}
 
@@ -15030,11 +15612,23 @@ func (c *Client) sendRevokeRelease(ctx context.Context, params RevokeReleasePara
 				return res, errors.Wrap(err, "security \"OAuth2\"")
 			}
 		}
+		{
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, RevokeReleaseOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
+			}
+		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -15070,8 +15664,8 @@ func (c *Client) sendRevokeRelease(ctx context.Context, params RevokeReleasePara
 //
 // Permanently deletes the session, terminating it immediately.
 // This is the operator revoke path and requires the `session.delete` scope on a
-// project-bound credential. End-user logout with the `__nextgen_session` cookie is
-// `DELETE /sessions/me` (`nextgenSession` scheme).
+// project-bound credential. End-user logout with the session cookie is
+// `DELETE /sessions/me` (`sessionCookie` scheme).
 // Idempotent: deleting a session that does not exist (or was already deleted)
 // still returns 204. After deletion, any tokens derived from the session are
 // invalidated.
@@ -15345,11 +15939,23 @@ func (c *Client) sendRollbackDeployment(ctx context.Context, request OptRollback
 				return res, errors.Wrap(err, "security \"OAuth2\"")
 			}
 		}
+		{
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, RollbackDeploymentOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
+			}
+		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -15799,14 +16405,14 @@ func (c *Client) sendUpdateTeam(ctx context.Context, request *UpdateTeamRequest,
 			}
 		}
 		{
-			stage = "Security:NextgenSession"
-			switch err := c.securityNextgenSession(ctx, UpdateTeamOperation, r); {
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, UpdateTeamOperation, r); {
 			case err == nil: // if NO error
 				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
-				return res, errors.Wrap(err, "security \"NextgenSession\"")
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
 			}
 		}
 

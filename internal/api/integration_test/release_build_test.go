@@ -239,6 +239,101 @@ func TestBuildRelease(t *testing.T) {
 		assert.Equal(t, v1.ID, reused.ID)
 		assert.Equal(t, idpV1, reused.Pointers[indexOfKind(reused.Pointers, api.ReleasePointerKindIdp)].RevisionID)
 	})
+
+	t.Run("publishes a bundled policy, revising it only when its config changes", func(t *testing.T) {
+		own, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+		require.NoError(t, err)
+		ownClient, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+		require.NoError(t, err)
+		harness.SetProjectSecretOnApiClient(t, ownClient, own)
+		ownParams := api.BuildReleaseParams{ProjectID: api.ProjectID(own.ID)}
+
+		build := func(t *testing.T, minLength int) api.BuildReleaseRes {
+			t.Helper()
+			resp, err := ownClient.BuildRelease(t.Context(), &api.BuildReleaseRequest{
+				Bundle: api.ConfigurationBundle{Policies: []api.PublishPolicyRequest{
+					passwordPolicyRequest(api.PasswordSetConfig{MinLength: api.NewOptInt(minLength)}),
+				}},
+			}, ownParams)
+			require.NoError(t, err)
+			return resp
+		}
+		applied := func(t *testing.T) int {
+			t.Helper()
+			resp, err := ownClient.ListPolicies(t.Context(), api.ListPoliciesParams{ProjectID: api.ProjectID(own.ID)})
+			require.NoError(t, err)
+			require.IsType(t, &api.ListPoliciesResponse{}, resp, helpers.MustMarshal(t, resp))
+			items := resp.(*api.ListPoliciesResponse).Policies
+			require.Len(t, items, 1)
+			policy, ok := items[0].GetPasswordSetPolicy()
+			require.True(t, ok)
+			return policy.Config.MinLength.Value
+		}
+
+		first := build(t, 12)
+		require.IsType(t, &api.BuildReleaseCreated{}, first, helpers.MustMarshal(t, first))
+		v1 := api.Release(*first.(*api.BuildReleaseCreated))
+		pointer := v1.Pointers[indexOfKind(v1.Pointers, api.ReleasePointerKindPolicy)]
+		assert.Equal(t, api.ReleasePointerKindPolicy, pointer.Kind)
+		assert.Equal(t, passwordSetOperation, pointer.Handle)
+		assert.True(t, domain.PrefixPolicyRevision.Matches(pointer.RevisionID), pointer.RevisionID)
+		assert.Equal(t, 12, applied(t))
+
+		same := build(t, 12)
+		require.IsType(t, &api.BuildReleaseOK{}, same, helpers.MustMarshal(t, same))
+		assert.Equal(t, v1.ID, api.Release(*same.(*api.BuildReleaseOK)).ID)
+
+		changed := build(t, 14)
+		require.IsType(t, &api.BuildReleaseCreated{}, changed, helpers.MustMarshal(t, changed))
+		v2 := api.Release(*changed.(*api.BuildReleaseCreated))
+		assert.NotEqual(t, pointer.RevisionID, v2.Pointers[indexOfKind(v2.Pointers, api.ReleasePointerKindPolicy)].RevisionID)
+		assert.Equal(t, 14, applied(t))
+
+		// Back to 12: until a deployment's pinned revision is what applies,
+		// the newest revision is, so going back appends one rather than
+		// reusing the first, and 12 applies again.
+		back := build(t, 12)
+		require.IsType(t, &api.BuildReleaseCreated{}, back, helpers.MustMarshal(t, back))
+		v3 := api.Release(*back.(*api.BuildReleaseCreated))
+		assert.NotEqual(t, pointer.RevisionID, v3.Pointers[indexOfKind(v3.Pointers, api.ReleasePointerKindPolicy)].RevisionID)
+		assert.Equal(t, 12, applied(t))
+	})
+
+	t.Run("refuses a policy its template refuses, and two for one operation", func(t *testing.T) {
+		resp, err := client.BuildRelease(t.Context(), &api.BuildReleaseRequest{
+			Bundle: api.ConfigurationBundle{Policies: []api.PublishPolicyRequest{
+				passwordPolicyRequest(api.PasswordSetConfig{MinLength: api.NewOptInt(20), MaxLength: api.NewOptInt(10)}),
+			}},
+		}, params)
+		require.NoError(t, err)
+		require.IsType(t, &api.BuildReleaseBadRequest{}, resp, helpers.MustMarshal(t, resp))
+		resources := resp.(*api.BuildReleaseBadRequest).Details.Value.Resources
+		require.Len(t, resources, 1)
+		assert.Equal(t, api.ReleasePointerKindPolicy, resources[0].Kind)
+		assert.Equal(t, api.ErrorCode(domain.ErrPolicyInvalid(nil, nil).Code), resources[0].Code)
+		assert.Equal(t, passwordSetOperation, resources[0].Handle.Value)
+
+		twice := passwordPolicyRequest(api.PasswordSetConfig{MinLength: api.NewOptInt(12)})
+		resp, err = client.BuildRelease(t.Context(), &api.BuildReleaseRequest{
+			Bundle: api.ConfigurationBundle{Policies: []api.PublishPolicyRequest{twice, twice}},
+		}, params)
+		require.NoError(t, err)
+		require.IsType(t, &api.BuildReleaseBadRequest{}, resp, helpers.MustMarshal(t, resp))
+		resources = resp.(*api.BuildReleaseBadRequest).Details.Value.Resources
+		require.Len(t, resources, 2)
+		for _, resource := range resources {
+			assert.Equal(t, api.ReleasePointerKindPolicy, resource.Kind)
+			assert.Equal(t, api.ErrorCode(domain.ErrReleaseInvalid(nil, nil).Code), resource.Code)
+		}
+	})
+}
+
+// passwordPolicyRequest is a bundled password policy with config.
+func passwordPolicyRequest(config api.PasswordSetConfig) api.PublishPolicyRequest {
+	return api.NewPasswordSetPolicyInputPublishPolicyRequest(api.PasswordSetPolicyInput{
+		Operation: api.PasswordSetPolicyInputOperationAuthFactorPasswordSet,
+		Config:    config,
+	})
 }
 
 func indexOfKind(pointers []api.ReleasePointer, kind api.ReleasePointerKind) int {

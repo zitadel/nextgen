@@ -24,6 +24,29 @@ tasks:
     deps:
       # Next resolves @zitadel/components to its dist/.
       - "components:build"
+    inputs:
+      # Declaring inputs drops the default project folder, so it is restated.
+      - "**/*"
+      # Literal paths include ignored files; Moon's globs do not.
+      - "file://.env?optional"
+      - "file://.env.local?optional"
+      - "file://.env.production?optional"
+      - "file://.env.production.local?optional"
+      - "file://.env.development?optional"
+      - "file://.env.development.local?optional"
+      - "file://.env.test?optional"
+      - "file://.env.test.local?optional"
+      - "$NEXT_*"
+      - "$NODE_ENV"
+      - "$VERCEL_DEPLOYMENT_ID"
+      - "$VERCEL_GIT_COMMIT_SHA"
+      - "$WEBSITE_SPEED_INSIGHTS_SAMPLE_RATE"
+      # The release that ships each changelog entry: the published packages,
+      # and the release notes Changesets writes into each on every release
+      # (app/changelog/entries.ts).
+      - "/.changeset/config.json"
+      - "/apps/*/CHANGELOG.md"
+      - "/packages/*/CHANGELOG.md"
     outputs:
       - ".next/**/*"
     options:

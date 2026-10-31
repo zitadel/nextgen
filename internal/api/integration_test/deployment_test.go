@@ -74,7 +74,7 @@ func (f deploymentFixture) deploy(t *testing.T, releaseID api.ReleaseID) api.Cre
 // API does not take preview targets yet.
 func (f deploymentFixture) deployPreview(t *testing.T, releaseID api.ReleaseID) *service.CreateDeploymentOutput {
 	t.Helper()
-	out, err := service.NewDeploymentService(harness.EnsureServiceDB(t)).Create(t.Context(), service.CreateDeploymentInput{
+	out, err := service.NewDeploymentService(harness.EnsureServiceDB(t), harness.EnsureVariableService(t)).Create(t.Context(), service.CreateDeploymentInput{
 		ProjectID:  f.project,
 		ReleaseID:  string(releaseID),
 		OriginKind: domain.DeploymentOriginKindPreview,
@@ -200,7 +200,7 @@ func TestCreateDeployment(t *testing.T) {
 			req: &api.CreateDeploymentRequest{
 				ReleaseID: api.NewOptReleaseID(releaseID),
 				Targets:   api.DeploymentTargetsRequest{"primary"},
-				TTL:       api.NewOptPreviewTTL("1h"),
+				TTL:       api.NewOptPreviewTTL(api.PreviewTTL(time.Hour)),
 			},
 			wantType: &api.CreateDeploymentBadRequest{}, wantCode: domain.ErrDeploymentInvalid().Code,
 		},
@@ -208,7 +208,7 @@ func TestCreateDeployment(t *testing.T) {
 			req: &api.CreateDeploymentRequest{
 				ReleaseID: api.NewOptReleaseID(releaseID),
 				Targets:   api.DeploymentTargetsRequest{appOrigin},
-				TTL:       api.NewOptPreviewTTL("1h"),
+				TTL:       api.NewOptPreviewTTL(api.PreviewTTL(time.Hour)),
 			},
 			wantType: &api.CreateDeploymentBadRequest{}, wantCode: domain.ErrDeploymentInvalid().Code,
 		},
@@ -216,7 +216,7 @@ func TestCreateDeployment(t *testing.T) {
 			req: &api.CreateDeploymentRequest{
 				ReleaseID: api.NewOptReleaseID(releaseID),
 				Targets:   api.DeploymentTargetsRequest{"primary", previewOrigin},
-				TTL:       api.NewOptPreviewTTL("1h"),
+				TTL:       api.NewOptPreviewTTL(api.PreviewTTL(time.Hour)),
 			},
 			wantType: &api.CreateDeploymentBadRequest{}, wantCode: domain.ErrDeploymentInvalid().Code,
 		},
@@ -562,6 +562,52 @@ func TestDeploymentReads(t *testing.T) {
 	})
 }
 
+// TestPreviews deploys to two preview URLs, then lists and removes them.
+func TestPreviews(t *testing.T) {
+	t.Parallel()
+
+	fixture := newDeploymentFixture(t)
+	project := api.ProjectID(fixture.project)
+	origins := []string{previewOrigin, "https://acme-k3x9v2-acmeinc.vercel.app"}
+
+	resp := fixture.createDeployment(t, &api.CreateDeploymentRequest{
+		ReleaseID: api.NewOptReleaseID(fixture.release.ID),
+		Targets:   api.DeploymentTargetsRequest(origins),
+		TTL:       api.NewOptPreviewTTL(api.PreviewTTL(168 * time.Hour)),
+	})
+	require.IsType(t, &api.CreateDeploymentCreated{}, resp, helpers.MustMarshal(t, resp))
+
+	list := func(t *testing.T) []string {
+		t.Helper()
+		resp, err := fixture.client.ListPreviews(t.Context(), api.ListPreviewsParams{ProjectID: project})
+		require.NoError(t, err)
+		require.IsType(t, &api.ListPreviewsResponse{}, resp, helpers.MustMarshal(t, resp))
+		var listed []string
+		for _, p := range resp.(*api.ListPreviewsResponse).Previews {
+			assert.True(t, p.ExpiresAt.After(p.CreatedAt))
+			listed = append(listed, string(p.Origin))
+		}
+		return listed
+	}
+	remove := func(t *testing.T, origin string) {
+		t.Helper()
+		resp, err := fixture.client.RemovePreview(t.Context(),
+			&api.RemovePreviewRequest{Origin: api.Origin(origin)},
+			api.RemovePreviewParams{ProjectID: project})
+		require.NoError(t, err)
+		require.IsType(t, &api.RemovePreviewNoContent{}, resp, helpers.MustMarshal(t, resp))
+	}
+
+	assert.ElementsMatch(t, origins, list(t))
+
+	remove(t, origins[0])
+	assert.Equal(t, origins[1:], list(t))
+
+	// Again, with nothing left to remove.
+	remove(t, origins[0])
+	assert.Equal(t, origins[1:], list(t))
+}
+
 // TestDeploymentsNotImplemented pins the deployment operations not served
 // yet to 501. Each request goes through the
 // real server, so the new shapes decode and the access check still runs
@@ -589,29 +635,6 @@ func TestDeploymentsNotImplemented(t *testing.T) {
 				Targets:     api.DeploymentTargetsRequest{"https://app.acme.com"},
 			},
 			api.CreateDeploymentParams{ProjectID: project})
-		require.NoError(t, err)
-		expectNotImplemented(t, resp)
-	})
-
-	t.Run("variables", func(t *testing.T) {
-		resp, err := fixture.client.GetDeploymentVariables(t.Context(), api.GetDeploymentVariablesParams{
-			ProjectID:    project,
-			DeploymentID: "dep_01KX5N7C9D2E7F0N9WD3P2E4YM6",
-		})
-		require.NoError(t, err)
-		expectNotImplemented(t, resp)
-	})
-
-	t.Run("list previews", func(t *testing.T) {
-		resp, err := fixture.client.ListPreviews(t.Context(), api.ListPreviewsParams{ProjectID: project})
-		require.NoError(t, err)
-		expectNotImplemented(t, resp)
-	})
-
-	t.Run("remove a preview", func(t *testing.T) {
-		resp, err := fixture.client.RemovePreview(t.Context(),
-			&api.RemovePreviewRequest{Origin: "https://acme-git-sso-acmeinc.vercel.app"},
-			api.RemovePreviewParams{ProjectID: project})
 		require.NoError(t, err)
 		expectNotImplemented(t, resp)
 	})
@@ -762,11 +785,28 @@ func TestCreatePreviewDeployment(t *testing.T) {
 		refused(t, resp, &api.CreateDeploymentForbidden{}, domain.ErrProjectOriginNotAllowed(nil).Code)
 	})
 
-	t.Run("a ttl is accepted", func(t *testing.T) {
-		preview(t, &api.CreateDeploymentRequest{
+	t.Run("a ttl sets the expiry", func(t *testing.T) {
+		deployed := preview(t, &api.CreateDeploymentRequest{
 			Targets: api.DeploymentTargetsRequest{previewOrigin},
-			TTL:     api.NewOptPreviewTTL("1h"),
+			TTL:     api.NewOptPreviewTTL(api.PreviewTTL(90 * time.Minute)),
 		})
+		got, err := harness.EnsureServiceDB(t).Statements().GetPreview(t.Context(), fixture.project, previewOrigin)
+		require.NoError(t, err)
+		assert.WithinDuration(t, deployed.DeployedAt.Add(90*time.Minute), got.ExpiresAt, time.Second)
+	})
+
+	t.Run("a ttl above the maximum writes nothing", func(t *testing.T) {
+		before, err := harness.EnsureServiceDB(t).Statements().GetPreview(t.Context(), fixture.project, previewOrigin)
+		require.NoError(t, err)
+		resp := fixture.createDeployment(t, &api.CreateDeploymentRequest{
+			ReleaseID: api.NewOptReleaseID(releaseID),
+			Targets:   api.DeploymentTargetsRequest{previewOrigin},
+			TTL:       api.NewOptPreviewTTL(api.PreviewTTL(366 * 24 * time.Hour)),
+		})
+		refused(t, resp, &api.CreateDeploymentBadRequest{}, domain.ErrDeploymentInvalid().Code)
+		after, err := harness.EnsureServiceDB(t).Statements().GetPreview(t.Context(), fixture.project, previewOrigin)
+		require.NoError(t, err)
+		assert.Equal(t, before.ExpiresAt, after.ExpiresAt)
 	})
 
 	t.Run("a loopback URL is never a preview", func(t *testing.T) {
@@ -777,4 +817,171 @@ func TestCreatePreviewDeployment(t *testing.T) {
 		})
 		refused(t, resp, &api.CreateDeploymentForbidden{}, domain.ErrProjectOriginNotAllowed(nil).Code)
 	})
+}
+
+func (f deploymentFixture) frozenVariables(t *testing.T, id api.DeploymentID) api.Variables {
+	t.Helper()
+	resp, err := f.client.GetDeploymentVariables(t.Context(), api.GetDeploymentVariablesParams{
+		ProjectID: api.ProjectID(f.project), DeploymentID: id,
+	})
+	require.NoError(t, err)
+	require.IsType(t, &api.Variables{}, resp, helpers.MustMarshal(t, resp))
+	return *resp.(*api.Variables)
+}
+
+func (f deploymentFixture) setPrimaryVariables(t *testing.T, body api.UpdateVariablesRequest) {
+	t.Helper()
+	res, err := f.client.UpdateVariables(t.Context(), body, api.UpdateVariablesParams{
+		ProjectID: api.ProjectID(f.project),
+		Kind:      api.NewOptVariableKind(api.VariableKindPrimary),
+	})
+	require.NoError(t, err)
+	require.IsType(t, &api.VariablesByKind{}, res, helpers.MustMarshal(t, res))
+}
+
+func (f deploymentFixture) deploymentCount(t *testing.T) int {
+	t.Helper()
+	resp, err := f.client.ListDeployments(t.Context(), api.ListDeploymentsParams{ProjectID: api.ProjectID(f.project)})
+	require.NoError(t, err)
+	require.IsType(t, &api.ListDeploymentsResponse{}, resp, helpers.MustMarshal(t, resp))
+	return len(resp.(*api.ListDeploymentsResponse).Deployments)
+}
+
+// TestDeploymentFreezesItsKind pins a deployment to the values of its kind.
+// A later edit leaves that deployment's read alone, and the same release is a
+// new deployment only once the set has changed.
+func TestDeploymentFreezesItsKind(t *testing.T) {
+	t.Parallel()
+
+	fixture := newDeploymentFixture(t)
+	releaseID := fixture.release.ID
+
+	unknown, err := fixture.client.GetDeploymentVariables(t.Context(), api.GetDeploymentVariablesParams{
+		ProjectID:    api.ProjectID(fixture.project),
+		DeploymentID: "dep_01KX5N7C9D2E7F0N9WD3P2E4YM6",
+	})
+	require.NoError(t, err)
+	status, code, _, ok := errorResponseParts(t, unknown)
+	require.True(t, ok, helpers.MustMarshal(t, unknown))
+	assert.Equal(t, http.StatusNotFound, status)
+	assert.Equal(t, domain.ErrDeploymentNotFound().Code, code)
+
+	firstResp := fixture.deploy(t, releaseID)
+	require.IsType(t, &api.CreateDeploymentCreated{}, firstResp, helpers.MustMarshal(t, firstResp))
+	firstID := firstResp.(*api.CreateDeploymentCreated).ID
+	assert.Empty(t, fixture.frozenVariables(t, firstID))
+
+	fixture.setPrimaryVariables(t, api.UpdateVariablesRequest{
+		"HOST": api.NewVariableScalarVariableInput(api.NewStringVariableScalar("example.com")),
+		"TOKEN": api.NewSecretVariableInputVariableInput(api.SecretVariableInput{
+			Value:  api.NewStringVariableScalar("s3cr3t"),
+			Secret: true,
+		}),
+	})
+	secondResp := fixture.deploy(t, releaseID)
+	require.IsType(t, &api.CreateDeploymentCreated{}, secondResp, helpers.MustMarshal(t, secondResp))
+	secondID := secondResp.(*api.CreateDeploymentCreated).ID
+	held := api.NewSecretVariableVariable(api.SecretVariable{Secret: true})
+	frozen := api.Variables{
+		"HOST":  api.NewVariableScalarVariable(api.NewStringVariableScalar("example.com")),
+		"TOKEN": held,
+	}
+	assert.Equal(t, frozen, fixture.frozenVariables(t, secondID))
+	assert.NotContains(t, helpers.MustMarshal(t, fixture.frozenVariables(t, secondID)), "s3cr3t")
+	assert.Empty(t, fixture.frozenVariables(t, firstID))
+
+	fixture.setPrimaryVariables(t, api.UpdateVariablesRequest{
+		"HOST": api.NewVariableScalarVariableInput(api.NewStringVariableScalar("changed.example")),
+	})
+	assert.Equal(t, frozen, fixture.frozenVariables(t, secondID))
+
+	thirdResp := fixture.deploy(t, releaseID)
+	require.IsType(t, &api.CreateDeploymentCreated{}, thirdResp, helpers.MustMarshal(t, thirdResp))
+	thirdID := thirdResp.(*api.CreateDeploymentCreated).ID
+	assert.NotEqual(t, secondID, thirdID)
+	assert.Equal(t, api.NewVariableScalarVariable(api.NewStringVariableScalar("changed.example")), fixture.frozenVariables(t, thirdID)["HOST"])
+	assert.Equal(t, held, fixture.frozenVariables(t, thirdID)["TOKEN"])
+
+	unchanged := fixture.deploy(t, releaseID)
+	require.IsType(t, &api.CreateDeploymentOK{}, unchanged, helpers.MustMarshal(t, unchanged))
+	assert.Equal(t, thirdID, unchanged.(*api.CreateDeploymentOK).ID)
+
+	// A preview freeze is that kind's rows. The primary values are not among them.
+	previewResp, err := fixture.client.CreateDeployment(t.Context(), &api.CreateDeploymentRequest{
+		ReleaseID: api.NewOptReleaseID(releaseID),
+		Targets:   api.DeploymentTargetsRequest{previewOrigin},
+	}, api.CreateDeploymentParams{ProjectID: api.ProjectID(fixture.project)})
+	require.NoError(t, err)
+	require.IsType(t, &api.CreateDeploymentCreated{}, previewResp, helpers.MustMarshal(t, previewResp))
+	assert.Empty(t, fixture.frozenVariables(t, previewResp.(*api.CreateDeploymentCreated).ID))
+
+	rolled := fixture.rollback(t, secondID, api.RollbackDeploymentRequest{})
+	require.IsType(t, &api.RollbackDeploymentCreated{}, rolled, helpers.MustMarshal(t, rolled))
+	assert.Equal(t, frozen, fixture.frozenVariables(t, rolled.(*api.RollbackDeploymentCreated).ID))
+	assert.Equal(t, api.NewVariableScalarVariable(api.NewStringVariableScalar("changed.example")), fixture.frozenVariables(t, thirdID)["HOST"])
+}
+
+// TestDeploymentRefusesAMissingVariable refuses a deploy whose release names
+// a variable that kind does not hold, and writes nothing.
+func TestDeploymentRefusesAMissingVariable(t *testing.T) {
+	t.Parallel()
+
+	fixture := newDeploymentFixture(t)
+	connection := helpers.OIDCConnection("google")
+	oidc := connection.Oidc.Value
+	oidc.ClientID = "${{ ZEBRA }}"
+	oidc.ClientSecret = "${{ GONE }}"
+	connection.Oidc = api.NewOptIdpConnectionOidc(oidc)
+	created, err := fixture.client.CreateIdp(t.Context(), &api.CreateIdpRequest{Idp: connection}, api.CreateIdpParams{
+		ProjectID: api.ProjectID(fixture.project),
+	})
+	require.NoError(t, err)
+	require.IsType(t, &api.CreateIdpCreated{}, created, helpers.MustMarshal(t, created))
+	idp := api.IdpResponse(*created.(*api.CreateIdpCreated))
+
+	release := fixture.create(t, &api.CreateReleaseRequest{Pointers: append(fixture.pointers(), api.CreateReleasePointer{
+		Kind: api.ReleasePointerKindIdp, RevisionID: idp.RevisionID,
+	})})
+	require.IsType(t, &api.CreateReleaseCreated{}, release, helpers.MustMarshal(t, release))
+	releaseID := release.(*api.CreateReleaseCreated).ID
+
+	refused := fixture.createDeployment(t, &api.CreateDeploymentRequest{
+		ReleaseID: api.NewOptReleaseID(releaseID),
+		Targets:   api.DeploymentTargetsRequest{"primary"},
+	})
+	require.IsType(t, &api.CreateDeploymentBadRequest{}, refused, helpers.MustMarshal(t, refused))
+	missing, ok := refused.(*api.CreateDeploymentBadRequest).GetDeploymentVariablesMissing()
+	require.True(t, ok, helpers.MustMarshal(t, refused))
+	assert.Equal(t, domain.ErrDeploymentVariablesMissing(domain.DeploymentOriginKindPrimary, nil).Code, missing.Code)
+	assert.Equal(t, "deployment: the release references variables its kind has no value for", missing.Message)
+	assert.Equal(t, api.DeploymentVariablesMissingDetails{
+		Kind:  api.DeploymentKindPrimary,
+		Names: []string{"GONE", "ZEBRA"},
+	}, missing.Details)
+	assert.Zero(t, fixture.deploymentCount(t))
+
+	fixture.setPrimaryVariables(t, api.UpdateVariablesRequest{
+		"GONE":  api.NewVariableScalarVariableInput(api.NewStringVariableScalar("gone")),
+		"ZEBRA": api.NewVariableScalarVariableInput(api.NewStringVariableScalar("zebra")),
+	})
+	deployed := fixture.deploy(t, releaseID)
+	require.IsType(t, &api.CreateDeploymentCreated{}, deployed, helpers.MustMarshal(t, deployed))
+	assert.Equal(t, api.Variables{
+		"GONE":  api.NewVariableScalarVariable(api.NewStringVariableScalar("gone")),
+		"ZEBRA": api.NewVariableScalarVariable(api.NewStringVariableScalar("zebra")),
+	}, fixture.frozenVariables(t, deployed.(*api.CreateDeploymentCreated).ID))
+	assert.Equal(t, 1, fixture.deploymentCount(t))
+
+	preview := fixture.createDeployment(t, &api.CreateDeploymentRequest{
+		ReleaseID: api.NewOptReleaseID(releaseID),
+		Targets:   api.DeploymentTargetsRequest{previewOrigin},
+	})
+	require.IsType(t, &api.CreateDeploymentBadRequest{}, preview, helpers.MustMarshal(t, preview))
+	previewMissing, ok := preview.(*api.CreateDeploymentBadRequest).GetDeploymentVariablesMissing()
+	require.True(t, ok, helpers.MustMarshal(t, preview))
+	assert.Equal(t, api.DeploymentVariablesMissingDetails{
+		Kind:  api.DeploymentKindPreview,
+		Names: []string{"GONE", "ZEBRA"},
+	}, previewMissing.Details)
+	assert.Equal(t, 1, fixture.deploymentCount(t))
 }

@@ -1,0 +1,19 @@
+x-meta-schema: true
+title: Policy
+description: |
+  A `.zitadel/policies/<operation>.json` file: one operation's policy, as
+  `zitadel deploy` carries it in the release bundle, in the shape of a
+  publish (`POST /policies`). `operation` selects the
+  operation's template and `config` sets its settings; a setting left out is
+  off, and `{}` switches every rule off. The file is named after its
+  `operation`.
+type: object
+properties:
+  $schema:
+    type: string
+    minLength: 1
+    description: 'Editor affordance: path or URL of this schema so editors validate and autocomplete the
+      file (policy files point at `.zitadel/meta/policy.json`). Ignored by the platform.'
+oneOf:
+  - $ref: ../policies/password-set-policy-input.yaml
+unevaluatedProperties: false

@@ -25,6 +25,7 @@ post:
   security:
     - oauth2:
         - deployment.write
+    - sessionCookie: []
   requestBody:
     required: false
     content:

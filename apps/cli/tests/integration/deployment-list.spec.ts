@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "../helpers/platform";
-import { aSetUpApp } from "../helpers/project";
+import { anUndeployedEnvironment, aSetUpApp } from "../helpers/project";
 
 const platform = usePlatformMock();
 
@@ -20,9 +20,9 @@ describe("deployment list", () => {
   describe("against a valid server", () => {
     describe("--json", () => {
       it("is empty before anything is deployed", async () => {
-        const app = await aSetUpApp();
+        const app = await anUndeployedEnvironment();
 
-        const result = await app.run(["deployment", "list", "--json"]);
+        const result = await app.run(["deployment", "list", "--env", "staging", "--json"]);
 
         expect(result).toSucceed();
         expect(app.envelopeOf<{ count: number }>(result).data.count).toBe(0);
@@ -44,8 +44,9 @@ describe("deployment list", () => {
           count: number;
           next_page_token: string | null;
         }>(result);
-        expect(data.count).toBe(1);
-        expect(data.items).toHaveLength(1);
+        // Setup's deployment, then this one, newest first.
+        expect(data.count).toBe(2);
+        expect(data.items).toHaveLength(2);
         expect(data.items[0]?.release_id).toBe(deployed.release_id);
         expect(data.next_page_token).toBeNull();
       });
@@ -58,7 +59,7 @@ describe("deployment list", () => {
         const result = await app.run(["deployment", "list", "--all", "--limit", "1", "--json"]);
 
         expect(result).toSucceed();
-        expect(app.envelopeOf<{ count: number }>(result).data.count).toBe(1);
+        expect(app.envelopeOf<{ count: number }>(result).data.count).toBe(2);
       });
     });
 

@@ -1,13 +1,13 @@
+import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it, vi } from "vitest";
+import { NEUTRAL_MESSAGE, SELF_MESSAGE } from "@/components/add-admin-dialog";
 import { scopedPath } from "@/test/project-scope.fixture";
-
-// Safe as a static import where `@/auth/session` is not: the fixture's only
-// dependency on it is a type, which the transform erases.
 import { makeTestSession } from "@/test/session.fixture";
 import { server } from "@/test/msw";
+import { createAppRouter } from "../../../router";
 
 // The `_authed` layout guards every screen behind `GET /sessions/me`
 // (Console ADR 0003); mock the auth module so routes render as signed in.
@@ -17,15 +17,11 @@ vi.mock("@/auth/session", async (importOriginal) => {
   return { ...actual, fetchSession: vi.fn(async () => makeTestSession()) };
 });
 
-// Loaded after the env stub, for the same reason `renderProject` imports the
-// router dynamically: the API client reads its base once, at module load, and a
-// static import would run before the stub and send every request to port 3000.
-const { NEUTRAL_MESSAGE, SELF_MESSAGE } = await import("@/components/add-admin-dialog");
-
 /**
- * The admins section of the project page (#1238). Grants are project-level
- * data: the section reads, adds and removes against the route's project id,
- * never the console's own (platform) project.
+ * The admins section of the project page (#1238, #1462). The people and how
+ * they hold access come from the project's admins list; team grants and lower
+ * levels from its grants. Every read, add and remove goes against the route's
+ * project id, never the console's own (platform) project.
  */
 const PROJECT_ID = "proj_1";
 const PROJECTS_URL = "http://localhost/api/projects";
@@ -36,10 +32,6 @@ const USERS_QUERY_URL = "http://localhost/api/users/query";
 const SELF = makeTestSession().user?.identifier ?? "";
 
 async function renderProject(projectId = PROJECT_ID) {
-  const [{ RouterProvider, createMemoryHistory }, { createAppRouter }] = await Promise.all([
-    import("@tanstack/react-router"),
-    import("../../../router"),
-  ]);
   const router = createAppRouter({
     history: createMemoryHistory({ initialEntries: [scopedPath("/project", projectId)] }),
   });
@@ -48,7 +40,32 @@ async function renderProject(projectId = PROJECT_ID) {
 }
 
 function project(id = PROJECT_ID, name = "Acme") {
-  return { id, name, created_at: "2026-07-08T09:00:00Z", updated_at: "2026-07-08T09:00:00Z" };
+  return {
+    id,
+    name,
+    origins: [],
+    created_at: "2026-07-08T09:00:00Z",
+    updated_at: "2026-07-08T09:00:00Z",
+  };
+}
+
+const OWNING_TEAM = { team_id: "team_owner", name: "Acme founders" };
+const GRANTED_TEAM = { team_id: "team_ops", name: "Operations" };
+
+/** One source as the admins list serves it. */
+const source = {
+  owningTeam: (team = OWNING_TEAM) => ({ type: "owning_team", team }),
+  grant: (grant_id = "asgn_1") => ({ type: "grant", grant_id }),
+  teamGrant: (grant_id = "asgn_team", team: { team_id: string; name?: string } = GRANTED_TEAM) => ({
+    type: "grant",
+    grant_id,
+    team,
+  }),
+};
+
+/** One person on the admins list, with the sources they hold. */
+function admin(user: Record<string, unknown>, sources: Record<string, unknown>[]) {
+  return { user, sources };
 }
 
 function grant(overrides: Record<string, unknown> = {}) {
@@ -63,22 +80,14 @@ function grant(overrides: Record<string, unknown> = {}) {
   };
 }
 
-/**
- * A user as `expand: ["principal"]` inlines it: extras live on the same
- * `user` object as the ref (`user_id`, never `id`).
- */
+/** A grant's user ref: the id, and whatever identity the schema designates. */
 function grantUser(identity: Record<string, unknown>) {
-  return {
-    user_id: "user_1",
-    schema: "sch_1",
-    attributes: {},
-    metadata: {
-      created_at: "2026-09-01T10:00:00Z",
-      updated_at: "2026-09-01T10:00:00Z",
-      status: "active",
-    },
-    ...identity,
-  };
+  return { user_id: "user_1", ...identity };
+}
+
+/** A grant's team ref: the id, and the name where the viewer may see it. */
+function grantTeam(team = GRANTED_TEAM) {
+  return { ...team };
 }
 
 /** One `POST /grants/query` as the section sends it: which project, and what body. */
@@ -88,20 +97,38 @@ interface GrantsQuery {
 }
 
 /**
- * The project and its grants. Records every `POST /grants/query`, so both the
- * project each request was scoped to and the expansion sent can be asserted.
+ * The project, its admins and its grants. Records every admins read and every
+ * `POST /grants/query`, so both the project each request was scoped to and the
+ * expansion sent can be asserted.
  */
-function stubProject(grants: Record<string, unknown>[], record = project()) {
+function stubProject(
+  {
+    admins = [],
+    grants = [],
+  }: { admins?: Record<string, unknown>[]; grants?: Record<string, unknown>[] } = {},
+  record = project(),
+) {
+  const adminReads: string[] = [];
   const queries: GrantsQuery[] = [];
   server.use(
     http.get(`${PROJECTS_URL}/:id`, () => HttpResponse.json(record)),
+    // The page's variables and policy cards read alongside; none keeps these
+    // tests about the admins.
+    http.get("http://localhost/api/variables", () => HttpResponse.json({})),
+    http.get("http://localhost/api/policies", () =>
+      HttpResponse.json({ policies: [], next_page_token: null }),
+    ),
+    http.get(`${PROJECTS_URL}/:id/admins`, ({ params }) => {
+      adminReads.push(params.id as string);
+      return HttpResponse.json({ admins });
+    }),
     http.post(GRANTS_QUERY_URL, async ({ request }) => {
       const projectId = new URL(request.url).searchParams.get("project_id");
       queries.push({ projectId, body: (await request.json()) as Record<string, unknown> });
       return HttpResponse.json({ grants });
     }),
   );
-  return queries;
+  return { adminReads, queries };
 }
 
 /** One `POST /grants` as the dialog sends it: which project, and what body. */
@@ -128,13 +155,47 @@ function stubCreateGrant() {
   return created;
 }
 
+/** Every `DELETE /grants/{id}` the console sends, with the project it named. */
+function stubDeleteGrant() {
+  const deleted: { id: string; projectId: string | null }[] = [];
+  server.use(
+    http.delete(`${GRANTS_URL}/:id`, ({ params, request }) => {
+      deleted.push({
+        id: params.id as string,
+        projectId: new URL(request.url).searchParams.get("project_id"),
+      });
+      return new HttpResponse(null, { status: 204 });
+    }),
+  );
+  return deleted;
+}
+
 function admins() {
   return within(screen.getByRole("region", { name: "Admins" }));
 }
 
+/** Opens the Admins tab, where the list and the Add button live. */
+async function openAdmins() {
+  await userEvent.click(await screen.findByRole("tab", { name: "Admins" }));
+  return within(await screen.findByRole("region", { name: "Admins" }));
+}
+
+/** The row labelled by a person or team, found by its name. */
+function row(name: string) {
+  return within(admins().getByRole("row", { name: new RegExp(name) }));
+}
+
+/** From any tab: opens Admins, then the row's menu, then its confirmation. */
+async function openRemove(name: string) {
+  await openAdmins();
+  await userEvent.click(screen.getByRole("button", { name: `Actions for ${name}` }));
+  await userEvent.click(await screen.findByRole("menuitem", { name: "Remove grant" }));
+  return within(await screen.findByRole("alertdialog"));
+}
+
 async function openAddAdmin() {
-  await screen.findByRole("region", { name: "Admins" });
-  await userEvent.click(admins().getByRole("button", { name: "Add admin" }));
+  await openAdmins();
+  await userEvent.click(screen.getByRole("button", { name: "Add admin" }));
   const dialog = within(await screen.findByRole("dialog"));
   return {
     dialog,
@@ -145,120 +206,263 @@ async function openAddAdmin() {
 }
 
 describe("project admins", () => {
-  it("reads the grants of the route's project, with their principals", async () => {
-    // One request, scoped to the project on the URL — not to the console's own
-    // project — and not a read per row: the principal rides along on the list
-    // (ADR 059), and ADR 058's resolved identity is what the row shows.
-    const queries = stubProject([
-      grant({ user: grantUser({ display: "Maya Patel", identifier: "maya@acme.com" }) }),
-      grant({ id: "asgn_2", user: grantUser({ user_id: "user_2", identifier: "sol@acme.com" }) }),
-    ]);
+  it("reads the admins and the grants of the route's project", async () => {
+    // One read each, scoped to the project on the URL — not to the console's
+    // own project — and not a read per row: the admins list resolves its
+    // people, and a grant's ref carries its principal's name (ADR 059), so
+    // nothing is expanded.
+    const { adminReads, queries } = stubProject({
+      admins: [
+        admin({ user_id: "user_1", display: "Maya Patel", identifier: "maya@acme.com" }, [
+          source.grant(),
+        ]),
+        admin({ user_id: "user_2", identifier: "sol@acme.com" }, [source.grant("asgn_2")]),
+      ],
+    });
     await renderProject();
 
-    const section = within(await screen.findByRole("region", { name: "Admins" }));
+    const section = await openAdmins();
+    expect(adminReads).toEqual([PROJECT_ID]);
     expect(queries).toHaveLength(1);
-    expect(queries[0]).toMatchObject({ projectId: PROJECT_ID, body: { expand: ["principal"] } });
+    expect(queries[0]).toEqual({ projectId: PROJECT_ID, body: { limit: 100 } });
     expect(section.getByText("Maya Patel")).toBeInTheDocument();
     // No display designated, so the identifier is the label rather than the id.
     expect(section.getByText("sol@acme.com")).toBeInTheDocument();
   });
 
-  it("shows the granted person to themselves on the granter's project", async () => {
-    // The person owns nothing: the page opens because somebody granted them
-    // access to their project, and they see themselves in it.
-    const queries = stubProject(
-      [
-        grant({
-          project_id: "proj_theirs",
-          user: grantUser({ user_id: "user_test", identifier: SELF }),
-        }),
-      ],
-      project("proj_theirs", "Granted to me"),
-    );
-    await renderProject("proj_theirs");
-
-    expect(await screen.findByRole("heading", { name: "Granted to me" })).toBeInTheDocument();
-    expect(admins().getByText(SELF)).toBeInTheDocument();
-    expect(queries.map((query) => query.projectId)).toEqual(["proj_theirs"]);
-  });
-
-  it("falls back to the principal id when the principal cannot be loaded", async () => {
-    // A deleted user's surviving grant is a degraded ref: `user_id` only.
-    stubProject([grant({ user: { user_id: "user_1" } })]);
+  it("lists the owner through the owning team, and marks the viewer's own row", async () => {
+    // Right after local setup (#1462): the person who claimed the project holds
+    // no grant, and used to be missing from this list entirely. The session
+    // fixture signs in as `user_test`.
+    stubProject({
+      admins: [admin({ user_id: "user_test", identifier: SELF }, [source.owningTeam()])],
+    });
     await renderProject();
 
-    await screen.findByRole("region", { name: "Admins" });
-    expect(admins().getByText("user_1")).toBeInTheDocument();
+    await openAdmins();
+    const self = row(SELF);
+    expect(self.getByText("Owning team")).toBeInTheDocument();
+    expect(self.getByText("(you)")).toBeInTheDocument();
+    // Not a grant, so nothing to revoke from here.
+    expect(self.queryByRole("button", { name: /Actions for/ })).not.toBeInTheDocument();
+    expect(admins().queryByText("No admins to show.")).not.toBeInTheDocument();
+  });
+
+  it("shows a person with both sources once, with each named", async () => {
+    stubProject({
+      admins: [
+        admin({ user_id: "user_1", display: "Maya Patel" }, [
+          source.owningTeam(),
+          source.grant("asgn_maya"),
+        ]),
+      ],
+      // Her direct grant is also in the grants read; it must not become a
+      // second row.
+      grants: [grant({ id: "asgn_maya", user: grantUser({ display: "Maya Patel" }) })],
+    });
+    await renderProject();
+
+    await openAdmins();
+    expect(admins().getAllByText("Maya Patel")).toHaveLength(1);
+    expect(row("Maya Patel").getByText("Owning team and admin grant")).toBeInTheDocument();
+  });
+
+  it("says what stays when removing a grant from someone with other access", async () => {
+    // Removing the explicit grant does not remove access through the owning
+    // team, and the dialog must not imply it does.
+    stubProject({
+      admins: [
+        admin({ user_id: "user_1", display: "Maya Patel" }, [
+          source.owningTeam(),
+          source.teamGrant(),
+          source.grant("asgn_maya"),
+        ]),
+      ],
+    });
+    const deleted = stubDeleteGrant();
+    await renderProject();
+
+    await openAdmins();
+    // One line however many sources, so the row keeps the list's height.
+    expect(
+      row("Maya Patel").getByText("Owning team, via team Operations and admin grant"),
+    ).toBeInTheDocument();
+    const dialog = await openRemove("Maya Patel");
+    expect(dialog.getByText("Remove grant?")).toBeInTheDocument();
+    expect(
+      dialog.getByText(
+        "The user will keep admin access through the owning team and team Operations.",
+      ),
+    ).toBeInTheDocument();
+    expect(dialog.queryByText(/direct access grant/)).not.toBeInTheDocument();
+    await userEvent.click(dialog.getByRole("button", { name: "Remove grant" }));
+
+    // The direct grant, not the team's.
+    await waitFor(() => expect(deleted).toEqual([{ id: "asgn_maya", projectId: PROJECT_ID }]));
+  });
+
+  it("names access through a granted team, with no action on the person's row", async () => {
+    // The grant is the team's: revoking it from a member's row would take the
+    // project from everyone in the team.
+    stubProject({
+      admins: [admin({ user_id: "user_1", display: "Sol Reyes" }, [source.teamGrant()])],
+    });
+    await renderProject();
+
+    await openAdmins();
+    const sol = row("Sol Reyes");
+    expect(sol.getByText("Via team Operations")).toBeInTheDocument();
+    expect(sol.queryByRole("button", { name: /Actions for/ })).not.toBeInTheDocument();
+  });
+
+  it("names a team the viewer is not in by its id", async () => {
+    // The API leaves the name off a team the caller may not see; the id is
+    // always on the ref.
+    stubProject({
+      admins: [
+        admin({ user_id: "user_1", display: "Sol Reyes" }, [
+          source.teamGrant("asgn_x", { team_id: "team_hidden" }),
+        ]),
+      ],
+    });
+    await renderProject();
+
+    await openAdmins();
+    expect(row("Sol Reyes").getByText("Via team team_hidden")).toBeInTheDocument();
+  });
+
+  it("lists a team grant as the team's own row, and revokes it from there", async () => {
+    // The admins list is people only, and leaves out members of a team the
+    // viewer is not in; the grant to the team is still the project's.
+    stubProject({
+      grants: [grant({ id: "asgn_team", user: undefined, team: grantTeam() })],
+    });
+    const deleted = stubDeleteGrant();
+    await renderProject();
+
+    await openAdmins();
+    expect(row("Operations").getByText("Admin grant")).toBeInTheDocument();
+    // The team label is what tells a team row from a person's.
+    expect(row("Operations").getByText("Team")).toBeInTheDocument();
+    expect(row("Operations").queryByText("(you)")).not.toBeInTheDocument();
+    const dialog = await openRemove("Operations");
+    // A team's grant, so the copy is about its members, not "their account".
+    expect(
+      dialog.getByText(
+        "Team members will lose access provided by this grant. Other access is unaffected.",
+      ),
+    ).toBeInTheDocument();
+    await userEvent.click(dialog.getByRole("button", { name: "Remove grant" }));
+    await waitFor(() => expect(deleted).toEqual([{ id: "asgn_team", projectId: PROJECT_ID }]));
+  });
+
+  it("says when a grant has expired", async () => {
+    // Authorization ignores an expired grant, so it must not read like a live
+    // one; it is still the project's, and still revocable here.
+    stubProject({
+      grants: [
+        grant({
+          id: "asgn_old",
+          expires_at: "2020-01-01T00:00:00Z",
+          user: grantUser({ display: "Maya Patel" }),
+        }),
+      ],
+    });
+    await renderProject();
+
+    await openAdmins();
+    expect(row("Maya Patel").getByText("Admin grant, expired")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Actions for Maya Patel" })).toBeInTheDocument();
+  });
+
+  it("keeps a direct grant the admins list leaves out, down to its id", async () => {
+    // The admins list is live admin access, so an expired grant is only on
+    // the grants read; a ref whose schema designates neither display name nor
+    // identifier carries `user_id` only. It is still the project's, and still
+    // revocable here.
+    stubProject({ grants: [grant({ user: { user_id: "user_1" } })] });
+    const deleted = stubDeleteGrant();
+    await renderProject();
+
+    await openAdmins();
+    expect(row("user_1").getByText("Admin grant")).toBeInTheDocument();
+    expect(row("user_1").queryByText("Team")).not.toBeInTheDocument();
+    const dialog = await openRemove("user_1");
+    // The id alone names the row, and the default copy is true for it: the
+    // grant is the user's direct access, whatever else is known about them.
+    expect(
+      dialog.getByText("This removes the user's direct access grant to this project."),
+    ).toBeInTheDocument();
+    await userEvent.click(dialog.getByRole("button", { name: "Remove grant" }));
+    await waitFor(() => expect(deleted).toEqual([{ id: "asgn_1", projectId: PROJECT_ID }]));
+  });
+
+  it("says what stays when removing a lower grant from an admin", async () => {
+    // A viewer grant to someone the owning team already makes an admin: the
+    // grant is its own row, and taking it away leaves them the project.
+    stubProject({
+      admins: [admin({ user_id: "user_1", display: "Maya Patel" }, [source.owningTeam()])],
+      grants: [
+        grant({ id: "asgn_view", relation: "viewer", user: grantUser({ display: "Maya Patel" }) }),
+      ],
+    });
+    await renderProject();
+
+    const dialog = await openRemove("Maya Patel");
+    expect(
+      dialog.getByText("The user will keep admin access through the owning team."),
+    ).toBeInTheDocument();
+  });
+
+  it("marks no row for a viewer with no grant of their own", async () => {
+    // A platform operator (ADR 075) reaches the project through neither a grant
+    // nor the owning team, so nothing here is theirs.
+    stubProject({
+      admins: [admin({ user_id: "user_1", identifier: "colleague@acme.com" }, [source.grant()])],
+    });
+    await renderProject();
+
+    await openAdmins();
+    expect(admins().queryByText("(you)")).not.toBeInTheDocument();
+  });
+
+  it("marks the viewer's own lower grant", async () => {
+    // The session fixture signs in as `user_test`.
+    stubProject({
+      grants: [
+        grant({ relation: "viewer", user: grantUser({ user_id: "user_test", identifier: SELF }) }),
+      ],
+    });
+    await renderProject();
+
+    await openAdmins();
+    expect(row(SELF).getByText("(you)")).toBeInTheDocument();
   });
 
   it("renders whatever relation a grant carries, not just admin", async () => {
-    // The section only creates `admin`, but the catalog has three relations and
-    // a grant made elsewhere must not be mislabelled.
-    stubProject([grant({ relation: "viewer", user: grantUser({ identifier: "vi@acme.com" }) })]);
+    // The section only creates `admin`, but the catalog has three relations,
+    // the admins list leaves the others out, and a grant made elsewhere must
+    // not be mislabelled or hidden.
+    stubProject({
+      grants: [grant({ relation: "viewer", user: grantUser({ identifier: "vi@acme.com" }) })],
+    });
     await renderProject();
 
-    await screen.findByRole("region", { name: "Admins" });
-    expect(admins().getByText("Viewer")).toBeInTheDocument();
+    await openAdmins();
+    expect(row("vi@acme.com").getByText("Viewer grant")).toBeInTheDocument();
   });
 
-  it("labels a team principal by its name", async () => {
-    // A team grant carries `team` and omits `user`. `name` is already on the ref.
-    stubProject([
-      grant({
-        user: undefined,
-        team: {
-          team_id: "team_1",
-          name: "Platform",
-          status: "active",
-          created_at: "2026-09-01T10:00:00Z",
-          updated_at: "2026-09-01T10:00:00Z",
-        },
-      }),
-    ]);
+  it("says so when there is nobody to show", async () => {
+    stubProject();
     await renderProject();
 
-    await screen.findByRole("region", { name: "Admins" });
-    expect(admins().getByText("Platform")).toBeInTheDocument();
-  });
-
-  it("says so when nobody has been granted access", async () => {
-    // Right after claiming: the owner's access comes through the owning team,
-    // not an admin grant, so their own project lists nobody.
-    stubProject([]);
-    await renderProject();
-
-    await screen.findByRole("region", { name: "Admins" });
-    expect(admins().getByText("No additional admins have been added.")).toBeInTheDocument();
-    expect(admins().getByRole("button", { name: "Add admin" })).toBeInTheDocument();
-  });
-
-  const NOT_LISTED_LINE =
-    "Your access to this Project isn’t a grant of your own, so you aren’t listed here.";
-
-  it("tells a viewer with no grant of their own why they are not listed", async () => {
-    // Whoever reaches this page has access to the project, but not where it
-    // comes from: the owning team, a team grant, the platform's operators. So
-    // the line names no source. It stays once admins exist.
-    stubProject([grant({ user: grantUser({ identifier: "colleague@acme.com" }) })]);
-    await renderProject();
-
-    await screen.findByRole("region", { name: "Admins" });
-    expect(admins().getByText(NOT_LISTED_LINE)).toBeInTheDocument();
-    expect(admins().queryByText(/owning Team/)).not.toBeInTheDocument();
-    expect(admins().getByText("colleague@acme.com")).toBeInTheDocument();
-  });
-
-  it("says nothing about a granted admin's access", async () => {
-    // The session fixture signs in as `user_test`.
-    stubProject([grant({ user: { user_id: "user_test" } })]);
-    await renderProject();
-
-    await screen.findByRole("region", { name: "Admins" });
-    expect(admins().queryByText(NOT_LISTED_LINE)).not.toBeInTheDocument();
+    await openAdmins();
+    expect(admins().getByText("No admins to show.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add admin" })).toBeInTheDocument();
   });
 
   it("grants by the address that was typed, on the route's project", async () => {
-    stubProject([]);
+    stubProject();
     const created = stubCreateGrant();
     await renderProject();
 
@@ -281,7 +485,7 @@ describe("project admins", () => {
   it("says the same thing for an address that belongs to nobody", async () => {
     // The 202 carries no body, so the console has nothing to branch on and the
     // operator learns nothing about who is registered.
-    stubProject([]);
+    stubProject();
     stubCreateGrant();
     let userQueries = 0;
     server.use(
@@ -304,7 +508,7 @@ describe("project admins", () => {
   it("refuses the operator's own address without sending it", async () => {
     // Different case and surrounding spaces: the comparison is on the trimmed
     // value, case-insensitively, because the address is the same address.
-    stubProject([]);
+    stubProject();
     const created = stubCreateGrant();
     await renderProject();
 
@@ -332,7 +536,7 @@ describe("project admins", () => {
   it("leaves a malformed address to the browser", async () => {
     // `type="email"` refuses it before the handler runs, so there is no
     // console-authored format message to keep in step with the server's.
-    stubProject([]);
+    stubProject();
     const created = stubCreateGrant();
     await renderProject();
 
@@ -358,7 +562,7 @@ describe("project admins", () => {
       ...session,
       user: user && { user_id: user.user_id, display: user.display },
     });
-    stubProject([]);
+    stubProject();
     server.use(
       http.post(GRANTS_URL, () =>
         HttpResponse.json(
@@ -378,48 +582,32 @@ describe("project admins", () => {
     );
   });
 
-  it("names the relation the row holds, not always admin", async () => {
-    // The section only creates `admin`, but the list shows whatever a grant
-    // carries, and "Remove admin" over a `viewer` row would misdescribe the
-    // click.
-    stubProject([grant({ relation: "viewer", user: grantUser({ display: "Sasha Kim" }) })]);
-    await renderProject();
-
-    await userEvent.click(await screen.findByRole("button", { name: "Actions for Sasha Kim" }));
-    await userEvent.click(await screen.findByRole("menuitem", { name: "Remove viewer" }));
-    const dialog = within(await screen.findByRole("alertdialog"));
-    expect(dialog.getByText("Remove viewer?")).toBeInTheDocument();
-  });
-
   it("removes an admin from the route's project after confirming", async () => {
     // The revoke is scoped like the read: `DELETE /grants/{id}` carries the
     // route's project, not the console's own.
-    stubProject([grant({ user: grantUser({ display: "Maya Patel" }) })]);
-    let deleted: { id: string; projectId: string | null } | undefined;
-    server.use(
-      http.delete(`${GRANTS_URL}/:id`, ({ params, request }) => {
-        deleted = {
-          id: params.id as string,
-          projectId: new URL(request.url).searchParams.get("project_id"),
-        };
-        return new HttpResponse(null, { status: 204 });
-      }),
-    );
+    stubProject({
+      admins: [admin({ user_id: "user_1", display: "Maya Patel" }, [source.grant()])],
+    });
+    const deleted = stubDeleteGrant();
     await renderProject();
 
-    await userEvent.click(await screen.findByRole("button", { name: "Actions for Maya Patel" }));
-    await userEvent.click(await screen.findByRole("menuitem", { name: "Remove admin" }));
-    const dialog = within(await screen.findByRole("alertdialog"));
-    expect(dialog.getByText("Remove admin?")).toBeInTheDocument();
-    await userEvent.click(dialog.getByRole("button", { name: "Remove admin" }));
+    const dialog = await openRemove("Maya Patel");
+    expect(dialog.getByText("Remove grant?")).toBeInTheDocument();
+    expect(
+      dialog.getByText("This removes the user's direct access grant to this project."),
+    ).toBeInTheDocument();
+    await userEvent.click(dialog.getByRole("button", { name: "Remove grant" }));
+    expect(await screen.findByText("Grant removed")).toBeInTheDocument();
 
-    await waitFor(() => expect(deleted).toEqual({ id: "asgn_1", projectId: PROJECT_ID }));
+    await waitFor(() => expect(deleted).toEqual([{ id: "asgn_1", projectId: PROJECT_ID }]));
   });
 
   it("does not carry a failed removal into the next opening", async () => {
     // The dialog content is mounted per opening, so the error from one attempt
     // is not sitting there when the operator opens it again.
-    stubProject([grant({ user: grantUser({ display: "Maya Patel" }) })]);
+    stubProject({
+      admins: [admin({ user_id: "user_1", display: "Maya Patel" }, [source.grant()])],
+    });
     server.use(
       http.delete(`${GRANTS_URL}/:id`, () =>
         HttpResponse.json({ code: "grant.not_found", message: "no such grant" }, { status: 404 }),
@@ -427,41 +615,26 @@ describe("project admins", () => {
     );
     await renderProject();
 
-    await userEvent.click(await screen.findByRole("button", { name: "Actions for Maya Patel" }));
-    await userEvent.click(await screen.findByRole("menuitem", { name: "Remove admin" }));
-    await userEvent.click(
-      within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Remove admin" }),
-    );
+    const dialog = await openRemove("Maya Patel");
+    await userEvent.click(dialog.getByRole("button", { name: "Remove grant" }));
     expect(await screen.findByText("no such grant")).toBeInTheDocument();
 
-    await userEvent.click(
-      within(screen.getByRole("alertdialog")).getByRole("button", { name: "Cancel" }),
-    );
-    await userEvent.click(screen.getByRole("button", { name: "Actions for Maya Patel" }));
-    await userEvent.click(await screen.findByRole("menuitem", { name: "Remove admin" }));
-
-    await screen.findByRole("alertdialog");
+    await userEvent.click(dialog.getByRole("button", { name: "Cancel" }));
+    await openRemove("Maya Patel");
     expect(screen.queryByText("no such grant")).not.toBeInTheDocument();
   });
 
   it("keeps the row when the removal is cancelled", async () => {
-    stubProject([grant({ user: grantUser({ display: "Maya Patel" }) })]);
-    let deleteCalls = 0;
-    server.use(
-      http.delete(`${GRANTS_URL}/:id`, () => {
-        deleteCalls += 1;
-        return new HttpResponse(null, { status: 204 });
-      }),
-    );
+    stubProject({
+      admins: [admin({ user_id: "user_1", display: "Maya Patel" }, [source.grant()])],
+    });
+    const deleted = stubDeleteGrant();
     await renderProject();
 
-    await userEvent.click(await screen.findByRole("button", { name: "Actions for Maya Patel" }));
-    await userEvent.click(await screen.findByRole("menuitem", { name: "Remove admin" }));
-    await userEvent.click(
-      within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Cancel" }),
-    );
+    const dialog = await openRemove("Maya Patel");
+    await userEvent.click(dialog.getByRole("button", { name: "Cancel" }));
 
-    expect(deleteCalls).toBe(0);
+    expect(deleted).toHaveLength(0);
     expect(screen.getByText("Maya Patel")).toBeInTheDocument();
   });
 });
@@ -471,7 +644,7 @@ describe("portal nav", () => {
     // Admins lives on the project page now, not as a list screen. The Settings
     // half of this is asserted where Settings renders (`landing.spec.tsx`):
     // on a project URL the Settings nav is never mounted.
-    stubProject([]);
+    stubProject();
     await renderProject();
 
     const primary = await screen.findByRole("navigation", { name: "Primary" });

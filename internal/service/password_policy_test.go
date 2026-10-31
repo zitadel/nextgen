@@ -247,7 +247,7 @@ func TestPasswordPolicy_History(t *testing.T) {
 
 func TestSetPasswordAction_GateRunsBeforeTheHash(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	hasher := cryptomock.NewMockHasher(ctrl) // no EXPECT: hashing must not happen
+	hasher := cryptomock.NewMockPasswordHasher(ctrl) // no EXPECT: hashing must not happen
 	gate := newGate(t, fixedPolicy{config: map[string]any{"min_length": 12}}, nil, nil)
 
 	action := service.NewSetUserPasswordAction(service.SetPasswordInput{ProjectID: "p", UserID: "u", Password: "short"},
@@ -271,7 +271,7 @@ func TestSetPasswordAction_RejectsAStaleHistoryCheck(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			f := newHistoryFixture(t, 1)
 			f.kept(0, 1, "a")
-			hasher := cryptomock.NewMockHasher(gomock.NewController(t))
+			hasher := cryptomock.NewMockPasswordHasher(gomock.NewController(t))
 			hasher.EXPECT().Hash("candidate").Return("hash", nil)
 			action := service.NewSetUserPasswordAction(
 				service.SetPasswordInput{ProjectID: "p", UserID: "u", Password: "candidate", SelfService: true},

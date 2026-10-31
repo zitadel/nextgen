@@ -11,7 +11,7 @@ import { Tab, Tabs } from "fumadocs-ui/components/tabs";
 The SvelteKit SDK is a `handle` hook that proxies and verifies sessions on the server. The login and logout widgets come from the [Svelte SDK](/docs/sdks/svelte).
 
 <Callout title="Generated setup" type="info">
-  The CLI writes `src/hooks.server.ts` and the auth pages, and writes the backend URL, the project secret, and the project id to `.env.local`. It works on SvelteKit 2 and 3.
+  The CLI writes `src/hooks.server.ts` and the auth pages, declares the hook's settings in `src/env.ts` (adding them to the app's own file when it has one), and writes the backend URL, the project secret, and the project id to `.env.local`. It needs SvelteKit 3.
 </Callout>
 
 ## Install
@@ -42,6 +42,7 @@ The SvelteKit SDK is a `handle` hook that proxies and verifies sessions on the s
 
     <Files>
       <File name="src/hooks.server.ts" />
+      <File name="src/env.ts" />
       <File name="src/routes/+layout.svelte" />
       <File name="src/routes/+page.svelte" />
       <File name="src/routes/login/+page.svelte" />
@@ -55,18 +56,28 @@ The SvelteKit SDK is a `handle` hook that proxies and verifies sessions on the s
     Every setup also writes `zitadel.json` and the `.zitadel/` folder, adds its entries to `.gitignore`, and adds managed sections to `AGENTS.md` and `README.md`.
   </Tab>
   <Tab>
-    Create `src/hooks.server.ts`. Read the config from `process.env` rather than SvelteKit's `$env` modules, whose import paths moved between SvelteKit 2 and 3. SvelteKit does not put `.env` files on `process.env`, so load `.env.local` yourself in development:
+    Declare the hook's settings in `src/env.ts`, so SvelteKit serves them from the server-only `$app/env/private`: from `.env.local` in development and from the platform's environment in production. A missing one fails each request with an error naming it, and SvelteKit never bundles them for the browser. If the app already has `src/env.ts`, add the three entries to its `defineEnvVars` call:
 
     ```ts
+    import { defineEnvVars } from "@sveltejs/kit/env";
+
+    export const variables = defineEnvVars({
+      ZITADEL_URL: {},
+      ZITADEL_PROJECT_SECRET: {},
+      ZITADEL_PROJECT_ID: {},
+    });
+    ```
+
+    Create `src/hooks.server.ts` and pass them to the handle:
+
+    ```ts
+    import { ZITADEL_PROJECT_ID, ZITADEL_PROJECT_SECRET, ZITADEL_URL } from "$app/env/private";
     import { createNextgenHandle } from "@zitadel/sdk-sveltekit/server";
 
-    try {
-      process.loadEnvFile?.(".env.local");
-    } catch {
-      // .env.local is optional; the platform provides the variables in production.
-    }
-
     export const handle = createNextgenHandle({
+      url: ZITADEL_URL,
+      projectSecret: ZITADEL_PROJECT_SECRET,
+      projectId: ZITADEL_PROJECT_ID,
       protectedRoutes: ["/profile"],
       loginPath: "/login",
     });

@@ -26,6 +26,14 @@ type BuildIDP struct {
 	Document []byte
 }
 
+// BuildPolicy is one policies[] entry: the operation and the config its
+// template validates.
+type BuildPolicy struct {
+	Index     int
+	Operation string
+	Config    map[string]any
+}
+
 // BuildFlowDefinition is one flow_definitions[] entry with its bundle index.
 type BuildFlowDefinition struct {
 	Index   int
@@ -38,6 +46,7 @@ type BuildReleaseInput struct {
 	Schemas         []BuildSchema
 	FlowDefinitions []BuildFlowDefinition
 	IDPs            []BuildIDP
+	Policies        []BuildPolicy
 	Branding        *CreateBrandingInput
 	Message         *string
 	GitSHA          *string
@@ -50,6 +59,11 @@ type preparedIDP struct {
 	document []byte
 }
 
+type preparedPolicy struct {
+	operation string
+	config    []byte
+}
+
 type preparedSchema struct {
 	model *domain.JSONSchema // set for inline after prepare; for URL after in-tx resolve
 	url   string
@@ -57,9 +71,9 @@ type preparedSchema struct {
 }
 
 // Build turns a configuration bundle into a release in one transaction:
-// unchanged resources reuse a matching revision (any age), changed ones
-// allocate, and the release is created or the existing content-hash match is
-// returned.
+// unchanged resources reuse a matching revision (any age; for policies only
+// the newest, see resolveOrPublish), changed ones allocate, and the release is
+// created or the existing content-hash match is returned.
 func (s *releaseService) Build(ctx context.Context, input BuildReleaseInput) (_ *CreateReleaseOutput, err error) {
 	ctx, end := startSpan(ctx, "ReleaseService.Build")
 	defer end(&err)
@@ -76,6 +90,10 @@ func (s *releaseService) Build(ctx context.Context, input BuildReleaseInput) (_ 
 
 	preparedSchemas, schemaByHandle := s.prepareBundleSchemas(input, failures)
 	preparedIDPs := s.prepareBundleIDPs(input, failures)
+	preparedPolicies, err := s.prepareBundlePolicies(ctx, input, failures)
+	if err != nil {
+		return nil, err
+	}
 	var preparedBranding *domain.Branding
 	if input.Branding != nil {
 		var err error
@@ -148,6 +166,13 @@ func (s *releaseService) Build(ctx context.Context, input BuildReleaseInput) (_ 
 			}
 			content.IDPConnections = append(content.IDPConnections, connection.Connection)
 		}
+		for _, prepared := range preparedPolicies {
+			revision, err := s.policies.resolveOrPublish(ctx, stmts, input.ProjectID, prepared.operation, prepared.config)
+			if err != nil {
+				return err
+			}
+			content.Policies = append(content.Policies, revision)
+		}
 		if preparedBranding != nil {
 			brandingEntity, err := s.branding.resolveOrCreateBranding(ctx, stmts, input.ProjectID, preparedBranding)
 			if err != nil {
@@ -215,10 +240,15 @@ func bundleShapeInput(input BuildReleaseInput) domain.BundleShapeInput {
 	for i, idp := range input.IDPs {
 		idps[i] = domain.BundleShapeIDP{Index: idp.Index, Document: idp.Document}
 	}
+	policies := make([]domain.BundleShapePolicy, len(input.Policies))
+	for i, policy := range input.Policies {
+		policies[i] = domain.BundleShapePolicy{Index: policy.Index, Operation: policy.Operation}
+	}
 	return domain.BundleShapeInput{
 		Schemas:     schemas,
 		Flows:       flows,
 		IDPs:        idps,
+		Policies:    policies,
 		HasBranding: input.Branding != nil,
 	}
 }
@@ -401,6 +431,33 @@ func (s *releaseService) prepareBundleIDPs(input BuildReleaseInput, failures *Bu
 	return docs
 }
 
+// prepareBundlePolicies validates each bundled policy against its
+// operation's template before the transaction opens, the check
+// `POST /policies` runs, so every refused config lands in the failures bag at
+// once.
+//
+// Only a refused config is the bundle's fault: a template the engine cannot
+// evaluate, or a config it cannot encode, is the server's, and fails the
+// build as an internal error rather than a `rel.invalid` entry.
+func (s *releaseService) prepareBundlePolicies(ctx context.Context, input BuildReleaseInput, failures *BundleValidationError) ([]preparedPolicy, error) {
+	prepared := make([]preparedPolicy, 0, len(input.Policies))
+	for _, policy := range input.Policies {
+		if shapeFailed(failures, domain.ReleasePointerKindPolicy, policy.Index) {
+			continue
+		}
+		config, err := s.policies.canonicalConfig(ctx, policy.Operation, policy.Config)
+		if errors.Is(err, domain.ErrPolicyInvalid(nil, nil)) {
+			failures.add(domain.ReleasePointerKindPolicy, policy.Index, policy.Operation, err)
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		prepared = append(prepared, preparedPolicy{operation: policy.Operation, config: config})
+	}
+	return prepared, nil
+}
+
 // checkBundleIDPImmutables runs the immutable-field check for each bundled
 // IDP that already exists, so every violation lands in the failures bag
 // before any write.
@@ -478,7 +535,7 @@ func (s *releaseService) autoPinReferences(
 	}
 
 	for handle := range needSchema {
-		latest, err := latestSchemaByObjectType(ctx, stmts, projectID, handle)
+		latest, err := LatestSchemaByObjectType(ctx, stmts, projectID, handle)
 		if err != nil {
 			return err
 		}
