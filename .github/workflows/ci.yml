@@ -210,11 +210,11 @@ jobs:
           MOON_BASE: ${{ env.CI_BASE }}
         run: moon ci :lint :typecheck :build :test :check-typecheck :check-openapi-rules :check-adrs :check-moon-graph --downstream deep --include-relations
 
-      - name: Upload login component diagnostics
+      - name: Upload component test diagnostics
         if: ${{ failure() && steps.moon-ci.outcome == 'failure' }}
         uses: actions/upload-artifact@v7
         with:
-          name: login-component-diagnostics
+          name: component-test-diagnostics
           path: |
             packages/components/test-output/vitest/junit.xml
             packages/components/src/**/__screenshots__/**

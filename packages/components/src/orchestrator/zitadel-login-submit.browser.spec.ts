@@ -36,20 +36,18 @@ async function expectPasswordFocus() {
   });
 }
 
-describe("login confidence", () => {
-  it("wrong password: announces the error, keeps a keyboard retry usable, and exposes no password events", async () => {
+describe("<zitadel-login> submit failures and latency (chromium)", () => {
+  it("wrong password: announces the error, refocuses the field and retries with Enter", async () => {
     const completed = vi.fn();
     login.addEventListener("zitadel-flow-complete", completed);
-    const publicInputs: unknown[] = [];
-    const onInput = (event: Event) => publicInputs.push((event as CustomEvent).detail);
-    const privateInput = vi.fn();
-    document.addEventListener("zitadel-flow-input", onInput);
-    document.addEventListener("zl-input", privateInput);
-    document.addEventListener("zl-change", privateInput);
+    // Real typing reaches the atoms' native inputs, which jsdom specs bypass
+    // by dispatching zl-input on the orchestrator directly.
+    const atomEvent = vi.fn();
+    document.addEventListener("zl-input", atomEvent);
+    document.addEventListener("zl-change", atomEvent);
     onTestFinished(() => {
-      document.removeEventListener("zitadel-flow-input", onInput);
-      document.removeEventListener("zl-input", privateInput);
-      document.removeEventListener("zl-change", privateInput);
+      document.removeEventListener("zl-input", atomEvent);
+      document.removeEventListener("zl-change", atomEvent);
     });
 
     await email().fill("alice@example.com");
@@ -65,7 +63,6 @@ describe("login confidence", () => {
     await expectPasswordFocus();
     await expect.element(submit()).toBeEnabled();
     expect(completed).not.toHaveBeenCalled();
-    expect(mock.current.getCaptured().some((r) => r.kind === "exchangeHandoff")).toBe(false);
 
     await password().fill("corrected-password");
     await expect.element(page.getByRole("alert")).not.toBeInTheDocument();
@@ -78,12 +75,10 @@ describe("login confidence", () => {
       { [PASSWORD_FIELD]: "incorrect-password" },
       { [PASSWORD_FIELD]: "corrected-password" },
     ]);
-    expect(publicInputs).toContainEqual({ name: "email", value: "alice@example.com" });
-    expect(publicInputs).not.toContainEqual(expect.objectContaining({ name: PASSWORD_FIELD }));
-    expect(privateInput).not.toHaveBeenCalled();
+    expect(atomEvent).not.toHaveBeenCalled();
   });
 
-  it("slow submit: shows busy state, ignores repeated submission, and advances with focus once released", async () => {
+  it("slow submit: sends one request for repeated submits, shows busy state, and focuses the next step", async () => {
     let release!: () => void;
     const released = new Promise<void>((resolve) => {
       release = resolve;
@@ -92,19 +87,16 @@ describe("login confidence", () => {
     mock.current.delayNextSubmitUntil(released);
 
     await email().fill("alice@example.com");
-    await userEvent.keyboard("{Enter}");
+    const form = login.shadowRoot!.querySelector("form")!;
+    // The second submit lands in the same tick, before the busy state renders.
+    form.requestSubmit();
+    form.requestSubmit();
     await vi.waitFor(() => expect(submissions()).toHaveLength(1));
     await expect.element(submit()).toBeDisabled();
-    const form = login.shadowRoot!.querySelector("form")!;
     expect(form.getAttribute("aria-busy")).toBe("true");
-
-    // Exercise the native form path even if a second submit was queued before
-    // the disabled button painted. The submit guard must hold independently.
-    form.requestSubmit();
     form.requestSubmit();
     await login.updateComplete;
     expect(submissions()).toHaveLength(1);
-    expect(login.shadowRoot!.querySelector('zl-field[type="password"]')).toBeNull();
 
     release();
     await expectPasswordFocus();

@@ -9,26 +9,6 @@ dependsOn:
   - "design-tokens"
 
 tasks:
-  # These select specs also discovered by the existing CI test task.
-  check-login:
-    command: "corepack pnpm run test:login"
-    deps:
-      - "install-browsers"
-      - "api-mock:build"
-    options:
-      cache: false
-      runInCI: false
-
-  watch-login:
-    command: "corepack pnpm run watch:login"
-    deps:
-      - "install-browsers"
-      - "api-mock:build"
-    options:
-      cache: false
-      persistent: true
-      runInCI: false
-
   typecheck:
     deps:
       # server.edge.spec.ts imports the built dist/server.mjs.

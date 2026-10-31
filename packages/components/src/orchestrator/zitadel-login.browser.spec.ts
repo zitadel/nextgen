@@ -14,10 +14,9 @@ import type { ZitadelLogin } from "./zitadel-login.js";
  * The orchestrator calls the typed `@zitadel/api` client
  * directly. This suite swaps `globalThis.fetch` for a queue of pre-baked
  * `CreateFlow201` payloads — equivalent to swapping the previous
- * `transport` property, one level lower in the stack. Fetch is stubbed
- * (rather than running `msw/browser`) because vitest's browser provider
- * has no out-of-the-box service-worker registration; the unit suite
- * covers the MSW-handler-driven contract.
+ * `transport` property, one level lower in the stack. Fetch is stubbed so
+ * each test pins its exact step payloads; `zitadel-login-submit.browser.spec.ts`
+ * drives the api-mock flow walker through `msw/browser` instead.
  */
 
 const identifierStep: CreateFlow201 = {
