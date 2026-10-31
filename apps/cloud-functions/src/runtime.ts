@@ -7,9 +7,9 @@ import { provisionCrm } from "./workflows/provision-crm";
 import { liveDirectory, zitadelServer } from "./zitadel";
 
 /**
- * The people, with their teams, whose CRM onboarding this instance started:
- * a page load starts it once per instance. Its run looks up what exists
- * before it writes, so another instance starting it again changes nothing.
+ * The people whose CRM onboarding this instance started: a page load starts
+ * it once per instance. Its run looks up what exists before it writes, so
+ * another instance starting it again changes nothing.
  */
 const crmStarted = new Set<string>();
 
@@ -21,11 +21,10 @@ export function workflowRuntime(request: Request): Runtime {
   return {
     systems: rpcSystems(liveDirectory(zitadelServer(request))),
     async provisionOnce(person, teams, attribution) {
-      const crmKey = [person.user_id, ...teams.map((team) => team.id).sort()].join(" ");
-      const crm = !crmStarted.has(crmKey);
+      const crm = !crmStarted.has(person.user_id);
       if (crm) {
-        await start(provisionCrm, [person, teams, attribution]);
-        crmStarted.add(crmKey);
+        await start(provisionCrm, [person, attribution]);
+        crmStarted.add(person.user_id);
       }
       // Stripe is asked only once the CRM's run has started, so HubSpot never
       // waits on its answer, nor fails with it.
