@@ -1311,7 +1311,9 @@ func (s *Server) handleCreateBrandingRequest(args [0]string, argsEscaped bool, w
 // must already exist in the project. `targets` is `primary` or preview
 // URLs. The deployment freezes the project's variable values for its kind,
 // with no fallback between primary and preview values. The newest primary
-// deployment also serves a caller with no origin.
+// deployment also serves a caller with no origin. `primary` freezes the
+// project's primary origins: one added later serves nothing until the next
+// deployment to `primary`, and one removed stops being served at once.
 // A deployment to `primary` changes nothing when the project's newest
 // primary deployment has the same release and frozen values and covers
 // exactly the current primary origins: the call answers `200` with that
@@ -18700,15 +18702,15 @@ func (s *Server) handleRevokeSessionRequest(args [1]string, argsEscaped bool, w 
 
 // handleRollbackDeploymentRequest handles rollbackDeployment operation.
 //
-// Re-deploys the release of the deployment named in the path to `primary`,
-// with the variable values it froze: a new deployment with `reason:
-// rollback` and `rollback_to` naming it. Like any deployment to `primary`,
-// it covers every current primary origin. Idempotent like a deployment to
-// `primary`: when nothing would change it answers `200` with the newest
-// primary deployment.
+// Re-deploys the release of the deployment named in the path, with the
+// origins and variable values it froze: a new deployment with `reason:
+// rollback` and `rollback_to` naming it. A primary origin added since serves
+// nothing until the next deployment to `primary`. Idempotent like a
+// deployment to `primary`: when nothing would change it answers `200` with
+// the newest primary deployment.
 // Failures:
 // - `400 dep.invalid`: the deployment went to preview URLs (deploy to the
-// preview again instead), or the project has no primary origin.
+// preview again instead).
 // - `404 dep.not_found`: no deployment of the project has that id.
 // - `409 dep.conflict`: `expected_deployment_id` is not the project's
 // newest primary deployment; `details.deployment` is that deployment.

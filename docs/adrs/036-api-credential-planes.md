@@ -344,3 +344,10 @@ list, needs a primary deployment, and without one answers `409` with
 nothing deployed answers `409` with `rel.not_deployed`. So the console signs in
 to the platform project on a loopback origin only when that origin is its
 public base.
+
+## Amendment (2026-10-31): a deployment freezes its origins
+
+A deployment to `primary` freezes the project's primary origins, and a rollback
+restores the ones it names. A primary origin serves the newest primary
+deployment only when that deployment names it and the project still lists it.
+So an added origin waits for a deploy, and removing one takes effect at once.

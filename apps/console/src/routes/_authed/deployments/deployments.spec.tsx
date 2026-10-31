@@ -393,6 +393,7 @@ describe("rollback from a row", () => {
   });
 
   it("rolls back to a superseded deployment, naming the live one", async () => {
+    serveProject([{ pattern: "https://app.acme.com", kind: "primary" }]);
     const history = [
       deployment("dep_live", { release_id: "rel_2" }),
       deployment("dep_old", { status: "inactive" }),
@@ -445,7 +446,32 @@ describe("rollback from a row", () => {
     expect(rows[1]).toHaveTextContent("rel_1");
   });
 
+  it("names a listed origin the restored deployment leaves out", async () => {
+    serveProject([
+      { pattern: "https://app.acme.com", kind: "primary" },
+      { pattern: "https://new.acme.com", kind: "primary" },
+    ]);
+    serveDeployments([
+      deployment("dep_live", {
+        release_id: "rel_2",
+        targets: [{ origin: "https://app.acme.com" }, { origin: "https://new.acme.com" }],
+      }),
+      deployment("dep_old", { status: "inactive" }),
+    ]);
+    await renderAt("/deployments");
+
+    await pick("dep_old", "Rollback");
+    const drawer = await screen.findByRole("dialog", { name: "Rollback deployment" });
+
+    expect(
+      await within(drawer).findByText(
+        "https://new.acme.com will refuse sign-in until the next deploy.",
+      ),
+    ).toBeInTheDocument();
+  });
+
   it("opens the choice of what to go back to from the live row", async () => {
+    serveProject([{ pattern: "https://app.acme.com", kind: "primary" }]);
     serveDeployments([
       deployment("dep_live", { release_id: "rel_2" }),
       deployment("dep_old", { status: "inactive" }),

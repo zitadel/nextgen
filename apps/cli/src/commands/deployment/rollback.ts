@@ -116,11 +116,16 @@ export default class DeploymentRollback extends Promptable(EnvironmentCommand) {
     // letting the rollback overwrite a change the caller never saw. Omitted
     // when nothing is live there, which an optional id cannot stand in for.
     const expectedDeploymentId = bareGuard ?? (await liveGuard(client, projectId));
+    const { dropped, unserved } = await originChanges(client, projectId, targetId);
 
     const confirmed = await this.input({
       kind: "confirm",
       name: `re-apply ${targetId}`,
-      message: `Re-apply ${targetId}? Its release goes live again.`,
+      message: `Re-apply ${targetId}? Its release goes live again.${
+        dropped.length === 0
+          ? ""
+          : ` ${dropped.join(", ")} will refuse sign-in until the next deploy.`
+      }`,
       retry: this.suggest(`deployment rollback ${targetId} --force`),
     });
     if (!confirmed) {
@@ -142,7 +147,14 @@ export default class DeploymentRollback extends Promptable(EnvironmentCommand) {
       );
     }
 
-    const origins = deployment.targets.map((target) => target.origin);
+    if (dropped.length > 0) {
+      reportWarning(
+        `Rolled back to origins that leave out ${dropped.join(", ")}: they refuse sign-in until the next deploy.`,
+      );
+    }
+    const origins = deployment.targets
+      .map((target) => target.origin)
+      .filter((origin) => !unserved.includes(origin));
     return this.emit({
       status: "ok",
       data: {
@@ -150,6 +162,8 @@ export default class DeploymentRollback extends Promptable(EnvironmentCommand) {
         release_id: deployment.release_id,
         rolled_back_to: deployment.metadata.rollback_to,
         origins,
+        dropped_origins: dropped,
+        unserved_origins: unserved,
         ...(pointers === undefined ? {} : { pointers }),
       },
       pretty: [
@@ -162,6 +176,30 @@ export default class DeploymentRollback extends Promptable(EnvironmentCommand) {
       ].join("\n"),
     });
   }
+}
+
+/**
+ * What a rollback to a deployment does to the project's origins, since it
+ * restores the origins that deployment froze. `dropped` are listed but left
+ * out, so they refuse; `unserved` are named but no longer listed.
+ */
+async function originChanges(
+  client: ZitadelClient,
+  projectId: string,
+  deploymentId: string,
+): Promise<{ dropped: string[]; unserved: string[] }> {
+  const [deployment, project] = await Promise.all([
+    client.getDeploymentById(deploymentId, { project_id: projectId }),
+    client.getProject(projectId),
+  ]);
+  const frozen = deployment.targets.map((target) => target.origin);
+  const listed = (project.origins ?? [])
+    .filter((origin) => origin.kind === "primary")
+    .map((origin) => origin.pattern);
+  return {
+    dropped: listed.filter((origin) => !frozen.includes(origin)),
+    unserved: frozen.filter((origin) => !listed.includes(origin)),
+  };
 }
 
 /** The project's newest primary deployment, which a rollback is guarded by. */

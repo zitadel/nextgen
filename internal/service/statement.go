@@ -84,8 +84,9 @@ type ProjectStatements interface {
 	DeleteProjectByID(ctx context.Context, id string) (changed bool, err error)
 	// LockProject locks the project row until the transaction ends. Callers
 	// that lock several projects do it in project id order, one row at a time.
-	// Postgres and Spanner take FOR UPDATE; SQLite already holds the write lock
-	// from BEGIN IMMEDIATE, so its statement is a plain read. Returns
+	// Postgres takes FOR NO KEY UPDATE and Spanner FOR UPDATE; SQLite already
+	// holds the write lock from BEGIN IMMEDIATE, so its statement is a plain
+	// read. Returns
 	// [database.NoRowFoundError] when no project carries the id.
 	LockProject(ctx context.Context, id string) error
 }

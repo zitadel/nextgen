@@ -2432,7 +2432,7 @@ describe("api-mock releases and deployments", () => {
     expect(deployed.targets[0]?.expires_at).not.toBeNull();
   });
 
-  test("refuses a rollback to an origin that is no longer primary with 403", async () => {
+  test("a rollback keeps the origins it froze when one is no longer primary", async () => {
     const project = await newProject("deploy-rollback-removed");
     await addPrimary(project.id, project.secret, "https://app.acme.com");
     await addPrimary(project.id, project.secret, "https://www.acme.com");
@@ -2460,8 +2460,12 @@ describe("api-mock releases and deployments", () => {
       },
     );
 
-    expect(rollback.status).toBe(403);
-    expect(((await rollback.json()) as { code: string }).code).toBe("proj.origin_not_allowed");
+    expect(rollback.status).toBe(200);
+    const restored = (await rollback.json()) as { targets: { origin: string }[] };
+    expect(restored.targets.map((target) => target.origin)).toEqual([
+      "https://app.acme.com",
+      "https://www.acme.com",
+    ]);
   });
 
   test("rolls back to an earlier deployment, reversing the live release", async () => {
