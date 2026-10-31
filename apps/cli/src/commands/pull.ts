@@ -2,6 +2,7 @@ import { mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 import { Args } from "@oclif/core";
+import type { GetReleaseById200PointersItemKind } from "@zitadel/api/generated/model";
 
 import type { ZitadelClient } from "../lib/api-client";
 import { ZitadelError } from "../lib/errors";
@@ -27,19 +28,22 @@ import { reportWarning } from "../lib/warnings";
  */
 type Reconstructable = {
   readonly dir: string;
-  read(client: ZitadelClient, revisionId: string): Promise<Record<string, unknown>>;
+  read(client: ZitadelClient, revisionId: string): Promise<object>;
   handleOf(body: Record<string, unknown>): string | undefined;
 };
 
 /** The release-pointer kinds `pull` can rebuild on disk. */
 type ReconstructableKind = "schema" | "flow_definition";
 
-export const RECONSTRUCTABLE: Readonly<Record<ReconstructableKind, Reconstructable>> = {
+// Keyed by every kind a release pins, so a kind pull cannot rebuild yet (branding,
+// idp) looks up as missing.
+export const RECONSTRUCTABLE: Readonly<Record<ReconstructableKind, Reconstructable>> &
+  Readonly<Partial<Record<GetReleaseById200PointersItemKind, Reconstructable>>> = {
   schema: {
     dir: SCHEMAS_DIR,
     read: async (client, revisionId) => {
       const response = await client.getSchemaById(revisionId);
-      return response.schema as Record<string, unknown>;
+      return response.schema;
     },
     handleOf: (body) => (typeof body.objectType === "string" ? body.objectType : undefined),
   },
@@ -47,7 +51,7 @@ export const RECONSTRUCTABLE: Readonly<Record<ReconstructableKind, Reconstructab
     dir: FLOWS_DIR,
     read: async (client, revisionId) => {
       const response = await client.getFlowDefinition(revisionId);
-      return response.flow_definition as Record<string, unknown>;
+      return response.flow_definition;
     },
     handleOf: (body) => (typeof body.name === "string" ? body.name : undefined),
   },
@@ -143,9 +147,7 @@ export default class Pull extends EnvironmentCommand {
     const pulled: { kind: string; handle: string; path: string }[] = [];
     const skipped: { kind: string; handle: string }[] = [];
     for (const pointer of release.pointers) {
-      // A release may pin kinds pull cannot rebuild yet (branding, idp), so the
-      // lookup is over the broad pointer kind and may miss.
-      const kind = (RECONSTRUCTABLE as Record<string, Reconstructable | undefined>)[pointer.kind];
+      const kind = RECONSTRUCTABLE[pointer.kind];
       if (kind === undefined) {
         skipped.push({ kind: pointer.kind, handle: pointer.handle });
         continue;

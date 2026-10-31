@@ -125,15 +125,34 @@ export type ListPage<I> = I extends string
   ? { readonly [K in I]: readonly unknown[] }
   : readonly unknown[];
 
-export type GetSpec<Ctx> = Readonly<{
-  call: (ctx: Ctx, id: string) => Promise<unknown>;
+/** One item of a page `P` whose list sits under `I`, or of `P` itself when there is none. */
+export type ListItem<P, I> = (I extends string ? P[I & keyof P] : P) extends readonly (infer T)[]
+  ? T
+  : never;
+
+/**
+ * Every dot-path into `T`: its fields, and the fields of the objects below
+ * them, stopping at arrays. What a resource's columns and detail may name.
+ */
+export type FieldPath<T> = T extends readonly unknown[]
+  ? never
+  : T extends object
+    ? {
+        [K in keyof T & string]: K | `${K}.${FieldPath<NonNullable<T[K]>>}`;
+      }[keyof T & string]
+    : never;
+
+// Method syntax for the same reason as `CreateSpec`: a spec typed by its
+// record `R` still assigns to the erased spec the registry holds.
+export type GetSpec<Ctx, R = unknown> = Readonly<{
+  call(ctx: Ctx, id: string): Promise<R>;
   /** Generated response schema of the record itself; see {@link QueryListSpec.response}. */
   response?: Schema;
   /**
    * Blocks a terminal shows under the fields, for a value that does not read
    * on one line (a release's pointers). Skipped when `--fields` picks the view.
    */
-  sections?: (item: unknown) => readonly string[];
+  sections?(item: R): readonly string[];
 }>;
 // Method syntax makes `body` bivariant, so a concrete-body spec still assigns to
 // the erased spec the registry and factory hold; the body/schema fit is checked

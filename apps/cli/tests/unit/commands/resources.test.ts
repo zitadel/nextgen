@@ -2,6 +2,7 @@ import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import type { GetReleaseById200 } from "@zitadel/api/generated/model";
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
@@ -1906,7 +1907,12 @@ describe("the release resource", () => {
   });
 
   it("shows the resources a release pins as a table under its fields", () => {
-    const release = {
+    const release: GetReleaseById200 = {
+      id: "rel_1",
+      project_id: "proj_1",
+      content_hash: "sha256:1",
+      metadata: { git_dirty: false, created_at: "2026-01-01T00:00:00.000Z" },
+      revoked_at: null,
       pointers: [
         { kind: "schema", handle: "human-user", revision_id: "sch_1" },
         { kind: "flow_definition", handle: "default-login", revision_id: "fd_1" },

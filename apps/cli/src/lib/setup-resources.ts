@@ -2,10 +2,9 @@ import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 import type {
-  CreateFlowDefinition201,
   CreateIdpBodyIdp,
-  CreateSchema201,
   CreateSchemaBody,
+  PublishPolicy201,
 } from "@zitadel/api/generated/model";
 import type { ZitadelClient } from "@zitadel/api/client";
 import {
@@ -179,7 +178,7 @@ export async function materializeSetupResources(opts: {
     // The file stays as written: the stored connection spells out defaults
     // the file leaves to the server, and `plan` reads those as no change.
     await updateState(opts.cwd, connectionPath, {
-      id: requiredString(created.id, "created identity provider connection id"),
+      id: created.id,
       hash: hashForState({ normalize: normalizeIdpBody }, connection),
     });
   }
@@ -201,11 +200,11 @@ export async function materializeSetupResources(opts: {
     filesWritten.push(join(opts.cwd, DEFAULT_SCHEMA_CONFIG_PATH));
   }
 
-  const schema = (await opts.client.createSchema(schemaBody as CreateSchemaBody, {
+  const schema = await opts.client.createSchema(schemaBody as CreateSchemaBody, {
     project_id: opts.projectId,
-  })) as CreateSchema201;
+  });
   await updateState(opts.cwd, DEFAULT_SCHEMA_CONFIG_PATH, {
-    id: requiredString(schema.id, "created schema id"),
+    id: schema.id,
     hash: hashForState({ normalize: normalizeSchemaBody }, schemaBody),
   });
 
@@ -229,14 +228,14 @@ export async function materializeSetupResources(opts: {
     filesWritten.push(join(opts.cwd, DEFAULT_FLOW_CONFIG_PATH));
   }
 
-  const flow = (await opts.client.createFlowDefinition({
+  const flow = await opts.client.createFlowDefinition({
     project_id: opts.projectId,
     schema_uri: DEFAULT_FLOW_SCHEMA_URI,
     flow_definition: flowBody,
-  })) as CreateFlowDefinition201;
+  });
 
   await updateState(opts.cwd, DEFAULT_FLOW_CONFIG_PATH, {
-    id: requiredString(flow.id, "created flow definition id"),
+    id: flow.id,
     hash: hashForState({ normalize: normalizeFlowBody }, flowBody),
     name: flowBody.name,
     status: flowBody.status,
@@ -252,7 +251,7 @@ export async function materializeSetupResources(opts: {
     kept === undefined
       ? passwordPolicyFile(opts.passwordMinLength)
       : withMinLength(kept, opts.passwordMinLength);
-  let published: { id?: unknown } | undefined;
+  let published: PublishPolicy201 | undefined;
   try {
     published = await opts.client.publishPolicy(toPolicyWireBody(policy), {
       project_id: opts.projectId,
@@ -276,7 +275,7 @@ export async function materializeSetupResources(opts: {
       filesWritten.push(join(opts.cwd, PASSWORD_POLICY_PATH));
     }
     await updateState(opts.cwd, PASSWORD_POLICY_PATH, {
-      id: requiredString(published.id, "published policy id"),
+      id: published.id,
       hash: hashForState({ normalize: (body) => toPolicyWireBody(body as PolicyFile) }, policy),
     });
   }
@@ -563,13 +562,6 @@ function resourceExists(
       "Move the file aside or rerun setup with --force if you want setup to replace it.",
     nextCommands: onExists?.nextCommands,
   });
-}
-
-function requiredString(value: unknown, label: string): string {
-  if (typeof value === "string" && value.length > 0) {
-    return value;
-  }
-  throw new ZitadelError("E_VALIDATION", `Missing ${label} in server response.`);
 }
 
 function isErrno(error: unknown, code: string): boolean {

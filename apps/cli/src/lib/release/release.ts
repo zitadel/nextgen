@@ -1,13 +1,17 @@
 import type { ZitadelClient } from "@zitadel/api/client";
-import type { BuildRelease201, BuildReleaseBody } from "@zitadel/api/generated/model";
+import type {
+  BuildRelease200,
+  BuildRelease201,
+  BuildReleaseBody,
+} from "@zitadel/api/generated/model";
 
 import type { ConfigurationBundle } from "./bundle";
 
 /**
- * A release, as every build/get returns it. `BuildRelease200` (the dedupe
- * answer) and `BuildRelease201` share this shape, so one alias covers both.
+ * A release, as build returns it: 200 when the bundle matched a release that
+ * already carries it, 201 when it built a new one. The two shapes match.
  */
-export type Release = BuildRelease201;
+export type Release = BuildRelease200 | BuildRelease201;
 
 /** Metadata recorded alongside a release, mirroring the source commit. */
 export type ReleaseSource = {
@@ -37,8 +41,7 @@ export async function createReleaseFromBundle(
     ...(source.gitSha === null ? {} : { git_sha: source.gitSha }),
     git_dirty: source.gitDirty,
   } as unknown as BuildReleaseBody;
-  const result = await client.buildRelease(body, { project_id: projectId });
-  return result as Release;
+  return client.buildRelease(body, { project_id: projectId });
 }
 
 /** Revoke a release so its content is never served again. Idempotent. */
