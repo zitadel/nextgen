@@ -63,7 +63,7 @@ export class IssuerOriginCheck implements SanityCheck {
    * The API has no kind change, and adding the pattern as primary conflicts
    * with the stored preview one, so it is removed and added back. Should the
    * add fail, the preview pattern is put back: a project left with no origins
-   * admits every origin.
+   * admits no origin except a loopback origin.
    */
   async fix(ctx: CheckContext): Promise<void> {
     if (ctx.dryRun) {
