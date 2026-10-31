@@ -436,10 +436,10 @@ APIs under [`packages/config/defaults/`](../../packages/config/defaults/),
 [`SKILL.md`](../../apps/cli/skills/zitadel-cli/SKILL.md), the SDK READMEs and
 the components README.
 
-## Amendment (2026-10-31): the newest primary deployment
+## Amendment (2026-10-31): §4, the newest primary deployment
 
 There is no project default target, and a newest deployment to an origin here is
 the deployment that origin serves under
 [ADR 085](085-which-release-serves-a-request.md): for a primary origin, the
-project's newest primary deployment while that names it. A client credentials
+project's newest primary deployment while that deployment names it. A client credentials
 request still never resolves from its `Origin` header.

@@ -28,11 +28,12 @@ Opening a flow takes four steps:
    Anything else answers `403` with `proj.origin_not_allowed` or
    `proj.preview_not_live`. The console's origins (`server.public_base`'s and
    `server.console_origins`) can open any project's flow, but cannot take a
-   later step.
+   later step. An unlisted loopback origin passes, but no deployment names it,
+   so it answers `409 rel.not_deployed` rather than `403`.
 2. Find the deployment. A live preview URL uses its own newest deployment. Any
    other origin uses the project's newest primary deployment, if that deployment
    names the origin. A request with no `Origin`, and a console origin the project
-   does not list, use the newest primary deployment.
+   does not list, a loopback one included, use the newest primary deployment.
 3. With no deployment, the request answers `409`: `rel.not_deployed` for an
    origin, `rel.no_default` for a request with no origin of its own.
 4. Serve that deployment's release. If it was revoked, the request answers `409`
@@ -63,9 +64,9 @@ they follow the newest primary deployment and ignore `Origin`.
 
 Primary origins deploy as a whole, so one deployment already describes what the
 project serves. It also serves callers with no `Origin`, and there is no other
-target to deploy to or keep in step. With every primary origin removed it keeps
-serving them, so it stays live and its release cannot be revoked. `targets` on
-`POST /deployments` is `"primary"` or a list of preview URLs.
+target to deploy to or keep in step. The newest primary deployment is therefore
+always live, whatever the project lists, and its release cannot be revoked.
+`targets` on `POST /deployments` is `"primary"` or a list of preview URLs.
 
 ### A deployment freezes its origins
 
@@ -74,7 +75,8 @@ restores the ones it recorded. A primary origin is served only while the newest
 primary deployment names it and the project lists it. So an origin new to the
 project serves nothing until the next deploy. Removing an origin takes effect at
 once, because the origin check still reads the project's list, and adding it back
-before the next deploy restores it.
+before the next deploy restores it. Primary deploys to one project are serialized,
+so two that name different origins cannot both replace the same deployment.
 
 ### Example
 
@@ -150,8 +152,11 @@ still read the newest revisions, because no release serves them.
 - A project with no primary origin cannot deploy, so a project with no web app
   lists one anyway.
 - Callers with no `Origin` cannot stay on an older release than the web origins.
-- After a rollback, an origin added since the restored deployment refuses until
-  the next deploy.
+- A rollback drops every listed origin the restored deployment does not name, and
+  those refuse until the next deploy. `zitadel deployment rollback` names them
+  before it asks.
+- A dev server on a loopback origin the project does not list, such as `:5173`
+  with `:3000` listed, answers `409 rel.not_deployed`.
 - The console's login preview of a project it does not list shows the newest
   primary deployment, so undeployed drafts stay out of it.
 - Signing in to the console from a hosted deployment's own URL is not covered:
