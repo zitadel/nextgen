@@ -13,6 +13,12 @@ export function zitadelServer(request: Request): string {
 }
 
 /**
+ * The prefix the server answers the API under (ADR 077). Until 1.0.0 it also
+ * answers the same operations at the root, which older widgets still call.
+ */
+export const API_PREFIX = "/api/v1";
+
+/**
  * Lets a call from the functions through to the server on a preview, whose
  * own origin sits behind Vercel Authentication as it does for a browser.
  */
@@ -43,7 +49,7 @@ interface MyTeams {
  */
 export function liveDirectory(server: string): Directory {
   async function read<T>(cookie: string, path: string): Promise<T | undefined> {
-    const url = new URL(path, server);
+    const url = new URL(`${API_PREFIX}${path}`, server);
     const answer = await fetch(url, {
       headers: passProtection(new Headers({ accept: "application/json", cookie })),
     });

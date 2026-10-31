@@ -1189,7 +1189,7 @@ async function startCreateProjectCaptureServer(
       );
       return;
     }
-    if (req.method === "POST" && path === "/releases/build") {
+    if (req.method === "POST" && path === "/api/v1/releases/build") {
       if (rejectsBuilds) {
         res
           .writeHead(500, { "content-type": "application/json" })
@@ -1205,7 +1205,7 @@ async function startCreateProjectCaptureServer(
       );
       return;
     }
-    if (req.method === "POST" && path === "/deployments") {
+    if (req.method === "POST" && path === "/api/v1/deployments") {
       const chunks: Buffer[] = [];
       for await (const chunk of req) {
         chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
@@ -1225,7 +1225,7 @@ async function startCreateProjectCaptureServer(
       );
       return;
     }
-    if (req.method === "POST" && path === "/policies") {
+    if (req.method === "POST" && path === "/api/v1/policies") {
       res.writeHead(201, { "content-type": "application/json" }).end(
         JSON.stringify({
           id: "pol_test",

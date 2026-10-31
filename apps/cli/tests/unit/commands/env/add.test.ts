@@ -687,10 +687,10 @@ describe("env add asked on a terminal", () => {
   /** The platform accepts the release and the deployment. */
   function platformDeploys(): void {
     server.use(
-      http.post(`${SERVER}/releases/build`, () =>
+      http.post(`${SERVER}/api/v1/releases/build`, () =>
         HttpResponse.json({ id: "rel_1", content_hash: "sha256:abc" }, { status: 201 }),
       ),
-      http.post(`${SERVER}/deployments`, () =>
+      http.post(`${SERVER}/api/v1/deployments`, () =>
         HttpResponse.json(
           { id: "dep_1", targets: [{ origin: "https://app.acme.com", expires_at: null }] },
           { status: 201 },
@@ -702,7 +702,7 @@ describe("env add asked on a terminal", () => {
   /** The platform refuses to build the release. */
   function platformRefusesTheRelease(): void {
     server.use(
-      http.post(`${SERVER}/releases/build`, () =>
+      http.post(`${SERVER}/api/v1/releases/build`, () =>
         HttpResponse.json({ code: "rel.invalid", message: "no" }, { status: 400 }),
       ),
     );

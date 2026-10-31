@@ -442,7 +442,7 @@ describe("get rendering", () => {
   it("shows a policy's config, the setting a reader looks it up for", async () => {
     const cwd = await makeProject();
     server.use(
-      http.get(`${SERVER}/policies/pol_1`, () =>
+      http.get(`${SERVER}/api/v1/policies/pol_1`, () =>
         HttpResponse.json({
           id: "pol_1",
           revision_id: "polrev_1",
@@ -475,7 +475,7 @@ describe("get rendering", () => {
   it("shows an empty config, which says the policy enforces nothing", async () => {
     const cwd = await makeProject();
     server.use(
-      http.get(`${SERVER}/policies/pol_1`, () =>
+      http.get(`${SERVER}/api/v1/policies/pol_1`, () =>
         HttpResponse.json({
           id: "pol_1",
           revision_id: "polrev_1",
@@ -520,7 +520,7 @@ describe("policies", () => {
   it("gets a policy by id", async () => {
     const cwd = await makeProject();
     server.use(
-      http.get(`${SERVER}/policies/pol_1`, ({ request }) => {
+      http.get(`${SERVER}/api/v1/policies/pol_1`, ({ request }) => {
         expect(new URL(request.url).searchParams.get("project_id")).toBe("proj_test");
         return HttpResponse.json(policy);
       }),
@@ -536,7 +536,7 @@ describe("policies", () => {
     const cwd = await makeProject();
     let query: URLSearchParams | undefined;
     server.use(
-      http.get(`${SERVER}/policies`, ({ request }) => {
+      http.get(`${SERVER}/api/v1/policies`, ({ request }) => {
         query = new URL(request.url).searchParams;
         return HttpResponse.json({ policies: [policy], next_page_token: null });
       }),
@@ -552,7 +552,7 @@ describe("policies", () => {
   it("answers E_NOT_FOUND for an operation the project has no policy for", async () => {
     const cwd = await makeProject();
     server.use(
-      http.get(`${SERVER}/policies`, () =>
+      http.get(`${SERVER}/api/v1/policies`, () =>
         HttpResponse.json({ policies: [], next_page_token: null }),
       ),
     );
@@ -576,7 +576,7 @@ describe("policies", () => {
     const cwd = await makeProject();
     let query: URLSearchParams | undefined;
     server.use(
-      http.get(`${SERVER}/policies`, ({ request }) => {
+      http.get(`${SERVER}/api/v1/policies`, ({ request }) => {
         query = new URL(request.url).searchParams;
         return HttpResponse.json({ policies: [policy], next_page_token: null });
       }),

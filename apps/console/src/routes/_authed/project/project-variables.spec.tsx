@@ -46,7 +46,9 @@ beforeEach(() =>
 function stubVariables(body: Record<string, unknown>, status = 200) {
   const projects: (string | null)[] = [];
   server.use(
-    http.get("http://localhost/api/v1/projects/:id/admins", () => HttpResponse.json({ admins: [] })),
+    http.get("http://localhost/api/v1/projects/:id/admins", () =>
+      HttpResponse.json({ admins: [] }),
+    ),
     http.get(VARIABLES_URL, ({ request }) => {
       projects.push(new URL(request.url).searchParams.get("project_id"));
       return HttpResponse.json(body, { status });

@@ -37,7 +37,9 @@ const PREVIEW: Origin = { pattern: "https://*-acmeinc.vercel.app", kind: "previe
 beforeEach(() =>
   server.use(
     http.post("http://localhost/api/v1/grants/query", () => HttpResponse.json({ grants: [] })),
-    http.get("http://localhost/api/v1/projects/:id/admins", () => HttpResponse.json({ admins: [] })),
+    http.get("http://localhost/api/v1/projects/:id/admins", () =>
+      HttpResponse.json({ admins: [] }),
+    ),
     http.get("http://localhost/api/v1/variables", () => HttpResponse.json({})),
     http.get("http://localhost/api/v1/policies", () =>
       HttpResponse.json({ policies: [], next_page_token: null }),

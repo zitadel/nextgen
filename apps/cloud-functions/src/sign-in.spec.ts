@@ -68,7 +68,7 @@ describe("the sign-in widget's calls", () => {
     );
     vi.stubGlobal("fetch", upstream);
     const answer = await forwardSignIn(
-      new Request("https://cloud.example/cloud/zitadel/flow/flw_1/submit?x=1", {
+      new Request("https://cloud.example/cloud/zitadel/api/v1/flow/flw_1/submit?x=1", {
         method: "POST",
         headers: { cookie: "__Host-zitadel_session=old", origin: "https://cloud.example" },
         body: "{}",
@@ -76,7 +76,7 @@ describe("the sign-in widget's calls", () => {
       human,
     );
     const [url, init] = upstream.mock.calls[0] as unknown as [URL, RequestInit];
-    expect(url.href).toBe("https://cloud.example/flow/flw_1/submit?x=1");
+    expect(url.href).toBe("https://cloud.example/api/v1/flow/flw_1/submit?x=1");
     expect(new Headers(init.headers).get("cookie")).toBe("__Host-zitadel_session=old");
     expect(answer.headers.getSetCookie()).toEqual(["__Host-zitadel_session=new; Path=/; Secure"]);
   });

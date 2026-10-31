@@ -195,7 +195,7 @@ function signOutBackend(check: () => Response): { method: string; cookie: string
           headers: { "set-cookie": `${SHARED}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax` },
         });
       }
-      return new URL(url).pathname === "/sessions/me/csrf"
+      return new URL(url).pathname === "/api/v1/sessions/me/csrf"
         ? Response.json({ csrf_token: "csrf" })
         : check();
     }),

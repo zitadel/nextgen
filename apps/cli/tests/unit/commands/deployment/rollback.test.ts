@@ -121,7 +121,7 @@ describe("deployment rollback", () => {
   it("warns rather than fails when the restored release cannot be read", async () => {
     const { cwd } = await twoDeploys();
     server.use(
-      http.get(`${SERVER}/releases/:id`, () =>
+      http.get(`${SERVER}/api/v1/releases/:id`, () =>
         HttpResponse.json({ code: "internal", message: "boom" }, { status: 500 }),
       ),
     );
