@@ -222,9 +222,13 @@ func TestPrepareServerLeavesThePurgeToTheCronJob(t *testing.T) {
 				TriggerSecret string `yaml:"trigger_secret"`
 			} `yaml:"retention"`
 		} `yaml:"events"`
+		Usage struct {
+			TriggerSecret string `yaml:"trigger_secret"`
+		} `yaml:"usage"`
 	}
 	require.NoError(t, yaml.Unmarshal(raw, &config))
 	assert.Equal(t, secret, config.Events.Retention.TriggerSecret)
+	assert.Equal(t, secret, config.Usage.TriggerSecret, "the usage count runs from its own cron path")
 	assert.Empty(t, os.Getenv("CRON_SECRET"), "the secret leaves the environment once it is on disk")
 }
 
@@ -376,11 +380,11 @@ func TestVercelJSONKeepsTheServerInFrankfurt(t *testing.T) {
 	assert.Equal(t, []string{"fra1"}, function.Regions, "the region of the PlanetScale databases")
 }
 
-// The cron job is the only caller of the audit event purge in the cloud, so
-// its path is the server's trigger, and nothing routes it anywhere but the
-// server: a redirect would end the run, which a cron job does not follow, and
-// another service would answer 404.
-func TestVercelJSONSchedulesTheEventRetentionPurge(t *testing.T) {
+// The cron jobs are the only callers of the audit event purge and the usage
+// count in the cloud, so their paths are the server's triggers, and nothing
+// routes them anywhere but the server: a redirect would end the run, which a
+// cron job does not follow, and another service would answer 404.
+func TestVercelJSONSchedulesTheJobTriggers(t *testing.T) {
 	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "vercel.json"))
 	require.NoError(t, err)
 	var config struct {
@@ -398,23 +402,32 @@ func TestVercelJSONSchedulesTheEventRetentionPurge(t *testing.T) {
 	}
 	require.NoError(t, json.Unmarshal(raw, &config))
 
-	require.Len(t, config.Crons, 1)
-	assert.Equal(t, audit.RetentionTriggerPath, config.Crons[0].Path)
-	assert.Equal(t, "17 * * * *", config.Crons[0].Schedule, "hourly, as a self-hosted server purges")
+	schedules := make(map[string]string, len(config.Crons))
+	for _, cron := range config.Crons {
+		schedules[cron.Path] = cron.Schedule
+	}
+	assert.Equal(t, map[string]string{
+		// Hourly, as a self-hosted server purges.
+		audit.RetentionTriggerPath: "17 * * * *",
+		// Every five minutes, as a self-hosted server counts.
+		audit.UsageTriggerPath: "*/5 * * * *",
+	}, schedules)
 
-	for _, redirect := range config.Redirects {
-		assert.False(t, routeMatches(redirect.Source, audit.RetentionTriggerPath), "redirected by %s", redirect.Source)
-	}
-	var service string
-	for _, rewrite := range config.Rewrites {
-		if routeMatches(rewrite.Source, audit.RetentionTriggerPath) {
-			var destination struct{ Service string }
-			require.NoError(t, json.Unmarshal(rewrite.Destination, &destination))
-			service = destination.Service
-			break
+	for path := range schedules {
+		for _, redirect := range config.Redirects {
+			assert.False(t, routeMatches(redirect.Source, path), "%s redirected by %s", path, redirect.Source)
 		}
+		var service string
+		for _, rewrite := range config.Rewrites {
+			if routeMatches(rewrite.Source, path) {
+				var destination struct{ Service string }
+				require.NoError(t, json.Unmarshal(rewrite.Destination, &destination))
+				service = destination.Service
+				break
+			}
+		}
+		assert.Equal(t, "server", service, "the first rewrite that matches %s", path)
 	}
-	assert.Equal(t, "server", service, "the first rewrite that matches the trigger's path")
 }
 
 // routeMatches reports whether a vercel.json source matches path, for the

@@ -197,6 +197,14 @@ var eventsAccess = resourceAccess{
 	denied:    domain.ErrEventPermissionDenied,
 }
 
+// usageAccess gates a project's usage read (ADR 086), project-scoped like
+// the events it is counted from, until #420 mints a fine-grained relation.
+var usageAccess = resourceAccess{
+	readMiss:  domain.ErrUsageNotFound,
+	writeMiss: domain.ErrUsageNotFound,
+	denied:    domain.ErrUsagePermissionDenied,
+}
+
 // grantAccess gates create/get/query/revoke. Grants are not in resource_scope_index;
 // every op takes project_id from the query (same as events).
 var grantAccess = resourceAccess{

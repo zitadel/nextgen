@@ -17,6 +17,10 @@
 > not counted.
 > **Depends on:** [#2551](https://github.com/zitadel/nextgen/pull/2551), which
 > tells a reader when no event can still commit with an earlier `created_at`.
+> **Implementation state:** §1 to §5 are built, with the purge's wait, the
+> console's Usage screen and the cloud's prices on it. `usage_days`
+> compaction and `usage.retention` (§6) and the operator feed (§5) are not
+> yet, so `report-usage` still reads the cloud's mock.
 
 ## Context
 
@@ -58,48 +62,53 @@ in code, beside the event types in `internal/domain`. Each meter names:
 - **The event types it counts**, and, for a `users` meter, which column names
   the user.
 
-The first meter is `monthly_active_users`: the users named by a
-`session.established` or `auth.token.issued` event. The catalog's other meters
-follow one at a time.
+The first meter is `monthly_active_users`: the users a `session.established`
+event names in its `payload.user_id`. Every `auth.token.issued` that names a
+user is minted in the transaction that establishes its session, so counting it
+too would add no one. The catalog's other meters follow one at a time.
 
 The server stores no price, allowance or plan. A self-hosted deployment that
 bills nothing gets the same counts.
 
-A meter counts from the release that adds it, and nothing is backfilled. Its
-first month is partial, so the cloud prices a new meter from the first of the
-following month.
+A meter counts from the release that adds it, and nothing older than the
+retention window is backfilled: a project's first count reads every event
+still stored. A new meter's first month can therefore be partial, so the cloud
+prices a new meter from the first of the following month.
 
 ### 2. Rollup tables, written only by the projector
 
 ```sql
--- Postgres; Spanner and SQLite mirror it.
+-- Postgres (migration 000039); Spanner and SQLite mirror it.
 CREATE TABLE zitadel_nextgen.usage_first_seen (
-    project_id  TEXT NOT NULL
-    , meter     TEXT NOT NULL
-    , month     DATE NOT NULL                -- UTC, the month's first day
-    , user_id   TEXT NOT NULL
+    project_id  TEXT COLLATE "C" NOT NULL
+    , meter     TEXT COLLATE "C" NOT NULL
+    , month     TIMESTAMPTZ      NOT NULL    -- UTC, the month's first instant
+    , user_id   TEXT COLLATE "C" NOT NULL
     , PRIMARY KEY (project_id, meter, month, user_id)
 );
 
 CREATE TABLE zitadel_nextgen.usage_hours (
-    project_id  TEXT        NOT NULL
-    , meter     TEXT        NOT NULL
-    , hour      TIMESTAMPTZ NOT NULL         -- UTC, the hour's start
-    , value     BIGINT      NOT NULL
+    project_id  TEXT COLLATE "C" NOT NULL
+    , meter     TEXT COLLATE "C" NOT NULL
+    , hour      TIMESTAMPTZ      NOT NULL    -- UTC, the hour's start
+    , value     BIGINT           NOT NULL
     , PRIMARY KEY (project_id, meter, hour)
 );
 
--- usage_days: the same columns, keyed by UTC day (§6).
+-- usage_days: the same columns, keyed by UTC day (§6), once compaction lands.
 
 CREATE TABLE zitadel_nextgen.usage_cursors (
-    project_id        TEXT        NOT NULL
+    project_id        TEXT COLLATE "C" NOT NULL
         REFERENCES zitadel_nextgen.projects (id) ON DELETE CASCADE
-    , last_created_at TIMESTAMPTZ NOT NULL
-    , last_event_id   TEXT        NOT NULL
-    , counted_before  TIMESTAMPTZ NOT NULL   -- every earlier event is counted
+    , counted_before  TIMESTAMPTZ      NOT NULL  -- every earlier event is counted
+    , last_event_id   TEXT COLLATE "C" NOT NULL  -- "" when it sits on a bound
     , PRIMARY KEY (project_id)
 );
 ```
+
+`(counted_before, last_event_id)` is also where the next read starts, after
+it on `(created_at, id)`. No column is a DATE: Spanner's DATE needs
+`civil.Date` in Go, which nothing else in the repo uses.
 
 - **Rows only where something counted.** A row exists only for an hour in
   which something counted. A project's month is therefore at most 31 day rows
@@ -110,38 +119,51 @@ CREATE TABLE zitadel_nextgen.usage_cursors (
 
 ### 3. The projector counts each event once
 
-**When it runs.** The projector is a periodic job
-([ADR 065](065-background-jobs.md)), running every `usage.interval`.
+**When it runs.** The projector (`audit.UsageProjector`) runs its own loop,
+every `usage.interval`, as the purge does: ADR 065's job table does not exist
+yet, and the projector moves onto it with the purge.
 
 - On a server that runs only while it serves a request, a scheduler calls
   `/cron/usage` with `usage.trigger_secret` instead. This works like the
   purge's trigger (ADR 049, amendment of 2026-10-27).
-- It walks every project, claimed or not, that has events past its cursor.
-  This is how the shipper walks its sinks and projects (ADR 049 §3). Counting
-  unclaimed projects means a project claimed mid-month has its whole month
-  counted.
+- It walks every project, claimed or not, per project as the shipper does
+  (ADR 049 §3), though the shipper walks only claimed ones. Counting unclaimed
+  projects means a project claimed mid-month has its whole month counted.
 
 **What it does for each project:**
 
-1. **Reads a batch of settled events.** It reads the project's settled events
-   after its cursor, in `(created_at, id)` order, a bounded batch at a time.
-   An event is settled once no event can still commit with an earlier
-   `created_at` (#2551), so the cursor never passes an event that commits
-   late.
-2. **Counts the batch in one transaction.** The transaction does three things:
+1. **Reads a batch of settled events.** It reads the project's events of the
+   meters' types after its cursor, in `(created_at, id)` order, at most 500,
+   with the bound the read is complete to (`ReadUsageEvents`). Each dialect
+   knows that bound its own way:
+   - **Postgres:** #2551's settled bound, from the locks event writers hold.
+   - **Spanner:** the strong read's own timestamp. `created_at` is the commit
+     timestamp, so a later commit is stamped later.
+   - **SQLite:** the clock, read before the list. An insert never stamps an
+     event before its project's `counted_before`, so one whose clock read
+     came earlier still lands after the cursor.
+2. **Picks the next cursor.**
+   - A full batch moves it onto its last event.
+   - A short batch moves it to `(bound, "")`, so a quiet project never reads
+     the request events behind its last sign-in again.
+   - It never moves back, and an idle project's moves only when the bound
+     enters another hour: about one write per idle project and hour.
+3. **Counts the batch in one transaction.** The transaction does three things:
+   - It moves the cursor, by compare-and-set against the one it read
+     (`AdvanceUsageCursor`).
    - It inserts the batch's users into `usage_first_seen` where they are not
      there yet.
-   - It adds to `usage_hours`, per hour of `created_at`, the users it inserted
-     and the activity it matched.
-   - It moves the cursor.
-3. **Moves `counted_before`.** If the batch reached the settled bound,
-   `counted_before` becomes that bound. If the batch limit cut the batch
-   short, it becomes the `created_at` of the batch's last event.
+   - It adds to `usage_hours`, per hour of `created_at`, the users it inserted.
+   A batch that names no user only moves the cursor.
 
 **Why every event counts exactly once:**
 
 - A crash rolls the batch back together with its cursor.
-- Two runs that overlap queue up on the cursor row.
+- Of two runs that read the same cursor, the second's compare-and-set
+  matches no row, so it writes nothing and stops: Postgres makes it wait for
+  the first's row lock, Spanner aborts and replays it, SQLite starts it after
+  the first commits. A Spanner replay recomputes from values captured before
+  the transaction.
 
 **Events a meter can't use.** An event a meter can't read, such as a `users`
 event that names no user, counts nothing, and it never stops the projector.
@@ -163,18 +185,21 @@ page can rely on it.
 Each read reports `sealed_through`, the start of the first hour that is not
 sealed yet:
 
-- For one project, on that project's read.
+- For one project, on that project's read: its `counted_before`, truncated to
+  the hour, or null before its first count.
 - For the whole deployment, on the operator feed: the earliest hour before
-  which any project still has events to count.
+  which any project still has events to count. A project without a cursor
+  yet counts as unsealed.
 
-An idle project's settled bound moves with the clock. Only projects with
-uncounted events hold `sealed_through` back.
+An idle project's cursor moves with the clock, an hour at a time. Only
+projects with uncounted events hold `sealed_through` back.
 
 ### 5. Two reads, both returning counts only
 
-**Per project.** It is authorized the way `/events` is (ADR 049 §1): a
-`usage.read` system-catalog permission on the project, plus the same pre-claim
-gate (ADR 049 §4).
+**Per project.** It is authorized the way `/events` is (ADR 049 §1): the
+project's `viewer` relation, with `usage.read` declared as its OAuth scope, as
+`events.read` is. Unlike `/events` it has no pre-claim gate: the counts carry
+no event content, and a standalone deployment never claims its projects.
 
 ```http
 GET /usage?project_id=…&from=2026-10-01T00:00:00Z&to=2026-11-01T00:00:00Z&granularity=day
@@ -186,23 +211,28 @@ GET /usage?project_id=…&from=2026-10-01T00:00:00Z&to=2026-11-01T00:00:00Z&gran
     { "meter": "monthly_active_users", "start": "2026-10-01T00:00:00Z", "value": 412 }
   ],
   "sealed_through": "2026-10-30T14:00:00Z",
-  "next_page_token": null
+  "team_id": "team_…"
 }
 ```
 
-- **`granularity`** is `day` (a UTC day) or `hour`. Hours exist only for the
-  current and the previous month (§6).
+- **`granularity`** is `day` (a UTC day) or `hour`. `from` and `to` start one,
+  at most 31 days apart.
 - **`meter`** filters the result and can be repeated.
-- **Paging** works as in ADR 027's lists.
+- **No paging:** it is a bounded report, not a list. A month is at most 744
+  hours per meter.
 - **Open buckets:** a bucket that starts at or after `sealed_through` may still
   grow.
-- **Who calls it:** the cloud functions read it as the signed-in person (ADR
-  084 §4), once for each of the team's projects, and price the counts with the
-  catalog.
+- **`team_id`** is the team that has claimed the project (ADR 046), or null.
+  The cloud prices a project inside its team's bill, and no other API tells it
+  which team that is.
+- **Who calls it:** the console's Usage screen, for the selected project, and
+  the cloud functions, as the signed-in person (ADR 084 §4), for each project
+  the person can act on, keeping those whose `team_id` is the team they price.
+- **With counting off,** it answers `404 usage.disabled`.
 
-**For the whole deployment, for `report-usage`.** This is an operator path
-outside the OpenAPI document, as the purge's trigger is. It answers only
-requests that carry `usage.read_secret` as a bearer token.
+**For the whole deployment, for `report-usage`** (not built yet). This is an
+operator path outside the OpenAPI document, as the purge's trigger is. It
+answers only requests that carry `usage.read_secret` as a bearer token.
 
 ```http
 GET /operator/usage?from=…&to=…
@@ -239,7 +269,8 @@ GET /operator/usage?from=…&to=…
 
 ### 6. Usage outlives events, and events wait for usage
 
-**How long usage is kept:**
+**How long usage is kept** (not built yet: until it is, every rollup row
+stays):
 
 - **First-seen rows.** A month's `usage_first_seen` rows are deleted once the
   following month is sealed. They only decide who counted first.
@@ -250,10 +281,11 @@ GET /operator/usage?from=…&to=…
   month can be compared with the same month a year earlier.
 
 **The purge (amends ADR 049 §2).** While `usage.enabled` is on, the purge
-doesn't delete a project's events from that project's `counted_before` on.
+doesn't delete a project's events from that project's `counted_before` on
+(`DeleteCountedEventsOlderThan`).
 
-- A stalled projector makes `events` grow instead of losing usage, and
-  `usage_projector_lag_seconds` shows the stall.
+- A stalled projector makes `events` grow instead of losing usage. Each run
+  logs what it counted, and a failed run logs why; a lag metric is to come.
 - ADR 049 §2 keeps export best-effort, and that stays. Usage can't be
   best-effort, because the bill and the customer's history depend on it.
 - A project's cursor is deleted with the project, so a deleted project's events
@@ -269,8 +301,9 @@ doesn't delete a project's events from that project's `counted_before` on.
   across projects.
 - **Postgres.** It needs no partitions at first: the rows are small and exist
   only where something counted.
-- **Settings.** `usage.enabled`, `usage.interval` (5 minutes by default),
-  `usage.trigger_secret`, `usage.read_secret` and `usage.retention`.
+- **Settings.** `usage.enabled` (on by default, self-hosted too),
+  `usage.interval` (5 minutes by default) and `usage.trigger_secret`; with the
+  feed and compaction, `usage.read_secret` and `usage.retention`.
 - **Hosted cloud.** Its Vercel Cron Job calls `/cron/usage` every five minutes,
   with the same `CRON_SECRET` as the purge.
 
@@ -359,13 +392,16 @@ stalls for longer than the window.
 
 ## Open questions
 
-1. **Self-hosted default.** Should usage be on by default when self-hosted? It
-   costs a job, and it changes the purge.
+1. **Self-hosted default.** Usage is on by default when self-hosted, so the
+   console's Usage screen has something to show. Is a job and a purge that
+   waits for it the right default?
 2. **The feed's guard.** Is a secret the right guard for the feed, or does
    billing need a machine principal, which ADR 075 rules out today?
-3. **What makes a user active.** Does `auth.token.issued` from a refresh grant
-   count as activity, or only sign-ins?
-4. **Per-project retention.** The catalog's 90- and 400-day retention meters
+3. **What makes a user active.** Once refresh grants mint tokens without a
+   new session, does such a token count as activity, or only sign-ins?
+4. **Usage before a claim.** The per-project read answers before a claim,
+   where `/events` answers nothing (§5). Is that the right line?
+5. **Per-project retention.** The catalog's 90- and 400-day retention meters
    imply a purge window per project. The purge's wait works with such a
    window, but the window itself needs a decision.
 
