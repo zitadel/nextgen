@@ -48,6 +48,8 @@ import { ZitadelError } from "../lib/errors";
 import {
   buildResourceCommands,
   type CreateSpec,
+  type Json,
+  type ListPage,
   type ListSpec,
   renderTable,
   type ResourceRegistry,
@@ -78,9 +80,17 @@ const update = <B>(
   shape: WriteShape = {},
 ): UpdateSpec<Platform, B> => ({ ...shape, schema, call });
 
-// Infers a structured-query list's request type `B` from its `body` schema. A
-// `GET` list has no body, so it is written as a plain object (request stays `Json`).
-const list = <B>(spec: ListSpec<Platform, B>): ListSpec<Platform, B> => spec;
+// Checks `call`'s response against `items`: it must hold an array under that
+// field, or be the array when there is none. Infers a structured query's
+// request type `B` from its `body` schema; a `GET` list has no body, so its
+// request stays `Json`.
+const list = <
+  I extends string | undefined = undefined,
+  B = Json,
+  P extends ListPage<I> = ListPage<I>,
+>(
+  spec: ListSpec<Platform, B, P, I>,
+): ListSpec<Platform, B> => spec;
 
 /** Filter operations of `POST /<resource>/query` endpoints (ADR 031). */
 const FILTER_OPERATIONS = [
@@ -232,7 +242,7 @@ export const RESOURCES = {
       "request_id",
       "occurred_at",
     ],
-    list: {
+    list: list({
       items: "data",
       response: ListEventsResponse,
       // `GET /events` spells its filters as flat query parameters, and a range
@@ -269,7 +279,7 @@ export const RESOURCES = {
       sortParam: "order",
       call: ({ client, projectId }, params) =>
         client.listEvents({ project_id: projectId, ...params }),
-    },
+    }),
     get: { call: ({ client, projectId }, id) => client.getEvent(id, { project_id: projectId }) },
   },
 
@@ -388,7 +398,7 @@ export const RESOURCES = {
     columns: ["id", "schema.objectType", "schema.kind", "metadata.created_at"],
     heading: "schema.objectType",
     detail: ["id", "schema.objectType", "schema.kind", "metadata.created_at"],
-    list: {
+    list: list({
       items: "schemas",
       response: ListSchemasResponse,
       filters: [
@@ -407,7 +417,7 @@ export const RESOURCES = {
       ],
       call: ({ client, projectId }, params) =>
         client.listSchemas({ ...params, project_id: projectId }),
-    },
+    }),
     get: {
       response: GetSchemaByIdResponse,
       // A schema is addressed two ways: a revision id names one immutable
@@ -458,12 +468,12 @@ export const RESOURCES = {
       "metadata.git_sha",
       "metadata.git_dirty",
     ],
-    list: {
+    list: list({
       items: "releases",
       response: ListReleasesResponse,
       call: ({ client, projectId }, params) =>
         client.listReleases({ ...params, project_id: projectId }),
-    },
+    }),
     get: {
       call: ({ client, projectId }, id) => client.getReleaseById(id, { project_id: projectId }),
       response: GetReleaseByIdResponse,
@@ -481,7 +491,7 @@ export const RESOURCES = {
     columns: ["id", "flow_definition.name", "flow_definition.status", "created_at"],
     heading: "flow_definition.name",
     detail: ["id", "flow_definition.name", "flow_definition.status", "created_at", "updated_at"],
-    list: {
+    list: list({
       items: "flow_definitions",
       response: ListFlowDefinitionsResponse,
       filters: [
@@ -502,7 +512,7 @@ export const RESOURCES = {
           ...params,
           project_id: projectId,
         }),
-    },
+    }),
     get: {
       response: GetFlowDefinitionResponse,
       // `flowdef_…` names one revision. Anything else is a flow name, and the
@@ -535,13 +545,13 @@ export const RESOURCES = {
     columns: ["id", "created_at"],
     heading: "id",
     detail: ["id", "created_at"],
-    list: {
+    list: list({
       // `GET /branding` answers with the array itself and takes no cursor, so
       // the paging flags are not generated for it.
       paged: false,
       response: ListBrandingResponse,
       call: ({ client, projectId }) => client.listBranding({ project_id: projectId }),
-    },
+    }),
     get: {
       call: ({ client }, id) => client.getBrandingById(id),
       response: GetBrandingByIdResponse,
@@ -564,13 +574,13 @@ export const RESOURCES = {
     columns: ["id", "operation", "revision_id", "updated_at"],
     heading: "operation",
     detail: ["id", "operation", "config", "revision_id", "project_id", "created_at", "updated_at"],
-    list: {
+    list: list({
       items: "policies",
       response: ListPoliciesResponse,
       filters: [{ field: "operation", operations: ["equals"] }],
       call: ({ client, projectId }, params) =>
         client.listPolicies({ ...params, project_id: projectId }),
-    },
+    }),
     get: {
       response: GetPolicyResponse,
       // An id names the policy; a catalogued operation resolves through the

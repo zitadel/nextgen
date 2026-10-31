@@ -2,7 +2,7 @@
  * The client's own use of the cursor walk: `pages`, `items` and `all` on one
  * generated function. Internal to the package; `./paging` is what it exports.
  */
-import { itemsOf, pages } from "./paging";
+import { pages } from "./paging";
 
 /** How a generated function pages: the field holding its items, and the argument carrying `page_token`. */
 type PagingShape = Readonly<{ items: string; arg: number }>;
@@ -44,12 +44,16 @@ export function paged(send: (...args: unknown[]) => unknown, shape: PagingShape,
     }
   }
 
+  // The generated types promise each page holds its list under `shape.items`.
+  const listOf = (page: unknown) =>
+    (page as Record<string, unknown>)[shape.items] as readonly unknown[];
+
   return {
     pages: (...args: unknown[]) => walk(args, (page) => [page]),
-    items: (...args: unknown[]) => walk(args, (page) => itemsOf(page, shape.items)),
+    items: (...args: unknown[]) => walk(args, listOf),
     all: async (...args: unknown[]) => {
       const collected: unknown[] = [];
-      for await (const list of walk(args, (page) => [itemsOf(page, shape.items)])) {
+      for await (const list of walk(args, (page) => [listOf(page)])) {
         collected.push(...list);
       }
       return collected;

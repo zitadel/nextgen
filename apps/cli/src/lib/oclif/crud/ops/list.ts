@@ -1,6 +1,6 @@
 import { spinner } from "@clack/prompts";
 import { Flags } from "@oclif/core";
-import { itemsOf, nextToken, pages } from "@zitadel/api/runtime/paging";
+import { nextToken, pages } from "@zitadel/api/runtime/paging";
 
 import { nonBlankString } from "../../flags";
 
@@ -198,16 +198,12 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
       ),
       {
         // A wrapped page names its list; an endpoint that answers with the
-        // collection itself has nothing to name.
-        items: (response) => {
-          if (spec.items !== undefined) {
-            return itemsOf(response, spec.items);
-          }
-          if (!Array.isArray(response)) {
-            throw new TypeError("Unexpected list response: expected an array");
-          }
-          return response;
-        },
+        // collection itself has nothing to name. `list` in the registry checks
+        // both against the response type.
+        items: (response) =>
+          (spec.items === undefined
+            ? response
+            : (response as Json)[spec.items]) as readonly unknown[],
         all,
         next: cursorOf,
       },

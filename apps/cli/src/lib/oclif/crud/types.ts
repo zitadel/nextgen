@@ -72,12 +72,13 @@ export type FilterField = Readonly<{
  * without it is sent as flat query parameters. Everything the caller sees —
  * the flags, the grammar, the envelope — is the same either way.
  */
-export type ListSpec<Ctx, B = Json> = Readonly<{
+export type ListSpec<Ctx, B = Json, P = unknown, I = string | undefined> = Readonly<{
   /**
    * Response property holding the page of items; omit when the response body
-   * is itself the array.
+   * is itself the array. A spec built with {@link ListPage} has it checked
+   * against what `call` returns.
    */
-  items?: string;
+  items?: I;
   /**
    * Generated response schema. `--fields` is checked against the record shape
    * it describes, so the same arguments are valid whether a page came back
@@ -112,8 +113,17 @@ export type ListSpec<Ctx, B = Json> = Readonly<{
    * for an endpoint that orders by one implicit field.
    */
   sortParam?: string;
-  call(ctx: Ctx, request: B): Promise<unknown>;
+  call(ctx: Ctx, request: B): Promise<P>;
 }>;
+
+/**
+ * The page a list's `items` promises: an object holding an array under that
+ * field, or the array itself when there is none. Constraining `call`'s result
+ * by it makes a field the response does not hold as an array a type error.
+ */
+export type ListPage<I> = I extends string
+  ? { readonly [K in I]: readonly unknown[] }
+  : readonly unknown[];
 
 export type GetSpec<Ctx> = Readonly<{
   call: (ctx: Ctx, id: string) => Promise<unknown>;

@@ -79,7 +79,9 @@ describe("paged", () => {
 
   it("hands every failure of the walk to its error hook once", async () => {
     const seen: unknown[] = [];
-    const call = vi.fn(async () => ({ next_page_token: "" }));
+    const call = vi.fn(async () => {
+      throw new Error("down");
+    });
     const record = {
       ...asIs,
       fail: (error: unknown): never => {
@@ -90,13 +92,5 @@ describe("paged", () => {
 
     await expect(paged(call, { items: "rows", arg: 0 }, record).all()).rejects.toThrow("handled");
     expect(seen).toHaveLength(1);
-  });
-
-  it("refuses a page without its items array", async () => {
-    const call = vi.fn(async () => ({ next_page_token: "" }));
-
-    await expect(paged(call, { items: "rows", arg: 0 }, asIs).all()).rejects.toThrow(
-      'Unexpected list response: missing "rows" array',
-    );
   });
 });

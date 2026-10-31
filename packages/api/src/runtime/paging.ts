@@ -5,6 +5,8 @@
  * The walk trusts that contract. A server that repeats a cursor, skips one or
  * answers a page in a different shape is an upstream bug to fix in the server,
  * not something the client detects or works around; do not add guards for it.
+ * Typed callers read a page's list straight off it; only {@link itemsOf}, for
+ * a caller that knows the list by name alone, checks it is there.
  */
 
 /** Fetches the page a cursor names; `undefined` asks for the first page. */
@@ -19,7 +21,11 @@ export function nextToken(page: unknown, field = "next_page_token"): string | un
   return typeof token === "string" && token !== "" ? token : undefined;
 }
 
-/** The array `field` names on a page; a page without one is not a page of that list. */
+/**
+ * The array `field` names on a page, for a caller that learns the field only
+ * at runtime (an operation picked from a table); a page without one is not a
+ * page of that list.
+ */
 export function itemsOf(page: unknown, field: string): readonly unknown[] {
   const list = (page as Record<string, unknown> | null)?.[field];
   if (!Array.isArray(list)) {
