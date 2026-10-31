@@ -1,0 +1,83 @@
+{{define "detail"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>{{.Title}} · cell hierarchy</title>
+  <style>
+    :root { --bg:#0f1419; --panel:#1a222c; --text:#e7ecf1; --muted:#8b9aab; --accent:#3d9cf0; --ok:#3ecf8e; --bad:#f07178; --stale:#6b7280; --border:#2a3542; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family:ui-sans-serif,system-ui,sans-serif; background:var(--bg); color:var(--text); line-height:1.45; }
+    header { display:flex; gap:1rem; align-items:center; padding:0.75rem 1.25rem; border-bottom:1px solid var(--border); background:var(--panel); }
+    header a { color:var(--muted); text-decoration:none; margin-right:0.75rem; }
+    main { padding:1.25rem; max-width:960px; margin:0 auto; }
+    .panel { background:var(--panel); border:1px solid var(--border); border-radius:8px; padding:1rem; margin-bottom:1rem; }
+    .muted { color:var(--muted); font-size:0.875rem; }
+    .flash-err { color:var(--bad); }
+    table { width:100%; border-collapse:collapse; }
+    th, td { text-align:left; padding:0.4rem 0.5rem; border-bottom:1px solid var(--border); font-size:0.9rem; }
+    .dot { display:inline-block; width:0.55rem; height:0.55rem; border-radius:50%; margin-right:0.35rem; background:var(--ok); }
+    .dot.stale { background:var(--stale); }
+    code { font-size:0.8rem; color:var(--muted); }
+  </style>
+</head>
+<body>
+  <header>
+    <strong>cell hierarchy</strong>
+    <nav><a href="/">Tree</a><a href="/join">Join</a><a href="/scenarios">Scenarios</a></nav>
+  </header>
+  <main>
+    <h1>{{.Title}}</h1>
+    {{with .Detail}}
+      {{if .Error}}<p class="flash-err">{{.Error}}</p>{{end}}
+      <div class="panel">
+        <h2 style="font-size:1rem;margin:0 0 0.5rem">Me</h2>
+        <p><strong>{{.Me.Label}}</strong></p>
+        <p><code>{{.Me.URL}}</code></p>
+        <p class="muted">is_parent={{.Me.IsParent}} · status={{.Me.Status}} · parent_url={{.Me.ParentURL}}</p>
+      </div>
+      <div class="panel">
+        <h2 style="font-size:1rem;margin:0 0 0.5rem">Children</h2>
+        {{if .Children}}
+        <table>
+          <thead><tr><th>Status</th><th>Label</th><th>URL</th><th>Last seen</th></tr></thead>
+          <tbody>
+          {{range .Children}}
+            <tr>
+              <td>{{if .Alive}}<span class="dot"></span>alive{{else}}<span class="dot stale"></span>stale{{end}}</td>
+              <td>{{.Label}}</td>
+              <td><code>{{.ChildURL}}</code></td>
+              <td class="muted">{{.LastSeenAt}}</td>
+            </tr>
+          {{end}}
+          </tbody>
+        </table>
+        {{else}}
+        <p class="muted">No children registered.</p>
+        {{end}}
+      </div>
+      <div class="panel">
+        <h2 style="font-size:1rem;margin:0 0 0.5rem">Projects hosted here</h2>
+        {{if .Projects}}
+        <table>
+          <thead><tr><th>ID</th><th>Lookup</th><th>Parent</th></tr></thead>
+          <tbody>
+          {{range .Projects}}
+            <tr>
+              <td><a href="/projects/{{.ID}}" style="color:inherit">{{.ID}}</a></td>
+              <td>{{if .LookupEnabled}}on{{else}}off{{end}}</td>
+              <td class="muted">{{.ParentProjectID}}</td>
+            </tr>
+          {{end}}
+          </tbody>
+        </table>
+        {{else}}
+        <p class="muted">No projects on this cell.</p>
+        {{end}}
+      </div>
+    {{end}}
+  </main>
+</body>
+</html>
+{{end}}
