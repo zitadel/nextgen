@@ -1,11 +1,7 @@
 import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
-import type {
-  CreateIdpBodyIdp,
-  CreateSchemaBody,
-  PublishPolicy201,
-} from "@zitadel/api/generated/model";
+import type { CreateIdpBodyIdp, PublishPolicy201 } from "@zitadel/api/generated/model";
 import type { ZitadelClient } from "@zitadel/api/client";
 import {
   DEFAULT_FLOW_CONFIG_PATH,
@@ -20,6 +16,7 @@ import {
   schemasReadmeContent,
   type SetupPreset,
   type SetupUseCase,
+  type UserSchemaDocument,
 } from "@zitadel/config/defaults";
 import {
   type ConnectionEndpoints,
@@ -185,8 +182,8 @@ export async function materializeSetupResources(opts: {
 
   // Each slug in turn: the edits are additive and idempotent, so folding them
   // builds one schema that names every chosen provider.
-  const schemaBody = slugs.reduce<Record<string, unknown>>(
-    (document, slug) => applySsoToSchema(document, slug).document as Record<string, unknown>,
+  const schemaBody = slugs.reduce(
+    (document, slug) => applySsoToSchema(document, slug).document,
     schemaTemplate,
   );
 
@@ -200,7 +197,7 @@ export async function materializeSetupResources(opts: {
     filesWritten.push(join(opts.cwd, DEFAULT_SCHEMA_CONFIG_PATH));
   }
 
-  const schema = await opts.client.createSchema(schemaBody as CreateSchemaBody, {
+  const schema = await opts.client.createSchema(schemaBody, {
     project_id: opts.projectId,
   });
   await updateState(opts.cwd, DEFAULT_SCHEMA_CONFIG_PATH, {
@@ -343,14 +340,11 @@ export async function assertNoSetupResourceConflicts(opts: {
 }
 
 /** The default human user schema for a preset and use case, without the template's `$id`. */
-function defaultSchemaTemplate(
-  preset: SetupPreset,
-  useCase: SetupUseCase,
-): Record<string, unknown> {
+function defaultSchemaTemplate(preset: SetupPreset, useCase: SetupUseCase): UserSchemaDocument {
   const { $id: _templateId, ...schemaTemplate } = getDefaultHumanUserSchema({
     preset,
     useCase,
-  }) as { $id?: string } & Record<string, unknown>;
+  });
   void _templateId;
   return schemaTemplate;
 }
@@ -364,7 +358,7 @@ type PlannedConnection = {
 
 /** The connection each chosen provider gets, and the file it is written to. */
 function planConnections(
-  schemaTemplate: Record<string, unknown>,
+  schemaTemplate: UserSchemaDocument,
   sso: readonly { selection: ProviderSelection; endpoints?: ConnectionEndpoints }[] | undefined,
 ): PlannedConnection[] {
   const planned: PlannedConnection[] = [];
@@ -372,7 +366,7 @@ function planConnections(
     const provider = providerOf(chosen.selection);
     const connection = provider.connection({
       endpoints: chosen.endpoints,
-      schemaProperties: Object.keys((schemaTemplate.properties as object | undefined) ?? {}),
+      schemaProperties: Object.keys(schemaTemplate.properties ?? {}),
       schemaRef: CONNECTION_SCHEMA_REF,
     });
     planned.push({

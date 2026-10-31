@@ -1,4 +1,4 @@
-import { createZitadelClient, type ZitadelClient } from "@zitadel/api/client";
+import { createZitadelClient } from "@zitadel/api/client";
 import {
   DEFAULT_FLOW_SCHEMA_URI,
   getDefaultHumanUserSchema,
@@ -57,12 +57,9 @@ export async function bootstrapProject(
   const { $id: _templateId, ...schemaBody } = getDefaultHumanUserSchema({
     preset: options.preset,
     useCase: options.useCase,
-  }) as { $id?: string } & Record<string, unknown>;
+  });
   void _templateId;
-  const schema = await client.createSchema(
-    schemaBody as Parameters<ZitadelClient["createSchema"]>[0],
-    { project_id: projectId },
-  );
+  const schema = await client.createSchema(schemaBody, { project_id: projectId });
   const schemaId = schema.id;
 
   const flowBody = getDefaultLoginFlow({

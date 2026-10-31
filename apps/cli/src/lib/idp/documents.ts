@@ -239,7 +239,7 @@ function stepNamed(flow: Json, name: string): Step | undefined {
  * belongs to whoever set it, and a provider is added to the list rather than
  * replacing it, so enabling a second one later keeps the first.
  */
-export function applySsoToSchema(schema: object, slug: ConnectionSlug): SsoResult<object> {
+export function applySsoToSchema<S extends object>(schema: S, slug: ConnectionSlug): SsoResult<S> {
   const document = clone(schema) as Json;
   const methods = isObject(document["x-auth-methods"]) ? { ...document["x-auth-methods"] } : {};
   const existing = isObject(methods.sso) ? methods.sso : undefined;
@@ -255,7 +255,8 @@ export function applySsoToSchema(schema: object, slug: ConnectionSlug): SsoResul
   }
   methods.sso = { ...existing, enabled: true, providers };
   document["x-auth-methods"] = methods;
-  return { document, changed: true, skipped: [] };
+  // The same schema with one provider more under `x-auth-methods.sso`.
+  return { document: document as S, changed: true, skipped: [] };
 }
 
 /**
