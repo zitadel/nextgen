@@ -52,7 +52,7 @@ import {
   type SuggestedCommand,
   unscopedCommand,
 } from "../../lib/suggestion";
-import { nextCommandsData } from "../../lib/oclif/envelope";
+import { type NextSteps, nextStepsData } from "../../lib/oclif/next-steps";
 
 const LOCAL_RUNTIME_CHECK_NAMES = new Set([
   "server-binary",
@@ -250,8 +250,10 @@ export default class Doctor extends BaseCommand {
         lifecycle: hasConfig ? "configured" : "not-configured",
       },
       checks,
-      ...(nextActions.length > 0 ? { next_actions: nextActions } : {}),
-      ...(warningAdvice ? nextCommandsData(warningAdvice.nextCommands) : {}),
+    };
+    const next: NextSteps<SuggestedCommand> = {
+      ...(nextActions.length > 0 ? { actions: nextActions } : {}),
+      ...(warningAdvice ? { commands: warningAdvice.nextCommands } : {}),
     };
 
     if (failed.length > 0) {
@@ -267,7 +269,9 @@ export default class Doctor extends BaseCommand {
       // A check that failed with a typed CLI error advertises its own
       // category (e.g. the framework floor's E_UNSUPPORTED_PROJECT_SHAPE) —
       // surface that instead of the generic validation class so agents can
-      // branch on it. The port check keeps its dedicated code first.
+      // branch on it. The port check keeps its dedicated code first. The
+      // details are the report a passing run would emit, next steps included.
+      const report = { ...data, ...nextStepsData(next) };
       const code = failed.some((check) => check.name === "port")
         ? "E_PORT_IN_USE"
         : (failed.find((check) => check.code !== undefined)?.code ?? "E_VALIDATION");
@@ -276,14 +280,15 @@ export default class Doctor extends BaseCommand {
         nextCommands: advice.nextCommands,
         details:
           advice.suggestedArgs === undefined
-            ? data
-            : { ...data, suggested_args: advice.suggestedArgs },
+            ? report
+            : { ...report, suggested_args: advice.suggestedArgs },
       });
     }
 
     return this.emit({
       status: "ok",
       data,
+      next,
       warnings: warnings.map((warning) => `${warning.name}: ${warning.message}`),
     });
   }

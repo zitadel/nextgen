@@ -9,7 +9,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   assertCleanWorktree,
   ensureInitialCommit,
+  gitReport,
   INITIAL_COMMIT_SUBJECT,
+  unavailableWarning,
 } from "../../../../src/commands/setup/initial-commit";
 
 const run = promisify(execFile);
@@ -221,7 +223,11 @@ describe("ensureInitialCommit", () => {
 
       const outcome = await ensureInitialCommit(dir);
 
-      expect(outcome).toEqual({ kind: "unavailable", reason: "there was nothing to commit" });
+      expect(outcome).toEqual({
+        kind: "unavailable",
+        reason: "there was nothing to commit",
+        createdRepository: true,
+      });
     });
   });
 
@@ -555,7 +561,11 @@ describe("ensureInitialCommit when git cannot run", () => {
       try {
         const outcome = await ensureInitialCommit(cwd);
 
-        expect(outcome).toEqual({ kind: "unavailable", reason: "git: not available" });
+        expect(outcome).toEqual({
+          kind: "unavailable",
+          reason: "git: not available",
+          createdRepository: false,
+        });
       } finally {
         vi.unstubAllEnvs();
       }
@@ -574,5 +584,141 @@ describe("ensureInitialCommit when it refuses to commit", () => {
     expect(outcome.kind).toBe("unavailable");
     const { stdout } = await run("git", ["diff", "--cached", "--name-only"], { cwd: dir });
     expect(stdout.trim()).toBe("");
+  });
+});
+
+describe("ensureInitialCommit when git explains at length", () => {
+  it("reports only git's first line, for a one-line warning", async () => {
+    const cwd = await aProject();
+    const binDir = await mkdtemp(join(tmpdir(), "zitadel-initial-commit-"));
+    dirs.push(binDir);
+    await writeFile(
+      join(binDir, "git"),
+      "#!/bin/sh\nprintf 'fatal: one\\nhint: two\\n' >&2\nexit 1\n",
+    );
+    await chmod(join(binDir, "git"), 0o755);
+    vi.stubEnv("PATH", binDir);
+    try {
+      expect(await ensureInitialCommit(cwd)).toEqual({
+        kind: "unavailable",
+        reason: "fatal: one",
+        createdRepository: false,
+      });
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+});
+
+describe("assertCleanWorktree with a directory named like the local server's", () => {
+  it("refuses uncommitted work under it, since only start's own is exempt", async () => {
+    const cwd = await aRepository();
+    await mkdir(join(cwd, ".Zitadel/Local"), { recursive: true });
+    await writeFile(join(cwd, ".Zitadel/Local/notes.md"), "mine\n");
+
+    await expect(assertCleanWorktree(cwd)).rejects.toMatchObject({ code: "E_CONFLICT" });
+  });
+});
+
+describe("ensureInitialCommit when the commit fails in a repository it existed in", () => {
+  it("reports that it did not create the repository", async () => {
+    const cwd = await aRepository();
+    await writeFile(join(cwd, ".env"), "SECRET=1\n");
+
+    expect(await ensureInitialCommit(cwd)).toMatchObject({
+      kind: "unavailable",
+      createdRepository: false,
+    });
+  });
+});
+
+describe("gitReport", () => {
+  it("reports a repository setup created and committed into", () => {
+    expect(
+      gitReport({ kind: "created", sha: "abc", guessedIdentity: false, invented: false }),
+    ).toEqual({ initialized: true, commit: "abc" });
+  });
+
+  it("reports a commit into a repository that already existed", () => {
+    expect(
+      gitReport({ kind: "committed", sha: "abc", guessedIdentity: false, invented: false }),
+    ).toEqual({ initialized: false, commit: "abc" });
+  });
+
+  it("reports a repository setup created even when its commit failed", () => {
+    expect(gitReport({ kind: "unavailable", reason: "r", createdRepository: true })).toEqual({
+      initialized: true,
+      commit: null,
+    });
+  });
+
+  it("reports no repository and no commit when the commit failed in an existing one", () => {
+    expect(gitReport({ kind: "unavailable", reason: "r", createdRepository: false })).toEqual({
+      initialized: false,
+      commit: null,
+    });
+  });
+
+  it("reports nothing when setup skipped git", () => {
+    expect(gitReport({ kind: "skipped" })).toEqual({ initialized: false, commit: null });
+  });
+});
+
+describe("unavailableWarning", () => {
+  it("names the reason the commit could not be made", () => {
+    expect(unavailableWarning({ reason: "fatal: one", createdRepository: false })).toBe(
+      "Could not commit the scaffolded project (fatal: one); the first release records no commit, so the next deploy cannot show a diff.",
+    );
+  });
+
+  it("names a missing reason rather than leaving it blank", () => {
+    expect(unavailableWarning({ reason: "", createdRepository: false })).toContain(
+      "(git gave no reason)",
+    );
+  });
+
+  it("says when setup left a new, empty repository behind", () => {
+    expect(unavailableWarning({ reason: "fatal: one", createdRepository: true })).toContain(
+      "Setup created a new, empty git repository here.",
+    );
+  });
+});
+
+describe("assertCleanWorktree where a commit would not land on a branch", () => {
+  it("refuses a detached HEAD before setup writes anything", async () => {
+    const cwd = await aRepository();
+    await run("git", ["checkout", "--quiet", "--detach"], { cwd });
+
+    await expect(assertCleanWorktree(cwd)).rejects.toMatchObject({ code: "E_CONFLICT" });
+  });
+
+  it("names what stops the commit", async () => {
+    const cwd = await aRepository();
+    await run("git", ["checkout", "--quiet", "--detach"], { cwd });
+
+    await expect(assertCleanWorktree(cwd)).rejects.toThrow(
+      "Setup cannot commit here: HEAD is detached, so the commit would be on no branch",
+    );
+  });
+});
+
+describe("ensureInitialCommit when git warns before it fails", () => {
+  it("reports the line that says why, not the warning", async () => {
+    const cwd = await aProject();
+    const binDir = await mkdtemp(join(tmpdir(), "zitadel-initial-commit-"));
+    dirs.push(binDir);
+    await writeFile(
+      join(binDir, "git"),
+      "#!/bin/sh\nprintf 'warning: LF will be replaced by CRLF\\nfatal: adding files failed\\n' >&2\nexit 1\n",
+    );
+    await chmod(join(binDir, "git"), 0o755);
+    vi.stubEnv("PATH", binDir);
+    try {
+      expect(await ensureInitialCommit(cwd)).toMatchObject({
+        reason: "fatal: adding files failed",
+      });
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 });

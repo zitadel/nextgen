@@ -46,7 +46,7 @@
         "@zitadel/api-mock#build",
         "@zitadel/components#build"
       ],
-      "inputs": ["$TURBO_EXTENDS$", "$TURBO_ROOT$/packages/api/src/**", "!$TURBO_ROOT$/packages/api/src/generated/**"]
+      "inputs": ["$TURBO_EXTENDS$", "$TURBO_ROOT$/packages/api/src/**", "!$TURBO_ROOT$/packages/api/src/generated/**", "!$TURBO_ROOT$/packages/vitest-config/**"]
     },
     // app/global.css imports the design tokens' CSS variables, which the
     // repository commits, so that build needs no generation of them.
@@ -65,7 +65,8 @@
     // Insights sample rate is read at build time (next.config.mjs,
     // app/layout.tsx), and strict mode would hide it.
     "build": {
-      "env": ["VERCEL_DEPLOYMENT_ID", "DOCS_SPEED_INSIGHTS_SAMPLE_RATE"],
+      "env": ["NODE_ENV", "VERCEL_DEPLOYMENT_ID", "DOCS_SPEED_INSIGHTS_SAMPLE_RATE"],
+      "inputs": ["$TURBO_EXTENDS$", ".env*"],
       "dependsOn": [
         "typecheck",
         "generate",

@@ -48,8 +48,8 @@ export interface Envelope<T = Record<string, unknown>> {
 }
 
 /**
- * A non-interactive `deploy` needs a `-m` message, so the helpers default one
- * unless the spec already supplied its own.
+ * A non-interactive `deploy` outside a git repository, as `aSetUpApp` arranges,
+ * needs a `-m` message, so the helpers default one unless the spec supplied its own.
  */
 function withDeployMessage(extraArgs: readonly string[]): string[] {
   const hasMessage = extraArgs.some((arg) => arg === "-m" || arg === "--message");
@@ -277,6 +277,17 @@ export class ScaffoldedApp {
   }
 
   /**
+   * Runs setup with a git that does everything but commit, as a full disk or a
+   * broken git would: setup creates the repository and then cannot commit.
+   */
+  async setupWithGitThatCannotCommit(): Promise<CliResult> {
+    const git = await gitThatCannotCommit();
+    return this.cli(["setup", "--non-interactive", "--json", "--skip-install"], {
+      PATH: `${git}:${process.env.PATH ?? ""}`,
+    });
+  }
+
+  /**
    * Puts the app under version control with everything committed, the state a
    * developer who already uses git is in before they run setup.
    */
@@ -299,6 +310,11 @@ export class ScaffoldedApp {
       ],
       { cwd: this.path },
     );
+  }
+
+  /** Detaches HEAD from its branch, as a checkout of a tag or a CI job's checkout does. */
+  async onADetachedHead(): Promise<void> {
+    await execFileAsync("git", ["checkout", "--quiet", "--detach"], { cwd: this.path });
   }
 
   /** Leaves a file nobody has committed, as a developer mid-change would. */
@@ -691,6 +707,20 @@ export class ScaffoldedApp {
     const result = await this.cli(["deployment", "list", "--json"]);
     expect(result, "deployment list should have succeeded").toSucceed();
     return this.envelopeOf<{ count: number }>(result).data.count;
+  }
+
+  /** The message a release records, as `release get` reports it. */
+  async releaseMessage(releaseId: string): Promise<string | null> {
+    const result = await this.cli(["release", "get", releaseId, "--json"]);
+    expect(result, "release get should have succeeded").toSucceed();
+    return this.envelopeOf<{ metadata: { message: string | null } }>(result).data.metadata.message;
+  }
+
+  /** The message a deployment records, as `deployment get` reports it. */
+  async deploymentMessage(deploymentId: string): Promise<string | null> {
+    const result = await this.cli(["deployment", "get", deploymentId, "--json"]);
+    expect(result, "deployment get should have succeeded").toSucceed();
+    return this.envelopeOf<{ metadata: { message: string | null } }>(result).data.metadata.message;
   }
 
   /** Build a release from `.zitadel/` and deploy it to every primary origin. */
@@ -1590,6 +1620,18 @@ process.stderr.write("fake npm stderr\\n");
   );
   await chmod(binPath, 0o755);
   return { binDir, logPath };
+}
+
+/** A `git` on PATH that runs the real one for everything but `commit`, which it refuses. Returns its directory. */
+async function gitThatCannotCommit(): Promise<string> {
+  const binDir = await mkdtemp(join(tmpdir(), "zitadel-git-no-commit-"));
+  const { stdout } = await execFileAsync("sh", ["-c", "command -v git"]);
+  await writeFile(
+    join(binDir, "git"),
+    `#!/bin/sh\nfor arg in "$@"; do\n  if [ "$arg" = "commit" ]; then\n    echo "fatal: cannot commit" >&2\n    exit 1\n  fi\ndone\nexec "${stdout.trim()}" "$@"\n`,
+  );
+  await chmod(join(binDir, "git"), 0o755);
+  return binDir;
 }
 
 /** A fake `docker` on PATH, so doctor's runtime probe needs no daemon. */

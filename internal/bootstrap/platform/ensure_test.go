@@ -11,12 +11,12 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
-// expectCreate declares the one call Ensure is allowed to make. seedDefaults
-// must be true: a bare project row satisfies the foreign keys and nothing
-// else, so a deployment that bootstrapped one could not serve a registration.
+// expectCreate declares the one call Ensure is allowed to make. It seeds no
+// configuration: the platform user schema and login flows are the release
+// EnsureDeployed builds.
 func expectCreate(projects *servicemocks.MockProjectService) *servicemocks.MockProjectServiceCreateWithIDCall {
 	return projects.EXPECT().CreateWithID(
-		gomock.Any(), domain.PlatformProjectID, "Platform", []domain.Origin{}, true,
+		gomock.Any(), domain.PlatformProjectID, "Platform", []domain.Origin{}, false,
 	)
 }
 
@@ -70,7 +70,7 @@ func TestEnsure(t *testing.T) {
 			expect:  func(*servicemocks.MockProjectService) {},
 		},
 		{
-			name:    "enabled creates the platform project with defaults seeded",
+			name:    "enabled creates the platform project",
 			enabled: true,
 			expect: func(projects *servicemocks.MockProjectService) {
 				expectCreate(projects).Return(&domain.Project{ID: domain.PlatformProjectID}, nil)

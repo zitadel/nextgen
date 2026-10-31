@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, symlink, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
@@ -63,6 +63,25 @@ describe("worktreeIsDirty", () => {
 });
 
 describe("diffConfigAgainst", () => {
+  it("detects a same-size edit whose timestamp matches the index", async () => {
+    const cwd = await cleanRepo();
+    const git = (args: string[]) => run("git", args, { cwd });
+    const sha = (await git(["rev-parse", "HEAD"])).stdout.trim();
+    await git(["config", "core.trustctime", "false"]);
+    await git(["config", "core.checkStat", "minimal"]);
+    const file = join(cwd, ".zitadel", "schemas", "marker.json");
+    const mtime = new Date(Date.now() - 10_000);
+    await utimes(file, mtime, mtime);
+    await git(["update-index", "--refresh"]);
+    await writeFile(file, "[]");
+    await utimes(file, mtime, mtime);
+    // Git must compare content for entries at least as new as the index.
+    // Copying it with a newer mtime incorrectly makes this entry look clean.
+    await utimes(join(cwd, ".git", "index"), mtime, mtime);
+
+    expect(await diffConfigAgainst(cwd, sha, false)).toContain("+[]");
+  });
+
   it("shows an untracked .zitadel/ file as an addition", async () => {
     const cwd = await cleanRepo();
     const sha = (await run("git", ["rev-parse", "HEAD"], { cwd })).stdout.trim();

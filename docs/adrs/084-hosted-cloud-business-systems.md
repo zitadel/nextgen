@@ -1,7 +1,8 @@
 # ADR 084: The Hosted Cloud's Business Systems Run Beside the Server
 
-> **Status:** Proposed (scaffolded: every system answers from mocks; open
-> questions 1 to 4 decided 2026-10-29)
+> **Status:** Proposed (scaffolded: Zitadel's reads are live, Stripe and
+> HubSpot answer from mocks; open questions 1 to 4 decided 2026-10-29;
+> HubSpot's records and email subscriptions decided 2026-10-30)
 > **Date:** 2026-10-29
 > **Context:** What the hosted cloud needs because we sell Zitadel (sign-up,
 > bot checks on its own sign-in, support, CRM and marketing consent, pricing
@@ -57,8 +58,8 @@
 3. Support.
 4. Pricing and billing.
 
-Every person and team also needs a record in the CRM, and marketing needs
-consent.
+Every person and team also needs a record in the CRM, and marketing email
+needs a legal basis.
 
 ### Two proposals this answers
 
@@ -87,7 +88,8 @@ places:
 - Zitadel holds identity, teams and projects, and what a person ticked when
   signing up. Stripe holds money, HubSpot the relationship. There is no store
   of our own: Stripe customers carry `zitadel_team_id`, HubSpot contacts
-  `zitadel_user_id` and companies `team_id`, and each record is found by them.
+  `zitadel_user_id` and deals `zitadel_team_id`, and each record is found by
+  them.
 
 ### 2. One backend service: functions for answers, workflows for the rest
 
@@ -122,8 +124,9 @@ server's catch-all.
   beta. Only four route files and `next.config.ts` know the host; the ports,
   routes, workflows and sign-in check take a web `Request`.
 - **Ports.** `src/ports.ts` names the three systems (`Directory`, `Billing`,
-  `Crm`); a route or a workflow names a port, never a vendor SDK. Mocks answer
-  all three (§9).
+  `Crm`); a route or a workflow names a port, never a vendor SDK. The
+  `Directory` reads the person and their teams live; mocks answer the rest
+  (§9).
 
 ### 3. Sign-up (priority 1)
 
@@ -150,32 +153,68 @@ server's catch-all.
     That question is now due, because billing is per team.
 
   Each added team is provisioned like the first (Stripe customer, HubSpot
-  company); today's trigger picks it up on the next signed-in page.
+  deal); today's trigger picks it up on the next signed-in page.
 - What sign-up asks for is the platform project's configuration, kept where
   a customer keeps theirs: a `.zitadel/` folder in `apps/cloud`, applied with
-  `zitadel apply`. It adds two fields to the `register` step: a required
-  terms checkbox (`const: true`), and an optional "product news" checkbox,
-  unticked by default. This needs §8.1.
-- **Provisioning** (`provision-account`) gives each new person:
-  - a HubSpot contact keyed by `zitadel_user_id`, holding the consent of §7;
-  - a company for each team, keyed by `team_id`, with the contact on it;
+  `zitadel apply`. It adds one field to the `register` step: a required terms
+  checkbox (`const: true`). This needs §8.1. Product news needs no checkbox
+  (§7), but the sign-up page says that it comes and how to leave it.
+- **Provisioning**, a workflow per system (`provision-crm`,
+  `provision-billing`), so neither system's failure holds up the other, gives
+  each new person, as HubSpot models it natively and the legacy cloud does:
+  - a HubSpot contact keyed by `zitadel_user_id`. A contact HubSpot already
+    has for the email, from a form or the legacy cloud, takes the id rather
+    than getting a second;
+  - the newsletter and security subscriptions of §7;
+  - a deal for each team, keyed by `zitadel_team_id`, with the contact on it.
+    HubSpot makes the company itself, from the email domain ("Create and
+    associate companies with contacts"), so a personal team never becomes a
+    company;
   - a Stripe customer for each team, with no subscription. Stripe advises
     creating the customer at sign-up.
 
-  Every step finds what an earlier attempt made. Sign-up never waits on
-  Stripe or HubSpot.
+  Every step finds what an earlier attempt made, since HubSpot has no
+  idempotency key, and returns the calls it made, which the run shows.
+  Sign-up never waits on Stripe or HubSpot.
 - **Today's trigger.** The add-on calls `POST /cloud/api/account/ensure` on
-  the first signed-in page. The function starts the workflow unless every
-  team of the person's already has a Stripe customer.
+  the first signed-in page, and on the CLI's claim page, where the CLI's
+  sign-ups land signed in outside the signed-in shell. The function starts
+  `provision-billing` unless every team of the person's already has a Stripe
+  customer, and `provision-crm` once per instance, whose lookups find what
+  exists: HubSpot never waits on Stripe's answer.
+- **Where a sign-up came from** (decided 2026-10-30). The source travels in
+  the address only, never on the device, so it needs no consent banner and
+  holds only as far as links carry it.
+  - What counts as the source: a link's `utm_source`, `utm_medium` and
+    `utm_campaign`, and whether the account was made on the CLI's claim page
+    (`cli`) or the console's sign-up or login page (`console`).
+  - How it gets through sign-in: `/login` already keeps the page it returns
+    to, query and all, in `next`, and `/signup` copies its own campaign
+    parameters there too. The add-on reads the address it loads at, before
+    the console's redirects drop the query, and sends it with `ensure`.
+  - On the contact: `provision-crm` writes it in the contact's `signup_*`
+    properties when it makes or takes over the contact, and never again. The
+    first touch wins, and HubSpot's own "Original Traffic Source" stays its
+    tracking script's.
+  - In Vercel: the add-on reports `signup_completed` from the browser when the
+    sign-in widget finishes a flow whose last step created the user, with the
+    page, the parameters and the referring host
+    ([catalog](../product-analytics-events.yaml)).
+  - When the website's sign-up link comes (§8.2), it goes to
+    `/console/signup` and forwards its page's `utm_*`.
+  - What is lost: a journey across the website's pages, or through the
+    terminal (website, quickstart, CLI), loses the earlier parameters.
+  - With the target trigger, `user.created` starts provisioning and reports
+    `signup_completed` from the server, and `ensure` only delivers the
+    source.
 - **The target trigger.** A cron route reads the platform project's
   `GET /events` (`user.created`, `team.created`) for the last minutes, with
   the project secret §8.1 gives the cloud, as a customer would read theirs.
-  This also catches people who never open the console. The workflow is the
-  same either way.
+  This also catches people who never open the console. The workflows are
+  the same either way.
 - **No email verification exists.** Until it does, every contact is
-  unverified, no marketing email goes to an address nobody confirmed (double
-  opt-in), and public sign-up waits for §5 and ADR 078's guards. Verification
-  is §8.2.
+  unverified, no marketing email goes to an address nobody verified, and
+  public sign-up waits for §5 and ADR 078's guards. Verification is §8.2.
 
 ### 4. The RPC trusts the console's session and nothing else
 
@@ -258,21 +297,33 @@ server's catch-all.
 ### 7. Support, the CRM and marketing consent (priority 3)
 
 - **Support.** Settings → Support files a HubSpot ticket on the person's
-  contact and their team's company, and lists their own tickets. HubSpot
-  sends the replies by email.
-- **Consent at sign-up.** The person's choice is a user attribute
-  (`product_news`) that the `register` step collects. Provisioning writes it
-  to HubSpot once, as the contact's email subscription, with legal basis
-  `CONSENT_WITH_NOTICE`, the checkbox's text and the time.
+  contact and their team's deal, and lists their own tickets. HubSpot sends
+  the replies by email.
+- **Subscriptions at sign-up** (decided 2026-10-30). Provisioning subscribes
+  every new person to HubSpot's Newsletter (product news) and Security
+  subscription types, with legal basis `LEGITIMATE_INTEREST_CLIENT`, as
+  zitadel.com's portal does: opt-out, not opt-in. It writes a subscription
+  only where HubSpot holds no choice yet, so an unsubscribe is never undone.
 - **After sign-up, HubSpot holds it.** An email's unsubscribe link and
   Settings → Email change the same subscription. The screen reads it live,
   because HubSpot sends no webhook when it changes.
+- **Onboarding mail.** A HubSpot workflow enrolls a contact once
+  `zitadel_user_id` is set, with re-enrollment off, and sends it. The
+  functions make no call for it.
 - **Marketing contacts.** Contacts created through the API are not marketing
-  contacts. A HubSpot workflow makes opted-in, verified contacts marketing
+  contacts. A HubSpot workflow makes subscribed, verified contacts marketing
   contacts.
 - **What isn't marketing.** Email about an account, its security, billing or
-  support needs no opt-in. A newsletter sign-up without an account is a
-  HubSpot form on the website.
+  support needs no subscription. Notices about the terms, the privacy policy,
+  urgent security issues and maintenance go out as HubSpot transactional
+  email to a segment of the cloud's contacts, which no one can leave. A
+  newsletter sign-up without an account is a HubSpot form on the website.
+- **Sign-up source.** The contact keeps how the person reached sign-up
+  (§3), for learning which channels bring customers, on legitimate interest.
+  zitadel.com's privacy policy says so: the link's campaign parameters and
+  CLI or console are stored on the contact, and an anonymous count, with the
+  referring host, goes to Vercel Web Analytics, with no cookie or device
+  storage.
 - **Erasure.** When an account is deleted (`user.deleted`, read as in §3),
   `erase-account` deletes the HubSpot contact through HubSpot's GDPR delete,
   and removes the person from the contact fields of their team's Stripe
@@ -304,26 +355,48 @@ server's catch-all.
 
 ### 9. The scaffold, and the order things go live
 
-- Every system answers from `src/mock.ts`. It keeps state per process, so a
-  change made in one Vercel instance is not seen by another.
+- Stripe and HubSpot answer from `src/mock.ts`. It keeps state per process,
+  so a change made in one Vercel instance is not seen by another. Zitadel's
+  reads (the person, their teams) are live, at the server the sign-in hop
+  uses; its usage and plans have no API yet (§8.3).
+- HubSpot's mock, and Stripe's for the customer, record the calls the live
+  clients will send and send nothing. Each provisioning step returns them, so
+  a run in Observability → Workflows shows them once decrypted; their log
+  lines name ids, never an email.
 - Production refuses mocks with `503 cloud.not_live`, and a screen that reads
   one shows its preview state instead (`whenLive`). In production, Billing says
   the cloud is free during the preview and that nothing is charged until a
   team picks a plan. Support points to Zitadel's GitHub issues, and warns that
   they are public.
+- Provisioning is the exception (decided 2026-10-30): production runs it on
+  the mocks too (`onboardingSystems()`), which send nothing to HubSpot or
+  Stripe, so its runs show what onboarding will write. Sign-up has no call to
+  action yet. The live adapters replace the mocks in production only;
+  previews keep them, whatever keys their environment holds.
 - The add-on's production build (`CLOUD_STAGE`) leaves out what has no
-  preview state: Email, since nothing sends marketing email yet, the
-  provisioning call, and the sign-in hop and BotID client until a preview has
-  shown them working. Previews get all of it; local runs get all but BotID's
-  client, whose challenge only a deployment serves.
+  preview state: Email, since nothing sends marketing email yet, and the
+  sign-in hop and BotID client until a preview has shown them working.
+  Previews get all of it; local runs get all but BotID's client, whose
+  challenge only a deployment serves.
 - The hourly cron is not in `vercel.json` yet. Cron runs in production only,
   where it would answer 503 every hour; it lands with the live Stripe
   adapter. `erase-account` is not scaffolded: it starts from the event
   trigger of §3.
 - Each of these lands on its own:
   1. Sign-up: §8.1 and §8.5, the `.zitadel/` fields, accounts in the console
-     (Console ADR 0005 §4), and the live `Directory` and HubSpot contact
-     adapters. The website's link follows §8.2.
+     (Console ADR 0005 §4), and the live HubSpot adapter. The website's link
+     follows §8.2. The adapter needs, in HubSpot:
+     - unique-value properties `zitadel_user_id` (contacts) and
+       `zitadel_team_id` (deals);
+     - the sign-up's source on contacts, in a "Cloud sign-up" group:
+       `signup_via` (dropdown: `cli`, `console`) and `signup_utm_source`,
+       `signup_utm_medium` and `signup_utm_campaign` (single-line text);
+     - the pipeline and first stage for a team's deal: "Cloud Pipeline", the
+       legacy cloud's, or one of its own;
+     - the ids of the Newsletter and Security subscription types;
+     - the onboarding workflow of §7, and the notices' segment;
+     - a private app with the contacts, deals and communication-preferences
+       scopes, whose token only Production holds.
   2. BotID: verified on a preview, and open question 1 answered.
   3. Support and Email: HubSpot's tickets and subscriptions, live.
   4. Billing: §8.3, Stripe's meters and prices, the live adapter, the
