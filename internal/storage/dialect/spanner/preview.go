@@ -56,7 +56,8 @@ func (ps previewStatements) UpsertPreviews(ctx context.Context, projectID string
 			mutations = append(mutations, spanner.Insert(previewTable, previewColumns,
 				[]any{projectID, origin, expiresAt, createdAt}))
 		}
-		return tx.BufferWrite(ctx, mutations)
+		_, err := tx.BufferWrite(ctx, mutations)
+		return err
 	})
 }
 
