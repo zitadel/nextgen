@@ -38,6 +38,24 @@ Opening a flow takes four steps:
 4. Serve that deployment's release. If it was revoked, the request answers `409`
    with `rel.revoked`.
 
+```mermaid
+flowchart TD
+    open([Open a flow]) --> check{Origin?}
+    check -- none --> primary[Newest primary deployment]
+    check -- not admitted --> forbidden[403]
+    check -- console origin the project does not list --> primary
+    check -- live preview --> preview[Its own newest deployment]
+    check -- any other admitted origin --> named{Newest primary deployment names it?}
+    named -- yes --> revoked{Release revoked?}
+    named -- no --> notDeployed[409 rel.not_deployed]
+    preview -- found --> revoked
+    preview -- none --> notDeployed
+    primary -- found --> revoked
+    primary -- none --> noDefault[409 rel.no_default]
+    revoked -- yes --> conflict[409 rel.revoked]
+    revoked -- no --> serve([Serve the release])
+```
+
 `setUserPassword` and `createAuthAttempt` do not come from a browser page, so
 they follow the newest primary deployment and ignore `Origin`.
 
@@ -57,6 +75,50 @@ primary deployment names it and the project lists it. So an origin new to the
 project serves nothing until the next deploy. Removing an origin takes effect at
 once, because the origin check still reads the project's list, and adding it back
 before the next deploy restores it.
+
+### Example
+
+A project lists three primary origins and a preview pattern, trimmed here to the
+columns that decide. `new.acme.com` was added after `dep_2`.
+
+`project_origins`:
+
+| pattern | kind |
+| --- | --- |
+| `https://app.acme.com` | `primary` |
+| `https://www.acme.com` | `primary` |
+| `https://new.acme.com` | `primary` |
+| `https://*-acme.vercel.app` | `preview` |
+
+`deployments`, newest last:
+
+| id | release_id | origin_kind |
+| --- | --- | --- |
+| `dep_1` | `rel_1` | `primary` |
+| `dep_2` | `rel_2` | `primary` |
+| `dep_3` | `rel_3` | `preview` |
+
+`deployment_origins`:
+
+| deployment_id | origin | seq |
+| --- | --- | --- |
+| `dep_1` | `https://app.acme.com` | 1 |
+| `dep_1` | `https://www.acme.com` | 1 |
+| `dep_2` | `https://app.acme.com` | 2 |
+| `dep_2` | `https://www.acme.com` | 2 |
+| `dep_3` | `https://pr-7-acme.vercel.app` | 1 |
+
+`previews` holds `https://pr-7-acme.vercel.app` with an `expires_at` in the
+future. Requests then resolve like this:
+
+| `Origin` | Deployment | Answer |
+| --- | --- | --- |
+| `https://app.acme.com` | `dep_2` | serves `rel_2` |
+| none | `dep_2` | serves `rel_2` |
+| a console origin the project does not list | `dep_2` | serves `rel_2` |
+| `https://pr-7-acme.vercel.app` | `dep_3` | serves `rel_3` |
+| `https://new.acme.com` | none: `dep_2` does not name it | `409 rel.not_deployed` |
+| `https://other.acme.com` | none | `403 proj.origin_not_allowed` |
 
 ### A flow keeps its release
 
