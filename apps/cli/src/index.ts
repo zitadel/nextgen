@@ -40,6 +40,7 @@ import SkillsAdd from "./commands/skills/add";
 import Start from "./commands/start";
 import Status from "./commands/status";
 import Stop from "./commands/stop";
+import TestSignIn from "./commands/test/sign-in";
 import VariableGet from "./commands/variable/get";
 import VariableList from "./commands/variable/list";
 import VariableResolve from "./commands/variable/resolve";
@@ -72,6 +73,7 @@ export const COMMANDS: Record<string, typeof Command> = {
   start: Start,
   status: Status,
   stop: Stop,
+  "test:sign-in": TestSignIn,
   "auth-method:password:enable": AuthMethodPasswordEnable,
   "auth-method:password:disable": AuthMethodPasswordDisable,
   "auth-method:passkey:enable": AuthMethodPasskeyEnable,

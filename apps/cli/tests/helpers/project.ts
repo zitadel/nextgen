@@ -1,6 +1,16 @@
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
-import { chmod, mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import {
+  chmod,
+  mkdir,
+  mkdtemp,
+  readdir,
+  readFile,
+  rename,
+  rm,
+  stat,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Readable } from "node:stream";
@@ -509,6 +519,26 @@ export class ScaffoldedApp {
         credentials.clientId,
       ],
       credentials.secret,
+    );
+  }
+
+  /** Renames the Google connection the way a developer with two Google logins would, keeping its template. */
+  async reslugConnection(from: string, to: string): Promise<void> {
+    const source = join(this.path, ".zitadel/idps", `${from}.json`);
+    const connection = JSON.parse(await readFile(source, "utf8")) as Record<string, unknown>;
+    await writeFile(source, JSON.stringify({ ...connection, slug: to }, null, 2));
+    await rename(source, join(this.path, ".zitadel/idps", `${to}.json`));
+  }
+
+  /** Edits the `oidc` block of a connection file, to set endpoints the way a developer would by hand. */
+  async editOidc(slug: string, edit: Record<string, unknown>): Promise<void> {
+    const path = join(this.path, ".zitadel/idps", `${slug}.json`);
+    const connection = JSON.parse(await readFile(path, "utf8")) as {
+      oidc: Record<string, unknown>;
+    };
+    await writeFile(
+      path,
+      JSON.stringify({ ...connection, oidc: { ...connection.oidc, ...edit } }, null, 2),
     );
   }
 

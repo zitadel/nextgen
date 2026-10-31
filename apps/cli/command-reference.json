@@ -3378,6 +3378,35 @@
       ]
     },
     {
+      "id": "test sign-in",
+      "group": "Configuration and releases",
+      "description": "Check that a sign-in provider is set up correctly.",
+      "args": [],
+      "flags": [
+        {
+          "name": "provider",
+          "description": "Connection to check. Defaults to every connection the Project has.",
+          "type": "option"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
+          "type": "option"
+        }
+      ],
+      "examples": [
+        {
+          "command": "test sign-in --provider google"
+        }
+      ]
+    },
+    {
       "id": "variable get",
       "group": "Configuration and releases",
       "description": "Get one variable from the project.",
