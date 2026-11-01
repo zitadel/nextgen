@@ -584,6 +584,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.1.11(@vitest/browser@4.1.11)(vitest@4.1.11)
+      '@zitadel/api':
+        specifier: workspace:*
+        version: link:packages/api
       publint:
         specifier: 'catalog:'
         version: 0.3.25
