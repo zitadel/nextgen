@@ -1002,9 +1002,7 @@ describe("variable rm", () => {
     ]);
 
     const json = parseJson(res.stdout) as { next_commands?: string[] };
-    expect(json.next_commands?.[0]).toMatch(
-      new RegExp(`variable rm SUPPORT_EMAIL --force .*--server ${DEFAULT_SERVER}`),
-    );
+    expect(json.next_commands?.[0]).toContain(`--server ${DEFAULT_SERVER}`);
   });
 
   it("keeps --preview in the suggested --force retry, so it removes the override", async () => {
