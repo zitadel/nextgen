@@ -9,7 +9,6 @@ export interface Usage {
   /** Core users above 1M bill only once the owner opts in. */
   bands_opt_in?: boolean;
   hide_mark?: boolean;
-  custom_domains?: number;
   /** Regions outside the EU. */
   regions?: number;
   support_priority?: boolean;
@@ -106,12 +105,7 @@ export function bill(usage: Usage, catalog: Catalog = CATALOG): Bill {
     };
   }
   const price = (id: string) => minor(catalog.licensed.find((line) => line.id === id)?.amount ?? 0);
-  const domains = Math.max(
-    0,
-    (usage.custom_domains ?? 0) - catalog.plans.pro.custom_domains_included,
-  );
   const onTop =
-    domains * price("custom_domain_extra") +
     (usage.regions ?? 0) * price("region") +
     (usage.support_priority ? price("support_priority") : 0);
   const minimum = minor(catalog.plans.pro.minimum.amount);
@@ -139,7 +133,6 @@ function proReasons(
     reasons.push("more users than Free is sized for");
   }
   if (usage.hide_mark) reasons.push("hides the attribution mark");
-  if ((usage.custom_domains ?? 0) > 0) reasons.push("hosted login on a custom domain");
   if ((usage.regions ?? 0) > 0) reasons.push("a region outside the EU");
   if (usage.support_priority) reasons.push("priority support");
   for (const line of lines) {

@@ -17,8 +17,8 @@ const QUOTED: [string, Usage, number][] = [
   ],
   ["a B2C app past Free's sizing, 600k MAU", { counts: { monthly_active_users: 600_000 } }, 10_000],
   [
-    "a B2C app with a custom domain and 200k bot checks",
-    { counts: { monthly_active_users: 600_000, bot_checks: 200_000 }, custom_domains: 1 },
+    "a B2C app with 200k bot checks",
+    { counts: { monthly_active_users: 600_000, bot_checks: 200_000 } },
     29_850,
   ],
   [

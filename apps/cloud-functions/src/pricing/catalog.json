@@ -1,7 +1,7 @@
 {
   "$schema": "./catalog.schema.json",
   "id": "zitadel-pricing",
-  "version": "2026-10-31.1",
+  "version": "2026-10-31.2",
   "status": "proposal",
   "currency": "usd",
   "decided": ["plans.pro.minimum", "meters.sso_users.allowance"],
@@ -27,7 +27,6 @@
       "over_allowance": "Security and sign-ins never stop: 30 days to move to Pro. Delivery and M2M tokens stop at the allowance; advanced bot checks fall back to the basic challenge.",
       "event_retention_days": 7,
       "attribution_mark": "shown",
-      "custom_domains_included": 0,
       "delivery_modes": ["dev_inbox", "own_provider"],
       "support": "community",
       "sla": null,
@@ -44,7 +43,6 @@
       },
       "event_retention_days": 30,
       "attribution_mark": "hideable",
-      "custom_domains_included": 1,
       "delivery_modes": ["dev_inbox", "own_provider", "managed"],
       "support": "24/7 tickets, next business day; priority add-on 1 h for outages",
       "sla": { "target_percent": 99.9, "credits": false },
@@ -282,7 +280,6 @@
   "licensed": [
     { "id": "pro_monthly", "label": "Pro minimum", "amount": 100, "interval": "month", "plans": ["pro"], "grants_credit": 100, "tag": "minimum spend" },
     { "id": "pro_yearly", "label": "Pro minimum, annual", "amount": 1000, "interval": "year", "plans": ["pro"], "grants_credit": null, "tag": "minimum spend" },
-    { "id": "custom_domain_extra", "label": "Hosted login domain beyond the included one", "amount": 50, "interval": "month", "per": "domain", "plans": ["pro"], "tag": "delivered cost" },
     { "id": "region", "label": "Region outside the EU, once built", "amount": 100, "interval": "month", "per": "region", "plans": ["pro"], "included_in": ["enterprise"], "tag": "compliance" },
     { "id": "support_priority", "label": "Priority support", "amount": 999, "interval": "month", "plans": ["pro"], "tag": "support" },
     { "id": "sla_9995", "label": "99.95% SLA", "amount": 1000, "interval": "month", "plans": ["pro", "enterprise"], "tag": "compliance" },
