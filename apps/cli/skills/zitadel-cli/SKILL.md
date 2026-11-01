@@ -111,7 +111,8 @@ nothing; `data.skills` and `data.directories` say what it added where.
   where the app is served, a `preview` pattern (it may hold a `*`) is where
   pull-request builds run. They need the project secret, not the preview token.
   An empty list admits every origin, so removing the last one opens the project
-  up; `origin rm` asks first and needs `--force` when non-interactive. Removing
+  up. A caller with no `Origin` is served the newest primary deployment;
+  `origin rm` asks first and needs `--force` when non-interactive. Removing
   a preview pattern leaves its live previews served until they expire.
   `deploy` lands only on primary origins and fails with `E_VALIDATION` without
   one; its `next_commands` name the step that gives the project one. `setup`
