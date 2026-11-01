@@ -227,15 +227,15 @@ export function parseJsonObject(contents: string, path: string): Record<string, 
 }
 
 /**
- * Whether `value` is sent with a `null` at any depth, which a merge patch reads
- * as a removal. It is read as it is sent, so what serializing turns into one
- * counts too: `NaN` and `Infinity` (a piped `1e999`), and an `undefined` in an
- * array.
+ * Whether `value` is sent with a `null` member at any depth, which a merge patch
+ * reads as a removal. It is read as it is sent, so what serializing turns into
+ * one counts too: `NaN` and `Infinity` (a piped `1e999`). An array is a value
+ * the patch replaces whole, so a `null` inside one removes nothing.
  */
 export function holdsNull(value: unknown): boolean {
   const sent = JSON.stringify(value);
   const nullIn = (item: unknown): boolean =>
-    item === null || (typeof item === "object" && Object.values(item).some(nullIn));
+    item === null || (isObject(item) && Object.values(item).some(nullIn));
   return sent !== undefined && nullIn(JSON.parse(sent));
 }
 
