@@ -19,14 +19,20 @@ export type Catalog = {
   status: string;
   /** ISO 4217, lower case. */
   currency: string;
-  conventions: Record<"period" | "user_meters" | "allowance" | "invoice" | "caps", string>;
+  conventions: Record<
+    "period" | "user_meters" | "allowance" | "invoice" | "caps" | "self_hosted",
+    string
+  >;
   plans: {
     free: Plan & {
       limits: {
         requests_per_second_per_project: number;
         requests_per_month_per_account: number;
         core_mau_sized_for: number;
+        past_monthly_ceiling: string;
       };
+      /** What happens past an allowance, where Free has no card to bill. */
+      over_allowance: string;
     };
     pro: Plan & {
       minimum: { amount: number; interval: string };
@@ -134,6 +140,21 @@ export function count(value: number): string {
   return COUNT.format(value);
 }
 
+/** A count as a table cell writes it: `1K`, `200K`, `1M`. */
+export function short(value: number): string {
+  return COMPACT.format(value);
+}
+
+export function capitalize(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+/** The catalog's notes as sentences: capitalized, ending in a period. */
+export function sentence(text: string): string {
+  const capitalized = capitalize(text.trim());
+  return /[.!?]$/.test(capitalized) ? capitalized : `${capitalized}.`;
+}
+
 /** Words as a phrase: `Pro`, `Pro and Enterprise`, `A, B and C`. */
 function and(words: string[]): string {
   return words.length > 1
@@ -167,18 +188,28 @@ export function meterPrice(meter: Meter, catalog: Catalog): string[] {
         `${dollars(price.amount)} per started ${COMPACT.format(price.size)} users above ${COMPACT.format(price.above)}, up to ${COMPACT.format(price.until)}`,
         ...(price.opt_in ? ["Billed only after the owner opts in"] : []),
       ];
-    case "per_band":
-      return price.bands.map((band) => {
+    case "per_band": {
+      // The first priced band leads with its price; the others name their place first.
+      const lines: string[] = [];
+      for (const band of price.bands) {
         const where =
           band.countries.length > 0
             ? and(band.countries.map((code) => REGIONS.of(code) ?? code))
             : "Other countries";
-        if (band.per_user === null) return `${where}: not priced yet`;
-        const pool = meter.pool ? `, ${count(meter.pool.per_user)} texts pooled` : "";
-        const extra =
-          band.extra_message === null ? "" : `, then ${dollars(band.extra_message)} a text`;
-        return `${where}: ${dollars(band.per_user)} per user${pool}${extra}`;
-      });
+        if (band.per_user === null) {
+          lines.push(`${where}: not priced yet`);
+          continue;
+        }
+        const terms = [
+          where,
+          ...(meter.pool ? [`${count(meter.pool.per_user)} texts pooled per user`] : []),
+          ...(band.extra_message === null ? [] : [`then ${dollars(band.extra_message)} a text`]),
+        ].join(", ");
+        if (lines.length === 0) lines.push(`${dollars(band.per_user)} per user`, terms);
+        else lines.push(`${where}: ${dollars(band.per_user)} per user`);
+      }
+      return lines;
+    }
   }
 }
 
@@ -196,11 +227,4 @@ export function licensedPrice(line: Licensed): string {
   if (line.plans.every((plan) => plan === "enterprise")) return "In the Enterprise quote";
   if (line.amount === null) return line.note ?? "On request";
   return `${dollars(line.amount)} a${line.interval === "hour" ? "n" : ""} ${line.interval}${line.per ? ` per ${line.per}` : ""}`;
-}
-
-const PLAN_LABELS: Record<PlanId, string> = { free: "Free", pro: "Pro", enterprise: "Enterprise" };
-
-/** Plans as a phrase: `Pro`, `Pro and Enterprise`. */
-export function planList(plans: PlanId[]): string {
-  return and(plans.map((plan) => PLAN_LABELS[plan]));
 }

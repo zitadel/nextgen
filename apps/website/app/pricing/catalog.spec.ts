@@ -8,7 +8,6 @@ import {
   listedMeters,
   type Meter,
   meterPrice,
-  planList,
   readCatalog,
 } from "./catalog";
 
@@ -103,7 +102,8 @@ describe("meterPrice", () => {
       },
     });
     expect(meterPrice(sms, withMeters([sms]))).toEqual([
-      "United States and Canada: $0.03 per user, 2 texts pooled, then $0.015 a text",
+      "$0.03 per user",
+      "United States and Canada, 2 texts pooled per user, then $0.015 a text",
       "Other countries: not priced yet",
     ]);
   });
@@ -138,13 +138,5 @@ describe("licensedPrice", () => {
     expect(licensedPrice(line({ amount: null, note: "cost plus margin" }))).toBe(
       "cost plus margin",
     );
-  });
-});
-
-describe("planList", () => {
-  it("joins the plans' names", () => {
-    expect(planList(["pro"])).toBe("Pro");
-    expect(planList(["pro", "enterprise"])).toBe("Pro and Enterprise");
-    expect(planList(["free", "pro", "enterprise"])).toBe("Free, Pro and Enterprise");
   });
 });

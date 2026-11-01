@@ -1,23 +1,17 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { CallToAction } from "../cta";
 import { links } from "../links";
 import og from "../og.jpg";
 import { SiteFooter } from "../site-footer";
 import { SiteHeader } from "../site-header";
-import {
-  type Catalog,
-  count,
-  dollars,
-  licensedPrice,
-  listedMeters,
-  meterPrice,
-  planList,
-  readCatalog,
-} from "./catalog";
+import { type Catalog, capitalize, dollars, readCatalog, sentence, short } from "./catalog";
+import { compareGroups } from "./compare";
+import { CompareTable } from "./compare-table";
 
 // Built from the repository (catalog.ts), so a deploy brings the prices the
-// cloud bills from; nothing is read per visit.
+// cloud bills from; nothing is read per visit. Laid out like the pricing
+// pages people know: the plans as cards, then every price compared by
+// audience, then the questions, which hold every explanation.
 export const dynamic = "force-static";
 
 const title = "Pricing — Zitadel preview";
@@ -40,51 +34,56 @@ export const metadata: Metadata = {
 };
 
 const DATE = new Intl.DateTimeFormat("en-US", { dateStyle: "long", timeZone: "UTC" });
-const COMPACT = new Intl.NumberFormat("en-US", { notation: "compact" });
 
 const H2 = "font-heading text-3xl text-text-primary leading-tight tracking-[-0.02em] md:text-4xl";
-const LEAD = "mt-4 max-w-2xl text-base text-text-secondary leading-7";
-const CARD =
-  "flex flex-col rounded-2xl border border-window-border bg-window p-6 shadow-(--window-shadow)";
-const TH = "py-3 pr-6 text-left font-mono font-normal text-text-muted text-xs leading-4";
-const TD = "py-4 pr-6 align-top text-sm leading-6";
+const BUTTON =
+  "flex h-11 items-center justify-center rounded-lg px-5 font-semibold text-sm transition-colors";
+const PRIMARY = `${BUTTON} bg-text-primary text-background hover:opacity-85`;
+const SECONDARY = `${BUTTON} border border-window-border bg-tint/[0.03] text-text-primary hover:bg-tint/[0.07]`;
 
 export default function PricingPage() {
   const catalog = readCatalog();
-  const mau = catalog.meters.find((meter) => meter.id === "monthly_active_users");
+  const proposal = catalog.status === "proposal";
   return (
     <>
       <SiteHeader current="pricing" />
       <main className="px-6 pt-12 pb-20 md:pt-20 md:pb-28">
         <div className="mx-auto max-w-6xl">
-          {catalog.status === "proposal" && (
+          {proposal && (
             <p className="inline-flex rounded-full bg-tint/10 px-3 py-1 font-semibold text-text-secondary text-xs leading-5">
-              A proposal as of {DATE.format(new Date(catalog.version.slice(0, 10)))}: nothing is
-              billed yet, and prices may change before they are
+              A proposal as of {proposalDate(catalog)}: nothing is billed yet, and prices may change
+              before they are
             </p>
           )}
-          <h1 className="mt-6 font-heading text-4xl text-text-primary leading-tight tracking-[-0.025em] md:text-5xl">
+          <h1 className="mt-6 max-w-3xl font-heading text-4xl text-text-primary leading-tight tracking-[-0.025em] md:text-6xl">
             Pay for features, not for users
           </h1>
           <p className="mt-4 max-w-2xl text-base text-text-secondary leading-7 md:text-lg md:leading-8">
-            {mau?.allowance
-              ? `The first ${COMPACT.format(mau.allowance)} monthly active users are free on every plan, and so are teams and console seats. `
-              : "Teams and console seats are free on every plan. "}
-            You pay for the features you turn on, per user each one touches, against a monthly
-            minimum that works as credit. Compliance and support are billed on top.
+            Users, teams and seats stay free. You pay for the features you turn on, per user each
+            one touches.
           </p>
-          <CallToAction placement="hero" className="mt-8 justify-start" />
 
-          <Plans catalog={catalog} />
-          <Bill catalog={catalog} />
-          <Meters catalog={catalog} />
-          <OnTop catalog={catalog} />
+          <CloudPlans catalog={catalog} />
+          <p className="mt-6 text-center text-text-muted text-xs leading-5">
+            All prices in {catalog.currency.toUpperCase()}, before taxes.
+          </p>
+
+          <section aria-labelledby="compare" className="mt-20 md:mt-28">
+            <h2 id="compare" className={H2}>
+              Compare plans
+            </h2>
+            <CompareTable
+              groups={compareGroups(catalog)}
+              prices={{
+                free: "$0",
+                pro: `${dollars(catalog.plans.pro.minimum.amount)} / ${catalog.plans.pro.minimum.interval}`,
+                enterprise: "Custom",
+              }}
+            />
+          </section>
+
           <SelfHosted catalog={catalog} />
-
-          <p className="mt-16 border-border-primary border-t pt-8 text-sm text-text-muted leading-6">
-            Prices in {catalog.currency.toUpperCase()}, before taxes, from the price list{" "}
-            <span className="font-mono">{catalog.version}</span>.
-          </p>
+          <Questions catalog={catalog} />
         </div>
       </main>
       <SiteFooter />
@@ -92,122 +91,107 @@ export default function PricingPage() {
   );
 }
 
-/** The cloud's three plans, side by side. */
-function Plans({ catalog }: { catalog: Catalog }) {
+function proposalDate(catalog: Catalog): string {
+  return DATE.format(new Date(catalog.version.slice(0, 10)));
+}
+
+/** The cloud's three plans as cards, each adding to the one before it. */
+function CloudPlans({ catalog }: { catalog: Catalog }) {
   const { free, pro, enterprise } = catalog.plans;
+  const mau = catalog.meters.find((meter) => meter.id === "monthly_active_users");
+  const addendum = catalog.licensed.find((line) => line.id === "addendum");
+  const [proSupport = ""] = pro.support.split("; ");
   return (
-    <section aria-labelledby="plans" className="mt-16 md:mt-24">
-      <h2 id="plans" className={H2}>
-        Cloud plans
-      </h2>
-      <div className="mt-8 grid gap-4 md:grid-cols-3">
-        <Plan
-          name={free.label}
-          price="$0"
-          per="No card needed"
-          line="For building and launching."
-          facts={[
-            `Sized for ${count(free.limits.core_mau_sized_for)} monthly active users`,
-            `${free.limits.requests_per_second_per_project} requests a second per project, ${COMPACT.format(free.limits.requests_per_month_per_account)} a month per account`,
-            ...common(free),
-          ]}
-        />
-        <Plan
-          name={pro.label}
-          price={dollars(pro.minimum.amount)}
-          per={`a ${pro.minimum.interval}, all of it credit for the meters, or ${dollars(pro.annual.amount)} a ${pro.annual.interval}`}
-          line="For companies running production."
-          facts={[
-            `Sized for ${count(pro.limits.core_mau_sized_for)} monthly active users`,
-            ...common(pro),
-          ]}
-          featured
-        />
-        {/* Enterprise is quoted, never listed: no tier, minimum or rate. */}
-        <Plan
-          name={enterprise.label}
-          price="Custom"
-          per="A yearly commitment, all of it credit for the meters, at contract rates"
-          line="For contracts, compliance and scale."
-          facts={common(enterprise, { quoted: true })}
-          contact
-        />
-      </div>
-    </section>
+    <div className="mt-12 grid gap-4 md:grid-cols-3">
+      <Card
+        name={free.label}
+        price="$0"
+        per="/ month"
+        line="For building and launching, no card needed."
+        features={[
+          `Up to ${short(free.limits.core_mau_sized_for)} monthly active users`,
+          "Unlimited teams and console seats",
+          `${free.event_retention_days} days of audit events`,
+          "The dev inbox or your own email provider",
+          "Community support",
+        ]}
+        action={{ label: "Start building", href: links.quickstart }}
+      />
+      <Card
+        name={pro.label}
+        price={dollars(pro.minimum.amount)}
+        per={`/ ${pro.minimum.interval}`}
+        line={`All of it credit for usage, or ${dollars(pro.annual.amount)} a ${pro.annual.interval}.`}
+        includes={`All ${free.label} features, plus:`}
+        features={[
+          ...(mau?.allowance ? [`${short(mau.allowance)} monthly active users included`] : []),
+          "Managed email and SMS",
+          `${pro.custom_domains_included ?? 0} custom login domain, no Zitadel mark`,
+          `${pro.event_retention_days} days of audit events`,
+          ...(pro.sla ? [`${pro.sla.target_percent}% uptime SLA`] : []),
+          capitalize(proSupport),
+        ]}
+        action={{ label: "Upgrade in the console", href: links.console }}
+        featured
+      />
+      <Card
+        name={enterprise.label}
+        price="Custom"
+        line="Contract rates on every meter, as a yearly commitment."
+        includes={`All ${pro.label} features, plus:`}
+        features={[
+          typeof enterprise.regions === "string"
+            ? capitalize(enterprise.regions.split("; ")[0] ?? enterprise.regions)
+            : "Your choice of region",
+          "A dedicated deployment, on request",
+          "Uptime SLA with service credits",
+          capitalize(enterprise.support),
+          ...(addendum ? [addendum.label] : []),
+        ]}
+        action={{ label: "Contact us", href: links.contact }}
+      />
+    </div>
   );
 }
 
-/**
- * What every plan states: retention, domains, delivery, the mark, support, the
- * SLA and regions. A `quoted` plan leaves out the SLA's note, which names its
- * tiers.
- */
-function common(
-  plan: Catalog["plans"][keyof Catalog["plans"]],
-  { quoted = false }: { quoted?: boolean } = {},
-): string[] {
-  const facts = [`${plan.event_retention_days} days of audit events`];
-  if (plan.custom_domains_included) {
-    facts.push(
-      `${plan.custom_domains_included} custom login domain${plan.custom_domains_included > 1 ? "s" : ""}`,
-    );
-  }
-  facts.push(
-    plan.delivery_modes.includes("managed")
-      ? "Managed email and SMS, or your own provider"
-      : "Email through the dev inbox or your own provider",
-  );
-  facts.push(
-    plan.attribution_mark === "shown" ? "Zitadel mark on the login" : "Zitadel mark can be hidden",
-  );
-  // "by tier: …" reads on from the word; a list of terms takes a colon.
-  facts.push(
-    plan.support === "community"
-      ? "Community support"
-      : `Support${plan.support.includes(":") ? " " : ": "}${plan.support}`,
-  );
-  if (plan.sla) {
-    facts.push(
-      `${plan.sla.target_percent}% SLA${plan.sla.credits ? " with credits" : ""}${plan.sla.note && !quoted ? `; ${plan.sla.note}` : ""}`,
-    );
-  }
-  facts.push(
-    Array.isArray(plan.regions)
-      ? `${plan.regions.map((region) => region.toUpperCase()).join(", ")} region`
-      : capitalize(plan.regions),
-  );
-  return facts;
-}
-
-function Plan({
+function Card({
   name,
   price,
   per,
   line,
-  facts,
+  includes,
+  features,
+  action,
   featured = false,
-  contact = false,
 }: {
   name: string;
   price: string;
-  per: string;
+  per?: string;
   line: string;
-  facts: string[];
+  /** Heads the features of a plan that adds to another. */
+  includes?: string;
+  features: string[];
+  action: { label: string; href: string };
   featured?: boolean;
-  /** Ends the card on the way to a quote. */
-  contact?: boolean;
 }) {
   return (
-    <article className={`${CARD} ${featured ? "ring-1 ring-text-accent/40" : ""}`}>
-      <h3 className="font-heading text-2xl text-text-primary leading-tight">{name}</h3>
-      <p className="mt-1 text-sm text-text-secondary leading-6">{line}</p>
-      <p className="mt-6 font-heading text-4xl text-text-primary leading-none tracking-[-0.02em]">
-        {price}
+    <article
+      className={`flex flex-col rounded-2xl border bg-window p-6 shadow-(--window-shadow) ${featured ? "border-text-accent/40" : "border-window-border"}`}
+    >
+      <h3 className="font-semibold text-sm text-text-secondary leading-5">{name}</h3>
+      <p className="mt-3 flex items-baseline gap-1.5">
+        <span className="font-heading text-4xl text-text-primary leading-none tracking-[-0.02em]">
+          {price}
+        </span>
+        {per && <span className="text-sm text-text-muted">{per}</span>}
       </p>
-      <p className="mt-2 min-h-12 text-sm text-text-muted leading-6">{per}</p>
-      <ul className="mt-6 flex flex-col gap-3 border-border-primary border-t pt-6 text-sm text-text-secondary leading-6">
-        {facts.map((fact) => (
-          <li key={fact} className="flex gap-3">
+      <p className="mt-3 min-h-12 text-sm text-text-secondary leading-6">{line}</p>
+      {includes && <p className="mt-6 font-mono text-text-muted text-xs leading-4">{includes}</p>}
+      <ul
+        className={`flex flex-col gap-3 text-sm text-text-secondary leading-6 ${includes ? "mt-3" : "mt-6"}`}
+      >
+        {features.map((feature) => (
+          <li key={feature} className="flex gap-3">
             <svg
               aria-hidden="true"
               viewBox="0 0 16 16"
@@ -222,234 +206,231 @@ function Plan({
                 strokeLinejoin="round"
               />
             </svg>
-            {fact}
+            {feature}
           </li>
         ))}
       </ul>
-      {contact && (
-        <div className="mt-auto pt-8">
-          <a
-            href={links.contact}
-            className="flex h-11 items-center justify-center rounded-lg border border-window-border bg-tint/[0.03] px-5 font-semibold text-sm text-text-primary transition-colors hover:bg-tint/[0.07]"
-          >
-            Contact us
-          </a>
-        </div>
-      )}
+      <div className="mt-auto pt-8">
+        <a href={action.href} className={featured ? PRIMARY : SECONDARY}>
+          {action.label}
+        </a>
+      </div>
     </article>
-  );
-}
-
-/** How the minimum, the meters and the lines on top make one invoice. */
-function Bill({ catalog }: { catalog: Catalog }) {
-  const { conventions } = catalog;
-  // The invoice's rule opens with its formula, which stays as written.
-  const [formula, ...why] = conventions.invoice.split("; ");
-  const rules: [string, ReactNode][] = [
-    [
-      "The invoice",
-      <>
-        <code className="font-mono text-sm text-text-primary">{formula}</code>
-        {why.length > 0 && `: ${period(why.join("; "))}`}
-      </>,
-    ],
-    ["Allowances", sentence(conventions.allowance)],
-    ["Caps", sentence(conventions.caps)],
-    ["The period", sentence(`a ${conventions.period}`)],
-  ];
-  return (
-    <Section
-      id="bill"
-      title="How a bill adds up"
-      lead="The minimum is credit: what the meters use draws on it first, and only usage past it is billed."
-    >
-      <dl className="mt-8 grid gap-x-12 gap-y-6 md:grid-cols-2">
-        {rules.map(([term, rule]) => (
-          <div key={term} className="border-border-primary border-t pt-4">
-            <dt className="font-mono text-text-muted text-xs leading-4">{term}</dt>
-            <dd className="mt-2 text-base text-text-secondary leading-7">{rule}</dd>
-          </div>
-        ))}
-      </dl>
-    </Section>
-  );
-}
-
-/** The meters, each priced past the allowance every plan has. */
-function Meters({ catalog }: { catalog: Catalog }) {
-  const gauges = catalog.meters.filter((meter) => meter.price === null);
-  return (
-    <Section
-      id="meters"
-      title="Features, per user they touch"
-      lead={sentence(catalog.conventions.user_meters)}
-    >
-      <Table head={["Feature", "What counts", "Free each month", "Then"]}>
-        {listedMeters(catalog).map((meter) => (
-          <tr key={meter.id} className="border-border-primary border-t">
-            <td className={`${TD} font-semibold text-text-primary`}>
-              {meter.label}
-              {meter.plans && (
-                <span className="mt-1 block font-normal text-text-muted text-xs leading-5">
-                  {planList(meter.plans)} only
-                </span>
-              )}
-            </td>
-            <td className={`${TD} text-text-secondary`}>{sentence(meter.counts)}</td>
-            <td className={`${TD} whitespace-nowrap text-text-secondary`}>
-              {meter.allowance ? count(meter.allowance) : "—"}
-            </td>
-            <td className={`${TD} text-text-secondary`}>
-              {/* The price, then what qualifies it, quieter. */}
-              {meterPrice(meter, catalog).map((line, index) => (
-                <span key={line} className={`block ${index > 0 ? "text-text-muted" : ""}`}>
-                  {line}
-                </span>
-              ))}
-            </td>
-          </tr>
-        ))}
-      </Table>
-      {gauges.map((gauge) => (
-        <p key={gauge.id} className="mt-4 text-sm text-text-muted leading-6">
-          {gauge.label}: {lowercase(gauge.counts)}.
-        </p>
-      ))}
-    </Section>
-  );
-}
-
-/** The lines billed outside the minimum. */
-function OnTop({ catalog }: { catalog: Catalog }) {
-  const lines = catalog.licensed.filter((line) => line.tag !== "minimum spend");
-  return (
-    <Section
-      id="on-top"
-      title="Billed on top, never from the credit"
-      lead="Compliance, support and extra domains are lines of their own, so they never vanish into the minimum."
-    >
-      <Table head={["Line", "Price", "Plans"]}>
-        {lines.map((line) => (
-          <tr key={line.id} className="border-border-primary border-t">
-            <td className={`${TD} font-semibold text-text-primary`}>{line.label}</td>
-            <td className={`${TD} text-text-secondary`}>{licensedPrice(line)}</td>
-            <td className={`${TD} text-text-secondary`}>
-              {planList(line.plans)}
-              {line.included_in && `; included in ${planList(line.included_in)}`}
-              {line.amount !== null && line.note && `; ${line.note}`}
-            </td>
-          </tr>
-        ))}
-      </Table>
-    </Section>
   );
 }
 
 /** Self-hosting's three steps, priced per installation. */
 function SelfHosted({ catalog }: { catalog: Catalog }) {
-  const { unit, free, pro, enterprise } = catalog.self_hosted;
-  const [unitName, unitMeaning] = unit.split(": ");
+  const { free, pro, enterprise } = catalog.self_hosted;
+  const lowest = Math.min(...pro.prices.map(({ amount }) => amount));
   return (
-    <Section
-      id="self-hosted"
-      title="Self-hosted"
-      lead={`The same three steps, priced per ${unitName}${unitMeaning ? ` (${unitMeaning})` : ""}, never per user or meter.`}
-    >
+    <section aria-labelledby="self-hosted" className="mt-20 md:mt-28">
+      <h2 id="self-hosted" className={H2}>
+        Self-hosted
+      </h2>
+      <p className="mt-4 max-w-2xl text-base text-text-secondary leading-7">
+        Run Zitadel yourself, priced per production installation.
+      </p>
       <div className="mt-8 grid gap-4 md:grid-cols-3">
-        <Plan
+        <Card
           name="Open source"
           price="$0"
-          per="On your own servers"
-          line="Every feature, run it yourself."
-          facts={[
-            `Licensed ${free.license}`,
-            "Every feature",
-            `${capitalize(free.support)} support`,
-          ]}
+          line={`${free.license}, on your own servers.`}
+          features={["Every feature", `${capitalize(free.support)} support`]}
+          action={{ label: "View on GitHub", href: links.github }}
         />
-        <Plan
+        <Card
           name="Self-hosted Pro"
-          price={`From ${dollars(Math.min(...pro.prices.map(({ amount }) => amount)))}`}
-          per={`a ${pro.prices[0]?.interval ?? "year"}`}
-          line="For companies running it in production."
-          facts={[
+          price={dollars(lowest)}
+          per={`/ ${pro.prices[0]?.interval ?? "year"}`}
+          line="The commercial license and tickets, by card."
+          includes="Per production installation:"
+          features={[
             ...pro.prices.map(
               ({ installations_up_to: upTo, amount, interval }) =>
-                `${upTo === 1 ? "1 installation" : `Up to ${upTo} installations`}: ${dollars(amount)} a ${interval}`,
+                `${upTo === 1 ? "1 installation" : `Up to ${upTo}`}: ${dollars(amount)} a ${interval}`,
             ),
             ...pro.includes.map(capitalize),
             `${pro.ticket_cap_per_year} tickets a year`,
           ]}
+          action={{ label: "Buy in the console", href: links.console }}
           featured
         />
-        <Plan
+        <Card
           name="Self-hosted Enterprise"
           price="Custom"
-          per="A yearly commitment, on the cloud's Enterprise terms"
-          line="For contracts and compliance."
-          facts={enterprise.includes.map(capitalize)}
-          contact
+          line="Contract terms for running it yourself."
+          includes="All Self-hosted Pro features, plus:"
+          features={enterprise.includes.map(capitalize)}
+          action={{ label: "Contact us", href: links.contact }}
         />
       </div>
-    </Section>
-  );
-}
-
-function Section({
-  id,
-  title,
-  lead,
-  children,
-}: {
-  id: string;
-  title: string;
-  lead: string;
-  children: ReactNode;
-}) {
-  return (
-    <section aria-labelledby={id} className="mt-16 md:mt-24">
-      <h2 id={id} className={H2}>
-        {title}
-      </h2>
-      <p className={LEAD}>{lead}</p>
-      {children}
     </section>
   );
 }
 
-/** A table that scrolls inside itself on a narrow screen, never the page. */
-function Table({ head, children }: { head: string[]; children: ReactNode }) {
+/** Every explanation of the page, as questions. */
+function Questions({ catalog }: { catalog: Catalog }) {
+  const { conventions, plans } = catalog;
+  const { pro, free } = plans;
+  const [formula, ...why] = conventions.invoice.split("; ");
+  const requests = catalog.meters.find((meter) => meter.id === "api_requests");
+  const counted = catalog.meters.filter((meter) => meter.price !== null);
+  const [unitName, unitMeaning] = catalog.self_hosted.unit.split(": ");
+  const questions: { question: string; answer: ReactNode }[] = [
+    ...(catalog.status === "proposal"
+      ? [
+          {
+            question: "Is this pricing final?",
+            answer: (
+              <p>
+                No. It is a proposal as of {proposalDate(catalog)}: nothing is billed during the
+                preview, and prices may change before they are.
+              </p>
+            ),
+          },
+        ]
+      : []),
+    {
+      question: `How does ${pro.label}'s minimum work?`,
+      answer: (
+        <>
+          <p>
+            {pro.label} bills at least {dollars(pro.minimum.amount)} a {pro.minimum.interval}, or{" "}
+            {dollars(pro.annual.amount)} a {pro.annual.interval}, and all of it is credit: what the
+            meters use draws on it first, and only usage past it is billed.
+          </p>
+          <p>
+            The invoice is <code className="font-mono text-sm text-text-primary">{formula}</code>
+            {why.length > 0 ? `: ${why.join("; ")}` : "."}
+          </p>
+        </>
+      ),
+    },
+    {
+      question: "What counts as a user?",
+      answer: <p>{sentence(conventions.user_meters)}</p>,
+    },
+    {
+      question: "What does each meter count?",
+      answer: (
+        <dl className="grid gap-x-6 gap-y-2 sm:grid-cols-[14rem_1fr]">
+          {counted.map((meter) => (
+            <div key={meter.id} className="contents">
+              <dt className="text-text-primary">{meter.label}</dt>
+              <dd>{sentence(meter.counts)}</dd>
+            </div>
+          ))}
+        </dl>
+      ),
+    },
+    {
+      question: "Are the allowances the same on every plan?",
+      answer: <p>{sentence(conventions.allowance)}</p>,
+    },
+    {
+      question: `What happens when ${free.label} reaches an allowance?`,
+      answer: <p>{sentence(free.over_allowance)}</p>,
+    },
+    {
+      question: "Can I cap what I spend?",
+      answer: <p>{sentence(conventions.caps)}</p>,
+    },
+    {
+      question: "Do teams and console seats cost anything?",
+      answer: (
+        <p>
+          No, on every plan: a customer never pays for its own seats, nor for the teams it runs for
+          its own customers.
+        </p>
+      ),
+    },
+    ...(requests
+      ? [
+          {
+            question: "Are API requests billed?",
+            answer: (
+              <p>
+                No: {requests.counts.replace(/^Each request; /, "they are ")}. {free.label} allows{" "}
+                {free.limits.requests_per_second_per_project} requests a second per project and{" "}
+                {short(free.limits.requests_per_month_per_account)} a month per account; past that,{" "}
+                {free.limits.past_monthly_ceiling}.
+              </p>
+            ),
+          },
+        ]
+      : []),
+    {
+      question: "What is billed on top of the minimum?",
+      answer: (
+        <p>
+          Compliance, support and extra login domains. They are lines of their own and never draw on
+          the credit, so they never vanish into the minimum.
+        </p>
+      ),
+    },
+    {
+      question: "How is Enterprise priced?",
+      answer: (
+        <p>
+          Per contract: a yearly commitment, all of it credit for the meters, at rates below the
+          list prices.{" "}
+          <a href={links.contact} className="text-text-primary underline underline-offset-4">
+            Contact us
+          </a>{" "}
+          for a quote.
+        </p>
+      ),
+    },
+    {
+      question: "How is self-hosting priced?",
+      answer: (
+        <p>
+          {sentence(conventions.self_hosted)}{" "}
+          {unitMeaning ? `A ${unitName} is ${unitMeaning}.` : ""}
+        </p>
+      ),
+    },
+    {
+      question: "When are we billed, and in which currency?",
+      answer: (
+        <p>
+          By {conventions.period}, in {catalog.currency.toUpperCase()} and before taxes. These
+          prices are the price list <span className="font-mono">{catalog.version}</span>.
+        </p>
+      ),
+    },
+  ];
   return (
-    <div className="mt-8 overflow-x-auto">
-      <table className="w-full min-w-[40rem] border-collapse">
-        <thead>
-          <tr>
-            {head.map((cell) => (
-              <th key={cell} scope="col" className={TH}>
-                {cell}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>{children}</tbody>
-      </table>
-    </div>
+    <section aria-labelledby="questions" className="mt-20 md:mt-28">
+      <h2 id="questions" className={H2}>
+        Questions
+      </h2>
+      <div className="mt-8 border-border-primary border-b">
+        {questions.map(({ question, answer }) => (
+          <details key={question} className="group border-border-primary border-t">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-6 py-5 text-base text-text-primary leading-7 [&::-webkit-details-marker]:hidden">
+              {question}
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 16 16"
+                fill="none"
+                className="size-4 shrink-0 text-text-muted transition-transform group-open:rotate-45"
+              >
+                <path
+                  d="M8 3v10M3 8h10"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </summary>
+            <div className="flex max-w-3xl flex-col gap-3 pb-6 text-base text-text-secondary leading-7">
+              {answer}
+            </div>
+          </details>
+        ))}
+      </div>
+    </section>
   );
-}
-
-function capitalize(text: string): string {
-  return text.charAt(0).toUpperCase() + text.slice(1);
-}
-
-function lowercase(text: string): string {
-  return text.charAt(0).toLowerCase() + text.slice(1);
-}
-
-/** The catalog's notes as sentences: capitalized, ending in a period. */
-function sentence(text: string): string {
-  return period(capitalize(text.trim()));
-}
-
-function period(text: string): string {
-  return /[.!?]$/.test(text) ? text : `${text}.`;
 }
