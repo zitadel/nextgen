@@ -36,7 +36,7 @@ type Project = { id: string; project_secret: string; cwd: string };
  * records `recorded` (the server's origins unless given).
  */
 async function aProject(origins: Origin[], recorded: Origin[] = origins): Promise<Project> {
-  const response = await fetch(`${SERVER}/projects`, {
+  const response = await fetch(`${SERVER}/api/v1/projects`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ name: "demo", origins }),
@@ -88,7 +88,7 @@ async function recordedSecret(project: Project) {
 /** Fails every request that would add `pattern` as primary; any other passes on to the mock. */
 function refusePrimaryAdds(): void {
   server.use(
-    http.post(`${SERVER}/projects/:project_id/origins`, async ({ request }) => {
+    http.post(`${SERVER}/api/v1/projects/:project_id/origins`, async ({ request }) => {
       const body = (await request.clone().json()) as { kind?: string };
       if (body.kind === "primary") {
         return HttpResponse.json({ code: "unavailable", message: "try again" }, { status: 503 });
@@ -123,7 +123,7 @@ describe("IssuerOriginCheck", () => {
 
   it("asks no server when .zitadel/secret records the issuer as primary", async () => {
     const project = await aProject([{ pattern: ISSUER, kind: "primary" }]);
-    server.use(http.get(`${SERVER}/projects/:project_id`, () => HttpResponse.error()));
+    server.use(http.get(`${SERVER}/api/v1/projects/:project_id`, () => HttpResponse.error()));
 
     const outcome = await check.run(ctxFor(project.cwd));
 
@@ -158,7 +158,7 @@ describe("IssuerOriginCheck", () => {
 
   it("skips, passing, when the server cannot be reached", async () => {
     const project = await aProjectFrom010();
-    server.use(http.get(`${SERVER}/projects/:project_id`, () => HttpResponse.error()));
+    server.use(http.get(`${SERVER}/api/v1/projects/:project_id`, () => HttpResponse.error()));
 
     const outcome = await check.run(ctxFor(project.cwd));
 
