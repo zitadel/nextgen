@@ -1,3 +1,4 @@
+import type { Consent, Gate } from "../../../lib/consent";
 import { ZitadelError, type ZitadelErrorCode } from "../../../lib/errors";
 import type { Orca } from "../../../lib/orca";
 
@@ -25,6 +26,11 @@ export type CheckContext = {
   readonly cliVersion: string;
   /** When true, {@link SanityCheck.fix} must preview without writing. */
   readonly dryRun: boolean;
+  /**
+   * Asks for consent to a destructive repair: `doctor`'s own confirmation,
+   * which `--force` answers. `undefined` is a no. Never called on a dry run.
+   */
+  readonly consent: (gate: Gate) => Promise<Consent | undefined>;
 };
 
 /**

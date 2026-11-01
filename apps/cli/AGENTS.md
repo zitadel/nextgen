@@ -68,8 +68,14 @@
   - Leave names and ids in a prompt unquoted ("What is the value of user_id?",
     "Remove FOO from the project?"); a terminal does not render backticks.
   - Ask the same thing the same way in every command that asks it.
-- A command whose `--force` means something other than "yes to every
-  confirm" builds its own asker with `force: false`, as `setup` does.
+- A command that deletes, revokes or rolls back extends `Destructive(...)`
+  (`src/lib/oclif/destructive.ts`) and does it in `this.confirmed({ ... })`.
+- Every destructive operation takes a `Consent` (`src/lib/consent.ts`); the
+  client withholds the spec's destructive operations until `consent.unlock`.
+- A plain yes or no is `kind: "yes-no"`, which `--force` never answers; only
+  `Consent` asks a `confirm`.
+- `biome-plugins/no-consent-bypass.grit` rejects every way around `Consent`:
+  casts, raw HTTP, `Consent.request` outside the mixin.
 - The flag surface follows the [WebCLI spec](https://webcli.com/). Record a new
   global flag, or a deviation, in `SKILL.md`'s invocation rules.
 - Declare an environment variable that sets what a global flag sets as a

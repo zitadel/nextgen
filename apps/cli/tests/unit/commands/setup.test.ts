@@ -35,6 +35,8 @@ import Setup from "../../../src/commands/setup";
 import { aFakeAppGeneratorPath } from "../../helpers/app-generator";
 import { expectedPublicCliCommand, parseJson, runCliForTest } from "../../helpers/run-cli";
 import { asTerminal } from "../../helpers/terminal";
+import { moveDevPort } from "../../../src/commands/setup/move-dev-port";
+import { createOrca } from "../../../src/lib/orca";
 
 const tempDirs: string[] = [];
 const held: Server[] = [];
@@ -1328,8 +1330,8 @@ describe("setup --dev-port on an app already set up", () => {
     return cwd;
   }
 
-  function moveTo(cwd: string, port: number) {
-    return setup(cwd, ["--non-interactive", "--dev-port", String(port)]);
+  function moveTo(cwd: string, port: number, extra: string[] = []) {
+    return setup(cwd, ["--non-interactive", "--dev-port", String(port), ...extra]);
   }
 
   /** The fields of `package.json`, `zitadel.json` and `.zitadel/secret` these tests read. */
@@ -1354,7 +1356,7 @@ describe("setup --dev-port on an app already set up", () => {
   it("moves the dev script, the issuer and the allowed origin to the new port", async () => {
     const cwd = await aSetUpNextApp();
 
-    const res = await moveTo(cwd, 3101);
+    const res = await moveTo(cwd, 3101, ["--force"]);
 
     expect(res.exitCode, res.stdout).toBe(0);
     const json = parseJson(res.stdout) as { status: string; data: Record<string, unknown> };
@@ -1378,6 +1380,43 @@ describe("setup --dev-port on an app already set up", () => {
     expect(await projectOrigins(cwd)).toEqual([
       { pattern: "http://localhost:3101", kind: "primary" },
     ]);
+  });
+
+  it("stops when asking to remove the previous origin fails for another reason", async () => {
+    const cwd = await aSetUpNextApp();
+
+    const move = moveDevPort({
+      cwd,
+      devPort: 3101,
+      source: "https://api.zitadel.cloud",
+      orca: createOrca(),
+      cliVersion: "0.0.0",
+      dryRun: false,
+      consent: () => Promise.reject(new Error("a bug in the caller")),
+    });
+
+    await expect(move).rejects.toThrow("a bug in the caller");
+  });
+
+  it("keeps the previous origin without --force, since nobody can be asked", async () => {
+    const cwd = await aSetUpNextApp();
+
+    await moveTo(cwd, 3101);
+
+    expect(await projectOrigins(cwd)).toContainEqual({
+      pattern: "http://localhost:3000",
+      kind: "primary",
+    });
+  });
+
+  it("says the previous origin was kept", async () => {
+    const cwd = await aSetUpNextApp();
+
+    const res = await moveTo(cwd, 3101);
+
+    expect((parseJson(res.stdout) as { warnings: string[] }).warnings).toContain(
+      "http://localhost:3000 is still among the project's origins; it admits a port nothing serves any more.",
+    );
   });
 
   it("changes nothing when the server refuses the new origin", async () => {

@@ -9,6 +9,7 @@ import { environmentFlags, environmentSelectorSuffix } from "./environment-flags
 import type { GlobalOptions } from "./types";
 import { type EnvironmentSelector, projectCommand, type SuggestedCommand } from "../suggestion";
 import { optionArgs } from "../public-cli";
+import { shellArg, withoutOptions } from "../shell";
 
 /** The platform connection {@link EnvironmentCommand.connect} opens. */
 export type Connection = Readonly<{
@@ -126,6 +127,19 @@ export abstract class EnvironmentCommand extends BaseCommand {
    */
   protected suggest(args: string): SuggestedCommand {
     return projectCommand(args, this.environmentSelector(), this.meta.cliVersion);
+  }
+
+  /**
+   * The run again through {@link suggest}, which puts its selector back on.
+   * A run that resolved no environment (an `auth-method` edit) has none to
+   * put back, so it keeps the words as typed.
+   */
+  protected override retryCommand(words: readonly string[]): SuggestedCommand {
+    if ((this.environment as Environment | undefined) === undefined) {
+      return super.retryCommand(words);
+    }
+    const selector = ["--env", "-e", "--env-file", "--server", "-s", "--cwd", "-c"];
+    return this.suggest(withoutOptions(words, selector).map(shellArg).join(" "));
   }
 
   /**

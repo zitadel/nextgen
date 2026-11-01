@@ -10,6 +10,7 @@ import {
   anApp,
   type ScaffoldedApp,
   PASSWORD_POLICY,
+  SETUP_ORIGIN,
 } from "../helpers/project";
 
 const platform = usePlatformMock();
@@ -472,6 +473,26 @@ describe("setup", () => {
         const rerun = await app.setup();
 
         expect(rerun).toBeSkipped();
+      });
+
+      it("keeps the previous origin when --dev-port moves the app without --force", async () => {
+        const app = await anApp();
+        expect(await app.setup()).toSucceed();
+
+        await app.setup(["--dev-port", "3001"]);
+
+        expect(await app.projectOrigins()).toContainEqual(SETUP_ORIGIN);
+      });
+
+      it("replaces the previous origin when --dev-port moves the app with --force", async () => {
+        const app = await anApp();
+        expect(await app.setup()).toSucceed();
+
+        await app.setup(["--dev-port", "3001", "--force"]);
+
+        expect(await app.projectOrigins()).toEqual([
+          { pattern: "http://localhost:3001", kind: "primary" },
+        ]);
       });
 
       it("leaves the developer's edits in place on a rerun", async () => {

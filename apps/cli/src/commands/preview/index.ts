@@ -1,5 +1,5 @@
 import { Flags } from "@oclif/core";
-import type { ZitadelClient } from "@zitadel/api/client";
+import type { ZitadelClient } from "../../lib/api-client";
 import { ApiError } from "@zitadel/api/runtime/fetch";
 
 import {

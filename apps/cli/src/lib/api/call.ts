@@ -1,6 +1,7 @@
 import { ApiError, request as fetchWithPolicy } from "@zitadel/api/runtime/fetch";
 
 import { REQUEST_TIMEOUT_MS, sanitizeRejection, sanitizeResponse } from "../api-client";
+import { Consent } from "../consent";
 import { interruptSignal } from "../interrupt";
 import { collectPages } from "../oclif/crud/paging";
 import { type ApiRequest, urlOf } from "./request";
@@ -32,12 +33,19 @@ const readBody = async (res: Response): Promise<unknown> => {
  * there is one. It is bounded and cancelled as every platform call is
  * (`createZitadelClient`), and what the server says is escaped the same way:
  * a non-2xx is the {@link ApiError} `toZitadelError` maps to an exit code.
+ *
+ * A destructive operation (the spec marks them) is sent only with the
+ * `consent` its command asked for, as the client's are.
  */
 export const send = async (
   server: string,
   token: string | undefined,
   request: ApiRequest,
+  consent?: Consent,
 ): Promise<ApiResponse> => {
+  if (request.operation.destructive) {
+    Consent.assert(consent);
+  }
   const url = urlOf(server, request);
   const { method } = request.operation;
   const headers = new Headers({ accept: "application/json" });

@@ -27,6 +27,9 @@ import {
 } from "../../lib/local-server/runtime";
 import { LocalServer } from "../../lib/local-server/server";
 import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../../lib/oclif";
+import { Destructive } from "../../lib/oclif/destructive";
+import { isRefusal } from "../../lib/consent";
+import { reportWarning } from "../../lib/warnings";
 import {
   environmentFlags,
   environmentSelectorSuffix,
@@ -77,12 +80,18 @@ const LOCAL_RUNTIME_CHECK_NAMES = new Set([
  * level and skipped, not propagated — the post-fix re-verify still reports
  * whatever remains broken.
  */
-export default class Doctor extends BaseCommand {
+export default class Doctor extends Destructive(BaseCommand) {
   static override description = "Verify local runtime and project state.";
   static override group = CommandGroups.diagnostics;
   static override groupOrder = 1;
   static override flags = {
     fix: Flags.boolean({ description: "Repair missing files and stale managed wiring." }),
+    force: Flags.boolean({
+      char: "f",
+      description:
+        "With --fix, make repairs that replace an origin without the confirmation prompt. Required when non-interactive.",
+      dependsOn: ["fix"],
+    }),
     image: nonBlankString({ description: "Container image to check." }),
     port: Flags.integer({
       description: "Local HTTP port to check. Defaults to the port this directory's server uses.",
@@ -137,7 +146,13 @@ export default class Doctor extends BaseCommand {
           )
         : [];
     const hasConfig = await hasZitadelConfig(cwd);
-    const ctx: CheckContext = { cwd, orca: createOrca(), cliVersion: this.meta.cliVersion, dryRun };
+    const ctx: CheckContext = {
+      cwd,
+      orca: createOrca(),
+      cliVersion: this.meta.cliVersion,
+      dryRun,
+      consent: (gate) => this.consent(gate),
+    };
 
     if (hasConfig && flags.fix) {
       const before = await Promise.all(SANITY_CHECKS.map((check) => check.run(ctx)));
@@ -150,6 +165,16 @@ export default class Doctor extends BaseCommand {
         try {
           await check.fix(ctx);
         } catch (error) {
+          // Ctrl-C stops the run. A repair refused for want of --force is the
+          // person's to approve, not one that failed: it is said, the other
+          // repairs still run, and the check below still reports what is left.
+          if (error instanceof ZitadelError && error.code === "E_CANCELLED") {
+            throw error;
+          }
+          if (isRefusal(error) && error instanceof ZitadelError) {
+            reportWarning(`${error.message}. ${error.hint ?? ""}`.trim());
+            continue;
+          }
           consola.debug(`doctor --fix: ${check.name} repair failed`, error);
         }
       }

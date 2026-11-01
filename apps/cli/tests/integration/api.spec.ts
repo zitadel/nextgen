@@ -95,6 +95,33 @@ describe("api", () => {
         expect(result).toFailWith("E_NOT_FOUND");
       });
 
+      it("refuses an operation that deletes without --force", async () => {
+        const app = await aSetUpApp();
+        expect(await app.setVariable("FOO", "bar")).toSucceed();
+
+        const result = await app.api("deleteVariable", "FOO");
+
+        expect(result).toFailWith("E_VALIDATION");
+      });
+
+      it("deletes nothing when it refuses", async () => {
+        const app = await aSetUpApp();
+        expect(await app.setVariable("FOO", "bar")).toSucceed();
+
+        await app.api("deleteVariable", "FOO");
+
+        expect(await app.projectVariables()).not.toEqual([]);
+      });
+
+      it("runs an operation that deletes with --force", async () => {
+        const app = await aSetUpApp();
+        expect(await app.setVariable("FOO", "bar")).toSucceed();
+
+        await app.api("deleteVariable", "FOO", "--force");
+
+        expect(await app.projectVariables()).toEqual([]);
+      });
+
       it("refuses an operation only an end user's session authenticates", async () => {
         const app = await aSetUpApp();
 

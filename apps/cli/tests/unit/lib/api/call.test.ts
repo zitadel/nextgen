@@ -5,6 +5,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { send, sendAll } from "../../../../src/lib/api/call";
 import { resolveTarget } from "../../../../src/lib/api/operations";
 import { buildRequest, pathValuesOf } from "../../../../src/lib/api/request";
+import { forcedConsent } from "../../../helpers/consent";
 import { toZitadelError } from "../../../../src/lib/errors";
 
 const SERVER = "http://localhost:8080";
@@ -75,10 +76,32 @@ describe("send", () => {
       http.delete(`${SERVER}/teams/team_1`, () => new HttpResponse(null, { status: 204 })),
     );
 
-    await expect(send(SERVER, "s", requestFor("deleteTeam", [], ["team_1"]))).resolves.toEqual({
+    await expect(
+      send(SERVER, "s", requestFor("deleteTeam", [], ["team_1"]), await forcedConsent()),
+    ).resolves.toEqual({
       status: 204,
       body: undefined,
     });
+  });
+
+  it("refuses a destructive operation without consent", async () => {
+    await expect(send(SERVER, "s", requestFor("deleteTeam", [], ["team_1"]))).rejects.toThrow(
+      "A destructive operation ran without consent",
+    );
+  });
+
+  it("sends nothing for a destructive operation without consent", async () => {
+    const sent: string[] = [];
+    server.use(
+      http.delete(`${SERVER}/teams/team_1`, ({ request }) => {
+        sent.push(request.url);
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+
+    await send(SERVER, "s", requestFor("deleteTeam", [], ["team_1"])).catch(() => undefined);
+
+    expect(sent).toEqual([]);
   });
 
   it("answers text for a response that is not JSON", async () => {

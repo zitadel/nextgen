@@ -1,4 +1,4 @@
-import type { ZitadelClient } from "@zitadel/api/client";
+import type { ZitadelClient } from "../api-client";
 
 import type { SuggestedCommand } from "../suggestion";
 import { buildBundle } from "./bundle";

@@ -1,4 +1,5 @@
-import type { ZitadelClient } from "@zitadel/api/client";
+import type { ZitadelClient } from "../api-client";
+import type { Consent } from "../consent";
 import type { BuildRelease201, BuildReleaseBody } from "@zitadel/api/generated/model";
 
 import type { ConfigurationBundle } from "./bundle";
@@ -43,9 +44,10 @@ export async function createReleaseFromBundle(
 
 /** Revoke a release so its content is never served again. Idempotent. */
 export async function revokeRelease(
+  consent: Consent,
   client: ZitadelClient,
   projectId: string,
   releaseId: string,
 ): Promise<Release> {
-  return client.revokeRelease(releaseId, { project_id: projectId });
+  return consent.unlock(client).revokeRelease(releaseId, { project_id: projectId });
 }

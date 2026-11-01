@@ -1,4 +1,5 @@
-import type { ZitadelClient } from "@zitadel/api/client";
+import type { ZitadelClient } from "../api-client";
+import type { Consent } from "../consent";
 import type {
   CreateDeployment200,
   CreateDeployment201,
@@ -111,6 +112,7 @@ export async function createDeployment(
  * recorded as a rollback. Returns 200 when the targets already serve it.
  */
 export async function rollbackDeployment(
+  consent: Consent,
   client: ZitadelClient,
   projectId: string,
   deploymentId: string,
@@ -131,9 +133,11 @@ export async function rollbackDeployment(
       ? {}
       : { expected_deployment_id: options.expectedDeploymentId }),
   };
-  return client.rollbackDeployment(
-    deploymentId,
-    { project_id: projectId },
-    Object.keys(body).length === 0 ? undefined : body,
-  );
+  return consent
+    .unlock(client)
+    .rollbackDeployment(
+      deploymentId,
+      { project_id: projectId },
+      Object.keys(body).length === 0 ? undefined : body,
+    );
 }

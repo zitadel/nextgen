@@ -524,9 +524,12 @@ describe("get sections", () => {
 
 describe("delete confirmation", () => {
   const deleting = (verb: "delete" | "revoke" | "deactivate", call = async () => undefined) =>
-    bindOperation(
-      DeleteOperation as OperationClass<Ctx, DeleteSpec<Ctx>>,
-      definition<DeleteSpec<Ctx>>({ verb, call }),
+    Object.assign(
+      bindOperation(
+        DeleteOperation as OperationClass<Ctx, DeleteSpec<Ctx>>,
+        definition<DeleteSpec<Ctx>>({ verb, call }),
+      ),
+      { id: `teams:${verb}` },
     ) as unknown as { run(argv: string[]): Promise<unknown> };
 
   /** What a failing command prints, which is how an agent or a person reads the failure. */

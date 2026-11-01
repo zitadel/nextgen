@@ -157,7 +157,7 @@ export const RESOURCES = {
       client.createUser(body, { project_id: projectId }),
     ),
     update: update(PatchUserByIDBody, ({ client }, id, body) => client.patchUserByID(id, body)),
-    delete: { call: ({ client }, id) => client.deleteUserByID(id) },
+    delete: { call: ({ client }, id, consent) => consent.unlock(client).deleteUserByID(id) },
   },
 
   teams: {
@@ -187,7 +187,10 @@ export const RESOURCES = {
     update: update(UpdateTeamBody, ({ client }, id, body) => client.updateTeam(id, body)),
     // A team's DELETE deactivates it and leaves it readable (ADR 024), so the
     // command is named after that rather than claiming the team is gone.
-    delete: { verb: "deactivate", call: ({ client }, id) => client.deleteTeam(id) },
+    delete: {
+      verb: "deactivate",
+      call: ({ client }, id, consent) => consent.unlock(client).deleteTeam(id),
+    },
   },
 
   sessions: {
@@ -213,7 +216,10 @@ export const RESOURCES = {
     get: { call: ({ client }, id) => client.getSession(id), response: GetSessionResponse },
     // The endpoint terminates the session rather than removing a record, so
     // the command says `revoke`. `delete` would tell the caller it is gone.
-    delete: { verb: "revoke", call: ({ client }, id) => client.revokeSession(id) },
+    delete: {
+      verb: "revoke",
+      call: ({ client }, id, consent) => consent.unlock(client).revokeSession(id),
+    },
   },
 
   events: {
@@ -307,7 +313,8 @@ export const RESOURCES = {
       { example: "--relation viewer --user-identifier alice@acme.com" },
     ),
     delete: {
-      call: ({ client, projectId }, id) => client.deleteGrant(id, { project_id: projectId }),
+      call: ({ client, projectId }, id, consent) =>
+        consent.unlock(client).deleteGrant(id, { project_id: projectId }),
     },
   },
 

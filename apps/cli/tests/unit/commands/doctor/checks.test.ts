@@ -134,8 +134,15 @@ async function readScaffoldState(cwd: string): Promise<ScaffoldManifest> {
   return state.scaffold;
 }
 
+/** A context for checks whose repairs remove nothing, so none of them asks for consent. */
 function ctxFor(cwd: string, dryRun = false): CheckContext {
-  return { cwd, orca: createOrca(), cliVersion: "0.1.0-alpha.0", dryRun };
+  return {
+    cwd,
+    orca: createOrca(),
+    cliVersion: "0.1.0-alpha.0",
+    dryRun,
+    consent: (gate) => Promise.reject(new Error(`unexpected request to ${gate.name}`)),
+  };
 }
 
 /**
