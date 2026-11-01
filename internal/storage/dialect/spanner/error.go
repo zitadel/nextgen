@@ -3,6 +3,7 @@ package spanner
 import (
 	"context"
 	"errors"
+	"regexp"
 	"strings"
 
 	"cloud.google.com/go/spanner"
@@ -49,7 +50,7 @@ func wrapError(err error) error {
 	case codes.NotFound:
 		return database.NewNoRowFoundError(err)
 	case codes.AlreadyExists:
-		return database.NewUniqueError("", "", err)
+		return database.NewUniqueError("", "", redact(err))
 	// A violated CHECK arrives as OutOfRange, which Spanner also returns for
 	// ordinary query failures like a division by zero.
 	case codes.FailedPrecondition, codes.InvalidArgument, codes.OutOfRange:
@@ -73,15 +74,35 @@ func classifyIntegrityError(err error) error {
 	msg := strings.ToLower(err.Error())
 	switch {
 	case strings.Contains(msg, "foreign key"):
-		return database.NewForeignKeyError("", "", err)
+		return database.NewForeignKeyError("", "", redact(err))
 	case strings.Contains(msg, "unique"):
-		return database.NewUniqueError("", "", err)
+		return database.NewUniqueError("", "", redact(err))
 	case strings.Contains(msg, "not null"), strings.Contains(msg, "null value"):
-		return database.NewNotNullError("", "", err)
+		return database.NewNotNullError("", "", redact(err))
 	// Postgres spells the column width as a CHECK, so report it the same way.
 	case strings.Contains(msg, "check constraint"), strings.Contains(msg, "exceeds the maximum size limit"):
-		return database.NewCheckError("", "", err)
+		return database.NewCheckError("", "", redact(err))
 	default:
 		return database.NewUnknownError(err)
 	}
 }
+
+// bracketed matches the segments Spanner's integrity messages quote values
+// in: the index key of a unique index violation, the row key.
+var bracketed = regexp.MustCompile(`\[[^\]]*\]`)
+
+// redact hides the values an integrity message quotes, which are the
+// submitted ones (an email, say) and must not reach the log (ADR 030). The
+// original stays reachable through Unwrap, so the gRPC status and errors.Is
+// read it as before.
+func redact(err error) error {
+	return &redactedError{err: err}
+}
+
+type redactedError struct{ err error }
+
+func (e *redactedError) Error() string {
+	return bracketed.ReplaceAllString(e.err.Error(), "[redacted]")
+}
+
+func (e *redactedError) Unwrap() error { return e.err }

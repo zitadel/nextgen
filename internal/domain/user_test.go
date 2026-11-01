@@ -1,8 +1,11 @@
 package domain_test
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"log/slog"
+	"strings"
 	"testing"
 	"time"
 
@@ -590,6 +593,49 @@ func TestNewCreateUser_SchemaFailureNamesFields(t *testing.T) {
 			assert.NotContains(t, fmt.Sprint(derr.Details), "secret-value")
 		})
 	}
+}
+
+// The validator's messages quote the rejected values, and the error is
+// logged with its cause chain: the chain, brief or full, names where the
+// values failed and never a value.
+func TestNewCreateUser_SchemaFailureLogsNoValue(t *testing.T) {
+	const schema = `{
+		"$schema": "https://json-schema.org/draft/2020-12/schema",
+		"$id": "https://example.test/schema.json",
+		"type": "object",
+		"properties": {"zip": {"type": "string", "pattern": "^[0-9]+$"}}
+	}`
+	_, err := domain.NewCreateUser(domain.CreateUserParams{
+		ProjectID:  "proj_1",
+		SchemaURL:  "https://example.test/schema.json",
+		Schema:     []byte(schema),
+		Attributes: map[string]any{"zip": "secret-value"},
+	})
+	var derr domain.Error
+	require.ErrorAs(t, err, &derr)
+	require.NotEmpty(t, domain.ValidationFailures(err), "the failures stay reachable through the cause")
+
+	var chain []string
+	for e := error(derr); e != nil; e = errors.Unwrap(e) {
+		chain = append(chain, e.Error())
+	}
+	for _, logged := range []string{
+		strings.Join(chain, " | "),
+		logLine(t, slog.Any("error", derr.Brief())),
+		logLine(t, slog.Any("error", derr)),
+	} {
+		assert.NotContains(t, logged, "secret-value")
+		assert.Contains(t, logged, "/properties/zip")
+	}
+}
+
+// logLine is the JSON line a handler writes for attrs.
+func logLine(t *testing.T, attrs ...slog.Attr) string {
+	t.Helper()
+	var out bytes.Buffer
+	logger := slog.New(slog.NewJSONHandler(&out, nil))
+	logger.LogAttrs(t.Context(), slog.LevelInfo, "api error", attrs...)
+	return out.String()
 }
 
 func TestInvalidAttributeKeys(t *testing.T) {

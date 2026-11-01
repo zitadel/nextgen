@@ -39,7 +39,7 @@ func TestDeploymentErrorResponseStatuses(t *testing.T) {
 // only works if details.deployment reaches the caller. Nothing deployed yet
 // is a null deployment rather than a dropped key.
 func TestDeploymentConflictCarriesDetails(t *testing.T) {
-	resp, ok := deploymentConflictResponse(domain.ErrDeploymentConflict(domain.DeploymentConflictDetails{}))
+	resp, ok := deploymentConflictResponse(t.Context(), domain.ErrDeploymentConflict(domain.DeploymentConflictDetails{}))
 	require.True(t, ok)
 	body := resp.DeploymentGuardConflict
 	assert.Equal(t, domain.ErrDeploymentConflict(domain.DeploymentConflictDetails{}).Code, body.Code)
@@ -62,7 +62,7 @@ func TestDeploymentConflictRendersTheDeployment(t *testing.T) {
 			DeployedByType: new(domain.EventActorTypeService),
 		},
 	}
-	resp, ok := deploymentConflictResponse(domain.ErrDeploymentConflict(domain.DeploymentConflictDetails{Deployment: newest}))
+	resp, ok := deploymentConflictResponse(t.Context(), domain.ErrDeploymentConflict(domain.DeploymentConflictDetails{Deployment: newest}))
 	require.True(t, ok)
 	assert.Equal(t, api.NewNilDeployment(api.Deployment{
 		ID:         "dep_1",
@@ -82,7 +82,7 @@ func TestDeploymentConflictRendersTheDeployment(t *testing.T) {
 
 // A revoked release is the other member of the 409 union.
 func TestDeploymentConflictRendersARevokedRelease(t *testing.T) {
-	resp, ok := deploymentConflictResponse(domain.ErrReleaseRevoked())
+	resp, ok := deploymentConflictResponse(t.Context(), domain.ErrReleaseRevoked())
 	require.True(t, ok)
 	assert.Equal(t, api.ReleaseRevokedConflictDeploymentConflict, resp.Type)
 	assert.Equal(t, domain.ErrReleaseRevoked().Code, resp.ReleaseRevokedConflict.Code)
@@ -91,7 +91,7 @@ func TestDeploymentConflictRendersARevokedRelease(t *testing.T) {
 // The 400 names the kind and every missing variable on details, sorted.
 func TestDeploymentVariablesMissingResponse(t *testing.T) {
 	err := domain.ErrDeploymentVariablesMissing(domain.DeploymentOriginKindPreview, []string{"GOOGLE_CLIENT_SECRET", "GOOGLE_CLIENT_ID"})
-	resp, ok := deploymentVariablesMissingResponse(err)
+	resp, ok := deploymentVariablesMissingResponse(t.Context(), err)
 	require.True(t, ok)
 	body, isMissing := resp.GetDeploymentVariablesMissing()
 	require.True(t, isMissing)
@@ -104,13 +104,13 @@ func TestDeploymentVariablesMissingResponse(t *testing.T) {
 }
 
 func TestDeploymentVariablesMissingResponseIgnoresOtherErrors(t *testing.T) {
-	_, ok := deploymentVariablesMissingResponse(domain.ErrDeploymentInvalid())
+	_, ok := deploymentVariablesMissingResponse(t.Context(), domain.ErrDeploymentInvalid())
 	assert.False(t, ok)
 }
 
 // Any other error is left to NewError.
 func TestDeploymentConflictResponseIgnoresOtherErrors(t *testing.T) {
-	_, ok := deploymentConflictResponse(domain.ErrDeploymentNotFound())
+	_, ok := deploymentConflictResponse(t.Context(), domain.ErrDeploymentNotFound())
 	assert.False(t, ok)
 }
 

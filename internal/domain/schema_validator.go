@@ -187,17 +187,43 @@ func FlattenValidationErrors(err error) map[string]string {
 	return out
 }
 
-// ValidationFailures returns the schema validation errors err wraps.
+// ValidationFailures returns the schema validation errors err wraps, through
+// a [SchemaValidationCause] too.
 func ValidationFailures(err error) []*types.ValidationError {
-	var ves *types.ValidationErrors
-	var ve *types.ValidationError
-	switch {
-	case errors.As(err, &ves):
+	if cause, ok := errors.AsType[*schemaValidationCause](err); ok {
+		return cause.failures
+	}
+	if ves, ok := errors.AsType[*types.ValidationErrors](err); ok {
 		return ves.Errs
-	case errors.As(err, &ve):
+	}
+	if ve, ok := errors.AsType[*types.ValidationError](err); ok {
 		return []*types.ValidationError{ve}
 	}
 	return nil
+}
+
+// SchemaValidationCause returns err as a cause safe to log: the validator's
+// messages quote the rejected values, so its text names only where the
+// failures are, by location and keyword, and [ValidationFailures] still finds
+// them. An error that is not a validation error is returned as it is.
+func SchemaValidationCause(err error) error {
+	failures := ValidationFailures(err)
+	if failures == nil {
+		return err
+	}
+	return &schemaValidationCause{failures: failures}
+}
+
+type schemaValidationCause struct {
+	failures []*types.ValidationError
+}
+
+func (c *schemaValidationCause) Error() string {
+	locations := make([]string, len(c.failures))
+	for i, ve := range c.failures {
+		locations[i] = ValidationLocation(ve)
+	}
+	return "schema validation failed at " + strings.Join(locations, ", ")
 }
 
 // ValidationLocation formats the error location as a string.

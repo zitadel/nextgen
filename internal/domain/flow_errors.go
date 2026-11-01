@@ -1,5 +1,7 @@
 package domain
 
+import "errors"
+
 // PrefixFlow is the error-code namespace for flow *runtime* (cookie, state
 // machine, submit/get step). Flow *definition* CRUD uses PrefixFlowDefinition.
 const PrefixFlow ResourcePrefix = "flow"
@@ -58,4 +60,34 @@ func ErrFlowIntegrity() Error {
 // cause is log-only.
 func ErrFlowSSOUnavailable(cause error) Error {
 	return newError(PrefixFlow.ErrorCodePrefix("sso_unavailable"), "identity provider is unavailable", nil, cause)
+}
+
+// ErrFlowStepRefused is the log-only cause of a step error key that no error
+// produced, such as a field the user left empty or an outcome the definition
+// does not wire. It never reaches a client: the step carries the key.
+func ErrFlowStepRefused(key string) Error {
+	return newError(PrefixFlow.ErrorCodePrefix("step_refused"), flowStepRefusedMessage(key), nil, nil)
+}
+
+func flowStepRefusedMessage(key string) string {
+	return "the step refused the submission with " + key
+}
+
+// FlowStepFailure is a step error key with the cause it stands for. The key
+// goes to the client on the step; the cause goes to the API error line the
+// handler writes for the step (ADR 030), so a key never travels without it.
+type FlowStepFailure struct {
+	Key   string
+	Cause error
+}
+
+// FlowStepFailed pairs key with the error that produced it. A cause that
+// carries a domain error is logged as it is, so the line points where it was
+// raised; a plain cause, or none, is wrapped as [ErrFlowStepRefused], raised
+// here so the line points at the caller.
+func FlowStepFailed(key string, cause error) *FlowStepFailure {
+	if _, ok := errors.AsType[Error](cause); !ok {
+		cause = newError(PrefixFlow.ErrorCodePrefix("step_refused"), flowStepRefusedMessage(key), nil, cause)
+	}
+	return &FlowStepFailure{Key: key, Cause: cause}
 }

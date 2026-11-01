@@ -12,7 +12,7 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/errorpage"
 	"github.com/zitadel/nextgen/internal/httputil"
-	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
+	"github.com/zitadel/nextgen/internal/instrumentation/errlog"
 	"github.com/zitadel/nextgen/internal/service"
 )
 
@@ -54,6 +54,7 @@ func (h *IDPCallbackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	middleware.SetServerSpanContext(ctx, span.SpanContext())
 	if r.Method != http.MethodGet {
 		w.Header().Set("Allow", http.MethodGet)
+		errlog.Log(ctx, domain.ErrRequestMethodNotAllowed())
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
@@ -77,26 +78,38 @@ func (h *IDPCallbackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "private, no-store")
 	out, err := h.callback.Process(ctx, in)
 	if errors.Is(err, domain.ErrSSOStateInvalid()) {
+		errlog.Log(ctx, err)
 		writeIDPCallbackErrorPage(w, r, http.StatusBadRequest)
 		return
 	}
 	if err != nil {
-		// Process logs ceremony failures itself; what reaches here is a bug in
-		// the process, logged with its cause before the cause-free page. A
-		// cancelled request is the client leaving, not a bug; a deadline is
-		// still logged.
-		if !errors.Is(ctx.Err(), context.Canceled) {
-			zlog.GetLoggingContext(ctx).Error("sso callback processing failed", slog.Any("error", err))
-		}
+		// A ceremony failure is answered with a step error; what reaches here
+		// is a bug in the process, logged with its cause before the
+		// cause-free page.
+		errlog.LogFault(ctx, err)
 		writeIDPCallbackErrorPage(w, r, http.StatusInternalServerError)
 		return
+	}
+	if out.Failure != nil {
+		// The ceremony failed and the step shows the key; the cause is the
+		// operator's, logged whatever the answer below. An internal cause is
+		// a bug in the process, not an outcome of the ceremony.
+		level := slog.LevelWarn
+		if errors.Is(out.Failure.Cause, domain.ErrInternal(nil)) {
+			level = slog.LevelError
+		}
+		errlog.LogLevel(ctx, level, out.Failure.Cause,
+			slog.String("step_error", out.Failure.Key),
+			slog.String("project_id", out.ProjectID),
+			slog.String("slug", out.Slug),
+		)
 	}
 	// The target was checked when the sign-in started. It is checked again
 	// where it is used, so a target stored before the check was as strict as it
 	// is now can never be redirected to.
 	if _, err := httputil.ParseRedirectTarget(out.ReturnTarget); err != nil {
-		zlog.GetLoggingContext(ctx).Error("sso callback return target refused",
-			slog.String("return_target", out.ReturnTarget), slog.Any("error", err))
+		errlog.LogFault(ctx, domain.ErrInternal(err).WithMessage("sso callback return target refused"),
+			slog.String("return_target", out.ReturnTarget))
 		writeIDPCallbackErrorPage(w, r, http.StatusInternalServerError)
 		return
 	}

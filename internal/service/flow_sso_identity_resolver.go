@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -82,11 +81,8 @@ func (r *FlowSSOIdentityResolver) LoadParked(ctx context.Context, in domain.Flow
 	if errors.Is(err, domain.ErrIDPConnectionNotFound()) {
 		// Deleted while the user was at the provider: nothing can resolve the
 		// identity any more, so the flow starts over.
-		getLoggingContext(ctx, "flow").Warn("sso identity parked on a connection revision that no longer exists",
-			slog.String("project_id", in.ProjectID),
-			slog.String("connection_revision_id", result.ConnectionRevisionID),
-		)
-		return nil, domain.ErrFlowRestartRequired()
+		return nil, domain.ErrFlowRestartRequired().WithParent(fmt.Errorf(
+			"%w: connection revision %s no longer exists", domain.ErrSSOParkedIdentityUnusable, result.ConnectionRevisionID))
 	}
 	if err != nil {
 		return nil, fmt.Errorf("load parked sso identity: read connection revision: %w", err)
@@ -130,13 +126,9 @@ func (r *FlowSSOIdentityResolver) LoadParked(ctx context.Context, in domain.Flow
 	}
 	if !sameSchema {
 		// The flow validates against one schema and cannot continue with a
-		// user of another. The response stays generic; the log says why.
-		getLoggingContext(ctx, "flow").Warn("sso identity is linked to a user of another schema",
-			slog.String("project_id", in.ProjectID),
-			slog.String("flow_schema_url", in.UserSchemaURL),
-			slog.String("user_schema_url", user.SchemaURL),
-		)
-		return nil, domain.ErrFlowRestartRequired()
+		// user of another. The response stays generic; the cause says why.
+		return nil, domain.ErrFlowRestartRequired().WithParent(fmt.Errorf(
+			"%w: linked to a user of schema %s, the flow runs on %s", domain.ErrSSOParkedIdentityUnusable, user.SchemaURL, in.UserSchemaURL))
 	}
 	parked.Link = &domain.FlowSSOLinkedUser{LinkID: link.ID, UserID: link.UserID}
 	return parked, nil
@@ -162,11 +154,8 @@ func (r *FlowSSOIdentityResolver) LoadCollected(ctx context.Context, in domain.F
 	}
 	connection, err := r.connections.GetRevision(ctx, in.ProjectID, result.ConnectionRevisionID)
 	if errors.Is(err, domain.ErrIDPConnectionNotFound()) {
-		getLoggingContext(ctx, "flow").Warn("sso identity parked on a connection revision that no longer exists",
-			slog.String("project_id", in.ProjectID),
-			slog.String("connection_revision_id", result.ConnectionRevisionID),
-		)
-		return nil, domain.ErrFlowRestartRequired()
+		return nil, domain.ErrFlowRestartRequired().WithParent(fmt.Errorf(
+			"%w: connection revision %s no longer exists", domain.ErrSSOParkedIdentityUnusable, result.ConnectionRevisionID))
 	}
 	if err != nil {
 		return nil, fmt.Errorf("load collected sso identity: read connection revision: %w", err)
@@ -311,18 +300,11 @@ func (r *FlowSSOIdentityResolver) CreateLinked(ctx context.Context, in domain.Fl
 			// Audited like a create through the user API.
 			emitUserCreateFailedBestEffort(ctx, r.db.Statements(), in.ProjectID, unique)
 		}
-		if domain.IsUserInvalid(err) {
-			// The validator's messages quote the values, so only where they
-			// failed is logged.
-			var locations []string
-			for _, ve := range domain.ValidationFailures(err) {
-				locations = append(locations, domain.ValidationLocation(ve))
-			}
-			getLoggingContext(ctx, "flow").WarnContext(ctx, "sso user fails the user schema",
-				slog.String("project_id", in.ProjectID),
-				slog.String("schema_url", in.UserSchemaURL),
-				slog.Any("locations", locations),
-			)
+		if derr, ok := errors.AsType[domain.Error](err); ok && domain.IsUserInvalid(err) {
+			// The cause names the schema and where the values failed it; the
+			// values themselves never reach the log.
+			derr.Parent = fmt.Errorf("user schema %s: %w", in.UserSchemaURL, derr.Parent)
+			return "", derr
 		}
 		return "", err
 	}
@@ -411,13 +393,8 @@ func (r *FlowSSOIdentityResolver) FindUniqueOwner(ctx context.Context, projectID
 		return "", fmt.Errorf("find unique owner: %w", err)
 	}
 	if !sameSchema {
-		getLoggingContext(ctx, "flow").Warn("sso claim is owned by a user of another schema",
-			slog.String("project_id", projectID),
-			slog.String("attribute", attribute),
-			slog.String("flow_schema_url", userSchemaURL),
-			slog.String("user_schema_url", user.SchemaURL),
-		)
-		return "", domain.ErrSSOOwnerOtherSchema
+		return "", fmt.Errorf("%w: attribute %s is held by a user of schema %s, the flow runs on %s",
+			domain.ErrSSOOwnerOtherSchema, attribute, user.SchemaURL, userSchemaURL)
 	}
 	return user.ID, nil
 }

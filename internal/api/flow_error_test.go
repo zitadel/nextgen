@@ -1,9 +1,11 @@
 package api
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"log/slog"
 	"net/http"
 	"testing"
@@ -155,7 +157,7 @@ func TestMapFlowErrorStatus_usesFlowSentinels(t *testing.T) {
 func TestMapFlowGetError_restartRequiredIs409(t *testing.T) {
 	t.Parallel()
 
-	res, err := mapFlowGetError(fmt.Errorf("%w: other schema", domain.ErrFlowRestartRequired()))
+	res, err := mapFlowGetError(t.Context(), fmt.Errorf("%w: other schema", domain.ErrFlowRestartRequired()))
 	require.NoError(t, err)
 	conflict, ok := res.(*api.GetFlowStepConflict)
 	require.True(t, ok, "got %T", res)
@@ -166,9 +168,48 @@ func TestMapFlowGetError_restartRequiredIs409(t *testing.T) {
 func TestMapFlowGetError_releaseRevokedIs409(t *testing.T) {
 	t.Parallel()
 
-	res, err := mapFlowGetError(domain.ErrReleaseRevoked())
+	res, err := mapFlowGetError(t.Context(), domain.ErrReleaseRevoked())
 	require.NoError(t, err)
 	conflict, ok := res.(*api.GetFlowStepConflict)
 	require.True(t, ok, "got %T", res)
 	assert.Equal(t, "rel.revoked", string(conflict.Code))
+}
+
+// An error no typed refusal answers goes back to the sink, which logs it: a
+// line here would be its second.
+func TestMapFlowGetError_unmatchedErrorIsNotLoggedHere(t *testing.T) {
+	t.Parallel()
+
+	var logs bytes.Buffer
+	ctx := zlog.WithLoggingContext(t.Context(), slog.New(slog.NewJSONHandler(&logs, nil)))
+	res, err := mapFlowGetError(ctx, domain.ErrInternal(errors.New("store down")))
+	require.Error(t, err)
+	assert.Nil(t, res)
+	assert.Empty(t, logs.String())
+}
+
+// A restart the SSO setup caused is the operator's to see, at Warn; any other
+// restart is Info.
+func TestMapFlowGetErrorLogsASSORestartAtWarn(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		err       error
+		wantLevel string
+	}{
+		{"parked identity unusable", domain.ErrFlowRestartRequired().WithParent(fmt.Errorf("%w: connection revision rev_1 no longer exists", domain.ErrSSOParkedIdentityUnusable)), "WARN"},
+		{"owner of another schema", domain.ErrFlowRestartRequired().WithParent(domain.ErrSSOOwnerOtherSchema), "WARN"},
+		{"other restart", domain.ErrFlowRestartRequired(), "INFO"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var logs bytes.Buffer
+			ctx := zlog.WithLoggingContext(t.Context(), slog.New(slog.NewJSONHandler(&logs, nil)))
+
+			res, err := mapFlowGetError(ctx, tc.err)
+			require.NoError(t, err)
+			require.IsType(t, &api.GetFlowStepConflict{}, res)
+			var record map[string]any
+			require.NoError(t, json.Unmarshal(logs.Bytes(), &record), "one line: %q", logs.String())
+			require.Equal(t, tc.wantLevel, record["level"])
+		})
+	}
 }
