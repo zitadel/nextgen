@@ -114,10 +114,7 @@ nothing; `data.skills` and `data.directories` say what it added where.
   up; `origin rm` asks first and needs `--force` when non-interactive. Removing
   a preview pattern leaves its live previews served until they expire.
   `deploy` lands only on primary origins and fails with `E_VALIDATION` without
-  one; its `next_commands` name the step that gives the project one. `deploy`,
-  `preview` and `release create`, `--dry-run` included, check `.zitadel/`
-  against the release body the API takes before anything is written, and fail
-  with `E_VALIDATION` listing each problem by its file and field. `setup`
+  one; its `next_commands` name the step that gives the project one. `setup`
   0.1.0 registered the app's URL (`ZITADEL_ISSUER`) as a `preview` origin,
   which `origin add --kind primary` refuses with `E_CONFLICT`: `doctor` warns
   (`issuer-origin`) and `doctor --fix` makes it primary.
@@ -596,6 +593,9 @@ missing or outdated (after an upgrade that changed a dialect), and
 `doctor --fix` writes the current ones, unless the project pins a newer
 `@zitadel/*` version (run that version's `doctor --fix`) or a symlink is on
 the path; `deploy --dry-run` validates without them either way.
+`deploy`, `preview` and `release create`, `--dry-run` included, check
+`.zitadel/` before anything is written, last against the release body the API
+takes, and fail with `E_VALIDATION` listing each problem by its file and field.
 
 An SPA's dev proxy (`vite.config.*`, Angular's `proxy.conf.cjs`) keeps the
 app's session in a cookie of its own project, `zitadel_session_<project id>`

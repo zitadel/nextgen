@@ -105,12 +105,36 @@ describe("validate step", () => {
     await expect(validateStep.run(ctx(bundle))).rejects.toMatchObject({ code: "E_VALIDATION" });
   });
 
-  it("rejects a connection the release body does not take, naming its file", async () => {
+  it("keeps the fix a literal client_secret gets, rather than the release body's pattern", async () => {
+    const connection = {
+      slug: "acme",
+      protocol: "oidc",
+      display_name: "Acme",
+      oidc: {
+        issuer: "https://sso.acme.example",
+        client_id: "client",
+        client_secret: "a-literal-secret",
+        scopes: ["openid"],
+      },
+    };
+
     await expect(
-      validateStep.run(ctx({ idps: [{ slug: "acme" }] }, { idpFiles: ["acme.json"] })),
+      validateStep.run(ctx({ idps: [connection] }, { idpFiles: ["acme.json"] })),
     ).rejects.toMatchObject({
+      message: "Connection file's client_secret must reference a variable, not hold a value",
+      hint: expect.stringContaining("variable set NAME --secret"),
+    });
+  });
+
+  it("refuses what only the release body refuses, naming the kind", async () => {
+    const schemas = Array.from({ length: 51 }, (_, index) => ({
+      ...validSchema,
+      objectType: `user-${index}`,
+    }));
+
+    await expect(validateStep.run(ctx({ schemas }))).rejects.toMatchObject({
       code: "E_VALIDATION",
-      message: expect.stringContaining(".zitadel/idps/acme.json: "),
+      message: expect.stringContaining("  - schemas: (root) Too big"),
     });
   });
 

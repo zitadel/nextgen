@@ -42,6 +42,7 @@ export const validateStep: Step = {
     validateFlows(ctx);
     await validateConnections(ctx);
     await validateSsoConsistency(ctx.cwd);
+    validateReleaseBody(ctx);
     for (const warning of await brandingAssetWarnings(brandingsOf(ctx))) {
       reportWarning(warning);
     }
@@ -120,11 +121,6 @@ function validateBundleShapes(ctx: StepContext): void {
       }
     }
   });
-  // The body the API takes, checked last: it repeats what the file schemas
-  // above already refused, so it only reports what they let through.
-  if (failures.length === 0) {
-    failures.push(...bundleIssues(ctx.bundle).map((issue) => apiIssue(ctx, issue)));
-  }
   if (failures.length === 0) {
     return;
   }
@@ -135,6 +131,29 @@ function validateBundleShapes(ctx: StepContext): void {
       failures.map((failure) => `  - ${failure}`).join("\n"),
     {
       hint: "These are the same rules the server enforces. Fix the file(s) and re-run.",
+      details: { issues: failures },
+    },
+  );
+}
+
+/**
+ * The bundle against the release body the API takes, last: every check above
+ * refuses its own mistakes with a fix to go with them (a literal
+ * `client_secret` among them), so this reports only what they let through,
+ * such as a bundle holding more resources of a kind than a release takes.
+ */
+function validateReleaseBody(ctx: StepContext): void {
+  const failures = bundleIssues(ctx.bundle).map((issue) => apiIssue(ctx, issue));
+  if (failures.length === 0) {
+    return;
+  }
+  const noun = failures.length === 1 ? "issue" : "issues";
+  throw new ZitadelError(
+    "E_VALIDATION",
+    `The release the API would build was refused (${failures.length} ${noun}):\n` +
+      failures.map((failure) => `  - ${failure}`).join("\n"),
+    {
+      hint: "These are the rules the API holds a release to. Fix the file(s) and re-run.",
       details: { issues: failures },
     },
   );
