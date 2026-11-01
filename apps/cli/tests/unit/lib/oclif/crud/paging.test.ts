@@ -77,4 +77,15 @@ describe("collectPages", () => {
       }),
     ).resolves.toEqual({ items: [1], next: "c2" });
   });
+
+  it("reports an empty cursor on the one page it reads as no next page", async () => {
+    const { walk } = source({ users: [1], next_page_token: "" });
+    await expect(
+      collectPages(walk, {
+        items: (page) => page.users,
+        all: false,
+        next: (page) => page.next_page_token,
+      }),
+    ).resolves.toEqual({ items: [1], next: null });
+  });
 });

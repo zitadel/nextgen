@@ -69,13 +69,63 @@ describe("deployment rollback", () => {
     expect(guards).toEqual([undone]);
   });
 
+  it("rolls a bare rollback back to the prior primary listed past the first page", async () => {
+    const { cwd } = await twoDeploys();
+    const primary = (id: string, deployedAt: string) => ({
+      id,
+      release_id: `rel_${id}`,
+      targets: [{ origin: "https://app.acme.com", expires_at: null }],
+      metadata: { reason: "deploy" },
+      deployed_at: deployedAt,
+    });
+    server.use(
+      http.get(`${SERVER}/api/v1/deployments`, ({ request }) => {
+        const query = new URL(request.url).searchParams;
+        if (query.get("live") === "true") {
+          return undefined;
+        }
+        return HttpResponse.json(
+          query.get("page_token") === "h2"
+            ? {
+                deployments: [primary("dep_prior", "2026-01-01T00:00:00.000Z")],
+                next_page_token: null,
+              }
+            : {
+                deployments: [primary("dep_latest", "2026-01-02T00:00:00.000Z")],
+                next_page_token: "h2",
+              },
+        );
+      }),
+    );
+    const targets: string[] = [];
+    server.use(
+      http.post(`${SERVER}/api/v1/deployments/:id/rollback`, ({ params }) => {
+        targets.push(String(params.id));
+        return undefined;
+      }),
+    );
+
+    await runCliForTest([
+      "deployment",
+      "rollback",
+      "--force",
+      "--cwd",
+      cwd,
+      "--server",
+      SERVER,
+      "--json",
+    ]);
+
+    expect(targets).toEqual(["dep_prior"]);
+  });
+
   it("guards a rollback to a named deployment with the primary that is live, past the first page", async () => {
     const { cwd, undone } = await twoDeploys();
     server.use(liveAcrossTwoPages({ id: "dep_live_primary", release_id: "rel_live" }));
     const guards: unknown[] = [];
     server.use(
       http.post(`${SERVER}/api/v1/deployments/:id/rollback`, async ({ request }) => {
-        const body = (await request.clone().json()) as Record<string, unknown>;
+        const body: { expected_deployment_id?: string } = await request.clone().json();
         guards.push(body.expected_deployment_id);
         return undefined;
       }),

@@ -22,7 +22,8 @@ export interface BootstrapProjectOptions {
 export interface BootstrappedProject {
   projectId: string;
   projectSecret: string;
-  previewSecret?: string;
+  /** The browser-plane credential the server issues with every project. */
+  previewSecret: string;
   schemaId: string;
   flowId: string;
 }

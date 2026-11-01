@@ -63,4 +63,44 @@ describe("preview list", () => {
 
     expect(stderr).toContain("preview list --limit 1 --page-token p2");
   });
+
+  it("lists every page's previews with --all", async () => {
+    server.use(
+      http.get(`${SERVER}/api/v1/projects/:project_id/previews`, ({ request }) =>
+        HttpResponse.json({
+          previews: [
+            {
+              origin:
+                new URL(request.url).searchParams.get("page_token") === "p2"
+                  ? "https://pr-2.app.acme.com"
+                  : "https://pr-1.app.acme.com",
+              expires_at: "2026-02-01T00:00:00.000Z",
+              created_at: "2026-01-01T00:00:00.000Z",
+            },
+          ],
+          next_page_token:
+            new URL(request.url).searchParams.get("page_token") === "p2" ? null : "p2",
+        }),
+      ),
+    );
+    const cwd = await aProjectDirectory("zitadel-preview-list-", { id: "proj_test", secret: "ps" });
+    dirs.push(cwd);
+
+    const { stdout } = await runCliForTest([
+      "preview",
+      "list",
+      "--all",
+      "--plain",
+      "--cwd",
+      cwd,
+      "--server",
+      SERVER,
+    ]);
+
+    expect(stdout.split("\n").map((line) => line.split("\t")[0])).toEqual([
+      "https://pr-1.app.acme.com",
+      "https://pr-2.app.acme.com",
+      "",
+    ]);
+  });
 });

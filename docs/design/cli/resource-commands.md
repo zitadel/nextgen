@@ -204,17 +204,22 @@ state it per field:
 
 ```ts
 filters: [
-  { field: "status",     operations: ALL_OPERATIONS },              // POST /query
+  { field: "status",     operations: USER_OPERATIONS },             // POST /query
   { field: "object_type", operations: ["equals"] },                 // GET parameter
-  { field: "revisions",  operations: ["equals"], values: ["all", "latest"] },
+  { field: "revisions",  operations: ["equals"], values: Object.values(ListSchemasRevisions) },
   { field: "category",   operations: ["equals"], combine: "or" },   // repeats widen
   {
     field: "created_at",                                            // one field,
-    operations: ["greater_than_or_equal", "less_than"],             // two parameters
-    params: { greater_than_or_equal: "created_after", less_than: "created_before" },
-  },
+    ...range({ greater_than_or_equal: "created_after", less_than: "created_before" }),
+  },                                                                // two parameters
 ]
 ```
+
+A query's operations come from its body's generated enum
+(`USER_OPERATIONS` is `Object.values(QueryUsersBodyFilterItemOperation)`), and a
+`GET` parameter's values from its own. A `GET` parameter filters by `equals`
+only; a range is written with `range()`, which pairs each operation with the
+parameter it travels as, and the registry's types refuse one written by hand.
 
 Transport follows from the entry: a spec carrying `body` is assembled into a
 filter body and validated against the generated Zod request schema

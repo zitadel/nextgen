@@ -1299,6 +1299,32 @@ describe("variable resolve", () => {
     expect(json.hint).toContain("https://admin.acme.com");
   });
 
+  it("names the live origins of every page when more than one deployment is live", async () => {
+    const cwd = await makeProject();
+    server.use(
+      http.get("*/deployments", ({ request }) =>
+        HttpResponse.json(
+          new URL(request.url).searchParams.get("page_token") === "p2"
+            ? {
+                deployments: [{ id: "dep_b", targets: [{ origin: "https://admin.acme.com" }] }],
+                next_page_token: null,
+              }
+            : {
+                deployments: [{ id: "dep_a", targets: [{ origin: "https://app.acme.com" }] }],
+                next_page_token: "p2",
+              },
+        ),
+      ),
+    );
+
+    const res = await runCliForTest(["variable", "resolve", ...base(cwd)]);
+
+    expect(parseJson(res.stdout)).toMatchObject({
+      code: "E_VALIDATION",
+      hint: "Live origins: https://admin.acme.com, https://app.acme.com.",
+    });
+  });
+
   it("asks the server only for the named origin's live deployment", async () => {
     const cwd = await makeProject();
     let origin: string | null = "unset";

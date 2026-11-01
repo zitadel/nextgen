@@ -59,6 +59,9 @@ export default class DeploymentRollback extends Promptable(EnvironmentCommand) {
       // A preview deployment is never the deploy a bare rollback undoes, nor
       // one it can restore: the server refuses to roll one back. Primary
       // deployments make one history for the project, newest first.
+      // The whole history, not the first page: the prior deployment of a
+      // long-lived origin can sit beyond it, and a bare rollback that missed it
+      // would refuse a rollback it should resolve.
       const deployments = await client.listDeployments.all({
         project_id: projectId,
       });

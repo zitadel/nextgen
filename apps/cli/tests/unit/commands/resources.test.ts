@@ -16,6 +16,7 @@ import {
   type QueryUsers200,
   QueryUsersBodyFilterItemOperation,
 } from "@zitadel/api/generated/model";
+import { paging } from "@zitadel/api/client";
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
@@ -2383,5 +2384,25 @@ describe("the registry builders", () => {
     } satisfies CheckedRegistry;
 
     expect(Object.keys(registry)).toEqual(["users"]);
+  });
+});
+
+describe("the paged resources' lists", () => {
+  it.each([
+    ["users", paging.queryUsers],
+    ["teams", paging.queryTeams],
+    ["sessions", paging.querySessions],
+    ["events", paging.listEvents],
+    ["grants", paging.queryGrants],
+    ["idps", paging.queryIdps],
+    ["projects", paging.queryProjects],
+    ["schemas", paging.listSchemas],
+    ["release", paging.listReleases],
+    ["flow-definitions", paging.listFlowDefinitions],
+    ["policies", paging.listPolicies],
+  ] as const)("read %s's pages with the readers the client generates", (topic, readers) => {
+    const list = RESOURCES[topic].list;
+
+    expect([list.items, list.next]).toEqual([readers.items, readers.next]);
   });
 });

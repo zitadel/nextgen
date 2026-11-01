@@ -40,6 +40,16 @@ export const send = async (
   token: string | undefined,
   request: ApiRequest,
 ): Promise<ApiResponse> => {
+  const { status, raw } = await sendRaw(server, token, request);
+  return { status, body: sanitizeResponse(raw) };
+};
+
+/** {@link send}, answering the body as the server sent it; a failure is escaped all the same. */
+const sendRaw = async (
+  server: string,
+  token: string | undefined,
+  request: ApiRequest,
+): Promise<{ status: number; raw: unknown }> => {
   const url = urlOf(server, request);
   const { method } = request.operation;
   const headers = new Headers({ accept: "application/json" });
@@ -64,7 +74,7 @@ export const send = async (
       new ApiError(res.status, url, rawBody, `${method} ${url} returned ${res.status}`),
     );
   }
-  return { status: res.status, body: sanitizeResponse(rawBody) };
+  return { status: res.status, raw: rawBody };
 };
 
 /** The request for the page `token` names; `undefined` leaves the request as it is. */
@@ -96,29 +106,34 @@ export const sendAll = async (
   if (paging === null) {
     return send(server, token, request);
   }
-  let last: ApiResponse = { status: 200, body: undefined };
+  let last: { status: number; raw: unknown } = { status: 200, raw: undefined };
+  // Each page is fetched raw: the cursor goes back to the server exactly as it
+  // came, and only the items are escaped, as the client's own walk does.
   const { items } = await collectPages(
     async (cursor) => {
-      last = await send(server, token, pageOf(request, cursor));
-      return last.body;
+      last = await sendRaw(server, token, pageOf(request, cursor));
+      return last.raw;
     },
     {
       // The one list read by a field named only at runtime, so the one checked.
-      items: (body) => {
+      items: (raw) => {
         try {
-          return itemsOf(body, paging.items);
+          return itemsOf(sanitizeResponse(raw), paging.items);
         } catch (error) {
-          throw new ZitadelError("E_VALIDATION", (error as TypeError).message, {
-            details: { response: body },
-          });
+          throw new ZitadelError(
+            "E_VALIDATION",
+            error instanceof Error ? error.message : String(error),
+            { details: { response: sanitizeResponse(raw) } },
+          );
         }
       },
       all: true,
       next: nextToken,
     },
   );
+  const body = sanitizeResponse(last.raw);
   return {
     status: last.status,
-    body: { ...(last.body as Record<string, unknown>), [paging.items]: items },
+    body: { ...(body as Record<string, unknown>), [paging.items]: items },
   };
 };

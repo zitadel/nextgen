@@ -375,12 +375,10 @@ describe("write results", () => {
       definition(updated),
     );
 
-    const envelope = (await (command as unknown as { run(argv: string[]): Promise<unknown> }).run([
-      "team_1",
-      "--name",
-      "a",
-      "--json",
-    ])) as { data: { next_commands: string[] } };
+    const runnable = command as unknown as {
+      run(argv: string[]): Promise<{ data: { next_commands: string[] } }>;
+    };
+    const envelope = await runnable.run(["team_1", "--name", "a", "--json"]);
 
     expect(envelope.data.next_commands[0]).toContain("teams get team_1 --json");
   });

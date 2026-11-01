@@ -186,7 +186,7 @@ describe("sendAll", () => {
   it("starts from the page the caller named in the body", async () => {
     server.use(
       http.post(`${SERVER}/api/v1/users/query`, async ({ request }) => {
-        const body = (await request.json()) as { page_token?: string };
+        const body: { page_token?: string } = await request.json();
         const { items, next } = pageAt(body.page_token ?? null);
         return HttpResponse.json({ users: items, next_page_token: next });
       }),
@@ -195,5 +195,27 @@ describe("sendAll", () => {
     const response = await sendAll(SERVER, "s", requestFor("queryUsers", ["page_token=cursor-3"]));
 
     expect(response.body).toMatchObject({ users: ["d", "e", "f", "g"] });
+  });
+
+  it("sends a cursor back as the server wrote it, and escapes the items", async () => {
+    const asked: (string | null)[] = [];
+    server.use(
+      http.get(`${SERVER}/api/v1/users/user_1/passkeys`, ({ request }) => {
+        const token = new URL(request.url).searchParams.get("page_token");
+        asked.push(token);
+        return HttpResponse.json(
+          token === null
+            ? { passkeys: ["\u001b[2Ja"], next_page_token: "c\u001b2" }
+            : { passkeys: ["b"], next_page_token: "" },
+        );
+      }),
+    );
+
+    const response = await sendAll(SERVER, "s", requestFor("listUserPasskeys", [], ["user_1"]));
+
+    expect([asked, response.body]).toEqual([
+      [null, "c\u001b2"],
+      { passkeys: ["\\x1b[2Ja", "b"], next_page_token: "" },
+    ]);
   });
 });

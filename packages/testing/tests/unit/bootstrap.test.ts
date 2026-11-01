@@ -1,10 +1,10 @@
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, expectTypeOf, it } from "vitest";
 
 import { DEFAULT_FLOW_SCHEMA_URI } from "@zitadel/config/defaults";
 
-import { bootstrapProject } from "../../src/bootstrap";
+import { type BootstrappedProject, bootstrapProject } from "../../src/bootstrap";
 
 // Never resolved on the network: msw intercepts everything, and unhandled
 // requests error out (a stray fetch would otherwise freeze sandboxed vitest).
@@ -99,5 +99,9 @@ describe("bootstrapProject", () => {
       ),
     );
     await expect(bootstrapProject({ baseUrl: BASE })).rejects.toMatchObject({ status: 400 });
+  });
+
+  it("types the preview secret as always there, as the server always issues one", () => {
+    expectTypeOf<BootstrappedProject["previewSecret"]>().toEqualTypeOf<string>();
   });
 });

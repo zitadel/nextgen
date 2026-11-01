@@ -96,6 +96,23 @@ describe("applySsoToSchema", () => {
     >;
     expect((methods.sso as { providers: string[] }).providers).toEqual(["google", "github"]);
   });
+
+  it("keeps the schema's keys in their order", () => {
+    const schema = getDefaultHumanUserSchema({ useCase: "minimal" });
+
+    const { document } = applySsoToSchema(schema, slug("google"));
+
+    expect(Object.keys(document)).toEqual(Object.keys(schema));
+  });
+
+  it("leaves the schema it was given as it was", () => {
+    const schema = getDefaultHumanUserSchema({ useCase: "minimal" });
+    const before = structuredClone(schema);
+
+    applySsoToSchema(schema, slug("google"));
+
+    expect(schema).toEqual(before);
+  });
 });
 
 describe("applySsoToFlow", () => {

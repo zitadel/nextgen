@@ -5,7 +5,7 @@ import {
   DEFAULT_SCHEMA_CONFIG_PATH,
   getDefaultHumanUserSchemaBody,
 } from "@zitadel/config/defaults";
-import { http } from "msw";
+import { HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
 
 import { noPrimaryOriginError } from "../../../src/commands/deploy";
@@ -16,7 +16,12 @@ import {
   PLATFORM_URL,
   usePlatformServer,
 } from "../../helpers/platform-project";
-import { cliVersion, expectedPublicCliCommand, runCliForTest } from "../../helpers/run-cli";
+import {
+  cliVersion,
+  expectedPublicCliCommand,
+  parseJson,
+  runCliForTest,
+} from "../../helpers/run-cli";
 
 const ISSUER = "http://localhost:3000";
 const PREVIEW_ISSUER = [{ pattern: ISSUER, kind: "preview" }];
@@ -116,7 +121,7 @@ describe("deploy", () => {
     const guards: unknown[] = [];
     server.use(
       http.post(`${PLATFORM_URL}/api/v1/deployments`, async ({ request }) => {
-        const body = (await request.clone().json()) as Record<string, unknown>;
+        const body: { expected_deployment_id?: string } = await request.clone().json();
         guards.push(body.expected_deployment_id);
         return undefined;
       }),
@@ -134,5 +139,40 @@ describe("deploy", () => {
     ]);
 
     expect(guards).toEqual(["dep_live_primary"]);
+  });
+
+  it("reports the primary that raced in on a conflict, past the first page", async () => {
+    const project = await aProjectWithTwoDeploys("zitadel-deploy-");
+    dirs.push(project.cwd);
+    await mkdir(join(project.cwd, ".zitadel/schemas"), { recursive: true });
+    await writeFile(
+      join(project.cwd, DEFAULT_SCHEMA_CONFIG_PATH),
+      JSON.stringify(getDefaultHumanUserSchemaBody()),
+    );
+    server.use(
+      liveAcrossTwoPages({ id: "dep_live_primary", release_id: "rel_live" }),
+      http.post(`${PLATFORM_URL}/api/v1/deployments`, () =>
+        HttpResponse.json(
+          { code: "dep.expected_mismatch", message: "the targets changed" },
+          { status: 409 },
+        ),
+      ),
+    );
+
+    const res = await runCliForTest([
+      "deploy",
+      "-m",
+      "test",
+      "--cwd",
+      project.cwd,
+      "--server",
+      PLATFORM_URL,
+      "--json",
+    ]);
+
+    expect(parseJson(res.stdout)).toMatchObject({
+      code: "E_CONFLICT",
+      details: { current_deployment: { id: "dep_live_primary" } },
+    });
   });
 });

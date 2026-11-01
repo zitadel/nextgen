@@ -24,6 +24,12 @@ import { setProxyPath } from "./base-url";
 import { setRequestPolicy } from "./fetch";
 import { paged } from "./paged";
 
+/**
+ * How each paged function pages, by name: typed readers of a page's items and
+ * of its cursor, for a caller that walks the pages itself.
+ */
+export { paging };
+
 type Endpoints = typeof endpoints;
 type Paging = typeof paging;
 
