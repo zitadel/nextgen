@@ -61,13 +61,16 @@ export function SchemaFieldsPanel({ schema }: { schema: UserSchema }) {
       {/* `table-fixed` so the declared column widths are exact rather than a
           hint the auto layout can widen. The design pads the row by 8px and
           leaves the cells flush, which a table expresses as padding on the
-          outer two cells — so `Req.` is 70px of content inside a 78px column. */}
+          outer two cells — so `Req.` is 70px of content inside a 78px column.
+          Below `sm` the card is too narrow for those widths: Type and Req.
+          shrink to their longest value (`Boolean`, the `REQ.` heading) so
+          the field name keeps the room. */}
       <Table className="table-fixed">
         <TableHeader>
           <TableRow className="hover:bg-transparent">
             <TableHead className={`${HEAD_CELL} pl-2`}>Field</TableHead>
-            <TableHead className={`${HEAD_CELL} w-[110px]`}>Type</TableHead>
-            <TableHead className={`${HEAD_CELL} w-[78px] pr-2`}>Req.</TableHead>
+            <TableHead className={`${HEAD_CELL} w-18 sm:w-[110px]`}>Type</TableHead>
+            <TableHead className={`${HEAD_CELL} w-12 pr-2 sm:w-[78px]`}>Req.</TableHead>
           </TableRow>
         </TableHeader>
         {/* The design keeps the rule under the last row — it is the card's
@@ -126,9 +129,10 @@ function PropertyRow({
             <ChevronRight className="size-4 text-muted-foreground" aria-hidden />
           </button>
         ) : designation ? (
-          // The key gives way to the badge, which never truncates. The space
-          // separates the two in the cell's accessible name.
-          <span className="flex min-w-0 items-center gap-2">
+          // Where the key and the badge do not fit side by side (a phone),
+          // the badge wraps under the key rather than cutting it short. The
+          // space separates the two in the cell's accessible name.
+          <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
             <span className="truncate">{property.key}</span>{" "}
             <Badge variant="secondary" className="font-mono font-normal">
               {designation}

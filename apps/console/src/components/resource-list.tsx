@@ -81,7 +81,7 @@ export function ResourceTitle({
     <div className={cn(RESOURCE_HEADER, PAGE_TITLE_ROW, "flex-wrap gap-x-2 gap-y-4")}>
       <h1 className={RESOURCE_TITLE}>{children}</h1>
       {filter && (
-        <div className="order-3 flex basis-full items-center gap-2 sm:order-2 sm:ml-auto sm:basis-auto">
+        <div className="order-3 flex basis-full flex-wrap items-center gap-2 sm:order-2 sm:ml-auto sm:basis-auto">
           {filter}
         </div>
       )}
