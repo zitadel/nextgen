@@ -2,16 +2,12 @@ import { resolve } from "node:path";
 
 import { defineConfig } from "vitest/config";
 
-import { baseTest, sourceConditions } from "@zitadel/vitest-config";
+import { baseTest } from "@zitadel/vitest-config";
 
 export default defineConfig({
   cacheDir: ".vitest",
-  // tsconfig.json's `@/*`, which Next resolves itself, and @zitadel/api from
-  // its source, as tsc reads it.
-  resolve: {
-    alias: { "@": resolve(import.meta.dirname, "src") },
-    conditions: sourceConditions,
-  },
+  // tsconfig.json's `@/*`, which Next resolves itself.
+  resolve: { alias: { "@": resolve(import.meta.dirname, "src") } },
   test: {
     ...baseTest,
     name: "@zitadel/cloud-functions",
