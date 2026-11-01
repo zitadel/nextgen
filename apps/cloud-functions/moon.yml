@@ -8,7 +8,12 @@ dependsOn:
   - "api"
 
 tasks:
-  # lint and test are the inherited tasks unchanged.
+  # lint is the inherited task unchanged.
+  test:
+    deps:
+      # The specs import @zitadel/api's dist/, as Next does.
+      - "api:build"
+
   typecheck:
     deps:
       # After the build, never beside it, for apps/website/moon.yml's reason:
