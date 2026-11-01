@@ -27,11 +27,14 @@ async function aProjectWithPreviewsOnTwoPages(): Promise<{ cwd: string; removed:
           : { previews: [preview("https://pr-1.app.acme.com")], next_page_token: "p2" },
       ),
     ),
-    http.post(`${SERVER}/api/v1/projects/:project_id/previews/remove`, async ({ request }) => {
-      const body: { origin: string } = await request.json();
-      removed.push(body.origin);
-      return new HttpResponse(null, { status: 204 });
-    }),
+    http.post<{ project_id: string }, { origin: string }>(
+      `${SERVER}/api/v1/projects/:project_id/previews/remove`,
+      async ({ request }) => {
+        const body = await request.json();
+        removed.push(body.origin);
+        return new HttpResponse(null, { status: 204 });
+      },
+    ),
   );
   const cwd = await aProjectDirectory("zitadel-preview-rm-", { id: "proj_test", secret: "ps" });
   dirs.push(cwd);

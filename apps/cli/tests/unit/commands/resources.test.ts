@@ -2403,6 +2403,6 @@ describe("the paged resources' lists", () => {
   ] as const)("read %s's pages with the readers the client generates", (topic, readers) => {
     const list = RESOURCES[topic].list;
 
-    expect([list.items, list.next]).toEqual([readers.items, readers.next]);
+    expect([list?.items, list?.next]).toEqual([readers.items, readers.next]);
   });
 });

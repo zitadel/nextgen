@@ -185,11 +185,14 @@ describe("sendAll", () => {
 
   it("starts from the page the caller named in the body", async () => {
     server.use(
-      http.post(`${SERVER}/api/v1/users/query`, async ({ request }) => {
-        const body: { page_token?: string } = await request.json();
-        const { items, next } = pageAt(body.page_token ?? null);
-        return HttpResponse.json({ users: items, next_page_token: next });
-      }),
+      http.post<never, { page_token?: string }>(
+        `${SERVER}/api/v1/users/query`,
+        async ({ request }) => {
+          const body = await request.json();
+          const { items, next } = pageAt(body.page_token ?? null);
+          return HttpResponse.json({ users: items, next_page_token: next });
+        },
+      ),
     );
 
     const response = await sendAll(SERVER, "s", requestFor("queryUsers", ["page_token=cursor-3"]));

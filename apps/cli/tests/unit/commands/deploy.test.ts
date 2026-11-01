@@ -120,11 +120,14 @@ describe("deploy", () => {
     server.use(liveAcrossTwoPages({ id: "dep_live_primary", release_id: "rel_live" }));
     const guards: unknown[] = [];
     server.use(
-      http.post(`${PLATFORM_URL}/api/v1/deployments`, async ({ request }) => {
-        const body: { expected_deployment_id?: string } = await request.clone().json();
-        guards.push(body.expected_deployment_id);
-        return undefined;
-      }),
+      http.post<never, { expected_deployment_id?: string }>(
+        `${PLATFORM_URL}/api/v1/deployments`,
+        async ({ request }) => {
+          const body = await request.clone().json();
+          guards.push(body.expected_deployment_id);
+          return undefined;
+        },
+      ),
     );
 
     await runCliForTest([

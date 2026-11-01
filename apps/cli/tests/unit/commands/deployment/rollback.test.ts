@@ -124,11 +124,14 @@ describe("deployment rollback", () => {
     server.use(liveAcrossTwoPages({ id: "dep_live_primary", release_id: "rel_live" }));
     const guards: unknown[] = [];
     server.use(
-      http.post(`${SERVER}/api/v1/deployments/:id/rollback`, async ({ request }) => {
-        const body: { expected_deployment_id?: string } = await request.clone().json();
-        guards.push(body.expected_deployment_id);
-        return undefined;
-      }),
+      http.post<{ id: string }, { expected_deployment_id?: string }>(
+        `${SERVER}/api/v1/deployments/:id/rollback`,
+        async ({ request }) => {
+          const body = await request.clone().json();
+          guards.push(body.expected_deployment_id);
+          return undefined;
+        },
+      ),
     );
 
     await runCliForTest([
