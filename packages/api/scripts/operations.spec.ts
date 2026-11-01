@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { pagingArgument } from "./operations";
+import { pagingArgument, pagingSource } from "./operations";
 
 /** Signatures as orval writes them, one per argument order a paged function can have. */
 const endpoints = `
@@ -46,5 +46,31 @@ describe("pagingArgument", () => {
     expect(() =>
       pagingArgument(endpoints, { id: "listThings", paging: { token: "body", items: "things" } }),
     ).toThrow("listThings has no argument to carry its page_token");
+  });
+});
+
+describe("pagingSource", () => {
+  it("reads a list under a plain name as a property", () => {
+    const source = pagingSource(
+      [{ id: "listThings", paging: { token: "query", items: "things" } }],
+      endpoints,
+    );
+
+    expect(source).toContain('items: (page: Page<"listThings">) => page.things,');
+  });
+
+  it("reads a list under a name that is no identifier by its quoted name", () => {
+    const source = pagingSource(
+      [{ id: "listThings", paging: { token: "query", items: "thing-list" } }],
+      endpoints,
+    );
+
+    expect(source).toContain('items: (page: Page<"listThings">) => page["thing-list"],');
+  });
+
+  it("leaves out an operation that does not page", () => {
+    const source = pagingSource([{ id: "listThings", paging: null }], endpoints);
+
+    expect(source).not.toContain("listThings");
   });
 });

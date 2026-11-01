@@ -130,10 +130,9 @@ describe("operation statics", () => {
   it("omits the paging flags for an unpaginated list", () => {
     const statics = ListOperation.describe(
       definition({
-        paged: false,
+        paged: false as const,
         call: async () => ({ data: [] }),
         items: (page: { data: readonly unknown[] }) => page.data,
-        next: () => undefined,
       }),
     );
     expect(Object.keys(statics.flags)).toEqual(["fields", "plain", "extra"]);
@@ -263,16 +262,18 @@ describe("wire conventions", () => {
     // The factory must not carry one platform's cursor names as though they
     // were universal: a list is driven here with `cursor`/`next_cursor` and a
     // query body that nests its filters, and nothing in the factory objects.
+    // The page holds its cursor as `continuation`, which only the spec's own
+    // `next` reads; the envelope reports it under the wire's name.
     let sent: unknown;
-    const spec: ListSpec<Ctx, Json, { rows: readonly unknown[]; next_cursor?: string }> = {
+    const spec: ListSpec<Ctx, Json, { rows: readonly unknown[]; continuation?: string }> = {
       body: z.object({}).passthrough(),
       filters: [{ field: "state", operations: ["equals"] }],
       call: async (_ctx, request) => {
         sent = request;
-        return { rows: [{ id: "r1" }], next_cursor: "c2" };
+        return { rows: [{ id: "r1" }], continuation: "c2" };
       },
       items: (page) => page.rows,
-      next: (page) => page.next_cursor,
+      next: (page) => page.continuation,
     };
     const definition: OperationDefinition<Ctx, ListSpec<Ctx>> = {
       topic: "rows",

@@ -181,8 +181,12 @@ export function pagingArgument(
   return index;
 }
 
-function pagingSource(
-  operations: readonly ReturnType<typeof operationOf>[],
+/**
+ * The source of `src/generated/paging.ts`: for each operation that pages, typed
+ * readers of a page's items and cursor, and the argument carrying `page_token`.
+ */
+export function pagingSource(
+  operations: readonly Pick<ReturnType<typeof operationOf>, "id" | "paging">[],
   endpoints: string,
 ): string {
   const field = (name: string) =>

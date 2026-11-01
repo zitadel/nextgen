@@ -80,12 +80,6 @@ export type ListSpec<Ctx, B = Json, P = unknown, T = unknown> = Readonly<{
    */
   item?: Schema;
   /**
-   * Whether the endpoint is cursor-paginated (ADR 027). Defaults to `true`.
-   * A `false` endpoint returns its whole collection in one response, so the
-   * paging flags are not generated and no cursor is sent.
-   */
-  paged?: boolean;
-  /**
    * Whether a bare invocation drains every page. Off by default: a page is the
    * honest answer for an unbounded collection. A resource turns it on when a
    * partial answer would read as a complete one — a revision history shown
@@ -114,12 +108,24 @@ export type ListSpec<Ctx, B = Json, P = unknown, T = unknown> = Readonly<{
    * spec typed by its page still assigns to the erased spec the registry holds.
    */
   items(page: P): readonly T[];
-  /**
-   * The cursor to the page after `page`, read off it the same way; empty or
-   * missing on the last page. An unpaged list answers nothing.
-   */
+}> &
+  (PagedList<P> | UnpagedList);
+
+/**
+ * A cursor-paginated list (ADR 027), the default: it reads the cursor to the
+ * page after `page` off it the same way as its items, empty or missing on the
+ * last page.
+ */
+type PagedList<P> = Readonly<{
+  paged?: true;
   next(page: P): string | null | undefined;
 }>;
+
+/**
+ * A list whose endpoint returns its whole collection in one response, so the
+ * paging flags are not generated, no cursor is sent, and none is read.
+ */
+type UnpagedList = Readonly<{ paged: false; next?: never }>;
 
 /**
  * Every dot-path into `T`: its fields, and the fields of the objects below
@@ -287,7 +293,11 @@ export type WireConventions = Readonly<{
   limit: string;
   /** Request property carrying the cursor. */
   pageToken: string;
-  /** Response property carrying the cursor for the next page. */
+  /**
+   * Envelope property the next page's cursor is reported under, as this
+   * platform spells it. Only the name: the cursor itself is read off each page
+   * by its list's own `next`.
+   */
   nextPageToken: string;
   /** Assembles the structured-query body from the parts the flags produced. */
   query: (parts: QueryParts) => Json;

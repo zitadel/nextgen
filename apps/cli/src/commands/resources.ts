@@ -622,7 +622,6 @@ export const RESOURCES = {
       item: ListBrandingResponse.element,
       call: ({ client, projectId }) => client.listBranding({ project_id: projectId }),
       items: (page) => page,
-      next: () => undefined,
     }),
     get: get({
       call: ({ client }, id) => client.getBrandingById(id),

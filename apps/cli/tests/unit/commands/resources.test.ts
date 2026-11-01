@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import type { GetReleaseById200 } from "@zitadel/api/generated/model";
+import type { GetReleaseById200, QueryUsers200 } from "@zitadel/api/generated/model";
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
@@ -2097,6 +2097,25 @@ describe("the registry builders", () => {
       // @ts-expect-error the page holds its users under `users`
       items: (page) => page.user,
       next: (page) => page.next_page_token,
+    });
+  });
+
+  it("takes an unpaged list without a cursor", () => {
+    const branding = list({
+      paged: false,
+      call: ({ client, projectId }) => client.listBranding({ project_id: projectId }),
+      items: (page) => page,
+    });
+
+    expect(branding.paged).toBe(false);
+  });
+
+  it("refuses a paged list without a cursor", () => {
+    // @ts-expect-error a paged list reads its cursor with `next`
+    list({
+      body: QueryUsersBody,
+      call: ({ client }, body) => client.queryUsers(body),
+      items: (page: QueryUsers200) => page.users,
     });
   });
 

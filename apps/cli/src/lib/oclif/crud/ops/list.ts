@@ -179,7 +179,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
     progress?.start(`Fetching ${topic}`);
     let fetched = 0;
     let drained = false;
-    const cursorOf = (response: unknown) => spec.next(response) || undefined;
+    const cursorOf = (response: unknown) => spec.next?.(response) || undefined;
     // The walk begins at the page --page-token names, if any.
     const first = typeof flags["page-token"] === "string" ? flags["page-token"] : undefined;
     // The spinner owns the cursor and a SIGINT handler until it is stopped, so a

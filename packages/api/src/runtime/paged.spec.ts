@@ -46,6 +46,21 @@ describe("paged", () => {
     expect(call.mock.calls[1]).toEqual(["user_1", { page_token: "t1" }]);
   });
 
+  it("follows the cursor its shape reads, whatever the field is called", async () => {
+    const call = vi.fn(async (...args: unknown[]) =>
+      (args[0] as { page_token?: string } | undefined)?.page_token === undefined
+        ? { rows: ["a"], cursor: "t1" }
+        : { rows: ["b"] },
+    );
+    const shape = {
+      items: (page: { rows: string[] }) => page.rows,
+      next: (page: { cursor?: string }) => page.cursor,
+      arg: 0,
+    };
+
+    expect(await paged(call, shape, asIs).all()).toEqual(["a", "b"]);
+  });
+
   it("collects every page's items in order", async () => {
     expect(await paged(endpoint(), { ...rows, arg: 1 }, asIs).all("user_1")).toEqual(["a", "b"]);
   });
