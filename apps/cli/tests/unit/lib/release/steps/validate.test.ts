@@ -105,6 +105,15 @@ describe("validate step", () => {
     await expect(validateStep.run(ctx(bundle))).rejects.toMatchObject({ code: "E_VALIDATION" });
   });
 
+  it("rejects a connection the release body does not take, naming its file", async () => {
+    await expect(
+      validateStep.run(ctx({ idps: [{ slug: "acme" }] }, { idpFiles: ["acme.json"] })),
+    ).rejects.toMatchObject({
+      code: "E_VALIDATION",
+      message: expect.stringContaining(".zitadel/idps/acme.json: "),
+    });
+  });
+
   describe("a flow's user_schema", () => {
     /** The default login flow, naming its schema `userSchema` and collecting `fields` first. */
     const flowNaming = (userSchema: string, fields: string[]) => ({

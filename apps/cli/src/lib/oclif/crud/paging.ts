@@ -1,10 +1,13 @@
+import { type FetchPage, pages } from "@zitadel/api/runtime/paging";
+
 /**
- * The first page of `source`, or with `all` every page in order, as one list
- * of the items `items` takes from each page. `next` is the cursor to the page
- * after the first, or `null` once `all` has read the last page.
+ * The first page `fetchPage` answers, or with `all` every page in order, as
+ * one list of the items `items` takes from each page. `next` reads a page's
+ * cursor, both to follow it and to report it: the cursor to the page after
+ * the first, or `null` once `all` has read the last page.
  */
 export const collectPages = async <P, T>(
-  source: AsyncIterable<P>,
+  fetchPage: FetchPage<P>,
   {
     items,
     all,
@@ -19,7 +22,7 @@ export const collectPages = async <P, T>(
   // last: these resources are unbounded, and a wide `--all` would otherwise
   // copy every record once per remaining page.
   const collected: T[] = [];
-  for await (const page of source) {
+  for await (const page of pages(fetchPage, { next: (page) => next(page) || undefined })) {
     collected.push(...items(page));
     if (!all) {
       return { items: collected, next: next(page) || null };

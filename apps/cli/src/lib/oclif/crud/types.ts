@@ -158,7 +158,7 @@ type DeclaredKeys<T> = keyof {
 // record `R` still assigns to the erased spec the registry holds.
 export type GetSpec<Ctx, R = unknown> = Readonly<{
   call(ctx: Ctx, id: string): Promise<R>;
-  /** Generated response schema of the record itself; see {@link QueryListSpec.response}. */
+  /** Generated response schema of the record itself; see {@link ListSpec.item}. */
   response?: Schema;
   /**
    * Blocks a terminal shows under the fields, for a value that does not read

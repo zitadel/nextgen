@@ -135,6 +135,9 @@ function properties(schema: Schema | undefined): Map<string, Schema> {
   return found;
 }
 
+/** The name orval gives an operation's function: its id, first letter lowercased. */
+const functionName = (id: string): string => id.charAt(0).toLowerCase() + id.slice(1);
+
 /**
  * The argument of the generated function that carries `page_token`, read from
  * the signature orval wrote for it in `endpoints`: the body for a token the
@@ -144,8 +147,7 @@ export function pagingArgument(
   endpoints: string,
   operation: Pick<ReturnType<typeof operationOf>, "id" | "paging">,
 ): number {
-  const name = operation.id.charAt(0).toLowerCase() + operation.id.slice(1);
-  const head = `export const ${name} = async (`;
+  const head = `export const ${functionName(operation.id)} = async (`;
   const start = endpoints.indexOf(head);
   if (start === -1) {
     throw new Error(`${operation.id} has no generated function`);
@@ -191,12 +193,13 @@ export function pagingSource(
 ): string {
   const field = (name: string) =>
     /^[A-Za-z_$][\w$]*$/.test(name) ? `.${name}` : `[${JSON.stringify(name)}]`;
+  // Keyed by the function's name, which is what the client is called by.
   const entries = operations.flatMap((operation) =>
     operation.paging
       ? [
-          `  ${operation.id}: {
-    items: (page: Page<"${operation.id}">) => page${field(operation.paging.items)},
-    next: (page: Page<"${operation.id}">) => page.next_page_token,
+          `  ${functionName(operation.id)}: {
+    items: (page: Page<"${functionName(operation.id)}">) => page${field(operation.paging.items)},
+    next: (page: Page<"${functionName(operation.id)}">) => page.next_page_token,
     arg: ${pagingArgument(endpoints, operation)},
   },`,
         ]

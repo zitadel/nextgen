@@ -15,6 +15,7 @@ export const sortThings = async (order: ("asc" | "desc")[],
     params?: SortThingsParams, options?: Parameters<typeof customFetch>[1]): Promise<SortThings200> => {
 export const watchThings = async (onPage: (page: Page, params: Cursor) => void,
     labels: Record<string, string>, params?: WatchThingsParams): Promise<WatchThings200> => {
+export const listWidgets = async (params?: ListWidgetsParams, options?: Parameters<typeof customFetch>[1]): Promise<ListWidgets200> => {
 export const brokenThings = async (params?: BrokenThingsParams
 `;
 
@@ -66,6 +67,17 @@ describe("pagingSource", () => {
     );
 
     expect(source).toContain('items: (page: Page<"listThings">) => page["thing-list"],');
+  });
+
+  it("keys an operation by the name of its function", () => {
+    const source = pagingSource(
+      [{ id: "ListWidgets", paging: { token: "query", items: "widgets" } }],
+      endpoints,
+    );
+
+    expect(source).toContain(
+      '  listWidgets: {\n    items: (page: Page<"listWidgets">) => page.widgets,',
+    );
   });
 
   it("leaves out an operation that does not page", () => {

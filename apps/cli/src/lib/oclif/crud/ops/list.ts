@@ -1,6 +1,5 @@
 import { spinner } from "@clack/prompts";
 import { Flags } from "@oclif/core";
-import { pages } from "@zitadel/api/runtime/paging";
 
 import { nonBlankString } from "../../flags";
 
@@ -179,26 +178,22 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
     progress?.start(`Fetching ${topic}`);
     let fetched = 0;
     let drained = false;
-    const cursorOf = (response: unknown) => spec.next?.(response) || undefined;
     // The walk begins at the page --page-token names, if any.
     const first = typeof flags["page-token"] === "string" ? flags["page-token"] : undefined;
     // The spinner owns the cursor and a SIGINT handler until it is stopped, so a
     // page that fails mid-drain has to stop it too; otherwise the error prints
     // under a live spinner and the handler outlives the command.
     const { items, next } = await collectPages(
-      pages(
-        async (token) => {
-          const page = await request(token ?? first);
-          fetched += 1;
-          progress?.message(`Fetching ${topic} — page ${fetched}`);
-          return page;
-        },
-        { next: cursorOf },
-      ),
+      async (token) => {
+        const page = await request(token ?? first);
+        fetched += 1;
+        progress?.message(`Fetching ${topic} — page ${fetched}`);
+        return page;
+      },
       {
         items: (response) => spec.items(response),
         all,
-        next: cursorOf,
+        next: (response) => spec.next?.(response),
       },
     )
       .then((page) => {

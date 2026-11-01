@@ -6,7 +6,6 @@ import {
   type JsonEnvelope,
   nonBlankString,
 } from "../../lib/oclif";
-import { collectPages } from "../../lib/oclif/crud/paging";
 import { renderList } from "../../lib/oclif/crud/table";
 import { listData } from "../../lib/oclif/envelope";
 import { shellArg } from "../../lib/shell";
@@ -59,21 +58,17 @@ export default class DeploymentList extends EnvironmentCommand {
     await this.toMeta(flags);
     const { client, projectId } = await this.connect();
 
+    const params = {
+      project_id: projectId,
+      origin: flags.origin,
+      live: flags.live,
+      limit: flags.limit,
+      page_token: flags["page-token"],
+    };
     // One page unless `--all`, whose drain leaves no next page to report.
-    const { items: deployments, next } = await collectPages(
-      client.listDeployments.pages({
-        project_id: projectId,
-        origin: flags.origin,
-        live: flags.live,
-        limit: flags.limit,
-        page_token: flags["page-token"],
-      }),
-      {
-        items: (page) => page.deployments,
-        next: (page) => page.next_page_token,
-        all: flags.all === true,
-      },
-    );
+    const page = flags.all ? undefined : await client.listDeployments(params);
+    const deployments = page ? page.deployments : await client.listDeployments.all(params);
+    const next = page?.next_page_token || null;
 
     // Flatten each deployment's targets to one `origins` cell for the table.
     const rows = deployments.map((deployment) => ({

@@ -1,7 +1,6 @@
 import { Flags } from "@oclif/core";
 
 import { CommandGroups, type JsonEnvelope, nonBlankString, PreviewCommand } from "../../lib/oclif";
-import { collectPages } from "../../lib/oclif/crud/paging";
 import { renderList } from "../../lib/oclif/crud/table";
 import { listData } from "../../lib/oclif/envelope";
 import { shellArg } from "../../lib/shell";
@@ -51,18 +50,14 @@ export default class PreviewList extends PreviewCommand {
     await this.toMeta(flags);
     const { client, projectId } = await this.connect();
 
+    const params = {
+      limit: flags.limit,
+      page_token: flags["page-token"],
+    };
     // One page unless `--all`, whose drain leaves no next page to report.
-    const { items: previews, next } = await collectPages(
-      client.listPreviews.pages(projectId, {
-        limit: flags.limit,
-        page_token: flags["page-token"],
-      }),
-      {
-        items: (page) => page.previews,
-        next: (page) => page.next_page_token,
-        all: flags.all === true,
-      },
-    );
+    const page = flags.all ? undefined : await client.listPreviews(projectId, params);
+    const previews = page ? page.previews : await client.listPreviews.all(projectId, params);
+    const next = page?.next_page_token || null;
 
     const rows = previews.map((preview) => ({
       url: preview.origin,

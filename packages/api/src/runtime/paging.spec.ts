@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { nextToken, pages } from "./paging";
+import { itemsOf, nextToken, pages } from "./paging";
 
 /** Answers each cursor with the page `chain` holds for it; `""` is the first page. */
 function fetchPage(chain: Record<string, { rows: string[]; next?: string }>) {
@@ -22,6 +22,22 @@ describe("nextToken", () => {
 
   it("reads the field it is told to", () => {
     expect(nextToken({ next_cursor: "c2", next_page_token: "t2" }, "next_cursor")).toBe("c2");
+  });
+});
+
+describe("itemsOf", () => {
+  it("reads the list the field names", () => {
+    expect(itemsOf({ users: ["a", "b"], next_page_token: "t1" }, "users")).toEqual(["a", "b"]);
+  });
+
+  it.each([
+    ["a page without the field", { next_page_token: "" }],
+    ["a field that is not a list", { users: "a" }],
+    ["no page at all", null],
+  ])("refuses %s, naming the field", (_, page) => {
+    expect(() => itemsOf(page, "users")).toThrow(
+      new TypeError('Unexpected list response: missing "users" array'),
+    );
   });
 });
 

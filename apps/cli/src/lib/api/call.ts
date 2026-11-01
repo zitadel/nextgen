@@ -1,5 +1,5 @@
 import { ApiError, request as fetchWithPolicy } from "@zitadel/api/runtime/fetch";
-import { itemsOf, nextToken, pages } from "@zitadel/api/runtime/paging";
+import { itemsOf, nextToken } from "@zitadel/api/runtime/paging";
 
 import { REQUEST_TIMEOUT_MS, sanitizeRejection, sanitizeResponse } from "../api-client";
 import { ZitadelError } from "../errors";
@@ -98,10 +98,10 @@ export const sendAll = async (
   }
   let last: ApiResponse = { status: 200, body: undefined };
   const { items } = await collectPages(
-    pages(async (cursor) => {
+    async (cursor) => {
       last = await send(server, token, pageOf(request, cursor));
       return last.body;
-    }),
+    },
     {
       // The one list read by a field named only at runtime, so the one checked.
       items: (body) => {
