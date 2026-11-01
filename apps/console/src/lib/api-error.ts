@@ -20,17 +20,33 @@ import { ApiError } from "@zitadel/api/runtime/fetch";
  * are listed as the server named them, minus the `attributes.` prefix of the
  * request body, and never guessed from the schema's `x-unique` markers.
  */
-export function describeError(cause: unknown, fallback: string): string {
+export function describeError(
+  cause: unknown,
+  fallback: string,
+  /** False when the form shows the named fields on the fields themselves. */
+  withFields = true,
+): string {
   if (cause instanceof ApiError) {
     const body = errorBody(cause);
     const message = body?.message;
     if (body && typeof message === "string" && message.trim() !== "") {
-      const fields = namedFields(body);
+      const fields = withFields ? namedFields(body) : [];
       return fields.length > 0 ? `${message} (${fields.join(", ")})` : message;
     }
     return fallback;
   }
   return cause instanceof Error ? cause.message : fallback;
+}
+
+/**
+ * The fields a failed request names, from its producer's `details`, as
+ * attribute keys: the `attributes.` prefix of the request body is dropped, so
+ * a form can match them to its own controls. Empty for any other failure.
+ */
+export function invalidFields(cause: unknown): string[] {
+  if (!(cause instanceof ApiError)) return [];
+  const body = errorBody(cause);
+  return body ? namedFields(body) : [];
 }
 
 /** The error payload of a failed request, when it carried one. */
