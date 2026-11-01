@@ -6,6 +6,9 @@ import tailwindcss from "@tailwindcss/vite";
 import { devtools } from "@tanstack/devtools-vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import react from "@vitejs/plugin-react";
+// The config loads @zitadel/api's dist/, which sdk-react's build, a dep of
+// every console task, builds first.
+import { API_PREFIX, apiBaseUrl } from "@zitadel/api/runtime/base-url";
 import { type Alias, defineConfig, loadEnv, type Plugin, type ProxyOptions } from "vite";
 
 const defaultConsoleBase = "/ui/console/";
@@ -105,7 +108,7 @@ function devApiProxy(mode: string): Record<string, ProxyOptions> {
   // Unset, the client calls `/api/v1` on the page's origin, as the built
   // console does on the server's, and the proxy forwards that path unchanged.
   const env = loadEnv(mode, import.meta.dirname, "VITE_");
-  const apiBase = env.VITE_CONSOLE_API_BASE || "";
+  const { context, rewrite } = devApiRoute(env.VITE_CONSOLE_API_BASE || "");
   // Removed in #1345: the console takes the project it signs into from the
   // server's `/console/runtime.json`. Said out loud, because a `.env.local`
   // that still sets it would otherwise be ignored without a word.
@@ -117,12 +120,6 @@ function devApiProxy(mode: string): Record<string, ProxyOptions> {
   }
   const backendUrl = devBackendUrl(mode);
 
-  // Anchor the context to a path segment so a similarly-prefixed path (e.g.
-  // `/api/v12/...`) is not accidentally proxied and rewritten. A base of its
-  // own is stripped, and what follows it, `/api/v1/...`, goes to the server.
-  const proxied = apiBase || "/api/v1";
-  const escaped = proxied.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
   return {
     // Console ADR 0004 §3: the pre-session runtime-metadata document lives
     // at a root path served by the Go mux; forward it as-is (public, no
@@ -131,16 +128,10 @@ function devApiProxy(mode: string): Record<string, ProxyOptions> {
       target: backendUrl,
       changeOrigin: true,
     },
-    [`^${escaped}(/|$)`]: {
+    [context]: {
       target: backendUrl,
       changeOrigin: true,
-      rewrite: (path: string) => {
-        if (!apiBase) {
-          return path;
-        }
-        const stripped = path.startsWith(apiBase) ? path.slice(apiBase.length) : path;
-        return stripped.startsWith("/") ? stripped : `/${stripped}`;
-      },
+      rewrite,
       // `CONSOLE_DEV_PROXY_LOG=1` prints each proxied request — the thing to
       // look at when a screen answers 401/403/404 and it is not obvious what
       // the server was asked.
@@ -152,6 +143,26 @@ function devApiProxy(mode: string): Record<string, ProxyOptions> {
         });
       },
     },
+  };
+}
+
+/**
+ * The dev proxy's route for the API. `base` reads as the client reads it
+ * (`apiBaseUrl`, `src/api/zitadel.ts`), so a base that already ends in
+ * `/api/v1` keeps a single one. What comes before the prefix is this proxy's
+ * own path, stripped on the way; the prefix and what follows reach the server
+ * unchanged. The context is anchored to a path segment, so a look-alike
+ * (`/api/v12/...`) is not proxied.
+ */
+export function devApiRoute(base: string): {
+  context: string;
+  rewrite: (path: string) => string;
+} {
+  const apiPath = apiBaseUrl(base);
+  const ownPath = apiPath.slice(0, -API_PREFIX.length);
+  return {
+    context: `^${apiPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(/|$)`,
+    rewrite: (path) => path.slice(ownPath.length),
   };
 }
 
