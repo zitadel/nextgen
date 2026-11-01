@@ -42,19 +42,13 @@ Opening a flow takes four steps:
 ```mermaid
 flowchart TD
     open([Open a flow]) --> check{Origin?}
-    check -- none --> primary[Newest primary deployment]
     check -- not admitted --> forbidden[403]
-    check -- console origin the project does not list --> primary
-    check -- live preview --> preview[Its own newest deployment]
-    check -- any other admitted origin --> named{Newest primary deployment names it?}
-    named -- yes --> revoked{Release revoked?}
-    named -- no --> notDeployed[409 rel.not_deployed]
-    preview -- found --> revoked
-    preview -- none --> notDeployed
-    primary -- found --> revoked
-    primary -- none --> noDefault[409 rel.no_default]
-    revoked -- yes --> conflict[409 rel.revoked]
-    revoked -- no --> serve([Serve the release])
+    check -- live preview --> preview[Its newest deployment]
+    check -- any other, or none --> primary[Newest primary deployment]
+    preview --> usable{Found and not revoked?}
+    primary --> usable
+    usable -- no --> conflict[409]
+    usable -- yes --> serve([Serve the release])
 ```
 
 `setUserPassword` and `createAuthAttempt` do not come from a browser page, so
