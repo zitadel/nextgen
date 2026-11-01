@@ -103,6 +103,9 @@ nothing; `data.skills` and `data.directories` say what it added where.
   `deploy` yourself. `data.deployment` carries the `release_id`,
   `content_hash`, `deployment_id` and `origins` when a person accepted, and is
   null otherwise — a failed deploy is a warning, never a failed `env add`.
+  `ZITADEL_URL` and `--server` are the server's origin: the API lives under
+  `/api/v1` there, which the CLI adds (and drops from a URL that already ends
+  in it).
 - **Origins.** `zitadel origin add <url> --kind primary|preview`, `origin list`
   and `origin rm <url>` manage the URLs a project serves: a `primary` origin is
   where the app is served, a `preview` pattern (it may hold a `*`) is where
@@ -144,8 +147,9 @@ nothing; `data.skills` and `data.directories` say what it added where.
 - **Calling an operation no command covers.** `zitadel api <operation>` calls
   any operation of the API with the resolved server and `.zitadel/secret`.
   Name it by its `operationId` (`queryUsers`, as the API reference and
-  `@zitadel/api` spell it) or by its path (`/users/query`; `-X` picks the
-  method where a path has several). Path parameters follow as arguments, in
+  `@zitadel/api` spell it) or by its path as the spec has it (`/users/query`,
+  which the server serves at `/api/v1/users/query`; a path copied with the
+  prefix works too, and `-X` picks the method where a path has several). Path parameters follow as arguments, in
   path order; a `project_id` left out is the project's own. `-F name=value`
   (or `name:=json`) sets a query parameter when the operation declares one by
   that name, else a dot path into the body, typed by the operation's schema;
@@ -245,6 +249,12 @@ Each invocation prints one JSON object:
   `--origin`, which selects targets but never authorizes a preview deploy. A CI
   build other than Vercel or Netlify must set `ZITADEL_ENV=preview`, or it is
   skipped too. `preview list` and `preview rm <url>` read and end live previews.
+- `deploy` and `preview` record `-m` on the release and the deployment. Omitted,
+  they use a GitHub pull request's title, Vercel's commit message, or a clean
+  worktree's commit subject; with none, a non-interactive `deploy` fails. A
+  blank `-m` is refused. A release keeps the message of
+  the run that first built its content, usually the pull request's `preview`.
+  `deployment rollback -m` records why on the rollback.
 - `deployment get <id>` emits the deployment as the API serves it; on a
   terminal it also shows the variables the deployment froze, secrets masked.
   Read them as JSON with `variable resolve`.
@@ -286,7 +296,8 @@ Common error codes point at their own fix in `next_commands`:
 - `E_LOCAL_SERVER_NOT_RUNNING`: start the local runtime, then retry with
   `--server local`.
 - `E_NOT_FOUND`: an HTTP 404 — a missing resource, an operation the server's
-  version does not have (`details.body.code` is `req.not_found`), or a
+  version does not have (`details.body.code` is `req.not_found`; a server
+  from before the API moved under `/api/v1` answers every call so), or a
   `--server` that is not a Zitadel platform API. Follow `next_commands`.
 - `E_PORT_IN_USE`: the requested local runtime port already has a listener; stop
   that process or choose another port.

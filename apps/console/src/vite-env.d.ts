@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
-  /** Same-origin base path for API requests. Defaults to `/api`. */
+  /** A path or origin to put in front of the API's `/api/v1`. Defaults to the page's own origin. */
   readonly VITE_CONSOLE_API_BASE?: string;
   /**
    * Opt-in for builds that run without a runtime document (`vite preview`):

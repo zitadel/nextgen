@@ -246,7 +246,7 @@ func (f releaseFixture) postRaw(t *testing.T, body string) (int, *api.ErrorDetai
 	t.Helper()
 
 	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost,
-		harness.EnsureTestServer(t).URL+"/releases?project_id="+url.QueryEscape(f.project),
+		harness.APIBaseURL(t)+"/releases?project_id="+url.QueryEscape(f.project),
 		strings.NewReader(body),
 	)
 	require.NoError(t, err)

@@ -60,6 +60,6 @@ describe("session checks in the Next.js middleware", () => {
 
     mockHeaders.set("x-nextgen-auth-token", token ?? "");
     expect(await auth(OPTIONS)).toMatchObject({ isAuthenticated: true, session: { userId: "u1" } });
-    expect(calls).toEqual([`http://localhost:4000/sessions/me?project_id=${PROJECT}`]);
+    expect(calls).toEqual([`http://localhost:4000/api/v1/sessions/me?project_id=${PROJECT}`]);
   });
 });

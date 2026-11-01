@@ -24,13 +24,20 @@ import (
 // ogenAttributes are the attributes the generated server's request
 // instruments may carry: the operation, and the method, route template and
 // status it served. http.route is the template (`/users/{user_id}`), never
-// the path.
+// the path. A request that reached its operation at the root path rather
+// than under /api/v1 also carries rootPathKey, true.
 var ogenAttributes = []attribute.Key{
 	otelogen.OperationIDKey,
 	semconv.HTTPRequestMethodKey,
 	semconv.HTTPRouteKey,
 	semconv.HTTPResponseStatusCodeKey,
+	rootPathKey,
 }
+
+// rootPathKey is internal/api's RootPathAttribute, which the root path alias
+// sets until 1.0.0 removes it (ADR 077): it counts the traffic still on the
+// root. It is declared here because internal/api depends on this package.
+const rootPathKey = attribute.Key("zitadel.api.root_path")
 
 // otelhttpAttributes are the same, plus the names otelhttp used before the
 // HTTP conventions were stable. The raw request path (http.target, url.path)

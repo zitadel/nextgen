@@ -55,8 +55,8 @@ const PROJECT_ID = "proj_claimme";
 const CHALLENGE_ID = "chal_1";
 const CLAIM_PATH = `/claim?challenge_id=${CHALLENGE_ID}&project_id=${PROJECT_ID}`;
 
-const COMPLETE_PATTERN = `*/api/projects/${PROJECT_ID}/claim/complete`;
-const WINDOW_PATTERN = `*/api/projects/${PROJECT_ID}/claim/window`;
+const COMPLETE_PATTERN = `*/api/v1/projects/${PROJECT_ID}/claim/complete`;
+const WINDOW_PATTERN = `*/api/v1/projects/${PROJECT_ID}/claim/window`;
 
 beforeEach(() => {
   fetchSession.mockReset();
@@ -146,12 +146,12 @@ describe("claim page", () => {
     fetchSession.mockResolvedValue(makeTestSession());
     let claimed = false;
     server.use(
-      http.get("*/api/users/me/projects", () =>
+      http.get("*/api/v1/users/me/projects", () =>
         HttpResponse.json({
           projects: claimed ? [{ id: PROJECT_ID, name: "Claimed" }] : [],
         }),
       ),
-      http.post("*/api/users/query", () => HttpResponse.json({ users: [] })),
+      http.post("*/api/v1/users/query", () => HttpResponse.json({ users: [] })),
     );
     stubComplete(() => {
       claimed = true;

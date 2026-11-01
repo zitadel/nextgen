@@ -61,7 +61,7 @@ const client = createZitadelClient({
 const project = await client.getProject(process.env.ZITADEL_PROJECT_ID!);
 ```
 
-Every operation in the [API reference](/docs/reference/api) shows its call through this client, beside its request and response shapes. The method is named after the operation and takes its path parameters, its body, then its query parameters; an optional body comes after required query parameters.
+`baseUrl` is the server's origin: the client calls the API under `/api/v1` there, and keeps a single prefix when the origin already ends in it. Every operation in the [API reference](/docs/reference/api) shows its call through this client, beside its request and response shapes. The method is named after the operation and takes its path parameters, its body, then its query parameters; an optional body comes after required query parameters.
 
 <Callout title="Edit the OpenAPI source" type="warn">
   Do not hand-edit generated API package output. Update `api/openapi/**` and regenerate through the repo tasks.
