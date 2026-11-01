@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { _resetConfigForTesting } from "@zitadel/api/config";
+import { apiBaseUrl } from "@zitadel/api/runtime/base-url";
+
+import { devApiRoute } from "../../vite.config";
 
 /**
  * Pins the API base (Console ADR 0002 §4, revised): the console puts nothing
@@ -57,5 +60,25 @@ describe("apiBase", () => {
     vi.stubEnv("VITE_CONSOLE_API_BASE", "");
     const { apiBase } = await import("./zitadel");
     expect(apiBase).toBe("");
+  });
+});
+
+// The dev proxy reads VITE_CONSOLE_API_BASE as the client does, so the path
+// the client calls is the one the proxy matches, and it reaches the server
+// with the prefix kept, whatever the base: a base that ends in /api/v1 too.
+describe("the dev proxy's API route", () => {
+  it.each(["", "/api/v1", "/gateway", "/gateway/api/v1", "/gateway/"])(
+    "with VITE_CONSOLE_API_BASE=%j forwards the client's call under /api/v1",
+    (base) => {
+      const called = `${apiBaseUrl(base)}/users/me?project_id=proj_1`;
+      const { context, rewrite } = devApiRoute(base);
+
+      expect(new RegExp(context).test(called), called).toBe(true);
+      expect(rewrite(called)).toBe("/api/v1/users/me?project_id=proj_1");
+    },
+  );
+
+  it("leaves a look-alike of the prefix alone", () => {
+    expect(new RegExp(devApiRoute("").context).test("/api/v12/users")).toBe(false);
   });
 });

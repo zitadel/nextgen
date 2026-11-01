@@ -8,6 +8,7 @@ import {
   EXCHANGE_PATH_CHECK,
   hasProxyCredentialPolicyMarker,
   PROXY_CREDENTIAL_POLICY_MARKER,
+  PREFIXED_EXCHANGE_PATH,
   PROXY_CREDENTIAL_POLICY_V2_MARKER,
   V2_EXCHANGE_PATH_CHECK,
 } from "./proxy-credential-policy";
@@ -474,18 +475,16 @@ export function viteApiPrefixVerdict(source: string): WiringVerdict {
   }
   if (hasProxyCredentialPolicyMarker(text)) {
     return {
-      unknown:
-        "its /__nextgen proxy entry was changed since zitadel setup wrote it, so its project-secret check must accept /api/v1/sessions/exchange by hand (ADR 077)",
+      unknown: `its /__nextgen proxy entry was changed since zitadel setup wrote it, so its project-secret check must accept ${PREFIXED_EXCHANGE_PATH} by hand (ADR 077)`,
     };
   }
   if (
     text.includes(PROXY_PATH) &&
     text.includes("ZITADEL_PROJECT_SECRET") &&
-    !text.includes("/api/v1/sessions/exchange")
+    !text.includes(PREFIXED_EXCHANGE_PATH)
   ) {
     return {
-      unknown:
-        "its /__nextgen proxy is not the one zitadel setup writes, so its project-secret check must accept /api/v1/sessions/exchange by hand (ADR 077)",
+      unknown: `its /__nextgen proxy is not the one zitadel setup writes, so its project-secret check must accept ${PREFIXED_EXCHANGE_PATH} by hand (ADR 077)`,
     };
   }
   return "applied";

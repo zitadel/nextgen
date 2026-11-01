@@ -20,12 +20,15 @@ export function hasProxyCredentialPolicyMarker(source: string): boolean {
   );
 }
 
+/** The session exchange under the API prefix (ADR 077), as a browser calls it through the proxy. */
+export const PREFIXED_EXCHANGE_PATH = `${API_PREFIX}/sessions/exchange`;
+
 /**
  * The generated proxies' path check: the exchange with and without the API
  * prefix, since the server answers both until 1.0.0 and an app's packages may
  * call either.
  */
-export const EXCHANGE_PATH_CHECK = `(pathname === "/sessions/exchange" || pathname === "${API_PREFIX}/sessions/exchange")`;
+export const EXCHANGE_PATH_CHECK = `(pathname === "/sessions/exchange" || pathname === "${PREFIXED_EXCHANGE_PATH}")`;
 
 /** The path check of a v2 proxy, which knew only the unprefixed exchange. */
 export const V2_EXCHANGE_PATH_CHECK = 'pathname === "/sessions/exchange"';
@@ -51,7 +54,7 @@ export function assertNoUnreviewedProjectSecretProxy(source: string, label: stri
     "E_VALIDATION",
     `${label} may forward ZITADEL_PROJECT_SECRET outside POST /sessions/exchange`,
     {
-      hint: `Review the proxy manually: restrict the bearer to the exact POST /sessions/exchange or ${API_PREFIX}/sessions/exchange pathname and preserve caller-provided authorization.`,
+      hint: `Review the proxy manually: restrict the bearer to the exact POST /sessions/exchange or ${PREFIXED_EXCHANGE_PATH} pathname and preserve caller-provided authorization.`,
     },
   );
 }
@@ -67,9 +70,7 @@ const NO_OVERWRITE_TERM = '!proxyReq.getHeader("authorization")';
 const PATH_TERMS = new Set([
   normalized(V2_EXCHANGE_PATH_CHECK),
   normalized(EXCHANGE_PATH_CHECK),
-  normalized(
-    `(pathname === "${API_PREFIX}/sessions/exchange" || pathname === "/sessions/exchange")`,
-  ),
+  normalized(`(pathname === "${PREFIXED_EXCHANGE_PATH}" || pathname === "/sessions/exchange")`),
 ]);
 
 /** `condition`'s terms joined by `&&` outside any parentheses. */

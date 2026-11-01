@@ -1,3 +1,5 @@
+import { API_PREFIX } from "@zitadel/api/runtime/base-url";
+
 import type { Directory } from "./ports";
 import { NotLiveError } from "./systems";
 
@@ -11,12 +13,6 @@ import { NotLiveError } from "./systems";
 export function zitadelServer(request: Request): string {
   return process.env.CLOUD_ZITADEL_URL || new URL(request.url).origin;
 }
-
-/**
- * The prefix the server answers the API under (ADR 077). Until 1.0.0 it also
- * answers the same operations at the root, which older widgets still call.
- */
-export const API_PREFIX = "/api/v1";
 
 /**
  * Lets a call from the functions through to the server on a preview, whose

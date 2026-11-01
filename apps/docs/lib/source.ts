@@ -1,3 +1,4 @@
+import { API_PREFIX } from "@zitadel/api/runtime/base-url";
 import { renderPlaceholder } from "fumadocs-core/mdx-plugins/remark-llms.runtime";
 import type * as PageTree from "fumadocs-core/page-tree";
 import type { AdvancedIndex } from "fumadocs-core/search/server";
@@ -372,7 +373,7 @@ function operationSamples(
 // The page's cURL calls the page's own origin under the spec's server,
 // /api/v1; the Markdown's the local server the spec names, as
 // lib/sdk-sample.ts does, under the same prefix.
-const curlServer = "http://localhost:8080/api/v1";
+const curlServer = `http://localhost:8080${API_PREFIX}`;
 
 // cURL as the page generates it. An operation a project secret authenticates
 // sends it as the bearer, from the variable the TypeScript sample reads; one

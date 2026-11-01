@@ -1,4 +1,5 @@
 "use client";
+import { API_PREFIX } from "@zitadel/api/runtime/base-url";
 import { CSRF_HEADER } from "@zitadel/api/runtime/fetch";
 import type { AuthProvider } from "fumadocs-openapi/playground";
 import { ShieldCheck } from "lucide-react";
@@ -13,7 +14,7 @@ import { createContext, use, useEffect, useSyncExternalStore } from "react";
 // proxy omits credentials.
 
 /** The server the playground calls, the spec's: `/api/v1` on the page's own origin. */
-const server = "/api/v1/";
+const server = `${API_PREFIX}/`;
 
 const sessionScheme = "sessionCookie";
 

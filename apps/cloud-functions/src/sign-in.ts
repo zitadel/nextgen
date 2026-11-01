@@ -1,4 +1,6 @@
-import { API_PREFIX, passProtection, zitadelServer } from "./zitadel";
+import { API_PREFIX } from "@zitadel/api/runtime/base-url";
+
+import { passProtection, zitadelServer } from "./zitadel";
 
 /** Where the console's add-on points the sign-in widget (`signInApiBase`). */
 export const SIGN_IN_PREFIX = "/cloud/zitadel";

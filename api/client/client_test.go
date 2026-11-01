@@ -3,14 +3,35 @@ package client_test
 import (
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 
 	"github.com/zitadel/nextgen/api/client"
 	api "github.com/zitadel/nextgen/api/generated"
 )
+
+// The spec's servers URL is the contract (ADR 077), and PathPrefix what the
+// server mounts the API under and the Go clients call; @zitadel/api's
+// API_PREFIX has the same test. A change to one alone would leave the others
+// behind.
+func TestPathPrefixIsTheSpecsServerURL(t *testing.T) {
+	t.Parallel()
+	raw, err := os.ReadFile(filepath.Join("..", "openapi", "openapi-spec.yaml"))
+	require.NoError(t, err)
+	var spec struct {
+		Servers []struct {
+			URL string `yaml:"url"`
+		} `yaml:"servers"`
+	}
+	require.NoError(t, yaml.Unmarshal(raw, &spec))
+	require.NotEmpty(t, spec.Servers)
+	assert.Equal(t, spec.Servers[0].URL, client.PathPrefix)
+}
 
 func TestBaseURL(t *testing.T) {
 	t.Parallel()
