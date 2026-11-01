@@ -292,8 +292,10 @@ export function defaultHumanUserSchemaUrl(builtinSchemaBase = DEFAULT_BUILTIN_SC
 export type UserSchemaDocument = Extract<CreateSchemaBody, { kind: "user-schema" }>;
 
 /**
- * The default human user schema: a create body, plus the template's `$id`,
- * which names the schema in a file and is not part of what the server takes.
+ * The default human user schema: a create body, plus the template's `$id`, the
+ * document URI that names the schema in a file. An inline schema in a release
+ * bundle must not declare one; {@link getDefaultHumanUserSchemaBody} leaves it
+ * off.
  */
 export function getDefaultHumanUserSchema(
   options: DefaultConfigRenderOptions = {},
@@ -333,8 +335,9 @@ function assertUserSchemaDocument(
 }
 
 /**
- * The default human user schema as the create body takes it: without the
- * template's `$id`, which the server does not take.
+ * The default human user schema without the template's `$id`: as an inline
+ * schema in a release bundle must be, and as a schema created with a URI the
+ * server assigns.
  */
 export function getDefaultHumanUserSchemaBody(
   options: DefaultConfigRenderOptions = {},
