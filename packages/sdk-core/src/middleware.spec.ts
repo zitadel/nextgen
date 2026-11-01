@@ -371,7 +371,7 @@ describe("opaque session tokens", () => {
       await checkOpaqueSessionToken("tok", "http://auth.test", 1000, PROJECT);
 
       expect(fetchMock).toHaveBeenCalledWith(
-        "http://auth.test/sessions/me?project_id=proj_app",
+        "http://auth.test/api/v1/sessions/me?project_id=proj_app",
         expect.objectContaining({ headers: { cookie: "__Host-zitadel_session=tok" } }),
       );
     });
@@ -382,7 +382,7 @@ describe("opaque session tokens", () => {
       await checkOpaqueSessionToken("tok", "http://auth.test/", 1000, PROJECT);
 
       expect(fetchMock).toHaveBeenCalledWith(
-        "http://auth.test/sessions/me?project_id=proj_app",
+        "http://auth.test/api/v1/sessions/me?project_id=proj_app",
         expect.anything(),
       );
     });
@@ -488,8 +488,31 @@ describe("opaque session tokens", () => {
 
       expect(warn).toHaveBeenCalledWith(
         expect.stringContaining(
-          "http://auth.test/sessions/me (TypeError: fetch failed: connect ECONNREFUSED 127.0.0.1:4000)",
+          "http://auth.test/api/v1/sessions/me (TypeError: fetch failed: connect ECONNREFUSED 127.0.0.1:4000)",
         ),
+      );
+    });
+
+    it("says a backend without the operation is older than the SDK", async () => {
+      backend(Response.json({ code: "req.not_found" }, { status: 404 }));
+
+      expect(await checkOpaqueSessionToken("tok", "http://auth.test", 1000, PROJECT)).toEqual({
+        verdict: "undecided",
+      });
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining("does not serve the API under /api/v1"),
+      );
+    });
+
+    it("asks a backend url given with the API prefix once", async () => {
+      const fetchMock = vi.fn(async () => Response.json({ project_id: PROJECT, user_id: "u1" }));
+      vi.stubGlobal("fetch", fetchMock);
+
+      await checkOpaqueSessionToken("tok", "http://auth.test/api/v1/", 1000, PROJECT);
+
+      expect(fetchMock).toHaveBeenCalledWith(
+        `http://auth.test/api/v1/sessions/me?project_id=${PROJECT}`,
+        expect.anything(),
       );
     });
 
@@ -1023,7 +1046,7 @@ describe("proxySessionCookies", () => {
         if (init?.method === "DELETE") {
           return revoke();
         }
-        return new URL(url).pathname === "/sessions/me/csrf" ? csrf() : check();
+        return new URL(url).pathname === "/api/v1/sessions/me/csrf" ? csrf() : check();
       });
       vi.stubGlobal("fetch", fetchMock);
       return fetchMock;
@@ -1046,14 +1069,14 @@ describe("proxySessionCookies", () => {
       expect(cookies.upstreamCookie).toBe("__Host-zitadel_session=current");
       expect(setCookies).toEqual([CLEARED_OWN, CLEARED_SHARED]);
       expect(fetchMock).toHaveBeenCalledWith(
-        `http://auth.test/sessions/me?project_id=${PROJECT}`,
+        `http://auth.test/api/v1/sessions/me?project_id=${PROJECT}`,
         expect.objectContaining({
           method: "GET",
           headers: { cookie: "__Host-zitadel_session=earlier" },
         }),
       );
       expect(fetchMock).toHaveBeenCalledWith(
-        "http://auth.test/sessions/me",
+        "http://auth.test/api/v1/sessions/me",
         expect.objectContaining({
           method: "DELETE",
           headers: expect.objectContaining({ cookie: "__Host-zitadel_session=earlier" }),
@@ -1095,7 +1118,7 @@ describe("proxySessionCookies", () => {
 
       expect(fetchMock).toHaveBeenNthCalledWith(
         2,
-        `http://auth.test/sessions/me/csrf?project_id=${PROJECT}`,
+        `http://auth.test/api/v1/sessions/me/csrf?project_id=${PROJECT}`,
         expect.objectContaining({
           method: "GET",
           headers: { cookie: "__Host-zitadel_session=earlier" },
@@ -1103,7 +1126,7 @@ describe("proxySessionCookies", () => {
       );
       expect(fetchMock).toHaveBeenNthCalledWith(
         3,
-        "http://auth.test/sessions/me",
+        "http://auth.test/api/v1/sessions/me",
         expect.objectContaining({
           method: "DELETE",
           headers: { cookie: "__Host-zitadel_session=earlier", "X-Zitadel-CSRF": CSRF_TOKEN },
@@ -1149,9 +1172,9 @@ describe("proxySessionCookies", () => {
       await cookies.toBrowser(answer(204, null, [SERVER_CLEARED]));
 
       expect(fetchMock.mock.calls.map(([url, init]) => [String(url), init?.method])).toEqual([
-        [`http://auth.test/sessions/me?project_id=${PROJECT}`, "GET"],
-        [`http://auth.test/sessions/me/csrf?project_id=${PROJECT}`, "GET"],
-        ["http://auth.test/sessions/me", "DELETE"],
+        [`http://auth.test/api/v1/sessions/me?project_id=${PROJECT}`, "GET"],
+        [`http://auth.test/api/v1/sessions/me/csrf?project_id=${PROJECT}`, "GET"],
+        ["http://auth.test/api/v1/sessions/me", "DELETE"],
       ]);
     });
 
@@ -1268,7 +1291,7 @@ describe("proxySessionCookies", () => {
       expect(cookies.upstreamCookie).toBeNull();
       expect(setCookies).toEqual([CLEARED_SHARED]);
       expect(fetchMock).toHaveBeenCalledWith(
-        "http://auth.test/sessions/me",
+        "http://auth.test/api/v1/sessions/me",
         expect.objectContaining({ method: "DELETE" }),
       );
     });
@@ -1679,7 +1702,7 @@ describe("resolveSession", () => {
         cookies: [],
       });
       expect(fetchMock).toHaveBeenCalledWith(
-        `${OPTIONS.url}/sessions/me?project_id=${PROJECT}`,
+        `${OPTIONS.url}/api/v1/sessions/me?project_id=${PROJECT}`,
         expect.anything(),
       );
     });

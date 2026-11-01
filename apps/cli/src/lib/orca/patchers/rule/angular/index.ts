@@ -134,10 +134,10 @@ export class AngularPatcher extends AbstractRulePatcher {
         kind: "edit",
         path: "proxy.conf.cjs",
         edit: proxyConfApiPrefixEdit(),
-        // A v2 proxy signs users in while the app's packages call the root
-        // paths; once they call /api/v1 (ADR 077) it no longer attaches the
-        // project secret to the exchange. Until then the doctor only warns.
-        wiring: "convenience",
+        // The packages call the API under /api/v1 (ADR 077), and a v2 proxy
+        // attaches the project secret only to the exchange at the root, so
+        // sign-in fails: the doctor fails until `doctor --fix` moves it to v3.
+        wiring: "infrastructure",
         verify: proxyConfApiPrefixVerdict,
       },
       {

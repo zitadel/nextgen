@@ -15,7 +15,7 @@ vi.mock("@/auth/session", async (importOriginal) => {
   return { ...actual, fetchSession: vi.fn(async () => makeTestSession()) };
 });
 
-const TEAMS_URL = "http://localhost/api/teams/query";
+const TEAMS_URL = "http://localhost/api/v1/teams/query";
 
 /** The same locale-derived string the screen renders, rather than one locale's output. */
 function expectedDate(value: string): string {
@@ -103,8 +103,8 @@ describe("teams screen", () => {
     server.use(
       http.post(TEAMS_URL, () => HttpResponse.json({ teams: [team()] })),
       // The click opens the team's page, whose loader reads the team and its members.
-      http.get(`http://localhost/api/teams/${team().id}`, () => HttpResponse.json(team())),
-      http.post("*/api/users/query", () => HttpResponse.json({ users: [] })),
+      http.get(`http://localhost/api/v1/teams/${team().id}`, () => HttpResponse.json(team())),
+      http.post("*/api/v1/users/query", () => HttpResponse.json({ users: [] })),
     );
     const router = await renderTeams();
 
@@ -133,7 +133,7 @@ describe("teams screen", () => {
     const created: unknown[] = [];
     server.use(
       http.post(TEAMS_URL, () => HttpResponse.json({ teams: [] })),
-      http.post("http://localhost/api/teams", async ({ request }) => {
+      http.post("http://localhost/api/v1/teams", async ({ request }) => {
         created.push(await request.json());
         return HttpResponse.json(team());
       }),

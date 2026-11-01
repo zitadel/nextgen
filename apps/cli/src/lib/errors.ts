@@ -131,7 +131,7 @@ export function toZitadelError(error: unknown): ZitadelError {
           "E_NOT_FOUND",
           `${error.url} has no such endpoint on this Zitadel server`,
           {
-            hint: "The server and this CLI are different versions. Run the CLI release that matches the server, or upgrade the server.",
+            hint: "The server and this CLI are different versions; a server from before the API moved under /api/v1 answers every call so. Run the CLI release that matches the server, or upgrade the server.",
             details,
           },
         );

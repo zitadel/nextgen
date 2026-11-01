@@ -20,6 +20,13 @@ const project = configureZitadel({
 export const api = getApi(project);
 ```
 
+Every operation goes to the proxy path, or to the server URL a client is given,
+followed by `/api/v1`, where the server serves the API: `getUser` calls
+`/__nextgen/api/v1/users/{id}`. Give a server's origin, without `/api/v1`; one
+that already ends in it keeps a single prefix. A `404` with the code
+`req.not_found` means the server has no such operation: a server older than the
+client does not serve the API under `/api/v1`.
+
 Subsequent `configureZitadel()` calls with the same values return the original
 handle; different values log a warning and keep the original — safe for HMR
 and framework double-mounts. The same handle is what you pass to the shared
@@ -36,7 +43,7 @@ web components' `project` property.
 | `@zitadel/api/generated/endpoints/zitadelNextGen.zod` | Zod schemas per endpoint |
 | `@zitadel/api/generated/endpoints/zitadelNextGen.msw` | MSW handlers for tests |
 | `@zitadel/api/generated/operations` | Every operation as data: method, path, parameters, authentication, paging |
-| `@zitadel/api/runtime/base-url` | `setProxyPath()` / `getProxyPath()` — the low-level slot `configureZitadel()` writes; call it directly only when you manage configuration yourself |
+| `@zitadel/api/runtime/base-url` | `API_PREFIX` and `apiBaseUrl()`, which put `/api/v1` after a base; `setProxyPath()` / `getProxyPath()` — the low-level slot `configureZitadel()` writes; call it directly only when you manage configuration yourself |
 | `@zitadel/api/runtime/auth` | `getApiAuthToken()` and bearer plumbing; `setApiCsrfToken()` / `getApiCsrfToken()` / `setApiCsrfRejectionHandler()` for session-cookie writes (see below) |
 | `@zitadel/api/runtime/fetch` | The shared `customFetch` interceptor |
 

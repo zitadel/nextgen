@@ -7,7 +7,7 @@
 
 import type { JwtPayload } from "./jwt.js";
 
-import { API_PREFIX } from "@zitadel/api/runtime/base-url";
+import { API_PREFIX, apiBaseUrl } from "@zitadel/api/runtime/base-url";
 import { joinURL } from "ufo";
 
 import { isJwtShaped, verifyJwt } from "./jwt.js";
@@ -664,7 +664,7 @@ async function retiresSharedSession(
   let res: Response;
   try {
     res = await fetch(
-      `${joinURL(upstream.url, "/sessions/me")}?project_id=${encodeURIComponent(projectId)}`,
+      `${joinURL(apiBaseUrl(upstream.url), "/sessions/me")}?project_id=${encodeURIComponent(projectId)}`,
       {
         method: "GET",
         headers: { cookie },
@@ -714,7 +714,7 @@ async function revokeSession(
 ): Promise<void> {
   try {
     const res = await fetch(
-      `${joinURL(upstream.url, "/sessions/me/csrf")}?project_id=${encodeURIComponent(projectId)}`,
+      `${joinURL(apiBaseUrl(upstream.url), "/sessions/me/csrf")}?project_id=${encodeURIComponent(projectId)}`,
       {
         method: "GET",
         headers: { cookie },
@@ -727,7 +727,7 @@ async function revokeSession(
     if (typeof answer?.csrf_token !== "string") {
       return;
     }
-    await fetch(joinURL(upstream.url, "/sessions/me"), {
+    await fetch(joinURL(apiBaseUrl(upstream.url), "/sessions/me"), {
       method: "DELETE",
       headers: { cookie, [CSRF_HEADER]: answer.csrf_token },
       signal: AbortSignal.timeout(upstream.timeoutMs),
@@ -1037,8 +1037,11 @@ export type OpaqueSessionCheck =
 /** The code the backend answers `GET /sessions/me` with when the session is gone. */
 const SESSION_NOT_FOUND = "sess.not_found";
 
+/** The code the backend answers a path no operation of its version has with (ADR 076). */
+const ROUTE_NOT_FOUND = "req.not_found";
+
 /**
- * Asks the backend (`GET {issuerUrl}/sessions/me?project_id={projectId}`)
+ * Asks the backend (`GET {issuerUrl}/api/v1/sessions/me?project_id={projectId}`)
  * whether an opaque session token names a live session in this app's project,
  * telling a refusal apart from no verdict.
  *
@@ -1048,9 +1051,11 @@ const SESSION_NOT_FOUND = "sess.not_found";
  * project its answer names is checked as well, because a backend that predates
  * the parameter answers for any project.
  *
- * A `404` is a refusal only with the `sess.not_found` code. Without it, the
- * answer came from something in front of the backend (a proxy, a `url` with
- * the wrong path), which judged nothing.
+ * A `404` is a refusal only with the `sess.not_found` code. With
+ * `req.not_found` the backend knows no such operation: it is older than this
+ * SDK and does not serve the API under its prefix. Without a code, the answer
+ * came from something in front of the backend (a proxy, a `url` with the
+ * wrong path). Neither judged anything.
  *
  * When there is no verdict, it logs why: the request it was asked for then
  * renders signed out, or answers `503` on a protected route, and nothing else
@@ -1077,7 +1082,7 @@ export async function checkOpaqueSessionToken(
   if (otherProjectSessions.knows(key)) {
     return { verdict: "live", session: noUser() };
   }
-  const endpoint = joinURL(issuerUrl, "/sessions/me");
+  const endpoint = joinURL(apiBaseUrl(issuerUrl), "/sessions/me");
   try {
     const res = await fetch(`${endpoint}?project_id=${encodeURIComponent(projectId)}`, {
       method: "GET",
@@ -1087,8 +1092,17 @@ export async function checkOpaqueSessionToken(
     if (res.status === 401) {
       return { verdict: "refused" };
     }
-    if (res.status === 404 && (await errorCode(res)) === SESSION_NOT_FOUND) {
-      return { verdict: "refused" };
+    if (res.status === 404) {
+      const code = await errorCode(res);
+      if (code === SESSION_NOT_FOUND) {
+        return { verdict: "refused" };
+      }
+      if (code === ROUTE_NOT_FOUND) {
+        return undecided(
+          endpoint,
+          `HTTP 404 ${ROUTE_NOT_FOUND}: the server has no such operation; a server older than this SDK does not serve the API under ${API_PREFIX}`,
+        );
+      }
     }
     if (res.status === 403 && (await errorCode(res)) === SESSION_PROJECT_MISMATCH) {
       otherProjectSessions.remember(key);
@@ -1166,7 +1180,7 @@ export function clearSessionCheckCache(): void {
 
 /**
  * Validates an opaque session token by asking the backend
- * (`GET {issuerUrl}/sessions/me?project_id={projectId}`) whether the session is
+ * (`GET {issuerUrl}/api/v1/sessions/me?project_id={projectId}`) whether the session is
  * live in this app's project.
  *
  * `null` folds a refusal and no verdict together, so it says whether the

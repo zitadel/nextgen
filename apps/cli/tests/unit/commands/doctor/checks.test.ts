@@ -1171,9 +1171,9 @@ describe("ManagedFilesCheck", () => {
     expect((await check.run(ctxFor(cwd))).status).toBe("pass");
   });
 
-  // A v2 proxy signs users in while the app's packages call the root paths;
-  // once they call /api/v1 (ADR 077) it no longer attaches the project secret.
-  it("warns while the managed proxy knows only the bare exchange, and --fix moves it to both paths", async () => {
+  // The packages call /api/v1 (ADR 077), and a v2 proxy attaches the project
+  // secret only to the exchange at the root: sign-in fails.
+  it("fails while the managed proxy knows only the bare exchange, and --fix moves it to both paths", async () => {
     const cwd = await makeAngularProject();
     const proxyPath = join(cwd, "proxy.conf.cjs");
     const v2 = proxyConfTemplate()
@@ -1187,10 +1187,8 @@ describe("ManagedFilesCheck", () => {
     const check = new ManagedFilesCheck();
 
     const outcome = await check.run(ctxFor(cwd));
-    expect(outcome.status).toBe("warn");
-    expect(outcome.message).toContain(
-      "unapplied managed config edit(s): proxy.conf.cjs (doctor --fix applies them)",
-    );
+    expect(outcome.status).toBe("fail");
+    expect(outcome.message).toContain("detached managed config wiring: proxy.conf.cjs");
 
     await check.fix(ctxFor(cwd));
 
