@@ -1,7 +1,10 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { DEFAULT_SCHEMA_CONFIG_PATH, getDefaultHumanUserSchemaBody } from "@zitadel/config/defaults";
+import {
+  DEFAULT_SCHEMA_CONFIG_PATH,
+  getDefaultHumanUserSchemaBody,
+} from "@zitadel/config/defaults";
 import { http } from "msw";
 import { describe, expect, it } from "vitest";
 
