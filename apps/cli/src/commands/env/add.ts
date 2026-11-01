@@ -257,13 +257,14 @@ export default class EnvAdd extends Promptable(BaseCommand) {
       consola.info(
         "Nothing is deployed to this environment yet, so it serves the server's default schema and login flow rather than your .zitadel/ files.",
       );
-      const confirmed = await this.input({
-        kind: "yes-no",
-        name: "deploy .zitadel/ to the new environment",
-        message: "Would you like to deploy .zitadel/ to it now?",
-        initialValue: true,
-      });
-      if (confirmed) {
+      if (
+        await this.input({
+          kind: "yes-no",
+          name: "deploy .zitadel/ to the new environment",
+          message: "Would you like to deploy .zitadel/ to it now?",
+          initialValue: true,
+        })
+      ) {
         deployment = await this.deployInitialRelease({
           cwd,
           server,

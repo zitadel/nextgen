@@ -24,7 +24,6 @@ import {
   CommandGroups,
   type JsonEnvelope,
   nonBlankString,
-  type Permit,
 } from "../../../lib/oclif";
 import { optionArgs } from "../../../lib/public-cli";
 
@@ -96,28 +95,26 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
       ...changedFlows.map(({ file }) => file.path),
     ];
 
-    let permit: Permit = "keeps-a-method";
     if (changed.length > 0) {
       // Before the last-method guard: these refusals have no override, so
       // nobody should be asked to confirm a change that fails anyway.
       refuseBrokenFlows(schema, after, flowChanges);
-      const granted = await this.lastMethodPermit({
-        schema,
-        after,
-        disabling: provider,
-        retryArgs: [
-          "auth-method",
-          "sso",
-          "disable",
-          ...optionArgs("--provider", provider),
-          ...optionArgs("--schema", schema.name),
-        ],
-        cwdArgs,
-      });
-      if (granted === undefined) {
-        return this.emit({ status: "skipped", reason: "disable-cancelled" });
-      }
-      permit = granted;
+    }
+    const permit = await this.lastMethodPermit({
+      schema,
+      after,
+      disabling: provider,
+      retryArgs: [
+        "auth-method",
+        "sso",
+        "disable",
+        ...optionArgs("--provider", provider),
+        ...optionArgs("--schema", schema.name),
+      ],
+      cwdArgs,
+    });
+    if (permit === undefined) {
+      return this.emit({ status: "skipped", reason: "disable-cancelled" });
     }
 
     // When only a flow still offered the provider, say so: the schema itself

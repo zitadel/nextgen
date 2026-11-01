@@ -30,10 +30,10 @@ import { Consent } from "../consent";
 
 /**
  * What lets a schema change be written: consent when it removes the last way
- * to sign in, `keeps-a-method` when it does not, and `dry-run`, which writes
- * nothing. {@link AuthMethodCommand.writeSchema} checks the claim.
+ * to sign in, `not-the-last-method` when it does not, and `dry-run`, which
+ * writes nothing. {@link AuthMethodCommand.writeSchema} checks the claim.
  */
-export type Permit = Consent | "keeps-a-method" | "dry-run";
+export type Permit = Consent | "not-the-last-method" | "dry-run";
 
 /** The message `deploy` needs, which only the caller can write. */
 const DEPLOY_MESSAGE = "<what changed>";
@@ -114,7 +114,8 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
    * The last-method guard (ADR 070 §3). Returns what lets {@link writeSchema}
    * write the change: consent when it removes the last way to sign in, or
    * `undefined` when the user declined, which ends the run as skipped. It
-   * refuses without `--force` when nobody can be asked.
+   * refuses without `--force` when nobody can be asked. A change that leaves
+   * a way to sign in, or changes nothing, is never asked about.
    *
    * A dry run answers before the guard, as it does `variable rm`'s: it
    * changes nothing, so there is nothing to confirm, and {@link reportOutcome}
@@ -137,7 +138,7 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
       return "dry-run";
     }
     if (!removesLastMethod(input.schema.body, input.after)) {
-      return "keeps-a-method";
+      return "not-the-last-method";
     }
     const retryArgs = [...input.retryArgs, ...input.cwdArgs, "--force"];
     return this.consent({
@@ -267,7 +268,6 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
 
     refuseUneditable(schema.path, malformedAuthMethods(schema.body, method));
     const change = setMethodEnabled(schema.body, method, enabled);
-    let permit: Permit = "keeps-a-method";
     if (change.changed) {
       if (enabled) {
         refuseMissingIdentifier(schema, method);
@@ -289,17 +289,16 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
                 "Login flows are not edited for you.",
             },
       );
-      const granted = await this.lastMethodPermit({
-        schema,
-        after: change.document,
-        disabling: method,
-        retryArgs: ["auth-method", method, "disable", ...optionArgs("--schema", schema.name)],
-        cwdArgs,
-      });
-      if (granted === undefined) {
-        return this.emit({ status: "skipped", reason: "disable-cancelled" });
-      }
-      permit = granted;
+    }
+    const permit = await this.lastMethodPermit({
+      schema,
+      after: change.document,
+      disabling: method,
+      retryArgs: ["auth-method", method, "disable", ...optionArgs("--schema", schema.name)],
+      cwdArgs,
+    });
+    if (permit === undefined) {
+      return this.emit({ status: "skipped", reason: "disable-cancelled" });
     }
 
     const flowsAfter = flows.map((file) => file.body);

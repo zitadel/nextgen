@@ -49,12 +49,14 @@ export default class PreviewRm extends Destructive(PreviewCommand) {
         },
         prepare: async () => {
           const connection = await this.connect();
-          const { client, projectId } = connection;
           // The server answers 204 whether or not the URL was live, so a typo
           // would otherwise read as a removal. Checked before asking, so
           // nobody confirms removing what is not there.
-          const previews = await client.listPreviews.all(projectId);
-          if (!previews.some((preview) => preview.origin === url)) {
+          if (
+            !(await connection.client.listPreviews.all(connection.projectId)).some(
+              (preview) => preview.origin === url,
+            )
+          ) {
             return new Settled({
               status: "skipped",
               reason: "not-live",

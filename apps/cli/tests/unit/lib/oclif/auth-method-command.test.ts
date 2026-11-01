@@ -296,7 +296,7 @@ describe("auth-method schema write", () => {
     const cwd = await passkeyOnlyProject();
     const { writer, schema, after } = await lastMethodWrite(cwd);
 
-    await expect(writer.write(cwd, schema, after, "keeps-a-method")).rejects.toThrow(
+    await expect(writer.write(cwd, schema, after, "not-the-last-method")).rejects.toThrow(
       "A destructive operation ran without consent",
     );
   });
@@ -305,7 +305,7 @@ describe("auth-method schema write", () => {
     const cwd = await passkeyOnlyProject();
     const { writer, schema, after } = await lastMethodWrite(cwd);
 
-    await writer.write(cwd, schema, after, "keeps-a-method").catch(() => undefined);
+    await writer.write(cwd, schema, after, "not-the-last-method").catch(() => undefined);
 
     expect(await methodOf(cwd, "passkey")).toEqual({ enabled: true });
   });
