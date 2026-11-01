@@ -1,4 +1,10 @@
-import type { GetReleaseById200 } from "@zitadel/api/generated/model";
+import {
+  type GetReleaseById200,
+  ListEventsCategoryItem,
+  ListFlowDefinitionsRevisions,
+  ListSchemasRevisions,
+  QueryUsersBodyFilterItemOperation,
+} from "@zitadel/api/generated/model";
 import {
   CreateGrantBody,
   CreateTeamBody,
@@ -104,31 +110,58 @@ type FieldsOf<T> = { [K in keyof T]: unknown };
 // identifier answers 202).
 type Written<Id extends string> = Readonly<Record<Id, unknown>> | Exclude<WriteResult, Json>;
 
-// The fields a structured query's body filters and sorts by: the enums of its
-// `filter[].field` and `sorting.field`.
-type BodyFilterField<B> = B extends { filter?: readonly (infer F)[] | null }
-  ? F extends { field: infer N }
-    ? N & string
-    : never
-  : never;
+// What a structured query's body filters and sorts by: the enums of its
+// `filter[].field`, `filter[].operation` and `sorting.field`.
+type BodyFilter<B> = B extends { filter?: readonly (infer F)[] | null } ? F : never;
+type BodyFilterField<B> = BodyFilter<B> extends { field: infer N } ? N & string : never;
+type BodyFilterOperation<B> = BodyFilter<B> extends { operation: infer O } ? O & string : never;
 type BodySortField<B> = B extends { sorting?: infer S }
   ? NonNullable<S> extends { field: infer N }
     ? N & string
     : never
   : never;
 
-// A filter checked against what its list sends: a structured query's `field`
-// is one its body filters by; a `GET` list's is a query parameter, or, for a
-// field sent as one parameter per operation (a range), `params` names them.
-type ListFilter<B> = "filter" extends keyof B
-  ? FilterField & { readonly field: BodyFilterField<B> }
-  :
-      | (FilterField & { readonly field: keyof B & string; readonly params?: undefined })
-      | (FilterField & { readonly params: Readonly<Record<string, keyof B & string>> });
+// A structured query's filter: a field and operations its body takes. The body
+// carries every value as one free-form scalar, so `values` and `default` are
+// plain strings.
+type QueryFilter<B> = FilterField & {
+  readonly field: BodyFilterField<B>;
+  readonly operations: readonly BodyFilterOperation<B>[];
+};
 
-// A structured query sorts by a field its body names; a `GET` list orders by one
-// implicit field, so its sort is only a name, and `sortParam` the parameter.
-type ListSort<B> = "sorting" extends keyof B ? BodySortField<B> : string;
+// What a `GET` query parameter takes: one entry of it, when it repeats.
+type ParamValue<V> = NonNullable<V> extends readonly (infer E)[] ? E : NonNullable<V>;
+
+// A `GET` list's filter: a query parameter, whose `values` and `default` are of
+// the type it takes; or, for a field sent as one parameter per operation (a
+// range), the parameters `params` names.
+type GetFilter<B> =
+  | {
+      [K in keyof B & string]: FilterField & {
+        readonly field: K;
+        readonly params?: undefined;
+        readonly values?: readonly (ParamValue<B[K]> & string)[];
+        readonly default?: ParamValue<B[K]> & string;
+      };
+    }[keyof B & string]
+  | (FilterField & { readonly params: Readonly<Record<string, keyof B & string>> });
+
+// A list's filters and sorts, checked against the request it sends. A list with
+// a `body` is a structured query, sorted by a field the body names. A `GET` list
+// orders by one implicit field, so its sort is only a name, and `sortParam` the
+// parameter carrying the direction.
+type QueryList<B> = Readonly<{
+  body: Schema<B>;
+  filters?: readonly NoInfer<QueryFilter<B>>[];
+  sorts?: readonly NoInfer<BodySortField<B>>[];
+  sortParam?: undefined;
+}>;
+type GetList<B> = Readonly<{
+  body?: undefined;
+  filters?: readonly NoInfer<GetFilter<B>>[];
+  sorts?: readonly string[];
+  sortParam?: NoInfer<keyof B & string>;
+}>;
 
 /** What a `GET` list's call takes: the client function's query, less what the platform fills. */
 type Query<K extends keyof ZitadelClient> = Omit<
@@ -142,12 +175,7 @@ type Query<K extends keyof ZitadelClient> = Omit<
 // no body, so its request stays `Json`. `items` comes after `call`, so the page
 // is known when `items` is read.
 export const list = <B = Json, P = unknown, T = unknown, S extends FieldsOf<T> = FieldsOf<T>>(
-  spec: ListSpec<Platform, B, P, T> & {
-    item?: Schema<S>;
-    filters?: readonly NoInfer<ListFilter<B>>[];
-    sorts?: readonly NoInfer<ListSort<B>>[];
-    sortParam?: NoInfer<keyof B & string>;
-  },
+  spec: ListSpec<Platform, B, P, T> & { item?: Schema<S> } & (QueryList<B> | GetList<B>),
 ): NoInfer<ListSpec<Platform, B, P, T>> => spec;
 
 // Infers the record `get` answers with, so `sections` reads it typed.
@@ -188,19 +216,12 @@ export const resource = <
   [checked]: true,
 });
 
-/** Filter operations of `POST /<resource>/query` endpoints (ADR 031). */
-const FILTER_OPERATIONS = [
-  "equals",
-  "not_equals",
-  "contains",
-  "not_contains",
-  "less_than",
-  "less_than_or_equal",
-  "greater_than",
-  "greater_than_or_equal",
-] as const;
-
-const EVENT_CATEGORIES = ["request", "auth", "session", "admin", "entity", "signal"] as const;
+/**
+ * Filter operations of `POST /<resource>/query` endpoints (ADR 031), as the API
+ * spells them. Every query offers the same set; `list` checks each against the
+ * operations its own body takes.
+ */
+const FILTER_OPERATIONS = Object.values(QueryUsersBodyFilterItemOperation);
 
 /** A release's pointers as an indented table, one pinned revision per row. */
 export const releasePointers = (release: Pick<GetReleaseById200, "pointers">): string => {
@@ -352,7 +373,7 @@ export const RESOURCES = {
         {
           field: "category",
           operations: ["equals"],
-          values: EVENT_CATEGORIES,
+          values: Object.values(ListEventsCategoryItem),
           combine: "or",
         },
         { field: "event_type", operations: ["equals"], combine: "or" },
@@ -511,12 +532,12 @@ export const RESOURCES = {
         {
           field: "revisions",
           operations: ["equals"],
-          values: ["all", "latest"],
+          values: Object.values(ListSchemasRevisions),
           // Editing a schema mints a new revision rather than changing the old
           // one, so the unfiltered list is a history: the same object type over
           // and over. Someone typing `schemas list` means "what schemas do I
           // have", which is one row each. The console made the same choice.
-          default: "latest",
+          default: ListSchemasRevisions.latest,
         },
       ],
       call: ({ client, projectId }: Platform, params: Query<"listSchemas">) =>
@@ -606,11 +627,11 @@ export const RESOURCES = {
         {
           field: "revisions",
           operations: ["equals"],
-          values: ["all", "latest"],
+          values: Object.values(ListFlowDefinitionsRevisions),
           // Publishing under an existing name mints a new row (#1246), so the
           // unfiltered list is a history of the same flows. Same reasoning as
           // `schemas`: a bare list is the current flows.
-          default: "latest",
+          default: ListFlowDefinitionsRevisions.latest,
         },
       ],
       call: ({ client, projectId }: Platform, params: Query<"listFlowDefinitions">) =>

@@ -4,6 +4,8 @@ import { join } from "node:path";
 
 import type {
   GetReleaseById200,
+  ListEvents200,
+  ListEventsParams,
   ListSchemas200,
   ListSchemasParams,
   QueryUsers200,
@@ -2136,9 +2138,9 @@ describe("the registry builders", () => {
   });
 
   it("refuses a sort field the query body does not sort by", () => {
+    // @ts-expect-error a user query sorts by `created_at`, not `created`
     list({
       body: QueryUsersBody,
-      // @ts-expect-error a user query sorts by `created_at`, not `created`
       sorts: ["created"],
       call: ({ client }, body) => client.queryUsers(body),
       items: (page: QueryUsers200) => page.users,
@@ -2147,8 +2149,8 @@ describe("the registry builders", () => {
   });
 
   it("refuses a filter that is no query parameter of a GET list", () => {
+    // @ts-expect-error schemas are listed by `object_type`, not `objectType`
     list({
-      // @ts-expect-error schemas are listed by `object_type`, not `objectType`
       filters: [{ field: "objectType", operations: ["equals"] }],
       call: ({ client, projectId }: Platform, params: Omit<ListSchemasParams, "project_id">) =>
         client.listSchemas({ ...params, project_id: projectId }),
@@ -2167,6 +2169,68 @@ describe("the registry builders", () => {
       items: (page: ListSchemas200) => page.schemas,
       next: (page: ListSchemas200) => page.next_page_token,
     });
+  });
+
+  it("refuses an operation the query body does not take", () => {
+    list({
+      body: QueryUsersBody,
+      // @ts-expect-error a user query takes no `starts_with` operation
+      filters: [{ field: "status", operations: ["starts_with"] }],
+      call: ({ client }, body) => client.queryUsers(body),
+      items: (page: QueryUsers200) => page.users,
+      next: (page: QueryUsers200) => page.next_page_token,
+    });
+  });
+
+  it("refuses a value a GET parameter does not take", () => {
+    // @ts-expect-error schemas list `all` or `latest` revisions, not `newest`
+    list({
+      filters: [{ field: "revisions", operations: ["equals"], values: ["all", "newest"] }],
+      call: ({ client, projectId }: Platform, params: Omit<ListSchemasParams, "project_id">) =>
+        client.listSchemas({ ...params, project_id: projectId }),
+      items: (page: ListSchemas200) => page.schemas,
+      next: (page: ListSchemas200) => page.next_page_token,
+    });
+  });
+
+  it("refuses a default a GET parameter does not take", () => {
+    // @ts-expect-error schemas list `all` or `latest` revisions, not `newest`
+    list({
+      filters: [{ field: "revisions", operations: ["equals"], default: "newest" }],
+      call: ({ client, projectId }: Platform, params: Omit<ListSchemasParams, "project_id">) =>
+        client.listSchemas({ ...params, project_id: projectId }),
+      items: (page: ListSchemas200) => page.schemas,
+      next: (page: ListSchemas200) => page.next_page_token,
+    });
+  });
+
+  it("refuses a range parameter a GET list does not take", () => {
+    // @ts-expect-error events take `created_after`, not `created_afer`
+    list({
+      filters: [
+        {
+          field: "created_at",
+          operations: ["greater_than_or_equal"],
+          params: { greater_than_or_equal: "created_afer" },
+        },
+      ],
+      call: ({ client, projectId }: Platform, params: Omit<ListEventsParams, "project_id">) =>
+        client.listEvents({ ...params, project_id: projectId }),
+      items: (page: ListEvents200) => page.data,
+      next: (page: ListEvents200) => page.next_page_token,
+    });
+  });
+
+  it("checks a GET list by its parameters even when one is called filter", () => {
+    const filtered = list({
+      filters: [{ field: "filter", operations: ["equals"] }],
+      call: ({ client, projectId }: Platform, _params: { filter?: string }) =>
+        client.listSchemas({ project_id: projectId }),
+      items: (page) => page.schemas,
+      next: (page) => page.next_page_token,
+    });
+
+    expect(filtered.filters?.[0]?.field).toBe("filter");
   });
 
   it("refuses an item schema of another operation", () => {
