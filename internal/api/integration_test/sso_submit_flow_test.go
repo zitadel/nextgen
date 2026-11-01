@@ -44,7 +44,6 @@ func TestFlowSSOSubmitRedirectsToProvider(t *testing.T) {
 	require.NoError(t, err)
 	require.IsType(t, &api.VariablesByKind{}, varsResp, helpers.MustMarshal(t, varsResp))
 	// A deployment freezes the variables, so these need one of their own.
-	deployPrimary(t, f.project.ID)
 
 	defResp, err := f.client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID:      f.projectID(),
@@ -53,6 +52,7 @@ func TestFlowSSOSubmitRedirectsToProvider(t *testing.T) {
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowDefinitionResponse{}, defResp, "create flow definition: %s", helpers.MustMarshal(t, defResp))
 
+	deployPrimary(t, string(f.projectID()))
 	createResp, err := f.client.CreateFlow(t.Context(), &api.CreateFlowRequest{
 		ProjectID: f.projectID(),
 		Purpose:   api.CreateFlowRequestPurposeLogin,

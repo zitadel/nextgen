@@ -763,7 +763,7 @@ func TestFlowStateMachine_Process_UndeclaredActionRefusedBeforeIdentifierLookup(
 				Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
 				AnyTimes()
 			w.ssoProviders.EXPECT().
-				Resolve(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+				Resolve(gomock.Any(), gomock.Any(), gomock.Any()).
 				Return([]domain.FlowSSOProvider{{ID: "google", Name: "Google"}}, nil).
 				AnyTimes()
 			w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
@@ -798,7 +798,7 @@ func startSSOStepFlow(t *testing.T, w *flowTestWorld, def *domain.FlowDefinition
 		AnyTimes()
 	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
 	w.ssoProviders.EXPECT().
-		Resolve(gomock.Any(), testProjectID, "credentials", []string{"google", "github"}).
+		Resolve(gomock.Any(), testProjectID, []string{"google", "github"}).
 		Return([]domain.FlowSSOProvider{{ID: "google", Name: "Google"}, {ID: "github", Name: "GitHub"}}, nil)
 
 	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
@@ -923,7 +923,7 @@ func TestFlowStateMachine_Process_SSO_ProviderUnavailableReRendersStep(t *testin
 	w.ssoRedirects.EXPECT().Issue(gomock.Any(), gomock.Any()).
 		Return(domain.FlowSSORedirectOutput{}, domain.ErrFlowSSOUnavailable(errors.New("discovery timed out")))
 	w.ssoProviders.EXPECT().
-		Resolve(gomock.Any(), testProjectID, "credentials", []string{"google", "github"}).
+		Resolve(gomock.Any(), testProjectID, []string{"google", "github"}).
 		Return([]domain.FlowSSOProvider{{ID: "google", Name: "Google"}, {ID: "github", Name: "GitHub"}}, nil)
 
 	result, err := w.sm.Process(t.Context(), def, state, domain.FlowSubmitInput{
@@ -1003,7 +1003,7 @@ func TestFlowStateMachine_Start_RendersSSOProvidersInStepOrder(t *testing.T) {
 	google := domain.FlowSSOProvider{ID: "google", Name: "Google", Template: "google"}
 	github := domain.FlowSSOProvider{ID: "github", Name: "GitHub", Template: "github"}
 	w.ssoProviders.EXPECT().
-		Resolve(gomock.Any(), testProjectID, "credentials", []string{"google", "github"}).
+		Resolve(gomock.Any(), testProjectID, []string{"google", "github"}).
 		Return([]domain.FlowSSOProvider{google, github}, nil)
 
 	result, err := w.sm.Start(t.Context(), domain.FlowStartInput{
@@ -1027,7 +1027,7 @@ func TestFlowStateMachine_Start_AsksForTheSSODescriptionOnAStepOfferingProviders
 		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil)
 	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
 	w.ssoProviders.EXPECT().
-		Resolve(gomock.Any(), testProjectID, "credentials", []string{"google", "github"}).
+		Resolve(gomock.Any(), testProjectID, []string{"google", "github"}).
 		Return([]domain.FlowSSOProvider{{ID: "google", Name: "Google", Template: "google"}}, nil)
 
 	result, err := w.sm.Start(t.Context(), domain.FlowStartInput{
@@ -1051,7 +1051,7 @@ func TestFlowStateMachine_Start_KeepsThePlainDescriptionWhenNoListedProviderReso
 		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil)
 	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
 	w.ssoProviders.EXPECT().
-		Resolve(gomock.Any(), testProjectID, "credentials", []string{"google", "github"}).
+		Resolve(gomock.Any(), testProjectID, []string{"google", "github"}).
 		Return(nil, nil)
 
 	result, err := w.sm.Start(t.Context(), domain.FlowStartInput{
@@ -1098,10 +1098,10 @@ func TestFlowStateMachine_Process_ReRenderResolvesSSOProvidersAgain(t *testing.T
 	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
 	gomock.InOrder(
 		w.ssoProviders.EXPECT().
-			Resolve(gomock.Any(), testProjectID, "credentials", []string{"google", "github"}).
+			Resolve(gomock.Any(), testProjectID, []string{"google", "github"}).
 			Return([]domain.FlowSSOProvider{{ID: "google", Name: "Google", Template: "google"}}, nil),
 		w.ssoProviders.EXPECT().
-			Resolve(gomock.Any(), testProjectID, "credentials", []string{"google", "github"}).
+			Resolve(gomock.Any(), testProjectID, []string{"google", "github"}).
 			Return([]domain.FlowSSOProvider{{ID: "google", Name: "Google Workspace", Template: "google"}}, nil),
 	)
 
@@ -1133,7 +1133,7 @@ func TestFlowStateMachine_Start_SSOProviderResolverErrorFailsRender(t *testing.T
 		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil)
 	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil)
 	w.ssoProviders.EXPECT().
-		Resolve(gomock.Any(), testProjectID, "credentials", []string{"google", "github"}).
+		Resolve(gomock.Any(), testProjectID, []string{"google", "github"}).
 		Return(nil, errors.New("connection store unavailable"))
 
 	_, err := w.sm.Start(t.Context(), domain.FlowStartInput{
@@ -5089,7 +5089,7 @@ func ssoRenderWorldWithSchema(t *testing.T, schema string) (*flowTestWorld, *dom
 		Return(mustUnmarshal[jsonschema.Schema](t, schema), nil).
 		AnyTimes()
 	w.ssoProviders.EXPECT().
-		Resolve(gomock.Any(), testProjectID, "credentials", gomock.Any()).
+		Resolve(gomock.Any(), testProjectID, []string{"google", "github"}).
 		Return([]domain.FlowSSOProvider{{ID: "google", Name: "Google"}}, nil).
 		AnyTimes()
 	state := &domain.FlowState{

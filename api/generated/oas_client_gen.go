@@ -58,8 +58,8 @@ type Invoker interface {
 	// project's newest revision of the same handle: unchanged content reuses
 	// that revision, changed content allocates a new one, and the request
 	// answers `201` with the new release. A policy whose config matches only an
-	// older revision allocates a new one too, so a request that resolves no
-	// release, which reads the newest revision, applies it as well. Metadata is excluded from the
+	// older revision allocates a new one too, so the policy reads back as the
+	// config the build carried. Metadata is excluded from the
 	// comparison, so the same content under a different `message` is the same
 	// release.
 	// A structurally malformed request is refused while decoding with
@@ -98,10 +98,10 @@ type Invoker interface {
 	// Accepts a project_id and challenge_nonce (from POST /bootstrap/challenge). For step-up re-auth,
 	// also include session_id and that session's session_token to add factors to an existing session.
 	// The project comes from the project secret. A body `project_id` that disagrees
-	// answers `403` with `proj.mismatch`. Sealed `deployment_id` / `release_id` are
-	// filled only when create runs with a runtime resolution already on the
-	// context (the flow create path); this HTTP entry point does not resolve
-	// Origin or refuse a revoked release itself.
+	// answers `403` with `proj.mismatch`. The attempt seals the project's newest
+	// primary deployment, whatever the caller's `Origin`. With none it answers
+	// `409` with `rel.no_default`, and a revoked release answers `409` with
+	// `rel.revoked`.
 	//
 	// POST /auth_attempts
 	CreateAuthAttempt(ctx context.Context, request *CreateAuthAttemptRequest) (CreateAuthAttemptRes, error)
@@ -109,7 +109,8 @@ type Invoker interface {
 	//
 	// Publishes a new immutable branding revision for the project. Branding
 	// revisions cannot be updated or deleted; every edit publishes a new
-	// revision, and flow responses resolve the latest revision per project.
+	// revision, and flow responses carry the revision the request's release
+	// pins.
 	// The `liquid_template` is validated lexically on save (size, encoding,
 	// banned patterns such as `<script>` tags, inline event handlers, and the
 	// `| raw` filter). Authoritative LiquidJS validation runs at authoring
@@ -634,8 +635,7 @@ type Invoker interface {
 	GetMyUserSchema(ctx context.Context, params GetMyUserSchemaParams) (GetMyUserSchemaRes, error)
 	// GetPolicy invokes getPolicy operation.
 	//
-	// Reads a policy as its newest revision, the one that applies the next time
-	// its operation runs.
+	// Reads a policy as its newest revision.
 	// The lookup is scoped to the project in `project_id`: a policy of another
 	// project answers not found exactly as an unknown id does.
 	//
@@ -996,10 +996,9 @@ type Invoker interface {
 	// PublishPolicy invokes publishPolicy operation.
 	//
 	// Publishes the project's policy for an operation as a new immutable
-	// revision, creating the policy on its first publish. The newest revision
-	// applies to the next time the operation runs; nothing already stored is
-	// re-evaluated, so a stricter password policy applies the next time a
-	// password is set.
+	// revision, creating the policy on its first publish. A revision applies
+	// once a deployed release pins it; nothing already stored is re-evaluated,
+	// so a stricter password policy applies the next time a password is set.
 	// The request is typed by `operation`: an unknown operation or setting, or
 	// a value of the wrong type or outside its bounds, answers `req.invalid`
 	// like any malformed request. The operation's template then checks the
@@ -1169,6 +1168,9 @@ type Invoker interface {
 	// policy.
 	// The new password replaces the current one, and setting it emits
 	// `auth.factor.password.set`.
+	// The password policy is the one in the project's newest primary deployment,
+	// whatever the caller's `Origin`. With none the call answers `409` with
+	// `rel.no_default`, and a revoked release answers `409` with `rel.revoked`.
 	//
 	// PUT /users/{user_id}/password
 	SetUserPassword(ctx context.Context, request *SetUserPasswordRequest, params SetUserPasswordParams) (SetUserPasswordRes, error)
@@ -1612,8 +1614,8 @@ func (c *Client) sendBeginUserPasskeyRegistration(ctx context.Context, request *
 // project's newest revision of the same handle: unchanged content reuses
 // that revision, changed content allocates a new one, and the request
 // answers `201` with the new release. A policy whose config matches only an
-// older revision allocates a new one too, so a request that resolves no
-// release, which reads the newest revision, applies it as well. Metadata is excluded from the
+// older revision allocates a new one too, so the policy reads back as the
+// config the build carried. Metadata is excluded from the
 // comparison, so the same content under a different `message` is the same
 // release.
 // A structurally malformed request is refused while decoding with
@@ -1921,10 +1923,10 @@ func (c *Client) sendCompleteClaim(ctx context.Context, request *CompleteClaimRe
 // Accepts a project_id and challenge_nonce (from POST /bootstrap/challenge). For step-up re-auth,
 // also include session_id and that session's session_token to add factors to an existing session.
 // The project comes from the project secret. A body `project_id` that disagrees
-// answers `403` with `proj.mismatch`. Sealed `deployment_id` / `release_id` are
-// filled only when create runs with a runtime resolution already on the
-// context (the flow create path); this HTTP entry point does not resolve
-// Origin or refuse a revoked release itself.
+// answers `403` with `proj.mismatch`. The attempt seals the project's newest
+// primary deployment, whatever the caller's `Origin`. With none it answers
+// `409` with `rel.no_default`, and a revoked release answers `409` with
+// `rel.revoked`.
 //
 // POST /auth_attempts
 func (c *Client) CreateAuthAttempt(ctx context.Context, request *CreateAuthAttemptRequest) (CreateAuthAttemptRes, error) {
@@ -2045,7 +2047,8 @@ func (c *Client) sendCreateAuthAttempt(ctx context.Context, request *CreateAuthA
 //
 // Publishes a new immutable branding revision for the project. Branding
 // revisions cannot be updated or deleted; every edit publishes a new
-// revision, and flow responses resolve the latest revision per project.
+// revision, and flow responses carry the revision the request's release
+// pins.
 // The `liquid_template` is validated lexically on save (size, encoding,
 // banned patterns such as `<script>` tags, inline event handlers, and the
 // `| raw` filter). Authoritative LiquidJS validation runs at authoring
@@ -7628,8 +7631,7 @@ func (c *Client) sendGetMyUserSchema(ctx context.Context, params GetMyUserSchema
 
 // GetPolicy invokes getPolicy operation.
 //
-// Reads a policy as its newest revision, the one that applies the next time
-// its operation runs.
+// Reads a policy as its newest revision.
 // The lookup is scoped to the project in `project_id`: a policy of another
 // project answers not found exactly as an unknown id does.
 //
@@ -14004,10 +14006,9 @@ func (c *Client) sendPatchUserByID(ctx context.Context, request *PatchUserReques
 // PublishPolicy invokes publishPolicy operation.
 //
 // Publishes the project's policy for an operation as a new immutable
-// revision, creating the policy on its first publish. The newest revision
-// applies to the next time the operation runs; nothing already stored is
-// re-evaluated, so a stricter password policy applies the next time a
-// password is set.
+// revision, creating the policy on its first publish. A revision applies
+// once a deployed release pins it; nothing already stored is re-evaluated,
+// so a stricter password policy applies the next time a password is set.
 // The request is typed by `operation`: an unknown operation or setting, or
 // a value of the wrong type or outside its bounds, answers `req.invalid`
 // like any malformed request. The operation's template then checks the
@@ -15999,6 +16000,9 @@ func (c *Client) sendRollbackDeployment(ctx context.Context, request OptRollback
 // policy.
 // The new password replaces the current one, and setting it emits
 // `auth.factor.password.set`.
+// The password policy is the one in the project's newest primary deployment,
+// whatever the caller's `Origin`. With none the call answers `409` with
+// `rel.no_default`, and a revoked release answers `409` with `rel.revoked`.
 //
 // PUT /users/{user_id}/password
 func (c *Client) SetUserPassword(ctx context.Context, request *SetUserPasswordRequest, params SetUserPasswordParams) (SetUserPasswordRes, error) {

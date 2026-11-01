@@ -134,7 +134,7 @@ npx @zitadel/cli@latest deploy --dry-run
 npx @zitadel/cli@latest deploy
 ```
 
-`deploy --dry-run` validates the descriptor and the template (LiquidJS parse, banned patterns, required tags) and shows the diff; `deploy` publishes it as part of the release. Every publish creates an immutable revision — there is no in-place update, and rolling back means deploying an earlier release. The live login picks up the newest revision on its next step response.
+`deploy --dry-run` validates the descriptor and the template (LiquidJS parse, banned patterns, required tags) and shows the diff; `deploy` publishes it as part of the release. Every publish creates an immutable revision — there is no in-place update, and rolling back means deploying an earlier release. The live login picks up a revision on its next step response once its release is deployed.
 
 The scaffolded `README.md` in `.zitadel/branding/` documents the template rules (compose `zl-*` components, no `<script>` or `<style>` tags or inline event handlers, copy through translation keys).
 

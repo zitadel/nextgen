@@ -74,6 +74,7 @@ var submitFlowStepCodes = []string{
 	string(api.ProjOriginNotAllowedSubmitFlowStepErrorResponse),
 	string(api.ProjPreviewNotLiveSubmitFlowStepErrorResponse),
 	string(api.RelNotFoundSubmitFlowStepErrorResponse),
+	string(api.RelNotDeployedSubmitFlowStepErrorResponse),
 	string(api.RelRevokedSubmitFlowStepErrorResponse),
 	string(api.ReqInvalidSubmitFlowStepErrorResponse),
 	string(api.TknInvalidSubmitFlowStepErrorResponse),

@@ -743,18 +743,18 @@ func (m *MockFlowSSOProviderResolver) EXPECT() *MockFlowSSOProviderResolverMockR
 }
 
 // Resolve mocks base method.
-func (m *MockFlowSSOProviderResolver) Resolve(ctx context.Context, projectID, stepName string, slugs []string) ([]domain.FlowSSOProvider, error) {
+func (m *MockFlowSSOProviderResolver) Resolve(ctx context.Context, projectID string, slugs []string) ([]domain.FlowSSOProvider, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Resolve", ctx, projectID, stepName, slugs)
+	ret := m.ctrl.Call(m, "Resolve", ctx, projectID, slugs)
 	ret0, _ := ret[0].([]domain.FlowSSOProvider)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Resolve indicates an expected call of Resolve.
-func (mr *MockFlowSSOProviderResolverMockRecorder) Resolve(ctx, projectID, stepName, slugs any) *MockFlowSSOProviderResolverResolveCall {
+func (mr *MockFlowSSOProviderResolverMockRecorder) Resolve(ctx, projectID, slugs any) *MockFlowSSOProviderResolverResolveCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Resolve", reflect.TypeOf((*MockFlowSSOProviderResolver)(nil).Resolve), ctx, projectID, stepName, slugs)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Resolve", reflect.TypeOf((*MockFlowSSOProviderResolver)(nil).Resolve), ctx, projectID, slugs)
 	return &MockFlowSSOProviderResolverResolveCall{Call: call}
 }
 
@@ -770,13 +770,13 @@ func (c *MockFlowSSOProviderResolverResolveCall) Return(arg0 []domain.FlowSSOPro
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockFlowSSOProviderResolverResolveCall) Do(f func(context.Context, string, string, []string) ([]domain.FlowSSOProvider, error)) *MockFlowSSOProviderResolverResolveCall {
+func (c *MockFlowSSOProviderResolverResolveCall) Do(f func(context.Context, string, []string) ([]domain.FlowSSOProvider, error)) *MockFlowSSOProviderResolverResolveCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockFlowSSOProviderResolverResolveCall) DoAndReturn(f func(context.Context, string, string, []string) ([]domain.FlowSSOProvider, error)) *MockFlowSSOProviderResolverResolveCall {
+func (c *MockFlowSSOProviderResolverResolveCall) DoAndReturn(f func(context.Context, string, []string) ([]domain.FlowSSOProvider, error)) *MockFlowSSOProviderResolverResolveCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

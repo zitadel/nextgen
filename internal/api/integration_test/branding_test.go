@@ -364,6 +364,7 @@ func TestBranding(t *testing.T) {
 
 func createBrandingTestFlow(t *testing.T, client *helpers.ApiClient, projectID string) api.FlowResponse {
 	t.Helper()
+	deployPrimary(t, projectID)
 	resp, err := client.CreateFlow(t.Context(), &api.CreateFlowRequest{
 		ProjectID: api.ProjectID(projectID),
 		Purpose:   api.CreateFlowRequestPurposeLogin,

@@ -130,7 +130,6 @@ func TestClaimHappyPath(t *testing.T) {
 	// The human on the platform project: their earliest active membership is
 	// the personal team the claim lands on.
 	platform := harness.EnsurePlatformProject(t)
-	deployPrimary(t, platform.ID)
 	team, err := harness.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{
 		ProjectID: platform.ID,
 		Name:      helpers.TeamName(),
@@ -171,6 +170,7 @@ func TestClaimHappyPath(t *testing.T) {
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowDefinitionResponse{}, defResp, helpers.MustMarshal(t, defResp))
 
+	deployPrimary(t, platform.ID)
 	createResp, err := platClient.CreateFlow(t.Context(), &api.CreateFlowRequest{
 		ProjectID: api.ProjectID(platform.ID),
 		Purpose:   api.CreateFlowRequestPurposeLogin,

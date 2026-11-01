@@ -280,12 +280,12 @@ func TestFlowService_metrics(t *testing.T) {
 	}{
 		{"start at a step", func(t *testing.T) error {
 			sm := &fakeStateMachine{startResult: domain.FlowStepResult{State: &domain.FlowState{ProjectID: def.ProjectID}, Step: &domain.FlowStep{Name: "start"}}}
-			_, err := service.NewFlowService(stubDB(t), sm, domain.BuiltinSchemaBases{}).Start(t.Context(), service.StartFlowRequest{Definition: def, Purpose: domain.FlowDefinitionPurposeLogin})
+			_, err := service.NewFlowService(stubDB(t), sm, domain.BuiltinSchemaBases{}).Start(withPinnedSchema(t, t.Context(), "human-user", testUserSchema.URL), service.StartFlowRequest{Definition: def, Purpose: domain.FlowDefinitionPurposeLogin})
 			return err
 		}, metrics.FlowStart, metrics.FlowStep},
 		{"start completes", func(t *testing.T) error {
 			sm := &fakeStateMachine{startResult: domain.FlowStepResult{State: &domain.FlowState{ProjectID: def.ProjectID}, Step: completeStep}}
-			_, err := service.NewFlowService(stubDB(t), sm, domain.BuiltinSchemaBases{}).Start(t.Context(), service.StartFlowRequest{Definition: def, Purpose: domain.FlowDefinitionPurposeLogin})
+			_, err := service.NewFlowService(stubDB(t), sm, domain.BuiltinSchemaBases{}).Start(withPinnedSchema(t, t.Context(), "human-user", testUserSchema.URL), service.StartFlowRequest{Definition: def, Purpose: domain.FlowDefinitionPurposeLogin})
 			return err
 		}, metrics.FlowStart, metrics.FlowComplete},
 		{"start fails", func(t *testing.T) error {
