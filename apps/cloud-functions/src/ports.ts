@@ -1,9 +1,17 @@
-import type { EmailPreferences, NewTicket, Plan, TeamBilling, Ticket } from "./contract";
+import type {
+  EmailPreferences,
+  NewTicket,
+  Plan,
+  SignupAttribution,
+  TeamBilling,
+  Ticket,
+} from "./contract";
 
 /**
  * The three systems the functions sit between (root ADR 084 §2), each behind
  * an interface so a route or a workflow names what it needs, never a vendor
- * SDK. `src/mock.ts` answers all three in memory; the live ones replace it
+ * SDK. `src/zitadel.ts` reads the person and their teams live, and
+ * `src/mock.ts` answers the rest in memory; the live adapters replace it
  * system by system, in the order of the ADR's sequence.
  */
 export interface Systems {
@@ -37,8 +45,6 @@ export interface Directory {
    * (§8).
    */
   administeredTeams(cookie: string): Promise<Team[]>;
-  /** What the person ticked when they signed up: user attributes the register step collected (§3). */
-  signupConsent(cookie: string): Promise<SignupConsent>;
   /** Every team's usage in one hour, as the cloud's operator reads it (§6, §8). */
   usage(hour: UsageWindow): Promise<UsageRecord[]>;
   /** Sets the limits a team's plan allows, which the server enforces (§6, §8). */
@@ -71,8 +77,8 @@ export interface UsageRecord {
 export interface Billing {
   /** Whether the team has a customer yet: what tells a provisioned person from a new one. */
   hasCustomer(team: Team): Promise<boolean>;
-  /** Creates the team's customer, or finds the one an earlier attempt created. */
-  ensureCustomer(team: Team, owner: Caller): Promise<{ customer_id: string }>;
+  /** Finds the team's customer, or creates it, answering the calls it made. */
+  ensureCustomer(team: Team, owner: Caller): Promise<BillingWrite & { customer_id: string }>;
   overview(team: Team): Promise<TeamBilling>;
   /** Stripe's Customer Portal, where payment methods and invoices are managed. */
   portalUrl(team: Team, returnUrl: string): Promise<string>;
@@ -86,6 +92,26 @@ export interface Billing {
   planOf(customerId: string): Promise<{ team_id: string; plan: Plan["id"] }>;
 }
 
+/**
+ * The calls a write made to Stripe, or, until its live adapter lands, would
+ * have made (§9). A workflow step returns them, so its run shows them.
+ */
+export interface BillingWrite {
+  requests: BillingRequest[];
+}
+
+/** One call to Stripe's HTTP API, on the one account its secret key names. */
+export interface BillingRequest {
+  /** What the call does, naming our ids and never an email: what a log line may show. */
+  label: string;
+  method: "GET" | "POST";
+  /** Path and query beneath the API's origin. */
+  path: string;
+  headers?: Record<string, string>;
+  /** Form fields, which the live client sends form-encoded, as Stripe takes them. */
+  body?: Record<string, string>;
+}
+
 /** The webhooks that change what a team may do: its subscription or an invoice. */
 export interface BillingEvent {
   /** Stripe's event id, which a redelivery repeats. */
@@ -94,22 +120,52 @@ export interface BillingEvent {
   customer_id: string;
 }
 
-/** HubSpot: contacts, companies, marketing subscriptions and tickets. */
+/**
+ * HubSpot: contacts, leads, email subscriptions and tickets. A person is a
+ * contact, and their sign-up a lead on it; HubSpot makes the company itself,
+ * from the contact's email domain (§3). A team reaches HubSpot only once it
+ * pays (§7).
+ */
 export interface Crm {
-  /** Creates or updates the person's contact, recording their sign-up consent once. */
-  upsertContact(person: Caller, consent: SignupConsent): Promise<{ contact_id: string }>;
-  /** Creates or updates the team's company, keyed by the team's id, with the person on it. */
-  upsertCompany(team: Team, person: Caller): Promise<{ company_id: string }>;
+  /**
+   * Finds the person's contact by their Zitadel id, else takes over the one
+   * HubSpot already has for their email, else creates it. HubSpot's own
+   * workflow then sends the onboarding mail (§7). A contact it takes over or
+   * creates gets `attribution`, the sign-up's first touch; one it finds by the
+   * id keeps what it has (§3).
+   */
+  upsertContact(
+    person: Caller,
+    attribution?: SignupAttribution,
+  ): Promise<CrmWrite & { contact_id: string }>;
+  /**
+   * Subscribes the person to the newsletter and the security mail, which they
+   * may unsubscribe from, wherever HubSpot holds no choice of theirs yet: an
+   * unsubscribe is never undone (§7).
+   */
+  subscribe(person: Caller): Promise<CrmWrite>;
+  /** Finds the lead of the person's sign-up by their Zitadel id, or creates it on their contact. */
+  ensureLead(person: Caller, contactId: string): Promise<CrmWrite & { lead_id: string }>;
   emailPreferences(person: Caller): Promise<EmailPreferences>;
   setEmailPreferences(person: Caller, preferences: EmailPreferences): Promise<void>;
   tickets(person: Caller): Promise<Ticket[]>;
   createTicket(person: Caller, ticket: NewTicket): Promise<Ticket>;
 }
 
-/** What the person agreed to when they signed up, as the sign-up step recorded it (§7). */
-export interface SignupConsent {
-  /** Ticked "send me product news": unticked, nothing is subscribed. */
-  product_news: boolean;
-  /** When, RFC 3339; HubSpot stores it with the subscription as its legal basis. */
-  at: string;
+/**
+ * The calls a write made to the CRM, or, until its live adapter lands, would
+ * have made (§9). A workflow step returns them, so its run shows them.
+ */
+export interface CrmWrite {
+  requests: CrmRequest[];
+}
+
+/** One call to the CRM's HTTP API. */
+export interface CrmRequest {
+  /** What the call does, naming our ids and never an email: what a log line may show. */
+  label: string;
+  method: "GET" | "POST" | "PATCH" | "PUT";
+  /** Path and query beneath the API's origin. */
+  path: string;
+  body?: unknown;
 }

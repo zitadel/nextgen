@@ -1,4 +1,5 @@
 import { apiCsrfRejectionHandlerFor, apiCsrfTokenFor, getApiAuthToken } from "./auth";
+import { API_PREFIX } from "./base-url";
 
 /** The header the session-bound CSRF token travels in (ADR 053 §5). */
 export const CSRF_HEADER = "X-Zitadel-CSRF";
@@ -8,6 +9,9 @@ const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
 /** The code the server answers a refused CSRF check with. */
 const CSRF_INVALID = "auth.csrf_invalid";
+
+/** The code the server answers a path no operation of its version has with (ADR 076). */
+const ROUTE_NOT_FOUND = "req.not_found";
 
 /**
  * Framework-neutral failure type the orval-generated client throws on
@@ -42,32 +46,36 @@ export class ApiError extends Error {
 }
 
 /**
- * Thrown when a request got no response at all: the connection was refused or
- * reset, the host did not resolve, or the server accepted the connection but
- * did not answer in time. The counterpart to {@link ApiError}, which is a
- * response that came back with a failing status.
+ * Thrown when a request got no usable response: the connection was refused or
+ * reset, the host did not resolve, the server accepted the connection but did
+ * not answer in time, or it answered with a body that could not be read. The
+ * counterpart to {@link ApiError}, which is a response that came back with a
+ * failing status.
  *
- * `fetch` only rejects when no response arrived, so this is decided by the
- * fact that it rejected, never by how a runtime words the failure. The
- * runtime's own error stays on `cause` for debugging.
+ * `fetch` only rejects when no response arrived, and reading the body only
+ * when the body broke off or could not be decoded, so this is decided by which
+ * of the two rejected, never by how a runtime words the failure. The runtime's
+ * own error stays on `cause` for debugging.
  */
 export class NetworkError extends Error {
   readonly url: string;
-  /** `timeout` when a deadline cut the request off, `unreachable` otherwise. */
-  readonly reason: "unreachable" | "timeout";
+  /**
+   * `timeout` when a deadline cut the request off, `unreadable` when a response
+   * arrived but its body could not be read (a proxy that labels a decoded body
+   * as compressed, say), `unreachable` otherwise.
+   */
+  readonly reason: NetworkErrorReason;
 
-  constructor(
-    url: string,
-    reason: "unreachable" | "timeout",
-    message: string,
-    options?: ErrorOptions,
-  ) {
+  constructor(url: string, reason: NetworkErrorReason, message: string, options?: ErrorOptions) {
     super(message, options);
     this.name = "NetworkError";
     this.url = url;
     this.reason = reason;
   }
 }
+
+/** Why a {@link NetworkError} got no usable response. */
+export type NetworkErrorReason = "unreachable" | "unreadable" | "timeout";
 
 /**
  * What every request a client makes is bound by. Set per call by
@@ -150,7 +158,13 @@ export async function customFetch<T>(url: string, options: RequestInit): Promise
   }
 
   if (!res.ok) {
-    const message = `${options.method ?? "GET"} ${url} returned ${res.status}`;
+    // Every operation this client calls is one the spec has, so a server that
+    // knows no such path is another version, most likely one from before the
+    // API moved under its prefix.
+    const message =
+      res.status === 404 && apiErrorCode(parsed) === ROUTE_NOT_FOUND
+        ? `${options.method ?? "GET"} ${url} returned 404 (${ROUTE_NOT_FOUND}): the server has no such operation; a server older than this client does not serve the API under ${API_PREFIX}`
+        : `${options.method ?? "GET"} ${url} returned ${res.status}`;
     throw new ApiError(
       res.status,
       url,
@@ -161,9 +175,9 @@ export async function customFetch<T>(url: string, options: RequestInit): Promise
   }
 
   // The body is trusted to have the shape the generated types promise; no
-  // response is checked. Should that be needed, check it here, against the
-  // generated Zod response schemas, so every call is covered and no caller
-  // checks fields of its own.
+  // response is checked here or by the paged functions. Should that change,
+  // check it here, against the generated Zod response schemas, so every call
+  // is covered.
   return parsed as T;
 }
 
@@ -197,6 +211,8 @@ function isStream(body: RequestInit["body"]): boolean {
  * - a deadline fired → {@link NetworkError} with reason `timeout`;
  * - any other abort → the signal's own reason, rethrown untouched, because a
  *   cancellation is the caller's decision and the caller knows what it means;
+ * - a response arrived but `read` failed → {@link NetworkError} with reason
+ *   `unreadable`, naming the status that did come back;
  * - anything else → {@link NetworkError} with reason `unreachable`.
  *
  * Exported for the few callers that need the raw {@link Response} (a
@@ -214,25 +230,44 @@ export async function request<R = undefined>(
   }
   const signal = signals.length > 0 ? AbortSignal.any(signals) : undefined;
   const method = init.method ?? "GET";
+  let res: Response;
   try {
-    const res = await fetch(url, { ...init, signal });
+    res = await fetch(url, { ...init, signal });
+  } catch (error) {
+    throw failure(error, signal, method, url, "unreachable", "got no response");
+  }
+  try {
     return { res, rawBody: (read ? await read(res) : undefined) as R };
   } catch (error) {
-    if (signal?.aborted) {
-      const reason: unknown = signal.reason;
-      if (reason instanceof DOMException && reason.name === "TimeoutError") {
-        throw new NetworkError(url, "timeout", `${method} ${url} timed out`, { cause: reason });
-      }
-      throw reason;
-    }
-    const code = errnoOf(error);
-    throw new NetworkError(
-      url,
-      "unreachable",
-      `${method} ${url} got no response${code ? ` (${code})` : ""}`,
-      { cause: error },
-    );
+    const what = `answered ${res.status}, but its body could not be read`;
+    throw failure(error, signal, method, url, "unreadable", what);
   }
+}
+
+/**
+ * What {@link request} rejects with when `fetch` or `read` failed: the abort
+ * as {@link request} describes it, or else a {@link NetworkError} of `reason`
+ * saying `what` happened to the request.
+ */
+function failure(
+  error: unknown,
+  signal: AbortSignal | undefined,
+  method: string,
+  url: string,
+  reason: "unreachable" | "unreadable",
+  what: string,
+): unknown {
+  if (signal?.aborted) {
+    const abort: unknown = signal.reason;
+    if (abort instanceof DOMException && abort.name === "TimeoutError") {
+      return new NetworkError(url, "timeout", `${method} ${url} timed out`, { cause: abort });
+    }
+    return abort;
+  }
+  const code = errnoOf(error);
+  return new NetworkError(url, reason, `${method} ${url} ${what}${code ? ` (${code})` : ""}`, {
+    cause: error,
+  });
 }
 
 /**

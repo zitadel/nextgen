@@ -16,10 +16,10 @@ vi.mock("@/auth/session", async (importOriginal) => {
   return { ...actual, fetchSession: vi.fn(async () => makeTestSession()) };
 });
 
-const USERS_URL = "http://localhost/api/users";
+const USERS_URL = "http://localhost/api/v1/users";
 const USERS_QUERY_URL = `${USERS_URL}/query`;
-const SCHEMAS_URL = "http://localhost/api/schemas";
-const IDPS_QUERY_URL = "http://localhost/api/idps/query";
+const SCHEMAS_URL = "http://localhost/api/v1/schemas";
+const IDPS_QUERY_URL = "http://localhost/api/v1/idps/query";
 const USER_ID = "user_1";
 
 const BUSINESS = {
@@ -255,7 +255,7 @@ describe("user detail", () => {
     stub();
     const projects: (string | null)[] = [];
     server.use(
-      http.get("*/api/projects/proj_other", () =>
+      http.get("*/api/v1/projects/proj_other", () =>
         HttpResponse.json({ id: "proj_other", name: "Other project" }),
       ),
       http.get(`${SCHEMAS_URL}/sch_business`, ({ request }) => {

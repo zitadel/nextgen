@@ -3,6 +3,7 @@ package spanner
 import (
 	"context"
 	"errors"
+	"time"
 
 	"cloud.google.com/go/spanner"
 
@@ -20,8 +21,10 @@ type queryExecutor interface {
 	// It must not be used for reading data.
 	Update(ctx context.Context, stmt spanner.Statement) (int64, error)
 	// BufferWrite queues mutations. Inside a read-write transaction they apply at
-	// commit with no intermediate RPC; outside a transaction they are Applied immediately.
-	BufferWrite(ctx context.Context, ms []*spanner.Mutation) error
+	// commit with no intermediate RPC, and it returns the zero time: the commit
+	// timestamp is not known yet. Outside a transaction they are Applied
+	// immediately, and it returns that write's commit timestamp.
+	BufferWrite(ctx context.Context, ms []*spanner.Mutation) (time.Time, error)
 	// ReadRow reads a single row from the database and returns it. It must not be used for writing data.
 	ReadRow(ctx context.Context, table string, key spanner.Key, columns []string) (*spanner.Row, error)
 }
@@ -69,11 +72,11 @@ func (c client) Update(ctx context.Context, stmt spanner.Statement) (rowCount in
 }
 
 // BufferWrite implements [queryExecutor].
-func (c client) BufferWrite(ctx context.Context, ms []*spanner.Mutation) error {
+func (c client) BufferWrite(ctx context.Context, ms []*spanner.Mutation) (time.Time, error) {
 	ctx, cancel := boundRetry(ctx)
 	defer cancel()
-	_, err := c.client.Apply(ctx, ms)
-	return wrapError(err)
+	commitTS, err := c.client.Apply(ctx, ms)
+	return commitTS, wrapError(err)
 }
 
 func (c client) ReadRow(ctx context.Context, table string, key spanner.Key, columns []string) (*spanner.Row, error) {
@@ -110,8 +113,8 @@ func (t tx) Update(ctx context.Context, stmt spanner.Statement) (int64, error) {
 }
 
 // BufferWrite implements [queryExecutor].
-func (t tx) BufferWrite(ctx context.Context, ms []*spanner.Mutation) error {
-	return wrapError(t.txn.BufferWrite(ms))
+func (t tx) BufferWrite(ctx context.Context, ms []*spanner.Mutation) (time.Time, error) {
+	return time.Time{}, wrapError(t.txn.BufferWrite(ms))
 }
 
 // ReadRow implements [queryExecutor].

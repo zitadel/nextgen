@@ -9,12 +9,12 @@
  * public API.
  *
  * Per-instance isolation: multiple clients can coexist in one process
- * (different servers, different tokens). Their Proxy `get` traps set
- * the globals synchronously before invoking the underlying generated
- * function, which reads them at the top of `customFetch` before any
- * `await`. Two clients running interleaved within a single JS turn
- * are safe; two clients running in parallel across awaits could
- * clobber each other — not a pattern any current consumer uses.
+ * (different servers, different tokens). Every call through a client,
+ * each page of a paged one included, sets that client's globals
+ * synchronously before invoking the underlying generated function,
+ * which reads them at the top of `customFetch` before any `await`. So
+ * clients can run in parallel across awaits without clobbering each
+ * other.
  */
 import * as endpoints from "../generated/endpoints/zitadelNextGen";
 import { paging } from "../generated/paging";
@@ -22,7 +22,14 @@ import { paging } from "../generated/paging";
 import { setApiAuthToken } from "./auth";
 import { setProxyPath } from "./base-url";
 import { setRequestPolicy } from "./fetch";
-import { paged, type PagingShape } from "./paged";
+import { paged } from "./paged";
+
+/**
+ * How each paged function pages, by name: typed readers of a page's items and
+ * of its cursor, and the arguments that fetch the page a cursor names. Named
+ * apart from `@zitadel/api/runtime/paging`, the walk itself.
+ */
+export { paging as pagedFunctions };
 
 type Endpoints = typeof endpoints;
 type Paging = typeof paging;
@@ -35,7 +42,7 @@ export type PageOf<K extends PagedOperation> = Awaited<ReturnType<Endpoints[K]>>
 
 /** One item of a paged function's response. */
 export type ItemOf<K extends PagedOperation> =
-  PageOf<K> extends { [F in Paging[K]["items"]]: readonly (infer T)[] } ? T : never;
+  ReturnType<Paging[K]["items"]> extends readonly (infer T)[] ? T : never;
 
 /**
  * What a paged function carries besides fetching one page. Each takes the
@@ -84,23 +91,19 @@ export type ZitadelClientOptions = {
    * Unset by default: no deadline beyond the runtime's own.
    */
   timeoutMs?: number;
+  /**
+   * Applied to every response this client resolves with, each page of a
+   * paged function's included, before the caller sees it. A paged function
+   * reads its cursor from the page as the server sent it, and its items from
+   * what this returns under the same field.
+   */
+  onResponse?: (body: unknown) => unknown;
+  /**
+   * Applied to every failure of a call: the request's, `onResponse`'s, and a
+   * paged function's own. It throws what the caller sees.
+   */
+  onError?: (error: unknown) => never;
 };
-
-/**
- * `call` with {@link Paged} added when `name` is a function that pages, and
- * as it is otherwise. A wrapper around the client uses it to keep paging, with
- * every page going through its own `call`.
- */
-export function withPaging<F extends (...args: unknown[]) => unknown>(
-  name: PropertyKey,
-  call: F,
-): F {
-  if (!Object.hasOwn(paging, name)) {
-    return call;
-  }
-  const shape: PagingShape = paging[name as PagedOperation];
-  return Object.assign(call, paged(call, shape));
-}
 
 /**
  * Build a typed Zitadel client pre-bound to a base URL and (optionally)
@@ -117,28 +120,48 @@ export function createZitadelClient(opts: ZitadelClientOptions): ZitadelClient {
   while (baseUrl.endsWith("/")) {
     baseUrl = baseUrl.slice(0, -1);
   }
+  const hooks = {
+    respond: (body: unknown) => (opts.onResponse ? opts.onResponse(body) : body),
+    fail: (error: unknown): never => {
+      opts.onError?.(error);
+      throw error;
+    },
+  };
+  const hooked = opts.onResponse !== undefined || opts.onError !== undefined;
   // Built once per function, not on every property read.
   const bound = new Map<PropertyKey, unknown>();
   return new Proxy(endpoints as unknown as ZitadelClient, {
     get(target, prop, receiver) {
+      const known = bound.get(prop);
+      if (known !== undefined) {
+        return known;
+      }
       const value = Reflect.get(target, prop, receiver);
       if (typeof value !== "function") {
         return value;
       }
-      if (!bound.has(prop)) {
-        // Every page goes through this call, so each one sets this client's
-        // base URL and token again: another client may have run between pages.
-        bound.set(
-          prop,
-          withPaging(prop, (...args: unknown[]) => {
-            setProxyPath(baseUrl);
-            setApiAuthToken(opts.token);
-            setRequestPolicy({ signal: opts.signal, timeoutMs: opts.timeoutMs });
-            return (value as (...a: unknown[]) => Promise<unknown>)(...args);
-          }),
-        );
-      }
-      return bound.get(prop);
+      // Every request, each page included, sets this client's base URL and
+      // token again: another client may have run in between.
+      const send = (...args: unknown[]) => {
+        setProxyPath(baseUrl);
+        setApiAuthToken(opts.token);
+        setRequestPolicy({ signal: opts.signal, timeoutMs: opts.timeoutMs });
+        return (value as (...a: unknown[]) => unknown)(...args);
+      };
+      // The URL builders orval exports beside the requests return strings, so
+      // only a pending result is hooked. A then-check rather than `instanceof`,
+      // which a replaced global `Promise` (zone.js) would fail.
+      const call = (...args: unknown[]) => {
+        const result = send(...args);
+        return hooked && typeof (result as { then?: unknown } | null)?.then === "function"
+          ? Promise.resolve(result).then(hooks.respond).catch(hooks.fail)
+          : result;
+      };
+      const fn = Object.hasOwn(paging, prop)
+        ? Object.assign(call, paged(send, paging[prop as PagedOperation], hooks))
+        : call;
+      bound.set(prop, fn);
+      return fn;
     },
   });
 }

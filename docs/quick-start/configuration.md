@@ -15,8 +15,8 @@ Example file: [`docs/operations/nextgen.example.yaml`](../operations/nextgen.exa
 | `server.generate_master_key` | `NEXTGEN_SERVER_GENERATE_MASTER_KEY` | `true`                                                          | Mint a master key when none is configured and the master key directory is empty; `false` (or `--disable-master-key-generation`) fails the start instead |
 | `server.console_enabled` | `NEXTGEN_SERVER_CONSOLE_ENABLED` | `true`                                                              | Serve embedded management console                                                                      |
 | `server.console_path`    | `NEXTGEN_SERVER_CONSOLE_PATH`    | `/ui/console`                                                       | Console URL prefix                                                                                     |
-| `server.public_base`     | `NEXTGEN_SERVER_PUBLIC_BASE`     | `https://nextgen.zitadel.cloud`                                     | Public origin browsers reach this deployment at; feeds the claim and dashboard URLs. Set to `http://localhost:8080` when running the server locally by hand; the CLI runtime (`zitadel start`) sets it itself. |
-| `server.console_origins` | `NEXTGEN_SERVER_CONSOLE_ORIGINS` | — (none) | Other origins the console is reached at, beside the origin of `server.public_base`, such as another hostname in front of the deployment. Like that origin, they may open any project's flow to preview its login. A comma-separated list in the environment. |
+| `server.public_base`     | `NEXTGEN_SERVER_PUBLIC_BASE`     | `https://nextgen.zitadel.cloud`                                     | Public origin browsers reach this deployment at; feeds the claim and dashboard URLs. Set to `http://localhost:8080` when running the server locally by hand; the CLI runtime (`zitadel start`) sets it itself. With platform bootstrap on, it is the platform project's one primary origin, so servers sharing a database need the same value. |
+| `server.console_origins` | `NEXTGEN_SERVER_CONSOLE_ORIGINS` | — (none) | Other origins the console is reached at, beside the origin of `server.public_base`, such as another hostname in front of the deployment. Like that origin, they may open any project's flow to preview its login; signing in to the platform project works only at `server.public_base`. A comma-separated list in the environment. |
 | `server.request_id_header` | `NEXTGEN_SERVER_REQUEST_ID_HEADER` | — (unset)                                                      | A header a proxy in front of the server sets to its own ID for each request, such as Vercel's `x-vercel-id`. The server then uses that ID in its logs, `X-Request-Id`, audit events and error pages. Set it only behind a proxy that overwrites the header, or a client chooses its own ID. |
 
 ## Platform
@@ -285,8 +285,10 @@ never from data. The API's request instruments (`ogen.server.request_count`,
 milliseconds with the SDK's default buckets) carry
 the operation (`oas.operation`), the method (`http.request.method`), the
 route template (`http.route`, as in `/users/{user_id}`) and the status
-(`http.response.status_code`), never the request path. Should an attribute
-ever follow the data anyway, each instrument holds at most 2000 series: past
+(`http.response.status_code`), never the request path. A request that
+reached its operation at the root path rather than under `/api/v1`, which the
+API answers until 1.0.0, also carries `zitadel.api.root_path` (`true`).
+Should an attribute ever follow the data anyway, each instrument holds at most 2000 series: past
 that, new attribute combinations land on one series marked
 `otel.metric.overflow=true` instead of becoming series of their own. The
 limit is the OpenTelemetry SDK's default; `OTEL_GO_X_CARDINALITY_LIMIT`

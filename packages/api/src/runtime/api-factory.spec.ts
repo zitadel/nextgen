@@ -4,7 +4,10 @@ import type { AddressInfo } from "node:net";
 import { afterEach, describe, expect, expectTypeOf, it } from "vitest";
 
 import type { ListDeployments200DeploymentsItem } from "../generated/model";
-import { createZitadelClient } from "./api-factory";
+import type { paging } from "../generated/paging";
+import { createZitadelClient, type ItemOf } from "./api-factory";
+
+type Paging = typeof paging;
 
 const servers: Server[] = [];
 
@@ -32,6 +35,31 @@ async function deployments(): Promise<{ base: string; requests: string[][] }> {
   return { base: `http://127.0.0.1:${(server.address() as AddressInfo).port}`, requests };
 }
 
+/**
+ * Answers any paged request two pages deep, its list under `field`, reading the
+ * cursor from the query or the JSON body; records each request's path and body.
+ */
+async function twoPages(field: string): Promise<{ base: string; requests: unknown[][] }> {
+  const requests: unknown[][] = [];
+  const server = createServer((req, res) => {
+    let text = "";
+    req.on("data", (chunk) => {
+      text += chunk;
+    });
+    req.on("end", () => {
+      const url = new URL(req.url ?? "/", "http://localhost");
+      const body: unknown = text === "" ? undefined : JSON.parse(text);
+      requests.push([url.pathname + url.search, body]);
+      const second = url.search.includes("page_token=t1") || text.includes('"page_token":"t1"');
+      res.setHeader("content-type", "application/json");
+      res.end(JSON.stringify({ [field]: [], ...(second ? {} : { next_page_token: "t1" }) }));
+    });
+  });
+  servers.push(server);
+  await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
+  return { base: `http://127.0.0.1:${(server.address() as AddressInfo).port}`, requests };
+}
+
 describe("createZitadelClient", () => {
   it("walks a paged function's pages with its own base URL and token", async () => {
     const { base, requests } = await deployments();
@@ -40,18 +68,51 @@ describe("createZitadelClient", () => {
     const other = createZitadelClient({ baseUrl: elsewhere.base, token: "other" });
 
     const ids = [];
-    for await (const deployment of client.listDeployments.items({ project_id: "proj_1" })) {
+    for await (const deployment of client.listDeployments.items({
+      project_id: "proj_1",
+    })) {
       ids.push(deployment.id);
       // Another client's call between two pages must not redirect the next one.
-      if (ids.length === 1) await other.listDeployments({ project_id: "proj_2" });
+      if (ids.length === 1) {
+        await other.listDeployments({
+          project_id: "proj_2",
+        });
+      }
     }
 
     expect(ids).toEqual(["dep_1", "dep_2"]);
     expect(requests).toEqual([
-      ["/deployments?project_id=proj_1", "Bearer secret"],
-      ["/deployments?project_id=proj_1&page_token=t1", "Bearer secret"],
+      ["/api/v1/deployments?project_id=proj_1", "Bearer secret"],
+      ["/api/v1/deployments?project_id=proj_1&page_token=t1", "Bearer secret"],
     ]);
-    expect(elsewhere.requests).toEqual([["/deployments?project_id=proj_2", "Bearer other"]]);
+    expect(elsewhere.requests).toEqual([["/api/v1/deployments?project_id=proj_2", "Bearer other"]]);
+  });
+
+  it("keeps two clients' walks apart while both are in flight", async () => {
+    const one = await deployments();
+    const two = await deployments();
+    const first = createZitadelClient({ baseUrl: one.base, token: "one" });
+    const second = createZitadelClient({ baseUrl: two.base, token: "two" });
+
+    await Promise.all([
+      first.listDeployments.all({
+        project_id: "proj_1",
+      }),
+      second.listDeployments.all({
+        project_id: "proj_2",
+      }),
+    ]);
+
+    expect([one.requests, two.requests]).toEqual([
+      [
+        ["/api/v1/deployments?project_id=proj_1", "Bearer one"],
+        ["/api/v1/deployments?project_id=proj_1&page_token=t1", "Bearer one"],
+      ],
+      [
+        ["/api/v1/deployments?project_id=proj_2", "Bearer two"],
+        ["/api/v1/deployments?project_id=proj_2&page_token=t1", "Bearer two"],
+      ],
+    ]);
   });
 
   it("types a paged function's items as the response's list entries", () => {
@@ -60,6 +121,153 @@ describe("createZitadelClient", () => {
     expectTypeOf(client.listDeployments.all).returns.resolves.toEqualTypeOf<
       ListDeployments200DeploymentsItem[]
     >();
+  });
+
+  it("applies its response hook to every page", async () => {
+    const { base } = await deployments();
+    const client = createZitadelClient({
+      baseUrl: base,
+      onResponse: (body) => ({
+        ...(body as object),
+        deployments: (body as { deployments: { id: string }[] }).deployments.map((d) => ({
+          id: d.id.toUpperCase(),
+        })),
+      }),
+    });
+
+    const listed = await client.listDeployments.all({
+      project_id: "proj_1",
+    });
+
+    expect(listed.map((deployment) => deployment.id)).toEqual(["DEP_1", "DEP_2"]);
+  });
+
+  it("applies its hooks when the global Promise has been replaced", async () => {
+    const { base } = await deployments();
+    const seen: unknown[] = [];
+    const client = createZitadelClient({
+      baseUrl: base,
+      onResponse: (body) => {
+        seen.push(body);
+        return body;
+      },
+    });
+    const Native = globalThis.Promise;
+    // As zone.js does: a subclass the engine's own promises are not instances of.
+    globalThis.Promise = class extends Native<unknown> {} as PromiseConstructor;
+    try {
+      await client.listDeployments({
+        project_id: "proj_1",
+      });
+    } finally {
+      globalThis.Promise = Native;
+    }
+
+    expect(seen).toHaveLength(1);
+  });
+
+  it("walks every page when its response hook reshapes them", async () => {
+    const { base } = await deployments();
+    const client = createZitadelClient({
+      baseUrl: base,
+      onResponse: (body) => {
+        const { next_page_token: nextPageToken, ...rest } = body as Record<string, unknown>;
+        return { ...rest, nextPageToken };
+      },
+    });
+
+    const listed = await client.listDeployments.all({
+      project_id: "proj_1",
+    });
+
+    expect(listed).toHaveLength(2);
+  });
+
+  it("hands its response hook's failures to its error hook", async () => {
+    const { base } = await deployments();
+    const client = createZitadelClient({
+      baseUrl: base,
+      onResponse: () => {
+        throw new Error("hook");
+      },
+      onError: () => {
+        throw new Error("handled");
+      },
+    });
+
+    const listed = client.listDeployments({
+      project_id: "proj_1",
+    });
+
+    await expect(listed).rejects.toThrow("handled");
+  });
+
+  it("hands every failure to its error hook", async () => {
+    const client = createZitadelClient({
+      baseUrl: "http://127.0.0.1:1",
+      onError: () => {
+        throw new Error("handled");
+      },
+    });
+
+    const listed = client.listDeployments.all({
+      project_id: "proj_1",
+    });
+
+    await expect(listed).rejects.toThrow("handled");
+  });
+
+  it("puts a later page's page_token in the query parameters after a path parameter", async () => {
+    const { base, requests } = await twoPages("previews");
+
+    await createZitadelClient({ baseUrl: base }).listPreviews.all("proj_1", { limit: 1 });
+
+    expect(requests.map(([path]) => path)).toEqual([
+      "/api/v1/projects/proj_1/previews?limit=1",
+      "/api/v1/projects/proj_1/previews?limit=1&page_token=t1",
+    ]);
+  });
+
+  it("puts a later page's page_token in query parameters the caller left off", async () => {
+    const { base, requests } = await twoPages("previews");
+
+    await createZitadelClient({ baseUrl: base }).listPreviews.all("proj_1");
+
+    expect(requests.map(([path]) => path)).toEqual([
+      "/api/v1/projects/proj_1/previews",
+      "/api/v1/projects/proj_1/previews?page_token=t1",
+    ]);
+  });
+
+  it("puts a later page's page_token in the body of a query", async () => {
+    const { base, requests } = await twoPages("users");
+
+    await createZitadelClient({ baseUrl: base }).queryUsers.all({ limit: 1 });
+
+    expect(requests.map(([, body]) => body)).toEqual([
+      { limit: 1 },
+      { limit: 1, page_token: "t1" },
+    ]);
+  });
+
+  it("types every paged function's items", () => {
+    // A list field the generated types lost or renamed fails here, naming the function.
+    type Untyped = {
+      // A missing field leaves the items `unknown`, a field that is not an array `never`.
+      [K in keyof Paging]: [ItemOf<K>] extends [never] ? K : unknown extends ItemOf<K> ? K : never;
+    }[keyof Paging];
+
+    expectTypeOf<Untyped>().toBeNever();
+  });
+
+  it("builds a URL against its own base URL", () => {
+    const client = createZitadelClient({ baseUrl: "http://127.0.0.1:1/" });
+
+    const url = client.getListDeploymentsUrl({
+      project_id: "proj_1",
+    });
+
+    expect(url).toBe("http://127.0.0.1:1/api/v1/deployments?project_id=proj_1");
   });
 
   it("leaves paging off a function that does not page", () => {

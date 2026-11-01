@@ -5,7 +5,7 @@
  * **untrusted input**: on routes outside the middleware `matcher` the header
  * arrives straight from the client, so every value is re-verified — JWTs
  * cryptographically (signature via a real RSA key pair and a mocked JWKS
- * endpoint), opaque tokens against a mocked `GET /sessions/me`.
+ * endpoint), opaque tokens against a mocked `GET /api/v1/sessions/me`.
  *
  * The forged-header cases in this file are the regression tests for the
  * header-spoofing vulnerability: a JWT-shaped value with a bogus signature
@@ -242,7 +242,7 @@ describe("auth()", () => {
 
     expect(result).toEqual({ isAuthenticated: false, session: null });
     expect(fetchMock).toHaveBeenCalledWith(
-      `${ISSUER}/sessions/me?project_id=${PROJECT}`,
+      `${ISSUER}/api/v1/sessions/me?project_id=${PROJECT}`,
       expect.objectContaining({
         headers: expect.objectContaining({
           cookie: "__Host-zitadel_session=attacker-supplied-junk",
@@ -355,7 +355,7 @@ describe("auth()", () => {
 
     expect(result.isAuthenticated).toBe(true);
     expect(fetchMock).toHaveBeenCalledWith(
-      `${ISSUER}/sessions/me?project_id=${PROJECT}`,
+      `${ISSUER}/api/v1/sessions/me?project_id=${PROJECT}`,
       expect.anything(),
     );
   });
@@ -383,7 +383,7 @@ describe("auth()", () => {
 
     expect(result.isAuthenticated).toBe(true);
     expect(fetchMock).toHaveBeenCalledWith(
-      `${ISSUER}/sessions/me?project_id=${PROJECT}`,
+      `${ISSUER}/api/v1/sessions/me?project_id=${PROJECT}`,
       expect.anything(),
     );
   });

@@ -69,7 +69,12 @@ describe("dryRunResult redaction", () => {
 
 describe("idArg", () => {
   it("declares a required positional named after the resource", () => {
-    const args = idArg({ singular: "user", idField: "id", columns: [] });
+    const args = idArg({
+      singular: "user",
+      idField: "id",
+      idOf: (written) => written.id,
+      columns: [],
+    });
     expect(args!.id!.required).toBe(true);
     expect(args!.id!.description).toBe("user id");
   });

@@ -20,32 +20,39 @@ const project = configureZitadel({
 export const api = getApi(project);
 ```
 
+Every operation goes to the proxy path, or to the server URL a client is given,
+followed by `/api/v1`, where the server serves the API: `getUser` calls
+`/__nextgen/api/v1/users/{id}`. Give a server's origin, without `/api/v1`; one
+that already ends in it keeps a single prefix. A `404` with the code
+`req.not_found` means the server has no such operation: a server older than the
+client does not serve the API under `/api/v1`.
+
 Subsequent `configureZitadel()` calls with the same values return the original
 handle; different values log a warning and keep the original — safe for HMR
 and framework double-mounts. The same handle is what you pass to the shared
 web components' `project` property.
 
-Every list method also walks its cursor for you, one page at a time as the
-loop asks: `client.listDeployments.items({ project_id })` yields every
+Every paged list method also walks its cursor for you, one page at a time as
+the loop asks: `client.listDeployments.items({ project_id })` yields every
 deployment, `.pages(...)` every page, and `.all(...)` collects them into one
-array. A wrapper that proxies the client keeps them with `withPaging(name, call)`
-from `@zitadel/api/client`.
+array. To change what every call returns, each page included, pass
+`onResponse` or `onError` to `createZitadelClient`.
 
 ## Entry points
 
 | Import | What it carries |
 | --- | --- |
 | `@zitadel/api/config` | `configureZitadel()`, `getApi()` — the primary surface |
-| `@zitadel/api/client` | The client wrapper the SDKs consume |
+| `@zitadel/api/client` | The client wrapper the SDKs consume; `pagedFunctions`, each paged function's typed readers of a page's items and cursor and the arguments of its next page |
 | `@zitadel/api/generated/endpoints/zitadelNextGen` | Generated endpoint functions (orval, from the OpenAPI source) |
 | `@zitadel/api/generated/model` | Generated request/response types |
 | `@zitadel/api/generated/endpoints/zitadelNextGen.zod` | Zod schemas per endpoint |
 | `@zitadel/api/generated/endpoints/zitadelNextGen.msw` | MSW handlers for tests |
 | `@zitadel/api/generated/operations` | Every operation as data: method, path, parameters, authentication, paging |
-| `@zitadel/api/runtime/base-url` | `setProxyPath()` / `getProxyPath()` — the low-level slot `configureZitadel()` writes; call it directly only when you manage configuration yourself |
+| `@zitadel/api/runtime/base-url` | `API_PREFIX` and `apiBaseUrl()`, which put `/api/v1` after a base; `setProxyPath()` / `getProxyPath()` — the low-level slot `configureZitadel()` writes; call it directly only when you manage configuration yourself |
 | `@zitadel/api/runtime/auth` | `getApiAuthToken()` and bearer plumbing; `setApiCsrfToken()` / `getApiCsrfToken()` / `setApiCsrfRejectionHandler()` for session-cookie writes (see below) |
 | `@zitadel/api/runtime/fetch` | The shared `customFetch` interceptor |
-| `@zitadel/api/runtime/paging` | `pages()`, the cursor walk behind every paged function's `pages`, `items` and `all` |
+| `@zitadel/api/runtime/paging` | `pages()`, the cursor walk behind every paged function's `pages`, `items` and `all`; `nextToken()`, a page's cursor to the next one; `itemsOf()`, a page's list |
 
 ### CSRF token for session-cookie writes
 

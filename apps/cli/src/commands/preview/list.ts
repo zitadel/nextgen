@@ -1,7 +1,7 @@
 import { Flags } from "@oclif/core";
-import { nextToken } from "@zitadel/api/runtime/paging";
 
 import { CommandGroups, type JsonEnvelope, nonBlankString, PreviewCommand } from "../../lib/oclif";
+import { collectPages } from "../../lib/oclif/crud/paging";
 import { renderList } from "../../lib/oclif/crud/table";
 import { listData } from "../../lib/oclif/envelope";
 import { shellArg } from "../../lib/shell";
@@ -52,13 +52,19 @@ export default class PreviewList extends PreviewCommand {
     const { client, projectId } = await this.connect();
 
     const params = {
-      ...(flags.limit === undefined ? {} : { limit: flags.limit }),
-      ...(flags["page-token"] === undefined ? {} : { page_token: flags["page-token"] }),
+      limit: flags.limit,
+      page_token: flags["page-token"],
     };
-    // One page unless `--all`, whose drain leaves no next page to report.
-    const page = flags.all ? undefined : await client.listPreviews(projectId, params);
-    const previews = page ? page.previews : await client.listPreviews.all(projectId, params);
-    const next = page === undefined ? undefined : nextToken(page);
+    // One page unless `--all`, as every list does; the walk starts at
+    // `--page-token`, and a drain leaves no next page to report.
+    const { items: previews, next } = await collectPages(
+      client.listPreviews.pages(projectId, params),
+      {
+        items: (page) => page.previews,
+        all: flags.all === true,
+        next: (page) => page.next_page_token,
+      },
+    );
 
     const rows = previews.map((preview) => ({
       url: preview.origin,

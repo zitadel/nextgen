@@ -1,53 +1,35 @@
-import { nextToken, pages } from "@zitadel/api/runtime/paging";
-
-import { ZitadelError } from "../../errors";
-import { isObject } from "../../json";
-import type { Page } from "./types";
-
 /**
- * One page of a cursor-paginated endpoint, or with `all` every page in order.
- * `request` fetches the page a cursor names, starting at `token`. A page holds
- * its items under `items`, or is the array itself when `items` is unset, and
- * the cursor to the next page under `nextPageToken`. `next` is that cursor, or
- * `null` once `all` has read the last page.
+ * The first page `pages` yields, or with `all` every page in order, as one
+ * list of the items `items` takes from each page. `next` reads a page's
+ * cursor to report it: the cursor to the page after the first, or `null` once
+ * `all` has read the last page.
+ *
+ * Following the cursor is the walk's job, not this one's: a client function's
+ * `.pages()` reads it from the page as the server sent it, before the CLI
+ * escapes the page, so it goes back to the server unchanged. Without `all`
+ * the walk is left after its first page, so no second one is fetched.
  */
-export const collectPages = async (
-  request: (token?: string) => Promise<unknown>,
+export const collectPages = async <P, T>(
+  pages: AsyncIterable<P>,
   {
     items,
     all,
-    token,
-    nextPageToken,
-  }: Readonly<{ items?: string; all: boolean; token?: string; nextPageToken: string }>,
-): Promise<Page> => {
-  const next = (response: unknown) => nextToken(response, nextPageToken);
+    next,
+  }: Readonly<{
+    items: (page: P) => readonly T[];
+    all: boolean;
+    next: (page: P) => string | null | undefined;
+  }>,
+): Promise<{ items: T[]; next: string | null }> => {
   // Accumulated in one array rather than by concatenating each page onto the
   // last: these resources are unbounded, and a wide `--all` would otherwise
   // copy every record once per remaining page.
-  const collected: unknown[] = [];
-  for await (const response of pages((cursor) => request(cursor ?? token), {
-    start: token,
-    next,
-  })) {
-    collected.push(...itemsOf(response, items));
+  const collected: T[] = [];
+  for await (const page of pages) {
+    collected.push(...items(page));
     if (!all) {
-      return { items: collected, next: next(response) ?? null };
+      return { items: collected, next: next(page) || null };
     }
   }
   return { items: collected, next: null };
 };
-
-/** A page's items: the array `items` names, or the body when it is the collection itself. */
-function itemsOf(response: unknown, items: string | undefined): readonly unknown[] {
-  const page = items === undefined ? response : isObject(response) ? response[items] : undefined;
-  if (!Array.isArray(page)) {
-    throw new ZitadelError(
-      "E_VALIDATION",
-      items === undefined
-        ? "Unexpected list response: expected an array"
-        : `Unexpected list response: missing "${items}" array`,
-      { details: { response } },
-    );
-  }
-  return page;
-}

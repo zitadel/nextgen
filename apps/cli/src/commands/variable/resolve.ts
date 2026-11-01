@@ -54,7 +54,7 @@ export default class VariableResolve extends EnvironmentCommand {
     const deployments = await client.listDeployments.all({
       project_id: projectId,
       live: true,
-      ...(origin === undefined ? {} : { origin }),
+      origin,
     });
 
     // Without `--origin`, more than one live deployment means there is no single
@@ -128,7 +128,8 @@ export default class VariableResolve extends EnvironmentCommand {
         nextCommands: [this.suggest(DEPLOY_ARGS)],
       });
     }
-    const origins = (await client.getProject(projectId)).origins ?? [];
+    const project = await client.getProject(projectId);
+    const origins = project.origins;
     if (origins.some((entry) => entry.kind === "primary" && entry.pattern === origin)) {
       return new ZitadelError("E_NOT_FOUND", `Nothing is deployed to ${origin}.`, {
         hint: `Deploy to it first with \`zitadel ${DEPLOY_ARGS}${this.environmentSelector()}\`, then resolve its variables.`,

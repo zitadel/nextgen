@@ -1,5 +1,4 @@
 import { Flags } from "@oclif/core";
-import { nextToken } from "@zitadel/api/runtime/paging";
 
 import {
   CommandGroups,
@@ -7,6 +6,7 @@ import {
   type JsonEnvelope,
   nonBlankString,
 } from "../../lib/oclif";
+import { collectPages } from "../../lib/oclif/crud/paging";
 import { renderList } from "../../lib/oclif/crud/table";
 import { listData } from "../../lib/oclif/envelope";
 import { shellArg } from "../../lib/shell";
@@ -61,21 +61,24 @@ export default class DeploymentList extends EnvironmentCommand {
 
     const params = {
       project_id: projectId,
-      ...(flags.origin === undefined ? {} : { origin: flags.origin }),
-      ...(flags.live ? { live: true } : {}),
-      ...(flags.limit === undefined ? {} : { limit: flags.limit }),
-      ...(flags["page-token"] === undefined ? {} : { page_token: flags["page-token"] }),
+      origin: flags.origin,
+      live: flags.live,
+      limit: flags.limit,
+      page_token: flags["page-token"],
     };
-    // One page unless `--all`, whose drain leaves no next page to report.
-    const page = flags.all ? undefined : await client.listDeployments(params);
-    const deployments = page ? page.deployments : await client.listDeployments.all(params);
-    const next = page === undefined ? undefined : nextToken(page);
+    // One page unless `--all`, as every list does; the walk starts at
+    // `--page-token`, and a drain leaves no next page to report.
+    const { items: deployments, next } = await collectPages(client.listDeployments.pages(params), {
+      items: (page) => page.deployments,
+      all: flags.all === true,
+      next: (page) => page.next_page_token,
+    });
 
     // Flatten each deployment's targets to one `origins` cell for the table.
     const rows = deployments.map((deployment) => ({
       id: deployment.id,
       release_id: deployment.release_id,
-      reason: deployment.metadata.reason ?? "deploy",
+      reason: deployment.metadata.reason,
       origins: deployment.targets.map((target) => target.origin).join(", "),
       deployed_at: deployment.deployed_at,
     }));
