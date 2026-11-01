@@ -2235,6 +2235,45 @@ func (c *MockAllStatementsEnsureVariableSetCall) DoAndReturn(f func(context.Cont
 	return c
 }
 
+// EventsSettledBefore mocks base method.
+func (m *MockAllStatements) EventsSettledBefore(ctx context.Context, projectID string) (time.Time, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "EventsSettledBefore", ctx, projectID)
+	ret0, _ := ret[0].(time.Time)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// EventsSettledBefore indicates an expected call of EventsSettledBefore.
+func (mr *MockAllStatementsMockRecorder) EventsSettledBefore(ctx, projectID any) *MockAllStatementsEventsSettledBeforeCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EventsSettledBefore", reflect.TypeOf((*MockAllStatements)(nil).EventsSettledBefore), ctx, projectID)
+	return &MockAllStatementsEventsSettledBeforeCall{Call: call}
+}
+
+// MockAllStatementsEventsSettledBeforeCall wrap *gomock.Call
+type MockAllStatementsEventsSettledBeforeCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsEventsSettledBeforeCall) Return(arg0 time.Time, arg1 error) *MockAllStatementsEventsSettledBeforeCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsEventsSettledBeforeCall) Do(f func(context.Context, string) (time.Time, error)) *MockAllStatementsEventsSettledBeforeCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsEventsSettledBeforeCall) DoAndReturn(f func(context.Context, string) (time.Time, error)) *MockAllStatementsEventsSettledBeforeCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // ExchangeSession mocks base method.
 func (m *MockAllStatements) ExchangeSession(ctx context.Context, projectID, handoffToken string, idempotencyKey *string, ttl time.Duration) (*domain.Session, error) {
 	m.ctrl.T.Helper()
@@ -13997,6 +14036,45 @@ func (c *MockEventStatementsEnsureEventSinkCall) Do(f func(context.Context, *dom
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockEventStatementsEnsureEventSinkCall) DoAndReturn(f func(context.Context, *domain.EventSink) error) *MockEventStatementsEnsureEventSinkCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// EventsSettledBefore mocks base method.
+func (m *MockEventStatements) EventsSettledBefore(ctx context.Context, projectID string) (time.Time, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "EventsSettledBefore", ctx, projectID)
+	ret0, _ := ret[0].(time.Time)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// EventsSettledBefore indicates an expected call of EventsSettledBefore.
+func (mr *MockEventStatementsMockRecorder) EventsSettledBefore(ctx, projectID any) *MockEventStatementsEventsSettledBeforeCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EventsSettledBefore", reflect.TypeOf((*MockEventStatements)(nil).EventsSettledBefore), ctx, projectID)
+	return &MockEventStatementsEventsSettledBeforeCall{Call: call}
+}
+
+// MockEventStatementsEventsSettledBeforeCall wrap *gomock.Call
+type MockEventStatementsEventsSettledBeforeCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockEventStatementsEventsSettledBeforeCall) Return(arg0 time.Time, arg1 error) *MockEventStatementsEventsSettledBeforeCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockEventStatementsEventsSettledBeforeCall) Do(f func(context.Context, string) (time.Time, error)) *MockEventStatementsEventsSettledBeforeCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockEventStatementsEventsSettledBeforeCall) DoAndReturn(f func(context.Context, string) (time.Time, error)) *MockEventStatementsEventsSettledBeforeCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
