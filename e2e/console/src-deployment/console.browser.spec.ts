@@ -24,7 +24,7 @@ test("a deep link lands on the sign-in screen, whose widget asks for an email", 
     const { pathname } = new URL(response.url());
     if (
       response.status() >= 400 &&
-      pathname !== "/sessions/me" &&
+      pathname !== "/api/v1/sessions/me" &&
       !pathname.startsWith("/_vercel/")
     ) {
       failed.push(`${response.status()} ${response.request().method()} ${pathname}`);

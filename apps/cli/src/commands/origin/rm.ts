@@ -73,7 +73,7 @@ export default class OriginRm extends Promptable(EnvironmentCommand) {
     // The pattern is already removed, so a failed read of what is left is said
     // aloud rather than reported as a failed removal.
     const remaining = await client.getProject(projectId).then(
-      (project) => project.origins ?? [],
+      (project) => project.origins,
       (error: unknown) => {
         reportWarning(
           `${pattern} was removed, but the project's remaining origins could not be read: ${error instanceof Error ? error.message : String(error)}`,

@@ -11,7 +11,7 @@ describe("curlOf", () => {
   it("reads the project secret from the environment, never writing it out", () => {
     expect(curlOf("http://localhost:8080", requestFor("createTeam", ["name=O'Brien"]))).toBe(
       [
-        "curl -X POST 'http://localhost:8080/teams?project_id=proj_1'",
+        "curl -X POST 'http://localhost:8080/api/v1/teams?project_id=proj_1'",
         '-H "Authorization: Bearer $ZITADEL_PROJECT_SECRET"',
         "-H 'Content-Type: application/json'",
         `-d '{"name":"O'\\''Brien"}'`,
@@ -21,7 +21,7 @@ describe("curlOf", () => {
 
   it("sends no credential for an operation that needs none", () => {
     expect(curlOf("http://localhost:8080", requestFor("getLive"))).toBe(
-      "curl -X GET 'http://localhost:8080/livez'",
+      "curl -X GET 'http://localhost:8080/api/v1/livez'",
     );
   });
 });

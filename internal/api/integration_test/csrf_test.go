@@ -22,7 +22,7 @@ import (
 // raw cookie request share it.
 func cookieRequest(t *testing.T, cookie *http.Cookie, method, path, body string, headers map[string]string) (int, string) {
 	t.Helper()
-	req, err := http.NewRequestWithContext(t.Context(), method, harness.EnsureTestServer(t).URL+path, strings.NewReader(body))
+	req, err := http.NewRequestWithContext(t.Context(), method, harness.APIBaseURL(t)+path, strings.NewReader(body))
 	require.NoError(t, err)
 	if body != "" {
 		req.Header.Set("Content-Type", "application/json")
@@ -50,7 +50,7 @@ func TestSessionCSRF(t *testing.T) {
 
 	home, operatorID, cookie := ownSessionUser(t)
 	harness.SeedProjectAdmin(t, home.ID, operatorID)
-	base := harness.EnsureTestServer(t).URL
+	base := harness.APIBaseURL(t)
 
 	raw := func(t *testing.T, method, path, body string, headers map[string]string) (int, string) {
 		t.Helper()

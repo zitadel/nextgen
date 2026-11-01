@@ -107,23 +107,12 @@ export async function validateSsoConsistency(
 export async function deployedSlugs(
   ctx: Pick<StepContext, "client" | "projectId">,
 ): Promise<ReadonlySet<string> | undefined> {
-  const slugs = new Set<string>();
-  let pageToken: string | null | undefined;
   try {
-    do {
-      const page = await ctx.client.queryIdps(
-        { limit: 100, ...(pageToken ? { page_token: pageToken } : {}) },
-        { project_id: ctx.projectId },
-      );
-      for (const idp of page.idps) {
-        slugs.add(idp.slug);
-      }
-      pageToken = page.next_page_token;
-    } while (pageToken);
+    const idps = await ctx.client.queryIdps.all({ limit: 100 }, { project_id: ctx.projectId });
+    return new Set(idps.map((idp) => idp.slug));
   } catch {
     return undefined;
   }
-  return slugs;
 }
 
 /** The provider slugs the steps of a flow offer. */

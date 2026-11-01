@@ -19,11 +19,11 @@ vi.mock("@/auth/session", async (importOriginal) => {
  * the value each kind holds, read from one `GET /variables` without a kind.
  */
 const PROJECT_ID = "proj_1";
-const VARIABLES_URL = "http://localhost/api/variables";
+const VARIABLES_URL = "http://localhost/api/v1/variables";
 
 beforeEach(() =>
   server.use(
-    http.get(`http://localhost/api/projects/${PROJECT_ID}`, () =>
+    http.get(`http://localhost/api/v1/projects/${PROJECT_ID}`, () =>
       HttpResponse.json({
         id: PROJECT_ID,
         name: "River",
@@ -32,11 +32,11 @@ beforeEach(() =>
         updated_at: "2026-07-08T09:00:00Z",
       }),
     ),
-    http.post("http://localhost/api/grants/query", () => HttpResponse.json({ grants: [] })),
-    http.get("http://localhost/api/policies", () =>
+    http.post("http://localhost/api/v1/grants/query", () => HttpResponse.json({ grants: [] })),
+    http.get("http://localhost/api/v1/policies", () =>
       HttpResponse.json({ policies: [], next_page_token: null }),
     ),
-    http.get("http://localhost/api/users/me/projects", () =>
+    http.get("http://localhost/api/v1/users/me/projects", () =>
       HttpResponse.json({ projects: [{ id: PROJECT_ID, name: "River" }] }),
     ),
   ),
@@ -46,7 +46,9 @@ beforeEach(() =>
 function stubVariables(body: Record<string, unknown>, status = 200) {
   const projects: (string | null)[] = [];
   server.use(
-    http.get("http://localhost/api/projects/:id/admins", () => HttpResponse.json({ admins: [] })),
+    http.get("http://localhost/api/v1/projects/:id/admins", () =>
+      HttpResponse.json({ admins: [] }),
+    ),
     http.get(VARIABLES_URL, ({ request }) => {
       projects.push(new URL(request.url).searchParams.get("project_id"));
       return HttpResponse.json(body, { status });

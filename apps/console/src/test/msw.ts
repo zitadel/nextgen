@@ -16,8 +16,8 @@ import { TEST_PROJECT_ID } from "./project-scope.fixture";
  * test. Refusing it in MSW fails the test that made it, every time.
  *
  * Paths match any origin (`*`): some specs bind the API base to
- * `http://localhost/api`, others import the router before they can and request
- * the relative `/api` default.
+ * `http://localhost`, others import the router before they can and request the
+ * relative `/api/v1` of the empty default.
  */
 
 /**
@@ -36,12 +36,12 @@ import { TEST_PROJECT_ID } from "./project-scope.fixture";
  * the handler themselves.
  */
 const shellHandlers = [
-  http.get("*/api/users/me/projects", () =>
+  http.get("*/api/v1/users/me/projects", () =>
     HttpResponse.json({ projects: [{ id: TEST_PROJECT_ID, name: "Test project" }] }),
   ),
   // The signed-in person's own schema (account settings' profile): the shipped
   // default, email only, nothing designated for display.
-  http.get("*/api/users/me/schema", () =>
+  http.get("*/api/v1/users/me/schema", () =>
     HttpResponse.json({
       id: "https://example.test/default-human-user.json",
       schema: {
@@ -53,13 +53,13 @@ const shellHandlers = [
   ),
   // The person's own sign-in methods, on account settings' profile: none, and
   // no password.
-  http.get("*/api/users/me/password", () => HttpResponse.json({})),
-  http.get("*/api/users/me/passkeys", () => HttpResponse.json({ passkeys: [] })),
-  http.get("*/api/users/me/identity_links", () => HttpResponse.json({ identity_links: [] })),
+  http.get("*/api/v1/users/me/password", () => HttpResponse.json({})),
+  http.get("*/api/v1/users/me/passkeys", () => HttpResponse.json({ passkeys: [] })),
+  http.get("*/api/v1/users/me/identity_links", () => HttpResponse.json({ identity_links: [] })),
   // The Users list, where the console lands, reads the project's schema
   // lineages for its filter (#1669). None by default: the filter stays off
   // the title row, and a spec about it serves its own list.
-  http.get("*/api/schemas", () => HttpResponse.json({ schemas: [] })),
+  http.get("*/api/v1/schemas", () => HttpResponse.json({ schemas: [] })),
 ];
 
 export const server = setupServer(...shellHandlers);

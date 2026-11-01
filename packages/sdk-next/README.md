@@ -183,7 +183,7 @@ a `matcher` that lists routes, a header on a public page would always look
 signed out. For your app's own chrome in client components (header navigation,
 account menus), read the session client-side with `getSession()` from
 `@zitadel/sdk-next/session`. It fetches the same-origin
-`{proxyPath}/sessions/me?project_id=…` — the same read the `<zitadel-session>`
+`{proxyPath}/api/v1/sessions/me?project_id=…` — the same read the `<zitadel-session>`
 card performs — so it works on every page and the answer is the server's. The
 project is the `projectId` option, else the project of `configureZitadel()`,
 else `NEXT_PUBLIC_ZITADEL_PROJECT_ID`; with none, it reads as signed out:

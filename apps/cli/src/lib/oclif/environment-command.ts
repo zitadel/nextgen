@@ -138,8 +138,8 @@ export abstract class EnvironmentCommand extends BaseCommand {
    * terminal: on a pipe the result travels alone, and `--json` silences them
    * either way. `quiet` is for a command whose own output is that summary.
    *
-   * `verbatim` is for a caller that stores or compares what it reads (see
-   * `SanitizeOptions`).
+   * `verbatim` is for a caller that stores, compares or sends back what it
+   * reads (see `SanitizeOptions`).
    * `prompt: false` is for a best-effort probe that must never stop to ask
    * (or write `.env.<name>.local`): a missing value then fails as it would
    * non-interactively.

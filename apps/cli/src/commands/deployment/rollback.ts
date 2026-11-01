@@ -1,19 +1,9 @@
 import { Flags } from "@oclif/core";
-import type { ZitadelClient } from "@zitadel/api/client";
-import type {
-  GetReleaseById200PointersItem,
-  ListDeployments200DeploymentsItem,
-} from "@zitadel/api/generated/model";
+import type { GetReleaseById200PointersItem } from "@zitadel/api/generated/model";
 
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope, nonBlankArg } from "../../lib/oclif";
-import { collectPages } from "../../lib/oclif/crud/paging";
 import { renderTable } from "../../lib/oclif/crud/table";
-import {
-  listLiveDeployments,
-  messageFlag,
-  rollbackDeployment,
-  servesPrimary,
-} from "../../lib/release";
+import { messageFlag, rollbackDeployment, servesPrimary } from "../../lib/release";
 import { toZitadelError, ZitadelError } from "../../lib/errors";
 import { Promptable } from "../../lib/oclif/promptable";
 import { reportWarning } from "../../lib/warnings";
@@ -64,25 +54,18 @@ export default class DeploymentRollback extends Promptable(EnvironmentCommand) {
     // The bare form decides from one read of the history, so its guard comes
     // from that same read: a deploy landing after it is one the caller never
     // saw, and must make the server refuse rather than become the expected one.
-    let bareGuard: string | undefined;
+    let expectedDeploymentId: string | undefined;
     if (targetId === undefined) {
-      // The prior deployment of a long-lived origin can sit beyond the
-      // server's first page, so the whole history is drained rather than the
-      // default page searched — otherwise a bare rollback would miss a target
-      // further back and refuse a rollback it should resolve.
-      const { items } = await collectPages(
-        (token) =>
-          client.listDeployments({
-            project_id: projectId,
-            ...(token === undefined ? {} : { page_token: token }),
-          }),
-        { items: "deployments", all: true, nextPageToken: "next_page_token" },
-      );
       // A preview deployment is never the deploy a bare rollback undoes, nor
       // one it can restore: the server refuses to roll one back. Primary
       // deployments make one history for the project, newest first.
-      const history = (items as ListDeployments200DeploymentsItem[]).filter(servesPrimary);
-      const [latest, prior] = history;
+      // The whole history, not the first page: the prior deployment of a
+      // long-lived origin can sit beyond it, and a bare rollback that missed it
+      // would refuse a rollback it should resolve.
+      const deployments = await client.listDeployments.all({
+        project_id: projectId,
+      });
+      const [latest, prior] = deployments.filter(servesPrimary);
       if (!latest) {
         throw new ZitadelError("E_VALIDATION", "There is no deployment to roll back", {
           hint: `Nothing has been deployed yet; check \`zitadel deployment list${this.environmentSelector()}\`.`,
@@ -94,7 +77,7 @@ export default class DeploymentRollback extends Promptable(EnvironmentCommand) {
         });
       }
       targetId = prior.id;
-      bareGuard = latest.id;
+      expectedDeploymentId = latest.id;
     }
 
     // A dry run re-applies nothing, so it stops once the target is resolved,
@@ -115,7 +98,13 @@ export default class DeploymentRollback extends Promptable(EnvironmentCommand) {
     // write in non-interactive mode) makes the server answer 409 rather than
     // letting the rollback overwrite a change the caller never saw. Omitted
     // when nothing is live there, which an optional id cannot stand in for.
-    const expectedDeploymentId = bareGuard ?? (await liveGuard(client, projectId));
+    if (expectedDeploymentId === undefined) {
+      const deployments = await client.listDeployments.all({
+        project_id: projectId,
+        live: true,
+      });
+      expectedDeploymentId = deployments.find(servesPrimary)?.id;
+    }
 
     const confirmed = await this.input({
       kind: "confirm",
@@ -134,8 +123,10 @@ export default class DeploymentRollback extends Promptable(EnvironmentCommand) {
 
     let pointers: readonly GetReleaseById200PointersItem[] | undefined;
     try {
-      pointers = (await client.getReleaseById(deployment.release_id, { project_id: projectId }))
-        .pointers;
+      const release = await client.getReleaseById(deployment.release_id, {
+        project_id: projectId,
+      });
+      pointers = release.pointers;
     } catch (error) {
       reportWarning(
         `Rolled back, but the revisions ${deployment.release_id} pins could not be read: ${toZitadelError(error).message}`,
@@ -162,9 +153,4 @@ export default class DeploymentRollback extends Promptable(EnvironmentCommand) {
       ].join("\n"),
     });
   }
-}
-
-/** The project's newest primary deployment, which a rollback is guarded by. */
-async function liveGuard(client: ZitadelClient, projectId: string): Promise<string | undefined> {
-  return (await listLiveDeployments(client, projectId)).find(servesPrimary)?.id;
 }

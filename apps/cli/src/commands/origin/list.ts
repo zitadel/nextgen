@@ -33,7 +33,8 @@ export default class OriginList extends EnvironmentCommand {
     await this.toMeta(flags);
     const { client, projectId } = await this.connect();
 
-    const origins = (await client.getProject(projectId)).origins ?? [];
+    const project = await client.getProject(projectId);
+    const origins = project.origins;
 
     // The resource commands' list rendering: a pipe (or `--plain`) gets one
     // tab-separated record per line, with no header and nothing at all when

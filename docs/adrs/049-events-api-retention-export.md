@@ -10,6 +10,10 @@
 > instead of on the server's own timer, and it runs as the server's role, not
 > a dedicated one. See
 > [the amendment](#amendment-2026-10-27-who-starts-the-purge-and-as-which-role).
+>
+> **Amendment (2026-10-30):** §3's shipper and §1's ascending pages list only
+> settled events, so no cursor skips an event whose transaction commits late.
+> See [the amendment](#amendment-2026-10-30-no-cursor-skips-a-late-commit).
 
 ## Context
 
@@ -302,6 +306,9 @@ flowchart LR
 
 - At-least-once delivery within the retention window. Consumers must be
   **idempotent** on `event.id`.
+- No event is skipped: the shipper lists only settled events, so one whose
+  transaction commits late still ships
+  ([amendment 2026-10-30](#amendment-2026-10-30-no-cursor-skips-a-late-commit)).
 - Shipper retries on transient failure without advancing the cursor.
 - Duplicate external delivery is acceptable (crash between deliver and upsert);
   missing delivery after retention purge is accepted (metric
@@ -442,3 +449,55 @@ role needs a second connection for the purge and an application role with
 grants of its own in place of `pg_write_all_data`. Until a deployment needs
 that, the code holds the line: one statement deletes events,
 `DeleteEventsOlderThan`, and only the purge calls it.
+
+## Amendment (2026-10-30): no cursor skips a late commit
+
+§3's shipper reads `(created_at, id) > cursor`, and so does every page of
+`GET /events?order=asc` after the first. Such a reader skips an event for good
+when the event commits after the reader has moved past it. On Postgres
+`created_at` was `now()`, the start of the transaction, so a transaction that
+began first and committed last left its events behind cursors that had already
+passed later ones. Path B events commit with their mutation
+([ADR 048](048-wide-events-internal-audit-primitive.md)), so any slow mutation
+could do it, and sinks missed those events without a trace.
+
+**Guarantee.** Forward readers list only *settled* events: those no open
+transaction can still commit an event before. The shipper delivers every event
+committed within the retention window, in `(created_at, id)` order within a
+project. Delivery stays at least once, since a crash between delivery and the
+cursor upsert repeats events, so consumers still drop duplicates by `id`.
+Paging `GET /events?order=asc` forward returns every committed event once.
+
+**Cost.** An event is listed once every transaction that may still commit an
+earlier event of its project has ended. A transaction that stays open holds
+back its own project's export and ascending lists, never another project's,
+and never makes a reader skip. Descending lists are not bounded: nothing reads
+them as a feed.
+
+| Dialect | `created_at` | Settled events |
+|---|---|---|
+| Postgres | `clock_timestamp()` at the insert, which first takes a shared advisory lock keyed by the project and the current second; the transaction holds it until it ends | Those before the oldest second from which a writer of the project still holds a lock, read from `pg_locks` before the list |
+| Spanner | The commit timestamp (`allow_commit_timestamp`) | All: a strong read sees every event up to its timestamp, and a later commit sorts after them |
+| SQLite | The clock, raised past every event already stored in the project; the one writer holds its lock from the stamp to the commit | All |
+
+`EventsSettledBefore` returns the bound; `ListEventsAfterCursor` and the
+ascending list apply it.
+
+**Rejected:**
+
+- *A safety lag*, listing only events older than now minus a margin, holds
+  only while every transaction that writes an event ends within the margin.
+  Nothing bounds a Path B transaction: Postgres 17's `transaction_timeout`
+  would abort every slow mutation, a serverless instance frozen mid-transaction
+  outlives any margin, and on Spanner the application servers' clock skew adds
+  to it. A lag also delays every event, not only those behind an open
+  transaction.
+- *A snapshot `xmin` guard* bounds transaction IDs, not times. Postgres
+  assigns an ID at a transaction's first write, not when it stamps an event,
+  so a finished transaction with an older ID can have stamped its events after
+  a running one: listing only IDs older than the oldest running one still
+  passes the running one's events.
+- *The oldest `xact_start` in `pg_stat_activity`* holds every project back by
+  the database's oldest open transaction, a retention purge or a dump
+  included. It also sees only the sessions of the reader's role, and only
+  while `track_activities` is on.
