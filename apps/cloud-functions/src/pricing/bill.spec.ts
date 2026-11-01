@@ -4,6 +4,18 @@ import { type Usage, bill, meterLines } from "./bill";
 import { CATALOG, entitlementsFor } from "./catalog";
 
 /**
+ * What a meter counted per connection or directory reports for `users`, one
+ * number per connection or directory: at most the catalog's `at_most` of each.
+ */
+function counted(id: string, users: number[]): number {
+  const most = CATALOG.meters.find((meter) => meter.id === id)?.counted_per?.at_most;
+  if (!most) throw new Error(`${id} is not counted per connection or directory`);
+  return users.reduce((sum, count) => sum + Math.min(count, most), 0);
+}
+
+const times = (n: number, users: number) => Array.from({ length: n }, () => users);
+
+/**
  * The bills the pricing proposal quotes, in minor units: its stress test,
  * its example bills and its migration example. A changed price that moves one
  * shows here first.
@@ -19,7 +31,7 @@ const QUOTED: [string, Usage, number][] = [
   [
     "a B2C app with 200k bot checks",
     { counts: { monthly_active_users: 600_000, bot_checks: 200_000 } },
-    29_850,
+    39_800,
   ],
   [
     "a consumer app, 3M MAU, bands opted in",
@@ -27,14 +39,43 @@ const QUOTED: [string, Usage, number][] = [
     400_000,
   ],
   [
-    "a B2B app with its first enterprise customers: 400 SSO users",
-    { counts: { monthly_active_users: 5_000, sso_users: 400, policy_users: 5_000 } },
+    "a B2B app with its first enterprise customers: 2 connections of 200 users, 1 directory",
+    {
+      counts: {
+        monthly_active_users: 5_000,
+        sso_users: counted("sso_users", [200, 200]),
+        directory_users: counted("directory_users", [200]),
+        policy_users: 5_000,
+      },
+    },
     0,
   ],
   [
-    "a growing B2B SaaS: 20k users, all on SSO, MFA required",
-    { counts: { monthly_active_users: 20_000, sso_users: 20_000, policy_users: 20_000 } },
-    30_500,
+    "a B2B app whose one customer brings 10k users on one connection",
+    { counts: { monthly_active_users: 10_000, sso_users: counted("sso_users", [10_000]) } },
+    0,
+  ],
+  [
+    "a mid-market B2B SaaS: 50 connections of 200 users, MFA required",
+    {
+      counts: {
+        monthly_active_users: 10_000,
+        sso_users: counted("sso_users", times(50, 200)),
+        policy_users: 10_000,
+      },
+    },
+    90_000,
+  ],
+  [
+    "a growing B2B SaaS: 20 connections of 1,000 users, MFA required",
+    {
+      counts: {
+        monthly_active_users: 20_000,
+        sso_users: counted("sso_users", times(20, 1_000)),
+        policy_users: 20_000,
+      },
+    },
+    142_000,
   ],
   [
     "a small-business SaaS: 100k users, MFA required, no SSO",
@@ -42,17 +83,19 @@ const QUOTED: [string, Usage, number][] = [
     18_000,
   ],
   [
-    "an enterprise B2B app with 400-day retention and priority support",
+    "an enterprise B2B app: 300 connections and 100 directories of 500 users, 400-day retention, a SIEM sink, priority support",
     {
       counts: {
         monthly_active_users: 200_000,
-        sso_users: 150_000,
+        sso_users: counted("sso_users", times(300, 500)),
+        directory_users: counted("directory_users", times(100, 500)),
         policy_users: 400_000,
         retained_users_400d: 200_000,
       },
+      event_sinks: 1,
       support_priority: true,
     },
-    461_400,
+    2_467_900,
   ],
   [
     "an M2M platform, 20M tokens",
@@ -65,16 +108,16 @@ const QUOTED: [string, Usage, number][] = [
     1_800_000,
   ],
   [
-    "a migrating IdP customer: 100k SSO users, two policies, 400-day retention",
+    "a migrating IdP customer: 200 connections of 500 users, two policies, 400-day retention",
     {
       counts: {
         monthly_active_users: 100_000,
-        sso_users: 100_000,
+        sso_users: counted("sso_users", times(200, 500)),
         policy_users: 200_000,
         retained_users_400d: 100_000,
       },
     },
-    216_500,
+    1_178_000,
   ],
 ];
 
@@ -95,12 +138,18 @@ describe("a month's bill", () => {
 
   it("bills the usage alone once it passes the minimum, never both", () => {
     const month = bill({ counts: { sso_users: 20_000 } });
-    expect(month).toMatchObject({ usage_amount: 28_500, total_amount: 28_500 });
+    expect(month).toMatchObject({ usage_amount: 190_000, total_amount: 190_000 });
   });
 
   it("adds what is billed on top to the minimum, never drawing on its credit", () => {
     const month = bill({ counts: { policy_users: 30_000 }, support_priority: true });
     expect(month).toMatchObject({ on_top_amount: 99_900, total_amount: 109_900 });
+  });
+
+  it("needs Pro to stream events to a SIEM, billed on top per sink", () => {
+    const month = bill({ counts: {}, event_sinks: 2 });
+    expect(month.reasons).toContain("streams events to a SIEM");
+    expect(month).toMatchObject({ plan: "pro", on_top_amount: 20_000, total_amount: 30_000 });
   });
 
   it("bills core users above 1M only once the owner opts in", () => {
@@ -150,10 +199,24 @@ describe("the catalog", () => {
   it("gives every plan the same allowances, and managed delivery to Pro and Enterprise only", () => {
     const free = entitlementsFor("free").allowances;
     const pro = entitlementsFor("pro").allowances;
-    expect(free).toMatchObject({ sso_users: 1_000, policy_users: 10_000, bot_checks: 1_000 });
+    expect(free).toMatchObject({
+      sso_users: 1_000,
+      directory_users: 1_000,
+      policy_users: 10_000,
+      authz_users: 100_000,
+      bot_checks: 1_000,
+    });
     expect(pro).toMatchObject({ sso_users: 1_000, policy_users: 10_000, email_users: 0 });
     expect(free).not.toHaveProperty("email_users");
     expect(pro).not.toHaveProperty("email_messages");
+  });
+
+  it("bills a connection or directory at most $75 a month, however many users it brings", () => {
+    for (const id of ["sso_users", "directory_users"]) {
+      const meter = CATALOG.meters.find((candidate) => candidate.id === id);
+      const price = meter?.price?.model === "per_unit" ? meter.price.unit_amount : 0;
+      expect((meter?.counted_per?.at_most ?? 0) * price).toBeCloseTo(75);
+    }
   });
 
   it("sells Enterprise, which keeps 90 days, only the 400-day retention", () => {

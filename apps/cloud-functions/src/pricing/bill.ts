@@ -11,6 +11,8 @@ export interface Usage {
   hide_mark?: boolean;
   /** Regions outside the EU. */
   regions?: number;
+  /** Event sinks that stream a project's events to a SIEM. */
+  event_sinks?: number;
   support_priority?: boolean;
 }
 
@@ -107,6 +109,7 @@ export function bill(usage: Usage, catalog: Catalog = CATALOG): Bill {
   const price = (id: string) => minor(catalog.licensed.find((line) => line.id === id)?.amount ?? 0);
   const onTop =
     (usage.regions ?? 0) * price("region") +
+    (usage.event_sinks ?? 0) * price("event_sink") +
     (usage.support_priority ? price("support_priority") : 0);
   const minimum = minor(catalog.plans.pro.minimum.amount);
   return {
@@ -134,6 +137,7 @@ function proReasons(
   }
   if (usage.hide_mark) reasons.push("hides the attribution mark");
   if ((usage.regions ?? 0) > 0) reasons.push("a region outside the EU");
+  if ((usage.event_sinks ?? 0) > 0) reasons.push("streams events to a SIEM");
   if (usage.support_priority) reasons.push("priority support");
   for (const line of lines) {
     if (line.meter.plans && !line.meter.plans.includes("free")) {

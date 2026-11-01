@@ -44,11 +44,11 @@ describe("the mock team's usage", () => {
     const { stripe } = mockSystems();
     const billing = await stripe.overview(MOCK_TEAM);
     expect(billing.plan.id).toBe("free");
-    expect(billing.estimate).toEqual({ plan: "pro", total_amount: 30_500, currency: "usd" });
+    expect(billing.estimate).toEqual({ plan: "pro", total_amount: 142_000, currency: "usd" });
     expect(billing.usage.find((line) => line.metric === "sso_users")).toMatchObject({
-      used: 20_000,
+      used: 15_000,
       included: 1_000,
-      amount: 28_500,
+      amount: 140_000,
     });
   });
 

@@ -69,21 +69,22 @@ export const MOCK_PROJECTS = [
 
 /**
  * The mock team's month by project: a growing B2B SaaS whose 20,000 users all
- * sign in through SSO with MFA required, the pricing proposal's example bill,
- * $305 on Pro. Most use the customer portal. The partner API's machines take
- * tokens and the portal's sign-up runs bot checks, both within their
- * allowances.
+ * sign in through 20 SSO connections of 1,000 with MFA required, the pricing
+ * proposal's example bill, $1,420 on Pro. The SSO meter counts at most 750 of
+ * a connection's users. Most use the customer portal. The partner API's
+ * machines take tokens and the portal's sign-up runs bot checks, both within
+ * their allowances.
  */
 const MOCK_PROJECT_MONTHS: Record<string, Record<string, number>> = {
   proj_mock_portal: {
     monthly_active_users: 14_000,
-    sso_users: 14_000,
+    sso_users: 10_500,
     policy_users: 14_000,
     bot_checks: 700,
   },
   proj_mock_api: {
     monthly_active_users: 6_000,
-    sso_users: 6_000,
+    sso_users: 4_500,
     policy_users: 6_000,
     m2m_tokens: 600_000,
   },

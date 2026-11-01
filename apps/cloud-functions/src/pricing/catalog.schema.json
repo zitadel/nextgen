@@ -129,9 +129,16 @@
         "dedupe": {
           "oneOf": [
             { "type": "null" },
-            { "type": "array", "items": { "enum": ["project", "user", "policy", "band", "month"] }, "contains": { "const": "month" } }
+            { "type": "array", "items": { "enum": ["project", "connection", "directory", "user", "policy", "band", "month"] }, "contains": { "const": "month" } }
           ],
           "description": "The key a subject is counted once by; null for activity meters"
+        },
+        "counted_per": {
+          "type": "object",
+          "required": ["key", "at_most"],
+          "properties": { "key": { "enum": ["connection", "directory"] }, "at_most": { "type": "integer", "minimum": 1 } },
+          "additionalProperties": false,
+          "description": "Counts at most this many users per connection or directory a month, so one large tenant costs at most at_most times the unit price"
         },
         "allowance": { "type": ["integer", "null"], "minimum": 0, "description": "Free per account and month, on every plan" },
         "retention_days": { "type": "integer", "minimum": 1, "description": "How many days a counted user's audit events are kept; a plan that keeps events as long already includes it and is not sold the meter" },
