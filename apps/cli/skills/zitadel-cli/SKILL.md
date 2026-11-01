@@ -116,7 +116,10 @@ nothing; `data.skills` and `data.directories` say what it added where.
   `--force` when non-interactive. Removing a preview pattern leaves its live
   previews served until they expire.
   `deploy` lands only on primary origins and fails with `E_VALIDATION` without
-  one; its `next_commands` name the step that gives the project one. `setup`
+  one; its `next_commands` name the step that gives the project one. A
+  deployment freezes its origins: a primary origin added later serves nothing
+  until the next `deploy`, also after a `deployment rollback`, and one removed
+  stops being served at once. `setup`
   0.1.0 registered the app's URL (`ZITADEL_ISSUER`) as a `preview` origin,
   which `origin add --kind primary` refuses with `E_CONFLICT`: `doctor` warns
   (`issuer-origin`) and `doctor --fix` makes it primary.
@@ -263,6 +266,10 @@ Each invocation prints one JSON object:
 - `deployment rollback` emits `data.release_id` (the release live again),
   `data.origins` and `data.pointers`, the `{kind, handle, revision_id}`
   revisions that release pins; the `schema` one is what new registrations use.
+  It restores the origins that deployment froze: `data.dropped_origins` are
+  listed origins it leaves out, which refuse sign-in until the next `deploy`,
+  and `data.unserved_origins` are origins it names that the project no longer
+  lists.
   Users keep their schema revision and attributes: a rollback does not migrate
   them back. Without `data.pointers`, a warning says the release could not be
   read.

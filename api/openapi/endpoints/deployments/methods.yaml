@@ -11,7 +11,9 @@ post:
     must already exist in the project. `targets` is `primary` or preview
     URLs. The deployment freezes the project's variable values for its kind,
     with no fallback between primary and preview values. The newest primary
-    deployment also serves a caller with no origin.
+    deployment also serves a caller with no origin. `primary` freezes the
+    project's primary origins: one added later serves nothing until the next
+    deployment to `primary`, and one removed stops being served at once.
 
     A deployment to `primary` changes nothing when the project's newest
     primary deployment has the same release and frozen values and covers
