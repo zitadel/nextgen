@@ -1,4 +1,4 @@
-import type { Config } from "@oclif/core";
+import { Args, type Config, Flags } from "@oclif/core";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@clack/prompts", () => ({
@@ -38,13 +38,23 @@ type Invocation = {
 /** A destructive command that records what its act was handed. */
 class Removing extends Destructive(BaseCommand) {
   public static override readonly id: string = "variable:rm";
+  public static override readonly args = { name: Args.string() };
+  public static override readonly flags = {
+    force: Flags.boolean({ char: "f" }),
+    preview: Flags.boolean(),
+    env: Flags.string(),
+    message: Flags.string(),
+  };
   public readonly acted: unknown[] = [];
   public readonly ready: unknown[] = [];
 
   private readonly invocation: Invocation;
 
   constructor(invocation: Invocation) {
-    super(invocation.argv ?? ["API_URL"], { version: "1.2.3" } as unknown as Config);
+    super(invocation.argv ?? ["API_URL"], {
+      version: "1.2.3",
+      runHook: async () => ({ successes: [], failures: [] }),
+    } as unknown as Config);
     this.invocation = invocation;
   }
 
@@ -80,6 +90,7 @@ class Removing extends Destructive(BaseCommand) {
 /** A command whose oclif id is missing, as a class run without a manifest has. */
 class Unnamed extends Removing {
   public static override readonly id = "";
+  public static override readonly args = Removing.args;
 }
 
 afterEach(() => {
@@ -253,6 +264,25 @@ describe("Destructive", () => {
       });
     });
 
+    it("keeps an argument typed after a flag once, before --force", async () => {
+      const command = new Removing({ argv: ["--message", "restore", "API_URL"] });
+
+      await expect(command.remove()).rejects.toMatchObject({
+        nextCommands: ["npx @zitadel/cli@1.2.3 variable rm API_URL --force --message restore"],
+      });
+    });
+
+    it("names the gate's arguments once, in place of one typed after a flag", async () => {
+      const command = new Removing({
+        argv: ["--message", "restore", "API_URL"],
+        arguments: ["API_URL"],
+      });
+
+      await expect(command.remove()).rejects.toMatchObject({
+        nextCommands: ["npx @zitadel/cli@1.2.3 variable rm API_URL --force --message restore"],
+      });
+    });
+
     it("names the gate's arguments in place of the typed ones", async () => {
       const command = new Removing({ argv: ["--env", "staging"], arguments: ["API_URL"] });
 
@@ -273,7 +303,7 @@ describe("Destructive", () => {
       const command = new Removing({ argv: ["--", "https://me:secret@host"] });
 
       await expect(command.remove()).rejects.toMatchObject({
-        nextCommands: ["npx @zitadel/cli@1.2.3 variable rm --force -- https://host"],
+        nextCommands: ["npx @zitadel/cli@1.2.3 variable rm https://host --force"],
       });
     });
 

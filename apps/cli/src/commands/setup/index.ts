@@ -1,4 +1,4 @@
-import { readFile, rm, writeFile } from "node:fs/promises";
+import { access, readFile, rm, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 
 import { intro, note, outro } from "@clack/prompts";
@@ -333,7 +333,7 @@ export default class Setup extends Destructive(BaseCommand) {
       // An app already set up has nothing left to scaffold, but an explicit
       // --dev-port is how it moves to another port.
       if (flags["dev-port"] !== undefined) {
-        return this.moveToDevPort(cwd, assertDevPort(flags["dev-port"]), dryRun);
+        return this.moveToDevPort(cwd, flags.cwd, assertDevPort(flags["dev-port"]), dryRun);
       }
       return this.emit({ status: "skipped", reason: "already-initialized" });
     }
@@ -1238,6 +1238,7 @@ export default class Setup extends Destructive(BaseCommand) {
    */
   private async moveToDevPort(
     cwd: string,
+    typedCwd: string | undefined,
     devPort: number,
     dryRun: boolean,
   ): Promise<JsonEnvelope> {
@@ -1256,9 +1257,26 @@ export default class Setup extends Destructive(BaseCommand) {
     for (const file of move.result.filesWritten) {
       consola.info(`${dryRun ? "Would update" : "Updated"} ${relativeDisplay(cwd, file)}`);
     }
+    // Not setup again: the app is on the new port by now, so a rerun moves
+    // nothing and never reaches the old origin. Pinned to the project just
+    // moved, as the other recoveries are: its env file, or the server the move
+    // used for a project setup gave none, never what the shell has exported.
+    const cleanup =
+      move.refused && move.staleOrigin !== undefined
+        ? projectCommand(
+            `origin rm ${shellArg(move.staleOrigin)} --force`,
+            (await access(join(cwd, ".env.development.local")).then(
+              () => true,
+              () => false,
+            ))
+              ? recoverySelector(typedCwd)
+              : environmentSelectorSuffix({ server, cwd: typedCwd }),
+            this.meta.cliVersion,
+          )
+        : undefined;
     if (move.staleOrigin !== undefined) {
       reportWarning(
-        `${move.staleOrigin} is still among the project's origins; it admits a port nothing serves any more.${move.refused ? ` Remove it with \`origin rm ${move.staleOrigin} --force\`.` : ""}`,
+        `${move.staleOrigin} is still among the project's origins; it admits a port nothing serves any more.${cleanup === undefined ? "" : ` Remove it with \`${cleanup}\`.`}`,
       );
     }
     for (const slug of move.ssoProviders) {
@@ -1284,11 +1302,7 @@ export default class Setup extends Destructive(BaseCommand) {
       },
       next: {
         actions: [`Restart the dev server and open ${move.issuer}/login.`],
-        // Not setup again: the app is on the new port by now, so a rerun moves
-        // nothing and never reaches the old origin.
-        ...(move.refused && move.staleOrigin !== undefined
-          ? { commands: [this.suggestUnscoped(`origin rm ${shellArg(move.staleOrigin)} --force`)] }
-          : {}),
+        ...(cleanup === undefined ? {} : { commands: [cleanup] }),
       },
     });
   }

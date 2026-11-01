@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { type AddressInfo, createServer, type Server } from "node:net";
 import { join } from "node:path";
@@ -1403,9 +1403,32 @@ describe("setup --dev-port on an app already set up", () => {
 
     const res = await moveTo(cwd, 3101);
 
-    expect((parseJson(res.stdout) as { warnings: string[] }).warnings).toContain(
-      "http://localhost:3000 is still among the project's origins; it admits a port nothing serves any more. Remove it with `origin rm http://localhost:3000 --force`.",
+    expect((parseJson(res.stdout) as { warnings: string[] }).warnings).toContainEqual(
+      expect.stringMatching(
+        /^http:\/\/localhost:3000 is still among the project's origins; it admits a port nothing serves any more\. Remove it with `\S+ \S+ origin rm http:\/\/localhost:3000 --force .+`\.$/,
+      ),
     );
+  });
+
+  it("pins the removal to the server it moved on, for a project with no env file", async () => {
+    const cwd = await aSetUpNextApp();
+    await rm(join(cwd, ".env.development.local"), { force: true });
+
+    const res = await moveTo(cwd, 3101);
+
+    expect(
+      (parseJson(res.stdout) as { data: { next_commands: string[] } }).data.next_commands,
+    ).toEqual([expect.stringContaining("origin rm http://localhost:3000 --force --server ")]);
+  });
+
+  it("suggests removing the previous origin from the project it moved", async () => {
+    const cwd = await aSetUpNextApp();
+
+    const res = await moveTo(cwd, 3101);
+
+    expect(
+      (parseJson(res.stdout) as { data: { next_commands: string[] } }).data.next_commands,
+    ).toEqual([expect.stringContaining(`--env-file ${join(cwd, ".env.development.local")}`)]);
   });
 
   it("suggests removing the previous origin with --force", async () => {

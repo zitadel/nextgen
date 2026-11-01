@@ -3669,6 +3669,7 @@
           "description": "An operationId (queryUsers) or a path (/users/query), then the path parameters. Omit it to choose one."
         }
       ],
+      "variadic": true,
       "flags": [
         {
           "name": "method",

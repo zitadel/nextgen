@@ -10,7 +10,7 @@ import type { CommandResult } from "./types";
 type CommandClass<T extends BaseCommand> = abstract new (...args: any[]) => T;
 
 /** Flags that say how a run answers, not what it does, so a retry leaves them out. */
-const ANSWERING = new Set(["--force", "-f", "--json", "--non-interactive", "-n"]);
+const ANSWERING = new Set(["force", "json", "non-interactive"]);
 
 /**
  * The `user:password@` of a URL, which a retry never prints: everything in the
@@ -92,32 +92,42 @@ export function Destructive<TBase extends CommandClass<BaseCommand>>(Base: TBase
      * `undefined` is a no. It throws during a dry run, which must answer first.
      *
      * Without a `retry` of the gate's own, the refusal suggests this
-     * invocation again with `--force`, as typed: after the leading arguments
-     * (the gate's `arguments` in their place, when it names them),
-     * without the flags that only say how to answer or a URL's credentials,
-     * and with the selector put back on by {@link BaseCommand.retryCommand}.
-     * Whatever follows a `--` stays last, after it, where it is read as
-     * arguments rather than flags.
+     * invocation again with `--force`, rebuilt from the command line as oclif
+     * parsed it rather than as typed: its arguments (or the gate's
+     * `arguments` in their place), `--force`, then each flag but the ones that
+     * only say how to answer, with a URL's credentials left out and the
+     * selector put back on by {@link BaseCommand.retryCommand}. Arguments that
+     * read as flags go last, after a `--`.
      */
-    protected consent(gate: Gate): Promise<Consent | undefined> {
-      const words = this.argv.map((word) => word.replace(CREDENTIALS, "$1"));
-      const delimiter = words.indexOf("--");
-      const typed = (delimiter === -1 ? words : words.slice(0, delimiter)).filter(
-        (word) => !ANSWERING.has(word),
-      );
-      const leading = typed.findIndex((word) => word.startsWith("-"));
-      const split = leading === -1 ? typed.length : leading;
+    protected async consent(gate: Gate): Promise<Consent | undefined> {
+      const { raw } = await this.parse();
+      const definitions: Record<string, { type: string } | undefined> = {
+        ...this.ctor.baseFlags,
+        ...this.ctor.flags,
+      };
+      const redact = (word: string) => word.replace(CREDENTIALS, "$1");
+      const positional = (
+        gate.arguments ?? raw.flatMap((token) => (token.type === "arg" ? [token.input] : []))
+      ).map(redact);
+      const flags = raw.flatMap((token) => {
+        if (token.type !== "flag" || ANSWERING.has(token.flag)) {
+          return [];
+        }
+        // A boolean's input is the flag as typed (`--no-color`, `-v`).
+        return definitions[token.flag]?.type === "boolean"
+          ? [token.input]
+          : [`--${token.flag}`, redact(token.input)];
+      });
+      const delimited = positional.some((word) => word.startsWith("-"));
       const command = this.retryCommand([
         ...(this.id ?? "").split(":").filter((word) => word !== ""),
-        ...(gate.arguments ?? typed.slice(0, split)),
+        ...(delimited ? [] : positional),
         "--force",
-        ...typed.slice(split),
+        ...flags,
       ]);
-      const trailing = delimiter === -1 ? [] : words.slice(delimiter + 1);
-      const retry =
-        trailing.length === 0
-          ? command
-          : inShell(command, { after: ` -- ${trailing.map(shellArg).join(" ")}` });
+      const retry = delimited
+        ? inShell(command, { after: ` -- ${positional.map(shellArg).join(" ")}` })
+        : command;
       return Consent.request("retry" in gate ? gate : { ...gate, retry }, {
         interactive: !this.meta.nonInteractive,
         force: this.meta.force,
