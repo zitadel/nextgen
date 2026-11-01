@@ -164,12 +164,15 @@ has died down.
   and `zitadel setup` check the version of a local server they find running,
   and a client that gets `req.not_found` for an operation says the server may
   predate the prefix.
-- **Cloud:** `vercel.json` routes `/api/*` to the server, and its catch-all
-  stays on the server, as ADR 076 keeps it. ADR 076 rejected routing the
-  server's paths by name because every new API path needed a rewrite of its
-  own. Under the prefix one `/api/*` rule covers them all, so once the alias
-  is gone that option is open again, and with it a website that can take any
-  other path.
+- **Cloud:** `vercel.json` routes `/api/*` to the server ahead of every other
+  service. The server also gets the few paths it answers at the root and,
+  until 1.0.0, the root paths of the API's resources, whose names are fixed:
+  a client released before the prefix calls only operations it knows. Every
+  other path goes to the website, whose 404 answers it
+  ([ADR 076](076-error-pages-and-unmatched-routes.md), amended). ADR 076 had
+  rejected routing the server's paths by name because every new API path
+  needed a rewrite of its own, which the prefix ends. The alias's rule goes
+  with the alias at GA.
 - **Rollout:** every step leaves every mix of versions working. The server
   answers both spellings, and the checks that decide by path accept both, in
   either order. Then the clients move to the prefix, in a `minor` release

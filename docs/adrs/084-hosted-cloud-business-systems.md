@@ -95,7 +95,7 @@ places:
 
 `apps/cloud-functions` is a Next.js app of route handlers, no pages, deployed
 as the service `cloud-functions` and routed `/cloud/(.*)` ahead of the
-server's catch-all.
+website's catch-all.
 
 | Path | What | Who may call it |
 |---|---|---|
