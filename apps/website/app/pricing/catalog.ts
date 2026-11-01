@@ -20,7 +20,7 @@ export type Catalog = {
   /** ISO 4217, lower case. */
   currency: string;
   conventions: Record<
-    "period" | "user_meters" | "allowance" | "invoice" | "caps" | "self_hosted",
+    "period" | "user_meters" | "allowance" | "invoice" | "caps" | "self_hosted" | "packages",
     string
   >;
   plans: {
@@ -28,7 +28,6 @@ export type Catalog = {
       limits: {
         requests_per_second_per_project: number;
         requests_per_month_per_account: number;
-        core_mau_sized_for: number;
         past_monthly_ceiling: string;
       };
       /** What happens past an allowance, where Free has no card to bill. */
@@ -36,12 +35,19 @@ export type Catalog = {
     };
     pro: Plan & {
       minimum: { amount: number; interval: string };
-      annual: { amount: number; interval: string };
-      limits: { core_mau_sized_for: number };
+      limits: { requests_per_second_per_project: number };
     };
     // Quoted, never listed: the page reads none of its minimums or rates.
     enterprise: Plan;
   };
+  core: {
+    platform: string[];
+    resources: string[];
+    authentication: string[];
+    security: string[];
+    billing: string;
+  };
+  packages: Package[];
   meters: Meter[];
   licensed: Licensed[];
   self_hosted: {
@@ -63,25 +69,16 @@ type Plan = {
   delivery_modes: string[];
   support: string;
   sla: { target_percent: number; credits: boolean; note?: string } | null;
-  regions: string[] | string;
+  regions: { scope: "project"; selection: "all_available" };
 };
 
 export type PerUnit = { model: "per_unit"; unit_amount: number; display?: string };
-export type Bands = {
-  model: "bands";
-  above: number;
-  size: number;
-  amount: number;
-  until: number;
-  opt_in: boolean;
-};
 export type PerBand = {
   model: "per_band";
   bands: {
     id: string;
     countries: string[];
-    per_user: number | null;
-    extra_message: number | null;
+    unit_amount: number | null;
   }[];
 };
 
@@ -91,23 +88,31 @@ export type Meter = {
   kind: "users" | "activity" | "gauge";
   /** What one count is. */
   counts: string;
-  /** What counts once a month: a `policy` in it bills a user once per policy. */
+  /** What counts once a month for an enterprise integration. */
   dedupe?: string[];
   allowance: number | null;
-  price: PerUnit | Bands | PerBand | null;
-  /** Activity included per counted user, billed past the pool by `meter`. */
-  pool?: { meter: string; per_user: number };
-  /** The user meter whose pool this activity draws on. */
-  pool_of?: string;
+  price: PerUnit | PerBand | null;
   /** The plans that may use it; every plan when unset. */
   plans?: PlanId[];
-  /** How long a counted user's audit events are kept: a plan that keeps them as long has it already. */
-  retention_days?: number;
   /** Counts at most `at_most` users per connection or directory a month. */
   counted_per?: { key: string; at_most: number };
 };
 
-/** A line billed on top of the minimum, never drawn from its credit. */
+export type Package = {
+  id: string;
+  label: string;
+  pricing: "included_in_plan" | "quoted";
+  scope: "account";
+  plans: PlanId[];
+  included_in: PlanId[];
+  features: string[];
+  availability: "planned" | "available";
+  note: string;
+  retention_days?: number[];
+  volume_unit?: string;
+};
+
+/** A recurring plan fee or an add-on billed separately from metered usage. */
 export type Licensed = {
   id: string;
   label: string;
@@ -168,39 +173,28 @@ function and(words: string[]): string {
     : (words[0] ?? "");
 }
 
-/** The meters the page lists: those a price applies to, without the activity drawn from a pool. */
+/** The meters the page lists: those a price applies to. */
 export function listedMeters(catalog: Catalog): Meter[] {
-  return catalog.meters.filter((meter) => meter.price !== null && !meter.pool_of);
+  return catalog.meters.filter((meter) => meter.price !== null);
 }
 
 /**
  * What a meter costs past its allowance, one line per part: the price, what
- * one connection or directory costs at most, then its pool.
+ * one connection or directory costs at most.
  */
-export function meterPrice(meter: Meter, catalog: Catalog): string[] {
+export function meterPrice(meter: Meter): string[] {
   const { price } = meter;
   if (!price) return ["Never billed"];
   switch (price.model) {
     case "per_unit": {
-      const per = meter.dedupe?.includes("policy") ? "per user and policy" : "per user";
+      const per = meter.kind === "users" ? "per user" : "per unit";
       const lines = [price.display ?? `${dollars(price.unit_amount)} ${per}`];
       const most = mostPer(meter);
       if (most !== undefined) {
         lines.push(`At most ${dollars(most)} per ${meter.counted_per?.key} a month`);
       }
-      const pooled = meter.pool && catalog.meters.find(({ id }) => id === meter.pool?.meter);
-      if (meter.pool && pooled?.price?.model === "per_unit") {
-        lines.push(
-          `${count(meter.pool.per_user)} ${poolNoun(pooled)} pooled per user, then ${pooled.price.display ?? dollars(pooled.price.unit_amount)}`,
-        );
-      }
       return lines;
     }
-    case "bands":
-      return [
-        `${dollars(price.amount)} per started ${COMPACT.format(price.size)} users above ${COMPACT.format(price.above)}, up to ${COMPACT.format(price.until)}`,
-        ...(price.opt_in ? ["Billed only after the owner opts in"] : []),
-      ];
     case "per_band": {
       // The first priced band leads with its price; the others name their place first.
       const lines: string[] = [];
@@ -209,17 +203,11 @@ export function meterPrice(meter: Meter, catalog: Catalog): string[] {
           band.countries.length > 0
             ? and(band.countries.map((code) => REGIONS.of(code) ?? code))
             : "Other countries";
-        if (band.per_user === null) {
-          lines.push(`${where}: not priced yet`);
-          continue;
-        }
-        const terms = [
-          where,
-          ...(meter.pool ? [`${count(meter.pool.per_user)} texts pooled per user`] : []),
-          ...(band.extra_message === null ? [] : [`then ${dollars(band.extra_message)} a text`]),
-        ].join(", ");
-        if (lines.length === 0) lines.push(`${dollars(band.per_user)} per user`, terms);
-        else lines.push(`${where}: ${dollars(band.per_user)} per user`);
+        lines.push(
+          band.unit_amount === null
+            ? `${where}: quote required`
+            : `${where}: ${dollars(band.unit_amount)} per message`,
+        );
       }
       return lines;
     }
@@ -231,11 +219,6 @@ export function mostPer(meter: Meter): number | undefined {
   const { price, counted_per } = meter;
   if (price?.model !== "per_unit" || !counted_per) return undefined;
   return Math.round(counted_per.at_most * price.unit_amount * 100) / 100;
-}
-
-/** What a pooled meter counts, from its label: "Emails past the pool" → "emails". */
-function poolNoun(meter: Meter): string {
-  return meter.label.replace(/ past the pool.*$/, "").toLowerCase();
 }
 
 /**

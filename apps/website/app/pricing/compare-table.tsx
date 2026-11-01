@@ -1,10 +1,11 @@
+import { Fragment } from "react";
 import type { PlanId } from "./catalog";
 import { type Cell, type Group, PLANS } from "./compare";
 
 const PLAN_NAMES: Record<PlanId, string> = { free: "Free", pro: "Pro", enterprise: "Enterprise" };
 
 /**
- * The plans side by side, a group of rows per audience. From md up the plans'
+ * The plans side by side, a group of rows per capability. From md up the plans'
  * names stick under the site's header (h-16) while the rows scroll; below md
  * the table scrolls sideways inside itself, never the page.
  */
@@ -21,6 +22,12 @@ export function CompareTable({
     // with the table rather than widening the page.
     <div className="relative mt-8 max-md:overflow-x-auto">
       <table className="w-full min-w-[40rem] table-fixed border-collapse text-sm">
+        <caption className="pb-6 text-left text-text-secondary leading-6">
+          <span className="block max-md:sticky max-md:left-0 max-md:w-[calc(100vw-3rem)]">
+            Combine B2C, B2B and M2M under one plan. Platform, sign-in, security, audit and support
+            capabilities are shared across use cases.
+          </span>
+        </caption>
         <colgroup>
           <col className="w-[28%] md:w-[34%]" />
           {PLANS.map((plan) => (
@@ -53,26 +60,39 @@ export function CompareTable({
                   <span className="block font-heading font-normal text-2xl text-text-primary leading-tight">
                     {group.title}
                   </span>
-                  <span className="mt-1 block font-normal text-sm text-text-secondary leading-6">
-                    {group.line}
-                  </span>
                 </div>
               </th>
             </tr>
             {group.rows.map((row) => (
-              <tr key={row.label} className="border-border-primary border-t">
-                <th
-                  scope="row"
-                  className="sticky left-0 z-[1] bg-background py-3 pr-4 text-left align-top font-normal text-text-secondary leading-6"
-                >
-                  {row.label}
-                </th>
-                {PLANS.map((plan) => (
-                  <td key={plan} className="px-3 py-3 align-top leading-6">
-                    <CellContent cell={row.cells[plan]} />
-                  </td>
-                ))}
-              </tr>
+              <Fragment key={row.label}>
+                {row.subgroup && (
+                  <tr>
+                    <th scope="colgroup" colSpan={PLANS.length + 1} className="pt-6 pb-3 text-left">
+                      <div className="max-md:sticky max-md:left-0 max-md:w-[calc(100vw-3rem)]">
+                        <span className="block font-medium text-text-primary">
+                          {row.subgroup.title}
+                        </span>
+                        <span className="mt-1 block max-w-3xl font-normal text-text-secondary leading-6">
+                          {row.subgroup.guidance}
+                        </span>
+                      </div>
+                    </th>
+                  </tr>
+                )}
+                <tr className="border-border-primary border-t">
+                  <th
+                    scope="row"
+                    className="sticky left-0 z-[1] bg-background py-3 pr-4 text-left align-top font-normal text-text-secondary leading-6"
+                  >
+                    {row.label}
+                  </th>
+                  {PLANS.map((plan) => (
+                    <td key={plan} className="px-3 py-3 align-top leading-6">
+                      <CellContent cell={row.cells[plan]} />
+                    </td>
+                  ))}
+                </tr>
+              </Fragment>
             ))}
           </tbody>
         ))}

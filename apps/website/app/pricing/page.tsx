@@ -9,7 +9,6 @@ import {
   capitalize,
   count,
   dollars,
-  licensedPrice,
   type Meter,
   mostPer,
   readCatalog,
@@ -21,13 +20,13 @@ import { CompareTable } from "./compare-table";
 
 // Built from the repository (catalog.ts), so a deploy brings the prices the
 // cloud bills from; nothing is read per visit. Laid out like the pricing
-// pages people know: the plans as cards, then every price compared by
-// audience, then the questions, which hold every explanation.
+// pages people know: plans, a capability comparison with use-case guidance,
+// then the questions for billing details.
 export const dynamic = "force-static";
 
 const title = "Pricing — Zitadel preview";
 const description =
-  "Users, teams and seats stay free. Pay for the features you turn on, per user each one touches, against a monthly minimum that works as credit.";
+  "Core identity and basic MFA are free. Pay for advanced controls, audit capabilities and services, with no MAU-based upgrades.";
 
 // The share image is the front page's (layout.tsx): a page's openGraph
 // replaces the layout's whole.
@@ -63,15 +62,15 @@ export default function PricingPage() {
           {proposal && (
             <p className="inline-flex rounded-full bg-tint/10 px-3 py-1 font-semibold text-text-secondary text-xs leading-5">
               A proposal as of {proposalDate(catalog)}: nothing is billed yet, and prices may change
-              before they are
+              before launch
             </p>
           )}
           <h1 className="mt-6 max-w-3xl font-heading text-4xl text-text-primary leading-tight tracking-[-0.025em] md:text-6xl">
-            Pay for features, not for users
+            Identity and core security are free
           </h1>
           <p className="mt-4 max-w-2xl text-base text-text-secondary leading-7 md:text-lg md:leading-8">
-            Users, teams and seats stay free. You pay for the features you turn on, per user each
-            one touches.
+            Users, teams and basic MFA stay free as you grow. Pay for advanced controls, audit
+            capabilities and the services your business needs.
           </p>
 
           <CloudPlans catalog={catalog} />
@@ -87,7 +86,7 @@ export default function PricingPage() {
               groups={compareGroups(catalog)}
               prices={{
                 free: "$0",
-                pro: `${dollars(catalog.plans.pro.minimum.amount)} / ${catalog.plans.pro.minimum.interval}`,
+                pro: `${dollars(catalog.plans.pro.minimum.amount)} / ${catalog.plans.pro.minimum.interval} + usage`,
                 enterprise: "Custom",
               }}
             />
@@ -109,7 +108,6 @@ function proposalDate(catalog: Catalog): string {
 /** The cloud's three plans as cards, each adding to the one before it. */
 function CloudPlans({ catalog }: { catalog: Catalog }) {
   const { free, pro, enterprise } = catalog.plans;
-  const mau = catalog.meters.find((meter) => meter.id === "monthly_active_users");
   const addendum = catalog.licensed.find((line) => line.id === "addendum");
   const [proSupport = ""] = pro.support.split("; ");
   return (
@@ -120,8 +118,10 @@ function CloudPlans({ catalog }: { catalog: Catalog }) {
         per="/ month"
         line="For building and launching, no card needed."
         features={[
-          `Up to ${short(free.limits.core_mau_sized_for)} monthly active users`,
-          "Unlimited teams and console seats",
+          "Unlimited users, teams and console seats",
+          "Passkeys, TOTP MFA and basic require-MFA",
+          "No active-user upgrade thresholds",
+          `Choose a region per ${free.regions.scope}`,
           `${free.event_retention_days} days of audit events`,
           "The dev inbox or your own email provider",
           "Community support",
@@ -131,34 +131,37 @@ function CloudPlans({ catalog }: { catalog: Catalog }) {
       <Card
         name={pro.label}
         price={dollars(pro.minimum.amount)}
-        per={`/ ${pro.minimum.interval}`}
-        line={`All of it credit for usage, or ${dollars(pro.annual.amount)} a ${pro.annual.interval}.`}
+        per={`/ ${pro.minimum.interval} + usage`}
+        line="Advanced controls and operational tools for growing businesses."
         includes={`All ${free.label} features, plus:`}
         features={[
-          ...(mau?.allowance ? [`${short(mau.allowance)} monthly active users included`] : []),
+          "Conditional policies and delegated administration",
+          `${pro.limits.requests_per_second_per_project} RPS per project`,
           "Managed email and SMS",
-          "No Zitadel mark on your login",
+          "Remove the Zitadel mark",
           `${pro.event_retention_days} days of audit events`,
-          ...(pro.sla ? [`${pro.sla.target_percent}% uptime SLA`] : []),
+          ...(pro.sla
+            ? [`${pro.sla.target_percent}% availability ${pro.sla.credits ? "SLA" : "target"}`]
+            : []),
           capitalize(proSupport),
         ]}
-        action={{ label: "Upgrade in the console", href: links.console }}
+        action={{ label: "View the console", href: links.console }}
         featured
       />
       <Card
         name={enterprise.label}
         price="Custom"
-        line="Contract rates on every meter, as a yearly commitment."
+        line="An annual agreement for audit, support and contractual commitments."
         includes={`All ${pro.label} features, plus:`}
         features={[
           ...(enterprise.event_retention_days > pro.event_retention_days
             ? [`${enterprise.event_retention_days} days of audit events`]
             : []),
-          typeof enterprise.regions === "string"
-            ? capitalize(enterprise.regions.split("; ")[0] ?? enterprise.regions)
-            : "Your choice of region",
+          "Extended audit retention and reporting, by agreement",
           "A dedicated deployment, on request",
-          "Uptime SLA with service credits",
+          ...(enterprise.sla
+            ? [`${enterprise.sla.target_percent}% uptime SLA with service credits`]
+            : []),
           capitalize(enterprise.support),
           ...(addendum ? [addendum.label] : []),
         ]}
@@ -295,7 +298,7 @@ function Questions({ catalog }: { catalog: Catalog }) {
   const terms = (meter?: Meter) =>
     JSON.stringify([meter?.price, meter?.allowance, meter?.counted_per?.at_most]);
   const directoriesAlike = directories !== undefined && terms(directories) === terms(sso);
-  const sink = catalog.licensed.find((line) => line.id === "event_sink");
+  const compliance = catalog.packages.find((entry) => entry.id === "compliance");
   const [unitName, unitMeaning] = catalog.self_hosted.unit.split(": ");
   const questions: { question: string; answer: ReactNode }[] = [
     ...(catalog.status === "proposal"
@@ -305,20 +308,21 @@ function Questions({ catalog }: { catalog: Catalog }) {
             answer: (
               <p>
                 No. It is a proposal as of {proposalDate(catalog)}: nothing is billed during the
-                preview, and prices may change before they are.
+                preview, and prices may change before launch.
               </p>
             ),
           },
         ]
       : []),
     {
-      question: `How does ${pro.label}'s minimum work?`,
+      question: `How is ${pro.label} billed?`,
       answer: (
         <>
           <p>
-            {pro.label} bills at least {dollars(pro.minimum.amount)} a {pro.minimum.interval}, or{" "}
-            {dollars(pro.annual.amount)} a {pro.annual.interval}, and all of it is credit: what the
-            meters use draws on it first, and only usage past it is billed.
+            {pro.label} includes Governance for {dollars(pro.minimum.amount)} a{" "}
+            {pro.minimum.interval}, plus metered integrations and consumption beyond the included
+            allowances. The base fee is not usage credit. An owner must choose a paid plan before
+            billing starts.
           </p>
           <p>
             The invoice is <code className="font-mono text-sm text-text-primary">{formula}</code>
@@ -328,8 +332,39 @@ function Questions({ catalog }: { catalog: Catalog }) {
       ),
     },
     {
-      question: "What counts as a user?",
-      answer: <p>{sentence(conventions.user_meters)}</p>,
+      question: "Do more users or basic MFA trigger an upgrade?",
+      answer: (
+        <p>
+          {catalog.core.billing} Basic require-MFA enforcement is included, with no per-user or
+          per-policy fee.
+        </p>
+      ),
+    },
+    {
+      question: "Which advanced capabilities are paid?",
+      answer: (
+        <>
+          <p>{conventions.packages}</p>
+          {catalog.packages.map((entry) => (
+            <p key={entry.id}>
+              <strong>{entry.label}:</strong> {entry.features.join(", ")}. {entry.note}
+            </p>
+          ))}
+        </>
+      ),
+    },
+    {
+      question: "Are all proposed features available today?",
+      answer: (
+        <p>
+          No. This page describes proposed packaging. Governance and Compliance are planned
+          packages; availability and contract terms must be confirmed before purchase.
+        </p>
+      ),
+    },
+    {
+      question: "What do integration user counts mean?",
+      answer: <p>{conventions.user_meters}</p>,
     },
     {
       question: "What does each meter count?",
@@ -391,12 +426,24 @@ function Questions({ catalog }: { catalog: Catalog }) {
                 No: {requests.counts.replace(/^Each request; /, "they are ")}. {free.label} allows{" "}
                 {free.limits.requests_per_second_per_project} requests a second per project and{" "}
                 {short(free.limits.requests_per_month_per_account)} a month per account; past that,{" "}
-                {free.limits.past_monthly_ceiling}.
+                {free.limits.past_monthly_ceiling}. {pro.label} includes{" "}
+                {pro.limits.requests_per_second_per_project} requests a second per project.
+                Enterprise capacity is agreed in the contract.
               </p>
             ),
           },
         ]
       : []),
+    {
+      question: "Can I choose where each project runs?",
+      answer: (
+        <p>
+          Yes. Every plan includes a choice of the available regions for each project. Region
+          selection is separate from a dedicated deployment, which is available by agreement on
+          Enterprise.
+        </p>
+      ),
+    },
     {
       question: "Do I pay for my login's domain?",
       answer: (
@@ -413,18 +460,18 @@ function Questions({ catalog }: { catalog: Catalog }) {
           {(["free", "pro", "enterprise"] as const)
             .map((plan) => `${plans[plan].label} keeps ${plans[plan].event_retention_days} days`)
             .join(", ")}
-          . Longer retention is an add-on, priced per user whose events are kept, with events pooled
-          per user.
-          {sink ? ` Or stream them to your SIEM and keep them there: ${licensedPrice(sink)}.` : ""}
+          . {compliance?.note} {compliance?.retention_days?.join(" or ")}-day retention is scoped in
+          the Compliance quote.
         </p>
       ),
     },
     {
-      question: "What is billed on top of the minimum?",
+      question: "What is billed on top of the Pro base fee?",
       answer: (
         <p>
-          Compliance and support. They are lines of their own and never draw on the credit, so they
-          never vanish into the minimum.
+          Metered integrations and consumption beyond the included allowances, plus contracted
+          Compliance packages and support add-ons. Governance is included in Pro and is never
+          charged per user or policy.
         </p>
       ),
     },
@@ -432,8 +479,8 @@ function Questions({ catalog }: { catalog: Catalog }) {
       question: "How is Enterprise priced?",
       answer: (
         <p>
-          Per contract: a yearly commitment, all of it credit for the meters, at rates below the
-          list prices.{" "}
+          Per contract: an annual commitment for agreed packages, capacity and operational
+          assurance. Included consumption and any overages are set in the quote.{" "}
           <a href={links.contact} className="text-text-primary underline underline-offset-4">
             Contact us
           </a>{" "}

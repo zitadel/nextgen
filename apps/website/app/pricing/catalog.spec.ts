@@ -2,7 +2,6 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import {
-  type Catalog,
   type Licensed,
   licensedPrice,
   listedMeters,
@@ -12,11 +11,6 @@ import {
 } from "./catalog";
 
 const ROOT = fileURLToPath(new URL("../../../../", import.meta.url));
-
-/** A catalog holding only `meters`, which is all meterPrice reads of it. */
-function withMeters(meters: Meter[]): Catalog {
-  return { meters } as Catalog;
-}
 
 function meter(fields: Partial<Meter>): Meter {
   return { id: "m", label: "M", kind: "users", counts: "", allowance: 0, price: null, ...fields };
@@ -29,7 +23,7 @@ describe("the cloud's price list", () => {
     const listed = listedMeters(catalog);
     expect(listed.length).toBeGreaterThan(0);
     for (const each of listed) {
-      const lines = meterPrice(each, catalog);
+      const lines = meterPrice(each);
       expect(lines.length, each.id).toBeGreaterThan(0);
       for (const line of lines) expect(line, each.id).not.toMatch(/undefined|NaN|null/);
     }
@@ -43,20 +37,27 @@ describe("the cloud's price list", () => {
 
   it("has what the plan cards read", () => {
     const { free, pro, enterprise } = catalog.plans;
-    expect(free.limits.core_mau_sized_for).toBeGreaterThan(0);
+    expect(free.limits.requests_per_month_per_account).toBeGreaterThan(0);
+    expect(pro.limits.requests_per_second_per_project).toBeGreaterThan(0);
+    for (const plan of [free, pro, enterprise]) {
+      expect(plan.regions).toEqual({ scope: "project", selection: "all_available" });
+    }
+    expect(catalog.core.authentication).toContain("Passkeys and TOTP MFA");
     expect(pro.minimum.amount).toBeGreaterThan(0);
-    expect(pro.annual.amount).toBeGreaterThan(0);
+    expect(catalog.packages.map((entry) => entry.id)).toEqual(["governance", "compliance"]);
     expect(enterprise.support).not.toBe("");
     expect(catalog.self_hosted.pro.prices.length).toBeGreaterThan(0);
   });
 });
 
 describe("meterPrice", () => {
-  it("prices a user once, or once per policy", () => {
-    const sso = meter({ price: { model: "per_unit", unit_amount: 0.015 } });
-    expect(meterPrice(sso, withMeters([sso]))).toEqual(["$0.015 per user"]);
-    const policy = meter({ dedupe: ["project", "user", "policy", "month"], price: sso.price });
-    expect(meterPrice(policy, withMeters([policy]))).toEqual(["$0.015 per user and policy"]);
+  it("never prices the core active-user gauge", () => {
+    const mau = readCatalog(ROOT).meters.find((entry) => entry.id === "monthly_active_users");
+    expect(mau).toBeDefined();
+    expect(meterPrice(mau!)).toEqual(["Never billed"]);
+    expect(listedMeters(readCatalog(ROOT)).map((entry) => entry.id)).not.toContain(
+      "monthly_active_users",
+    );
   });
 
   it("says what a connection costs at most, for a meter counted per connection", () => {
@@ -64,58 +65,22 @@ describe("meterPrice", () => {
       price: { model: "per_unit", unit_amount: 0.1 },
       counted_per: { key: "connection", at_most: 750 },
     });
-    expect(meterPrice(sso, withMeters([sso]))).toEqual([
-      "$0.10 per user",
-      "At most $75 per connection a month",
-    ]);
-  });
-
-  it("adds the pool and what past it costs", () => {
-    const checks = meter({
-      id: "authz_checks",
-      label: "Authorization checks past the pool",
-      kind: "activity",
-      pool_of: "authz_users",
-      price: { model: "per_unit", unit_amount: 0.000002, display: "$2 per million" },
-    });
-    const users = meter({
-      id: "authz_users",
-      pool: { meter: "authz_checks", per_user: 1000 },
-      price: { model: "per_unit", unit_amount: 0.005 },
-    });
-    const catalog = withMeters([users, checks]);
-    expect(meterPrice(users, catalog)).toEqual([
-      "$0.005 per user",
-      "1,000 authorization checks pooled per user, then $2 per million",
-    ]);
-    expect(listedMeters(catalog)).toEqual([users]);
-  });
-
-  it("prices bands, and says when they need an opt-in", () => {
-    const mau = meter({
-      price: { model: "bands", above: 1e6, size: 1e6, amount: 2000, until: 1e7, opt_in: true },
-    });
-    expect(meterPrice(mau, withMeters([mau]))).toEqual([
-      "$2,000 per started 1M users above 1M, up to 10M",
-      "Billed only after the owner opts in",
-    ]);
+    expect(meterPrice(sso)).toEqual(["$0.10 per user", "At most $75 per connection a month"]);
   });
 
   it("prices each destination band, or says it is not priced yet", () => {
     const sms = meter({
-      pool: { meter: "sms_messages", per_user: 2 },
       price: {
         model: "per_band",
         bands: [
-          { id: "us_ca", countries: ["US", "CA"], per_user: 0.03, extra_message: 0.015 },
-          { id: "other", countries: [], per_user: null, extra_message: null },
+          { id: "us_ca", countries: ["US", "CA"], unit_amount: 0.015 },
+          { id: "other", countries: [], unit_amount: null },
         ],
       },
     });
-    expect(meterPrice(sms, withMeters([sms]))).toEqual([
-      "$0.03 per user",
-      "United States and Canada, 2 texts pooled per user, then $0.015 a text",
-      "Other countries: not priced yet",
+    expect(meterPrice(sms)).toEqual([
+      "United States and Canada: $0.015 per message",
+      "Other countries: quote required",
     ]);
   });
 });

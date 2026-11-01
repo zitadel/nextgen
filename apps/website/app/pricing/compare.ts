@@ -6,11 +6,12 @@ import {
   type Meter,
   meterPrice,
   type PlanId,
+  type Package,
   short,
 } from "./catalog";
 
 // The plan comparison under the cards: every meter and every line billed on
-// top, grouped by who needs it, each row saying per plan what is included and
+// top, grouped by capability, each row saying per plan what is included and
 // what past it costs. Enterprise's column says Custom wherever a price would
 // stand, because Enterprise is quoted, never listed.
 
@@ -25,11 +26,15 @@ export type Cell =
 export type Row = {
   label: string;
   cells: Record<PlanId, Cell>;
-  /** The catalog meter or line the row prices, so the spec can find every one. */
+  /** Introduce a use case before its authentication rows. */
+  subgroup?: { title: string; guidance: string };
+  /** The catalog meter or licensed line the row prices. */
   source?: string;
+  /** The commercial package that includes this capability. */
+  packageId?: string;
 };
 
-export type Group = { id: string; title: string; line: string; rows: Row[] };
+export type Group = { id: string; title: string; rows: Row[] };
 
 const YES: Cell = { kind: "yes" };
 const NO: Cell = { kind: "no" };
@@ -43,19 +48,20 @@ function each(cell: (plan: PlanId) => Cell): Record<PlanId, Cell> {
   return { free: cell("free"), pro: cell("pro"), enterprise: cell("enterprise") };
 }
 
+function subgroup(title: string, guidance: string, rows: Row[]): Row[] {
+  return rows.map((row, index) => (index === 0 ? { ...row, subgroup: { title, guidance } } : row));
+}
+
 /**
  * A meter's cell: its monthly allowance, then its price past it; Free stops at
- * the allowance. A retention the plan keeps anyway is included.
+ * the allowance.
  */
-export function meterCell(meter: Meter, plan: PlanId, catalog: Catalog): Cell {
+export function meterCell(meter: Meter, plan: PlanId): Cell {
   if (meter.plans && !meter.plans.includes(plan)) return NO;
-  if (meter.retention_days && meter.retention_days <= catalog.plans[plan].event_retention_days) {
-    return text("Included");
-  }
   if (plan === "enterprise") return CUSTOM;
   const included = meter.allowance ? `${short(meter.allowance)} / month included` : undefined;
   if (plan === "free") return included ? text(included) : NO;
-  const [price = "", ...more] = meterPrice(meter, catalog);
+  const [price = "", ...more] = meterPrice(meter);
   return included ? text(included, [`Then ${price}`, ...more]) : text(price, more);
 }
 
@@ -64,6 +70,13 @@ export function lineCell(line: Licensed, plan: PlanId): Cell {
   if (line.included_in?.includes(plan)) return text("Included");
   if (!line.plans.includes(plan)) return NO;
   return plan === "enterprise" ? CUSTOM : text(licensedPrice(line));
+}
+
+/** The package's account-wide entitlement; quotes never masquerade as free access. */
+export function packageCell(entry: Package, plan: PlanId): Cell {
+  if (!entry.plans.includes(plan)) return NO;
+  const notes = entry.availability === "planned" ? ["Planned"] : [];
+  return text(entry.included_in.includes(plan) ? "Included" : "Custom quote", notes);
 }
 
 /** The comparison's groups, in the order the page shows them. */
@@ -90,7 +103,7 @@ export function compareGroups(catalog: Catalog): Group[] {
     const found = meter(id);
     return {
       label: label ?? found.label,
-      cells: each((plan) => meterCell(found, plan, catalog)),
+      cells: each((plan) => meterCell(found, plan)),
       source: id,
     };
   };
@@ -106,124 +119,101 @@ export function compareGroups(catalog: Catalog): Group[] {
   const mau = meter("monthly_active_users");
   const requests = meter("api_requests");
   const [proSupport = "", ...proSupportMore] = pro.support.split("; ");
+  const packageRows = (id: string): Row[] => {
+    const entry = catalog.packages.find((candidate) => candidate.id === id);
+    if (!entry) throw new Error(`The price list has no package ${id}.`);
+    return entry.features.map((feature) => ({
+      label: feature,
+      packageId: entry.id,
+      cells: each((plan) => packageCell(entry, plan)),
+    }));
+  };
 
   const groups: Group[] = [
     {
       id: "platform",
       title: "Platform",
-      line: "What every plan runs on.",
       rows: [
         {
           label: "Monthly active users",
           source: mau.id,
-          cells: {
-            free: text(`Up to ${short(free.limits.core_mau_sized_for)} / month`),
-            pro: meterCell(mau, "pro", catalog),
-            enterprise: CUSTOM,
-          },
+          cells: each(() => text("Never billed")),
         },
-        { label: "Teams and console seats", cells: each(() => text("Unlimited")) },
-        // The login is a component the customer runs in its own app, so its
-        // domain is the customer's on every plan.
-        { label: "Login in your own app, on your domain", cells: each(() => YES) },
+        ...catalog.core.resources.map((label) => ({ label, cells: each(() => text("Unlimited")) })),
+        ...catalog.core.platform.map((label) => ({ label, cells: each(() => YES) })),
         {
-          label: "Audit events kept",
-          cells: each((plan) => text(`${plans[plan].event_retention_days} days`)),
+          label: "Region selection",
+          cells: each((plan) => text(`Choose per ${plans[plan].regions.scope}`)),
         },
-      ],
-    },
-    {
-      id: "b2c",
-      title: "B2C",
-      line: "Sign-in for consumers at scale: delivery, bot defence and your brand.",
-      rows: [
-        meterRow("email_users", "Managed email"),
-        meterRow("sms_users", "Managed SMS"),
-        {
-          label: "Dev inbox and your own email provider",
-          cells: each((plan) => (plans[plan].delivery_modes.includes("own_provider") ? YES : NO)),
-        },
-        { label: "Basic bot challenges", cells: each(() => text("Unlimited")) },
-        meterRow("bot_checks"),
-        {
-          label: "Hide the Zitadel mark",
-          cells: each((plan) => (plans[plan].attribution_mark === "hideable" ? YES : NO)),
-        },
-      ],
-    },
-    {
-      id: "b2b",
-      title: "B2B",
-      line: "Selling to companies: their SSO and directories, their policies and their permissions.",
-      rows: [
-        meterRow("sso_users"),
-        meterRow("directory_users"),
-        meterRow("policy_users"),
-        meterRow("authz_users"),
-      ],
-    },
-    {
-      id: "m2m",
-      title: "M2M and APIs",
-      line: "Machines and agents calling your APIs, and the API itself.",
-      rows: [
-        meterRow("m2m_tokens"),
         {
           label: requests.label,
           source: requests.id,
           cells: {
-            free: text(`${free.limits.requests_per_second_per_project} / second per project`, [
+            free: text(`${free.limits.requests_per_second_per_project} RPS per project`, [
               `${short(free.limits.requests_per_month_per_account)} / month per account`,
             ]),
-            pro: text("Never billed"),
-            enterprise: text("Never billed"),
+            pro: text(`${pro.limits.requests_per_second_per_project} RPS per project`),
+            enterprise: CUSTOM,
           },
         },
+        meterRow("email_messages"),
+        meterRow("sms_messages"),
+        {
+          label: "Dev inbox and your own email provider",
+          cells: each((plan) => (plans[plan].delivery_modes.includes("own_provider") ? YES : NO)),
+        },
+        {
+          label: "Hide the Zitadel mark",
+          cells: each((plan) => (plans[plan].attribution_mark === "hideable" ? YES : NO)),
+        },
+        lineRow("dedicated_deployment"),
+      ],
+    },
+    {
+      id: "authentication",
+      title: "Authentication",
+      rows: [
+        ...subgroup(
+          "B2C · Consumer apps",
+          "Users, sign-in and basic MFA stay free. Find shared delivery and branding in Platform, and advanced policies and bot checks in Security & policies.",
+          catalog.core.authentication.map((label) => ({ label, cells: each(() => YES) })),
+        ),
+        ...subgroup(
+          "B2B · Business apps",
+          "Customer organizations, core roles and basic MFA stay free. Add your customers' SSO and directories below; advanced policies and delegated administration are in Security & policies.",
+          [meterRow("sso_users"), meterRow("directory_users")],
+        ),
+        ...subgroup(
+          "M2M · Services & agents",
+          "Service identities and credentials stay free. Compare token usage below; advanced authorization checks are in Security & policies.",
+          [meterRow("m2m_tokens")],
+        ),
+      ],
+    },
+    {
+      id: "security",
+      title: "Security & policies",
+      rows: [
+        ...catalog.core.security.map((label) => ({ label, cells: each(() => YES) })),
+        meterRow("bot_checks"),
+        meterRow("authz_checks"),
+        ...packageRows("governance"),
       ],
     },
     {
       id: "audit",
-      title: "Audit trail",
-      line: "How long you keep who did what past the plan's own days, and where it streams.",
-      rows: [
-        meterRow("retained_users_90d", "Retention to 90 days"),
-        meterRow("retained_users_400d", "Retention to 400 days"),
-        lineRow("event_sink"),
-      ],
-    },
-    {
-      id: "compliance",
-      title: "Compliance",
-      line: "Uptime, regions and the terms your customers' auditors ask for.",
+      title: "Audit & logs",
       rows: [
         {
-          label: "Uptime SLA",
-          cells: each((plan) => {
-            const sla = plans[plan].sla;
-            if (!sla) return NO;
-            return text(`${sla.target_percent}%`, sla.credits ? ["With service credits"] : []);
-          }),
+          label: "Audit events kept",
+          cells: each((plan) => text(`${plans[plan].event_retention_days} days`)),
         },
-        lineRow("sla_9995"),
-        lineRow("sla_9999", "99.99% SLA"),
-        {
-          label: "Regions",
-          cells: each((plan) => {
-            const regions = plans[plan].regions;
-            return Array.isArray(regions)
-              ? text(regions.map((region) => region.toUpperCase()).join(", "))
-              : text(capitalize(regions.split("; ")[0] ?? regions));
-          }),
-        },
-        lineRow("region", "Regions outside the EU"),
-        lineRow("dedicated_deployment"),
-        lineRow("addendum"),
+        ...packageRows("compliance"),
       ],
     },
     {
       id: "support",
-      title: "Support",
-      line: "Who answers, and how fast.",
+      title: "Support & agreements",
       rows: [
         {
           label: "Support",
@@ -236,6 +226,19 @@ export function compareGroups(catalog: Catalog): Group[] {
         lineRow("support_priority"),
         lineRow("tam_hours"),
         lineRow("private_slack"),
+        {
+          label: "Availability commitment",
+          cells: each((plan) => {
+            const sla = plans[plan].sla;
+            if (!sla) return NO;
+            return text(`${sla.target_percent}% ${sla.credits ? "SLA" : "target"}`, [
+              sla.credits ? "With service credits" : "No service credits",
+            ]);
+          }),
+        },
+        lineRow("sla_9995"),
+        lineRow("sla_9999", "99.99% SLA upgrade"),
+        lineRow("addendum"),
       ],
     },
   ];
@@ -244,7 +247,7 @@ export function compareGroups(catalog: Catalog): Group[] {
   // until it gets a group; the spec fails while any does.
   const rest: Row[] = [
     ...catalog.meters
-      .filter((candidate) => !placed.has(candidate.id) && !candidate.pool_of)
+      .filter((candidate) => !placed.has(candidate.id))
       .map((candidate) => meterRow(candidate.id)),
     ...catalog.licensed
       .filter((candidate) => !placed.has(candidate.id) && candidate.tag !== "minimum spend")
@@ -254,7 +257,6 @@ export function compareGroups(catalog: Catalog): Group[] {
     groups.push({
       id: "other",
       title: "Other",
-      line: "Everything else on the price list.",
       rows: rest,
     });
   }
