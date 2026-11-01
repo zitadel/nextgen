@@ -3,7 +3,6 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { formatDateTime } from "@/lib/date";
 import { scopedPath } from "@/test/project-scope.fixture";
 import { server } from "@/test/msw";
 import { createAppRouter } from "../../../router";
@@ -1334,16 +1333,17 @@ describe("users screen", () => {
     );
   });
 
-  it("narrows the list to a schema, then to its older revisions, on the server", async () => {
+  it("narrows the list to a schema, then to one of its revisions, on the server", async () => {
     // Every revision of a schema shares its object type, so the schema filter
-    // sends that; `Older revisions` adds `schema not_equals` the newest id.
-    // The revision belongs to the schema, so changing the schema drops it.
+    // sends that; a revision adds `schema equals` its id. The revision filter
+    // stays in view, disabled until a schema is chosen, and changing the
+    // schema drops it.
     serveLineage();
     const bodies = recordQueries(() => HttpResponse.json({ users: [] }));
     const router = await renderUsers();
     await screen.findByRole("table");
     expect(bodies.at(-1)).not.toHaveProperty("filter");
-    expect(screen.queryByRole("combobox", { name: "Filter by revision" })).not.toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Filter by revision" })).toBeDisabled();
 
     await userEvent.click(screen.getByRole("combobox", { name: "Filter by schema" }));
     await userEvent.click(await screen.findByRole("option", { name: "Business" }));
@@ -1357,57 +1357,124 @@ describe("users screen", () => {
     );
     expect(await screen.findByText("No users match this filter.")).toBeInTheDocument();
 
-    await userEvent.click(await screen.findByRole("combobox", { name: "Filter by revision" }));
+    const revision = screen.getByRole("combobox", { name: "Filter by revision" });
+    await waitFor(() => expect(revision).toBeEnabled());
+    await userEvent.click(revision);
+    // The chosen schema's history, newest first; what each option shows is
+    // `RevisionItems`' to prove.
     const options = within(await screen.findByRole("listbox")).getAllByRole("option");
-    expect(options.map((option) => option.textContent)).toEqual([
-      "All revisions",
-      "Latest only",
-      "Older revisions",
-      `sch_business_2${formatDateTime("2026-08-01T09:30:00Z")}latestin use`,
-      `sch_business${formatDateTime("2026-07-01T00:00:00Z")}`,
+    expect(options.map((option) => option.getAttribute("title"))).toEqual([
+      "sch_business_2",
+      "sch_business",
     ]);
-    await userEvent.click(screen.getByRole("option", { name: "Older revisions" }));
+    await userEvent.click(options[1]!);
     await waitFor(() =>
       expect(bodies.at(-1)).toMatchObject({
         filter: [
           { field: "schema_object_type", operation: "equals", value: "business" },
-          { field: "schema", operation: "not_equals", value: "sch_business_2" },
+          { field: "schema", operation: "equals", value: "sch_business" },
         ],
       }),
     );
     expect(screen.getByRole("combobox", { name: "Filter by revision" })).toHaveTextContent(
-      "Older revisions",
+      "Revisionsch_business",
     );
 
-    await userEvent.click(screen.getByRole("combobox", { name: "Filter by schema" }));
-    await userEvent.click(await screen.findByRole("option", { name: "All schemas" }));
+    await userEvent.click(screen.getByRole("button", { name: "Clear the schema filter" }));
     await waitFor(() => expect(bodies.at(-1)).not.toHaveProperty("filter"));
-    expect(screen.queryByRole("combobox", { name: "Filter by revision" })).not.toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Filter by revision" })).toBeDisabled();
+    expect(router.state.resolvedLocation?.search).toEqual({ project: "proj_test" });
   });
 
-  it("drops a latest or older filter the URL carries when the newest revision is unknown", async () => {
-    // `older` compares with the newest revision's id. With the lineages
-    // unreadable there is none to compare with, and a list that quietly widened
-    // under the same URL would claim a filter it does not send; the URL loses
-    // the revision instead, and keeps the schema it can still narrow by.
-    server.use(
-      http.get(SCHEMAS_URL, () =>
-        HttpResponse.json({ code: "internal", message: "boom" }, { status: 500 }),
-      ),
-    );
+  it("orders the list by revision only once asked, and leaves one revision unordered", async () => {
+    // Unasked, the server's own order stands (newest users first), so a user
+    // just added stays on top. Revision ids are ULIDs, so sorting by `schema`
+    // is sorting by when each revision was created. With one revision chosen
+    // every row is on it, so the sort is disabled and no order is sent.
+    serveLineage();
     const bodies = recordQueries(() => HttpResponse.json({ users: [] }));
-    const router = await renderUsers(`${scopedPath("/users")}&schema=business&revision=older`);
+    const router = await renderUsers();
+    await screen.findByRole("table");
+    expect(bodies.at(-1)).not.toHaveProperty("sorting");
+    const sort = screen.getByRole("combobox", { name: "Sort by revision" });
+    expect(sort).toHaveTextContent("Sort by revision");
 
+    await userEvent.click(sort);
+    await userEvent.click(await screen.findByRole("option", { name: "Sort by latest" }));
+    await waitFor(() =>
+      expect(bodies.at(-1)).toMatchObject({ sorting: { field: "schema", direction: "desc" } }),
+    );
+    expect(router.state.resolvedLocation?.search).toMatchObject({ sort: "latest" });
+
+    await userEvent.click(screen.getByRole("combobox", { name: "Sort by revision" }));
+    await userEvent.click(await screen.findByRole("option", { name: "Sort by oldest" }));
+    await waitFor(() =>
+      expect(bodies.at(-1)).toMatchObject({ sorting: { field: "schema", direction: "asc" } }),
+    );
+
+    await act(() =>
+      router.navigate({
+        to: "/users",
+        search: { project: "proj_test", schema: "business", revision: "sch_business" },
+      }),
+    );
+    await waitFor(() =>
+      expect(screen.getByRole("combobox", { name: "Sort by revision" })).toBeDisabled(),
+    );
+    expect(bodies.at(-1)).not.toHaveProperty("sorting");
+  });
+
+  it("drops an order from a URL that also names one revision", async () => {
+    // One revision sends no sorting, so the route keeps no `sort` beside it,
+    // and the control reads the default rather than an order it does not apply.
+    serveLineage();
+    const bodies = recordQueries(() => HttpResponse.json({ users: [] }));
+    const router = await renderUsers(
+      `${scopedPath("/users")}&schema=business&revision=sch_business&sort=oldest`,
+    );
     await screen.findByRole("table");
     await waitFor(() =>
       expect(router.state.resolvedLocation?.search).toEqual({
         project: "proj_test",
         schema: "business",
+        revision: "sch_business",
       }),
     );
-    expect(bodies.at(-1)).toMatchObject({
-      filter: [{ field: "schema_object_type", operation: "equals", value: "business" }],
-    });
+    expect(bodies.at(-1)).not.toHaveProperty("sorting");
+    const sort = screen.getByRole("combobox", { name: "Sort by revision" });
+    expect(sort).toBeDisabled();
+    expect(sort).toHaveTextContent("Sort by revision");
+  });
+
+  it("pages with the order the first page was read in", async () => {
+    // A page token is only valid with the sorting that issued it.
+    const bodies = recordQueries((body) =>
+      HttpResponse.json(
+        body.page_token
+          ? { users: [] }
+          : {
+              users: [
+                {
+                  id: "user_1",
+                  schema: "sch_business",
+                  identifier: "maya@acme.com",
+                  identifier_property: "email",
+                  attributes: { email: "maya@acme.com" },
+                },
+              ],
+              next_page_token: "page-2",
+            },
+      ),
+    );
+    server.use(http.get(`${SCHEMAS_URL}/sch_business`, () => HttpResponse.json(BUSINESS_SCHEMA)));
+    await renderUsers(`${scopedPath("/users")}&sort=oldest`);
+    await userEvent.click(await screen.findByRole("button", { name: "Load more" }));
+    await waitFor(() =>
+      expect(bodies.at(-1)).toMatchObject({
+        page_token: "page-2",
+        sorting: { field: "schema", direction: "asc" },
+      }),
+    );
   });
 
   it("names an object type the URL carries that no schema has", async () => {

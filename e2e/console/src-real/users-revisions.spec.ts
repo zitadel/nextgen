@@ -11,8 +11,9 @@ import { signIn } from "../support/sign-in";
  *
  * The unit specs cover which criteria each choice sends. What only a live
  * backend proves is that the server honours them together: `schema_object_type
- * equals` with `schema not_equals` the newest revision returns exactly the
- * users left on the older one, and `Latest only` exactly the rest.
+ * equals` with `schema equals` one revision returns exactly that revision's
+ * users, and sorting by `schema` orders users by when their revision was
+ * created.
  */
 
 test("narrows the users to one revision of a schema", async ({ page, zitadel, seed }) => {
@@ -23,9 +24,11 @@ test("narrows the users to one revision of a schema", async ({ page, zitadel, se
   const newer = await createSchemaFromSeed(zitadel, { title: `Staff ${suffix}`, objectType });
   const onOlder = `older-${suffix}@example.com`;
   const onNewer = `newer-${suffix}@example.com`;
+  // The newer revision's user is created first, so creation order (the
+  // list's own) and revision order disagree.
   for (const [schema, email] of [
-    [older.id, onOlder],
     [newer.id, onNewer],
+    [older.id, onOlder],
   ] as const) {
     await withErrorBody(
       zitadel.api.createUser({ schema, attributes: { email } }, { project_id: projectId }),
@@ -41,13 +44,23 @@ test("narrows the users to one revision of a schema", async ({ page, zitadel, se
 
   await page.getByRole("combobox", { name: "Filter by schema" }).click();
   await page.getByRole("option", { name: `Staff ${suffix}` }).click();
+  // By revision once asked; unasked, the newest user comes first.
+  const emails = table.getByRole("link", { name: /@example\.com$/ });
+  await expect(emails).toHaveText([onOlder, onNewer]);
+  await page.getByRole("combobox", { name: "Sort by revision" }).click();
+  await page.getByRole("option", { name: "Sort by oldest" }).click();
+  await expect(emails).toHaveText([onOlder, onNewer]);
+  await page.getByRole("combobox", { name: "Sort by revision" }).click();
+  await page.getByRole("option", { name: "Sort by latest" }).click();
+  await expect(emails).toHaveText([onNewer, onOlder]);
+
   await page.getByRole("combobox", { name: "Filter by revision" }).click();
-  await page.getByRole("option", { name: "Older revisions" }).click();
+  await page.getByRole("option").and(page.getByTitle(older.id)).click();
   await expect(table.getByRole("link", { name: onOlder })).toBeVisible();
   await expect(table.getByRole("link", { name: onNewer })).toHaveCount(0);
 
   await page.getByRole("combobox", { name: "Filter by revision" }).click();
-  await page.getByRole("option", { name: "Latest only" }).click();
+  await page.getByRole("option").and(page.getByTitle(newer.id)).click();
   await expect(table.getByRole("link", { name: onNewer })).toBeVisible();
   await expect(table.getByRole("link", { name: onOlder })).toHaveCount(0);
   await expectNoErrorBoundary(page);

@@ -30,14 +30,15 @@ test("opens a user's URI schema revision from the user detail screen", async ({
   const schema = await createSchemaFromSeed(zitadel, { $id: uri, title });
   expect(schema.id).toBe(uri);
   const email = seed.identity().email;
-  await withErrorBody(
+  const user = await withErrorBody(
     zitadel.api.createUser({ schema: schema.id, attributes: { email } }, { project_id: projectId }),
   );
 
   const actor = await seed.user();
   await signIn(page, zitadel, actor);
-  await page.goto("/users");
-  await page.getByRole("link", { name: email }).click();
+  // Straight to the user: this spec is about the detail screen, and the
+  // list's first page on a busy instance need not hold this user.
+  await page.goto(`/users/${user.id}`);
   await expect(page.getByRole("heading", { name: email })).toBeVisible();
 
   // The Overview card's only link is the revision box.
@@ -48,9 +49,10 @@ test("opens a user's URI schema revision from the user detail screen", async ({
   );
   await expect(page.getByRole("heading", { name: title })).toBeVisible();
   // The revision picker lists the schema's own history, this one revision,
-  // and marks it latest; a URI id survives the round trip into the picker too.
+  // and marks it Latest; a URI id survives the round trip into the picker too,
+  // shortened on the trigger and whole in its title.
   const picker = page.getByRole("combobox", { name: "Schema revision" });
-  await expect(picker).toContainText(schema.id);
-  await expect(picker).toContainText("latest");
+  await expect(picker).toHaveAttribute("title", schema.id);
+  await expect(picker).toContainText("Latest");
   await expectNoErrorBoundary(page);
 });

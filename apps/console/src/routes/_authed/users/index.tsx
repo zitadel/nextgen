@@ -71,6 +71,7 @@ import {
   schemaOptions,
   toUserRow,
   userFilter,
+  userSorting,
   writeColumnPins,
 } from "@/lib/user-list";
 import { Page } from "@/components/layout";
@@ -81,9 +82,9 @@ export const Route = createFileRoute("/_authed/users/")({
   // reads as a group.
   // Order 3: Teams sits at 2.
   staticData: { scope: "project", nav: { label: "Users", order: 3, icon: User } },
-  // The filter lives in the URL, as the Teams tabs do: it is a server-side
-  // filter, so it belongs to the request the loader makes, is linkable and
-  // survives a reload. Only what the filter can send is kept: a revision
+  // The filter and the order live in the URL, as the Teams tabs do: both go
+  // to the server, so they belong to the request the loader makes, are
+  // linkable and survive a reload. Only what can be sent is kept: a revision
   // belongs to a schema, so it goes without one.
   validateSearch: (search: Record<string, unknown>): UsersSearch => {
     const schema = typeof search.schema === "string" && search.schema ? search.schema : undefined;
@@ -91,32 +92,29 @@ export const Route = createFileRoute("/_authed/users/")({
       schema && typeof search.revision === "string" && search.revision
         ? search.revision
         : undefined;
-    return { ...(schema ? { schema } : {}), ...(revision ? { revision } : {}) };
+    return {
+      ...(schema ? { schema } : {}),
+      ...(revision ? { revision } : {}),
+      ...(search.sort === "latest" || search.sort === "oldest" ? { sort: search.sort } : {}),
+    };
   },
   loaderDeps: ({ search }) => search,
   loader: async ({ deps }) => {
     const projectId = requireProjectScope(deps.project);
-    // The filter's options are the project's schemas at their latest revision,
-    // which also names the newest id a `latest` or `older` criterion compares
-    // with; the chosen schema's revisions, with whether each is in use, are
-    // read for it alone. Both are chrome: unreadable, the list still renders,
-    // narrowed by whatever the URL can still express.
-    const readingOptions = fetchAllSchemas(projectId).then(schemaOptions, () => []);
-    const needsLatest = deps.revision === "latest" || deps.revision === "older";
-    // Only those two criteria wait for the options; the users read runs
-    // beside the schema reads otherwise.
-    const chosenFirst = needsLatest
-      ? (await readingOptions).find((option) => option.objectType === deps.schema)
-      : undefined;
-    if (needsLatest && !chosenFirst) {
-      // The URL asks for a comparison nobody can make. Dropping it from the URL
-      // keeps the list from claiming a narrower filter than it sends.
-      throw redirect({ to: "/users", search: { ...deps, revision: undefined } });
+    if (deps.revision && deps.sort) {
+      // One revision sends no order, so a URL keeping one would claim an
+      // order the list does not apply.
+      throw redirect({ to: "/users", search: { ...deps, sort: undefined } });
     }
-    const filter = userFilter(deps, chosenFirst?.latestId);
+    // The filter's options are the project's schemas at their latest revision;
+    // the chosen schema's revisions, with whether each is in use, are read for
+    // it alone. Both are chrome: unreadable, the list still renders, narrowed
+    // by what the URL carries.
+    const filter = userFilter(deps);
+    const sorting = userSorting(deps);
     const [page, options, revisions] = await Promise.all([
-      fetchUsers(projectId, undefined, true, filter),
-      readingOptions,
+      fetchUsers(projectId, undefined, true, filter, sorting),
+      fetchAllSchemas(projectId).then(schemaOptions, () => []),
       deps.schema
         ? fetchSchemaRevisions(projectId, deps.schema, { inUse: true }).catch(() => [])
         : [],
@@ -129,6 +127,7 @@ export const Route = createFileRoute("/_authed/users/")({
       options,
       revisions,
       filter,
+      sorting,
     };
   },
   component: UsersScreen,
@@ -164,7 +163,13 @@ function UsersScreen() {
   const paging = useLoadMore(
     loaded,
     async (pageToken): Promise<UsersPage> => {
-      const page = await fetchUsers(projectId, pageToken, teamsExpanded, loaded.filter);
+      const page = await fetchUsers(
+        projectId,
+        pageToken,
+        teamsExpanded,
+        loaded.filter,
+        loaded.sorting,
+      );
       return {
         items: page.users,
         nextPageToken: page.next_page_token ?? undefined,
@@ -235,18 +240,21 @@ function UsersScreen() {
           is a console-wide solution (D19). */}
       <ResourceTitle
         filter={
-          (loaded.options.length > 0 || search.schema) && (
-            <UsersFilter
-              options={loaded.options}
-              revisions={loaded.revisions}
-              search={search}
-              onChange={(next) =>
-                void navigate({
-                  search: (prev) => ({ ...prev, schema: next.schema, revision: next.revision }),
-                })
-              }
-            />
-          )
+          <UsersFilter
+            options={loaded.options}
+            revisions={loaded.revisions}
+            search={search}
+            onChange={(next) =>
+              void navigate({
+                search: (prev) => ({
+                  ...prev,
+                  schema: next.schema,
+                  revision: next.revision,
+                  sort: next.sort,
+                }),
+              })
+            }
+          />
         }
         action={
           <AddUserSheet onCreated={() => router.invalidate()}>
