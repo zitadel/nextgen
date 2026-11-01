@@ -196,7 +196,7 @@ describe("doctor", () => {
 
           const result = await app.doctor(["--fix"]);
 
-          expect(result).toSuggest("doctor --fix --force");
+          expect(result).toSuggestExactly(app.againAsRun("doctor --fix --force"));
         });
 
         it("replaces nothing", async () => {

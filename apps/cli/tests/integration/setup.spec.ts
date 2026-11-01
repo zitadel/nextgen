@@ -500,7 +500,9 @@ describe("setup", () => {
 
           const result = await app.setup(["--dev-port", "3001"]);
 
-          expect(result).toSuggest("origin rm http://localhost:3000 --force");
+          expect(result).toSuggestExactly(
+            `origin rm http://localhost:3000 --force --env-file ${app.path}/.env.development.local --cwd ${app.path}`,
+          );
         });
 
         it("removes nothing", async () => {

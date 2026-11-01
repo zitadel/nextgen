@@ -120,7 +120,7 @@ describe("api", () => {
 
           const result = await app.api("deleteVariable", "FOO");
 
-          expect(result).toSuggest("api deleteVariable FOO --force");
+          expect(result).toSuggestExactly(app.againAsRun("api deleteVariable FOO --force"));
         });
 
         it("deletes nothing", async () => {

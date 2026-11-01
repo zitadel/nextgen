@@ -136,7 +136,7 @@ describe("origin rm", () => {
 
           const result = await app.run(["origin", "rm", "https://app.acme.com", "--json"]);
 
-          expect(result).toSuggest("origin rm https://app.acme.com --force");
+          expect(result).toSuggestExactly(app.againAsRun("origin rm https://app.acme.com --force"));
         });
 
         it("removes nothing", async () => {

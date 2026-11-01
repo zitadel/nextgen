@@ -151,7 +151,7 @@ describe("eject", () => {
 
         const result = await app.run(["eject", "--json"]);
 
-        expect(result).toSuggest("eject --force");
+        expect(result).toSuggestExactly(app.againAsRun("eject --force"));
       });
 
       it("removes nothing", async () => {

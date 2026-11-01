@@ -149,7 +149,7 @@ describe("release revoke", () => {
 
           const result = await app.run(["release", "revoke", releaseId, "--json"]);
 
-          expect(result).toSuggest(`release revoke ${releaseId} --force`);
+          expect(result).toSuggestExactly(app.againAsRun(`release revoke ${releaseId} --force`));
         });
 
         it("revokes nothing", async () => {

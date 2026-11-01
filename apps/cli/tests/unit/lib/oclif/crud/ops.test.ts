@@ -663,6 +663,29 @@ describe("delete confirmation", () => {
     },
   );
 
+  it.each(["delete", "revoke", "deactivate"] as const)(
+    "sends no %s when it refuses without --force",
+    async (verb) => {
+      const call = vi.fn(async () => undefined);
+
+      await printedByFailing(() => deleting(verb, call).run(["team_1", "--json"]));
+
+      expect(call).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(["delete", "revoke", "deactivate"] as const)(
+    "sends no %s when the answer is no",
+    async (verb) => {
+      vi.mocked(confirm).mockResolvedValueOnce(false as never);
+      const call = vi.fn(async () => undefined);
+
+      await asTerminal(() => deleting(verb, call).run(["team_1"]));
+
+      expect(call).not.toHaveBeenCalled();
+    },
+  );
+
   it("asks the question with the verb, the resource and the id", async () => {
     vi.mocked(confirm).mockResolvedValueOnce(true as never);
 

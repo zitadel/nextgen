@@ -65,7 +65,7 @@ describe("reset", () => {
 
           const result = await app.run(["reset", "--json"]);
 
-          expect(result).toSuggest("reset --force");
+          expect(result).toSuggestExactly(app.againAsRun("reset --force"));
         });
 
         it("deletes nothing", async () => {

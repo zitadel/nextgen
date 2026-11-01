@@ -141,7 +141,7 @@ describe("resources", () => {
 
             const result = await app.run([topic, verb, id, "--json"]);
 
-            expect(result).toSuggest(`${topic} ${verb} ${id} --force`);
+            expect(result).toSuggestExactly(app.againAsRun(`${topic} ${verb} ${id} --force`));
           },
         );
       });

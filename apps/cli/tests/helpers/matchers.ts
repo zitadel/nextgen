@@ -145,6 +145,23 @@ expect.extend({
     };
   },
 
+  toSuggestExactly(received: CliResult, command: string) {
+    // The command after the runner, which differs by how the CLI was invoked.
+    const suggested = suggestionsIn(envelopeOf(received)).map((candidate) =>
+      candidate.replace(/^.*?(?:@zitadel\/cli(?:@\S+)?|zitadel) /, ""),
+    );
+    const pass = suggested.includes(command);
+    return {
+      pass,
+      message: () =>
+        pass
+          ? `expected not to suggest exactly "${command}", but it did`
+          : `expected to suggest exactly "${command}", but next_commands were: ${
+              suggested.join(", ") || "(none)"
+            }`,
+    };
+  },
+
   toPrint(received: CliResult, text: string) {
     const pass = received.stdout.includes(text);
     return {
@@ -207,6 +224,11 @@ declare module "vitest" {
     toHintAt(text: string): T;
     /** One of the suggested `next_commands` contains this text. */
     toSuggest(command: string): T;
+    /**
+     * One of the suggested `next_commands` is exactly this, after the runner
+     * (`npx @zitadel/cli@<version>`): no flag missing, extra or repeated.
+     */
+    toSuggestExactly(command: string): T;
     /** stdout contains this text. Prefer it over `toSay` for rendered output. */
     toPrint(text: string): T;
     /** stdout carries rendered text, and is neither empty nor a JSON envelope. */

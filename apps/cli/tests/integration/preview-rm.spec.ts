@@ -130,7 +130,7 @@ describe("preview rm", () => {
 
           const result = await app.run(["preview", "rm", PREVIEW_URL, "--json"]);
 
-          expect(result).toSuggest(`preview rm ${PREVIEW_URL} --force`);
+          expect(result).toSuggestExactly(app.againAsRun(`preview rm ${PREVIEW_URL} --force`));
         });
 
         it("removes nothing", async () => {

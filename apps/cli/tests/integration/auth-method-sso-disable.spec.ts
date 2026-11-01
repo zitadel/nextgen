@@ -82,7 +82,7 @@ describe("auth-method sso disable", () => {
 
           const result = await app.disableSso(GOOGLE);
 
-          expect(result).toSuggest(
+          expect(result).toSuggestExactly(
             `auth-method sso disable --provider google --schema default-human-user --cwd ${app.path} --force`,
           );
         });

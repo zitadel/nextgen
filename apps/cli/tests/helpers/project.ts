@@ -14,6 +14,7 @@ import { cliPackageRoot } from "./oclif-build";
 import { nextPort } from "./ports";
 import { aBinaryRecord } from "./runtime-record";
 import { parseJson, runCliForTest } from "./run-cli";
+import { assertRunnableSuggestions } from "./suggestions";
 
 const execFileAsync = promisify(execFile);
 
@@ -798,6 +799,14 @@ export class ScaffoldedApp {
     return this.cli(args, env);
   }
 
+  /**
+   * `command` as this fixture's runs suggest it again: with the server and
+   * `--cwd` every run is given, so a spec states the whole suggestion.
+   */
+  againAsRun(command: string): string {
+    return `${command} --server ${MOCK_SERVER_URL} --cwd ${this.path}`;
+  }
+
   /** For output oclif owns rather than our envelope: `--help`, `--version`. */
   runUnenveloped(args: string[], env: NodeJS.ProcessEnv = {}): Promise<CliResult> {
     return this.cli(args, env, { envelope: false });
@@ -1451,6 +1460,7 @@ export function assertEnvelope(result: CliResult, args: string[] = []): void {
   if (envelope.status === "error") {
     expect(envelope.code, `${where}: error envelope carries no code`).toBeTypeOf("string");
   }
+  assertRunnableSuggestions(where, envelope);
   assertDataShape(where, envelope);
 }
 

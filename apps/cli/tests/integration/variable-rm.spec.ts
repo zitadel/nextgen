@@ -128,7 +128,7 @@ describe("variable rm", () => {
 
         const result = await app.run(["variable", "rm", "FOO", "--json"]);
 
-        expect(result).toSuggest("variable rm FOO --force");
+        expect(result).toSuggestExactly(app.againAsRun("variable rm FOO --force"));
       });
 
       it("removes nothing", async () => {

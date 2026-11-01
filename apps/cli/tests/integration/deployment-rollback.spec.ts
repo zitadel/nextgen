@@ -233,7 +233,9 @@ describe("deployment rollback", () => {
             "--json",
           ]);
 
-          expect(result).toSuggest(`deployment rollback ${first.deployment_id ?? ""} --force`);
+          expect(result).toSuggestExactly(
+            app.againAsRun(`deployment rollback ${first.deployment_id ?? ""} --force`),
+          );
         });
 
         it("suggests the deployment it resolved when none was named", async () => {
@@ -247,7 +249,30 @@ describe("deployment rollback", () => {
 
           const result = await app.run(["deployment", "rollback", "--json"]);
 
-          expect(result).toSuggest(`deployment rollback ${first.deployment_id ?? ""} --force`);
+          expect(result).toSuggestExactly(
+            app.againAsRun(`deployment rollback ${first.deployment_id ?? ""} --force`),
+          );
+        });
+
+        it("suggests the deployment once when it is named after a flag", async () => {
+          const app = await aSetUpApp();
+          await app.addPrimaryOrigin();
+          const first = await app.deployData();
+
+          const result = await app.run([
+            "deployment",
+            "rollback",
+            "--message",
+            "restore",
+            first.deployment_id ?? "",
+            "--json",
+          ]);
+
+          expect(result).toSuggestExactly(
+            app.againAsRun(
+              `deployment rollback ${first.deployment_id ?? ""} --force --message restore`,
+            ),
+          );
         });
 
         it("rolls back nothing", async () => {

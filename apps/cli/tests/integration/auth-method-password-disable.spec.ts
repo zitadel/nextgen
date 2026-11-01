@@ -53,7 +53,7 @@ describe("auth-method password disable", () => {
 
           const result = await app.disableMethod("password");
 
-          expect(result).toSuggest(
+          expect(result).toSuggestExactly(
             `auth-method password disable --schema default-human-user --cwd ${app.path} --force`,
           );
         });
