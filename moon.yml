@@ -91,6 +91,10 @@ tasks:
   # executes.
   test:
     command: "corepack pnpm run test:all"
+    # render-builtin-schemas.test.mjs imports packages/config/src/defaults.ts,
+    # which checks the default schema against the generated API schemas.
+    deps:
+      - "api:generate"
     inputs:
       - "scripts/ci-mode.mjs"
       - "scripts/ci-mode.test.mjs"
