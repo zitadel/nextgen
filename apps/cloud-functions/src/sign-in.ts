@@ -1,3 +1,5 @@
+import { API_PREFIX } from "@zitadel/api/runtime/base-url";
+
 import { passProtection, zitadelServer } from "./zitadel";
 
 /** Where the console's add-on points the sign-in widget (`signInApiBase`). */
@@ -8,12 +10,6 @@ export interface BotVerdict {
   isBot: boolean;
   isVerifiedBot: boolean;
 }
-
-/**
- * The prefix the server answers the API under (ADR 077). Until 1.0.0 it also
- * answers the same operations at the root, so a widget may call either.
- */
-const API_PREFIX = "/api/v1";
 
 /**
  * The widget's two calls that start or advance a sign-in or sign-up: what a
