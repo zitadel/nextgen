@@ -533,7 +533,8 @@ It allows the new origin on the server first, and a refusal changes nothing.
 It then rewrites the dev script or dev-server config, `ZITADEL_ISSUER` in
 `.env.local`, `zitadel.json`, `.zitadel/secret` and the README/AGENTS.md
 guidance, and removes the old origin, which asks first: non-interactive, pass
-`--force` to remove it, or `warnings` says it was kept. `data.previous_issuer` and `data.issuer`
+`--force` to remove it, or `warnings` says it was kept and `next_commands`
+holds the `--force` re-run. `data.previous_issuer` and `data.issuer`
 name both origins, and `data.moved` is `false` when the app was already on that
 port. A social sign-in provider still redirects to the old port: `warnings`
 names the redirect URI to add at each provider. Restart the dev server

@@ -8,6 +8,7 @@ import { IDPS_DIR } from "../../lib/idp/connections";
 import { issuerFromPort, type Orca } from "../../lib/orca";
 import { portFromIssuer } from "../../lib/orca/detectors/port";
 import { replaceOrigin } from "../../lib/orca/patchers/rule/dev-port-move";
+import type { SuggestedCommand } from "../../lib/suggestion";
 import type { PatchResult } from "../../lib/orca/patchers/types";
 import { readZitadelSecret, writeZitadelSecret } from "../../lib/project";
 import { readScaffoldManifest } from "../../lib/scaffold-manifest";
@@ -23,6 +24,8 @@ export type DevPortMove = Readonly<{
   ssoProviders: ReadonlyArray<string>;
   /** Set when the previous origin was left among the project's origins. */
   staleOrigin?: string;
+  /** The `--force` re-run that removes it, when it was left for want of `--force`. */
+  retry?: readonly SuggestedCommand[];
 }>;
 
 /**
@@ -77,6 +80,7 @@ export async function moveDevPort(opts: {
   const result = await patcher.moveDevPort(ctx, previousIssuer, { cwd, dryRun, force: false });
 
   let staleOrigin: string | undefined;
+  let retry: readonly SuggestedCommand[] | undefined;
   if (!dryRun) {
     // The app's own origin is primary, so the move rewrites that list. An
     // older secret that still carries the issuer as a preview pattern is
@@ -105,7 +109,8 @@ export async function moveDevPort(opts: {
           message: `Remove ${previousIssuer}, the app's previous origin, from the project? ${issuer} replaces it.`,
         })
         .catch((error: unknown) => {
-          if (isRefusal(error)) {
+          if (isRefusal(error) && error instanceof ZitadelError) {
+            retry = error.nextCommands;
             return undefined;
           }
           throw error;
@@ -128,6 +133,7 @@ export async function moveDevPort(opts: {
     result,
     ssoProviders: moving ? await connectionSlugs(cwd) : [],
     ...(staleOrigin === undefined ? {} : { staleOrigin }),
+    ...(retry === undefined ? {} : { retry }),
   };
 }
 

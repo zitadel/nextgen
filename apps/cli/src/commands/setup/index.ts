@@ -1258,7 +1258,7 @@ export default class Setup extends Destructive(BaseCommand) {
     }
     if (move.staleOrigin !== undefined) {
       reportWarning(
-        `${move.staleOrigin} is still among the project's origins; it admits a port nothing serves any more.`,
+        `${move.staleOrigin} is still among the project's origins; it admits a port nothing serves any more.${move.retry === undefined ? "" : " Pass --force to remove it."}`,
       );
     }
     for (const slug of move.ssoProviders) {
@@ -1282,7 +1282,10 @@ export default class Setup extends Destructive(BaseCommand) {
         dev_port: devPort,
         files_written: move.result.filesWritten.map((file) => relativeDisplay(cwd, file)),
       },
-      next: { actions: [`Restart the dev server and open ${move.issuer}/login.`] },
+      next: {
+        actions: [`Restart the dev server and open ${move.issuer}/login.`],
+        ...(move.retry === undefined ? {} : { commands: move.retry }),
+      },
     });
   }
 }

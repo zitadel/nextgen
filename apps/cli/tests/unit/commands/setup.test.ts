@@ -1404,8 +1404,18 @@ describe("setup --dev-port on an app already set up", () => {
     const res = await moveTo(cwd, 3101);
 
     expect((parseJson(res.stdout) as { warnings: string[] }).warnings).toContain(
-      "http://localhost:3000 is still among the project's origins; it admits a port nothing serves any more.",
+      "http://localhost:3000 is still among the project's origins; it admits a port nothing serves any more. Pass --force to remove it.",
     );
+  });
+
+  it("suggests moving again with --force to remove the previous origin", async () => {
+    const cwd = await aSetUpNextApp();
+
+    const res = await moveTo(cwd, 3101);
+
+    expect(
+      (parseJson(res.stdout) as { data: { next_commands: string[] } }).data.next_commands,
+    ).toEqual([expect.stringMatching(/ setup --force .*--dev-port 3101/)]);
   });
 
   it("changes nothing when the server refuses the new origin", async () => {
