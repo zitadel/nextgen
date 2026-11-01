@@ -3,7 +3,7 @@ import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it, vi } from "vitest";
-import { formatDate, formatDateTime } from "@/lib/date";
+import { formatDate } from "@/lib/date";
 import { scopedPath } from "@/test/project-scope.fixture";
 import { server } from "@/test/msw";
 import { createAppRouter } from "../../../router";
@@ -372,14 +372,15 @@ describe("user schema detail", () => {
     expect(screen.getByText(formatDate(CREATED_AT))).toBeInTheDocument();
   });
 
-  it("lists every revision of the schema, newest marked latest, and opens the chosen one", async () => {
+  it("lists every revision of the schema, newest marked Latest, and opens the chosen one", async () => {
     // Revisions share an `objectType` and are listed by it, each named by its
     // id and creation time (decisions log D10: several can be minted minutes
-    // apart). None is called active: which revision serves new registrations
-    // is the release's choice. An older one says users stay on it until they
-    // are migrated.
+    // apart), and marked `In use` while some user is on it. None is called
+    // active: which revision serves new registrations is the release's
+    // choice. An older one says users stay on it until they are migrated.
     const NEWER_AT = "2026-08-01T09:30:00Z";
-    const newer = envelope("sch_business_2", BUSINESS, NEWER_AT);
+    const plain = envelope("sch_business_2", BUSINESS, NEWER_AT);
+    const newer = { ...plain, metadata: { ...plain.metadata, in_use: true } };
     const lists: URLSearchParams[] = [];
     server.use(
       http.get(SCHEMAS_URL, ({ request }) => {
@@ -396,16 +397,17 @@ describe("user schema detail", () => {
 
     expect(lists.at(-1)?.get("object_type")).toBe("human-user");
     expect(lists.at(-1)?.get("revisions")).toBe("all");
+    expect(lists.at(-1)?.get("expand")).toBe("in_use");
     const picker = screen.getByRole("combobox", { name: "Schema revision" });
-    expect(picker).toHaveTextContent("sch_business");
-    expect(picker).not.toHaveTextContent("latest");
+    expect(picker).toHaveTextContent("Revisionsch_business");
+    expect(picker).not.toHaveTextContent("Latest");
     expect(screen.getByText(/Not the newest revision/)).toBeInTheDocument();
 
     await userEvent.click(picker);
     const options = within(await screen.findByRole("listbox")).getAllByRole("option");
-    expect(options.map((option) => option.textContent)).toEqual([
-      `sch_business_2${formatDateTime(NEWER_AT)}latest`,
-      `sch_business${formatDateTime(CREATED_AT)}`,
+    expect(options.map((option) => option.getAttribute("title"))).toEqual([
+      "sch_business_2",
+      "sch_business",
     ]);
     await userEvent.click(options[0] as HTMLElement);
 
@@ -413,7 +415,9 @@ describe("user schema detail", () => {
       expect(router.state.resolvedLocation?.pathname).toBe("/schemas/sch_business_2"),
     );
     await waitFor(() =>
-      expect(screen.getByRole("combobox", { name: "Schema revision" })).toHaveTextContent("latest"),
+      expect(screen.getByRole("combobox", { name: "Schema revision" })).toHaveTextContent(
+        "LatestIn use",
+      ),
     );
     expect(screen.queryByText(/Not the newest revision/)).not.toBeInTheDocument();
   });

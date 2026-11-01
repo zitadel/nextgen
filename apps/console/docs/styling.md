@@ -108,7 +108,7 @@ Canonical examples:
 | --- | --- |
 | Nav chrome | `Sidebar` (`collapsible="icon"`; mobile = persistent icon rail) |
 | Org/project picker | `Popover` + `Badge` |
-| Users filters | `Select` (schema, then revision), in `ResourceTitle`'s `filter` slot |
+| Users filters and sort | `Select` (schema, revision, sort), in `ResourceTitle`'s `filter` slot; the revision menu is `RevisionItems` (`src/components/revision-select.tsx`), shared with the schema detail's picker |
 | Users table | `Table`, `Avatar`, `Badge`, `DropdownMenu`, `Button`; `HoverCard` (identity), `Popover` (attributes) |
 | Panel around a screen's content | `Card` |
 | Attribute chip / CLI command in prose | `InlineCode` |

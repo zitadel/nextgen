@@ -51,11 +51,13 @@ export async function fetchUsers(
   pageToken?: string,
   expand = true,
   filter: UserFilter = [],
+  sorting?: UserSorting,
 ): Promise<UsersPage & { teamsExpanded: boolean }> {
   const body = {
     limit: PAGE_SIZE,
     page_token: pageToken,
     ...(filter.length > 0 ? { filter } : {}),
+    ...(sorting ? { sorting } : {}),
   };
   const params = { project_id: projectId };
   if (!expand) {
@@ -72,22 +74,28 @@ export async function fetchUsers(
   }
 }
 
-/** What the Users list is narrowed to, as the URL carries it. */
+/** What the Users list is narrowed to and ordered by, as the URL carries it. */
 export interface UsersSearch {
   /** A schema's object type; absent for every schema. */
   schema?: string;
-  /** `latest`, `older`, or one revision's id; absent for every revision. */
+  /** One revision's id; absent for every revision. */
   revision?: string;
+  /** The revision order, newest or oldest first; absent for the server's own order, newest users first. */
+  sort?: UsersSort;
 }
 
 type UserFilter = NonNullable<Parameters<typeof api.queryUsers>[0]["filter"]>;
+type UserSorting = NonNullable<Parameters<typeof api.queryUsers>[0]["sorting"]>;
+
+/** The two orders by revision the Users list offers. */
+export type UsersSort = "latest" | "oldest";
 
 /** One schema as the Users filter offers it: its object type, title and newest revision. */
 export interface SchemaOption {
   objectType: string;
   /** The newest revision's title, else its id. */
   title: string;
-  /** The newest revision's id, which `latest` and `older` compare with. */
+  /** The newest revision's id. */
   latestId: string;
   /** The newest revision's document, for the column groups. */
   schema: UserSchema;
@@ -117,23 +125,29 @@ export function schemaOptions(entries: SchemaEntry[]): SchemaOption[] {
 
 /**
  * The server-side criteria for a search (#1669). Every revision of a schema
- * shares its `object_type`; `latest` and `older` compare the user's `schema`
- * with the newest revision's id, `latest`. The route sends neither without
- * it, so a URL never claims a narrower list than it shows.
+ * shares its `object_type`, and a user's `schema` is the revision it is on.
  */
-export function userFilter(search: UsersSearch, latest: string | undefined): UserFilter {
+export function userFilter(search: UsersSearch): UserFilter {
   if (!search.schema) return [];
   const criteria: UserFilter = [
     { field: "schema_object_type", operation: "equals", value: search.schema },
   ];
-  if (search.revision === "latest") {
-    if (latest) criteria.push({ field: "schema", operation: "equals", value: latest });
-  } else if (search.revision === "older") {
-    if (latest) criteria.push({ field: "schema", operation: "not_equals", value: latest });
-  } else if (search.revision) {
+  if (search.revision) {
     criteria.push({ field: "schema", operation: "equals", value: search.revision });
   }
   return criteria;
+}
+
+/**
+ * The order for a search (#2502, decisions log D25): by the revision each
+ * user is on, once one is asked for. Minted revision ids are ULIDs, so their
+ * order is their creation order; a schema named by a URI `$id` sorts by that
+ * string instead, after every minted one. Unasked, or with one revision
+ * chosen, the server's own order stands: newest users first.
+ */
+export function userSorting(search: UsersSearch): UserSorting | undefined {
+  if (search.revision || !search.sort) return undefined;
+  return { field: "schema", direction: search.sort === "oldest" ? "asc" : "desc" };
 }
 
 /**

@@ -16,6 +16,9 @@
 
 ## Decisions
 
+### D25 · The Users list filters by one revision and sorts by revision — 2026-11-01
+Amends D5, which left filtering and sorting out of the MVP. The title row carries three controls: a schema filter, a revision filter that stays in view but disabled until a schema is chosen, and a separate sort by revision, `Sort by latest` or `Sort by oldest`. The revision filter picks one revision; there is no "latest only" or "older revisions" choice. The sort orders users by the revision they are on. It is opt-in: until one is picked the list keeps its own order, newest users first, so a user just added stays on top, and the control reads `Sort by revision`. It is disabled once one revision is chosen, since every row is then on it. The revision menu is shared with the schema detail's picker: each revision by its shortened id (`sch_…ZNP02S`), creation time to the minute (D10), and a filled `Latest` and an outlined `In use` badge, which a revision can carry together. Still no total count (D5).
+
 ### D24 · Projects is the home, drawn without the sidebar — 2026-10-26 · [standing]
 The sidebar is one project's screens, so Projects leaves it: the logo and the project switcher's "All projects" open it, and it draws no sidebar, only a bar with the logo, search and the account menu. It is a project-free page, so the list sits in a centred column. A project is created from the app it connects, so the page hands over the CLI's `setup` command in a card beside the list instead of a New project button and drawer, and below the list it explains how a project lives: set up, build locally, deploy, add environments (each a project of its own), operate in the console. On the way to a screen (`?next=`, D22) the guide is left out. Supersedes D21's New project drawer and the sidebar row of D22.
 → Design review of the home bar, the setup card and the lifecycle guide.
