@@ -59,6 +59,17 @@ describe("meterPrice", () => {
     expect(meterPrice(policy, withMeters([policy]))).toEqual(["$0.015 per user and policy"]);
   });
 
+  it("says what a connection costs at most, for a meter counted per connection", () => {
+    const sso = meter({
+      price: { model: "per_unit", unit_amount: 0.1 },
+      counted_per: { key: "connection", at_most: 750 },
+    });
+    expect(meterPrice(sso, withMeters([sso]))).toEqual([
+      "$0.10 per user",
+      "At most $75 per connection a month",
+    ]);
+  });
+
   it("adds the pool and what past it costs", () => {
     const checks = meter({
       id: "authz_checks",

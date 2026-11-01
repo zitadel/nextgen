@@ -4,7 +4,18 @@ import { links } from "../links";
 import og from "../og.jpg";
 import { SiteFooter } from "../site-footer";
 import { SiteHeader } from "../site-header";
-import { type Catalog, capitalize, dollars, readCatalog, sentence, short } from "./catalog";
+import {
+  type Catalog,
+  capitalize,
+  count,
+  dollars,
+  licensedPrice,
+  type Meter,
+  mostPer,
+  readCatalog,
+  sentence,
+  short,
+} from "./catalog";
 import { compareGroups } from "./compare";
 import { CompareTable } from "./compare-table";
 
@@ -279,6 +290,12 @@ function Questions({ catalog }: { catalog: Catalog }) {
   const [formula, ...why] = conventions.invoice.split("; ");
   const requests = catalog.meters.find((meter) => meter.id === "api_requests");
   const counted = catalog.meters.filter((meter) => meter.price !== null);
+  const sso = catalog.meters.find((meter) => meter.id === "sso_users");
+  const directories = catalog.meters.find((meter) => meter.id === "directory_users");
+  const terms = (meter?: Meter) =>
+    JSON.stringify([meter?.price, meter?.allowance, meter?.counted_per?.at_most]);
+  const directoriesAlike = directories !== undefined && terms(directories) === terms(sso);
+  const sink = catalog.licensed.find((line) => line.id === "event_sink");
   const [unitName, unitMeaning] = catalog.self_hosted.unit.split(": ");
   const questions: { question: string; answer: ReactNode }[] = [
     ...(catalog.status === "proposal"
@@ -348,6 +365,23 @@ function Questions({ catalog }: { catalog: Catalog }) {
         </p>
       ),
     },
+    ...(sso?.price?.model === "per_unit" && sso.counted_per
+      ? [
+          {
+            question: "How is SSO priced?",
+            answer: (
+              <p>
+                Per user who signs in through an enterprise connection: {count(sso.allowance ?? 0)}{" "}
+                a month are free, then {dollars(sso.price.unit_amount)} each. A connection counts at
+                most {count(sso.counted_per.at_most)} of its users, so it costs at most{" "}
+                {dollars(mostPer(sso) ?? 0)} a month, however large the customer behind it.{" "}
+                {directoriesAlike ? "Directory sync is priced the same way, per directory. " : ""}
+                Connections themselves cost nothing.
+              </p>
+            ),
+          },
+        ]
+      : []),
     ...(requests
       ? [
           {
@@ -381,6 +415,7 @@ function Questions({ catalog }: { catalog: Catalog }) {
             .join(", ")}
           . Longer retention is an add-on, priced per user whose events are kept, with events pooled
           per user.
+          {sink ? ` Or stream them to your SIEM and keep them there: ${licensedPrice(sink)}.` : ""}
         </p>
       ),
     },

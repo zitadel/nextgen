@@ -103,6 +103,8 @@ export type Meter = {
   plans?: PlanId[];
   /** How long a counted user's audit events are kept: a plan that keeps them as long has it already. */
   retention_days?: number;
+  /** Counts at most `at_most` users per connection or directory a month. */
+  counted_per?: { key: string; at_most: number };
 };
 
 /** A line billed on top of the minimum, never drawn from its credit. */
@@ -131,9 +133,12 @@ const COUNT = new Intl.NumberFormat("en-US");
 const COMPACT = new Intl.NumberFormat("en-US", { notation: "compact" });
 const REGIONS = new Intl.DisplayNames(["en"], { type: "region" });
 
-/** A dollar amount as the page writes it: `$100`, `$36,000`, `$0.015`. */
+/** A dollar amount as the page writes it: `$100`, `$36,000`, `$0.10`, `$0.015`. */
 export function dollars(amount: number): string {
-  return `$${amount.toLocaleString("en-US", { maximumFractionDigits: 6 })}`;
+  return `$${amount.toLocaleString("en-US", {
+    minimumFractionDigits: Number.isInteger(amount) ? 0 : 2,
+    maximumFractionDigits: 6,
+  })}`;
 }
 
 /** A count as the page writes it: `1,000,000`. */
@@ -168,7 +173,10 @@ export function listedMeters(catalog: Catalog): Meter[] {
   return catalog.meters.filter((meter) => meter.price !== null && !meter.pool_of);
 }
 
-/** What a meter costs past its allowance, one line per part: the price, then its pool. */
+/**
+ * What a meter costs past its allowance, one line per part: the price, what
+ * one connection or directory costs at most, then its pool.
+ */
 export function meterPrice(meter: Meter, catalog: Catalog): string[] {
   const { price } = meter;
   if (!price) return ["Never billed"];
@@ -176,6 +184,10 @@ export function meterPrice(meter: Meter, catalog: Catalog): string[] {
     case "per_unit": {
       const per = meter.dedupe?.includes("policy") ? "per user and policy" : "per user";
       const lines = [price.display ?? `${dollars(price.unit_amount)} ${per}`];
+      const most = mostPer(meter);
+      if (most !== undefined) {
+        lines.push(`At most ${dollars(most)} per ${meter.counted_per?.key} a month`);
+      }
       const pooled = meter.pool && catalog.meters.find(({ id }) => id === meter.pool?.meter);
       if (meter.pool && pooled?.price?.model === "per_unit") {
         lines.push(
@@ -212,6 +224,13 @@ export function meterPrice(meter: Meter, catalog: Catalog): string[] {
       return lines;
     }
   }
+}
+
+/** What one connection or directory costs at most a month, for a meter counted per one. */
+export function mostPer(meter: Meter): number | undefined {
+  const { price, counted_per } = meter;
+  if (price?.model !== "per_unit" || !counted_per) return undefined;
+  return Math.round(counted_per.at_most * price.unit_amount * 100) / 100;
 }
 
 /** What a pooled meter counts, from its label: "Emails past the pool" → "emails". */

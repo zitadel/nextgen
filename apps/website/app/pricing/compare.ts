@@ -154,8 +154,13 @@ export function compareGroups(catalog: Catalog): Group[] {
     {
       id: "b2b",
       title: "B2B",
-      line: "Selling to companies: their SSO, their policies and their permissions.",
-      rows: [meterRow("sso_users"), meterRow("policy_users"), meterRow("authz_users")],
+      line: "Selling to companies: their SSO and directories, their policies and their permissions.",
+      rows: [
+        meterRow("sso_users"),
+        meterRow("directory_users"),
+        meterRow("policy_users"),
+        meterRow("authz_users"),
+      ],
     },
     {
       id: "m2m",
@@ -178,11 +183,12 @@ export function compareGroups(catalog: Catalog): Group[] {
     },
     {
       id: "audit",
-      title: "Audit retention",
-      line: "How long you keep who did what, past the plan's own days.",
+      title: "Audit trail",
+      line: "How long you keep who did what past the plan's own days, and where it streams.",
       rows: [
         meterRow("retained_users_90d", "Retention to 90 days"),
         meterRow("retained_users_400d", "Retention to 400 days"),
+        lineRow("event_sink"),
       ],
     },
     {
