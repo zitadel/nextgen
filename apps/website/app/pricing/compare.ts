@@ -105,7 +105,6 @@ export function compareGroups(catalog: Catalog): Group[] {
 
   const mau = meter("monthly_active_users");
   const requests = meter("api_requests");
-  const extraDomain = line("custom_domain_extra");
   const [proSupport = "", ...proSupportMore] = pro.support.split("; ");
 
   const groups: Group[] = [
@@ -124,6 +123,9 @@ export function compareGroups(catalog: Catalog): Group[] {
           },
         },
         { label: "Teams and console seats", cells: each(() => text("Unlimited")) },
+        // The login is a component the customer runs in its own app, so its
+        // domain is the customer's on every plan.
+        { label: "Login in your own app, on your domain", cells: each(() => YES) },
         {
           label: "Audit events kept",
           cells: each((plan) => text(`${plans[plan].event_retention_days} days`)),
@@ -143,21 +145,6 @@ export function compareGroups(catalog: Catalog): Group[] {
         },
         { label: "Basic bot challenges", cells: each(() => text("Unlimited")) },
         meterRow("bot_checks"),
-        // The login runs in the customer's own app on its own domain, so a
-        // domain costs something only when Zitadel hosts the login.
-        { label: "Login in your own app, on your domain", cells: each(() => YES) },
-        {
-          label: "Hosted login domains",
-          source: extraDomain.id,
-          cells: each((plan) => {
-            const included = plans[plan].custom_domains_included;
-            if (plan === "enterprise") return CUSTOM;
-            if (!included) return NO;
-            return extraDomain.plans.includes(plan)
-              ? text(`${included} included`, [`Then ${licensedPrice(extraDomain)}`])
-              : text(`${included} included`);
-          }),
-        },
         {
           label: "Hide the Zitadel mark",
           cells: each((plan) => (plans[plan].attribution_mark === "hideable" ? YES : NO)),

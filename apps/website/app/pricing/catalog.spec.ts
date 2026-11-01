@@ -121,7 +121,7 @@ describe("licensedPrice", () => {
   });
 
   it("names the interval and what it is per", () => {
-    expect(licensedPrice(line({ amount: 50, per: "domain" }))).toBe("$50 a month per domain");
+    expect(licensedPrice(line({ amount: 100, per: "region" }))).toBe("$100 a month per region");
     expect(licensedPrice(line({ amount: 250, interval: "hour" }))).toBe("$250 an hour");
   });
 

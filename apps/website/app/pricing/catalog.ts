@@ -60,7 +60,6 @@ type Plan = {
   label: string;
   event_retention_days: number;
   attribution_mark: "shown" | "hideable";
-  custom_domains_included?: number;
   delivery_modes: string[];
   support: string;
   sla: { target_percent: number; credits: boolean; note?: string } | null;
@@ -221,7 +220,7 @@ function poolNoun(meter: Meter): string {
 }
 
 /**
- * A licensed line's price: `$1,000 a month`, `$50 a month per domain`, or its
+ * A licensed line's price: `$1,000 a month`, `$100 a month per region`, or its
  * note when it has no amount. A line only Enterprise takes is quoted with the
  * rest of its contract, never listed.
  */
