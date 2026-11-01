@@ -38,11 +38,7 @@
         "email_fallback": {
           "target": "identifier"
         },
-        "user_not_found": {
-          "target": "register"
-        },
         "register": {
-          "target": "register",
           "purpose": "register"
         }
       }
@@ -83,7 +79,6 @@
           "target": "register"
         },
         "register": {
-          "target": "register",
           "purpose": "register"
         }
       }
@@ -152,7 +147,6 @@
           "target": "password"
         },
         "sign_in": {
-          "target": "passkey-first",
           "purpose": "login"
         }
       }

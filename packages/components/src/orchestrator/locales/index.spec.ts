@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { de } from "./de.js";
 import { en } from "./en.js";
 import { it as italian } from "./it.js";
-import { localeFor, mergeLocale } from "./index.js";
+import { isHidden, localeFor, mergeLocale } from "./index.js";
 
 describe("built-in locale dictionaries", () => {
   it("keeps translated locale keys aligned with English", () => {
@@ -110,5 +110,36 @@ describe("localeFor", () => {
     });
 
     expect(locale).not.toHaveProperty("password.description.sso");
+  });
+});
+
+describe("isHidden", () => {
+  const key = "notice.user_not_found";
+
+  it("hides a text the integrator set to an empty string in English for every language", () => {
+    const locales = { en: { [key]: "" } };
+
+    expect(isHidden("en-US", locales, key)).toBe(true);
+    expect(isHidden("de-DE", locales, key)).toBe(true);
+    expect(isHidden("fr", locales, key)).toBe(true);
+  });
+
+  it("shows a language's own text over an English empty string", () => {
+    const locales = { en: { [key]: "" }, de: { [key]: "Neues Konto" } };
+
+    expect(isHidden("de", locales, key)).toBe(false);
+    expect(isHidden("it", locales, key)).toBe(true);
+  });
+
+  it("hides a text only in the language that sets it to an empty string", () => {
+    const locales = { de: { [key]: "" } };
+
+    expect(isHidden("de", locales, key)).toBe(true);
+    expect(isHidden("en", locales, key)).toBe(false);
+  });
+
+  it("hides nothing without integrator text", () => {
+    expect(isHidden("en", undefined, key)).toBe(false);
+    expect(isHidden("en", { en: { [key]: "New account" } }, key)).toBe(false);
   });
 });

@@ -50,24 +50,26 @@ export const FLOW_PURPOSES = [
 ] as const;
 
 /**
- * Mirrors `purposeFlipTargets` in flow_definition_validator.go: the
- * identifier outcomes only. `sso_user_not_found` comes only from SSO
- * resolution and is left out here; requiring it on every combined entry
- * step would reject the shipped default flow. A rule on steps carrying
- * sso_providers is future work (#1044).
+ * The identifier half of `applyOutcomeFlip` in flow_state_machine.go: the
+ * outcome that switches each purpose to the other. `sso_user_not_found`
+ * also switches login to register but comes only from SSO resolution, so
+ * it is left out here.
  */
 export const PURPOSE_FLIP_TARGETS: Readonly<Record<string, Readonly<Record<string, string>>>> = {
   login: { user_not_found: "register" },
   register: { user_already_exists: "login" },
 };
 
-/** Mirrors `flipOutcomeImpacts` in flow_definition_validator.go (verbatim). */
-const FLIP_OUTCOME_IMPACTS: Readonly<Record<string, string>> = {
+/** What a combined flow does instead when its entry step leaves the switch out. */
+const UNWIRED_SWITCH_EFFECTS: Readonly<Record<string, string>> = {
   user_not_found:
-    "someone without an account gets stuck at sign-in instead of being routed to registration",
+    "an identifier with no account stays on the step with error.user_not_found instead of continuing as a sign-up",
   user_already_exists:
-    "someone who already has an account gets stuck at registration instead of being routed to sign-in",
+    "an identifier that has an account stays on the step with error.user_already_exists instead of continuing as a sign-in",
 };
+
+/** Purposes a definition may declare whose journeys the engine does not run yet. */
+const RESERVED_PURPOSES = new Set(["recovery", "profiling", "reauth", "link_account"]);
 
 /** Action kinds a flow author may declare; `back` is engine-injected. */
 const DECLARABLE_ACTION_KINDS = new Set(["submit", "passkey", "passkey_register", "navigate"]);
@@ -115,6 +117,16 @@ export function validateFlowDefinition(flow: object, schema?: object): FlowValid
   }
 
   // Phase 2 — purposes.
+  for (const purpose of def.purposes.keys()) {
+    if (RESERVED_PURPOSES.has(purpose)) {
+      issues.push(
+        warning(
+          "warn/reserved-purpose",
+          `purpose ${q(purpose)} is reserved: the engine does not run its journey yet`,
+        ),
+      );
+    }
+  }
   if (def.purposes.size === 0) {
     issues.push(error("definition", "no purposes defined"));
   }
@@ -143,17 +155,19 @@ export function validateFlowDefinition(flow: object, schema?: object): FlowValid
   }
 
   // Graph phases are ill-defined over broken structure — gate on 1–3.
-  if (issues.length === 0) {
+  // Warnings never gate: they describe a flow that works.
+  const clean = () => !issues.some((issue) => issue.severity === "error");
+  if (clean()) {
     issues.push(...validateGraph(def, stepNames));
-    if (issues.length === 0) {
+    if (clean()) {
       issues.push(...validateCycles(def));
     }
-    issues.push(...validateFlipTableCoverage(def));
+    issues.push(...warnUnwiredSwitch(def));
   }
 
   // Schema-dependent phases: only meaningful over structurally sound
   // steps, and only when the paired schema content is available.
-  if (schema !== undefined && issues.length === 0) {
+  if (schema !== undefined && clean()) {
     issues.push(...validateAgainstSchema(def, schema));
   }
 
@@ -168,9 +182,18 @@ type FlowStep = {
   actions: { name: string; kind: string }[];
   gateCount: number;
   ssoProviderCount: number;
-  transitions: Map<string, { target: string; action: string | null; purpose: string | null }>;
+  transitions: Map<string, FlowTransition>;
   onSuccess: string | undefined;
   terminal: boolean;
+};
+
+type FlowTransition = {
+  /** `""` when absent. */
+  target: string;
+  /** Written as `"target": ""`, which the API schema refuses (`minLength: 1`). */
+  emptyTarget: boolean;
+  action: string | null;
+  purpose: string | null;
 };
 
 type FlowDef = {
@@ -206,15 +229,13 @@ function readFlow(flow: object): FlowDef {
   if (Array.isArray(raw.steps)) {
     for (const value of raw.steps) {
       if (!isPlainObject(value)) continue;
-      const transitions = new Map<
-        string,
-        { target: string; action: string | null; purpose: string | null }
-      >();
+      const transitions = new Map<string, FlowTransition>();
       if (isPlainObject(value.transitions)) {
         for (const [key, t] of Object.entries(value.transitions)) {
           const entry = isPlainObject(t) ? t : {};
           transitions.set(key, {
             target: str(entry.target),
+            emptyTarget: entry.target === "",
             action: typeof entry.action === "string" ? entry.action : null,
             purpose: typeof entry.purpose === "string" ? entry.purpose : null,
           });
@@ -249,6 +270,12 @@ function error(rule: FlowRuleId, message: string, step?: string): FlowValidation
   return step === undefined
     ? { severity: "error", rule, message }
     : { severity: "error", rule, message, step };
+}
+
+function warning(rule: FlowRuleId, message: string, step?: string): FlowValidationIssue {
+  return step === undefined
+    ? { severity: "warning", rule, message }
+    : { severity: "warning", rule, message, step };
 }
 
 // ── phase 3: per-step structure (validateSteps + uniqueNonEmptyFields) ──────
@@ -391,11 +418,23 @@ function validateStep(step: FlowStep): FlowValidationIssue[] {
   return issues;
 }
 
-// ── phase 4: graph / cycles / flip table ─────────────────────────────────────
+// ── phase 4: graph / cycles / switch ─────────────────────────────────────────
 
 /** A transition with no cross-flow action targets a step in this flow. */
 function isCurrentFlow(t: { action: string | null }): boolean {
   return t.action === null;
+}
+
+/**
+ * The step a current-flow transition goes to: its `target`, or the entry
+ * step of its `purpose` when it names only that. Mirrors
+ * `FlowDefinition.TransitionTarget` in flow_definition.go.
+ */
+function transitionTarget(def: FlowDef, t: FlowTransition): string {
+  if (t.target === "" && t.purpose !== null) {
+    return def.purposes.get(t.purpose) ?? "";
+  }
+  return t.target;
 }
 
 /** Adjacency over local (current-flow) transitions: step → target steps. */
@@ -405,7 +444,7 @@ function localAdjacency(def: FlowDef): Map<string, string[]> {
     for (const t of step.transitions.values()) {
       if (isCurrentFlow(t)) {
         const targets = adj.get(step.name) ?? [];
-        targets.push(t.target);
+        targets.push(transitionTarget(def, t));
         adj.set(step.name, targets);
       }
     }
@@ -419,9 +458,10 @@ function reverseAdjacency(def: FlowDef): Map<string, string[]> {
   for (const step of def.steps) {
     for (const t of step.transitions.values()) {
       if (isCurrentFlow(t)) {
-        const sources = reverse.get(t.target) ?? [];
+        const target = transitionTarget(def, t);
+        const sources = reverse.get(target) ?? [];
         sources.push(step.name);
-        reverse.set(t.target, sources);
+        reverse.set(target, sources);
       }
     }
   }
@@ -444,6 +484,16 @@ function validateGraph(def: FlowDef, stepNames: Set<string>): FlowValidationIssu
 
   for (const step of def.steps) {
     for (const [key, t] of step.transitions) {
+      if (t.emptyTarget) {
+        issues.push(
+          error(
+            "transition-target",
+            `step ${q(step.name)}: transition ${q(key)} has an empty target; leave target out to go to its purpose's entry step`,
+            step.name,
+          ),
+        );
+        continue;
+      }
       if (t.purpose !== null) {
         // Local re-purposing: never combined with a cross-flow action,
         // only to a purpose this definition serves, and only to that
@@ -476,7 +526,7 @@ function validateGraph(def: FlowDef, stepNames: Set<string>): FlowValidationIssu
                 step.name,
               ),
             );
-          } else if (t.target !== entry) {
+          } else if (t.target !== "" && t.target !== entry) {
             issues.push(
               error(
                 "graph",
@@ -487,8 +537,19 @@ function validateGraph(def: FlowDef, stepNames: Set<string>): FlowValidationIssu
           }
         }
       }
-      if (isCurrentFlow(t)) {
-        if (!stepNames.has(t.target)) {
+      if (t.target === "" && t.purpose === null) {
+        issues.push(
+          error(
+            "graph",
+            `step ${q(step.name)}: transition ${q(key)} has neither a target nor a purpose`,
+            step.name,
+          ),
+        );
+      } else if (isCurrentFlow(t)) {
+        // A purpose-only transition to a purpose the flow does not serve has
+        // no target; that error is reported above, and Go stops at it.
+        const target = transitionTarget(def, t);
+        if (target !== "" && !stepNames.has(target)) {
           issues.push(
             error(
               "graph",
@@ -502,6 +563,14 @@ function validateGraph(def: FlowDef, stepNames: Set<string>): FlowValidationIssu
           error(
             "graph",
             `step ${q(step.name)}: transition ${q(key)} has invalid action ${q(t.action ?? "")}`,
+            step.name,
+          ),
+        );
+      } else {
+        issues.push(
+          warning(
+            "warn/cross-flow-transition",
+            `step ${q(step.name)}: transition ${q(key)} uses action ${q(t.action)}, which the engine does not run yet: taking it fails with flow.unsupported`,
             step.name,
           ),
         );
@@ -576,20 +645,28 @@ function validateCycles(def: FlowDef): FlowValidationIssue[] {
   return issues;
 }
 
-function validateFlipTableCoverage(def: FlowDef): FlowValidationIssue[] {
+/**
+ * CLI-only guidance (the server accepts it): a flow that serves both
+ * login and register but whose entry step leaves out the outcome that
+ * switches between them. That is a valid choice, so it is a warning that
+ * says what the flow does instead.
+ */
+function warnUnwiredSwitch(def: FlowDef): FlowValidationIssue[] {
   const issues: FlowValidationIssue[] = [];
   for (const [purpose, entryStepName] of def.purposes) {
     const flipTargets = PURPOSE_FLIP_TARGETS[purpose];
     if (flipTargets === undefined) continue;
     const entry = def.steps.find((s) => s.name === entryStepName);
-    if (entry === undefined) continue;
+    // A step that collects nothing looks up no identifier, so it can never
+    // raise the outcome (a passkey-first entry, say).
+    if (entry === undefined || entry.fields.length === 0) continue;
     for (const [outcome, targetPurpose] of Object.entries(flipTargets)) {
       if (!def.purposes.has(targetPurpose)) continue;
       if (!entry.transitions.has(outcome)) {
         issues.push(
-          error(
-            "flip-table",
-            `step ${q(entry.name)}: entry step for purpose ${q(purpose)} must wire ${q(outcome)} transition because ${q(targetPurpose)} is also a purpose: without it, ${FLIP_OUTCOME_IMPACTS[outcome]}`,
+          warning(
+            "warn/no-purpose-switch",
+            `step ${q(entry.name)}: entry step for purpose ${q(purpose)} has no ${q(outcome)} transition although ${q(targetPurpose)} is also a purpose: ${UNWIRED_SWITCH_EFFECTS[outcome]}`,
             entry.name,
           ),
         );
@@ -874,12 +951,13 @@ function validateAgainstSchema(def: FlowDef, schema: object): FlowValidationIssu
     for (const step of def.steps) {
       if (!identifierFree.has(step.name)) continue;
       if (!challengesByStep.get(step.name)?.has("password")) continue;
-      issues.push({
-        severity: "warning",
-        rule: "warn/password-without-identifier",
-        message: `step ${q(step.name)} collects ${AUTH_METHOD_PREFIX}password on the login path but no upstream step collects an identifier field — the engine cannot resolve which user to challenge`,
-        step: step.name,
-      });
+      issues.push(
+        warning(
+          "warn/password-without-identifier",
+          `step ${q(step.name)} collects ${AUTH_METHOD_PREFIX}password on the login path but no upstream step collects an identifier field — the engine cannot resolve which user to challenge`,
+          step.name,
+        ),
+      );
     }
   }
 

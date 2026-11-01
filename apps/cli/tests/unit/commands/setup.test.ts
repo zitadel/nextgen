@@ -1363,7 +1363,9 @@ describe("setup --dev-port on an app already set up", () => {
     expect((await readJsonFile(cwd, ".zitadel/secret")).primary_origins).toEqual([
       "http://localhost:3101",
     ]);
-    expect(await readFile(join(cwd, "README.md"), "utf8")).toContain("http://localhost:3101/login");
+    expect(await readFile(join(cwd, "README.md"), "utf8")).toContain(
+      "http://localhost:3101/register",
+    );
     expect(await projectOrigins(cwd)).toEqual([
       { pattern: "http://localhost:3101", kind: "primary" },
     ]);
