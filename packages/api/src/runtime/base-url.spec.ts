@@ -1,9 +1,24 @@
+import { readFileSync } from "node:fs";
+
 import { afterEach, expect, test } from "vitest";
 
 import { getGetSchemaByIdUrl, getGetUserByIDUrl } from "../generated/endpoints/zitadelNextGen";
 import { API_PREFIX, apiBaseUrl, getApiBaseUrl, getProxyPath, setProxyPath } from "./base-url";
 
 afterEach(() => setProxyPath(""));
+
+// The spec's servers URL is the contract (ADR 077), and API_PREFIX what every
+// TypeScript client puts in front of an operation's path; the Go client's
+// PathPrefix has the same test. A change to one alone would leave the others
+// behind.
+test("API_PREFIX is the spec's server URL", () => {
+  const spec = readFileSync(
+    new URL("../../../../api/openapi/openapi-spec.yaml", import.meta.url),
+    "utf8",
+  );
+
+  expect(spec.match(/^servers:\n(?:\s*#.*\n)*\s*- url: (\S+)/m)?.[1]).toBe(API_PREFIX);
+});
 
 test("getProxyPath returns empty string by default", () => {
   expect(getProxyPath()).toBe("");

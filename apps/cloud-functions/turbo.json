@@ -9,9 +9,15 @@
     "typecheck": {
       "dependsOn": ["build"]
     },
+    // `next dev` resolves @zitadel/api to its dist/, as the build does.
+    "dev": {
+      "dependsOn": ["@zitadel/api#build"]
+    },
     // The cloud's service builds through this task, keyed by the
     // deployment's ID as the website's is: on Vercel it never hits.
     "build": {
+      // Next resolves @zitadel/api to its dist/.
+      "dependsOn": ["@zitadel/api#build"],
       "env": ["VERCEL_DEPLOYMENT_ID"],
       "outputs": [".next/**", "!.next/cache/**"]
     }
