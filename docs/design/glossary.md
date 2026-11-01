@@ -133,7 +133,7 @@ From the configuration surface, flow engine, and branding. Long-form in [`platfo
 
 ## 7. URL shape
 
-**RECOMMENDED: the resource API lives under `/api/v1/`** (`POST /api/v1/users`, `GET /api/v1/teams/{id}`); the login UI, the console, IdP callbacks, health probes and protocol endpoints stay at the root ([ADR 077](../adrs/077-api-path-prefix.md), Proposed). It replaces the lock on no version segment, which assumed an API host of its own. The shipped API still lives directly under the root. Header-selected versioning (`Zitadel-Version`, pinned per API key and per webhook endpoint) stays target design for opt-in changes within a major; until GA, breaking changes ride the release train. See [`api/conventions.md`](api/conventions.md#direction-not-shipped).
+**LOCKED: the resource API lives under `/api/v1/`** (`POST /api/v1/users`, `GET /api/v1/teams/{id}`); the console, IdP callbacks, health probes and protocol endpoints stay at the root ([ADR 077](../adrs/077-api-path-prefix.md), Accepted). It replaces the lock on no version segment, which assumed an API host of its own. Not shipped yet: the API still lives directly under the root. Header-selected versioning (`Zitadel-Version`, pinned per API key and per webhook endpoint) stays target design for opt-in changes within a major; until GA, breaking changes ride the release train. See [`api/conventions.md`](api/conventions.md#direction-not-shipped).
 
 ---
 
@@ -163,7 +163,7 @@ Four independent axes the system moves on.
 | `sk_org_…` | **`sk_team_…`** | One team-scoped service token prefix. |
 | `zp_…` | **`sk_proj_…`** | Pre-claim anonymous secret is `sk_proj_` with `pre_claim: true`. |
 | `zpp_…` | **`sk_proj_…`** (origin-scoped) | Origin-scoped variant for preview deploys. Status now **OPEN**: see `preview_secret` in §3. |
-| no path version segment *(header only)* | **`/api/v1/` prefix** | RECOMMENDED, not locked: [ADR 077](../adrs/077-api-path-prefix.md) is Proposed and the shipped API is still at the root (§7). |
+| no path version segment *(header only)* | **`/api/v1/` prefix** | Locked by [ADR 077](../adrs/077-api-path-prefix.md); not shipped yet, so the API still answers at the root (§7). |
 
 ### "Instance" disambiguation
 
