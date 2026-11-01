@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
+import { CreateSchemaBody as CreateSchemaBodySchema } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
+
 import type {
   CreateFlowDefinitionBodyFlowDefinition,
   CreateSchemaBody,
@@ -302,10 +304,31 @@ export function getDefaultHumanUserSchema(
     SERVER_URL: builtinSchemaBase,
     USER_SCHEMA_URL: options.userSchemaUrl ?? defaultHumanUserSchemaUrl(builtinSchemaBase),
   }) as Record<string, unknown>;
-  return applyUseCaseToSchema(
-    rendered,
-    options.useCase ?? DEFAULT_SETUP_USE_CASE,
-  ) as UserSchemaDocument & { $id: string };
+  const schema = applyUseCaseToSchema(rendered, options.useCase ?? DEFAULT_SETUP_USE_CASE);
+  assertUserSchemaDocument(schema);
+  return schema;
+}
+
+/**
+ * Holds a rendered template to the user schema document the create body takes,
+ * with the `$id` it names itself by, so a template edit that breaks it fails
+ * here rather than when the server refuses the create.
+ */
+function assertUserSchemaDocument(
+  schema: Record<string, unknown>,
+): asserts schema is UserSchemaDocument & { $id: string } {
+  const checked = CreateSchemaBodySchema.safeParse(schema);
+  if (!checked.success || schema.kind !== "user-schema" || typeof schema.$id !== "string") {
+    throw new Error(
+      `the default human user schema template is not a user schema document: ${
+        checked.success
+          ? "it needs kind user-schema and a $id"
+          : checked.error.issues
+              .map((issue) => `${issue.path.join(".") || "(root)"} ${issue.message}`)
+              .join("; ")
+      }`,
+    );
+  }
 }
 
 /**

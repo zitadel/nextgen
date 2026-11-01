@@ -594,8 +594,8 @@ missing or outdated (after an upgrade that changed a dialect), and
 `@zitadel/*` version (run that version's `doctor --fix`) or a symlink is on
 the path; `deploy --dry-run` validates without them either way.
 `deploy`, `preview` and `release create`, `--dry-run` included, check
-`.zitadel/` before anything is written, last against the release body the API
-takes, and fail with `E_VALIDATION` listing each problem by its file and field.
+`.zitadel/` against the rules the API holds a release to before anything is
+written, and fail with `E_VALIDATION` listing each problem by its file and field.
 
 An SPA's dev proxy (`vite.config.*`, Angular's `proxy.conf.cjs`) keeps the
 app's session in a cookie of its own project, `zitadel_session_<project id>`

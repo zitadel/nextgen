@@ -67,6 +67,7 @@ const resource: ResourceDescriptor<Ctx> = {
 };
 const options = {
   connect: async () => ({ token: "t" }),
+  operations: ["equals"],
   flags: { extra: { type: "boolean" as const } },
 } as unknown as OperationDefinition<Ctx, GetSpec<Ctx>>["options"];
 const definition = <Spec>(spec: Spec): OperationDefinition<Ctx, Spec> => ({
@@ -286,6 +287,7 @@ describe("wire conventions", () => {
       spec,
       options: {
         connect: async () => ({ token: "t" }),
+        operations: ["equals"],
         wire: {
           limit: "size",
           pageToken: "cursor",
@@ -314,6 +316,36 @@ describe("wire conventions", () => {
     const data = (result as { data: Record<string, unknown> }).data;
     expect(data.next_cursor).toBe("c2");
     expect(data.next_page_token).toBeUndefined();
+  });
+});
+
+describe("list filters", () => {
+  it("refuses an operation the platform knows that the field does not offer", async () => {
+    const spec: ListSpec<Ctx, Json, { rows: readonly unknown[] }> = {
+      body: z.object({}).passthrough(),
+      filters: [{ field: "state", operations: ["equals"] }],
+      call: async () => ({ rows: [] }),
+      items: (page) => page.rows,
+      next: () => undefined,
+    };
+    const definition: OperationDefinition<Ctx, ListSpec<Ctx>> = {
+      topic: "rows",
+      resource: {
+        singular: "row",
+        idField: "id",
+        idOf: (written) => written.id,
+        columns: ["id"],
+        list: spec,
+      },
+      spec,
+      options: { connect: async () => ({ token: "t" }), operations: ["equals", "less_than"] },
+    };
+
+    const command = bindOperation(ListOperation as OperationClass<Ctx, ListSpec<Ctx>>, definition);
+
+    await expect(printed(command, ["--filter", "state=less_than:5"])).rejects.toThrow(
+      'Filter field "state" does not support the less_than operation',
+    );
   });
 });
 

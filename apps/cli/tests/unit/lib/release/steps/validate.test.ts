@@ -126,18 +126,6 @@ describe("validate step", () => {
     });
   });
 
-  it("refuses what only the release body refuses, naming the kind", async () => {
-    const schemas = Array.from({ length: 51 }, (_, index) => ({
-      ...validSchema,
-      objectType: `user-${index}`,
-    }));
-
-    await expect(validateStep.run(ctx({ schemas }))).rejects.toMatchObject({
-      code: "E_VALIDATION",
-      message: expect.stringContaining("  - schemas: (root) Too big"),
-    });
-  });
-
   describe("a flow's user_schema", () => {
     /** The default login flow, naming its schema `userSchema` and collecting `fields` first. */
     const flowNaming = (userSchema: string, fields: string[]) => ({

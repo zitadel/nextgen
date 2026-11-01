@@ -317,6 +317,11 @@ export type ResourceCommandOptions<Ctx> = Readonly<{
    * command's own `connect`, so nothing connects until a verb needs it.
    */
   connect: (open: () => Promise<Connection>) => Promise<Ctx>;
+  /**
+   * Every filter operation the platform knows, so `--filter` tells a typo or an
+   * operation a field does not offer from a value that merely holds a colon.
+   */
+  operations: readonly string[];
   /** Extra flags added to every generated command. */
   flags?: Interfaces.FlagInput;
   /** Wire vocabulary; each property falls back to {@link DEFAULT_WIRE}. */

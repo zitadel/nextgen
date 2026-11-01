@@ -126,7 +126,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
     // field's own declaration first, so an operation the endpoint does not
     // offer fails locally with what that field accepts.
     const given = (Array.isArray(flags.filter) ? flags.filter : []).map((raw) =>
-      parseFilter(String(raw), spec.filters ?? []),
+      parseFilter(String(raw), spec.filters ?? [], options.operations),
     );
     // A field that declares a default contributes it only when the caller did
     // not name that field, so naming it always wins.

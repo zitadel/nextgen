@@ -1,7 +1,7 @@
 import { getDefaultHumanUserSchemaBody } from "@zitadel/config/defaults";
 import { describe, expect, it, vi } from "vitest";
 
-import { bundleIssues, createReleaseFromBundle } from "../../../../src/lib/release/release";
+import { createReleaseFromBundle } from "../../../../src/lib/release/release";
 
 /** A client whose build answers with an empty release, recording what it was sent. */
 function aClient() {
@@ -30,22 +30,8 @@ describe("createReleaseFromBundle", () => {
 
     await expect(createReleaseFromBundle(client, "proj_1", bundle, source)).rejects.toMatchObject({
       code: "E_VALIDATION",
-      message: expect.stringContaining("bundle.schemas.0"),
+      message: expect.stringMatching(/nothing was sent[\s\S]*bundle\.schemas\.0/),
     });
     expect(buildRelease).not.toHaveBeenCalled();
-  });
-});
-
-describe("bundleIssues", () => {
-  it("finds nothing in a bundle the API takes", () => {
-    expect(
-      bundleIssues({ schemas: [getDefaultHumanUserSchemaBody()], flow_definitions: [], idps: [] }),
-    ).toEqual([]);
-  });
-
-  it("places each problem by its path inside the bundle", () => {
-    const issues = bundleIssues({ schemas: [], flow_definitions: [], idps: [{ slug: "acme" }] });
-
-    expect(issues.map((issue) => issue.path.slice(0, 2))).toContainEqual(["idps", 0]);
   });
 });

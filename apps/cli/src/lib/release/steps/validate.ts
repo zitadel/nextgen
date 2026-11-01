@@ -8,11 +8,9 @@ import {
 import { assertNoLegacyTemplateKey, readDescriptorTemplate } from "../../branding";
 import { ZitadelError } from "../../errors";
 import { flowEnvRefs } from "../../flows";
-import { IDPS_DIR } from "../../idp";
 import { POLICIES_DIR, policyFileIssues } from "../../policies";
 import { reportWarning } from "../../warnings";
 import type { Step, StepContext } from "../pipeline";
-import { type BundleIssue, bundleIssues } from "../release";
 import { brandingAssetWarnings } from "./asset-probe";
 import { validateConnections } from "./idp-checks";
 import { validateSsoConsistency } from "./sso-consistency";
@@ -42,7 +40,6 @@ export const validateStep: Step = {
     validateFlows(ctx);
     await validateConnections(ctx);
     await validateSsoConsistency(ctx.cwd);
-    validateReleaseBody(ctx);
     for (const warning of await brandingAssetWarnings(brandingsOf(ctx))) {
       reportWarning(warning);
     }
@@ -134,55 +131,6 @@ function validateBundleShapes(ctx: StepContext): void {
       details: { issues: failures },
     },
   );
-}
-
-/**
- * The bundle against the release body the API takes, last: every check above
- * refuses its own mistakes with a fix to go with them (a literal
- * `client_secret` among them), so this reports only what they let through,
- * such as a bundle holding more resources of a kind than a release takes.
- */
-function validateReleaseBody(ctx: StepContext): void {
-  const failures = bundleIssues(ctx.bundle).map((issue) => apiIssue(ctx, issue));
-  if (failures.length === 0) {
-    return;
-  }
-  const noun = failures.length === 1 ? "issue" : "issues";
-  throw new ZitadelError(
-    "E_VALIDATION",
-    `The release the API would build was refused (${failures.length} ${noun}):\n` +
-      failures.map((failure) => `  - ${failure}`).join("\n"),
-    {
-      hint: "These are the rules the API holds a release to. Fix the file(s) and re-run.",
-      details: { issues: failures },
-    },
-  );
-}
-
-/** An issue the API body raised, named by the file or handle it sits in. */
-function apiIssue(ctx: StepContext, { path, message }: BundleIssue): string {
-  const [kind, index, ...field] = path;
-  const at = typeof index === "number" ? index : undefined;
-  const handle = (): string => {
-    if (kind === "schemas" && at !== undefined) {
-      const objectType = ctx.bundle.schemas[at]?.objectType;
-      return typeof objectType === "string" ? objectType : `schema #${at + 1}`;
-    }
-    if (kind === "flow_definitions" && at !== undefined) {
-      const name = ctx.bundle.flow_definitions[at]?.name;
-      return typeof name === "string" ? name : `flow #${at + 1}`;
-    }
-    if (kind === "idps" && at !== undefined) {
-      return `${IDPS_DIR}/${ctx.idpFiles[at] ?? "(unnamed)"}`;
-    }
-    if (kind === "policies" && at !== undefined) {
-      return `${POLICIES_DIR}/${ctx.policyFiles[at] ?? "(unnamed)"}`;
-    }
-    return String(kind ?? "bundle");
-  };
-  // Branding is one document, so its path has no position to skip.
-  const rest = at === undefined ? path.slice(1) : field;
-  return `${handle()}: ${rest.map(String).join(".") || "(root)"} ${message}`;
 }
 
 /** The schema a flow's `user_schema` names, found by `objectType` in the bundle. */

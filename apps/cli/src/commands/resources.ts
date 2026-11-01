@@ -1,5 +1,6 @@
 import {
   type GetReleaseById200,
+  type ListEvents200,
   ListEventsCategoryItem,
   ListFlowDefinitionsRevisions,
   ListSchemasRevisions,
@@ -137,24 +138,42 @@ type QueryFilter<B> = FilterField & {
 // What a `GET` query parameter takes: one entry of it, when it repeats.
 type ParamValue<V> = NonNullable<V> extends readonly (infer E)[] ? E : NonNullable<V>;
 
-// A `GET` list's filter: a query parameter, whose `values` and `default` are of
-// the type it takes; or, for a field sent as one parameter per operation (a
-// range), the parameters `params` names.
+// A `GET` list's filter: a query parameter, which carries a value as it is and
+// so filters only by `equals`, and whose `values` and `default` are of the type
+// it takes; or a range, sent as one parameter per operation, which only
+// `range()` makes.
 type GetFilter<B> =
   | {
       [K in keyof B & string]: FilterField & {
         readonly field: K;
+        readonly operations: readonly "equals"[];
         readonly params?: undefined;
         readonly values?: readonly (ParamValue<B[K]> & string)[];
         readonly default?: ParamValue<B[K]> & string;
       };
     }[keyof B & string]
-  | (FilterField & { readonly params: Readonly<Record<string, keyof B & string>> });
+  | (FilterField & {
+      readonly params: Readonly<Record<string, keyof B & string>>;
+      readonly [ranged]: true;
+    });
+
+// Marks the operations and parameters `range()` paired; a `GET` list takes no
+// other range, so none can offer an operation it has no parameter for.
+const ranged = Symbol("ranged");
+
+/**
+ * A field a `GET` list sends as one parameter per operation (a range, such as
+ * `created_after` and `created_before`), keyed by operation: the operations it
+ * offers are the keys, so each has the parameter it travels as.
+ */
+export const range = <const M extends { readonly [O in Operation]?: string }>(
+  params: M & { readonly [K in Exclude<keyof M, Operation>]: never },
+) => ({ operations: Object.keys(params), params, [ranged]: true as const });
 
 // A list's filters and sorts, checked against the request it sends. A list with
 // a `body` is a structured query, sorted by a field the body names. A `GET` list
-// orders by one implicit field, so its sort is only a name, and `sortParam` the
-// parameter carrying the direction.
+// orders by one implicit field of its item, so its sort names that field, and
+// `sortParam` the parameter carrying the direction.
 type QueryList<B> = Readonly<{
   body: Schema<B>;
   filters?: readonly NoInfer<QueryFilter<B>>[];
@@ -163,10 +182,10 @@ type QueryList<B> = Readonly<{
 }>;
 // A `GET` list whose call parameter is untyped has a request of any key, which
 // would check nothing, so it takes no filters or `sortParam` at all.
-type GetList<B> = Readonly<{
+type GetList<B, T> = Readonly<{
   body?: undefined;
   filters?: string extends keyof B ? never : readonly NoInfer<GetFilter<B>>[];
-  sorts?: readonly string[];
+  sorts?: readonly NoInfer<FieldPath<T>>[];
   sortParam?: string extends keyof B ? never : NoInfer<keyof B & string>;
 }>;
 
@@ -183,7 +202,7 @@ type Query<K extends keyof ZitadelClient> = Omit<
 // the list to take filters or a `sortParam`. `items` comes after `call`, so the
 // page is known when `items` is read.
 export const list = <B = Json, P = unknown, T = unknown, S extends FieldsOf<T> = FieldsOf<T>>(
-  spec: ListSpec<Platform, B, P, T> & { item?: Schema<S> } & (QueryList<B> | GetList<B>),
+  spec: ListSpec<Platform, B, P, T> & { item?: Schema<S> } & (QueryList<B> | GetList<B, T>),
 ): NoInfer<ListSpec<Platform, B, P, T>> => spec;
 
 // Infers the record `get` answers with, so `sections` reads it typed.
@@ -232,6 +251,27 @@ const SESSION_OPERATIONS = Object.values(QuerySessionsBodyFilterItemOperation);
 const GRANT_OPERATIONS = Object.values(QueryGrantsBodyFilterItemOperation);
 const IDP_OPERATIONS = Object.values(QueryIdpsBodyFilterItemOperation);
 const PROJECT_OPERATIONS = Object.values(QueryProjectsBodyFilterItemOperation);
+
+/** A filter operation any of the API's structured queries takes. */
+type Operation =
+  | QueryUsersBodyFilterItemOperation
+  | QueryTeamsBodyFilterItemOperation
+  | QuerySessionsBodyFilterItemOperation
+  | QueryGrantsBodyFilterItemOperation
+  | QueryIdpsBodyFilterItemOperation
+  | QueryProjectsBodyFilterItemOperation;
+
+/** Every filter operation the API knows, so `--filter` tells one from a value. */
+const OPERATIONS: readonly Operation[] = [
+  ...new Set([
+    ...USER_OPERATIONS,
+    ...TEAM_OPERATIONS,
+    ...SESSION_OPERATIONS,
+    ...GRANT_OPERATIONS,
+    ...IDP_OPERATIONS,
+    ...PROJECT_OPERATIONS,
+  ]),
+];
 
 /** A release's pointers as an indented table, one pinned revision per row. */
 export const releasePointers = (release: Pick<GetReleaseById200, "pointers">): string => {
@@ -396,11 +436,7 @@ export const RESOURCES = {
         { field: "team_id", operations: ["equals"] },
         {
           field: "created_at",
-          operations: ["greater_than_or_equal", "less_than"],
-          params: {
-            greater_than_or_equal: "created_after",
-            less_than: "created_before",
-          },
+          ...range({ greater_than_or_equal: "created_after", less_than: "created_before" }),
         },
       ],
       // The endpoint orders by `occurred_at` and takes only the direction.
@@ -408,7 +444,8 @@ export const RESOURCES = {
       sortParam: "order",
       call: ({ client, projectId }: Platform, params: Query<"listEvents">) =>
         client.listEvents({ project_id: projectId, ...params }),
-      items: (page) => page.data,
+      // Typed, so the item is known before the sort that names one of its fields.
+      items: (page: ListEvents200) => page.data,
       next: (page) => page.next_page_token,
     }),
     get: get({
@@ -757,6 +794,7 @@ export const RESOURCES = {
  * `EnvironmentCommand`), so they take `--env` and `--env-file` too.
  */
 export const RESOURCE_COMMANDS = buildResourceCommands<Platform>(RESOURCES, {
+  operations: OPERATIONS,
   // A `${{ NAME }}` reference to a project variable (ADR 062) names a
   // credential without revealing it, and is the only form a connection's
   // `client_secret` takes, so it may stand on a command line.

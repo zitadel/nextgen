@@ -36,6 +36,7 @@ import {
   list,
   type Platform,
   RESOURCES,
+  range,
   releasePointers,
   resource,
   update,
@@ -236,19 +237,21 @@ describe("filter grammar", () => {
       { field: "created_at", operations: OPERATIONS },
       { field: "id", operations: OPERATIONS },
     ];
-    expect(parseFilter("status=active", fields)).toMatchObject({
+    expect(parseFilter("status=active", fields, OPERATIONS)).toMatchObject({
       operation: "equals",
       value: "active",
     });
-    expect(parseFilter("created_at=greater_than:2026-01-01T00:00:00Z", fields)).toMatchObject({
+    expect(
+      parseFilter("created_at=greater_than:2026-01-01T00:00:00Z", fields, OPERATIONS),
+    ).toMatchObject({
       operation: "greater_than",
       value: "2026-01-01T00:00:00Z",
     });
-    expect(parseFilter("id=equals:a:b", fields)).toMatchObject({
+    expect(parseFilter("id=equals:a:b", fields, OPERATIONS)).toMatchObject({
       operation: "equals",
       value: "a:b",
     });
-    expect(() => parseFilter("nonsense", fields)).toThrow(/Invalid --filter/);
+    expect(() => parseFilter("nonsense", fields, OPERATIONS)).toThrow(/Invalid --filter/);
   });
 
   it("parses field:direction and defaults to asc", () => {
@@ -2183,9 +2186,9 @@ describe("the registry builders", () => {
   });
 
   it("refuses a sort field the query body does not sort by", () => {
-    // @ts-expect-error a user query sorts by `created_at`, not `created`
     list({
       body: QueryUsersBody,
+      // @ts-expect-error a user query sorts by `created_at`, not `created`
       sorts: ["created"],
       call: ({ client }, body) => client.queryUsers(body),
       items: (page: QueryUsers200) => page.users,
@@ -2206,7 +2209,7 @@ describe("the registry builders", () => {
 
   it("refuses a sort parameter a GET list does not take", () => {
     list({
-      sorts: ["created_at"],
+      sorts: ["metadata.created_at"],
       // @ts-expect-error schemas take no `order` parameter
       sortParam: "order",
       call: ({ client, projectId }: Platform, params: Omit<ListSchemasParams, "project_id">) =>
@@ -2255,14 +2258,71 @@ describe("the registry builders", () => {
       filters: [
         {
           field: "created_at",
-          operations: ["greater_than_or_equal"],
-          params: { greater_than_or_equal: "created_afer" },
+          ...range({ greater_than_or_equal: "created_afer" }),
         },
       ],
       call: ({ client, projectId }: Platform, params: Omit<ListEventsParams, "project_id">) =>
         client.listEvents({ ...params, project_id: projectId }),
       items: (page: ListEvents200) => page.data,
       next: (page: ListEvents200) => page.next_page_token,
+    });
+  });
+
+  it("offers exactly the operations a range names a parameter for", () => {
+    expect(
+      range({ greater_than: "created_after", less_than: "created_before" }).operations,
+    ).toEqual(["greater_than", "less_than"]);
+  });
+
+  it("refuses a range operation no query takes", () => {
+    // @ts-expect-error no query takes a `between` operation
+    range({ between: "created_after" });
+  });
+
+  it("refuses a range written without range()", () => {
+    // @ts-expect-error only range() pairs a range's operations with their parameters
+    list({
+      filters: [
+        {
+          field: "created_at",
+          operations: ["greater_than_or_equal", "less_than"],
+          params: { greater_than_or_equal: "created_after" },
+        },
+      ],
+      call: ({ client, projectId }: Platform, params: Omit<ListEventsParams, "project_id">) =>
+        client.listEvents({ ...params, project_id: projectId }),
+      items: (page: ListEvents200) => page.data,
+      next: (page: ListEvents200) => page.next_page_token,
+    });
+  });
+
+  it("refuses an operation other than equals on a GET parameter", () => {
+    // @ts-expect-error a parameter carries its value as it is, so it filters by equals
+    list({
+      filters: [{ field: "created_after", operations: ["greater_than"] }],
+      call: ({ client, projectId }: Platform, params: Omit<ListEventsParams, "project_id">) =>
+        client.listEvents({ ...params, project_id: projectId }),
+      items: (page: ListEvents200) => page.data,
+      next: (page: ListEvents200) => page.next_page_token,
+    });
+  });
+
+  it("refuses a GET sort the listed item does not have", () => {
+    list({
+      // @ts-expect-error events are ordered by `occurred_at`
+      sorts: ["occured_at"],
+      sortParam: "order",
+      call: ({ client, projectId }: Platform, params: Omit<ListEventsParams, "project_id">) =>
+        client.listEvents({ ...params, project_id: projectId }),
+      items: (page: ListEvents200) => page.data,
+      next: (page: ListEvents200) => page.next_page_token,
+    });
+  });
+
+  it("sends each operation of the events' created_at range as its own parameter", () => {
+    expect(RESOURCES.events.list?.filters?.find((f) => f.field === "created_at")).toMatchObject({
+      operations: ["greater_than_or_equal", "less_than"],
+      params: { greater_than_or_equal: "created_after", less_than: "created_before" },
     });
   });
 

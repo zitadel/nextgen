@@ -1,7 +1,10 @@
+import { CreateSchemaBody } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import { describe, expect, it } from "vitest";
 
 import {
   defaultHumanUserSchemaUrl,
+  SETUP_PRESETS,
+  SETUP_USE_CASES,
   getDefaultHumanUserSchema,
   getDefaultHumanUserSchemaBody,
   getDefaultLoginFlow,
@@ -44,4 +47,14 @@ describe("default config rendering", () => {
 
     expect(getDefaultHumanUserSchemaBody()).toEqual(template);
   });
+
+  it.each(SETUP_PRESETS.flatMap((preset) => SETUP_USE_CASES.map((useCase) => [preset, useCase])))(
+    "renders the %s %s schema as a user schema document the create body takes",
+    (preset, useCase) => {
+      const schema = getDefaultHumanUserSchema({ preset, useCase });
+
+      expect(CreateSchemaBody.safeParse(schema).success).toBe(true);
+      expect(schema).toMatchObject({ kind: "user-schema", $id: expect.any(String) });
+    },
+  );
 });
