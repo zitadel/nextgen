@@ -82,7 +82,7 @@ export default class Deploy extends EnvironmentCommand {
       // and never reaches the deploy, so it is exempt: it still validates and
       // previews a project that has no primary origin yet.
       const project = await client.getProject(projectId);
-      const origins = project.origins ?? [];
+      const origins = project.origins;
       landing = origins.filter((entry) => entry.kind === "primary").map((entry) => entry.pattern);
       if (landing.length === 0) {
         const setupProject = await setupProjectId(cwd);

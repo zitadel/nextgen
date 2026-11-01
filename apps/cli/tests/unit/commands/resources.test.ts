@@ -2,7 +2,12 @@ import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import type { GetReleaseById200, QueryUsers200 } from "@zitadel/api/generated/model";
+import type {
+  GetReleaseById200,
+  ListSchemas200,
+  ListSchemasParams,
+  QueryUsers200,
+} from "@zitadel/api/generated/model";
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
@@ -2116,6 +2121,51 @@ describe("the registry builders", () => {
       body: QueryUsersBody,
       call: ({ client }, body) => client.queryUsers(body),
       items: (page: QueryUsers200) => page.users,
+    });
+  });
+
+  it("refuses a filter field the query body does not filter by", () => {
+    list({
+      body: QueryUsersBody,
+      // @ts-expect-error a user query filters by `status`, not `state`
+      filters: [{ field: "state", operations: ["equals"] }],
+      call: ({ client }, body) => client.queryUsers(body),
+      items: (page: QueryUsers200) => page.users,
+      next: (page: QueryUsers200) => page.next_page_token,
+    });
+  });
+
+  it("refuses a sort field the query body does not sort by", () => {
+    list({
+      body: QueryUsersBody,
+      // @ts-expect-error a user query sorts by `created_at`, not `created`
+      sorts: ["created"],
+      call: ({ client }, body) => client.queryUsers(body),
+      items: (page: QueryUsers200) => page.users,
+      next: (page: QueryUsers200) => page.next_page_token,
+    });
+  });
+
+  it("refuses a filter that is no query parameter of a GET list", () => {
+    list({
+      // @ts-expect-error schemas are listed by `object_type`, not `objectType`
+      filters: [{ field: "objectType", operations: ["equals"] }],
+      call: ({ client, projectId }: Platform, params: Omit<ListSchemasParams, "project_id">) =>
+        client.listSchemas({ ...params, project_id: projectId }),
+      items: (page: ListSchemas200) => page.schemas,
+      next: (page: ListSchemas200) => page.next_page_token,
+    });
+  });
+
+  it("refuses a sort parameter a GET list does not take", () => {
+    list({
+      sorts: ["created_at"],
+      // @ts-expect-error schemas take no `order` parameter
+      sortParam: "order",
+      call: ({ client, projectId }: Platform, params: Omit<ListSchemasParams, "project_id">) =>
+        client.listSchemas({ ...params, project_id: projectId }),
+      items: (page: ListSchemas200) => page.schemas,
+      next: (page: ListSchemas200) => page.next_page_token,
     });
   });
 

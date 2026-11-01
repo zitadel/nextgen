@@ -79,7 +79,7 @@ export default class DeploymentList extends EnvironmentCommand {
     const rows = deployments.map((deployment) => ({
       id: deployment.id,
       release_id: deployment.release_id,
-      reason: deployment.metadata.reason ?? "deploy",
+      reason: deployment.metadata.reason,
       origins: deployment.targets.map((target) => target.origin).join(", "),
       deployed_at: deployment.deployed_at,
     }));

@@ -50,6 +50,7 @@ import {
   buildResourceCommands,
   type CreateSpec,
   type FieldPath,
+  type FilterField,
   type GetSpec,
   type Json,
   type ListSpec,
@@ -103,13 +104,50 @@ type FieldsOf<T> = { [K in keyof T]: unknown };
 // identifier answers 202).
 type Written<Id extends string> = Readonly<Record<Id, unknown>> | Exclude<WriteResult, Json>;
 
+// The fields a structured query's body filters and sorts by: the enums of its
+// `filter[].field` and `sorting.field`.
+type BodyFilterField<B> = B extends { filter?: readonly (infer F)[] | null }
+  ? F extends { field: infer N }
+    ? N & string
+    : never
+  : never;
+type BodySortField<B> = B extends { sorting?: infer S }
+  ? NonNullable<S> extends { field: infer N }
+    ? N & string
+    : never
+  : never;
+
+// A filter checked against what its list sends: a structured query's `field`
+// is one its body filters by; a `GET` list's is a query parameter, or, for a
+// field sent as one parameter per operation (a range), `params` names them.
+type ListFilter<B> = "filter" extends keyof B
+  ? FilterField & { readonly field: BodyFilterField<B> }
+  :
+      | (FilterField & { readonly field: keyof B & string; readonly params?: undefined })
+      | (FilterField & { readonly params: Readonly<Record<string, keyof B & string>> });
+
+// A structured query sorts by a field its body names; a `GET` list orders by one
+// implicit field, so its sort is only a name, and `sortParam` the parameter.
+type ListSort<B> = "sorting" extends keyof B ? BodySortField<B> : string;
+
+/** What a `GET` list's call takes: the client function's query, less what the platform fills. */
+type Query<K extends keyof ZitadelClient> = Omit<
+  NonNullable<Parameters<ZitadelClient[K]>[0]>,
+  "project_id"
+>;
+
 // Infers a list's page `P` from `call` and its item `T` from `items`, which
 // reads the list off that page, and checks `item` against `T`. Infers a
 // structured query's request type `B` from its `body` schema; a `GET` list has
 // no body, so its request stays `Json`. `items` comes after `call`, so the page
 // is known when `items` is read.
 export const list = <B = Json, P = unknown, T = unknown, S extends FieldsOf<T> = FieldsOf<T>>(
-  spec: ListSpec<Platform, B, P, T> & { item?: Schema<S> },
+  spec: ListSpec<Platform, B, P, T> & {
+    item?: Schema<S>;
+    filters?: readonly NoInfer<ListFilter<B>>[];
+    sorts?: readonly NoInfer<ListSort<B>>[];
+    sortParam?: NoInfer<keyof B & string>;
+  },
 ): NoInfer<ListSpec<Platform, B, P, T>> => spec;
 
 // Infers the record `get` answers with, so `sections` reads it typed.
@@ -337,7 +375,7 @@ export const RESOURCES = {
       // The endpoint orders by `occurred_at` and takes only the direction.
       sorts: ["occurred_at"],
       sortParam: "order",
-      call: ({ client, projectId }, params) =>
+      call: ({ client, projectId }: Platform, params: Query<"listEvents">) =>
         client.listEvents({ project_id: projectId, ...params }),
       items: (page) => page.data,
       next: (page) => page.next_page_token,
@@ -481,7 +519,7 @@ export const RESOURCES = {
           default: "latest",
         },
       ],
-      call: ({ client, projectId }, params) =>
+      call: ({ client, projectId }: Platform, params: Query<"listSchemas">) =>
         client.listSchemas({ ...params, project_id: projectId }),
       items: (page) => page.schemas,
       next: (page) => page.next_page_token,
@@ -538,7 +576,7 @@ export const RESOURCES = {
     ],
     list: list({
       item: ListReleasesResponse.shape.releases.element,
-      call: ({ client, projectId }, params) =>
+      call: ({ client, projectId }: Platform, params: Query<"listReleases">) =>
         client.listReleases({ ...params, project_id: projectId }),
       items: (page) => page.releases,
       next: (page) => page.next_page_token,
@@ -575,7 +613,7 @@ export const RESOURCES = {
           default: "latest",
         },
       ],
-      call: ({ client, projectId }, params) =>
+      call: ({ client, projectId }: Platform, params: Query<"listFlowDefinitions">) =>
         client.listFlowDefinitions({
           ...params,
           project_id: projectId,
@@ -648,7 +686,7 @@ export const RESOURCES = {
     list: list({
       item: ListPoliciesResponse.shape.policies.element,
       filters: [{ field: "operation", operations: ["equals"] }],
-      call: ({ client, projectId }, params) =>
+      call: ({ client, projectId }: Platform, params: Query<"listPolicies">) =>
         client.listPolicies({ ...params, project_id: projectId }),
       items: (page) => page.policies,
       next: (page) => page.next_page_token,

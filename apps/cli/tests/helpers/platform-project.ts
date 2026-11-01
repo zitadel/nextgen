@@ -95,7 +95,7 @@ export function liveAcrossTwoPages(primary: { id: string; release_id: string }) 
               {
                 ...primary,
                 targets: [{ origin: "https://app.acme.com", expires_at: null }],
-                reason: "deploy",
+                metadata: { reason: "deploy" },
                 deployed_at: "2026-01-01T00:00:00.000Z",
               },
             ],
@@ -109,7 +109,7 @@ export function liveAcrossTwoPages(primary: { id: string; release_id: string }) 
                 targets: [
                   { origin: "https://pr-1.acme.com", expires_at: "2027-01-01T00:00:00.000Z" },
                 ],
-                reason: "deploy",
+                metadata: { reason: "deploy" },
                 deployed_at: "2026-01-02T00:00:00.000Z",
               },
             ],
