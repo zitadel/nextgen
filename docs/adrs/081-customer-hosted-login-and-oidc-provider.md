@@ -572,3 +572,12 @@ On implementation: the CLI's
 [`SKILL.md`](../../apps/cli/skills/zitadel-cli/SKILL.md), the SDK and
 components READMEs, the API spec's `hint.login_name` description, and the
 [compose quick start](../quick-start/docker-compose.md).
+
+## Amendment (2026-10-31): §10, the newest primary deployment
+
+There is no project default target, and §10's newest deployment to an origin is
+the deployment that origin serves under
+[ADR 085](085-which-release-serves-a-request.md): for a primary origin, the
+project's newest primary deployment while that deployment names it. The token
+endpoint still takes its deployment from the code and never resolves from an
+`Origin`.
