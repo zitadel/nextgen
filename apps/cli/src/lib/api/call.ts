@@ -3,6 +3,7 @@ import { itemsOf, nextToken } from "@zitadel/api/runtime/paging";
 
 import { REQUEST_TIMEOUT_MS, sanitizeRejection, sanitizeResponse } from "../api-client";
 import { ZitadelError } from "../errors";
+import { isObject } from "../json";
 import { interruptSignal } from "../interrupt";
 import { collectPages } from "../oclif/crud/paging";
 import { type ApiRequest, urlOf } from "./request";
@@ -108,7 +109,7 @@ export const sendAll = async (
   }
   let last: { status: number; raw: unknown } = { status: 200, raw: undefined };
   // Each page is fetched raw: the cursor goes back to the server exactly as it
-  // came, and only the items are escaped, as the client's own walk does.
+  // came, and `collectPages` escapes only the items it answers.
   const { items } = await collectPages(
     async (cursor) => {
       last = await sendRaw(server, token, pageOf(request, cursor));
@@ -118,7 +119,7 @@ export const sendAll = async (
       // The one list read by a field named only at runtime, so the one checked.
       items: (raw) => {
         try {
-          return itemsOf(sanitizeResponse(raw), paging.items);
+          return itemsOf(raw, paging.items);
         } catch (error) {
           throw new ZitadelError(
             "E_VALIDATION",
@@ -131,9 +132,15 @@ export const sendAll = async (
       next: nextToken,
     },
   );
-  const body = sanitizeResponse(last.raw);
+  // The last page's other fields, escaped once, with every page's items in
+  // place of its own and in its order.
+  const page = isObject(last.raw) ? last.raw : {};
   return {
     status: last.status,
-    body: { ...(body as Record<string, unknown>), [paging.items]: items },
+    body: Object.fromEntries(
+      Object.entries(page).map(([field, value]) =>
+        field === paging.items ? [field, items] : sanitizeResponse([field, value]),
+      ),
+    ),
   };
 };

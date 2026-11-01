@@ -57,7 +57,9 @@ export default class DeploymentList extends EnvironmentCommand {
   async run(): Promise<JsonEnvelope> {
     const { flags } = await this.parse(DeploymentList);
     await this.toMeta(flags);
-    const { client, projectId } = await this.connect();
+    // Pages arrive as the server sent them, so the cursor goes back unchanged;
+    // `collectPages` escapes what it answers.
+    const { client, projectId } = await this.connect({ verbatim: true });
 
     const params = {
       project_id: projectId,

@@ -221,4 +221,18 @@ describe("sendAll", () => {
       { passkeys: ["\\x1b[2Ja", "b"], next_page_token: "" },
     ]);
   });
+
+  it("answers the last page's other fields escaped once, its items in their place", async () => {
+    server.use(
+      http.get(`${SERVER}/api/v1/users/user_1/passkeys`, () =>
+        HttpResponse.json({ note: "\u001b[2J", passkeys: ["a"], next_page_token: "" }),
+      ),
+    );
+
+    const response = await sendAll(SERVER, "s", requestFor("listUserPasskeys", [], ["user_1"]));
+
+    expect(JSON.stringify(response.body)).toBe(
+      JSON.stringify({ note: "\\x1b[2J", passkeys: ["a"], next_page_token: "" }),
+    );
+  });
 });

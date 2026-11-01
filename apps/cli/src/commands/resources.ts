@@ -129,10 +129,11 @@ type BodySortField<B> = B extends { sorting?: infer S }
 
 // A structured query's filter: a field and operations its body takes. The body
 // carries every value as one free-form scalar, so `values` and `default` are
-// plain strings.
+// plain strings, and repeats of a field all apply, so none widens.
 type QueryFilter<B> = FilterField & {
   readonly field: BodyFilterField<B>;
   readonly operations: readonly BodyFilterOperation<B>[];
+  readonly combine?: undefined;
 };
 
 // What a `GET` query parameter takes: one entry of it, when it repeats.
@@ -141,7 +142,8 @@ type ParamValue<V> = NonNullable<V> extends readonly (infer E)[] ? E : NonNullab
 // A `GET` list's filter: a query parameter, which carries a value as it is and
 // so filters only by `equals`, and whose `values` and `default` are of the type
 // it takes; or a range, sent as one parameter per operation, which only
-// `range()` makes.
+// `range()` makes. A parameter that takes a list widens with each repeat, so
+// it says so, and one that takes a single value cannot.
 type GetFilter<B> =
   | {
       [K in keyof B & string]: FilterField & {
@@ -150,10 +152,13 @@ type GetFilter<B> =
         readonly params?: undefined;
         readonly values?: readonly (ParamValue<B[K]> & string)[];
         readonly default?: ParamValue<B[K]> & string;
-      };
+      } & (NonNullable<B[K]> extends readonly unknown[]
+          ? { readonly combine: "or" }
+          : { readonly combine?: undefined });
     }[keyof B & string]
   | (FilterField & {
       readonly params: Readonly<Record<string, keyof B & string>>;
+      readonly combine?: undefined;
       readonly [ranged]: true;
     });
 

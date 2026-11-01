@@ -113,6 +113,15 @@ describe("applySsoToSchema", () => {
 
     expect(schema).toEqual(before);
   });
+
+  it("shares nothing under sso with the schema it was given", () => {
+    const options = { prompt: "login" };
+    const schema = { "x-auth-methods": { sso: { enabled: false, providers: [], options } } };
+
+    const { document } = applySsoToSchema(schema, slug("google"));
+
+    expect(document["x-auth-methods"].sso.options).not.toBe(options);
+  });
 });
 
 describe("applySsoToFlow", () => {

@@ -21,14 +21,47 @@ export const brokenThings = async (params?: BrokenThingsParams
 
 describe("pagingArgument", () => {
   it.each([
-    ["the query parameters alone", "listThings", "query", 0],
-    ["the query parameters after a path parameter", "listUserThings", "query", 1],
-    ["the body before the query parameters", "queryThings", "body", 0],
-    ["the body after required query parameters", "searchThings", "body", 1],
-    ["the query parameters after a type in brackets", "sortThings", "query", 1],
-    ["the query parameters after types with commas inside", "watchThings", "query", 2],
-  ] as const)("finds %s", (_, id, token, expected) => {
-    expect(pagingArgument(endpoints, { id, paging: { token, items: "things" } })).toBe(expected);
+    ["the query parameters alone", "listThings", "query", ["params", "options"], "params"],
+    [
+      "the query parameters after a path parameter",
+      "listUserThings",
+      "query",
+      ["userId", "params", "options"],
+      "params",
+    ],
+    [
+      "the body before the query parameters",
+      "queryThings",
+      "body",
+      ["queryThingsBody", "params", "options"],
+      "queryThingsBody",
+    ],
+    [
+      "the body after required query parameters",
+      "searchThings",
+      "body",
+      ["params", "searchThingsBody", "options"],
+      "searchThingsBody",
+    ],
+    [
+      "the query parameters after a type in brackets",
+      "sortThings",
+      "query",
+      ["order", "params", "options"],
+      "params",
+    ],
+    [
+      "the query parameters after types with commas inside",
+      "watchThings",
+      "query",
+      ["onPage", "labels", "params"],
+      "params",
+    ],
+  ] as const)("finds %s", (_, id, token, names, carrier) => {
+    expect(pagingArgument(endpoints, { id, paging: { token, items: "things" } })).toEqual({
+      names,
+      token: carrier,
+    });
   });
 
   it("refuses an operation orval wrote no function for", () => {
@@ -77,6 +110,17 @@ describe("pagingSource", () => {
 
     expect(source).toContain(
       '  listWidgets: {\n    items: (page: Page<"listWidgets">) => page.widgets,',
+    );
+  });
+
+  it("sets page_token on the argument that carries it, typed by the function's parameters", () => {
+    const source = pagingSource(
+      [{ id: "listUserThings", paging: { token: "query", items: "things" } }],
+      endpoints,
+    );
+
+    expect(source).toContain(
+      'withToken: ([userId, params, options]: Parameters<(typeof endpoints)["listUserThings"]>, page_token: string): Parameters<(typeof endpoints)["listUserThings"]> => [userId, { ...params, page_token }, options],',
     );
   });
 

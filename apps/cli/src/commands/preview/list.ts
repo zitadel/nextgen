@@ -49,7 +49,9 @@ export default class PreviewList extends PreviewCommand {
   async run(): Promise<JsonEnvelope> {
     const { flags } = await this.parse(PreviewList);
     await this.toMeta(flags);
-    const { client, projectId } = await this.connect();
+    // Pages arrive as the server sent them, so the cursor goes back unchanged;
+    // `collectPages` escapes what it answers.
+    const { client, projectId } = await this.connect({ verbatim: true });
 
     const params = {
       limit: flags.limit,

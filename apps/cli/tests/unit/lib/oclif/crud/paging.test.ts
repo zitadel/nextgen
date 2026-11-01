@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { collectPages } from "../../../../../src/lib/oclif/crud";
 
-type Page = { users: number[]; next_page_token?: string; next_cursor?: string };
+type Page = { users: (number | string)[]; next_page_token?: string; next_cursor?: string };
 
 /** Answers the pages in order, the first for no cursor; records each cursor it was asked for. */
 function source(...pages: Page[]) {
@@ -87,5 +87,37 @@ describe("collectPages", () => {
         next: (page) => page.next_page_token,
       }),
     ).resolves.toEqual({ items: [1], next: null });
+  });
+
+  it("follows a cursor back as the server wrote it", async () => {
+    const { walk, asked } = source({ users: [1], next_page_token: "p\u001b2" }, { users: [2] });
+    await collectPages(walk, {
+      items: (page) => page.users,
+      all: true,
+      next: (page) => page.next_page_token,
+    });
+    expect(asked).toEqual([undefined, "p\u001b2"]);
+  });
+
+  it("escapes the items it answers", async () => {
+    const { walk } = source({ users: ["a\u001b[2J"] });
+    await expect(
+      collectPages(walk, {
+        items: (page) => page.users,
+        all: true,
+        next: (page) => page.next_page_token,
+      }),
+    ).resolves.toEqual({ items: ["a\\x1b[2J"], next: null });
+  });
+
+  it("escapes the cursor it reports", async () => {
+    const { walk } = source({ users: [1], next_page_token: "p\u001b2" });
+    await expect(
+      collectPages(walk, {
+        items: (page) => page.users,
+        all: false,
+        next: (page) => page.next_page_token,
+      }),
+    ).resolves.toEqual({ items: [1], next: "p\\x1b2" });
   });
 });

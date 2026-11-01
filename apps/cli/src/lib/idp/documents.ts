@@ -255,7 +255,7 @@ export function applySsoToSchema<S extends object>(schema: S, slug: ConnectionSl
   // spread over its own keeps its place, so the file's key order holds.
   const document = {
     ...clone(schema),
-    "x-auth-methods": { ...clone(methods), sso: { ...existing, enabled: true, providers } },
+    "x-auth-methods": { ...clone(methods), sso: { ...clone(existing), enabled: true, providers } },
   };
   return { document, changed: true, skipped: [] };
 }

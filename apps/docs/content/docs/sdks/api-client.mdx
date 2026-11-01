@@ -41,7 +41,7 @@ It exposes:
 
 The package has no root export; import from its subpaths:
 
-- `@zitadel/api/client` — `createZitadelClient`, a typed client bound to a base URL and an optional bearer token.
+- `@zitadel/api/client` — `createZitadelClient`, a typed client bound to a base URL and an optional bearer token; and `paging`, which says for each paged function where a page's items and cursor are, and builds the arguments that fetch the page a cursor names.
 - `@zitadel/api/config` — `configureZitadel` and `getApi`, the shared browser configuration the components read. Every SDK except Angular uses it; the Angular SDK has its own `configureZitadel`.
 - `@zitadel/api/generated/model` — request and response types.
 - `@zitadel/api/generated/endpoints/zitadelNextGen` — the endpoint functions behind the client, with `.zod` and `.msw` variants for the Zod schemas and MSW handlers. Call the endpoints through `createZitadelClient`: on their own they use one base URL and token for the whole process, and the client sets both before each call. The MSW handlers need the optional peers `msw` and `@faker-js/faker`.

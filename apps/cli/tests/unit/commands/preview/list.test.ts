@@ -103,4 +103,24 @@ describe("preview list", () => {
       "",
     ]);
   });
+
+  it("follows a cursor back as the server wrote it with --all", async () => {
+    const tokens: (string | null)[] = [];
+    server.use(
+      http.get(`${SERVER}/api/v1/projects/:project_id/previews`, ({ request }) => {
+        const token = new URL(request.url).searchParams.get("page_token");
+        tokens.push(token);
+        return HttpResponse.json({
+          previews: [],
+          next_page_token: token === null ? "p\u001b2" : null,
+        });
+      }),
+    );
+    const cwd = await aProjectDirectory("zitadel-preview-list-", { id: "proj_test", secret: "ps" });
+    dirs.push(cwd);
+
+    await runCliForTest(["preview", "list", "--all", "--json", "--cwd", cwd, "--server", SERVER]);
+
+    expect(tokens).toEqual([null, "p\u001b2"]);
+  });
 });

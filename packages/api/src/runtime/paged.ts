@@ -6,13 +6,13 @@ import { pages } from "./paging";
 
 /**
  * How a generated function pages: its page's items and cursor, read off a page
- * as the generated table types them, and the argument carrying `page_token`.
+ * as the generated table types them, and the arguments that fetch the next one.
  * Method syntax, so a table entry typed by its page assigns here.
  */
 type PagingShape = Readonly<{
   items(page: unknown): readonly unknown[];
   next(page: unknown): string | null | undefined;
-  arg: number;
+  withToken(args: unknown[], token: string): readonly unknown[];
 }>;
 
 /** What the client does to every response and every failure. */
@@ -32,15 +32,7 @@ export function paged(send: (...args: unknown[]) => unknown, shape: PagingShape,
   async function* walk<T>(args: unknown[], take: (page: unknown) => readonly T[]) {
     const raw = pages(
       async (token) => {
-        if (token === undefined) {
-          return send(...args);
-        }
-        // Built fresh rather than with `Array.prototype.with`, which throws when
-        // the caller left an optional argument at `shape.arg` off.
-        const pageArgs = Array.from({ length: Math.max(args.length, shape.arg + 1) }, (_, i) =>
-          i === shape.arg ? { ...(args[i] as object | undefined), page_token: token } : args[i],
-        );
-        return send(...pageArgs);
+        return token === undefined ? send(...args) : send(...shape.withToken(args, token));
       },
       { next: (page) => shape.next(page) ?? undefined },
     );

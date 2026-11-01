@@ -3,12 +3,10 @@ import type { AddressInfo } from "node:net";
 
 import { afterEach, describe, expect, expectTypeOf, it } from "vitest";
 
-import type * as endpoints from "../generated/endpoints/zitadelNextGen";
 import type { ListDeployments200DeploymentsItem } from "../generated/model";
-import type { paging } from "../generated/paging";
+import { paging } from "../generated/paging";
 import { createZitadelClient, type ItemOf } from "./api-factory";
 
-type Endpoints = typeof endpoints;
 type Paging = typeof paging;
 
 const servers: Server[] = [];
@@ -194,17 +192,24 @@ describe("createZitadelClient", () => {
     await expect(listed).rejects.toThrow("handled");
   });
 
-  it("puts every paged function's page_token in an argument that takes one", () => {
-    // A wrong index in the generated table fails here, naming the function.
-    type Misplaced = {
-      [K in keyof Paging]: `${Paging[K]["arg"]}` extends keyof Parameters<Endpoints[K]>
-        ? "page_token" extends keyof NonNullable<Parameters<Endpoints[K]>[Paging[K]["arg"]]>
-          ? never
-          : K
-        : K;
-    }[keyof Paging];
-
-    expectTypeOf<Misplaced>().toBeNever();
+  it.each([
+    [
+      "the query parameters after a path parameter",
+      paging.listPreviews.withToken(["proj_1", { limit: 1 }], "t1"),
+      ["proj_1", { limit: 1, page_token: "t1" }, undefined],
+    ],
+    [
+      "query parameters the caller left off",
+      paging.listPreviews.withToken(["proj_1"], "t1"),
+      ["proj_1", { page_token: "t1" }, undefined],
+    ],
+    [
+      "the body of a query",
+      paging.queryUsers.withToken([{ limit: 1 }], "t1"),
+      [{ limit: 1, page_token: "t1" }, undefined, undefined],
+    ],
+  ])("puts a later page's page_token on %s", (_, args, expected) => {
+    expect(args).toEqual(expected);
   });
 
   it("types every paged function's items", () => {

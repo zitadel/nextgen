@@ -337,6 +337,27 @@ describe("users list", () => {
     expect(json.data.next_page_token).toBeNull();
   });
 
+  it("follows a cursor back as the server wrote it with --all", async () => {
+    const cwd = await makeProject();
+    const tokens: unknown[] = [];
+    server.use(
+      http.post<never, { page_token?: string }>(
+        `${SERVER}/api/v1/users/query`,
+        async ({ request }) => {
+          const body = await request.json();
+          tokens.push(body.page_token ?? null);
+          return body.page_token
+            ? HttpResponse.json({ users: [user("user_2")] })
+            : HttpResponse.json({ users: [user("user_1")], next_page_token: "p\u001b2" });
+        },
+      ),
+    );
+
+    await run(cwd, ["users", "list", "--all"]);
+
+    expect(tokens).toEqual([null, "p\u001b2"]);
+  });
+
   it("rejects an unknown filter field before any request", async () => {
     const cwd = await makeProject();
     const res = await run(cwd, ["users", "list", "--filter", "email=a@b.c"]);
@@ -2278,6 +2299,39 @@ describe("the registry builders", () => {
   it("refuses a range operation no query takes", () => {
     // @ts-expect-error no query takes a `between` operation
     range({ between: "created_after" });
+  });
+
+  it("refuses a repeat that widens on a query body", () => {
+    list({
+      body: QueryUsersBody,
+      // @ts-expect-error a user query applies every repeat of a field, so none widens
+      filters: [{ field: "status", operations: ["equals"], combine: "or" }],
+      call: ({ client }, body) => client.queryUsers(body),
+      items: (page: QueryUsers200) => page.users,
+      next: (page: QueryUsers200) => page.next_page_token,
+    });
+  });
+
+  it("refuses a repeat that widens on a GET parameter taking one value", () => {
+    list({
+      // @ts-expect-error events take one `actor_id`, so its repeats cannot widen
+      filters: [{ field: "actor_id", operations: ["equals"], combine: "or" }],
+      call: ({ client, projectId }: Platform, params: Omit<ListEventsParams, "project_id">) =>
+        client.listEvents({ ...params, project_id: projectId }),
+      items: (page: ListEvents200) => page.data,
+      next: (page: ListEvents200) => page.next_page_token,
+    });
+  });
+
+  it("refuses a GET parameter taking a list that does not say its repeats widen", () => {
+    // @ts-expect-error events take a list of `event_type`, whose repeats widen
+    list({
+      filters: [{ field: "event_type", operations: ["equals"] }],
+      call: ({ client, projectId }: Platform, params: Omit<ListEventsParams, "project_id">) =>
+        client.listEvents({ ...params, project_id: projectId }),
+      items: (page: ListEvents200) => page.data,
+      next: (page: ListEvents200) => page.next_page_token,
+    });
   });
 
   it("refuses a range written without range()", () => {
