@@ -3,9 +3,9 @@ import { isPortableShellWord, publicCliCommand } from "./public-cli";
 declare const suggestedCommand: unique symbol;
 
 /**
- * A command the CLI suggests running next: a `nextCommands` entry on a result
- * or an error, a `next_commands` row in a command's data, or the `retry` of an
- * input question. Only the builders below make one, so a suggestion cannot be
+ * A command the CLI suggests running next: a `next.commands` entry on a
+ * result, a `nextCommands` entry on an error, or the `retry` of an input
+ * question. Only the builders below make one, so a suggestion cannot be
  * written without deciding whether it targets this run's project.
  *
  * That decision is the point. A suggestion for a command that talks to a

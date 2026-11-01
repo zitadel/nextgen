@@ -19,13 +19,13 @@ Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
 
 ## Content-Security-Policy
 
-- The enforced policy is `next.config.ts`'; the report-only one is
-  `csp-adapter.mjs`', with each prerendered page's inline scripts by hash.
+- `csp-adapter.mjs` enforces each prerendered page's script hashes, and the
+  404's for other URLs in place of `next.config.ts`' scriptless fallback.
 - Never give a page a nonce or `'unsafe-inline'`: pages, the changelog too,
   stay prerendered ([why](../../docs/design/cloud/csp-docs-and-website.md)).
 - `csp-adapter.mjs` copies `apps/docs/csp-adapter.mjs` but for the policy:
   change both.
-- Load nothing from another origin without widening the report-only policy
+- Load nothing from another origin without widening the enforced policy
   in the same change.
 - The cloud's deployment checks (`e2e/console/src-deployment/routes.spec.ts`)
   fail a page with an unhashed inline script.
@@ -116,12 +116,13 @@ Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
 
 ## Routing
 
-The cloud routes only `/`, `/changelog`, `/changelog/*`, `/llms.txt`,
-`/_next/*`, `/favicon.ico` and `/favicons/*` here (repo-root
-[`vercel.json`](../../vercel.json)).
+The cloud routes every path no other service claims here (repo-root
+[`vercel.json`](../../vercel.json)), so `app/not-found.tsx` answers what
+nothing serves ([ADR 076](../../docs/adrs/076-error-pages-and-unmatched-routes.md) §4).
 
-- A new page or `public/` file outside `/changelog/` needs a rewrite of its own
-  in `vercel.json`, or the server answers it with a 404.
+- A new page needs no rewrite, but must keep off the paths other services
+  claim: `/api/`, `/console/`, `/docs`, `/cloud/`, `/schemas/v1/`, the
+  server's root paths and the API's resource names (`vercel.json`).
 - Load every other asset from `/_next/`: fonts through `next/font`, images as
   imports. Never use Next's metadata files (`app/icon.svg`, `opengraph-image`),
   which Next serves at the root.

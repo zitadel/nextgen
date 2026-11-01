@@ -6,6 +6,11 @@
  * reusing the existing MSW handlers via @mswjs/http-middleware — zero
  * duplication of routing logic.
  *
+ * Like the server until 1.0.0 (ADR 077), every API route answers at
+ * `/api/v1/<path>` and at its old root `<path>`; the paths below are the
+ * spec's. The JWKS, OIDC discovery, `/auth/*` and `/console/runtime.json`
+ * are not API operations and stay at the root.
+ *
  * Custom-only routes added on top:
  *   POST   /sessions/exchange     — exchange handoff_token for session cookie
  *   GET    /sessions/me           — get current session from opaque cookie
@@ -36,6 +41,7 @@ import type { Server } from "node:http";
 import { createMiddleware } from "@mswjs/http-middleware";
 import { CompleteClaimBody } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import type { ExchangeHandoff200, GetMySession200 } from "@zitadel/api/generated/model";
+import { API_PREFIX } from "@zitadel/api/runtime/base-url";
 import cookieParser from "cookie-parser";
 import express from "express";
 
@@ -47,6 +53,9 @@ import { buildOpenIdConfiguration } from "./openid-configuration.js";
 import { completeClaimChallenge, errorBody, setupPlatformHandlers } from "./platform-handlers.js";
 
 const SESSION_TTL_SECONDS = 3600;
+
+/** An API route's two spellings: under the API prefix and at the old root path. */
+const apiPaths = (path: string): string[] => [`${API_PREFIX}${path}`, path];
 
 // The claiming human's account lives in Zitadel's own platform project (ADR
 // 046 §2), so only a session belonging to it may complete a claim. Exported so
@@ -257,7 +266,7 @@ export function createMockApp(options: { issuer: string }): express.Express {
     });
   };
   app.post(
-    "/sessions/exchange",
+    apiPaths("/sessions/exchange"),
     jsonBodyParser,
     async (req: express.Request, res: express.Response) => {
       const projectId = req.query.project_id;
@@ -403,7 +412,7 @@ export function createMockApp(options: { issuer: string }): express.Express {
 
   // GET /sessions/me — validate opaque session cookie and return session data.
   // Mirrors the Go server's GetMySession handler.
-  app.get("/sessions/me", (req: express.Request, res: express.Response) => {
+  app.get(apiPaths("/sessions/me"), (req: express.Request, res: express.Response) => {
     const found = lookupSession(req);
     switch (found.status) {
       case "missing":
@@ -424,7 +433,7 @@ export function createMockApp(options: { issuer: string }): express.Express {
 
   // GET /sessions/me/csrf — the session's CSRF token (ADR 053 §5). Mirrors
   // the Go server's GetMySessionCsrfToken handler.
-  app.get("/sessions/me/csrf", (req: express.Request, res: express.Response) => {
+  app.get(apiPaths("/sessions/me/csrf"), (req: express.Request, res: express.Response) => {
     // Both the token and the 401 are session state: neither may be stored.
     res.setHeader("Cache-Control", "private, no-store");
     const found = lookupSession(req);
@@ -441,7 +450,7 @@ export function createMockApp(options: { issuer: string }): express.Express {
 
   // DELETE /sessions/me — revoke the current session (logout). Mirrors the
   // Go server's revokeMySession handler and the SDK proxy's logout call.
-  app.delete("/sessions/me", (req: express.Request, res: express.Response) => {
+  app.delete(apiPaths("/sessions/me"), (req: express.Request, res: express.Response) => {
     const found = lookupSession(req);
     // As on GET /sessions/me/csrf: the server's token gate answers these 401
     // before the handler, whatever project the request names.
@@ -478,7 +487,7 @@ export function createMockApp(options: { issuer: string }): express.Express {
   // with the module-scoped session cookie, exactly like GET
   // /sessions/me. The challenge_id from the body is its browser-safe authorization.
   app.post(
-    "/projects/:project_id/claim/complete",
+    apiPaths("/projects/:project_id/claim/complete"),
     jsonBodyParser,
     (req: express.Request, res: express.Response) => {
       const found = lookupSession(req);
@@ -556,6 +565,6 @@ export function startMockServer(port: number): Server {
   return app.listen(port, () => {
     console.log(`\napi-mock server listening on http://localhost:${port}`);
     console.log(`  JWKS: http://localhost:${port}/.well-known/jwks.json`);
-    console.log(`  Sessions exchange: http://localhost:${port}/sessions/exchange\n`);
+    console.log(`  Sessions exchange: http://localhost:${port}${API_PREFIX}/sessions/exchange\n`);
   });
 }

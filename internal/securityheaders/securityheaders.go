@@ -33,7 +33,7 @@ const resourcePolicy = "default-src 'none'; frame-ancestors 'none'"
 // Middleware sets the headers every response of the server carries, before
 // next runs: a handler that serves a page replaces the policy with the
 // page's own (internal/errorpage, the console). On the hosted cloud the edge
-// sets the first three for every service as well (repo-root vercel.json).
+// sets these shared headers for every service as well (repo-root vercel.json).
 func Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		header := w.Header()
@@ -42,6 +42,9 @@ func Middleware(next http.Handler) http.Handler {
 		// frame-ancestors' predecessor, for the responses whose policy a
 		// browser does not read and for browsers that read neither.
 		header.Set("X-Frame-Options", "DENY")
+		// None of our pages needs these devices; leave passkeys and the
+		// clipboard available to the login and console.
+		header.Set("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
 		header.Set(PolicyHeader, resourcePolicy)
 		next.ServeHTTP(w, r)
 	})

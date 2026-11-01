@@ -103,6 +103,9 @@ nothing; `data.skills` and `data.directories` say what it added where.
   `deploy` yourself. `data.deployment` carries the `release_id`,
   `content_hash`, `deployment_id` and `origins` when a person accepted, and is
   null otherwise — a failed deploy is a warning, never a failed `env add`.
+  `ZITADEL_URL` and `--server` are the server's origin: the API lives under
+  `/api/v1` there, which the CLI adds (and drops from a URL that already ends
+  in it).
 - **Origins.** `zitadel origin add <url> --kind primary|preview`, `origin list`
   and `origin rm <url>` manage the URLs a project serves: a `primary` origin is
   where the app is served, a `preview` pattern (it may hold a `*`) is where
@@ -144,8 +147,9 @@ nothing; `data.skills` and `data.directories` say what it added where.
 - **Calling an operation no command covers.** `zitadel api <operation>` calls
   any operation of the API with the resolved server and `.zitadel/secret`.
   Name it by its `operationId` (`queryUsers`, as the API reference and
-  `@zitadel/api` spell it) or by its path (`/users/query`; `-X` picks the
-  method where a path has several). Path parameters follow as arguments, in
+  `@zitadel/api` spell it) or by its path as the spec has it (`/users/query`,
+  which the server serves at `/api/v1/users/query`; a path copied with the
+  prefix works too, and `-X` picks the method where a path has several). Path parameters follow as arguments, in
   path order; a `project_id` left out is the project's own. `-F name=value`
   (or `name:=json`) sets a query parameter when the operation declares one by
   that name, else a dot path into the body, typed by the operation's schema;
@@ -245,6 +249,12 @@ Each invocation prints one JSON object:
   `--origin`, which selects targets but never authorizes a preview deploy. A CI
   build other than Vercel or Netlify must set `ZITADEL_ENV=preview`, or it is
   skipped too. `preview list` and `preview rm <url>` read and end live previews.
+- `deploy` and `preview` record `-m` on the release and the deployment. Omitted,
+  they use a GitHub pull request's title, Vercel's commit message, or a clean
+  worktree's commit subject; with none, a non-interactive `deploy` fails. A
+  blank `-m` is refused. A release keeps the message of
+  the run that first built its content, usually the pull request's `preview`.
+  `deployment rollback -m` records why on the rollback.
 - `deployment get <id>` emits the deployment as the API serves it; on a
   terminal it also shows the variables the deployment froze, secrets masked.
   Read them as JSON with `variable resolve`.
@@ -258,7 +268,8 @@ Each invocation prints one JSON object:
   shows, against the live release's commit (`diff.against`): `diff.files` holds
   one `{path, status, previous_path?, patch}` per changed file (`status` is
   `added`, `modified`, `deleted`, `renamed` or `copied`; `patch` is its unified
-  diff). Review it before you deploy. `files` is `[]` when nothing changed and
+  diff), including rapid same-size edits and untracked configuration files.
+  Review it before you deploy. `files` is `[]` when nothing changed and
   `null` when there is nothing to diff against, with `diff.note` saying why.
 - A write verb's `--dry-run` reports what it would send without calling the
   platform, so you can preview a mutation before making it.
@@ -278,13 +289,18 @@ Common error codes point at their own fix in `next_commands`:
 - `E_LOCAL_SERVER_NOT_RUNNING`: start the local runtime, then retry with
   `--server local`.
 - `E_NOT_FOUND`: an HTTP 404 — a missing resource, an operation the server's
-  version does not have (`details.body.code` is `req.not_found`), or a
+  version does not have (`details.body.code` is `req.not_found`; a server
+  from before the API moved under `/api/v1` answers every call so), or a
   `--server` that is not a Zitadel platform API. Follow `next_commands`.
 - `E_PORT_IN_USE`: the requested local runtime port already has a listener; stop
   that process or choose another port.
 
 In human mode the output follows the terminal (TTY table, or tab-separated lines
-when piped or `--plain`); `--json` is unaffected and remains the contract.
+when piped or `--plain`); `--json` is unaffected and remains the contract. A
+human run lists its next steps under `Next:` after its result (`setup` shows
+them in its summary box instead); where stdout is data a script reads (a piped
+or `--plain` list, a resource's created or updated JSON) they go to stderr, so
+stdout holds only that data.
 
 Text the server returns is escaped before it is printed, in `--json` as in human
 mode, so a stored value cannot drive the reader's terminal. Control, format and
@@ -400,17 +416,22 @@ it.
 Setup refuses with `E_CONFLICT` when the repository already has uncommitted
 work, untracked files included, which `details.untracked` lists separately
 from `details.modified`. The commit covers the project directory, so it can
-only tell its own files from yours when the tree starts clean. Commit or stash
+only tell its own files from yours when the tree starts clean. It never
+commits `.env*` files (other than `.env.example`), `.zitadel/secret` or
+`.zitadel/local/`, whatever their case. Commit or stash
 first, then rerun. Only what `start` leaves is exempt: `.zitadel/local/` and
 the `.gitignore` line that ignores it. A connection under `.zitadel/idps/` is
-yours and is not exempt.
+yours and is not exempt. During a merge, rebase, cherry-pick, revert or bisect,
+or on a detached HEAD, setup refuses with `E_CONFLICT` before it writes
+anything, naming what stops the commit.
 
 Setup deploys nothing, and it does not need to: a project with no release
 resolves the newest revisions, which are the ones setup just uploaded, so
 sign-in already runs on `.zitadel/`. Deploying pins them into a release, which
 is what the server will require once that fallback goes (#1616). The publish
-step says so and names the command. `data.git` reports what setup did
-(`initialized`, and the `commit`, or null). `--no-git` skips both the refusal
+step says so and names the command. `data.git` reports what setup did:
+`initialized` when it ran `git init`, even if the commit then failed, and the
+`commit`, or null. `--no-git` skips both the refusal
 and the commit, and nothing prompts, so this is the same interactively and in
 CI.
 

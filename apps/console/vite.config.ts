@@ -6,13 +6,13 @@ import tailwindcss from "@tailwindcss/vite";
 import { devtools } from "@tanstack/devtools-vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import react from "@vitejs/plugin-react";
+// The config loads @zitadel/api's dist/, which sdk-react's build, a dep of
+// every console task, builds first.
+import { API_PREFIX, apiBaseUrl } from "@zitadel/api/runtime/base-url";
 import { type Alias, defineConfig, loadEnv, type Plugin, type ProxyOptions } from "vite";
-
-import { baseTest } from "@zitadel/vitest-config";
 
 const defaultConsoleBase = "/ui/console/";
 const consoleOutDir = "../../internal/staticui/console/dist";
-const defaultApiBase = "/api";
 const defaultBackendUrl = "http://localhost:8080";
 
 export default defineConfig(async ({ command, mode, isPreview }) => {
@@ -39,8 +39,8 @@ export default defineConfig(async ({ command, mode, isPreview }) => {
       port: 5174,
       strictPort: true,
       // Dev-server-only API proxy (Console ADR 0002), the frontend HMR loop. The
-      // browser calls the same-origin `/api` base and this Node-side proxy
-      // forwards it to the Go server, stripping the prefix. It adds no
+      // browser calls the same-origin `/api/v1` and this Node-side proxy
+      // forwards it to the Go server unchanged (ADR 077). It adds no
       // credential: the console user signs in through the embedded login widget
       // (Console ADR 0003), and the session cookie that rides along
       // on these same-origin requests authorizes every management call, exactly
@@ -85,28 +85,6 @@ export default defineConfig(async ({ command, mode, isPreview }) => {
         transformMixedEsModules: true,
       },
     },
-    test: {
-      ...baseTest,
-      name: "@zitadel/console",
-      environment: "jsdom",
-      setupFiles: ["./src/test-setup.ts"],
-      // The env every spec starts from. Vite also loads `.env.local`, so without
-      // the blank fallback a developer's local VITE_CONSOLE_RUNTIME_FALLBACK would
-      // turn runtime-discovery failures into the standalone fallback (Console ADR
-      // 0004 §3). A spec that needs another value stubs it with `vi.stubEnv`, and
-      // `unstubEnvs` restores these before the next test.
-      env: {
-        VITE_CONSOLE_API_BASE: "http://localhost/api",
-        VITE_CONSOLE_RUNTIME_FALLBACK: "",
-      },
-      unstubEnvs: true,
-      // Above the RTL asyncUtilTimeout (5s, set in test-setup.ts) with room for a
-      // test that makes several queries, so a slow query reports its own Testing
-      // Library diagnostic rather than being cut short by this budget. A file
-      // loads the router and every screen before its first test, outside this
-      // budget (test-setup.ts).
-      testTimeout: 30_000,
-    },
   };
 });
 
@@ -125,12 +103,12 @@ function devBackendUrl(mode: string): string {
 }
 
 function devApiProxy(mode: string): Record<string, ProxyOptions> {
-  // Public, browser-safe var (VITE_ prefixed): the API base the SDK client
-  // targets. `/api` is this proxy's own path and applies to the dev server
-  // only — the built console targets the origin root, where the Go binary
-  // serves the API (`src/api/zitadel.ts`, Console ADR 0002 §4).
+  // Public, browser-safe var (VITE_ prefixed): what the SDK client puts in
+  // front of the API's `/api/v1` (`src/api/zitadel.ts`, Console ADR 0002 §4).
+  // Unset, the client calls `/api/v1` on the page's origin, as the built
+  // console does on the server's, and the proxy forwards that path unchanged.
   const env = loadEnv(mode, import.meta.dirname, "VITE_");
-  const apiBase = env.VITE_CONSOLE_API_BASE || defaultApiBase;
+  const { context, rewrite } = devApiRoute(env.VITE_CONSOLE_API_BASE || "");
   // Removed in #1345: the console takes the project it signs into from the
   // server's `/console/runtime.json`. Said out loud, because a `.env.local`
   // that still sets it would otherwise be ignored without a word.
@@ -142,10 +120,6 @@ function devApiProxy(mode: string): Record<string, ProxyOptions> {
   }
   const backendUrl = devBackendUrl(mode);
 
-  // Anchor the context to a path segment so a similarly-prefixed path (e.g.
-  // `/api2/...`) is not accidentally proxied and rewritten.
-  const escaped = apiBase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
   return {
     // Console ADR 0004 §3: the pre-session runtime-metadata document lives
     // at a root path served by the Go mux; forward it as-is (public, no
@@ -154,13 +128,10 @@ function devApiProxy(mode: string): Record<string, ProxyOptions> {
       target: backendUrl,
       changeOrigin: true,
     },
-    [`^${escaped}(/|$)`]: {
+    [context]: {
       target: backendUrl,
       changeOrigin: true,
-      rewrite: (path: string) => {
-        const stripped = path.startsWith(apiBase) ? path.slice(apiBase.length) : path;
-        return stripped.startsWith("/") ? stripped : `/${stripped}`;
-      },
+      rewrite,
       // `CONSOLE_DEV_PROXY_LOG=1` prints each proxied request — the thing to
       // look at when a screen answers 401/403/404 and it is not obvious what
       // the server was asked.
@@ -172,6 +143,26 @@ function devApiProxy(mode: string): Record<string, ProxyOptions> {
         });
       },
     },
+  };
+}
+
+/**
+ * The dev proxy's route for the API. `base` reads as the client reads it
+ * (`apiBaseUrl`, `src/api/zitadel.ts`), so a base that already ends in
+ * `/api/v1` keeps a single one. What comes before the prefix is this proxy's
+ * own path, stripped on the way; the prefix and what follows reach the server
+ * unchanged. The context is anchored to a path segment, so a look-alike
+ * (`/api/v12/...`) is not proxied.
+ */
+export function devApiRoute(base: string): {
+  context: string;
+  rewrite: (path: string) => string;
+} {
+  const apiPath = apiBaseUrl(base);
+  const ownPath = apiPath.slice(0, -API_PREFIX.length);
+  return {
+    context: `^${apiPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(/|$)`,
+    rewrite: (path) => path.slice(ownPath.length),
   };
 }
 

@@ -22,7 +22,6 @@ import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from ".
 import { hasZitadelConfig } from "../../lib/project";
 import { metaSchemaState, projectMetaSchemas } from "../../lib/meta-schemas";
 import { normalizePublicCliProse } from "../../lib/public-cli";
-import { nextCommandsData } from "../../lib/oclif/envelope";
 import { DEPLOY_ARGS } from "../../lib/release";
 import { Promptable } from "../../lib/oclif/promptable";
 
@@ -126,16 +125,15 @@ export default class BrandingEject extends Promptable(BaseCommand) {
       data: {
         design,
         files_written: filesWritten,
-        next_actions: [
+      },
+      next: {
+        actions: [
           `Edit ${DEFAULT_BRANDING_TEMPLATE_PATH} — the login UI is yours now.`,
           "Deploy --dry-run validates the template and shows the diff; deploy publishes it.",
         ],
         // `branding eject` reads no environment, so it has no selector to
         // carry: the follow-ups run against whichever one the developer uses.
-        ...nextCommandsData([
-          this.suggestUnscoped("deploy --dry-run"),
-          this.suggestUnscoped(DEPLOY_ARGS),
-        ]),
+        commands: [this.suggestUnscoped("deploy --dry-run"), this.suggestUnscoped(DEPLOY_ARGS)],
       },
     });
   }

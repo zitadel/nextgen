@@ -7,6 +7,7 @@
 
 import type { JwtPayload } from "./jwt.js";
 
+import { API_PREFIX, apiBaseUrl } from "@zitadel/api/runtime/base-url";
 import { joinURL } from "ufo";
 
 import { isJwtShaped, verifyJwt } from "./jwt.js";
@@ -19,6 +20,10 @@ import { isJwtShaped, verifyJwt } from "./jwt.js";
  * two directly connected peers and become invalid when proxied.
  */
 export const HOP_BY_HOP: ReadonlySet<string> = new Set([
+  // accept-encoding is not hop-by-hop per RFC 7230, but the browser's value
+  // must not reach the upstream: the proxy's fetch decodes the body it gets
+  // back, so only the codings that fetch advertises itself may be chosen.
+  "accept-encoding",
   "connection",
   // content-length is not hop-by-hop per RFC 7230, but it must be stripped: the
   // proxy re-sends a freshly buffered body, so the fetch implementation computes
@@ -128,6 +133,19 @@ export function loginRedirectUrl(loginPath: string, requestUrl: string | URL): U
 // ─── Proxy credentials ───────────────────────────────────────────────────────
 
 /**
+ * The operation a proxied path names: the path without the API prefix
+ * (ADR 077), so `/api/v1/sessions/me` and `/sessions/me` name the same one.
+ * Until 1.0.0 the server answers both spellings, and so every check here that
+ * decides by path accepts both.
+ */
+function operationPath(path: string): string {
+  if (path === API_PREFIX) {
+    return "/";
+  }
+  return path.startsWith(`${API_PREFIX}/`) ? path.slice(API_PREFIX.length) : path;
+}
+
+/**
  * Whether a proxied call may carry the confidential project secret.
  *
  * ADR 036: the browser flow needs the secret only for the handoff exchange
@@ -136,11 +154,12 @@ export function loginRedirectUrl(loginPath: string, requestUrl: string | URL): U
  * project-level authority for any anonymous caller.
  *
  * @param method   - The proxied request's HTTP method.
- * @param pathname - The path after the proxy prefix, e.g. `/sessions/exchange`.
+ * @param pathname - The path after the proxy prefix, e.g. `/sessions/exchange`
+ *   or `/api/v1/sessions/exchange`.
  * @returns `true` only for the handoff exchange.
  */
 export function requiresProjectSecret(method: string, pathname: string): boolean {
-  return method.toUpperCase() === "POST" && pathname === "/sessions/exchange";
+  return method.toUpperCase() === "POST" && operationPath(pathname) === "/sessions/exchange";
 }
 
 // ─── Response header filtering ───────────────────────────────────────────────
@@ -185,9 +204,15 @@ function ontoThisApp(location: string, selfUrl: string | undefined): string | un
 }
 
 /**
- * Filters upstream response headers for proxying: strips hop-by-hop headers
- * and `set-cookie` (handled separately via `getSetCookie()`), and reduces
- * `location` to a redirect that can only land on this app.
+ * Filters upstream response headers for proxying: strips hop-by-hop headers,
+ * `content-encoding` and `set-cookie` (handled separately via `getSetCookie()`),
+ * and reduces `location` to a redirect that can only land on this app.
+ *
+ * `content-encoding` describes the bytes the upstream sent, but `fetch` has
+ * already decoded them, so the proxy passes on a plain body. Forwarding the
+ * header labels that body as compressed: the browser fails to decode it, and a
+ * `200` reaches the caller as a request that got no response. `content-length`
+ * goes for the same reason, as a hop-by-hop header.
  *
  * `location` was stripped outright until the identity-provider callback
  * needed it: the provider returns the browser to `/__nextgen/idp/{slug}/callback`,
@@ -207,7 +232,7 @@ export function filterResponseHeaders(upstream: Headers, selfUrl?: string): Head
   const filtered = new Headers();
   upstream.forEach((value, key) => {
     const name = key.toLowerCase();
-    if (HOP_BY_HOP.has(name) || name === "set-cookie") {
+    if (HOP_BY_HOP.has(name) || name === "content-encoding" || name === "set-cookie") {
       return;
     }
     if (name === "location") {
@@ -463,7 +488,7 @@ function setCookieName(setCookie: string): string {
  */
 export interface ProxiedRequest extends BrowserRequest {
   readonly method: string;
-  /** The path after the proxy prefix, e.g. `/sessions/me`. */
+  /** The path after the proxy prefix, e.g. `/sessions/me` or `/api/v1/sessions/me`. */
   readonly path: string;
   /** The query string, with its leading `?`, or `""`. */
   readonly search: string;
@@ -526,6 +551,8 @@ export interface ProxiedSessionCookies {
  *   gone: the server is asked about it in this project, and a session of this
  *   project is cleared (and on sign-out also ended), a dead one cleared, and
  *   one of another project, the Console's on `localhost`, left alone.
+ * - Each of these calls is known by its path with or without the API prefix
+ *   (`/api/v1`), which the server answers both ways until 1.0.0.
  * - Without a project the cookies pass as they are: nothing says which session
  *   is the app's.
  *
@@ -557,12 +584,13 @@ export function proxySessionCookies(
   // A session kept under the server's name, which goes up to the probe only.
   const shared = cookieValue(pieces, serverName);
   const method = request.method.toUpperCase();
+  const operation = operationPath(request.path);
   const isProbe =
     method === "GET" &&
-    request.path === "/sessions/me" &&
+    operation === "/sessions/me" &&
     new URLSearchParams(request.search).get("project_id") === projectId;
-  const signsIn = method === "POST" && request.path === "/sessions/exchange";
-  const signsOut = method === "DELETE" && request.path === "/sessions/me";
+  const signsIn = method === "POST" && operation === "/sessions/exchange";
+  const signsOut = method === "DELETE" && operation === "/sessions/me";
   const probed = own === null && isProbe ? shared : null;
 
   const sent = pieces.filter(({ name }) => !isSessionCookie(name)).map(({ piece }) => piece);
@@ -636,7 +664,7 @@ async function retiresSharedSession(
   let res: Response;
   try {
     res = await fetch(
-      `${joinURL(upstream.url, "/sessions/me")}?project_id=${encodeURIComponent(projectId)}`,
+      `${joinURL(apiBaseUrl(upstream.url), "/sessions/me")}?project_id=${encodeURIComponent(projectId)}`,
       {
         method: "GET",
         headers: { cookie },
@@ -686,7 +714,7 @@ async function revokeSession(
 ): Promise<void> {
   try {
     const res = await fetch(
-      `${joinURL(upstream.url, "/sessions/me/csrf")}?project_id=${encodeURIComponent(projectId)}`,
+      `${joinURL(apiBaseUrl(upstream.url), "/sessions/me/csrf")}?project_id=${encodeURIComponent(projectId)}`,
       {
         method: "GET",
         headers: { cookie },
@@ -699,7 +727,7 @@ async function revokeSession(
     if (typeof answer?.csrf_token !== "string") {
       return;
     }
-    await fetch(joinURL(upstream.url, "/sessions/me"), {
+    await fetch(joinURL(apiBaseUrl(upstream.url), "/sessions/me"), {
       method: "DELETE",
       headers: { cookie, [CSRF_HEADER]: answer.csrf_token },
       signal: AbortSignal.timeout(upstream.timeoutMs),
@@ -1009,8 +1037,11 @@ export type OpaqueSessionCheck =
 /** The code the backend answers `GET /sessions/me` with when the session is gone. */
 const SESSION_NOT_FOUND = "sess.not_found";
 
+/** The code the backend answers a path no operation of its version has with (ADR 076). */
+const ROUTE_NOT_FOUND = "req.not_found";
+
 /**
- * Asks the backend (`GET {issuerUrl}/sessions/me?project_id={projectId}`)
+ * Asks the backend (`GET {issuerUrl}/api/v1/sessions/me?project_id={projectId}`)
  * whether an opaque session token names a live session in this app's project,
  * telling a refusal apart from no verdict.
  *
@@ -1020,9 +1051,11 @@ const SESSION_NOT_FOUND = "sess.not_found";
  * project its answer names is checked as well, because a backend that predates
  * the parameter answers for any project.
  *
- * A `404` is a refusal only with the `sess.not_found` code. Without it, the
- * answer came from something in front of the backend (a proxy, a `url` with
- * the wrong path), which judged nothing.
+ * A `404` is a refusal only with the `sess.not_found` code. With
+ * `req.not_found` the backend knows no such operation: it is older than this
+ * SDK and does not serve the API under its prefix. Without a code, the answer
+ * came from something in front of the backend (a proxy, a `url` with the
+ * wrong path). Neither judged anything.
  *
  * When there is no verdict, it logs why: the request it was asked for then
  * renders signed out, or answers `503` on a protected route, and nothing else
@@ -1049,7 +1082,7 @@ export async function checkOpaqueSessionToken(
   if (otherProjectSessions.knows(key)) {
     return { verdict: "live", session: noUser() };
   }
-  const endpoint = joinURL(issuerUrl, "/sessions/me");
+  const endpoint = joinURL(apiBaseUrl(issuerUrl), "/sessions/me");
   try {
     const res = await fetch(`${endpoint}?project_id=${encodeURIComponent(projectId)}`, {
       method: "GET",
@@ -1059,8 +1092,17 @@ export async function checkOpaqueSessionToken(
     if (res.status === 401) {
       return { verdict: "refused" };
     }
-    if (res.status === 404 && (await errorCode(res)) === SESSION_NOT_FOUND) {
-      return { verdict: "refused" };
+    if (res.status === 404) {
+      const code = await errorCode(res);
+      if (code === SESSION_NOT_FOUND) {
+        return { verdict: "refused" };
+      }
+      if (code === ROUTE_NOT_FOUND) {
+        return undecided(
+          endpoint,
+          `HTTP 404 ${ROUTE_NOT_FOUND}: the server has no such operation; a server older than this SDK does not serve the API under ${API_PREFIX}`,
+        );
+      }
     }
     if (res.status === 403 && (await errorCode(res)) === SESSION_PROJECT_MISMATCH) {
       otherProjectSessions.remember(key);
@@ -1138,7 +1180,7 @@ export function clearSessionCheckCache(): void {
 
 /**
  * Validates an opaque session token by asking the backend
- * (`GET {issuerUrl}/sessions/me?project_id={projectId}`) whether the session is
+ * (`GET {issuerUrl}/api/v1/sessions/me?project_id={projectId}`) whether the session is
  * live in this app's project.
  *
  * `null` folds a refusal and no verdict together, so it says whether the

@@ -18,7 +18,7 @@ vi.mock("@/auth/session", async (importOriginal) => {
 });
 
 // Absolute base so requests parse under jsdom/undici and MSW can intercept.
-const API = "http://localhost/api";
+const API = "http://localhost/api/v1";
 const DEPLOYMENTS_URL = `${API}/deployments`;
 const RELEASES_URL = `${API}/releases`;
 const PROJECT_URL = `${API}/projects/proj_test`;

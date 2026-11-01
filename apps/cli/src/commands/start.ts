@@ -17,8 +17,8 @@ import {
 } from "../lib/local-server/runtime";
 import { LocalServer } from "../lib/local-server/server";
 import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../lib/oclif";
+import type { NextSteps } from "../lib/oclif/next-steps";
 import { resolveCwd } from "../lib/paths";
-import { nextCommandsData } from "../lib/oclif/envelope";
 import type { SuggestedCommand } from "../lib/suggestion";
 
 export default class Start extends BaseCommand {
@@ -81,8 +81,8 @@ export default class Start extends BaseCommand {
             api: serverUrl,
             console: `${serverUrl}/ui/console/`,
           },
-          ...nextCommandsData([this.suggestUnscoped("start")]),
         },
+        next: { commands: [this.suggestUnscoped("start")] },
       });
     }
 
@@ -120,12 +120,8 @@ export default class Start extends BaseCommand {
       // Setup reads the server from the directory start ran in, so a run from
       // elsewhere carries it: `setup --server local` from the shell's directory
       // finds no server and scaffolds into the wrong place.
-      data: readyData(
-        runtime,
-        alreadyRunning,
-        this.meta.cliVersion,
-        this.suggestUnscoped("setup --server local"),
-      ),
+      data: readyData(runtime, alreadyRunning),
+      next: readyNext(this.meta.cliVersion, this.suggestUnscoped("setup --server local")),
     });
   }
 }
@@ -146,12 +142,7 @@ function platformBootstrapEnabled(env: NodeJS.ProcessEnv): boolean {
   return !pinned || pinned === PLATFORM_PROJECT_ID;
 }
 
-function readyData(
-  metadata: RuntimeMetadata,
-  alreadyRunning: boolean,
-  cliVersion: string,
-  setupCommand: SuggestedCommand,
-) {
+function readyData(metadata: RuntimeMetadata, alreadyRunning: boolean) {
   return {
     title: alreadyRunning
       ? "Local Zitadel server is already running."
@@ -178,12 +169,20 @@ function readyData(
       api: metadata.server_url,
       console: `${metadata.server_url}/ui/console/`,
     },
-    next_actions: [
+  };
+}
+
+function readyNext(
+  cliVersion: string,
+  setupCommand: SuggestedCommand,
+): NextSteps<SuggestedCommand> {
+  return {
+    actions: [
       "Create an app with authentication. Run setup in this directory or a subdirectory.",
       "Setup asks for a framework and sign-in method, creates or updates your app, and installs its dependencies.",
       serverLogAction(cliVersion),
     ],
-    ...nextCommandsData([setupCommand]),
+    commands: [setupCommand],
   };
 }
 

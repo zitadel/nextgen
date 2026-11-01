@@ -98,6 +98,10 @@ tasks:
 
   check-advisories:
     command: "corepack pnpm run check-advisories"
+    inputs:
+      - "**/*"
+      - "/packages/vitest-config/vitest.shared.mjs"
+      - "/packages/vitest-config/vitest.shared.d.mts"
     options:
       # It asks the npm advisory database about the package versions the
       # scaffolders pin, so it needs the network, and its answer changes when

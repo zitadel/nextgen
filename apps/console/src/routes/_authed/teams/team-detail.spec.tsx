@@ -16,10 +16,10 @@ vi.mock("@/auth/session", async (importOriginal) => {
 });
 
 const TEAM_ID = "team_1";
-const TEAM_URL = `http://localhost/api/teams/${TEAM_ID}`;
-const USERS_QUERY_URL = "*/api/users/query";
-const USERS_URL = "http://localhost/api/users";
-const SCHEMAS_URL = "http://localhost/api/schemas";
+const TEAM_URL = `http://localhost/api/v1/teams/${TEAM_ID}`;
+const USERS_QUERY_URL = "*/api/v1/users/query";
+const USERS_URL = "http://localhost/api/v1/users";
+const SCHEMAS_URL = "http://localhost/api/v1/schemas";
 
 /** Which relation a `POST /users/query` body asks for, by its one filter field. */
 function relationOf(body: Record<string, unknown>): "members" | "owned" {
@@ -90,7 +90,7 @@ describe("team detail", () => {
   // and the Members tab's first page loads with the team.
   beforeEach(() =>
     server.use(
-      http.post("*/api/teams/query", () => HttpResponse.json({ teams: [team()] })),
+      http.post("*/api/v1/teams/query", () => HttpResponse.json({ teams: [team()] })),
       http.post(USERS_QUERY_URL, () => HttpResponse.json({ users: [] })),
     ),
   );
@@ -162,7 +162,7 @@ describe("team detail", () => {
     let name = "Acme Web";
     server.use(
       http.get(TEAM_URL, () => HttpResponse.json(team({ name }))),
-      http.post("*/api/teams/query", () => HttpResponse.json({ teams: [team({ name })] })),
+      http.post("*/api/v1/teams/query", () => HttpResponse.json({ teams: [team({ name })] })),
       http.patch(TEAM_URL, async ({ request }) => {
         name = ((await request.json()) as { name: string }).name;
         return HttpResponse.json(team({ name }));

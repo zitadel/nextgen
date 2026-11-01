@@ -61,6 +61,17 @@ test("the routes that are not pages answer an agent that asks for text", async (
   }
 });
 
+test("the live examples' service worker may pass on any request its pages make", async ({
+  request,
+}) => {
+  // A worker's policy comes from its own script's response, and MSW's
+  // fetch()es the requests it does not mock (next.config.mjs).
+  const response = await request.get("/docs/mock-service-worker.js");
+  const policy = response.headers()["content-security-policy"] ?? "";
+  expect(policy).toContain("frame-ancestors 'none'");
+  expect(policy).not.toMatch(/(^|; )(default|connect|script)-src /);
+});
+
 test("the whole OpenAPI document is served as JSON, and llms.txt links it", async ({ request }) => {
   const response = await request.get("/docs/openapi.json");
   expect(response.status()).toBe(200);

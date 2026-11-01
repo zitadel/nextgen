@@ -26,11 +26,11 @@ One Vercel deployment, six [services](https://vercel.com/docs/services):
 
 | Service | Built by | Serves |
 |---|---|---|
-| `server` | Go preset; the build command installs, because Vercel's Go builder runs no `installCommand`, and then runs `node_modules/.bin/turbo run deploy --filter=@zitadel/cloud`. turbo goes by its path because, unlike the JS builders, the Go builder puts no `node_modules/.bin` on `PATH`. `@zitadel/cloud`'s `build` compiles `apps/cloud/launcher` without the console (`-tags noconsole`), then `migrate` migrates and `deploy` hands the binary to the preset, none of them cached | every path except the console's, the docs', the website's, the cloud functions' and the Mixpanel proxy's, including `/console/runtime.json` |
-| `console` | Vite; `turbo run build` with `CONSOLE_BASE_PATH=/console/` and `CONSOLE_ADDON=../cloud-console`, which compiles in the cloud's add-on ([`apps/cloud-console`](../../apps/cloud-console/AGENTS.md)): it reports Vercel Web Analytics and Speed Insights, adds the unlisted sign-up page `/console/signup`, and adds Billing and Support to Settings, which until their systems are live say the cloud is free during the preview and point to GitHub issues; in previews it also adds Email and sends the sign-in widget's calls through BotID's check in `cloud-functions`; the service serves the build where it lands, `internal/staticui/console/dist` | `/console/*` (bare `/console` redirects to the slash form; `/ui/console` and `/ui/console/*` redirect here with a 307) |
+| `server` | Go preset; the build command installs, because Vercel's Go builder runs no `installCommand`, and then runs `node_modules/.bin/turbo run deploy --filter=@zitadel/cloud`. turbo goes by its path because, unlike the JS builders, the Go builder puts no `node_modules/.bin` on `PATH`. `@zitadel/cloud`'s `build` compiles `apps/cloud/launcher` without the console (`-tags noconsole`), then `migrate` migrates and `deploy` hands the binary to the preset, none of them cached | `/api/*`, the API; its own root paths, `/console/runtime.json`, `/livez`, `/readyz`, `/csp-report`, `/cron/events-retention` and the IdP callbacks (`/idp/{slug}/callback`, `/__nextgen/idp/{slug}/callback`); and until 1.0.0 the root paths of the API's resources (`/users`, `/flow`, … in one rule). Nothing else |
+| `console` | Vite; `turbo run build` with `CONSOLE_BASE_PATH=/console/` and `CONSOLE_ADDON=../cloud-console`, which compiles in the cloud's add-on ([`apps/cloud-console`](../../apps/cloud-console/AGENTS.md)): it reports Vercel Web Analytics and Speed Insights, adds the unlisted sign-up page `/console/signup`, and adds Billing and Support to Settings, which until their systems are live say the cloud is free during the preview and point to GitHub issues, starts onboarding on each signed-in page and on the CLI's claim page, and reports `signup_completed` when the sign-in widget makes an account; in previews it also adds Email and sends the sign-in widget's calls through BotID's check in `cloud-functions`; the service serves the build where it lands, `internal/staticui/console/dist` | `/console/*` (bare `/console` redirects to the slash form; `/ui/console` and `/ui/console/*` redirect here with a 307) |
 | `docs` | Next.js; `turbo run build --filter=@zitadel/docs`, after `@zitadel/components`, `@zitadel/api-mock` and the `@zitadel/api` client the mock calls, which the live examples render, and the docs' typecheck. The build's cache key holds the deployment's ID, which Skew Protection bakes into it, so it never comes from the cache; never moon, which cannot archive the symlinks Vercel's Next.js adapter writes | `/docs` and `/docs/*`: pages, assets (`/docs/_next/`), search, `llms.txt`, each page's `.md` and the MCP server |
-| `website` | Next.js; `turbo run build --filter=@zitadel/website`, after the atoms of `@zitadel/components` its showcase renders; keyed by the deployment's ID, as the docs' | `/`, the front page, `/changelog` (`/changelog/` redirects there) with its entries' pages and its feed under it, `/changelog/*`, and their assets at `/_next/*`; the host's `/llms.txt`; the host's favicons at `/favicon.ico` and `/favicons/*`, which the console, the login UI and the docs link |
-| `cloud-functions` | Next.js; `turbo run build --filter=@zitadel/cloud-functions`, route handlers and the Workflow SDK's routes, no pages ([`apps/cloud-functions`](../../apps/cloud-functions/AGENTS.md), [ADR 084](../adrs/084-hosted-cloud-business-systems.md)); keyed by the deployment's ID, as the website's. Its systems are mocks, and production answers `503 cloud.not_live` | `/cloud/*`: the console add-on's calls (`/cloud/api/*`), the sign-in widget's calls through BotID's check (`/cloud/zitadel/*`), Stripe's webhooks (`/cloud/hooks/stripe`) and its cron routes (`/cloud/cron/*`, none scheduled yet) |
+| `website` | Next.js; `turbo run build --filter=@zitadel/website`, after the atoms of `@zitadel/components` its showcase renders; keyed by the deployment's ID, as the docs' | `/`, the front page, `/changelog` (`/changelog/` redirects there) with its entries' pages and its feed under it, `/changelog/*`, and their assets at `/_next/*`; the host's `/llms.txt`; the host's favicons at `/favicon.ico` and `/favicons/*`, which the console, the login UI and the docs link; and every path no other service claims, which its 404 answers ([ADR 076](../adrs/076-error-pages-and-unmatched-routes.md)) |
+| `cloud-functions` | Next.js; `turbo run build --filter=@zitadel/cloud-functions`, route handlers and the Workflow SDK's routes, no pages ([`apps/cloud-functions`](../../apps/cloud-functions/AGENTS.md), [ADR 084](../adrs/084-hosted-cloud-business-systems.md)); keyed by the deployment's ID, as the website's. It reads Zitadel live; Stripe and HubSpot are mocks, which send nothing. Production runs onboarding on them and answers everything else `503 cloud.not_live` | `/cloud/*`: the console add-on's calls (`/cloud/api/*`), the sign-in widget's calls through BotID's check (`/cloud/zitadel/*`), Stripe's webhooks (`/cloud/hooks/stripe`) and its cron routes (`/cloud/cron/*`, none scheduled yet) |
 | `schemas` | Static files: `turbo run schemas --filter=@zitadel/cloud` renders them with [`scripts/render-builtin-schemas.mjs`](../../scripts/render-builtin-schemas.mjs) into `apps/cloud/dist/cloud-schemas`. The service is rooted at `apps/cloud`, whose `package.json` has no dependencies, so Vercel detects no framework: a service takes no `framework: null`, and a framework dependency there would change how it builds | `/schemas/v1/*`: the [built-in schemas](#built-in-schemas), as `application/schema+json`, fresh for an hour and readable from any origin |
 
 The console lives on the same origin, at `/console/` rather than a
@@ -44,10 +44,21 @@ The server's `/console/runtime.json` lies under the console's path, so its
 rewrite comes first in `vercel.json`, and a launcher test holds the mount,
 the build's base and the console path together.
 
+`/api/*` is the API's ([ADR 077](../adrs/077-api-path-prefix.md)): its
+rewrite to the server comes first, so no service can take a path under it.
+Until 1.0.0 the server also answers the API's root paths, with a
+`Deprecation` header, through one rule that names the API's resources. The
+list is fixed: a client released before the prefix calls only operations it
+knows, so a resource added since needs no root rule. The server gets nothing
+but these and its own root paths; every other path is the website's, whose
+404 answers it, so a scanner's or a typo's request never starts the server's
+function. A launcher test (`apps/cloud/launcher`) resolves each of the
+server's paths through `vercel.json`.
+
 `/telemetry/mixpanel/*` belongs to no service: a rewrite forwards it to
 Mixpanel's EU API, `api-eu.mixpanel.com`. The CLI's usage analytics and
 the server's service ping send to Mixpanel through it once Mixpanel is no
-longer paused: keep it, ahead of the server's catch-all.
+longer paused: keep it, ahead of the website's catch-all.
 
 The docs' live examples mock the flow API in the browser with a service
 worker scoped to `/docs/`, so the mock never answers for the console on the
@@ -57,16 +68,19 @@ Every service shares the origin, and with it a signed-in user's session, so
 each response carries security headers:
 
 - `vercel.json`'s top-level `headers` reach every service's responses (not
-  its own redirects): `nosniff`, `Referrer-Policy` and `X-Frame-Options`.
-- Each service sends its own Content-Security-Policy, enforced and
-  report-only: the console's in its service's `headers` (a server test holds
+  its own redirects): `nosniff`, `Referrer-Policy`, `X-Frame-Options` and a
+  `Permissions-Policy` disabling camera, microphone and geolocation.
+  Passkeys and clipboard remain available.
+- Each service sends its own Content-Security-Policy: the console's enforced
+  and report-only policies in its service's `headers` (a server test holds
   them to the server's policy for the same page, plus Vercel's toolbar), the
   docs' and the website's from their `next.config` and, per prerendered page,
   their build adapter (`csp-adapter.mjs`), the server's from the Go code.
   Violations go to the server's `/csp-report`.
 - The console's enforced policy covers inline script. The docs' and the
-  website's report-only policies list each page's inline scripts by hash;
-  their enforced ones do not cover script yet.
+  website's enforced policies list each prerendered page's inline scripts by
+  hash. Every other URL gets the prerendered 404's policy, so the 404
+  hydrates; unknown docs slugs reach that 404, in the docs layout.
 - HSTS is Vercel's default: zitadel.com is on the preload list with its
   subdomains, so the cloud's host needs no `includeSubDomains` or `preload`
   of its own.
@@ -99,9 +113,11 @@ document for editors and people under the same path on this project:
   and the services build in no fixed order. A change to one renderer belongs
   in the other.
 - **The routes:** the top-level rewrite sends `/schemas/v1/*` to the service,
-  ahead of the server's catch-all; a name that is no built-in is the
-  service's 404. The API keeps `/schemas` and `/schemas/{id}`: a schema id
-  never holds a slash.
+  ahead of the server's rule for the API's root paths, which takes `/schemas`
+  too; a name that is no built-in is the
+  service's 404. The API keeps `/api/v1/schemas` and `/api/v1/schemas/{id}`,
+  and until 1.0.0 `/schemas` and `/schemas/{id}`: a schema id never holds a
+  slash.
 - **zitadel.com** answers for the namespace itself by forwarding
   `/schemas/v1/:path*` to this project, or by running
   `node scripts/render-builtin-schemas.mjs` in its own build. Until it does,
@@ -332,6 +348,12 @@ or garbled fails the build and the serving deployment stays.
   the new schema until the new one is live, and Instant Rollback promotes
   an older deployment without touching the schema.
 - **Startup never migrates:** the serving function refuses `--migrate`.
+- **The server's defaults must be expand/contract too.** The platform project
+  is deployed from them on every start, and a new deployment's checks start it
+  before the production domains move, so the previous deployment serves the
+  new defaults. Instant Rollback keeps them: a server never replaces a
+  deployment a newer build made. A default that turns out wrong is fixed by
+  shipping a corrected one.
 
 ## Deployment checks
 
@@ -344,12 +366,13 @@ service's contract suite against the deployment, today the docs'
 schemas' ([`e2e/schemas/`](../../e2e/schemas/)), and on a preview the CLI's
 ([`e2e/cli/`](../../e2e/cli/)), as the turbo tasks
 `pnpm check:cloud` runs [by hand](#checking-a-deployment-by-hand). The console's
-signs nobody in: it checks how `vercel.json` routes the console's paths and
-the Mixpanel proxy, and that the signed-out console comes up, down to the login widget's first step,
+signs nobody in: it checks how `vercel.json` routes the console's paths, the
+API's prefix and the Mixpanel proxy, and that the signed-out console comes up, down to the login widget's first step,
 which needs the server and its database behind it. The schemas' fetches every
 built-in from `/schemas/v1/` and compares it with the deployed commit's own
-rendering, checks the headers `vercel.json` gives them, and that `/schemas`
-still reaches the API; it needs no browser. The CLI's packs this commit's
+rendering, checks the headers `vercel.json` gives them, and that
+`/api/v1/schemas`, and until 1.0.0 `/schemas`, reach the API; it needs no
+browser. The CLI's packs this commit's
 CLI, as `release:pack` does, and drives it with `--non-interactive --json`
 from an empty directory: `setup --server <deployment>` creates a project,
 then `deploy`, `variable set` and `list`, `origin add` and `list`,
@@ -556,6 +579,23 @@ project and imports the root admin.
 
 ## Operating
 
+- **Onboarding runs:** each signed-in person, and each CLI sign-up on its
+  claim page, starts `provision-crm`, and `provision-billing` for a team
+  without a Stripe customer. A contact `provision-crm` makes or takes over
+  carries the sign-up's source in its `signup_*` properties (ADR 084 §3).
+  Their steps return the HubSpot and Stripe calls they would make, which
+  nothing sends yet: read them in Vercel → Observability → Workflows, a run, then Decrypt
+  (permission to read the project's environment variables). From
+  `apps/cloud-functions`, with the Vercel CLI linked:
+  `npx workflow inspect runs --backend vercel --env preview --decrypt`, or
+  `--env production`. The log lines start `hubspot (mock, not sent)` or
+  `stripe (mock, not sent)`.
+- **Sign-ups by source:** Web Analytics → Events → `signup_completed`, or
+  with the Vercel CLI, grouping by `eventData/utm_source`, `eventData/page`
+  (`claim` is the CLI) or `eventData/referrer_host`:
+  `npx -y vercel@64.5.0 api "/v1/query/web-analytics/events/aggregate?projectId=cloud&teamId=team_IDtOs36TGPOejsKm40wr1p3C&since=<date>&until=<date>&by=eventData/utm_source&filter=eventName%20eq%20%27signup_completed%27"`.
+  The browser sends it, so a blocker drops a sign-up as it drops page views;
+  the contacts' `signup_*` count every sign-up that reached onboarding.
 - **Logs:** Vercel runtime logs of the `server` function (JSON). The
   launcher's first line names the database host and database it serves
   from. Add a log drain for retention. A line's `request_id` is Vercel's

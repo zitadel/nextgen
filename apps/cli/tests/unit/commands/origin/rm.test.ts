@@ -19,11 +19,11 @@ afterAll(() => server.close());
 beforeEach(() => {
   removed = [];
   server.use(
-    http.post(`${SERVER}/projects/:id/origins/remove`, async ({ request }) => {
+    http.post(`${SERVER}/api/v1/projects/:id/origins/remove`, async ({ request }) => {
       removed.push((await request.json()) as Record<string, unknown>);
       return new HttpResponse(null, { status: 204 });
     }),
-    http.get(`${SERVER}/projects/:id`, ({ params }) =>
+    http.get(`${SERVER}/api/v1/projects/:id`, ({ params }) =>
       HttpResponse.json({
         id: params.id,
         origins: [{ pattern: "https://other.acme.com", kind: "primary" }],
@@ -90,7 +90,7 @@ describe("origin rm", () => {
   it("still reports the removal when the remaining origins cannot be read", async () => {
     const cwd = await anAppDir();
     server.use(
-      http.get(`${SERVER}/projects/:id`, () =>
+      http.get(`${SERVER}/api/v1/projects/:id`, () =>
         HttpResponse.json({ code: "internal" }, { status: 500 }),
       ),
     );
@@ -143,7 +143,7 @@ describe("origin rm", () => {
       "ZITADEL_PROJECT_ID=proj_unit\nZITADEL_PROJECT_SECRET=sk_unit\n",
     );
     server.use(
-      http.get(`${SERVER}/projects/:id`, ({ params }) =>
+      http.get(`${SERVER}/api/v1/projects/:id`, ({ params }) =>
         HttpResponse.json({ id: params.id, origins: [] }),
       ),
     );

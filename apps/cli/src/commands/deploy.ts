@@ -1,14 +1,14 @@
-import { Flags } from "@oclif/core";
-
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../lib/oclif";
 import {
   buildBundle,
   createDeployment,
   DEPLOY_ARGS,
   createReleaseFromBundle,
+  deployMessage,
   diffStep,
   headSha,
   listLiveDeployments,
+  messageFlag,
   runSteps,
   servesPrimary,
   type StepContext,
@@ -23,7 +23,6 @@ import { readZitadelSecret } from "../lib/project";
 import { shellArg } from "../lib/shell";
 import { type EnvironmentSelector, projectCommand } from "../lib/suggestion";
 import { reportWarning } from "../lib/warnings";
-import { nextCommandsData } from "../lib/oclif/envelope";
 
 /**
  * `zitadel deploy` — publish `.zitadel/` to the project's primary origins.
@@ -48,10 +47,9 @@ export default class Deploy extends EnvironmentCommand {
     "<%= config.bin %> deploy --dry-run",
   ];
   static override flags = {
-    message: Flags.string({
-      char: "m",
-      description: "A short summary of what this release changes.",
-    }),
+    message: messageFlag(
+      "A short summary of what this release changes. Defaults to the pull request's title or the current commit's subject.",
+    ),
   };
 
   async run(): Promise<JsonEnvelope> {
@@ -62,14 +60,13 @@ export default class Deploy extends EnvironmentCommand {
     const color = !json && isTTY && flags.color !== false && !process.env.NO_COLOR;
 
     // A deploy records why it happened. Interactively the reason can be left
-    // off, but a non-interactive caller (CI) has no prompt to fall back on, so
-    // it must name one. Rejected here, before the pipeline writes anything, so
-    // a missing message never leaves a half-synced IdP behind. A dry run makes
-    // no release, so it is exempt.
-    const message = flags.message?.trim() ? flags.message.trim() : undefined;
+    // off, but a non-interactive caller (CI) with no message to fall back on
+    // must name one, refused before anything is built. A dry run records
+    // nothing, so it neither resolves nor needs one.
+    const message = dryRun ? undefined : await deployMessage(flags.message, cwd, env);
     if (nonInteractive && !dryRun && message === undefined) {
       throw new ZitadelError("E_VALIDATION", "A deploy needs a message in non-interactive mode", {
-        hint: "Pass -m/--message with a short summary of what this release changes.",
+        hint: "Pass -m/--message with a short summary of what this release changes, or deploy from a clean git commit.",
       });
     }
 
@@ -217,8 +214,8 @@ export default class Deploy extends EnvironmentCommand {
         resources: resourceCount,
         origins: servedOrigins,
         ...reported,
-        ...nextCommandsData([this.suggest("deployment list")]),
       },
+      next: { commands: [this.suggest("deployment list")] },
       pretty: [
         `Deployed ${release.content_hash}`,
         `  ${resourceCount} resource${resourceCount === 1 ? "" : "s"} to ${servedOrigins.length} origin${servedOrigins.length === 1 ? "" : "s"}`,
