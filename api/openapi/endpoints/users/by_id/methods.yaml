@@ -64,7 +64,6 @@ get:
 patch:
   operationId: PatchUserByID
   x-zitadel-cli: users update
-  x-zitadel-destructive: null-removes
   summary: Update user by ID
   description: |
     Partially updates a user's schema-defined attributes, and optionally

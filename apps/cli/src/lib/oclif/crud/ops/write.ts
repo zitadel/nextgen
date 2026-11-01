@@ -2,9 +2,8 @@ import { Flags } from "@oclif/core";
 
 import { nonBlankString } from "../../flags";
 
-import type { Consent } from "../../../consent";
 import { ZitadelError } from "../../../errors";
-import { holdsNull, isObject } from "../../../json";
+import { isObject } from "../../../json";
 import type { CommandResult, GlobalOptions } from "../../types";
 import { type Assignment, fragmentOf, readAssignments } from "../assign";
 import { readRawBody } from "../body";
@@ -107,20 +106,7 @@ const describeWrite = <
       `${command} --data '{...}' --json`,
       `${command} --file ${exampleFile(resource.singular)}`,
     ],
-    flags: {
-      ...bodyFieldFlags(fields),
-      ...rawBodyFlags,
-      // A `null` in an update's body removes what it names, so it is asked.
-      ...(verb === "update"
-        ? {
-            force: Flags.boolean({
-              char: "f",
-              description: `Remove what the body sets to null without the confirmation prompt. Required when non-interactive.`,
-            }),
-          }
-        : {}),
-      ...options.flags,
-    },
+    flags: { ...bodyFieldFlags(fields), ...rawBodyFlags, ...options.flags },
     args: verb === "create" ? {} : idArg(resource),
   };
 };
@@ -252,14 +238,17 @@ abstract class WriteOperation<
     }
     const wrapped = spec.root === undefined ? merged : { [spec.root]: merged };
     const body = parseOrThrow(spec.schema, wrapped, "Body does not match the API schema");
-    const preview = () =>
-      dryRunResult(this.verb, topic, id, body, {
+    if (meta.dryRun) {
+      return dryRunResult(this.verb, topic, id, body, {
         schema: spec.schema as ZodLike,
         references: options.references,
       });
+    }
+
     // Some writes answer without a body (`grants create` by identifier answers
     // 202), so there is no record to get, and `data` is still an object.
-    const written = (result: WriteResult): CommandResult => ({
+    const result = await this.send(await this.context(), body, id);
+    return {
       status: "ok",
       data: result ?? {},
       ...(result && resource.get
@@ -271,47 +260,10 @@ abstract class WriteOperation<
         : {}),
       pretty: JSON.stringify(result, null, 2),
       machineReadable: true,
-    });
-
-    // A `null` in a patch removes what it names (RFC 7386), so it is asked.
-    if (this.verb === "update" && holdsNull(body)) {
-      const target = `${resource.singular} ${String(id)}`;
-      return this.confirmed({
-        verb: "remove",
-        name: `remove what the body sets to null from ${target}`,
-        message: `Remove what the body sets to null from ${target}?`,
-        // A body piped into `--file -` is not in the command a retry prints.
-        ...(flags.file === "-"
-          ? {
-              retry: undefined,
-              refuse: () => {
-                throw new ZitadelError(
-                  "E_VALIDATION",
-                  `Cannot remove what the body sets to null from ${target} without --force in non-interactive mode`,
-                  {
-                    hint: "Run the same command again, with the pipe into --file -, and add --force.",
-                  },
-                );
-              },
-            }
-          : {}),
-        preview,
-        prepare: () => this.context(),
-        apply: async (consent, context) => written(await this.send(context, body, id, consent)),
-      });
-    }
-    if (meta.dryRun) {
-      return preview();
-    }
-    return written(await this.send(await this.context(), body, id));
+    };
   }
 
-  protected abstract send(
-    ctx: Ctx,
-    body: Json,
-    id: string | undefined,
-    consent?: Consent,
-  ): Promise<WriteResult>;
+  protected abstract send(ctx: Ctx, body: Json, id: string | undefined): Promise<WriteResult>;
 }
 
 /** `<topic> create`. */
@@ -335,13 +287,8 @@ export class UpdateOperation<Ctx> extends WriteOperation<Ctx, UpdateSpec<Ctx>> {
 
   protected readonly verb = "update";
 
-  protected send(
-    ctx: Ctx,
-    body: Json,
-    id: string | undefined,
-    consent?: Consent,
-  ): Promise<WriteResult> {
-    return this.definition.spec.call(ctx, id ?? "", body, consent);
+  protected send(ctx: Ctx, body: Json, id: string | undefined): Promise<WriteResult> {
+    return this.definition.spec.call(ctx, id ?? "", body);
   }
 }
 

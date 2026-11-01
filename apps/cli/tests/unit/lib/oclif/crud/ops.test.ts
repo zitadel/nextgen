@@ -13,10 +13,8 @@ vi.mock("@clack/prompts", () => ({
 
 import { cancel, confirm, isCancel } from "@clack/prompts";
 
-import { withStdin } from "../../../../helpers/local-project";
 import { asTerminal } from "../../../../helpers/terminal";
 import { EXIT_CODES } from "../../../../../src/lib/errors";
-import { Consent } from "../../../../../src/lib/consent";
 import { BaseCommand } from "../../../../../src/lib/oclif";
 import {
   bindOperation,
@@ -152,21 +150,11 @@ describe("operation statics", () => {
       CreateOperation.describe(definition(create)),
       UpdateOperation.describe(definition(update)),
     ]) {
-      expect(Object.keys(statics.flags)).toEqual(
-        expect.arrayContaining(["name", "data", "file", "set", "extra"]),
-      );
+      expect(Object.keys(statics.flags)).toEqual(["name", "data", "file", "set", "extra"]);
       const flags = statics.flags as Record<string, { helpGroup?: string }>;
       expect(flags.name?.helpGroup).toBe("REQUIRED FIELD");
       expect(flags.data?.helpGroup).toBe("RAW BODY");
     }
-  });
-
-  it("update alone takes --force, for a body that removes with a null", () => {
-    expect(Object.keys(UpdateOperation.describe(definition(update)).flags)).toContain("force");
-  });
-
-  it("create takes no --force", () => {
-    expect(Object.keys(CreateOperation.describe(definition(create)).flags)).not.toContain("force");
   });
 
   it("leads the create and update examples with the required fields", () => {
@@ -701,109 +689,5 @@ describe("delete confirmation", () => {
     await expect(asTerminal(() => deleting("delete").run(["team_1"]))).rejects.toThrow();
 
     expect(cancel).toHaveBeenCalledWith("Cancelled.");
-  });
-});
-
-describe("update removing with a null", () => {
-  const nullable = z.object({ name: z.string().nullable() });
-  const updating = (call: UpdateSpec<Ctx>["call"] = async () => ({})) =>
-    Object.assign(
-      bindOperation(
-        UpdateOperation as OperationClass<Ctx, UpdateSpec<Ctx>>,
-        definition<UpdateSpec<Ctx>>({ schema: nullable, call }),
-      ),
-      { id: "teams:update" },
-    ) as unknown as { run(argv: string[]): Promise<unknown> };
-
-  /** What a failing command printed on stdout. */
-  const failureOf = async (run: () => Promise<unknown>): Promise<Record<string, unknown>> => {
-    const written: string[] = [];
-    const write = vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
-      written.push(String(chunk));
-      return true;
-    });
-    const log = vi.spyOn(console, "log").mockImplementation((...args) => {
-      written.push(`${args.join(" ")}\n`);
-    });
-    try {
-      await run().catch(() => undefined);
-    } finally {
-      write.mockRestore();
-      log.mockRestore();
-    }
-    return JSON.parse(written.join("")) as Record<string, unknown>;
-  };
-
-  afterEach(() => {
-    vi.mocked(confirm).mockReset();
-    vi.mocked(isCancel).mockReset();
-    vi.mocked(isCancel).mockReturnValue(false);
-  });
-
-  it("refuses without --force when nobody can be asked", async () => {
-    expect(
-      await failureOf(() => updating().run(["team_1", "--set", "name:=null", "--json"])),
-    ).toMatchObject({
-      code: "E_VALIDATION",
-      message:
-        "Cannot remove what the body sets to null from team team_1 without --force in non-interactive mode",
-      next_commands: [expect.stringContaining("teams update team_1 --force --set name:=null")],
-    });
-  });
-
-  it("refuses a piped body with the pipe in its hint, not a retry", async () => {
-    const failure = await failureOf(() =>
-      withStdin('{"name":null}', () => updating().run(["team_1", "--file", "-", "--json"])),
-    );
-
-    expect(failure).toMatchObject({
-      hint: "Run the same command again, with the pipe into --file -, and add --force.",
-    });
-  });
-
-  it("asks before it removes", async () => {
-    vi.mocked(confirm).mockResolvedValueOnce(true as never);
-
-    await asTerminal(() => updating().run(["team_1", "--set", "name:=null"]));
-
-    expect(vi.mocked(confirm).mock.calls[0]?.[0]).toMatchObject({
-      message: "Remove what the body sets to null from team team_1?",
-    });
-  });
-
-  it("sends the update with the consent a yes gave", async () => {
-    vi.mocked(confirm).mockResolvedValueOnce(true as never);
-    const call = vi.fn<UpdateSpec<Ctx>["call"]>(async () => ({}));
-
-    await asTerminal(() => updating(call).run(["team_1", "--set", "name:=null"]));
-
-    expect(call.mock.calls[0]?.[3]).toBeInstanceOf(Consent);
-  });
-
-  it("is skipped when the answer is no", async () => {
-    vi.mocked(confirm).mockResolvedValueOnce(false as never);
-
-    const envelope = await asTerminal(() => updating().run(["team_1", "--set", "name:=null"]));
-
-    expect(JSON.parse(JSON.stringify(envelope))).toMatchObject({
-      status: "skipped",
-      reason: "remove-cancelled",
-    });
-  });
-
-  it("sends the update with consent under --force", async () => {
-    const call = vi.fn<UpdateSpec<Ctx>["call"]>(async () => ({}));
-
-    await updating(call).run(["team_1", "--set", "name:=null", "--force", "--json"]);
-
-    expect(call.mock.calls[0]?.[3]).toBeInstanceOf(Consent);
-  });
-
-  it("never asks for a body without a null", async () => {
-    const call = vi.fn<UpdateSpec<Ctx>["call"]>(async () => ({}));
-
-    await asTerminal(() => updating(call).run(["team_1", "--name", "a"]));
-
-    expect(confirm).not.toHaveBeenCalled();
   });
 });

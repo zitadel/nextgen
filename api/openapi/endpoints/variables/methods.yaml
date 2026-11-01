@@ -30,7 +30,6 @@ get:
 patch:
   operationId: updateVariables
   x-zitadel-cli: variable set
-  x-zitadel-destructive: null-removes
   summary: Update variables
   description: |
     Enters, replaces and removes the project's variables for the requested

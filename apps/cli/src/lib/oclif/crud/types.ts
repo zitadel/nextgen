@@ -186,12 +186,7 @@ export type CreateSpec<Ctx, B = Json, C = WriteResult> = Readonly<
 export type UpdateSpec<Ctx, B = Json, U = WriteResult> = Readonly<
   WriteShape & {
     schema: Schema<B>;
-    /**
-     * The update. A body holding a `null` removes what it names, so it comes
-     * with the `consent` its command asked for, which reaches the client's
-     * merge-patch operations through `Consent.unlock`.
-     */
-    call(ctx: Ctx, id: string, body: B, consent?: Consent): Promise<U>;
+    call(ctx: Ctx, id: string, body: B): Promise<U>;
   }
 >;
 

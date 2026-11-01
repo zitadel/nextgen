@@ -5,7 +5,7 @@ import * as schemas from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import { apiBaseUrl } from "@zitadel/api/runtime/base-url";
 
 import { ZitadelError } from "../errors";
-import { holdsNull, parseJsonObject } from "../json";
+import { parseJsonObject } from "../json";
 import { fragmentOf, readAssignment } from "../oclif/crud/assign";
 import { mergeDocuments, typedValue } from "../oclif/crud/document";
 import { describeBody } from "../oclif/crud/fields";
@@ -26,14 +26,6 @@ export type ApiRequest = Readonly<{
   /** The JSON body, when the request has one. */
   body?: unknown;
 }>;
-
-/**
- * Whether sending `request` deletes, revokes or rolls back something: an
- * operation the spec marks destructive, or a merge patch whose body holds a
- * `null`, which removes what it names.
- */
-export const isDestructive = (request: ApiRequest): boolean =>
-  request.operation.destructive || (request.operation.removesWithNull && holdsNull(request.body));
 
 /** The URL a request goes to on `server`: the API under `/api/v1` there, then the spec's path. */
 export const urlOf = (server: string, request: ApiRequest): string => {

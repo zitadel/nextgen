@@ -122,40 +122,29 @@ describe("api", () => {
         expect(await app.projectVariables()).toEqual([]);
       });
 
-      it("refuses a merge patch that removes a variable without --force", async () => {
-        const app = await aSetUpApp();
-        expect(await app.setVariable("FOO", "bar")).toSucceed();
-
-        const result = await app.api("updateVariables", "-F", "FOO:=null");
-
-        expect(result).toFailWith("E_VALIDATION");
-      });
-
       it("does not repeat a refused request's body in its suggestion", async () => {
         const app = await aSetUpApp();
-        expect(await app.setVariable("FOO", "bar")).toSucceed();
 
-        const result = await app.api("updateVariables", "-F", "FOO:=null");
+        const result = await app.api("removePreview", "-F", "origin=https://pr-1.example.com");
 
-        expect(result).not.toSuggest("FOO");
+        expect(result).not.toSuggest("pr-1.example.com");
       });
 
       it("says to run a refused request with a body again with --force", async () => {
         const app = await aSetUpApp();
-        expect(await app.setVariable("FOO", "bar")).toSucceed();
 
-        const result = await app.api("updateVariables", "-F", "FOO:=null");
+        const result = await app.api("removePreview", "-F", "origin=https://pr-1.example.com");
 
         expect(result).toHintAt("Run the same command again");
       });
 
-      it("keeps the variable a refused merge patch would have removed", async () => {
+      it("sends a merge patch with a null without asking, as before", async () => {
         const app = await aSetUpApp();
         expect(await app.setVariable("FOO", "bar")).toSucceed();
 
         await app.api("updateVariables", "-F", "FOO:=null");
 
-        expect(await app.projectVariables()).not.toEqual([]);
+        expect(await app.projectVariables()).toEqual([]);
       });
 
       it("refuses an operation only an end user's session authenticates", async () => {

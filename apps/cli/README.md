@@ -2698,7 +2698,7 @@ USAGE
     [--password-hash-params-threads <value>] [--password-hash-params-cost
     <value>] [--password-hash-params-rounds <value>]
     [--password-hash-params-hash sha1|sha224|sha256|sha384|sha512] [--data
-    <value> | --file <value>] [--set <value>...] [-f]
+    <value> | --file <value>] [--set <value>...]
 
 ARGUMENTS
   ID  project id
@@ -2708,8 +2708,6 @@ FLAGS
   -e, --env=<value>       Environment to run against, e.g. production. Defaults
                           to ZITADEL_ENV, then the hosting platform's build
                           (VERCEL_ENV, or Netlify's CONTEXT), then development.
-  -f, --force             Remove what the body sets to null without the
-                          confirmation prompt. Required when non-interactive.
   -n, --non-interactive   Disable prompts. Required when scripting or running as
                           an agent.
   -s, --server=<value>    Override the resolved server URL.
@@ -3891,7 +3889,7 @@ USAGE
   $ zitadel teams update ID [--json] [-c <value>] [-s <value>] [-n]
     [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
     <value>] [--name <value>] [--data <value> | --file <value>] [--set
-    <value>...] [-f]
+    <value>...]
 
 ARGUMENTS
   ID  team id
@@ -3901,8 +3899,6 @@ FLAGS
   -e, --env=<value>       Environment to run against, e.g. production. Defaults
                           to ZITADEL_ENV, then the hosting platform's build
                           (VERCEL_ENV, or Netlify's CONTEXT), then development.
-  -f, --force             Remove what the body sets to null without the
-                          confirmation prompt. Required when non-interactive.
   -n, --non-interactive   Disable prompts. Required when scripting or running as
                           an agent.
   -s, --server=<value>    Override the resolved server URL.
@@ -4236,7 +4232,7 @@ USAGE
   $ zitadel users update ID [--json] [-c <value>] [-s <value>] [-n]
     [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
     <value>] [--schema <value>] [--attributes <value>...] [--data <value> |
-    --file <value>] [--set <value>...] [-f]
+    --file <value>] [--set <value>...]
 
 ARGUMENTS
   ID  user id
@@ -4246,8 +4242,6 @@ FLAGS
   -e, --env=<value>       Environment to run against, e.g. production. Defaults
                           to ZITADEL_ENV, then the hosting platform's build
                           (VERCEL_ENV, or Netlify's CONTEXT), then development.
-  -f, --force             Remove what the body sets to null without the
-                          confirmation prompt. Required when non-interactive.
   -n, --non-interactive   Disable prompts. Required when scripting or running as
                           an agent.
   -s, --server=<value>    Override the resolved server URL.

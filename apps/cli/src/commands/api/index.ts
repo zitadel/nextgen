@@ -10,7 +10,7 @@ import {
   type Target,
   uncallable,
 } from "../../lib/api/operations";
-import { buildRequest, isDestructive, pathValuesOf, readInput, urlOf } from "../../lib/api/request";
+import { buildRequest, pathValuesOf, readInput, urlOf } from "../../lib/api/request";
 import { ZitadelError } from "../../lib/errors";
 import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../../lib/oclif";
 import { readZitadelSecret } from "../../lib/project";
@@ -144,7 +144,7 @@ export default class Api extends Destructive(BaseCommand) {
     if (process.stdout.isTTY) {
       consola.info(`${operation.method} ${urlOf(meta.source, request)}`);
     }
-    const destructive = isDestructive(request);
+    const destructive = request.operation.destructive;
     const consent = destructive
       ? await this.consent({
           verb: "call",

@@ -1,11 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  holdsNull,
-  parseJsonObject,
-  setTopLevelJsonKey,
-  stableStringify,
-} from "../../../src/lib/json";
+import { parseJsonObject, setTopLevelJsonKey, stableStringify } from "../../../src/lib/json";
 
 describe("setTopLevelJsonKey", () => {
   it("splices one value and leaves every other byte untouched", () => {
@@ -142,27 +137,5 @@ describe("parseJsonObject", () => {
 
   it("propagates the JSON.parse SyntaxError for invalid JSON", () => {
     expect(() => parseJsonObject("{ not json", "config.json")).toThrow(SyntaxError);
-  });
-});
-
-describe("holdsNull", () => {
-  it.each([
-    ["a null", null],
-    ["a nested null", { FOO: { value: null } }],
-    ["an infinity, sent as null", { FOO: Number.POSITIVE_INFINITY }],
-    ["a NaN, sent as null", { FOO: Number.NaN }],
-    ["a null member beside other fields", { FOO: { value: "x" }, BAR: { tags: { a: null } } }],
-  ])("finds %s", (_label, value) => {
-    expect(holdsNull(value)).toBe(true);
-  });
-
-  it.each([
-    ["an ordinary body", { FOO: { value: "x", secret: false } }],
-    ["an undefined field, which is not sent", { FOO: undefined }],
-    ["a null inside an array, which the patch replaces whole", { tags: ["work", null] }],
-    ["an infinity inside an array", { tags: [Number.POSITIVE_INFINITY] }],
-    ["nothing", undefined],
-  ])("finds none in %s", (_label, value) => {
-    expect(holdsNull(value)).toBe(false);
   });
 });

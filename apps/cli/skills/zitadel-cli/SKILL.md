@@ -145,14 +145,12 @@ nothing; `data.skills` and `data.directories` say what it added where.
   `required`; `--dry-run --json` returns the body that would be sent. For a
   deeply nested body, writing the document and passing it with `--file -` is
   often simplest. An `update` body holding a `null` removes what it names
-  (a user attribute, a project's own password hash), so it asks first and
-  needs `--force` when non-interactive.
+  (a user attribute, a project's own password hash) without asking first.
 - **Calling an operation no command covers.** `zitadel api <operation>` calls
   any operation of the API with the resolved server and `.zitadel/secret`. One
   that deletes, revokes or rolls back asks first and needs `--force` when
-  non-interactive, as the command that covers it does; so does a merge-patch
-  body with a `null` (`updateVariables`, `PatchUserByID`, `patchMyUser`,
-  `patchProject`), which removes what it names.
+  non-interactive, as the command that covers it does. An update is not
+  asked about, even one whose `null` removes what it names.
   Name it by its `operationId` (`queryUsers`, as the API reference and
   `@zitadel/api` spell it) or by its path as the spec has it (`/users/query`,
   which the server serves at `/api/v1/users/query`; a path copied with the

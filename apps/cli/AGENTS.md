@@ -72,6 +72,8 @@
   (`src/lib/oclif/destructive.ts`) and does it in `this.confirmed({ ... })`.
 - Every destructive operation takes a `Consent` (`src/lib/consent.ts`); the
   client withholds the spec's destructive operations until `consent.unlock`.
+- Updates are not guarded, though a merge-patch `null` removes what it names;
+  guarding them needs a follow-up of its own, not a `Consent`.
 - A plain yes or no is `kind: "yes-no"`, which `--force` never answers; only
   `Consent` asks a `confirm`.
 - `biome-plugins/no-consent-bypass.grit` rejects every way around `Consent`:

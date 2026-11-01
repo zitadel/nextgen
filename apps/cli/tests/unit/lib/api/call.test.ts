@@ -104,19 +104,13 @@ describe("send", () => {
     expect(sent).toEqual([]);
   });
 
-  it("refuses a merge patch that removes a variable without consent", async () => {
-    await expect(
-      send(SERVER, "s", requestFor("updateVariables", ["FOO:=null", "project_id=proj_1"])),
-    ).rejects.toThrow("A destructive operation ran without consent");
-  });
-
-  it("sends a merge patch that only assigns without consent", async () => {
+  it("sends a merge patch with a null without consent: updates are not guarded", async () => {
     server.use(
       http.patch(`${SERVER}/api/v1/variables`, () => HttpResponse.json({ variables: [] })),
     );
 
     await expect(
-      send(SERVER, "s", requestFor("updateVariables", ["FOO=bar", "project_id=proj_1"])),
+      send(SERVER, "s", requestFor("updateVariables", ["FOO:=null", "project_id=proj_1"])),
     ).resolves.toMatchObject({ status: 200 });
   });
 
