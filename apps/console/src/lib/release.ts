@@ -95,11 +95,11 @@ export async function resolvePointer(
       }
       case "branding": {
         const body = await api.getBrandingById(pointer.revision_id);
-        return { ...base, name: humanise(pointer.handle), document: body.branding };
+        return { ...base, name: handleName(pointer), document: body.branding };
       }
       case "idp": {
         const body = await api.getIdpRevisionById(pointer.revision_id, { project_id: projectId });
-        return { ...base, name: humanise(pointer.handle), document: body.definition };
+        return { ...base, name: handleName(pointer), document: body.definition };
       }
       case "policy": {
         const revision = await api.getPolicyRevision(pointer.revision_id, {
@@ -107,7 +107,7 @@ export async function resolvePointer(
         });
         return {
           ...base,
-          name: policyDisplayName(pointer.handle),
+          name: handleName(pointer),
           document: policyDocument(revision),
           settings: policySettings(revision),
         };
@@ -116,15 +116,15 @@ export async function resolvePointer(
   } catch {
     // Fall through to the unresolved shape.
   }
-  return { ...base, name: unresolvedName(pointer), document: undefined };
+  return { ...base, name: handleName(pointer), document: undefined };
 }
 
 /**
- * The name a pointer has without its revision. A policy's handle is its
- * operation, so the row reads the same whether or not the read succeeded;
- * every other kind falls back to its handle.
+ * The name a pointer takes from its handle. Branding, identity providers and
+ * policies are always named this way, so their rows read the same whether or
+ * not the revision could be read; schemas and flows fall back to it.
  */
-function unresolvedName(pointer: ReleasePointer): string {
+function handleName(pointer: ReleasePointer): string {
   return pointer.kind === "policy" ? policyDisplayName(pointer.handle) : humanise(pointer.handle);
 }
 

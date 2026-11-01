@@ -22,8 +22,8 @@ describe("policy display", () => {
     expect(policyDisplayName("auth.factor.password.set")).toBe("Password policy");
   });
 
-  it("names an operation it does not know from the operation, with no rows", () => {
-    expect(policyDisplayName("auth.factor.passkey.set")).toBe("Auth.factor.passkey.set");
+  it("names an operation it does not know by the operation as written, with no rows", () => {
+    expect(policyDisplayName("auth.factor.passkey.set")).toBe("auth.factor.passkey.set");
     expect(policySettings({ ...revision, operation: "auth.factor.passkey.set" as never })).toEqual(
       [],
     );
@@ -35,6 +35,7 @@ describe("policy display", () => {
     expect(length({ min_length: 15 })).toBe("At least 15 characters");
     expect(length({ max_length: 32 })).toBe("At most 32 characters");
     expect(length({ min_length: 12, max_length: 32 })).toBe("12 to 32 characters");
+    expect(length({ min_length: 16, max_length: 16 })).toBe("Exactly 16 characters");
   });
 
   it("says whether history is checked, not how deep", () => {

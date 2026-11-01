@@ -1,7 +1,5 @@
 import type { GetPolicyRevision200 } from "@zitadel/api/generated/model";
 
-import { humanise } from "./flow-definition";
-
 /**
  * Display helpers for operation policies (ADR 066).
  *
@@ -12,12 +10,10 @@ import { humanise } from "./flow-definition";
  */
 
 /** One revision of a policy, as `GET /policies/revisions/{revision_id}` reads it. */
-export type PolicyRevision = GetPolicyRevision200;
-
-export type PolicyOperation = PolicyRevision["operation"];
+type PolicyRevision = GetPolicyRevision200;
 
 /** The settings of the password policy; every one optional, and off when left out. */
-export type PasswordPolicyConfig = PolicyRevision["config"];
+type PasswordPolicyConfig = PolicyRevision["config"];
 
 /** One row of a policy's settings summary. */
 export interface PolicySetting {
@@ -32,8 +28,9 @@ interface PolicyDisplay {
 
 /**
  * How each operation's policy reads. An operation the console does not know
- * yet, from a server whose catalog has grown, is named from the operation and
- * shows its document alone.
+ * yet, from a server whose catalog has grown, is named by the operation as
+ * written, which is the file name the operator edits, and shows its document
+ * alone.
  */
 const POLICIES: Partial<Record<string, PolicyDisplay>> = {
   "auth.factor.password.set": { name: "Password policy", settings: passwordPolicySettings },
@@ -41,7 +38,7 @@ const POLICIES: Partial<Record<string, PolicyDisplay>> = {
 
 /** The policy's name, by the operation it guards. */
 export function policyDisplayName(operation: string): string {
-  return POLICIES[operation]?.name ?? humanise(operation);
+  return POLICIES[operation]?.name ?? operation;
 }
 
 /** The settings rows for a revision, by its operation. */
@@ -65,6 +62,7 @@ export function passwordPolicySettings(config: PasswordPolicyConfig): PolicySett
 
 function lengthRule({ min_length, max_length }: PasswordPolicyConfig): string | undefined {
   if (min_length !== undefined && max_length !== undefined) {
+    if (min_length === max_length) return `Exactly ${min_length} characters`;
     return `${min_length} to ${max_length} characters`;
   }
   if (min_length !== undefined) return `At least ${min_length} characters`;
@@ -78,9 +76,8 @@ function lengthRule({ min_length, max_length }: PasswordPolicyConfig): string | 
  * holds beside its editor `$schema`. The ids and timestamps the read carries
  * are the revision's, not the policy's.
  */
-export function policyDocument(revision: PolicyRevision): {
-  operation: PolicyOperation;
-  config: PasswordPolicyConfig;
-} {
+export function policyDocument(
+  revision: PolicyRevision,
+): Pick<PolicyRevision, "operation" | "config"> {
   return { operation: revision.operation, config: revision.config };
 }

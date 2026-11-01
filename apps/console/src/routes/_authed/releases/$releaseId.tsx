@@ -5,7 +5,7 @@ import { Fragment, type ReactNode, useState } from "react";
 import { api } from "@/api/zitadel";
 import { DeploySheet } from "@/components/deploy-sheet";
 import { MetaCard, MetaRule, MetaValue } from "@/components/detail-meta";
-import { DetailPanel, DetailSection, PanelTitle } from "@/components/detail-page";
+import { DetailPanel, DetailRow, DetailSection, PanelTitle } from "@/components/detail-page";
 import { DocumentViewer } from "@/components/document-viewer";
 import { Page } from "@/components/layout";
 import { ReleaseDeployments } from "@/components/release-deployments";
@@ -279,24 +279,21 @@ function PointerGroupSection({ group }: { group: PointerGroup }) {
 }
 
 /**
- * A policy's settings above its document: 28px rows with the label in a 200px
- * column, ruled off from each other with 8px either side of the rule.
+ * A policy's settings above its document, ruled off as the deployments below
+ * them are, with 12px from the text to each rule.
  */
 function PolicySettingsRows({ settings }: { settings: PolicySetting[] }) {
   return (
-    <dl className="flex flex-col gap-2">
+    <div className="flex flex-col gap-3">
       {settings.map((setting, index) => (
         <Fragment key={setting.label}>
           {index > 0 && <Separator />}
-          <div className="flex min-h-7 items-center gap-4 sm:gap-0">
-            <dt className="shrink-0 text-sm leading-5 text-muted-foreground sm:w-50">
-              {setting.label}
-            </dt>
-            <dd className="min-w-0 text-sm leading-5 text-foreground">{setting.value}</dd>
-          </div>
+          <DetailRow label={setting.label}>
+            <span className="min-w-0 text-sm leading-5 text-foreground">{setting.value}</span>
+          </DetailRow>
         </Fragment>
       ))}
-    </dl>
+    </div>
   );
 }
 
