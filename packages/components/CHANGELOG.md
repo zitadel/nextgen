@@ -1,5 +1,17 @@
 # @zitadel/components
 
+## 0.4.0
+
+### Patch Changes
+
+- [#2500](https://github.com/zitadel/nextgen/pull/2500) [`1ca73bd`](https://github.com/zitadel/nextgen/commit/1ca73bdeb158ad7b9f947e9c0b795cab33d93195) - Repeated clicks on Sign up or Sign in in `<zitadel-login>` no longer follow an empty anchor while a request is pending, avoiding unwanted URL and browser-history changes.
+
+- [#2488](https://github.com/zitadel/nextgen/pull/2488) [`db05fbb`](https://github.com/zitadel/nextgen/commit/db05fbb18b1bf33251694382787be8445da608da) - The session cookie is now `__Host-zitadel_session`, which a browser accepts only from Zitadel's own host over https, so another site under the same domain can no longer plant a session. On `http://localhost` it is `zitadel_session`, so sign-in keeps working in Safari. An app's own, behind a server SDK or dev proxy, adds `_<project id>`.
+  
+  **Breaking:** every browser signs in again: cookies named `__nextgen_session` are no longer read. Update the server, the server SDKs, the CLI and `@zitadel/testing` together; an SDK from before this release keeps no session with this server, nor the other way round. In `@zitadel/testing`, `SESSION_COOKIE_NAME` is `__Host-zitadel_session`, and `sessionCookieName(projectId, url)` and the new `browserSessionCookieName(url)` name the cookies for the app's URL. `zitadel doctor` fails on the dev proxy of a single-page app set up before this release until `zitadel doctor --fix` updates it.
+- Updated dependencies [[`0a00b60`](https://github.com/zitadel/nextgen/commit/0a00b60ad40068b39ecb1a4eb9b988f7276d2924)]:
+  - @zitadel/config@0.4.0
+
 ## 0.3.0
 
 ### Patch Changes
