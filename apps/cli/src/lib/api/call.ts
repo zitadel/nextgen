@@ -132,16 +132,11 @@ export const sendAll = async (
     all: true,
     next: nextToken,
   });
-  // The last page's other fields, escaped once, with every page's items in
-  // place of its own and in its order. The check only narrows the type: the
-  // items above were read off this page, so it is an object.
+  // The last page escaped as one object, so its keys keep their collision-safe
+  // escaping, with an empty list in place of its own, which every page's
+  // escaped items then fill. The check only narrows the type: the items above
+  // were read off this page, so it is an object.
   const page = isObject(last.raw) ? last.raw : {};
-  return {
-    status: last.status,
-    body: Object.fromEntries(
-      Object.entries(page).map(([field, value]) =>
-        field === paging.items ? [field, items] : sanitizeResponse([field, value]),
-      ),
-    ),
-  };
+  const body = sanitizeResponse({ ...page, [paging.items]: [] });
+  return { status: last.status, body: { ...body, [paging.items]: items } };
 };

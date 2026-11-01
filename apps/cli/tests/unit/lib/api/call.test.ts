@@ -235,4 +235,16 @@ describe("sendAll", () => {
       JSON.stringify({ note: "\\x1b[2J", passkeys: ["a"], next_page_token: "" }),
     );
   });
+
+  it("keeps two fields of the last page whose names escape alike apart", async () => {
+    server.use(
+      http.get(`${SERVER}/api/v1/users/user_1/passkeys`, () =>
+        HttpResponse.json({ "\u001bk": 1, "\\x1bk": 2, passkeys: ["a"], next_page_token: "" }),
+      ),
+    );
+
+    const response = await sendAll(SERVER, "s", requestFor("listUserPasskeys", [], ["user_1"]));
+
+    expect(Object.keys(Object(response.body))).toHaveLength(4);
+  });
 });
