@@ -337,7 +337,9 @@ function SchemaInput({
             checked={value === "true"}
             onCheckedChange={(checked) => onChange(String(checked))}
             // Not `required`: Radix backs the switch with a native checkbox,
-            // and a required one blocks the submit while it is off.
+            // and a required one blocks the submit while it is off. The
+            // requiredness still reaches AT, as on the profile's switches.
+            aria-required={field.required}
             aria-invalid={refused ? true : undefined}
             aria-describedby={refused ? errorId : undefined}
           />

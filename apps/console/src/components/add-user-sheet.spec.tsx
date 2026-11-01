@@ -517,7 +517,12 @@ describe("add user sheet", () => {
     );
     await openSheet();
 
-    // Off is a value, so the switch does not hold Add user back.
+    // Off is a value, so the switch does not hold Add user back, but it still
+    // reads as required.
+    expect(await screen.findByRole("switch", { name: "Accepted terms" })).toHaveAttribute(
+      "aria-required",
+      "true",
+    );
     await userEvent.type(await screen.findByLabelText("Email"), "a@acme.com");
     await userEvent.click(screen.getByRole("button", { name: "Add user" }));
 

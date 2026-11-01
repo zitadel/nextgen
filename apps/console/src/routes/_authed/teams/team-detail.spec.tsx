@@ -291,6 +291,32 @@ describe("team detail", () => {
     );
   });
 
+  it("keeps the members Load more fetched across a switch to Owned and back", async () => {
+    server.use(http.get(TEAM_URL, () => HttpResponse.json(team())));
+    const bodies = recordQueries((body) => {
+      if (relationOf(body) === "owned") return HttpResponse.json({ users: [] });
+      return HttpResponse.json(
+        body.page_token
+          ? { users: [user("user_2", "second@acme.com")] }
+          : { users: [user("user_1", "first@acme.com")], next_page_token: "tok_2" },
+      );
+    });
+    await renderDetail();
+
+    await openUsers();
+    await userEvent.click(await screen.findByRole("button", { name: "Load more" }));
+    await screen.findByRole("link", { name: "second@acme.com" });
+    await userEvent.click(screen.getByRole("tab", { name: "Owned" }));
+    expect(await screen.findByText("This team owns no users.")).toBeVisible();
+    await userEvent.click(screen.getByRole("tab", { name: "Members" }));
+
+    // Each relation pages on its own, so coming back neither drops the second
+    // page nor fetches it again.
+    expect(screen.getByRole("link", { name: "first@acme.com" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "second@acme.com" })).toBeInTheDocument();
+    expect(bodies.filter((body) => body.page_token)).toHaveLength(1);
+  });
+
   it("filters the Users tab to the users the team owns, as its own query", async () => {
     server.use(http.get(TEAM_URL, () => HttpResponse.json(team())));
     const bodies = recordQueries((body) =>

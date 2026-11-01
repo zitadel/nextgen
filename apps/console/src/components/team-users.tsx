@@ -117,7 +117,9 @@ export function TeamUsers({
       {RELATIONS.map(({ value, denied, empty }) => {
         const page = pages[value];
         return (
-          <TabsContent key={value} value={value}>
+          // Mounted while hidden: switching away and back keeps the rows Load
+          // more fetched and its cursor, as each relation pages on its own.
+          <TabsContent key={value} value={value} forceMount hidden={value !== relation}>
             {page ? (
               <UsersTable team={team} relation={value} loaded={page} empty={empty} />
             ) : (
