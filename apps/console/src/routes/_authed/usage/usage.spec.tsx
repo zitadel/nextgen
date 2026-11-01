@@ -21,7 +21,7 @@ vi.mock("@/addon", () => ({
   addon: { usagePrices: vi.fn(async () => addonPrices.current) },
 }));
 
-const USAGE_URL = "http://localhost/api/usage";
+const USAGE_URL = "http://localhost/api/v1/usage";
 const period = usagePeriod(new Date());
 const firstDay = period.from;
 const secondDay = `${period.days[1]}T00:00:00Z`;

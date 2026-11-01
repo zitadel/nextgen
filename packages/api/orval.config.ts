@@ -25,9 +25,10 @@ export default defineConfig({
       // `//` on a redirect and 404s. orval only encodes the parameters —
       // not the `baseUrl` below — from 8.37.0 (orval-labs/orval#4179).
       urlEncodeParameters: true,
+      // The proxy path or server URL, then the API prefix (ADR 077).
       baseUrl: {
-        runtime: "getProxyPath()",
-        imports: [{ name: "getProxyPath", importPath: "../../runtime/base-url" }],
+        runtime: "getApiBaseUrl()",
+        imports: [{ name: "getApiBaseUrl", importPath: "../../runtime/base-url" }],
       },
       override: {
         fetch: {

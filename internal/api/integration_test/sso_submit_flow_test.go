@@ -70,7 +70,7 @@ func TestFlowSSOSubmitRedirectsToProvider(t *testing.T) {
 	}
 	body, err := submission.MarshalJSON()
 	require.NoError(t, err)
-	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, harness.EnsureTestServer(t).URL+"/flow/"+flowID+"/submit", bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, harness.APIBaseURL(t)+"/flow/"+flowID+"/submit", bytes.NewReader(body))
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Origin", "https://login.example.test")

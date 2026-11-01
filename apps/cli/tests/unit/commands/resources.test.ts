@@ -106,7 +106,7 @@ describe("resource registry", () => {
     await writeFile(file, "ZITADEL_PROJECT_ID=proj_staging\nZITADEL_PROJECT_SECRET=sk_staging\n");
     let seen: { project?: string | null; authorization?: string | null } = {};
     server.use(
-      http.post(`${SERVER}/teams/query`, ({ request }) => {
+      http.post(`${SERVER}/api/v1/teams/query`, ({ request }) => {
         seen = {
           project: new URL(request.url).searchParams.get("project_id"),
           authorization: request.headers.get("authorization"),
@@ -234,7 +234,7 @@ describe("users list", () => {
     const cwd = await makeProject();
     let body: unknown;
     server.use(
-      http.post(`${SERVER}/users/query`, async ({ request }) => {
+      http.post(`${SERVER}/api/v1/users/query`, async ({ request }) => {
         body = await request.json();
         expect(request.headers.get("authorization")).toBe("Bearer sk_proj_test_full");
         return HttpResponse.json({
@@ -282,7 +282,7 @@ describe("users list", () => {
     const cwd = await makeProject();
     const tokens: unknown[] = [];
     server.use(
-      http.post(`${SERVER}/users/query`, async ({ request }) => {
+      http.post(`${SERVER}/api/v1/users/query`, async ({ request }) => {
         const body = (await request.json()) as { page_token?: string };
         tokens.push(body.page_token ?? null);
         return body.page_token
@@ -312,7 +312,7 @@ describe("users list", () => {
   it("emits tab-separated rows when stdout is not a terminal", async () => {
     const cwd = await makeProject();
     server.use(
-      http.post(`${SERVER}/users/query`, () =>
+      http.post(`${SERVER}/api/v1/users/query`, () =>
         HttpResponse.json({ users: [user("user_1"), user("user_2")] }),
       ),
     );
@@ -343,7 +343,9 @@ describe("users list", () => {
   it("takes --plain to force the machine form", async () => {
     const cwd = await makeProject();
     server.use(
-      http.post(`${SERVER}/users/query`, () => HttpResponse.json({ users: [user("user_1")] })),
+      http.post(`${SERVER}/api/v1/users/query`, () =>
+        HttpResponse.json({ users: [user("user_1")] }),
+      ),
     );
     const res = await runCliForTest([
       "users",
@@ -373,7 +375,7 @@ describe("get rendering", () => {
 
   it("lays the record out field by field on a terminal", async () => {
     const cwd = await makeProject();
-    server.use(http.get(`${SERVER}/users/user_1`, () => HttpResponse.json(user("user_1"))));
+    server.use(http.get(`${SERVER}/api/v1/users/user_1`, () => HttpResponse.json(user("user_1"))));
 
     const res = await asTerminal(() =>
       runCliForTest([
@@ -397,7 +399,7 @@ describe("get rendering", () => {
 
   it("still prints the whole object when piped", async () => {
     const cwd = await makeProject();
-    server.use(http.get(`${SERVER}/users/user_1`, () => HttpResponse.json(user("user_1"))));
+    server.use(http.get(`${SERVER}/api/v1/users/user_1`, () => HttpResponse.json(user("user_1"))));
 
     const res = await runCliForTest([
       "users",
@@ -416,7 +418,7 @@ describe("get rendering", () => {
 
   it("takes --fields on a terminal too", async () => {
     const cwd = await makeProject();
-    server.use(http.get(`${SERVER}/users/user_1`, () => HttpResponse.json(user("user_1"))));
+    server.use(http.get(`${SERVER}/api/v1/users/user_1`, () => HttpResponse.json(user("user_1"))));
 
     const res = await asTerminal(() =>
       runCliForTest([
@@ -440,7 +442,7 @@ describe("get rendering", () => {
   it("shows a policy's config, the setting a reader looks it up for", async () => {
     const cwd = await makeProject();
     server.use(
-      http.get(`${SERVER}/policies/pol_1`, () =>
+      http.get(`${SERVER}/api/v1/policies/pol_1`, () =>
         HttpResponse.json({
           id: "pol_1",
           revision_id: "polrev_1",
@@ -473,7 +475,7 @@ describe("get rendering", () => {
   it("shows an empty config, which says the policy enforces nothing", async () => {
     const cwd = await makeProject();
     server.use(
-      http.get(`${SERVER}/policies/pol_1`, () =>
+      http.get(`${SERVER}/api/v1/policies/pol_1`, () =>
         HttpResponse.json({
           id: "pol_1",
           revision_id: "polrev_1",
@@ -518,7 +520,7 @@ describe("policies", () => {
   it("gets a policy by id", async () => {
     const cwd = await makeProject();
     server.use(
-      http.get(`${SERVER}/policies/pol_1`, ({ request }) => {
+      http.get(`${SERVER}/api/v1/policies/pol_1`, ({ request }) => {
         expect(new URL(request.url).searchParams.get("project_id")).toBe("proj_test");
         return HttpResponse.json(policy);
       }),
@@ -534,7 +536,7 @@ describe("policies", () => {
     const cwd = await makeProject();
     let query: URLSearchParams | undefined;
     server.use(
-      http.get(`${SERVER}/policies`, ({ request }) => {
+      http.get(`${SERVER}/api/v1/policies`, ({ request }) => {
         query = new URL(request.url).searchParams;
         return HttpResponse.json({ policies: [policy], next_page_token: null });
       }),
@@ -550,7 +552,7 @@ describe("policies", () => {
   it("answers E_NOT_FOUND for an operation the project has no policy for", async () => {
     const cwd = await makeProject();
     server.use(
-      http.get(`${SERVER}/policies`, () =>
+      http.get(`${SERVER}/api/v1/policies`, () =>
         HttpResponse.json({ policies: [], next_page_token: null }),
       ),
     );
@@ -574,7 +576,7 @@ describe("policies", () => {
     const cwd = await makeProject();
     let query: URLSearchParams | undefined;
     server.use(
-      http.get(`${SERVER}/policies`, ({ request }) => {
+      http.get(`${SERVER}/api/v1/policies`, ({ request }) => {
         query = new URL(request.url).searchParams;
         return HttpResponse.json({ policies: [policy], next_page_token: null });
       }),
@@ -596,7 +598,7 @@ describe("policies", () => {
 describe("users get / create / update / delete", () => {
   it("gets one user by id", async () => {
     const cwd = await makeProject();
-    server.use(http.get(`${SERVER}/users/user_1`, () => HttpResponse.json(user("user_1"))));
+    server.use(http.get(`${SERVER}/api/v1/users/user_1`, () => HttpResponse.json(user("user_1"))));
     const res = await run(cwd, ["users", "get", "user_1"]);
     expect(res.exitCode).toBe(0);
     const json = parseJson(res.stdout) as { data: { id: string } };
@@ -606,7 +608,7 @@ describe("users get / create / update / delete", () => {
   it("maps a platform 404 to E_NOT_FOUND", async () => {
     const cwd = await makeProject();
     server.use(
-      http.get(`${SERVER}/users/user_missing`, () =>
+      http.get(`${SERVER}/api/v1/users/user_missing`, () =>
         HttpResponse.json({ code: "user.not_found", message: "no such user" }, { status: 404 }),
       ),
     );
@@ -620,7 +622,7 @@ describe("users get / create / update / delete", () => {
     let url = "";
     let body: unknown;
     server.use(
-      http.post(`${SERVER}/users`, async ({ request }) => {
+      http.post(`${SERVER}/api/v1/users`, async ({ request }) => {
         url = request.url;
         body = await request.json();
         return HttpResponse.json(user("user_new"), { status: 201 });
@@ -645,7 +647,9 @@ describe("users get / create / update / delete", () => {
     const file = join(cwd, "user.json");
     await writeFile(file, JSON.stringify({ schema: "sch_default", attributes: {} }));
     server.use(
-      http.post(`${SERVER}/users`, () => HttpResponse.json(user("user_file"), { status: 201 })),
+      http.post(`${SERVER}/api/v1/users`, () =>
+        HttpResponse.json(user("user_file"), { status: 201 }),
+      ),
     );
     const res = await run(cwd, ["users", "create", "--file", file]);
     expect(res.exitCode).toBe(0);
@@ -693,7 +697,7 @@ describe("users get / create / update / delete", () => {
     const cwd = await makeProject();
     let body: unknown;
     server.use(
-      http.patch(`${SERVER}/users/user_1`, async ({ request }) => {
+      http.patch(`${SERVER}/api/v1/users/user_1`, async ({ request }) => {
         body = await request.json();
         return HttpResponse.json(user("user_1"));
       }),
@@ -722,7 +726,7 @@ describe("users get / create / update / delete", () => {
     const cwd = await makeProject();
     let called = false;
     server.use(
-      http.delete(`${SERVER}/users/user_1`, () => {
+      http.delete(`${SERVER}/api/v1/users/user_1`, () => {
         called = true;
         return new HttpResponse(null, { status: 204 });
       }),
@@ -759,7 +763,9 @@ describe("piped output", () => {
   it("omits the project and server lines when stdout is not a terminal", async () => {
     const cwd = await makeProject();
     server.use(
-      http.post(`${SERVER}/users/query`, () => HttpResponse.json({ users: [user("user_1")] })),
+      http.post(`${SERVER}/api/v1/users/query`, () =>
+        HttpResponse.json({ users: [user("user_1")] }),
+      ),
     );
 
     // The harness captures stdout, so process.stdout.isTTY is undefined here —
@@ -786,7 +792,7 @@ describe("the drain spinner", () => {
   it("is stopped when a page fails, so it does not outlive the command", async () => {
     const cwd = await makeProject();
     server.use(
-      http.post(`${SERVER}/users/query`, () =>
+      http.post(`${SERVER}/api/v1/users/query`, () =>
         HttpResponse.json({ code: "boom" }, { status: 500 }),
       ),
     );
@@ -831,7 +837,7 @@ describe("field validation is independent of the data", () => {
 
   it("refuses the same path on an empty page, where sampling could not judge", async () => {
     const cwd = await makeProject();
-    server.use(http.post(`${SERVER}/users/query`, () => HttpResponse.json({ users: [] })));
+    server.use(http.post(`${SERVER}/api/v1/users/query`, () => HttpResponse.json({ users: [] })));
 
     const res = await run(cwd, ["users", "list", "--fields", "id,emial"]);
     expect(res.exitCode).toBe(3);
@@ -843,7 +849,9 @@ describe("field validation is independent of the data", () => {
   it("accepts a path under the open attributes record", async () => {
     const cwd = await makeProject();
     server.use(
-      http.post(`${SERVER}/users/query`, () => HttpResponse.json({ users: [user("user_1")] })),
+      http.post(`${SERVER}/api/v1/users/query`, () =>
+        HttpResponse.json({ users: [user("user_1")] }),
+      ),
     );
 
     const res = await run(cwd, ["users", "list", "--fields", "id,attributes.email"]);
@@ -855,7 +863,9 @@ describe("chosen columns", () => {
   it("takes --fields, resolving nested paths", async () => {
     const cwd = await makeProject();
     server.use(
-      http.post(`${SERVER}/users/query`, () => HttpResponse.json({ users: [user("user_1")] })),
+      http.post(`${SERVER}/api/v1/users/query`, () =>
+        HttpResponse.json({ users: [user("user_1")] }),
+      ),
     );
 
     const res = await run(cwd, ["users", "list", "--fields", "id,attributes.email"]);
@@ -881,7 +891,9 @@ describe("chosen columns", () => {
   it("names the columns a record actually has when a path is wrong", async () => {
     const cwd = await makeProject();
     server.use(
-      http.post(`${SERVER}/users/query`, () => HttpResponse.json({ users: [user("user_1")] })),
+      http.post(`${SERVER}/api/v1/users/query`, () =>
+        HttpResponse.json({ users: [user("user_1")] }),
+      ),
     );
 
     const res = await run(cwd, ["users", "list", "--fields", "id,nope"]);
@@ -902,7 +914,7 @@ describe("chosen columns", () => {
 
   it("validates --fields on get whether the output is piped or not", async () => {
     const cwd = await makeProject();
-    server.use(http.get(`${SERVER}/users/user_1`, () => HttpResponse.json(user("user_1"))));
+    server.use(http.get(`${SERVER}/api/v1/users/user_1`, () => HttpResponse.json(user("user_1"))));
 
     const res = await run(cwd, ["users", "get", "user_1", "--fields", "nope"]);
     expect(res.exitCode).toBe(3);
@@ -914,7 +926,9 @@ describe("chosen columns", () => {
   it("rejects an empty --fields", async () => {
     const cwd = await makeProject();
     server.use(
-      http.post(`${SERVER}/users/query`, () => HttpResponse.json({ users: [user("user_1")] })),
+      http.post(`${SERVER}/api/v1/users/query`, () =>
+        HttpResponse.json({ users: [user("user_1")] }),
+      ),
     );
     const res = await run(cwd, ["users", "list", "--fields", " , "]);
     expect(res.exitCode).toBe(3);
@@ -928,7 +942,7 @@ describe("next page suggestion", () => {
   it("suggests a runnable next page that repeats the sorting and filters", async () => {
     const cwd = await makeProject();
     server.use(
-      http.post(`${SERVER}/users/query`, () =>
+      http.post(`${SERVER}/api/v1/users/query`, () =>
         HttpResponse.json({ users: [user("user_1")], next_page_token: "p2" }),
       ),
     );
@@ -955,7 +969,7 @@ describe("next page suggestion", () => {
   it("repeats the named parameters of a GET-backed list", async () => {
     const cwd = await makeProject();
     server.use(
-      http.get(`${SERVER}/events`, () =>
+      http.get(`${SERVER}/api/v1/events`, () =>
         HttpResponse.json({ data: [{ id: "evt_1" }], next_page_token: "p2" }),
       ),
     );
@@ -981,7 +995,7 @@ describe("next page suggestion", () => {
   it("quotes a value a shell would otherwise split", async () => {
     const cwd = await makeProject();
     server.use(
-      http.post(`${SERVER}/teams/query`, () =>
+      http.post(`${SERVER}/api/v1/teams/query`, () =>
         HttpResponse.json({ teams: [], next_page_token: "p2" }),
       ),
     );
@@ -995,7 +1009,9 @@ describe("next page suggestion", () => {
   it("suggests nothing on the last page", async () => {
     const cwd = await makeProject();
     server.use(
-      http.post(`${SERVER}/users/query`, () => HttpResponse.json({ users: [user("user_1")] })),
+      http.post(`${SERVER}/api/v1/users/query`, () =>
+        HttpResponse.json({ users: [user("user_1")] }),
+      ),
     );
 
     const res = await run(cwd, ["users", "list"]);
@@ -1010,7 +1026,9 @@ describe("next page suggestion", () => {
     const cwd = await makeProject();
     const pages = [{ users: [user("user_1")], next_page_token: "p2" }, { users: [user("user_2")] }];
     let call = 0;
-    server.use(http.post(`${SERVER}/users/query`, () => HttpResponse.json(pages[call++] ?? {})));
+    server.use(
+      http.post(`${SERVER}/api/v1/users/query`, () => HttpResponse.json(pages[call++] ?? {})),
+    );
 
     const res = await run(cwd, ["users", "list", "--all"]);
     const json = parseJson(res.stdout) as { data: { next_commands?: string[] } };
@@ -1023,8 +1041,8 @@ describe("body field flags", () => {
     const cwd = await makeProject();
     let body: unknown;
     server.use(
-      http.post(`${SERVER}/teams/query`, () => HttpResponse.json({ teams: [] })),
-      http.post(`${SERVER}/teams`, async ({ request }) => {
+      http.post(`${SERVER}/api/v1/teams/query`, () => HttpResponse.json({ teams: [] })),
+      http.post(`${SERVER}/api/v1/teams`, async ({ request }) => {
         body = await request.json();
         return HttpResponse.json({ id: "team_1", name: "platform" }, { status: 201 });
       }),
@@ -1039,7 +1057,7 @@ describe("body field flags", () => {
     const cwd = await makeProject();
     let body: unknown;
     server.use(
-      http.post(`${SERVER}/users`, async ({ request }) => {
+      http.post(`${SERVER}/api/v1/users`, async ({ request }) => {
         body = await request.json();
         return HttpResponse.json(user("user_1"), { status: 201 });
       }),
@@ -1066,7 +1084,7 @@ describe("body field flags", () => {
     const cwd = await makeProject();
     let body: unknown;
     server.use(
-      http.post(`${SERVER}/teams`, async ({ request }) => {
+      http.post(`${SERVER}/api/v1/teams`, async ({ request }) => {
         body = await request.json();
         return HttpResponse.json({ id: "team_1", name: "flag-wins" }, { status: 201 });
       }),
@@ -1127,7 +1145,7 @@ describe("body field flags", () => {
     const cwd = await makeProject();
     let body: unknown;
     server.use(
-      http.post(`${SERVER}/grants`, async ({ request }) => {
+      http.post(`${SERVER}/api/v1/grants`, async ({ request }) => {
         body = await request.json();
         return HttpResponse.json({ id: "asgn_1" }, { status: 201 });
       }),
@@ -1166,7 +1184,7 @@ describe("body field flags", () => {
     const cwd = await makeProject();
     let body: unknown;
     server.use(
-      http.patch(`${SERVER}/teams/team_1`, async ({ request }) => {
+      http.patch(`${SERVER}/api/v1/teams/team_1`, async ({ request }) => {
         body = await request.json();
         return HttpResponse.json({ id: "team_1", name: "renamed" });
       }),
@@ -1213,7 +1231,7 @@ describe("nested bodies", () => {
   const capturingIdps = (): { body?: { idp?: Record<string, unknown> } } => {
     const seen: { body?: { idp?: Record<string, unknown> } } = {};
     server.use(
-      http.post(`${SERVER}/idps`, async ({ request }) => {
+      http.post(`${SERVER}/api/v1/idps`, async ({ request }) => {
         seen.body = (await request.json()) as typeof seen.body;
         return HttpResponse.json({ id: "idp_1", slug: "acme-sso" }, { status: 201 });
       }),
@@ -1320,7 +1338,7 @@ describe("nested bodies", () => {
     );
     let body: unknown;
     server.use(
-      http.post(`${SERVER}/users`, async ({ request }) => {
+      http.post(`${SERVER}/api/v1/users`, async ({ request }) => {
         body = await request.json();
         return HttpResponse.json(user("user_1"), { status: 201 });
       }),
@@ -1365,7 +1383,7 @@ describe("nested bodies", () => {
     const cwd = await makeProject();
     let body: unknown;
     server.use(
-      http.patch(`${SERVER}/projects/prj_1`, async ({ request }) => {
+      http.patch(`${SERVER}/api/v1/projects/prj_1`, async ({ request }) => {
         body = await request.json();
         return HttpResponse.json({ id: "prj_1", name: "p" });
       }),
@@ -1429,7 +1447,7 @@ describe("dry runs", () => {
 describe("an empty list writes nothing", () => {
   it("leaves stdout empty when piped, so `wc -l` counts no records", async () => {
     const cwd = await makeProject();
-    server.use(http.post(`${SERVER}/users/query`, () => HttpResponse.json({ users: [] })));
+    server.use(http.post(`${SERVER}/api/v1/users/query`, () => HttpResponse.json({ users: [] })));
 
     const res = await runCliForTest([
       "users",
@@ -1447,7 +1465,7 @@ describe("an empty list writes nothing", () => {
 
   it("still reports the empty page in the envelope", async () => {
     const cwd = await makeProject();
-    server.use(http.post(`${SERVER}/users/query`, () => HttpResponse.json({ users: [] })));
+    server.use(http.post(`${SERVER}/api/v1/users/query`, () => HttpResponse.json({ users: [] })));
 
     const res = await run(cwd, ["users", "list"]);
     expect((parseJson(res.stdout) as { data: { count: number } }).data.count).toBe(0);
@@ -1458,7 +1476,7 @@ describe("delete outcomes", () => {
   it("names the command after what the endpoint does, not after removal", async () => {
     const cwd = await makeProject();
     server.use(
-      http.delete(`${SERVER}/teams/team_1`, () => new HttpResponse(null, { status: 204 })),
+      http.delete(`${SERVER}/api/v1/teams/team_1`, () => new HttpResponse(null, { status: 204 })),
     );
 
     const res = await run(cwd, ["teams", "deactivate", "team_1", "--force"]);
@@ -1473,7 +1491,7 @@ describe("delete outcomes", () => {
   it("still reports a user delete as deleted", async () => {
     const cwd = await makeProject();
     server.use(
-      http.delete(`${SERVER}/users/user_1`, () => new HttpResponse(null, { status: 204 })),
+      http.delete(`${SERVER}/api/v1/users/user_1`, () => new HttpResponse(null, { status: 204 })),
     );
 
     const res = await run(cwd, ["users", "delete", "user_1", "--force"]);
@@ -1488,7 +1506,7 @@ describe("page tokens are opaque", () => {
   it("quotes a token that would otherwise be split by a shell", async () => {
     const cwd = await makeProject();
     server.use(
-      http.post(`${SERVER}/users/query`, () =>
+      http.post(`${SERVER}/api/v1/users/query`, () =>
         HttpResponse.json({ users: [user("user_1")], next_page_token: "tok en;rm -rf /" }),
       ),
     );
@@ -1503,7 +1521,10 @@ describe("other resources", () => {
   it("sessions revoke terminates the session and says so", async () => {
     const cwd = await makeProject();
     server.use(
-      http.delete(`${SERVER}/sessions/sess_1`, () => new HttpResponse(null, { status: 204 })),
+      http.delete(
+        `${SERVER}/api/v1/sessions/sess_1`,
+        () => new HttpResponse(null, { status: 204 }),
+      ),
     );
     const res = await run(cwd, ["sessions", "revoke", "sess_1", "--force"]);
     expect(res.exitCode).toBe(0);
@@ -1517,7 +1538,7 @@ describe("other resources", () => {
     const cwd = await makeProject();
     let url = "";
     server.use(
-      http.post(`${SERVER}/teams/query`, ({ request }) => {
+      http.post(`${SERVER}/api/v1/teams/query`, ({ request }) => {
         url = request.url;
         return HttpResponse.json({ teams: [] });
       }),
@@ -1531,7 +1552,7 @@ describe("other resources", () => {
     const cwd = await makeProject();
     let url = "";
     server.use(
-      http.get(`${SERVER}/events`, ({ request }) => {
+      http.get(`${SERVER}/api/v1/events`, ({ request }) => {
         url = request.url;
         return HttpResponse.json({
           data: [{ id: "evt_1", event_type: "user.created", category: "entity" }],
@@ -1566,7 +1587,7 @@ describe("other resources", () => {
     const cwd = await makeProject();
     let url = "";
     server.use(
-      http.get(`${SERVER}/events`, ({ request }) => {
+      http.get(`${SERVER}/api/v1/events`, ({ request }) => {
         url = request.url;
         return HttpResponse.json({ data: [] });
       }),
@@ -1598,7 +1619,7 @@ describe("configuration resources are read-only", () => {
     const cwd = await makeProject();
     let url: URL | undefined;
     server.use(
-      http.get(`${SERVER}/schemas`, ({ request }) => {
+      http.get(`${SERVER}/api/v1/schemas`, ({ request }) => {
         url = new URL(request.url);
         return HttpResponse.json({
           schemas: [
@@ -1632,7 +1653,7 @@ describe("configuration resources are read-only", () => {
   it("offers no paging flags for an unpaginated collection and reads the bare array", async () => {
     const cwd = await makeProject();
     server.use(
-      http.get(`${SERVER}/branding`, () =>
+      http.get(`${SERVER}/api/v1/branding`, () =>
         HttpResponse.json([{ id: "brand_1", created_at: "2026-01-01T00:00:00Z" }]),
       ),
     );
@@ -1659,7 +1680,7 @@ describe("schemas list shows the current schemas, not the history", () => {
     const cwd = await makeProject();
     let url: URL | undefined;
     server.use(
-      http.get(`${SERVER}/schemas`, ({ request }) => {
+      http.get(`${SERVER}/api/v1/schemas`, ({ request }) => {
         url = new URL(request.url);
         return HttpResponse.json({
           schemas: [
@@ -1691,7 +1712,7 @@ describe("schemas list shows the current schemas, not the history", () => {
     const cwd = await makeProject();
     let url: URL | undefined;
     server.use(
-      http.get(`${SERVER}/schemas`, ({ request }) => {
+      http.get(`${SERVER}/api/v1/schemas`, ({ request }) => {
         url = new URL(request.url);
         return HttpResponse.json({ schemas: [] });
       }),
@@ -1707,7 +1728,7 @@ describe("schemas list shows the current schemas, not the history", () => {
     const cwd = await makeProject();
     const seen: Array<string | null> = [];
     server.use(
-      http.get(`${SERVER}/schemas`, ({ request }) => {
+      http.get(`${SERVER}/api/v1/schemas`, ({ request }) => {
         seen.push(new URL(request.url).searchParams.get("revisions"));
         return HttpResponse.json({ schemas: [] });
       }),
@@ -1726,7 +1747,7 @@ describe("a schema or flow is addressable by name as well as by id", () => {
     const cwd = await makeProject();
     let path = "";
     server.use(
-      http.get(`${SERVER}/schemas/sch_04`, ({ request }) => {
+      http.get(`${SERVER}/api/v1/schemas/sch_04`, ({ request }) => {
         path = new URL(request.url).pathname;
         return HttpResponse.json({ id: "sch_04", schema: { objectType: "human-user" } });
       }),
@@ -1735,7 +1756,7 @@ describe("a schema or flow is addressable by name as well as by id", () => {
     const res = await run(cwd, ["schemas", "get", "sch_04"]);
 
     expect(res.exitCode).toBe(0);
-    expect(path).toBe("/schemas/sch_04");
+    expect(path).toBe("/api/v1/schemas/sch_04");
   });
 
   // A customer's `$id` is any string the API accepts, so the client has to
@@ -1746,7 +1767,7 @@ describe("a schema or flow is addressable by name as well as by id", () => {
     const id = "https://zitadel.com/schemas/v1/default-human-user.json";
     let path = "";
     server.use(
-      http.get(`${SERVER}/schemas/:id`, ({ request }) => {
+      http.get(`${SERVER}/api/v1/schemas/:id`, ({ request }) => {
         path = new URL(request.url).pathname;
         return HttpResponse.json({ id, schema: { objectType: "human-user" } });
       }),
@@ -1755,7 +1776,7 @@ describe("a schema or flow is addressable by name as well as by id", () => {
     const res = await run(cwd, ["schemas", "get", id]);
 
     expect(res.exitCode).toBe(0);
-    expect(path).toBe(`/schemas/${encodeURIComponent(id)}`);
+    expect(path).toBe(`/api/v1/schemas/${encodeURIComponent(id)}`);
     const json = parseJson(res.stdout) as { data: { id: string } };
     expect(json.data.id).toBe(id);
   });
@@ -1766,7 +1787,7 @@ describe("a schema or flow is addressable by name as well as by id", () => {
     const cwd = await makeProject();
     let path = "";
     server.use(
-      http.get(`${SERVER}/schemas/:id`, ({ request }) => {
+      http.get(`${SERVER}/api/v1/schemas/:id`, ({ request }) => {
         path = new URL(request.url).pathname;
         return HttpResponse.json({ id: "urn:example:human", schema: { objectType: "human-user" } });
       }),
@@ -1775,15 +1796,15 @@ describe("a schema or flow is addressable by name as well as by id", () => {
     const res = await run(cwd, ["schemas", "get", "urn:example:human"]);
 
     expect(res.exitCode).toBe(0);
-    expect(path).toBe(`/schemas/${encodeURIComponent("urn:example:human")}`);
+    expect(path).toBe(`/api/v1/schemas/${encodeURIComponent("urn:example:human")}`);
   });
 
   it("resolves an object type to its current revision once the fetch 404s", async () => {
     const cwd = await makeProject();
     let url: URL | undefined;
     server.use(
-      http.get(`${SERVER}/schemas/:id`, () => new HttpResponse(null, { status: 404 })),
-      http.get(`${SERVER}/schemas`, ({ request }) => {
+      http.get(`${SERVER}/api/v1/schemas/:id`, () => new HttpResponse(null, { status: 404 })),
+      http.get(`${SERVER}/api/v1/schemas`, ({ request }) => {
         url = new URL(request.url);
         return HttpResponse.json({
           schemas: [{ id: "sch_04", schema: { objectType: "human-user", kind: "user-schema" } }],
@@ -1803,8 +1824,8 @@ describe("a schema or flow is addressable by name as well as by id", () => {
   it("says so when the ref is neither a revision nor an object type", async () => {
     const cwd = await makeProject();
     server.use(
-      http.get(`${SERVER}/schemas/:id`, () => new HttpResponse(null, { status: 404 })),
-      http.get(`${SERVER}/schemas`, () => HttpResponse.json({ schemas: [] })),
+      http.get(`${SERVER}/api/v1/schemas/:id`, () => new HttpResponse(null, { status: 404 })),
+      http.get(`${SERVER}/api/v1/schemas`, () => HttpResponse.json({ schemas: [] })),
     );
 
     const res = await run(cwd, ["schemas", "get", "nonexistent"]);
@@ -1821,8 +1842,8 @@ describe("a schema or flow is addressable by name as well as by id", () => {
     const cwd = await makeProject();
     let listed = false;
     server.use(
-      http.get(`${SERVER}/schemas/:id`, () => new HttpResponse(null, { status: 500 })),
-      http.get(`${SERVER}/schemas`, () => {
+      http.get(`${SERVER}/api/v1/schemas/:id`, () => new HttpResponse(null, { status: 500 })),
+      http.get(`${SERVER}/api/v1/schemas`, () => {
         listed = true;
         return HttpResponse.json({ schemas: [] });
       }),
@@ -1840,7 +1861,7 @@ describe("a schema or flow is addressable by name as well as by id", () => {
     const cwd = await makeProject();
     let url: URL | undefined;
     server.use(
-      http.get(`${SERVER}/flow_definitions`, ({ request }) => {
+      http.get(`${SERVER}/api/v1/flow_definitions`, ({ request }) => {
         url = new URL(request.url);
         return HttpResponse.json({
           flow_definitions: [{ id: "flowdef_9", flow_definition: { name: "default-login" } }],
@@ -1864,7 +1885,7 @@ describe("flow definitions list the current flows", () => {
     const cwd = await makeProject();
     let url: URL | undefined;
     server.use(
-      http.get(`${SERVER}/flow_definitions`, ({ request }) => {
+      http.get(`${SERVER}/api/v1/flow_definitions`, ({ request }) => {
         url = new URL(request.url);
         return HttpResponse.json({ flow_definitions: [] });
       }),
@@ -1880,7 +1901,7 @@ describe("flow definitions list the current flows", () => {
     const cwd = await makeProject();
     let url: URL | undefined;
     server.use(
-      http.get(`${SERVER}/flow_definitions`, ({ request }) => {
+      http.get(`${SERVER}/api/v1/flow_definitions`, ({ request }) => {
         url = new URL(request.url);
         return HttpResponse.json({ flow_definitions: [] });
       }),

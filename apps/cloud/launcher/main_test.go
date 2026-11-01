@@ -18,7 +18,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 
+	"github.com/zitadel/nextgen/api/client"
+	"github.com/zitadel/nextgen/internal/api"
 	"github.com/zitadel/nextgen/internal/audit"
+	"github.com/zitadel/nextgen/internal/securityheaders"
 )
 
 const testPEM = "-----BEGIN RSA PRIVATE KEY-----\nMIIBOgIBAAJBAKj34GkxFhD90vcNLYLInFEX6Ppy1tPf9Cnzj4p4WGeKLs1Pt8Qu\n-----END RSA PRIVATE KEY-----\n"
@@ -430,13 +433,112 @@ func TestVercelJSONSchedulesTheJobTriggers(t *testing.T) {
 	}
 }
 
+// The cloud gives the server its own paths and nothing else: the API under
+// its prefix, the few paths the server answers at the root and, until 1.0.0,
+// the root paths of the API's resources, which clients released before the
+// prefix call (ADR 077 §4). Their names are fixed: a client can only call an
+// operation it knows, so a resource added since needs no root rule. Every
+// other path is the website's, whose 404 answers what nothing serves
+// (ADR 076, as amended). A missed rule shows here, not in production.
+func TestVercelJSONSendsTheServerOnlyItsOwnPaths(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "vercel.json"))
+	require.NoError(t, err)
+	var config struct {
+		Rewrites []struct {
+			Source      string          `json:"source"`
+			Destination json.RawMessage `json:"destination"`
+		} `json:"rewrites"`
+	}
+	require.NoError(t, json.Unmarshal(raw, &config))
+	serviceFor := func(path string) string {
+		for _, rewrite := range config.Rewrites {
+			if !routeMatches(rewrite.Source, path) {
+				continue
+			}
+			var destination struct{ Service string }
+			if json.Unmarshal(rewrite.Destination, &destination) != nil {
+				return "(external)"
+			}
+			return destination.Service
+		}
+		return "(none)"
+	}
+
+	server := []string{
+		client.PathPrefix,
+		client.PathPrefix + "/users/me",
+		"/console/runtime.json",
+		"/livez",
+		"/readyz",
+		securityheaders.ReportPath,
+		audit.RetentionTriggerPath,
+		api.IDPCallbackUpstreamPath("github"),
+		api.IDPCallbackPath("github"),
+	}
+	for _, name := range []string{
+		"auth_attempts", "branding", "deployments", "events", "flow", "flow_definitions",
+		"grants", "idps", "policies", "projects", "releases", "schemas", "sessions", "teams",
+		"users", "variables",
+	} {
+		server = append(server, "/"+name, "/"+name+"/x_1/y")
+	}
+	for _, path := range server {
+		assert.Equal(t, "server", serviceFor(path), path)
+	}
+
+	others := map[string]string{
+		"/":                            "website",
+		"/changelog":                   "website",
+		"/robots.txt":                  "website",
+		"/.env":                        "website",
+		"/api":                         "website",
+		"/flows":                       "website",
+		"/userss/x":                    "website",
+		"/idp/github":                  "website",
+		"/oauth/proj_1/token":          "website",
+		"/schemas/v1/user-schema.json": "schemas",
+		"/console/users":               "console",
+		"/docs/reference/api":          "docs",
+		"/cloud/zitadel/flow":          "cloud-functions",
+		"/telemetry/mixpanel/track":    "(external)",
+	}
+	for path, want := range others {
+		assert.Equal(t, want, serviceFor(path), path)
+	}
+}
+
 // routeMatches reports whether a vercel.json source matches path, for the
-// forms the file uses: literal paths, (.*) and a named :param(.*).
+// forms the file uses: literal paths, (.*), a named :param that takes one
+// segment, and one with a pattern of its own, :param(...), optional with a
+// trailing ? together with the slash before it.
 func routeMatches(source, path string) bool {
-	pattern := strings.ReplaceAll(regexp.QuoteMeta(source), `\(\.\*\)\?`, `(.*)`)
-	pattern = strings.ReplaceAll(pattern, `\(\.\*\)`, `(.*)`)
-	pattern = regexp.MustCompile(`:\w+`).ReplaceAllString(pattern, "")
-	return regexp.MustCompile("^" + pattern + "$").MatchString(path)
+	return routePattern(source).MatchString(path)
+}
+
+var routeToken = regexp.MustCompile(`(/?):\w+(?:\(([^)]*)\))?(\?)?|\(([^)]*)\)`)
+
+func routePattern(source string) *regexp.Regexp {
+	var pattern strings.Builder
+	last := 0
+	for _, match := range routeToken.FindAllStringSubmatchIndex(source, -1) {
+		pattern.WriteString(regexp.QuoteMeta(source[last:match[0]]))
+		last = match[1]
+		if match[8] >= 0 {
+			pattern.WriteString("(" + source[match[8]:match[9]] + ")")
+			continue
+		}
+		param := "[^/]+"
+		if match[4] >= 0 {
+			param = source[match[4]:match[5]]
+		}
+		group := regexp.QuoteMeta(source[match[2]:match[3]]) + "(" + param + ")"
+		if match[6] >= 0 {
+			group = "(?:" + group + ")?"
+		}
+		pattern.WriteString(group)
+	}
+	pattern.WriteString(regexp.QuoteMeta(source[last:]))
+	return regexp.MustCompile("^" + pattern.String() + "$")
 }
 
 // The console service builds into the server's embed directory in the same

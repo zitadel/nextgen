@@ -67,7 +67,7 @@ describe("zitadel api without an operation, at a terminal", () => {
 
     expect(envelope).toMatchObject({
       status: "ok",
-      data: { operation: "revokeSession", url: "http://localhost:8080/sessions/sess_1" },
+      data: { operation: "revokeSession", url: "http://localhost:8080/api/v1/sessions/sess_1" },
     });
     expect(vi.mocked(select).mock.calls.map(([question]) => question.message)).toEqual([
       "Which part of the API would you like to use?",
@@ -95,7 +95,7 @@ describe("zitadel api for an operation that needs no credential", () => {
 
     expect(envelope).toMatchObject({
       status: "ok",
-      data: { url: "http://localhost:8080/livez" },
+      data: { url: "http://localhost:8080/api/v1/livez" },
     });
   });
 });

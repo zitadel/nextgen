@@ -1,14 +1,22 @@
 # ADR 077: The Resource API Under `/api/v1/`
 
-> **Status:** Proposed
+> **Status:** Implemented — 2026-10-26 (accepted 2026-10-25, originally
+> Proposed 2026-10-23)
 > **Date:** 2026-10-23
 > **Context:** Where the resource API's routes live on a host it shares with
 > the console, the website, the docs and the protocol endpoints, and whether
 > its path carries a version.
-> **Amends if accepted:** the "no version segment in paths" lock in the
+> **Amends:** the "no version segment in paths" lock in the
 > [glossary §7](../design/glossary.md#7-url-shape), and the
 > [API design guide](../design/api/README.md)'s premise of an API host of its
 > own.
+>
+> **Amendment (2026-10-25):** revised before acceptance, after checking the
+> proposal against the code. The probes stay operations of the spec (§2).
+> The alias gets its headers and a measure of its traffic (§4). §5 adds what
+> moves besides the mount and the base URL: the checks that decide by path,
+> which the proposal said needed no change, the versions clients and servers
+> must have, and the order of the rollout. `/healthz` is gone since #2308.
 
 ## Context
 
@@ -22,8 +30,8 @@ are operations of the API itself.
 The design docs lock this shape: no version segment in paths, with a
 `Zitadel-Version` header as the target for versioning. The lock assumed one
 surface, `api.zitadel.cloud/*`, a host the API has to itself. The hosted cloud
-doesn't work that way. It serves the API, the website, the docs, the console,
-the storybook and the built-in schemas from one origin
+doesn't work that way. It serves the API, the website, the docs, the console
+and the built-in schemas from one origin
 ([`vercel.json`](../../vercel.json)), and the console relies on that origin for
 its session cookie and CSRF ([cloud README](../../apps/cloud/README.md)).
 Whatever no other service claims goes to the server, so the API answers at
@@ -74,11 +82,14 @@ Paths that aren't the resource API keep their place, outside the prefix:
 - the console and `/console/runtime.json`;
 - the IdP callbacks, which external providers hold as registered redirect
   URIs;
-- the health probes (`/healthz`, `/livez`, `/readyz`), where orchestrators
-  look for them;
+- the health probes `/livez` and `/readyz`, where orchestrators look for
+  them. They stay operations of the spec, which the console reads through
+  the client, so they answer under `/api/v1` as well; the root stays their
+  home for good, and §4's deprecation never applies to it;
 - the protocol surfaces (OIDC, SAML, SCIM), whose paths and versions their own
-  specifications and conventions set (`/.well-known/openid-configuration`,
-  `/scim/v2/`).
+  specifications and decisions set (`/scim/v2/`;
+  [ADR 081](081-customer-hosted-login-and-oidc-provider.md) proposes
+  `/oauth/` for the server's side of OIDC).
 
 The server's root paths become a short, fixed list, and the API's resource
 names stop claiming the host's namespace.
@@ -101,38 +112,73 @@ and this ADR doesn't decide whether it is built.
 The cloud deploys `main` continuously, and the CLI pins the SDK version it
 scaffolds (ADR 074), so apps on an older SDK will call the root paths for a
 while. Until 1.0.0 the server also answers every operation at its old,
-unprefixed path, with a `Deprecation` header
-([RFC 9745](https://www.rfc-editor.org/rfc/rfc9745)). The alias covers only
+unprefixed path. Such a response carries a `Deprecation` header with the
+date the prefix shipped ([RFC 9745](https://www.rfc-editor.org/rfc/rfc9745)),
+and a `Link` with `rel="deprecation"` to the docs on the base URL. The
+probes never carry them, and neither does a `405`, which matches no
+operation. No `Sunset` is sent until GA has a date. The alias covers only
 the spec's own paths. Any other path, at the root or under the prefix,
 answers as [ADR 076](076-error-pages-and-unmatched-routes.md) says: the error
 page to a browser navigation, `404 req.not_found` to a program. A client
 still on the root paths after GA therefore learns that it runs a different
 version, not that the server isn't Zitadel. GA removes the alias with the
-other 0.x allowances.
+other 0.x allowances, once the root-path traffic the server measures (§5)
+has died down.
 
 ### 5. What changes
 
 - **Spec:** the `servers` URL becomes `/api/v1`, and the API reference shows
   it on every path.
 - **Server:** the ogen server is built with `WithPathPrefix("/api/v1")` and
-  mounted at `/api/v1/`. The §4 alias and the probes are mounted at the root.
+  mounted at `/api/v1/`. A second ogen server over the same handler, without
+  the prefix, answers the §4 alias at the root and tags its spans and
+  metrics as root-path traffic. The probes are mounted at the root on their
+  own. Code that reads the request path before ogen does handles both
+  spellings: the no-store rule for session responses, and the audit, which
+  records the operation rather than the mount.
 - **Clients:** the generated TypeScript client adds the prefix to its runtime
-  base URL, and the Go client takes the prefixed server URL. The CLI, the
-  console, the login components, the SDKs' own calls (`/sessions/me` in
-  `@zitadel/sdk-core`), `@zitadel/api-mock` and the benchmark harness follow.
+  base URL, and the Go client module (`go.zitadel.com/zitadel/v5`) gets a
+  helper that adds it to an origin. The CLI, the console, the login
+  components, the SDKs' own calls (`/sessions/me` in `@zitadel/sdk-core`),
+  `@zitadel/api-mock` and the benchmark harness follow. `zitadel api` keeps
+  taking the spec's paths. The console's dev proxy forwards the prefix
+  instead of stripping a path of its own.
+- **Origins:** `ZITADEL_URL`, the CLI's `--server` and `zitadel start`'s
+  `urls.api` stay bare origins; `ZITADEL_URL` is also the issuer a token is
+  checked against. A client given an origin that ends in `/api/v1` drops it
+  instead of doubling it.
 - **Apps:** the SDKs' `/__nextgen` proxies, and the dev proxies the CLI
   writes, forward whatever follows their prefix unchanged
-  ([ADR 073](073-session-cookie-per-project.md)). A browser call becomes
-  `/__nextgen/api/v1/…` with no change to an app's configuration or
-  scaffolded files, and `ZITADEL_URL` stays the bare origin.
-- **Cloud:** `vercel.json` routes `/api/*` to the server, and its catch-all
-  stays on the server, as ADR 076 keeps it. ADR 076 rejected routing the
-  server's paths by name because every new API path needed a rewrite of its
-  own. Under the prefix one `/api/*` rule covers them all, so once the alias
-  is gone that option is open again, and with it a website that can take any
-  other path.
-- **Release:** a `minor` changeset with a **Breaking:** paragraph. The CLI's
-  `SKILL.md` and the docs say where the API lives.
+  ([ADR 073](073-session-cookie-per-project.md)), so a browser call becomes
+  `/__nextgen/api/v1/…`. They also decide by path in one place: the project
+  secret goes only to the session exchange, and the SDKs' handling of the
+  shared session cookie recognises the session reads. On the hosted cloud,
+  the functions in front of the sign-in widget check its flow writes for bots
+  ([ADR 084](084-hosted-cloud-business-systems.md)). Until 1.0.0 every such
+  check accepts both spellings. A dev proxy an earlier CLI wrote knows only
+  the root path: `zitadel doctor` reports it and `doctor --fix` rewrites it.
+  A proxy written by hand, such as the production proxy an SPA needs, must
+  accept the prefixed path before its app upgrades.
+- **Versions:** a client that calls the prefix needs a server that serves
+  it, so a self-hosted server is upgraded before its apps. `zitadel start`
+  and `zitadel setup` check the version of a local server they find running,
+  and a client that gets `req.not_found` for an operation says the server may
+  predate the prefix.
+- **Cloud:** `vercel.json` routes `/api/*` to the server ahead of every other
+  service. The server also gets the few paths it answers at the root and,
+  until 1.0.0, the root paths of the API's resources, whose names are fixed:
+  a client released before the prefix calls only operations it knows. Every
+  other path goes to the website, whose 404 answers it
+  ([ADR 076](076-error-pages-and-unmatched-routes.md), amended). ADR 076 had
+  rejected routing the server's paths by name because every new API path
+  needed a rewrite of its own, which the prefix ends. The alias's rule goes
+  with the alias at GA.
+- **Rollout:** every step leaves every mix of versions working. The server
+  answers both spellings, and the checks that decide by path accept both, in
+  either order. Then the clients move to the prefix, in a `minor` release
+  whose **Breaking:** paragraph names the server upgrade, `doctor --fix` and
+  hand-written proxies. The CLI's `SKILL.md` and the docs say where the API
+  lives.
 
 ## Consequences
 
@@ -151,6 +197,9 @@ other 0.x allowances.
 ### Negative / Risks
 
 - Every client and fixture that names a path changes in one release.
+- A proxy that decides by path stops attaching the project secret once its
+  app's packages call the prefix, until it is updated: an SPA's dev proxy
+  from an earlier CLI (`doctor --fix`), or a proxy written by hand.
 - Until GA the server answers both spellings, so the API's root names stay
   taken on the cloud host until then.
 - Classic Zitadel serves `/v2/users`, so to someone migrating,
@@ -205,5 +254,10 @@ within a major (§3), not a replacement for the namespace.
 - On implementation: the spec's `servers`, the
   [cloud README](../../apps/cloud/README.md) and
   [runbook](../runbooks/cloud.md), the CLI's
-  [`SKILL.md`](../../apps/cli/skills/zitadel-cli/SKILL.md) and the docs' API
-  reference.
+  [`SKILL.md`](../../apps/cli/skills/zitadel-cli/SKILL.md), the docs' API
+  reference and their [SDK proxy page](../../apps/docs/content/docs/sdks/proxy.mdx),
+  which tells an SPA how to write its production proxy. The console's
+  [ADR 0002](../../apps/console/docs/adrs/0002-console-api-access.md),
+  [ADR 0003](../../apps/console/docs/adrs/0003-console-authentication.md)
+  and [`AGENTS.md`](../../apps/console/AGENTS.md) forbid an `/api` path
+  today and change with it.

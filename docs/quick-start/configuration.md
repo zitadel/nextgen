@@ -299,8 +299,10 @@ never from data. The API's request instruments (`ogen.server.request_count`,
 milliseconds with the SDK's default buckets) carry
 the operation (`oas.operation`), the method (`http.request.method`), the
 route template (`http.route`, as in `/users/{user_id}`) and the status
-(`http.response.status_code`), never the request path. Should an attribute
-ever follow the data anyway, each instrument holds at most 2000 series: past
+(`http.response.status_code`), never the request path. A request that
+reached its operation at the root path rather than under `/api/v1`, which the
+API answers until 1.0.0, also carries `zitadel.api.root_path` (`true`).
+Should an attribute ever follow the data anyway, each instrument holds at most 2000 series: past
 that, new attribute combinations land on one series marked
 `otel.metric.overflow=true` instead of becoming series of their own. The
 limit is the OpenTelemetry SDK's default; `OTEL_GO_X_CARDINALITY_LIMIT`

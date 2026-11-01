@@ -4,7 +4,11 @@ import type { WiringVerdict } from "../file-writer/types";
 import { PROXY_PATH } from "../proxy";
 import {
   assertNoUnreviewedProjectSecretProxy,
+  EXCHANGE_PATH_CHECK,
+  PREFIXED_EXCHANGE_PATH,
   PROXY_CREDENTIAL_POLICY_MARKER,
+  PROXY_CREDENTIAL_POLICY_V2_MARKER,
+  V2_EXCHANGE_PATH_CHECK,
 } from "../proxy-credential-policy";
 import {
   indented,
@@ -116,7 +120,8 @@ export function appTemplateHtml(ctx: PatchContext): string {
 /**
  * The managed `proxy.conf.cjs` for `ng serve`: forwards `/__nextgen/*` to the
  * backend and attaches the project's service-key secret only to the current
- * app-plane `POST /sessions/exchange` request. Both the backend URL
+ * app-plane `POST /sessions/exchange` request, which it knows with and without
+ * the API prefix (`/api/v1`, ADR 077). Both the backend URL
  * (`ZITADEL_URL`) and the secret
  * (`ZITADEL_PROJECT_SECRET`) are read from `.env.local`, which `zitadel setup`
  * writes and `.gitignore` excludes — Angular's CLI does not auto-load env files
@@ -184,17 +189,36 @@ const LEGACY_UNCONDITIONAL_BEARER = `function setBearer(proxyReq) {
   proxyReq.setHeader("authorization", bearer);
 }`;
 
-const EXCHANGE_ONLY_BEARER = `/* ${PROXY_CREDENTIAL_POLICY_MARKER} */
+/** The bearer hook, marked with the credential policy `marker`, testing the path with `pathCheck`. */
+function exchangeOnlyBearer(marker: string, pathCheck: string): string {
+  return `/* ${marker} */
 function setBearer(proxyReq) {
   const pathname = new URL(proxyReq.path, "http://zitadel.local").pathname;
   if (
     proxyReq.method === "POST" &&
-    pathname === "/sessions/exchange" &&
+    ${pathCheck} &&
     !proxyReq.getHeader("authorization")
   ) {
     proxyReq.setHeader("authorization", bearer);
   }
 }`;
+}
+
+const EXCHANGE_ONLY_BEARER = exchangeOnlyBearer(
+  PROXY_CREDENTIAL_POLICY_MARKER,
+  EXCHANGE_PATH_CHECK,
+);
+
+/** The bearer hook as the CLI wrote it before it knew the API prefix (ADR 077). */
+const V2_EXCHANGE_ONLY_BEARER = exchangeOnlyBearer(
+  PROXY_CREDENTIAL_POLICY_V2_MARKER,
+  V2_EXCHANGE_PATH_CHECK,
+);
+
+/** The exchange-only bearer hook `text` carries, of either version, or `undefined`. */
+function bearerIn(text: string): string | undefined {
+  return [EXCHANGE_ONLY_BEARER, V2_EXCHANGE_ONLY_BEARER].find((bearer) => text.includes(bearer));
+}
 
 /** The session-cookie hooks' functions, after the bearer hook (ADR 073, ADR 083). */
 const SESSION_COOKIE_FUNCTIONS = indented(proxyConfSessionCookieStatements(), "");
@@ -284,7 +308,7 @@ export function proxyConfEdit(): (source: string | undefined) => string {
 function hasBearerOnlyHooks(text: string): boolean {
   return (
     text.includes(MANAGED_MARKER) &&
-    text.includes(EXCHANGE_ONLY_BEARER) &&
+    bearerIn(text) !== undefined &&
     text.includes(BEARER_ONLY_HOOKS)
   );
 }
@@ -322,9 +346,10 @@ export function proxyConfSessionCookieEdit(): (source: string | undefined) => st
           .replace(SESSION_COOKIE_FUNCTIONS_V1, SESSION_COOKIE_FUNCTIONS)
           .replace(SESSION_COOKIE_HOOKS_V1, SESSION_COOKIE_HOOKS);
       }
-      return hasBearerOnlyHooks(text)
+      const bearer = bearerIn(text);
+      return bearer && hasBearerOnlyHooks(text)
         ? text
-            .replace(EXCHANGE_ONLY_BEARER, `${EXCHANGE_ONLY_BEARER}\n\n${SESSION_COOKIE_FUNCTIONS}`)
+            .replace(bearer, `${bearer}\n\n${SESSION_COOKIE_FUNCTIONS}`)
             .replace(BEARER_ONLY_HOOKS, SESSION_COOKIE_HOOKS)
         : text;
     });
@@ -358,5 +383,55 @@ export function proxyConfSessionCookieVerdict(source: string): WiringVerdict {
     unknown: text.includes(MANAGED_MARKER)
       ? "it was changed since zitadel setup wrote it, so the session-cookie hooks (ADR 073) must be added by hand"
       : "it is not the proxy zitadel setup writes, so the session-cookie hooks (ADR 073) must be added by hand",
+  };
+}
+
+/**
+ * Moves the managed proxy's bearer hook from v2, which knew only
+ * `/sessions/exchange`, to v3, which knows the exchange under the API prefix
+ * too (ADR 077): once an app's packages call `/api/v1`, a v2 proxy no longer
+ * attaches the project secret to the exchange. Only the exact hook an earlier
+ * CLI wrote is replaced; a file that carries v3 already, an unmanaged one and a
+ * hook changed by hand are left as they are, and
+ * {@link proxyConfApiPrefixVerdict} tells the doctor which it is. Line ends are
+ * the file's own. Creates the managed proxy when it is absent, as
+ * {@link proxyConfEdit} does.
+ */
+export function proxyConfApiPrefixEdit(): (source: string | undefined) => string {
+  return (source) => {
+    if (source === undefined) {
+      return proxyConfTemplate();
+    }
+    return withLfLineEnds(source, (text) =>
+      text.includes(MANAGED_MARKER) && text.includes(V2_EXCHANGE_ONLY_BEARER)
+        ? text.replace(V2_EXCHANGE_ONLY_BEARER, EXCHANGE_ONLY_BEARER)
+        : text,
+    );
+  };
+}
+
+/**
+ * Whether `proxy.conf.cjs` attaches the project secret to the exchange under
+ * the API prefix too, for the doctor. The managed file with an earlier CLI's
+ * v2 hook is `detached` (`doctor --fix` moves it to v3). A managed file whose
+ * hook was changed by hand, and a proxy of the developer's own that attaches
+ * the secret but never names `/api/v1/sessions/exchange`, are `unknown`: only
+ * the developer can change them.
+ */
+export function proxyConfApiPrefixVerdict(source: string): WiringVerdict {
+  const text = lfText(source);
+  if (text.includes(EXCHANGE_ONLY_BEARER)) {
+    return "applied";
+  }
+  if (text.includes(MANAGED_MARKER) && text.includes(V2_EXCHANGE_ONLY_BEARER)) {
+    return "detached";
+  }
+  if (!text.includes("ZITADEL_PROJECT_SECRET") || text.includes(PREFIXED_EXCHANGE_PATH)) {
+    return "applied";
+  }
+  return {
+    unknown: text.includes(MANAGED_MARKER)
+      ? `it was changed since zitadel setup wrote it, so its project-secret check must accept ${PREFIXED_EXCHANGE_PATH} by hand (ADR 077)`
+      : `it is not the proxy zitadel setup writes, so its project-secret check must accept ${PREFIXED_EXCHANGE_PATH} by hand (ADR 077)`,
   };
 }

@@ -28,7 +28,7 @@ describe("the person calling", () => {
   it("is the one Zitadel says the cookie is, asked past a preview's protection", async () => {
     vi.stubEnv("VERCEL_AUTOMATION_BYPASS_SECRET", "bypass");
     const fetch = serve({
-      "/users/me": {
+      "/api/v1/users/me": {
         id: "user_1",
         attributes: { email: "ada@example.com", name: "Ada" },
         identifier: "ada@example.com",
@@ -46,12 +46,12 @@ describe("the person calling", () => {
   });
 
   it("is no one when Zitadel answers 401, as for an anonymous session", async () => {
-    serve({ "/users/me": 401 });
+    serve({ "/api/v1/users/me": 401 });
     expect(await liveDirectory(SERVER).caller(COOKIE)).toBeUndefined();
   });
 
   it("is never taken for no one when Zitadel fails", async () => {
-    serve({ "/users/me": 500 });
+    serve({ "/api/v1/users/me": 500 });
     await expect(liveDirectory(SERVER).caller(COOKIE)).rejects.toThrow(/500/);
   });
 });
@@ -64,11 +64,11 @@ function membership(id: string, membership_status: string, day: string) {
 describe("the person's teams", () => {
   it("are the active memberships of every page, the earliest being the personal team", async () => {
     serve({
-      "/users/me/teams?limit=100": {
+      "/api/v1/users/me/teams?limit=100": {
         teams: [membership("team_b", "active", "10-02"), membership("team_p", "pending", "10-03")],
         next_page_token: "next",
       },
-      "/users/me/teams?limit=100&page_token=next": {
+      "/api/v1/users/me/teams?limit=100&page_token=next": {
         teams: [membership("team_a", "active", "10-01")],
       },
     });
@@ -80,7 +80,7 @@ describe("the person's teams", () => {
 
   it("have no personal team while the earliest membership is not active, as the server has none", async () => {
     serve({
-      "/users/me/teams?limit=100": {
+      "/api/v1/users/me/teams?limit=100": {
         teams: [
           membership("team_invited", "pending", "09-01"),
           membership("team_a", "active", "10-01"),
@@ -96,11 +96,11 @@ describe("the person's teams", () => {
 describe("a team's usage", () => {
   const days = { start: "2026-10-01T00:00:00.000Z", end: "2026-10-03T00:00:00.000Z" };
   const usageOf = (project: string) =>
-    `/usage?project_id=${project}&from=${encodeURIComponent(days.start)}&to=${encodeURIComponent(days.end)}&granularity=day`;
+    `/api/v1/usage?project_id=${project}&from=${encodeURIComponent(days.start)}&to=${encodeURIComponent(days.end)}&granularity=day`;
 
   it("is the usage of the person's projects that the team claimed, day by day", async () => {
     serve({
-      "/users/me/projects?limit=100": {
+      "/api/v1/users/me/projects?limit=100": {
         projects: [
           { id: "proj_a", name: "Portal" },
           { id: "proj_b", name: "Elsewhere" },
