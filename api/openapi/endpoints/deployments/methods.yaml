@@ -21,7 +21,7 @@ post:
 
     Failures:
     - `400 dep.invalid`: both or neither of `release_id` and `content_hash`;
-      a primary origin named exactly; `primary` mixed with preview URLs;
+      a primary origin among the preview URLs;
       `primary` on a project with no primary origin; `ttl` with `primary`;
       `ttl` above 365 days (`P365D`).
     - `400 dep.variables_missing`: a referenced variable has no value for
@@ -54,8 +54,7 @@ post:
               deploying.
             value:
               release_id: rel_01KX3RG8A7F0N9WD3P2E4YM5C1
-              targets:
-                - primary
+              targets: primary
               message: add phone_number to human-user
               expected_deployment_id: dep_01KX4SB9C8E1F0N9WD3P2E4YM5
           preview:
@@ -155,7 +154,7 @@ post:
                 Primary origins are deployed as a whole: send `primary`.
               value:
                 code: dep.invalid
-                message: deploy primary origins with the primary keyword
+                message: deploy to primary origins with the primary target
             variablesMissing:
               summary: The release references variables with no preview value
               description: |

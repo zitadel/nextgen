@@ -135,7 +135,7 @@ type Invoker interface {
 	// for preview URLs that record renews their previews.
 	// Failures:
 	// - `400 dep.invalid`: both or neither of `release_id` and `content_hash`;
-	// a primary origin named exactly; `primary` mixed with preview URLs;
+	// a primary origin among the preview URLs;
 	// `primary` on a project with no primary origin; `ttl` with `primary`;
 	// `ttl` above 365 days (`P365D`).
 	// - `400 dep.variables_missing`: a referenced variable has no value for
@@ -2207,7 +2207,7 @@ func (c *Client) sendCreateBranding(ctx context.Context, request *Branding, para
 // for preview URLs that record renews their previews.
 // Failures:
 // - `400 dep.invalid`: both or neither of `release_id` and `content_hash`;
-// a primary origin named exactly; `primary` mixed with preview URLs;
+// a primary origin among the preview URLs;
 // `primary` on a project with no primary origin; `ttl` with `primary`;
 // `ttl` above 365 days (`P365D`).
 // - `400 dep.variables_missing`: a referenced variable has no value for

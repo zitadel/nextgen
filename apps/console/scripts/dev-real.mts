@@ -437,8 +437,8 @@ async function seedReleases(): Promise<string | null> {
     await post(origins, { pattern: "https://app.acme.com", kind: "primary" });
     await post(origins, { pattern: "https://www.acme.com", kind: "primary" });
     await post(origins, { pattern: "https://*-acmeinc.vercel.app", kind: "preview" });
-    await post("/deployments", { release_id: first.id, targets: ["primary"] });
-    await post("/deployments", { release_id: second.id, targets: ["primary"] });
+    await post("/deployments", { release_id: first.id, targets: "primary" });
+    await post("/deployments", { release_id: second.id, targets: "primary" });
     await post("/deployments", {
       release_id: first.id,
       targets: ["https://acme-k3x9v2-acmeinc.vercel.app"],

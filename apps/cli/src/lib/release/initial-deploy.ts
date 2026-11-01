@@ -57,7 +57,7 @@ export async function deployInitialRelease(input: {
   });
   const deployment = await createDeployment(input.client, input.projectId, {
     releaseId: release.id,
-    targets: ["primary"],
+    targets: "primary",
     message: input.message,
   });
   return {

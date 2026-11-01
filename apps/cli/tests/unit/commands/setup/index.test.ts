@@ -688,7 +688,7 @@ describe("setup command pre-flight", () => {
       {
         body: expect.objectContaining({
           release_id: "rel_test",
-          targets: ["primary"],
+          targets: "primary",
         }),
         authorization: `Bearer ${capture.projects[0]?.project_secret}`,
       },
