@@ -5,6 +5,7 @@ import { PROXY_PATH } from "../proxy";
 import {
   assertNoUnreviewedProjectSecretProxy,
   EXCHANGE_PATH_CHECK,
+  PREFIXED_EXCHANGE_PATH,
   PROXY_CREDENTIAL_POLICY_MARKER,
   PROXY_CREDENTIAL_POLICY_V2_MARKER,
   V2_EXCHANGE_PATH_CHECK,
@@ -425,12 +426,12 @@ export function proxyConfApiPrefixVerdict(source: string): WiringVerdict {
   if (text.includes(MANAGED_MARKER) && text.includes(V2_EXCHANGE_ONLY_BEARER)) {
     return "detached";
   }
-  if (!text.includes("ZITADEL_PROJECT_SECRET") || text.includes("/api/v1/sessions/exchange")) {
+  if (!text.includes("ZITADEL_PROJECT_SECRET") || text.includes(PREFIXED_EXCHANGE_PATH)) {
     return "applied";
   }
   return {
     unknown: text.includes(MANAGED_MARKER)
-      ? "it was changed since zitadel setup wrote it, so its project-secret check must accept /api/v1/sessions/exchange by hand (ADR 077)"
-      : "it is not the proxy zitadel setup writes, so its project-secret check must accept /api/v1/sessions/exchange by hand (ADR 077)",
+      ? `it was changed since zitadel setup wrote it, so its project-secret check must accept ${PREFIXED_EXCHANGE_PATH} by hand (ADR 077)`
+      : `it is not the proxy zitadel setup writes, so its project-secret check must accept ${PREFIXED_EXCHANGE_PATH} by hand (ADR 077)`,
   };
 }
