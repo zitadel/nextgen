@@ -187,6 +187,75 @@ describe("user detail", () => {
     expect(link).toHaveAttribute("href", scopedPath(`/schemas/${encodeURIComponent(uri)}`));
   });
 
+  it("opens the schema at its newest revision from its name, and the user's own revision from the box", async () => {
+    // A revision is a schema of its own. The name stands for the schema, so it
+    // opens the newest revision of the object type; the box beside it opens
+    // the revision this user is on, which may be older.
+    stub();
+    const lists: URLSearchParams[] = [];
+    server.use(
+      http.get(`${SCHEMAS_URL}/sch_business`, () =>
+        HttpResponse.json({
+          id: "sch_business",
+          schema: { ...BUSINESS, objectType: "business" },
+          metadata: { created_at: "2026-07-01T00:00:00Z" },
+        }),
+      ),
+      http.get(SCHEMAS_URL, ({ request }) => {
+        lists.push(new URL(request.url).searchParams);
+        return HttpResponse.json({
+          schemas: [
+            {
+              id: "sch_business_2",
+              schema: BUSINESS,
+              metadata: { created_at: "2026-08-01T00:00:00Z" },
+            },
+            {
+              id: "sch_business",
+              schema: BUSINESS,
+              metadata: { created_at: "2026-07-01T00:00:00Z" },
+            },
+          ],
+        });
+      }),
+    );
+    await renderDetail();
+
+    const panel = within(await screen.findByRole("tabpanel"));
+    expect(await panel.findByRole("link", { name: "Business" })).toHaveAttribute(
+      "href",
+      scopedPath("/schemas/sch_business_2"),
+    );
+    expect(panel.getByRole("link", { name: "Business sch_business" })).toHaveAttribute(
+      "href",
+      scopedPath("/schemas/sch_business"),
+    );
+    expect(lists.at(-1)?.get("object_type")).toBe("business");
+  });
+
+  it("opens the user's own revision from the name when the history cannot be read", async () => {
+    stub();
+    server.use(
+      http.get(`${SCHEMAS_URL}/sch_business`, () =>
+        HttpResponse.json({
+          id: "sch_business",
+          schema: { ...BUSINESS, objectType: "business" },
+          metadata: { created_at: "2026-07-01T00:00:00Z" },
+        }),
+      ),
+      http.get(SCHEMAS_URL, () =>
+        HttpResponse.json({ code: "internal", message: "boom" }, { status: 500 }),
+      ),
+    );
+    await renderDetail();
+
+    const panel = within(await screen.findByRole("tabpanel"));
+    expect(await panel.findByRole("link", { name: "Business" })).toHaveAttribute(
+      "href",
+      scopedPath("/schemas/sch_business"),
+    );
+  });
+
   it("names an untitled schema by its id in the revision link", async () => {
     stub();
     server.use(

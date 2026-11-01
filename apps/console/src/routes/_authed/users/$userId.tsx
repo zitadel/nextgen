@@ -34,6 +34,7 @@ import {
   type SchemaField,
   type UserSchema,
   attributeValue,
+  fetchSchemaRevisions,
   inputAttributes,
   schemaDisplayName,
   schemaFields,
@@ -65,14 +66,24 @@ export const Route = createFileRoute("/_authed/users/$userId")({
     // allowed to reject the loader: a failure costs a row, not the screen.
     const projectId = requireProjectScope(deps.project);
     const schemaId = field(user, "schema");
-    const [schema, passkeys, identityLinks, passwordSetAt] = await Promise.all([
-      schemaId
-        ? api
-            // Schema ids are unique per project only, so name the selected one.
-            .getSchemaById(schemaId, { project_id: projectId })
-            .then((value) => value.schema as UserSchema)
-            .catch(() => undefined)
-        : Promise.resolve(undefined),
+    const readingSchema = schemaId
+      ? api
+          // Schema ids are unique per project only, so name the selected one.
+          .getSchemaById(schemaId, { project_id: projectId })
+          .then((value) => value.schema as UserSchema)
+          .catch(() => undefined)
+      : Promise.resolve(undefined);
+    const [schema, latestSchemaId, passkeys, identityLinks, passwordSetAt] = await Promise.all([
+      readingSchema,
+      // The schema's name opens the schema at its newest revision; the user
+      // may be on an older one, which the revision box opens. Unreadable, the
+      // name opens the user's own revision.
+      readingSchema.then(async (value) => {
+        const objectType = value && field(value, "objectType");
+        if (!objectType) return undefined;
+        const revisions = await fetchSchemaRevisions(projectId, objectType).catch(() => []);
+        return revisions[0]?.id;
+      }),
       api.listUserPasskeys.all(params.userId, { limit: 100 }).catch(() => undefined),
       fetchUserIdentityLinks(params.userId).catch(() => undefined),
       // `null`: the user has no password; `undefined`: it could not be read.
@@ -90,7 +101,7 @@ export const Route = createFileRoute("/_authed/users/$userId")({
         ? await fetchAllIdps(projectId).catch(() => null)
         : null;
 
-    return { user, schema, passkeys, identityLinks, idps, passwordSetAt };
+    return { user, schema, latestSchemaId, passkeys, identityLinks, idps, passwordSetAt };
   },
   component: UserDetail,
 });
@@ -121,7 +132,8 @@ const ROW_VALUE = "text-foreground shrink-0 text-sm";
 const WRITABLE_TYPES = new Set(["String", "Number", "Integer", "Boolean", "—"]);
 
 function UserDetail() {
-  const { user, schema, passkeys, identityLinks, idps, passwordSetAt } = Route.useLoaderData();
+  const { user, schema, latestSchemaId, passkeys, identityLinks, idps, passwordSetAt } =
+    Route.useLoaderData();
   const { userId } = Route.useParams();
   const router = useRouter();
   const attributes = userAttributes(user);
@@ -171,6 +183,7 @@ function UserDetail() {
             userId={userId}
             schema={schema}
             schemaId={field(user, "schema")}
+            latestSchemaId={latestSchemaId}
             attributes={attributes}
             onSaved={() => router.invalidate()}
           />
@@ -311,12 +324,15 @@ function ProfileCard({
   userId,
   schema,
   schemaId,
+  latestSchemaId,
   attributes,
   onSaved,
 }: {
   userId: string;
   schema: UserSchema | undefined;
   schemaId: string | undefined;
+  /** The newest revision of the user's schema, which its name opens; absent when unknown. */
+  latestSchemaId?: string;
   attributes: Record<string, unknown>;
   onSaved: () => Promise<void>;
 }) {
@@ -389,9 +405,16 @@ function ProfileCard({
         {schema && schemaId && (
           <div className="flex max-w-full min-w-0 flex-wrap items-center gap-x-3">
             {name !== schemaId && (
-              <span className={`text-foreground min-w-0 break-words ${FIELD_LABEL_TYPOGRAPHY}`}>
+              // The name is the schema, so it opens the newest revision; the
+              // box beside it is the revision this user is on. `min-h-6` is
+              // the 24px touch target, the box's own height.
+              <Link
+                to="/schemas/$schemaId"
+                params={{ schemaId: latestSchemaId ?? schemaId }}
+                className={`text-foreground inline-flex min-h-6 min-w-0 items-center break-words underline-offset-2 hover:underline ${FIELD_LABEL_TYPOGRAPHY}`}
+              >
                 {name}
-              </span>
+              </Link>
             )}
             <Button
               asChild
