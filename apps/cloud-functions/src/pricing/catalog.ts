@@ -13,9 +13,16 @@ export interface Catalog {
   version: string;
   currency: string;
   plans: {
-    free: { limits: { core_mau_sized_for: number } };
-    pro: { minimum: { amount: number }; custom_domains_included: number };
-    enterprise: { minimum: { tiers_per_year: Record<string, number> } };
+    free: { limits: { core_mau_sized_for: number }; event_retention_days: number };
+    pro: {
+      minimum: { amount: number };
+      custom_domains_included: number;
+      event_retention_days: number;
+    };
+    enterprise: {
+      minimum: { tiers_per_year: Record<string, number> };
+      event_retention_days: number;
+    };
   };
   meters: Meter[];
   licensed: Licensed[];
@@ -66,6 +73,8 @@ export interface Meter {
   pool_of?: string;
   /** The plans that may use it; every plan when unset. */
   plans?: Plan["id"][];
+  /** How long a counted user's audit events are kept: a plan that keeps them as long has it already. */
+  retention_days?: number;
 }
 
 /** A line billed on top of the minimum, never drawn from its credit. */
@@ -82,13 +91,15 @@ export const CATALOG = data as Catalog;
  * What a plan may use and the allowances the server enforces (root ADR 084
  * §6, §8.3): every billed meter the plan offers, at its allowance. Activity
  * drawn from a pool is billed past the pool and never enforced, so it is left
- * out.
+ * out, and so is a retention the plan keeps anyway.
  */
 export function entitlementsFor(plan: Plan["id"], catalog: Catalog = CATALOG): Entitlements {
   const allowances: Record<string, number> = {};
+  const keeps = catalog.plans[plan].event_retention_days;
   for (const meter of catalog.meters) {
     if (meter.price === null || meter.pool_of) continue;
     if (meter.plans && !meter.plans.includes(plan)) continue;
+    if (meter.retention_days && meter.retention_days <= keeps) continue;
     allowances[meter.id] = meter.allowance ?? 0;
   }
   return { plan, allowances };
