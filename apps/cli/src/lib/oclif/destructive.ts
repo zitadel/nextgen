@@ -12,8 +12,11 @@ type CommandClass<T extends BaseCommand> = abstract new (...args: any[]) => T;
 /** Flags that say how a run answers, not what it does, so a retry leaves them out. */
 const ANSWERING = new Set(["--force", "-f", "--json", "--non-interactive", "-n"]);
 
-/** The `user:password@` of a URL, which a retry never prints. */
-const CREDENTIALS = /(\w+:\/\/)[^/@\s]*@/g;
+/**
+ * The `user:password@` of a URL, which a retry never prints: everything in the
+ * authority up to its last `@`, since a password may hold one.
+ */
+const CREDENTIALS = /(\w+:\/\/)[^/?#\s]*@/g;
 
 /** A result that ends a run before anyone is asked, from {@link DestructiveChange.prepare}. */
 export class Settled {

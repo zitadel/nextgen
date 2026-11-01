@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { parseJsonObject, setTopLevelJsonKey, stableStringify } from "../../../src/lib/json";
+import {
+  holdsNull,
+  parseJsonObject,
+  setTopLevelJsonKey,
+  stableStringify,
+} from "../../../src/lib/json";
 
 describe("setTopLevelJsonKey", () => {
   it("splices one value and leaves every other byte untouched", () => {
@@ -137,5 +142,26 @@ describe("parseJsonObject", () => {
 
   it("propagates the JSON.parse SyntaxError for invalid JSON", () => {
     expect(() => parseJsonObject("{ not json", "config.json")).toThrow(SyntaxError);
+  });
+});
+
+describe("holdsNull", () => {
+  it.each([
+    ["a null", null],
+    ["a nested null", { FOO: { value: null } }],
+    ["a null in an array", [1, null]],
+    ["an infinity, sent as null", { FOO: Number.POSITIVE_INFINITY }],
+    ["a NaN, sent as null", { FOO: Number.NaN }],
+    ["an undefined in an array, sent as null", { FOO: [undefined] }],
+  ])("finds %s", (_label, value) => {
+    expect(holdsNull(value)).toBe(true);
+  });
+
+  it.each([
+    ["an ordinary body", { FOO: { value: "x", secret: false } }],
+    ["an undefined field, which is not sent", { FOO: undefined }],
+    ["nothing", undefined],
+  ])("finds none in %s", (_label, value) => {
+    expect(holdsNull(value)).toBe(false);
   });
 });

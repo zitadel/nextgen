@@ -238,6 +238,18 @@ describe("Destructive", () => {
       });
     });
 
+    it("leaves a password holding an @ out of the suggestion", async () => {
+      const command = new Removing({
+        argv: ["API_URL", "--server", "https://me:part1@part2@host/path"],
+      });
+
+      await expect(command.remove()).rejects.toMatchObject({
+        nextCommands: [
+          "npx @zitadel/cli@1.2.3 variable rm API_URL --force --server https://host/path",
+        ],
+      });
+    });
+
     it("keeps the arguments after -- last, after --force", async () => {
       const command = new Removing({ argv: ["--env", "staging", "--", "-FOO"] });
 

@@ -227,15 +227,23 @@ export function parseJsonObject(contents: string, path: string): Record<string, 
 }
 
 /**
+ * Whether `value` is sent with a `null` at any depth, which a merge patch reads
+ * as a removal. It is read as it is sent, so what serializing turns into one
+ * counts too: `NaN` and `Infinity` (a piped `1e999`), and an `undefined` in an
+ * array.
+ */
+export function holdsNull(value: unknown): boolean {
+  const sent = JSON.stringify(value);
+  const nullIn = (item: unknown): boolean =>
+    item === null || (typeof item === "object" && Object.values(item).some(nullIn));
+  return sent !== undefined && nullIn(JSON.parse(sent));
+}
+
+/**
  * Narrows an unknown value to a plain (non-array, non-null) object. Shared by
  * the commands and the file-writer that walk parsed JSON, so the predicate
  * isn't reimplemented per call site.
  */
-/** Whether `value` is `null` or holds one at any depth, which a merge patch reads as a removal. */
-export function holdsNull(value: unknown): boolean {
-  return value === null || (typeof value === "object" && Object.values(value).some(holdsNull));
-}
-
 export function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
