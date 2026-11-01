@@ -78,12 +78,14 @@ test("the playground uses the reader's session after visiting a live example", a
   // the worker's own fetches; a context route answers those too, so this
   // test never reaches real data when it runs against a deployment.
   await context.route(
-    (url) => url.origin === origin && ["/sessions/me", "/teams/query"].includes(url.pathname),
+    (url) =>
+      url.origin === origin &&
+      ["/api/v1/sessions/me", "/api/v1/teams/query"].includes(url.pathname),
     async (route) => {
       const request = route.request();
       const path = new URL(request.url()).pathname;
       calls.push(`${request.method()} ${path}`);
-      if (path === "/sessions/me") {
+      if (path === "/api/v1/sessions/me") {
         await route.fulfill({
           json: { user: { user_id: "usr_docs_test", display: "Docs regression reader" } },
         });
@@ -118,7 +120,7 @@ test("the playground uses the reader's session after visiting a live example", a
 
   await expect
     .poll(() => calls)
-    .toEqual(["GET /sessions/me", "GET /sessions/me", "POST /teams/query"]);
+    .toEqual(["GET /api/v1/sessions/me", "GET /api/v1/sessions/me", "POST /api/v1/teams/query"]);
 });
 
 test("the design guide's login wears the stylesheet it shows", async ({ page }) => {

@@ -7,7 +7,6 @@ import (
 	"sync"
 
 	"github.com/go-jose/go-jose/v4"
-	generated "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api"
 	"github.com/zitadel/nextgen/internal/api/integration_test/test_data"
 	"github.com/zitadel/nextgen/internal/crypto"
@@ -34,7 +33,7 @@ type Harness struct {
 	secretGenerator dependency[secrets.Generator]
 	joseSigner      dependency[jose.Signer]
 
-	generatedServer dependency[*generated.Server]
+	apiServers      dependency[*api.Servers]
 	handler         dependency[*api.Handler]
 	securityHandler dependency[*api.SecurityHandler]
 

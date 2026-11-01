@@ -141,6 +141,12 @@
   ],
   "rewrites": [
     {
+      "source": "/api/(.*)",
+      "destination": {
+        "service": "server"
+      }
+    },
+    {
       "source": "/console/runtime.json",
       "destination": {
         "service": "server"

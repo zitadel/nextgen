@@ -23,7 +23,7 @@ const ada: Reader = { user_id: "usr_docs_ada", display: "Ada from the docs tests
 const grace: Reader = { user_id: "usr_docs_grace", display: "Grace from the docs tests" };
 
 /** The API's paths these tests send to; the stub answers each of them. */
-const stubbed = /^\/(?:sessions\/me|teams(?:\/query)?|users\/me|grants\/[^/]+)$/;
+const stubbed = /^\/api\/v1\/(?:sessions\/me|teams(?:\/query)?|users\/me|grants\/[^/]+)$/;
 
 /**
  * Answers the session reads as `reader()` says, and records every other
@@ -45,7 +45,7 @@ async function stubSession(
       const request = route.request();
       const method = request.method();
       const path = new URL(request.url()).pathname;
-      if (method === "GET" && path === "/sessions/me") {
+      if (method === "GET" && path === "/api/v1/sessions/me") {
         reads += 1;
         if (!stall || reads === 1) await route.fulfill({ json: { user: reader() } });
       } else {
@@ -84,9 +84,14 @@ test("a read goes out with the session: a GET and a POST …/query", async ({
       operation: "users/getMyUser",
       title: "Get my user information",
       method: "GET",
-      path: "/users/me",
+      path: "/api/v1/users/me",
     },
-    { operation: "teams/queryTeams", title: "Query teams", method: "POST", path: "/teams/query" },
+    {
+      operation: "teams/queryTeams",
+      title: "Query teams",
+      method: "POST",
+      path: "/api/v1/teams/query",
+    },
   ];
   for (const { operation, title, method, path } of reads) {
     const { note, send } = await openPlayground(page, operation, title);
@@ -139,7 +144,7 @@ test("a request with a bearer token goes as it is", async ({ page, context, base
   await send.click();
   await expect
     .poll(() => sent)
-    .toEqual([{ method: "POST", path: "/teams", authorization: "Bearer docs-test-secret" }]);
+    .toEqual([{ method: "POST", path: "/api/v1/teams", authorization: "Bearer docs-test-secret" }]);
   // The playground did not even ask whose session it is.
   expect(sessionReads()).toBe(1);
 });
@@ -163,7 +168,7 @@ test("the playground sends nothing as another account than the one it shows", as
 
   // Sent again, it goes as the account the page now shows.
   await send.click();
-  await expect.poll(() => sent).toEqual([{ method: "POST", path: "/teams/query" }]);
+  await expect.poll(() => sent).toEqual([{ method: "POST", path: "/api/v1/teams/query" }]);
 });
 
 test("a session lookup that never answers ends with the playground's timeout", async ({
@@ -195,7 +200,7 @@ test("optional project scope starts unset and can be set and unset explicitly", 
   const origin = new URL(baseURL!).origin;
   const projects: (string | null)[] = [];
   await context.route(
-    (url) => url.origin === origin && url.pathname === "/users/query",
+    (url) => url.origin === origin && url.pathname === "/api/v1/users/query",
     async (route) => {
       projects.push(new URL(route.request().url()).searchParams.get("project_id"));
       await route.fulfill({ json: { users: [] } });
@@ -298,7 +303,7 @@ test("a signed-out reader's sample starts with project-secret authentication", a
 }) => {
   const origin = new URL(baseURL!).origin;
   await context.route(
-    (url) => url.origin === origin && url.pathname === "/sessions/me",
+    (url) => url.origin === origin && url.pathname === "/api/v1/sessions/me",
     (route) => route.fulfill({ status: 401, json: { code: "auth.unauthorized" } }),
   );
   await page.goto("/docs/reference/api/users/queryUsers");

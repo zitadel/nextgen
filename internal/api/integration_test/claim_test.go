@@ -40,7 +40,7 @@ func exchangeForSessionCookie(t *testing.T, projectID, projectSecret, handoffTok
 	body, err := json.Marshal(map[string]string{"handoff_token": handoffToken})
 	require.NoError(t, err)
 	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost,
-		harness.EnsureTestServer(t).URL+"/sessions/exchange?project_id="+projectID, bytes.NewReader(body))
+		harness.APIBaseURL(t)+"/sessions/exchange?project_id="+projectID, bytes.NewReader(body))
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+projectSecret)
@@ -257,7 +257,7 @@ func TestInitClaimAlreadyClaimed(t *testing.T) {
 	harness.SeedOwningTeam(t, project.ID, team.ID)
 
 	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost,
-		harness.EnsureTestServer(t).URL+"/projects/"+project.ID+"/claim/init", nil)
+		harness.APIBaseURL(t)+"/projects/"+project.ID+"/claim/init", nil)
 	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+harness.ProjectSecret(t, project))
 
@@ -587,7 +587,7 @@ func TestClaimAuthNegatives(t *testing.T) {
 
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
-	serverURL := harness.EnsureTestServer(t).URL
+	serverURL := harness.APIBaseURL(t)
 
 	do := func(t *testing.T, method, url string, body io.Reader) (int, *api.ErrorDetails) {
 		t.Helper()
