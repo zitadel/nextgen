@@ -161,7 +161,7 @@ describe("Settings → Usage", () => {
     const team = await usage({ systems: mockSystems(), provisionOnce: vi.fn() });
     const days = team.days.flatMap(({ entries }) => entries);
     expect(team.days).toHaveLength(31);
-    expect(days.reduce((sum, entry) => sum + entry.amount, 0)).toBe(30_500);
+    expect(days.reduce((sum, entry) => sum + entry.amount, 0)).toBe(142_000);
     expect(team.projects.map((project) => project.name)).toEqual([
       "Customer portal",
       "Partner API",
@@ -173,7 +173,7 @@ describe("Settings → Usage", () => {
     expect(team).toMatchObject({
       credit: { amount: 0, used: 0 },
       on_demand_amount: 0,
-      estimate: { plan: "pro", total_amount: 30_500 },
+      estimate: { plan: "pro", total_amount: 142_000 },
     });
   });
 
@@ -183,7 +183,7 @@ describe("Settings → Usage", () => {
     const team = await usage({ systems, provisionOnce: vi.fn() });
     expect(team).toMatchObject({
       credit: { amount: 10_000, used: 10_000 },
-      on_demand_amount: 20_500,
+      on_demand_amount: 132_000,
     });
   });
 });

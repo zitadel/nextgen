@@ -71,6 +71,8 @@ export interface Meter {
   plans?: Plan["id"][];
   /** How long a counted user's audit events are kept: a plan that keeps them as long has it already. */
   retention_days?: number;
+  /** Counts at most `at_most` users per connection or directory a month. */
+  counted_per?: { key: "connection" | "directory"; at_most: number };
 }
 
 /** A line billed on top of the minimum, never drawn from its credit. */

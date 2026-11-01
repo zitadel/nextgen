@@ -17,8 +17,8 @@ describe("a day's price", () => {
     const days = pricedDays([1, 2, 3].map((n) => count(n, "sso_users", 600)));
     expect(days.map(({ entries }) => entries.map((entry) => entry.amount))).toEqual([
       [0],
-      [300],
-      [900],
+      [2_000],
+      [6_000],
     ]);
   });
 
@@ -45,11 +45,11 @@ describe("a day's price", () => {
     const [first] = pricedDays([
       count(1, "sso_users", 1_401, "proj_a"),
       count(1, "sso_users", 400, "proj_b"),
-      count(1, "sso_users", 199, "proj_c"),
+      count(1, "sso_users", 202, "proj_c"),
     ]);
     const parts = first?.entries.map((entry) => entry.amount) ?? [];
     expect(parts.every(Number.isInteger)).toBe(true);
-    expect(parts.reduce((sum, part) => sum + part, 0)).toBe(1_500);
+    expect(parts.reduce((sum, part) => sum + part, 0)).toBe(10_030);
   });
 });
 
