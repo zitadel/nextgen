@@ -38,6 +38,7 @@ import { COMMANDS } from "../../../src/index";
 import {
   definitionOf,
   describeBody,
+  type Json,
   parseFilter,
   parseSort,
   type ResourceDescriptor,
@@ -2218,6 +2219,17 @@ describe("the registry builders", () => {
         client.listEvents({ ...params, project_id: projectId }),
       items: (page: ListEvents200) => page.data,
       next: (page: ListEvents200) => page.next_page_token,
+    });
+  });
+
+  it("refuses filters on a GET list whose call parameter is untyped", () => {
+    list({
+      // @ts-expect-error an untyped parameter would check no filter, so none is taken
+      filters: [{ field: "object_type", operations: ["equals"] }],
+      call: ({ client, projectId }: Platform, params: Json) =>
+        client.listSchemas({ ...params, project_id: projectId }),
+      items: (page: ListSchemas200) => page.schemas,
+      next: (page: ListSchemas200) => page.next_page_token,
     });
   });
 

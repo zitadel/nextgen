@@ -3,6 +3,11 @@ import {
   ListEventsCategoryItem,
   ListFlowDefinitionsRevisions,
   ListSchemasRevisions,
+  QueryGrantsBodyFilterItemOperation,
+  QueryIdpsBodyFilterItemOperation,
+  QueryProjectsBodyFilterItemOperation,
+  QuerySessionsBodyFilterItemOperation,
+  QueryTeamsBodyFilterItemOperation,
   QueryUsersBodyFilterItemOperation,
 } from "@zitadel/api/generated/model";
 import {
@@ -156,11 +161,13 @@ type QueryList<B> = Readonly<{
   sorts?: readonly NoInfer<BodySortField<B>>[];
   sortParam?: undefined;
 }>;
+// A `GET` list whose call parameter is untyped has a request of any key, which
+// would check nothing, so it takes no filters or `sortParam` at all.
 type GetList<B> = Readonly<{
   body?: undefined;
-  filters?: readonly NoInfer<GetFilter<B>>[];
+  filters?: string extends keyof B ? never : readonly NoInfer<GetFilter<B>>[];
   sorts?: readonly string[];
-  sortParam?: NoInfer<keyof B & string>;
+  sortParam?: string extends keyof B ? never : NoInfer<keyof B & string>;
 }>;
 
 /** What a `GET` list's call takes: the client function's query, less what the platform fills. */
@@ -171,9 +178,10 @@ type Query<K extends keyof ZitadelClient> = Omit<
 
 // Infers a list's page `P` from `call` and its item `T` from `items`, which
 // reads the list off that page, and checks `item` against `T`. Infers a
-// structured query's request type `B` from its `body` schema; a `GET` list has
-// no body, so its request stays `Json`. `items` comes after `call`, so the page
-// is known when `items` is read.
+// structured query's request type `B` from its `body` schema, and a `GET` list's
+// from its call's parameter, which must be typed (`params: Query<"listX">`) for
+// the list to take filters or a `sortParam`. `items` comes after `call`, so the
+// page is known when `items` is read.
 export const list = <B = Json, P = unknown, T = unknown, S extends FieldsOf<T> = FieldsOf<T>>(
   spec: ListSpec<Platform, B, P, T> & { item?: Schema<S> } & (QueryList<B> | GetList<B>),
 ): NoInfer<ListSpec<Platform, B, P, T>> => spec;
@@ -216,12 +224,26 @@ export const resource = <
   [checked]: true,
 });
 
-/**
- * Filter operations of `POST /<resource>/query` endpoints (ADR 031), as the API
- * spells them. Every query offers the same set; `list` checks each against the
- * operations its own body takes.
- */
-const FILTER_OPERATIONS = Object.values(QueryUsersBodyFilterItemOperation);
+// The filter operations each `POST /<resource>/query` endpoint takes (ADR 031),
+// from its own body's enum, so a query that gains one offers it.
+const USER_OPERATIONS = Object.values(QueryUsersBodyFilterItemOperation);
+const TEAM_OPERATIONS = Object.values(QueryTeamsBodyFilterItemOperation);
+const SESSION_OPERATIONS = Object.values(QuerySessionsBodyFilterItemOperation);
+const GRANT_OPERATIONS = Object.values(QueryGrantsBodyFilterItemOperation);
+const IDP_OPERATIONS = Object.values(QueryIdpsBodyFilterItemOperation);
+const PROJECT_OPERATIONS = Object.values(QueryProjectsBodyFilterItemOperation);
+
+/** Every operation a query takes: the `--filter` grammar's whole vocabulary. */
+const FILTER_OPERATIONS = [
+  ...new Set([
+    ...USER_OPERATIONS,
+    ...TEAM_OPERATIONS,
+    ...SESSION_OPERATIONS,
+    ...GRANT_OPERATIONS,
+    ...IDP_OPERATIONS,
+    ...PROJECT_OPERATIONS,
+  ]),
+];
 
 /** A release's pointers as an indented table, one pinned revision per row. */
 export const releasePointers = (release: Pick<GetReleaseById200, "pointers">): string => {
@@ -265,13 +287,13 @@ export const RESOURCES = {
       body: QueryUsersBody,
       item: QueryUsersResponse.shape.users.element,
       filters: [
-        { field: "created_at", operations: FILTER_OPERATIONS },
-        { field: "id", operations: FILTER_OPERATIONS },
-        { field: "schema", operations: FILTER_OPERATIONS },
+        { field: "created_at", operations: USER_OPERATIONS },
+        { field: "id", operations: USER_OPERATIONS },
+        { field: "schema", operations: USER_OPERATIONS },
         { field: "schema_object_type", operations: ["equals", "not_equals", "contains"] },
-        { field: "status", operations: FILTER_OPERATIONS },
-        { field: "team_id", operations: FILTER_OPERATIONS },
-        { field: "lifecycle_owner_team_id", operations: FILTER_OPERATIONS },
+        { field: "status", operations: USER_OPERATIONS },
+        { field: "team_id", operations: USER_OPERATIONS },
+        { field: "lifecycle_owner_team_id", operations: USER_OPERATIONS },
       ],
       sorts: ["created_at", "id", "schema", "status", "lifecycle_owner_team_id"],
       // No project_id: the users query defaults to the token's own project,
@@ -300,9 +322,9 @@ export const RESOURCES = {
       body: QueryTeamsBody,
       item: QueryTeamsResponse.shape.teams.element,
       filters: [
-        { field: "created_at", operations: FILTER_OPERATIONS },
-        { field: "name", operations: FILTER_OPERATIONS },
-        { field: "status", operations: FILTER_OPERATIONS },
+        { field: "created_at", operations: TEAM_OPERATIONS },
+        { field: "name", operations: TEAM_OPERATIONS },
+        { field: "status", operations: TEAM_OPERATIONS },
       ],
       sorts: ["created_at", "name", "status"],
       call: ({ client, projectId }, body) => client.queryTeams(body, { project_id: projectId }),
@@ -330,10 +352,10 @@ export const RESOURCES = {
       body: QuerySessionsBody,
       item: QuerySessionsResponse.shape.sessions.element,
       filters: [
-        { field: "created_at", operations: FILTER_OPERATIONS },
-        { field: "user_id", operations: FILTER_OPERATIONS },
-        { field: "state", operations: FILTER_OPERATIONS },
-        { field: "lifecycle_owner_team_id", operations: FILTER_OPERATIONS },
+        { field: "created_at", operations: SESSION_OPERATIONS },
+        { field: "user_id", operations: SESSION_OPERATIONS },
+        { field: "state", operations: SESSION_OPERATIONS },
+        { field: "lifecycle_owner_team_id", operations: SESSION_OPERATIONS },
       ],
       sorts: ["created_at", "user_id"],
       call: ({ client, projectId }, body) => client.querySessions(body, { project_id: projectId }),
@@ -418,11 +440,11 @@ export const RESOURCES = {
       body: QueryGrantsBody,
       item: QueryGrantsResponse.shape.grants.element,
       filters: [
-        { field: "created_at", operations: FILTER_OPERATIONS },
-        { field: "user_id", operations: FILTER_OPERATIONS },
-        { field: "team_id", operations: FILTER_OPERATIONS },
-        { field: "relation", operations: FILTER_OPERATIONS },
-        { field: "expires_at", operations: FILTER_OPERATIONS },
+        { field: "created_at", operations: GRANT_OPERATIONS },
+        { field: "user_id", operations: GRANT_OPERATIONS },
+        { field: "team_id", operations: GRANT_OPERATIONS },
+        { field: "relation", operations: GRANT_OPERATIONS },
+        { field: "expires_at", operations: GRANT_OPERATIONS },
       ],
       sorts: ["created_at", "expires_at", "id"],
       call: ({ client, projectId }, body) => client.queryGrants(body, { project_id: projectId }),
@@ -460,8 +482,8 @@ export const RESOURCES = {
       body: QueryIdpsBody,
       item: QueryIdpsResponse.shape.idps.element,
       filters: [
-        { field: "slug", operations: FILTER_OPERATIONS },
-        { field: "created_at", operations: FILTER_OPERATIONS },
+        { field: "slug", operations: IDP_OPERATIONS },
+        { field: "created_at", operations: IDP_OPERATIONS },
       ],
       sorts: ["slug", "created_at"],
       call: ({ client, projectId }, body) => client.queryIdps(body, { project_id: projectId }),
@@ -499,7 +521,7 @@ export const RESOURCES = {
     list: list({
       body: QueryProjectsBody,
       item: QueryProjectsResponse.shape.projects.element,
-      filters: [{ field: "created_at", operations: FILTER_OPERATIONS }],
+      filters: [{ field: "created_at", operations: PROJECT_OPERATIONS }],
       sorts: ["created_at"],
       call: ({ client }, body) => client.queryProjects(body),
       items: (page) => page.projects,
