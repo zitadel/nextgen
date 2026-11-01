@@ -122,6 +122,24 @@ describe("api", () => {
         expect(await app.projectVariables()).toEqual([]);
       });
 
+      it("refuses a merge patch that removes a variable without --force", async () => {
+        const app = await aSetUpApp();
+        expect(await app.setVariable("FOO", "bar")).toSucceed();
+
+        const result = await app.api("updateVariables", "-F", "FOO:=null");
+
+        expect(result).toFailWith("E_VALIDATION");
+      });
+
+      it("keeps the variable a refused merge patch would have removed", async () => {
+        const app = await aSetUpApp();
+        expect(await app.setVariable("FOO", "bar")).toSucceed();
+
+        await app.api("updateVariables", "-F", "FOO:=null");
+
+        expect(await app.projectVariables()).not.toEqual([]);
+      });
+
       it("refuses an operation only an end user's session authenticates", async () => {
         const app = await aSetUpApp();
 

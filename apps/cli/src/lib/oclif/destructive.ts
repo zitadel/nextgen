@@ -1,4 +1,6 @@
 import { Consent, type Gate } from "../consent";
+import { shellArg } from "../shell";
+import { inShell } from "../suggestion";
 import type { BaseCommand } from "./base";
 import { Promptable } from "./promptable";
 import type { CommandResult } from "./types";
@@ -90,19 +92,28 @@ export function Destructive<TBase extends CommandClass<BaseCommand>>(Base: TBase
      * invocation again with `--force`, as typed: after the leading arguments,
      * without the flags that only say how to answer or a URL's credentials,
      * and with the selector put back on by {@link BaseCommand.retryCommand}.
+     * Whatever follows a `--` stays last, after it, where it is read as
+     * arguments rather than flags.
      */
     protected consent(gate: Gate): Promise<Consent | undefined> {
-      const typed = this.argv
+      const delimiter = this.argv.indexOf("--");
+      const flags = delimiter === -1 ? this.argv : this.argv.slice(0, delimiter);
+      const typed = flags
         .filter((word) => !ANSWERING.has(word))
         .map((word) => word.replace(CREDENTIALS, "$1"));
       const leading = typed.findIndex((word) => word.startsWith("-"));
       const split = leading === -1 ? typed.length : leading;
-      const retry = this.retryCommand([
+      const command = this.retryCommand([
         ...(this.id ?? "").split(":").filter((word) => word !== ""),
         ...typed.slice(0, split),
         "--force",
         ...typed.slice(split),
       ]);
+      const trailing = delimiter === -1 ? [] : this.argv.slice(delimiter + 1);
+      const retry =
+        trailing.length === 0
+          ? command
+          : inShell(command, { after: ` -- ${trailing.map(shellArg).join(" ")}` });
       return Consent.request("retry" in gate ? gate : { ...gate, retry }, {
         interactive: !this.meta.nonInteractive,
         force: this.meta.force,

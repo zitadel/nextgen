@@ -238,6 +238,14 @@ describe("Destructive", () => {
       });
     });
 
+    it("keeps the arguments after -- last, after --force", async () => {
+      const command = new Removing({ argv: ["--env", "staging", "--", "-FOO"] });
+
+      await expect(command.remove()).rejects.toMatchObject({
+        nextCommands: ["npx @zitadel/cli@1.2.3 variable rm --force --env staging -- -FOO"],
+      });
+    });
+
     it("suggests no empty command word when the command has no id", async () => {
       await expect(new Unnamed({}).remove()).rejects.toMatchObject({
         nextCommands: ["npx @zitadel/cli@1.2.3 API_URL --force"],

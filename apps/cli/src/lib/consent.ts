@@ -1,9 +1,10 @@
 import type { ZitadelClient as FullClient } from "@zitadel/api/client";
-import { destructiveOperations } from "@zitadel/api/generated/operations";
+import { destructiveOperations, nullRemovingOperations } from "@zitadel/api/generated/operations";
 
 import type { ZitadelClient } from "./api-client";
 import { ZitadelError } from "./errors";
 import { input } from "./input";
+import { holdsNull } from "./json";
 import type { SuggestedCommand } from "./suggestion";
 
 /**
@@ -60,22 +61,42 @@ const granted = new WeakSet<object>();
 /** The client functions a narrowed client refuses. */
 const WITHHELD: ReadonlySet<string> = new Set(destructiveOperations);
 
+/** The client functions a narrowed client refuses when an argument holds a `null`. */
+const NULL_REMOVING: ReadonlySet<string> = new Set(nullRemovingOperations);
+
 /** Each narrowed client's full client, which only {@link Consent.unlock} reads. */
 const fullClients = new WeakMap<object, FullClient>();
 
 /**
  * The client without its destructive operations, at run time as in its type:
- * reaching one throws, however it is reached (a cast, `Reflect.get`, an
- * `any`), and only {@link Consent.unlock} hands back the full client.
- * `createZitadelClient` narrows every client it makes.
+ * reaching one throws, however it is reached (a cast, `Reflect.get`, a
+ * property descriptor, an `any`), and so does calling a merge-patch operation
+ * with a `null`, which removes what it names. Only {@link Consent.unlock}
+ * hands back the full client. `createZitadelClient` narrows every client it
+ * makes.
  */
 export function withholdDestructive(client: FullClient): ZitadelClient {
+  const refuse = (what: string): never => {
+    throw new Error(`${what} is destructive: reach it through a Consent`);
+  };
   const narrowed = new Proxy(client, {
     get(target, property, receiver) {
       if (typeof property === "string" && WITHHELD.has(property)) {
-        throw new Error(`${property} is destructive: reach it through a Consent`);
+        refuse(property);
       }
-      return Reflect.get(target, property, receiver);
+      const value = Reflect.get(target, property, receiver);
+      if (typeof property !== "string" || !NULL_REMOVING.has(property)) {
+        return value;
+      }
+      const call = value as (...args: unknown[]) => unknown;
+      return (...args: unknown[]) =>
+        args.some(holdsNull) ? refuse(`${property} with a null`) : call(...args);
+    },
+    getOwnPropertyDescriptor(target, property) {
+      if (typeof property === "string" && (WITHHELD.has(property) || NULL_REMOVING.has(property))) {
+        refuse(property);
+      }
+      return Reflect.getOwnPropertyDescriptor(target, property);
     },
   });
   fullClients.set(narrowed, client);
@@ -101,9 +122,7 @@ export class Consent {
   /** Makes the type nominal: no object of the same shape is a `Consent`. */
   declare private readonly nominal: never;
 
-  private constructor() {
-    granted.add(this);
-  }
+  private constructor() {}
 
   /**
    * Ask for consent. `--force` gives it without asking; with nobody to ask
@@ -126,7 +145,14 @@ export class Consent {
         { kind: "confirm", name: gate.name, message: gate.message, retry: gate.retry },
         session,
       );
-      return agreed ? new Consent() : undefined;
+      if (!agreed) {
+        return undefined;
+      }
+      // Recorded here rather than in the constructor, which `Reflect.construct`
+      // reaches around its TypeScript-only privacy.
+      const consent = new Consent();
+      granted.add(consent);
+      return consent;
     } catch (error) {
       if (error instanceof ZitadelError && error.code === "E_VALIDATION") {
         refusals.add(error);

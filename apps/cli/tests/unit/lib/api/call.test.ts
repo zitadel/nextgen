@@ -93,7 +93,7 @@ describe("send", () => {
   it("sends nothing for a destructive operation without consent", async () => {
     const sent: string[] = [];
     server.use(
-      http.delete(`${SERVER}/teams/team_1`, ({ request }) => {
+      http.delete(`${SERVER}/api/v1/teams/team_1`, ({ request }) => {
         sent.push(request.url);
         return new HttpResponse(null, { status: 204 });
       }),
@@ -102,6 +102,22 @@ describe("send", () => {
     await send(SERVER, "s", requestFor("deleteTeam", [], ["team_1"])).catch(() => undefined);
 
     expect(sent).toEqual([]);
+  });
+
+  it("refuses a merge patch that removes a variable without consent", async () => {
+    await expect(
+      send(SERVER, "s", requestFor("updateVariables", ["FOO:=null", "project_id=proj_1"])),
+    ).rejects.toThrow("A destructive operation ran without consent");
+  });
+
+  it("sends a merge patch that only assigns without consent", async () => {
+    server.use(
+      http.patch(`${SERVER}/api/v1/variables`, () => HttpResponse.json({ variables: [] })),
+    );
+
+    await expect(
+      send(SERVER, "s", requestFor("updateVariables", ["FOO=bar", "project_id=proj_1"])),
+    ).resolves.toMatchObject({ status: 200 });
   });
 
   it("answers text for a response that is not JSON", async () => {

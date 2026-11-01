@@ -71,6 +71,8 @@ no command answers to.
 
 - Every `DELETE` is destructive; a `POST` that removes, revokes or rolls back
   says so with `x-zitadel-destructive: true` after its `x-zitadel-cli`.
+- A `PATCH` whose `null` removes what it names (RFC 7386) says
+  `x-zitadel-destructive: null-removes`: only a body holding a null needs consent.
 - The CLI's client only exposes a destructive operation behind a confirmation
   ([consent](../../apps/cli/src/lib/consent.ts)).
 

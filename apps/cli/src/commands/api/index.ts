@@ -10,7 +10,7 @@ import {
   type Target,
   uncallable,
 } from "../../lib/api/operations";
-import { buildRequest, pathValuesOf, readInput, urlOf } from "../../lib/api/request";
+import { buildRequest, isDestructive, pathValuesOf, readInput, urlOf } from "../../lib/api/request";
 import { ZitadelError } from "../../lib/errors";
 import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../../lib/oclif";
 import { readZitadelSecret } from "../../lib/project";
@@ -144,7 +144,8 @@ export default class Api extends Destructive(BaseCommand) {
     if (process.stdout.isTTY) {
       consola.info(`${operation.method} ${urlOf(meta.source, request)}`);
     }
-    const consent = operation.destructive
+    const destructive = isDestructive(request);
+    const consent = destructive
       ? await this.consent({
           verb: "call",
           name: `call ${operation.id}`,
@@ -154,7 +155,7 @@ export default class Api extends Destructive(BaseCommand) {
           ].join(" "),
         })
       : undefined;
-    if (operation.destructive && consent === undefined) {
+    if (destructive && consent === undefined) {
       return this.emit({ status: "skipped", reason: "call-cancelled" });
     }
     const token = operation.auth === "secret" ? secret?.project_secret : undefined;

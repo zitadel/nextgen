@@ -140,6 +140,7 @@ describe("Consent", () => {
       ["nothing", undefined],
       ["an object of the same shape", { verb: "remove", unlock: () => undefined }],
       ["an object built from its prototype", Object.create(Consent.prototype)],
+      ["one constructed around its private constructor", Reflect.construct(Consent, [])],
     ])("refuses %s", (_label, value) => {
       expect(() => Consent.assert(value)).toThrow("A destructive operation ran without consent");
     });
@@ -178,6 +179,24 @@ describe("withholdDestructive", () => {
   it("refuses a destructive operation reached around the type", () => {
     expect(() => Reflect.get(aClient(), "revokeRelease")).toThrow(
       "revokeRelease is destructive: reach it through a Consent",
+    );
+  });
+
+  it("refuses a destructive operation reached through its property descriptor", () => {
+    expect(() => Object.getOwnPropertyDescriptor(aClient(), "deleteVariable")).toThrow(
+      "deleteVariable is destructive: reach it through a Consent",
+    );
+  });
+
+  it("refuses a merge patch that removes with a null", () => {
+    expect(() => aClient().updateVariables({ FOO: null }, { project_id: "proj_1" })).toThrow(
+      "updateVariables with a null is destructive: reach it through a Consent",
+    );
+  });
+
+  it("refuses a merge-patch operation reached through its property descriptor", () => {
+    expect(() => Object.getOwnPropertyDescriptor(aClient(), "updateVariables")).toThrow(
+      "updateVariables is destructive: reach it through a Consent",
     );
   });
 

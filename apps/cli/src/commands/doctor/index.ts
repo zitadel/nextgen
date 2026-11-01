@@ -515,7 +515,8 @@ export function advisoryForWarnings(
     nextActions.push(
       "Make the app's issuer a primary origin; `zitadel deploy` lands only on primary origins, and `zitadel setup` 0.1.0 registered it as a preview one.",
     );
-    nextCommands.push(projectCommand("doctor --fix", selector, cliVersion));
+    // The repair removes the origin and adds it back, which needs consent.
+    nextCommands.push(projectCommand("doctor --fix --force", selector, cliVersion));
   }
 
   if (hasRepairableMetaSchemas(warnings.find((check) => check.name === "meta-schemas"))) {

@@ -231,6 +231,11 @@ export function parseJsonObject(contents: string, path: string): Record<string, 
  * the commands and the file-writer that walk parsed JSON, so the predicate
  * isn't reimplemented per call site.
  */
+/** Whether `value` is `null` or holds one at any depth, which a merge patch reads as a removal. */
+export function holdsNull(value: unknown): boolean {
+  return value === null || (typeof value === "object" && Object.values(value).some(holdsNull));
+}
+
 export function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }

@@ -7,7 +7,7 @@ import { ZitadelError } from "../errors";
 import { isObject } from "../json";
 import { interruptSignal } from "../interrupt";
 import { collectPages } from "../oclif/crud/paging";
-import { type ApiRequest, urlOf } from "./request";
+import { type ApiRequest, isDestructive, urlOf } from "./request";
 
 /** What the server answered. `body` is `undefined` for a response without one. */
 export type ApiResponse = Readonly<{ status: number; body: unknown }>;
@@ -37,7 +37,7 @@ const readBody = async (res: Response): Promise<unknown> => {
  * (`createZitadelClient`), and what the server says is escaped the same way:
  * a non-2xx is the {@link ApiError} `toZitadelError` maps to an exit code.
  *
- * A destructive operation (the spec marks them) is sent only with the
+ * A destructive request ({@link isDestructive}) is sent only with the
  * `consent` its command asked for, as the client's are.
  */
 export const send = async (
@@ -61,7 +61,7 @@ const sendRaw = async (
   request: ApiRequest,
   consent?: Consent,
 ): Promise<{ status: number; raw: unknown }> => {
-  if (request.operation.destructive) {
+  if (isDestructive(request)) {
     Consent.assert(consent);
   }
   const url = urlOf(server, request);
