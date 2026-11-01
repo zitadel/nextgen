@@ -1,5 +1,8 @@
 import { spinner } from "@clack/prompts";
 import { Flags } from "@oclif/core";
+import { pages } from "@zitadel/api/runtime/paging";
+
+import { sanitizeResponse } from "../../../api-client";
 
 import { nonBlankString } from "../../flags";
 
@@ -10,7 +13,7 @@ import { type ParsedFilter, parseFilter, parseSort } from "../query";
 import { parseOrThrow } from "../shared";
 import { chosenColumns } from "../columns";
 import { shellOption } from "../../../shell";
-import { fieldPaths, itemSchemaOf } from "../paths";
+import { fieldPaths } from "../paths";
 import { renderRows, renderTable } from "../table";
 import type { Json, ListSpec } from "../types";
 import {
@@ -108,9 +111,11 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
     const wire = wireOf(options.wire);
     // With a schema in hand the columns are known before any request, so a
     // typo fails without contacting the server at all.
-    const shape = fieldPaths(itemSchemaOf(spec.response, spec.items));
+    const shape = fieldPaths(spec.item);
     const early = shape ? chosenColumns(flags.fields, resource.columns, [], shape) : undefined;
-    const ctx = await this.context();
+    // Every list's pages arrive as the server sent them, so the walk below
+    // sends each cursor back unchanged and escapes only what the list answers.
+    const ctx = await this.context({ verbatim: true });
     // An unpaged endpoint has no cursor flags to read and would reject the
     // parameters anyway, so nothing is sent and one request is the whole list.
     const paged = spec.paged !== false;
@@ -126,7 +131,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
     // field's own declaration first, so an operation the endpoint does not
     // offer fails locally with what that field accepts.
     const given = (Array.isArray(flags.filter) ? flags.filter : []).map((raw) =>
-      parseFilter(String(raw), spec.filters ?? []),
+      parseFilter(String(raw), spec.filters ?? [], options.operations),
     );
     // A field that declares a default contributes it only when the caller did
     // not name that field, so naming it always wins.
@@ -178,23 +183,25 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
     progress?.start(`Fetching ${topic}`);
     let fetched = 0;
     let drained = false;
+    // The walk begins at the page --page-token names, if any.
+    const first = typeof flags["page-token"] === "string" ? flags["page-token"] : undefined;
     // The spinner owns the cursor and a SIGINT handler until it is stopped, so a
     // page that fails mid-drain has to stop it too; otherwise the error prints
     // under a live spinner and the handler outlives the command.
-    const { items, next } = await collectPages(
+    const walk = pages(
       async (token) => {
-        const page = await request(token);
+        const page = await request(token ?? first);
         fetched += 1;
         progress?.message(`Fetching ${topic} — page ${fetched}`);
         return page;
       },
-      {
-        items: spec.items,
-        all,
-        nextPageToken: wire.nextPageToken,
-        token: paged && typeof flags["page-token"] === "string" ? flags["page-token"] : undefined,
-      },
-    )
+      { next: (response) => spec.next?.(response) || undefined },
+    );
+    const { items, next } = await collectPages(walk, {
+      items: (response) => sanitizeResponse(spec.items(response)),
+      all,
+      next: (response) => sanitizeResponse(spec.next?.(response)),
+    })
       .then((page) => {
         drained = true;
         return page;

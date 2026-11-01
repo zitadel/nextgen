@@ -1,12 +1,7 @@
 import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
-import type {
-  CreateFlowDefinition201,
-  CreateIdpBodyIdp,
-  CreateSchema201,
-  CreateSchemaBody,
-} from "@zitadel/api/generated/model";
+import type { CreateIdpBodyIdp, PublishPolicy201 } from "@zitadel/api/generated/model";
 import type { ZitadelClient } from "./api-client";
 import {
   DEFAULT_FLOW_CONFIG_PATH,
@@ -15,12 +10,13 @@ import {
   DEFAULT_SETUP_PRESET,
   DEFAULT_SETUP_USE_CASE,
   flowsReadmeContent,
-  getDefaultHumanUserSchema,
+  getDefaultHumanUserSchemaBody,
   getDefaultLoginFlow,
   policiesReadmeContent,
   schemasReadmeContent,
   type SetupPreset,
   type SetupUseCase,
+  type UserSchemaDocument,
 } from "@zitadel/config/defaults";
 import {
   type ConnectionEndpoints,
@@ -129,7 +125,7 @@ export async function materializeSetupResources(opts: {
   const filesWritten: string[] = [];
   const preset = opts.preset ?? DEFAULT_SETUP_PRESET;
   const useCase = opts.useCase ?? DEFAULT_SETUP_USE_CASE;
-  const schemaTemplate = defaultSchemaTemplate(preset, useCase);
+  const schemaTemplate = getDefaultHumanUserSchemaBody({ preset, useCase });
 
   // The connection goes first, and is created before the schema and flow that
   // name its slug: a Project should never be published claiming a provider the
@@ -179,15 +175,15 @@ export async function materializeSetupResources(opts: {
     // The file stays as written: the stored connection spells out defaults
     // the file leaves to the server, and `plan` reads those as no change.
     await updateState(opts.cwd, connectionPath, {
-      id: requiredString(created.id, "created identity provider connection id"),
+      id: created.id,
       hash: hashForState({ normalize: normalizeIdpBody }, connection),
     });
   }
 
   // Each slug in turn: the edits are additive and idempotent, so folding them
   // builds one schema that names every chosen provider.
-  const schemaBody = slugs.reduce<Record<string, unknown>>(
-    (document, slug) => applySsoToSchema(document, slug).document as Record<string, unknown>,
+  const schemaBody = slugs.reduce(
+    (document, slug) => applySsoToSchema(document, slug).document,
     schemaTemplate,
   );
 
@@ -201,11 +197,11 @@ export async function materializeSetupResources(opts: {
     filesWritten.push(join(opts.cwd, DEFAULT_SCHEMA_CONFIG_PATH));
   }
 
-  const schema = (await opts.client.createSchema(schemaBody as CreateSchemaBody, {
+  const schema = await opts.client.createSchema(schemaBody, {
     project_id: opts.projectId,
-  })) as CreateSchema201;
+  });
   await updateState(opts.cwd, DEFAULT_SCHEMA_CONFIG_PATH, {
-    id: requiredString(schema.id, "created schema id"),
+    id: schema.id,
     hash: hashForState({ normalize: normalizeSchemaBody }, schemaBody),
   });
 
@@ -229,14 +225,14 @@ export async function materializeSetupResources(opts: {
     filesWritten.push(join(opts.cwd, DEFAULT_FLOW_CONFIG_PATH));
   }
 
-  const flow = (await opts.client.createFlowDefinition({
+  const flow = await opts.client.createFlowDefinition({
     project_id: opts.projectId,
     schema_uri: DEFAULT_FLOW_SCHEMA_URI,
     flow_definition: flowBody,
-  })) as CreateFlowDefinition201;
+  });
 
   await updateState(opts.cwd, DEFAULT_FLOW_CONFIG_PATH, {
-    id: requiredString(flow.id, "created flow definition id"),
+    id: flow.id,
     hash: hashForState({ normalize: normalizeFlowBody }, flowBody),
     name: flowBody.name,
     status: flowBody.status,
@@ -252,7 +248,7 @@ export async function materializeSetupResources(opts: {
     kept === undefined
       ? passwordPolicyFile(opts.passwordMinLength)
       : withMinLength(kept, opts.passwordMinLength);
-  let published: { id?: unknown } | undefined;
+  let published: PublishPolicy201 | undefined;
   try {
     published = await opts.client.publishPolicy(toPolicyWireBody(policy), {
       project_id: opts.projectId,
@@ -276,7 +272,7 @@ export async function materializeSetupResources(opts: {
       filesWritten.push(join(opts.cwd, PASSWORD_POLICY_PATH));
     }
     await updateState(opts.cwd, PASSWORD_POLICY_PATH, {
-      id: requiredString(published.id, "published policy id"),
+      id: published.id,
       hash: hashForState({ normalize: (body) => toPolicyWireBody(body as PolicyFile) }, policy),
     });
   }
@@ -336,24 +332,11 @@ export async function assertNoSetupResourceConflicts(opts: {
   useCase?: SetupUseCase;
   sso?: readonly { selection: ProviderSelection; endpoints?: ConnectionEndpoints }[];
 }): Promise<void> {
-  const schemaTemplate = defaultSchemaTemplate(
-    opts.preset ?? DEFAULT_SETUP_PRESET,
-    opts.useCase ?? DEFAULT_SETUP_USE_CASE,
-  );
+  const schemaTemplate = getDefaultHumanUserSchemaBody({
+    preset: opts.preset ?? DEFAULT_SETUP_PRESET,
+    useCase: opts.useCase ?? DEFAULT_SETUP_USE_CASE,
+  });
   await refuseResourceConflicts(opts.cwd, opts.force, planConnections(schemaTemplate, opts.sso));
-}
-
-/** The default human user schema for a preset and use case, without the template's `$id`. */
-function defaultSchemaTemplate(
-  preset: SetupPreset,
-  useCase: SetupUseCase,
-): Record<string, unknown> {
-  const { $id: _templateId, ...schemaTemplate } = getDefaultHumanUserSchema({
-    preset,
-    useCase,
-  }) as { $id?: string } & Record<string, unknown>;
-  void _templateId;
-  return schemaTemplate;
 }
 
 type PlannedConnection = {
@@ -365,7 +348,7 @@ type PlannedConnection = {
 
 /** The connection each chosen provider gets, and the file it is written to. */
 function planConnections(
-  schemaTemplate: Record<string, unknown>,
+  schemaTemplate: UserSchemaDocument,
   sso: readonly { selection: ProviderSelection; endpoints?: ConnectionEndpoints }[] | undefined,
 ): PlannedConnection[] {
   const planned: PlannedConnection[] = [];
@@ -373,7 +356,7 @@ function planConnections(
     const provider = providerOf(chosen.selection);
     const connection = provider.connection({
       endpoints: chosen.endpoints,
-      schemaProperties: Object.keys((schemaTemplate.properties as object | undefined) ?? {}),
+      schemaProperties: Object.keys(schemaTemplate.properties ?? {}),
       schemaRef: CONNECTION_SCHEMA_REF,
     });
     planned.push({
@@ -563,13 +546,6 @@ function resourceExists(
       "Move the file aside or rerun setup with --force if you want setup to replace it.",
     nextCommands: onExists?.nextCommands,
   });
-}
-
-function requiredString(value: unknown, label: string): string {
-  if (typeof value === "string" && value.length > 0) {
-    return value;
-  }
-  throw new ZitadelError("E_VALIDATION", `Missing ${label} in server response.`);
 }
 
 function isErrno(error: unknown, code: string): boolean {

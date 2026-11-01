@@ -910,5 +910,15 @@ type EventStatements interface {
 	// GetEventSinkCursor returns (nil, nil) when no cursor row exists.
 	GetEventSinkCursor(ctx context.Context, sinkID, projectID string) (*domain.EventSinkCursor, error)
 	UpsertEventSinkCursor(ctx context.Context, cursor *domain.EventSinkCursor) error
+	// ListEventsAfterCursor lists the project's settled events after the
+	// cursor, oldest first (see EventsSettledBefore): once it has returned an
+	// event, no event that commits later sorts at or before it.
 	ListEventsAfterCursor(ctx context.Context, projectID string, afterCreatedAt time.Time, afterID string, limit uint32) ([]*domain.Event, error)
+	// EventsSettledBefore returns the instant before which the project's
+	// events are settled: every event with an earlier created_at has committed,
+	// so a reader that pages forward on (created_at, id) only up to it skips
+	// none that commits later. The zero time means every committed event is
+	// settled, because the dialect stamps events in commit order. Call it
+	// outside a transaction, or at READ COMMITTED, before the list it bounds.
+	EventsSettledBefore(ctx context.Context, projectID string) (time.Time, error)
 }

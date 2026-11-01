@@ -1,7 +1,10 @@
 import { ApiError, request as fetchWithPolicy } from "@zitadel/api/runtime/fetch";
+import { itemsOf, nextToken, pages } from "@zitadel/api/runtime/paging";
 
 import { REQUEST_TIMEOUT_MS, sanitizeRejection, sanitizeResponse } from "../api-client";
 import { Consent } from "../consent";
+import { ZitadelError } from "../errors";
+import { isObject } from "../json";
 import { interruptSignal } from "../interrupt";
 import { collectPages } from "../oclif/crud/paging";
 import { type ApiRequest, urlOf } from "./request";
@@ -43,6 +46,21 @@ export const send = async (
   request: ApiRequest,
   consent?: Consent,
 ): Promise<ApiResponse> => {
+  const { status, raw } = await sendRaw(server, token, request, consent);
+  return { status, body: sanitizeResponse(raw) };
+};
+
+/**
+ * {@link send}, answering the body as the server sent it; a failure is escaped
+ * all the same. Every request goes out here, so a destructive one without
+ * `consent` is refused here, whichever caller sent it.
+ */
+const sendRaw = async (
+  server: string,
+  token: string | undefined,
+  request: ApiRequest,
+  consent?: Consent,
+): Promise<{ status: number; raw: unknown }> => {
   if (request.operation.destructive) {
     Consent.assert(consent);
   }
@@ -70,7 +88,7 @@ export const send = async (
       new ApiError(res.status, url, rawBody, `${method} ${url} returned ${res.status}`),
     );
   }
-  return { status: res.status, body: sanitizeResponse(rawBody) };
+  return { status: res.status, raw: rawBody };
 };
 
 /** The request for the page `token` names; `undefined` leaves the request as it is. */
@@ -90,9 +108,7 @@ const pageOf = (request: ApiRequest, token: string | undefined): ApiRequest => {
 
 /**
  * Send a paged request until the server's `next_page_token` runs out, and
- * answer the last page with the page field holding every page's items. The
- * walk is `collectPages`, the resource lists' `--all`, so a server that
- * repeats a cursor is caught the same way.
+ * answer the last page with the page field holding every page's items.
  */
 export const sendAll = async (
   server: string,
@@ -103,21 +119,37 @@ export const sendAll = async (
   if (paging === null) {
     return send(server, token, request);
   }
-  let last: ApiResponse = { status: 200, body: undefined };
-  const { items } = await collectPages(
+  let last: { status: number; raw: unknown } = { status: 200, raw: undefined };
+  // Each page is fetched raw: the cursor goes back to the server exactly as it
+  // came, and only the items are escaped.
+  const walk = pages(
     async (cursor) => {
-      last = await send(server, token, pageOf(request, cursor));
-      return last.body;
+      last = await sendRaw(server, token, pageOf(request, cursor));
+      return last.raw;
     },
-    {
-      items: paging.items,
-      all: true,
-      nextPageToken: "next_page_token",
-      flags: { all: "--paginate", onePage: "-F limit=<n> and -F page_token=<token>" },
-    },
+    { next: nextToken },
   );
-  return {
-    status: last.status,
-    body: { ...(last.body as Record<string, unknown>), [paging.items]: items },
-  };
+  const { items } = await collectPages(walk, {
+    // The one list read by a field named only at runtime, so the one checked.
+    items: (raw) => {
+      try {
+        return sanitizeResponse(itemsOf(raw, paging.items));
+      } catch (error) {
+        throw new ZitadelError(
+          "E_VALIDATION",
+          error instanceof Error ? error.message : String(error),
+          { details: { response: sanitizeResponse(raw) } },
+        );
+      }
+    },
+    all: true,
+    next: nextToken,
+  });
+  // The last page escaped as one object, so its keys keep their collision-safe
+  // escaping, with an empty list in place of its own, which every page's
+  // escaped items then fill. The check only narrows the type: the items above
+  // were read off this page, so it is an object.
+  const page = isObject(last.raw) ? last.raw : {};
+  const body = sanitizeResponse({ ...page, [paging.items]: [] });
+  return { status: last.status, body: { ...body, [paging.items]: items } };
 };

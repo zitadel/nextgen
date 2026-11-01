@@ -303,10 +303,8 @@
         "scripts/render-builtin-schemas.test.mjs",
         "api/openapi/endpoints/schemas/*.json",
         // The built-in schemas' renderer matches the server's default
-        // namespace, which packages/config/src/defaults.ts reads from its
-        // defaults.
-        "packages/config/src/defaults.ts",
-        "packages/config/defaults/**",
+        // namespace.
+        "packages/config/src/builtin-schema-base.ts",
         "scripts/assert-file.mjs",
         "vitest.config.ts"
       ]

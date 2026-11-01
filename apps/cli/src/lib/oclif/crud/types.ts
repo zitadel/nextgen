@@ -14,7 +14,6 @@ import type { References } from "./secrets";
 export type Verb = "list" | "get" | "create" | "update" | "delete" | "revoke" | "deactivate";
 export type ResourceCommandId = `${string}:${Verb}`;
 export type Json = Readonly<Record<string, unknown>>;
-export type Page = Readonly<{ items: readonly unknown[]; next: string | null }>;
 
 /**
  * Structural subset of a Zod schema (a `ZodType<B>` satisfies it); keeps the
@@ -74,24 +73,13 @@ export type FilterField = Readonly<{
  * without it is sent as flat query parameters. Everything the caller sees —
  * the flags, the grammar, the envelope — is the same either way.
  */
-export type ListSpec<Ctx, B = Json> = Readonly<{
+export type ListSpec<Ctx, B = Json, P = unknown, T = unknown> = Readonly<{
   /**
-   * Response property holding the page of items; omit when the response body
-   * is itself the array.
+   * Generated schema of one listed item. `--fields` is checked against the
+   * record shape it describes, so the same arguments are valid whether a page
+   * came back full or empty.
    */
-  items?: string;
-  /**
-   * Generated response schema. `--fields` is checked against the record shape
-   * it describes, so the same arguments are valid whether a page came back
-   * full or empty.
-   */
-  response?: Schema;
-  /**
-   * Whether the endpoint is cursor-paginated (ADR 027). Defaults to `true`.
-   * A `false` endpoint returns its whole collection in one response, so the
-   * paging flags are not generated and no cursor is sent.
-   */
-  paged?: boolean;
+  item?: Schema;
   /**
    * Whether a bare invocation drains every page. Off by default: a page is the
    * honest answer for an unbounded collection. A resource turns it on when a
@@ -114,32 +102,91 @@ export type ListSpec<Ctx, B = Json> = Readonly<{
    * for an endpoint that orders by one implicit field.
    */
   sortParam?: string;
-  call(ctx: Ctx, request: B): Promise<unknown>;
+  call(ctx: Ctx, request: B): Promise<P>;
+  /**
+   * The items a page holds, read off the page `call` answers with (or the page
+   * itself, for an endpoint that answers with the array). Method syntax, so a
+   * spec typed by its page still assigns to the erased spec the registry holds.
+   */
+  items(page: P): readonly T[];
+}> &
+  (PagedList<P> | UnpagedList);
+
+/**
+ * A cursor-paginated list (ADR 027), the default: it reads the cursor to the
+ * page after `page` off it the same way as its items, empty or missing on the
+ * last page.
+ */
+type PagedList<P> = Readonly<{
+  paged?: true;
+  next(page: P): string | null | undefined;
 }>;
 
-export type GetSpec<Ctx> = Readonly<{
-  call: (ctx: Ctx, id: string) => Promise<unknown>;
-  /** Generated response schema of the record itself; see {@link QueryListSpec.response}. */
+/**
+ * A list whose endpoint returns its whole collection in one response, so the
+ * paging flags are not generated, no cursor is sent, and none is read.
+ */
+type UnpagedList = Readonly<{ paged: false; next?: never }>;
+
+/**
+ * Every dot-path into `T`: its fields, and the fields of the objects below
+ * them, stopping at arrays. What a resource's columns and detail may name.
+ *
+ * Only declared fields count: an index signature would let any name through.
+ * A union `T` (a `get` that answers with either of two records) names only the
+ * paths every member has, as `keyof` does.
+ */
+export type FieldPath<T> = [T] extends [readonly unknown[]]
+  ? never
+  : [T] extends [object]
+    ? {
+        // Not mapped over `keyof T`, so a union is not split per member: each
+        // level recurses into the union of the members' fields.
+        [K in DeclaredKeys<T>]-?: K | `${K}.${FieldPath<NonNullable<T[K & keyof T]>>}`;
+      }[DeclaredKeys<T>]
+    : never;
+
+// The named fields every member of `T` declares. Mapped over `keyof T` itself,
+// which visits declared fields one by one even beside an index signature
+// (`keyof T & string` would collapse them into it); `keyof` of the per-member
+// results keeps only the ones all members share.
+type DeclaredKeys<T> = keyof {
+  [K in keyof T as K extends string ? (string extends K ? never : K) : never]: unknown;
+} &
+  string;
+
+// Method syntax for the same reason as `CreateSpec`: a spec typed by its
+// record `R` still assigns to the erased spec the registry holds.
+export type GetSpec<Ctx, R = unknown> = Readonly<{
+  call(ctx: Ctx, id: string): Promise<R>;
+  /** Generated response schema of the record itself; see {@link ListSpec.item}. */
   response?: Schema;
   /**
    * Blocks a terminal shows under the fields, for a value that does not read
    * on one line (a release's pointers). Skipped when `--fields` picks the view.
    */
-  sections?: (item: unknown) => readonly string[];
+  sections?(item: R): readonly string[];
 }>;
+/**
+ * What a write answers with: a record, or nothing for a write that answers
+ * without a body, which the generated client types as `void`.
+ */
+// biome-ignore lint/suspicious/noConfusingVoidType: the generated client's own type for an empty answer.
+export type WriteResult = Json | void;
+
 // Method syntax makes `body` bivariant, so a concrete-body spec still assigns to
 // the erased spec the registry and factory hold; the body/schema fit is checked
 // at the builder call site, not as bodies flow through the factory.
-export type CreateSpec<Ctx, B = Json> = Readonly<
+export type CreateSpec<Ctx, B = Json, C = WriteResult> = Readonly<
   WriteShape & {
     schema: Schema<B>;
-    call(ctx: Ctx, body: B): Promise<unknown>;
+    call(ctx: Ctx, body: B): Promise<C>;
   }
 >;
-export type UpdateSpec<Ctx, B = Json> = Readonly<
+export type UpdateSpec<Ctx, B = Json, U = WriteResult> = Readonly<
   WriteShape & {
     schema: Schema<B>;
-    call(ctx: Ctx, id: string, body: B): Promise<unknown>;
+    call(ctx: Ctx, id: string, body: B): Promise<U>;
   }
 >;
 
@@ -195,6 +242,13 @@ export type ResourceDescriptor<Ctx> = Readonly<{
   /** Property carrying the resource's own id on the wire. */
   idField: string;
   /**
+   * The id a write answered with, read off its result. The registry's
+   * `resource` builder makes it from `idField`, typed against each write, so
+   * the write commands read no field by name. Method syntax, so a reader typed
+   * by its write still assigns to the erased descriptor.
+   */
+  idOf(written: Json): unknown;
+  /**
    * Name of the positional argument the verbs take, and the word `--help`
    * shows. Defaults to `id`; a resource addressed by something else names it
    * (an environment is fetched by `name`), so the usage line reads as the API
@@ -241,7 +295,11 @@ export type WireConventions = Readonly<{
   limit: string;
   /** Request property carrying the cursor. */
   pageToken: string;
-  /** Response property carrying the cursor for the next page. */
+  /**
+   * Envelope property the next page's cursor is reported under, as this
+   * platform spells it. Only the name: the cursor itself is read off each page
+   * by its list's own `next`.
+   */
   nextPageToken: string;
   /** Assembles the structured-query body from the parts the flags produced. */
   query: (parts: QueryParts) => Json;
@@ -261,7 +319,10 @@ export type ResourceCommandOptions<Ctx> = Readonly<{
    * command's own `connect`, so nothing connects until a verb needs it.
    */
   connect: (open: () => Promise<Connection>) => Promise<Ctx>;
-  /** Filter operations the query endpoints accept (`equals`, `contains`, …). */
+  /**
+   * Every filter operation the platform knows, so `--filter` tells a typo or an
+   * operation a field does not offer from a value that merely holds a colon.
+   */
   operations: readonly string[];
   /** Extra flags added to every generated command. */
   flags?: Interfaces.FlagInput;

@@ -4,10 +4,7 @@ import { join } from "node:path";
 import { Readable } from "node:stream";
 
 import { HttpResponse, http } from "msw";
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { setupServer } from "msw/node";
-
-import { resetPlatformStore, setupPlatformHandlers } from "@zitadel/api-mock/platform";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@clack/prompts", async () => (await import("../../helpers/clack")).clackDouble());
 
@@ -16,17 +13,11 @@ import { cancel, confirm, isCancel, text } from "@clack/prompts";
 import VariableRm from "../../../src/commands/variable/rm";
 import VariableSet from "../../../src/commands/variable/set";
 import { DEFAULT_SERVER } from "../../../src/lib/server";
+import { usePlatformServer } from "../../helpers/platform-project";
 import { parseJson, runCliForTest } from "../../helpers/run-cli";
 import { asTerminal as asPerson } from "../../helpers/terminal";
 
-const server = setupServer(...setupPlatformHandlers());
-
-beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
-afterAll(() => server.close());
-afterEach(() => {
-  server.resetHandlers(...setupPlatformHandlers());
-  resetPlatformStore();
-});
+const { server } = usePlatformServer();
 
 async function makeProject(): Promise<string> {
   const cwd = await mkdtemp(join(tmpdir(), "zitadel-variables-"));
@@ -1306,6 +1297,32 @@ describe("variable resolve", () => {
     expect(json.code).toBe("E_VALIDATION");
     expect(json.hint).toContain("https://app.acme.com");
     expect(json.hint).toContain("https://admin.acme.com");
+  });
+
+  it("names the live origins of every page when more than one deployment is live", async () => {
+    const cwd = await makeProject();
+    server.use(
+      http.get("*/deployments", ({ request }) =>
+        HttpResponse.json(
+          new URL(request.url).searchParams.get("page_token") === "p2"
+            ? {
+                deployments: [{ id: "dep_b", targets: [{ origin: "https://admin.acme.com" }] }],
+                next_page_token: null,
+              }
+            : {
+                deployments: [{ id: "dep_a", targets: [{ origin: "https://app.acme.com" }] }],
+                next_page_token: "p2",
+              },
+        ),
+      ),
+    );
+
+    const res = await runCliForTest(["variable", "resolve", ...base(cwd)]);
+
+    expect(parseJson(res.stdout)).toMatchObject({
+      code: "E_VALIDATION",
+      hint: "Live origins: https://admin.acme.com, https://app.acme.com.",
+    });
   });
 
   it("asks the server only for the named origin's live deployment", async () => {

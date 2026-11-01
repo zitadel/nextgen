@@ -8,5 +8,7 @@ export default defineConfig({
     ...baseTest,
     name: "@zitadel/api",
     environment: "node",
+    // The generator's own tests, beside the client's.
+    include: [...(baseTest.include ?? []), "scripts/**/*.spec.ts"],
   },
 });

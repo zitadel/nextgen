@@ -101,7 +101,7 @@ strips the raw token before the server→client boundary) in your root layout,
 then read with `useAuth()` in any client component. For chrome on pages the
 matcher does not cover, read client-side with `getSession()` from
 `@zitadel/sdk-next/session` instead — it fetches same-origin
-`{proxyPath}/sessions/me`.
+`{proxyPath}/api/v1/sessions/me`.
 
 **4. Login page.** Render `ZitadelLogin` from `@zitadel/sdk-next/components`
 client-side only (via `next/dynamic` with `ssr: false`); call
@@ -154,7 +154,7 @@ Confirm names against those before writing code.
   into the RSC flight payload. To seed from client state, use
   `AuthContextProvider` from `/react` (it only takes the token-less shape).
 - **Same-origin proxy is required.** The widgets and `getSession()` hit
-  `{proxyPath}/sessions/me` on the same origin; the middleware `matcher` must
+  `{proxyPath}/api/v1/sessions/me` on the same origin; the middleware `matcher` must
   cover `{proxyPath}/:path*` or the proxy breaks.
 - **A protected route must be in the matcher too.** Next.js runs the
   middleware only on routes the matcher covers, so a `protectedRoutes` entry a

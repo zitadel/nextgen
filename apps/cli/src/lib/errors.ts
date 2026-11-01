@@ -1,4 +1,10 @@
-import { ApiError, apiErrorCode, apiErrorMessage, NetworkError } from "@zitadel/api/runtime/fetch";
+import {
+  ApiError,
+  apiErrorCode,
+  apiErrorMessage,
+  NetworkError,
+  type NetworkErrorReason,
+} from "@zitadel/api/runtime/fetch";
 import type { SuggestedCommand } from "./suggestion";
 
 /**
@@ -83,6 +89,15 @@ export class ZitadelError extends Error {
   }
 }
 
+/** What to do about a request that got no usable response, by its reason. */
+const NETWORK_HINTS: Record<NetworkErrorReason, string> = {
+  unreachable: "Check your connection and the server URL (ZITADEL_URL or --server).",
+  timeout:
+    "The server accepted the connection but did not answer in time. Check that it is healthy, then retry.",
+  unreadable:
+    "The server answered, but its response could not be read. Check any proxy between you and the server, then retry.",
+};
+
 /**
  * Normalises any thrown value into a {@link ZitadelError}. Inspection is
  * ordered most-specific-first (already-normalised, HTTP status, then
@@ -116,7 +131,7 @@ export function toZitadelError(error: unknown): ZitadelError {
           "E_NOT_FOUND",
           `${error.url} has no such endpoint on this Zitadel server`,
           {
-            hint: "The server and this CLI are different versions. Run the CLI release that matches the server, or upgrade the server.",
+            hint: "The server and this CLI are different versions; a server from before the API moved under /api/v1 answers every call so. Run the CLI release that matches the server, or upgrade the server.",
             details,
           },
         );
@@ -195,10 +210,7 @@ export function toZitadelError(error: unknown): ZitadelError {
 
   if (error instanceof NetworkError) {
     return new ZitadelError("E_NETWORK", error.message, {
-      hint:
-        error.reason === "timeout"
-          ? "The server accepted the connection but did not answer in time. Check that it is healthy, then retry."
-          : "Check your connection and the server URL (ZITADEL_URL or --server).",
+      hint: NETWORK_HINTS[error.reason],
       details: { url: error.url, reason: error.reason },
     });
   }

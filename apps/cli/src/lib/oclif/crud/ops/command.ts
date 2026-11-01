@@ -62,9 +62,13 @@ export class ResourceCommand<Ctx, Spec> extends Destructive(EnvironmentCommand) 
     );
   }
 
-  /** Open the platform connection; deferred so `--dry-run` never connects. */
-  protected context(): Promise<Ctx> {
-    return this.definition.options.connect(() => this.connect());
+  /**
+   * Open the platform connection; deferred so `--dry-run` never connects.
+   * `verbatim` is for a caller that sends back what it reads, as a list sends
+   * back its cursor.
+   */
+  protected context(options: { verbatim?: boolean } = {}): Promise<Ctx> {
+    return this.definition.options.connect(() => this.connect(options));
   }
 
   /**

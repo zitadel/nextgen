@@ -17,11 +17,11 @@ vi.mock("@/auth/session", async (importOriginal) => {
   return { ...actual, fetchSession: vi.fn(async () => makeTestSession()) };
 });
 
-const ME_URL = "http://localhost/api/users/me";
-const SCHEMA_URL = "*/api/users/me/schema";
-const PASSKEYS_URL = "*/api/users/me/passkeys";
-const PASSWORD_URL = "*/api/users/me/password";
-const LINKS_URL = "*/api/users/me/identity_links";
+const ME_URL = "http://localhost/api/v1/users/me";
+const SCHEMA_URL = "*/api/v1/users/me/schema";
+const PASSKEYS_URL = "*/api/v1/users/me/passkeys";
+const PASSWORD_URL = "*/api/v1/users/me/password";
+const LINKS_URL = "*/api/v1/users/me/identity_links";
 
 /** The shipped default: email only, nothing designated for display. */
 const DEFAULT_SCHEMA = {

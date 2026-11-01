@@ -21,10 +21,12 @@ type Live = {
 
 let cwd: string;
 let written: string[];
+let asked: unknown[];
 
 beforeEach(async () => {
   cwd = await mkdtemp(join(tmpdir(), "zitadel-diff-step-"));
   written = [];
+  asked = [];
   vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
     written.push(String(chunk));
     return true;
@@ -40,13 +42,18 @@ function ctx(live: Live[], json = false, env: Record<string, string> = {}): Step
   return {
     cwd,
     client: {
-      listDeployments: async () => ({
-        deployments: live.map((deployment) => ({
-          targets: deployment.targets,
-          release_id: deployment.release ?? "rel_1",
-          release: { metadata: { git_sha: deployment.sha, git_dirty: deployment.dirty ?? false } },
-        })),
-      }),
+      listDeployments: {
+        all: async (params: unknown) => {
+          asked.push(params);
+          return live.map((deployment) => ({
+            targets: deployment.targets,
+            release_id: deployment.release ?? "rel_1",
+            release: {
+              metadata: { git_sha: deployment.sha, git_dirty: deployment.dirty ?? false },
+            },
+          }));
+        },
+      },
     } as never,
     projectId: "proj_1",
     env,
@@ -85,6 +92,12 @@ const SECOND_PRIMARY = { origin: "https://www.acme.com", expires_at: null };
 const PREVIEW = { origin: "https://pr-7.acme.com", expires_at: "2026-12-01T00:00:00Z" };
 
 describe("diffStep", () => {
+  it("reads what is live, with the release each deployment serves", async () => {
+    await diffStep.run(ctx([]));
+
+    expect(asked).toEqual([{ project_id: "proj_1", live: true, expand: ["release"] }]);
+  });
+
   it("says there is nothing to diff against before the first deploy", async () => {
     await diffStep.run(ctx([]));
 

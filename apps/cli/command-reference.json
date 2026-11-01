@@ -1924,7 +1924,7 @@
         {
           "name": "message",
           "char": "m",
-          "description": "A short summary of what this release changes.",
+          "description": "A short summary of what this release changes. Defaults to the pull request's title or the current commit's subject.",
           "type": "option"
         },
         {
@@ -1966,6 +1966,12 @@
           "type": "option"
         },
         {
+          "name": "message",
+          "char": "m",
+          "description": "A short summary of what this release changes. Defaults to the pull request's title or the current commit's subject.",
+          "type": "option"
+        },
+        {
           "name": "strict",
           "description": "Fail instead of warning when no preview credential (ZITADEL_PROJECT_SECRET) is set.",
           "type": "boolean"
@@ -1991,6 +1997,9 @@
         },
         {
           "command": "preview --ttl 24h"
+        },
+        {
+          "command": "preview -m 'add phone_number to human-user'"
         }
       ]
     },
@@ -2272,6 +2281,12 @@
           "char": "f",
           "description": "Re-apply the deployment without the confirmation prompt. Required when non-interactive.",
           "type": "boolean"
+        },
+        {
+          "name": "message",
+          "char": "m",
+          "description": "A short summary of why this rolls back.",
+          "type": "option"
         },
         {
           "name": "env",

@@ -25,6 +25,7 @@ import {
   type DeleteSpec,
   GetOperation,
   type GetSpec,
+  type Json,
   ListOperation,
   type ListSpec,
   type OperationClass,
@@ -38,8 +39,7 @@ type Ctx = { token: string };
 
 const schema = z.object({ name: z.string() });
 const OPERATIONS = ["equals", "contains"] as const;
-const list: ListSpec<Ctx> = {
-  items: "teams",
+const list: ListSpec<Ctx, Json, { teams: readonly unknown[]; next_page_token?: string }> = {
   body: schema,
   filters: [
     { field: "name", operations: OPERATIONS },
@@ -47,6 +47,8 @@ const list: ListSpec<Ctx> = {
   ],
   sorts: ["created_at"],
   call: async () => ({ teams: [] }),
+  items: (page) => page.teams,
+  next: (page) => page.next_page_token,
 };
 const get: GetSpec<Ctx> = { call: async () => ({}) };
 const create: CreateSpec<Ctx> = { schema, call: async () => ({}) };
@@ -55,6 +57,7 @@ const remove: DeleteSpec<Ctx> = { outcome: "revoked", call: async () => undefine
 const resource: ResourceDescriptor<Ctx> = {
   singular: "team",
   idField: "id",
+  idOf: (written) => written.id,
   columns: ["id", "name"],
   list,
   get,
@@ -64,7 +67,7 @@ const resource: ResourceDescriptor<Ctx> = {
 };
 const options = {
   connect: async () => ({ token: "t" }),
-  operations: ["equals", "contains"],
+  operations: ["equals"],
   flags: { extra: { type: "boolean" as const } },
 } as unknown as OperationDefinition<Ctx, GetSpec<Ctx>>["options"];
 const definition = <Spec>(spec: Spec): OperationDefinition<Ctx, Spec> => ({
@@ -99,12 +102,13 @@ describe("operation statics", () => {
     // sees the one `--filter` grammar, not a flag per parameter.
     const statics = ListOperation.describe(
       definition({
-        items: "data",
         filters: [
           { field: "category", operations: ["equals"], values: ["a", "b"], combine: "or" as const },
           { field: "actor_id", operations: ["equals"] },
         ],
         call: async () => ({ data: [] }),
+        items: (page: { data: readonly unknown[] }) => page.data,
+        next: () => undefined,
       }),
     );
     expect(Object.keys(statics.flags)).toEqual([
@@ -125,7 +129,11 @@ describe("operation statics", () => {
 
   it("omits the paging flags for an unpaginated list", () => {
     const statics = ListOperation.describe(
-      definition({ items: "data", paged: false, call: async () => ({ data: [] }) }),
+      definition({
+        paged: false as const,
+        call: async () => ({ data: [] }),
+        items: (page: { data: readonly unknown[] }) => page.data,
+      }),
     );
     expect(Object.keys(statics.flags)).toEqual(["fields", "plain", "extra"]);
   });
@@ -254,19 +262,28 @@ describe("wire conventions", () => {
     // The factory must not carry one platform's cursor names as though they
     // were universal: a list is driven here with `cursor`/`next_cursor` and a
     // query body that nests its filters, and nothing in the factory objects.
+    // The page holds its cursor as `continuation`, which only the spec's own
+    // `next` reads; the envelope reports it under the wire's name.
     let sent: unknown;
-    const spec: ListSpec<Ctx> = {
-      items: "rows",
+    const spec: ListSpec<Ctx, Json, { rows: readonly unknown[]; continuation?: string }> = {
       body: z.object({}).passthrough(),
       filters: [{ field: "state", operations: ["equals"] }],
       call: async (_ctx, request) => {
         sent = request;
-        return { rows: [{ id: "r1" }], next_cursor: "c2" };
+        return { rows: [{ id: "r1" }], continuation: "c2" };
       },
+      items: (page) => page.rows,
+      next: (page) => page.continuation,
     };
     const definition: OperationDefinition<Ctx, ListSpec<Ctx>> = {
       topic: "rows",
-      resource: { singular: "row", idField: "id", columns: ["id"], list: spec },
+      resource: {
+        singular: "row",
+        idField: "id",
+        idOf: (written) => written.id,
+        columns: ["id"],
+        list: spec,
+      },
       spec,
       options: {
         connect: async () => ({ token: "t" }),
@@ -302,8 +319,38 @@ describe("wire conventions", () => {
   });
 });
 
+describe("list filters", () => {
+  it("refuses an operation the platform knows that the field does not offer", async () => {
+    const spec: ListSpec<Ctx, Json, { rows: readonly unknown[] }> = {
+      body: z.object({}).passthrough(),
+      filters: [{ field: "state", operations: ["equals"] }],
+      call: async () => ({ rows: [] }),
+      items: (page) => page.rows,
+      next: () => undefined,
+    };
+    const definition: OperationDefinition<Ctx, ListSpec<Ctx>> = {
+      topic: "rows",
+      resource: {
+        singular: "row",
+        idField: "id",
+        idOf: (written) => written.id,
+        columns: ["id"],
+        list: spec,
+      },
+      spec,
+      options: { connect: async () => ({ token: "t" }), operations: ["equals", "less_than"] },
+    };
+
+    const command = bindOperation(ListOperation as OperationClass<Ctx, ListSpec<Ctx>>, definition);
+
+    await expect(printed(command, ["--filter", "state=less_than:5"])).rejects.toThrow(
+      'Filter field "state" does not support the less_than operation',
+    );
+  });
+});
+
 describe("write results", () => {
-  it("carries data in the envelope when the server answers without a body", async () => {
+  it("carries data and no next command when the server answers without a body", async () => {
     // `grants create` by identifier answers 202 with no body.
     const accepted: CreateSpec<Ctx> = { schema, call: async () => undefined };
     const command = bindOperation(
@@ -319,6 +366,21 @@ describe("write results", () => {
 
     // Round-tripped as printed: JSON drops a key whose value is undefined.
     expect(JSON.parse(JSON.stringify(envelope))).toHaveProperty("data", {});
+  });
+
+  it("suggests getting the resource an update answered with", async () => {
+    const updated: UpdateSpec<Ctx> = { schema, call: async () => ({ id: "team_1", name: "a" }) };
+    const command = bindOperation(
+      UpdateOperation as OperationClass<Ctx, UpdateSpec<Ctx>>,
+      definition(updated),
+    );
+
+    const runnable = command as unknown as {
+      run(argv: string[]): Promise<{ data: { next_commands: string[] } }>;
+    };
+    const envelope = await runnable.run(["team_1", "--name", "a", "--json"]);
+
+    expect(envelope.data.next_commands[0]).toContain("teams get team_1 --json");
   });
 });
 
@@ -386,6 +448,27 @@ describe("output a script reads", () => {
     const { stdout } = await printed(command, ["--name", "a"]);
 
     expect(stdout).toEqual([JSON.stringify({ id: "team_1", name: "a" }, null, 2)]);
+  });
+});
+
+describe("list paging", () => {
+  it("asks for the page --page-token names first", async () => {
+    const sent: unknown[] = [];
+    const command = bindOperation(
+      ListOperation as OperationClass<Ctx, ListSpec<Ctx>>,
+      definition({
+        ...list,
+        body: z.object({}).passthrough(),
+        call: async (_ctx, body) => {
+          sent.push(body);
+          return { teams: [] };
+        },
+      }),
+    );
+
+    await printed(command, ["--page-token", "p2", "--plain"]);
+
+    expect(sent).toEqual([expect.objectContaining({ page_token: "p2" })]);
   });
 });
 

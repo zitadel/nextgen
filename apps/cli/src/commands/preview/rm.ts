@@ -1,7 +1,6 @@
 import { Flags } from "@oclif/core";
 
 import { CommandGroups, type JsonEnvelope, nonBlankArg, PreviewCommand } from "../../lib/oclif";
-import { collectPages } from "../../lib/oclif/crud/paging";
 import { dryRunResult } from "../../lib/oclif/crud/shared";
 import { deletedData } from "../../lib/oclif/envelope";
 import { Destructive, Settled } from "../../lib/oclif/destructive";
@@ -54,12 +53,8 @@ export default class PreviewRm extends Destructive(PreviewCommand) {
           // The server answers 204 whether or not the URL was live, so a typo
           // would otherwise read as a removal. Checked before asking, so
           // nobody confirms removing what is not there.
-          const { items } = await collectPages(
-            (token) =>
-              client.listPreviews(projectId, token === undefined ? {} : { page_token: token }),
-            { items: "previews", all: true, nextPageToken: "next_page_token" },
-          );
-          if (!(items as Array<{ origin: string }>).some((preview) => preview.origin === url)) {
+          const previews = await client.listPreviews.all(projectId);
+          if (!previews.some((preview) => preview.origin === url)) {
             return new Settled({
               status: "skipped",
               reason: "not-live",

@@ -16,7 +16,9 @@ the event the request carries.
   or no response within 10 seconds leaves it undelivered: the server sends it
   again on its next pass, and holds back the project's later events until it
   is delivered. Other projects' events keep going.
-- Within a project, events arrive in the order they were stored.
+- Within a project, events arrive in the order they were stored. A write
+  still in progress holds back the project's later events until it is stored,
+  so none is skipped.
 - Delivery is at least once, so an event can arrive twice. Drop duplicates by
   its `id`.
 - A request carries no signature and no credentials.

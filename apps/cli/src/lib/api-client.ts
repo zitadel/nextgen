@@ -153,12 +153,12 @@ export type ZitadelClient = Omit<FullClient, DestructiveOperation>;
 export type SanitizeOptions = {
   /**
    * Return response bodies exactly as the server sent them. Only for a
-   * caller that stores or compares what it reads rather than printing it:
-   * `setup` writes the server's canonical body back to the project's
-   * files, and `deploy` diffs against them, so an escaped
-   * `\r` or zero-width joiner would be written to disk as literal text and
-   * published as a change. Such a caller escapes at the point it prints.
-   * Errors are escaped either way.
+   * caller that stores, compares or sends back what it reads: `setup` writes
+   * the server's canonical body back to the project's files, and `deploy`
+   * diffs against them, so an escaped `\r` or zero-width joiner would be
+   * written to disk as literal text and published as a change; the resource
+   * lists send each page's cursor back. Such a caller escapes at the point it
+   * prints. Errors are escaped either way.
    */
   verbatim?: boolean;
 };
@@ -181,29 +181,21 @@ export type SanitizeOptions = {
  * `timeoutMs`.
  */
 export function createZitadelClient(
-  opts: ZitadelClientOptions,
+  // The CLI sets both hooks itself, so a caller's would be silently replaced.
+  opts: Omit<ZitadelClientOptions, "onResponse" | "onError">,
   sanitize: SanitizeOptions = {},
 ): ZitadelClient {
-  const onResolve = sanitize.verbatim ? <T>(value: T): T => value : sanitizeResponse;
-  const client = createRawClient({
-    signal: interruptSignal(),
-    timeoutMs: REQUEST_TIMEOUT_MS,
-    ...opts,
-  });
+  // The client applies both to every call, each page of a paged one included.
   return withholdDestructive(
-    new Proxy(client, {
-      get(target, prop, receiver) {
-        const value = Reflect.get(target, prop, receiver);
-        if (typeof value !== "function") {
-          return value;
-        }
-        return (...args: unknown[]) => {
-          const result = (value as (...a: unknown[]) => unknown)(...args);
-          return result instanceof Promise ? result.then(onResolve, sanitizeRejection) : result;
-        };
-      },
+    createRawClient({
+      signal: interruptSignal(),
+      timeoutMs: REQUEST_TIMEOUT_MS,
+      ...opts,
+      ...(sanitize.verbatim ? {} : { onResponse: sanitizeResponse }),
+      onError: sanitizeRejection,
     }),
   );
 }
 
+export { pagedFunctions } from "@zitadel/api/client";
 export type { ZitadelClientOptions };

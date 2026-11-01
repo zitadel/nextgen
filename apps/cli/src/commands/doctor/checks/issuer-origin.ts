@@ -124,7 +124,8 @@ async function inspect(cwd: string): Promise<Finding> {
   const client = createZitadelClient({ baseUrl: server, token: secret.project_secret });
   let origins: ReadonlyArray<{ pattern: string; kind: string }>;
   try {
-    origins = (await client.getProject(secret.project_id)).origins ?? [];
+    const project = await client.getProject(secret.project_id);
+    origins = project.origins;
   } catch (error) {
     return {
       status: "pass",

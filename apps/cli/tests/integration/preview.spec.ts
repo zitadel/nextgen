@@ -10,6 +10,8 @@ const PREVIEW_PATTERN = "https://*-acme.vercel.app";
 const PREVIEW_URL = "https://x-acme.vercel.app";
 
 type Published = {
+  release_id: string;
+  deployment_id: string;
   content_hash: string;
   previews: { url: string; expires_at: string | null }[];
   release_env: string;
@@ -96,6 +98,40 @@ describe("preview", () => {
         expect(app.envelopeOf<Published>(result).data.release_env).toMatch(
           /^NEXT_PUBLIC_ZITADEL_RELEASE=sha256:[0-9a-f]{64}$/,
         );
+      });
+
+      it("records -m on the release and the deployment", async () => {
+        const app = await anAppAdmittingPreviews();
+        await app.editUserSchema((schema) => {
+          schema.properties.company = { type: "string" };
+        });
+
+        const result = await app.run([
+          "preview",
+          "--origin",
+          PREVIEW_URL,
+          "-m",
+          "add company",
+          "--json",
+        ]);
+
+        const data = app.envelopeOf<Published>(result).data;
+        expect(await app.releaseMessage(data.release_id)).toBe("add company");
+        expect(await app.deploymentMessage(data.deployment_id)).toBe("add company");
+      });
+
+      it("records the commit subject when -m is omitted", async () => {
+        const app = await anAppAdmittingPreviews();
+        await app.editUserSchema((schema) => {
+          schema.properties.company = { type: "string" };
+        });
+        await app.commit();
+
+        const result = await app.run(["preview", "--origin", PREVIEW_URL, "--json"]);
+
+        const data = app.envelopeOf<Published>(result).data;
+        expect(await app.releaseMessage(data.release_id)).toBe("wip");
+        expect(await app.deploymentMessage(data.deployment_id)).toBe("wip");
       });
 
       it.each(["30s", "366d"])("refuses a ttl of %s, outside the 60s..365d range", async (ttl) => {

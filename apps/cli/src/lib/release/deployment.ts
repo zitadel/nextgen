@@ -8,8 +8,6 @@ import type {
   RollbackDeployment201,
 } from "@zitadel/api/generated/model";
 
-import { collectPages } from "../oclif/crud/paging";
-
 /**
  * A deployment, as create returns it: 200 when every target already served it,
  * 201 when it wrote a new one. The two shapes match.
@@ -26,40 +24,15 @@ export type Deployment = CreateDeployment200 | CreateDeployment201;
  */
 export type RolledBackDeployment = RollbackDeployment200 | RollbackDeployment201;
 
-/** One row of the deployment list. */
-export type ListedDeployment = ListDeployments200DeploymentsItem;
-
-/**
- * Every live deployment of the project, newest first, drained across pages: one
- * live preview per open pull request can push the primary origins' deployment
- * off the first page, and a guard, a baseline or a rollback read from that page
- * alone would quietly miss it.
- */
-export async function listLiveDeployments(
-  client: ZitadelClient,
-  projectId: string,
-  options: { origin?: string; withRelease?: boolean } = {},
-): Promise<ListedDeployment[]> {
-  const { items } = await collectPages(
-    (token) =>
-      client.listDeployments({
-        project_id: projectId,
-        live: true,
-        ...(options.origin === undefined ? {} : { origin: options.origin }),
-        ...(options.withRelease ? { expand: ["release"] } : {}),
-        ...(token === undefined ? {} : { page_token: token }),
-      }),
-    { items: "deployments", all: true, nextPageToken: "next_page_token" },
-  );
-  return items as ListedDeployment[];
-}
-
 /**
  * Whether a deployment serves a primary origin. A preview deployment's targets
  * carry an expiry; it is never the baseline, the guard or the thing a bare
- * rollback undoes.
+ * rollback undoes. Look for it across every page (`listDeployments.all`): one
+ * live preview per open pull request can push it off the first.
  */
-export function servesPrimary(deployment: Pick<ListedDeployment, "targets">): boolean {
+export function servesPrimary(
+  deployment: Pick<ListDeployments200DeploymentsItem, "targets">,
+): boolean {
   return deployment.targets.some((target) => target.expires_at == null);
 }
 

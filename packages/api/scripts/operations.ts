@@ -1,4 +1,4 @@
-import { writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -8,6 +8,8 @@ const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const repoRoot = resolve(packageRoot, "../..");
 const input = resolve(repoRoot, "api/openapi/openapi-spec.yaml");
 const output = resolve(packageRoot, "src/generated/operations.ts");
+const pagingOutput = resolve(packageRoot, "src/generated/paging.ts");
+const endpointsOutput = resolve(packageRoot, "src/generated/endpoints/zitadelNextGen.ts");
 
 const METHODS = ["get", "put", "post", "delete", "patch"] as const;
 
@@ -32,9 +34,10 @@ type PathItem = { parameters?: Parameter[] } & Partial<Record<(typeof METHODS)[n
 
 /**
  * Writes `src/generated/operations.ts`: every operation of the spec as data,
- * which the generated endpoints carry only as code. orval runs it after it has
- * written the client (`hooks.afterAllFilesWrite` in `orval.config.ts`), so it
- * reads the spec under the same lock and in the same task.
+ * which the generated endpoints carry only as code, and `src/generated/paging.ts`,
+ * the slice of it the client needs to page. orval runs it after it has written
+ * the client (`hooks.afterAllFilesWrite` in `orval.config.ts`), so it reads the
+ * spec under the same lock and in the same task.
  */
 export async function writeOperations(): Promise<void> {
   // Bundled with the repo's redocly.yaml, as the docs bundle it
@@ -51,6 +54,7 @@ export async function writeOperations(): Promise<void> {
     }),
   );
   await writeFile(output, source(operations));
+  await writeFile(pagingOutput, pagingSource(operations, await readFile(endpointsOutput, "utf8")));
 }
 
 function operationOf(path: string, method: string, item: PathItem, operation: Operation) {
@@ -119,7 +123,8 @@ function paging(
   const fields = properties(response);
   if (!token || !fields.has("next_page_token")) return null;
   const lists = [...fields].filter(([, schema]) => schema.type === "array").map(([name]) => name);
-  return lists.length === 1 ? { token, items: lists[0] } : null;
+  const [items, ...others] = lists;
+  return items !== undefined && others.length === 0 ? { token, items } : null;
 }
 
 /** An object schema's properties, its `allOf` parts' included. */
@@ -133,13 +138,109 @@ function properties(schema: Schema | undefined): Map<string, Schema> {
   return found;
 }
 
+/** The name orval gives an operation's function: its id, first letter lowercased. */
+const functionName = (id: string): string => id.charAt(0).toLowerCase() + id.slice(1);
+
+/**
+ * The parameters of the generated function that pages, by name, read from the
+ * signature orval wrote for it in `endpoints`, and which of them carries
+ * `page_token`: the body for a token the body carries, the query parameters
+ * otherwise.
+ */
+export function pagingParameters(
+  endpoints: string,
+  operation: Pick<ReturnType<typeof operationOf>, "id" | "paging">,
+): { names: string[]; carrier: string } {
+  const head = `export const ${functionName(operation.id)} = async (`;
+  const start = endpoints.indexOf(head);
+  if (start === -1) {
+    throw new Error(`${operation.id} has no generated function`);
+  }
+  // The parameter names, read to the bracket that closes the list. A comma
+  // inside a bracket a type opens (a function, tuple, object or generic type)
+  // separates no parameter; the `>` of an arrow `=>` closes nothing.
+  const names: string[] = [];
+  let depth = 0;
+  let from = start + head.length;
+  for (let at = from; ; at += 1) {
+    const char = endpoints[at];
+    if (char === undefined) {
+      throw new Error(`${operation.id} has an unterminated parameter list`);
+    }
+    if (depth === 0 && (char === "," || char === ")")) {
+      names.push(endpoints.slice(from, at).trim().split(/\??:/)[0] ?? "");
+      from = at + 1;
+      if (char === ")") {
+        break;
+      }
+      continue;
+    }
+    const arrow = char === ">" && endpoints[at - 1] === "=";
+    depth += "([{<".includes(char) ? 1 : ")]}>".includes(char) && !arrow ? -1 : 0;
+  }
+  const carrier = names.find((parameter) =>
+    operation.paging?.token === "body" ? parameter.endsWith("Body") : parameter === "params",
+  );
+  if (carrier === undefined) {
+    throw new Error(`${operation.id} has no argument to carry its page_token`);
+  }
+  return { names, carrier };
+}
+
+/**
+ * The source of `src/generated/paging.ts`: for each operation that pages, typed
+ * readers of a page's items and cursor, and the arguments of its next page.
+ */
+export function pagingSource(
+  operations: readonly Pick<ReturnType<typeof operationOf>, "id" | "paging">[],
+  endpoints: string,
+): string {
+  const field = (name: string) =>
+    /^[A-Za-z_$][\w$]*$/.test(name) ? `.${name}` : `[${JSON.stringify(name)}]`;
+  // Keyed by the function's name, which is what the client is called by.
+  const entries = operations.flatMap((operation) => {
+    if (!operation.paging) {
+      return [];
+    }
+    const name = functionName(operation.id);
+    // The next page's arguments are the caller's with `page_token` set on the
+    // one that carries it, typed by the function's own parameters, so a token
+    // put anywhere the function does not take one fails to compile.
+    const { names, carrier } = pagingParameters(endpoints, operation);
+    const next = names.map((parameter) =>
+      parameter === carrier ? `{ ...${parameter}, page_token }` : parameter,
+    );
+    return [
+      `  ${name}: {
+    items: (page: Page<"${name}">) => page${field(operation.paging.items)},
+    next: (page: Page<"${name}">) => page.next_page_token,
+    withToken: ([${names.join(", ")}]: Parameters<(typeof endpoints)["${name}"]>, page_token: string): Parameters<(typeof endpoints)["${name}"]> => [${next.join(", ")}],
+  },`,
+    ];
+  });
+  return `// Code generated by packages/api/scripts/operations.ts from api/openapi. DO NOT EDIT: regenerate with moon run api:generate.
+
+import type * as endpoints from "./endpoints/zitadelNextGen";
+
+type Page<K extends keyof typeof endpoints> = Awaited<ReturnType<(typeof endpoints)[K]>>;
+
+/**
+ * The client functions that page (ADR 027), by name: a page's items and its
+ * cursor to the next one, each read off the page as the function's response
+ * type declares them, and the arguments that fetch the page a cursor names.
+ */
+export const paging = {
+${entries.join("\n")}
+} as const;
+`;
+}
+
 function source(operations: readonly { id: string; destructive: boolean }[]): string {
-  // The client's function names: orval camel-cases an operationId
-  // (`DeleteUserByID` is `deleteUserByID`), and the typecheck holds the list to
-  // the generated endpoints, so a name the client lacks fails the build.
+  // The client's function names, which the typecheck holds to the generated
+  // endpoints, so a name the client lacks fails the build.
   const destructive = operations
     .filter((operation) => operation.destructive)
-    .map(({ id }) => id.charAt(0).toLowerCase() + id.slice(1));
+    .map(({ id }) => functionName(id));
   return `// Code generated by packages/api/scripts/operations.ts from api/openapi. DO NOT EDIT: regenerate with moon run api:generate.
 
 import type * as endpoints from "./endpoints/zitadelNextGen";
