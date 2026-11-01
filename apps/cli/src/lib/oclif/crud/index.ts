@@ -42,7 +42,7 @@ export { collectPages } from "./paging";
 export { DEFAULT_WIRE, wireOf } from "./wire";
 export { parseFilter, parseSort } from "./query";
 export { chosenColumns } from "./columns";
-export { allows, fieldPaths, itemSchemaOf, observedPaths, suggestable } from "./paths";
+export { allows, fieldPaths, observedPaths, suggestable } from "./paths";
 export type { FieldPaths } from "./paths";
 export { renderDetail, renderRows, renderTable } from "./table";
 export { bindOperation, definitionOf, ResourceCommand } from "./ops/command";

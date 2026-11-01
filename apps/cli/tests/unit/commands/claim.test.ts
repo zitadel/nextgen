@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -7,14 +7,11 @@ import {
   completeClaimChallenge,
   expireClaimChallenge,
   expireClaimWindow,
-  resetPlatformStore,
-  setupPlatformHandlers,
   snapshotPlatformStore,
 } from "@zitadel/api-mock/platform";
 import { http, passthrough } from "msw";
-import { setupServer } from "msw/node";
 import { text } from "@clack/prompts";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   localRuntimePaths,
@@ -22,6 +19,7 @@ import {
   type RuntimeMetadata,
 } from "../../../src/lib/local-server/runtime";
 import Claim from "../../../src/commands/claim";
+import { usePlatformServer } from "../../helpers/platform-project";
 import { parseJson, runCliForTest } from "../../helpers/run-cli";
 import { asTerminal } from "../../helpers/terminal";
 
@@ -36,24 +34,12 @@ import { aBinaryRecord } from "../../helpers/runtime-record";
  * not reachable through msw handlers.
  */
 const SERVER = "https://api.zitadel.cloud";
-const server = setupServer(...setupPlatformHandlers());
-const tempDirs: string[] = [];
+const { server, dirs: tempDirs } = usePlatformServer();
 const servers: Server[] = [];
 
-beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
-afterAll(() => server.close());
-
 afterEach(async () => {
-  server.resetHandlers();
-  resetPlatformStore();
   for (const httpServer of servers.splice(0)) {
     await new Promise<void>((resolve) => httpServer.close(() => resolve()));
-  }
-  while (tempDirs.length > 0) {
-    const dir = tempDirs.pop();
-    if (dir) {
-      await rm(dir, { recursive: true, force: true });
-    }
   }
 });
 

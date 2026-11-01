@@ -174,6 +174,10 @@ export async function customFetch<T>(url: string, options: RequestInit): Promise
     );
   }
 
+  // The body is trusted to have the shape the generated types promise; no
+  // response is checked here or by the paged functions. Should that change,
+  // check it here, against the generated Zod response schemas, so every call
+  // is covered.
   return parsed as T;
 }
 

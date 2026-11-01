@@ -2,15 +2,51 @@ import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import {
+  type GetReleaseById200,
+  type ListEvents200,
+  type ListEventsParams,
+  type ListSchemas200,
+  type ListSchemasParams,
+  QueryGrantsBodyFilterItemOperation,
+  QueryIdpsBodyFilterItemOperation,
+  QueryProjectsBodyFilterItemOperation,
+  QuerySessionsBodyFilterItemOperation,
+  QueryTeamsBodyFilterItemOperation,
+  type QueryUsers200,
+  QueryUsersBodyFilterItemOperation,
+} from "@zitadel/api/generated/model";
+import { pagedFunctions } from "@zitadel/api/client";
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
-import { type Platform, RESOURCES, releasePointers } from "../../../src/commands/resources";
+import {
+  CreateUserBody,
+  GetTeamResponse,
+  GetUserByIDResponse,
+  PatchUserByIDBody,
+  QueryUsersBody,
+  QueryUsersResponse,
+} from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
+
+import {
+  type CheckedRegistry,
+  create,
+  get,
+  list,
+  type Platform,
+  RESOURCES,
+  range,
+  releasePointers,
+  resource,
+  update,
+} from "../../../src/commands/resources";
 import { COMMANDS } from "../../../src/index";
 import {
   definitionOf,
   describeBody,
+  type Json,
   parseFilter,
   parseSort,
   type ResourceDescriptor,
@@ -202,19 +238,21 @@ describe("filter grammar", () => {
       { field: "created_at", operations: OPERATIONS },
       { field: "id", operations: OPERATIONS },
     ];
-    expect(parseFilter("status=active", fields)).toMatchObject({
+    expect(parseFilter("status=active", fields, OPERATIONS)).toMatchObject({
       operation: "equals",
       value: "active",
     });
-    expect(parseFilter("created_at=greater_than:2026-01-01T00:00:00Z", fields)).toMatchObject({
+    expect(
+      parseFilter("created_at=greater_than:2026-01-01T00:00:00Z", fields, OPERATIONS),
+    ).toMatchObject({
       operation: "greater_than",
       value: "2026-01-01T00:00:00Z",
     });
-    expect(parseFilter("id=equals:a:b", fields)).toMatchObject({
+    expect(parseFilter("id=equals:a:b", fields, OPERATIONS)).toMatchObject({
       operation: "equals",
       value: "a:b",
     });
-    expect(() => parseFilter("nonsense", fields)).toThrow(/Invalid --filter/);
+    expect(() => parseFilter("nonsense", fields, OPERATIONS)).toThrow(/Invalid --filter/);
   });
 
   it("parses field:direction and defaults to asc", () => {
@@ -297,6 +335,61 @@ describe("users list", () => {
     const json = parseJson(res.stdout) as { data: { count: number; next_page_token: null } };
     expect(json.data.count).toBe(2);
     expect(json.data.next_page_token).toBeNull();
+  });
+
+  it("follows a cursor back as the server wrote it with --all", async () => {
+    const cwd = await makeProject();
+    const tokens: unknown[] = [];
+    server.use(
+      http.post<never, { page_token?: string }>(
+        `${SERVER}/api/v1/users/query`,
+        async ({ request }) => {
+          const body = await request.json();
+          tokens.push(body.page_token ?? null);
+          return body.page_token
+            ? HttpResponse.json({ users: [user("user_2")] })
+            : HttpResponse.json({ users: [user("user_1")], next_page_token: "p\u001b2" });
+        },
+      ),
+    );
+
+    await run(cwd, ["users", "list", "--all"]);
+
+    expect(tokens).toEqual([null, "p\u001b2"]);
+  });
+
+  it("follows a cursor back as the server wrote it on a GET list with --all", async () => {
+    const cwd = await makeProject();
+    const tokens: (string | null)[] = [];
+    server.use(
+      http.get(`${SERVER}/api/v1/events`, ({ request }) => {
+        const token = new URL(request.url).searchParams.get("page_token");
+        tokens.push(token);
+        return HttpResponse.json({ data: [], next_page_token: token === null ? "p\u001b2" : null });
+      }),
+    );
+
+    await run(cwd, ["events", "list", "--all"]);
+
+    expect(tokens).toEqual([null, "p\u001b2"]);
+  });
+
+  it("escapes the items and the next cursor a list answers with", async () => {
+    const cwd = await makeProject();
+    server.use(
+      http.post(`${SERVER}/api/v1/users/query`, () =>
+        HttpResponse.json({
+          users: [{ ...user("user_1"), identifier: "a\u001b[2J" }],
+          next_page_token: "p\u001b2",
+        }),
+      ),
+    );
+
+    const res = await run(cwd, ["users", "list"]);
+
+    expect(parseJson(res.stdout)).toMatchObject({
+      data: { items: [{ identifier: "a\\x1b[2J" }], next_page_token: "p\\x1b2" },
+    });
   });
 
   it("rejects an unknown filter field before any request", async () => {
@@ -1927,7 +2020,12 @@ describe("the release resource", () => {
   });
 
   it("shows the resources a release pins as a table under its fields", () => {
-    const release = {
+    const release: GetReleaseById200 = {
+      id: "rel_1",
+      project_id: "proj_1",
+      content_hash: "sha256:1",
+      metadata: { git_dirty: false, created_at: "2026-01-01T00:00:00.000Z" },
+      revoked_at: null,
       pointers: [
         { kind: "schema", handle: "human-user", revision_id: "sch_1" },
         { kind: "flow_definition", handle: "default-login", revision_id: "fd_1" },
@@ -1944,5 +2042,455 @@ describe("the release resource", () => {
         "  flow_definition  default-login  fd_1",
       ].join("\n"),
     );
+  });
+});
+
+describe("the query resources' filters", () => {
+  it.each([
+    ["users", QueryUsersBodyFilterItemOperation],
+    ["teams", QueryTeamsBodyFilterItemOperation],
+    ["sessions", QuerySessionsBodyFilterItemOperation],
+    ["grants", QueryGrantsBodyFilterItemOperation],
+    ["idps", QueryIdpsBodyFilterItemOperation],
+    ["projects", QueryProjectsBodyFilterItemOperation],
+  ] as const)("offer the operations the %s query takes, and no other", (topic, operations) => {
+    const offered = new Set(
+      (RESOURCES[topic].list?.filters ?? []).flatMap((filter) => filter.operations),
+    );
+
+    expect([...offered].sort()).toEqual(Object.values(operations).sort());
+  });
+});
+
+describe("the registry builders", () => {
+  const users = list({
+    body: QueryUsersBody,
+    item: QueryUsersResponse.shape.users.element,
+    call: ({ client }, body) => client.queryUsers(body),
+    items: (page) => page.users,
+    next: (page) => page.next_page_token,
+  });
+  const user = get({
+    call: ({ client }, id) => client.getUserByID(id),
+    response: GetUserByIDResponse,
+  });
+
+  it("takes paths the list and get answer with", () => {
+    const checked = resource({
+      singular: "user",
+      idField: "id",
+      columns: ["id", "metadata.status"],
+      heading: "identifier",
+      detail: ["id", "metadata.created_at"],
+      list: users,
+      get: user,
+    });
+
+    expect(checked.columns).toEqual(["id", "metadata.status"]);
+  });
+
+  it("reads the id a write answered with off its id field", () => {
+    const checked = resource({
+      singular: "user",
+      idField: "id",
+      columns: ["id"],
+      heading: "identifier",
+      detail: ["id"],
+      list: users,
+      get: user,
+    });
+
+    expect(checked.idOf({ id: "user_1", identifier: "a" })).toBe("user_1");
+  });
+
+  it("refuses a column a listed item does not have", () => {
+    resource({
+      singular: "user",
+      idField: "id",
+      // @ts-expect-error a listed user has no `metadata.statu`
+      columns: ["id", "metadata.statu"],
+      heading: "identifier",
+      detail: ["id"],
+      list: users,
+      get: user,
+    });
+  });
+
+  it("refuses a heading the record does not have", () => {
+    resource({
+      singular: "user",
+      idField: "id",
+      columns: ["id"],
+      // @ts-expect-error a user has no `nam`
+      heading: "nam",
+      detail: ["id"],
+      list: users,
+      get: user,
+    });
+  });
+
+  it("refuses detail the record does not have", () => {
+    resource({
+      singular: "user",
+      idField: "id",
+      columns: ["id"],
+      heading: "identifier",
+      // @ts-expect-error a user has no `metadata.updated`
+      detail: ["id", "metadata.updated"],
+      list: users,
+      get: user,
+    });
+  });
+
+  it("refuses an id field a listed item does not have", () => {
+    resource({
+      singular: "user",
+      // @ts-expect-error a listed user carries `user_id`, not `id`
+      idField: "id",
+      columns: ["user_id"],
+      heading: "identifier",
+      detail: ["id"],
+      list: list({
+        body: QueryUsersBody,
+        call: async () => ({ users: [{ user_id: "user_1" }] }),
+        items: (page) => page.users,
+        next: () => undefined,
+      }),
+      get: user,
+    });
+  });
+
+  it("refuses an id field the record does not have", () => {
+    resource({
+      singular: "user",
+      // @ts-expect-error the record carries `identifier`, not `id`
+      idField: "id",
+      columns: ["id"],
+      heading: "identifier",
+      detail: ["identifier"],
+      list: users,
+      get: get({ call: async () => ({ identifier: "a" }) }),
+    });
+  });
+
+  it("refuses an id field the created resource does not answer with", () => {
+    resource({
+      singular: "user",
+      idField: "id",
+      columns: ["id"],
+      heading: "identifier",
+      detail: ["id"],
+      list: users,
+      get: user,
+      // @ts-expect-error this create answers with `user_id`, not the `id` field
+      create: create(CreateUserBody, async () => ({ user_id: "user_1" })),
+    });
+  });
+
+  it("refuses an id field the updated resource does not answer with", () => {
+    resource({
+      singular: "user",
+      idField: "id",
+      columns: ["id"],
+      heading: "identifier",
+      detail: ["id"],
+      list: users,
+      get: user,
+      // @ts-expect-error this update answers with `user_id`, not the `id` field
+      update: update(PatchUserByIDBody, async () => ({ user_id: "user_1" })),
+    });
+  });
+
+  it("refuses items the page does not hold", () => {
+    list({
+      body: QueryUsersBody,
+      call: ({ client }, body) => client.queryUsers(body),
+      // @ts-expect-error the page holds its users under `users`
+      items: (page) => page.user,
+      next: (page) => page.next_page_token,
+    });
+  });
+
+  it("takes an unpaged list without a cursor", () => {
+    const branding = list({
+      paged: false,
+      call: ({ client, projectId }) => client.listBranding({ project_id: projectId }),
+      items: (page) => page,
+    });
+
+    expect(branding.paged).toBe(false);
+  });
+
+  it("refuses a paged list without a cursor", () => {
+    // @ts-expect-error a paged list reads its cursor with `next`
+    list({
+      body: QueryUsersBody,
+      call: ({ client }, body) => client.queryUsers(body),
+      items: (page: QueryUsers200) => page.users,
+    });
+  });
+
+  it("refuses a filter field the query body does not filter by", () => {
+    list({
+      body: QueryUsersBody,
+      // @ts-expect-error a user query filters by `status`, not `state`
+      filters: [{ field: "state", operations: ["equals"] }],
+      call: ({ client }, body) => client.queryUsers(body),
+      items: (page: QueryUsers200) => page.users,
+      next: (page: QueryUsers200) => page.next_page_token,
+    });
+  });
+
+  it("refuses a sort field the query body does not sort by", () => {
+    list({
+      body: QueryUsersBody,
+      // @ts-expect-error a user query sorts by `created_at`, not `created`
+      sorts: ["created"],
+      call: ({ client }, body) => client.queryUsers(body),
+      items: (page: QueryUsers200) => page.users,
+      next: (page: QueryUsers200) => page.next_page_token,
+    });
+  });
+
+  it("refuses a filter that is no query parameter of a GET list", () => {
+    // @ts-expect-error schemas are listed by `object_type`, not `objectType`
+    list({
+      filters: [{ field: "objectType", operations: ["equals"] }],
+      call: ({ client, projectId }: Platform, params: Omit<ListSchemasParams, "project_id">) =>
+        client.listSchemas({ ...params, project_id: projectId }),
+      items: (page: ListSchemas200) => page.schemas,
+      next: (page: ListSchemas200) => page.next_page_token,
+    });
+  });
+
+  it("refuses a sort parameter a GET list does not take", () => {
+    list({
+      sorts: ["metadata.created_at"],
+      // @ts-expect-error schemas take no `order` parameter
+      sortParam: "order",
+      call: ({ client, projectId }: Platform, params: Omit<ListSchemasParams, "project_id">) =>
+        client.listSchemas({ ...params, project_id: projectId }),
+      items: (page: ListSchemas200) => page.schemas,
+      next: (page: ListSchemas200) => page.next_page_token,
+    });
+  });
+
+  it("refuses an operation the query body does not take", () => {
+    list({
+      body: QueryUsersBody,
+      // @ts-expect-error a user query takes no `starts_with` operation
+      filters: [{ field: "status", operations: ["starts_with"] }],
+      call: ({ client }, body) => client.queryUsers(body),
+      items: (page: QueryUsers200) => page.users,
+      next: (page: QueryUsers200) => page.next_page_token,
+    });
+  });
+
+  it("refuses a value a GET parameter does not take", () => {
+    // @ts-expect-error schemas list `all` or `latest` revisions, not `newest`
+    list({
+      filters: [{ field: "revisions", operations: ["equals"], values: ["all", "newest"] }],
+      call: ({ client, projectId }: Platform, params: Omit<ListSchemasParams, "project_id">) =>
+        client.listSchemas({ ...params, project_id: projectId }),
+      items: (page: ListSchemas200) => page.schemas,
+      next: (page: ListSchemas200) => page.next_page_token,
+    });
+  });
+
+  it("refuses a default a GET parameter does not take", () => {
+    // @ts-expect-error schemas list `all` or `latest` revisions, not `newest`
+    list({
+      filters: [{ field: "revisions", operations: ["equals"], default: "newest" }],
+      call: ({ client, projectId }: Platform, params: Omit<ListSchemasParams, "project_id">) =>
+        client.listSchemas({ ...params, project_id: projectId }),
+      items: (page: ListSchemas200) => page.schemas,
+      next: (page: ListSchemas200) => page.next_page_token,
+    });
+  });
+
+  it("refuses a range parameter a GET list does not take", () => {
+    // @ts-expect-error events take `created_after`, not `created_afer`
+    list({
+      filters: [
+        {
+          field: "created_at",
+          ...range({ greater_than_or_equal: "created_afer" }),
+        },
+      ],
+      call: ({ client, projectId }: Platform, params: Omit<ListEventsParams, "project_id">) =>
+        client.listEvents({ ...params, project_id: projectId }),
+      items: (page: ListEvents200) => page.data,
+      next: (page: ListEvents200) => page.next_page_token,
+    });
+  });
+
+  it("offers exactly the operations a range names a parameter for", () => {
+    expect(
+      range({ greater_than: "created_after", less_than: "created_before" }).operations,
+    ).toEqual(["greater_than", "less_than"]);
+  });
+
+  it("refuses a range operation no query takes", () => {
+    // @ts-expect-error no query takes a `between` operation
+    range({ between: "created_after" });
+  });
+
+  it("refuses a repeat that widens on a query body", () => {
+    list({
+      body: QueryUsersBody,
+      // @ts-expect-error a user query applies every repeat of a field, so none widens
+      filters: [{ field: "status", operations: ["equals"], combine: "or" }],
+      call: ({ client }, body) => client.queryUsers(body),
+      items: (page: QueryUsers200) => page.users,
+      next: (page: QueryUsers200) => page.next_page_token,
+    });
+  });
+
+  it("refuses a repeat that widens on a GET parameter taking one value", () => {
+    list({
+      // @ts-expect-error events take one `actor_id`, so its repeats cannot widen
+      filters: [{ field: "actor_id", operations: ["equals"], combine: "or" }],
+      call: ({ client, projectId }: Platform, params: Omit<ListEventsParams, "project_id">) =>
+        client.listEvents({ ...params, project_id: projectId }),
+      items: (page: ListEvents200) => page.data,
+      next: (page: ListEvents200) => page.next_page_token,
+    });
+  });
+
+  it("refuses a GET parameter taking a list that does not say its repeats widen", () => {
+    // @ts-expect-error events take a list of `event_type`, whose repeats widen
+    list({
+      filters: [{ field: "event_type", operations: ["equals"] }],
+      call: ({ client, projectId }: Platform, params: Omit<ListEventsParams, "project_id">) =>
+        client.listEvents({ ...params, project_id: projectId }),
+      items: (page: ListEvents200) => page.data,
+      next: (page: ListEvents200) => page.next_page_token,
+    });
+  });
+
+  it("refuses a range written without range()", () => {
+    // @ts-expect-error only range() pairs a range's operations with their parameters
+    list({
+      filters: [
+        {
+          field: "created_at",
+          operations: ["greater_than_or_equal", "less_than"],
+          params: { greater_than_or_equal: "created_after" },
+        },
+      ],
+      call: ({ client, projectId }: Platform, params: Omit<ListEventsParams, "project_id">) =>
+        client.listEvents({ ...params, project_id: projectId }),
+      items: (page: ListEvents200) => page.data,
+      next: (page: ListEvents200) => page.next_page_token,
+    });
+  });
+
+  it("refuses an operation other than equals on a GET parameter", () => {
+    // @ts-expect-error a parameter carries its value as it is, so it filters by equals
+    list({
+      filters: [{ field: "created_after", operations: ["greater_than"] }],
+      call: ({ client, projectId }: Platform, params: Omit<ListEventsParams, "project_id">) =>
+        client.listEvents({ ...params, project_id: projectId }),
+      items: (page: ListEvents200) => page.data,
+      next: (page: ListEvents200) => page.next_page_token,
+    });
+  });
+
+  it("refuses a GET sort the listed item does not have", () => {
+    list({
+      // @ts-expect-error events are ordered by `occurred_at`
+      sorts: ["occured_at"],
+      sortParam: "order",
+      call: ({ client, projectId }: Platform, params: Omit<ListEventsParams, "project_id">) =>
+        client.listEvents({ ...params, project_id: projectId }),
+      items: (page: ListEvents200) => page.data,
+      next: (page: ListEvents200) => page.next_page_token,
+    });
+  });
+
+  it("sends each operation of the events' created_at range as its own parameter", () => {
+    expect(RESOURCES.events.list?.filters?.find((f) => f.field === "created_at")).toMatchObject({
+      operations: ["greater_than_or_equal", "less_than"],
+      params: { greater_than_or_equal: "created_after", less_than: "created_before" },
+    });
+  });
+
+  it("refuses filters on a GET list whose call parameter is untyped", () => {
+    list({
+      // @ts-expect-error an untyped parameter would check no filter, so none is taken
+      filters: [{ field: "object_type", operations: ["equals"] }],
+      call: ({ client, projectId }: Platform, params: Json) =>
+        client.listSchemas({ ...params, project_id: projectId }),
+      items: (page: ListSchemas200) => page.schemas,
+      next: (page: ListSchemas200) => page.next_page_token,
+    });
+  });
+
+  it("checks a GET list by its parameters even when one is called filter", () => {
+    const filtered = list({
+      filters: [{ field: "filter", operations: ["equals"] }],
+      call: ({ client, projectId }: Platform, _params: { filter?: string }) =>
+        client.listSchemas({ project_id: projectId }),
+      items: (page) => page.schemas,
+      next: (page) => page.next_page_token,
+    });
+
+    expect(filtered.filters?.[0]?.field).toBe("filter");
+  });
+
+  it("refuses an item schema of another operation", () => {
+    list({
+      body: QueryUsersBody,
+      // @ts-expect-error a team's schema does not parse into a listed user
+      item: GetTeamResponse,
+      call: ({ client }, body) => client.queryUsers(body),
+      items: (page) => page.users,
+      next: (page) => page.next_page_token,
+    });
+  });
+
+  it("refuses a response schema of another operation", () => {
+    get({
+      call: ({ client }, id) => client.getUserByID(id),
+      // @ts-expect-error a team's schema does not parse into a user
+      response: GetTeamResponse,
+    });
+  });
+
+  it("refuses an entry resource() did not check", () => {
+    const registry = {
+      // @ts-expect-error a plain descriptor skips every check above
+      users: {
+        singular: "user",
+        idField: "id",
+        columns: ["id"],
+        heading: "identifier",
+        detail: ["id"],
+        list: users,
+        get: user,
+      },
+    } satisfies CheckedRegistry;
+
+    expect(Object.keys(registry)).toEqual(["users"]);
+  });
+});
+
+describe("the paged resources' lists", () => {
+  it.each([
+    ["users", pagedFunctions.queryUsers],
+    ["teams", pagedFunctions.queryTeams],
+    ["sessions", pagedFunctions.querySessions],
+    ["events", pagedFunctions.listEvents],
+    ["grants", pagedFunctions.queryGrants],
+    ["idps", pagedFunctions.queryIdps],
+    ["projects", pagedFunctions.queryProjects],
+    ["schemas", pagedFunctions.listSchemas],
+    ["release", pagedFunctions.listReleases],
+    ["flow-definitions", pagedFunctions.listFlowDefinitions],
+    ["policies", pagedFunctions.listPolicies],
+  ] as const)("read %s's pages with the readers the client generates", (topic, readers) => {
+    const list = RESOURCES[topic].list;
+
+    expect([list?.items, list?.next]).toEqual([readers.items, readers.next]);
   });
 });

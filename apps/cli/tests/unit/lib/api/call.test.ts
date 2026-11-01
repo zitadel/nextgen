@@ -150,7 +150,23 @@ describe("sendAll", () => {
     expect(response.body).toEqual({ users: LETTERS, next_page_token: "" });
   });
 
-  it("starts from the page the caller named", async () => {
+  it("refuses a page without its list, carrying the response", async () => {
+    server.use(
+      http.get(`${SERVER}/api/v1/users/user_1/passkeys`, () =>
+        HttpResponse.json({ next_page_token: "" }),
+      ),
+    );
+
+    await expect(
+      sendAll(SERVER, "s", requestFor("listUserPasskeys", [], ["user_1"])),
+    ).rejects.toMatchObject({
+      code: "E_VALIDATION",
+      message: 'Unexpected list response: missing "passkeys" array',
+      details: { response: { next_page_token: "" } },
+    });
+  });
+
+  it("starts from the page the caller named in the query", async () => {
     server.use(
       http.get(`${SERVER}/api/v1/users/user_1/passkeys`, ({ request }) => {
         const { items, next } = pageAt(new URL(request.url).searchParams.get("page_token"));
@@ -167,18 +183,68 @@ describe("sendAll", () => {
     expect(response.body).toMatchObject({ passkeys: ["d", "e", "f", "g"] });
   });
 
-  it("stops on a server that repeats a cursor", async () => {
+  it("starts from the page the caller named in the body", async () => {
     server.use(
-      http.get(`${SERVER}/api/v1/users/user_1/passkeys`, () =>
-        HttpResponse.json({ passkeys: ["a"], next_page_token: "again" }),
+      http.post<never, { page_token?: string }>(
+        `${SERVER}/api/v1/users/query`,
+        async ({ request }) => {
+          const body = await request.json();
+          const { items, next } = pageAt(body.page_token ?? null);
+          return HttpResponse.json({ users: items, next_page_token: next });
+        },
       ),
     );
 
-    await expect(
-      sendAll(SERVER, "s", requestFor("listUserPasskeys", [], ["user_1"])),
-    ).rejects.toMatchObject({
-      message: "The server repeated a page cursor, so --paginate would never finish",
-      hint: "Fetch one page at a time with -F limit=<n> and -F page_token=<token>, and report the repeated cursor.",
-    });
+    const response = await sendAll(SERVER, "s", requestFor("queryUsers", ["page_token=cursor-3"]));
+
+    expect(response.body).toMatchObject({ users: ["d", "e", "f", "g"] });
+  });
+
+  it("sends a cursor back as the server wrote it, and escapes the items", async () => {
+    const asked: (string | null)[] = [];
+    server.use(
+      http.get(`${SERVER}/api/v1/users/user_1/passkeys`, ({ request }) => {
+        const token = new URL(request.url).searchParams.get("page_token");
+        asked.push(token);
+        return HttpResponse.json(
+          token === null
+            ? { passkeys: ["\u001b[2Ja"], next_page_token: "c\u001b2" }
+            : { passkeys: ["b"], next_page_token: "" },
+        );
+      }),
+    );
+
+    const response = await sendAll(SERVER, "s", requestFor("listUserPasskeys", [], ["user_1"]));
+
+    expect([asked, response.body]).toEqual([
+      [null, "c\u001b2"],
+      { passkeys: ["\\x1b[2Ja", "b"], next_page_token: "" },
+    ]);
+  });
+
+  it("answers the last page's other fields escaped once, its items in their place", async () => {
+    server.use(
+      http.get(`${SERVER}/api/v1/users/user_1/passkeys`, () =>
+        HttpResponse.json({ note: "\u001b[2J", passkeys: ["a"], next_page_token: "" }),
+      ),
+    );
+
+    const response = await sendAll(SERVER, "s", requestFor("listUserPasskeys", [], ["user_1"]));
+
+    expect(JSON.stringify(response.body)).toBe(
+      JSON.stringify({ note: "\\x1b[2J", passkeys: ["a"], next_page_token: "" }),
+    );
+  });
+
+  it("keeps two fields of the last page whose names escape alike apart", async () => {
+    server.use(
+      http.get(`${SERVER}/api/v1/users/user_1/passkeys`, () =>
+        HttpResponse.json({ "\u001bk": 1, "\\x1bk": 2, passkeys: ["a"], next_page_token: "" }),
+      ),
+    );
+
+    const response = await sendAll(SERVER, "s", requestFor("listUserPasskeys", [], ["user_1"]));
+
+    expect(Object.keys(Object(response.body))).toHaveLength(4);
   });
 });

@@ -2,30 +2,17 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { resetPlatformStore, setupPlatformHandlers } from "@zitadel/api-mock/platform";
 import { HttpResponse, http } from "msw";
-import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { IssuerOriginCheck, type CheckContext } from "../../../../../src/commands/doctor/checks";
 import { createZitadelClient } from "../../../../../src/lib/api-client";
 import { createOrca } from "../../../../../src/lib/orca";
+import { usePlatformServer } from "../../../../helpers/platform-project";
 
 const SERVER = "https://api.zitadel.example";
 const ISSUER = "http://localhost:3000";
-const server = setupServer(...setupPlatformHandlers());
-const tempDirs: string[] = [];
-
-beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
-afterAll(() => server.close());
-
-afterEach(async () => {
-  server.resetHandlers();
-  resetPlatformStore();
-  for (const dir of tempDirs.splice(0)) {
-    await rm(dir, { recursive: true, force: true });
-  }
-});
+const { server, dirs: tempDirs } = usePlatformServer();
 
 type Origin = { pattern: string; kind: "primary" | "preview" };
 type Project = { id: string; project_secret: string; cwd: string };
