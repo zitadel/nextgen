@@ -161,7 +161,7 @@ describe("Settings → Usage", () => {
     const team = await usage({ systems: mockSystems(), provisionOnce: vi.fn() });
     const days = team.days.flatMap(({ entries }) => entries);
     expect(team.days).toHaveLength(31);
-    expect(days.reduce((sum, entry) => sum + entry.amount, 0)).toBe(142_000);
+    expect(days.reduce((sum, entry) => sum + entry.amount, 0)).toBe(140_000);
     expect(team.projects.map((project) => project.name)).toEqual([
       "Customer portal",
       "Partner API",
@@ -173,17 +173,29 @@ describe("Settings → Usage", () => {
     expect(team).toMatchObject({
       credit: { amount: 0, used: 0 },
       on_demand_amount: 0,
-      estimate: { plan: "pro", total_amount: 142_000 },
+      estimate: { plan: "pro", total_amount: 150_000 },
     });
   });
 
-  it("draws Pro's minimum first, as credit, and bills the rest on demand", async () => {
+  it("adds Pro's base fee to usage without a usage credit", async () => {
     const systems = mockSystems();
     await systems.zitadel.applyEntitlements(MOCK_TEAM.id, entitlementsFor("pro"));
     const team = await usage({ systems, provisionOnce: vi.fn() });
     expect(team).toMatchObject({
-      credit: { amount: 10_000, used: 10_000 },
-      on_demand_amount: 132_000,
+      credit: { amount: 0, used: 0 },
+      on_demand_amount: 140_000,
+      estimate: { plan: "pro", total_amount: 150_000 },
+    });
+  });
+
+  it("applies an Enterprise contract's credit without adding the Pro base fee", async () => {
+    const systems = mockSystems();
+    await systems.zitadel.applyEntitlements(MOCK_TEAM.id, entitlementsFor("enterprise"));
+    const team = await usage({ systems, provisionOnce: vi.fn() });
+    expect(team).toMatchObject({
+      credit: { amount: 300_000, used: 140_000 },
+      on_demand_amount: 0,
+      estimate: { plan: "enterprise", total_amount: 300_000 },
     });
   });
 });

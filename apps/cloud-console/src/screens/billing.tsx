@@ -139,6 +139,7 @@ function TeamBillingSections({ team, usage }: { team: TeamBilling; usage?: TeamU
               {team.plan.name}
               <Badge variant="secondary">
                 {money(team.plan.minimum_amount, team.plan.currency)} / month
+                {team.plan.id === "pro" ? " + usage" : ""}
               </Badge>
             </span>
           </DetailRow>
@@ -221,7 +222,7 @@ function TeamBillingSections({ team, usage }: { team: TeamBilling; usage?: TeamU
 /**
  * The plan's credit and what is billed past it, as one bar: the credit usage
  * drew, then on-demand charges, against the credit or the total, whichever
- * is larger. Free has no credit, so it shows none.
+ * is larger. Free and Pro have no credit, so they show none.
  */
 function CreditSummary({ usage }: { usage: TeamUsage }) {
   const { credit, on_demand_amount: onDemand, plan } = usage;

@@ -83,10 +83,12 @@ export interface Plan {
   id: "free" | "pro" | "enterprise";
   name: string;
   /**
-   * Minor units of `currency` per month that usage is billed against: the
-   * invoice is the larger of the two, plus what is billed on top.
+   * Monthly base fee or contractual minimum in minor units of `currency`.
+   * Pro adds metered usage to this fee; Enterprise follows its contract.
    */
   minimum_amount: number;
+  /** Included usage credit in minor units; zero on Free and Pro. */
+  credit_amount: number;
   currency: string;
 }
 
@@ -121,8 +123,8 @@ export interface TeamUsage {
   /** Each meter's period so far, as Billing lists it. */
   usage: UsageLine[];
   /**
-   * The plan's minimum, which usage draws on before anything else (Pro's
-   * $100 a month), and how much of it usage has drawn. Both 0 on Free.
+   * Contracted usage credit and how much has been used. Both zero on Free
+   * and Pro; Pro's base fee is separate from metered usage.
    */
   credit: { amount: number; used: number };
   /** Minor units of usage past the credit so far. */
@@ -154,7 +156,7 @@ export interface UsageEntry {
 export interface BillingEstimate {
   /** The plan the usage needs: `free` while nothing is past an allowance or Pro's only. */
   plan: Plan["id"];
-  /** Minor units: the larger of the plan's minimum and the usage, plus what is billed on top. */
+  /** Minor units: the base fee plus usage beyond any contracted credit and add-ons. */
   total_amount: number;
   currency: string;
 }

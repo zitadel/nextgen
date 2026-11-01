@@ -22,7 +22,7 @@ const request = {
 const team = {
   team_id: "team_1",
   team_name: "Acme",
-  plan: { id: "pro", name: "Pro", currency: "USD", minimum_amount: 10_000 },
+  plan: { id: "pro", name: "Pro", currency: "USD", minimum_amount: 10_000, credit_amount: 0 },
   period: { start: request.from, end: request.to },
   projects: [
     { id: "proj_a", name: "Portal" },

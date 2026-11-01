@@ -13,13 +13,14 @@ export interface Catalog {
   version: string;
   currency: string;
   plans: {
-    free: { limits: { core_mau_sized_for: number }; event_retention_days: number };
-    pro: { minimum: { amount: number }; event_retention_days: number };
+    free: { event_retention_days: number };
+    pro: { minimum: { amount: number; is_credit: boolean }; event_retention_days: number };
     enterprise: {
-      minimum: { tiers_per_year: Record<string, number> };
+      minimum: { tiers_per_year: Record<string, number>; is_credit: boolean };
       event_retention_days: number;
     };
   };
+  packages: Package[];
   meters: Meter[];
   licensed: Licensed[];
 }
@@ -30,28 +31,22 @@ export interface PerUnit {
   unit_amount: number;
 }
 
-/** A flat amount per started `size` above `above`, up to `until`. */
-export interface Bands {
-  model: "bands";
-  above: number;
-  size: number;
-  amount: number;
-  until: number;
-  /** Bills only once the account's owner opts in. */
-  opt_in: boolean;
+export type PackageId = "governance" | "compliance";
+
+/** Packages are selected per account, never counted per user or policy. */
+export interface Package {
+  id: PackageId;
+  label: string;
+  pricing: "included_in_plan" | "quoted";
+  scope: "account";
+  plans: Plan["id"][];
+  included_in: Plan["id"][];
 }
 
-/** A price per user and per extra message, by the destination's band. */
+/** A consumption price by destination. Unpriced destinations require a quote. */
 export interface PerBand {
   model: "per_band";
-  bands: Band[];
-}
-
-export interface Band {
-  id: string;
-  /** `null` until the band is priced. */
-  per_user: number | null;
-  extra_message: number | null;
+  bands: { id: string; unit_amount: number | null }[];
 }
 
 export interface Meter {
@@ -62,20 +57,14 @@ export interface Meter {
   /** Free per account and month, on every plan; `null` for a gauge. */
   allowance: number | null;
   /** `null` for a gauge, which is counted and never billed. */
-  price: PerUnit | Bands | PerBand | null;
-  /** Activity included per counted user, pooled across the account. */
-  pool?: { meter: string; per_user: number };
-  /** The user meter whose pool this activity draws on first. */
-  pool_of?: string;
+  price: PerUnit | PerBand | null;
   /** The plans that may use it; every plan when unset. */
   plans?: Plan["id"][];
-  /** How long a counted user's audit events are kept: a plan that keeps them as long has it already. */
-  retention_days?: number;
   /** Counts at most `at_most` users per connection or directory a month. */
   counted_per?: { key: "connection" | "directory"; at_most: number };
 }
 
-/** A line billed on top of the minimum, never drawn from its credit. */
+/** A recurring plan fee or an add-on billed separately from metered usage. */
 export interface Licensed {
   id: string;
   label: string;
@@ -85,19 +74,12 @@ export interface Licensed {
 
 export const CATALOG = data as Catalog;
 
-/**
- * What a plan may use and the allowances the server enforces (root ADR 084
- * §6, §8.3): every billed meter the plan offers, at its allowance. Activity
- * drawn from a pool is billed past the pool and never enforced, so it is left
- * out, and so is a retention the plan keeps anyway.
- */
+/** Allowances for paid integrations and consumption; core gauges are never entitlements. */
 export function entitlementsFor(plan: Plan["id"], catalog: Catalog = CATALOG): Entitlements {
   const allowances: Record<string, number> = {};
-  const keeps = catalog.plans[plan].event_retention_days;
   for (const meter of catalog.meters) {
-    if (meter.price === null || meter.pool_of) continue;
+    if (meter.price === null) continue;
     if (meter.plans && !meter.plans.includes(plan)) continue;
-    if (meter.retention_days && meter.retention_days <= keeps) continue;
     allowances[meter.id] = meter.allowance ?? 0;
   }
   return { plan, allowances };
