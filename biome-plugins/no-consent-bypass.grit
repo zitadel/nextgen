@@ -19,14 +19,22 @@ or {
     $filename <: not r".*/apps/cli/src/lib/consent\.ts$",
     register_diagnostic(span=$bypass, message="Never cast a client: its destructive operations are reached only through Consent.unlock.", severity="error")
   },
-  `Consent.request($_)` as $bypass where {
+  or {
+    `Consent.request`,
+    `Consent["request"]`,
+    `{ $_ } = Consent`
+  } as $bypass where {
     $filename <: r".*/apps/cli/src/.*",
     $filename <: not r".*/apps/cli/src/lib/oclif/destructive\.ts$",
     register_diagnostic(span=$bypass, message="Ask for consent with Destructive's confirmed() or consent(), which take --force and the terminal from the run.", severity="error")
   },
-  `import { $names } from "@zitadel/api/runtime/fetch"` as $bypass where {
+  `import * as $_ from "@zitadel/api/runtime/fetch"` as $bypass where {
     $filename <: r".*/apps/cli/src/.*",
-    $names <: contains `request`,
+    register_diagnostic(span=$bypass, message="Import what you need from @zitadel/api/runtime/fetch by name; its senders go through send() in lib/api/call.", severity="error")
+  },
+  `import $names from "@zitadel/api/runtime/fetch"` as $bypass where {
+    $filename <: r".*/apps/cli/src/.*",
+    $names <: r"(?s).*\brequest\b.*|(?s).*\bcustomFetch\b.*",
     $filename <: not r".*/apps/cli/src/lib/api/call\.ts$",
     $filename <: not r".*/apps/cli/src/lib/local-server/sign-in\.ts$",
     register_diagnostic(span=$bypass, message="Send a request through send() in lib/api/call, which refuses a destructive operation without a Consent.", severity="error")

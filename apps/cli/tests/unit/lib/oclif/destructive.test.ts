@@ -246,6 +246,14 @@ describe("Destructive", () => {
       });
     });
 
+    it("leaves a URL's credentials out of the arguments after --", async () => {
+      const command = new Removing({ argv: ["--", "https://me:secret@host"] });
+
+      await expect(command.remove()).rejects.toMatchObject({
+        nextCommands: ["npx @zitadel/cli@1.2.3 variable rm --force -- https://host"],
+      });
+    });
+
     it("suggests no empty command word when the command has no id", async () => {
       await expect(new Unnamed({}).remove()).rejects.toMatchObject({
         nextCommands: ["npx @zitadel/cli@1.2.3 API_URL --force"],

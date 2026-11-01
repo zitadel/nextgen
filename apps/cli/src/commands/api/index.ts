@@ -153,6 +153,22 @@ export default class Api extends Destructive(BaseCommand) {
             `Would you like to call ${operation.id} at ${urlOf(meta.source, request)}?`,
             ...(operation.summary === "" ? [] : [`${operation.summary}.`]),
           ].join(" "),
+          // A body is not repeated in a suggestion: it can hold a secret, or
+          // have come from a pipe a rerun of the command alone would not have.
+          ...(request.body === undefined
+            ? {}
+            : {
+                retry: undefined,
+                refuse: () => {
+                  throw new ZitadelError(
+                    "E_VALIDATION",
+                    `Cannot call ${operation.id} without --force in non-interactive mode`,
+                    {
+                      hint: "Run the same command again, with its --field values or the pipe into --input, and add --force.",
+                    },
+                  );
+                },
+              }),
         })
       : undefined;
     if (destructive && consent === undefined) {

@@ -96,11 +96,11 @@ export function Destructive<TBase extends CommandClass<BaseCommand>>(Base: TBase
      * arguments rather than flags.
      */
     protected consent(gate: Gate): Promise<Consent | undefined> {
-      const delimiter = this.argv.indexOf("--");
-      const flags = delimiter === -1 ? this.argv : this.argv.slice(0, delimiter);
-      const typed = flags
-        .filter((word) => !ANSWERING.has(word))
-        .map((word) => word.replace(CREDENTIALS, "$1"));
+      const words = this.argv.map((word) => word.replace(CREDENTIALS, "$1"));
+      const delimiter = words.indexOf("--");
+      const typed = (delimiter === -1 ? words : words.slice(0, delimiter)).filter(
+        (word) => !ANSWERING.has(word),
+      );
       const leading = typed.findIndex((word) => word.startsWith("-"));
       const split = leading === -1 ? typed.length : leading;
       const command = this.retryCommand([
@@ -109,7 +109,7 @@ export function Destructive<TBase extends CommandClass<BaseCommand>>(Base: TBase
         "--force",
         ...typed.slice(split),
       ]);
-      const trailing = delimiter === -1 ? [] : this.argv.slice(delimiter + 1);
+      const trailing = delimiter === -1 ? [] : words.slice(delimiter + 1);
       const retry =
         trailing.length === 0
           ? command

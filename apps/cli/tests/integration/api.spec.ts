@@ -131,6 +131,24 @@ describe("api", () => {
         expect(result).toFailWith("E_VALIDATION");
       });
 
+      it("does not repeat a refused request's body in its suggestion", async () => {
+        const app = await aSetUpApp();
+        expect(await app.setVariable("FOO", "bar")).toSucceed();
+
+        const result = await app.api("updateVariables", "-F", "FOO:=null");
+
+        expect(result).not.toSuggest("FOO");
+      });
+
+      it("says to run a refused request with a body again with --force", async () => {
+        const app = await aSetUpApp();
+        expect(await app.setVariable("FOO", "bar")).toSucceed();
+
+        const result = await app.api("updateVariables", "-F", "FOO:=null");
+
+        expect(result).toHintAt("Run the same command again");
+      });
+
       it("keeps the variable a refused merge patch would have removed", async () => {
         const app = await aSetUpApp();
         expect(await app.setVariable("FOO", "bar")).toSucceed();
