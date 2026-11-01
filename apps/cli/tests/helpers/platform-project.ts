@@ -83,7 +83,7 @@ export async function aProjectWithTwoDeploys(
  * `primary` only behind the cursor, so a read of the first page alone misses it.
  */
 export function liveAcrossTwoPages(primary: { id: string; release_id: string }) {
-  return http.get(`${PLATFORM_URL}/deployments`, ({ request }) => {
+  return http.get(`${PLATFORM_URL}/api/v1/deployments`, ({ request }) => {
     const query = new URL(request.url).searchParams;
     if (query.get("live") !== "true") {
       return undefined;

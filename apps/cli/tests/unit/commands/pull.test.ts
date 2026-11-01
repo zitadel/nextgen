@@ -92,7 +92,7 @@ describe("pull latest", () => {
     server.use(liveAcrossTwoPages({ id: "dep_live_primary", release_id: "rel_live" }));
     const read: string[] = [];
     server.use(
-      http.get(`${PLATFORM_URL}/releases/:id`, ({ params }) => {
+      http.get(`${PLATFORM_URL}/api/v1/releases/:id`, ({ params }) => {
         read.push(params.id as string);
         return undefined;
       }),

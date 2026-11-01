@@ -722,7 +722,7 @@ describe("setup command", () => {
           publishable_key: "pk_platform",
         }),
       ),
-      http.post("http://localhost:9941/projects/:projectId/claim/init", () =>
+      http.post("http://localhost:9941/api/v1/projects/:projectId/claim/init", () =>
         HttpResponse.json({ code: "internal", message: "claim unavailable" }, { status: 500 }),
       ),
     );
@@ -877,32 +877,34 @@ describe("setup command", () => {
           publishable_key: "pk_platform",
         }),
       ),
-      http.post(`${local}/auth_attempts`, () =>
+      http.post(`${local}/api/v1/auth_attempts`, () =>
         HttpResponse.json({ attempt_id: "att_1" }, { status: 201 }),
       ),
-      http.post(`${local}/auth_attempts/:attempt/challenges`, () =>
+      http.post(`${local}/api/v1/auth_attempts/:attempt/challenges`, () =>
         HttpResponse.json({ challenge_id: "ch_1" }, { status: 201 }),
       ),
-      http.post(`${local}/auth_attempts/:attempt/challenges/:challenge/verify`, () =>
+      http.post(`${local}/api/v1/auth_attempts/:attempt/challenges/:challenge/verify`, () =>
         HttpResponse.json({ attempt_id: "att_1" }),
       ),
-      http.post(`${local}/auth_attempts/:attempt/handoff`, () =>
+      http.post(`${local}/api/v1/auth_attempts/:attempt/handoff`, () =>
         HttpResponse.json({ handoff_token: "handoff_1" }),
       ),
       http.post(
-        `${local}/sessions/exchange`,
+        `${local}/api/v1/sessions/exchange`,
         () =>
           new HttpResponse(null, {
             headers: { "set-cookie": "zitadel_session=admin_session; Path=/; HttpOnly" },
           }),
       ),
-      http.post(`${local}/projects/:projectId/claim/init`, () =>
+      http.post(`${local}/api/v1/projects/:projectId/claim/init`, () =>
         HttpResponse.json({ challenge_id: "claim_ch_1" }, { status: 201 }),
       ),
-      http.get(`${local}/sessions/me/csrf`, () => HttpResponse.json({ csrf_token: "csrf_admin" })),
+      http.get(`${local}/api/v1/sessions/me/csrf`, () =>
+        HttpResponse.json({ csrf_token: "csrf_admin" }),
+      ),
       // A cookie-authenticated write: refused without the session's CSRF
       // token, as the server does (ADR 053 §5).
-      http.post(`${local}/projects/:projectId/claim/complete`, ({ request }) =>
+      http.post(`${local}/api/v1/projects/:projectId/claim/complete`, ({ request }) =>
         request.headers.get("x-zitadel-csrf") === "csrf_admin"
           ? HttpResponse.json({ team_id: "team_localadmin", claimed_at: "2027-01-01T00:00:00Z" })
           : HttpResponse.json({ code: "auth.csrf_invalid", message: "no" }, { status: 403 }),

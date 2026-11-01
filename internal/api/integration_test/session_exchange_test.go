@@ -39,7 +39,7 @@ func TestExchangeHandoff_RefusedToken(t *testing.T) {
 		body, err := json.Marshal(map[string]string{"handoff_token": handoffToken})
 		require.NoError(t, err)
 		req, err := http.NewRequestWithContext(t.Context(), http.MethodPost,
-			testServer.URL+"/sessions/exchange?project_id="+project.ID, bytes.NewReader(body))
+			harness.APIBaseURL(t)+"/sessions/exchange?project_id="+project.ID, bytes.NewReader(body))
 		require.NoError(t, err)
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Authorization", "Bearer "+projectSecret)

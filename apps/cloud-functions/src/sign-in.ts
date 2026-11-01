@@ -1,3 +1,5 @@
+import { API_PREFIX } from "@zitadel/api/runtime/base-url";
+
 import { passProtection, zitadelServer } from "./zitadel";
 
 /** Where the console's add-on points the sign-in widget (`signInApiBase`). */
@@ -11,11 +13,12 @@ export interface BotVerdict {
 
 /**
  * The widget's two calls that start or advance a sign-in or sign-up: what a
- * bot would script. Everything else under the prefix (sessions, CSRF, a
- * flow's state) passes unchecked.
+ * bot would script, with or without the API prefix. Everything else under
+ * the prefix (sessions, CSRF, a flow's state) passes unchecked.
  */
 export function isFlowWrite(method: string, path: string): boolean {
-  return method === "POST" && (path === "/flow" || /^\/flow\/[^/]+\/submit$/.test(path));
+  const operation = path.startsWith(`${API_PREFIX}/`) ? path.slice(API_PREFIX.length) : path;
+  return method === "POST" && (operation === "/flow" || /^\/flow\/[^/]+\/submit$/.test(operation));
 }
 
 /**

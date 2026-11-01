@@ -36,7 +36,7 @@ describe("send", () => {
   it("sends the project secret as the bearer and the body as JSON", async () => {
     let seen: { authorization: string | null; type: string | null; body: unknown } | undefined;
     server.use(
-      http.post(`${SERVER}/teams`, async ({ request }) => {
+      http.post(`${SERVER}/api/v1/teams`, async ({ request }) => {
         seen = {
           authorization: request.headers.get("authorization"),
           type: request.headers.get("content-type"),
@@ -59,7 +59,7 @@ describe("send", () => {
   it("sends no bearer when there is no secret", async () => {
     let authorization: string | null = "unset";
     server.use(
-      http.get(`${SERVER}/livez`, ({ request }) => {
+      http.get(`${SERVER}/api/v1/livez`, ({ request }) => {
         authorization = request.headers.get("authorization");
         return HttpResponse.json({ status: "ok" });
       }),
@@ -72,7 +72,7 @@ describe("send", () => {
 
   it("answers no body for a response without one", async () => {
     server.use(
-      http.delete(`${SERVER}/teams/team_1`, () => new HttpResponse(null, { status: 204 })),
+      http.delete(`${SERVER}/api/v1/teams/team_1`, () => new HttpResponse(null, { status: 204 })),
     );
 
     await expect(send(SERVER, "s", requestFor("deleteTeam", [], ["team_1"]))).resolves.toEqual({
@@ -82,7 +82,7 @@ describe("send", () => {
   });
 
   it("answers text for a response that is not JSON", async () => {
-    server.use(http.get(`${SERVER}/livez`, () => HttpResponse.text("alive")));
+    server.use(http.get(`${SERVER}/api/v1/livez`, () => HttpResponse.text("alive")));
 
     await expect(send(SERVER, undefined, requestFor("getLive"))).resolves.toMatchObject({
       body: "alive",
@@ -91,7 +91,9 @@ describe("send", () => {
 
   it("escapes what the server wrote before anything prints it", async () => {
     server.use(
-      http.get(`${SERVER}/teams/team_1`, () => HttpResponse.json({ name: "\u001b[2Jwiped" })),
+      http.get(`${SERVER}/api/v1/teams/team_1`, () =>
+        HttpResponse.json({ name: "\u001b[2Jwiped" }),
+      ),
     );
 
     await expect(send(SERVER, "s", requestFor("getTeam", [], ["team_1"]))).resolves.toMatchObject({
@@ -101,7 +103,7 @@ describe("send", () => {
 
   it("fails a refusal as the error the CLI maps to an exit code, escaped too", async () => {
     server.use(
-      http.get(`${SERVER}/teams/team_1`, () =>
+      http.get(`${SERVER}/api/v1/teams/team_1`, () =>
         HttpResponse.json(
           { code: "team.not_found", message: "no \u001b[31mteam" },
           { status: 404 },
@@ -123,7 +125,7 @@ describe("send", () => {
 describe("sendAll", () => {
   it("follows a cursor the query carries and gathers every page", async () => {
     server.use(
-      http.get(`${SERVER}/users/user_1/passkeys`, ({ request }) => {
+      http.get(`${SERVER}/api/v1/users/user_1/passkeys`, ({ request }) => {
         const { items, next } = pageAt(new URL(request.url).searchParams.get("page_token"));
         return HttpResponse.json({ passkeys: items, next_page_token: next });
       }),
@@ -136,7 +138,7 @@ describe("sendAll", () => {
 
   it("follows a cursor the body carries", async () => {
     server.use(
-      http.post(`${SERVER}/users/query`, async ({ request }) => {
+      http.post(`${SERVER}/api/v1/users/query`, async ({ request }) => {
         const body = (await request.json()) as { page_token?: string };
         const { items, next } = pageAt(body.page_token ?? null);
         return HttpResponse.json({ users: items, next_page_token: next });
@@ -150,7 +152,9 @@ describe("sendAll", () => {
 
   it("refuses a page without its list, carrying the response", async () => {
     server.use(
-      http.get(`${SERVER}/users/user_1/passkeys`, () => HttpResponse.json({ next_page_token: "" })),
+      http.get(`${SERVER}/api/v1/users/user_1/passkeys`, () =>
+        HttpResponse.json({ next_page_token: "" }),
+      ),
     );
 
     await expect(
@@ -164,7 +168,7 @@ describe("sendAll", () => {
 
   it("starts from the page the caller named in the query", async () => {
     server.use(
-      http.get(`${SERVER}/users/user_1/passkeys`, ({ request }) => {
+      http.get(`${SERVER}/api/v1/users/user_1/passkeys`, ({ request }) => {
         const { items, next } = pageAt(new URL(request.url).searchParams.get("page_token"));
         return HttpResponse.json({ passkeys: items, next_page_token: next });
       }),
@@ -181,7 +185,7 @@ describe("sendAll", () => {
 
   it("starts from the page the caller named in the body", async () => {
     server.use(
-      http.post(`${SERVER}/users/query`, async ({ request }) => {
+      http.post(`${SERVER}/api/v1/users/query`, async ({ request }) => {
         const body = (await request.json()) as { page_token?: string };
         const { items, next } = pageAt(body.page_token ?? null);
         return HttpResponse.json({ users: items, next_page_token: next });

@@ -2,6 +2,7 @@ import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import * as endpoints from "@zitadel/api/generated/endpoints/zitadelNextGen";
+import { API_PREFIX } from "@zitadel/api/runtime/base-url";
 import { describe, expect, it } from "vitest";
 
 import { RESOURCES } from "../../../src/commands/resources";
@@ -145,12 +146,13 @@ type ClientOperations = ReadonlyMap<string, string>;
  * arguments and taking the first path segment, so a sub-resource
  * (`/users/{id}/passkeys`) counts against its parent.
  */
-/** The path an operation addresses, with placeholder path parameters. */
+/** The spec's path of an operation, with placeholder path parameters and without the API prefix. */
 const urlOf = (operation: string): string => {
   const module = endpoints as unknown as Record<string, unknown>;
   const build = module[`get${capitalize(operation)}Url`];
   expect(typeof build, `no URL builder paired with ${operation}`).toBe("function");
-  return String((build as (...args: unknown[]) => string)("ID", "NAME")).replace(/\?.*$/, "");
+  const url = String((build as (...args: unknown[]) => string)("ID", "NAME")).replace(/\?.*$/, "");
+  return url.startsWith(`${API_PREFIX}/`) ? url.slice(API_PREFIX.length) : url;
 };
 
 const clientOperations = (): ClientOperations => {

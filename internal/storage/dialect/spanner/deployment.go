@@ -89,7 +89,7 @@ func (ds deploymentStatements) CreateDeployment(ctx context.Context, entity *dom
 				entity.ProjectID, entity.ID, origin, entity.ReleaseID, entity.OriginKind.String(), stamped, seqs[i],
 			}))
 		}
-		if err := tx.BufferWrite(ctx, mutations); err != nil {
+		if _, err := tx.BufferWrite(ctx, mutations); err != nil {
 			return err
 		}
 		deployedAt = stamped

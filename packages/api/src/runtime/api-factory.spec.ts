@@ -59,10 +59,10 @@ describe("createZitadelClient", () => {
 
     expect(ids).toEqual(["dep_1", "dep_2"]);
     expect(requests).toEqual([
-      ["/deployments?project_id=proj_1", "Bearer secret"],
-      ["/deployments?project_id=proj_1&page_token=t1", "Bearer secret"],
+      ["/api/v1/deployments?project_id=proj_1", "Bearer secret"],
+      ["/api/v1/deployments?project_id=proj_1&page_token=t1", "Bearer secret"],
     ]);
-    expect(elsewhere.requests).toEqual([["/deployments?project_id=proj_2", "Bearer other"]]);
+    expect(elsewhere.requests).toEqual([["/api/v1/deployments?project_id=proj_2", "Bearer other"]]);
   });
 
   it("keeps two clients' walks apart while both are in flight", async () => {
@@ -82,12 +82,12 @@ describe("createZitadelClient", () => {
 
     expect([one.requests, two.requests]).toEqual([
       [
-        ["/deployments?project_id=proj_1", "Bearer one"],
-        ["/deployments?project_id=proj_1&page_token=t1", "Bearer one"],
+        ["/api/v1/deployments?project_id=proj_1", "Bearer one"],
+        ["/api/v1/deployments?project_id=proj_1&page_token=t1", "Bearer one"],
       ],
       [
-        ["/deployments?project_id=proj_2", "Bearer two"],
-        ["/deployments?project_id=proj_2&page_token=t1", "Bearer two"],
+        ["/api/v1/deployments?project_id=proj_2", "Bearer two"],
+        ["/api/v1/deployments?project_id=proj_2&page_token=t1", "Bearer two"],
       ],
     ]);
   });
@@ -224,7 +224,7 @@ describe("createZitadelClient", () => {
       project_id: "proj_1",
     });
 
-    expect(url).toBe("http://127.0.0.1:1/deployments?project_id=proj_1");
+    expect(url).toBe("http://127.0.0.1:1/api/v1/deployments?project_id=proj_1");
   });
 
   it("leaves paging off a function that does not page", () => {

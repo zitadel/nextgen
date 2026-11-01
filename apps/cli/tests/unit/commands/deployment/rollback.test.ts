@@ -25,7 +25,7 @@ describe("deployment rollback", () => {
     // A deploy that lands after the history was read shows up only in a later
     // live read; the guard must still name the deployment the decision undid.
     server.use(
-      http.get(`${SERVER}/deployments`, ({ request }) =>
+      http.get(`${SERVER}/api/v1/deployments`, ({ request }) =>
         new URL(request.url).searchParams.get("live") === "true"
           ? HttpResponse.json({
               deployments: [
@@ -44,7 +44,7 @@ describe("deployment rollback", () => {
     );
     const guards: unknown[] = [];
     server.use(
-      http.post(`${SERVER}/deployments/:id/rollback`, async ({ request }) => {
+      http.post(`${SERVER}/api/v1/deployments/:id/rollback`, async ({ request }) => {
         const text = await request.clone().text();
         guards.push(
           text === ""
@@ -74,7 +74,7 @@ describe("deployment rollback", () => {
     server.use(liveAcrossTwoPages({ id: "dep_live_primary", release_id: "rel_live" }));
     const guards: unknown[] = [];
     server.use(
-      http.post(`${SERVER}/deployments/:id/rollback`, async ({ request }) => {
+      http.post(`${SERVER}/api/v1/deployments/:id/rollback`, async ({ request }) => {
         const body = (await request.clone().json()) as Record<string, unknown>;
         guards.push(body.expected_deployment_id);
         return undefined;
@@ -138,7 +138,7 @@ describe("deployment rollback", () => {
   it("warns rather than fails when the restored release cannot be read", async () => {
     const { cwd } = await twoDeploys();
     server.use(
-      http.get(`${SERVER}/releases/:id`, () =>
+      http.get(`${SERVER}/api/v1/releases/:id`, () =>
         HttpResponse.json({ code: "internal", message: "boom" }, { status: 500 }),
       ),
     );

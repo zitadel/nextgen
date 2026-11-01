@@ -17,7 +17,6 @@
  */
 import {
   getCreateFlowMockHandler,
-  getExchangeHandoffMockHandler,
   getExchangeHandoffResponseMock,
   getGetFlowStepMockHandler,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.msw";
@@ -74,6 +73,12 @@ export type MockHandle = {
   reset: () => void;
   /** Return captured request bodies for test assertions. */
   getCaptured: () => readonly CapturedRequest[];
+  /** Reject one submit with a step error, without advancing the flow. */
+  rejectNextSubmit: (errorKey: string) => void;
+  /** Hold one captured submit until the test releases it; callers must settle the promise. */
+  delayNextSubmitUntil: (released: Promise<void>) => void;
+  /** Fail one exchange with a 503 error envelope. */
+  failNextExchange: () => void;
   /**
    * Pre-register a WebAuthn credential so that a subsequent passkey-login
    * submission succeeds without going through the full register flow.
@@ -194,6 +199,9 @@ export function setupMockHandlers(
   const routesByAccount = options.accounts !== undefined;
   let actor: FlowActor = startFlowActor();
   let captured: CapturedRequest[] = [];
+  let submitError: string | undefined;
+  let submitDelay: Promise<void> | undefined;
+  let exchangeFails = false;
   // Typed emails and the provider's return ask the same store, so an account
   // is one whichever way the visitor arrives.
   const authn = new AuthnStore(options.accounts);
@@ -249,6 +257,9 @@ export function setupMockHandlers(
     actor = startFlowActor();
     pendingStepError = null;
     captured = [];
+    submitError = undefined;
+    submitDelay = undefined;
+    exchangeFails = false;
     authn.clear();
     // Links too: a caller asking for a clean mock must not inherit an email
     // that a previous test signed up through a provider, which would turn the
@@ -449,6 +460,18 @@ export function setupMockHandlers(
       const flowId = String(params.id);
       const body = (await request.clone().json()) as SubmitFlowStepBody;
       captured.push({ kind: "submitFlowStep", flowId, body });
+      const delayed = submitDelay;
+      const rejected = submitError;
+      submitDelay = undefined;
+      submitError = undefined;
+      if (delayed) await delayed;
+      if (rejected) {
+        const response = await currentResponse();
+        return HttpResponse.json(
+          { ...response, step: { ...response.step, error: rejected } },
+          { status: 400 },
+        );
+      }
       // The engine refuses an sso submission without `return_target`, the
       // page the callback sends the browser back to, before anything else.
       let acceptedTarget: string | null = null;
@@ -606,12 +629,19 @@ export function setupMockHandlers(
     // prefix.
     http.get("*/__nextgen/idp/callback", idpCallback),
     http.get("*/idp/callback", idpCallback),
-    getExchangeHandoffMockHandler(async ({ request }) => {
+    http.post("*/sessions/exchange", async ({ request }) => {
       const body = (await request.clone().json()) as ExchangeHandoffBody;
       const url = new URL(request.url);
       const projectId = url.searchParams.get("project_id") ?? undefined;
       captured.push({ kind: "exchangeHandoff", body, projectId });
-      return getExchangeHandoffResponseMock();
+      if (exchangeFails) {
+        exchangeFails = false;
+        return HttpResponse.json(
+          { code: "unavailable", message: "Session exchange is temporarily unavailable." },
+          { status: 503 },
+        );
+      }
+      return HttpResponse.json(getExchangeHandoffResponseMock());
     }),
     // The session endpoints `<zitadel-session>` and `<zitadel-logout>` read on
     // mount and on sign-out. In-process there is no session cookie to present,
@@ -636,5 +666,20 @@ export function setupMockHandlers(
     ),
   ];
 
-  return { handlers, reset, getCaptured, registerCredential, returnFromProvider };
+  return {
+    handlers,
+    reset,
+    getCaptured,
+    registerCredential,
+    returnFromProvider,
+    rejectNextSubmit: (errorKey) => {
+      submitError = errorKey;
+    },
+    delayNextSubmitUntil: (released) => {
+      submitDelay = released;
+    },
+    failNextExchange: () => {
+      exchangeFails = true;
+    },
+  };
 }

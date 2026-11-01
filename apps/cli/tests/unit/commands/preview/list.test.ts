@@ -14,7 +14,7 @@ const { server, dirs } = usePlatformServer();
 /** A project directory whose server answers with one page of previews and a cursor to the next. */
 async function aProjectWithTwoPagesOfPreviews(): Promise<string> {
   server.use(
-    http.get(`${SERVER}/projects/:project_id/previews`, () =>
+    http.get(`${SERVER}/api/v1/projects/:project_id/previews`, () =>
       HttpResponse.json({
         previews: [
           {

@@ -56,7 +56,7 @@ type Project = { id: string; project_secret: string };
  * fetch) so its secret and the store agree — `claim/init` checks that.
  */
 async function createProjectOnMock(): Promise<Project> {
-  const response = await fetch(`${SERVER}/projects`, {
+  const response = await fetch(`${SERVER}/api/v1/projects`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ name: "demo", origins: [] }),

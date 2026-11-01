@@ -4,7 +4,7 @@
 
 ## Thesis
 
-One surface: the resource API under `/api/v1/` on the deployment's host, beside the login UI, the console and the protocol endpoints at the root (RECOMMENDED, [ADR 077](../../adrs/077-api-path-prefix.md); the shipped API is still at the root). Stripe-shaped, Vercel-shaped. No frontend/backend/platform product split. One bearer-token auth model. Self-hosted exposes the identical API shape as cloud — the SDK does not branch on deployment mode. Header-selected versioning (`Zitadel-Version`) for opt-in changes within a major is target design, not shipped ([`conventions.md`](conventions.md#direction-not-shipped)).
+One surface: the resource API under `/api/v1/` on the deployment's host, beside the console and the protocol endpoints at the root ([ADR 077](../../adrs/077-api-path-prefix.md)). Stripe-shaped, Vercel-shaped. No frontend/backend/platform product split. One bearer-token auth model. Self-hosted exposes the identical API shape as cloud — the SDK does not branch on deployment mode. Header-selected versioning (`Zitadel-Version`) for opt-in changes within a major is target design, not shipped ([`conventions.md`](conventions.md#direction-not-shipped)).
 
 Target properties:
 

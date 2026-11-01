@@ -115,7 +115,7 @@ describe("deploy", () => {
     server.use(liveAcrossTwoPages({ id: "dep_live_primary", release_id: "rel_live" }));
     const guards: unknown[] = [];
     server.use(
-      http.post(`${PLATFORM_URL}/deployments`, async ({ request }) => {
+      http.post(`${PLATFORM_URL}/api/v1/deployments`, async ({ request }) => {
         const body = (await request.clone().json()) as Record<string, unknown>;
         guards.push(body.expected_deployment_id);
         return undefined;

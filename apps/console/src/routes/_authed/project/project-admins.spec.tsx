@@ -24,10 +24,10 @@ vi.mock("@/auth/session", async (importOriginal) => {
  * project id, never the console's own (platform) project.
  */
 const PROJECT_ID = "proj_1";
-const PROJECTS_URL = "http://localhost/api/projects";
-const GRANTS_URL = "http://localhost/api/grants";
+const PROJECTS_URL = "http://localhost/api/v1/projects";
+const GRANTS_URL = "http://localhost/api/v1/grants";
 const GRANTS_QUERY_URL = `${GRANTS_URL}/query`;
-const USERS_QUERY_URL = "http://localhost/api/users/query";
+const USERS_QUERY_URL = "http://localhost/api/v1/users/query";
 /** The signed-in address, read from the fixture rather than restated here. */
 const SELF = makeTestSession().user?.identifier ?? "";
 
@@ -114,8 +114,8 @@ function stubProject(
     http.get(`${PROJECTS_URL}/:id`, () => HttpResponse.json(record)),
     // The page's variables and policy cards read alongside; none keeps these
     // tests about the admins.
-    http.get("http://localhost/api/variables", () => HttpResponse.json({})),
-    http.get("http://localhost/api/policies", () =>
+    http.get("http://localhost/api/v1/variables", () => HttpResponse.json({})),
+    http.get("http://localhost/api/v1/policies", () =>
       HttpResponse.json({ policies: [], next_page_token: null }),
     ),
     http.get(`${PROJECTS_URL}/:id/admins`, ({ params }) => {

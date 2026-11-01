@@ -48,7 +48,7 @@ func passwordSetPolicy(t *testing.T, resp any) api.PasswordSetPolicy {
 func publishRawPolicy(t *testing.T, token, projectID, body string) (int, api.ErrorCode) {
 	t.Helper()
 	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost,
-		harness.EnsureTestServer(t).URL+"/policies?project_id="+url.QueryEscape(projectID),
+		harness.APIBaseURL(t)+"/policies?project_id="+url.QueryEscape(projectID),
 		strings.NewReader(body),
 	)
 	require.NoError(t, err)
