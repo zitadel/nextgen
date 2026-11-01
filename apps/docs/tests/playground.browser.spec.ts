@@ -1,10 +1,10 @@
 import { type BrowserContext, expect, type Page, test } from "@playwright/test";
 
 /**
- * The API playground sends with the reader's session only as the account the
- * page shows (components/session-auth.tsx). A context route answers every
- * session call and write, so these tests write nothing, against the local
- * build or a deployment.
+ * The API playground sends only reads with the reader's session, and those only
+ * as the account the page shows (components/session-auth.tsx). A context route
+ * answers every session call and every request the tests send, so they write
+ * nothing, against the local build or a deployment.
  */
 
 interface Reader {
@@ -12,51 +12,137 @@ interface Reader {
   display: string;
 }
 
+/** A request the stub answered in the API's place. */
+interface Sent {
+  method: string;
+  path: string;
+  authorization?: string;
+}
+
 const ada: Reader = { user_id: "usr_docs_ada", display: "Ada from the docs tests" };
 const grace: Reader = { user_id: "usr_docs_grace", display: "Grace from the docs tests" };
 
+/** The API's paths these tests send to; the stub answers each of them. */
+const stubbed = /^\/(?:sessions\/me|teams(?:\/query)?|users\/me|grants\/[^/]+)$/;
+
 /**
- * Answers the session reads as `reader()` says, and records each write's CSRF
- * header. Without `csrf`, the token lookup never answers.
+ * Answers the session reads as `reader()` says, and records every other
+ * request. With `stall`, only the page's own first read of the session
+ * answers.
  */
 async function stubSession(
   context: BrowserContext,
   baseURL: string,
   reader: () => Reader,
-  csrf = true,
-): Promise<(string | undefined)[]> {
+  stall = false,
+): Promise<{ sent: Sent[]; sessionReads: () => number }> {
   const origin = new URL(baseURL).origin;
-  const writes: (string | undefined)[] = [];
+  const sent: Sent[] = [];
+  let reads = 0;
   await context.route(
-    (url) =>
-      url.origin === origin &&
-      ["/sessions/me", "/sessions/me/csrf", "/teams"].includes(url.pathname),
+    (url) => url.origin === origin && stubbed.test(url.pathname),
     async (route) => {
       const request = route.request();
+      const method = request.method();
       const path = new URL(request.url()).pathname;
-      if (path === "/sessions/me") {
-        await route.fulfill({ json: { user: reader() } });
-      } else if (path === "/sessions/me/csrf") {
-        if (csrf) await route.fulfill({ json: { csrf_token: `csrf-${reader().user_id}` } });
+      if (method === "GET" && path === "/sessions/me") {
+        reads += 1;
+        if (!stall || reads === 1) await route.fulfill({ json: { user: reader() } });
       } else {
-        writes.push(request.headers()["x-zitadel-csrf"]);
-        await route.fulfill({ status: 201, json: { id: "team_docs_test", name: "Docs test" } });
+        const { authorization } = await request.allHeaders();
+        sent.push({ method, path, authorization });
+        await route.fulfill(method === "DELETE" ? { status: 204 } : { json: {} });
       }
     },
   );
-  return writes;
+  return { sent, sessionReads: () => reads };
 }
 
-/** Opens Create team's playground, once it shows the session's account. */
-async function openPlayground(page: Page, name: string) {
-  await page.goto("/docs/reference/api/teams/createTeam");
+/** Opens an operation's playground. */
+async function openPlayground(page: Page, operation: string, title: string) {
+  await page.goto(`/docs/reference/api/${operation}`);
   await page.getByRole("button", { name: "Try in Playground" }).click();
-  const playground = page.getByRole("dialog", { name: "Create team" });
-  const note = playground.getByText("Sent with your session, signed in as", { exact: false });
-  await expect(note).toContainText(name);
-  await playground.getByRole("textbox", { name: "name", exact: true }).fill("Docs test");
-  return { playground, note, send: playground.getByRole("button", { name: /^Send/ }) };
+  const playground = page.getByRole("dialog", { name: title });
+  return {
+    playground,
+    // The session's note on a read, once the page knows the reader.
+    note: playground.getByText("Sent with your session", { exact: false }),
+    // The session's note on a write.
+    readsOnly: playground.getByText("sends only reads with your session", { exact: false }),
+    send: playground.getByRole("button", { name: /^Send/ }),
+  };
 }
+
+test("a read goes out with the session: a GET and a POST …/query", async ({
+  page,
+  context,
+  baseURL,
+}) => {
+  const { sent } = await stubSession(context, baseURL!, () => ada);
+  const reads = [
+    {
+      operation: "users/getMyUser",
+      title: "Get my user information",
+      method: "GET",
+      path: "/users/me",
+    },
+    { operation: "teams/queryTeams", title: "Query teams", method: "POST", path: "/teams/query" },
+  ];
+  for (const { operation, title, method, path } of reads) {
+    const { note, send } = await openPlayground(page, operation, title);
+    // The note names the account and the API it acts on, the page's own.
+    await expect(note).toContainText(ada.display);
+    await expect(note).toContainText(new URL(baseURL!).origin);
+    await send.click();
+    await expect.poll(() => sent.at(-1)).toEqual({ method, path });
+  }
+});
+
+test("the session sends no write: a POST and a DELETE", async ({ page, context, baseURL }) => {
+  const { sent, sessionReads } = await stubSession(context, baseURL!, () => ada);
+  const writes = [
+    { operation: "teams/createTeam", title: "Create team" },
+    { operation: "grants/deleteGrant", title: "Revoke grant" },
+  ];
+  for (const { operation, title } of writes) {
+    const { playground, readsOnly, send } = await openPlayground(page, operation, title);
+    await expect(readsOnly).toBeVisible();
+    await send.click();
+    const refusal = playground.getByRole("alert");
+    await expect(refusal).toContainText("Not sent");
+    await expect(refusal).toContainText("The playground sends only reads with your session");
+    // Nothing failed on the way to a server, so Fumadocs' hint for that stays out.
+    await expect(playground.getByText("a proxy is needed", { exact: false })).toHaveCount(0);
+  }
+  expect(sent).toEqual([]);
+  // Refused before it asked whose session it is: only each page's own read.
+  expect(sessionReads()).toBe(writes.length);
+});
+
+test("a request with a bearer token goes as it is", async ({ page, context, baseURL }) => {
+  const { sent, sessionReads } = await stubSession(context, baseURL!, () => ada);
+  const { playground, readsOnly, send } = await openPlayground(
+    page,
+    "teams/createTeam",
+    "Create team",
+  );
+  await expect(readsOnly).toBeVisible();
+
+  await playground
+    .getByRole("combobox")
+    .filter({ hasText: /^sessionCookie$/ })
+    .click();
+  await page.getByRole("option", { name: "oauth2", exact: true }).click();
+  await playground
+    .getByRole("textbox", { name: "Authorization", exact: true })
+    .fill("Bearer docs-test-secret");
+  await send.click();
+  await expect
+    .poll(() => sent)
+    .toEqual([{ method: "POST", path: "/teams", authorization: "Bearer docs-test-secret" }]);
+  // The playground did not even ask whose session it is.
+  expect(sessionReads()).toBe(1);
+});
 
 test("the playground sends nothing as another account than the one it shows", async ({
   page,
@@ -64,38 +150,40 @@ test("the playground sends nothing as another account than the one it shows", as
   baseURL,
 }) => {
   let reader = ada;
-  const writes = await stubSession(context, baseURL!, () => reader);
-  const { playground, note, send } = await openPlayground(page, ada.display);
+  const { sent } = await stubSession(context, baseURL!, () => reader);
+  const { playground, note, send } = await openPlayground(page, "teams/queryTeams", "Query teams");
+  await expect(note).toContainText(ada.display);
 
   // Another tab signs out and in as someone else.
   reader = grace;
   await send.click();
-  await expect(
-    playground.getByText("Not sent: your session changed", { exact: false }),
-  ).toBeVisible();
+  await expect(playground.getByRole("alert")).toContainText("Your session changed");
   await expect(note).toContainText(grace.display);
-  expect(writes).toEqual([]);
+  expect(sent).toEqual([]);
 
-  // Sent again, it goes as the account the page now shows, with its token.
+  // Sent again, it goes as the account the page now shows.
   await send.click();
-  await expect.poll(() => writes).toEqual([`csrf-${grace.user_id}`]);
+  await expect.poll(() => sent).toEqual([{ method: "POST", path: "/teams/query" }]);
 });
 
-test("a token lookup that never answers ends with the playground's timeout", async ({
+test("a session lookup that never answers ends with the playground's timeout", async ({
   page,
   context,
   baseURL,
 }) => {
   // Fumadocs gives a request 10 seconds.
   test.slow();
-  const writes = await stubSession(context, baseURL!, () => ada, false);
-  const { playground, send } = await openPlayground(page, ada.display);
+  const { sent } = await stubSession(context, baseURL!, () => ada, true);
+  const { playground, note, send } = await openPlayground(page, "teams/queryTeams", "Query teams");
+  await expect(note).toContainText(ada.display);
 
   await send.click();
   await expect(playground.getByText("TimeoutError", { exact: false })).toBeVisible({
     timeout: 20_000,
   });
-  expect(writes).toEqual([]);
+  // A request that failed keeps Fumadocs' own display, hint and all.
+  await expect(playground.getByText("a proxy is needed", { exact: false })).toBeVisible();
+  expect(sent).toEqual([]);
 });
 
 test("optional project scope starts unset and can be set and unset explicitly", async ({
@@ -154,9 +242,17 @@ for (const operation of [
     await page.getByRole("button", { name: "Try in Playground" }).click();
     const playground = page.getByRole("dialog", { name: operation.title });
     const sample = playground.locator("pre").filter({ hasText: "@zitadel/api/" });
-    await expect(playground.getByText("Sent with your session", { exact: false })).toContainText(
-      ada.display,
-    );
+    // The playground opens on the session once the page knows the reader. On
+    // a write its note says it sends none with it; the sample still shows how.
+    if (operation.id === "createTeam") {
+      await expect(
+        playground.getByText("sends only reads with your session", { exact: false }),
+      ).toBeVisible();
+    } else {
+      await expect(playground.getByText("Sent with your session", { exact: false })).toContainText(
+        ada.display,
+      );
+    }
     await expect(sample).toContainText("@zitadel/api/config");
     await expect(sample).not.toContainText("ZITADEL_PROJECT_SECRET");
     // A session-authenticated write must show how to obtain and send CSRF.
