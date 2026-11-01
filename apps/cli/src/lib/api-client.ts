@@ -143,12 +143,12 @@ export function sanitizeRejection(error: unknown): never {
 export type SanitizeOptions = {
   /**
    * Return response bodies exactly as the server sent them. Only for a
-   * caller that stores or compares what it reads rather than printing it:
-   * `setup` writes the server's canonical body back to the project's
-   * files, and `deploy` diffs against them, so an escaped
-   * `\r` or zero-width joiner would be written to disk as literal text and
-   * published as a change. Such a caller escapes at the point it prints.
-   * Errors are escaped either way.
+   * caller that stores, compares or sends back what it reads: `setup` writes
+   * the server's canonical body back to the project's files, and `deploy`
+   * diffs against them, so an escaped `\r` or zero-width joiner would be
+   * written to disk as literal text and published as a change; the resource
+   * lists send each page's cursor back. Such a caller escapes at the point it
+   * prints. Errors are escaped either way.
    */
   verbatim?: boolean;
 };

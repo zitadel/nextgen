@@ -49,9 +49,7 @@ export default class PreviewList extends PreviewCommand {
   async run(): Promise<JsonEnvelope> {
     const { flags } = await this.parse(PreviewList);
     await this.toMeta(flags);
-    // Pages arrive as the server sent them, so the cursor goes back unchanged;
-    // `collectPages` escapes what it answers.
-    const { client, projectId } = await this.connect({ verbatim: true });
+    const { client, projectId } = await this.connect();
 
     const params = {
       limit: flags.limit,
@@ -60,8 +58,7 @@ export default class PreviewList extends PreviewCommand {
     // One page unless `--all`, as every list does; the walk starts at
     // `--page-token`, and a drain leaves no next page to report.
     const { items: previews, next } = await collectPages(
-      (token) =>
-        client.listPreviews(projectId, { ...params, page_token: token ?? params.page_token }),
+      client.listPreviews.pages(projectId, params),
       {
         items: (page) => page.previews,
         all: flags.all === true,

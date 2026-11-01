@@ -16,7 +16,7 @@ import {
   type QueryUsers200,
   QueryUsersBodyFilterItemOperation,
 } from "@zitadel/api/generated/model";
-import { paging } from "@zitadel/api/client";
+import { pagedFunctions } from "@zitadel/api/client";
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
@@ -356,6 +356,40 @@ describe("users list", () => {
     await run(cwd, ["users", "list", "--all"]);
 
     expect(tokens).toEqual([null, "p\u001b2"]);
+  });
+
+  it("follows a cursor back as the server wrote it on a GET list with --all", async () => {
+    const cwd = await makeProject();
+    const tokens: (string | null)[] = [];
+    server.use(
+      http.get(`${SERVER}/api/v1/events`, ({ request }) => {
+        const token = new URL(request.url).searchParams.get("page_token");
+        tokens.push(token);
+        return HttpResponse.json({ data: [], next_page_token: token === null ? "p\u001b2" : null });
+      }),
+    );
+
+    await run(cwd, ["events", "list", "--all"]);
+
+    expect(tokens).toEqual([null, "p\u001b2"]);
+  });
+
+  it("escapes the items and the next cursor a list answers with", async () => {
+    const cwd = await makeProject();
+    server.use(
+      http.post(`${SERVER}/api/v1/users/query`, () =>
+        HttpResponse.json({
+          users: [{ ...user("user_1"), identifier: "a\u001b[2J" }],
+          next_page_token: "p\u001b2",
+        }),
+      ),
+    );
+
+    const res = await run(cwd, ["users", "list"]);
+
+    expect(parseJson(res.stdout)).toMatchObject({
+      data: { items: [{ identifier: "a\\x1b[2J" }], next_page_token: "p\\x1b2" },
+    });
   });
 
   it("rejects an unknown filter field before any request", async () => {
@@ -2443,17 +2477,17 @@ describe("the registry builders", () => {
 
 describe("the paged resources' lists", () => {
   it.each([
-    ["users", paging.queryUsers],
-    ["teams", paging.queryTeams],
-    ["sessions", paging.querySessions],
-    ["events", paging.listEvents],
-    ["grants", paging.queryGrants],
-    ["idps", paging.queryIdps],
-    ["projects", paging.queryProjects],
-    ["schemas", paging.listSchemas],
-    ["release", paging.listReleases],
-    ["flow-definitions", paging.listFlowDefinitions],
-    ["policies", paging.listPolicies],
+    ["users", pagedFunctions.queryUsers],
+    ["teams", pagedFunctions.queryTeams],
+    ["sessions", pagedFunctions.querySessions],
+    ["events", pagedFunctions.listEvents],
+    ["grants", pagedFunctions.queryGrants],
+    ["idps", pagedFunctions.queryIdps],
+    ["projects", pagedFunctions.queryProjects],
+    ["schemas", pagedFunctions.listSchemas],
+    ["release", pagedFunctions.listReleases],
+    ["flow-definitions", pagedFunctions.listFlowDefinitions],
+    ["policies", pagedFunctions.listPolicies],
   ] as const)("read %s's pages with the readers the client generates", (topic, readers) => {
     const list = RESOURCES[topic].list;
 

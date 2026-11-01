@@ -144,10 +144,10 @@ const functionName = (id: string): string => id.charAt(0).toLowerCase() + id.sli
  * `page_token`: the body for a token the body carries, the query parameters
  * otherwise.
  */
-export function pagingArgument(
+export function pagingParameters(
   endpoints: string,
   operation: Pick<ReturnType<typeof operationOf>, "id" | "paging">,
-): { names: string[]; token: string } {
+): { names: string[]; carrier: string } {
   const head = `export const ${functionName(operation.id)} = async (`;
   const start = endpoints.indexOf(head);
   if (start === -1) {
@@ -175,13 +175,13 @@ export function pagingArgument(
     const arrow = char === ">" && endpoints[at - 1] === "=";
     depth += "([{<".includes(char) ? 1 : ")]}>".includes(char) && !arrow ? -1 : 0;
   }
-  const token = names.find((parameter) =>
+  const carrier = names.find((parameter) =>
     operation.paging?.token === "body" ? parameter.endsWith("Body") : parameter === "params",
   );
-  if (token === undefined) {
+  if (carrier === undefined) {
     throw new Error(`${operation.id} has no argument to carry its page_token`);
   }
-  return { names, token };
+  return { names, carrier };
 }
 
 /**
@@ -203,9 +203,9 @@ export function pagingSource(
     // The next page's arguments are the caller's with `page_token` set on the
     // one that carries it, typed by the function's own parameters, so a token
     // put anywhere the function does not take one fails to compile.
-    const { names, token } = pagingArgument(endpoints, operation);
+    const { names, carrier } = pagingParameters(endpoints, operation);
     const next = names.map((parameter) =>
-      parameter === token ? `{ ...${parameter}, page_token }` : parameter,
+      parameter === carrier ? `{ ...${parameter}, page_token }` : parameter,
     );
     return [
       `  ${name}: {

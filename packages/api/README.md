@@ -43,7 +43,7 @@ array. To change what every call returns, each page included, pass
 | Import | What it carries |
 | --- | --- |
 | `@zitadel/api/config` | `configureZitadel()`, `getApi()` — the primary surface |
-| `@zitadel/api/client` | The client wrapper the SDKs consume; `paging`, each paged function's typed readers of a page's items and cursor and the arguments of its next page |
+| `@zitadel/api/client` | The client wrapper the SDKs consume; `pagedFunctions`, each paged function's typed readers of a page's items and cursor and the arguments of its next page |
 | `@zitadel/api/generated/endpoints/zitadelNextGen` | Generated endpoint functions (orval, from the OpenAPI source) |
 | `@zitadel/api/generated/model` | Generated request/response types |
 | `@zitadel/api/generated/endpoints/zitadelNextGen.zod` | Zod schemas per endpoint |

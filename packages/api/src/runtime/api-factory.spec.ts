@@ -4,7 +4,7 @@ import type { AddressInfo } from "node:net";
 import { afterEach, describe, expect, expectTypeOf, it } from "vitest";
 
 import type { ListDeployments200DeploymentsItem } from "../generated/model";
-import { paging } from "../generated/paging";
+import type { paging } from "../generated/paging";
 import { createZitadelClient, type ItemOf } from "./api-factory";
 
 type Paging = typeof paging;
@@ -29,6 +29,31 @@ async function deployments(): Promise<{ base: string; requests: string[][] }> {
         ...(second ? {} : { next_page_token: "t1" }),
       }),
     );
+  });
+  servers.push(server);
+  await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
+  return { base: `http://127.0.0.1:${(server.address() as AddressInfo).port}`, requests };
+}
+
+/**
+ * Answers any paged request two pages deep, its list under `field`, reading the
+ * cursor from the query or the JSON body; records each request's path and body.
+ */
+async function twoPages(field: string): Promise<{ base: string; requests: unknown[][] }> {
+  const requests: unknown[][] = [];
+  const server = createServer((req, res) => {
+    let text = "";
+    req.on("data", (chunk) => {
+      text += chunk;
+    });
+    req.on("end", () => {
+      const url = new URL(req.url ?? "/", "http://localhost");
+      const body: unknown = text === "" ? undefined : JSON.parse(text);
+      requests.push([url.pathname + url.search, body]);
+      const second = url.search.includes("page_token=t1") || text.includes('"page_token":"t1"');
+      res.setHeader("content-type", "application/json");
+      res.end(JSON.stringify({ [field]: [], ...(second ? {} : { next_page_token: "t1" }) }));
+    });
   });
   servers.push(server);
   await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
@@ -192,24 +217,37 @@ describe("createZitadelClient", () => {
     await expect(listed).rejects.toThrow("handled");
   });
 
-  it.each([
-    [
-      "the query parameters after a path parameter",
-      paging.listPreviews.withToken(["proj_1", { limit: 1 }], "t1"),
-      ["proj_1", { limit: 1, page_token: "t1" }, undefined],
-    ],
-    [
-      "query parameters the caller left off",
-      paging.listPreviews.withToken(["proj_1"], "t1"),
-      ["proj_1", { page_token: "t1" }, undefined],
-    ],
-    [
-      "the body of a query",
-      paging.queryUsers.withToken([{ limit: 1 }], "t1"),
-      [{ limit: 1, page_token: "t1" }, undefined, undefined],
-    ],
-  ])("puts a later page's page_token on %s", (_, args, expected) => {
-    expect(args).toEqual(expected);
+  it("puts a later page's page_token in the query parameters after a path parameter", async () => {
+    const { base, requests } = await twoPages("previews");
+
+    await createZitadelClient({ baseUrl: base }).listPreviews.all("proj_1", { limit: 1 });
+
+    expect(requests.map(([path]) => path)).toEqual([
+      "/api/v1/projects/proj_1/previews?limit=1",
+      "/api/v1/projects/proj_1/previews?limit=1&page_token=t1",
+    ]);
+  });
+
+  it("puts a later page's page_token in query parameters the caller left off", async () => {
+    const { base, requests } = await twoPages("previews");
+
+    await createZitadelClient({ baseUrl: base }).listPreviews.all("proj_1");
+
+    expect(requests.map(([path]) => path)).toEqual([
+      "/api/v1/projects/proj_1/previews",
+      "/api/v1/projects/proj_1/previews?page_token=t1",
+    ]);
+  });
+
+  it("puts a later page's page_token in the body of a query", async () => {
+    const { base, requests } = await twoPages("users");
+
+    await createZitadelClient({ baseUrl: base }).queryUsers.all({ limit: 1 });
+
+    expect(requests.map(([, body]) => body)).toEqual([
+      { limit: 1 },
+      { limit: 1, page_token: "t1" },
+    ]);
   });
 
   it("types every paged function's items", () => {

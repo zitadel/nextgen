@@ -51,7 +51,7 @@ import {
   QueryTeamsResponse,
   QueryUsersResponse,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
-import { paging } from "@zitadel/api/client";
+import { pagedFunctions } from "@zitadel/api/client";
 import { ApiError } from "@zitadel/api/runtime/fetch";
 import { isVariableReference } from "@zitadel/config/idp";
 
@@ -332,8 +332,8 @@ export const RESOURCES = {
       // No project_id: the users query defaults to the token's own project,
       // which is the only one a project secret can list.
       call: ({ client }, body) => client.queryUsers(body),
-      items: paging.queryUsers.items,
-      next: paging.queryUsers.next,
+      items: pagedFunctions.queryUsers.items,
+      next: pagedFunctions.queryUsers.next,
     }),
     get: get({ call: ({ client }, id) => client.getUserByID(id), response: GetUserByIDResponse }),
     create: create(CreateUserBody, ({ client, projectId }, body) =>
@@ -361,8 +361,8 @@ export const RESOURCES = {
       ],
       sorts: ["created_at", "name", "status"],
       call: ({ client, projectId }, body) => client.queryTeams(body, { project_id: projectId }),
-      items: paging.queryTeams.items,
-      next: paging.queryTeams.next,
+      items: pagedFunctions.queryTeams.items,
+      next: pagedFunctions.queryTeams.next,
     }),
     get: get({ call: ({ client }, id) => client.getTeam(id), response: GetTeamResponse }),
     create: create(CreateTeamBody, ({ client, projectId }, body) =>
@@ -392,8 +392,8 @@ export const RESOURCES = {
       ],
       sorts: ["created_at", "user_id"],
       call: ({ client, projectId }, body) => client.querySessions(body, { project_id: projectId }),
-      items: paging.querySessions.items,
-      next: paging.querySessions.next,
+      items: pagedFunctions.querySessions.items,
+      next: pagedFunctions.querySessions.next,
     }),
     get: get({ call: ({ client }, id) => client.getSession(id), response: GetSessionResponse }),
     // The endpoint terminates the session rather than removing a record, so
@@ -449,8 +449,8 @@ export const RESOURCES = {
       sortParam: "order",
       call: ({ client, projectId }: Platform, params: Query<"listEvents">) =>
         client.listEvents({ project_id: projectId, ...params }),
-      items: paging.listEvents.items,
-      next: paging.listEvents.next,
+      items: pagedFunctions.listEvents.items,
+      next: pagedFunctions.listEvents.next,
     }),
     get: get({
       call: ({ client, projectId }, id) => client.getEvent(id, { project_id: projectId }),
@@ -477,8 +477,8 @@ export const RESOURCES = {
       ],
       sorts: ["created_at", "expires_at", "id"],
       call: ({ client, projectId }, body) => client.queryGrants(body, { project_id: projectId }),
-      items: paging.queryGrants.items,
-      next: paging.queryGrants.next,
+      items: pagedFunctions.queryGrants.items,
+      next: pagedFunctions.queryGrants.next,
     }),
     get: get({
       call: ({ client, projectId }, id) => client.getGrant(id, { project_id: projectId }),
@@ -516,8 +516,8 @@ export const RESOURCES = {
       ],
       sorts: ["slug", "created_at"],
       call: ({ client, projectId }, body) => client.queryIdps(body, { project_id: projectId }),
-      items: paging.queryIdps.items,
-      next: paging.queryIdps.next,
+      items: pagedFunctions.queryIdps.items,
+      next: pagedFunctions.queryIdps.next,
     }),
     get: get({
       call: ({ client, projectId }, id) => client.getIdpById(id, { project_id: projectId }),
@@ -553,8 +553,8 @@ export const RESOURCES = {
       filters: [{ field: "created_at", operations: PROJECT_OPERATIONS }],
       sorts: ["created_at"],
       call: ({ client }, body) => client.queryProjects(body),
-      items: paging.queryProjects.items,
-      next: paging.queryProjects.next,
+      items: pagedFunctions.queryProjects.items,
+      next: pagedFunctions.queryProjects.next,
     }),
     get: get({ call: ({ client }, id) => client.getProject(id), response: GetProjectResponse }),
     update: update(PatchProjectBody, ({ client }, id, body) => client.patchProject(id, body)),
@@ -593,8 +593,8 @@ export const RESOURCES = {
       ],
       call: ({ client, projectId }: Platform, params: Query<"listSchemas">) =>
         client.listSchemas({ ...params, project_id: projectId }),
-      items: paging.listSchemas.items,
-      next: paging.listSchemas.next,
+      items: pagedFunctions.listSchemas.items,
+      next: pagedFunctions.listSchemas.next,
     }),
     get: get({
       response: GetSchemaByIdResponse,
@@ -650,8 +650,8 @@ export const RESOURCES = {
       item: ListReleasesResponse.shape.releases.element,
       call: ({ client, projectId }: Platform, params: Query<"listReleases">) =>
         client.listReleases({ ...params, project_id: projectId }),
-      items: paging.listReleases.items,
-      next: paging.listReleases.next,
+      items: pagedFunctions.listReleases.items,
+      next: pagedFunctions.listReleases.next,
     }),
     get: get({
       call: ({ client, projectId }, id) => client.getReleaseById(id, { project_id: projectId }),
@@ -690,8 +690,8 @@ export const RESOURCES = {
           ...params,
           project_id: projectId,
         }),
-      items: paging.listFlowDefinitions.items,
-      next: paging.listFlowDefinitions.next,
+      items: pagedFunctions.listFlowDefinitions.items,
+      next: pagedFunctions.listFlowDefinitions.next,
     }),
     get: get({
       response: GetFlowDefinitionResponse,
@@ -760,8 +760,8 @@ export const RESOURCES = {
       filters: [{ field: "operation", operations: ["equals"] }],
       call: ({ client, projectId }: Platform, params: Query<"listPolicies">) =>
         client.listPolicies({ ...params, project_id: projectId }),
-      items: paging.listPolicies.items,
-      next: paging.listPolicies.next,
+      items: pagedFunctions.listPolicies.items,
+      next: pagedFunctions.listPolicies.next,
     }),
     get: get({
       response: GetPolicyResponse,

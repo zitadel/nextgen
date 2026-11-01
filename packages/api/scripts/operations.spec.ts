@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { pagingArgument, pagingSource } from "./operations";
+import { pagingParameters, pagingSource } from "./operations";
 
 /** Signatures as orval writes them, one per argument order a paged function can have. */
 const endpoints = `
@@ -19,7 +19,7 @@ export const listWidgets = async (params?: ListWidgetsParams, options?: Paramete
 export const brokenThings = async (params?: BrokenThingsParams
 `;
 
-describe("pagingArgument", () => {
+describe("pagingParameters", () => {
   it.each([
     ["the query parameters alone", "listThings", "query", ["params", "options"], "params"],
     [
@@ -58,27 +58,27 @@ describe("pagingArgument", () => {
       "params",
     ],
   ] as const)("finds %s", (_, id, token, names, carrier) => {
-    expect(pagingArgument(endpoints, { id, paging: { token, items: "things" } })).toEqual({
+    expect(pagingParameters(endpoints, { id, paging: { token, items: "things" } })).toEqual({
       names,
-      token: carrier,
+      carrier,
     });
   });
 
   it("refuses an operation orval wrote no function for", () => {
     expect(() =>
-      pagingArgument(endpoints, { id: "listOthers", paging: { token: "query", items: "x" } }),
+      pagingParameters(endpoints, { id: "listOthers", paging: { token: "query", items: "x" } }),
     ).toThrow("listOthers has no generated function");
   });
 
   it("refuses a function whose parameter list never closes", () => {
     expect(() =>
-      pagingArgument(endpoints, { id: "brokenThings", paging: { token: "query", items: "x" } }),
+      pagingParameters(endpoints, { id: "brokenThings", paging: { token: "query", items: "x" } }),
     ).toThrow("brokenThings has an unterminated parameter list");
   });
 
   it("refuses an operation with no argument for its page_token", () => {
     expect(() =>
-      pagingArgument(endpoints, { id: "listThings", paging: { token: "body", items: "things" } }),
+      pagingParameters(endpoints, { id: "listThings", paging: { token: "body", items: "things" } }),
     ).toThrow("listThings has no argument to carry its page_token");
   });
 });

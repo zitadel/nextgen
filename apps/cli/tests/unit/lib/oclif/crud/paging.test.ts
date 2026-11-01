@@ -2,25 +2,23 @@ import { describe, expect, it } from "vitest";
 
 import { collectPages } from "../../../../../src/lib/oclif/crud";
 
-type Page = { users: (number | string)[]; next_page_token?: string; next_cursor?: string };
+type Page = { users: number[]; next_page_token?: string; next_cursor?: string };
 
-/** Answers the pages in order, the first for no cursor; records each cursor it was asked for. */
+/** Yields the pages in order, counting each one it was asked for. */
 function source(...pages: Page[]) {
-  const asked: (string | undefined)[] = [];
-  const walk = async (token: string | undefined): Promise<Page> => {
-    asked.push(token);
-    const page = pages[asked.length - 1];
-    if (page === undefined) {
-      throw new Error("asked past the last page");
+  const read = { count: 0 };
+  async function* walk() {
+    for (const page of pages) {
+      read.count += 1;
+      yield page;
     }
-    return page;
-  };
-  return { walk, asked };
+  }
+  return { walk: walk(), read };
 }
 
 describe("collectPages", () => {
   it("reads one page and reports its next token", async () => {
-    const { walk, asked } = source({ users: [1, 2], next_page_token: "p2" }, { users: [3] });
+    const { walk, read } = source({ users: [1, 2], next_page_token: "p2" }, { users: [3] });
     await expect(
       collectPages(walk, {
         items: (page) => page.users,
@@ -31,7 +29,7 @@ describe("collectPages", () => {
       items: [1, 2],
       next: "p2",
     });
-    expect(asked).toEqual([undefined]);
+    expect(read.count).toBe(1);
   });
 
   it("reports no next token on the last page", async () => {
@@ -49,7 +47,7 @@ describe("collectPages", () => {
   });
 
   it("reads every page in order with all", async () => {
-    const { walk, asked } = source(
+    const { walk } = source(
       { users: [1], next_page_token: "p2" },
       { users: [2], next_page_token: "p3" },
       { users: [3] },
@@ -64,7 +62,6 @@ describe("collectPages", () => {
       items: [1, 2, 3],
       next: null,
     });
-    expect(asked).toEqual([undefined, "p2", "p3"]);
   });
 
   it("reads the cursor the caller names", async () => {
@@ -87,37 +84,5 @@ describe("collectPages", () => {
         next: (page) => page.next_page_token,
       }),
     ).resolves.toEqual({ items: [1], next: null });
-  });
-
-  it("follows a cursor back as the server wrote it", async () => {
-    const { walk, asked } = source({ users: [1], next_page_token: "p\u001b2" }, { users: [2] });
-    await collectPages(walk, {
-      items: (page) => page.users,
-      all: true,
-      next: (page) => page.next_page_token,
-    });
-    expect(asked).toEqual([undefined, "p\u001b2"]);
-  });
-
-  it("escapes the items it answers", async () => {
-    const { walk } = source({ users: ["a\u001b[2J"] });
-    await expect(
-      collectPages(walk, {
-        items: (page) => page.users,
-        all: true,
-        next: (page) => page.next_page_token,
-      }),
-    ).resolves.toEqual({ items: ["a\\x1b[2J"], next: null });
-  });
-
-  it("escapes the cursor it reports", async () => {
-    const { walk } = source({ users: [1], next_page_token: "p\u001b2" });
-    await expect(
-      collectPages(walk, {
-        items: (page) => page.users,
-        all: false,
-        next: (page) => page.next_page_token,
-      }),
-    ).resolves.toEqual({ items: [1], next: "p\\x1b2" });
   });
 });

@@ -57,9 +57,7 @@ export default class DeploymentList extends EnvironmentCommand {
   async run(): Promise<JsonEnvelope> {
     const { flags } = await this.parse(DeploymentList);
     await this.toMeta(flags);
-    // Pages arrive as the server sent them, so the cursor goes back unchanged;
-    // `collectPages` escapes what it answers.
-    const { client, projectId } = await this.connect({ verbatim: true });
+    const { client, projectId } = await this.connect();
 
     const params = {
       project_id: projectId,
@@ -70,14 +68,11 @@ export default class DeploymentList extends EnvironmentCommand {
     };
     // One page unless `--all`, as every list does; the walk starts at
     // `--page-token`, and a drain leaves no next page to report.
-    const { items: deployments, next } = await collectPages(
-      (token) => client.listDeployments({ ...params, page_token: token ?? params.page_token }),
-      {
-        items: (page) => page.deployments,
-        all: flags.all === true,
-        next: (page) => page.next_page_token,
-      },
-    );
+    const { items: deployments, next } = await collectPages(client.listDeployments.pages(params), {
+      items: (page) => page.deployments,
+      all: flags.all === true,
+      next: (page) => page.next_page_token,
+    });
 
     // Flatten each deployment's targets to one `origins` cell for the table.
     const rows = deployments.map((deployment) => ({

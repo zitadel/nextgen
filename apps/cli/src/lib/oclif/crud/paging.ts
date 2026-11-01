@@ -1,19 +1,16 @@
-import { type FetchPage, pages } from "@zitadel/api/runtime/paging";
-
-import { sanitizeResponse } from "../../api-client";
-
 /**
- * The first page `fetchPage` answers, or with `all` every page in order, as
- * one list of the items `items` takes from each page. `next` reads a page's
- * cursor, both to follow it and to report it: the cursor to the page after
- * the first, or `null` once `all` has read the last page.
+ * The first page `pages` yields, or with `all` every page in order, as one
+ * list of the items `items` takes from each page. `next` reads a page's
+ * cursor to report it: the cursor to the page after the first, or `null` once
+ * `all` has read the last page.
  *
- * `fetchPage` answers each page as the server sent it, so the cursor goes back
- * to the server exactly as it came. What the walk answers, the items and the
- * cursor it reports, is escaped for the terminal here, once.
+ * Following the cursor is the walk's job, not this one's: a client function's
+ * `.pages()` reads it from the page as the server sent it, before the CLI
+ * escapes the page, so it goes back to the server unchanged. Without `all`
+ * the walk is left after its first page, so no second one is fetched.
  */
 export const collectPages = async <P, T>(
-  fetchPage: FetchPage<P>,
+  pages: AsyncIterable<P>,
   {
     items,
     all,
@@ -28,10 +25,10 @@ export const collectPages = async <P, T>(
   // last: these resources are unbounded, and a wide `--all` would otherwise
   // copy every record once per remaining page.
   const collected: T[] = [];
-  for await (const page of pages(fetchPage, { next: (page) => next(page) || undefined })) {
-    collected.push(...sanitizeResponse(items(page)));
+  for await (const page of pages) {
+    collected.push(...items(page));
     if (!all) {
-      return { items: collected, next: sanitizeResponse(next(page) || null) };
+      return { items: collected, next: next(page) || null };
     }
   }
   return { items: collected, next: null };

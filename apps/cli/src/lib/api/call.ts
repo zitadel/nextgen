@@ -1,5 +1,5 @@
 import { ApiError, request as fetchWithPolicy } from "@zitadel/api/runtime/fetch";
-import { itemsOf, nextToken } from "@zitadel/api/runtime/paging";
+import { itemsOf, nextToken, pages } from "@zitadel/api/runtime/paging";
 
 import { REQUEST_TIMEOUT_MS, sanitizeRejection, sanitizeResponse } from "../api-client";
 import { ZitadelError } from "../errors";
@@ -95,8 +95,7 @@ const pageOf = (request: ApiRequest, token: string | undefined): ApiRequest => {
 
 /**
  * Send a paged request until the server's `next_page_token` runs out, and
- * answer the last page with the page field holding every page's items. The
- * walk is `collectPages`, the resource lists' `--all`.
+ * answer the last page with the page field holding every page's items.
  */
 export const sendAll = async (
   server: string,
@@ -109,31 +108,33 @@ export const sendAll = async (
   }
   let last: { status: number; raw: unknown } = { status: 200, raw: undefined };
   // Each page is fetched raw: the cursor goes back to the server exactly as it
-  // came, and `collectPages` escapes only the items it answers.
-  const { items } = await collectPages(
+  // came, and only the items are escaped.
+  const walk = pages(
     async (cursor) => {
       last = await sendRaw(server, token, pageOf(request, cursor));
       return last.raw;
     },
-    {
-      // The one list read by a field named only at runtime, so the one checked.
-      items: (raw) => {
-        try {
-          return itemsOf(raw, paging.items);
-        } catch (error) {
-          throw new ZitadelError(
-            "E_VALIDATION",
-            error instanceof Error ? error.message : String(error),
-            { details: { response: sanitizeResponse(raw) } },
-          );
-        }
-      },
-      all: true,
-      next: nextToken,
-    },
+    { next: nextToken },
   );
+  const { items } = await collectPages(walk, {
+    // The one list read by a field named only at runtime, so the one checked.
+    items: (raw) => {
+      try {
+        return sanitizeResponse(itemsOf(raw, paging.items));
+      } catch (error) {
+        throw new ZitadelError(
+          "E_VALIDATION",
+          error instanceof Error ? error.message : String(error),
+          { details: { response: sanitizeResponse(raw) } },
+        );
+      }
+    },
+    all: true,
+    next: nextToken,
+  });
   // The last page's other fields, escaped once, with every page's items in
-  // place of its own and in its order.
+  // place of its own and in its order. The check only narrows the type: the
+  // items above were read off this page, so it is an object.
   const page = isObject(last.raw) ? last.raw : {};
   return {
     status: last.status,

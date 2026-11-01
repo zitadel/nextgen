@@ -240,10 +240,13 @@ function stepNamed(flow: Json, name: string): Step | undefined {
  * replacing it, so enabling a second one later keeps the first.
  */
 export function applySsoToSchema<S extends object>(schema: S, slug: ConnectionSlug): SsoResult<S> {
-  const current = "x-auth-methods" in schema ? schema["x-auth-methods"] : undefined;
+  // Read off one copy of the schema, so the document built from it shares
+  // nothing with the schema it was given.
+  const copy = clone(schema);
+  const current = "x-auth-methods" in copy ? copy["x-auth-methods"] : undefined;
   const methods = isObject(current) ? current : {};
   const existing = isObject(methods.sso) ? methods.sso : undefined;
-  const providers: unknown[] = Array.isArray(existing?.providers) ? [...existing.providers] : [];
+  const providers: unknown[] = Array.isArray(existing?.providers) ? existing.providers : [];
 
   if (existing?.enabled === true && providers.includes(slug)) {
     return { document: schema, changed: false, skipped: [] };
@@ -254,8 +257,8 @@ export function applySsoToSchema<S extends object>(schema: S, slug: ConnectionSl
   // The same schema with one provider more under `x-auth-methods.sso`; a key
   // spread over its own keeps its place, so the file's key order holds.
   const document = {
-    ...clone(schema),
-    "x-auth-methods": { ...clone(methods), sso: { ...clone(existing), enabled: true, providers } },
+    ...copy,
+    "x-auth-methods": { ...methods, sso: { ...existing, enabled: true, providers } },
   };
   return { document, changed: true, skipped: [] };
 }

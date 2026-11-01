@@ -1,5 +1,8 @@
 import { spinner } from "@clack/prompts";
 import { Flags } from "@oclif/core";
+import { pages } from "@zitadel/api/runtime/paging";
+
+import { sanitizeResponse } from "../../../api-client";
 
 import { nonBlankString } from "../../flags";
 
@@ -110,8 +113,8 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
     // typo fails without contacting the server at all.
     const shape = fieldPaths(spec.item);
     const early = shape ? chosenColumns(flags.fields, resource.columns, [], shape) : undefined;
-    // Pages arrive as the server sent them, so the cursor goes back unchanged;
-    // `collectPages` escapes what it answers.
+    // Every list's pages arrive as the server sent them, so the walk below
+    // sends each cursor back unchanged and escapes only what the list answers.
     const ctx = await this.context({ verbatim: true });
     // An unpaged endpoint has no cursor flags to read and would reject the
     // parameters anyway, so nothing is sent and one request is the whole list.
@@ -185,19 +188,20 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
     // The spinner owns the cursor and a SIGINT handler until it is stopped, so a
     // page that fails mid-drain has to stop it too; otherwise the error prints
     // under a live spinner and the handler outlives the command.
-    const { items, next } = await collectPages(
+    const walk = pages(
       async (token) => {
         const page = await request(token ?? first);
         fetched += 1;
         progress?.message(`Fetching ${topic} — page ${fetched}`);
         return page;
       },
-      {
-        items: (response) => spec.items(response),
-        all,
-        next: (response) => spec.next?.(response),
-      },
-    )
+      { next: (response) => spec.next?.(response) || undefined },
+    );
+    const { items, next } = await collectPages(walk, {
+      items: (response) => sanitizeResponse(spec.items(response)),
+      all,
+      next: (response) => sanitizeResponse(spec.next?.(response)),
+    })
       .then((page) => {
         drained = true;
         return page;
