@@ -47,6 +47,13 @@ by declared range or installed release, with `E_UNSUPPORTED_PROJECT_SHAPE`
 left the project untouched. The message names the minimum and the hint says to
 upgrade, so upgrade the app and rerun rather than retrying.
 
+The CLI ships this skill and the other Zitadel skills. `skills add` puts the
+ones of the version that runs it into the project's `.agents/skills/`, and into
+`.claude/skills/` when Claude Code is installed or the project has a `.claude/`
+folder, replacing older copies. After moving the app to a newer CLI, run it
+with that version so the skills describe it. It talks to no server and asks
+nothing; `data.skills` and `data.directories` say what it added where.
+
 ## Using the CLI
 
 - **Drive it non-interactively.** Always pass `--non-interactive --json` (short:
@@ -71,7 +78,10 @@ upgrade, so upgrade the app and rerun rather than retrying.
   `--help` output is bounded too — read it in full rather than `head`-ing it, or
   you will miss flags further down.
 - **Working directory.** Add `--cwd <path>` when operating outside the current
-  working directory.
+  working directory. A relative `--env-file` path is still read from the
+  current directory, not from `--cwd` (`--cwd app --env-file app/.env.ci`):
+  Node reads `--env-file` itself before the CLI starts and exits 9 with
+  `node: <path>: not found`, and no envelope, when the file is not there.
 - **Server and project.** A command that talks to a project reads
   `ZITADEL_URL`, `ZITADEL_PROJECT_ID` and `ZITADEL_PROJECT_SECRET`, each from the
   first source that has it: `--server` (the URL only), `--env-file <path>`, the
@@ -93,6 +103,9 @@ upgrade, so upgrade the app and rerun rather than retrying.
   `deploy` yourself. `data.deployment` carries the `release_id`,
   `content_hash`, `deployment_id` and `origins` when a person accepted, and is
   null otherwise — a failed deploy is a warning, never a failed `env add`.
+  `ZITADEL_URL` and `--server` are the server's origin: the API lives under
+  `/api/v1` there, which the CLI adds (and drops from a URL that already ends
+  in it).
 - **Origins.** `zitadel origin add <url> --kind primary|preview`, `origin list`
   and `origin rm <url>` manage the URLs a project serves: a `primary` origin is
   where the app is served, a `preview` pattern (it may hold a `*`) is where
@@ -100,6 +113,11 @@ upgrade, so upgrade the app and rerun rather than retrying.
   An empty list admits every origin, so removing the last one opens the project
   up; `origin rm` asks first and needs `--force` when non-interactive. Removing
   a preview pattern leaves its live previews served until they expire.
+  `deploy` lands only on primary origins and fails with `E_VALIDATION` without
+  one; its `next_commands` name the step that gives the project one. `setup`
+  0.1.0 registered the app's URL (`ZITADEL_ISSUER`) as a `preview` origin,
+  which `origin add --kind primary` refuses with `E_CONFLICT`: `doctor` warns
+  (`issuer-origin`) and `doctor --fix` makes it primary.
 - **Telemetry.** The CLI sends anonymous usage telemetry by default, and
   agent-driven runs are exactly the ones worth learning from — leave it on.
   Don't add `--no-telemetry` to commands. An opt-out exists for users who need
@@ -129,8 +147,9 @@ upgrade, so upgrade the app and rerun rather than retrying.
 - **Calling an operation no command covers.** `zitadel api <operation>` calls
   any operation of the API with the resolved server and `.zitadel/secret`.
   Name it by its `operationId` (`queryUsers`, as the API reference and
-  `@zitadel/api` spell it) or by its path (`/users/query`; `-X` picks the
-  method where a path has several). Path parameters follow as arguments, in
+  `@zitadel/api` spell it) or by its path as the spec has it (`/users/query`,
+  which the server serves at `/api/v1/users/query`; a path copied with the
+  prefix works too, and `-X` picks the method where a path has several). Path parameters follow as arguments, in
   path order; a `project_id` left out is the project's own. `-F name=value`
   (or `name:=json`) sets a query parameter when the operation declares one by
   that name, else a dot path into the body, typed by the operation's schema;
@@ -193,6 +212,11 @@ over reading `<resource> --help` one at a time. A `list` verb's envelope carries
 you pass `--all`, so a "how many …?" question is one `list --all --json` call:
 read the count, do not page and tally.
 
+To find the users still on an older revision of a schema, filter on the
+schema's object type and exclude the newest revision's URL:
+`users list --filter schema_object_type=equals:<type> --filter
+schema=not_equals:<newest-url> --all --json`.
+
 ## Reading the envelope
 
 Each invocation prints one JSON object:
@@ -217,6 +241,36 @@ Each invocation prints one JSON object:
   (the origins it went live on) and `data.resources` (how many it pinned). A
   re-run on unchanged config returns the same digest. Use it to confirm what
   went live.
+- `preview` is `deploy` for a pull-request build: it deploys the release to the
+  build's preview URLs (from the platform, or `--origin`) for `--ttl` and emits
+  `data.previews` plus `data.release_env` (the `NEXT_PUBLIC_ZITADEL_RELEASE`
+  line to pin). It uses `ZITADEL_PROJECT_SECRET` until the server accepts the narrower preview token (#1575), never the other credential, and
+  outside a preview or development build it is a no-op — even with an explicit
+  `--origin`, which selects targets but never authorizes a preview deploy. A CI
+  build other than Vercel or Netlify must set `ZITADEL_ENV=preview`, or it is
+  skipped too. `preview list` and `preview rm <url>` read and end live previews.
+- `deploy` and `preview` record `-m` on the release and the deployment. Omitted,
+  they use a GitHub pull request's title, Vercel's commit message, or a clean
+  worktree's commit subject; with none, a non-interactive `deploy` fails. A
+  blank `-m` is refused. A release keeps the message of
+  the run that first built its content, usually the pull request's `preview`.
+  `deployment rollback -m` records why on the rollback.
+- `deployment get <id>` emits the deployment as the API serves it; on a
+  terminal it also shows the variables the deployment froze, secrets masked.
+  Read them as JSON with `variable resolve`.
+- `deployment rollback` emits `data.release_id` (the release live again),
+  `data.origins` and `data.pointers`, the `{kind, handle, revision_id}`
+  revisions that release pins; the `schema` one is what new registrations use.
+  Users keep their schema revision and attributes: a rollback does not migrate
+  them back. Without `data.pointers`, a warning says the release could not be
+  read.
+- `deploy --dry-run` and `deploy` emit `data.diff`, the git diff the terminal
+  shows, against the live release's commit (`diff.against`): `diff.files` holds
+  one `{path, status, previous_path?, patch}` per changed file (`status` is
+  `added`, `modified`, `deleted`, `renamed` or `copied`; `patch` is its unified
+  diff), including rapid same-size edits and untracked configuration files.
+  Review it before you deploy. `files` is `[]` when nothing changed and
+  `null` when there is nothing to diff against, with `diff.note` saying why.
 - A write verb's `--dry-run` reports what it would send without calling the
   platform, so you can preview a mutation before making it.
 - `api` emits the response body as `data`, exactly as the API reference
@@ -235,13 +289,18 @@ Common error codes point at their own fix in `next_commands`:
 - `E_LOCAL_SERVER_NOT_RUNNING`: start the local runtime, then retry with
   `--server local`.
 - `E_NOT_FOUND`: an HTTP 404 — a missing resource, an operation the server's
-  version does not have (`details.body.code` is `req.not_found`), or a
+  version does not have (`details.body.code` is `req.not_found`; a server
+  from before the API moved under `/api/v1` answers every call so), or a
   `--server` that is not a Zitadel platform API. Follow `next_commands`.
 - `E_PORT_IN_USE`: the requested local runtime port already has a listener; stop
   that process or choose another port.
 
 In human mode the output follows the terminal (TTY table, or tab-separated lines
-when piped or `--plain`); `--json` is unaffected and remains the contract.
+when piped or `--plain`); `--json` is unaffected and remains the contract. A
+human run lists its next steps under `Next:` after its result (`setup` shows
+them in its summary box instead); where stdout is data a script reads (a piped
+or `--plain` list, a resource's created or updated JSON) they go to stderr, so
+stdout holds only that data.
 
 Text the server returns is escaped before it is printed, in `--json` as in human
 mode, so a stored value cannot drive the reader's terminal. Control, format and
@@ -341,12 +400,50 @@ npx @zitadel/cli@latest doctor --non-interactive --json
 npx @zitadel/cli@latest deploy -m "<why this release changes>" --non-interactive --json
 ```
 
+`setup` commits the project it scaffolds: `git init` first when the directory
+is not yet a repository, then one commit, `chore: scaffold the project with
+zitadel setup`. A release records the commit it was built from and `deploy`
+diffs `.zitadel/` against it, so without this the first release carries no
+commit and the next deploy reports no diff.
+
+Then setup deploys `.zitadel/` to the app's origin, so the sign-in it asks you
+to verify is served the release it built. `data.deployment` carries the
+`release_id`, `content_hash`, `deployment_id` and `origins`, and is null on
+`--dry-run` or when the deploy failed. A failed deploy is a warning, never a
+failed setup, and `data.next_commands` then leads with the `deploy` that fixes
+it.
+
+Setup refuses with `E_CONFLICT` when the repository already has uncommitted
+work, untracked files included, which `details.untracked` lists separately
+from `details.modified`. The commit covers the project directory, so it can
+only tell its own files from yours when the tree starts clean. It never
+commits `.env*` files (other than `.env.example`), `.zitadel/secret` or
+`.zitadel/local/`, whatever their case. Commit or stash
+first, then rerun. Only what `start` leaves is exempt: `.zitadel/local/` and
+the `.gitignore` line that ignores it. A connection under `.zitadel/idps/` is
+yours and is not exempt. During a merge, rebase, cherry-pick, revert or bisect,
+or on a detached HEAD, setup refuses with `E_CONFLICT` before it writes
+anything, naming what stops the commit.
+
+Setup deploys nothing, and it does not need to: a project with no release
+resolves the newest revisions, which are the ones setup just uploaded, so
+sign-in already runs on `.zitadel/`. Deploying pins them into a release, which
+is what the server will require once that fallback goes (#1616). The publish
+step says so and names the command. `data.git` reports what setup did:
+`initialized` when it ran `git init`, even if the commit then failed, and the
+`commit`, or null. `--no-git` skips both the refusal
+and the commit, and nothing prompts, so this is the same interactively and in
+CI.
+
 `setup` scaffolds into an empty directory, or patches an existing app project
 where it detects a framework. What `start` leaves in a directory —
 `.zitadel/local/` and the `.gitignore` line that ignores it — still counts as
 empty, so the golden path runs `setup` right after `start` in the same
-directory. Any other non-empty directory stops setup with a hint to pass
-`--force`. Pass it only for a directory whose contents may be replaced: files
+directory. A `--cwd` that does not exist yet counts as empty too: setup creates
+it with the app, and removes it again when setup fails before the app is kept.
+A `--cwd` that is a file fails with `E_VALIDATION`. Any other non-empty
+directory stops setup with a hint to pass `--force`. Pass it only for a
+directory whose contents may be replaced: files
 the new app also has, such as `package.json`, are overwritten. Without a
 terminal `setup` cannot ask which framework to scaffold, so pass `--framework`;
 the error lists the choices in `details.frameworks`. `setup --dry-run` creates
@@ -382,7 +479,11 @@ server and its port, but runs its project checks in the working directory, so ru
 it from the app. When that server is unhealthy it suggests `start` and
 `reset --force` with `--cwd` set to the directory that holds it (when that path needs
 shell quoting the commands are left out, the hint names the directory, and
-`doctor --json` returns the argument lists in `details.suggested_args` to run as they are). A
+`doctor --json` returns the argument lists in `details.suggested_args` to run as they are).
+The hint says the server is the parent's and that `reset --force` deletes the data in that
+directory, and it adds a plain `start`, which gives the working directory a server of its own
+because `start` does not look in parents; a healthy parent server is reported in the `runtime`
+check as started in the parent folder. A
 local server is healthy once its `/readyz` answers, which takes its database
 answering too: `start` waits for that, and the commands that read a server
 treat one whose database does not answer as unhealthy. `stop`,
@@ -492,6 +593,38 @@ missing or outdated (after an upgrade that changed a dialect), and
 `doctor --fix` writes the current ones, unless the project pins a newer
 `@zitadel/*` version (run that version's `doctor --fix`) or a symlink is on
 the path; `deploy --dry-run` validates without them either way.
+`deploy`, `preview` and `release create`, `--dry-run` included, check the
+shape of `.zitadel/` locally before anything is written, and fail with
+`E_VALIDATION` listing each problem by field and by the schema's or flow's
+handle (a policy by its file). The server still applies its own release rules
+when the build is submitted, such as handles being unique, so a passing dry run
+does not promise the release is accepted.
+
+An SPA's dev proxy (`vite.config.*`, Angular's `proxy.conf.cjs`) keeps the
+app's session in a cookie of its own project, `zitadel_session_<project id>`
+on `http://localhost` and `__Host-zitadel_session_<project id>` over https.
+`doctor` fails (`managed-files`, `outdated managed config wiring`) on the
+session-cookie hooks a CLI wrote before these names: the server no longer
+reads the cookies they keep. `doctor --fix` replaces hooks that are as the CLI
+wrote them; ones changed by hand must be updated by hand, which the failure
+says. Browsers signed in before the change sign in again.
+
+## Claiming a project
+
+A project on a hosted server stays temporary until a person claims it, within
+14 days of `setup`. Claiming signs that person in with their own Zitadel
+account in a browser, so it is their step: hand them the link, and never open
+it yourself. Plain `claim` waits for the browser step and prints nothing on
+stdout until it ends, so run `claim --no-wait --non-interactive --json`
+instead. It returns at once with `data.claim_url`, the link to give the person
+verbatim, and `data.expires_at`, when it stops working (about 10 minutes).
+Then run the `claim --challenge-id …` command in `data.next_commands`: it
+waits for the person to finish, returns `data.dashboard_url`, and records the
+owning team in `.zitadel/secret`. When the link expires, or `--challenge-id`
+names one the platform does not know (`E_NOT_FOUND`), `next_commands` starts a
+new `--no-wait` link. A project that already has a team is `skipped` with
+`reason: "already-claimed"`; one past its 14 days fails with `E_VALIDATION`
+and no `next_commands`, since a new link cannot reopen it.
 
 ## Reference files
 
@@ -499,4 +632,4 @@ Load on demand:
 
 - [`references/driving-login-ui.md`](references/driving-login-ui.md) — driving the
   `<zitadel-login>` component in a browser, and the authoritative repo-config
-  workflow (schemas, flows, branding, policies).
+  workflow (schemas, flows, branding, policies and their tests).

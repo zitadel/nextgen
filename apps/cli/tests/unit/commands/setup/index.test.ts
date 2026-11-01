@@ -601,7 +601,7 @@ describe("setup command pre-flight", () => {
     expect(json.status).toBe("error");
     expect(json.code).toBe("E_CONFLICT");
     expect(json.message).toContain("App.tsx");
-    expect(capture.requests).not.toContain("POST /projects");
+    expect(capture.requests).not.toContain("POST /api/v1/projects");
     expect(existsSync(join(cwd, "zitadel.json"))).toBe(false);
     expect(existsSync(join(cwd, ".zitadel/secret"))).toBe(false);
     expect(await readFile(join(cwd, "src/App.tsx"), "utf8")).toBe(ownApp);
@@ -629,7 +629,7 @@ describe("setup command pre-flight", () => {
       const json = parseJson(res.stdout) as { code: string; message: string };
       expect(json.code).toBe("E_CONFLICT");
       expect(json.message).toContain(named);
-      expect(capture.requests).not.toContain("POST /projects");
+      expect(capture.requests).not.toContain("POST /api/v1/projects");
       expect(existsSync(join(cwd, "zitadel.json"))).toBe(false);
     },
   );
@@ -665,6 +665,75 @@ describe("setup command pre-flight", () => {
     expect(capture.requests).toEqual([]);
   });
 
+  it("deploys .zitadel/ to the primary origin with the project secret", async () => {
+    const cwd = await makeNextApp();
+    const capture = await startCreateProjectCaptureServer();
+
+    const res = await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--server",
+      capture.url,
+      "--non-interactive",
+      "--json",
+      "--skip-install",
+      "--no-git",
+      "--dev-port",
+      "3000",
+    ]);
+
+    expect(res.exitCode).toBe(0);
+    expect(capture.deployments).toEqual([
+      {
+        body: expect.objectContaining({
+          release_id: "rel_test",
+          targets: ["primary"],
+        }),
+        authorization: `Bearer ${capture.projects[0]?.project_secret}`,
+      },
+    ]);
+    const json = parseJson(res.stdout) as { data: { deployment: unknown } };
+    expect(json.data.deployment).toEqual({
+      release_id: "rel_test",
+      content_hash: "sha256:test",
+      deployment_id: "dep_test",
+      origins: ["http://localhost:3000"],
+    });
+  });
+
+  it("warns, names the deploy and still succeeds when its first deploy fails", async () => {
+    const cwd = await makeNextApp();
+    const capture = await startCreateProjectCaptureServer();
+    capture.rejectsReleases();
+
+    const res = await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--server",
+      capture.url,
+      "--non-interactive",
+      "--json",
+      "--skip-install",
+      "--no-git",
+      "--dev-port",
+      "3000",
+    ]);
+
+    expect(res.exitCode).toBe(0);
+    const json = parseJson(res.stdout) as {
+      warnings: string[];
+      data: { deployment: unknown; next_commands: string[] };
+    };
+    expect(json.data.deployment).toBeNull();
+    expect(json.warnings).toEqual([
+      expect.stringContaining("The project was set up but its first deploy failed"),
+    ]);
+    expect(json.data.next_commands[0]).toContain("deploy -m");
+    expect(capture.deployments).toEqual([]);
+  });
+
   it("writes no login template and publishes no branding revision (#1039)", async () => {
     const cwd = await makeTempDir();
     await mkdir(join(cwd, "app"), { recursive: true });
@@ -683,6 +752,7 @@ describe("setup command pre-flight", () => {
       "--non-interactive",
       "--json",
       "--skip-install",
+      "--no-git",
       // Setup warns when the app's port is taken, and whatever holds 3000 on
       // the machine running the tests must not decide what it reports.
       "--dev-port",
@@ -702,7 +772,7 @@ describe("setup command pre-flight", () => {
     // and no branding revision is created on the platform.
     expect(existsSync(join(cwd, ".zitadel/branding"))).toBe(false);
     expect(json.data.files_written.some((file) => file.includes(".zitadel/branding/"))).toBe(false);
-    expect(capture.requests).not.toContain("POST /branding");
+    expect(capture.requests).not.toContain("POST /api/v1/branding");
     // The envelope no longer carries a design, and the look guidance must not
     // claim a revision is live.
     expect(json.data).not.toHaveProperty("design");
@@ -1057,15 +1127,24 @@ async function startCreateProjectCaptureServer(
   rejectsSchemaUploads(): void;
   /** Lets `POST /schemas` succeed again. */
   recovers(): void;
+  /** The body of each `POST /deployments`, and the token it carried. */
+  deployments: Array<{ body: Record<string, unknown>; authorization: string | undefined }>;
+  /** Makes `POST /releases/build` fail, so setup's first deploy fails. */
+  rejectsReleases(): void;
 }> {
   let body: Record<string, unknown> | null = null;
   let rejectsSchemas = false;
+  let rejectsBuilds = false;
+  const deployments: Array<{
+    body: Record<string, unknown>;
+    authorization: string | undefined;
+  }> = [];
   const requests: string[] = [];
   const projects: Array<{ id: string; project_secret: string }> = [];
   const server = createServer(async (req, res) => {
     const path = new URL(req.url ?? "/", "http://localhost").pathname;
     requests.push(`${req.method ?? "GET"} ${path}`);
-    if (req.method === "POST" && path === "/projects") {
+    if (req.method === "POST" && path === "/api/v1/projects") {
       const chunks: Buffer[] = [];
       for await (const chunk of req) {
         chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
@@ -1086,13 +1165,13 @@ async function startCreateProjectCaptureServer(
       );
       return;
     }
-    if (req.method === "POST" && path === "/schemas" && rejectsSchemas) {
+    if (req.method === "POST" && path === "/api/v1/schemas" && rejectsSchemas) {
       res
         .writeHead(500, { "content-type": "application/json" })
         .end(JSON.stringify({ code: "internal", message: "boom" }));
       return;
     }
-    if (req.method === "POST" && path === "/schemas") {
+    if (req.method === "POST" && path === "/api/v1/schemas") {
       res.writeHead(201, { "content-type": "application/json" }).end(
         JSON.stringify({
           id: "sch_test",
@@ -1101,7 +1180,7 @@ async function startCreateProjectCaptureServer(
       );
       return;
     }
-    if (req.method === "POST" && path === "/flow_definitions") {
+    if (req.method === "POST" && path === "/api/v1/flow_definitions") {
       res.writeHead(201, { "content-type": "application/json" }).end(
         JSON.stringify({
           id: "flow_test",
@@ -1110,7 +1189,43 @@ async function startCreateProjectCaptureServer(
       );
       return;
     }
-    if (req.method === "POST" && path === "/policies") {
+    if (req.method === "POST" && path === "/api/v1/releases/build") {
+      if (rejectsBuilds) {
+        res
+          .writeHead(500, { "content-type": "application/json" })
+          .end(JSON.stringify({ code: "internal", message: "boom" }));
+        return;
+      }
+      res.writeHead(201, { "content-type": "application/json" }).end(
+        JSON.stringify({
+          id: "rel_test",
+          content_hash: "sha256:test",
+          created_at: "2026-06-01T00:00:00.000Z",
+        }),
+      );
+      return;
+    }
+    if (req.method === "POST" && path === "/api/v1/deployments") {
+      const chunks: Buffer[] = [];
+      for await (const chunk of req) {
+        chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
+      }
+      const deployment = JSON.parse(Buffer.concat(chunks).toString("utf8")) as Record<
+        string,
+        unknown
+      >;
+      deployments.push({ body: deployment, authorization: req.headers.authorization });
+      res.writeHead(201, { "content-type": "application/json" }).end(
+        JSON.stringify({
+          id: "dep_test",
+          release_id: deployment.release_id,
+          targets: [{ origin: "http://localhost:3000" }],
+          deployed_at: "2026-06-01T00:00:00.000Z",
+        }),
+      );
+      return;
+    }
+    if (req.method === "POST" && path === "/api/v1/policies") {
       res.writeHead(201, { "content-type": "application/json" }).end(
         JSON.stringify({
           id: "pol_test",
@@ -1144,6 +1259,10 @@ async function startCreateProjectCaptureServer(
     },
     recovers() {
       rejectsSchemas = false;
+    },
+    deployments,
+    rejectsReleases() {
+      rejectsBuilds = true;
     },
   };
 }

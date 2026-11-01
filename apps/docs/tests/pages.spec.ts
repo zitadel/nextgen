@@ -12,6 +12,7 @@ import {
   markdownUrl,
   metaContent,
   parseIndex,
+  policyProblem,
   siteLinks,
 } from "./support";
 
@@ -82,7 +83,9 @@ test("the index lists every section, each page once, under /docs", async ({ requ
   expect(indexStrays(index), "lines of the index where the page tree puts none").toEqual([]);
 });
 
-test("every page answers as HTML, titled, described and in its size", async ({ request }) => {
+test("every page answers as HTML, titled, described, in its size and under its policies", async ({
+  request,
+}) => {
   test.setTimeout(120_000);
   const pages = await indexedPages(request);
 
@@ -104,6 +107,8 @@ test("every page answers as HTML, titled, described and in its size", async ({ r
     const html = body.toString("utf8");
     const expected = `<title>${escapeHtml(title)}</title>`;
     if (!html.includes(expected)) return `${url}: no ${expected}`;
+    const policy = policyProblem(response.headers(), html);
+    if (policy) return `${url}: ${policy}`;
     const meta = metaContent(html, "description");
     if (meta === undefined) {
       return description || operationPage.test(url) ? `${url}: no description` : null;
@@ -237,7 +242,7 @@ test("every API operation shows its call through @zitadel/api, its CLI command a
       if (!back.includes(`](${url})`)) return `${commandPage}: no link to ${url}`;
     }
     // And with cURL, as the page's last sample (lib/source.ts).
-    if (!/```bash\ncurl -X [A-Z]+ 'http:\/\/localhost:8080\//.test(markdown)) {
+    if (!/```bash\ncurl -X [A-Z]+ 'http:\/\/localhost:8080\/api\/v1\//.test(markdown)) {
       return `${markdownUrl(url)}: no cURL command`;
     }
     const html = await (await request.get(url)).text();
@@ -309,7 +314,10 @@ test("every CLI command shows its usage, in tables whose rows keep their cells",
 });
 
 test("a page that does not exist is a 404, as HTML and as Markdown", async ({ request }) => {
-  expect((await request.get("/docs/no-such-page")).status()).toBe(404);
+  const missing = await request.get("/docs/no-such-page");
+  expect(missing.status()).toBe(404);
+  // Every unknown URL carries the prerendered 404's own policy (csp-adapter.mjs).
+  expect(policyProblem(missing.headers(), await missing.text())).toBeUndefined();
   expect((await request.get("/docs/no-such-page.md")).status()).toBe(404);
   const negotiated = await request.get("/docs/no-such-page", {
     headers: { Accept: "text/markdown" },

@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -39,6 +40,26 @@ func (h *Handler) PublishPolicy(ctx context.Context, req api.PublishPolicyReques
 		return nil, err
 	}
 	return toAPIPolicy(entity)
+}
+
+// EvaluatePolicy is a dry run: it reads and writes nothing of the project,
+// but still needs read access to it, as the policy reads do.
+func (h *Handler) EvaluatePolicy(ctx context.Context, req api.EvaluatePolicyRequest, params api.EvaluatePolicyParams) (api.EvaluatePolicyRes, error) {
+	if err := h.requireProjectAccess(ctx, string(params.ProjectID), policyAccess, opRead); err != nil {
+		return nil, err
+	}
+	if h.policyService == nil {
+		return nil, domain.ErrInternal(errors.New("policy service not configured"))
+	}
+	in, err := fromAPIEvaluatePolicy(req)
+	if err != nil {
+		return nil, err
+	}
+	decision, err := h.policyService.Evaluate(ctx, in)
+	if err != nil {
+		return nil, err
+	}
+	return toAPIPolicyDecision(decision)
 }
 
 func (h *Handler) GetPolicyRevision(ctx context.Context, params api.GetPolicyRevisionParams) (api.GetPolicyRevisionRes, error) {
@@ -145,6 +166,50 @@ func fromAPIPublishPolicy(req api.PublishPolicyRequest) (string, map[string]any,
 	default:
 		return "", nil, domain.ErrPolicyInvalid(nil, nil).WithMessage("policy: invalid: unknown operation")
 	}
+}
+
+func fromAPIEvaluatePolicy(req api.EvaluatePolicyRequest) (service.EvaluatePolicyInput, error) {
+	switch req.Type {
+	case api.PasswordSetEvaluateRequestEvaluatePolicyRequest:
+		in := req.PasswordSetEvaluateRequest
+		// The facts' defaults are a self-service set by a user whose kept
+		// passwords all differ; ogen fills them in only when facts is sent.
+		evaluation := &service.PasswordSetEvaluation{Password: in.Input.Password, SelfService: true, HistoryMatches: []bool{}}
+		if facts, ok := in.Facts.Get(); ok {
+			if selfService, ok := facts.SelfService.Get(); ok {
+				evaluation.SelfService = selfService
+			}
+			if facts.HistoryMatches != nil {
+				evaluation.HistoryMatches = facts.HistoryMatches
+			}
+		}
+		return service.EvaluatePolicyInput{
+			Operation:   string(in.Operation),
+			Config:      fromAPIPasswordSetConfig(in.Config),
+			PasswordSet: evaluation,
+		}, nil
+	default:
+		return service.EvaluatePolicyInput{}, domain.ErrPolicyInvalid(nil, nil).WithMessage("policy: invalid: unknown operation")
+	}
+}
+
+func toAPIPolicyDecision(decision *service.PolicyDecision) (*api.EvaluatePolicyResponse, error) {
+	out := &api.EvaluatePolicyResponse{Allowed: decision.Allowed}
+	if decision.Code != "" {
+		out.Code = api.NewOptString(decision.Code)
+	}
+	if decision.Violations != nil {
+		violations := make(api.EvaluatePolicyResponseViolations, len(decision.Violations))
+		for name, value := range decision.Violations {
+			raw, err := json.Marshal(value)
+			if err != nil {
+				return nil, domain.ErrInternal(err).WithMessage("failed to encode policy violations")
+			}
+			violations[name] = raw
+		}
+		out.Violations = api.NewOptEvaluatePolicyResponseViolations(violations)
+	}
+	return out, nil
 }
 
 func fromAPIPasswordSetConfig(in api.PasswordSetConfig) map[string]any {

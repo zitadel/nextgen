@@ -18,16 +18,12 @@ const (
 	originsTable    = "deployment_origins"
 	previewTable    = "previews"
 
-	// CURRENT_TIMESTAMP() is taken when this statement runs. The origin rows
-	// bind that stamp: Spanner evaluates CURRENT_TIMESTAMP() per statement, so
-	// a default on the origin insert would land after the deployment.
+	// CURRENT_TIMESTAMP() is taken when the deployment insert runs. Origin
+	// rows copy that stamp: Spanner evaluates CURRENT_TIMESTAMP() per
+	// statement, so a default on those rows would land later.
 	createDeploymentStmt = `INSERT INTO deployments` +
 		` (project_id, id, release_id, origin_kind, metadata, deployed_at)` +
 		` VALUES (@p1, @p2, @p3, @p4, @p5, CURRENT_TIMESTAMP()) THEN RETURN deployed_at`
-	createDeploymentOriginStmt = `INSERT INTO deployment_origins` +
-		` (project_id, deployment_id, origin, release_id, origin_kind, deployed_at, seq)` +
-		` VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7)`
-
 	deploymentQuery = `SELECT project_id, id, release_id, origin_kind, metadata, deployed_at FROM deployments`
 )
 
@@ -36,6 +32,7 @@ var (
 	deploymentSchema = deployment.NewSchema(deploymentTables)
 
 	deploymentColumns = []string{"project_id", "id", "release_id", "origin_kind", "metadata", "deployed_at"}
+	originColumns     = []string{"project_id", "deployment_id", "origin", "release_id", "origin_kind", "deployed_at", "seq"}
 
 	originsQuery        = deployment.OriginsSelect(originsTable) + ` WHERE t.project_id = @p1 AND t.deployment_id IN UNNEST(@p2)`
 	newestPerOriginStmt = deployment.OriginsSelect(originsTable) +
@@ -71,10 +68,10 @@ func (ds deploymentStatements) CreateDeployment(ctx context.Context, entity *dom
 	}
 	var deployedAt time.Time
 	err = withTransaction(ctx, ds.db, func(ctx context.Context, tx queryExecutor) error {
-		// A retry replays this callback, so the stamp stays local until both
-		// inserts have landed. DML, not a mutation: the freeze in this same
-		// transaction reads the row back, and Spanner SQL cannot see a
-		// buffered mutation.
+		// A retry replays this callback, so the stamp stays local until the
+		// writes have landed. The deployment row is DML: the variable-set
+		// link that follows is SQL in this same transaction, and Spanner SQL
+		// cannot see a buffered mutation.
 		var stamped time.Time
 		stmt := buildStatement(createDeploymentStmt,
 			entity.ProjectID, entity.ID, entity.ReleaseID, entity.OriginKind.String(), metadata,
@@ -82,14 +79,18 @@ func (ds deploymentStatements) CreateDeployment(ctx context.Context, entity *dom
 		if err := tx.Write(ctx, stmt, scanReturnedTimestamp(&stamped)); err != nil {
 			return err
 		}
+		// Origin rows are not read here and are not the link's foreign key,
+		// so one mutation applies them at commit.
 		origins := entity.Origins()
-		for i, seq := range deployment.NextSeqs(origins, read) {
-			origin := buildStatement(createDeploymentOriginStmt,
-				entity.ProjectID, entity.ID, origins[i], entity.ReleaseID, entity.OriginKind.String(), stamped, seq,
-			).statement()
-			if _, err := tx.Update(ctx, origin); err != nil {
-				return err
-			}
+		seqs := deployment.NextSeqs(origins, read)
+		mutations := make([]*spanner.Mutation, 0, len(origins))
+		for i, origin := range origins {
+			mutations = append(mutations, spanner.Insert(originsTable, originColumns, []any{
+				entity.ProjectID, entity.ID, origin, entity.ReleaseID, entity.OriginKind.String(), stamped, seqs[i],
+			}))
+		}
+		if _, err := tx.BufferWrite(ctx, mutations); err != nil {
+			return err
 		}
 		deployedAt = stamped
 		rsi := newResourceScopeStatements(tx)

@@ -108,7 +108,7 @@ Canonical examples:
 | --- | --- |
 | Nav chrome | `Sidebar` (`collapsible="icon"`; mobile = persistent icon rail) |
 | Org/project picker | `Popover` + `Badge` |
-| Users filters | `Tabs` |
+| Users filters | `Select` (schema, then revision), in `ResourceTitle`'s `filter` slot |
 | Users table | `Table`, `Avatar`, `Badge`, `DropdownMenu`, `Button`; `HoverCard` (identity), `Popover` (attributes) |
 | Panel around a screen's content | `Card` |
 | Attribute chip / CLI command in prose | `InlineCode` |
@@ -124,11 +124,11 @@ Shared text styles (`PAGE_TITLE`, `SECTION_HEADING`, `SUBSECTION_HEADING`,
 `OVERLINE`, `EYEBROW`, the panel table cells) live in
 `src/components/typography.ts`.
 
-- `SECTION_HEADING`, 16/20 (Figma `zitadel/heading-md`): every primary card
+- `SECTION_HEADING`, 16/20 (Figma `zitadel/section-heading`): every primary card
   and section title, the project page's Project Detail, Origins and Variables
   and Secrets cards included. `DetailSection` renders it as an `h2`; so do
   Field definitions, Steps, Release content and the settings sections.
-- `SUBSECTION_HEADING`, 14/20 (`zitadel/heading-sm`): a subordinate heading
+- `SUBSECTION_HEADING`, 14/20 (`zitadel/subsection-heading`): a subordinate heading
   inside a card body, such as Sign-in methods on a schema.
 - The overline is for meta labels, table heads and drill-down breadcrumbs,
   never a section title.
@@ -159,8 +159,8 @@ Projects, the home, has no sidebar (D24), so its content sits in `HomeColumn`
 inside `Page`: capped and centred, so the table does not stretch across the
 window.
 
-`inset="panel"` is for the configuration-panel screens (User schemas, Login
-flows, Identity providers), whose single card the design insets by 24px on the
+`inset="panel"` is for the configuration-panel screens (Login flows, Identity
+providers, Releases), whose single card the design insets by 24px on the
 sides. It changes the sides only, never the top.
 
 ## Resource list layout — one shell for every list screen
@@ -172,7 +172,9 @@ compose it rather than restating the numbers per screen.
 Every list screen is a table on this shell, User schemas and Login flows
 included (D17; the earlier card of rows broke on narrow widths). A screen
 composes `Page`, `ResourceTitle` (with the Add button as its `action`,
-beside the title at every width, D19), then `ResourceHeaderRow` +
+beside the title at every width, D19, and any list filter as its `filter`,
+beside the action on one 36px row and on its own row under the title on a
+phone), then `ResourceHeaderRow` +
 `ResourceHeadCell`, `ResourceRow`, `ResourceEmptyRow` and `LoadMore`. A
 fractional grid takes `RESOURCE_TABLE_FIXED`, which scrolls the table inside
 its card below 576px rather than squeezing the cells.
@@ -223,8 +225,13 @@ Detail screens come in three compositions, and each has one shell:
   card the design titles by name rather than a section title (Users: the profile,
   under its schema's name) leads with `PanelTitle as="h2"`; the header owns the
   `h1`.
-- **Configuration panel** (User schemas, Login flows): the whole screen is one
-  `DetailPanel` headed by a `PanelTitle` (both in
+- **Resource detail, identity-line header** (User schemas): the resource
+  detail body under `DetailTitle` (`src/components/detail-page.tsx`) instead of
+  `DetailHeader`: the title over one 12/16 line with the id, its copy button
+  and the created date, no icon tile and no header card. The line stacks under
+  `sm`. Each tab is a `DetailSection`.
+- **Configuration panel** (Login flows, Identity providers, Releases): the whole
+  screen is one `DetailPanel` headed by a `PanelTitle` (both in
   `src/components/detail-page.tsx`), inside `<Page inset="panel">`
   (`src/components/layout.tsx`).
 - **Settings** (Profile): a bare title over one card of labelled rows, in a
@@ -234,9 +241,10 @@ Detail screens come in three compositions, and each has one shell:
   holding `Field` rows: 24px inset, 20px block, 16px between rows. No icon tile
   and no header card: a settings screen is not a resource with an id.
 
-The first two share the icon tile (`ICON_PLATE`) and the header card
-(`MetaCard`, holding `MetaValue`s split by `MetaRule`): the resource id,
-copyable, and the created date.
+Resource detail and the configuration panel share the icon tile (`ICON_PLATE`)
+and the header card (`MetaCard`, holding `MetaValue`s split by `MetaRule`): the
+resource id, copyable, and the created date. The identity-line header carries
+the same two values in one line instead.
 
 | Region        | Value                                                 |
 | ------------- | ----------------------------------------------------- |

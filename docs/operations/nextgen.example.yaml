@@ -26,8 +26,17 @@ server:
   console_path: /ui/console
   # Public origin browsers reach this deployment at; feeds the claim and
   # dashboard URLs. Set to http://localhost:8080 when running the server
-  # locally by hand (env: NEXTGEN_SERVER_PUBLIC_BASE).
+  # locally by hand (env: NEXTGEN_SERVER_PUBLIC_BASE). With platform bootstrap
+  # on, it is the platform project's one primary origin, so servers sharing a
+  # database need the same value.
   public_base: https://nextgen.zitadel.cloud
+  # Other origins the console is reached at, beside public_base's, such as
+  # another hostname in front of this deployment. Like public_base's, they may
+  # open any project's flow to preview its login; signing in to the platform
+  # project works only at public_base
+  # (env: NEXTGEN_SERVER_CONSOLE_ORIGINS, comma separated).
+  # console_origins:
+  #   - https://console.example.com
 
 # Optional. When omitted, the server uses SQLite at <data_dir>/zitadel.db.
 # Configure exactly one dialect to override the default:
@@ -41,8 +50,8 @@ server:
 password_hasher:
   # Algorithm used to hash new passwords/secrets. Defaults to argon2id
   # (RFC 9106). Existing hashes made with any of the verifiers below still
-  # validate and are transparently rehashed to the hasher algorithm on the
-  # next successful verification.
+  # validate. The next successful sign-in rehashes them to the project's
+  # method, or to this one when the project chose none.
   hasher:
     algorithm: argon2id
     # RFC 9106 second recommended option.

@@ -50,10 +50,11 @@ ALTER TABLE projects ADD COLUMN origins STRING(MAX)
 UPDATE projects AS p
 SET origins = COALESCE(
     (
-        SELECT TO_JSON_STRING(ARRAY_AGG(
-            JSON_OBJECT('pattern', o.pattern, 'kind', o.kind)
-            ORDER BY o.created_at, o.pattern
-        ))
+        -- Joined by hand: the emulator's TO_JSON_STRING takes no arrays.
+        SELECT CONCAT('[', STRING_AGG(
+            TO_JSON_STRING(JSON_OBJECT('pattern', o.pattern, 'kind', o.kind)),
+            ',' ORDER BY o.created_at, o.pattern
+        ), ']')
         FROM project_origins AS o
         WHERE o.project_id = p.id
     ),

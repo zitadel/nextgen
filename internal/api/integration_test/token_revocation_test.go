@@ -25,9 +25,9 @@ func getMyUserStatus(t *testing.T, sessionToken string) (int, string) {
 	t.Helper()
 
 	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet,
-		harness.EnsureTestServer(t).URL+"/users/me", nil)
+		harness.APIBaseURL(t)+"/users/me", nil)
 	require.NoError(t, err)
-	req.AddCookie(&http.Cookie{Name: "__nextgen_session", Value: sessionToken})
+	req.AddCookie(&http.Cookie{Name: "__Host-zitadel_session", Value: sessionToken})
 
 	resp, err := harness.EnsureHttpClient(t).Do(req)
 	require.NoError(t, err)

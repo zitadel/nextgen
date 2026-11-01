@@ -167,7 +167,9 @@ export abstract class AbstractRulePatcher implements Patcher {
         statuses.push(
           typeof verdict === "string"
             ? { path, wiring: op.wiring, state: verdict }
-            : { path, wiring: op.wiring, state: "unknown", reason: verdict.unknown },
+            : "outdated" in verdict
+              ? { path, wiring: op.wiring, state: "outdated", reason: verdict.outdated }
+              : { path, wiring: op.wiring, state: "unknown", reason: verdict.unknown },
         );
       } catch (error) {
         statuses.push({

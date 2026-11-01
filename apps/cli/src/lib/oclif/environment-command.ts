@@ -138,8 +138,8 @@ export abstract class EnvironmentCommand extends BaseCommand {
    * terminal: on a pipe the result travels alone, and `--json` silences them
    * either way. `quiet` is for a command whose own output is that summary.
    *
-   * `verbatim` is for a caller that stores or compares what it reads (see
-   * `SanitizeOptions`).
+   * `verbatim` is for a caller that stores, compares or sends back what it
+   * reads (see `SanitizeOptions`).
    * `prompt: false` is for a best-effort probe that must never stop to ask
    * (or write `.env.<name>.local`): a missing value then fails as it would
    * non-interactively.
@@ -174,5 +174,37 @@ export abstract class EnvironmentCommand extends BaseCommand {
       server,
       environment,
     };
+  }
+}
+
+/**
+ * A command that runs in a pull-request build and talks to the project with one
+ * credential, never falling back to the other: a missing one fails and names
+ * the variable. The `preview` command adds the `--origin`/`--ttl` flag bag
+ * itself; `preview list` and `preview rm` extend this for the credential alone.
+ *
+ * The reach the credential carries — the release/deployment/preview operations
+ * these commands make — is granted and enforced by the server, not by the CLI:
+ * the CLI only chooses which token to present.
+ *
+ * Which one that is, is {@link PREVIEW_CREDENTIAL}: the project secret for now,
+ * because the server does not accept the narrower preview token yet (#1575).
+ * Every message naming the variable derives it from there, so moving back to
+ * `preview` is this one constant.
+ */
+export const PREVIEW_CREDENTIAL: CredentialKind = "project";
+
+export abstract class PreviewCommand extends EnvironmentCommand {
+  static override credential: CredentialKind = PREVIEW_CREDENTIAL;
+
+  /**
+   * Never prompts: a pull-request build has no one to ask, and a missing
+   * value, the preview token above all, fails naming the variable rather
+   * than being typed in and saved to `.env.<name>.local`.
+   */
+  protected override connect(
+    options: { verbatim?: boolean; quiet?: boolean; prompt?: boolean } = {},
+  ): Promise<Connection> {
+    return super.connect({ ...options, prompt: false });
   }
 }

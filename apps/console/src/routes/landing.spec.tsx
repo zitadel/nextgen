@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { _setRuntimeForTesting } from "../runtime/runtime";
 import { server } from "@/test/msw";
+import { createAppRouter } from "../router";
 
 // The `_authed` layout guards every screen behind `GET /sessions/me`
 // (Console ADR 0003); mock the auth module so routes render as signed in.
@@ -16,7 +17,6 @@ vi.mock("@/auth/session", async (importOriginal) => {
 });
 
 async function renderAt(path: string) {
-  const { createAppRouter } = await import("../router");
   const router = createAppRouter({ history: createMemoryHistory({ initialEntries: [path] }) });
   render(<RouterProvider router={router} />);
   return router;
@@ -47,10 +47,10 @@ describe("landing routes", () => {
   it("lands on Users in the only project the person can act on", async () => {
     const userQueries: string[] = [];
     server.use(
-      http.get("http://localhost/api/users/me/projects", () =>
+      http.get("http://localhost/api/v1/users/me/projects", () =>
         HttpResponse.json({ projects: [project("proj_1", "Acme")] }),
       ),
-      http.post("http://localhost/api/users/query", ({ request }) => {
+      http.post("http://localhost/api/v1/users/query", ({ request }) => {
         userQueries.push(new URL(request.url).searchParams.get("project_id") ?? "");
         return HttpResponse.json({ users: [] });
       }),
@@ -65,7 +65,7 @@ describe("landing routes", () => {
 
   it("lands on Projects when there are several to choose from", async () => {
     server.use(
-      http.get("http://localhost/api/users/me/projects", () =>
+      http.get("http://localhost/api/v1/users/me/projects", () =>
         HttpResponse.json({ projects: [project("proj_1", "Acme"), project("proj_2", "Globex")] }),
       ),
     );
@@ -83,21 +83,21 @@ describe("landing routes", () => {
     // A link shared before the selection was part of the URL: several projects
     // to choose from, so the guard asks, and choosing one ends on the link.
     server.use(
-      http.get("http://localhost/api/users/me/projects", () =>
+      http.get("http://localhost/api/v1/users/me/projects", () =>
         HttpResponse.json({ projects: [project("proj_1", "Acme"), project("proj_2", "Globex")] }),
       ),
       // The link's own screen, once it is reached.
-      http.get("http://localhost/api/users/usr_1", () =>
+      http.get("http://localhost/api/v1/users/usr_1", () =>
         HttpResponse.json({ id: "usr_1", schema: "sch_1", attributes: {}, metadata: {} }),
       ),
-      http.get("http://localhost/api/users/usr_1/passkeys", () =>
+      http.get("http://localhost/api/v1/users/usr_1/passkeys", () =>
         HttpResponse.json({ passkeys: [] }),
       ),
-      http.get("http://localhost/api/users/usr_1/identity_links", () =>
+      http.get("http://localhost/api/v1/users/usr_1/identity_links", () =>
         HttpResponse.json({ identity_links: [] }),
       ),
-      http.get("http://localhost/api/users/usr_1/password", () => HttpResponse.json({})),
-      http.get("http://localhost/api/schemas/sch_1", () =>
+      http.get("http://localhost/api/v1/users/usr_1/password", () => HttpResponse.json({})),
+      http.get("http://localhost/api/v1/schemas/sch_1", () =>
         HttpResponse.json({ id: "sch_1", schema: { properties: {} }, metadata: {} }),
       ),
     );
@@ -114,7 +114,7 @@ describe("landing routes", () => {
   it("selects the only project on an unscoped screen too", async () => {
     // `/projects` opened directly agrees with `/`: one project, so it is selected.
     server.use(
-      http.get("http://localhost/api/users/me/projects", () =>
+      http.get("http://localhost/api/v1/users/me/projects", () =>
         HttpResponse.json({ projects: [project("proj_1", "Acme")] }),
       ),
     );
@@ -131,14 +131,14 @@ describe("landing routes", () => {
     // switcher share one unpaged read. System is a screen with both.
     let unpaged = 0;
     server.use(
-      http.get("http://localhost/api/users/me/projects", ({ request }) => {
+      http.get("http://localhost/api/v1/users/me/projects", ({ request }) => {
         if (!new URL(request.url).searchParams.has("limit")) unpaged += 1;
         return HttpResponse.json({
           projects: [project("proj_1", "Acme"), project("proj_2", "Globex")],
         });
       }),
     );
-    server.use(http.get("*/api/readyz", () => HttpResponse.text("ok")));
+    server.use(http.get("*/api/v1/readyz", () => HttpResponse.text("ok")));
     await renderAt("/system");
 
     const pill = await screen.findByRole("button", { name: "Switch project" });
@@ -152,10 +152,10 @@ describe("landing routes", () => {
     // their project is the default.
     _setRuntimeForTesting({ mode: "standalone", console_project_id: "proj_platform" });
     server.use(
-      http.get("http://localhost/api/users/me/projects", () =>
+      http.get("http://localhost/api/v1/users/me/projects", () =>
         HttpResponse.json({ projects: [project("proj_1", "Acme")] }),
       ),
-      http.post("http://localhost/api/users/query", () => HttpResponse.json({ users: [] })),
+      http.post("http://localhost/api/v1/users/query", () => HttpResponse.json({ users: [] })),
     );
     const router = await renderAt("/");
 
@@ -165,7 +165,7 @@ describe("landing routes", () => {
 
   it("does not take one listed project as the only one while more pages follow", async () => {
     server.use(
-      http.get("http://localhost/api/users/me/projects", () =>
+      http.get("http://localhost/api/v1/users/me/projects", () =>
         HttpResponse.json({ projects: [project("proj_1", "Acme")], next_page_token: "page_2" }),
       ),
     );
@@ -180,7 +180,9 @@ describe("landing routes", () => {
     // platform project, and every screen in it would refuse this person.
     _setRuntimeForTesting({ mode: "standalone", console_project_id: "proj_platform" });
     server.use(
-      http.get("http://localhost/api/users/me/projects", () => HttpResponse.json({ projects: [] })),
+      http.get("http://localhost/api/v1/users/me/projects", () =>
+        HttpResponse.json({ projects: [] }),
+      ),
     );
     const router = await renderAt("/");
 
@@ -191,7 +193,7 @@ describe("landing routes", () => {
 
   it("selects nothing when the person's projects cannot be read", async () => {
     server.use(
-      http.get("http://localhost/api/users/me/projects", ({ request }) =>
+      http.get("http://localhost/api/v1/users/me/projects", ({ request }) =>
         new URL(request.url).searchParams.has("limit")
           ? HttpResponse.json({ projects: [] })
           : HttpResponse.json({ code: "internal" }, { status: 500 }),
@@ -207,7 +209,7 @@ describe("landing routes", () => {
     // Settings has no landing page of its own; the account dropdown's target
     // forwards to the profile, its only screen.
     server.use(
-      http.get("http://localhost/api/users/me", () =>
+      http.get("http://localhost/api/v1/users/me", () =>
         HttpResponse.json({ id: "user_1", attributes: { email: "maya@example.com" } }),
       ),
     );

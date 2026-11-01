@@ -613,6 +613,44 @@ describe("<zitadel-login> against the typed Flow API", () => {
     }
   });
 
+  it("reports a failed handoff exchange without navigating or showing the signed-in screen", async () => {
+    const assign = vi.fn();
+    const { location } = window;
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...location, assign },
+    });
+
+    try {
+      mock.failNextExchange();
+      const element = document.createElement("zitadel-login") as ZitadelLogin;
+      element.purpose = "login";
+      element.project = testProject;
+      element.postSignInUrl = "/admin";
+      const failed = vi.fn();
+      element.addEventListener("zitadel-flow-error", failed);
+      host.appendChild(element);
+      await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
+
+      await advanceMockLoginFlow(element);
+
+      await waitFor(() => (failed.mock.calls.length > 0 ? failed : null));
+      await element.updateComplete;
+      expect(failed).toHaveBeenCalledOnce();
+      expect(assign).not.toHaveBeenCalled();
+      expect(element.shadowRoot?.querySelector("zl-alert")?.textContent).toContain(
+        "Session exchange is temporarily unavailable.",
+      );
+      expect(element.shadowRoot?.textContent).not.toContain("You're signed in");
+      expect(element.getAttribute("aria-busy")).toBe("false");
+    } finally {
+      Object.defineProperty(window, "location", {
+        configurable: true,
+        value: location,
+      });
+    }
+  });
+
   it.each([
     [
       "the protected route the page's next names",
@@ -1567,43 +1605,6 @@ describe("<zitadel-login> against the typed Flow API", () => {
     expect(email?.invalid).toBe(false);
     // The untouched field keeps its inline error until it is edited too.
     expect(password?.invalid).toBe(true);
-  });
-
-  it("says why sign-in moved to sign-up, and names the purpose in the step event", async () => {
-    const element = await mount(host);
-    const steps: unknown[] = [];
-    element.addEventListener("zitadel-flow-step", (event) => {
-      steps.push((event as CustomEvent<{ step: unknown }>).detail.step);
-    });
-    server.use(
-      http.post("*/flow/*/submit", () =>
-        HttpResponse.json({
-          id: "flow_test",
-          session_token: "st_test",
-          step: {
-            name: "register",
-            texts: { title_key: "register.title" },
-            purpose: "register",
-            notice: "notice.user_not_found",
-            fields: [
-              { name: "email", type: "email", text_key: "register.field.email", required: true },
-            ],
-            actions: [{ name: "submit", text_key: "register.action.password", primary: true }],
-            gates: {},
-          },
-          branding: {},
-        }),
-      ),
-    );
-
-    submit(element);
-
-    const notice = await waitFor(() =>
-      element.shadowRoot?.querySelector<ZlAlert>("zl-alert[data-zl-step-message]"),
-    );
-    expect(notice.severity).toBe("info");
-    expect(notice.textContent).toContain("We couldn't find an account for that email");
-    expect(steps.at(-1)).toMatchObject({ name: "register", purpose: "register" });
   });
 
   it("does not resurrect a dismissed banner during the loading re-render", async () => {

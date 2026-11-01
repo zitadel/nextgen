@@ -4,9 +4,20 @@ import { describe, expect, it } from "vitest";
 
 import { useLocalServers } from "../helpers/local-server";
 import { usePlatformMock } from "../helpers/platform";
-import { aNewAppDirectory, anApp, type ScaffoldedApp, PASSWORD_POLICY } from "../helpers/project";
+import {
+  aMissingAppDirectory,
+  aNewAppDirectory,
+  anApp,
+  type ScaffoldedApp,
+  PASSWORD_POLICY,
+} from "../helpers/project";
 
 const platform = usePlatformMock();
+
+/** The part of setup's envelope that says what it committed and published. */
+type SetupGitData = {
+  git: { initialized: boolean; commit: string | null };
+};
 useLocalServers();
 
 const SOCIAL_CREDENTIALS = {
@@ -102,6 +113,176 @@ describe("setup", () => {
 
   describe("against a valid server", () => {
     describe("--json", () => {
+      it("deploys what it wrote, so the first sign-in is served a release", async () => {
+        const app = await anApp();
+
+        await app.setup();
+
+        expect(await app.liveDeploymentCount()).toBe(1);
+      });
+
+      it("names the deploy that publishes an edit", async () => {
+        const app = await anApp();
+
+        const result = await app.setup();
+
+        expect(
+          app.envelopeOf<{ next_actions: string[] }>(result).data.next_actions.join("\n"),
+        ).toContain("deploy -m '<what changed>'");
+      });
+
+      it("says an edit takes effect once it is deployed", async () => {
+        const app = await anApp();
+
+        const result = await app.setup();
+
+        expect(
+          app.envelopeOf<{ next_actions: string[] }>(result).data.next_actions.join("\n"),
+        ).toContain("serves only what is deployed");
+      });
+
+      it("reports the commit it made", async () => {
+        const app = await anApp();
+
+        const result = await app.setup();
+
+        expect(app.envelopeOf<SetupGitData>(result).data.git).toMatchObject({
+          initialized: true,
+          commit: expect.stringMatching(/^[0-9a-f]{40}$/),
+        });
+      });
+
+      it("reports the repository it created when it could not commit", async () => {
+        const app = await anApp();
+
+        const result = await app.setupWithGitThatCannotCommit();
+
+        expect(app.envelopeOf<SetupGitData>(result).data.git).toEqual({
+          initialized: true,
+          commit: null,
+        });
+      });
+
+      it("warns that it could not commit and left a new repository", async () => {
+        const app = await anApp();
+
+        const result = await app.setupWithGitThatCannotCommit();
+
+        expect(app.envelopeOf(result).warnings?.join("\n")).toContain(
+          "Setup created a new, empty git repository here.",
+        );
+      });
+
+      it("keeps the project secret it wrote out of the commit it makes", async () => {
+        const app = await anApp();
+
+        await app.setup();
+
+        expect(await app.trackedFiles()).not.toContain(".zitadel/secret");
+      });
+
+      it.each([".env.development.local", ".env.local", ".env"])(
+        "keeps %s out of the commit it makes",
+        async (name) => {
+          const app = await anApp();
+
+          await app.setup();
+
+          expect(await app.trackedFiles()).not.toContain(name);
+        },
+      );
+
+      it("commits the configuration it wrote, which the release is built from", async () => {
+        const app = await anApp();
+
+        await app.setup();
+
+        expect(await app.trackedFiles()).toContain(".zitadel/schemas/default-human-user.json");
+      });
+
+      it("adds one commit on top of an existing repository's history", async () => {
+        const app = await anApp();
+        await app.underVersionControl();
+
+        await app.setup();
+
+        expect(await app.commitSubjects()).toHaveLength(2);
+      });
+
+      it("reports that it committed without having made the repository", async () => {
+        const app = await anApp();
+        await app.underVersionControl();
+
+        const result = await app.setup();
+
+        expect(app.envelopeOf<SetupGitData>(result).data.git).toMatchObject({
+          initialized: false,
+          commit: expect.stringMatching(/^[0-9a-f]{40}$/),
+        });
+      });
+
+      it("refuses a repository with uncommitted work", async () => {
+        const app = await anApp();
+        await app.underVersionControl();
+        await app.withUncommittedWork();
+
+        const result = await app.setup();
+
+        expect(result).toFailWith("E_CONFLICT");
+      });
+
+      it("refuses a detached HEAD, where its commit would be on no branch", async () => {
+        const app = await anApp();
+        await app.underVersionControl();
+        await app.onADetachedHead();
+
+        const result = await app.setup();
+
+        expect(result).toFailWith("E_CONFLICT");
+      });
+
+      it("names the untracked file it refused over", async () => {
+        const app = await anApp();
+        await app.underVersionControl();
+        await app.withUncommittedWork();
+
+        const result = await app.setup();
+
+        expect(result).toExplain("untracked file");
+      });
+
+      it("writes nothing into a project it refuses", async () => {
+        const app = await anApp();
+        await app.underVersionControl();
+        await app.withUncommittedWork();
+        const before = await app.snapshot();
+
+        await app.setup();
+
+        expect(await before.changes()).toMatchObject({ added: [], modified: [], removed: [] });
+      });
+
+      it("sets up a dirty repository anyway under --no-git", async () => {
+        const app = await anApp();
+        await app.underVersionControl();
+        await app.withUncommittedWork();
+
+        const result = await app.setup(["--no-git"]);
+
+        expect(result).toSucceed();
+      });
+
+      it("records no commit under --no-git", async () => {
+        const app = await anApp();
+
+        const result = await app.setup(["--no-git"]);
+
+        expect(app.envelopeOf<SetupGitData>(result).data.git).toEqual({
+          initialized: false,
+          commit: null,
+        });
+      });
+
       it("scaffolds the project", async () => {
         const app = await anApp();
         const before = await app.snapshot();
@@ -153,6 +334,14 @@ describe("setup", () => {
       it("creates a new app in the directory start ran in", async () => {
         const app = await aNewAppDirectory();
         await app.startLocalServer();
+
+        const result = await app.setupNewApp();
+
+        expect(result).toSucceed();
+      });
+
+      it("creates a new app in a directory that does not exist yet", async () => {
+        const app = await aMissingAppDirectory();
 
         const result = await app.setupNewApp();
 

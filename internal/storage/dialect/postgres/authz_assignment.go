@@ -75,6 +75,16 @@ SET revoked_at = now(), updated_at = now()
 WHERE project_id = $1 AND id = $2 AND revoked_at IS NULL
 RETURNING revoked_at, updated_at`
 
+	revokeAuthzAssignmentsByPrincipalStmt = `
+UPDATE zitadel_nextgen.authz_assignments
+SET revoked_at = now(), updated_at = now()
+WHERE principal_type = $1 AND principal_id = $2 AND revoked_at IS NULL
+RETURNING id, project_id, catalog_id,
+          principal_type, principal_id, object_type, relation,
+          scope_kind, scope_team_id, scope_resource_id,
+          grantor_type, grantor_id, delegation_id,
+          expires_at, revoked_at, created_at, updated_at`
+
 	// Literal 'project'/'team' so the planner can serve this from the partial
 	// index authz_assignments_one_owning_team; the relation names match
 	// domain.NewClaimTeamAssignment and the seeded system catalog.
@@ -208,6 +218,19 @@ func (s authzAssignmentStatements) RevokeAuthzAssignment(ctx context.Context, pr
 	return wrapError(s.client.QueryRow(ctx, revokeAuthzAssignmentStmt, projectID, id).Scan(&revokedAt, &updatedAt))
 }
 
+// RevokeAuthzAssignmentsByPrincipal implements [service.AuthzAssignmentStatements].
+func (s authzAssignmentStatements) RevokeAuthzAssignmentsByPrincipal(ctx context.Context, principalType domain.AuthzPrincipalType, principalID string) ([]*domain.AuthzAssignment, error) {
+	rows, err := s.client.Query(ctx, revokeAuthzAssignmentsByPrincipalStmt, principalType.String(), principalID)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	assignments, err := pgx.CollectRows(rows, scanAuthzAssignment)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	return assignments, nil
+}
+
 // GetActiveOwningTeamGrant implements [service.AuthzAssignmentStatements].
 func (s authzAssignmentStatements) GetActiveOwningTeamGrant(ctx context.Context, projectID string) (*domain.AuthzAssignment, error) {
 	rows, err := s.client.Query(ctx, getActiveOwningTeamGrantStmt, projectID)
@@ -332,4 +355,36 @@ func (s authzAssignmentStatements) ListProjectAdmins(ctx context.Context, projec
 		return nil, err
 	}
 	return &database.ListResult[*domain.ProjectAdminRecord]{Items: admins, NextCursor: next}, nil
+}
+
+// ListProjectsOwnedThroughMember implements [service.AuthzAssignmentStatements].
+func (s authzAssignmentStatements) ListProjectsOwnedThroughMember(ctx context.Context, userID string) ([]string, error) {
+	return s.listOwnerProjects(ctx, userID, false)
+}
+
+// ListProjectsLosingLastOwner implements [service.AuthzAssignmentStatements].
+func (s authzAssignmentStatements) ListProjectsLosingLastOwner(ctx context.Context, userID string) ([]string, error) {
+	return s.listOwnerProjects(ctx, userID, true)
+}
+
+func (s authzAssignmentStatements) listOwnerProjects(ctx context.Context, userID string, losing bool) ([]string, error) {
+	var c statementCompiler
+	if losing {
+		authz.WriteProjectsLosingLastOwner(&c, postgresAuthzEnv(), userID)
+	} else {
+		authz.WriteProjectsOwnedThroughMember(&c, postgresAuthzEnv(), userID)
+	}
+	rows, err := s.client.Query(ctx, c.String(), c.args...)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	ids, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (string, error) {
+		var id string
+		err := row.Scan(&id)
+		return id, err
+	})
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	return ids, nil
 }

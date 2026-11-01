@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/cli",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "Agent-friendly Zitadel CLI",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/apps/cli#readme",
   "bugs": {
@@ -93,6 +93,9 @@
       "deployment": {
         "description": "Deploy releases and roll them back."
       },
+      "preview": {
+        "description": "Deploy and manage pull-request preview URLs."
+      },
       "variable": {
         "description": "Manage project variables."
       },
@@ -103,13 +106,16 @@
         "description": "View login flows."
       },
       "policies": {
-        "description": "View policies."
+        "description": "View and test policies."
       },
       "env": {
         "description": "Show and bind environments."
       },
       "api": {
         "description": "Call any operation of the Zitadel API."
+      },
+      "skills": {
+        "description": "Give coding agents the Zitadel skills."
       }
     }
   },
@@ -159,6 +165,7 @@
     "@vitest/coverage-v8": "catalog:",
     "@zitadel/api-mock": "workspace:*",
     "@zitadel/sdk-next": "workspace:*",
+    "@zitadel/vitest-config": "workspace:*",
     "msw": "catalog:",
     "oclif": "catalog:",
     "tsdown": "catalog:",

@@ -166,6 +166,7 @@ tracked below.
 | Project create seed `CreateAuthzAssignment` (sk_proj) | `authz.granted` | `admin` | `authz_assignment` | `principal_type`, `principal_id`, `relation` |
 | GrantService create (`CreateAuthzAssignment` for user/team on project.viewer, editor, or admin) | `authz.granted` | `admin` | `authz_assignment` | `principal_type`, `principal_id`, `relation` |
 | GrantService revoke (`RevokeAuthzAssignment`) | `authz.revoked` | `admin` | `authz_assignment` | `principal_type`, `principal_id`, `relation` |
+| `DeleteUserByID` revoking the user's assignments (`RevokeAuthzAssignmentsByPrincipal`; one event per assignment, on its own project) | `authz.revoked` | `admin` | `authz_assignment` | `principal_type`, `principal_id`, `relation` |
 | Startup reconcile of the platform operators configuration (`CreateAuthzAssignment` / `RevokeAuthzAssignment` on the platform operator relation, [ADR 075](../../adrs/075-platform-operators.md)); actor type `system` | `authz.granted`, `authz.revoked` | `admin` | `authz_assignment` | `principal_type`, `principal_id`, `relation` |
 | Set password (`entity_id` / `factor_id` = password row id) | `auth.factor.password.set` | `auth` | `user_password` | `user_id`, `factor_id` |
 | Create passkey (`entity_id` / `factor_id` = credential id) | `auth.factor.passkey.enrolled` | `auth` | `user_passkey` | `user_id`, `factor_id` |
@@ -173,7 +174,9 @@ tracked below.
 **Non-events:** pure reads; RSI upserts as create side-effects; crypto/catalog
 internals without a product mutate API; signal category deferred until ADR 019
 writers exist; issuing a challenge or an sso state record (`IssueChallenge`,
-`IssueSSOState`), which mints the `check_id` the outcome event then carries.
+`IssueSSOState`), which mints the `check_id` the outcome event then carries;
+storing the rehash of an outdated password hash on sign-in, which rewrites the
+existing password row in place.
 
 ## Retired
 

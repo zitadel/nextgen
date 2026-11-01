@@ -2,6 +2,7 @@ import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import * as endpoints from "@zitadel/api/generated/endpoints/zitadelNextGen";
+import { API_PREFIX } from "@zitadel/api/runtime/base-url";
 import { describe, expect, it } from "vitest";
 
 import { RESOURCES } from "../../../src/commands/resources";
@@ -114,11 +115,13 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
   // listing (`idps revisions <id>`) and inventing verbs for one resource is
   // what ADR 064 §4 rules out, so these wait for that shape to be decided.
   listIdpRevisions: "sub-resource listing; the CLI has no grammar for it yet (ADR 063)",
-  // Policies are written from .zitadel/policies/ by `apply` (ADR 066).
-  publishPolicy: "configuration: `apply` publishes .zitadel/policies/ through the policy syncer",
+  // Policies are written from .zitadel/policies/ by `deploy` (ADR 066).
+  publishPolicy: "configuration: `deploy` publishes .zitadel/policies/ in the release bundle",
   listPolicyRevisions: "sub-resource listing; same grammar question as `listIdpRevisions`",
   getPolicyRevision: "reads one revision by revision id; same shape question as above",
   getIdpRevisionById: "reads one revision by revision id; same shape question as above",
+  evaluatePolicy:
+    "a dry run `policies test` sends per case from lib/policies/tests.ts; no registry verb evaluates",
 
   // Known gaps, recorded rather than hidden. These are additive and tracked as
   // a follow-up; they are listed here so adding one is a deliberate act.
@@ -143,12 +146,13 @@ type ClientOperations = ReadonlyMap<string, string>;
  * arguments and taking the first path segment, so a sub-resource
  * (`/users/{id}/passkeys`) counts against its parent.
  */
-/** The path an operation addresses, with placeholder path parameters. */
+/** The spec's path of an operation, with placeholder path parameters and without the API prefix. */
 const urlOf = (operation: string): string => {
   const module = endpoints as unknown as Record<string, unknown>;
   const build = module[`get${capitalize(operation)}Url`];
   expect(typeof build, `no URL builder paired with ${operation}`).toBe("function");
-  return String((build as (...args: unknown[]) => string)("ID", "NAME")).replace(/\?.*$/, "");
+  const url = String((build as (...args: unknown[]) => string)("ID", "NAME")).replace(/\?.*$/, "");
+  return url.startsWith(`${API_PREFIX}/`) ? url.slice(API_PREFIX.length) : url;
 };
 
 const clientOperations = (): ClientOperations => {
@@ -198,6 +202,11 @@ const STANDALONE: Readonly<Record<string, readonly string[]>> = {
   // rollback` re-applies one. The operations live in the `lib/release` wrappers
   // these commands call, which {@link standaloneOperations} scans too.
   deployments: ["deployment/create", "deployment/list", "deployment/get", "deployment/rollback"],
+  // A preview is written by a preview deployment, not created directly: `preview`
+  // deploys to the preview URLs, `preview list` reads the live ones and
+  // `preview rm` removes one. `preview` reaches the release/deployment
+  // operations through the `lib/release` wrappers scanned above.
+  previews: ["preview/index", "preview/list", "preview/rm"],
 };
 
 /**
@@ -222,8 +231,12 @@ const PIPELINE_SOURCES: readonly string[] = [
  * commands reach their operations through the pipeline modules above.
  */
 const standaloneCommandOperations = async (): Promise<ReadonlyMap<string, ReadonlySet<string>>> => {
-  const callsIn = async (path: string): Promise<string[]> =>
-    [...(await readFile(path, "utf8")).matchAll(/\bclient\.(\w+)\(/g)].map((m) => m[1] as string);
+  const callsIn = async (path: string): Promise<string[]> => {
+    const source = await readFile(path, "utf8");
+    return [...source.matchAll(/\bclient\.(\w+)(?:\.(?:all|items|pages))?\(/g)].map(
+      (m) => m[1] as string,
+    );
+  };
   const pipeline = (
     await Promise.all(
       PIPELINE_SOURCES.map((file) => callsIn(join(import.meta.dirname, "../../../src", file))),
@@ -423,6 +436,9 @@ describe("the CLI covers the API client", () => {
  * entry cannot outlive the sharing that justifies it.
  */
 const SHARES_OPERATION: Readonly<Record<string, string>> = {
+  // Reads the project to resolve the preview URLs it deploys to; the deploy
+  // itself is `POST /deployments`, which names `deployment create`.
+  "preview index": "projects get",
   // Builds a release from `.zitadel/` exactly as `deploy` does, without
   // deploying it, so `POST /releases/build` names `deploy`.
   "release create": "deploy",

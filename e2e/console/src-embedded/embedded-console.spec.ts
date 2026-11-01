@@ -1,6 +1,7 @@
 import { expect, test } from "@zitadel/testing/playwright";
 
 import { withErrorBody } from "../support/api";
+import { recordPolicyViolations } from "../support/policy";
 import { openAddTeam, uniqueName } from "../support/screens";
 import { EMBEDDED_LOGIN_URL, signIn } from "../support/sign-in";
 
@@ -10,10 +11,10 @@ import { EMBEDDED_LOGIN_URL, signIn } from "../support/sign-in";
  * Everything here is ordinary console behaviour that the other two suites
  * already appear to cover. The difference is the server: this one is the
  * built binary, serving the SPA out of `internal/staticui/console` and the
- * ogen API at the origin root, with no proxy in between. That makes the
+ * ogen API under `/api/v1`, with no proxy in between. That makes the
  * console's API base a real claim about a real routing table instead of a
- * string nobody checks — the claim that shipped wrong, as `/api/*` against a
- * mux that serves `/ui/console`, `/console/runtime.json`, `/`.
+ * string nobody checks — the claim that once shipped wrong, as `/api/*`
+ * against a mux that served the API at the root.
  *
  * Keep the assertions here about *reaching the API*. Console features belong
  * in `src-real/`, which runs the same screens through the Vite dev proxy.
@@ -21,6 +22,9 @@ import { EMBEDDED_LOGIN_URL, signIn } from "../support/sign-in";
 
 test("signs in end to end against the embedded API", async ({ page, seed }) => {
   const user = await seed.user();
+  // The binary sends the console's policies with every page of it; the
+  // sign-in and the shell break neither.
+  const violations = await recordPolicyViolations(page);
 
   await page.goto("/ui/console/");
 
@@ -30,8 +34,8 @@ test("signs in end to end against the embedded API", async ({ page, seed }) => {
   // nothing. The widget below is what needs a live API.
   await expect(page).toHaveURL(/\/ui\/console\/login$/);
 
-  // `POST /flow` — the first call whose result is visible on screen. With the
-  // wrong base the widget renders "POST /api/flow returned 404" here.
+  // `POST /api/v1/flow` — the first call whose result is visible on screen.
+  // With a wrong base the widget renders "POST … returned 404" here.
   await expect(page.getByLabel("Email")).toBeVisible();
   await page.getByLabel("Email").fill(user.email);
   await page.getByRole("button", { name: "Continue", exact: true }).click();
@@ -41,12 +45,12 @@ test("signs in end to end against the embedded API", async ({ page, seed }) => {
   // Registered before the terminal click, because the call fires as soon as
   // the console boots on the other side of the navigation.
   const myProjects = page.waitForResponse(
-    (response) => new URL(response.url()).pathname === "/users/me/projects",
+    (response) => new URL(response.url()).pathname === "/api/v1/users/me/projects",
   );
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
 
   // Terminal step → `POST /sessions/exchange` with the runtime-discovered
-  // publishable key → `__nextgen_session` cookie → full-document navigation
+  // publishable key → session cookie → full-document navigation
   // back into the console, where the guard's `GET /sessions/me` now answers
   // 200. Four more calls that only resolve if the base is right.
   await page.waitForURL((url) => !url.pathname.endsWith("/login"));
@@ -66,6 +70,7 @@ test("signs in end to end against the embedded API", async ({ page, seed }) => {
   await expect(page.getByRole("button", { name: /^Account:/ })).toBeVisible();
   await expect(page.getByRole("navigation", { name: "Primary" })).toHaveCount(0);
   await expect(page.getByText("No projects yet.")).toBeVisible();
+  expect(violations, "policy violations").toEqual([]);
 });
 
 test("manages the project with the session cookie alone", async ({ page, seed, zitadel }) => {
@@ -86,7 +91,8 @@ test("manages the project with the session cookie alone", async ({ page, seed, z
   await addTeam.name.fill(name);
   const created = page.waitForResponse(
     (response) =>
-      new URL(response.url()).pathname === "/teams" && response.request().method() === "POST",
+      new URL(response.url()).pathname === "/api/v1/teams" &&
+      response.request().method() === "POST",
   );
   await addTeam.submit.click();
   expect((await created).status()).toBe(201);
@@ -123,22 +129,28 @@ test("shows each user's team on the Users screen with the session cookie", async
   await expect(row.getByText(team.name, { exact: true })).toBeVisible();
 });
 
-test("targets the origin root, never an /api prefix", async ({ page }) => {
-  const apiPrefixed: string[] = [];
+test("calls the API only under /api/v1", async ({ page, baseURL }) => {
+  const server = new URL(baseURL ?? "http://localhost").origin;
+  const outside: string[] = [];
   page.on("request", (request) => {
-    const { pathname } = new URL(request.url());
-    if (pathname === "/api" || pathname.startsWith("/api/")) {
-      apiPrefixed.push(`${request.method()} ${pathname}`);
+    const url = new URL(request.url());
+    if (
+      url.origin === server &&
+      ["fetch", "xhr"].includes(request.resourceType()) &&
+      url.pathname !== "/console/runtime.json" &&
+      !url.pathname.startsWith("/api/v1/")
+    ) {
+      outside.push(`${request.method()} ${url.pathname}`);
     }
   });
 
   await page.goto("/ui/console/");
   await expect(page.getByLabel("Email")).toBeVisible();
 
-  // The dev proxy's path, and the only base the binary has never served.
-  // Asserted on the request side so the failure names what was called rather
-  // than leaving a rendered 404 to be interpreted.
-  expect(apiPrefixed).toEqual([]);
+  // Until 1.0.0 the root answers the API's paths too (ADR 077), so a call
+  // there would work and only this notices it. Asserted on the request side
+  // so the failure names what was called.
+  expect(outside).toEqual([]);
 });
 
 test("serves the runtime document the console bootstraps from", async ({ page, zitadel }) => {

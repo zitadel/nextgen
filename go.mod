@@ -13,7 +13,7 @@ require (
 	github.com/go-faker/faker/v4 v4.7.0
 	github.com/go-faster/errors v0.7.1
 	github.com/go-faster/jx v1.2.0
-	github.com/go-jose/go-jose/v4 v4.1.4
+	github.com/go-jose/go-jose/v4 v4.1.6
 	github.com/go-webauthn/webauthn v0.17.3
 	github.com/google/uuid v1.6.0
 	github.com/googleapis/go-sql-spanner v1.25.1
@@ -61,6 +61,7 @@ require (
 	golang.org/x/crypto v0.57.0
 	golang.org/x/exp v0.0.0-20260410095643-746e56fc9e2f
 	golang.org/x/oauth2 v0.36.0
+	golang.org/x/sync v0.23.0
 	golang.org/x/text v0.42.0
 	golang.org/x/tools v0.49.0
 	google.golang.org/api v0.280.0
@@ -196,7 +197,6 @@ require (
 	go.uber.org/zap v1.27.1 // indirect
 	golang.org/x/mod v0.41.0 // indirect
 	golang.org/x/net v0.60.0 // indirect
-	golang.org/x/sync v0.23.0 // indirect
 	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
 	google.golang.org/genproto v0.0.0-20260519071638-aa98bba5eb94 // indirect

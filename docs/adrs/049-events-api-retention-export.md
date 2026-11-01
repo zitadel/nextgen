@@ -5,6 +5,15 @@
 > **Context:** Operator and integrator access to the wide event audit stream
 > **Builds on:** [ADR 048](048-wide-events-internal-audit-primitive.md), [ADR 027](027-cursor-based-pagination.md), [ADR 033](033-internal-permission-management.md), [ADR 036](036-api-credential-planes.md), [ADR 046](046-claim-lifecycle-v2.md), [ADR 047](047-dialect-id-generation.md)
 > **Related:** [resource-map](../design/api/resource-map.md)
+>
+> **Amendment (2026-10-27):** §2's purge can run on a scheduler's request
+> instead of on the server's own timer, and it runs as the server's role, not
+> a dedicated one. See
+> [the amendment](#amendment-2026-10-27-who-starts-the-purge-and-as-which-role).
+>
+> **Amendment (2026-10-30):** §3's shipper and §1's ascending pages list only
+> settled events, so no cursor skips an event whose transaction commits late.
+> See [the amendment](#amendment-2026-10-30-no-cursor-skips-a-late-commit).
 
 ## Context
 
@@ -297,6 +306,9 @@ flowchart LR
 
 - At-least-once delivery within the retention window. Consumers must be
   **idempotent** on `event.id`.
+- No event is skipped: the shipper lists only settled events, so one whose
+  transaction commits late still ships
+  ([amendment 2026-10-30](#amendment-2026-10-30-no-cursor-skips-a-late-commit)).
 - Shipper retries on transient failure without advancing the cursor.
 - Duplicate external delivery is acceptable (crash between deliver and upsert);
   missing delivery after retention purge is accepted (metric
@@ -397,3 +409,95 @@ Per [ADR 046](046-claim-lifecycle-v2.md) and
 | [036 API Credential Planes](036-api-credential-planes.md) | `/events` is operator/confidential-plane |
 | [046 Claim Lifecycle v2](046-claim-lifecycle-v2.md) | Pre-claim: store always; visibility/export gated until claim |
 | [047 Dialect-Owned ID Generation](047-dialect-id-generation.md) | Event and sink managed ids |
+
+## Amendment (2026-10-27): who starts the purge, and as which role
+
+§2's background job runs in the server's process: one purge as the server
+starts, then one every `events.retention.interval`. That fits a server that
+runs until it is stopped. A server that runs only while it serves a request,
+as a Vercel function does, cannot keep a timer: its purge starts at a cold
+start, outside the request that started the instance, and its hourly runs
+happen only while an instance is up. On the hosted cloud those runs failed
+while connecting to the database.
+
+**Trigger.** `events.retention.trigger_secret` hands the schedule to a
+scheduler outside the process.
+
+- Unset, the default, a server purges on its own timer as before.
+- Set, the server keeps no timer. Each `GET` or `POST` to
+  `/cron/events-retention` that carries the secret as a bearer token runs one
+  purge; any other request to the path gets 401.
+- A run is the same purge: it deletes what is older than the window. A missed
+  run leaves its events to the next, and a second run at the same time
+  deletes what the first left, or nothing; within one process, runs wait for
+  each other.
+- The path is the operator's, not the API's: it is not in the OpenAPI
+  document and takes no API credential.
+- The hosted cloud calls it hourly from a Vercel Cron Job in `vercel.json`,
+  which sends the project's `CRON_SECRET` as the bearer token; the launcher
+  makes it the trigger secret ([runbook](../runbooks/cloud.md#operating)).
+
+[ADR 065](065-background-jobs.md) proposes moving the purge onto an in-process
+job loop with no HTTP surface. On such a platform that loop needs a trigger
+like this one.
+
+**Role.** §2 gives the purge a dedicated role with `DELETE` on `events` and
+the application none. No deployment has one: the server opens one pool and
+purges through it, as the server's role. On the hosted cloud that role
+inherits `pg_write_all_data`, so it may delete from every table. A dedicated
+role needs a second connection for the purge and an application role with
+grants of its own in place of `pg_write_all_data`. Until a deployment needs
+that, the code holds the line: one statement deletes events,
+`DeleteEventsOlderThan`, and only the purge calls it.
+
+## Amendment (2026-10-30): no cursor skips a late commit
+
+§3's shipper reads `(created_at, id) > cursor`, and so does every page of
+`GET /events?order=asc` after the first. Such a reader skips an event for good
+when the event commits after the reader has moved past it. On Postgres
+`created_at` was `now()`, the start of the transaction, so a transaction that
+began first and committed last left its events behind cursors that had already
+passed later ones. Path B events commit with their mutation
+([ADR 048](048-wide-events-internal-audit-primitive.md)), so any slow mutation
+could do it, and sinks missed those events without a trace.
+
+**Guarantee.** Forward readers list only *settled* events: those no open
+transaction can still commit an event before. The shipper delivers every event
+committed within the retention window, in `(created_at, id)` order within a
+project. Delivery stays at least once, since a crash between delivery and the
+cursor upsert repeats events, so consumers still drop duplicates by `id`.
+Paging `GET /events?order=asc` forward returns every committed event once.
+
+**Cost.** An event is listed once every transaction that may still commit an
+earlier event of its project has ended. A transaction that stays open holds
+back its own project's export and ascending lists, never another project's,
+and never makes a reader skip. Descending lists are not bounded: nothing reads
+them as a feed.
+
+| Dialect | `created_at` | Settled events |
+|---|---|---|
+| Postgres | `clock_timestamp()` at the insert, which first takes a shared advisory lock keyed by the project and the current second; the transaction holds it until it ends | Those before the oldest second from which a writer of the project still holds a lock, read from `pg_locks` before the list |
+| Spanner | The commit timestamp (`allow_commit_timestamp`) | All: a strong read sees every event up to its timestamp, and a later commit sorts after them |
+| SQLite | The clock, raised past every event already stored in the project; the one writer holds its lock from the stamp to the commit | All |
+
+`EventsSettledBefore` returns the bound; `ListEventsAfterCursor` and the
+ascending list apply it.
+
+**Rejected:**
+
+- *A safety lag*, listing only events older than now minus a margin, holds
+  only while every transaction that writes an event ends within the margin.
+  Nothing bounds a Path B transaction: Postgres 17's `transaction_timeout`
+  would abort every slow mutation, a serverless instance frozen mid-transaction
+  outlives any margin, and on Spanner the application servers' clock skew adds
+  to it. A lag also delays every event, not only those behind an open
+  transaction.
+- *A snapshot `xmin` guard* bounds transaction IDs, not times. Postgres
+  assigns an ID at a transaction's first write, not when it stamps an event,
+  so a finished transaction with an older ID can have stamped its events after
+  a running one: listing only IDs older than the oldest running one still
+  passes the running one's events.
+- *The oldest `xact_start` in `pg_stat_activity`* holds every project back by
+  the database's oldest open transaction, a retention purge or a dump
+  included. It also sees only the sessions of the reader's role, and only
+  while `track_activities` is on.

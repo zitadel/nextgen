@@ -7,7 +7,7 @@ import { Card, Cards } from "fumadocs-ui/components/card";
 
 The API reference is generated from the server's OpenAPI document, one page per operation, grouped by the document's tags. The whole document is at [`/docs/openapi.json`](/docs/openapi.json), for client generators, API tools, and agents. This page covers what every operation shares: where to send a request, how to authenticate it, and what errors and lists look like.
 
-Each operation shows its request as a call through [`@zitadel/api`](/docs/sdks/api-client), the generated TypeScript client, as the [CLI command](/docs/reference/cli) that runs it where there is one, and as cURL. All of them follow the example you pick and what you enter in the playground. An operation's Markdown, its URL plus `.md`, has the same samples for its default request, cURL against a local server at `http://localhost:8080`.
+Each operation shows its request as a call through [`@zitadel/api`](/docs/sdks/api-client), the generated TypeScript client, as the [CLI command](/docs/reference/cli) that runs it where there is one, and as cURL. All of them follow the example you pick and what you enter in the playground. An operation's Markdown, its URL plus `.md`, has the same samples for its default request, cURL against a local server at `http://localhost:8080/api/v1`.
 
 Use it when you need exact request bodies, response shapes, auth requirements, and operation names for the preview server. For the higher-level product path, start with the Quickstart, the CLI reference, and the SDK docs:
 
@@ -17,14 +17,18 @@ Use it when you need exact request bodies, response shapes, auth requirements, a
 
 ## Base URL
 
-An operation's path starts at the server's origin, with no version prefix: `POST /projects` is `https://preview.zitadel.com/projects` on the hosted preview.
+The API lives under `/api/v1` on the server's origin, and an operation's path follows it: `POST /projects` is `https://preview.zitadel.com/api/v1/projects` on the hosted preview.
 
 | Server | Base URL |
 | --- | --- |
-| The hosted preview, the CLI's default | `https://preview.zitadel.com` |
-| A server [`zitadel start`](/docs/guides/local-runtime) runs on your machine | `http://localhost:8080`, or the next free port for a second directory |
+| The hosted preview, the CLI's default | `https://preview.zitadel.com/api/v1` |
+| A server [`zitadel start`](/docs/guides/local-runtime) runs on your machine | `http://localhost:8080/api/v1`, or the next free port for a second directory |
 
-Setup writes the server your app uses to `.env.local` as `ZITADEL_URL`, which the SDKs and the samples on these pages read.
+Setup writes the server your app uses to `.env.local` as `ZITADEL_URL`, its origin without the prefix, which the SDKs and the samples on these pages read.
+
+The health probes stay at the root of the origin, `/livez` and `/readyz`, where orchestrators look for them; they answer under `/api/v1` too.
+
+Until 1.0.0 the server also answers every operation at its path without the prefix, `https://preview.zitadel.com/projects` for one. Such a response carries a `Deprecation` header ([RFC 9745](https://www.rfc-editor.org/rfc/rfc9745)) with the date the prefix shipped, and a `Link` with `rel="deprecation"` to this section. Move a client that still calls those paths to the prefix: from 1.0.0 they answer `404` with `req.not_found`.
 
 ## Authentication
 
@@ -42,9 +46,9 @@ The document declares this scheme as OAuth 2.0, with authorization-code and clie
 
 [`zitadel setup`](/docs/get-started/quickstart) creates your project and writes its secret to `.env.local` as `ZITADEL_PROJECT_SECRET`, and to `.zitadel/secret`. [Create project](/docs/reference/api/projects) (`POST /projects`), which needs no credential, returns it as `project_secret`; no other operation returns it. Keep the secret on a server, out of source control and out of the browser ([Configuration as code](/docs/concepts/repo-config#what-stays-out-of-source-control)).
 
-### Session cookie (`nextgenSession`)
+### Session cookie (`sessionCookie`)
 
-The `__nextgen_session` cookie authenticates a signed-in user's requests from the browser. The server sets it when a session is created or a handoff is exchanged ([Sessions](/docs/reference/api/sessions)); an app sends it through the [SDK proxy](/docs/sdks/proxy) on its own origin.
+The session cookie, `__Host-zitadel_session`, authenticates a signed-in user's requests from the browser. The server sets it when a session is created or a handoff is exchanged ([Sessions](/docs/reference/api/sessions)); an app sends it through the [SDK proxy](/docs/sdks/proxy) on its own origin. Over plain http to a loopback host, such as `http://localhost:8080`, the server sets it as `zitadel_session`, without the prefix and `Secure`, so that Safari keeps it, and reads that name there too. A program sends `__Host-zitadel_session` over any transport.
 
 A request the cookie authenticates that changes something must come from the same origin and carry the session's CSRF token, from `GET /sessions/me/csrf`, in the `X-Zitadel-CSRF` header. `GET` requests and the `POST …/query` reads need no token. A missing or invalid cookie answers `401` with the code `auth.unauthorized`, a failed CSRF check `403` with `auth.csrf_invalid`.
 
@@ -74,7 +78,7 @@ A list is paged with a cursor. Set the page size with `limit`, from 1 to 100, 20
 A `GET` list takes both as query parameters, a `POST …/query` in its JSON body:
 
 ```bash
-curl -X POST "$ZITADEL_URL/users/query" \
+curl -X POST "$ZITADEL_URL/api/v1/users/query" \
   -H "Authorization: Bearer $ZITADEL_PROJECT_SECRET" \
   -H "Content-Type: application/json" \
   -d '{"limit": 50, "page_token": "<next_page_token from the previous page>"}'

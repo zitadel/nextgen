@@ -14,15 +14,6 @@ import { shellArg } from "../../lib/shell";
 /** The columns `list` renders, in order. */
 const COLUMNS = ["id", "release_id", "reason", "origins", "deployed_at"] as const;
 
-/** A deployment as the list endpoint returns it, narrowed to what the table reads. */
-type DeploymentRow = {
-  id: string;
-  release_id: string;
-  metadata: { reason?: string };
-  targets: { origin: string }[];
-  deployed_at: string;
-};
-
 /**
  * `zitadel deployment list` — show the project's deployment history.
  *
@@ -68,28 +59,26 @@ export default class DeploymentList extends EnvironmentCommand {
     await this.toMeta(flags);
     const { client, projectId } = await this.connect();
 
-    const request = (token?: string): Promise<unknown> =>
-      client.listDeployments({
-        project_id: projectId,
-        ...(flags.origin === undefined ? {} : { origin: flags.origin }),
-        ...(flags.live ? { live: true } : {}),
-        ...(flags.limit === undefined ? {} : { limit: flags.limit }),
-        ...(token === undefined ? {} : { page_token: token }),
-      });
-
-    const { items, next } = await collectPages(request, {
-      items: "deployments",
+    const params = {
+      project_id: projectId,
+      origin: flags.origin,
+      live: flags.live,
+      limit: flags.limit,
+      page_token: flags["page-token"],
+    };
+    // One page unless `--all`, as every list does; the walk starts at
+    // `--page-token`, and a drain leaves no next page to report.
+    const { items: deployments, next } = await collectPages(client.listDeployments.pages(params), {
+      items: (page) => page.deployments,
       all: flags.all === true,
-      token: flags["page-token"],
-      nextPageToken: "next_page_token",
+      next: (page) => page.next_page_token,
     });
-    const deployments = items as DeploymentRow[];
 
     // Flatten each deployment's targets to one `origins` cell for the table.
     const rows = deployments.map((deployment) => ({
       id: deployment.id,
       release_id: deployment.release_id,
-      reason: deployment.metadata.reason ?? "deploy",
+      reason: deployment.metadata.reason,
       origins: deployment.targets.map((target) => target.origin).join(", "),
       deployed_at: deployment.deployed_at,
     }));
@@ -117,10 +106,9 @@ export default class DeploymentList extends EnvironmentCommand {
     const plain = flags.plain || !process.stdout.isTTY;
     return this.emit({
       status: "ok",
-      data: listData(deployments, {
-        nextPageToken: next,
-        nextCommands: nextCommand === undefined ? undefined : [nextCommand],
-      }),
+      data: listData(deployments, { nextPageToken: next }),
+      ...(nextCommand === undefined ? {} : { next: { commands: [nextCommand] } }),
+      machineReadable: plain,
       pretty: renderList(COLUMNS, rows, {
         plain,
         singular: "deployment",

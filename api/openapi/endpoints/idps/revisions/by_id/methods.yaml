@@ -11,7 +11,7 @@ get:
   security:
     - oauth2:
         - idp.read
-    - nextgenSession: []
+    - sessionCookie: []
   parameters:
     - $ref: ../../../../components/parameters/project-id.yaml
     - $ref: ../../../../components/parameters/idp-revision-id.yaml

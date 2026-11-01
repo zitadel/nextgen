@@ -1,7 +1,7 @@
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -357,7 +357,7 @@ describe("doctor command", () => {
       (parseJson(res.stdout) as { data: { next_commands?: string[] } }).data.next_commands,
     ).toContain(
       expectedPublicCliCommand(
-        `claim --env-file .env.development.local --server https://api.zitadel.cloud --cwd ${cwd}`,
+        `claim --env-file ${cwd}/.env.development.local --server https://api.zitadel.cloud --cwd ${cwd}`,
       ),
     );
   });
@@ -647,6 +647,17 @@ console.log(["p4242", "cnode", "n127.0.0.1:" + process.env.LSOF_FIXTURE_PORT].jo
         status: "pass",
         message: expect.stringContaining("is healthy"),
       });
+    });
+
+    it("names the parent folder the healthy server was started in", async () => {
+      const { app } = await appUnderStartedServer();
+
+      const res = await doctorWithoutPort(app);
+
+      const checks = (parseJson(res.stdout) as { data: { checks: Check[] } }).data.checks;
+      expect(checks.find((check) => check.name === "runtime")?.message).toContain(
+        `(server started in the parent folder ${dirname(app)})`,
+      );
     });
 
     it("points at that server's log", async () => {
@@ -1033,6 +1044,24 @@ describe("advisoryForWarnings", () => {
 
     expect(advice).toBeUndefined();
   });
+
+  it("suggests doctor --fix for an issuer held as a preview origin, in the directory doctor checked", () => {
+    const issuerWarning = {
+      name: "issuer-origin",
+      status: "warn" as const,
+      message: "preview",
+      details: { pattern: "http://localhost:3000", server: "https://api.zitadel.cloud" },
+    };
+
+    const advice = advisoryForWarnings(
+      [issuerWarning],
+      cliVersion.version,
+      undefined,
+      environmentSelectorSuffix({ cwd: "apps/web" }),
+    );
+
+    expect(advice?.nextCommands).toEqual([expectedPublicCliCommand("doctor --fix --cwd apps/web")]);
+  });
 });
 
 describe("failureAdvice for a runtime found in a parent directory", () => {
@@ -1052,9 +1081,10 @@ describe("failureAdvice for a runtime found in a parent directory", () => {
       dir,
     );
 
-    expect(advice.nextCommands).toEqual([]);
+    expect(advice.nextCommands).toEqual([publicCliCommand("start", "1.0.0")]);
     expect(advice.suggestedArgs).toEqual([
       ["start", "--cwd", dir],
+      ["start"],
       ["reset", "--force", "--cwd", dir],
     ]);
     expect(advice.hint).toContain("details.suggested_args");
@@ -1074,7 +1104,61 @@ describe("failureAdvice for a runtime found in a parent directory", () => {
 
     expect(advice.nextCommands).toEqual([
       publicCliCommand("start --cwd /home/dev/app", "1.0.0"),
+      publicCliCommand("start", "1.0.0"),
       publicCliCommand("reset --force --cwd /home/dev/app", "1.0.0"),
+    ]);
+  });
+
+  it("says the server is the parent's and that a reset deletes the parent's data", () => {
+    const advice = failureAdvice(
+      failed,
+      "image",
+      8080,
+      "1.0.0",
+      environmentSelectorSuffix({}),
+      "/home/dev/app",
+    );
+
+    expect(advice.hint).toContain("This folder has no Zitadel server of its own");
+    expect(advice.hint).toContain("the parent folder, /home/dev/app");
+    expect(advice.hint).toContain("Resetting deletes the local data in /home/dev/app");
+    expect(advice.hint).toContain("run start here");
+  });
+
+  it("starts a server in doctor's own --cwd, not the shell's directory", () => {
+    const advice = failureAdvice(
+      failed,
+      "image",
+      8080,
+      "1.0.0",
+      environmentSelectorSuffix({}),
+      "/home/dev/app",
+      "/home/dev/app/child",
+    );
+
+    expect(advice.suggestedArgs?.[1]).toEqual(["start", "--cwd", "/home/dev/app/child"]);
+  });
+
+  it("keeps the hint to one line", () => {
+    const advice = failureAdvice(
+      failed,
+      "image",
+      8080,
+      "1.0.0",
+      environmentSelectorSuffix({}),
+      "/home/dev/app",
+    );
+
+    expect(advice.hint).not.toContain("\n");
+  });
+
+  it("keeps the plain advice for a runtime in the working directory", () => {
+    const advice = failureAdvice(failed, "image", 8080, "1.0.0", environmentSelectorSuffix({}));
+
+    expect(advice.hint).not.toContain("parent folder");
+    expect(advice.nextCommands).toEqual([
+      publicCliCommand("start", "1.0.0"),
+      publicCliCommand("reset --force", "1.0.0"),
     ]);
   });
 });

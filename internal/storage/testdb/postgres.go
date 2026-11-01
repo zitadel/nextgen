@@ -18,9 +18,8 @@ import (
 	"github.com/testcontainers/testcontainers-go/wait"
 )
 
-// containerImage pins Postgres to the rate-limit-free public ECR mirror of the
-// official postgres:18.3 image. Docker Hub throttles anonymous pulls per-IP
-// and GitHub runners share IPs.
+// containerImage pins Postgres to the public ECR mirror of the official image.
+// CI pre-pulls it, falling back to Docker Hub if the mirror limits downloads.
 const containerImage = "public.ecr.aws/docker/library/postgres:18.3"
 
 const containerStartAttempts = 3

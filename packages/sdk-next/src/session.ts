@@ -1,6 +1,7 @@
 import type { GetMySession200 } from "@zitadel/api/generated/model";
 
 import { getZitadelConfig } from "@zitadel/api/config";
+import { API_PREFIX, apiBaseUrl } from "@zitadel/api/runtime/base-url";
 
 import type { ClientAuthResult } from "./types.js";
 
@@ -58,7 +59,7 @@ function warnMissingProject(): void {
  * an app's own UI (header navigation, account menus) to know whether a user
  * is signed in and who they are.
  *
- * Fetches the same-origin `{proxyPath}/sessions/me?project_id=…` with
+ * Fetches the same-origin `{proxyPath}/api/v1/sessions/me?project_id=…` with
  * credentials and `cache: "no-store"` — the same read the `<zitadel-session>`
  * card performs — so the answer is the server's, not a client-side guess.
  * Works on any page: unlike server-side `auth()`, it does not require the
@@ -120,33 +121,31 @@ export async function getSession(options: GetSessionOptions = {}): Promise<Clien
     );
   }
 
-  // Strip trailing slashes so "/__nextgen/" doesn't produce a double-slash
-  // URL that misses the request-boundary matcher — same normalization the
-  // typed API client applies to its base URL.
-  let proxyPath = options.proxyPath ?? getZitadelConfig()?.proxyPath ?? DEFAULT_PROXY_PATH;
-  while (proxyPath.endsWith("/")) {
-    proxyPath = proxyPath.slice(0, -1);
-  }
+  // The base the typed API client uses: trailing slashes go, so "/__nextgen/"
+  // doesn't produce a double-slash URL that misses the request-boundary
+  // matcher, and the API prefix follows.
+  const endpoint = `${apiBaseUrl(
+    options.proxyPath ?? getZitadelConfig()?.proxyPath ?? DEFAULT_PROXY_PATH,
+  )}/sessions/me`;
   const projectId = options.projectId || getZitadelConfig()?.projectId || publicProjectId();
   if (!projectId) {
     warnMissingProject();
     return { isAuthenticated: false, session: null };
   }
 
-  const response = await fetch(
-    `${proxyPath}/sessions/me?project_id=${encodeURIComponent(projectId)}`,
-    {
-      cache: "no-store",
-      credentials: "include",
-      headers: { accept: "application/json" },
-    },
-  );
+  const response = await fetch(`${endpoint}?project_id=${encodeURIComponent(projectId)}`, {
+    cache: "no-store",
+    credentials: "include",
+    headers: { accept: "application/json" },
+  });
 
   // Only the backend's canonical error envelope is definitive signed-out.
   // A framework route, gateway, or WAF can also return 401/404; accepting the
   // status or content type alone would turn a broken proxy into signed-out.
+  let code: string | undefined;
   if (response.status === 401 || response.status === 403 || response.status === 404) {
     const error = await readErrorEnvelope(response);
+    code = error?.code;
     const isSignedOut =
       (response.status === 401 && error?.code === "auth.unauthorized") ||
       (response.status === 403 && error?.code === "sess.project_mismatch") ||
@@ -157,8 +156,14 @@ export async function getSession(options: GetSessionOptions = {}): Promise<Clien
   }
 
   if (!response.ok) {
+    // `req.not_found` is the server knowing no such operation: it is older
+    // than this SDK and does not serve the API under its prefix.
+    const cause =
+      code === "req.not_found"
+        ? ` (req.not_found: a server older than this SDK does not serve the API under ${API_PREFIX})`
+        : "";
     throw new Error(
-      `[nextgen] Session read failed: HTTP ${response.status} from ${proxyPath}/sessions/me`,
+      `[nextgen] Session read failed: HTTP ${response.status} from ${endpoint}${cause}`,
     );
   }
 

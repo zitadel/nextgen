@@ -1,9 +1,11 @@
+import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it, vi } from "vitest";
 import { scopedPath } from "@/test/project-scope.fixture";
 import { server } from "@/test/msw";
+import { createAppRouter } from "../../../router";
 
 // The `_authed` layout guards every screen behind `GET /sessions/me`
 // (Console ADR 0003); mock the auth module so routes render as signed in.
@@ -13,7 +15,7 @@ vi.mock("@/auth/session", async (importOriginal) => {
   return { ...actual, fetchSession: vi.fn(async () => makeTestSession()) };
 });
 
-const TEAMS_URL = "http://localhost/api/teams/query";
+const TEAMS_URL = "http://localhost/api/v1/teams/query";
 
 /** The same locale-derived string the screen renders, rather than one locale's output. */
 function expectedDate(value: string): string {
@@ -36,10 +38,6 @@ function team(overrides: Record<string, unknown> = {}) {
 }
 
 async function renderTeams(entry = "/teams") {
-  const [{ RouterProvider, createMemoryHistory }, { createAppRouter }] = await Promise.all([
-    import("@tanstack/react-router"),
-    import("../../../router"),
-  ]);
   const router = createAppRouter({
     history: createMemoryHistory({ initialEntries: [scopedPath(entry)] }),
   });
@@ -105,8 +103,8 @@ describe("teams screen", () => {
     server.use(
       http.post(TEAMS_URL, () => HttpResponse.json({ teams: [team()] })),
       // The click opens the team's page, whose loader reads the team and its members.
-      http.get(`http://localhost/api/teams/${team().id}`, () => HttpResponse.json(team())),
-      http.post("*/api/users/query", () => HttpResponse.json({ users: [] })),
+      http.get(`http://localhost/api/v1/teams/${team().id}`, () => HttpResponse.json(team())),
+      http.post("*/api/v1/users/query", () => HttpResponse.json({ users: [] })),
     );
     const router = await renderTeams();
 
@@ -135,7 +133,7 @@ describe("teams screen", () => {
     const created: unknown[] = [];
     server.use(
       http.post(TEAMS_URL, () => HttpResponse.json({ teams: [] })),
-      http.post("http://localhost/api/teams", async ({ request }) => {
+      http.post("http://localhost/api/v1/teams", async ({ request }) => {
         created.push(await request.json());
         return HttpResponse.json(team());
       }),

@@ -162,6 +162,13 @@
           "type": "boolean"
         },
         {
+          "name": "git",
+          "description": "Commit the project setup writes, initialising a repository first when there is none, so a release records the commit it was built from. Refuses a repository that already has uncommitted work. Use --no-git to leave version control alone.",
+          "type": "boolean",
+          "allowNo": true,
+          "default": true
+        },
+        {
           "name": "preset",
           "description": "Sign-in preset for the scaffolded schema and login flow (default: password-first).",
           "type": "option",
@@ -271,7 +278,7 @@
         },
         {
           "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -295,6 +302,20 @@
           "min": 1
         },
         {
+          "name": "no-wait",
+          "description": "Print the link and exit, without opening a browser or waiting for the browser step. The result names the command that waits for it.",
+          "type": "boolean",
+          "exclusive": [
+            "challenge-id",
+            "timeout"
+          ]
+        },
+        {
+          "name": "challenge-id",
+          "description": "Wait for the link a --no-wait run printed, instead of creating a new one.",
+          "type": "option"
+        },
+        {
           "name": "env",
           "char": "e",
           "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
@@ -302,7 +323,7 @@
         },
         {
           "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -315,6 +336,27 @@
         },
         {
           "command": "claim --timeout 120"
+        },
+        {
+          "command": "claim --no-wait"
+        },
+        {
+          "command": "claim --challenge-id ch_01J0Z9KX7Y0Q2Y7JX5M9K2YF3C"
+        }
+      ]
+    },
+    {
+      "id": "skills add",
+      "group": "Getting started",
+      "description": "Add the Zitadel agent skills to this project.\n\nAdds the skills of this CLI's version to .agents/skills, which most coding agents read, and to .claude/skills for Claude Code. Run it again after updating the CLI to replace them with the new version's.",
+      "args": [],
+      "flags": [],
+      "examples": [
+        {
+          "command": "skills add"
+        },
+        {
+          "command": "skills add --cwd my-app"
         }
       ]
     },
@@ -476,7 +518,7 @@
         },
         {
           "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -518,7 +560,7 @@
         },
         {
           "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -553,7 +595,7 @@
         },
         {
           "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -605,7 +647,7 @@
         },
         {
           "name": "filter",
-          "description": "Filter as field=operation:value (operation defaults to equals). Fields: created_at (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), id (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), schema (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), status (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), team_id (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), lifecycle_owner_team_id (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal).",
+          "description": "Filter as field=operation:value (operation defaults to equals). Fields: created_at (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), id (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), schema (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), schema_object_type (equals|not_equals|contains), status (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), team_id (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), lifecycle_owner_team_id (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal).",
           "type": "option",
           "multiple": true
         },
@@ -622,7 +664,7 @@
         },
         {
           "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -696,7 +738,7 @@
         },
         {
           "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -754,7 +796,7 @@
         },
         {
           "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -796,7 +838,7 @@
         },
         {
           "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -831,7 +873,7 @@
         },
         {
           "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -900,7 +942,7 @@
         },
         {
           "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -967,7 +1009,7 @@
         },
         {
           "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -1060,7 +1102,7 @@
         },
         {
           "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -1102,7 +1144,7 @@
         },
         {
           "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -1137,7 +1179,7 @@
         },
         {
           "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -1206,7 +1248,7 @@
         },
         {
           "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -1398,7 +1440,7 @@
         },
         {
           "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
         },
         {
@@ -1601,7 +1643,7 @@
         },
         {
           "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -1642,7 +1684,7 @@
         },
         {
           "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -1711,7 +1753,7 @@
         },
         {
           "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -1752,7 +1794,7 @@
         },
         {
           "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -1821,7 +1863,7 @@
         },
         {
           "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -1863,7 +1905,7 @@
         },
         {
           "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -1882,7 +1924,7 @@
         {
           "name": "message",
           "char": "m",
-          "description": "A short summary of what this release changes.",
+          "description": "A short summary of what this release changes. Defaults to the pull request's title or the current commit's subject.",
           "type": "option"
         },
         {
@@ -1893,7 +1935,7 @@
         },
         {
           "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -1903,6 +1945,61 @@
         },
         {
           "command": "deploy --dry-run"
+        }
+      ]
+    },
+    {
+      "id": "preview",
+      "group": "Configuration and releases",
+      "description": "Deploy a release from .zitadel/ to a pull-request build's preview URLs.",
+      "args": [],
+      "flags": [
+        {
+          "name": "origin",
+          "description": "A preview URL to deploy to, instead of detecting them from the platform build. Repeatable.",
+          "type": "option",
+          "multiple": true
+        },
+        {
+          "name": "ttl",
+          "description": "How long each preview stays live, e.g. 7d, 12h or 90m. Between 60s and 365d. Omitted, the project's default applies.",
+          "type": "option"
+        },
+        {
+          "name": "message",
+          "char": "m",
+          "description": "A short summary of what this release changes. Defaults to the pull request's title or the current commit's subject.",
+          "type": "option"
+        },
+        {
+          "name": "strict",
+          "description": "Fail instead of warning when no preview credential (ZITADEL_PROJECT_SECRET) is set.",
+          "type": "boolean"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
+          "type": "option"
+        }
+      ],
+      "examples": [
+        {
+          "command": "preview"
+        },
+        {
+          "command": "preview --origin https://acme-git-sso-acmeinc.vercel.app"
+        },
+        {
+          "command": "preview --ttl 24h"
+        },
+        {
+          "command": "preview -m 'add phone_number to human-user'"
         }
       ]
     },
@@ -1925,7 +2022,7 @@
         },
         {
           "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -1986,7 +2083,7 @@
         },
         {
           "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -2023,7 +2120,7 @@
         },
         {
           "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -2059,7 +2156,7 @@
         },
         {
           "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -2089,7 +2186,7 @@
         },
         {
           "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -2149,7 +2246,7 @@
         },
         {
           "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -2186,6 +2283,12 @@
           "type": "boolean"
         },
         {
+          "name": "message",
+          "char": "m",
+          "description": "A short summary of why this rolls back.",
+          "type": "option"
+        },
+        {
           "name": "env",
           "char": "e",
           "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
@@ -2193,7 +2296,7 @@
         },
         {
           "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -2223,7 +2326,7 @@
         },
         {
           "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -2295,7 +2398,7 @@
         },
         {
           "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -2333,7 +2436,7 @@
         },
         {
           "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -2397,7 +2500,7 @@
         },
         {
           "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -2443,7 +2546,7 @@
         },
         {
           "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -2475,7 +2578,7 @@
         },
         {
           "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -2514,7 +2617,7 @@
         },
         {
           "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -2552,7 +2655,7 @@
         },
         {
           "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -2616,7 +2719,7 @@
         },
         {
           "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -2629,6 +2732,144 @@
         },
         {
           "command": "policies list --filter operation=equals:<value>"
+        }
+      ]
+    },
+    {
+      "id": "policies test",
+      "group": "Configuration and releases",
+      "description": "Run the test cases in .zitadel/policies/ against the policies",
+      "args": [
+        {
+          "name": "operation",
+          "description": "Test only this operation's policy, such as auth.factor.password.set."
+        }
+      ],
+      "flags": [
+        {
+          "name": "release",
+          "description": "Test the policies a release pins (rel_…) instead of the files in .zitadel/policies/.",
+          "type": "option"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
+          "type": "option"
+        }
+      ],
+      "examples": [
+        {
+          "command": "policies test"
+        },
+        {
+          "command": "policies test auth.factor.password.set"
+        },
+        {
+          "command": "policies test --release rel_01KXB7C2M4N7F0N9WD3P2E4YM7"
+        },
+        {
+          "command": "policies test --json"
+        }
+      ]
+    },
+    {
+      "id": "preview list",
+      "group": "Configuration and releases",
+      "description": "List the project's live previews, newest first.",
+      "args": [],
+      "flags": [
+        {
+          "name": "limit",
+          "description": "Page size (server default 20, max 100).",
+          "type": "option",
+          "min": 1,
+          "max": 100
+        },
+        {
+          "name": "page-token",
+          "description": "Continue from a previous page's next_page_token.",
+          "type": "option"
+        },
+        {
+          "name": "all",
+          "char": "a",
+          "description": "Fetch every page instead of one.",
+          "type": "boolean",
+          "exclusive": [
+            "page-token"
+          ]
+        },
+        {
+          "name": "plain",
+          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
+          "type": "boolean"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
+          "type": "option"
+        }
+      ],
+      "examples": [
+        {
+          "command": "preview list"
+        },
+        {
+          "command": "preview list --all"
+        },
+        {
+          "command": "preview list --plain"
+        }
+      ]
+    },
+    {
+      "id": "preview rm",
+      "group": "Configuration and releases",
+      "description": "Remove a live preview from the project.",
+      "args": [
+        {
+          "name": "url",
+          "description": "The preview URL to remove.",
+          "required": true
+        }
+      ],
+      "flags": [
+        {
+          "name": "force",
+          "char": "f",
+          "description": "Remove the preview without the confirmation prompt. Required when non-interactive.",
+          "type": "boolean"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
+          "type": "option"
+        }
+      ],
+      "examples": [
+        {
+          "command": "preview rm https://acme-git-sso-acmeinc.vercel.app"
+        },
+        {
+          "command": "preview rm https://acme-git-sso-acmeinc.vercel.app --force"
         }
       ]
     },
@@ -2657,7 +2898,7 @@
         },
         {
           "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -2726,7 +2967,7 @@
         },
         {
           "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -2850,7 +3091,7 @@
         },
         {
           "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -2883,7 +3124,7 @@
         },
         {
           "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -2921,7 +3162,7 @@
         },
         {
           "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -2979,7 +3220,7 @@
         },
         {
           "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -3018,7 +3259,7 @@
         },
         {
           "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -3056,7 +3297,7 @@
         },
         {
           "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -3120,7 +3361,7 @@
         },
         {
           "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -3161,7 +3402,7 @@
         },
         {
           "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -3201,7 +3442,7 @@
         },
         {
           "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -3241,7 +3482,7 @@
         },
         {
           "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -3288,7 +3529,7 @@
         },
         {
           "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -3349,7 +3590,7 @@
         },
         {
           "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -3406,7 +3647,7 @@
         },
         {
           "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -3525,7 +3766,7 @@
         },
         {
           "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
         }
       ],
@@ -3594,7 +3835,7 @@
         },
         {
           "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
         }
       ],

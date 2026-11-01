@@ -105,6 +105,27 @@ describe("validate step", () => {
     await expect(validateStep.run(ctx(bundle))).rejects.toMatchObject({ code: "E_VALIDATION" });
   });
 
+  it("keeps the fix a literal client_secret gets, rather than the release body's pattern", async () => {
+    const connection = {
+      slug: "acme",
+      protocol: "oidc",
+      display_name: "Acme",
+      oidc: {
+        issuer: "https://sso.acme.example",
+        client_id: "client",
+        client_secret: "a-literal-secret",
+        scopes: ["openid"],
+      },
+    };
+
+    await expect(
+      validateStep.run(ctx({ idps: [connection] }, { idpFiles: ["acme.json"] })),
+    ).rejects.toMatchObject({
+      message: "Connection file's client_secret must reference a variable, not hold a value",
+      hint: expect.stringContaining("variable set NAME --secret"),
+    });
+  });
+
   describe("a flow's user_schema", () => {
     /** The default login flow, naming its schema `userSchema` and collecting `fields` first. */
     const flowNaming = (userSchema: string, fields: string[]) => ({

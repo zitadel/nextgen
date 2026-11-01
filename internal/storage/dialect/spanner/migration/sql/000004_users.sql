@@ -63,8 +63,19 @@ CREATE TABLE user_unique_attributes (
 -- +goose StatementBegin
 DROP TABLE IF EXISTS user_unique_attributes
 -- +goose StatementEnd
+-- Spanner refuses to drop a table that still has secondary indexes, so each
+-- index the Up created goes before its table.
+-- +goose StatementBegin
+DROP INDEX IF EXISTS idx_user_attributes_team_id
+-- +goose StatementEnd
+-- +goose StatementBegin
+DROP INDEX IF EXISTS idx_user_attributes_scalar
+-- +goose StatementEnd
 -- +goose StatementBegin
 DROP TABLE IF EXISTS user_attributes
+-- +goose StatementEnd
+-- +goose StatementBegin
+DROP INDEX IF EXISTS idx_users_team_id
 -- +goose StatementEnd
 -- +goose StatementBegin
 DROP TABLE IF EXISTS users

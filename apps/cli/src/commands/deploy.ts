@@ -1,14 +1,13 @@
-import { Flags } from "@oclif/core";
-
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../lib/oclif";
 import {
   buildBundle,
   createDeployment,
   DEPLOY_ARGS,
   createReleaseFromBundle,
+  deployMessage,
   diffStep,
   headSha,
-  listLiveDeployments,
+  messageFlag,
   runSteps,
   servesPrimary,
   type StepContext,
@@ -18,8 +17,11 @@ import {
 import { ApiError } from "@zitadel/api/runtime/fetch";
 
 import { ZitadelError } from "../lib/errors";
+import { issuerHeldAsPreview, originOf, type ProjectOrigin } from "../lib/origins";
+import { readZitadelSecret } from "../lib/project";
+import { shellArg } from "../lib/shell";
+import { type EnvironmentSelector, projectCommand } from "../lib/suggestion";
 import { reportWarning } from "../lib/warnings";
-import { nextCommandsData } from "../lib/oclif/envelope";
 
 /**
  * `zitadel deploy` — publish `.zitadel/` to the project's primary origins.
@@ -44,10 +46,9 @@ export default class Deploy extends EnvironmentCommand {
     "<%= config.bin %> deploy --dry-run",
   ];
   static override flags = {
-    message: Flags.string({
-      char: "m",
-      description: "A short summary of what this release changes.",
-    }),
+    message: messageFlag(
+      "A short summary of what this release changes. Defaults to the pull request's title or the current commit's subject.",
+    ),
   };
 
   async run(): Promise<JsonEnvelope> {
@@ -58,14 +59,13 @@ export default class Deploy extends EnvironmentCommand {
     const color = !json && isTTY && flags.color !== false && !process.env.NO_COLOR;
 
     // A deploy records why it happened. Interactively the reason can be left
-    // off, but a non-interactive caller (CI) has no prompt to fall back on, so
-    // it must name one. Rejected here, before the pipeline writes anything, so
-    // a missing message never leaves a half-synced IdP behind. A dry run makes
-    // no release, so it is exempt.
-    const message = flags.message?.trim() ? flags.message.trim() : undefined;
+    // off, but a non-interactive caller (CI) with no message to fall back on
+    // must name one, refused before anything is built. A dry run records
+    // nothing, so it neither resolves nor needs one.
+    const message = dryRun ? undefined : await deployMessage(flags.message, cwd, env);
     if (nonInteractive && !dryRun && message === undefined) {
       throw new ZitadelError("E_VALIDATION", "A deploy needs a message in non-interactive mode", {
-        hint: "Pass -m/--message with a short summary of what this release changes.",
+        hint: "Pass -m/--message with a short summary of what this release changes, or deploy from a clean git commit.",
       });
     }
 
@@ -81,12 +81,17 @@ export default class Deploy extends EnvironmentCommand {
       // final deploy would report the missing origin. A dry run writes nothing
       // and never reaches the deploy, so it is exempt: it still validates and
       // previews a project that has no primary origin yet.
-      const origins = (await client.getProject(projectId)).origins ?? [];
+      const project = await client.getProject(projectId);
+      const origins = project.origins;
       landing = origins.filter((entry) => entry.kind === "primary").map((entry) => entry.pattern);
       if (landing.length === 0) {
-        throw new ZitadelError("E_VALIDATION", "The project has no primary origin to deploy to", {
-          hint: `Add one with \`zitadel origin add <url> --kind primary${this.environmentSelector()}\`, then deploy.`,
-          nextCommands: [this.suggest("origin list")],
+        const setupProject = await setupProjectId(cwd);
+        throw noPrimaryOriginError({
+          origins,
+          issuer: this.environment.values.ZITADEL_ISSUER?.value,
+          setupProject: setupProject === projectId,
+          selector: this.environmentSelector(),
+          cliVersion: this.meta.cliVersion,
         });
       }
     }
@@ -110,9 +115,9 @@ export default class Deploy extends EnvironmentCommand {
       suggest: (args) => this.suggest(args),
     };
 
-    // Before-release steps: validate, sync IdPs (validated and previewed but
-    // not written on a dry run), diff.
-    await runSteps([validateStep, diffStep], ctx);
+    // Before-release steps: validate, then diff, which `--json` reports as
+    // `diff` on a dry run and a deploy alike.
+    const reported = await runSteps([validateStep, diffStep], ctx);
 
     if (dryRun) {
       return this.emit({
@@ -121,6 +126,7 @@ export default class Deploy extends EnvironmentCommand {
           dry_run: true,
           resources: resourceCount,
           targets: ["primary"],
+          ...reported,
         },
         pretty: `Validated ${resourceCount} resource${resourceCount === 1 ? "" : "s"}. Nothing was deployed (dry run).`,
       });
@@ -147,8 +153,11 @@ export default class Deploy extends EnvironmentCommand {
     // preview, which never targets a primary, is never it. It guards the
     // create against another deploy that raced in since we inspected: the
     // server refuses with 409 rather than overwriting that deploy unseen (#538).
-    const live = await listLiveDeployments(client, projectId);
-    const observed = live.find((deployment) =>
+    const deployments = await client.listDeployments.all({
+      project_id: projectId,
+      live: true,
+    });
+    const observed = deployments.find((deployment) =>
       deployment.targets.some((entry) => landing.includes(entry.origin)),
     )?.id;
     const targets = ["primary"];
@@ -186,7 +195,11 @@ export default class Deploy extends EnvironmentCommand {
         );
       }
       // The deployment that raced in on a primary origin, not a live preview.
-      const current = (await listLiveDeployments(client, projectId)).find(servesPrimary);
+      const deployments = await client.listDeployments.all({
+        project_id: projectId,
+        live: true,
+      });
+      const current = deployments.find(servesPrimary);
       throw new ZitadelError(
         "E_CONFLICT",
         "Another deploy changed the targets since this one was prepared",
@@ -208,8 +221,9 @@ export default class Deploy extends EnvironmentCommand {
         deployment_id: deployment.id,
         resources: resourceCount,
         origins: servedOrigins,
-        ...nextCommandsData([this.suggest("deployment list")]),
+        ...reported,
       },
+      next: { commands: [this.suggest("deployment list")] },
       pretty: [
         `Deployed ${release.content_hash}`,
         `  ${resourceCount} resource${resourceCount === 1 ? "" : "s"} to ${servedOrigins.length} origin${servedOrigins.length === 1 ? "" : "s"}`,
@@ -227,4 +241,65 @@ function errorCode(error: ApiError): string | undefined {
     typeof (body as { code?: unknown }).code === "string"
     ? (body as { code: string }).code
     : undefined;
+}
+
+/**
+ * The error for a deploy with no primary origin to land on, naming the step
+ * that gives this project one. A project `zitadel setup` 0.1.0 created holds
+ * its issuer as a preview origin, which `origin add --kind primary` refuses as
+ * a conflict: `doctor --fix` makes it primary for the project
+ * `.zitadel/secret` records, the one doctor repairs, and any other project
+ * removes the pattern and adds it back. Otherwise the issuer is added as
+ * primary, or the URL the developer fills in when no issuer resolves.
+ */
+export function noPrimaryOriginError(input: {
+  origins: ReadonlyArray<ProjectOrigin>;
+  /** The resolved environment's `ZITADEL_ISSUER`, the URL the app serves from. */
+  issuer: string | undefined;
+  /** Whether the deploy targets the project `.zitadel/secret` records. */
+  setupProject: boolean;
+  selector: EnvironmentSelector;
+  cliVersion: string;
+}): ZitadelError {
+  const message = "The project has no primary origin to deploy to";
+  const suggest = (args: string) => projectCommand(args, input.selector, input.cliVersion);
+  const preview =
+    input.issuer === undefined ? undefined : issuerHeldAsPreview(input.origins, input.issuer);
+  if (preview !== undefined) {
+    const held = `It holds its issuer ${preview} as a preview origin, as \`zitadel setup\` 0.1.0 registered it, so adding it as primary conflicts.`;
+    if (input.setupProject) {
+      const doctor = suggest("doctor --fix");
+      return new ZitadelError("E_VALIDATION", message, {
+        hint: `${held} Run \`${doctor}\` to make it primary, then deploy.`,
+        nextCommands: [doctor],
+      });
+    }
+    const remove = suggest(`origin rm ${shellArg(preview)} --force`);
+    const add = suggest(`origin add ${shellArg(preview)} --kind primary`);
+    return new ZitadelError("E_VALIDATION", message, {
+      hint: `${held} Remove it with \`${remove}\`, add it back with \`${add}\`, then deploy.`,
+      nextCommands: [remove, add],
+    });
+  }
+  if (input.issuer !== undefined) {
+    const add = suggest(`origin add ${shellArg(originOf(input.issuer))} --kind primary`);
+    return new ZitadelError("E_VALIDATION", message, {
+      hint: `Add the URL the app serves from with \`${add}\`, then deploy.`,
+      nextCommands: [add],
+    });
+  }
+  return new ZitadelError("E_VALIDATION", message, {
+    // Named in the text, not as a next command: the URL is the developer's to
+    // fill in, and a `<url>` placeholder is a shell redirection.
+    hint: `Add one with \`zitadel origin add <url> --kind primary${input.selector}\`, then deploy.`,
+    nextCommands: [suggest("origin list")],
+  });
+}
+
+/** The project `.zitadel/secret` records, or nothing when it cannot be read. */
+async function setupProjectId(cwd: string): Promise<string | undefined> {
+  return readZitadelSecret(cwd).then(
+    (secret) => secret.project_id,
+    () => undefined,
+  );
 }

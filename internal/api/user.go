@@ -65,7 +65,7 @@ func (h *Handler) DeleteUserByID(ctx context.Context, params api.DeleteUserByIDP
 // otherwise.
 func (h *Handler) QueryUsers(ctx context.Context, req *api.QueryUsersRequest, params api.QueryUsersParams) (api.QueryUsersRes, error) {
 	scopeCtx, _ := GetScopeContext(ctx)
-	projectID := string(params.ProjectID.Or(api.ProjectID(scopeCtx.ProjectID)))
+	projectID := listProjectID(ctx, params.ProjectID)
 	ctx, projectWide, err := h.requireProjectListAccess(ctx, projectID, userAccess, domain.ResourceKindUser)
 	if err != nil {
 		return nil, err

@@ -1,5 +1,6 @@
 post:
   operationId: removePreview
+  x-zitadel-cli: preview rm
   summary: Remove a preview
   description: |
     Ends a preview before it expires: the URL stops being served at once.

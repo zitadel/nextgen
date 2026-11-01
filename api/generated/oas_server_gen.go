@@ -64,7 +64,7 @@ type Handler interface {
 	// CompleteClaim implements completeClaim operation.
 	//
 	// Called by the browser after the developer authenticates on the claim page.
-	// Authenticated by the `__nextgen_session` cookie, it attaches the project to
+	// Authenticated by the session cookie, it attaches the project to
 	// the developer's personal team using the `challenge_id` from the claim URL as
 	// its single-use, browser-safe authorization.
 	//
@@ -187,9 +187,9 @@ type Handler interface {
 	// `grant.invalid` on either user locator. Read the grant back for
 	// identifier and display.
 	// Accepts either a project secret (`oauth2`) or a user-bound Console
-	// session cookie (`nextgenSession`). Session callers are authorized as
+	// session cookie (`sessionCookie`). Session callers are authorized as
 	// the human against the target project (home may differ). Cookie-authenticated
-	// requests follow the scheme's CSRF rules (`nextgenSession`).
+	// requests follow the scheme's CSRF rules (`sessionCookie`).
 	//
 	// POST /grants
 	CreateGrant(ctx context.Context, req *CreateGrantRequest, params CreateGrantParams) (CreateGrantRes, error)
@@ -293,8 +293,9 @@ type Handler interface {
 	// Creating a session is an app-plane operation on the project credential
 	// (`session.write`). The returned `session_token` is a session credential for the
 	// end-user client, not a management scope: it is delivered as the
-	// `__nextgen_session` cookie and authorises the self-service operations
-	// `GET /sessions/me` and `DELETE /sessions/me` (`nextgenSession` scheme). The
+	// `__Host-zitadel_session` cookie (`zitadel_session` over plain http to a
+	// loopback host) and authorises the self-service operations
+	// `GET /sessions/me` and `DELETE /sessions/me` (`sessionCookie` scheme). The
 	// by-id operations `GET /sessions/{session_id}` and `DELETE /sessions/{session_id}`
 	// are operator endpoints and require `session.read` / `session.delete` instead.
 	// The `session_token` is superseded when a handoff exchange completes — clients must
@@ -328,8 +329,8 @@ type Handler interface {
 	// return 404. The row is not un-revoked. Expired grants can still be
 	// revoked so the unique binding can be reused.
 	// Accepts either a project secret (`oauth2`) or a user-bound Console
-	// session cookie (`nextgenSession`). Cookie-authenticated requests
-	// follow the scheme's CSRF rules (`nextgenSession`).
+	// session cookie (`sessionCookie`). Cookie-authenticated requests
+	// follow the scheme's CSRF rules (`sessionCookie`).
 	//
 	// DELETE /grants/{id}
 	DeleteGrant(ctx context.Context, params DeleteGrantParams) (DeleteGrantRes, error)
@@ -350,10 +351,14 @@ type Handler interface {
 	DeleteTeam(ctx context.Context, params DeleteTeamParams) (DeleteTeamRes, error)
 	// DeleteUserByID implements DeleteUserByID operation.
 	//
-	// Deletes a user and removes them from every team they belong to.
-	// The user is removed, not deactivated, and the deletion emits `user.deleted`.
+	// Deletes a user, removes them from every team they belong to, and revokes
+	// every grant they hold, on any project.
+	// The user is removed, not deactivated, and the deletion emits `user.deleted`,
+	// plus `authz.revoked` for each grant on that grant's project.
 	// With a project secret the request is idempotent: deleting a user that exists
-	// in no project succeeds without changing anything.
+	// in no project succeeds without changing anything. Deleting the last active
+	// member of a project's owning team returns 409 `proj.last_owner` and changes
+	// nothing.
 	//
 	// DELETE /users/{user_id}
 	DeleteUserByID(ctx context.Context, params DeleteUserByIDParams) (DeleteUserByIDRes, error)
@@ -365,6 +370,28 @@ type Handler interface {
 	//
 	// DELETE /variables/{variable_name}
 	DeleteVariable(ctx context.Context, params DeleteVariableParams) (DeleteVariableRes, error)
+	// EvaluatePolicy implements evaluatePolicy operation.
+	//
+	// Evaluates a policy config against one request, without side effects, and
+	// answers the decision the operation would reach. Nothing is read from or
+	// written to the project: the config is the one in the body, checked
+	// exactly as a publish checks it, so an invalid config answers `pol.invalid`
+	// with the same violations.
+	// `input` is what the operation's request carries, in the operation's own
+	// terms (a password, not its length): the server derives what the policy
+	// checks with the code the live operation runs, guards included. `facts`
+	// states what the operation would look up at runtime, such as whether the
+	// candidate matches one of the user's kept passwords.
+	// The decision and the names of the failed rules hold wherever the
+	// operation runs. `code` and `violations` are what an API call answers; a
+	// login flow shows the same rules as field errors on the password field
+	// (`error.x-auth-methods#password_<rule>` in `step.error`).
+	// Which policy a project or release applies is not decided here: read it
+	// and pass its config.
+	// The caller needs read access to the project in `project_id`.
+	//
+	// POST /policies/evaluate
+	EvaluatePolicy(ctx context.Context, req EvaluatePolicyRequest, params EvaluatePolicyParams) (EvaluatePolicyRes, error)
 	// ExchangeHandoff implements exchangeHandoff operation.
 	//
 	// Consumes a one-time `handoff_token` minted by `POST /auth_attempts/{id}/handoff`
@@ -499,8 +526,8 @@ type Handler interface {
 	// secrets. A user-bound Console session that already passed the project
 	// Check may expand without those scopes.
 	// Accepts either a project secret (`oauth2`) or a user-bound Console
-	// session cookie (`nextgenSession`). Cookie-authenticated requests
-	// follow the scheme's CSRF rules (`nextgenSession`).
+	// session cookie (`sessionCookie`). Cookie-authenticated requests
+	// follow the scheme's CSRF rules (`sessionCookie`).
 	//
 	// GET /grants/{id}
 	GetGrant(ctx context.Context, params GetGrantParams) (GetGrantRes, error)
@@ -523,9 +550,10 @@ type Handler interface {
 	// GetLive implements getLive operation.
 	//
 	// Answers `ok` while the server process serves HTTP, and checks nothing behind it.
-	// Point a liveness probe here. It never checks the database, so an outage
-	// of the database does not restart every instance; `GET /readyz` takes an
-	// instance out of rotation instead.
+	// Point a liveness probe at `/livez` at the root, where the probes stay,
+	// not under `/api/v1`. It never checks the database, so an outage of the
+	// database does not restart every instance; `GET /readyz` takes an instance
+	// out of rotation instead.
 	//
 	// GET /livez
 	GetLive(ctx context.Context) (GetLiveRes, error)
@@ -555,7 +583,7 @@ type Handler interface {
 	// Returns the session-bound token for cross-site request forgery protection
 	// (ADR 053 §5). Browser code sends it in the `X-Zitadel-CSRF` header on the
 	// state-changing requests the session cookie authenticates that require it
-	// — see the `nextgenSession` scheme. It authorizes nothing on its own: the
+	// — see the `sessionCookie` scheme. It authorizes nothing on its own: the
 	// HttpOnly cookie is still the credential, and a cross-site page cannot
 	// read this response. It stays the same for the life of the session, so a
 	// client fetches it once per session.
@@ -608,9 +636,9 @@ type Handler interface {
 	// GetReady implements getReady operation.
 	//
 	// Answers whether the server can serve requests, which takes its database answering within a second.
-	// Point a readiness probe here, so that a server whose database does not
-	// answer gets no requests until it does. The check is one round trip to the
-	// database.
+	// Point a readiness probe at `/readyz` at the root, where the probes stay,
+	// not under `/api/v1`, so that a server whose database does not answer gets
+	// no requests until it does. The check is one round trip to the database.
 	//
 	// GET /readyz
 	GetReady(ctx context.Context) (GetReadyRes, error)
@@ -866,7 +894,7 @@ type Handler interface {
 	// grants.
 	// Ordered by `user_id` and paginated with `page_token`.
 	// Accepts either a project secret (`oauth2`) or a user-bound Console
-	// session cookie (`nextgenSession`) that can read the project.
+	// session cookie (`sessionCookie`) that can read the project.
 	//
 	// GET /projects/{project_id}/admins
 	ListProjectAdmins(ctx context.Context, params ListProjectAdminsParams) (ListProjectAdminsRes, error)
@@ -979,8 +1007,8 @@ type Handler interface {
 	// body-conditional). A user-bound Console session that already passed
 	// the project Check may expand without those scopes.
 	// Accepts either a project secret (`oauth2`) or a user-bound Console
-	// session cookie (`nextgenSession`). Cookie-authenticated requests
-	// follow the scheme's CSRF rules (`nextgenSession`).
+	// session cookie (`sessionCookie`). Cookie-authenticated requests
+	// follow the scheme's CSRF rules (`sessionCookie`).
 	//
 	// POST /grants/query
 	QueryGrants(ctx context.Context, req *QueryGrantsRequest, params QueryGrantsParams) (QueryGrantsRes, error)
@@ -1012,6 +1040,8 @@ type Handler interface {
 	// QueryTeams implements queryTeams operation.
 	//
 	// Returns the teams of a project, paginated with a cursor.
+	// `project_id` names the project to list; without it, the credential's own
+	// project is listed.
 	//
 	// POST /teams/query
 	QueryTeams(ctx context.Context, req *QueryTeamsRequest, params QueryTeamsParams) (QueryTeamsRes, error)
@@ -1021,8 +1051,8 @@ type Handler interface {
 	// `project_id` names the project to list; without it, the credential's own
 	// project is listed.
 	// Accepts either a project secret (`oauth2`) or a user-bound Console
-	// session cookie (`nextgenSession`). Cookie-authenticated requests
-	// follow the scheme's CSRF rules (`nextgenSession`).
+	// session cookie (`sessionCookie`). Cookie-authenticated requests
+	// follow the scheme's CSRF rules (`sessionCookie`).
 	//
 	// POST /users/query
 	QueryUsers(ctx context.Context, req *QueryUsersRequest, params QueryUsersParams) (QueryUsersRes, error)
@@ -1050,7 +1080,7 @@ type Handler interface {
 	// RevokeMySession implements revokeMySession operation.
 	//
 	// Logs out by permanently deleting the session.
-	// The `__nextgen_session` cookie issued at creation (or superseded by a handoff
+	// The session cookie issued at creation (or superseded by a handoff
 	// exchange) is required, with the session's token from `GET /sessions/me/csrf`
 	// in the `X-Zitadel-CSRF` header. Idempotent: if the session is already gone
 	// this still returns 204. Any tokens derived from the session are invalidated,
@@ -1085,8 +1115,8 @@ type Handler interface {
 	//
 	// Permanently deletes the session, terminating it immediately.
 	// This is the operator revoke path and requires the `session.delete` scope on a
-	// project-bound credential. End-user logout with the `__nextgen_session` cookie is
-	// `DELETE /sessions/me` (`nextgenSession` scheme).
+	// project-bound credential. End-user logout with the session cookie is
+	// `DELETE /sessions/me` (`sessionCookie` scheme).
 	// Idempotent: deleting a session that does not exist (or was already deleted)
 	// still returns 204. After deletion, any tokens derived from the session are
 	// invalidated.

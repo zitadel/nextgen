@@ -40,23 +40,23 @@ const signInHandlers = [
   http.get(`${SERVER}/console/runtime.json`, () =>
     HttpResponse.json({ console_project_id: "proj_platform", publishable_key: "pk_platform" }),
   ),
-  http.post(`${SERVER}/auth_attempts`, async ({ request }) => {
+  http.post(`${SERVER}/api/v1/auth_attempts`, async ({ request }) => {
     await record(request);
     return HttpResponse.json({ attempt_id: "att_1", state: "in_progress" }, { status: 201 });
   }),
-  http.post(`${SERVER}/auth_attempts/:attempt/challenges`, async ({ request }) => {
+  http.post(`${SERVER}/api/v1/auth_attempts/:attempt/challenges`, async ({ request }) => {
     await record(request);
     const { method } = (await request.json()) as { method: string };
     return HttpResponse.json({ challenge_id: `ch_${method}`, method }, { status: 201 });
   }),
   http.post(
-    `${SERVER}/auth_attempts/:attempt/challenges/:challenge/verify`,
+    `${SERVER}/api/v1/auth_attempts/:attempt/challenges/:challenge/verify`,
     async ({ request }) => {
       await record(request);
       return HttpResponse.json({ attempt_id: "att_1", state: "in_progress" });
     },
   ),
-  http.post(`${SERVER}/auth_attempts/:attempt/handoff`, async ({ request }) => {
+  http.post(`${SERVER}/api/v1/auth_attempts/:attempt/handoff`, async ({ request }) => {
     await record(request);
     return HttpResponse.json({
       handoff_token: "handoff/one+time",
@@ -84,12 +84,12 @@ describe("local admin sign-in", () => {
     );
 
     expect(calls.map((call) => call.path)).toEqual([
-      "/auth_attempts",
-      "/auth_attempts/att_1/challenges",
-      "/auth_attempts/att_1/challenges/ch_identifier/verify",
-      "/auth_attempts/att_1/challenges",
-      "/auth_attempts/att_1/challenges/ch_password/verify",
-      "/auth_attempts/att_1/handoff",
+      "/api/v1/auth_attempts",
+      "/api/v1/auth_attempts/att_1/challenges",
+      "/api/v1/auth_attempts/att_1/challenges/ch_identifier/verify",
+      "/api/v1/auth_attempts/att_1/challenges",
+      "/api/v1/auth_attempts/att_1/challenges/ch_password/verify",
+      "/api/v1/auth_attempts/att_1/handoff",
     ]);
     expect(calls[0]?.body).toEqual({ project_id: "proj_platform" });
     expect(calls[1]?.body).toEqual({ method: "identifier" });
@@ -110,29 +110,56 @@ describe("local admin sign-in", () => {
   it("exchanges the handoff token for the session cookie", async () => {
     let exchanged: unknown;
     server.use(
-      http.post(`${SERVER}/sessions/exchange`, async ({ request }) => {
+      http.post(`${SERVER}/api/v1/sessions/exchange`, async ({ request }) => {
         exchanged = {
           project: new URL(request.url).searchParams.get("project_id"),
           body: await request.json(),
         };
         return new HttpResponse(null, {
-          headers: { "set-cookie": "__nextgen_session=sess_cookie_value; Path=/; HttpOnly" },
+          headers: { "set-cookie": "zitadel_session=sess_cookie_value; Path=/; HttpOnly" },
         });
       }),
     );
 
     const cookie = await adminSessionCookie(SERVER, admin);
 
-    expect(cookie).toBe("__nextgen_session=sess_cookie_value");
+    expect(cookie).toBe("zitadel_session=sess_cookie_value");
     expect(exchanged).toEqual({
       project: "proj_platform",
       body: { handoff_token: "handoff/one+time" },
     });
   });
 
-  it("fails when the exchange sets no session cookie", async () => {
+  // A server reached over https sets the prefixed name, and takes it back.
+  it("keeps the session cookie under the prefixed name an https server sets", async () => {
     server.use(
-      http.post(`${SERVER}/sessions/exchange`, () => HttpResponse.json({}, { status: 200 })),
+      http.post(
+        `${SERVER}/api/v1/sessions/exchange`,
+        () =>
+          new HttpResponse(null, {
+            headers: {
+              "set-cookie": "__Host-zitadel_session=sess_cookie_value; Path=/; HttpOnly; Secure",
+            },
+          }),
+      ),
+    );
+
+    const cookie = await adminSessionCookie(SERVER, admin);
+
+    expect(cookie).toBe("__Host-zitadel_session=sess_cookie_value");
+  });
+
+  it.each([
+    ["sets no session cookie", {}],
+    [
+      "sets only a session cookie from before ADR 083",
+      { "set-cookie": "__nextgen_session=sess_cookie_value; Path=/; HttpOnly" },
+    ],
+  ])("fails when the exchange %s", async (_label, headers) => {
+    server.use(
+      http.post(`${SERVER}/api/v1/sessions/exchange`, () =>
+        HttpResponse.json({}, { status: 200, headers }),
+      ),
     );
 
     await expect(adminSessionCookie(SERVER, admin)).rejects.toThrow(
@@ -163,7 +190,7 @@ describe("local admin sign-in", () => {
   // command an agent would run.
   it("explains a rejected identifier without steering an agent into a reset", async () => {
     server.use(
-      http.post(`${SERVER}/auth_attempts/:attempt/challenges/:challenge/verify`, () =>
+      http.post(`${SERVER}/api/v1/auth_attempts/:attempt/challenges/:challenge/verify`, () =>
         HttpResponse.json(
           { code: "att.proof_rejected", message: "The proof was rejected." },
           { status: 409 },
@@ -186,7 +213,7 @@ describe("local admin sign-in", () => {
 
   it("reports a rejected password with the server's own message", async () => {
     server.use(
-      http.post(`${SERVER}/auth_attempts/:attempt/challenges/ch_password/verify`, () =>
+      http.post(`${SERVER}/api/v1/auth_attempts/:attempt/challenges/ch_password/verify`, () =>
         HttpResponse.json(
           { code: "att.proof_rejected", message: "The proof was rejected." },
           { status: 409 },

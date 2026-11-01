@@ -1,0 +1,226 @@
+---
+title: Migrate users between schema revisions
+description: Move existing users to a new user schema revision through the API.
+---
+
+A user schema is immutable. Every change you deploy creates a new revision of
+it, and a user stays on the revision they were created on until you move them.
+This guide covers moving them: which changes need data from you, how to send
+it, and how to check progress.
+
+## Three separate steps
+
+Changing a schema is three steps, and each one happens only when you do it:
+
+1. **Definition**: you edit `.zitadel/schemas/*.json`. Building a release from
+   it creates a new revision.
+2. **Deployment**: you [deploy](/docs/guides/deploy) a release. New
+   registrations use the schema revision that release pins. Existing users are
+   not touched.
+3. **Migration**: you move existing users to another revision through the API,
+   one user per request, with any attribute changes the target revision needs.
+
+Deploying never migrates users, and migrating never deploys.
+
+A login flow uses the schema revision its release pins for two things: the
+fields its steps show, and the users it creates. New registrations land on
+that revision. It never checks an existing user's record against it. Sign-in
+looks the login name up among the users of every revision of the schema, and
+checks the password, passkey or SSO link, which belong to the user and not to
+a revision. A user on an older or newer revision therefore signs in under the
+same flow, as long as both revisions keep the same sign-in identifier and
+authentication methods. Users spread over several revisions are normal while a
+migration is in progress.
+
+## Three revisions to tell apart
+
+| Revision               | What it is                                                      | Where to read it                                                     |
+|------------------------|-----------------------------------------------------------------|----------------------------------------------------------------------|
+| The newest             | The most recently created revision of the schema                | `zitadel schemas list --filter object_type=equals:<objectType>`      |
+| The one a release pins | The revision new registrations use while that release is served | `zitadel release get <release_id>`, `zitadel deployment list --live` |
+| A user's own           | The revision the user's attributes are validated against        | `schema` on the user: `zitadel users get <user_id>`                  |
+
+The newest revision is not automatically the one in use: a revision you released
+but didn't deploy takes no registrations.
+
+## What a migration supports
+
+A migration changes a user's attributes. It is supported for attributes that
+play no part in sign-in. Sign-in identifiers, uniqueness rules, authentication
+methods and SSO connections must stay the same between the two revisions.
+Zitadel does not detect or block a migration that changes them, so check the
+target revision yourself.
+
+| Schema change              | Example                                                    | What the migration request needs                                                                        |
+|----------------------------|------------------------------------------------------------|---------------------------------------------------------------------------------------------------------|
+| Add an optional attribute  | Add `preferredLanguage`                                    | Nothing but the target revision                                                                         |
+| Relax validation           | Raise a `maxLength`, or make a required attribute optional | Nothing but the target revision                                                                         |
+| Add a required attribute   | Make `country` required                                    | A valid value for it, when the user has none                                                            |
+| Tighten validation         | Restrict `country` to a list of values                     | A corrected value, when the stored one no longer passes                                                 |
+| Rename an attribute        | Replace `surname` with `lastName`                          | The value under the new name; the old one removed only if the target sets `additionalProperties: false` |
+| Remove an attribute        | Drop `nickname`                                            | Nothing, unless the target sets `additionalProperties: false`: then the stored value removed            |
+| Change an attribute's type | `age` from a string to a number                            | A value of the new type. Zitadel does not convert it                                                    |
+
+A removed or renamed attribute only has to go when the target revision sets
+`additionalProperties: false`. Without it, the old value stays on the user as
+an extra property the target accepts. You can still remove it by sending it as
+`null`.
+
+Your own application has to read users on both revisions while a migration
+runs. Plan when you deploy application changes around that.
+
+If a changed attribute is collected at registration, update the login flow
+too, so the release you deploy pins both the schema and the flow that collects
+it. The [deploy guide](/docs/guides/deploy#walkthrough-add-a-field-to-registration)
+shows adding a field to the register step.
+
+## Migrate a user
+
+Send the target revision as `schema` and the attribute changes as `attributes`
+to `PATCH /users/{user_id}` (see [Users](/docs/reference/api/users)). The CLI
+sends the same request:
+
+```sh
+npx @zitadel/cli@latest users update <user_id> \
+  --schema <target revision id> \
+  --attributes country=CH \
+  --json
+```
+
+Repeat `--attributes` for each attribute. `key=value` sends a string, and
+`key:=value` sends JSON: `age:=36` for a number, `surname:=null` to remove an
+attribute. `--data` takes the whole request body as JSON instead, as in the
+examples below.
+
+`attributes` is merged into what the user has: a key you leave out stays as
+it is, `null` removes an attribute, and any other value replaces it. Zitadel
+validates the merged result against the target revision and checks its
+uniqueness rules, then saves the revision and the attributes together.
+
+The target must be a revision of the user's own schema, the same `objectType`,
+older or newer. A schema with another `objectType` is refused with
+`400 user.invalid`.
+
+### Examples
+
+Each request moves a user from revision 1 of their schema to revision 2, for
+one kind of change.
+
+Added optional attribute, or relaxed validation: send only the revision.
+
+```json
+{ "schema": "<revision 2>" }
+```
+
+Added required attribute: supply the value for a user who has none.
+
+```json
+{ "schema": "<revision 2>", "attributes": { "country": "CH" } }
+```
+
+Tightened validation: replace the value that no longer passes, here a
+`country` stored as `"Switzerland"` that revision 2 limits to country codes.
+
+```json
+{ "schema": "<revision 2>", "attributes": { "country": "CH" } }
+```
+
+Renamed attribute: write the value under the new name and remove the old one.
+When revision 2 sets `additionalProperties: false`, sending only `lastName` is
+refused, because the user still has `surname`. Without that setting, removing
+`surname` is optional cleanup.
+
+```json
+{
+  "schema": "<revision 2>",
+  "attributes": { "lastName": "Lovelace", "surname": null }
+}
+```
+
+Removed attribute, when revision 2 sets `additionalProperties: false`: remove
+the stored value. Without that setting, `{ "schema": "<revision 2>" }` alone
+is enough, and this request is optional cleanup.
+
+```json
+{ "schema": "<revision 2>", "attributes": { "nickname": null } }
+```
+
+Changed type: send the value in the new type, here an `age` stored as the
+string `"36"`.
+
+```json
+{ "schema": "<revision 2>", "attributes": { "age": 36 } }
+```
+
+### When a migration is refused
+
+A refused migration changes nothing: the user keeps their revision and every
+attribute. The response names each attribute that fails the target revision,
+by its path in the request body, without the rejected values:
+
+```json
+{
+  "code": "req.invalid",
+  "message": "…",
+  "details": {
+    "details": { "fields": ["attributes.country"] }
+  }
+}
+```
+
+An attribute you didn't send is named too when the merged result fails on it,
+as when the target requires `country` and the user has none. Fix those
+attributes and send the request again.
+
+A value that another user already holds under a uniqueness rule answers
+`409 user.already_exists`, with the attributes in the same
+`details.details.fields` list.
+
+### What a migration keeps
+
+A migration changes the schema reference and the attributes, nothing else.
+The user's id, password, passkeys, team memberships and SSO links stay, and
+the user signs in as before.
+
+### Moving back to an older revision
+
+You can move a user to an older revision with the same request. The same
+validation applies. Values an earlier migration removed are not restored: send
+them again if the older revision needs them.
+
+## Find users by revision
+
+List the users on one revision:
+
+```sh
+npx @zitadel/cli@latest users list \
+  --filter schema=equals:<revision id> \
+  --all --json
+```
+
+List the users of a schema who are not on its newest revision yet, which is
+the list left to migrate:
+
+```sh
+npx @zitadel/cli@latest users list \
+  --filter schema_object_type=equals:<objectType> \
+  --filter schema=not_equals:<newest revision id> \
+  --all --json
+```
+
+`data.count` in the result is how many users matched. It shows how users are
+spread over revisions now, not who was migrated: a user created on the newest
+revision was never migrated, and still counts.
+
+The same filters work on `POST /users/query` (see
+[Users](/docs/reference/api/users)).
+
+## Rolling back
+
+[`deployment rollback`](/docs/guides/deploy#releases-deployments-and-rollback)
+serves an earlier release again, and new registrations follow the revision
+that release pins. A rollback restores configuration, not user data: users
+keep their revisions and attributes, including those you migrated. For the
+attribute-only changes above, migrated users keep signing in after a rollback
+without being moved back. A rollback doesn't reverse a data change you made
+during migration.

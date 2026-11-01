@@ -1,9 +1,7 @@
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { resetPlatformStore, setupPlatformHandlers } from "@zitadel/api-mock/platform";
-import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@clack/prompts", async () => (await import("../../../../helpers/clack")).clackDouble());
 
@@ -19,22 +17,16 @@ import {
   withStdin,
   writeJson,
 } from "../../../../helpers/local-project";
+import { usePlatformServer } from "../../../../helpers/platform-project";
 import { parseJson, runCliForTest } from "../../../../helpers/run-cli";
 import { asTerminal } from "../../../../helpers/terminal";
 
 // The built CLI bundles its own prompts, so a prompt can only be answered by
 // running the command from source, where `input` is the one module asked.
-const platform = setupServer(...setupPlatformHandlers());
-
-beforeAll(() => platform.listen({ onUnhandledRequest: "error" }));
-afterAll(() => platform.close());
+usePlatformServer();
 beforeEach(() => {
   vi.mocked(text).mockReset();
   vi.mocked(password).mockReset();
-});
-afterEach(() => {
-  platform.resetHandlers();
-  resetPlatformStore();
 });
 
 const ACME = {

@@ -15,6 +15,7 @@ import (
 // AddOriginErrorResponse represents sum type.
 type AddOriginErrorResponse struct {
 	Type                   AddOriginErrorResponseType // switch on this field
+	AuthCsrfInvalid        AuthCsrfInvalid
 	AuthUnauthorized       AuthUnauthorized
 	EvtInvalid             EvtInvalid
 	Internal               Internal
@@ -35,6 +36,7 @@ type AddOriginErrorResponseType string
 
 // Possible values for AddOriginErrorResponseType.
 const (
+	AuthCsrfInvalidAddOriginErrorResponse        AddOriginErrorResponseType = "auth.csrf_invalid"
 	AuthUnauthorizedAddOriginErrorResponse       AddOriginErrorResponseType = "auth.unauthorized"
 	EvtInvalidAddOriginErrorResponse             AddOriginErrorResponseType = "evt.invalid"
 	InternalAddOriginErrorResponse               AddOriginErrorResponseType = "internal"
@@ -49,6 +51,11 @@ const (
 	ReqInvalidAddOriginErrorResponse             AddOriginErrorResponseType = "req.invalid"
 	UnavailableAddOriginErrorResponse            AddOriginErrorResponseType = "unavailable"
 )
+
+// IsAuthCsrfInvalid reports whether AddOriginErrorResponse is AuthCsrfInvalid.
+func (s AddOriginErrorResponse) IsAuthCsrfInvalid() bool {
+	return s.Type == AuthCsrfInvalidAddOriginErrorResponse
+}
 
 // IsAuthUnauthorized reports whether AddOriginErrorResponse is AuthUnauthorized.
 func (s AddOriginErrorResponse) IsAuthUnauthorized() bool {
@@ -111,6 +118,27 @@ func (s AddOriginErrorResponse) IsReqInvalid() bool {
 // IsUnavailable reports whether AddOriginErrorResponse is Unavailable.
 func (s AddOriginErrorResponse) IsUnavailable() bool {
 	return s.Type == UnavailableAddOriginErrorResponse
+}
+
+// SetAuthCsrfInvalid sets AddOriginErrorResponse to AuthCsrfInvalid.
+func (s *AddOriginErrorResponse) SetAuthCsrfInvalid(v AuthCsrfInvalid) {
+	s.Type = AuthCsrfInvalidAddOriginErrorResponse
+	s.AuthCsrfInvalid = v
+}
+
+// GetAuthCsrfInvalid returns AuthCsrfInvalid and true boolean if AddOriginErrorResponse is AuthCsrfInvalid.
+func (s AddOriginErrorResponse) GetAuthCsrfInvalid() (v AuthCsrfInvalid, ok bool) {
+	if !s.IsAuthCsrfInvalid() {
+		return v, false
+	}
+	return s.AuthCsrfInvalid, true
+}
+
+// NewAuthCsrfInvalidAddOriginErrorResponse returns new AddOriginErrorResponse from AuthCsrfInvalid.
+func NewAuthCsrfInvalidAddOriginErrorResponse(v AuthCsrfInvalid) AddOriginErrorResponse {
+	var s AddOriginErrorResponse
+	s.SetAuthCsrfInvalid(v)
+	return s
 }
 
 // SetAuthUnauthorized sets AddOriginErrorResponse to AuthUnauthorized.
@@ -13358,6 +13386,7 @@ type CreateDeploymentErrorResponse struct {
 	DepInvalid           DepInvalid
 	DepNotFound          DepNotFound
 	DepPermissionDenied  DepPermissionDenied
+	DepVariablesMissing  DepVariablesMissing
 	EnvProjectNotFound   EnvProjectNotFound
 	EvtInvalid           EvtInvalid
 	Internal             Internal
@@ -13368,6 +13397,7 @@ type CreateDeploymentErrorResponse struct {
 	RelRevoked           RelRevoked
 	ReqInvalid           ReqInvalid
 	Unavailable          Unavailable
+	VarDocumentTooDeep   VarDocumentTooDeep
 }
 
 // CreateDeploymentErrorResponseType is oneOf type of CreateDeploymentErrorResponse.
@@ -13381,6 +13411,7 @@ const (
 	DepInvalidCreateDeploymentErrorResponse           CreateDeploymentErrorResponseType = "dep.invalid"
 	DepNotFoundCreateDeploymentErrorResponse          CreateDeploymentErrorResponseType = "dep.not_found"
 	DepPermissionDeniedCreateDeploymentErrorResponse  CreateDeploymentErrorResponseType = "dep.permission_denied"
+	DepVariablesMissingCreateDeploymentErrorResponse  CreateDeploymentErrorResponseType = "dep.variables_missing"
 	EnvProjectNotFoundCreateDeploymentErrorResponse   CreateDeploymentErrorResponseType = "env.project_not_found"
 	EvtInvalidCreateDeploymentErrorResponse           CreateDeploymentErrorResponseType = "evt.invalid"
 	InternalCreateDeploymentErrorResponse             CreateDeploymentErrorResponseType = "internal"
@@ -13391,6 +13422,7 @@ const (
 	RelRevokedCreateDeploymentErrorResponse           CreateDeploymentErrorResponseType = "rel.revoked"
 	ReqInvalidCreateDeploymentErrorResponse           CreateDeploymentErrorResponseType = "req.invalid"
 	UnavailableCreateDeploymentErrorResponse          CreateDeploymentErrorResponseType = "unavailable"
+	VarDocumentTooDeepCreateDeploymentErrorResponse   CreateDeploymentErrorResponseType = "var.document_too_deep"
 )
 
 // IsAuthCsrfInvalid reports whether CreateDeploymentErrorResponse is AuthCsrfInvalid.
@@ -13421,6 +13453,11 @@ func (s CreateDeploymentErrorResponse) IsDepNotFound() bool {
 // IsDepPermissionDenied reports whether CreateDeploymentErrorResponse is DepPermissionDenied.
 func (s CreateDeploymentErrorResponse) IsDepPermissionDenied() bool {
 	return s.Type == DepPermissionDeniedCreateDeploymentErrorResponse
+}
+
+// IsDepVariablesMissing reports whether CreateDeploymentErrorResponse is DepVariablesMissing.
+func (s CreateDeploymentErrorResponse) IsDepVariablesMissing() bool {
+	return s.Type == DepVariablesMissingCreateDeploymentErrorResponse
 }
 
 // IsEnvProjectNotFound reports whether CreateDeploymentErrorResponse is EnvProjectNotFound.
@@ -13471,6 +13508,11 @@ func (s CreateDeploymentErrorResponse) IsReqInvalid() bool {
 // IsUnavailable reports whether CreateDeploymentErrorResponse is Unavailable.
 func (s CreateDeploymentErrorResponse) IsUnavailable() bool {
 	return s.Type == UnavailableCreateDeploymentErrorResponse
+}
+
+// IsVarDocumentTooDeep reports whether CreateDeploymentErrorResponse is VarDocumentTooDeep.
+func (s CreateDeploymentErrorResponse) IsVarDocumentTooDeep() bool {
+	return s.Type == VarDocumentTooDeepCreateDeploymentErrorResponse
 }
 
 // SetAuthCsrfInvalid sets CreateDeploymentErrorResponse to AuthCsrfInvalid.
@@ -13596,6 +13638,27 @@ func (s CreateDeploymentErrorResponse) GetDepPermissionDenied() (v DepPermission
 func NewDepPermissionDeniedCreateDeploymentErrorResponse(v DepPermissionDenied) CreateDeploymentErrorResponse {
 	var s CreateDeploymentErrorResponse
 	s.SetDepPermissionDenied(v)
+	return s
+}
+
+// SetDepVariablesMissing sets CreateDeploymentErrorResponse to DepVariablesMissing.
+func (s *CreateDeploymentErrorResponse) SetDepVariablesMissing(v DepVariablesMissing) {
+	s.Type = DepVariablesMissingCreateDeploymentErrorResponse
+	s.DepVariablesMissing = v
+}
+
+// GetDepVariablesMissing returns DepVariablesMissing and true boolean if CreateDeploymentErrorResponse is DepVariablesMissing.
+func (s CreateDeploymentErrorResponse) GetDepVariablesMissing() (v DepVariablesMissing, ok bool) {
+	if !s.IsDepVariablesMissing() {
+		return v, false
+	}
+	return s.DepVariablesMissing, true
+}
+
+// NewDepVariablesMissingCreateDeploymentErrorResponse returns new CreateDeploymentErrorResponse from DepVariablesMissing.
+func NewDepVariablesMissingCreateDeploymentErrorResponse(v DepVariablesMissing) CreateDeploymentErrorResponse {
+	var s CreateDeploymentErrorResponse
+	s.SetDepVariablesMissing(v)
 	return s
 }
 
@@ -13806,6 +13869,27 @@ func (s CreateDeploymentErrorResponse) GetUnavailable() (v Unavailable, ok bool)
 func NewUnavailableCreateDeploymentErrorResponse(v Unavailable) CreateDeploymentErrorResponse {
 	var s CreateDeploymentErrorResponse
 	s.SetUnavailable(v)
+	return s
+}
+
+// SetVarDocumentTooDeep sets CreateDeploymentErrorResponse to VarDocumentTooDeep.
+func (s *CreateDeploymentErrorResponse) SetVarDocumentTooDeep(v VarDocumentTooDeep) {
+	s.Type = VarDocumentTooDeepCreateDeploymentErrorResponse
+	s.VarDocumentTooDeep = v
+}
+
+// GetVarDocumentTooDeep returns VarDocumentTooDeep and true boolean if CreateDeploymentErrorResponse is VarDocumentTooDeep.
+func (s CreateDeploymentErrorResponse) GetVarDocumentTooDeep() (v VarDocumentTooDeep, ok bool) {
+	if !s.IsVarDocumentTooDeep() {
+		return v, false
+	}
+	return s.VarDocumentTooDeep, true
+}
+
+// NewVarDocumentTooDeepCreateDeploymentErrorResponse returns new CreateDeploymentErrorResponse from VarDocumentTooDeep.
+func NewVarDocumentTooDeepCreateDeploymentErrorResponse(v VarDocumentTooDeep) CreateDeploymentErrorResponse {
+	var s CreateDeploymentErrorResponse
+	s.SetVarDocumentTooDeep(v)
 	return s
 }
 
@@ -20085,6 +20169,10 @@ type DeleteTeamUnauthorized ErrorDetails
 
 func (*DeleteTeamUnauthorized) deleteTeamRes() {}
 
+type DeleteUserByIDConflict ErrorDetails
+
+func (*DeleteUserByIDConflict) deleteUserByIDRes() {}
+
 // DeleteUserByIDErrorResponse represents sum type.
 type DeleteUserByIDErrorResponse struct {
 	Type                 DeleteUserByIDErrorResponseType // switch on this field
@@ -20093,6 +20181,7 @@ type DeleteUserByIDErrorResponse struct {
 	EvtInvalid           EvtInvalid
 	Internal             Internal
 	NotImplemented       NotImplemented
+	ProjLastOwner        ProjLastOwner
 	ReqInvalid           ReqInvalid
 	Unavailable          Unavailable
 	UserNotFound         UserNotFound
@@ -20109,6 +20198,7 @@ const (
 	EvtInvalidDeleteUserByIDErrorResponse           DeleteUserByIDErrorResponseType = "evt.invalid"
 	InternalDeleteUserByIDErrorResponse             DeleteUserByIDErrorResponseType = "internal"
 	NotImplementedDeleteUserByIDErrorResponse       DeleteUserByIDErrorResponseType = "not_implemented"
+	ProjLastOwnerDeleteUserByIDErrorResponse        DeleteUserByIDErrorResponseType = "proj.last_owner"
 	ReqInvalidDeleteUserByIDErrorResponse           DeleteUserByIDErrorResponseType = "req.invalid"
 	UnavailableDeleteUserByIDErrorResponse          DeleteUserByIDErrorResponseType = "unavailable"
 	UserNotFoundDeleteUserByIDErrorResponse         DeleteUserByIDErrorResponseType = "user.not_found"
@@ -20138,6 +20228,11 @@ func (s DeleteUserByIDErrorResponse) IsInternal() bool {
 // IsNotImplemented reports whether DeleteUserByIDErrorResponse is NotImplemented.
 func (s DeleteUserByIDErrorResponse) IsNotImplemented() bool {
 	return s.Type == NotImplementedDeleteUserByIDErrorResponse
+}
+
+// IsProjLastOwner reports whether DeleteUserByIDErrorResponse is ProjLastOwner.
+func (s DeleteUserByIDErrorResponse) IsProjLastOwner() bool {
+	return s.Type == ProjLastOwnerDeleteUserByIDErrorResponse
 }
 
 // IsReqInvalid reports whether DeleteUserByIDErrorResponse is ReqInvalid.
@@ -20262,6 +20357,27 @@ func (s DeleteUserByIDErrorResponse) GetNotImplemented() (v NotImplemented, ok b
 func NewNotImplementedDeleteUserByIDErrorResponse(v NotImplemented) DeleteUserByIDErrorResponse {
 	var s DeleteUserByIDErrorResponse
 	s.SetNotImplemented(v)
+	return s
+}
+
+// SetProjLastOwner sets DeleteUserByIDErrorResponse to ProjLastOwner.
+func (s *DeleteUserByIDErrorResponse) SetProjLastOwner(v ProjLastOwner) {
+	s.Type = ProjLastOwnerDeleteUserByIDErrorResponse
+	s.ProjLastOwner = v
+}
+
+// GetProjLastOwner returns ProjLastOwner and true boolean if DeleteUserByIDErrorResponse is ProjLastOwner.
+func (s DeleteUserByIDErrorResponse) GetProjLastOwner() (v ProjLastOwner, ok bool) {
+	if !s.IsProjLastOwner() {
+		return v, false
+	}
+	return s.ProjLastOwner, true
+}
+
+// NewProjLastOwnerDeleteUserByIDErrorResponse returns new DeleteUserByIDErrorResponse from ProjLastOwner.
+func NewProjLastOwnerDeleteUserByIDErrorResponse(v ProjLastOwner) DeleteUserByIDErrorResponse {
+	var s DeleteUserByIDErrorResponse
+	s.SetProjLastOwner(v)
 	return s
 }
 
@@ -20863,6 +20979,59 @@ func (s *DepPermissionDenied) SetDetails(val OptDepPermissionDeniedDetails) {
 type DepPermissionDeniedDetails map[string]jx.Raw
 
 func (s *DepPermissionDeniedDetails) init() DepPermissionDeniedDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type DepVariablesMissing struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptDepVariablesMissingDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *DepVariablesMissing) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *DepVariablesMissing) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *DepVariablesMissing) GetDetails() OptDepVariablesMissingDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *DepVariablesMissing) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *DepVariablesMissing) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *DepVariablesMissing) SetDetails(val OptDepVariablesMissingDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type DepVariablesMissingDetails map[string]jx.Raw
+
+func (s *DepVariablesMissingDetails) init() DepVariablesMissingDetails {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}
@@ -22429,6 +22598,408 @@ func (s *ErrorDetailsStatusCode) SetResponse(val ErrorDetails) {
 
 func (*ErrorDetailsStatusCode) getLiveRes()  {}
 func (*ErrorDetailsStatusCode) getReadyRes() {}
+
+// EvaluatePolicyErrorResponse represents sum type.
+type EvaluatePolicyErrorResponse struct {
+	Type                EvaluatePolicyErrorResponseType // switch on this field
+	AuthCsrfInvalid     AuthCsrfInvalid
+	AuthUnauthorized    AuthUnauthorized
+	Internal            Internal
+	NotImplemented      NotImplemented
+	PolInvalid          PolInvalid
+	PolNotFound         PolNotFound
+	PolPermissionDenied PolPermissionDenied
+	ReqInvalid          ReqInvalid
+	Unavailable         Unavailable
+}
+
+// EvaluatePolicyErrorResponseType is oneOf type of EvaluatePolicyErrorResponse.
+type EvaluatePolicyErrorResponseType string
+
+// Possible values for EvaluatePolicyErrorResponseType.
+const (
+	AuthCsrfInvalidEvaluatePolicyErrorResponse     EvaluatePolicyErrorResponseType = "auth.csrf_invalid"
+	AuthUnauthorizedEvaluatePolicyErrorResponse    EvaluatePolicyErrorResponseType = "auth.unauthorized"
+	InternalEvaluatePolicyErrorResponse            EvaluatePolicyErrorResponseType = "internal"
+	NotImplementedEvaluatePolicyErrorResponse      EvaluatePolicyErrorResponseType = "not_implemented"
+	PolInvalidEvaluatePolicyErrorResponse          EvaluatePolicyErrorResponseType = "pol.invalid"
+	PolNotFoundEvaluatePolicyErrorResponse         EvaluatePolicyErrorResponseType = "pol.not_found"
+	PolPermissionDeniedEvaluatePolicyErrorResponse EvaluatePolicyErrorResponseType = "pol.permission_denied"
+	ReqInvalidEvaluatePolicyErrorResponse          EvaluatePolicyErrorResponseType = "req.invalid"
+	UnavailableEvaluatePolicyErrorResponse         EvaluatePolicyErrorResponseType = "unavailable"
+)
+
+// IsAuthCsrfInvalid reports whether EvaluatePolicyErrorResponse is AuthCsrfInvalid.
+func (s EvaluatePolicyErrorResponse) IsAuthCsrfInvalid() bool {
+	return s.Type == AuthCsrfInvalidEvaluatePolicyErrorResponse
+}
+
+// IsAuthUnauthorized reports whether EvaluatePolicyErrorResponse is AuthUnauthorized.
+func (s EvaluatePolicyErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedEvaluatePolicyErrorResponse
+}
+
+// IsInternal reports whether EvaluatePolicyErrorResponse is Internal.
+func (s EvaluatePolicyErrorResponse) IsInternal() bool {
+	return s.Type == InternalEvaluatePolicyErrorResponse
+}
+
+// IsNotImplemented reports whether EvaluatePolicyErrorResponse is NotImplemented.
+func (s EvaluatePolicyErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedEvaluatePolicyErrorResponse
+}
+
+// IsPolInvalid reports whether EvaluatePolicyErrorResponse is PolInvalid.
+func (s EvaluatePolicyErrorResponse) IsPolInvalid() bool {
+	return s.Type == PolInvalidEvaluatePolicyErrorResponse
+}
+
+// IsPolNotFound reports whether EvaluatePolicyErrorResponse is PolNotFound.
+func (s EvaluatePolicyErrorResponse) IsPolNotFound() bool {
+	return s.Type == PolNotFoundEvaluatePolicyErrorResponse
+}
+
+// IsPolPermissionDenied reports whether EvaluatePolicyErrorResponse is PolPermissionDenied.
+func (s EvaluatePolicyErrorResponse) IsPolPermissionDenied() bool {
+	return s.Type == PolPermissionDeniedEvaluatePolicyErrorResponse
+}
+
+// IsReqInvalid reports whether EvaluatePolicyErrorResponse is ReqInvalid.
+func (s EvaluatePolicyErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidEvaluatePolicyErrorResponse
+}
+
+// IsUnavailable reports whether EvaluatePolicyErrorResponse is Unavailable.
+func (s EvaluatePolicyErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableEvaluatePolicyErrorResponse
+}
+
+// SetAuthCsrfInvalid sets EvaluatePolicyErrorResponse to AuthCsrfInvalid.
+func (s *EvaluatePolicyErrorResponse) SetAuthCsrfInvalid(v AuthCsrfInvalid) {
+	s.Type = AuthCsrfInvalidEvaluatePolicyErrorResponse
+	s.AuthCsrfInvalid = v
+}
+
+// GetAuthCsrfInvalid returns AuthCsrfInvalid and true boolean if EvaluatePolicyErrorResponse is AuthCsrfInvalid.
+func (s EvaluatePolicyErrorResponse) GetAuthCsrfInvalid() (v AuthCsrfInvalid, ok bool) {
+	if !s.IsAuthCsrfInvalid() {
+		return v, false
+	}
+	return s.AuthCsrfInvalid, true
+}
+
+// NewAuthCsrfInvalidEvaluatePolicyErrorResponse returns new EvaluatePolicyErrorResponse from AuthCsrfInvalid.
+func NewAuthCsrfInvalidEvaluatePolicyErrorResponse(v AuthCsrfInvalid) EvaluatePolicyErrorResponse {
+	var s EvaluatePolicyErrorResponse
+	s.SetAuthCsrfInvalid(v)
+	return s
+}
+
+// SetAuthUnauthorized sets EvaluatePolicyErrorResponse to AuthUnauthorized.
+func (s *EvaluatePolicyErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedEvaluatePolicyErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if EvaluatePolicyErrorResponse is AuthUnauthorized.
+func (s EvaluatePolicyErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedEvaluatePolicyErrorResponse returns new EvaluatePolicyErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedEvaluatePolicyErrorResponse(v AuthUnauthorized) EvaluatePolicyErrorResponse {
+	var s EvaluatePolicyErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets EvaluatePolicyErrorResponse to Internal.
+func (s *EvaluatePolicyErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalEvaluatePolicyErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if EvaluatePolicyErrorResponse is Internal.
+func (s EvaluatePolicyErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalEvaluatePolicyErrorResponse returns new EvaluatePolicyErrorResponse from Internal.
+func NewInternalEvaluatePolicyErrorResponse(v Internal) EvaluatePolicyErrorResponse {
+	var s EvaluatePolicyErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets EvaluatePolicyErrorResponse to NotImplemented.
+func (s *EvaluatePolicyErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedEvaluatePolicyErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if EvaluatePolicyErrorResponse is NotImplemented.
+func (s EvaluatePolicyErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedEvaluatePolicyErrorResponse returns new EvaluatePolicyErrorResponse from NotImplemented.
+func NewNotImplementedEvaluatePolicyErrorResponse(v NotImplemented) EvaluatePolicyErrorResponse {
+	var s EvaluatePolicyErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
+// SetPolInvalid sets EvaluatePolicyErrorResponse to PolInvalid.
+func (s *EvaluatePolicyErrorResponse) SetPolInvalid(v PolInvalid) {
+	s.Type = PolInvalidEvaluatePolicyErrorResponse
+	s.PolInvalid = v
+}
+
+// GetPolInvalid returns PolInvalid and true boolean if EvaluatePolicyErrorResponse is PolInvalid.
+func (s EvaluatePolicyErrorResponse) GetPolInvalid() (v PolInvalid, ok bool) {
+	if !s.IsPolInvalid() {
+		return v, false
+	}
+	return s.PolInvalid, true
+}
+
+// NewPolInvalidEvaluatePolicyErrorResponse returns new EvaluatePolicyErrorResponse from PolInvalid.
+func NewPolInvalidEvaluatePolicyErrorResponse(v PolInvalid) EvaluatePolicyErrorResponse {
+	var s EvaluatePolicyErrorResponse
+	s.SetPolInvalid(v)
+	return s
+}
+
+// SetPolNotFound sets EvaluatePolicyErrorResponse to PolNotFound.
+func (s *EvaluatePolicyErrorResponse) SetPolNotFound(v PolNotFound) {
+	s.Type = PolNotFoundEvaluatePolicyErrorResponse
+	s.PolNotFound = v
+}
+
+// GetPolNotFound returns PolNotFound and true boolean if EvaluatePolicyErrorResponse is PolNotFound.
+func (s EvaluatePolicyErrorResponse) GetPolNotFound() (v PolNotFound, ok bool) {
+	if !s.IsPolNotFound() {
+		return v, false
+	}
+	return s.PolNotFound, true
+}
+
+// NewPolNotFoundEvaluatePolicyErrorResponse returns new EvaluatePolicyErrorResponse from PolNotFound.
+func NewPolNotFoundEvaluatePolicyErrorResponse(v PolNotFound) EvaluatePolicyErrorResponse {
+	var s EvaluatePolicyErrorResponse
+	s.SetPolNotFound(v)
+	return s
+}
+
+// SetPolPermissionDenied sets EvaluatePolicyErrorResponse to PolPermissionDenied.
+func (s *EvaluatePolicyErrorResponse) SetPolPermissionDenied(v PolPermissionDenied) {
+	s.Type = PolPermissionDeniedEvaluatePolicyErrorResponse
+	s.PolPermissionDenied = v
+}
+
+// GetPolPermissionDenied returns PolPermissionDenied and true boolean if EvaluatePolicyErrorResponse is PolPermissionDenied.
+func (s EvaluatePolicyErrorResponse) GetPolPermissionDenied() (v PolPermissionDenied, ok bool) {
+	if !s.IsPolPermissionDenied() {
+		return v, false
+	}
+	return s.PolPermissionDenied, true
+}
+
+// NewPolPermissionDeniedEvaluatePolicyErrorResponse returns new EvaluatePolicyErrorResponse from PolPermissionDenied.
+func NewPolPermissionDeniedEvaluatePolicyErrorResponse(v PolPermissionDenied) EvaluatePolicyErrorResponse {
+	var s EvaluatePolicyErrorResponse
+	s.SetPolPermissionDenied(v)
+	return s
+}
+
+// SetReqInvalid sets EvaluatePolicyErrorResponse to ReqInvalid.
+func (s *EvaluatePolicyErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidEvaluatePolicyErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if EvaluatePolicyErrorResponse is ReqInvalid.
+func (s EvaluatePolicyErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidEvaluatePolicyErrorResponse returns new EvaluatePolicyErrorResponse from ReqInvalid.
+func NewReqInvalidEvaluatePolicyErrorResponse(v ReqInvalid) EvaluatePolicyErrorResponse {
+	var s EvaluatePolicyErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets EvaluatePolicyErrorResponse to Unavailable.
+func (s *EvaluatePolicyErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableEvaluatePolicyErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if EvaluatePolicyErrorResponse is Unavailable.
+func (s EvaluatePolicyErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableEvaluatePolicyErrorResponse returns new EvaluatePolicyErrorResponse from Unavailable.
+func NewUnavailableEvaluatePolicyErrorResponse(v Unavailable) EvaluatePolicyErrorResponse {
+	var s EvaluatePolicyErrorResponse
+	s.SetUnavailable(v)
+	return s
+}
+
+// EvaluatePolicyErrorResponseStatusCode wraps EvaluatePolicyErrorResponse with StatusCode.
+type EvaluatePolicyErrorResponseStatusCode struct {
+	StatusCode int
+	Response   EvaluatePolicyErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *EvaluatePolicyErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *EvaluatePolicyErrorResponseStatusCode) GetResponse() EvaluatePolicyErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *EvaluatePolicyErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *EvaluatePolicyErrorResponseStatusCode) SetResponse(val EvaluatePolicyErrorResponse) {
+	s.Response = val
+}
+
+func (*EvaluatePolicyErrorResponseStatusCode) evaluatePolicyRes() {}
+
+// One dry run of an operation's policy. `operation` selects the operation's
+// template; `config` is the policy to evaluate, checked exactly as a publish
+// checks it; `input` is what the operation's request carries, in the
+// operation's own terms; `facts` states what the operation would look up at
+// runtime. The fields each operation accepts are listed in the policy
+// catalog.
+// Ref: #
+// EvaluatePolicyRequest represents sum type.
+type EvaluatePolicyRequest struct {
+	Type                       EvaluatePolicyRequestType // switch on this field
+	PasswordSetEvaluateRequest PasswordSetEvaluateRequest
+}
+
+// EvaluatePolicyRequestType is oneOf type of EvaluatePolicyRequest.
+type EvaluatePolicyRequestType string
+
+// Possible values for EvaluatePolicyRequestType.
+const (
+	PasswordSetEvaluateRequestEvaluatePolicyRequest EvaluatePolicyRequestType = "auth.factor.password.set"
+)
+
+// IsPasswordSetEvaluateRequest reports whether EvaluatePolicyRequest is PasswordSetEvaluateRequest.
+func (s EvaluatePolicyRequest) IsPasswordSetEvaluateRequest() bool {
+	return s.Type == PasswordSetEvaluateRequestEvaluatePolicyRequest
+}
+
+// SetPasswordSetEvaluateRequest sets EvaluatePolicyRequest to PasswordSetEvaluateRequest.
+func (s *EvaluatePolicyRequest) SetPasswordSetEvaluateRequest(v PasswordSetEvaluateRequest) {
+	s.Type = PasswordSetEvaluateRequestEvaluatePolicyRequest
+	s.PasswordSetEvaluateRequest = v
+}
+
+// GetPasswordSetEvaluateRequest returns PasswordSetEvaluateRequest and true boolean if EvaluatePolicyRequest is PasswordSetEvaluateRequest.
+func (s EvaluatePolicyRequest) GetPasswordSetEvaluateRequest() (v PasswordSetEvaluateRequest, ok bool) {
+	if !s.IsPasswordSetEvaluateRequest() {
+		return v, false
+	}
+	return s.PasswordSetEvaluateRequest, true
+}
+
+// NewPasswordSetEvaluateRequestEvaluatePolicyRequest returns new EvaluatePolicyRequest from PasswordSetEvaluateRequest.
+func NewPasswordSetEvaluateRequestEvaluatePolicyRequest(v PasswordSetEvaluateRequest) EvaluatePolicyRequest {
+	var s EvaluatePolicyRequest
+	s.SetPasswordSetEvaluateRequest(v)
+	return s
+}
+
+// The decision the operation would reach for the request. A refusal carries
+// the error code and violations an API call of the operation would answer
+// with; a login flow shows the same rules as field errors instead.
+// Ref: #
+type EvaluatePolicyResponse struct {
+	// Whether the operation would go ahead.
+	Allowed bool `json:"allowed"`
+	// The error code an API call of the operation would answer with, set
+	// only when it would refuse, for example `user.password_empty` or
+	// `user.password_policy_violation`.
+	Code OptString `json:"code"`
+	// Every failed rule keyed by name with the value of the setting it is
+	// named after, e.g. `{"min_length": 12}`, as the live error's
+	// `details.violations`. Set only with `user.password_policy_violation`.
+	Violations OptEvaluatePolicyResponseViolations `json:"violations"`
+}
+
+// GetAllowed returns the value of Allowed.
+func (s *EvaluatePolicyResponse) GetAllowed() bool {
+	return s.Allowed
+}
+
+// GetCode returns the value of Code.
+func (s *EvaluatePolicyResponse) GetCode() OptString {
+	return s.Code
+}
+
+// GetViolations returns the value of Violations.
+func (s *EvaluatePolicyResponse) GetViolations() OptEvaluatePolicyResponseViolations {
+	return s.Violations
+}
+
+// SetAllowed sets the value of Allowed.
+func (s *EvaluatePolicyResponse) SetAllowed(val bool) {
+	s.Allowed = val
+}
+
+// SetCode sets the value of Code.
+func (s *EvaluatePolicyResponse) SetCode(val OptString) {
+	s.Code = val
+}
+
+// SetViolations sets the value of Violations.
+func (s *EvaluatePolicyResponse) SetViolations(val OptEvaluatePolicyResponseViolations) {
+	s.Violations = val
+}
+
+func (*EvaluatePolicyResponse) evaluatePolicyRes() {}
+
+// Every failed rule keyed by name with the value of the setting it is
+// named after, e.g. `{"min_length": 12}`, as the live error's
+// `details.violations`. Set only with `user.password_policy_violation`.
+type EvaluatePolicyResponseViolations map[string]jx.Raw
+
+func (s *EvaluatePolicyResponseViolations) init() EvaluatePolicyResponseViolations {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
 
 // Discriminated wide-event union (ADR 048 / ADR 049). Clients select the
 // member via event_type; each member carries a typed payload.
@@ -32329,6 +32900,7 @@ type GetFlowStepErrorResponse struct {
 	Internal                    Internal
 	TknInvalid                  TknInvalid
 	NotImplemented              NotImplemented
+	ProjLastOwner               ProjLastOwner
 	RelNotFound                 RelNotFound
 	RelRevoked                  RelRevoked
 	ReqInvalid                  ReqInvalid
@@ -32373,6 +32945,7 @@ const (
 	InternalGetFlowStepErrorResponse                    GetFlowStepErrorResponseType = "internal"
 	TknInvalidGetFlowStepErrorResponse                  GetFlowStepErrorResponseType = "tkn.invalid"
 	NotImplementedGetFlowStepErrorResponse              GetFlowStepErrorResponseType = "not_implemented"
+	ProjLastOwnerGetFlowStepErrorResponse               GetFlowStepErrorResponseType = "proj.last_owner"
 	RelNotFoundGetFlowStepErrorResponse                 GetFlowStepErrorResponseType = "rel.not_found"
 	RelRevokedGetFlowStepErrorResponse                  GetFlowStepErrorResponseType = "rel.revoked"
 	ReqInvalidGetFlowStepErrorResponse                  GetFlowStepErrorResponseType = "req.invalid"
@@ -32510,6 +33083,11 @@ func (s GetFlowStepErrorResponse) IsTknInvalid() bool {
 // IsNotImplemented reports whether GetFlowStepErrorResponse is NotImplemented.
 func (s GetFlowStepErrorResponse) IsNotImplemented() bool {
 	return s.Type == NotImplementedGetFlowStepErrorResponse
+}
+
+// IsProjLastOwner reports whether GetFlowStepErrorResponse is ProjLastOwner.
+func (s GetFlowStepErrorResponse) IsProjLastOwner() bool {
+	return s.Type == ProjLastOwnerGetFlowStepErrorResponse
 }
 
 // IsRelNotFound reports whether GetFlowStepErrorResponse is RelNotFound.
@@ -33094,6 +33672,27 @@ func (s GetFlowStepErrorResponse) GetNotImplemented() (v NotImplemented, ok bool
 func NewNotImplementedGetFlowStepErrorResponse(v NotImplemented) GetFlowStepErrorResponse {
 	var s GetFlowStepErrorResponse
 	s.SetNotImplemented(v)
+	return s
+}
+
+// SetProjLastOwner sets GetFlowStepErrorResponse to ProjLastOwner.
+func (s *GetFlowStepErrorResponse) SetProjLastOwner(v ProjLastOwner) {
+	s.Type = ProjLastOwnerGetFlowStepErrorResponse
+	s.ProjLastOwner = v
+}
+
+// GetProjLastOwner returns ProjLastOwner and true boolean if GetFlowStepErrorResponse is ProjLastOwner.
+func (s GetFlowStepErrorResponse) GetProjLastOwner() (v ProjLastOwner, ok bool) {
+	if !s.IsProjLastOwner() {
+		return v, false
+	}
+	return s.ProjLastOwner, true
+}
+
+// NewProjLastOwnerGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from ProjLastOwner.
+func NewProjLastOwnerGetFlowStepErrorResponse(v ProjLastOwner) GetFlowStepErrorResponse {
+	var s GetFlowStepErrorResponse
+	s.SetProjLastOwner(v)
 	return s
 }
 
@@ -48007,31 +48606,6 @@ type ListUserTeamsUnauthorized ErrorDetails
 
 func (*ListUserTeamsUnauthorized) listUserTeamsRes() {}
 
-type NextgenSession struct {
-	APIKey string
-	Roles  []string
-}
-
-// GetAPIKey returns the value of APIKey.
-func (s *NextgenSession) GetAPIKey() string {
-	return s.APIKey
-}
-
-// GetRoles returns the value of Roles.
-func (s *NextgenSession) GetRoles() []string {
-	return s.Roles
-}
-
-// SetAPIKey sets the value of APIKey.
-func (s *NextgenSession) SetAPIKey(val string) {
-	s.APIKey = val
-}
-
-// SetRoles sets the value of Roles.
-func (s *NextgenSession) SetRoles(val []string) {
-	s.Roles = val
-}
-
 // NewNilDateTime returns new NilDateTime with value set to v.
 func NewNilDateTime(v time.Time) NilDateTime {
 	return NilDateTime{
@@ -50821,6 +51395,52 @@ func (o OptDepPermissionDeniedDetails) Or(d DepPermissionDeniedDetails) DepPermi
 	return d
 }
 
+// NewOptDepVariablesMissingDetails returns new OptDepVariablesMissingDetails with value set to v.
+func NewOptDepVariablesMissingDetails(v DepVariablesMissingDetails) OptDepVariablesMissingDetails {
+	return OptDepVariablesMissingDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptDepVariablesMissingDetails is optional DepVariablesMissingDetails.
+type OptDepVariablesMissingDetails struct {
+	Value DepVariablesMissingDetails
+	Set   bool
+}
+
+// IsSet returns true if OptDepVariablesMissingDetails was set.
+func (o OptDepVariablesMissingDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptDepVariablesMissingDetails) Reset() {
+	var v DepVariablesMissingDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptDepVariablesMissingDetails) SetTo(v DepVariablesMissingDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptDepVariablesMissingDetails) Get() (v DepVariablesMissingDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptDepVariablesMissingDetails) Or(d DepVariablesMissingDetails) DepVariablesMissingDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptDeploymentCreatedEventDelegationType returns new OptDeploymentCreatedEventDelegationType with value set to v.
 func NewOptDeploymentCreatedEventDelegationType(v DeploymentCreatedEventDelegationType) OptDeploymentCreatedEventDelegationType {
 	return OptDeploymentCreatedEventDelegationType{
@@ -51275,6 +51895,52 @@ func (o OptErrorDetailsDetails) Get() (v ErrorDetailsDetails, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptErrorDetailsDetails) Or(d ErrorDetailsDetails) ErrorDetailsDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptEvaluatePolicyResponseViolations returns new OptEvaluatePolicyResponseViolations with value set to v.
+func NewOptEvaluatePolicyResponseViolations(v EvaluatePolicyResponseViolations) OptEvaluatePolicyResponseViolations {
+	return OptEvaluatePolicyResponseViolations{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptEvaluatePolicyResponseViolations is optional EvaluatePolicyResponseViolations.
+type OptEvaluatePolicyResponseViolations struct {
+	Value EvaluatePolicyResponseViolations
+	Set   bool
+}
+
+// IsSet returns true if OptEvaluatePolicyResponseViolations was set.
+func (o OptEvaluatePolicyResponseViolations) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptEvaluatePolicyResponseViolations) Reset() {
+	var v EvaluatePolicyResponseViolations
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptEvaluatePolicyResponseViolations) SetTo(v EvaluatePolicyResponseViolations) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptEvaluatePolicyResponseViolations) Get() (v EvaluatePolicyResponseViolations, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptEvaluatePolicyResponseViolations) Or(d EvaluatePolicyResponseViolations) EvaluatePolicyResponseViolations {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -59523,6 +60189,52 @@ func (o OptPasswordHashPolicyParamsHash) Or(d PasswordHashPolicyParamsHash) Pass
 	return d
 }
 
+// NewOptPasswordSetEvaluateFacts returns new OptPasswordSetEvaluateFacts with value set to v.
+func NewOptPasswordSetEvaluateFacts(v PasswordSetEvaluateFacts) OptPasswordSetEvaluateFacts {
+	return OptPasswordSetEvaluateFacts{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptPasswordSetEvaluateFacts is optional PasswordSetEvaluateFacts.
+type OptPasswordSetEvaluateFacts struct {
+	Value PasswordSetEvaluateFacts
+	Set   bool
+}
+
+// IsSet returns true if OptPasswordSetEvaluateFacts was set.
+func (o OptPasswordSetEvaluateFacts) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptPasswordSetEvaluateFacts) Reset() {
+	var v PasswordSetEvaluateFacts
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptPasswordSetEvaluateFacts) SetTo(v PasswordSetEvaluateFacts) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptPasswordSetEvaluateFacts) Get() (v PasswordSetEvaluateFacts, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptPasswordSetEvaluateFacts) Or(d PasswordSetEvaluateFacts) PasswordSetEvaluateFacts {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptPatchUserRequestAttributes returns new OptPatchUserRequestAttributes with value set to v.
 func NewOptPatchUserRequestAttributes(v PatchUserRequestAttributes) OptPatchUserRequestAttributes {
 	return OptPatchUserRequestAttributes{
@@ -60115,6 +60827,52 @@ func (o OptProjClaimWindowExpiredDetails) Get() (v ProjClaimWindowExpiredDetails
 
 // Or returns value if set, or given parameter if does not.
 func (o OptProjClaimWindowExpiredDetails) Or(d ProjClaimWindowExpiredDetails) ProjClaimWindowExpiredDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptProjLastOwnerDetails returns new OptProjLastOwnerDetails with value set to v.
+func NewOptProjLastOwnerDetails(v ProjLastOwnerDetails) OptProjLastOwnerDetails {
+	return OptProjLastOwnerDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptProjLastOwnerDetails is optional ProjLastOwnerDetails.
+type OptProjLastOwnerDetails struct {
+	Value ProjLastOwnerDetails
+	Set   bool
+}
+
+// IsSet returns true if OptProjLastOwnerDetails was set.
+func (o OptProjLastOwnerDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptProjLastOwnerDetails) Reset() {
+	var v ProjLastOwnerDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptProjLastOwnerDetails) SetTo(v ProjLastOwnerDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptProjLastOwnerDetails) Get() (v ProjLastOwnerDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptProjLastOwnerDetails) Or(d ProjLastOwnerDetails) ProjLastOwnerDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -64675,6 +65433,52 @@ func (o OptUserUpdatedPayloadAttributes) Or(d UserUpdatedPayloadAttributes) User
 	return d
 }
 
+// NewOptVarDocumentTooDeepDetails returns new OptVarDocumentTooDeepDetails with value set to v.
+func NewOptVarDocumentTooDeepDetails(v VarDocumentTooDeepDetails) OptVarDocumentTooDeepDetails {
+	return OptVarDocumentTooDeepDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptVarDocumentTooDeepDetails is optional VarDocumentTooDeepDetails.
+type OptVarDocumentTooDeepDetails struct {
+	Value VarDocumentTooDeepDetails
+	Set   bool
+}
+
+// IsSet returns true if OptVarDocumentTooDeepDetails was set.
+func (o OptVarDocumentTooDeepDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptVarDocumentTooDeepDetails) Reset() {
+	var v VarDocumentTooDeepDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptVarDocumentTooDeepDetails) SetTo(v VarDocumentTooDeepDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptVarDocumentTooDeepDetails) Get() (v VarDocumentTooDeepDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptVarDocumentTooDeepDetails) Or(d VarDocumentTooDeepDetails) VarDocumentTooDeepDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptVarInvalidNameDetails returns new OptVarInvalidNameDetails with value set to v.
 func NewOptVarInvalidNameDetails(v VarInvalidNameDetails) OptVarInvalidNameDetails {
 	return OptVarInvalidNameDetails{
@@ -66962,8 +67766,9 @@ func (s *PasswordFactorPayloadMethod) UnmarshalText(data []byte) error {
 // one hashes with the server default, which is argon2id unless the deployment
 // configured otherwise.
 // This governs hashing only. Passwords already stored keep verifying under the
-// method they were written with, and nothing is rehashed when the policy
-// changes: a password moves to the new method the next time its owner sets one.
+// method they were written with. A policy change rewrites no stored password by
+// itself: a password moves to the new method on its owner's next successful
+// sign-in, or when its owner sets a new one.
 // Ref: #
 type PasswordHashPolicy struct {
 	// The hashing algorithm. Only algorithms that can hash appear here; the
@@ -67301,6 +68106,146 @@ func (s *PasswordSetConfig) SetMaxLength(val OptInt) {
 // SetHistoryDepth sets the value of HistoryDepth.
 func (s *PasswordSetConfig) SetHistoryDepth(val OptInt) {
 	s.HistoryDepth = val
+}
+
+// What a password set looks up instead of reading from the request. A dry run
+// has no user, so it is stated here.
+// Ref: #
+type PasswordSetEvaluateFacts struct {
+	// Whether the user sets their own password. Only then is the password
+	// history checked; an administrator's set skips it.
+	SelfService OptBool `json:"self_service"`
+	// Whether the candidate matches each of the user's kept passwords,
+	// current first, newest first. Only the first `history_depth` entries
+	// count, so at most 4, the highest `history_depth`.
+	HistoryMatches []bool `json:"history_matches"`
+}
+
+// GetSelfService returns the value of SelfService.
+func (s *PasswordSetEvaluateFacts) GetSelfService() OptBool {
+	return s.SelfService
+}
+
+// GetHistoryMatches returns the value of HistoryMatches.
+func (s *PasswordSetEvaluateFacts) GetHistoryMatches() []bool {
+	return s.HistoryMatches
+}
+
+// SetSelfService sets the value of SelfService.
+func (s *PasswordSetEvaluateFacts) SetSelfService(val OptBool) {
+	s.SelfService = val
+}
+
+// SetHistoryMatches sets the value of HistoryMatches.
+func (s *PasswordSetEvaluateFacts) SetHistoryMatches(val []bool) {
+	s.HistoryMatches = val
+}
+
+// The password as a user or administrator would set it. The server derives
+// what the policy checks (its length in code points after NFC normalization)
+// with the same code a password set runs.
+// Ref: #
+type PasswordSetEvaluateInput struct {
+	// The candidate password. It is evaluated and dropped: never stored,
+	// logged or returned. Anything above the server's cap of 64 characters is
+	// refused as `max_length`, as on a real set; the 4096 bound only keeps a
+	// dry run's body small.
+	Password string `json:"password"`
+}
+
+// GetPassword returns the value of Password.
+func (s *PasswordSetEvaluateInput) GetPassword() string {
+	return s.Password
+}
+
+// SetPassword sets the value of Password.
+func (s *PasswordSetEvaluateInput) SetPassword(val string) {
+	s.Password = val
+}
+
+// A dry run of the password policy for one candidate password.
+// Ref: #
+type PasswordSetEvaluateRequest struct {
+	// The operation the policy guards.
+	Operation PasswordSetEvaluateRequestOperation `json:"operation"`
+	Config    PasswordSetConfig                   `json:"config"`
+	Input     PasswordSetEvaluateInput            `json:"input"`
+	Facts     OptPasswordSetEvaluateFacts         `json:"facts"`
+}
+
+// GetOperation returns the value of Operation.
+func (s *PasswordSetEvaluateRequest) GetOperation() PasswordSetEvaluateRequestOperation {
+	return s.Operation
+}
+
+// GetConfig returns the value of Config.
+func (s *PasswordSetEvaluateRequest) GetConfig() PasswordSetConfig {
+	return s.Config
+}
+
+// GetInput returns the value of Input.
+func (s *PasswordSetEvaluateRequest) GetInput() PasswordSetEvaluateInput {
+	return s.Input
+}
+
+// GetFacts returns the value of Facts.
+func (s *PasswordSetEvaluateRequest) GetFacts() OptPasswordSetEvaluateFacts {
+	return s.Facts
+}
+
+// SetOperation sets the value of Operation.
+func (s *PasswordSetEvaluateRequest) SetOperation(val PasswordSetEvaluateRequestOperation) {
+	s.Operation = val
+}
+
+// SetConfig sets the value of Config.
+func (s *PasswordSetEvaluateRequest) SetConfig(val PasswordSetConfig) {
+	s.Config = val
+}
+
+// SetInput sets the value of Input.
+func (s *PasswordSetEvaluateRequest) SetInput(val PasswordSetEvaluateInput) {
+	s.Input = val
+}
+
+// SetFacts sets the value of Facts.
+func (s *PasswordSetEvaluateRequest) SetFacts(val OptPasswordSetEvaluateFacts) {
+	s.Facts = val
+}
+
+// The operation the policy guards.
+type PasswordSetEvaluateRequestOperation string
+
+const (
+	PasswordSetEvaluateRequestOperationAuthFactorPasswordSet PasswordSetEvaluateRequestOperation = "auth.factor.password.set"
+)
+
+// AllValues returns all PasswordSetEvaluateRequestOperation values.
+func (PasswordSetEvaluateRequestOperation) AllValues() []PasswordSetEvaluateRequestOperation {
+	return []PasswordSetEvaluateRequestOperation{
+		PasswordSetEvaluateRequestOperationAuthFactorPasswordSet,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s PasswordSetEvaluateRequestOperation) MarshalText() ([]byte, error) {
+	switch s {
+	case PasswordSetEvaluateRequestOperationAuthFactorPasswordSet:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *PasswordSetEvaluateRequestOperation) UnmarshalText(data []byte) error {
+	switch PasswordSetEvaluateRequestOperation(data) {
+	case PasswordSetEvaluateRequestOperationAuthFactorPasswordSet:
+		*s = PasswordSetEvaluateRequestOperationAuthFactorPasswordSet
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
 }
 
 // One revision of a project's `auth.factor.password.set` policy (ADR 066).
@@ -70788,6 +71733,59 @@ func (*ProjClaimWindowExpired) initClaimRes() {}
 type ProjClaimWindowExpiredDetails map[string]jx.Raw
 
 func (s *ProjClaimWindowExpiredDetails) init() ProjClaimWindowExpiredDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type ProjLastOwner struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptProjLastOwnerDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *ProjLastOwner) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *ProjLastOwner) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *ProjLastOwner) GetDetails() OptProjLastOwnerDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *ProjLastOwner) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *ProjLastOwner) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *ProjLastOwner) SetDetails(val OptProjLastOwnerDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type ProjLastOwnerDetails map[string]jx.Raw
+
+func (s *ProjLastOwnerDetails) init() ProjLastOwnerDetails {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}
@@ -78341,6 +79339,7 @@ func (s *ReleaseSummary) SetRevokedAt(val NilDateTime) {
 // RemoveOriginErrorResponse represents sum type.
 type RemoveOriginErrorResponse struct {
 	Type                   RemoveOriginErrorResponseType // switch on this field
+	AuthCsrfInvalid        AuthCsrfInvalid
 	AuthUnauthorized       AuthUnauthorized
 	EvtInvalid             EvtInvalid
 	Internal               Internal
@@ -78358,6 +79357,7 @@ type RemoveOriginErrorResponseType string
 
 // Possible values for RemoveOriginErrorResponseType.
 const (
+	AuthCsrfInvalidRemoveOriginErrorResponse        RemoveOriginErrorResponseType = "auth.csrf_invalid"
 	AuthUnauthorizedRemoveOriginErrorResponse       RemoveOriginErrorResponseType = "auth.unauthorized"
 	EvtInvalidRemoveOriginErrorResponse             RemoveOriginErrorResponseType = "evt.invalid"
 	InternalRemoveOriginErrorResponse               RemoveOriginErrorResponseType = "internal"
@@ -78369,6 +79369,11 @@ const (
 	ReqInvalidRemoveOriginErrorResponse             RemoveOriginErrorResponseType = "req.invalid"
 	UnavailableRemoveOriginErrorResponse            RemoveOriginErrorResponseType = "unavailable"
 )
+
+// IsAuthCsrfInvalid reports whether RemoveOriginErrorResponse is AuthCsrfInvalid.
+func (s RemoveOriginErrorResponse) IsAuthCsrfInvalid() bool {
+	return s.Type == AuthCsrfInvalidRemoveOriginErrorResponse
+}
 
 // IsAuthUnauthorized reports whether RemoveOriginErrorResponse is AuthUnauthorized.
 func (s RemoveOriginErrorResponse) IsAuthUnauthorized() bool {
@@ -78418,6 +79423,27 @@ func (s RemoveOriginErrorResponse) IsReqInvalid() bool {
 // IsUnavailable reports whether RemoveOriginErrorResponse is Unavailable.
 func (s RemoveOriginErrorResponse) IsUnavailable() bool {
 	return s.Type == UnavailableRemoveOriginErrorResponse
+}
+
+// SetAuthCsrfInvalid sets RemoveOriginErrorResponse to AuthCsrfInvalid.
+func (s *RemoveOriginErrorResponse) SetAuthCsrfInvalid(v AuthCsrfInvalid) {
+	s.Type = AuthCsrfInvalidRemoveOriginErrorResponse
+	s.AuthCsrfInvalid = v
+}
+
+// GetAuthCsrfInvalid returns AuthCsrfInvalid and true boolean if RemoveOriginErrorResponse is AuthCsrfInvalid.
+func (s RemoveOriginErrorResponse) GetAuthCsrfInvalid() (v AuthCsrfInvalid, ok bool) {
+	if !s.IsAuthCsrfInvalid() {
+		return v, false
+	}
+	return s.AuthCsrfInvalid, true
+}
+
+// NewAuthCsrfInvalidRemoveOriginErrorResponse returns new RemoveOriginErrorResponse from AuthCsrfInvalid.
+func NewAuthCsrfInvalidRemoveOriginErrorResponse(v AuthCsrfInvalid) RemoveOriginErrorResponse {
+	var s RemoveOriginErrorResponse
+	s.SetAuthCsrfInvalid(v)
+	return s
 }
 
 // SetAuthUnauthorized sets RemoveOriginErrorResponse to AuthUnauthorized.
@@ -80692,6 +81718,7 @@ type RollbackDeploymentErrorResponse struct {
 	DepInvalid           DepInvalid
 	DepNotFound          DepNotFound
 	DepPermissionDenied  DepPermissionDenied
+	DepVariablesMissing  DepVariablesMissing
 	EnvProjectNotFound   EnvProjectNotFound
 	EvtInvalid           EvtInvalid
 	Internal             Internal
@@ -80702,6 +81729,7 @@ type RollbackDeploymentErrorResponse struct {
 	RelRevoked           RelRevoked
 	ReqInvalid           ReqInvalid
 	Unavailable          Unavailable
+	VarDocumentTooDeep   VarDocumentTooDeep
 }
 
 // RollbackDeploymentErrorResponseType is oneOf type of RollbackDeploymentErrorResponse.
@@ -80715,6 +81743,7 @@ const (
 	DepInvalidRollbackDeploymentErrorResponse           RollbackDeploymentErrorResponseType = "dep.invalid"
 	DepNotFoundRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "dep.not_found"
 	DepPermissionDeniedRollbackDeploymentErrorResponse  RollbackDeploymentErrorResponseType = "dep.permission_denied"
+	DepVariablesMissingRollbackDeploymentErrorResponse  RollbackDeploymentErrorResponseType = "dep.variables_missing"
 	EnvProjectNotFoundRollbackDeploymentErrorResponse   RollbackDeploymentErrorResponseType = "env.project_not_found"
 	EvtInvalidRollbackDeploymentErrorResponse           RollbackDeploymentErrorResponseType = "evt.invalid"
 	InternalRollbackDeploymentErrorResponse             RollbackDeploymentErrorResponseType = "internal"
@@ -80725,6 +81754,7 @@ const (
 	RelRevokedRollbackDeploymentErrorResponse           RollbackDeploymentErrorResponseType = "rel.revoked"
 	ReqInvalidRollbackDeploymentErrorResponse           RollbackDeploymentErrorResponseType = "req.invalid"
 	UnavailableRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "unavailable"
+	VarDocumentTooDeepRollbackDeploymentErrorResponse   RollbackDeploymentErrorResponseType = "var.document_too_deep"
 )
 
 // IsAuthCsrfInvalid reports whether RollbackDeploymentErrorResponse is AuthCsrfInvalid.
@@ -80755,6 +81785,11 @@ func (s RollbackDeploymentErrorResponse) IsDepNotFound() bool {
 // IsDepPermissionDenied reports whether RollbackDeploymentErrorResponse is DepPermissionDenied.
 func (s RollbackDeploymentErrorResponse) IsDepPermissionDenied() bool {
 	return s.Type == DepPermissionDeniedRollbackDeploymentErrorResponse
+}
+
+// IsDepVariablesMissing reports whether RollbackDeploymentErrorResponse is DepVariablesMissing.
+func (s RollbackDeploymentErrorResponse) IsDepVariablesMissing() bool {
+	return s.Type == DepVariablesMissingRollbackDeploymentErrorResponse
 }
 
 // IsEnvProjectNotFound reports whether RollbackDeploymentErrorResponse is EnvProjectNotFound.
@@ -80805,6 +81840,11 @@ func (s RollbackDeploymentErrorResponse) IsReqInvalid() bool {
 // IsUnavailable reports whether RollbackDeploymentErrorResponse is Unavailable.
 func (s RollbackDeploymentErrorResponse) IsUnavailable() bool {
 	return s.Type == UnavailableRollbackDeploymentErrorResponse
+}
+
+// IsVarDocumentTooDeep reports whether RollbackDeploymentErrorResponse is VarDocumentTooDeep.
+func (s RollbackDeploymentErrorResponse) IsVarDocumentTooDeep() bool {
+	return s.Type == VarDocumentTooDeepRollbackDeploymentErrorResponse
 }
 
 // SetAuthCsrfInvalid sets RollbackDeploymentErrorResponse to AuthCsrfInvalid.
@@ -80930,6 +81970,27 @@ func (s RollbackDeploymentErrorResponse) GetDepPermissionDenied() (v DepPermissi
 func NewDepPermissionDeniedRollbackDeploymentErrorResponse(v DepPermissionDenied) RollbackDeploymentErrorResponse {
 	var s RollbackDeploymentErrorResponse
 	s.SetDepPermissionDenied(v)
+	return s
+}
+
+// SetDepVariablesMissing sets RollbackDeploymentErrorResponse to DepVariablesMissing.
+func (s *RollbackDeploymentErrorResponse) SetDepVariablesMissing(v DepVariablesMissing) {
+	s.Type = DepVariablesMissingRollbackDeploymentErrorResponse
+	s.DepVariablesMissing = v
+}
+
+// GetDepVariablesMissing returns DepVariablesMissing and true boolean if RollbackDeploymentErrorResponse is DepVariablesMissing.
+func (s RollbackDeploymentErrorResponse) GetDepVariablesMissing() (v DepVariablesMissing, ok bool) {
+	if !s.IsDepVariablesMissing() {
+		return v, false
+	}
+	return s.DepVariablesMissing, true
+}
+
+// NewDepVariablesMissingRollbackDeploymentErrorResponse returns new RollbackDeploymentErrorResponse from DepVariablesMissing.
+func NewDepVariablesMissingRollbackDeploymentErrorResponse(v DepVariablesMissing) RollbackDeploymentErrorResponse {
+	var s RollbackDeploymentErrorResponse
+	s.SetDepVariablesMissing(v)
 	return s
 }
 
@@ -81140,6 +82201,27 @@ func (s RollbackDeploymentErrorResponse) GetUnavailable() (v Unavailable, ok boo
 func NewUnavailableRollbackDeploymentErrorResponse(v Unavailable) RollbackDeploymentErrorResponse {
 	var s RollbackDeploymentErrorResponse
 	s.SetUnavailable(v)
+	return s
+}
+
+// SetVarDocumentTooDeep sets RollbackDeploymentErrorResponse to VarDocumentTooDeep.
+func (s *RollbackDeploymentErrorResponse) SetVarDocumentTooDeep(v VarDocumentTooDeep) {
+	s.Type = VarDocumentTooDeepRollbackDeploymentErrorResponse
+	s.VarDocumentTooDeep = v
+}
+
+// GetVarDocumentTooDeep returns VarDocumentTooDeep and true boolean if RollbackDeploymentErrorResponse is VarDocumentTooDeep.
+func (s RollbackDeploymentErrorResponse) GetVarDocumentTooDeep() (v VarDocumentTooDeep, ok bool) {
+	if !s.IsVarDocumentTooDeep() {
+		return v, false
+	}
+	return s.VarDocumentTooDeep, true
+}
+
+// NewVarDocumentTooDeepRollbackDeploymentErrorResponse returns new RollbackDeploymentErrorResponse from VarDocumentTooDeep.
+func NewVarDocumentTooDeepRollbackDeploymentErrorResponse(v VarDocumentTooDeep) RollbackDeploymentErrorResponse {
+	var s RollbackDeploymentErrorResponse
+	s.SetVarDocumentTooDeep(v)
 	return s
 }
 
@@ -82410,6 +83492,51 @@ func NewUserSchemaSchemaDocument(v UserSchema) SchemaDocument {
 	return s
 }
 
+// Extra fields to add onto each returned schema (ADR 059).
+// - `in_use`: whether any user of the project is on this revision, as
+// `metadata.in_use`. A revision in use cannot be deleted, and the users on it
+// are found with `POST /users/query` filtering on `schema`. The property is
+// omitted entirely when not requested, so "did not ask" is distinguishable
+// from `false`.
+// The flag counts every user of the project, not only those the caller may
+// list, so it requires read on the whole project, and for a token also
+// `user.read` in addition to `schema.read`. A caller without them is refused
+// with `403`.
+// Ref: #
+type SchemaExpand string
+
+const (
+	SchemaExpandInUse SchemaExpand = "in_use"
+)
+
+// AllValues returns all SchemaExpand values.
+func (SchemaExpand) AllValues() []SchemaExpand {
+	return []SchemaExpand{
+		SchemaExpandInUse,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s SchemaExpand) MarshalText() ([]byte, error) {
+	switch s {
+	case SchemaExpandInUse:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *SchemaExpand) UnmarshalText(data []byte) error {
+	switch SchemaExpand(data) {
+	case SchemaExpandInUse:
+		*s = SchemaExpandInUse
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
 // SchemaHeaders wraps Schema with response headers.
 type SchemaHeaders struct {
 	CacheControl OptString
@@ -82442,6 +83569,9 @@ func (*SchemaHeaders) getMyUserSchemaRes() {}
 type SchemaMetadata struct {
 	// The time when the schema was created.
 	CreatedAt time.Time `json:"created_at"`
+	// Whether any user of the project is on this revision. Only set when
+	// `GET /schemas` is asked for it with `expand=in_use`; omitted otherwise.
+	InUse OptBool `json:"in_use"`
 }
 
 // GetCreatedAt returns the value of CreatedAt.
@@ -82449,9 +83579,19 @@ func (s *SchemaMetadata) GetCreatedAt() time.Time {
 	return s.CreatedAt
 }
 
+// GetInUse returns the value of InUse.
+func (s *SchemaMetadata) GetInUse() OptBool {
+	return s.InUse
+}
+
 // SetCreatedAt sets the value of CreatedAt.
 func (s *SchemaMetadata) SetCreatedAt(val time.Time) {
 	s.CreatedAt = val
+}
+
+// SetInUse sets the value of InUse.
+func (s *SchemaMetadata) SetInUse(val OptBool) {
+	s.InUse = val
 }
 
 type SchemaURI url.URL
@@ -82979,6 +84119,31 @@ func (s *SessTokenCreationFailedDetails) init() SessTokenCreationFailedDetails {
 		*s = m
 	}
 	return m
+}
+
+type SessionCookie struct {
+	APIKey string
+	Roles  []string
+}
+
+// GetAPIKey returns the value of APIKey.
+func (s *SessionCookie) GetAPIKey() string {
+	return s.APIKey
+}
+
+// GetRoles returns the value of Roles.
+func (s *SessionCookie) GetRoles() []string {
+	return s.Roles
+}
+
+// SetAPIKey sets the value of APIKey.
+func (s *SessionCookie) SetAPIKey(val string) {
+	s.APIKey = val
+}
+
+// SetRoles sets the value of Roles.
+func (s *SessionCookie) SetRoles(val []string) {
+	s.Roles = val
 }
 
 // SessionDeleted2XX is 2XX pattern response for SessionDeleted operation.
@@ -85127,6 +86292,7 @@ type SubmitFlowStepErrorResponse struct {
 	Internal                    Internal
 	TknInvalid                  TknInvalid
 	NotImplemented              NotImplemented
+	ProjLastOwner               ProjLastOwner
 	ProjOriginNotAllowed        ProjOriginNotAllowed
 	ProjPreviewNotLive          ProjPreviewNotLive
 	RelNotFound                 RelNotFound
@@ -85173,6 +86339,7 @@ const (
 	InternalSubmitFlowStepErrorResponse                    SubmitFlowStepErrorResponseType = "internal"
 	TknInvalidSubmitFlowStepErrorResponse                  SubmitFlowStepErrorResponseType = "tkn.invalid"
 	NotImplementedSubmitFlowStepErrorResponse              SubmitFlowStepErrorResponseType = "not_implemented"
+	ProjLastOwnerSubmitFlowStepErrorResponse               SubmitFlowStepErrorResponseType = "proj.last_owner"
 	ProjOriginNotAllowedSubmitFlowStepErrorResponse        SubmitFlowStepErrorResponseType = "proj.origin_not_allowed"
 	ProjPreviewNotLiveSubmitFlowStepErrorResponse          SubmitFlowStepErrorResponseType = "proj.preview_not_live"
 	RelNotFoundSubmitFlowStepErrorResponse                 SubmitFlowStepErrorResponseType = "rel.not_found"
@@ -85312,6 +86479,11 @@ func (s SubmitFlowStepErrorResponse) IsTknInvalid() bool {
 // IsNotImplemented reports whether SubmitFlowStepErrorResponse is NotImplemented.
 func (s SubmitFlowStepErrorResponse) IsNotImplemented() bool {
 	return s.Type == NotImplementedSubmitFlowStepErrorResponse
+}
+
+// IsProjLastOwner reports whether SubmitFlowStepErrorResponse is ProjLastOwner.
+func (s SubmitFlowStepErrorResponse) IsProjLastOwner() bool {
+	return s.Type == ProjLastOwnerSubmitFlowStepErrorResponse
 }
 
 // IsProjOriginNotAllowed reports whether SubmitFlowStepErrorResponse is ProjOriginNotAllowed.
@@ -85906,6 +87078,27 @@ func (s SubmitFlowStepErrorResponse) GetNotImplemented() (v NotImplemented, ok b
 func NewNotImplementedSubmitFlowStepErrorResponse(v NotImplemented) SubmitFlowStepErrorResponse {
 	var s SubmitFlowStepErrorResponse
 	s.SetNotImplemented(v)
+	return s
+}
+
+// SetProjLastOwner sets SubmitFlowStepErrorResponse to ProjLastOwner.
+func (s *SubmitFlowStepErrorResponse) SetProjLastOwner(v ProjLastOwner) {
+	s.Type = ProjLastOwnerSubmitFlowStepErrorResponse
+	s.ProjLastOwner = v
+}
+
+// GetProjLastOwner returns ProjLastOwner and true boolean if SubmitFlowStepErrorResponse is ProjLastOwner.
+func (s SubmitFlowStepErrorResponse) GetProjLastOwner() (v ProjLastOwner, ok bool) {
+	if !s.IsProjLastOwner() {
+		return v, false
+	}
+	return s.ProjLastOwner, true
+}
+
+// NewProjLastOwnerSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from ProjLastOwner.
+func NewProjLastOwnerSubmitFlowStepErrorResponse(v ProjLastOwner) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetProjLastOwner(v)
 	return s
 }
 
@@ -91190,7 +92383,15 @@ func (s *UserExpand) UnmarshalText(data []byte) error {
 // - `created_at`: RFC3339 timestamp
 // - `id`: user id
 // - `schema`: the schema the user's attributes satisfy, matched against the
-// value the user carries as `schema`
+// value the user carries as `schema`. Each revision of a schema has its own
+// URL, so `equals` selects the users on one revision and `not_equals` the
+// users on any other.
+// - `schema_object_type`: the `object_type` of the user's schema, which every
+// revision of that schema shares. It may be repeated, like any field: give
+// `not_equals` once per object type to exclude several. A schema without an
+// object type reads as `""`, so `not_equals` matches its users and `equals`
+// `""` selects them. Combine `equals` here with `schema` `not_equals` the
+// newest revision to find the users still on an older one.
 // - `status`: one of `active`, `suspended`, `deactivated`, `pending_purge`
 // - `team_id`: restricts the result to users holding an **active** membership
 // in that team. A user who has been invited but has not accepted does not
@@ -91205,8 +92406,8 @@ func (s *UserExpand) UnmarshalText(data []byte) error {
 // team may deprovision the user. A user can belong to many teams while owning
 // their own lifecycle, so the two disagree often and neither implies the other
 // (ADR 024).
-// `team_id` is filterable but not sortable — it is not a column on the user, so
-// it is absent from the sort-field enum.
+// `team_id` and `schema_object_type` are filterable but not sortable: neither
+// is a column on the user, so both are absent from the sort-field enum.
 // Filtering on `team_id` requires `team_membership.read` in addition to
 // `user.read`: it reads the same memberships that `expand: ["teams"]` embeds.
 // A Console session, which carries no scopes, may filter on it when it may read
@@ -91219,6 +92420,7 @@ const (
 	UserFilterFieldCreatedAt            UserFilterField = "created_at"
 	UserFilterFieldID                   UserFilterField = "id"
 	UserFilterFieldSchema               UserFilterField = "schema"
+	UserFilterFieldSchemaObjectType     UserFilterField = "schema_object_type"
 	UserFilterFieldStatus               UserFilterField = "status"
 	UserFilterFieldTeamID               UserFilterField = "team_id"
 	UserFilterFieldLifecycleOwnerTeamID UserFilterField = "lifecycle_owner_team_id"
@@ -91230,6 +92432,7 @@ func (UserFilterField) AllValues() []UserFilterField {
 		UserFilterFieldCreatedAt,
 		UserFilterFieldID,
 		UserFilterFieldSchema,
+		UserFilterFieldSchemaObjectType,
 		UserFilterFieldStatus,
 		UserFilterFieldTeamID,
 		UserFilterFieldLifecycleOwnerTeamID,
@@ -91244,6 +92447,8 @@ func (s UserFilterField) MarshalText() ([]byte, error) {
 	case UserFilterFieldID:
 		return []byte(s), nil
 	case UserFilterFieldSchema:
+		return []byte(s), nil
+	case UserFilterFieldSchemaObjectType:
 		return []byte(s), nil
 	case UserFilterFieldStatus:
 		return []byte(s), nil
@@ -91267,6 +92472,9 @@ func (s *UserFilterField) UnmarshalText(data []byte) error {
 		return nil
 	case UserFilterFieldSchema:
 		*s = UserFilterFieldSchema
+		return nil
+	case UserFilterFieldSchemaObjectType:
+		*s = UserFilterFieldSchemaObjectType
 		return nil
 	case UserFilterFieldStatus:
 		*s = UserFilterFieldStatus
@@ -92929,6 +94137,59 @@ func (s *UserUpdatedPayload) SetAttributes(val OptUserUpdatedPayloadAttributes) 
 type UserUpdatedPayloadAttributes map[string]jx.Raw
 
 func (s *UserUpdatedPayloadAttributes) init() UserUpdatedPayloadAttributes {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type VarDocumentTooDeep struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptVarDocumentTooDeepDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *VarDocumentTooDeep) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *VarDocumentTooDeep) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *VarDocumentTooDeep) GetDetails() OptVarDocumentTooDeepDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *VarDocumentTooDeep) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *VarDocumentTooDeep) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *VarDocumentTooDeep) SetDetails(val OptVarDocumentTooDeepDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type VarDocumentTooDeepDetails map[string]jx.Raw
+
+func (s *VarDocumentTooDeepDetails) init() VarDocumentTooDeepDetails {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}

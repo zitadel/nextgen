@@ -4,6 +4,7 @@ import { chmod, mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "n
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Readable } from "node:stream";
+import { parseEnv, promisify } from "node:util";
 
 import { expect } from "vitest";
 
@@ -13,6 +14,8 @@ import { cliPackageRoot } from "./oclif-build";
 import { nextPort } from "./ports";
 import { aBinaryRecord } from "./runtime-record";
 import { parseJson, runCliForTest } from "./run-cli";
+
+const execFileAsync = promisify(execFile);
 
 const SCHEMA_FILE = ".zitadel/schemas/default-human-user.json";
 const FLOW_FILE = ".zitadel/flows/default-login.json";
@@ -45,8 +48,8 @@ export interface Envelope<T = Record<string, unknown>> {
 }
 
 /**
- * A non-interactive `deploy` needs a `-m` message, so the helpers default one
- * unless the spec already supplied its own.
+ * A non-interactive `deploy` outside a git repository, as `aSetUpApp` arranges,
+ * needs a `-m` message, so the helpers default one unless the spec supplied its own.
  */
 function withDeployMessage(extraArgs: readonly string[]): string[] {
   const hasMessage = extraArgs.some((arg) => arg === "-m" || arg === "--message");
@@ -61,6 +64,16 @@ export interface DeployResult {
   readonly resources?: number;
   readonly origins?: string[];
   readonly dry_run?: boolean;
+  readonly diff?: {
+    readonly against: string | null;
+    readonly files: ReadonlyArray<{
+      readonly path: string;
+      readonly status: string;
+      readonly previous_path?: string;
+      readonly patch: string;
+    }> | null;
+    readonly note?: string;
+  };
 }
 
 export interface FlowStep {
@@ -261,6 +274,106 @@ export class ScaffoldedApp {
       PACKAGE_MANAGER_LOG: npm.logPath,
       PATH: `${npm.binDir}:${process.env.PATH ?? ""}`,
     });
+  }
+
+  /**
+   * Runs setup with a git that does everything but commit, as a full disk or a
+   * broken git would: setup creates the repository and then cannot commit.
+   */
+  async setupWithGitThatCannotCommit(): Promise<CliResult> {
+    const git = await gitThatCannotCommit();
+    return this.cli(["setup", "--non-interactive", "--json", "--skip-install"], {
+      PATH: `${git}:${process.env.PATH ?? ""}`,
+    });
+  }
+
+  /**
+   * Puts the app under version control with everything committed, the state a
+   * developer who already uses git is in before they run setup.
+   */
+  async underVersionControl(): Promise<void> {
+    await execFileAsync("git", ["init", "--quiet"], { cwd: this.path });
+    await execFileAsync("git", ["add", "--all"], { cwd: this.path });
+    await execFileAsync(
+      "git",
+      [
+        "-c",
+        "user.name=Dev",
+        "-c",
+        "user.email=dev@example.com",
+        "-c",
+        "commit.gpgsign=false",
+        "commit",
+        "--quiet",
+        "--no-verify",
+        "--message=feat: the developer's own work",
+      ],
+      { cwd: this.path },
+    );
+  }
+
+  /** Detaches HEAD from its branch, as a checkout of a tag or a CI job's checkout does. */
+  async onADetachedHead(): Promise<void> {
+    await execFileAsync("git", ["checkout", "--quiet", "--detach"], { cwd: this.path });
+  }
+
+  /** Leaves a file nobody has committed, as a developer mid-change would. */
+  async withUncommittedWork(): Promise<void> {
+    await writeFile(join(this.path, "notes.md"), "a note to self\n");
+  }
+
+  /**
+   * The paths setup's commit put under version control. Read from git because
+   * that is the behaviour: a secret that reaches version control cannot be
+   * scrubbed later, so what is tracked is the claim being made.
+   */
+  async trackedFiles(): Promise<string[]> {
+    try {
+      const { stdout } = await execFileAsync(
+        "git",
+        ["-c", "core.quotePath=false", "ls-files", "-z"],
+        { cwd: this.path },
+      );
+      return stdout.split("\0").filter((line) => line !== "");
+    } catch {
+      return [];
+    }
+  }
+
+  /** Commits everything outstanding, as the developer would before deploying. */
+  async commitEverything(): Promise<void> {
+    await execFileAsync("git", ["add", "--all"], { cwd: this.path });
+    await execFileAsync(
+      "git",
+      [
+        "-c",
+        "user.name=Dev",
+        "-c",
+        "user.email=dev@example.com",
+        "-c",
+        "commit.gpgsign=false",
+        "commit",
+        "--quiet",
+        "--no-verify",
+        "--message=feat: change the configuration",
+      ],
+      { cwd: this.path },
+    );
+  }
+
+  /** The subjects of the project's commits, newest first, or [] without a repo. */
+  async commitSubjects(): Promise<string[]> {
+    try {
+      const { stdout } = await execFileAsync("git", ["log", "--format=%s"], { cwd: this.path });
+      return stdout.split("\n").filter((line) => line !== "");
+    } catch {
+      return [];
+    }
+  }
+
+  /** `setup` without `--json`, for a spec asserting what the developer reads. */
+  setupRendered(extraArgs: string[] = []): Promise<CliResult> {
+    return this.cli(["setup", "--non-interactive", "--skip-install", ...extraArgs]);
   }
 
   /**
@@ -589,6 +702,27 @@ export class ScaffoldedApp {
     expect(result, "origin add should have succeeded").toSucceed();
   }
 
+  /** How many deployments the project serves, as `deployment list` reports them. */
+  async liveDeploymentCount(): Promise<number> {
+    const result = await this.cli(["deployment", "list", "--json"]);
+    expect(result, "deployment list should have succeeded").toSucceed();
+    return this.envelopeOf<{ count: number }>(result).data.count;
+  }
+
+  /** The message a release records, as `release get` reports it. */
+  async releaseMessage(releaseId: string): Promise<string | null> {
+    const result = await this.cli(["release", "get", releaseId, "--json"]);
+    expect(result, "release get should have succeeded").toSucceed();
+    return this.envelopeOf<{ metadata: { message: string | null } }>(result).data.metadata.message;
+  }
+
+  /** The message a deployment records, as `deployment get` reports it. */
+  async deploymentMessage(deploymentId: string): Promise<string | null> {
+    const result = await this.cli(["deployment", "get", deploymentId, "--json"]);
+    expect(result, "deployment get should have succeeded").toSucceed();
+    return this.envelopeOf<{ metadata: { message: string | null } }>(result).data.metadata.message;
+  }
+
   /** Build a release from `.zitadel/` and deploy it to every primary origin. */
   deploy(extraArgs: string[] = []): Promise<CliResult> {
     return this.cli(["deploy", "--non-interactive", "--json", ...withDeployMessage(extraArgs)]);
@@ -616,9 +750,43 @@ export class ScaffoldedApp {
     return this.envelopeOf<DeployResult>(result).data;
   }
 
+  /** Deploys a preview to `url` and returns its envelope data, failing the arrange if it does not. */
+  async previewData(url: string): Promise<Record<string, unknown>> {
+    const result = await this.run(["preview", "--origin", url, "--json"]);
+    expect(result, "preview should have succeeded").toSucceed();
+    return this.envelopeOf<Record<string, unknown>>(result).data;
+  }
+
   /** `deploy --dry-run`: validates and shows the diff without writing. */
   deployDryRun(extraArgs: string[] = []): Promise<CliResult> {
     return this.cli(["deploy", "--dry-run", "--non-interactive", "--json", ...extraArgs]);
+  }
+
+  /** The envelope data of a dry run expected to succeed (its diff). */
+  async deployDryRunData(extraArgs: string[] = []): Promise<DeployResult> {
+    const result = await this.deployDryRun(extraArgs);
+    expect(result, "deploy --dry-run should have succeeded").toSucceed();
+    return this.envelopeOf<DeployResult>(result).data;
+  }
+
+  /**
+   * Commits the whole app to git, making it a repository the first time, as a
+   * developer does before they deploy: a deploy records the commit it was built
+   * from, and the next one diffs `.zitadel/` against it.
+   */
+  async commit(): Promise<void> {
+    const git = (args: string[]) => promisify(execFile)("git", args, { cwd: this.path });
+    await git(["init", "-q"]);
+    await git(["add", "-A"]);
+    await git([
+      "-c",
+      "user.name=Test",
+      "-c",
+      "user.email=test@example.com",
+      "commit",
+      "-qm",
+      "wip",
+    ]);
   }
 
   /** `deploy` without `--json`, for a spec asserting what the developer reads. */
@@ -726,6 +894,23 @@ export class ScaffoldedApp {
     for (const { pattern } of await this.projectOrigins()) {
       expect(await this.removeOrigin(pattern), `removing ${pattern}`).toSucceed();
     }
+  }
+
+  /**
+   * Leaves the app's origins as `zitadel setup` 0.1.0 registered them: its
+   * issuer a preview origin and nothing primary, on the project and in
+   * `.zitadel/secret`.
+   */
+  async hasItsIssuerAsAPreviewOrigin(): Promise<void> {
+    expect(await this.removeOrigin(SETUP_ORIGIN.pattern), "removing the issuer").toSucceed();
+    expect(await this.addOrigin(SETUP_ORIGIN.pattern, "preview"), "adding it back").toSucceed();
+    await this.editDocument<{ primary_origins: string[]; preview_origins: string[] }>(
+      ".zitadel/secret",
+      (secret) => {
+        secret.primary_origins = [];
+        secret.preview_origins = [SETUP_ORIGIN.pattern];
+      },
+    );
   }
 
   /** The origin patterns the project admits, read back through `origin list`. */
@@ -967,6 +1152,20 @@ export class ScaffoldedApp {
     );
   }
 
+  /** Writes the password policy's test file with `cases`, as the developer owning it would. */
+  async writePolicyTest(cases: ReadonlyArray<Record<string, unknown>>): Promise<void> {
+    await mkdir(join(this.path, ".zitadel/policies"), { recursive: true });
+    await this.writeProjectFile(
+      `.zitadel/policies/${PASSWORD_POLICY}.test.json`,
+      `${JSON.stringify({ $schema: "../meta/policy-test.json", operation: PASSWORD_POLICY, cases }, null, 2)}\n`,
+    );
+  }
+
+  /** Runs `zitadel policies test` with `args`. */
+  testPolicies(args: string[] = []): Promise<CliResult> {
+    return this.run(["policies", "test", "--non-interactive", ...args]);
+  }
+
   /** Removes the committed password policy file, as the developer owning it would. */
   removePasswordPolicy(): Promise<void> {
     return this.deleteProjectFile(this.policyFile(PASSWORD_POLICY));
@@ -1018,6 +1217,28 @@ export class ScaffoldedApp {
         created_at: "2026-01-01T00:00:00.000Z",
       }),
     );
+  }
+
+  /**
+   * The values setup bound the development environment to — its file, then the
+   * project secret for anything the file leaves out — for binding another
+   * environment to the same project.
+   */
+  async developmentValues(): Promise<Record<string, string>> {
+    const file = parseEnv(await readFile(join(this.path, ".env.development.local"), "utf8"));
+    const secret = JSON.parse(await readFile(join(this.path, ".zitadel/secret"), "utf8")) as {
+      project_id: string;
+      project_secret: string;
+      preview_secret: string;
+    };
+    return {
+      ZITADEL_PROJECT_ID: secret.project_id,
+      ZITADEL_PROJECT_SECRET: secret.project_secret,
+      ZITADEL_PREVIEW_TOKEN: secret.preview_secret,
+      ...Object.fromEntries(
+        Object.entries(file).filter((entry): entry is [string, string] => entry[1] !== undefined),
+      ),
+    };
   }
 
   /** Writes `.env.<name>.local`, the file that binds an environment to a project. */
@@ -1326,10 +1547,56 @@ export async function aNewAppDirectory(): Promise<ScaffoldedApp> {
   return new ScaffoldedApp(path);
 }
 
-/** An app already through `setup`, for specs about the commands after it. */
+/**
+ * A directory for setup to create a new app in that does not exist yet, under
+ * one that does: how `--cwd` names the folder a new app should live in.
+ */
+export async function aMissingAppDirectory(): Promise<ScaffoldedApp> {
+  const parent = await mkdtemp(join(tmpdir(), "zitadel-new-"));
+  return new ScaffoldedApp(join(parent, "my-app"));
+}
+
+/**
+ * An app already through `setup`, for specs about the commands after it.
+ *
+ * Setup's git commit is turned off here: this is the arrange for every other
+ * command's spec, and a repository of setup's making is not what they are
+ * about. Setup's spec drives setup with it on, and owns what it does.
+ */
 export async function aSetUpApp(extraArgs: string[] = []): Promise<ScaffoldedApp> {
   const app = await anApp();
-  const result = await app.setup(extraArgs);
+  const result = await app.setup(["--no-git", ...extraArgs]);
+  expect(result, "arranging setup should have succeeded").toSucceed();
+  return app;
+}
+
+/**
+ * A set-up app with a second environment, `staging`, that `env add` bound and
+ * nothing has been deployed to: setup deploys its own project, so this is
+ * where a spec finds a first deploy. Address it with `--env staging`.
+ */
+export async function anUndeployedEnvironment(): Promise<ScaffoldedApp> {
+  const app = await aSetUpApp();
+  const added = await app.run([
+    "env",
+    "add",
+    "staging",
+    "--app-url",
+    "https://staging.acme.com",
+    "--non-interactive",
+    "--json",
+  ]);
+  expect(added, "arranging env add should have succeeded").toSucceed();
+  return app;
+}
+
+/**
+ * An app through `setup` with its commit kept, so a release built from it
+ * records a git sha and a later deploy has a baseline to diff against.
+ */
+export async function aCommittedApp(): Promise<ScaffoldedApp> {
+  const app = await anApp();
+  const result = await app.setup();
   expect(result, "arranging setup should have succeeded").toSucceed();
   return app;
 }
@@ -1353,6 +1620,18 @@ process.stderr.write("fake npm stderr\\n");
   );
   await chmod(binPath, 0o755);
   return { binDir, logPath };
+}
+
+/** A `git` on PATH that runs the real one for everything but `commit`, which it refuses. Returns its directory. */
+async function gitThatCannotCommit(): Promise<string> {
+  const binDir = await mkdtemp(join(tmpdir(), "zitadel-git-no-commit-"));
+  const { stdout } = await execFileAsync("sh", ["-c", "command -v git"]);
+  await writeFile(
+    join(binDir, "git"),
+    `#!/bin/sh\nfor arg in "$@"; do\n  if [ "$arg" = "commit" ]; then\n    echo "fatal: cannot commit" >&2\n    exit 1\n  fi\ndone\nexec "${stdout.trim()}" "$@"\n`,
+  );
+  await chmod(join(binDir, "git"), 0o755);
+  return binDir;
 }
 
 /** A fake `docker` on PATH, so doctor's runtime probe needs no daemon. */

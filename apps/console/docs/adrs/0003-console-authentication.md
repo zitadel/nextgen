@@ -3,7 +3,8 @@
 > **Status:** Proposed
 > **Date:** 2026-07-23 (revised 2026-08-12 — §4/Consequences: the ADR 0002
 > `/api` shim this ADR narrowed was withdrawn, not built; revised 2026-08-13
-> — the first-party session becomes a management credential under root ADR 053)
+> — the first-party session becomes a management credential under root ADR 053;
+> revised 2026-10-25 — the server serves the API under `/api/v1`, root ADR 077)
 > **Scope:** `apps/console`. See
 > [`apps/console/AGENTS.md`](../../AGENTS.md).
 > **Context:** Follows the forward-looking slot recorded in
@@ -179,8 +180,8 @@ does not change.
   the browser bundle (ADR 005 holds) and not in the dev proxy either; dev
   tooling uses it only server-side, to seed and grant.
 - **~~Dependency to track~~ resolved 2026-08-12 by withdrawal (ADR 0002):**
-  no Go `/api` mount exists or is planned — the deployed console calls the
-  API at the origin root. The deployed management surface waited on
+  no secret-injecting mount exists or is planned — the deployed console calls
+  the API on its own origin, under `/api/v1` since root ADR 077. The deployed management surface waited on
   session-derived target permissions (root ADRs 032/033/053) rather than on a
   secret-injecting mount; those landed with #1300.
 - Tests: the `_authed` guard is covered by `src/routes/auth-guard.spec.tsx`;

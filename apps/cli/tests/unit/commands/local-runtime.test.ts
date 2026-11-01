@@ -239,7 +239,8 @@ describe("local runtime commands", () => {
     const cwd = await tempProject("zitadel-doctor-runtime-fail-");
     const fake = await fakeDocker();
     const port = nextPort();
-    await writeRuntimeMetadata(cwd, runtimeFor(cwd, `http://localhost:${String(port)}`));
+    const serverUrl = await startHealthServer(false);
+    await writeRuntimeMetadata(cwd, runtimeFor(cwd, serverUrl));
 
     const result = await runCliForTest(["doctor", "--cwd", cwd, "--json", "--port", String(port)], {
       PATH: `${fake.binDir}:${process.env.PATH ?? ""}`,
@@ -531,7 +532,9 @@ describe("local runtime commands", () => {
     // before setup attaches a project, so `console` is where its link comes from.
     expect(envelope.data.console).toBeUndefined();
     expect(envelope.data.urls).toMatchObject({ console: `${serverUrl}/ui/console/` });
-    expect(envelope.data.next_commands).toEqual([expectedPublicCliCommand("setup --server local")]);
+    expect(envelope.data.next_commands).toEqual([
+      expectedPublicCliCommand(`setup --server local --cwd ${cwd}`),
+    ]);
     expect(envelope.data.next_actions).toContainEqual(
       expect.stringContaining(expectedPublicCliCommand("logs --follow")),
     );
@@ -573,7 +576,9 @@ describe("local runtime commands", () => {
     expect(result.stdout).toContain(
       "  Create an app with authentication. Run setup in this directory",
     );
-    expect(result.stdout).toContain(`  $ ${expectedPublicCliCommand("setup --server local")}`);
+    expect(result.stdout).toContain(
+      `  $ ${expectedPublicCliCommand(`setup --server local --cwd ${cwd}`)}`,
+    );
     expect(result.stdout).not.toContain("handoff");
     expect(result.stdout).not.toContain(expectedPublicCliCommand("console"));
     expect(result.stderr).not.toContain("console sign-in link");
@@ -641,7 +646,7 @@ describe("local runtime commands", () => {
       // No admin, and no console in the report either way.
       expect(envelope.data.console).toBeUndefined();
       expect(envelope.data.next_commands).toEqual([
-        expectedPublicCliCommand("setup --server local"),
+        expectedPublicCliCommand(`setup --server local --cwd ${cwd}`),
       ]);
       await expect(readFile(join(cwd, ".zitadel/local/admin.json"), "utf8")).rejects.toThrow();
       await expect(readFile(join(cwd, ".zitadel/local/admin-user.json"), "utf8")).rejects.toThrow();
@@ -693,7 +698,9 @@ describe("local runtime commands", () => {
     );
     expect(envelope.data.next_actions.join("\n")).toContain("Setup asks for a framework");
     // As in the binary case: setup is the only next step, and no `console` one.
-    expect(envelope.data.next_commands).toEqual([expectedPublicCliCommand("setup --server local")]);
+    expect(envelope.data.next_commands).toEqual([
+      expectedPublicCliCommand(`setup --server local --cwd ${cwd}`),
+    ]);
     expect(envelope.data.next_commands).not.toContain("npm install");
     expect(envelope.data.next_commands).not.toContain("npm run dev");
 
@@ -1231,10 +1238,10 @@ async function readDockerCalls(logPath: string): Promise<string[][]> {
     .map((line) => JSON.parse(line) as string[]);
 }
 
-async function startHealthServer(): Promise<string> {
+async function startHealthServer(healthy = true): Promise<string> {
   const server = createServer((req, res) => {
     if (req.url === "/readyz") {
-      res.writeHead(200).end("ok");
+      res.writeHead(healthy ? 200 : 503).end(healthy ? "ok" : "unhealthy");
       return;
     }
     res.writeHead(404).end();

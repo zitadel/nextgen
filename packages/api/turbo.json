@@ -7,7 +7,7 @@
     // the server's generation and its checks rewrite the *-error-response.yaml
     // files this reads.
     "generate": {
-      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/api/openapi/**/*.yaml"],
+      "inputs": ["$TURBO_EXTENDS$", "$TURBO_ROOT$/api/openapi/**/*.yaml", "$TURBO_ROOT$/scripts/task-guard.mjs"],
       "outputs": ["src/generated/**"]
     },
     "typecheck": {
@@ -19,12 +19,13 @@
     "test": {
       "dependsOn": ["generate"]
     },
-    // The release builds start after cli:test, which imports this package's
-    // dist at runtime: the clean step must not run while it does (moon: the
-    // `public-dist` mutex). Every other release build depends on this one
-    // through its package edges, so they all wait for cli:test.
+    // Every other release build reaches this one, so none cleans a dist while
+    // cli#test or server#test (and the console build it embeds) reads it.
+    // Turbo has no order-only edge, so pack and publish run the Go tests too;
+    // moon orders them in snapshot only. Separate release output (open
+    // decision 5 in docs/design/build/turborepo-migration.md) would drop it.
     "build-release": {
-      "dependsOn": ["generate", "@zitadel/cli#test"]
+      "dependsOn": ["generate", "@zitadel/cli#test", "@zitadel/server#test"]
     }
   }
 }

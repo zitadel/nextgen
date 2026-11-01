@@ -9,6 +9,7 @@ import AuthMethodPasswordEnable from "./commands/auth-method/password/enable";
 import AuthMethodSsoDisable from "./commands/auth-method/sso/disable";
 import AuthMethodSsoEnable from "./commands/auth-method/sso/enable";
 import BrandingEject from "./commands/branding/eject";
+import PoliciesTest from "./commands/policies/test";
 import Claim from "./commands/claim";
 import Console from "./commands/console";
 import Deploy from "./commands/deploy";
@@ -25,6 +26,9 @@ import Logs from "./commands/logs";
 import OriginAdd from "./commands/origin/add";
 import OriginList from "./commands/origin/list";
 import OriginRm from "./commands/origin/rm";
+import Preview from "./commands/preview/index";
+import PreviewList from "./commands/preview/list";
+import PreviewRm from "./commands/preview/rm";
 import Pull from "./commands/pull";
 import ReleaseCreate from "./commands/release/create";
 import ReleaseRevoke from "./commands/release/revoke";
@@ -32,6 +36,7 @@ import Reset from "./commands/reset";
 import { RESOURCE_COMMANDS } from "./commands/resources";
 import ResourcesList from "./commands/resources-list";
 import Setup from "./commands/setup/index";
+import SkillsAdd from "./commands/skills/add";
 import Start from "./commands/start";
 import Status from "./commands/status";
 import Stop from "./commands/stop";
@@ -59,6 +64,7 @@ export const COMMANDS: Record<string, typeof Command> = {
   eject: Eject,
   env: Env,
   logs: Logs,
+  preview: Preview,
   pull: Pull,
   reset: Reset,
   resources: ResourcesList,
@@ -83,8 +89,12 @@ export const COMMANDS: Record<string, typeof Command> = {
   "origin:add": OriginAdd,
   "origin:list": OriginList,
   "origin:rm": OriginRm,
+  "policies:test": PoliciesTest,
+  "preview:list": PreviewList,
+  "preview:rm": PreviewRm,
   "release:create": ReleaseCreate,
   "release:revoke": ReleaseRevoke,
+  "skills:add": SkillsAdd,
   "variable:set": VariableSet,
   "variable:get": VariableGet,
   "variable:list": VariableList,

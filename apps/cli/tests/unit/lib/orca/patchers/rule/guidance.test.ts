@@ -171,7 +171,7 @@ describe("guidance content", () => {
       framework: { id: "react", devPort: 5173, url: "http://localhost:5173" },
     } as PatchContext;
     const reactAgents = agentsGuidanceSection(reactCtx);
-    expect(reactAgents).toContain("/__nextgen/sessions/me?project_id=");
+    expect(reactAgents).toContain("/__nextgen/api/v1/sessions/me?project_id=");
     expect(reactAgents).toContain('cache: "no-store"');
     expect(reactAgents).toContain("401/auth.unauthorized");
     expect(reactAgents).toContain("403/sess.project_mismatch");
@@ -222,6 +222,15 @@ describe("guidance content", () => {
     expect(agents).toContain("moves between sign-in and sign-up by itself");
     expect(agents).toContain("must follow its `zitadel-flow-step` event");
     expect(agents).toContain("`step.purpose` is `login` while it signs in");
+  });
+
+  it("says sign-in returns to the page's next parameter ahead of post-sign-in-url", () => {
+    const agents = agentsGuidanceSection(ctx);
+
+    expect(agents).toContain(
+      "the path in its page's `?next=` parameter, ahead of `post-sign-in-url`",
+    );
+    expect(agents).toContain("`force-post-sign-in-url` (SDK wrappers: `forcePostSignInUrl`)");
   });
 
   it("names the presentation knobs and, on Next, the shipped JSX types", () => {

@@ -14,6 +14,9 @@ non-required `ci-turbo` job.
 
 Where the two differ on purpose:
 
+- The hosted cloud is a turbo package (`@zitadel/cloud`: the launcher and
+  its migration, the schemas, `dev`) and no moon project. Moon's `workspace:cloud` runs the same
+  script as its `dev`, and `server:test` runs the launcher's tests.
 - Moon's `test` runs each package's `test:all` script, turbo runs `test`. In
   the browser-test packages, `test` wraps `scripts/task-guard.mjs` for
   turbo's retries and `test:all` calls Vitest directly, because moon has its
@@ -25,9 +28,17 @@ Where the two differ on purpose:
 - Some scripts set values a moon task's `env` sets too, because turbo cannot.
   They set them as defaults (`${VAR-default}`), so a caller's value still
   wins.
-- Turbo's console `build` lists the git-ignored `.env*` files as inputs. Moon
-  hashes only the files git sees, listed or not, so `moon.yml` does not list
-  them: under moon a changed `.env.local` still restores the old build.
+- Ignored dotenv inputs are `.env*` in turbo and `file://.env.local?optional`
+  paths in moon, whose globs skip ignored files (`scripts/task-graph.test.mjs`).
+- Release builds wait for their graph's Go tasks (`scripts/task-graph.test.mjs`).
+- Turbo's inputs follow file classes: no task hashes its package's docs, and
+  no build its tests ([turborepo-graph.md](../docs/design/build/turborepo-graph.md)).
+  Moon keeps the whole folder (below). A file read outside the folder goes
+  into both.
+- Turbo's `journey-local` also depends on `server#build`: ci-turbo.yml
+  selects each lane with `--affected`, and the server the journey runs comes
+  packed in the release snapshot, outside the graph. Moon runs the journey
+  with every other lane through `e2e:all`.
 
 ## Shared tasks live in `.moon/tasks`
 
@@ -37,6 +48,8 @@ Where the two differ on purpose:
 - `typescript.yml` defines `lint`, `typecheck`, `build`
   (`outputs: dist/**/*`) and `test` once for every TypeScript project.
   `javascript.yml` gives the JavaScript projects the same `lint`.
+- Only `test` and `typecheck` hash the shared Vitest config; a project without
+  Vitest replaces its typecheck inputs (`scripts/task-graph.test.mjs`).
 - A project's `moon.yml` never repeats a shared task's command. It adds only
   `deps` (appended), `outputs` with `options.mergeOutputs: "replace"`, a
   different command with `options.mergeArgs: "replace"`, or options (a mutex,
@@ -57,6 +70,10 @@ package's own files. The exceptions name only what lies outside the folder:
   `bench` because `tools/bench` compiles the root module through
   `replace github.com/zitadel/nextgen => ../..` (`tools/bench/go.mod`).
   Anything compiled in through `//go:embed` or read by a test belongs in them.
+- Go builds and generation never hash `_test.go`, `testdata` or nested modules
+  (`scripts/task-graph.test.mjs`); keep `//go:generate` out of test files.
+- Native Go compile, vet and test tasks are `cache: false`; generation stays
+  cached (`scripts/task-graph.test.mjs`).
 - The root `workspace` project's `test` and `check-*` tasks list their files,
   because its folder is the whole repo.
 

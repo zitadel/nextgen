@@ -37,6 +37,7 @@ type ListSchemasInput struct {
 	// LatestRevisionPerObjectType asks for the newest revision of each object
 	// type instead of the full revision history.
 	LatestRevisionPerObjectType bool
+	IncludeInUse                bool
 	PageToken                   string
 	Limit                       int
 }
@@ -322,7 +323,9 @@ func matchingSchemaByObjectType(ctx context.Context, stmts AllStatements, projec
 	return nil, nil
 }
 
-func latestSchemaByObjectType(ctx context.Context, stmts AllStatements, projectID, objectType string) (*domain.JSONSchema, error) {
+// LatestSchemaByObjectType is the project's newest schema declaring objectType,
+// nil when it has none.
+func LatestSchemaByObjectType(ctx context.Context, stmts AllStatements, projectID, objectType string) (*domain.JSONSchema, error) {
 	if objectType == "" {
 		return nil, nil
 	}
@@ -400,7 +403,10 @@ func (s *SchemaService) ListSchemas(ctx context.Context, input ListSchemasInput)
 				Direction: database.OrderDesc,
 			},
 		},
-	}, JSONSchemaQueryOptions{LatestRevisionPerObjectType: input.LatestRevisionPerObjectType})
+	}, JSONSchemaQueryOptions{
+		LatestRevisionPerObjectType: input.LatestRevisionPerObjectType,
+		IncludeInUse:                input.IncludeInUse,
+	})
 	if err != nil {
 		return nil, mapListError(err, "failed to list schemas")
 	}

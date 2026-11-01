@@ -3,7 +3,13 @@ import { ApiError } from "@zitadel/api/runtime/fetch";
 import { api } from "@/api/zitadel";
 
 import { displayValue, field, isPresent } from "./record";
-import { type SchemaField, type UserSchema, schemaFields } from "./schema";
+import {
+  type SchemaEntry,
+  type SchemaField,
+  type UserSchema,
+  schemaDisplayName,
+  schemaFields,
+} from "./schema";
 import {
   type UserTeam,
   userAttributes,
@@ -44,8 +50,13 @@ export async function fetchUsers(
   projectId: string,
   pageToken?: string,
   expand = true,
+  filter: UserFilter = [],
 ): Promise<UsersPage & { teamsExpanded: boolean }> {
-  const body = { limit: PAGE_SIZE, page_token: pageToken };
+  const body = {
+    limit: PAGE_SIZE,
+    page_token: pageToken,
+    ...(filter.length > 0 ? { filter } : {}),
+  };
   const params = { project_id: projectId };
   if (!expand) {
     return { ...(await api.queryUsers(body, params)), teamsExpanded: false };
@@ -59,6 +70,70 @@ export async function fetchUsers(
     if (!(cause instanceof ApiError) || cause.status !== 403) throw cause;
     return { ...(await api.queryUsers(body, params)), teamsExpanded: false };
   }
+}
+
+/** What the Users list is narrowed to, as the URL carries it. */
+export interface UsersSearch {
+  /** A schema's object type; absent for every schema. */
+  schema?: string;
+  /** `latest`, `older`, or one revision's id; absent for every revision. */
+  revision?: string;
+}
+
+type UserFilter = NonNullable<Parameters<typeof api.queryUsers>[0]["filter"]>;
+
+/** One schema as the Users filter offers it: its object type, title and newest revision. */
+export interface SchemaOption {
+  objectType: string;
+  /** The newest revision's title, else its id. */
+  title: string;
+  /** The newest revision's id, which `latest` and `older` compare with. */
+  latestId: string;
+  /** The newest revision's document, for the column groups. */
+  schema: UserSchema;
+}
+
+/**
+ * The filter's options from the project's schemas at their latest revision,
+ * by title. A schema stored without an object type has no lineage to filter
+ * by and is left out. The server calls every revision latest that none of its
+ * type was created after, so two minted in the same instant both arrive; the
+ * first listed (created at, then id, descending) stands for the type.
+ */
+export function schemaOptions(entries: SchemaEntry[]): SchemaOption[] {
+  const byType = new Map<string, SchemaOption>();
+  for (const entry of entries) {
+    const objectType = field(entry.schema, "objectType");
+    if (!objectType || byType.has(objectType)) continue;
+    byType.set(objectType, {
+      objectType,
+      title: schemaDisplayName(entry.schema, entry.id),
+      latestId: entry.id,
+      schema: entry.schema,
+    });
+  }
+  return [...byType.values()].sort((a, b) => a.title.localeCompare(b.title));
+}
+
+/**
+ * The server-side criteria for a search (#1669). Every revision of a schema
+ * shares its `object_type`; `latest` and `older` compare the user's `schema`
+ * with the newest revision's id, `latest`. The route sends neither without
+ * it, so a URL never claims a narrower list than it shows.
+ */
+export function userFilter(search: UsersSearch, latest: string | undefined): UserFilter {
+  if (!search.schema) return [];
+  const criteria: UserFilter = [
+    { field: "schema_object_type", operation: "equals", value: search.schema },
+  ];
+  if (search.revision === "latest") {
+    if (latest) criteria.push({ field: "schema", operation: "equals", value: latest });
+  } else if (search.revision === "older") {
+    if (latest) criteria.push({ field: "schema", operation: "not_equals", value: latest });
+  } else if (search.revision) {
+    criteria.push({ field: "schema", operation: "equals", value: search.revision });
+  }
+  return criteria;
 }
 
 /**
@@ -111,10 +186,14 @@ export interface ColumnGroup {
 export async function columnsForUsers(
   projectId: string,
   users: Record<string, unknown>[],
+  /** Documents already in hand (the filter's lineages), read again for nobody. */
+  known: ReadonlyMap<string, UserSchema> = new Map(),
 ): Promise<ColumnGroup[]> {
   const schemaIds = [...new Set(users.map((user) => field(user, "schema")).filter(isPresent))];
   const fetched = await Promise.all(
     schemaIds.map(async (id) => {
+      const held = known.get(id);
+      if (held) return held;
       try {
         return (await api.getSchemaById(id, { project_id: projectId })).schema as UserSchema;
       } catch {

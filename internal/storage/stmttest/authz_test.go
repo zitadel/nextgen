@@ -98,6 +98,62 @@ func TestAuthzAssignmentStatements_CRUD(t *testing.T) {
 	})
 }
 
+func TestAuthzAssignmentStatements_RevokeByPrincipal(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectA := ensureProject(t, d.stmts)
+		projectB := ensureProject(t, d.stmts)
+		userID := "user_" + uniqueSuffix(t)
+		otherUserID := "user_" + uniqueSuffix(t)
+		scope := domain.NewProjectAssignmentScope()
+
+		onA := newTestAssignment(projectA, "asgn-"+uniqueSuffix(t), domain.AuthzPrincipalTypeUser, userID, "project", "admin", scope)
+		onB := newTestAssignment(projectB, "asgn-"+uniqueSuffix(t), domain.AuthzPrincipalTypeUser, userID, "project", "viewer", scope)
+		revokedEarlier := newTestAssignment(projectA, "asgn-"+uniqueSuffix(t), domain.AuthzPrincipalTypeUser, userID, "project", "editor", scope)
+		otherUser := newTestAssignment(projectA, "asgn-"+uniqueSuffix(t), domain.AuthzPrincipalTypeUser, otherUserID, "project", "admin", scope)
+		teamWithSameID := newTestAssignment(projectA, "asgn-"+uniqueSuffix(t), domain.AuthzPrincipalTypeTeam, userID, "project", "admin", scope)
+		for _, a := range []*domain.AuthzAssignment{onA, onB, revokedEarlier, otherUser, teamWithSameID} {
+			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(), a))
+		}
+		require.NoError(t, d.stmts.RevokeAuthzAssignment(t.Context(), projectA, revokedEarlier.ID))
+
+		revoked, err := d.stmts.RevokeAuthzAssignmentsByPrincipal(t.Context(), domain.AuthzPrincipalTypeUser, userID)
+		require.NoError(t, err)
+		byID := make(map[string]*domain.AuthzAssignment, len(revoked))
+		for _, a := range revoked {
+			byID[a.ID] = a
+		}
+		require.Len(t, byID, 2, "the active assignments on both projects, not the one revoked earlier")
+		for _, want := range []*domain.AuthzAssignment{onA, onB} {
+			got := byID[want.ID]
+			require.NotNil(t, got, want.ID)
+			assert.Equal(t, want.ProjectID, got.ProjectID)
+			assert.Equal(t, want.Relation, got.Relation)
+			assert.Equal(t, domain.AuthzPrincipalTypeUser, got.PrincipalType)
+			assert.Equal(t, userID, got.PrincipalID)
+			assert.NotNil(t, got.RevokedAt)
+		}
+
+		for _, projectID := range []string{projectA, projectB} {
+			active, err := d.stmts.ListAuthzAssignments(t.Context(), projectID, domain.AuthzPrincipalTypeUser, userID, false)
+			require.NoError(t, err)
+			assert.Empty(t, active, projectID)
+		}
+		for _, untouched := range []*domain.AuthzAssignment{otherUser, teamWithSameID} {
+			got, err := d.stmts.GetAuthzAssignment(t.Context(), projectA, untouched.ID)
+			require.NoError(t, err)
+			assert.Nil(t, got.RevokedAt, untouched.ID)
+		}
+
+		// The freed unique key lets the same grant be made again.
+		again := newTestAssignment(projectA, "asgn-"+uniqueSuffix(t), domain.AuthzPrincipalTypeUser, userID, "project", "admin", scope)
+		require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(), again))
+
+		none, err := d.stmts.RevokeAuthzAssignmentsByPrincipal(t.Context(), domain.AuthzPrincipalTypeUser, otherUserID+"-unknown")
+		require.NoError(t, err)
+		assert.Empty(t, none)
+	})
+}
+
 func TestAuthzAssignmentStatements_ListManagedGrants(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID := ensureProject(t, d.stmts)

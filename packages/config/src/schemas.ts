@@ -3,10 +3,12 @@ import {
   CreateFlowDefinitionBody,
   CreateIdpBody,
   CreateSchemaBody,
+  EvaluatePolicyBody,
   PublishPolicyBody,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import { z } from "zod";
 
+import defaultPasswordPolicy from "../defaults/default-password-policy.json" with { type: "json" };
 import { isBrandingColor, isBrandingFontFamily, MAX_BRANDING_URL_BYTES } from "./branding-css.js";
 import { isCanonicalLoopbackHttpUrl } from "./branding-url.js";
 
@@ -36,6 +38,50 @@ export const policyConfigSchema = z.strictObject({
   $schema: z.string().optional(),
   operation: PublishPolicyBody.shape.operation,
   config: z.strictObject(PublishPolicyBody.shape.config.shape),
+});
+
+/**
+ * The minimum password length NIST SP 800-63B-4 sets for a password that is
+ * the only factor. `setup` writes it when given none, and the console warns
+ * on a policy under it.
+ */
+export const RECOMMENDED_PASSWORD_MIN_LENGTH: number = defaultPasswordPolicy.config.min_length;
+
+/**
+ * A `.zitadel/policies/<operation>.test.json` file: cases `zitadel policies
+ * test` evaluates (`POST /policies/evaluate`), each with the operation's
+ * input, the facts it would look up, and the decision it expects. `input` and
+ * `facts` come from the generated evaluate body, strict like the policy file,
+ * so the editor's `policy-test.json` and this check refuse the same typos.
+ *
+ * With one operation the generated body is a single object; a second turns
+ * this into a discriminated union on `operation`, as for `policyConfigSchema`.
+ */
+export const policyTestFileSchema = z.strictObject({
+  $schema: z.string().optional(),
+  operation: EvaluatePolicyBody.shape.operation,
+  cases: z
+    .array(
+      z.strictObject({
+        name: z.string().min(1),
+        input: z.strictObject(EvaluatePolicyBody.shape.input.shape),
+        facts: z.strictObject(EvaluatePolicyBody.shape.facts.unwrap().shape).optional(),
+        expect: z
+          .strictObject({
+            allowed: z.boolean(),
+            code: z.string().min(1).optional(),
+            violations: z.array(z.string().min(1)).optional(),
+          })
+          // Only a refusal carries a code or violations, so an allowed case
+          // that names one could never pass.
+          .refine(
+            (expect) =>
+              !expect.allowed || (expect.code === undefined && expect.violations === undefined),
+            "an allowed case names no code or violations",
+          ),
+      }),
+    )
+    .min(1),
 });
 
 /** The wire shape of a branding revision (`POST /branding` request body). */
