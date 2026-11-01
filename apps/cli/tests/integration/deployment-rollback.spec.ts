@@ -236,6 +236,20 @@ describe("deployment rollback", () => {
           expect(result).toSuggest(`deployment rollback ${first.deployment_id ?? ""} --force`);
         });
 
+        it("suggests the deployment it resolved when none was named", async () => {
+          const app = await aSetUpApp();
+          await app.addPrimaryOrigin();
+          const first = await app.deployData();
+          await app.editUserSchema((schema) => {
+            schema.properties.company = { type: "string" };
+          });
+          await app.deployData();
+
+          const result = await app.run(["deployment", "rollback", "--json"]);
+
+          expect(result).toSuggest(`deployment rollback ${first.deployment_id ?? ""} --force`);
+        });
+
         it("rolls back nothing", async () => {
           const app = await aSetUpApp();
           await app.addPrimaryOrigin();

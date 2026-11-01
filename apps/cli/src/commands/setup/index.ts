@@ -134,7 +134,7 @@ import {
   type Row,
   type Section,
 } from "./summary";
-import { shellOption } from "../../lib/shell";
+import { shellArg, shellOption } from "../../lib/shell";
 import { showSkillsHint } from "../../lib/skills-hint";
 import { reportWarning } from "../../lib/warnings";
 import {
@@ -1258,7 +1258,7 @@ export default class Setup extends Destructive(BaseCommand) {
     }
     if (move.staleOrigin !== undefined) {
       reportWarning(
-        `${move.staleOrigin} is still among the project's origins; it admits a port nothing serves any more.${move.retry === undefined ? "" : " Pass --force to remove it."}`,
+        `${move.staleOrigin} is still among the project's origins; it admits a port nothing serves any more.${move.refused ? ` Remove it with \`origin rm ${move.staleOrigin} --force\`.` : ""}`,
       );
     }
     for (const slug of move.ssoProviders) {
@@ -1284,7 +1284,11 @@ export default class Setup extends Destructive(BaseCommand) {
       },
       next: {
         actions: [`Restart the dev server and open ${move.issuer}/login.`],
-        ...(move.retry === undefined ? {} : { commands: move.retry }),
+        // Not setup again: the app is on the new port by now, so a rerun moves
+        // nothing and never reaches the old origin.
+        ...(move.refused && move.staleOrigin !== undefined
+          ? { commands: [this.suggestUnscoped(`origin rm ${shellArg(move.staleOrigin)} --force`)] }
+          : {}),
       },
     });
   }

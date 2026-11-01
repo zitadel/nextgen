@@ -36,6 +36,12 @@ export type Gate = Readonly<{
   /** The command again with `--force`, for an agent to run. */
   retry?: SuggestedCommand;
   /**
+   * The leading arguments the `--force` retry names in place of the typed
+   * ones, for a command that resolved what the invocation left out (a bare
+   * `deployment rollback`), so the retry acts on what the question named.
+   */
+  arguments?: readonly string[];
+  /**
    * Refuses in place of the default "Cannot … without --force" when nobody
    * can be asked and `--force` was not given, for a refusal that says more.
    */

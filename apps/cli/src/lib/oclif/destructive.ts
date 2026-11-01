@@ -92,7 +92,8 @@ export function Destructive<TBase extends CommandClass<BaseCommand>>(Base: TBase
      * `undefined` is a no. It throws during a dry run, which must answer first.
      *
      * Without a `retry` of the gate's own, the refusal suggests this
-     * invocation again with `--force`, as typed: after the leading arguments,
+     * invocation again with `--force`, as typed: after the leading arguments
+     * (the gate's `arguments` in their place, when it names them),
      * without the flags that only say how to answer or a URL's credentials,
      * and with the selector put back on by {@link BaseCommand.retryCommand}.
      * Whatever follows a `--` stays last, after it, where it is read as
@@ -108,7 +109,7 @@ export function Destructive<TBase extends CommandClass<BaseCommand>>(Base: TBase
       const split = leading === -1 ? typed.length : leading;
       const command = this.retryCommand([
         ...(this.id ?? "").split(":").filter((word) => word !== ""),
-        ...typed.slice(0, split),
+        ...(gate.arguments ?? typed.slice(0, split)),
         "--force",
         ...typed.slice(split),
       ]);

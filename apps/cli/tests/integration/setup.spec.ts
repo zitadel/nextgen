@@ -491,16 +491,16 @@ describe("setup", () => {
 
           const result = await app.setup(["--dev-port", "3001"]);
 
-          expect(result).toSay("Pass --force to remove it");
+          expect(result).toSay("origin rm http://localhost:3000 --force");
         });
 
-        it("suggests running it again with --force", async () => {
+        it("suggests removing the previous origin with --force", async () => {
           const app = await anApp();
           expect(await app.setup()).toSucceed();
 
           const result = await app.setup(["--dev-port", "3001"]);
 
-          expect(result).toSuggest("setup --force --skip-install --dev-port 3001");
+          expect(result).toSuggest("origin rm http://localhost:3000 --force");
         });
 
         it("removes nothing", async () => {

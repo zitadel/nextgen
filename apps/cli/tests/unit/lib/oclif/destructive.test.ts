@@ -31,6 +31,8 @@ type Invocation = {
   force?: boolean;
   dryRun?: boolean;
   interactive?: boolean;
+  /** The leading arguments the gate names for its retry. */
+  arguments?: string[];
 };
 
 /** A destructive command that records what its act was handed. */
@@ -64,6 +66,7 @@ class Removing extends Destructive(BaseCommand) {
     this.meta = { ...this.meta, nonInteractive: !(this.invocation.interactive ?? false) };
     return this.confirmed<string | undefined>({
       ...GATE,
+      ...(this.invocation.arguments === undefined ? {} : { arguments: this.invocation.arguments }),
       prepare,
       apply: async (consent, ready) => {
         this.acted.push(consent);
@@ -247,6 +250,14 @@ describe("Destructive", () => {
         nextCommands: [
           "npx @zitadel/cli@1.2.3 variable rm API_URL --force --server https://host/path",
         ],
+      });
+    });
+
+    it("names the gate's arguments in place of the typed ones", async () => {
+      const command = new Removing({ argv: ["--env", "staging"], arguments: ["API_URL"] });
+
+      await expect(command.remove()).rejects.toMatchObject({
+        nextCommands: ["npx @zitadel/cli@1.2.3 variable rm API_URL --force --env staging"],
       });
     });
 

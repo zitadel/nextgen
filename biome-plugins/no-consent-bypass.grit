@@ -28,6 +28,25 @@ or {
     $filename <: not r".*/apps/cli/src/lib/oclif/destructive\.ts$",
     register_diagnostic(span=$bypass, message="Ask for consent with Destructive's confirmed() or consent(), which take --force and the terminal from the run.", severity="error")
   },
+  or {
+    `import $names from $source`,
+    `import type $names from $source`,
+    `export { $names } from $source`
+  } as $bypass where {
+    $filename <: r".*/apps/cli/src/.*",
+    $source <: r".*/consent[\"']$",
+    $names <: r"(?s).*\bConsent\s+as\b.*|(?s)^\*\s+as\b.*",
+    register_diagnostic(span=$bypass, message="Import Consent by its own name, so the consent rules can see it.", severity="error")
+  },
+  or {
+    `const $_ = Consent`,
+    `let $_ = Consent`,
+    `var $_ = Consent`,
+    `$_ = Consent`
+  } as $bypass where {
+    $filename <: r".*/apps/cli/src/.*",
+    register_diagnostic(span=$bypass, message="Never alias Consent: ask for one with Destructive's confirmed() or consent().", severity="error")
+  },
   `import * as $_ from "@zitadel/api/runtime/fetch"` as $bypass where {
     $filename <: r".*/apps/cli/src/.*",
     register_diagnostic(span=$bypass, message="Import what you need from @zitadel/api/runtime/fetch by name; its senders go through send() in lib/api/call.", severity="error")

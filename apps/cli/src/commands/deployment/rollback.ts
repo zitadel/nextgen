@@ -83,6 +83,9 @@ export default class DeploymentRollback extends Destructive(EnvironmentCommand) 
         verb: "rollback",
         name: `re-apply ${targetId}`,
         message: `Re-apply ${targetId}? Its release goes live again.`,
+        // A bare rollback resolved its target, which a retry must not resolve
+        // again: a deploy landing in between would name another.
+        arguments: [targetId],
         // A dry run re-applies nothing, so it stops once the target is
         // resolved: a rollback re-serves an earlier release, and a dry run
         // must leave what is served untouched.
