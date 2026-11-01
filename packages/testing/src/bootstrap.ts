@@ -11,8 +11,10 @@ export interface BootstrapProjectOptions {
   baseUrl: string;
   projectName?: string;
   /**
-   * Origins of the apps that will proxy to this instance. The backend's
-   * origin check rejects forwarded requests from unregistered origins.
+   * Origins of the apps that will proxy to this instance. Each is a primary
+   * origin, and the bootstrap deploys the project's release there. A loopback
+   * origin with nothing deployed is refused, so the app origin has to be one
+   * the deployment names.
    */
   appOrigins?: string[];
   preset?: SetupPreset;
@@ -35,6 +37,12 @@ const DEFAULT_PROJECT_NAME = "zitadel-testing";
  * bearer for everything else; the schema is uploaded without `$id` so the
  * server assigns an opaque id, which the flow must then reference.
  */
+/**
+ * A deployment needs a primary origin. A loopback origin is always admitted, so
+ * listing this one opens nothing up.
+ */
+const FALLBACK_APP_ORIGIN = "http://localhost:3000";
+
 export async function bootstrapProject(
   options: BootstrapProjectOptions,
 ): Promise<BootstrappedProject> {
@@ -42,10 +50,12 @@ export async function bootstrapProject(
   const unauthenticated = createZitadelClient({ baseUrl });
   const project = (await unauthenticated.createProject({
     name: options.projectName ?? DEFAULT_PROJECT_NAME,
-    origins: (options.appOrigins ?? []).map((pattern) => ({
-      pattern,
-      kind: "preview" as const,
-    })),
+    origins: (options.appOrigins?.length ? options.appOrigins : [FALLBACK_APP_ORIGIN]).map(
+      (pattern) => ({
+        pattern,
+        kind: "primary" as const,
+      }),
+    ),
     seed_defaults: false,
   } as Parameters<ZitadelClient["createProject"]>[0])) as Record<string, unknown>;
   const projectId = requireString(project.id, "project id");
@@ -76,6 +86,21 @@ export async function bootstrapProject(
     flow_definition: flowBody,
   } as Parameters<ZitadelClient["createFlowDefinition"]>[0])) as Record<string, unknown>;
   const flowId = requireString(flow.id, "flow definition id");
+
+  const release = (await client.createRelease(
+    {
+      pointers: [
+        { kind: "schema", revision_id: schemaId },
+        { kind: "flow_definition", revision_id: flowId },
+      ],
+    },
+    { project_id: projectId },
+  )) as Record<string, unknown>;
+  const releaseId = requireString(release.id, "release id");
+  await client.createDeployment(
+    { release_id: releaseId, targets: ["primary"] },
+    { project_id: projectId },
+  );
 
   return { projectId, projectSecret, previewSecret, schemaId, flowId };
 }

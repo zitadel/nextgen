@@ -119,6 +119,9 @@ function devApiProxy(mode: string): Record<string, ProxyOptions> {
     );
   }
   const backendUrl = devBackendUrl(mode);
+  // `console:dev-claim` signs in to the platform project, which serves only the
+  // server's own origin; a browser's dev-server origin has nothing deployed.
+  const forwardedOrigin = process.env.CONSOLE_PROXY_ORIGIN;
 
   return {
     // Console ADR 0004 §3: the pre-session runtime-metadata document lives
@@ -137,6 +140,9 @@ function devApiProxy(mode: string): Record<string, ProxyOptions> {
       // the server was asked.
       configure: (proxy) => {
         proxy.on("proxyReq", (proxyReq) => {
+          if (forwardedOrigin && proxyReq.getHeader("origin")) {
+            proxyReq.setHeader("origin", forwardedOrigin);
+          }
           if (process.env.CONSOLE_DEV_PROXY_LOG) {
             console.log(`[console-proxy] ${proxyReq.method} ${proxyReq.path}`);
           }

@@ -258,7 +258,7 @@ export default class EnvAdd extends Promptable(BaseCommand) {
     let deployment: InitialDeployment | undefined;
     if (hasSomewhereToLand && !nonInteractive && projectSecret !== undefined) {
       consola.info(
-        "Nothing is deployed to this environment yet, so it serves the server's default schema and login flow rather than your .zitadel/ files.",
+        "Nothing is deployed to this environment yet, so sign-in is refused until your .zitadel/ files are deployed.",
       );
       const confirmed = await input(
         {
@@ -313,10 +313,10 @@ export default class EnvAdd extends Promptable(BaseCommand) {
                 origins: [...deployment.origins],
               },
       },
-      // A bound project admits every origin until the first pattern closes
-      // it, so the first step is to add one — `origin add` — before anything
-      // ships. `next_commands` is machine-readable, so the entry is included
-      // only when it is actually runnable: a concrete origin (without
+      // A bound project admits no origin except a loopback origin until the
+      // first pattern is added, so the first step is `origin add` before
+      // anything ships. `next_commands` is machine-readable, so the entry is
+      // included only when it is actually runnable: a concrete origin (without
       // `--app-url` it would be a `<your-app-url>` placeholder the shell
       // reads as redirection) and a project secret in the file for it to
       // authenticate with (a `--project` bind with no secret cannot). When it
@@ -364,11 +364,11 @@ export default class EnvAdd extends Promptable(BaseCommand) {
             : []),
           // Said even when nobody could be asked, because it is the one thing
           // standing between this environment and a working app: until a
-          // release is deployed the project serves the server's own defaults,
-          // not the `.zitadel/` files in this directory.
+          // release is deployed the project refuses sign-in, and the `.zitadel/`
+          // files in this directory are not served.
           ...(createdProject && deployment === undefined
             ? [
-                `Nothing is deployed to ${name} yet, so it serves the server's defaults rather than .zitadel/.`,
+                `Nothing is deployed to ${name} yet, so sign-in is refused until .zitadel/ is deployed.`,
                 // With an origin, the deploy is in the next steps.
                 ...(hasSomewhereToLand
                   ? []

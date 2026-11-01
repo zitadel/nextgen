@@ -333,3 +333,14 @@ A request with no `Origin`, and one admitted without a project pattern with
 nothing deployed to its origin, is served the project's newest primary
 deployment when there is one. So a console origin the platform project does not
 list still opens a flow.
+
+## Amendment (2026-10-31): an empty allowlist admits nothing
+
+A project with no origin pattern no longer admits every origin. A loopback
+origin is still always admitted. Nothing falls back to the newest revisions: a
+request with no `Origin`, and one from a console origin the project does not
+list, needs a primary deployment, and without one answers `409` with
+`rel.no_default`. A listed origin, a loopback origin, or a live preview with
+nothing deployed answers `409` with `rel.not_deployed`. So the console signs in
+to the platform project on a loopback origin only when that origin is its
+public base.

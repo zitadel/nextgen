@@ -160,15 +160,15 @@ type Invoker interface {
 	// that deployment's release supplies flow definitions, user schemas and
 	// branding. The resolved deployment is sealed into the `_zflow` cookie so
 	// later steps keep the same configuration. An origin that matches no pattern
-	// answers `403` with `proj.origin_not_allowed`; one that matches a preview
-	// pattern with no live preview answers `403` with `proj.preview_not_live`;
-	// nothing deployed to the target answers `409` with `rel.not_deployed`; a
-	// revoked release answers `409` with `rel.revoked`. A request with no
-	// `Origin` passes the gate. A loopback origin passes it too, and so does a
-	// console origin, from which the console previews a project's login; a step
-	// submitted from a console origin is still refused unless the project lists
-	// it. Any of these with nothing deployed to its origin is served the
-	// project's newest primary deployment when there is one.
+	// answers `403` with `proj.origin_not_allowed`, including when the project
+	// lists no origins; one that matches a preview pattern with no live preview
+	// answers `403` with `proj.preview_not_live`; nothing deployed to a listed
+	// origin, a loopback origin, or a live preview answers `409` with
+	// `rel.not_deployed`; a revoked release answers `409` with `rel.revoked`.
+	// A request with no `Origin`, and one from a console origin the project does
+	// not list, is served the project's newest primary deployment. No primary
+	// deployment answers `409` with `rel.no_default`. A step submitted from a
+	// console origin is still refused unless the project lists it.
 	// The response contains an `id` field — the flow handle. Use it as the path
 	// parameter for all subsequent `/flow/{id}/submit` calls.
 	// The response also sets an encrypted `HttpOnly` cookie (`_zflow`) containing
@@ -2376,15 +2376,15 @@ func (c *Client) sendCreateDeployment(ctx context.Context, request *CreateDeploy
 // that deployment's release supplies flow definitions, user schemas and
 // branding. The resolved deployment is sealed into the `_zflow` cookie so
 // later steps keep the same configuration. An origin that matches no pattern
-// answers `403` with `proj.origin_not_allowed`; one that matches a preview
-// pattern with no live preview answers `403` with `proj.preview_not_live`;
-// nothing deployed to the target answers `409` with `rel.not_deployed`; a
-// revoked release answers `409` with `rel.revoked`. A request with no
-// `Origin` passes the gate. A loopback origin passes it too, and so does a
-// console origin, from which the console previews a project's login; a step
-// submitted from a console origin is still refused unless the project lists
-// it. Any of these with nothing deployed to its origin is served the
-// project's newest primary deployment when there is one.
+// answers `403` with `proj.origin_not_allowed`, including when the project
+// lists no origins; one that matches a preview pattern with no live preview
+// answers `403` with `proj.preview_not_live`; nothing deployed to a listed
+// origin, a loopback origin, or a live preview answers `409` with
+// `rel.not_deployed`; a revoked release answers `409` with `rel.revoked`.
+// A request with no `Origin`, and one from a console origin the project does
+// not list, is served the project's newest primary deployment. No primary
+// deployment answers `409` with `rel.no_default`. A step submitted from a
+// console origin is still refused unless the project lists it.
 // The response contains an `id` field — the flow handle. Use it as the path
 // parameter for all subsequent `/flow/{id}/submit` calls.
 // The response also sets an encrypted `HttpOnly` cookie (`_zflow`) containing

@@ -110,11 +110,11 @@ describe("project origins", () => {
     expect(section.getByRole("button", { name: `Copy ${PREVIEW.pattern}` })).toBeInTheDocument();
   });
 
-  it("says that every origin is admitted while the list is empty", async () => {
+  it("says that only a loopback origin is admitted while the list is empty", async () => {
     stubProject([]);
     await renderProject();
 
-    expect((await origins()).getByText(/every origin is admitted/i)).toBeInTheDocument();
+    expect((await origins()).getByText(/only a loopback origin is admitted/i)).toBeInTheDocument();
   });
 
   it("adds a primary origin to the route's project and re-reads it", async () => {
@@ -220,7 +220,7 @@ describe("project origins", () => {
     );
   });
 
-  it("says that removing the only origin admits every origin", async () => {
+  it("says that removing the only origin admits only a loopback origin", async () => {
     stubProject([PRIMARY]);
     await renderProject();
 

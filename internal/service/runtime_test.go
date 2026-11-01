@@ -24,27 +24,31 @@ const ownOrigin = "https://zitadel.example.com"
 
 func newMockedRuntimeResolver(t *testing.T) (*service.RuntimeResolver, *servicemocks.MockAllStatements, *servicemocks.MockReleaseService) {
 	t.Helper()
+	return newRuntimeResolverOwning(t, ownOrigin)
+}
+
+func newRuntimeResolverOwning(t *testing.T, own string) (*service.RuntimeResolver, *servicemocks.MockAllStatements, *servicemocks.MockReleaseService) {
+	t.Helper()
 	ctrl := gomock.NewController(t)
 	pool := servicemocks.NewMockPool(ctrl)
 	statements := servicemocks.NewMockAllStatements(ctrl)
 	pool.EXPECT().Statements().Return(statements).AnyTimes()
 	releases := servicemocks.NewMockReleaseService(ctrl)
-	return service.NewRuntimeResolver(service.NewPool(pool), releases, ownOrigin), statements, releases
+	return service.NewRuntimeResolver(service.NewPool(pool), releases, own), statements, releases
 }
 
 func TestRuntimeResolver_Resolve(t *testing.T) {
 	const projectID = "proj_1"
 	const origin = "https://app.acme.com"
 
-	t.Run("absent origin with no primary deployment keeps pre-resolution path", func(t *testing.T) {
+	t.Run("absent origin with no primary deployment", func(t *testing.T) {
 		resolver, statements, _ := newMockedRuntimeResolver(t)
 		statements.EXPECT().GetProjectByID(gomock.Any(), projectID).Return(&domain.Project{ID: projectID}, nil)
 		statements.EXPECT().ListDeployments(gomock.Any(), gomock.Any()).
 			Return(&database.ListResult[*domain.Deployment]{}, nil)
-
-		got, err := resolver.Resolve(t.Context(), projectID, "")
-		require.NoError(t, err)
-		assert.Nil(t, got)
+		_, err := resolver.Resolve(t.Context(), projectID, "")
+		require.Error(t, err)
+		assert.True(t, errors.Is(err, domain.ErrReleaseNoDefault()))
 	})
 
 	t.Run("absent origin is served the newest primary deployment", func(t *testing.T) {
@@ -60,35 +64,10 @@ func TestRuntimeResolver_Resolve(t *testing.T) {
 
 		got, err := resolver.Resolve(t.Context(), projectID, "")
 		require.NoError(t, err)
-		require.NotNil(t, got)
-		assert.Equal(t, "default", got.Source)
+		require.NotNil(t, got.Release)
 		assert.Equal(t, "rel_primary", got.Release.ID)
-		assert.Empty(t, got.Origin)
-	})
-
-	t.Run("own origin with no deployment is served the newest primary deployment", func(t *testing.T) {
-		resolver, statements, releases := newMockedRuntimeResolver(t)
-		statements.EXPECT().GetProjectByID(gomock.Any(), projectID).Return(&domain.Project{
-			ID: projectID,
-			Origins: []domain.Origin{
-				{Pattern: origin, Kind: domain.OriginKindPrimary},
-			},
-		}, nil)
-		statements.EXPECT().GetNewestPerOrigin(gomock.Any(), projectID, []string{ownOrigin}).
-			Return([]domain.OriginDeployment{}, nil)
-		statements.EXPECT().ListDeployments(gomock.Any(), gomock.Any()).
-			Return(&database.ListResult[*domain.Deployment]{Items: []*domain.Deployment{{
-				ID: "dep_primary", ProjectID: projectID, ReleaseID: "rel_primary",
-			}}}, nil)
-		releases.EXPECT().Get(gomock.Any(), projectID, "rel_primary").Return(&domain.Release{
-			ID: "rel_primary", ProjectID: projectID,
-		}, nil)
-
-		got, err := resolver.Resolve(t.Context(), projectID, ownOrigin)
-		require.NoError(t, err)
-		require.NotNil(t, got)
 		assert.Equal(t, "default", got.Source)
-		assert.Equal(t, ownOrigin, got.Origin)
+		assert.Empty(t, got.Origin)
 		assert.Empty(t, got.Target)
 	})
 
@@ -150,22 +129,39 @@ func TestRuntimeResolver_Resolve(t *testing.T) {
 		assert.True(t, errors.Is(err, domain.ErrProjectPreviewNotLive(nil)))
 	})
 
-	t.Run("empty allowlist with no deployment keeps pre-resolution path", func(t *testing.T) {
+	t.Run("empty allowlist refuses an arbitrary origin", func(t *testing.T) {
 		resolver, statements, _ := newMockedRuntimeResolver(t)
 		statements.EXPECT().GetProjectByID(gomock.Any(), projectID).Return(&domain.Project{
 			ID: projectID,
 		}, nil)
-		statements.EXPECT().GetNewestPerOrigin(gomock.Any(), projectID, []string{origin}).
-			Return([]domain.OriginDeployment{}, nil)
-		statements.EXPECT().ListDeployments(gomock.Any(), gomock.Any()).
-			Return(&database.ListResult[*domain.Deployment]{}, nil)
 
-		got, err := resolver.Resolve(t.Context(), projectID, origin)
-		require.NoError(t, err)
-		assert.Nil(t, got)
+		_, err := resolver.Resolve(t.Context(), projectID, origin)
+		require.Error(t, err)
+		assert.True(t, errors.Is(err, domain.ErrProjectOriginNotAllowed(nil)))
 	})
 
-	t.Run("loopback with no deployment keeps pre-resolution path", func(t *testing.T) {
+	t.Run("a console on a loopback origin the project does not list is served the newest primary deployment", func(t *testing.T) {
+		const console = "http://localhost:8080"
+		resolver, statements, releases := newRuntimeResolverOwning(t, console)
+		statements.EXPECT().GetProjectByID(gomock.Any(), projectID).Return(&domain.Project{
+			ID:      projectID,
+			Origins: []domain.Origin{{Pattern: "http://localhost:3000", Kind: domain.OriginKindPrimary}},
+		}, nil)
+		statements.EXPECT().ListDeployments(gomock.Any(), gomock.Any()).
+			Return(&database.ListResult[*domain.Deployment]{Items: []*domain.Deployment{{
+				ID: "dep_primary", ProjectID: projectID, ReleaseID: "rel_primary",
+			}}}, nil)
+		releases.EXPECT().Get(gomock.Any(), projectID, "rel_primary").Return(&domain.Release{
+			ID: "rel_primary", ProjectID: projectID,
+		}, nil)
+
+		got, err := resolver.Resolve(t.Context(), projectID, console)
+		require.NoError(t, err)
+		assert.Equal(t, "default", got.Source)
+		assert.Equal(t, console, got.Origin)
+	})
+
+	t.Run("loopback with no deployment is not deployed", func(t *testing.T) {
 		resolver, statements, _ := newMockedRuntimeResolver(t)
 		loopback := "http://localhost:3000"
 		statements.EXPECT().GetProjectByID(gomock.Any(), projectID).Return(&domain.Project{
@@ -176,15 +172,66 @@ func TestRuntimeResolver_Resolve(t *testing.T) {
 		}, nil)
 		statements.EXPECT().GetNewestPerOrigin(gomock.Any(), projectID, []string{loopback}).
 			Return([]domain.OriginDeployment{}, nil)
-		statements.EXPECT().ListDeployments(gomock.Any(), gomock.Any()).
-			Return(&database.ListResult[*domain.Deployment]{}, nil)
 
-		got, err := resolver.Resolve(t.Context(), projectID, loopback)
-		require.NoError(t, err)
-		assert.Nil(t, got)
+		_, err := resolver.Resolve(t.Context(), projectID, loopback)
+		require.Error(t, err)
+		assert.True(t, errors.Is(err, domain.ErrReleaseNotDeployed(nil)))
 	})
 
-	t.Run("own origin with no deployment keeps pre-resolution path", func(t *testing.T) {
+	t.Run("own origin with no deployment is served the newest primary deployment", func(t *testing.T) {
+		resolver, statements, releases := newMockedRuntimeResolver(t)
+		statements.EXPECT().GetProjectByID(gomock.Any(), projectID).Return(&domain.Project{
+			ID: projectID,
+			Origins: []domain.Origin{
+				{Pattern: origin, Kind: domain.OriginKindPrimary},
+			},
+		}, nil)
+		statements.EXPECT().ListDeployments(gomock.Any(), gomock.Any()).
+			Return(&database.ListResult[*domain.Deployment]{Items: []*domain.Deployment{{
+				ID: "dep_primary", ProjectID: projectID, ReleaseID: "rel_primary",
+			}}}, nil)
+		releases.EXPECT().Get(gomock.Any(), projectID, "rel_primary").Return(&domain.Release{
+			ID: "rel_primary", ProjectID: projectID,
+		}, nil)
+
+		got, err := resolver.Resolve(t.Context(), projectID, ownOrigin)
+		require.NoError(t, err)
+		require.NotNil(t, got.Release)
+		assert.Equal(t, "rel_primary", got.Release.ID)
+		assert.Equal(t, "default", got.Source)
+		assert.Equal(t, ownOrigin, got.Origin)
+		assert.Empty(t, got.Target)
+	})
+
+	t.Run("another console host with no deployment is served the newest primary deployment", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		pool := servicemocks.NewMockPool(ctrl)
+		statements := servicemocks.NewMockAllStatements(ctrl)
+		pool.EXPECT().Statements().Return(statements).AnyTimes()
+		releases := servicemocks.NewMockReleaseService(ctrl)
+		alias := "https://console-abc123.example.com"
+		resolver := service.NewRuntimeResolver(service.NewPool(pool), releases, ownOrigin, " HTTPS://Console-ABC123.example.com ")
+		statements.EXPECT().GetProjectByID(gomock.Any(), projectID).Return(&domain.Project{
+			ID: projectID,
+			Origins: []domain.Origin{
+				{Pattern: origin, Kind: domain.OriginKindPrimary},
+			},
+		}, nil)
+		statements.EXPECT().ListDeployments(gomock.Any(), gomock.Any()).
+			Return(&database.ListResult[*domain.Deployment]{Items: []*domain.Deployment{{
+				ID: "dep_primary", ProjectID: projectID, ReleaseID: "rel_primary",
+			}}}, nil)
+		releases.EXPECT().Get(gomock.Any(), projectID, "rel_primary").Return(&domain.Release{
+			ID: "rel_primary", ProjectID: projectID,
+		}, nil)
+
+		got, err := resolver.Resolve(t.Context(), projectID, alias)
+		require.NoError(t, err)
+		assert.Equal(t, "default", got.Source)
+		assert.Equal(t, alias, got.Origin)
+	})
+
+	t.Run("own origin with neither deployment answers no default", func(t *testing.T) {
 		resolver, statements, _ := newMockedRuntimeResolver(t)
 		statements.EXPECT().GetProjectByID(gomock.Any(), projectID).Return(&domain.Project{
 			ID: projectID,
@@ -192,37 +239,12 @@ func TestRuntimeResolver_Resolve(t *testing.T) {
 				{Pattern: origin, Kind: domain.OriginKindPrimary},
 			},
 		}, nil)
-		statements.EXPECT().GetNewestPerOrigin(gomock.Any(), projectID, []string{ownOrigin}).
-			Return([]domain.OriginDeployment{}, nil)
 		statements.EXPECT().ListDeployments(gomock.Any(), gomock.Any()).
 			Return(&database.ListResult[*domain.Deployment]{}, nil)
 
-		got, err := resolver.Resolve(t.Context(), projectID, ownOrigin)
-		require.NoError(t, err)
-		assert.Nil(t, got)
-	})
-
-	t.Run("every console origin opens a flow the project's origins refuse", func(t *testing.T) {
-		const other = "https://console-abc123.example.com"
-		ctrl := gomock.NewController(t)
-		pool := servicemocks.NewMockPool(ctrl)
-		statements := servicemocks.NewMockAllStatements(ctrl)
-		pool.EXPECT().Statements().Return(statements).AnyTimes()
-		// Spelled as configured, not as a browser sends it: the resolver
-		// normalizes it as it does the request's origin.
-		resolver := service.NewRuntimeResolver(service.NewPool(pool), servicemocks.NewMockReleaseService(ctrl), ownOrigin, " HTTPS://Console-ABC123.example.com ")
-		statements.EXPECT().GetProjectByID(gomock.Any(), projectID).Return(&domain.Project{
-			ID:      projectID,
-			Origins: []domain.Origin{{Pattern: origin, Kind: domain.OriginKindPrimary}},
-		}, nil)
-		statements.EXPECT().GetNewestPerOrigin(gomock.Any(), projectID, []string{other}).
-			Return([]domain.OriginDeployment{}, nil)
-		statements.EXPECT().ListDeployments(gomock.Any(), gomock.Any()).
-			Return(&database.ListResult[*domain.Deployment]{}, nil)
-
-		got, err := resolver.Resolve(t.Context(), projectID, other)
-		require.NoError(t, err)
-		assert.Nil(t, got)
+		_, err := resolver.Resolve(t.Context(), projectID, ownOrigin)
+		require.Error(t, err)
+		assert.True(t, errors.Is(err, domain.ErrReleaseNoDefault()))
 	})
 
 	// A project that lists the deployment's own origin keeps its own rules
@@ -298,7 +320,7 @@ func TestRuntimeResolver_Resolve(t *testing.T) {
 		assert.Equal(t, pattern, got.Target, "admitted by the project's live preview")
 	})
 
-	t.Run("own origin under a preview pattern with no live preview keeps pre-resolution path", func(t *testing.T) {
+	t.Run("own origin under a preview pattern with no live preview is not live", func(t *testing.T) {
 		resolver, statements, _ := newMockedRuntimeResolver(t)
 		statements.EXPECT().GetProjectByID(gomock.Any(), projectID).Return(&domain.Project{
 			ID: projectID,
@@ -309,14 +331,10 @@ func TestRuntimeResolver_Resolve(t *testing.T) {
 		}, nil)
 		statements.EXPECT().GetPreview(gomock.Any(), projectID, ownOrigin).
 			Return(nil, &database.NoRowFoundError{})
-		statements.EXPECT().GetNewestPerOrigin(gomock.Any(), projectID, []string{ownOrigin}).
-			Return([]domain.OriginDeployment{}, nil)
-		statements.EXPECT().ListDeployments(gomock.Any(), gomock.Any()).
-			Return(&database.ListResult[*domain.Deployment]{}, nil)
 
-		got, err := resolver.Resolve(t.Context(), projectID, ownOrigin)
-		require.NoError(t, err)
-		assert.Nil(t, got)
+		_, err := resolver.Resolve(t.Context(), projectID, ownOrigin)
+		require.Error(t, err)
+		assert.True(t, errors.Is(err, domain.ErrProjectPreviewNotLive(nil)))
 	})
 
 	t.Run("primary origin with no deployment is not deployed", func(t *testing.T) {
@@ -434,6 +452,10 @@ func TestRuntimeResolver_Gate(t *testing.T) {
 	}
 
 	_, err := resolver.Gate(t.Context(), project, ownOrigin)
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, domain.ErrProjectOriginNotAllowed(nil)))
+
+	_, err = resolver.Gate(t.Context(), &domain.Project{ID: "proj_1"}, "https://app.acme.com")
 	require.Error(t, err)
 	assert.True(t, errors.Is(err, domain.ErrProjectOriginNotAllowed(nil)))
 }

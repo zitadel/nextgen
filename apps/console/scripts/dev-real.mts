@@ -554,6 +554,7 @@ if (seedOnly) {
     env: {
       ...process.env,
       CONSOLE_BACKEND_URL: baseUrl,
+      ...(claimMode ? { CONSOLE_PROXY_ORIGIN: new URL(baseUrl).origin } : {}),
     },
   });
   vite.on("exit", (code) => void shutdown(code ?? 0));

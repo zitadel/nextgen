@@ -25,6 +25,7 @@ import (
 func TestFlowSSOSubmitRedirectsToProvider(t *testing.T) {
 	t.Parallel()
 	f := newIdpFixture(t)
+	admitLoginOrigin(t, f.project.ID)
 	// Static endpoints: the client is built without a discovery fetch.
 	connection := helpers.OIDCConnection("google")
 	oidcConn := connection.Oidc.Value
@@ -42,6 +43,8 @@ func TestFlowSSOSubmitRedirectsToProvider(t *testing.T) {
 	}, api.UpdateVariablesParams{ProjectID: f.projectID()})
 	require.NoError(t, err)
 	require.IsType(t, &api.VariablesByKind{}, varsResp, helpers.MustMarshal(t, varsResp))
+	// A deployment freezes the variables, so these need one of their own.
+	deployPrimary(t, f.project.ID)
 
 	defResp, err := f.client.CreateFlowDefinition(t.Context(), &api.CreateFlowDefinitionRequest{
 		ProjectID:      f.projectID(),

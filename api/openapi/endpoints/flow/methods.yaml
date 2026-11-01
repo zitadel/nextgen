@@ -13,15 +13,15 @@ post:
     that deployment's release supplies flow definitions, user schemas and
     branding. The resolved deployment is sealed into the `_zflow` cookie so
     later steps keep the same configuration. An origin that matches no pattern
-    answers `403` with `proj.origin_not_allowed`; one that matches a preview
-    pattern with no live preview answers `403` with `proj.preview_not_live`;
-    nothing deployed to the target answers `409` with `rel.not_deployed`; a
-    revoked release answers `409` with `rel.revoked`. A request with no
-    `Origin` passes the gate. A loopback origin passes it too, and so does a
-    console origin, from which the console previews a project's login; a step
-    submitted from a console origin is still refused unless the project lists
-    it. Any of these with nothing deployed to its origin is served the
-    project's newest primary deployment when there is one.
+    answers `403` with `proj.origin_not_allowed`, including when the project
+    lists no origins; one that matches a preview pattern with no live preview
+    answers `403` with `proj.preview_not_live`; nothing deployed to a listed
+    origin, a loopback origin, or a live preview answers `409` with
+    `rel.not_deployed`; a revoked release answers `409` with `rel.revoked`.
+    A request with no `Origin`, and one from a console origin the project does
+    not list, is served the project's newest primary deployment. No primary
+    deployment answers `409` with `rel.no_default`. A step submitted from a
+    console origin is still refused unless the project lists it.
 
     The response contains an `id` field — the flow handle. Use it as the path
     parameter for all subsequent `/flow/{id}/submit` calls.
@@ -93,8 +93,10 @@ post:
                 message: 'no live preview for https://acme-k3x9v2-acmeinc.vercel.app; run zitadel preview on this branch'
     '409':
       description: |
-        Nothing is deployed to the resolved target (`rel.not_deployed`), or the
-        release of that deployment is revoked (`rel.revoked`).
+        Nothing is deployed to the resolved target (`rel.not_deployed`), the
+        request needs a primary deployment and the project has none
+        (`rel.no_default`), or the release of that deployment is revoked
+        (`rel.revoked`).
       content:
         application/json:
           schema:
@@ -105,6 +107,11 @@ post:
               value:
                 code: rel.not_deployed
                 message: 'nothing is deployed to https://www.acme.com'
+            no_default:
+              summary: No primary deployment
+              value:
+                code: rel.no_default
+                message: 'the project has no primary deployment'
             revoked:
               summary: The release is revoked
               value:
