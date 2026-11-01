@@ -181,57 +181,57 @@
       }
     },
     {
-      "source": "/",
-      "destination": {
-        "service": "website"
-      }
-    },
-    {
-      "source": "/changelog",
-      "destination": {
-        "service": "website"
-      }
-    },
-    {
-      "source": "/changelog/(.*)",
-      "destination": {
-        "service": "website"
-      }
-    },
-    {
-      "source": "/_next/(.*)",
-      "destination": {
-        "service": "website"
-      }
-    },
-    {
-      "source": "/favicon.ico",
-      "destination": {
-        "service": "website"
-      }
-    },
-    {
-      "source": "/favicons/(.*)",
-      "destination": {
-        "service": "website"
-      }
-    },
-    {
-      "source": "/llms.txt",
-      "destination": {
-        "service": "website"
-      }
-    },
-    {
       "source": "/cloud/(.*)",
       "destination": {
         "service": "cloud-functions"
       }
     },
     {
-      "source": "/(.*)",
+      "source": "/livez",
       "destination": {
         "service": "server"
+      }
+    },
+    {
+      "source": "/readyz",
+      "destination": {
+        "service": "server"
+      }
+    },
+    {
+      "source": "/csp-report",
+      "destination": {
+        "service": "server"
+      }
+    },
+    {
+      "source": "/cron/events-retention",
+      "destination": {
+        "service": "server"
+      }
+    },
+    {
+      "source": "/idp/:slug/callback",
+      "destination": {
+        "service": "server"
+      }
+    },
+    {
+      "source": "/__nextgen/idp/:slug/callback",
+      "destination": {
+        "service": "server"
+      }
+    },
+    {
+      "source": "/:resource(auth_attempts|branding|deployments|events|flow|flow_definitions|grants|idps|policies|projects|releases|schemas|sessions|teams|users|variables)/:path(.*)?",
+      "destination": {
+        "service": "server"
+      }
+    },
+    {
+      "source": "/(.*)",
+      "destination": {
+        "service": "website"
       }
     }
   ],

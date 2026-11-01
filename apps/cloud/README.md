@@ -22,7 +22,9 @@ The API lives under `/api/v1`
 ([ADR 077](../../docs/adrs/077-api-path-prefix.md)): the first rewrite sends
 `/api/*` to the server, so no other service can take a path there. Until
 1.0.0 the server also answers the API's root paths, with a `Deprecation`
-header, through the catch-all.
+header, through one rule that names the API's resources. Apart from those and
+its own root paths, nothing reaches the server: every other path is the
+website's.
 
 The console is served on the same origin, so the session cookie and CSRF work
 unchanged, but at `/console/` rather than a self-hosted server's
