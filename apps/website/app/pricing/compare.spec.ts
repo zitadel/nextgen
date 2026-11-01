@@ -56,6 +56,20 @@ describe("meterCell", () => {
     expect(meterCell(sso, "enterprise", catalog)).toEqual({ kind: "text", text: "Custom" });
   });
 
+  it("includes a retention the plan keeps anyway", () => {
+    const retained: Meter = { ...sso, allowance: 0, retention_days: 90 };
+    const keeping = {
+      meters: [retained],
+      plans: {
+        free: { event_retention_days: 7 },
+        pro: { event_retention_days: 30 },
+        enterprise: { event_retention_days: 90 },
+      },
+    } as unknown as Catalog;
+    expect(meterCell(retained, "enterprise", keeping)).toEqual({ kind: "text", text: "Included" });
+    expect(meterCell(retained, "pro", keeping)).toEqual({ kind: "text", text: "$0.015 per user" });
+  });
+
   it("leaves out a plan the meter is not offered on", () => {
     expect(meterCell({ ...sso, plans: ["pro", "enterprise"] }, "free", catalog)).toEqual({
       kind: "no",

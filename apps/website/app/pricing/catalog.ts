@@ -102,6 +102,8 @@ export type Meter = {
   pool_of?: string;
   /** The plans that may use it; every plan when unset. */
   plans?: PlanId[];
+  /** How long a counted user's audit events are kept: a plan that keeps them as long has it already. */
+  retention_days?: number;
 };
 
 /** A line billed on top of the minimum, never drawn from its credit. */

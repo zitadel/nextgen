@@ -43,9 +43,15 @@ function each(cell: (plan: PlanId) => Cell): Record<PlanId, Cell> {
   return { free: cell("free"), pro: cell("pro"), enterprise: cell("enterprise") };
 }
 
-/** A meter's cell: its monthly allowance, then its price past it; Free stops at the allowance. */
+/**
+ * A meter's cell: its monthly allowance, then its price past it; Free stops at
+ * the allowance. A retention the plan keeps anyway is included.
+ */
 export function meterCell(meter: Meter, plan: PlanId, catalog: Catalog): Cell {
   if (meter.plans && !meter.plans.includes(plan)) return NO;
+  if (meter.retention_days && meter.retention_days <= catalog.plans[plan].event_retention_days) {
+    return text("Included");
+  }
   if (plan === "enterprise") return CUSTOM;
   const included = meter.allowance ? `${short(meter.allowance)} / month included` : undefined;
   if (plan === "free") return included ? text(included) : NO;
@@ -137,8 +143,11 @@ export function compareGroups(catalog: Catalog): Group[] {
         },
         { label: "Basic bot challenges", cells: each(() => text("Unlimited")) },
         meterRow("bot_checks"),
+        // The login runs in the customer's own app on its own domain, so a
+        // domain costs something only when Zitadel hosts the login.
+        { label: "Login in your own app, on your domain", cells: each(() => YES) },
         {
-          label: "Custom login domains",
+          label: "Hosted login domains",
           source: extraDomain.id,
           cells: each((plan) => {
             const included = plans[plan].custom_domains_included;

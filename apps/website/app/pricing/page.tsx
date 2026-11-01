@@ -4,7 +4,15 @@ import { links } from "../links";
 import og from "../og.jpg";
 import { SiteFooter } from "../site-footer";
 import { SiteHeader } from "../site-header";
-import { type Catalog, capitalize, dollars, readCatalog, sentence, short } from "./catalog";
+import {
+  type Catalog,
+  capitalize,
+  dollars,
+  licensedPrice,
+  readCatalog,
+  sentence,
+  short,
+} from "./catalog";
 import { compareGroups } from "./compare";
 import { CompareTable } from "./compare-table";
 
@@ -126,7 +134,7 @@ function CloudPlans({ catalog }: { catalog: Catalog }) {
         features={[
           ...(mau?.allowance ? [`${short(mau.allowance)} monthly active users included`] : []),
           "Managed email and SMS",
-          `${pro.custom_domains_included ?? 0} custom login domain, no Zitadel mark`,
+          `${pro.custom_domains_included ?? 0} hosted login domain, no Zitadel mark`,
           `${pro.event_retention_days} days of audit events`,
           ...(pro.sla ? [`${pro.sla.target_percent}% uptime SLA`] : []),
           capitalize(proSupport),
@@ -140,6 +148,9 @@ function CloudPlans({ catalog }: { catalog: Catalog }) {
         line="Contract rates on every meter, as a yearly commitment."
         includes={`All ${pro.label} features, plus:`}
         features={[
+          ...(enterprise.event_retention_days > pro.event_retention_days
+            ? [`${enterprise.event_retention_days} days of audit events`]
+            : []),
           typeof enterprise.regions === "string"
             ? capitalize(enterprise.regions.split("; ")[0] ?? enterprise.regions)
             : "Your choice of region",
@@ -275,6 +286,7 @@ function Questions({ catalog }: { catalog: Catalog }) {
   const { pro, free } = plans;
   const [formula, ...why] = conventions.invoice.split("; ");
   const requests = catalog.meters.find((meter) => meter.id === "api_requests");
+  const extraDomain = catalog.licensed.find((line) => line.id === "custom_domain_extra");
   const counted = catalog.meters.filter((meter) => meter.price !== null);
   const [unitName, unitMeaning] = catalog.self_hosted.unit.split(": ");
   const questions: { question: string; answer: ReactNode }[] = [
@@ -361,11 +373,34 @@ function Questions({ catalog }: { catalog: Catalog }) {
         ]
       : []),
     {
+      question: "Do I pay for my login's domain?",
+      answer: (
+        <p>
+          Not when the login runs in your app: it serves from your own domain on every plan. A
+          domain costs something only when Zitadel hosts the login for you: {pro.label} includes{" "}
+          {pro.custom_domains_included ?? 0}, and each more is{" "}
+          {extraDomain ? licensedPrice(extraDomain) : "billed on top"}.
+        </p>
+      ),
+    },
+    {
+      question: "How long are audit events kept?",
+      answer: (
+        <p>
+          {(["free", "pro", "enterprise"] as const)
+            .map((plan) => `${plans[plan].label} keeps ${plans[plan].event_retention_days} days`)
+            .join(", ")}
+          . Longer retention is an add-on, priced per user whose events are kept, with events pooled
+          per user.
+        </p>
+      ),
+    },
+    {
       question: "What is billed on top of the minimum?",
       answer: (
         <p>
-          Compliance, support and extra login domains. They are lines of their own and never draw on
-          the credit, so they never vanish into the minimum.
+          Compliance, support and extra hosted login domains. They are lines of their own and never
+          draw on the credit, so they never vanish into the minimum.
         </p>
       ),
     },
