@@ -1,18 +1,18 @@
-import { CATALOG, type Catalog, type Meter } from "./catalog";
+import type { BillingEstimate, Plan } from "../contract";
+import { CATALOG, type Catalog, type Meter, type PackageId } from "./catalog";
 
 /**
  * One account's month as the meters count it: counts by Stripe event name, a
- * banded meter's as `sms_users_us_ca`, and what the account turned on.
+ * destination-priced meter's as `sms_messages_us_ca`, and what the account turned on.
  */
 export interface Usage {
   counts: Record<string, number>;
-  /** Core users above 1M bill only once the owner opts in. */
-  bands_opt_in?: boolean;
+  /** An owner-selected plan; usage alone never creates a subscription. */
+  plan?: "free" | "pro";
+  /** Branding removal requires Pro; Free keeps the mark. */
   hide_mark?: boolean;
-  /** Regions outside the EU. */
-  regions?: number;
-  /** Event sinks that stream a project's events to a SIEM. */
-  event_sinks?: number;
+  /** Quoted packages require a contract and cannot use the self-service estimator. */
+  packages?: PackageId[];
   support_priority?: boolean;
 }
 
@@ -30,21 +30,21 @@ export interface MeteredLine {
 
 /** A month's invoice at list prices, in minor units (root ADR 084 §6). */
 export interface Bill {
-  /** Free while nothing needs Pro. Enterprise rates are a contract's, so no bill is one. */
+  /** The lowest eligible plan, or the owner's selection. Enterprise is quoted. */
   plan: "free" | "pro";
-  /** What needs Pro; empty on Free. */
+  /** What needs a paid plan; empty on Free. */
   reasons: string[];
   lines: MeteredLine[];
   usage_amount: number;
   minimum_amount: number;
   on_top_amount: number;
-  /** The larger of the minimum and the usage, plus what is billed on top. */
+  /** The base fee plus metered usage and add-ons. */
   total_amount: number;
 }
 
 const minor = (dollars: number): number => Math.round(dollars * 100);
 
-/** Every meter the month counted something on, priced past its allowance or its pool. */
+/** Every meter the month counted something on, priced past its allowance. */
 export function meterLines(usage: Usage, catalog: Catalog = CATALOG): MeteredLine[] {
   const count = (metric: string) => usage.counts[metric] ?? 0;
   const lines: MeteredLine[] = [];
@@ -53,15 +53,12 @@ export function meterLines(usage: Usage, catalog: Catalog = CATALOG): MeteredLin
     if (price?.model === "per_band") {
       for (const band of price.bands) {
         const metric = `${meter.id}_${band.id}`;
-        const users = count(metric);
-        if (users === 0) continue;
-        if (band.per_user === null || band.extra_message === null) {
-          throw new Error(`${metric} has no price yet`);
-        }
-        const texts = count(`${meter.pool?.meter}_${band.id}`);
-        const extra = Math.max(0, texts - users * (meter.pool?.per_user ?? 0));
-        const amount = minor(users * band.per_user + extra * band.extra_message);
-        lines.push({ metric, meter, used: users, included: 0, amount });
+        const used = count(metric);
+        if (used === 0) continue;
+        if (band.unit_amount === null) throw new Error(`${metric} has no price yet`);
+        const included = meter.allowance ?? 0;
+        const amount = minor(Math.max(0, used - included) * band.unit_amount);
+        lines.push({ metric, meter, used, included, amount });
       }
       continue;
     }
@@ -71,30 +68,29 @@ export function meterLines(usage: Usage, catalog: Catalog = CATALOG): MeteredLin
       lines.push({ metric: meter.id, meter, used, amount: 0 });
       continue;
     }
-    const included = meter.pool_of
-      ? count(meter.pool_of) * (poolOwner(catalog, meter.pool_of)?.pool?.per_user ?? 0)
-      : (meter.allowance ?? 0);
-    let amount = 0;
-    if (price.model === "per_unit") {
-      amount = minor(Math.max(0, used - included) * price.unit_amount);
-    } else if (!price.opt_in || usage.bands_opt_in) {
-      const started = Math.ceil(Math.max(0, used - price.above) / price.size);
-      amount = minor(Math.min(started, (price.until - price.above) / price.size) * price.amount);
-    }
+    const included = meter.allowance ?? 0;
+    const amount = minor(Math.max(0, used - included) * price.unit_amount);
     lines.push({ metric: meter.id, meter, used, included, amount });
   }
   return lines;
 }
 
 /**
- * The month's invoice: Free while nothing needs Pro, else the larger of Pro's
- * minimum and the usage, since the minimum is credit, plus the lines billed on
- * top, which never draw on it.
+ * The month's estimate: Free while nothing needs a paid plan, otherwise Pro's
+ * base fee plus metered usage beyond allowances and selected add-ons.
+ * This estimate never starts a subscription.
  */
 export function bill(usage: Usage, catalog: Catalog = CATALOG): Bill {
+  for (const id of usage.packages ?? []) {
+    const selected = catalog.packages.find((entry) => entry.id === id);
+    if (!selected) throw new Error(`Unknown package: ${id}`);
+    if (selected.pricing === "quoted") {
+      throw new Error(`${selected.label} requires a contract quote before activation`);
+    }
+  }
   const lines = meterLines(usage, catalog);
   const usageAmount = lines.reduce((sum, line) => sum + line.amount, 0);
-  const reasons = proReasons(usage, lines, usageAmount, catalog);
+  const reasons = paidReasons(usage, lines, usageAmount, catalog);
   if (reasons.length === 0) {
     return {
       plan: "free",
@@ -107,10 +103,7 @@ export function bill(usage: Usage, catalog: Catalog = CATALOG): Bill {
     };
   }
   const price = (id: string) => minor(catalog.licensed.find((line) => line.id === id)?.amount ?? 0);
-  const onTop =
-    (usage.regions ?? 0) * price("region") +
-    (usage.event_sinks ?? 0) * price("event_sink") +
-    (usage.support_priority ? price("support_priority") : 0);
+  const onTop = usage.support_priority ? price("support_priority") : 0;
   const minimum = minor(catalog.plans.pro.minimum.amount);
   return {
     plan: "pro",
@@ -119,12 +112,12 @@ export function bill(usage: Usage, catalog: Catalog = CATALOG): Bill {
     usage_amount: usageAmount,
     minimum_amount: minimum,
     on_top_amount: onTop,
-    total_amount: Math.max(minimum, usageAmount) + onTop,
+    total_amount: minimum + usageAmount + onTop,
   };
 }
 
-/** Why a month needs Pro: usage past an allowance, Free's sizing outgrown, or what Free lacks. */
-function proReasons(
+/** Why the estimate uses a paid plan; it never creates a subscription. */
+function paidReasons(
   usage: Usage,
   lines: MeteredLine[],
   usageAmount: number,
@@ -132,12 +125,12 @@ function proReasons(
 ): string[] {
   const reasons: string[] = [];
   if (usageAmount > 0) reasons.push("usage past an allowance");
-  if ((usage.counts.monthly_active_users ?? 0) > catalog.plans.free.limits.core_mau_sized_for) {
-    reasons.push("more users than Free is sized for");
+  if (usage.plan === "pro") reasons.push("Pro selected by the owner");
+  if (usage.hide_mark) reasons.push("hides the Zitadel mark");
+  for (const id of new Set(usage.packages ?? [])) {
+    const selected = catalog.packages.find((entry) => entry.id === id);
+    if (selected && !selected.plans.includes("free")) reasons.push(`${selected.label} package`);
   }
-  if (usage.hide_mark) reasons.push("hides the attribution mark");
-  if ((usage.regions ?? 0) > 0) reasons.push("a region outside the EU");
-  if ((usage.event_sinks ?? 0) > 0) reasons.push("streams events to a SIEM");
   if (usage.support_priority) reasons.push("priority support");
   for (const line of lines) {
     if (line.meter.plans && !line.meter.plans.includes("free")) {
@@ -147,6 +140,16 @@ function proReasons(
   return reasons;
 }
 
-function poolOwner(catalog: Catalog, id: string): Meter | undefined {
-  return catalog.meters.find((meter) => meter.id === id);
+/** Price the selected subscription; Free only shows the opt-in Pro estimate. */
+export function estimateForPlan(month: Bill, plan: Plan): BillingEstimate {
+  return {
+    plan: plan.id === "free" ? month.plan : plan.id,
+    total_amount:
+      plan.id === "free"
+        ? month.total_amount
+        : plan.minimum_amount +
+          Math.max(0, month.usage_amount - plan.credit_amount) +
+          month.on_top_amount,
+    currency: plan.currency,
+  };
 }

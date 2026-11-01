@@ -34,6 +34,6 @@ export async function usagePrices(request: UsagePriceRequest): Promise<UsagePric
           amount: entry.amount,
         })),
     ),
-    note: `${team.team_name}'s ${team.plan.name} plan at list price. Allowances and the plan's credit apply to the team, so a project's part of them is its share of each day.`,
+    note: `${team.team_name}'s ${team.plan.name} plan at list price. Usage is priced after team allowances; the base fee and any contracted credit are applied separately to the team invoice.`,
   };
 }

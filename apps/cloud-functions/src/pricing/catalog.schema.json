@@ -3,7 +3,7 @@
   "$id": "https://zitadel.com/schemas/cloud-price-catalog.schema.json",
   "title": "Zitadel price catalog",
   "type": "object",
-  "required": ["id", "version", "status", "currency", "plans", "meters", "licensed", "self_hosted"],
+  "required": ["id", "version", "status", "currency", "plans", "meters", "licensed", "self_hosted", "core", "packages"],
   "additionalProperties": false,
   "properties": {
     "$schema": { "type": "string" },
@@ -27,7 +27,20 @@
     "meters": { "type": "array", "items": { "$ref": "#/$defs/meter" }, "minItems": 1 },
     "licensed": { "type": "array", "items": { "$ref": "#/$defs/licensed" } },
     "self_hosted": { "$ref": "#/$defs/self_hosted" },
-    "future": { "type": "array", "items": { "$ref": "#/$defs/future" } }
+    "future": { "type": "array", "items": { "$ref": "#/$defs/future" } },
+    "core": {
+      "type": "object",
+      "required": ["platform", "resources", "authentication", "security", "billing"],
+      "additionalProperties": false,
+      "properties": {
+        "platform": {"type": "array", "items": {"type": "string"}},
+        "resources": {"type": "array", "items": {"type": "string"}},
+        "authentication": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "security": {"type": "array", "items": {"type": "string"}},
+        "billing": {"type": "string"}
+      }
+    },
+    "packages": {"type": "array", "items": {"$ref": "#/$defs/package"}}
   },
   "$defs": {
     "plan_id": { "enum": ["free", "pro", "enterprise"] },
@@ -48,7 +61,7 @@
                 "interval": { "enum": ["month", "year"] },
                 "tiers_per_year": { "type": "object", "additionalProperties": { "type": "number" } },
                 "is_credit": { "type": "boolean" },
-                "credit_applies_to": { "const": "metered" }
+                "credit_applies_to": { "enum": ["metered", null] }
               }
             }
           ]
@@ -63,7 +76,15 @@
         "support": { "type": "string" },
         "sla": { "type": ["object", "null"] },
         "rates": { "type": "string" },
-        "regions": { "type": ["array", "string"] }
+        "regions": {
+          "type": "object",
+          "required": ["scope", "selection"],
+          "additionalProperties": false,
+          "properties": {
+            "scope": { "const": "project" },
+            "selection": { "const": "all_available" }
+          }
+        }
       }
     },
     "price": {
@@ -82,33 +103,19 @@
         },
         {
           "type": "object",
-          "required": ["model", "above", "size", "amount", "until", "opt_in"],
-          "properties": {
-            "model": { "const": "bands" },
-            "above": { "type": "integer" },
-            "size": { "type": "integer" },
-            "amount": { "type": "number" },
-            "until": { "type": "integer" },
-            "opt_in": { "type": "boolean" }
-          },
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
           "required": ["model", "bands"],
           "properties": {
-            "model": { "const": "per_band" },
+            "model": {"const": "per_band"},
             "bands": {
               "type": "array",
               "items": {
                 "type": "object",
-                "required": ["id", "per_user", "extra_message"],
+                "required": ["id", "unit_amount"],
                 "properties": {
-                  "id": { "type": "string" },
-                  "countries": { "type": "array", "items": { "type": "string", "pattern": "^[A-Z]{2}$" } },
-                  "per_user": { "$ref": "#/$defs/money" },
-                  "extra_message": { "$ref": "#/$defs/money" },
-                  "note": { "type": "string" }
+                  "id": {"type": "string"},
+                  "countries": {"type": "array", "items": {"type": "string", "pattern": "^[A-Z]{2}$"}},
+                  "note": {"type": "string"},
+                  "unit_amount": {"$ref": "#/$defs/money"}
                 }
               }
             }
@@ -141,16 +148,7 @@
           "description": "Counts at most this many users per connection or directory a month, so one large tenant costs at most at_most times the unit price"
         },
         "allowance": { "type": ["integer", "null"], "minimum": 0, "description": "Free per account and month, on every plan" },
-        "retention_days": { "type": "integer", "minimum": 1, "description": "How many days a counted user's audit events are kept; a plan that keeps events as long already includes it and is not sold the meter" },
         "price": { "$ref": "#/$defs/price" },
-        "pool": {
-          "type": "object",
-          "required": ["meter", "per_user"],
-          "properties": { "meter": { "type": "string" }, "per_user": { "type": "integer", "minimum": 1 } },
-          "additionalProperties": false,
-          "description": "Activity included per counted user, pooled across the account"
-        },
-        "pool_of": { "type": "string", "description": "The user meter whose pool this activity meter draws on first" },
         "plans": { "type": "array", "items": { "$ref": "#/$defs/plan_id" }, "description": "Plans that may use it; every plan when absent" },
         "security": { "type": "boolean", "description": "A cap on it alerts and never switches enforcement off" },
         "tag": { "enum": ["minimum spend", "metered feature", "delivered cost", "scale", "compliance", "certification", "support", null] },
@@ -232,6 +230,24 @@
         "paid_part": { "type": "string" },
         "price": { "$ref": "#/$defs/price" },
         "needs": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "package": {
+      "type": "object",
+      "required": ["id", "label", "pricing", "scope", "plans", "included_in", "features", "availability", "note"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"enum": ["governance", "compliance"]},
+        "label": {"type": "string"},
+        "pricing": {"enum": ["included_in_plan", "quoted"]},
+        "scope": {"const": "account"},
+        "plans": {"type": "array", "items": {"$ref": "#/$defs/plan_id"}},
+        "included_in": {"type": "array", "items": {"$ref": "#/$defs/plan_id"}},
+        "features": {"type": "array", "items": {"type": "string"}},
+        "availability": {"enum": ["planned", "available"]},
+        "note": {"type": "string"},
+        "retention_days": {"type": "array", "items": {"type": "integer", "minimum": 1}},
+        "volume_unit": {"type": "string"}
       }
     }
   }

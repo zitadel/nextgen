@@ -22,13 +22,11 @@ describe("a day's price", () => {
     ]);
   });
 
-  it("adds up to the period's bill, pools and all", () => {
+  it("adds up to the period's bill for integrations and consumption", () => {
     const counts = [
       count(1, "sso_users", 900),
-      count(1, "email_users", 100),
       count(1, "email_messages", 1_200),
       count(2, "sso_users", 700, "proj_b"),
-      count(2, "email_users", 200, "proj_b"),
       count(3, "email_messages", 900),
       count(3, "m2m_tokens", 1_500_000),
     ];
@@ -39,6 +37,14 @@ describe("a day's price", () => {
       .flatMap(({ entries }) => entries)
       .reduce((sum, entry) => sum + entry.amount, 0);
     expect(priced).toBe(billed);
+  });
+
+  it("keeps daily MAU costs zero across the former upgrade thresholds", () => {
+    const days = pricedDays([
+      count(1, "monthly_active_users", 200_000),
+      count(2, "monthly_active_users", 800_001),
+    ]);
+    expect(days.flatMap(({ entries }) => entries).map((entry) => entry.amount)).toEqual([0, 0]);
   });
 
   it("splits a day between projects by their counts, in whole cents that add up", () => {

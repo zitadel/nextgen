@@ -1,17 +1,18 @@
 {
   "$schema": "./catalog.schema.json",
   "id": "zitadel-pricing",
-  "version": "2026-10-31.3",
+  "version": "2026-11-01.4",
   "status": "proposal",
   "currency": "usd",
-  "decided": ["plans.pro.minimum", "meters.sso_users.allowance"],
+  "decided": ["core", "meters.monthly_active_users.price", "packages.governance.scope", "packages.compliance.scope", "plans.pro.minimum", "packages.governance.included_in", "packages.compliance.pricing", "plans.enterprise.sla", "plans.pro.limits", "plans.free.regions", "plans.pro.regions", "plans.enterprise.regions", "licensed.addendum.plans", "licensed.support_priority.plans"],
   "conventions": {
     "period": "calendar month, UTC",
-    "user_meters": "A user meter counts each subject once per project and month, at the first time the feature touches it.",
+    "user_meters": "Core users are never billed. Only enterprise SSO and directory integrations count users, once per project, connection or directory, and month, with a cap per connection or directory.",
     "allowance": "The same allowance applies on every plan, per account and month; Enterprise contracts may raise it.",
-    "invoice": "max(plan minimum, metered usage) + licensed lines on top; the minimum is credit that only metered prices draw on.",
-    "caps": "Owners set a cap per meter; alerts at 50, 80 and 100 percent. A cap on a security meter alerts and never switches enforcement off.",
-    "self_hosted": "Self-hosted installs pay for rights and support per production installation and are never metered."
+    "invoice": "Pro base fee + metered integrations and consumption beyond included allowances + contracted packages and support; the base fee includes Governance and is not usage credit",
+    "caps": "Owners opt in to paid packages and consumption. Alerts at 50, 80 and 100 percent of a budget are notifications, not a hard spending cap. A budget never switches security enforcement off.",
+    "self_hosted": "Self-hosted installs pay for rights and support per production installation and are never metered.",
+    "packages": "Governance is included in Pro. Compliance is quoted per account, with retention duration, retained-event volume, SIEM destinations and any overage prices agreed before activation. Neither package charges per user or per policy."
   },
   "plans": {
     "free": {
@@ -21,58 +22,55 @@
       "limits": {
         "requests_per_second_per_project": 50,
         "requests_per_month_per_account": 25000000,
-        "core_mau_sized_for": 200000,
         "past_monthly_ceiling": "30 days' notice, then 10 requests per second"
       },
-      "over_allowance": "Security and sign-ins never stop: 30 days to move to Pro. Delivery and M2M tokens stop at the allowance; advanced bot checks fall back to the basic challenge.",
+      "over_allowance": "Core identity and basic MFA stay free. Published API and token limits protect shared capacity; owners choose additional capacity explicitly. Owners can choose Pro for paid integrations and consumption beyond their evaluation allowances; there is no automatic subscription or MAU-based upgrade.",
       "event_retention_days": 7,
       "attribution_mark": "shown",
       "delivery_modes": ["dev_inbox", "own_provider"],
       "support": "community",
       "sla": null,
-      "regions": ["eu"]
+      "regions": { "scope": "project", "selection": "all_available" }
     },
     "pro": {
       "label": "Pro",
-      "minimum": { "amount": 100, "interval": "month", "is_credit": true, "credit_applies_to": "metered" },
-      "annual": { "amount": 1000, "interval": "year", "note": "two months free; how its credit is granted is open" },
+      "minimum": { "amount": 100, "interval": "month", "is_credit": false, "credit_applies_to": null },
       "card_required": true,
-      "limits": {
-        "core_mau_sized_for": 1000000,
-        "per_band": "1M more MAU of throughput per band bought"
-      },
+      "limits": { "requests_per_second_per_project": 500 },
       "event_retention_days": 30,
       "attribution_mark": "hideable",
       "delivery_modes": ["dev_inbox", "own_provider", "managed"],
       "support": "24/7 tickets, next business day; priority add-on 1 h for outages",
       "sla": { "target_percent": 99.9, "credits": false },
-      "regions": ["eu"]
+      "regions": { "scope": "project", "selection": "all_available" },
+      "packages": ["governance"]
     },
     "enterprise": {
       "label": "Enterprise",
       "minimum": { "tiers_per_year": { "essential": 36000, "scale": 60000, "strategic": 100000, "unbounded": 200000 }, "is_credit": true, "credit_applies_to": "metered" },
-      "rates": "list prices discounted per contract, as prepaid credit",
+      "rates": "Annual commitment for agreed governance, compliance and operational assurance; metered allowances and overages are specified in the contract.",
       "event_retention_days": 90,
       "attribution_mark": "hideable",
       "delivery_modes": ["dev_inbox", "own_provider", "managed"],
       "support": "by tier: 8 h to 30 min response SLOs, TAM",
-      "sla": { "target_percent": 99.5, "credits": true, "note": "99.95 from Scale; 99.99 only after a second region" },
-      "regions": "pinned region; dedicated deployment on top"
+      "sla": { "target_percent": 99.95, "credits": true, "note": "99.95 included; 99.99 is an upgrade requiring a second region" },
+      "regions": { "scope": "project", "selection": "all_available" },
+      "packages": ["governance"]
     }
   },
   "meters": [
     {
       "id": "monthly_active_users",
       "label": "Monthly active users",
-      "kind": "users",
-      "counts": "Every active user, at their first activity of the month",
+      "kind": "gauge",
+      "counts": "Every active user, shown for information only; never billed and never an upgrade trigger",
       "dedupe": ["project", "user", "month"],
-      "allowance": 1000000,
-      "price": { "model": "bands", "above": 1000000, "size": 1000000, "amount": 2000, "until": 10000000, "opt_in": true },
+      "allowance": null,
+      "price": null,
       "security": false,
-      "tag": "scale",
-      "source": { "where": "session creation and token issuance", "exists": "no" },
-      "stripe": { "event_name": "monthly_active_users", "aggregation": "sum", "price_lookup_key": "mau_bands" }
+      "tag": null,
+      "source": {"where": "session creation, projected into hourly usage counts", "exists": "yes"},
+      "stripe": null
     },
     {
       "id": "sso_users",
@@ -103,40 +101,12 @@
       "stripe": { "event_name": "directory_users", "aggregation": "sum", "price_lookup_key": "directory_users" }
     },
     {
-      "id": "policy_users",
-      "label": "Enforced-policy users",
-      "kind": "users",
-      "counts": "A user an enforced policy evaluates, once per policy: MFA required, session rules, expiry, per-tenant rules",
-      "dedupe": ["project", "user", "policy", "month"],
-      "allowance": 10000,
-      "price": { "model": "per_unit", "unit_amount": 0.002 },
-      "security": true,
-      "tag": "metered feature",
-      "source": { "where": "policy evaluation in the flow engine", "exists": "no: only the password rule exists; it and lockout stay free" },
-      "stripe": { "event_name": "policy_users", "aggregation": "sum", "price_lookup_key": "policy_users" }
-    },
-    {
-      "id": "authz_users",
-      "label": "Authorization users",
-      "kind": "users",
-      "counts": "A user an authorization check runs for",
-      "dedupe": ["project", "user", "month"],
-      "allowance": 100000,
-      "price": { "model": "per_unit", "unit_amount": 0.005 },
-      "pool": { "meter": "authz_checks", "per_user": 1000 },
-      "security": false,
-      "tag": "metered feature",
-      "source": { "where": "end-user authorization API", "exists": "no" },
-      "stripe": { "event_name": "authz_users", "aggregation": "sum", "price_lookup_key": "authz_users" }
-    },
-    {
       "id": "authz_checks",
-      "label": "Authorization checks past the pool",
+      "label": "Advanced authorization checks",
       "kind": "activity",
-      "counts": "Each authorization check",
+      "counts": "Each advanced authorization API check; core roles and permissions are free",
       "dedupe": null,
-      "allowance": 0,
-      "pool_of": "authz_users",
+      "allowance": 1000000,
       "price": { "model": "per_unit", "unit_amount": 0.000002, "display": "$2 per million" },
       "security": false,
       "tag": "metered feature",
@@ -144,86 +114,12 @@
       "stripe": { "event_name": "authz_checks", "aggregation": "sum", "price_lookup_key": "authz_checks" }
     },
     {
-      "id": "retained_users_90d",
-      "label": "Retained users, 90 days",
-      "kind": "users",
-      "counts": "A user whose audit events are kept past the plan's own days, up to 90",
-      "retention_days": 90,
-      "dedupe": ["project", "user", "month"],
-      "allowance": 0,
-      "price": { "model": "per_unit", "unit_amount": 0.005 },
-      "pool": { "meter": "retained_events_90d", "per_user": 200 },
-      "security": false,
-      "tag": "metered feature",
-      "source": { "where": "the retention job (internal/audit/retention.go), daily", "exists": "no: one 30-day window for the whole server" },
-      "stripe": { "event_name": "retained_users_90d", "aggregation": "sum", "price_lookup_key": "retained_users_90d" }
-    },
-    {
-      "id": "retained_events_90d",
-      "label": "Retained events past the pool, 90 days",
-      "kind": "activity",
-      "counts": "Each event kept past the plan's own days, up to 90",
-      "dedupe": null,
-      "allowance": 0,
-      "pool_of": "retained_users_90d",
-      "price": { "model": "per_unit", "unit_amount": 0.000003, "display": "$3 per million" },
-      "security": false,
-      "tag": "metered feature",
-      "source": { "where": "the retention job", "exists": "no" },
-      "stripe": { "event_name": "retained_events_90d", "aggregation": "sum", "price_lookup_key": "retained_events_90d" }
-    },
-    {
-      "id": "retained_users_400d",
-      "label": "Retained users, 400 days",
-      "kind": "users",
-      "counts": "A user whose audit events are kept past the plan's own days, up to 400",
-      "retention_days": 400,
-      "dedupe": ["project", "user", "month"],
-      "allowance": 0,
-      "price": { "model": "per_unit", "unit_amount": 0.015 },
-      "pool": { "meter": "retained_events_400d", "per_user": 200 },
-      "security": false,
-      "tag": "metered feature",
-      "source": { "where": "the retention job, daily", "exists": "no" },
-      "stripe": { "event_name": "retained_users_400d", "aggregation": "sum", "price_lookup_key": "retained_users_400d" }
-    },
-    {
-      "id": "retained_events_400d",
-      "label": "Retained events past the pool, 400 days",
-      "kind": "activity",
-      "counts": "Each event kept past the plan's own days, up to 400",
-      "dedupe": null,
-      "allowance": 0,
-      "pool_of": "retained_users_400d",
-      "price": { "model": "per_unit", "unit_amount": 0.00001, "display": "$10 per million" },
-      "security": false,
-      "tag": "metered feature",
-      "source": { "where": "the retention job", "exists": "no" },
-      "stripe": { "event_name": "retained_events_400d", "aggregation": "sum", "price_lookup_key": "retained_events_400d" }
-    },
-    {
-      "id": "email_users",
-      "label": "Email users",
-      "kind": "users",
-      "counts": "A user managed delivery emails in the month: codes, links, verification, resets",
-      "dedupe": ["project", "user", "month"],
-      "allowance": 0,
-      "price": { "model": "per_unit", "unit_amount": 0.001 },
-      "pool": { "meter": "email_messages", "per_user": 5 },
-      "plans": ["pro", "enterprise"],
-      "security": false,
-      "tag": "delivered cost",
-      "source": { "where": "the managed email sender", "exists": "no: Zitadel sends no email" },
-      "stripe": { "event_name": "email_users", "aggregation": "sum", "price_lookup_key": "email_users" }
-    },
-    {
       "id": "email_messages",
-      "label": "Emails past the pool",
+      "label": "Managed email",
       "kind": "activity",
-      "counts": "Each email managed delivery sends",
+      "counts": "Each email managed delivery sends; bringing your own provider has no Zitadel delivery charge",
       "dedupe": null,
       "allowance": 0,
-      "pool_of": "email_users",
       "price": { "model": "per_unit", "unit_amount": 0.0005, "display": "$0.50 per 1,000" },
       "plans": ["pro", "enterprise"],
       "security": false,
@@ -232,25 +128,24 @@
       "stripe": { "event_name": "email_messages", "aggregation": "sum", "price_lookup_key": "email_messages" }
     },
     {
-      "id": "sms_users",
-      "label": "SMS users",
-      "kind": "users",
-      "counts": "A user managed delivery texts in the month, only to countries the owner allows",
-      "dedupe": ["project", "user", "band", "month"],
+      "id": "sms_messages",
+      "label": "Managed SMS",
+      "kind": "activity",
+      "counts": "Each SMS managed delivery sends, priced by destination; only to countries the owner allows",
+      "dedupe": null,
       "allowance": 0,
       "price": {
         "model": "per_band",
         "bands": [
-          { "id": "us_ca", "countries": ["US", "CA"], "per_user": 0.03, "extra_message": 0.015 },
-          { "id": "other", "countries": [], "per_user": null, "extra_message": null, "note": "to set: two texts at the band's cost" }
+          {"id": "us_ca", "countries": ["US", "CA"], "unit_amount": 0.015},
+          {"id": "other", "countries": [], "unit_amount": null, "note": "Destination rate must be agreed before activation"}
         ]
       },
-      "pool": { "meter": "sms_messages", "per_user": 2 },
       "plans": ["pro", "enterprise"],
       "security": false,
       "tag": "delivered cost",
-      "source": { "where": "the managed SMS sender, after a bot check on a new number", "exists": "no" },
-      "stripe": { "event_name": "sms_users_<band>", "aggregation": "sum", "price_lookup_key": "sms_users_<band>" }
+      "source": {"where": "the managed SMS sender", "exists": "no"},
+      "stripe": {"event_name": "sms_messages_<band>", "aggregation": "sum", "price_lookup_key": "sms_messages_<band>"}
     },
     {
       "id": "m2m_tokens",
@@ -293,14 +188,19 @@
     }
   ],
   "licensed": [
-    { "id": "pro_monthly", "label": "Pro minimum", "amount": 100, "interval": "month", "plans": ["pro"], "grants_credit": 100, "tag": "minimum spend" },
-    { "id": "pro_yearly", "label": "Pro minimum, annual", "amount": 1000, "interval": "year", "plans": ["pro"], "grants_credit": null, "tag": "minimum spend" },
-    { "id": "region", "label": "Region outside the EU, once built", "amount": 100, "interval": "month", "per": "region", "plans": ["pro"], "included_in": ["enterprise"], "tag": "compliance" },
-    { "id": "event_sink", "label": "SIEM streaming", "amount": 100, "interval": "month", "per": "sink", "plans": ["pro", "enterprise"], "note": "an event sink that delivers a project's events to a SIEM (ADR 049 §3)", "tag": "compliance" },
-    { "id": "support_priority", "label": "Priority support", "amount": 999, "interval": "month", "plans": ["pro"], "tag": "support" },
-    { "id": "sla_9995", "label": "99.95% SLA", "amount": 1000, "interval": "month", "plans": ["pro", "enterprise"], "tag": "compliance" },
-    { "id": "sla_9999", "label": "99.99% SLA, after a second region", "amount": 2000, "interval": "month", "plans": ["enterprise"], "tag": "compliance" },
-    { "id": "addendum", "label": "Custom MSA, indemnification, DORA or BAA addendum", "amount": 2000, "interval": "month", "per": "addendum", "plans": ["pro", "enterprise"], "note": "or bundled in the Enterprise tier", "tag": "compliance" },
+    {
+      "id": "pro_monthly",
+      "label": "Pro with Governance",
+      "amount": 100,
+      "interval": "month",
+      "plans": ["pro"],
+      "grants_credit": 0,
+      "tag": "minimum spend"
+    },
+    { "id": "support_priority", "label": "Priority support", "amount": 999, "interval": "month", "plans": ["pro", "enterprise"], "tag": "support" },
+    { "id": "sla_9995", "label": "99.95% SLA", "amount": 1000, "interval": "month", "plans": ["pro"], "included_in": ["enterprise"], "tag": "compliance" },
+    { "id": "sla_9999", "label": "99.99% SLA upgrade, after a second region", "amount": 2000, "interval": "month", "plans": ["enterprise"], "tag": "compliance" },
+    { "id": "addendum", "label": "Custom MSA, indemnification, DORA or BAA addendum", "amount": null, "interval": "month", "per": "addendum", "plans": ["enterprise"], "note": "Terms and pricing agreed in the Enterprise contract", "tag": "compliance" },
     { "id": "tam_hours", "label": "Extra TAM hours", "amount": 250, "interval": "hour", "plans": ["enterprise"], "tag": "support" },
     { "id": "private_slack", "label": "Private Slack", "amount": 800, "interval": "month", "plans": ["enterprise"], "tag": "support" },
     { "id": "dedicated_deployment", "label": "Dedicated deployment", "amount": null, "interval": "month", "plans": ["enterprise"], "note": "cost plus margin", "tag": "compliance" }
@@ -326,19 +226,19 @@
   },
   "future": [
     {
-      "id": "observed_users",
+      "id": "identity_analytics",
       "label": "Identity analytics hub",
       "free_part": "Sign-in, MAU and error counts in the console, over the plan's event retention",
       "paid_part": "Funnels, conversion, sign-in method mix, per-tenant views, anomaly alerts and exports over 90 days",
-      "price": { "model": "per_unit", "unit_amount": 0.001, "note": "90-day retention included" },
+      "price": null,
       "needs": ["request events in an analytics store rather than Postgres"]
     },
     {
-      "id": "protected_users",
+      "id": "threat_intelligence",
       "label": "Threat intelligence",
       "free_part": "Brute-force guards, basic bot challenges and a breached-password check when a password is set",
       "paid_part": "Risk scoring of every sign-in with risk-based step-up or blocking",
-      "price": { "model": "per_unit", "unit_amount": 0.005, "note": "enforcement included" },
+      "price": null,
       "needs": ["risk signals in the login flow", "an IP-reputation feed"]
     },
     {
@@ -348,6 +248,43 @@
       "paid_part": "Device fingerprinting and SMS-fraud scoring on top of today's advanced checks",
       "price": { "model": "per_unit", "unit_amount": 0.002, "note": "per check, the bot_checks rate" },
       "needs": ["a fingerprinting vendor beside BotID"]
+    }
+  ],
+  "core": {
+    "platform": ["Deployments", "Releases", "Login in your own app, on your domain"],
+    "resources": ["Users and service users", "Teams and organizations", "Projects and applications", "Roles and credentials", "Console seats"],
+    "authentication": ["Password sign-in", "Social sign-in", "Passkeys and TOTP MFA"],
+    "security": ["Basic require-MFA enforcement", "Password rules and lockout", "Basic bot challenges"],
+    "billing": "Core resources and basic security are free on every plan. Active-user counts never change your plan or bill. Published request and token capacity limits still apply."
+  },
+  "packages": [
+    {
+      "id": "governance",
+      "label": "Governance",
+      "pricing": "included_in_plan",
+      "scope": "account",
+      "plans": ["pro", "enterprise"],
+      "included_in": ["pro", "enterprise"],
+      "availability": "planned",
+      "features": [
+        "Conditional access and session policies",
+        "Granular exceptions and delegated administration",
+        "Policy versioning and approval workflows"
+      ],
+      "note": "No per-user, per-policy or policy-evaluation charge. Basic require-MFA enforcement stays free."
+    },
+    {
+      "id": "compliance",
+      "label": "Compliance",
+      "pricing": "quoted",
+      "scope": "account",
+      "plans": ["pro", "enterprise"],
+      "included_in": [],
+      "availability": "planned",
+      "features": ["Extended audit retention", "SIEM export and streaming", "Compliance evidence and reporting"],
+      "retention_days": [90, 400],
+      "volume_unit": "retained events",
+      "note": "A fixed package quote defines retention, included event volume, SIEM destinations and any volume overages before activation; never priced by user count."
     }
   ]
 }

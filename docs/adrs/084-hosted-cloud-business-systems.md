@@ -259,11 +259,17 @@ website's catch-all.
 
 ### 6. Pricing and billing (priority 4)
 
-- **Stripe Billing Meters.** One `sum` meter per metric, the first being
-  `monthly_active_users`. Stripe now steers new usage-based billing to
-  Metronome. Meters stay supported, work with Checkout and the Customer
-  Portal, and are enough for one metric. If pricing outgrows them, only the
-  `Billing` port changes.
+- **Pricing boundary** (revised 2026-11-01). Core resources and basic MFA,
+  including basic require-MFA enforcement, are free. MAU is an analytics
+  gauge, never a billable meter or upgrade trigger. Paid Governance is an
+  account-wide package included in Pro; Compliance is quoted per account
+  with agreed retention, retained-event volume and SIEM destinations.
+  Neither package charges per user or per policy. The proposed catalog in
+  `apps/cloud-functions/src/pricing/catalog.json` is the source for both
+  the estimator and the website; package capabilities are still planned.
+- **Stripe Billing Meters.** One `sum` meter per priced integration or
+  consumption metric. The usage workflow excludes core gauges and retired
+  metrics. If pricing outgrows Billing Meters, only the `Billing` port changes.
 - **Usage is pulled as counts, never pushed per event.**
   - An hourly cron workflow (`report-usage`) reads each team's usage for the
     last complete hours from Zitadel (§8.3).
@@ -280,13 +286,22 @@ website's catch-all.
     message when billing needs one count, and the server would carry Vercel's
     queue client and the outbox behind it. A count can be read again safely.
 - **Plans.**
-  - Free: monthly active users up to the included amount, no card.
-  - Pro: a base fee plus a graduated metered price, with the included amount
-    at 0.
+  - Free: core identity and basic security, no card, subject to published
+    capacity limits rather than active-user thresholds.
+  - Pro: Governance and operational tools for a monthly base fee, plus
+    metered integrations and consumption beyond included allowances. The base
+    fee is not usage credit. Branding removal requires a paid plan.
+  - Compliance: a separate quote accepted before activation. Extended audit
+    retention is scoped by event volume and duration, never user count.
 
   A team gets a subscription when an admin chooses Pro in Checkout, and none
-  before (decided 2026-10-29): until then its usage is metered on its
-  customer and shown, never billed.
+  before (decided 2026-10-29): until then eligible usage is metered on its
+  customer and shown, never billed. Core MAU stays in Zitadel analytics.
+
+  Every plan includes deployments, releases and region choice per project.
+  Free and Pro publish their request capacity in the catalog; Enterprise
+  capacity is contracted. Custom agreements, indemnification and regulatory
+  addenda are Enterprise-only, as distinct from quoted audit capabilities.
 - **Entitlements.** Stripe's `customer.subscription.*` and `invoice.*`
   webhooks are checked by signature and start `sync-entitlements`. It reads
   the subscription's state at that moment, so a duplicate or out-of-order

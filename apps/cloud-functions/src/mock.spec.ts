@@ -44,7 +44,7 @@ describe("the mock team's usage", () => {
     const { stripe } = mockSystems();
     const billing = await stripe.overview(MOCK_TEAM);
     expect(billing.plan.id).toBe("free");
-    expect(billing.estimate).toEqual({ plan: "pro", total_amount: 142_000, currency: "usd" });
+    expect(billing.estimate).toEqual({ plan: "pro", total_amount: 150_000, currency: "usd" });
     expect(billing.usage.find((line) => line.metric === "sso_users")).toMatchObject({
       used: 15_000,
       included: 1_000,
@@ -66,13 +66,13 @@ describe("the mock team's usage", () => {
     expect(sent.sso_users).toBeLessThan(MOCK_MONTH.counts.sso_users ?? 0);
   });
 
-  it("bills a team Stripe moved to Pro at least the plan's minimum", async () => {
+  it("bills a team Stripe moved to Pro its base fee even without metered charges", async () => {
     const { zitadel, stripe } = mockSystems();
     await zitadel.applyEntitlements(MOCK_TEAM.id, entitlementsFor("pro"));
     const hour = { start: "2026-10-01T00:00:00.000Z", end: "2026-10-01T01:00:00.000Z" };
     await stripe.reportUsage(await zitadel.usage(hour));
     const billing = await stripe.overview(MOCK_TEAM);
-    expect(billing.plan).toMatchObject({ id: "pro", minimum_amount: 10_000 });
+    expect(billing.plan).toMatchObject({ id: "pro", minimum_amount: 10_000, credit_amount: 0 });
     expect(billing.estimate).toEqual({ plan: "pro", total_amount: 10_000, currency: "usd" });
   });
 });

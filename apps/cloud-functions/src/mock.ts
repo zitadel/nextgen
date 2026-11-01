@@ -14,7 +14,7 @@ import type {
   Team,
   UsageRecord,
 } from "./ports";
-import { type Usage, bill } from "./pricing/bill";
+import { type Usage, bill, estimateForPlan } from "./pricing/bill";
 import { CATALOG } from "./pricing/catalog";
 import { periodSoFar, usageLine } from "./pricing/days";
 import { type Send as SendToStripe, stripeBilling } from "./stripe/billing";
@@ -47,17 +47,27 @@ export const MOCK_TEAM: Team = { id: "team_mock", name: "Ada's team", personal: 
 
 /** The plans at the price catalog's minimums, Enterprise at its first tier's by the month. */
 const PLANS: Record<Plan["id"], Plan> = {
-  free: { id: "free", name: "Free", minimum_amount: 0, currency: CATALOG.currency },
+  free: {
+    id: "free",
+    name: "Free",
+    minimum_amount: 0,
+    credit_amount: 0,
+    currency: CATALOG.currency,
+  },
   pro: {
     id: "pro",
     name: "Pro",
     minimum_amount: CATALOG.plans.pro.minimum.amount * 100,
+    credit_amount: CATALOG.plans.pro.minimum.is_credit ? CATALOG.plans.pro.minimum.amount * 100 : 0,
     currency: CATALOG.currency,
   },
   enterprise: {
     id: "enterprise",
     name: "Enterprise",
     minimum_amount: ((CATALOG.plans.enterprise.minimum.tiers_per_year.essential ?? 0) * 100) / 12,
+    credit_amount: CATALOG.plans.enterprise.minimum.is_credit
+      ? ((CATALOG.plans.enterprise.minimum.tiers_per_year.essential ?? 0) * 100) / 12
+      : 0,
     currency: CATALOG.currency,
   },
 };
@@ -70,8 +80,8 @@ export const MOCK_PROJECTS = [
 /**
  * The mock team's month by project: a growing B2B SaaS whose 20,000 users all
  * sign in through 20 SSO connections of 1,000 with MFA required, the pricing
- * proposal's example bill, $1,420 on Pro. The SSO meter counts at most 750 of
- * a connection's users. Most use the customer portal. The partner API's
+ * proposal's example bill, $1,500 on Pro; basic MFA is free. The SSO meter
+ * counts at most 750 of a connection's users. Most use the customer portal. The partner API's
  * machines take tokens and the portal's sign-up runs bot checks, both within
  * their allowances.
  */
@@ -79,13 +89,11 @@ const MOCK_PROJECT_MONTHS: Record<string, Record<string, number>> = {
   proj_mock_portal: {
     monthly_active_users: 14_000,
     sso_users: 10_500,
-    policy_users: 14_000,
     bot_checks: 700,
   },
   proj_mock_api: {
     monthly_active_users: 6_000,
     sso_users: 4_500,
-    policy_users: 6_000,
     m2m_tokens: 600_000,
   },
 };
@@ -231,12 +239,7 @@ function mockBilling(entitlements: Map<string, Entitlements>): Billing {
         plan,
         period,
         usage: month.lines.map(usageLine),
-        // A paid plan bills at least its minimum, whatever the usage needs.
-        estimate: {
-          plan: plan.id === "free" ? month.plan : plan.id,
-          total_amount: Math.max(plan.minimum_amount, month.total_amount),
-          currency: plan.currency,
-        },
+        estimate: estimateForPlan(month, plan),
         invoices: [],
       };
     },
