@@ -354,6 +354,11 @@ describe("meta-schemas", () => {
         false,
       ],
       [
+        "transition with an empty target and a purpose",
+        { fields: ["email"], transitions: { submit: { target: "", purpose: "register" } } },
+        false,
+      ],
+      [
         "transition with a null purpose and no target",
         { fields: ["email"], transitions: { submit: { purpose: null } } },
         false,

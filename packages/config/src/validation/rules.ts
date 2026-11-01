@@ -30,6 +30,8 @@ export const VALIDATION_RULES = {
   steps: { scope: "flow", goRef: "validateSteps" },
   graph: { scope: "flow", goRef: "validateGraph" },
   cycles: { scope: "flow", goRef: "validateCycles" },
+  // The API schema's `minLength: 1` on a transition's `target`.
+  "transition-target": { scope: "flow", goRef: null },
   "warn/no-purpose-switch": { scope: "flow", goRef: null },
   "warn/cross-flow-transition": { scope: "flow", goRef: null },
   "warn/reserved-purpose": { scope: "flow", goRef: null },

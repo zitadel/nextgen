@@ -497,6 +497,14 @@ describe("graph / cycles / switch", () => {
     );
   });
 
+  it("rejects an explicitly empty target, which the API schema refuses, even with a purpose", () => {
+    const def = flow();
+    step(def, "identifier").transitions.register = { target: "", purpose: "register" };
+    expect(messages(validateFlowDefinition(def))).toEqual([
+      'step "identifier": transition "register" has an empty target; leave target out to go to its purpose\'s entry step',
+    ]);
+  });
+
   it("rejects a transition with neither a target nor a purpose", () => {
     const def = flow();
     step(def, "identifier").transitions.register = {};

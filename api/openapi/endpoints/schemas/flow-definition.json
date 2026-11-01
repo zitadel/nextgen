@@ -473,6 +473,7 @@
             "properties": {
               "target": {
                 "type": "string",
+                "minLength": 1,
                 "description": "Step name within this flow (when `action` is null), or the name\nof another flow (when `action` is `switch` or `pivot`). Optional\nwhen `purpose` is set: the transition then goes to that purpose's\nentry step.\n",
                 "examples": [
                   "password"

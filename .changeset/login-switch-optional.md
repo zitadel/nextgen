@@ -1,5 +1,6 @@
 ---
 "@zitadel/server": minor
+"@zitadel/api": minor
 "@zitadel/config": minor
 "@zitadel/cli": minor
 "@zitadel/components": minor
@@ -12,4 +13,7 @@ Flow definitions choose whether the login switches between sign-in and sign-up o
 - **More warnings, never errors:** `deploy --dry-run` also warns about `switch` and `pivot` transitions, which the engine does not run yet, and about the reserved purposes `recovery`, `profiling`, `reauth` and `link_account`.
 - **Hide the switch notice:** `<zitadel-login>` shows no notice when its text is `""` in `locales`. An `""` under `en` hides it in every language.
 - **Sign-up first:** `zitadel setup` and the docs send a new app's first visit to `/register`.
+- **An empty `target` is refused:** leave `target` out instead of setting it to `""`.
 - **Preset:** the `passkey-first` preset drops a `user_not_found` transition its passkey step could never take.
+
+**Breaking:** a flow definition read back through the API (`GET` and list) leaves out a transition's `target` when the transition only names a `purpose`, and a client generated from an earlier API spec fails to read it because it requires `target`. Upgrade `@zitadel/api`, or regenerate your client from the new spec, before deploying a flow that uses the short form.

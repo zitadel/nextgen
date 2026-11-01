@@ -279,3 +279,13 @@ func TestMapTransitionsToAPI_PurposeOnlyHasNoTarget(t *testing.T) {
 	require.Equal(t, apigen.FlowDefinitionStepTransitionsItemPurposeRegister, got["register"].Purpose.Value)
 	require.Equal(t, apigen.NewOptString("password"), got["submit"].Target)
 }
+
+// An explicit "" would read back without a target and differ from the file it
+// came from, so the request is refused rather than stored.
+func TestFlowDefinitionTransition_EmptyTargetRejected(t *testing.T) {
+	t.Parallel()
+
+	purpose := apigen.NewOptNilFlowDefinitionStepTransitionsItemPurpose(apigen.FlowDefinitionStepTransitionsItemPurposeRegister)
+	require.Error(t, (&apigen.FlowDefinitionStepTransitionsItem{Target: apigen.NewOptString(""), Purpose: purpose}).Validate())
+	require.NoError(t, (&apigen.FlowDefinitionStepTransitionsItem{Purpose: purpose}).Validate())
+}

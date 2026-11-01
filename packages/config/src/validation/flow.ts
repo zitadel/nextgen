@@ -187,7 +187,14 @@ type FlowStep = {
   terminal: boolean;
 };
 
-type FlowTransition = { target: string; action: string | null; purpose: string | null };
+type FlowTransition = {
+  /** `""` when absent. */
+  target: string;
+  /** Written as `"target": ""`, which the API schema refuses (`minLength: 1`). */
+  emptyTarget: boolean;
+  action: string | null;
+  purpose: string | null;
+};
 
 type FlowDef = {
   purposes: Map<string, string>;
@@ -228,6 +235,7 @@ function readFlow(flow: object): FlowDef {
           const entry = isPlainObject(t) ? t : {};
           transitions.set(key, {
             target: str(entry.target),
+            emptyTarget: entry.target === "",
             action: typeof entry.action === "string" ? entry.action : null,
             purpose: typeof entry.purpose === "string" ? entry.purpose : null,
           });
@@ -476,6 +484,16 @@ function validateGraph(def: FlowDef, stepNames: Set<string>): FlowValidationIssu
 
   for (const step of def.steps) {
     for (const [key, t] of step.transitions) {
+      if (t.emptyTarget) {
+        issues.push(
+          error(
+            "transition-target",
+            `step ${q(step.name)}: transition ${q(key)} has an empty target; leave target out to go to its purpose's entry step`,
+            step.name,
+          ),
+        );
+        continue;
+      }
       if (t.purpose !== null) {
         // Local re-purposing: never combined with a cross-flow action,
         // only to a purpose this definition serves, and only to that
