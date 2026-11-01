@@ -59,7 +59,6 @@
         "over_allowance": { "type": "string" },
         "event_retention_days": { "type": "integer" },
         "attribution_mark": { "enum": ["shown", "hideable"] },
-        "custom_domains_included": { "type": "integer" },
         "delivery_modes": { "type": "array", "items": { "enum": ["dev_inbox", "own_provider", "managed"] } },
         "support": { "type": "string" },
         "sla": { "type": ["object", "null"] },

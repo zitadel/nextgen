@@ -14,11 +14,7 @@ export interface Catalog {
   currency: string;
   plans: {
     free: { limits: { core_mau_sized_for: number }; event_retention_days: number };
-    pro: {
-      minimum: { amount: number };
-      custom_domains_included: number;
-      event_retention_days: number;
-    };
+    pro: { minimum: { amount: number }; event_retention_days: number };
     enterprise: {
       minimum: { tiers_per_year: Record<string, number> };
       event_retention_days: number;
