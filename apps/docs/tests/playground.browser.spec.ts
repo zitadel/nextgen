@@ -108,9 +108,11 @@ test("the session sends no write: a POST and a DELETE", async ({ page, context, 
     const { playground, readsOnly, send } = await openPlayground(page, operation, title);
     await expect(readsOnly).toBeVisible();
     await send.click();
-    await expect(
-      playground.getByText("Not sent: the playground sends only reads", { exact: false }),
-    ).toBeVisible();
+    const refusal = playground.getByRole("alert");
+    await expect(refusal).toContainText("Not sent");
+    await expect(refusal).toContainText("The playground sends only reads with your session");
+    // Nothing failed on the way to a server, so Fumadocs' hint for that stays out.
+    await expect(playground.getByText("a proxy is needed", { exact: false })).toHaveCount(0);
   }
   expect(sent).toEqual([]);
   // Refused before it asked whose session it is: only each page's own read.
@@ -155,9 +157,7 @@ test("the playground sends nothing as another account than the one it shows", as
   // Another tab signs out and in as someone else.
   reader = grace;
   await send.click();
-  await expect(
-    playground.getByText("Not sent: your session changed", { exact: false }),
-  ).toBeVisible();
+  await expect(playground.getByRole("alert")).toContainText("Your session changed");
   await expect(note).toContainText(grace.display);
   expect(sent).toEqual([]);
 
@@ -181,6 +181,8 @@ test("a session lookup that never answers ends with the playground's timeout", a
   await expect(playground.getByText("TimeoutError", { exact: false })).toBeVisible({
     timeout: 20_000,
   });
+  // A request that failed keeps Fumadocs' own display, hint and all.
+  await expect(playground.getByText("a proxy is needed", { exact: false })).toBeVisible();
   expect(sent).toEqual([]);
 });
 

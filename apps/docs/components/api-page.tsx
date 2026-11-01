@@ -11,6 +11,7 @@ import { authentication, sdkSample } from "@/lib/sdk-sample";
 
 import {
   type PlaygroundOperation,
+  SessionResultDisplay,
   SessionUserContext,
   sessionAuthProvider,
   sessionFirst,
@@ -75,9 +76,11 @@ const OperationPage = createOpenAPIPage({
 
 const authProviders = [sessionAuthProvider];
 
+const components = { ResultDisplay: SessionResultDisplay };
+
 // Fumadocs' own playground, sending through its operation: whether the session
 // may send a request depends on the operation (components/session-auth.tsx),
-// and `onRequestInit` is not told which.
+// and `onRequestInit` is not told which. A request it does not send shows why.
 function Playground({ method, path, operation }: PlaygroundOperation) {
   const fetchOptions = useMemo(
     () => ({
@@ -85,5 +88,11 @@ function Playground({ method, path, operation }: PlaygroundOperation) {
     }),
     [method, path, operation],
   );
-  return <PlaygroundClient authProviders={authProviders} fetchOptions={fetchOptions} />;
+  return (
+    <PlaygroundClient
+      authProviders={authProviders}
+      fetchOptions={fetchOptions}
+      components={components}
+    />
+  );
 }
