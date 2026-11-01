@@ -1,5 +1,16 @@
 # @zitadel/config
 
+## 0.4.0
+
+### Minor Changes
+
+- [#2527](https://github.com/zitadel/nextgen/pull/2527) [`0a00b60`](https://github.com/zitadel/nextgen/commit/0a00b60ad40068b39ecb1a4eb9b988f7276d2924) - Every paged list method of the [`@zitadel/api` client](https://preview.zitadel.com/docs/sdks/api-client) now has `items()`, `pages()` and `all()`, which follow the cursor for you, and `createZitadelClient` takes `onResponse` and `onError` hooks; `@zitadel/api/client` exports `pagedFunctions`, each paged function's typed readers of a page's items and cursor and the arguments of its next page. The CLI no longer stops `--all`, the resource list commands or `zitadel api --paginate` when a server sends the same page cursor twice: that is a server bug, and the client trusts the paging contract. `deploy`, `preview`, `release create` and `setup`'s first deploy check the release body against the API's own schema before sending it, and name each field it refuses. `@zitadel/testing` no longer re-checks the ids the server answers its bootstrap and seeding with, and types `BootstrappedProject.previewSecret` as always present, as the server always issues one. `@zitadel/config`'s `getDefaultHumanUserSchema` is typed as the user schema document it returns, `$id` included, and exports that type as `UserSchemaDocument`; `getDefaultHumanUserSchemaBody` returns it without `$id`, as an inline schema in a release bundle must be.
+
+### Patch Changes
+
+- Updated dependencies [[`0a00b60`](https://github.com/zitadel/nextgen/commit/0a00b60ad40068b39ecb1a4eb9b988f7276d2924), [`79d8dd0`](https://github.com/zitadel/nextgen/commit/79d8dd01660b5bb7a2d936aa330c3d591a8d3954), [`eb363f0`](https://github.com/zitadel/nextgen/commit/eb363f04586c594ae893253a6089b21e6e2e390a), [`26097dd`](https://github.com/zitadel/nextgen/commit/26097dd104c9b6fd6b9e8183921464b54f851a10), [`eaa07c3`](https://github.com/zitadel/nextgen/commit/eaa07c36f3c76a963214faa8a230f3befa2cff9b), [`665ea7d`](https://github.com/zitadel/nextgen/commit/665ea7db04c57c3abe2b9d60030fcd68f6339e15), [`db05fbb`](https://github.com/zitadel/nextgen/commit/db05fbb18b1bf33251694382787be8445da608da)]:
+  - @zitadel/api@0.4.0
+
 ## 0.3.0
 
 ### Minor Changes
