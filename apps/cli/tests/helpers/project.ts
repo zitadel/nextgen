@@ -1076,6 +1076,32 @@ export class ScaffoldedApp {
     return this.editDocument(SCHEMA_FILE, edit);
   }
 
+  /**
+   * Leaves `method` the schema's only way to sign in, with no login flow that
+   * would refuse removing it, so disabling it removes the last way in.
+   */
+  async signsInOnlyWith(method: "password" | "passkey"): Promise<void> {
+    await this.editUserSchema((schema) => {
+      schema["x-auth-methods"] = {
+        password: { enabled: method === "password" },
+        passkey: { enabled: method === "passkey" },
+      };
+    });
+    await this.deleteProjectFile(FLOW_FILE);
+  }
+
+  /** {@link signsInOnlyWith} for an SSO provider the project already offers. */
+  async signsInOnlyWithSso(provider: string): Promise<void> {
+    await this.editUserSchema((schema) => {
+      schema["x-auth-methods"] = {
+        password: { enabled: false },
+        passkey: { enabled: false },
+        sso: { enabled: true, providers: [provider] },
+      };
+    });
+    await this.deleteProjectFile(FLOW_FILE);
+  }
+
   /** Edits the password step of the committed login flow, as the developer owning it would. */
   editPasswordStep(edit: (step: FlowDocument["steps"][number]) => void): Promise<void> {
     return this.editLoginFlow((flow) => {

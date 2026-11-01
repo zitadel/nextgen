@@ -95,22 +95,42 @@ describe("api", () => {
         expect(result).toFailWith("E_NOT_FOUND");
       });
 
-      it("refuses an operation that deletes without --force", async () => {
-        const app = await aSetUpApp();
-        expect(await app.setVariable("FOO", "bar")).toSucceed();
+      describe("without --force when no one can be asked", () => {
+        it("is refused", async () => {
+          const app = await aSetUpApp();
+          expect(await app.setVariable("FOO", "bar")).toSucceed();
 
-        const result = await app.api("deleteVariable", "FOO");
+          const result = await app.api("deleteVariable", "FOO");
 
-        expect(result).toFailWith("E_VALIDATION");
-      });
+          expect(result).toFailWith("E_VALIDATION");
+        });
 
-      it("deletes nothing when it refuses", async () => {
-        const app = await aSetUpApp();
-        expect(await app.setVariable("FOO", "bar")).toSucceed();
+        it("says to pass --force", async () => {
+          const app = await aSetUpApp();
+          expect(await app.setVariable("FOO", "bar")).toSucceed();
 
-        await app.api("deleteVariable", "FOO");
+          const result = await app.api("deleteVariable", "FOO");
 
-        expect(await app.projectVariables()).not.toEqual([]);
+          expect(result).toHintAt("--force");
+        });
+
+        it("suggests running it again with --force", async () => {
+          const app = await aSetUpApp();
+          expect(await app.setVariable("FOO", "bar")).toSucceed();
+
+          const result = await app.api("deleteVariable", "FOO");
+
+          expect(result).toSuggest("api deleteVariable FOO --force");
+        });
+
+        it("deletes nothing", async () => {
+          const app = await aSetUpApp();
+          expect(await app.setVariable("FOO", "bar")).toSucceed();
+
+          await app.api("deleteVariable", "FOO");
+
+          expect(await app.projectVariables()).not.toEqual([]);
+        });
       });
 
       it("runs an operation that deletes with --force", async () => {

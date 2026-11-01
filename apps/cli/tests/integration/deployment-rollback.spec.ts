@@ -190,20 +190,66 @@ describe("deployment rollback", () => {
         expect(result).toFailWith("E_VALIDATION");
       });
 
-      it("requires --force when non-interactive", async () => {
-        const app = await aSetUpApp();
-        await app.addPrimaryOrigin();
-        const first = await app.deployData();
+      describe("without --force when no one can be asked", () => {
+        it("is refused", async () => {
+          const app = await aSetUpApp();
+          await app.addPrimaryOrigin();
+          const first = await app.deployData();
 
-        const result = await app.run([
-          "deployment",
-          "rollback",
-          first.deployment_id ?? "",
-          "--non-interactive",
-          "--json",
-        ]);
+          const result = await app.run([
+            "deployment",
+            "rollback",
+            first.deployment_id ?? "",
+            "--json",
+          ]);
 
-        expect(result).toFailWith("E_VALIDATION");
+          expect(result).toFailWith("E_VALIDATION");
+        });
+
+        it("says to pass --force", async () => {
+          const app = await aSetUpApp();
+          await app.addPrimaryOrigin();
+          const first = await app.deployData();
+
+          const result = await app.run([
+            "deployment",
+            "rollback",
+            first.deployment_id ?? "",
+            "--json",
+          ]);
+
+          expect(result).toHintAt("--force");
+        });
+
+        it("suggests running it again with --force", async () => {
+          const app = await aSetUpApp();
+          await app.addPrimaryOrigin();
+          const first = await app.deployData();
+
+          const result = await app.run([
+            "deployment",
+            "rollback",
+            first.deployment_id ?? "",
+            "--json",
+          ]);
+
+          expect(result).toSuggest(`deployment rollback ${first.deployment_id ?? ""} --force`);
+        });
+
+        it("rolls back nothing", async () => {
+          const app = await aSetUpApp();
+          await app.addPrimaryOrigin();
+          const first = await app.deployData();
+          await app.editUserSchema((schema) => {
+            schema.properties.company = { type: "string" };
+          });
+          await app.deployData();
+          const before = await app.liveDeploymentCount();
+
+          await app.run(["deployment", "rollback", first.deployment_id ?? "", "--json"]);
+
+          expect(await app.liveDeploymentCount()).toBe(before);
+        });
       });
     });
   });

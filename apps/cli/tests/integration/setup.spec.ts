@@ -475,13 +475,42 @@ describe("setup", () => {
         expect(rerun).toBeSkipped();
       });
 
-      it("keeps the previous origin when --dev-port moves the app without --force", async () => {
-        const app = await anApp();
-        expect(await app.setup()).toSucceed();
+      describe("--dev-port without --force when no one can be asked", () => {
+        it("still succeeds", async () => {
+          const app = await anApp();
+          expect(await app.setup()).toSucceed();
 
-        await app.setup(["--dev-port", "3001"]);
+          const result = await app.setup(["--dev-port", "3001"]);
 
-        expect(await app.projectOrigins()).toContainEqual(SETUP_ORIGIN);
+          expect(result).toSucceed();
+        });
+
+        it("says to pass --force", async () => {
+          const app = await anApp();
+          expect(await app.setup()).toSucceed();
+
+          const result = await app.setup(["--dev-port", "3001"]);
+
+          expect(result).toSay("Pass --force to remove it");
+        });
+
+        it("suggests running it again with --force", async () => {
+          const app = await anApp();
+          expect(await app.setup()).toSucceed();
+
+          const result = await app.setup(["--dev-port", "3001"]);
+
+          expect(result).toSuggest("setup --force --skip-install --dev-port 3001");
+        });
+
+        it("removes nothing", async () => {
+          const app = await anApp();
+          expect(await app.setup()).toSucceed();
+
+          await app.setup(["--dev-port", "3001"]);
+
+          expect(await app.projectOrigins()).toContainEqual(SETUP_ORIGIN);
+        });
       });
 
       it("replaces the previous origin when --dev-port moves the app with --force", async () => {

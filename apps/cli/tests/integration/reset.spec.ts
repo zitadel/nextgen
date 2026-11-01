@@ -43,14 +43,39 @@ describe("reset", () => {
 
   describe("against a valid server", () => {
     describe("--json", () => {
-      it("refuses to delete without --force when no one can be asked", async () => {
-        const app = await aSetUpApp();
+      describe("without --force when no one can be asked", () => {
+        it("is refused", async () => {
+          const app = await aSetUpApp();
 
-        const result = await app.run(["reset", "--json"]);
+          const result = await app.run(["reset", "--json"]);
 
-        expect(result).toFailWith("E_VALIDATION");
-        expect(result).toHintAt("--force");
-        expect(result).toSuggest("reset --force");
+          expect(result).toFailWith("E_VALIDATION");
+        });
+
+        it("says to pass --force", async () => {
+          const app = await aSetUpApp();
+
+          const result = await app.run(["reset", "--json"]);
+
+          expect(result).toHintAt("--force");
+        });
+
+        it("suggests running it again with --force", async () => {
+          const app = await aSetUpApp();
+
+          const result = await app.run(["reset", "--json"]);
+
+          expect(result).toSuggest("reset --force");
+        });
+
+        it("deletes nothing", async () => {
+          const app = await aSetUpApp();
+          const before = await app.snapshot();
+
+          await app.run(["reset", "--json"]);
+
+          expect(await before.changes()).toMatchObject({ added: [], modified: [], removed: [] });
+        });
       });
 
       it("succeeds when there is no local runtime to delete", async () => {

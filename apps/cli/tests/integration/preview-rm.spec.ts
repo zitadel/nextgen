@@ -108,12 +108,39 @@ describe("preview rm", () => {
         expect(result).toSuggest("preview list");
       });
 
-      it("requires --force when non-interactive", async () => {
-        const app = await anAppWithAPreview();
+      describe("without --force when no one can be asked", () => {
+        it("is refused", async () => {
+          const app = await anAppWithAPreview();
 
-        const result = await app.run(["preview", "rm", PREVIEW_URL, "--non-interactive", "--json"]);
+          const result = await app.run(["preview", "rm", PREVIEW_URL, "--json"]);
 
-        expect(result).toFailWith("E_VALIDATION");
+          expect(result).toFailWith("E_VALIDATION");
+        });
+
+        it("says to pass --force", async () => {
+          const app = await anAppWithAPreview();
+
+          const result = await app.run(["preview", "rm", PREVIEW_URL, "--json"]);
+
+          expect(result).toHintAt("--force");
+        });
+
+        it("suggests running it again with --force", async () => {
+          const app = await anAppWithAPreview();
+
+          const result = await app.run(["preview", "rm", PREVIEW_URL, "--json"]);
+
+          expect(result).toSuggest(`preview rm ${PREVIEW_URL} --force`);
+        });
+
+        it("removes nothing", async () => {
+          const app = await anAppWithAPreview();
+
+          await app.run(["preview", "rm", PREVIEW_URL, "--json"]);
+
+          const listed = await app.run(["preview", "list", "--json"]);
+          expect(app.envelopeOf<{ items: unknown[] }>(listed).data.items).not.toEqual([]);
+        });
       });
     });
 

@@ -111,18 +111,39 @@ describe("resources", () => {
         );
       });
 
-      it.each([
-        ["users", "delete", "user_1"],
-        ["teams", "deactivate", "team_1"],
-        ["sessions", "revoke", "sess_1"],
-      ])("refuses %s %s without --force when no one can be asked", async (topic, verb, id) => {
-        const app = await aSetUpApp();
+      describe("without --force when no one can be asked", () => {
+        const DESTRUCTIVE = [
+          ["users", "delete", "user_1"],
+          ["teams", "deactivate", "team_1"],
+          ["sessions", "revoke", "sess_1"],
+        ];
 
-        const result = await app.run([topic, verb, id, "--json"]);
+        it.each(DESTRUCTIVE)("is refused for %s %s", async (topic, verb, id) => {
+          const app = await aSetUpApp();
 
-        expect(result).toFailWith("E_VALIDATION");
-        expect(result).toHintAt("--force");
-        expect(result).toSuggest(`${topic} ${verb} ${id} --force`);
+          const result = await app.run([topic, verb, id, "--json"]);
+
+          expect(result).toFailWith("E_VALIDATION");
+        });
+
+        it.each(DESTRUCTIVE)("says to pass --force for %s %s", async (topic, verb, id) => {
+          const app = await aSetUpApp();
+
+          const result = await app.run([topic, verb, id, "--json"]);
+
+          expect(result).toHintAt("--force");
+        });
+
+        it.each(DESTRUCTIVE)(
+          "suggests running %s %s again with --force",
+          async (topic, verb, id) => {
+            const app = await aSetUpApp();
+
+            const result = await app.run([topic, verb, id, "--json"]);
+
+            expect(result).toSuggest(`${topic} ${verb} ${id} --force`);
+          },
+        );
       });
 
       it("registers a connection made from its nested fields", async () => {

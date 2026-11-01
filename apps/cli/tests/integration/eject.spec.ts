@@ -136,7 +136,21 @@ describe("eject", () => {
         const result = await app.run(["eject", "--json"]);
 
         expect(result).toFailWith("E_VALIDATION");
+      });
+
+      it("says to pass --force", async () => {
+        const app = await aPatchedApp();
+
+        const result = await app.run(["eject", "--json"]);
+
         expect(result).toHintAt("--force");
+      });
+
+      it("suggests running it again with --force", async () => {
+        const app = await aPatchedApp();
+
+        const result = await app.run(["eject", "--json"]);
+
         expect(result).toSuggest("eject --force");
       });
 
