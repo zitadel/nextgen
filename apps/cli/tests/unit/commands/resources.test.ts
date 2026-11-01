@@ -2,13 +2,19 @@ import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import type {
-  GetReleaseById200,
-  ListEvents200,
-  ListEventsParams,
-  ListSchemas200,
-  ListSchemasParams,
-  QueryUsers200,
+import {
+  type GetReleaseById200,
+  type ListEvents200,
+  type ListEventsParams,
+  type ListSchemas200,
+  type ListSchemasParams,
+  QueryGrantsBodyFilterItemOperation,
+  QueryIdpsBodyFilterItemOperation,
+  QueryProjectsBodyFilterItemOperation,
+  QuerySessionsBodyFilterItemOperation,
+  QueryTeamsBodyFilterItemOperation,
+  type QueryUsers200,
+  QueryUsersBodyFilterItemOperation,
 } from "@zitadel/api/generated/model";
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
@@ -1956,6 +1962,23 @@ describe("the release resource", () => {
         "  flow_definition  default-login  fd_1",
       ].join("\n"),
     );
+  });
+});
+
+describe("the query resources' filters", () => {
+  it.each([
+    ["users", QueryUsersBodyFilterItemOperation],
+    ["teams", QueryTeamsBodyFilterItemOperation],
+    ["sessions", QuerySessionsBodyFilterItemOperation],
+    ["grants", QueryGrantsBodyFilterItemOperation],
+    ["idps", QueryIdpsBodyFilterItemOperation],
+    ["projects", QueryProjectsBodyFilterItemOperation],
+  ] as const)("offer the operations the %s query takes, and no other", (topic, operations) => {
+    const offered = new Set(
+      (RESOURCES[topic].list?.filters ?? []).flatMap((filter) => filter.operations),
+    );
+
+    expect([...offered].sort()).toEqual(Object.values(operations).sort());
   });
 });
 

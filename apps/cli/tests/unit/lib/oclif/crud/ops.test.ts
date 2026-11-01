@@ -67,7 +67,6 @@ const resource: ResourceDescriptor<Ctx> = {
 };
 const options = {
   connect: async () => ({ token: "t" }),
-  operations: ["equals", "contains"],
   flags: { extra: { type: "boolean" as const } },
 } as unknown as OperationDefinition<Ctx, GetSpec<Ctx>>["options"];
 const definition = <Spec>(spec: Spec): OperationDefinition<Ctx, Spec> => ({
@@ -287,7 +286,6 @@ describe("wire conventions", () => {
       spec,
       options: {
         connect: async () => ({ token: "t" }),
-        operations: ["equals"],
         wire: {
           limit: "size",
           pageToken: "cursor",

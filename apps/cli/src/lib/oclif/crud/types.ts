@@ -317,8 +317,6 @@ export type ResourceCommandOptions<Ctx> = Readonly<{
    * command's own `connect`, so nothing connects until a verb needs it.
    */
   connect: (open: () => Promise<Connection>) => Promise<Ctx>;
-  /** Filter operations the query endpoints accept (`equals`, `contains`, …). */
-  operations: readonly string[];
   /** Extra flags added to every generated command. */
   flags?: Interfaces.FlagInput;
   /** Wire vocabulary; each property falls back to {@link DEFAULT_WIRE}. */

@@ -233,18 +233,6 @@ const GRANT_OPERATIONS = Object.values(QueryGrantsBodyFilterItemOperation);
 const IDP_OPERATIONS = Object.values(QueryIdpsBodyFilterItemOperation);
 const PROJECT_OPERATIONS = Object.values(QueryProjectsBodyFilterItemOperation);
 
-/** Every operation a query takes: the `--filter` grammar's whole vocabulary. */
-const FILTER_OPERATIONS = [
-  ...new Set([
-    ...USER_OPERATIONS,
-    ...TEAM_OPERATIONS,
-    ...SESSION_OPERATIONS,
-    ...GRANT_OPERATIONS,
-    ...IDP_OPERATIONS,
-    ...PROJECT_OPERATIONS,
-  ]),
-];
-
 /** A release's pointers as an indented table, one pinned revision per row. */
 export const releasePointers = (release: Pick<GetReleaseById200, "pointers">): string => {
   const { pointers } = release;
@@ -769,7 +757,6 @@ export const RESOURCES = {
  * `EnvironmentCommand`), so they take `--env` and `--env-file` too.
  */
 export const RESOURCE_COMMANDS = buildResourceCommands<Platform>(RESOURCES, {
-  operations: FILTER_OPERATIONS,
   // A `${{ NAME }}` reference to a project variable (ADR 062) names a
   // credential without revealing it, and is the only form a connection's
   // `client_secret` takes, so it may stand on a command line.
