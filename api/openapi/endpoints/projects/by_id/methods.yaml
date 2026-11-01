@@ -44,6 +44,7 @@ get:
 patch:
   operationId: patchProject
   x-zitadel-cli: projects update
+  x-zitadel-destructive: null-removes
   summary: Update project
   description: |
     Updates the state of a project.

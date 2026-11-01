@@ -731,6 +731,12 @@
           "helpGroup": "RAW BODY"
         },
         {
+          "name": "force",
+          "char": "f",
+          "description": "Remove what the body sets to null without the confirmation prompt. Required when non-interactive.",
+          "type": "boolean"
+        },
+        {
           "name": "env",
           "char": "e",
           "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
@@ -1000,6 +1006,12 @@
           "type": "option",
           "multiple": true,
           "helpGroup": "RAW BODY"
+        },
+        {
+          "name": "force",
+          "char": "f",
+          "description": "Remove what the body sets to null without the confirmation prompt. Required when non-interactive.",
+          "type": "boolean"
         },
         {
           "name": "env",
@@ -3082,6 +3094,12 @@
           "type": "option",
           "multiple": true,
           "helpGroup": "RAW BODY"
+        },
+        {
+          "name": "force",
+          "char": "f",
+          "description": "Remove what the body sets to null without the confirmation prompt. Required when non-interactive.",
+          "type": "boolean"
         },
         {
           "name": "env",

@@ -2,7 +2,7 @@ import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import * as endpoints from "@zitadel/api/generated/endpoints/zitadelNextGen";
-import { destructiveOperations } from "@zitadel/api/generated/operations";
+import { destructiveOperations, nullRemovingOperations } from "@zitadel/api/generated/operations";
 import { API_PREFIX } from "@zitadel/api/runtime/base-url";
 import { describe, expect, it } from "vitest";
 
@@ -517,9 +517,11 @@ const unlockedOperations = async (): Promise<ReadonlySet<string>> => {
   const files = (await readdir(src, { recursive: true })).filter((file) => file.endsWith(".ts"));
   const called = await Promise.all(
     files.map(async (file) =>
-      [...(await readFile(join(src, file), "utf8")).matchAll(/unlock\(\w+\)\s*\.(\w+)\(/g)].map(
-        (match) => match[1] as string,
-      ),
+      [
+        ...(await readFile(join(src, file), "utf8")).matchAll(
+          /unlock\(\w+\)(?:\s*\?\?\s*\w+\))?\s*\.(\w+)\(/g,
+        ),
+      ].map((match) => match[1] as string),
     ),
   );
   return new Set(called.flat());
@@ -528,12 +530,15 @@ const unlockedOperations = async (): Promise<ReadonlySet<string>> => {
 describe("the spec marks what the CLI confirms as destructive", () => {
   it("marks every operation the CLI calls only with consent", async () => {
     const unmarked = [...(await unlockedOperations())].filter(
-      (operation) => !(destructiveOperations as readonly string[]).includes(operation),
+      (operation) =>
+        ![...destructiveOperations, ...nullRemovingOperations].includes(
+          operation as (typeof destructiveOperations)[number],
+        ),
     );
 
     expect(
       unmarked,
-      "Give each in api/openapi/endpoints an `x-zitadel-destructive: true` line after its x-zitadel-cli, or stop asking for consent to run it.",
+      "Give each in api/openapi/endpoints an `x-zitadel-destructive: true` line (`null-removes` for a merge patch) after its x-zitadel-cli, or stop asking for consent to run it.",
     ).toEqual([]);
   });
 

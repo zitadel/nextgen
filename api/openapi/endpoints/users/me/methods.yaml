@@ -45,6 +45,7 @@ get:
 
 patch:
   operationId: patchMyUser
+  x-zitadel-destructive: null-removes
   summary: Update my user information
   description: |
     Partially updates the caller's own schema-defined attributes. The merged

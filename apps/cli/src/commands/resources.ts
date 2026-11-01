@@ -57,6 +57,7 @@ import { isVariableReference } from "@zitadel/config/idp";
 import type { ZitadelClient } from "../lib/api-client";
 import { CommandGroups } from "../lib/oclif/groups";
 import { pagedFunctions } from "../lib/api-client";
+import type { Consent } from "../lib/consent";
 import { ZitadelError } from "../lib/errors";
 import {
   buildResourceCommands,
@@ -93,7 +94,7 @@ export const create = <B, C>(
 
 export const update = <B, U>(
   schema: Schema<B>,
-  call: (ctx: Platform, id: string, body: B) => Promise<U>,
+  call: (ctx: Platform, id: string, body: B, consent?: Consent) => Promise<U>,
   shape: WriteShape = {},
 ): NoInfer<UpdateSpec<Platform, B, U>> => ({ ...shape, schema, call });
 
@@ -339,7 +340,9 @@ export const RESOURCES = {
     create: create(CreateUserBody, ({ client, projectId }, body) =>
       client.createUser(body, { project_id: projectId }),
     ),
-    update: update(PatchUserByIDBody, ({ client }, id, body) => client.patchUserByID(id, body)),
+    update: update(PatchUserByIDBody, ({ client }, id, body, consent) =>
+      (consent?.unlock(client) ?? client).patchUserByID(id, body),
+    ),
     delete: { call: ({ client }, id, consent) => consent.unlock(client).deleteUserByID(id) },
   }),
 
@@ -564,7 +567,9 @@ export const RESOURCES = {
       next: pagedFunctions.queryProjects.next,
     }),
     get: get({ call: ({ client }, id) => client.getProject(id), response: GetProjectResponse }),
-    update: update(PatchProjectBody, ({ client }, id, body) => client.patchProject(id, body)),
+    update: update(PatchProjectBody, ({ client }, id, body, consent) =>
+      (consent?.unlock(client) ?? client).patchProject(id, body),
+    ),
   }),
 
   // Configuration resources (ADR 035) are read-only here. They are authored as

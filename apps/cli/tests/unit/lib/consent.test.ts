@@ -194,6 +194,14 @@ describe("withholdDestructive", () => {
     );
   });
 
+  it.each([
+    ["patchUserByID", () => aClient().patchUserByID("user_1", { attributes: { nickname: null } })],
+    ["patchMyUser", () => aClient().patchMyUser({ attributes: { nickname: null } })],
+    ["patchProject", () => aClient().patchProject("proj_1", { password_hash: null })],
+  ])("refuses %s with a null, which removes what it names", (operation, call) => {
+    expect(call).toThrow(`${operation} with a null is destructive: reach it through a Consent`);
+  });
+
   it("refuses a merge-patch operation reached through its property descriptor", () => {
     expect(() => Object.getOwnPropertyDescriptor(aClient(), "updateVariables")).toThrow(
       "updateVariables is destructive: reach it through a Consent",
