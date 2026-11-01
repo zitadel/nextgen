@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { DEFAULT_SCHEMA_CONFIG_PATH, getDefaultHumanUserSchema } from "@zitadel/config/defaults";
+import { DEFAULT_SCHEMA_CONFIG_PATH, getDefaultHumanUserSchemaBody } from "@zitadel/config/defaults";
 import { http } from "msw";
 import { describe, expect, it } from "vitest";
 
@@ -107,7 +107,7 @@ describe("deploy", () => {
     await mkdir(join(project.cwd, ".zitadel/schemas"), { recursive: true });
     await writeFile(
       join(project.cwd, DEFAULT_SCHEMA_CONFIG_PATH),
-      JSON.stringify(getDefaultHumanUserSchema()),
+      JSON.stringify(getDefaultHumanUserSchemaBody()),
     );
     server.use(liveAcrossTwoPages({ id: "dep_live_primary", release_id: "rel_live" }));
     const guards: unknown[] = [];
