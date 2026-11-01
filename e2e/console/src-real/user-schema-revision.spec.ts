@@ -41,8 +41,14 @@ test("opens a user's URI schema revision from the user detail screen", async ({
   await page.goto(`/users/${user.id}`);
   await expect(page.getByRole("heading", { name: email })).toBeVisible();
 
-  // The Overview card's only link is the revision box.
-  await page.getByRole("tabpanel").getByRole("link").click();
+  // Two links name the schema: its title opens the newest revision, the box
+  // the revision this user is on. With one revision both open it; the box
+  // carries the id in its name.
+  const panel = page.getByRole("tabpanel");
+  expect(
+    await panel.getByRole("link", { name: title, exact: true }).getAttribute("href"),
+  ).toContain(`/schemas/${encodeURIComponent(schema.id)}`);
+  await panel.getByRole("link", { name: schema.id }).click();
 
   await expect(page).toHaveURL((url) =>
     url.pathname.endsWith(`/schemas/${encodeURIComponent(schema.id)}`),
