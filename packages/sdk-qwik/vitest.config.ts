@@ -4,7 +4,11 @@ import { apiMockPublicDir } from "@zitadel/api-mock/public-dir";
 import { defineConfig } from "vitest/config";
 
 import { baseTest, edgeProject, edgeSpecs } from "@zitadel/vitest-config";
-import { renderServerLogin } from "./src/__tests__/server-markup.ts";
+import {
+  closeServerLogin,
+  loadServerLogin,
+  renderServerLogin,
+} from "./src/__tests__/server-markup.ts";
 
 /**
  * Two projects in one config:
@@ -55,7 +59,7 @@ export default defineConfig({
             headless: true,
             instances: [{ browser: "chromium" }],
             // Node-side helpers a browser spec calls through `commands`.
-            commands: { renderServerLogin },
+            commands: { loadServerLogin, renderServerLogin, closeServerLogin },
           },
         },
       },
