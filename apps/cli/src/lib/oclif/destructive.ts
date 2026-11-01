@@ -113,10 +113,13 @@ export function Destructive<TBase extends CommandClass<BaseCommand>>(Base: TBase
         if (token.type !== "flag" || ANSWERING.has(token.flag)) {
           return [];
         }
-        // A boolean's input is the flag as typed (`--no-color`, `-v`).
-        return definitions[token.flag]?.type === "boolean"
-          ? [token.input]
-          : [`--${token.flag}`, redact(token.input)];
+        // A boolean's input is the flag as typed (`--no-color`, `-v`). A value
+        // that starts with `-` stays one word with its flag, or it reads as one.
+        const value = redact(token.input);
+        if (definitions[token.flag]?.type === "boolean") {
+          return [token.input];
+        }
+        return value.startsWith("-") ? [`--${token.flag}=${value}`] : [`--${token.flag}`, value];
       });
       const delimited = positional.some((word) => word.startsWith("-"));
       const command = this.retryCommand([

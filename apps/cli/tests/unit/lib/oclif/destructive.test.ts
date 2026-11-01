@@ -283,6 +283,14 @@ describe("Destructive", () => {
       });
     });
 
+    it("keeps a value that starts with a dash as the flag's value", async () => {
+      const command = new Removing({ argv: ["API_URL", "--message=--restore"] });
+
+      await expect(command.remove()).rejects.toMatchObject({
+        nextCommands: ["npx @zitadel/cli@1.2.3 variable rm API_URL --force --message=--restore"],
+      });
+    });
+
     it("names the gate's arguments in place of the typed ones", async () => {
       const command = new Removing({ argv: ["--env", "staging"], arguments: ["API_URL"] });
 
