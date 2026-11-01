@@ -32,7 +32,6 @@
     "@changesets/cli": "^3.0.3",
     "@moonrepo/cli": "catalog:",
     "@redocly/openapi-core": "catalog:",
-    "@zitadel/api": "workspace:*",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "publint": "catalog:",

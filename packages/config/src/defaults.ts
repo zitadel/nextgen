@@ -25,8 +25,9 @@ export {
   policiesReadmeContent,
   schemasReadmeContent,
 } from "./readmes.js";
+import { DEFAULT_BUILTIN_SCHEMA_BASE } from "./builtin-schema-base.js";
 
-export const DEFAULT_BUILTIN_SCHEMA_BASE = "https://zitadel.com/schemas/v1";
+export { DEFAULT_BUILTIN_SCHEMA_BASE };
 export const DEFAULT_FLOW_SCHEMA_URI = `${DEFAULT_BUILTIN_SCHEMA_BASE}/flow-definition.json`;
 export const DEFAULT_SCHEMA_CONFIG_PATH = ".zitadel/schemas/default-human-user.json";
 export const DEFAULT_FLOW_CONFIG_PATH = ".zitadel/flows/default-login.json";

@@ -263,9 +263,6 @@
       ]
     },
     "//#test": {
-      // render-builtin-schemas.test.mjs imports packages/config/src/defaults.ts,
-      // which checks the default schema against the generated API schemas.
-      "dependsOn": ["@zitadel/api#generate"],
       "inputs": [
         "packages/vitest-config/vitest.shared.mjs",
         "packages/vitest-config/vitest.shared.d.mts",
@@ -306,10 +303,8 @@
         "scripts/render-builtin-schemas.test.mjs",
         "api/openapi/endpoints/schemas/*.json",
         // The built-in schemas' renderer matches the server's default
-        // namespace, which packages/config/src/defaults.ts reads from its
-        // defaults.
-        "packages/config/src/defaults.ts",
-        "packages/config/defaults/**",
+        // namespace.
+        "packages/config/src/builtin-schema-base.ts",
         "scripts/assert-file.mjs",
         "vitest.config.ts"
       ]
