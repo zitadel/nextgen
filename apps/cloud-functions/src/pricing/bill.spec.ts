@@ -155,4 +155,12 @@ describe("the catalog", () => {
     expect(free).not.toHaveProperty("email_users");
     expect(pro).not.toHaveProperty("email_messages");
   });
+
+  it("sells Enterprise, which keeps 90 days, only the 400-day retention", () => {
+    const pro = entitlementsFor("pro").allowances;
+    const enterprise = entitlementsFor("enterprise").allowances;
+    expect(pro).toMatchObject({ retained_users_90d: 0, retained_users_400d: 0 });
+    expect(enterprise).not.toHaveProperty("retained_users_90d");
+    expect(enterprise).toHaveProperty("retained_users_400d", 0);
+  });
 });

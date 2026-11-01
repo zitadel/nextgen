@@ -135,6 +135,7 @@
           "description": "The key a subject is counted once by; null for activity meters"
         },
         "allowance": { "type": ["integer", "null"], "minimum": 0, "description": "Free per account and month, on every plan" },
+        "retention_days": { "type": "integer", "minimum": 1, "description": "How many days a counted user's audit events are kept; a plan that keeps events as long already includes it and is not sold the meter" },
         "price": { "$ref": "#/$defs/price" },
         "pool": {
           "type": "object",
