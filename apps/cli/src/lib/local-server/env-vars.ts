@@ -19,7 +19,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { parseEnv } from "node:util";
 
-import { ZitadelError } from "../errors";
+import { ZitadelError, errorMessage } from "../errors";
 import { isObject } from "../json";
 
 /** Highest priority first. */
@@ -89,7 +89,7 @@ const readEnvFile = async (path: string): Promise<Readonly<Record<string, string
     }
     throw new ZitadelError("E_VALIDATION", `Cannot read ${path}`, {
       hint: "The file exists but could not be read; fix its permissions or remove it.",
-      details: { path, message: error instanceof Error ? error.message : String(error) },
+      details: { path, message: errorMessage(error) },
     });
   });
   if (contents === undefined) {

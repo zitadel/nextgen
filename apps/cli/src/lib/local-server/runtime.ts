@@ -4,7 +4,7 @@ import { constants } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
-import { isErrno, ZitadelError } from "../errors";
+import { isErrno, ZitadelError, errorMessage } from "../errors";
 import { isPortableShellWord, isTrainVersion } from "../public-cli";
 import { unscopedCommand } from "../suggestion";
 import { readIfExists } from "../fs";
@@ -219,7 +219,7 @@ async function isOwnFile(path: string): Promise<boolean> {
     if (isErrno(error, "ENOENT") || isErrno(error, "ENOTDIR")) return false;
     throw new ZitadelError("E_VALIDATION", `${path} cannot be read`, {
       hint: `Check that ${path} and its directory are readable by you.`,
-      details: { cause: error instanceof Error ? error.message : String(error) },
+      details: { cause: errorMessage(error) },
     });
   }
 }

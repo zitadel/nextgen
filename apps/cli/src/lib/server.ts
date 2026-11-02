@@ -1,4 +1,4 @@
-import { ZitadelError } from "./errors";
+import { ZitadelError, errorMessage } from "./errors";
 import { LocalServer } from "./local-server/server";
 import type { Parsed } from "@zitadel/config/idp";
 import type { FlagVariable } from "./oclif/types";
@@ -69,7 +69,7 @@ export function parseServer(value: string): Parsed<string> {
   try {
     return { ok: true, value: serverOrigin(typed) };
   } catch (error) {
-    return { ok: false, problem: error instanceof Error ? error.message : String(error) };
+    return { ok: false, problem: errorMessage(error) };
   }
 }
 

@@ -3,7 +3,7 @@ import { itemsOf, nextToken, pages } from "@zitadel/api/runtime/paging";
 
 import { REQUEST_TIMEOUT_MS, sanitizeRejection, sanitizeResponse } from "../api-client";
 import { Consent } from "../consent";
-import { ZitadelError } from "../errors";
+import { ZitadelError, errorMessage } from "../errors";
 import { isObject, parseJsonOrUndefined } from "../json";
 import { interruptSignal } from "../interrupt";
 import { collectPages } from "../oclif/crud/paging";
@@ -132,11 +132,9 @@ export const sendAll = async (
       try {
         return sanitizeResponse(itemsOf(raw, paging.items));
       } catch (error) {
-        throw new ZitadelError(
-          "E_VALIDATION",
-          error instanceof Error ? error.message : String(error),
-          { details: { response: sanitizeResponse(raw) } },
-        );
+        throw new ZitadelError("E_VALIDATION", errorMessage(error), {
+          details: { response: sanitizeResponse(raw) },
+        });
       }
     },
     all: true,

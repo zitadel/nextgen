@@ -37,7 +37,7 @@ import {
   claimState,
   claimWindowDeadline,
 } from "../../lib/claim-state";
-import { isErrno, toZitadelError, ZitadelError } from "../../lib/errors";
+import { isErrno, toZitadelError, ZitadelError, errorMessage } from "../../lib/errors";
 import {
   callbackUriFor,
   customFlagText,
@@ -448,7 +448,7 @@ export default class Setup extends Destructive(BaseCommand) {
       app = { ...app, devPort: assertDevPort(flags["dev-port"]) };
     }
 
-    let answers: SetupAnswers = {
+    const defaultAnswers: SetupAnswers = {
       server: this.meta.source,
       devPort: app.devPort,
       preset: (flags.preset as SetupPreset | undefined) ?? DEFAULT_SETUP_PRESET,
@@ -457,29 +457,33 @@ export default class Setup extends Destructive(BaseCommand) {
       passwordMinLength: passwordMinLengthFlag,
     };
 
-    if (!nonInteractive && !dryRun) {
+    const asks = !nonInteractive && !dryRun;
+    if (asks && (!scaffoldedFramework || flags.framework !== undefined)) {
       // Asking which framework to scaffold opened the wizard already.
-      if (!scaffoldedFramework || flags.framework !== undefined) {
-        intro("Zitadel setup");
-      }
-      const promptCtx = {
-        input: wizardInput,
-        framework: { id: app.framework, displayName: orca.displayName(app.framework) },
-        suggest: (args: string) =>
-          projectCommand(args, recoverySelector(flags.cwd), this.meta.cliVersion),
-        cwd,
-        frameworkChosen: scaffoldedFramework || flags.framework !== undefined,
-        serverFlag: this.meta.serverFlag,
-        devPortFromFlag: flags["dev-port"] !== undefined,
-        presetFromFlag: flags.preset !== undefined,
-        useCaseFromFlag: flags["use-case"] !== undefined,
-        ssoFromFlag: flags.sso !== undefined,
-        passwordMinLengthFromFlag: flags["password-min-length"] !== undefined,
-        developmentBuild: isDevelopmentBuild(),
-      };
-      for (const prompt of SETUP_PROMPTS) {
-        answers = await prompt.ask(answers, promptCtx);
-      }
+      intro("Zitadel setup");
+    }
+    const promptCtx = {
+      input: wizardInput,
+      framework: { id: app.framework, displayName: orca.displayName(app.framework) },
+      suggest: (args: string) =>
+        projectCommand(args, recoverySelector(flags.cwd), this.meta.cliVersion),
+      cwd,
+      frameworkChosen: scaffoldedFramework || flags.framework !== undefined,
+      serverFlag: this.meta.serverFlag,
+      devPortFromFlag: flags["dev-port"] !== undefined,
+      presetFromFlag: flags.preset !== undefined,
+      useCaseFromFlag: flags["use-case"] !== undefined,
+      ssoFromFlag: flags.sso !== undefined,
+      passwordMinLengthFromFlag: flags["password-min-length"] !== undefined,
+      developmentBuild: isDevelopmentBuild(),
+    };
+    const answers = asks
+      ? await SETUP_PROMPTS.reduce(
+          async (previous, prompt) => prompt.ask(await previous, promptCtx),
+          Promise.resolve(defaultAnswers),
+        )
+      : defaultAnswers;
+    if (asks) {
       note(signInSummary(answers), "Sign-in");
       outro("Configuration captured");
     } else if (
@@ -986,7 +990,6 @@ export default class Setup extends Destructive(BaseCommand) {
     // The structured report is human-only. Under `--json` we let the
     // envelope returned from `this.emit(...)` be the sole stdout
     // payload (oclif requires single-doc JSON).
-    let nextShown: StepsShown | undefined;
     if (!this.jsonEnabled()) {
       const projectFacts = await detectProjectFacts(cwd, app.framework);
       const sections = buildSummary({
@@ -1023,8 +1026,6 @@ export default class Setup extends Destructive(BaseCommand) {
         ),
         style: { padding: 1, borderStyle: "rounded", borderColor: "green" },
       });
-      // The box holds the next steps, so the base command does not repeat them.
-      nextShown = asStepsShown();
       // After the steps that start the app and test sign-in, outside the box so
       // the command can be copied without its border.
       consola.log(`\n${exploreAllCommands(this.meta.cliVersion)}`);
@@ -1040,6 +1041,9 @@ export default class Setup extends Destructive(BaseCommand) {
         cliVersion: this.meta.cliVersion,
       });
     }
+
+    // The box holds the next steps, so the base command does not repeat them.
+    const nextShown: StepsShown | undefined = this.jsonEnabled() ? undefined : asStepsShown();
 
     return this.emit({
       status: "ok",
@@ -1479,7 +1483,7 @@ export async function restoreCredentialEnvFiles(
         await writeFile(path, content);
       }
     } catch (error) {
-      const reason = error instanceof Error ? error.message : String(error);
+      const reason = errorMessage(error);
       reportWarning(
         `Could not restore ${file} after the failed setup (${reason}); it may still name the abandoned project.`,
       );

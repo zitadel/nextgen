@@ -6,7 +6,7 @@ import consola from "consola";
 import { createZitadelClient } from "../../lib/api-client";
 import { claimAction, claimCommand, claimWindowClosedAction } from "../../lib/claim-state";
 import { type Environment, resolveEnvironment } from "../../lib/environment";
-import { ZitadelError } from "../../lib/errors";
+import { ZitadelError, errorMessage } from "../../lib/errors";
 import { serverLogAction } from "../../lib/journey-guidance";
 import {
   dockerRuntimeGuidance,
@@ -568,7 +568,7 @@ async function runEnvironmentChecks(input: {
       {
         name: "environment",
         status: "fail",
-        message: error instanceof Error ? error.message : String(error),
+        message: errorMessage(error),
       },
     ];
   }
@@ -945,7 +945,7 @@ async function check(
 }
 
 function imageUnavailableMessage(image: string, error: unknown): string {
-  const detail = error instanceof Error ? error.message : String(error);
+  const detail = errorMessage(error);
   const suffix = detail.trim() ? ` (${detail.trim()})` : "";
   return `Image ${image} is not available to Docker${suffix}; \`zitadel start\` may need a pull or a different image.`;
 }

@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { pathExists } from "./fs";
+import { isObject, parseJsonOrUndefined } from "./json";
 import { optionArgs } from "./public-cli";
 import { shellOption } from "./shell";
 
@@ -149,15 +150,10 @@ function command(packageManager: PackageManager, args: string[]): PackageCommand
 }
 
 async function packageManagerFromManifest(cwd: string): Promise<PackageManager | undefined> {
-  try {
-    const raw = await readFile(join(cwd, "package.json"), "utf8");
-    const parsed = JSON.parse(raw) as { packageManager?: unknown };
-    return typeof parsed.packageManager === "string"
-      ? packageManagerFromString(parsed.packageManager)
-      : undefined;
-  } catch {
-    return undefined;
-  }
+  const raw = await readFile(join(cwd, "package.json"), "utf8").catch(() => undefined);
+  const parsed = raw === undefined ? undefined : parseJsonOrUndefined(raw);
+  const manager = isObject(parsed) ? parsed.packageManager : undefined;
+  return typeof manager === "string" ? packageManagerFromString(manager) : undefined;
 }
 
 function packageManagerFromString(value: string): PackageManager | undefined {

@@ -3,6 +3,7 @@ import { join, resolve } from "node:path";
 
 import semver from "semver";
 
+import { isObject, parseJsonOrUndefined } from "../../json";
 import { ancestors } from "../../paths";
 
 /**
@@ -203,12 +204,9 @@ export async function installedVersion(cwd: string, name: string): Promise<strin
 
 /** The valid semver `version` a `package.json` declares, if any. */
 function versionIn(contents: string): string | undefined {
-  try {
-    const { version } = JSON.parse(contents) as { version?: unknown };
-    return typeof version === "string" ? (semver.valid(version) ?? undefined) : undefined;
-  } catch {
-    return undefined;
-  }
+  const parsed = parseJsonOrUndefined(contents);
+  const version = isObject(parsed) ? parsed.version : undefined;
+  return typeof version === "string" ? (semver.valid(version) ?? undefined) : undefined;
 }
 
 /**

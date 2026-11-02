@@ -3,7 +3,7 @@ import { join } from "node:path";
 import consola from "consola";
 
 import { Consent } from "../consent";
-import { ZitadelError } from "../errors";
+import { ZitadelError, errorMessage } from "../errors";
 import { unscopedCommand } from "../suggestion";
 import type { ResolvedEnv } from "./env-vars";
 import { assertDockerAvailable, startFailure } from "./internal/failures";
@@ -403,7 +403,7 @@ export class LocalServer {
       try {
         container = await DockerLauncher.inspect(runtime.container_name);
       } catch (error) {
-        dockerError = error instanceof Error ? error.message : String(error);
+        dockerError = errorMessage(error);
       }
     }
     const healthy = runtime ? await checkLocalServerHealth(runtime.server_url) : false;

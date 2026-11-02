@@ -1,12 +1,13 @@
 import { pbkdf2Sync, randomBytes } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 
 import { defaultHumanUserSchemaUrl } from "@zitadel/config";
 
-import { ZitadelError } from "../errors";
+import { ZitadelError, errorMessage } from "../errors";
 import { enforceMode } from "../fs-safe";
+import { ancestors } from "../paths";
 import { isObject } from "../json";
 import {
   findUpward,
@@ -60,16 +61,14 @@ export async function findLocalAdminFor(
   cwd: string,
   serverUrl: string,
 ): Promise<LocalAdmin | undefined> {
-  for (let from = cwd; ; ) {
-    const dir = await findLocalAdminDir(from);
-    if (!dir) return undefined;
+  for (const dir of ancestors(cwd, homedir())) {
+    if ((await findLocalAdminDir(dir)) !== dir) continue;
     const runtime = await readRuntimeMetadata(dir).catch(() => undefined);
     if (runtime && sameLocalServer(runtime.server_url, serverUrl)) {
       return readLocalAdmin(dir);
     }
-    if (dir === homedir() || dirname(dir) === dir) return undefined;
-    from = dirname(dir);
   }
+  return undefined;
 }
 
 /** Reads the local admin credential, or `undefined` when `start` never wrote one. */
@@ -81,7 +80,7 @@ export async function readLocalAdmin(cwd: string): Promise<LocalAdmin | undefine
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
     throw new ZitadelError("E_VALIDATION", `${LOCAL_ADMIN_FILE} cannot be read`, {
       hint: `Check that ${LOCAL_ADMIN_FILE} is readable by you; \`zitadel start\` writes it owner-only.`,
-      details: { cause: error instanceof Error ? error.message : String(error) },
+      details: { cause: errorMessage(error) },
     });
   });
   if (raw === undefined) return undefined;
@@ -120,9 +119,7 @@ function malformedAdminFile(cause?: unknown): ZitadelError {
       unscopedCommand("reset --force"),
       unscopedCommand("start"),
     ],
-    ...(cause
-      ? { details: { cause: cause instanceof Error ? cause.message : String(cause) } }
-      : {}),
+    ...(cause ? { details: { cause: errorMessage(cause) } } : {}),
   });
 }
 
