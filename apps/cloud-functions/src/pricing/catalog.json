@@ -1,7 +1,7 @@
 {
   "$schema": "./catalog.schema.json",
   "id": "zitadel-pricing",
-  "version": "2026-11-02.3",
+  "version": "2026-11-02.4",
   "status": "proposal",
   "currency": "usd",
   "decided": ["core", "meters.monthly_active_users.price", "meters.sso_users.allowance", "packages.governance.scope", "packages.compliance.scope", "plans.pro.minimum", "packages.governance.included_in", "packages.compliance.pricing", "plans.enterprise.sla", "plans.pro.limits.requests_per_second_per_project", "plans.free.regions", "plans.pro.regions", "plans.enterprise.regions", "licensed.region", "licensed.addendum.plans", "licensed.support_priority.plans"],
@@ -12,7 +12,7 @@
     "invoice": "Pro base fee + metered integrations and consumption beyond included allowances + capacity steps, regions outside the EU, contracted packages and support; the base fee includes Governance and is not usage credit",
     "caps": "Owners opt in to paid packages and consumption. Alerts at 50, 80 and 100 percent of a budget are notifications, not a hard spending cap. A budget never switches security enforcement off.",
     "self_hosted": "Self-hosted installs pay for rights and support per production installation and are never metered.",
-    "packages": "Governance is included in Pro. Compliance is quoted per account, with retention duration, retained-event volume, SIEM destinations and any overage prices agreed before activation. Neither package charges per user or per policy."
+    "packages": "Governance and custom security settings are included in Pro. Compliance is quoted per account, with retention duration, retained-event volume, SIEM destinations and any overage prices agreed before activation. No package charges per user or per policy."
   },
   "plans": {
     "free": {
@@ -47,7 +47,7 @@
       "support": "24/7 tickets, next business day; priority add-on 1 h for outages",
       "sla": { "target_percent": 99.9, "credits": false },
       "regions": { "scope": "project", "selection": ["eu"] },
-      "packages": ["governance"]
+      "packages": ["governance", "security_settings"]
     },
     "enterprise": {
       "label": "Enterprise",
@@ -59,7 +59,7 @@
       "support": "by tier: 8 h to 30 min response SLOs, TAM",
       "sla": { "target_percent": 99.95, "credits": true, "note": "99.95 included; 99.99 is an upgrade requiring a second region" },
       "regions": { "scope": "project", "selection": "all_available" },
-      "packages": ["governance"]
+      "packages": ["governance", "security_settings"]
     }
   },
   "meters": [
@@ -244,8 +244,8 @@
     "platform": ["Deployments", "Releases", "Login in your own app, on your domain"],
     "resources": ["Users and service users", "Teams and organizations", "Projects and applications", "Roles and credentials", "Console seats"],
     "authentication": ["Password sign-in", "Social sign-in", "Passkeys and TOTP MFA"],
-    "security": ["Require MFA for everyone", "Password rules and lockout", "Built-in bot challenge", "Your own captcha or edge bot check", "Risk-based challenges and MFA prompts"],
-    "billing": "Core resources and basic security are free on every plan. Active-user counts never change your plan or bill. Published request and token capacity limits still apply."
+    "security": ["Require MFA for everyone", "Default password rules and lockout", "Default session and token lifetimes", "Built-in bot challenge", "Edge bot verdicts", "Risk-based challenges and MFA prompts", "Revoking sessions and rotating keys"],
+    "billing": "Core resources and Zitadel's secure defaults are free on every plan. Active-user counts never change your plan or bill. Published request and token capacity limits still apply."
   },
   "packages": [
     {
@@ -257,11 +257,27 @@
       "included_in": ["pro", "enterprise"],
       "availability": "planned",
       "features": [
-        "Conditional access on device, network and location, and session policies",
+        "Conditional access on device, network and location",
         "Granular exceptions and delegated administration",
         "Policy versioning and approval workflows"
       ],
       "note": "No per-user, per-policy or policy-evaluation charge. Requiring MFA for everyone stays free."
+    },
+    {
+      "id": "security_settings",
+      "label": "Custom security settings",
+      "pricing": "included_in_plan",
+      "scope": "account",
+      "plans": ["pro", "enterprise"],
+      "included_in": ["pro", "enterprise"],
+      "availability": "planned",
+      "features": [
+        "Custom lockout and password rules",
+        "Captcha thresholds, difficulty and your own provider",
+        "Session and token lifetimes per project",
+        "Stricter rate limits of your own"
+      ],
+      "note": "Free runs Zitadel's secure defaults. Turning protection on, incident response (signing out everywhere, revoking sessions, rotating keys) and setup stay free on every plan, and raising capacity is a capacity step, not a setting. Self-hosted servers keep every setting."
     },
     {
       "id": "compliance",

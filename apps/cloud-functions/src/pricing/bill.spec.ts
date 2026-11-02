@@ -47,6 +47,15 @@ describe("free core identity", () => {
 });
 
 describe("paid packages", () => {
+  it("requires Pro to change the secure defaults, with no charge beyond the base fee", () => {
+    expect(bill({ counts: {}, packages: ["security_settings"] })).toMatchObject({
+      plan: "pro",
+      reasons: ["Custom security settings package"],
+      usage_amount: 0,
+      total_amount: 10_000,
+    });
+  });
+
   it("requires Pro for branding removal even with no metered usage", () => {
     expect(bill({ counts: {}, hide_mark: true })).toMatchObject({
       plan: "pro",

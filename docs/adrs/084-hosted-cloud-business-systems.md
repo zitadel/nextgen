@@ -269,7 +269,11 @@ website's catch-all.
   MFA prompts on Zitadel's own signals and the customer's are free, and rules
   on them belong to Governance. Only opt-in threat intelligence, feeds Zitadel
   licenses (IP reputation, leaked credentials), is metered per user checked.
-  MAU is an
+  Free runs Zitadel's secure defaults; changing lockout, password rules, the
+  captcha (a project's own provider included) or session and token lifetimes,
+  or adding stricter rate limits, needs Pro, which includes custom security
+  settings. Turning protection on, incident response and setup stay free on
+  every plan. MAU is an
   analytics gauge, never a billable meter or upgrade trigger. Paid Governance is an
   account-wide package included in Pro; Compliance is quoted per account
   with agreed retention, retained-event volume and SIEM destinations.

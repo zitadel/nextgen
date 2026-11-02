@@ -244,7 +244,7 @@
       "required": ["id", "label", "pricing", "scope", "plans", "included_in", "features", "availability", "note"],
       "additionalProperties": false,
       "properties": {
-        "id": {"enum": ["governance", "compliance"]},
+        "id": {"enum": ["governance", "security_settings", "compliance"]},
         "label": {"type": "string"},
         "pricing": {"enum": ["included_in_plan", "quoted"]},
         "scope": {"const": "account"},
