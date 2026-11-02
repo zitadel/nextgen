@@ -361,7 +361,7 @@ func TestVercelJSONServesTheConsoleAtConsolePath(t *testing.T) {
 // go-import prefix is the module path and whose subdirectory is the module's
 // directory. The three live in different files, so this test holds them
 // together, and it pins the host rewrite ahead of the catch-all that would
-// otherwise send the request to the server.
+// otherwise send the request to the website.
 func TestVercelJSONServesGoImportMetadataOnGoHost(t *testing.T) {
 	repo := filepath.Join("..", "..", "..", "..")
 	raw, err := os.ReadFile(filepath.Join(repo, "vercel.json"))
@@ -385,9 +385,9 @@ func TestVercelJSONServesGoImportMetadataOnGoHost(t *testing.T) {
 	}
 	require.NoError(t, json.Unmarshal(raw, &config))
 
-	const host = "go.zitadel.com"
+	const host = goImportHost
 	// Top-level rewrites match in order: the host rule must come before any
-	// catch-all without a host condition, or the server answers for the host.
+	// catch-all without a host condition, or the website answers for the host.
 	hostRule := -1
 	for i, rewrite := range config.Rewrites {
 		var destination struct{ Service string }
@@ -484,10 +484,9 @@ func TestVercelJSONSchedulesTheEventRetentionPurge(t *testing.T) {
 	}
 	var service string
 	for _, rewrite := range config.Rewrites {
-		// The cron job calls the cloud's own host, so another host's rules
-		// (go.zitadel.com) do not apply; a rule conditioned on anything else
-		// still does.
-		if forAnotherHost(rewrite.Has) {
+		// The cron job calls the cloud's own host, so go.zitadel.com's rule
+		// does not apply; every other rule still does.
+		if forGoImportHost(rewrite.Has) {
 			continue
 		}
 		if routeMatches(rewrite.Source, audit.RetentionTriggerPath) {
@@ -520,10 +519,9 @@ func TestVercelJSONSendsTheServerOnlyItsOwnPaths(t *testing.T) {
 	require.NoError(t, json.Unmarshal(raw, &config))
 	serviceFor := func(path string) string {
 		for _, rewrite := range config.Rewrites {
-			// These paths are the cloud's own host's, so another host's rules
-			// (go.zitadel.com) do not apply; a rule conditioned on anything
-			// else still does.
-			if forAnotherHost(rewrite.Has) || !routeMatches(rewrite.Source, path) {
+			// These paths are the cloud's own host's, so go.zitadel.com's rule
+			// does not apply; every other rule still does.
+			if forGoImportHost(rewrite.Has) || !routeMatches(rewrite.Source, path) {
 				continue
 			}
 			var destination struct{ Service string }
@@ -578,17 +576,25 @@ func TestVercelJSONSendsTheServerOnlyItsOwnPaths(t *testing.T) {
 	}
 }
 
+// goImportHost is the host vercel.json gives to the go-import service whole
+// (TestVercelJSONServesGoImportMetadataOnGoHost).
+const goImportHost = "go.zitadel.com"
+
 // hasCondition is one entry of a vercel.json rule's `has`: the request
-// property it is conditioned on (host, header, cookie or query).
+// property it is conditioned on (host, header, cookie or query) and its value.
 type hasCondition struct {
-	Type string `json:"type"`
+	Type  string `json:"type"`
+	Value string `json:"value"`
 }
 
-// forAnotherHost reports whether a rule is conditioned on the request's
-// host, which makes it another host's (go.zitadel.com) and not the cloud's
-// own. A header, cookie or query condition keeps the rule on the cloud's host.
-func forAnotherHost(has []hasCondition) bool {
-	return slices.ContainsFunc(has, func(c hasCondition) bool { return c.Type == "host" })
+// forGoImportHost reports whether a rule applies only on goImportHost, never
+// on the cloud's own host. Any other condition keeps the rule in the cloud's
+// routing, a host condition naming another host included, so a rule that
+// takes one of the cloud's paths there still fails the tests.
+func forGoImportHost(has []hasCondition) bool {
+	return slices.ContainsFunc(has, func(c hasCondition) bool {
+		return c.Type == "host" && c.Value == goImportHost
+	})
 }
 
 // routeMatches reports whether a vercel.json source matches path, for the
