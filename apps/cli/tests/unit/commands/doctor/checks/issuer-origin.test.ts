@@ -166,6 +166,18 @@ describe("IssuerOriginCheck", () => {
     });
   });
 
+  it("skips, passing, when the server answers with JSON null", async () => {
+    const project = await aProjectFrom010();
+    server.use(http.get(`${SERVER}/api/v1/projects/:project_id`, () => HttpResponse.json(null)));
+
+    const outcome = await check.run(ctxFor(project.cwd));
+
+    expect(outcome).toMatchObject({
+      status: "pass",
+      message: expect.stringContaining("Skipped: could not read the project's origins"),
+    });
+  });
+
   it("skips, passing, when no file sets ZITADEL_ISSUER", async () => {
     const project = await aProjectFrom010();
     await rm(join(project.cwd, ".env.local"));

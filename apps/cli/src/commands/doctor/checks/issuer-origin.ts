@@ -125,10 +125,10 @@ async function inspect(cwd: string): Promise<Finding> {
   }
 
   const client = createZitadelClient({ baseUrl: server, token: secret.project_secret });
-  const read = await client.getProject(secret.project_id).then(
-    ({ origins }) => ({ origins }),
-    (error: unknown) => ({ failure: error }),
-  );
+  const read = await client
+    .getProject(secret.project_id)
+    .then(({ origins }) => ({ origins }))
+    .catch((error: unknown) => ({ failure: error }));
   if ("failure" in read) {
     return {
       status: "pass",
