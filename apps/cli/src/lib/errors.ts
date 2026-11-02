@@ -5,6 +5,7 @@ import {
   NetworkError,
   type NetworkErrorReason,
 } from "@zitadel/api/runtime/fetch";
+import { isObject } from "./json";
 import type { SuggestedCommand } from "./suggestion";
 
 /**
@@ -131,7 +132,7 @@ export function toZitadelError(error: unknown): ZitadelError {
           "E_NOT_FOUND",
           `${error.url} has no such endpoint on this Zitadel server`,
           {
-            hint: "The server and this CLI are different versions. Run the CLI release that matches the server, or upgrade the server.",
+            hint: "The server and this CLI are different versions; a server from before the API moved under /api/v1 answers every call so. Run the CLI release that matches the server, or upgrade the server.",
             details,
           },
         );
@@ -260,10 +261,6 @@ function listedInDetails(body: unknown, key: "fields" | "missing"): string[] {
   return [...seen];
 }
 
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
 /**
  * Whether a request reached a server that has no such endpoint: a 404 without
  * the platform's error envelope. A Zitadel API answers a miss it knows about
@@ -300,7 +297,8 @@ export function isErrno(error: unknown, code: string): boolean {
   return typeof error === "object" && error !== null && "code" in error && error.code === code;
 }
 
-function errorMessage(error: unknown): string {
+/** The message of a caught value, whatever it is. */
+export function errorMessage(error: unknown): string {
   if (error instanceof Error) {
     return error.message;
   }

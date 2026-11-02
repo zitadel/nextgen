@@ -12,8 +12,16 @@ import type { FilterField } from "./types";
 
 export type ParsedFilter = Readonly<{ field: FilterField; operation: string; value: string }>;
 
-/** `field=operation:value`, or `field=value` for `equals`. */
-export const parseFilter = (raw: string, filters: readonly FilterField[]): ParsedFilter => {
+/**
+ * `field=operation:value`, or `field=value` for `equals`. `known` is every
+ * operation the platform has, so one the field does not offer is refused
+ * rather than read as part of a value.
+ */
+export const parseFilter = (
+  raw: string,
+  filters: readonly FilterField[],
+  known: readonly string[],
+): ParsedFilter => {
   const names = filters.map((filter) => filter.field);
   const [name, ...rest] = raw.split("=");
   if (!name || rest.length === 0) {
@@ -51,7 +59,7 @@ export const parseFilter = (raw: string, filters: readonly FilterField[]): Parse
     // A real operation the endpoint does not offer for this field is the
     // interesting case: the word is spelled right, so the caller believes it
     // works. Say which field is the limitation, not just that it failed.
-    if (!operations.includes(candidate) && KNOWN_OPERATIONS.has(candidate)) {
+    if (!operations.includes(candidate) && known.includes(candidate)) {
       throw new ZitadelError(
         "E_VALIDATION",
         `Filter field "${name}" does not support the ${candidate} operation`,
@@ -70,22 +78,6 @@ export const parseFilter = (raw: string, filters: readonly FilterField[]): Parse
   }
   return checked({ field, operation: "equals", value: expression });
 };
-
-/**
- * Operation names the CLI recognises as operations at all, so a value that
- * merely looks like `something:else` is not mistaken for one.
- */
-const KNOWN_OPERATIONS = new Set([
-  "equals",
-  "not_equals",
-  "contains",
-  "not_contains",
-  "less_than",
-  "less_than_or_equal",
-  "greater_than",
-  "greater_than_or_equal",
-  "array_contains",
-]);
 
 /** Reject a value outside a field's closed set before any request is made. */
 const checked = (parsed: ParsedFilter): ParsedFilter => {

@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -274,6 +275,130 @@ func TestEventStatements_SinkCursor(t *testing.T) {
 		got, err = d.stmts.GetEventSinkCursor(t.Context(), sink.ID, projectID)
 		require.NoError(t, err)
 		assert.Equal(t, second.ID, got.LastEventID)
+	})
+}
+
+// A transaction that stamps its event before another one but commits after it
+// must not lose the event to a reader that ships between the two commits. A
+// reader that listed the later event moved its cursor past the earlier one,
+// which sorts before the cursor once it commits. Postgres stamped created_at
+// with now(), the transaction's start, so the shipper skipped such an event
+// for good.
+func TestEventStatements_ListAfterCursor_LateCommitNotSkipped(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		if d.name == "sqlite" {
+			// A single writer: BEGIN IMMEDIATE blocks the late transaction
+			// until the early one commits.
+			t.Skip("sqlite serializes writers; interleaving not constructible")
+		}
+		projectID, _ := uniqueEventIDs(t)
+		ensureEventProject(t, d.stmts, projectID)
+
+		// ship lists what follows the cursor and moves the cursor past it, as
+		// the shipper does.
+		var (
+			shipped []string
+			afterAt time.Time
+			afterID string
+		)
+		ship := func() {
+			t.Helper()
+			batch, err := d.stmts.ListEventsAfterCursor(t.Context(), projectID, afterAt, afterID, 10)
+			require.NoError(t, err)
+			for _, ev := range batch {
+				shipped = append(shipped, ev.ID)
+				afterAt, afterID = ev.CreatedAt, ev.ID
+			}
+		}
+
+		early := sampleEvent(projectID, "evt-early")
+		var once sync.Once
+		inserted := make(chan struct{})
+		commit := make(chan struct{})
+		// A failed assertion must not leave the early transaction open.
+		release := sync.OnceFunc(func() { close(commit) })
+		t.Cleanup(release)
+		earlyErr := make(chan error, 1)
+		go func() {
+			// No require in here: it would leave inserted open and hang the test.
+			earlyErr <- d.pool.Transaction(context.Background(), func(ctx context.Context, tx service.Statementer[service.AllStatements]) error {
+				if err := tx.Statements().InsertEvent(ctx, early); err != nil {
+					return err
+				}
+				// Once per attempt: spanner replays aborted attempts.
+				once.Do(func() { close(inserted) })
+				<-commit
+				return nil
+			})
+		}()
+		select {
+		case <-inserted:
+		case err := <-earlyErr:
+			t.Fatalf("the early transaction ended before it inserted its event: %v", err)
+		}
+
+		late := sampleEvent(projectID, "evt-late")
+		require.NoError(t, d.pool.Transaction(t.Context(), func(ctx context.Context, tx service.Statementer[service.AllStatements]) error {
+			return tx.Statements().InsertEvent(ctx, late)
+		}))
+
+		ship()
+		release()
+		require.NoError(t, <-earlyErr)
+		ship()
+
+		assert.ElementsMatch(t, []string{early.ID, late.ID}, shipped,
+			"every event ships once, whichever transaction commits first")
+	})
+}
+
+// An open transaction that writes one project's events holds back that
+// project's readers only: another project's events stay listable meanwhile.
+func TestEventStatements_ListAfterCursor_OtherProjectsWriterDoesNotHoldBack(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		if d.name == "sqlite" {
+			// One connection: the open transaction would block the insert.
+			t.Skip("sqlite runs one transaction at a time; interleaving not constructible")
+		}
+		busyID, _ := uniqueEventIDs(t)
+		ensureEventProject(t, d.stmts, busyID)
+		quietID, _ := uniqueEventIDs(t)
+		ensureEventProject(t, d.stmts, quietID)
+
+		var once sync.Once
+		inserted := make(chan struct{})
+		commit := make(chan struct{})
+		// A failed assertion must not leave the open transaction open.
+		release := sync.OnceFunc(func() { close(commit) })
+		t.Cleanup(release)
+		openErr := make(chan error, 1)
+		go func() {
+			// No require in here: it would leave inserted open and hang the test.
+			openErr <- d.pool.Transaction(context.Background(), func(ctx context.Context, tx service.Statementer[service.AllStatements]) error {
+				if err := tx.Statements().InsertEvent(ctx, sampleEvent(busyID, "evt-open")); err != nil {
+					return err
+				}
+				// Once per attempt: spanner replays aborted attempts.
+				once.Do(func() { close(inserted) })
+				<-commit
+				return nil
+			})
+		}()
+		select {
+		case <-inserted:
+		case err := <-openErr:
+			t.Fatalf("the open transaction ended before it inserted its event: %v", err)
+		}
+
+		quiet := sampleEvent(quietID, "evt-quiet")
+		require.NoError(t, d.stmts.InsertEvent(t.Context(), quiet))
+		listed, err := d.stmts.ListEventsAfterCursor(t.Context(), quietID, time.Time{}, "", 10)
+		require.NoError(t, err)
+		require.Len(t, listed, 1, "another project's open transaction must not hold this project back")
+		assert.Equal(t, quiet.ID, listed[0].ID)
+
+		release()
+		require.NoError(t, <-openErr)
 	})
 }
 

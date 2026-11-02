@@ -7,6 +7,9 @@ import { Config } from "@oclif/core";
 
 import AuthMethodPasskeyDisable from "../../../../src/commands/auth-method/passkey/disable";
 import AuthMethodSsoDisable from "../../../../src/commands/auth-method/sso/disable";
+import { readSchemaFiles, type SchemaFile, selectSchema } from "../../../../src/lib/idp";
+import type { Permit } from "../../../../src/lib/oclif";
+import { forcedConsent } from "../../../helpers/consent";
 import { makeProject, readJson, writeJson } from "../../../helpers/local-project";
 import { cliPackageRoot } from "../../../helpers/oclif-build";
 
@@ -270,5 +273,58 @@ describe("auth-method passkey disable run from inside the Project", () => {
         ],
       },
     });
+  });
+});
+
+/** The passkey command with its schema write reachable, to drive the write's own guard. */
+class SchemaWriter extends AuthMethodPasskeyDisable {
+  write(cwd: string, schema: SchemaFile, after: Record<string, unknown>, permit: Permit) {
+    return this.writeSchema(cwd, schema, after, permit);
+  }
+}
+
+/** A writer, and the change that leaves `passkeyOnlyProject` no way to sign in. */
+async function lastMethodWrite(cwd: string) {
+  const writer = new SchemaWriter([], await Config.load({ root: cliPackageRoot }));
+  const schema = selectSchema(await readSchemaFiles(cwd), undefined);
+  const after = schemaWith({ password: { enabled: false }, passkey: { enabled: false } });
+  return { writer, schema, after };
+}
+
+describe("auth-method schema write", () => {
+  it("refuses a change that leaves no way to sign in without consent", async () => {
+    const cwd = await passkeyOnlyProject();
+    const { writer, schema, after } = await lastMethodWrite(cwd);
+
+    await expect(writer.write(cwd, schema, after, "not-the-last-method")).rejects.toThrow(
+      "A destructive operation ran without consent",
+    );
+  });
+
+  it("writes nothing when it refuses", async () => {
+    const cwd = await passkeyOnlyProject();
+    const { writer, schema, after } = await lastMethodWrite(cwd);
+
+    await writer.write(cwd, schema, after, "not-the-last-method").catch(() => undefined);
+
+    expect(await methodOf(cwd, "passkey")).toEqual({ enabled: true });
+  });
+
+  it("refuses to write during a dry run", async () => {
+    const cwd = await passkeyOnlyProject();
+    const { writer, schema, after } = await lastMethodWrite(cwd);
+
+    await expect(writer.write(cwd, schema, after, "dry-run")).rejects.toThrow(
+      "A dry run tried to write",
+    );
+  });
+
+  it("writes a change that leaves no way to sign in with consent", async () => {
+    const cwd = await passkeyOnlyProject();
+    const { writer, schema, after } = await lastMethodWrite(cwd);
+
+    await writer.write(cwd, schema, after, await forcedConsent());
+
+    expect(await methodOf(cwd, "passkey")).toEqual({ enabled: false });
   });
 });

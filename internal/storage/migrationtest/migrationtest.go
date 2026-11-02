@@ -12,6 +12,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/pressly/goose/v3"
 	"github.com/stretchr/testify/assert"
@@ -41,10 +42,20 @@ type Known map[int64][]string
 // goose's own bookkeeping table.
 func RoundTrip(t *testing.T, p *goose.Provider, snapshot func(t *testing.T) Schema, known Known) {
 	t.Helper()
+	sources := p.ListSources()
+	require.NotEmpty(t, sources, "the provider has no migrations to walk")
+	RoundTripRange(t, p, snapshot, known, sources[0].Version, sources[len(sources)-1].Version)
+}
+
+// RoundTripRange walks the migrations from version first to version last, both
+// included, as RoundTrip walks them all, after applying the ones before first
+// unchecked. A dialect whose schema changes are slow splits the walk into
+// ranges, each in a database of its own, and walks them at once.
+func RoundTripRange(t *testing.T, p *goose.Provider, snapshot func(t *testing.T) Schema, known Known, first, last int64) {
+	t.Helper()
 	ctx := t.Context()
 
 	sources := p.ListSources()
-	require.NotEmpty(t, sources, "the provider has no migrations to walk")
 	current, err := p.GetDBVersion(ctx)
 	require.NoError(t, err)
 	require.Zero(t, current, "the round trip needs a database with no migrations applied")
@@ -54,9 +65,21 @@ func RoundTrip(t *testing.T, p *goose.Provider, snapshot func(t *testing.T) Sche
 			"known lists version %d, which has no migration", v)
 	}
 
+	start := slices.IndexFunc(sources, func(s *goose.Source) bool { return s.Version >= first })
+	end := slices.IndexFunc(sources, func(s *goose.Source) bool { return s.Version > last })
+	if end < 0 {
+		end = len(sources)
+	}
+	require.True(t, start >= 0 && start < end, "no migration from version %d to %d", first, last)
+	if start > 0 {
+		_, err := p.UpTo(ctx, sources[start-1].Version)
+		require.NoError(t, err, "Up to %s", sources[start-1].Path)
+	}
+
 	before := snapshot(t)
-	for _, source := range sources {
+	for _, source := range sources[start:end] {
 		name := source.Path
+		began := time.Now()
 
 		_, err := p.UpByOne(ctx)
 		require.NoError(t, err, "Up of %s", name)
@@ -71,12 +94,15 @@ func RoundTrip(t *testing.T, p *goose.Provider, snapshot func(t *testing.T) Sche
 		require.NoError(t, err, "Up of %s again, after its Down", name)
 		assertSame(t, after, snapshot(t), "Up of %s again, after its Down, must give the schema its first Up gave", name)
 
+		// A walk that outlasts its timeout shows how far it got and where the
+		// time went.
+		t.Logf("%s: Up, Down and Up again in %s", name, time.Since(began).Round(time.Millisecond))
 		before = after
 	}
 
 	version, err := p.GetDBVersion(ctx)
 	require.NoError(t, err)
-	require.Equal(t, sources[len(sources)-1].Version, version, "the walk must end at the latest migration")
+	require.Equal(t, sources[end-1].Version, version, "the walk must end at the last migration of its range")
 }
 
 // compareRolledBack asserts want and got are equal apart from the keys in

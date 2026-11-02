@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"cloud.google.com/go/spanner"
 	"github.com/stretchr/testify/assert"
@@ -27,8 +28,8 @@ func (s *stubDB) Update(context.Context, spanner.Statement) (int64, error) {
 	return 1, nil
 }
 
-func (s *stubDB) BufferWrite(context.Context, []*spanner.Mutation) error {
-	return errors.New("not implemented")
+func (s *stubDB) BufferWrite(context.Context, []*spanner.Mutation) (time.Time, error) {
+	return time.Time{}, errors.New("not implemented")
 }
 
 func (s *stubDB) ReadRow(context.Context, string, spanner.Key, []string) (*spanner.Row, error) {

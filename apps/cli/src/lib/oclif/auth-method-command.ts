@@ -25,7 +25,15 @@ import { environmentFlags } from "./environment-flags";
 import { portableSuggestions, type SuggestedCommand } from "../suggestion";
 import { nonBlankString } from "./flags";
 import type { JsonEnvelope } from "./types";
-import { Promptable } from "./promptable";
+import { Destructive } from "./destructive";
+import { Consent } from "../consent";
+
+/**
+ * What lets a schema change be written: consent when it removes the last way
+ * to sign in, `not-the-last-method` when it does not, and `dry-run`, which
+ * writes nothing. {@link AuthMethodCommand.writeSchema} checks the claim.
+ */
+export type Permit = Consent | "not-the-last-method" | "dry-run";
 
 /** The message `deploy` needs, which only the caller can write. */
 const DEPLOY_MESSAGE = "<what changed>";
@@ -50,7 +58,7 @@ type Target = {
  * credentials. Every other edit is local, and `deploy` publishes it like any
  * configuration change.
  */
-export abstract class AuthMethodCommand extends Promptable(EnvironmentCommand) {
+export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) {
   // The environment flags are hidden here: most `auth-method` commands only
   // edit files and resolve no environment. The one that publishes credentials
   // to the project lists them among its own flags.
@@ -103,10 +111,11 @@ export abstract class AuthMethodCommand extends Promptable(EnvironmentCommand) {
   }
 
   /**
-   * The last-method guard (ADR 070 §3). Returns `false` when the user declined
-   * the prompt, which ends the run as skipped; refuses without `--force` when
-   * nobody can be asked. The question goes through `input`, which `--force`
-   * answers yes without asking.
+   * The last-method guard (ADR 070 §3). Returns what lets {@link writeSchema}
+   * write the change: consent when it removes the last way to sign in, or
+   * `undefined` when the user declined, which ends the run as skipped. It
+   * refuses without `--force` when nobody can be asked. A change that leaves
+   * a way to sign in, or changes nothing, is never asked about.
    *
    * A dry run answers before the guard, as it does `variable rm`'s: it
    * changes nothing, so there is nothing to confirm, and {@link reportOutcome}
@@ -117,30 +126,51 @@ export abstract class AuthMethodCommand extends Promptable(EnvironmentCommand) {
    * @param input.retryArgs - The command's own arguments, which the refusal
    *   suggests again with `--force`.
    */
-  protected async confirmLastMethod(input: {
+  protected async lastMethodPermit(input: {
     schema: SchemaFile;
     after: Record<string, unknown>;
     disabling: string;
     retryArgs: string[];
     cwdArgs: string[];
-  }): Promise<boolean> {
-    const { dryRun, force, nonInteractive, cliVersion } = this.meta;
-    if (dryRun || !removesLastMethod(input.schema.body, input.after)) {
-      return true;
+  }): Promise<Permit | undefined> {
+    const { dryRun, cliVersion } = this.meta;
+    if (dryRun) {
+      return "dry-run";
+    }
+    if (!removesLastMethod(input.schema.body, input.after)) {
+      return "not-the-last-method";
     }
     const retryArgs = [...input.retryArgs, ...input.cwdArgs, "--force"];
-    if (nonInteractive && !force) {
-      // Refused here rather than by `input`, whose refusal names only the
-      // --force re-run: this one also lists the methods that could be enabled
-      // instead, as argument lists an agent can run whatever the quoting.
-      refuseLastMethod({ schema: input.schema, retryArgs, cwdArgs: input.cwdArgs, cliVersion });
-    }
-    return this.input({
-      kind: "confirm",
+    return this.consent({
+      verb: "disable",
       name: `disable ${input.disabling}, the last way to sign in to ${input.schema.name}`,
       message: `Disable ${input.disabling} anyway? Nobody will be able to sign in to ${input.schema.name}.`,
       retry: portableSuggestions([retryArgs], cliVersion)[0],
+      // This refusal also lists the methods that could be enabled instead, as
+      // argument lists an agent can run whatever the quoting.
+      refuse: () =>
+        refuseLastMethod({ schema: input.schema, retryArgs, cwdArgs: input.cwdArgs, cliVersion }),
     });
+  }
+
+  /**
+   * Write a changed schema. One that leaves it no way to sign in takes the
+   * consent {@link lastMethodPermit} asked for; it checks that itself, so a
+   * permit cannot claim a method is kept when the change removes the last.
+   */
+  protected async writeSchema(
+    cwd: string,
+    schema: SchemaFile,
+    after: Record<string, unknown>,
+    permit: Permit,
+  ): Promise<void> {
+    if (permit === "dry-run") {
+      throw new Error(`A dry run tried to write ${schema.path}`);
+    }
+    if (removesLastMethod(schema.body, after)) {
+      Consent.assert(permit);
+    }
+    await writeFile(join(cwd, schema.path), `${stableStringify(after)}\n`);
   }
 
   /**
@@ -259,16 +289,16 @@ export abstract class AuthMethodCommand extends Promptable(EnvironmentCommand) {
                 "Login flows are not edited for you.",
             },
       );
-      const proceed = await this.confirmLastMethod({
-        schema,
-        after: change.document,
-        disabling: method,
-        retryArgs: ["auth-method", method, "disable", ...optionArgs("--schema", schema.name)],
-        cwdArgs,
-      });
-      if (!proceed) {
-        return this.emit({ status: "skipped", reason: "disable-cancelled" });
-      }
+    }
+    const permit = await this.lastMethodPermit({
+      schema,
+      after: change.document,
+      disabling: method,
+      retryArgs: ["auth-method", method, "disable", ...optionArgs("--schema", schema.name)],
+      cwdArgs,
+    });
+    if (permit === undefined) {
+      return this.emit({ status: "skipped", reason: "disable-cancelled" });
     }
 
     const flowsAfter = flows.map((file) => file.body);
@@ -306,7 +336,7 @@ export abstract class AuthMethodCommand extends Promptable(EnvironmentCommand) {
       });
     }
     if (change.changed) {
-      await writeFile(join(cwd, schema.path), `${stableStringify(change.document)}\n`);
+      await this.writeSchema(cwd, schema, change.document, permit);
       consola.success(`Updated ${schema.path}`);
     } else {
       consola.info(`${method} is already ${verb}d for ${schema.name}`);

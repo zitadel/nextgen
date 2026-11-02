@@ -15,7 +15,7 @@ export default defineConfig(async (env) =>
       // A local dotenv fallback must not mask runtime-discovery failures.
       // Specs that need it use vi.stubEnv; unstubEnvs restores these defaults.
       env: {
-        VITE_CONSOLE_API_BASE: "http://localhost/api",
+        VITE_CONSOLE_API_BASE: "http://localhost",
         VITE_CONSOLE_RUNTIME_FALLBACK: "",
       },
       unstubEnvs: true,

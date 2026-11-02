@@ -40,23 +40,23 @@ const signInHandlers = [
   http.get(`${SERVER}/console/runtime.json`, () =>
     HttpResponse.json({ console_project_id: "proj_platform", publishable_key: "pk_platform" }),
   ),
-  http.post(`${SERVER}/auth_attempts`, async ({ request }) => {
+  http.post(`${SERVER}/api/v1/auth_attempts`, async ({ request }) => {
     await record(request);
     return HttpResponse.json({ attempt_id: "att_1", state: "in_progress" }, { status: 201 });
   }),
-  http.post(`${SERVER}/auth_attempts/:attempt/challenges`, async ({ request }) => {
+  http.post(`${SERVER}/api/v1/auth_attempts/:attempt/challenges`, async ({ request }) => {
     await record(request);
     const { method } = (await request.json()) as { method: string };
     return HttpResponse.json({ challenge_id: `ch_${method}`, method }, { status: 201 });
   }),
   http.post(
-    `${SERVER}/auth_attempts/:attempt/challenges/:challenge/verify`,
+    `${SERVER}/api/v1/auth_attempts/:attempt/challenges/:challenge/verify`,
     async ({ request }) => {
       await record(request);
       return HttpResponse.json({ attempt_id: "att_1", state: "in_progress" });
     },
   ),
-  http.post(`${SERVER}/auth_attempts/:attempt/handoff`, async ({ request }) => {
+  http.post(`${SERVER}/api/v1/auth_attempts/:attempt/handoff`, async ({ request }) => {
     await record(request);
     return HttpResponse.json({
       handoff_token: "handoff/one+time",
@@ -84,12 +84,12 @@ describe("local admin sign-in", () => {
     );
 
     expect(calls.map((call) => call.path)).toEqual([
-      "/auth_attempts",
-      "/auth_attempts/att_1/challenges",
-      "/auth_attempts/att_1/challenges/ch_identifier/verify",
-      "/auth_attempts/att_1/challenges",
-      "/auth_attempts/att_1/challenges/ch_password/verify",
-      "/auth_attempts/att_1/handoff",
+      "/api/v1/auth_attempts",
+      "/api/v1/auth_attempts/att_1/challenges",
+      "/api/v1/auth_attempts/att_1/challenges/ch_identifier/verify",
+      "/api/v1/auth_attempts/att_1/challenges",
+      "/api/v1/auth_attempts/att_1/challenges/ch_password/verify",
+      "/api/v1/auth_attempts/att_1/handoff",
     ]);
     expect(calls[0]?.body).toEqual({ project_id: "proj_platform" });
     expect(calls[1]?.body).toEqual({ method: "identifier" });
@@ -110,7 +110,7 @@ describe("local admin sign-in", () => {
   it("exchanges the handoff token for the session cookie", async () => {
     let exchanged: unknown;
     server.use(
-      http.post(`${SERVER}/sessions/exchange`, async ({ request }) => {
+      http.post(`${SERVER}/api/v1/sessions/exchange`, async ({ request }) => {
         exchanged = {
           project: new URL(request.url).searchParams.get("project_id"),
           body: await request.json(),
@@ -134,7 +134,7 @@ describe("local admin sign-in", () => {
   it("keeps the session cookie under the prefixed name an https server sets", async () => {
     server.use(
       http.post(
-        `${SERVER}/sessions/exchange`,
+        `${SERVER}/api/v1/sessions/exchange`,
         () =>
           new HttpResponse(null, {
             headers: {
@@ -157,7 +157,7 @@ describe("local admin sign-in", () => {
     ],
   ])("fails when the exchange %s", async (_label, headers) => {
     server.use(
-      http.post(`${SERVER}/sessions/exchange`, () =>
+      http.post(`${SERVER}/api/v1/sessions/exchange`, () =>
         HttpResponse.json({}, { status: 200, headers }),
       ),
     );
@@ -190,7 +190,7 @@ describe("local admin sign-in", () => {
   // command an agent would run.
   it("explains a rejected identifier without steering an agent into a reset", async () => {
     server.use(
-      http.post(`${SERVER}/auth_attempts/:attempt/challenges/:challenge/verify`, () =>
+      http.post(`${SERVER}/api/v1/auth_attempts/:attempt/challenges/:challenge/verify`, () =>
         HttpResponse.json(
           { code: "att.proof_rejected", message: "The proof was rejected." },
           { status: 409 },
@@ -213,7 +213,7 @@ describe("local admin sign-in", () => {
 
   it("reports a rejected password with the server's own message", async () => {
     server.use(
-      http.post(`${SERVER}/auth_attempts/:attempt/challenges/ch_password/verify`, () =>
+      http.post(`${SERVER}/api/v1/auth_attempts/:attempt/challenges/ch_password/verify`, () =>
         HttpResponse.json(
           { code: "att.proof_rejected", message: "The proof was rejected." },
           { status: 409 },

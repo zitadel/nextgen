@@ -3,6 +3,8 @@ package api
 import (
 	"net/http"
 	"strings"
+
+	"github.com/zitadel/nextgen/api/client"
 )
 
 const sessionStateCacheControl = "private, no-store"
@@ -12,8 +14,11 @@ const sessionStateCacheControl = "private, no-store"
 // the flow start, step render and submit, which set the flow cookie and can
 // return the single-use handoff token. It wraps the generated server so the
 // header is also present on security and decoding errors emitted before the
-// operation handler runs. TestWithSessionStateNoStoreCoversTheSpec keeps the
-// GET paths in step with the OpenAPI source.
+// operation handler runs. It runs ahead of the generated server, so it reads
+// the path before the server cuts client.PathPrefix: the API answers under it
+// and, until 1.0.0, at the root (ADR 077), and both spellings match.
+// TestWithSessionStateNoStoreCoversTheSpec keeps the GET paths in step with
+// the OpenAPI source.
 func WithSessionStateNoStore(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if isNoStoreOperation(r.Method, r.URL.Path) {
@@ -24,6 +29,9 @@ func WithSessionStateNoStore(next http.Handler) http.Handler {
 }
 
 func isNoStoreOperation(method, path string) bool {
+	if rest, ok := strings.CutPrefix(path, client.PathPrefix); ok && strings.HasPrefix(rest, "/") {
+		path = rest
+	}
 	if method == http.MethodGet && (path == "/sessions/me" || path == "/sessions/me/csrf") {
 		return true
 	}
