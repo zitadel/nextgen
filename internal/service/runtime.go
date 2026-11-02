@@ -176,38 +176,27 @@ func (r *RuntimeResolver) finish(ctx context.Context, project *domain.Project, o
 }
 
 // deploymentOf is the deployment an admitted origin serves, nil for none: the
-// newest deployment to it, or for a live preview URL the one the live view
-// shows, so an older primary row on that URL never answers.
+// newest primary deployment when it names the origin, or for a live preview
+// URL the one the live view shows. An older deployment that named the origin
+// never answers.
 func (r *RuntimeResolver) deploymentOf(ctx context.Context, projectID string, matched *matchedOrigin) (*domain.Deployment, error) {
+	stmts := r.v2Pool.Statements()
 	if !matched.preview {
-		return r.newestDeployment(ctx, projectID, matched.origin)
+		dep, err := newestPrimary(ctx, stmts, projectID)
+		if err != nil {
+			return nil, domain.ErrInternal(err).WithMessage("failed to read the newest primary deployment")
+		}
+		if dep == nil || !slices.Contains(dep.Origins(), matched.origin) {
+			return nil, nil
+		}
+		return dep, nil
 	}
-	dep, err := r.v2Pool.Statements().GetLiveDeployment(ctx, projectID, matched.origin, r.now())
+	dep, err := stmts.GetLiveDeployment(ctx, projectID, matched.origin, r.now())
 	if err != nil {
 		if isNoRowFound(err) {
 			return nil, nil
 		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to read the preview's deployment")
-	}
-	return dep, nil
-}
-
-func (r *RuntimeResolver) newestDeployment(ctx context.Context, projectID, origin string) (*domain.Deployment, error) {
-	stmts := r.v2Pool.Statements()
-	serving, err := stmts.GetNewestPerOrigin(ctx, projectID, []string{origin})
-	if err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to read the origin's newest deployment")
-	}
-	newest := domain.NewestOriginDeployment(serving)
-	if newest == nil {
-		return nil, nil
-	}
-	dep, err := stmts.GetDeploymentByID(ctx, projectID, newest.DeploymentID)
-	if err != nil {
-		if isNoRowFound(err) {
-			return nil, nil
-		}
-		return nil, domain.ErrInternal(err).WithMessage("failed to read the origin's newest deployment")
 	}
 	return dep, nil
 }
