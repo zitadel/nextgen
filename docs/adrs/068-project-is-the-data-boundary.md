@@ -78,10 +78,9 @@ is bound to, and the server never sees it.
   revision it was created against, is unchanged and is per project like the
   user.
 
-## Amendment (2026-10-31): the newest primary deployment
+## Amendment (2026-10-31): callers with no origin
 
-A primary origin serves the project's newest primary deployment while that
-deployment names it, not the newest deployment to that origin, and a caller with
-no `Origin` is served the same deployment
-([ADR 085](085-which-release-serves-a-request.md)). A preview URL still serves
-its own newest deployment.
+A caller with no `Origin`, and a console origin the project does not list, is
+served the project's newest primary deployment
+([ADR 085](085-which-release-serves-a-request.md)). Any other origin still serves
+the newest deployment to it.

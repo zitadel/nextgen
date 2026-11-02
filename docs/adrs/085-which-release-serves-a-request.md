@@ -7,7 +7,7 @@
 > [ADR 066](066-operation-policies.md) (policies) and
 > [ADR 068](068-project-is-the-data-boundary.md) (a request resolves its release
 > from its `Origin`).
-> **Implemented by:** #2469, #2552, #2553, #2554, #2555, #2556.
+> **Implemented by:** #2469, #2552, #2553, #2554, #2555.
 
 ## Context
 
@@ -29,12 +29,12 @@ Opening a flow takes four steps:
    `proj.preview_not_live`. The console's origins (`server.public_base`'s and
    `server.console_origins`) can open any project's flow, but cannot take a
    later step unless the origin passes on its own, as a loopback one does. Any
-   other unlisted loopback origin passes, but no deployment names it, so it
+   other unlisted loopback origin passes, but nothing is deployed to it, so it
    answers `409 rel.not_deployed` rather than `403`.
-2. Find the deployment. A live preview URL uses its own newest deployment. Any
-   other origin uses the project's newest primary deployment, if that deployment
-   names the origin. A request with no `Origin`, and a console origin the project
-   does not list, a loopback one included, use the newest primary deployment.
+2. Find the deployment. An admitted origin uses the newest deployment to that
+   exact origin. A request with no `Origin`, and a console origin the project
+   does not list, a loopback one included, use the project's newest primary
+   deployment.
 3. With no deployment, the request answers `409`: `rel.not_deployed` for an
    origin, `rel.no_default` for a request with no origin of its own.
 4. Serve that deployment's release. If it was revoked, the request answers `409`
@@ -44,9 +44,9 @@ Opening a flow takes four steps:
 flowchart TD
     open([Open a flow]) --> check{Origin?}
     check -- not admitted --> forbidden[403]
-    check -- live preview --> preview[Its newest deployment]
-    check -- any other, or none --> primary[Newest primary deployment]
-    preview --> usable{Found and not revoked?}
+    check -- admitted --> own[Its newest deployment]
+    check -- none, or a console origin the project does not list --> primary[Newest primary deployment]
+    own --> usable{Found and not revoked?}
     primary --> usable
     usable -- no --> conflict[409]
     usable -- yes --> serve([Serve the release])
@@ -62,16 +62,6 @@ project serves. It also serves callers with no `Origin`, and there is no other
 target to deploy to or keep in step. The newest primary deployment is therefore
 always live, whatever the project lists, and its release cannot be revoked.
 `targets` on `POST /deployments` is `"primary"` or a list of preview URLs.
-
-### A deployment freezes its origins
-
-A deployment to `primary` records the project's primary origins, and a rollback
-restores the ones it recorded. A primary origin is served only while the newest
-primary deployment names it and the project lists it. So an origin new to the
-project serves nothing until the next deploy. Removing an origin takes effect at
-once, because the origin check still reads the project's list, and adding it back
-before the next deploy restores it. Primary deploys to one project are serialized,
-so two that name different origins cannot both replace the same deployment.
 
 ### Example
 
@@ -114,7 +104,7 @@ future. Requests then resolve like this:
 | none | `dep_2` | serves `rel_2` |
 | a console origin the project does not list | `dep_2` | serves `rel_2` |
 | `https://pr-7-acme.vercel.app` | `dep_3` | serves `rel_3` |
-| `https://new.acme.com` | none: `dep_2` does not name it | `409 rel.not_deployed` |
+| `https://new.acme.com` | none: nothing is deployed to it | `409 rel.not_deployed` |
 | `https://other.acme.com` | none | `403 proj.origin_not_allowed` |
 
 ### A flow keeps its release
@@ -144,12 +134,10 @@ still read the newest revisions, because no release serves them.
 - An edit to `.zitadel/` reaches sign-in only through a deploy.
 - One app reached at two origins, such as `localhost` and `127.0.0.1`, needs both
   listed and deployed.
-- A project with no primary origin cannot deploy, so a project with no web app
-  lists one anyway.
+- A project with no primary origin cannot deploy to `primary`, so a project with
+  no web app lists one anyway to serve callers with no `Origin`.
 - Callers with no `Origin` cannot stay on an older release than the web origins.
-- A rollback drops every listed origin the restored deployment does not name, and
-  those refuse until the next deploy. `zitadel deployment rollback` and the
-  console name them first.
+- An origin added to a project serves nothing until the next deploy.
 - A dev server on a loopback origin the project does not list, such as `:5173`
   with `:3000` listed, answers `409 rel.not_deployed`.
 - The console's login preview of a project it does not list shows the newest
