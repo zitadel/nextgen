@@ -1,13 +1,13 @@
 {
   "$schema": "./catalog.schema.json",
   "id": "zitadel-pricing",
-  "version": "2026-11-01.5",
+  "version": "2026-11-02.1",
   "status": "proposal",
   "currency": "usd",
   "decided": ["core", "meters.monthly_active_users.price", "meters.sso_users.allowance", "packages.governance.scope", "packages.compliance.scope", "plans.pro.minimum", "packages.governance.included_in", "packages.compliance.pricing", "plans.enterprise.sla", "plans.pro.limits.requests_per_second_per_project", "plans.free.regions", "plans.pro.regions", "plans.enterprise.regions", "licensed.region", "licensed.addendum.plans", "licensed.support_priority.plans"],
   "conventions": {
     "period": "calendar month, UTC",
-    "user_meters": "Core users are never billed. Only enterprise SSO and directory integrations count users, once per project, connection or directory, and month, with a cap per connection or directory.",
+    "user_meters": "Core users are never billed, and requiring MFA never counts a user. Only enterprise SSO and directory integrations count users, once per project, connection or directory, and month, with a cap per connection or directory; adaptive protection counts the users it scores on the projects that turn it on.",
     "allowance": "The same allowance applies on every plan, per account and month; Enterprise contracts may raise it.",
     "invoice": "Pro base fee + metered integrations and consumption beyond included allowances + capacity steps, regions outside the EU, contracted packages and support; the base fee includes Governance and is not usage credit",
     "caps": "Owners opt in to paid packages and consumption. Alerts at 50, 80 and 100 percent of a budget are notifications, not a hard spending cap. A budget never switches security enforcement off.",
@@ -38,7 +38,7 @@
       "card_required": true,
       "limits": {
         "requests_per_second_per_project": 500,
-        "requests_per_month_per_account": 150000000,
+        "requests_per_month_per_account": 50000000,
         "past_monthly_ceiling": "30 days' notice to add a capacity step, then 50 requests per second per project"
       },
       "event_retention_days": 30,
@@ -178,6 +178,19 @@
       "stripe": { "event_name": "bot_checks", "aggregation": "sum", "price_lookup_key": "bot_checks" }
     },
     {
+      "id": "protected_users",
+      "label": "Adaptive sign-in protection",
+      "kind": "users",
+      "counts": "A user whose sign-ins adaptive protection scores, on projects that turn it on: risk scoring, compromised-credential checks and risk-based step-up or blocking. Requiring MFA, brute-force guards and a breached-password check when a password is set stay free",
+      "dedupe": ["project", "user", "month"],
+      "allowance": 10000,
+      "price": { "model": "per_unit", "unit_amount": 0.003 },
+      "security": true,
+      "tag": "metered feature",
+      "source": { "where": "risk signals in the login flow", "exists": "no: needs risk signals in the login flow and an IP-reputation feed" },
+      "stripe": { "event_name": "protected_users", "aggregation": "sum", "price_lookup_key": "protected_users" }
+    },
+    {
       "id": "api_requests",
       "label": "API requests",
       "kind": "gauge",
@@ -201,7 +214,7 @@
       "grants_credit": 0,
       "tag": "minimum spend"
     },
-    { "id": "capacity_step", "label": "Capacity step", "amount": 2000, "interval": "month", "per": "step", "plans": ["pro", "enterprise"], "requests_per_month": 150000000, "note": "more requests a month per account past Pro's included volume, added by the owner; Enterprise capacity is contracted", "tag": "scale" },
+    { "id": "capacity_step", "label": "Capacity step", "amount": 700, "interval": "month", "per": "step", "plans": ["pro", "enterprise"], "requests_per_month": 50000000, "note": "more requests a month per account past Pro's included volume, added by the owner; Enterprise capacity is contracted", "tag": "scale" },
     { "id": "region", "label": "Region outside the EU, once built", "amount": 100, "interval": "month", "per": "region", "plans": ["pro"], "included_in": ["enterprise"], "tag": "compliance" },
     { "id": "support_priority", "label": "Priority support", "amount": 999, "interval": "month", "plans": ["pro", "enterprise"], "tag": "support" },
     { "id": "sla_9995", "label": "99.95% SLA", "amount": 1000, "interval": "month", "plans": ["pro"], "included_in": ["enterprise"], "tag": "compliance" },
@@ -240,14 +253,6 @@
       "needs": ["request events in an analytics store rather than Postgres"]
     },
     {
-      "id": "threat_intelligence",
-      "label": "Threat intelligence",
-      "free_part": "Brute-force guards, basic bot challenges and a breached-password check when a password is set",
-      "paid_part": "Risk scoring of every sign-in with risk-based step-up or blocking",
-      "price": null,
-      "needs": ["risk signals in the login flow", "an IP-reputation feed"]
-    },
-    {
       "id": "bot_checks_advanced",
       "label": "Bot and fraud defence: fingerprinting and SMS-fraud scoring",
       "free_part": "Basic challenges, unlimited; 1,000 advanced checks a month",
@@ -260,7 +265,7 @@
     "platform": ["Deployments", "Releases", "Login in your own app, on your domain"],
     "resources": ["Users and service users", "Teams and organizations", "Projects and applications", "Roles and credentials", "Console seats"],
     "authentication": ["Password sign-in", "Social sign-in", "Passkeys and TOTP MFA"],
-    "security": ["Basic require-MFA enforcement", "Password rules and lockout", "Basic bot challenges"],
+    "security": ["Require MFA for everyone", "Password rules and lockout", "Basic bot challenges"],
     "billing": "Core resources and basic security are free on every plan. Active-user counts never change your plan or bill. Published request and token capacity limits still apply."
   },
   "packages": [
@@ -277,7 +282,7 @@
         "Granular exceptions and delegated administration",
         "Policy versioning and approval workflows"
       ],
-      "note": "No per-user, per-policy or policy-evaluation charge. Basic require-MFA enforcement stays free."
+      "note": "No per-user, per-policy or policy-evaluation charge. Requiring MFA for everyone stays free."
     },
     {
       "id": "compliance",
