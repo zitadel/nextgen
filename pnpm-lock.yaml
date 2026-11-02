@@ -1361,6 +1361,9 @@ importers:
       '@zitadel/vitest-config':
         specifier: workspace:*
         version: link:../packages/vitest-config
+      p-map:
+        specifier: 'catalog:'
+        version: 7.1.1
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
