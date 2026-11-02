@@ -103,6 +103,8 @@
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/packages/vitest-config/vitest.shared.mjs",
         "$TURBO_ROOT$/packages/vitest-config/vitest.shared.d.mts",
+        "$TURBO_ROOT$/packages/vite/vite.shared.mjs",
+        "$TURBO_ROOT$/packages/vite/vite.shared.d.mts",
         "!**/README.md",
         "!**/AGENTS.md",
         "!**/CLAUDE.md",
@@ -116,6 +118,8 @@
     "build": {
       "inputs": [
         "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/packages/vite/vite.shared.mjs",
+        "$TURBO_ROOT$/packages/vite/vite.shared.d.mts",
         "!**/README.md",
         "!**/AGENTS.md",
         "!**/CLAUDE.md",
@@ -301,6 +305,8 @@
         "scripts/server-build.mjs",
         "scripts/render-builtin-schemas.mjs",
         "scripts/render-builtin-schemas.test.mjs",
+        "packages/vite/vite.shared.mjs",
+        "packages/vite/vite.shared.test.mjs",
         "api/openapi/endpoints/schemas/*.json",
         // The built-in schemas' renderer matches the server's default
         // namespace.

@@ -18,7 +18,7 @@ import { defineComponent, h, type PropType, ref, toRaw } from "vue";
 import "@zitadel/components";
 
 import type { WithZitadelWidgetAttributes } from "../types.js";
-import { forceAttr } from "./forceAttr";
+import { forceAttr } from "./forceAttr.js";
 
 const Base = defineComponent({
   name: "ZitadelLogin",

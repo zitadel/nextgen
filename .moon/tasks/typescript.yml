@@ -50,9 +50,15 @@ tasks:
       - "**/*"
       - "/packages/vitest-config/vitest.shared.mjs"
       - "/packages/vitest-config/vitest.shared.d.mts"
+      - "/packages/vite/vite.shared.mjs"
+      - "/packages/vite/vite.shared.d.mts"
 
   build:
     command: "corepack pnpm run build"
+    inputs:
+      - "**/*"
+      - "/packages/vite/vite.shared.mjs"
+      - "/packages/vite/vite.shared.d.mts"
     outputs:
       - "dist/**/*"
 

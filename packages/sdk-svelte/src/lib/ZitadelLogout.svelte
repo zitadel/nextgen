@@ -3,10 +3,10 @@
   import { standardAttributes } from '@zitadel/sdk-core/types';
   import type { ZitadelLogout as ZitadelLogoutElement } from '@zitadel/components';
 
-  import type { ZitadelLogoutSvelteProps } from './types';
-  import { assignGiven } from './given';
-  import { withDetail } from './events';
-  import { onClient, proxyPathAttr } from './attributes';
+  import type { ZitadelLogoutSvelteProps } from './types.js';
+  import { assignGiven } from './given.js';
+  import { withDetail } from './events.js';
+  import { onClient, proxyPathAttr } from './attributes.js';
 
   let {
     project,

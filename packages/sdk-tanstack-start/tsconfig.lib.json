@@ -5,9 +5,6 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "jsx": "react-jsx",
     "types": ["node", "react"],
-    // tsup's dts step (rollup-plugin-dts) sets the deprecated `baseUrl` itself,
-    // which TypeScript 6 rejects with TS5101 unless deprecations are ignored.
-    "ignoreDeprecations": "6.0",
     "declaration": true
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"],

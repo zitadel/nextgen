@@ -1,5 +1,5 @@
-export { createNextgenHandle, getAuth } from "./handle";
-export type { NextgenHandle } from "./handle";
+export { createNextgenHandle, getAuth } from "./handle.js";
+export type { NextgenHandle } from "./handle.js";
 export type {
   NextgenMiddlewareOptions,
   AuthResult,

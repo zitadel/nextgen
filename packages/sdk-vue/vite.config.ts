@@ -1,21 +1,11 @@
+import dts from "unplugin-dts/vite";
 import { defineConfig } from "vite";
-import dts from "vite-plugin-dts";
 
-// Vue library build (render-function components, no SFCs). esbuild compiles the
-// TS; vite-plugin-dts emits the `.d.ts`. Vue and workspace deps are
-// externalized — the consumer provides them.
+import { failOnDiagnostics, libraryBuild } from "@zitadel/vite";
+
 export default defineConfig({
-  build: {
-    lib: {
-      entry: "./src/index.ts",
-      formats: ["es"],
-      fileName: "index",
-    },
-    rollupOptions: {
-      external: [/^@zitadel\//, /^vue($|\/)/],
-    },
-  },
   plugins: [
-    dts({ tsconfigPath: "./tsconfig.lib.json", include: ["src"], exclude: ["src/**/*.spec.*"] }),
+    libraryBuild(import.meta.dirname),
+    dts({ tsconfigPath: "./tsconfig.lib.json", afterDiagnostic: failOnDiagnostics }),
   ],
 });

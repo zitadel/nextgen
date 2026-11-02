@@ -35,10 +35,9 @@ export { businessLocales } from "@zitadel/components";
 // this package, so under a strict package manager it cannot import
 // `@zitadel/sdk-react` to type a widget callback.
 //
-// The list is explicit because tsup's declaration bundler rewrites
-// `export type * from` into a plain `export *`, which would declare
-// sdk-react's runtime exports (`configureZitadel`, ...) on this entry without
-// shipping them. react.test.tsx fails when this list and sdk-react's drift.
+// The list is explicit so that this entry never declares sdk-react's runtime
+// exports (`configureZitadel`, ...) without shipping them. react.test.tsx fails
+// when this list and sdk-react's drift.
 export type {
   CreateFlowBodyPurpose,
   isStandardAttributeName,
