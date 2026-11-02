@@ -2,9 +2,11 @@ type: object
 required: [name, kind]
 additionalProperties: false
 description: |
-  An action a flow author declares on a step of a flow definition. The
-  `name` is sent back in the submit request as `action`; the engine resolves
-  the action's declared `kind` to decide how to handle the submission.
+  An action a flow author declares on a step of a flow definition: something
+  the user can do on the step, such as submitting the form or following a
+  link. The `name` is sent back in the submit request as `action`; the server
+  resolves the action's declared `kind` to decide how to handle the
+  submission.
 properties:
   name:
     type: string
@@ -16,8 +18,8 @@ properties:
     enum: [submit, passkey, passkey_register, navigate]
     example: submit
     description: |
-      Classifies how the engine handles this action. `back` is not declarable:
-      the engine injects it into runtime steps (see `flow-step-action.yaml`)
+      Classifies how the server handles this action. `back` is not declarable:
+      the server injects it into runtime steps (see `flow-step-action.yaml`)
       whenever going back is available.
       - `submit`: collect the step's fields and run validate/dispatch/on_success.
       - `passkey`: issue a WebAuthn assertion challenge; the matching transition
@@ -38,7 +40,7 @@ properties:
     type: string
     description: |
       Optional localization key override for the action's label. When
-      omitted, the engine derives a key from the step and action names.
+      omitted, the server derives a key from the step and action names.
       Display text is resolved client-side from a locale dictionary, never
-      by the engine.
+      by the server.
     example: actions.signin.submit

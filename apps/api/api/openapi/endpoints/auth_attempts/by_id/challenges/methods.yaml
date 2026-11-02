@@ -2,12 +2,12 @@ post:
   operationId: issueChallenge
   summary: Issue a factor challenge
   description: |
-    Issues a single-factor verification challenge within an auth attempt.
-    
-    This advances the authentication state machine by requesting a specific factor method
-    (password, passkey, TOTP, OTP via SMS, etc.). The server responds with challenge details
-    including method, metadata, and any UI hints. The client then verifies the proof
-    by calling POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify.
+    Issues a challenge, a request to prove one factor, within an authentication attempt.
+
+    A challenge names one factor method, such as password, passkey, TOTP or OTP
+    via SMS. The response carries the challenge's `challenge_id`, method,
+    metadata and any UI hints. The client then submits the proof with
+    `verifyChallengeProof`, using that `challenge_id`.
   tags:
     - Authentication Attempts
   security:
@@ -23,7 +23,7 @@ post:
           $ref: issue-challenge-request.yaml
   responses:
     '201':
-      description: Challenge issued successfully
+      description: The issued challenge.
       content:
         application/json:
           schema:

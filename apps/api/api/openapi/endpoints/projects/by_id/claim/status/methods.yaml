@@ -1,15 +1,23 @@
 get:
   operationId: getClaimStatus
-  summary: Get claim status
+  summary: Get the status of a project claim
   description: |
-    Polled by the CLI while a browser completes the claim. Authorized by the
-    project secret that initiated the challenge. Returns `pending`, or
-    `completed` with the owning team, the claim timestamp, and the dashboard
-    URL once the project is claimed. The claim grant, not the polled
-    challenge, is the source of truth: a project claimed through another
-    concurrent challenge also reports `completed`, and a completed claim
-    keeps reporting `completed` past this challenge's expiry and past the
-    project's claim window.
+    Returns the status of a claim challenge, `pending` or `completed`, while a
+    browser completes the claim.
+
+    A [claim attaches a project to a team](/docs/concepts/project-team-user#claim).
+    `zitadel claim` polls this operation after `initClaim` starts the claim.
+    Once the project is claimed, the response is `completed` with the owning
+    team, the claim timestamp and the dashboard URL.
+
+    The claim itself, not the polled challenge, decides the status. A project
+    claimed through another concurrent challenge also reports `completed`. A
+    completed claim keeps reporting `completed` past this challenge's expiry
+    and past the project's claim window.
+
+    Pass the `challenge_id` that `initClaim` returns. Authenticate with the
+    project secret that started the challenge. On `410` with `proj.claim_expired`, call
+    `initClaim` again for a fresh challenge.
   tags:
     - Projects
   parameters:
@@ -23,7 +31,7 @@ get:
         - project.write
   responses:
     '200':
-      description: Claim status.
+      description: The status of the claim.
       content:
         application/json:
           schema:
@@ -41,7 +49,7 @@ get:
           schema:
             $ref: ../../../../../components/schemas/errors/proj-permission_denied.yaml
     '404':
-      description: Challenge not found.
+      description: Challenge not found. Use the `challenge_id` that `initClaim` returned.
       content:
         application/json:
           schema:
@@ -69,8 +77,8 @@ get:
                 proj.claim_window_expired: ../../../../../components/schemas/errors/proj-claim_window_expired.yaml
     '429':
       description: |
-        Too many requests, the client has polled too many times in a given
-        amount of time.
+        Too many requests: the client polled too many times in a given amount
+        of time. Poll less often.
       content:
         application/json:
           schema:

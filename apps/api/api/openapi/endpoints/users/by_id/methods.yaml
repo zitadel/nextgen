@@ -1,12 +1,12 @@
 get:
   operationId: GetUserByID
   x-zitadel-cli: users get
-  summary: Get user by ID
+  summary: Get a user by ID
   description: |
-    Returns a user by its id, with the attributes its schema defines.
+    Returns a user by ID, with the attributes its schema defines.
 
-    With `team_id`, the user is returned only while they are an active member of
-    that team.
+    With `team_id`, the user is returned only while they are an active member
+    of that team.
   tags:
     - Users
   parameters:
@@ -15,22 +15,24 @@ get:
     # membership, and saying so is the whole point of spelling it out locally.
     - name: team_id
       in: query
+      # Membership versus lifecycle ownership is decided in ADR 024.
       description: |
         Serves the user only when they hold an active membership in this team,
-        and answers `404` otherwise.
+        and answers `404` otherwise. Use the `id` that `createTeam` returns or
+        `queryTeams` lists.
 
         This is team membership, not lifecycle ownership: it asks which team
         the user collaborates in, not which team may deprovision them. The
         owning team is reported separately as
         `metadata.lifecycle_owner_team_id`, and a user can belong to many teams
-        while owning their own lifecycle. See ADR 024.
+        while owning their own lifecycle.
 
         Only active memberships match. A user who has been invited but has not
         accepted is not served.
 
         It reads the user's memberships, so it takes the same permission as the
         `team_id` filter on `POST /users/query`: `team_membership.read` for a
-        project secret, read on the whole project for a Console session.
+        project secret, read on the whole project for a console session.
         Otherwise the answer is `403 user.permission_denied`.
       schema:
         $ref: ../../../components/schemas/team-id.yaml
@@ -41,19 +43,21 @@ get:
     - sessionCookie: []
   responses:
     '200':
-      description: Current user information retrieved successfully
+      description: The user.
       content:
         application/json:
           schema:
             $ref: ../user.yaml
     '401':
-      description: Client was not authorized or the session is anonymous
+      description: Client was not authorized or the session is anonymous.
       content:
         application/json:
           schema:
             $ref: ../../../components/error-details.yaml
     '404':
-      description: User referenced by the current session was not found
+      description: |
+        No user has this ID, or `team_id` is set and the user is not an active
+        member of that team.
       content:
         application/json:
           schema:
@@ -64,12 +68,15 @@ get:
 patch:
   operationId: PatchUserByID
   x-zitadel-cli: users update
-  summary: Update user by ID
+  summary: Update a user by ID
   description: |
     Partially updates a user's schema-defined attributes, and optionally
     moves the user to another registered schema. The merged result is
     validated against the schema before commit. Concurrent writes are
     last-write-wins.
+
+    To move the user, send `schema` with the `id` of a registered schema, as
+    `createSchema` returns it or `listSchemas` lists it.
   tags:
     - Users
   parameters:
@@ -87,7 +94,7 @@ patch:
           $ref: patch-user-request.yaml
   responses:
     '200':
-      description: Updated user state.
+      description: The updated user.
       content:
         application/json:
           schema:
@@ -104,7 +111,7 @@ patch:
         `attributes.address.zip`. A field the patch did not touch is named
         too when the merged document fails on it, as after a move to a schema
         that requires it. Only the field names are reported, never the
-        rejected values.
+        rejected values. Fix the fields listed and send the patch again.
       content:
         application/json:
           schema:
@@ -136,8 +143,9 @@ patch:
         `details.details.fields` naming the attributes whose value is taken in
         the same dotted form as a `400`, such as `attributes.email`. The user
         holding the value is not named. When no attribute can be named, as
-        when the value was freed again since, `details` is absent. Concurrent
-        writes answer `user.conflict`.
+        when the value was freed again since, `details` is absent. Send a
+        different value for each attribute named. Concurrent writes answer
+        `user.conflict`; send the patch again.
       content:
         application/json:
           schema:
@@ -148,7 +156,7 @@ patch:
 delete:
     operationId: DeleteUserByID
     x-zitadel-cli: users delete
-    summary: Delete user by ID
+    summary: Delete a user by ID
     description: |
       Deletes a user, removes them from every team they belong to, and revokes
       every grant they hold, on any project.
@@ -169,7 +177,7 @@ delete:
       - sessionCookie: []
     responses:
       '204':
-        description: User deleted successfully.
+        description: The user was deleted.
       '401':
         description: Client was not authorized or the session is anonymous.
         content:

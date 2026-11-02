@@ -6,6 +6,8 @@ get:
     Returns the variable values the deployment froze when it was made. Later
     changes to the project's variables do not affect them. A secret reads
     back as `{"secret": true}`.
+
+    Pass the `id` that `createDeployment` or `listDeployments` returns.
   tags:
     - Deployments
   security:
@@ -17,7 +19,7 @@ get:
     - $ref: ../../../../components/parameters/deployment-id.yaml
   responses:
     '200':
-      description: The deployment's variables were retrieved successfully.
+      description: The variables the deployment froze, keyed by name.
       content:
         application/json:
           schema:

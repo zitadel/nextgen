@@ -4,25 +4,27 @@ post:
   x-zitadel-destructive: true
   summary: Revoke a release
   description: |
-    Marks the release revoked, so that its content is never served again.
-    From then on the release cannot be deployed and is refused on every path
-    that would serve it, including to a build that pins its digest, with
-    `rel.revoked`.
+    Revokes a release, so that its content is never served again. Pass the
+    `id` that `createRelease`, `buildRelease` or `listReleases` returns. It
+    records a `release.revoked` event.
 
-    A release that any origin still serves cannot be revoked. An origin
-    serves the release of the newest deployment to it, so the call answers
-    `409` with `rel.in_use`, naming each such origin and that deployment.
-    Deploy another release there or roll back first, then revoke. Revoking
-    therefore never takes an origin down. Deployments that named the release
-    earlier stay in the history.
+    From then on the release cannot be deployed. Every path that would serve
+    it refuses it with `rel.revoked`, including a build that pins its digest.
 
-    Idempotent: revoking a release that is already revoked answers `200`
-    with the release unchanged, `revoked_at` still naming the first
-    revocation. There is no un-revoke; build a new release instead.
+    A release that any origin still serves cannot be revoked. An origin serves
+    the release of the newest deployment to it, so the call answers `409` with
+    `rel.in_use`, naming each such origin and that deployment. Deploy another
+    release there or roll back first, then revoke. Revoking therefore never
+    takes an origin down. Deployments that named the release earlier stay in
+    the history.
 
-    Takes no body. The lookup is scoped to the project in `project_id`, so a
-    release id of another project answers not found exactly as an unknown id
-    does.
+    The call is idempotent: revoking a release that is already revoked answers
+    `200` with the release unchanged, and `revoked_at` still names the first
+    revocation. There is no un-revoke, so build a new release instead.
+
+    The call takes no body. The lookup is scoped to the project in
+    `project_id`, so a release ID of another project answers not found exactly
+    as an unknown ID does.
   tags:
     - Releases
   security:

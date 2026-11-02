@@ -1,33 +1,46 @@
 post:
   operationId: createFlow
-  summary: Start a new flow
+  summary: Start a flow
   description: |
-    Resolves a flow definition based on purpose + audience context and returns
-    the first capability step. Creates a new session implicitly unless
-    `session_id` is provided, together with that session's `session_token`
-    (for step-up / reauth on an existing session).
+    Starts a flow: resolves a flow definition from the request's purpose and
+    audience, and returns the first step.
 
-    The browser `Origin` header selects which deployment serves this attempt:
-    the gate admits the origin against the project's origin patterns and live
-    previews, the newest deployment to that exact origin is the target, and
-    that deployment's release supplies flow definitions, user schemas and
-    branding. The resolved deployment is sealed into the `_zflow` cookie so
-    later steps keep the same configuration. An origin that matches no pattern
-    answers `403` with `proj.origin_not_allowed`; one that matches a preview
-    pattern with no live preview answers `403` with `proj.preview_not_live`;
-    nothing deployed to the target answers `409` with `rel.not_deployed`; a
-    revoked release answers `409` with `rel.revoked`. A request with no
-    `Origin` passes the gate and still needs a deployment target. A loopback
-    origin passes it too, and so does the server's own origin, from which its
-    console previews a project's login; a step submitted from the server's
-    own origin is still refused unless the project lists it.
+    The flow endpoints are the runtime calls the login component
+    (`<zitadel-login>`) makes, step by step. It starts a flow here, renders the
+    step it gets back, and submits the user's input with `submitFlowStep` to
+    get the next step. This call creates a new session implicitly, unless
+    `session_id` is provided together with that session's `session_token`
+    (for step-up or reauthentication on an existing session).
 
-    The response contains an `id` field — the flow handle. Use it as the path
+    The browser `Origin` header selects which deployment serves this attempt.
+    The server checks the origin against the project's origin patterns and live
+    previews, and the newest deployment to that exact origin is the target. A
+    deployment is a release, the immutable bundle of the project's
+    configuration, made live at an origin. The deployment's release supplies
+    flow definitions, user schemas and branding. The resolved deployment is
+    sealed into the `_zflow` cookie so later steps keep the same
+    configuration.
+
+    - An origin that matches no pattern answers `403` with
+      `proj.origin_not_allowed`. Add the origin with `zitadel origin add`.
+    - An origin that matches a preview pattern with no live preview answers
+      `403` with `proj.preview_not_live`. Run `zitadel preview` on the branch.
+    - Nothing deployed to the target answers `409` with `rel.not_deployed`.
+      Run `zitadel deploy`.
+    - A revoked release answers `409` with `rel.revoked`.
+
+    A request with no `Origin` passes the check and still needs a deployment
+    target. A loopback origin passes it too, and so does the server's own
+    origin, from which its console previews a project's login. A step
+    submitted from the server's own origin is still refused unless the project
+    lists it.
+
+    The response contains an `id` field, the flow handle. Use it as the path
     parameter for all subsequent `/flow/{id}/submit` calls.
 
     The response also sets an encrypted `HttpOnly` cookie (`_zflow`) containing
     the flow's orchestration state (current step, collected data, history).
-    The server is stateless between requests — all flow state lives in this
+    The server is stateless between requests: all flow state lives in this
     cookie. The browser sends it automatically on subsequent requests.
   tags:
     - Flows
@@ -54,7 +67,7 @@ post:
           $ref: ../../components/flows/create-flow-request.yaml
   responses:
     '201':
-      description: Flow started, first step returned.
+      description: The started flow, with its first step.
       headers:
         Set-Cookie:
           $ref: ../../components/headers/set-cookie-flow.yaml
@@ -65,7 +78,7 @@ post:
           schema:
             $ref: ../../components/flows/flow-response.yaml
     '400':
-      description: Invalid request (e.g., unknown purpose).
+      description: The request was not valid, for example it names an unknown purpose.
       content:
         application/json:
           schema:

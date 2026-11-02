@@ -55,15 +55,16 @@ not:
                     - { required: [purpose], properties: { purpose: { type: string } } }
                     - { required: [action], properties: { action: { type: string } } }
 description: |
-  A step in a flow definition. This is the admin-authored configuration,
-  not the runtime payload sent to the frontend.
+  A step in a flow definition: one screen of the flow, as an administrator
+  writes it. This is configuration, not the runtime payload sent to the
+  frontend.
 
   Steps are schema-driven: `fields` references properties from the flow's
-  user schema, and the engine resolves field metadata (type, validation,
+  user schema, and the server resolves field metadata (type, validation,
   implicit outcomes) from schema annotations at runtime.
 
-  A step with only `complete` set is a terminal step. All other steps are
-  rendered to the frontend as capability payloads.
+  A step with only `complete` set is a terminal step. The server sends every
+  other step to the login component as fields, actions and gates to render.
 properties:
   name:
     type: string
@@ -76,11 +77,11 @@ properties:
   fields:
     type: array
     description: |
-      Schema property names to collect from the user. Each entry references
-      a property in the flow's user schema. The engine resolves field type,
-      validation rules, and implicit outcomes from schema annotations
-      (e.g. a property with `x-unique` set implies a `user_not_found`
-      transition outcome).
+      The fields to collect from the user. A field is one input of the step,
+      named after a property in the flow's user schema. The server resolves
+      field type, validation rules, and implicit outcomes from schema
+      annotations (for example, a property with `x-unique` set implies a
+      `user_not_found` transition outcome).
     items:
       type: string
     uniqueItems: true
@@ -90,9 +91,10 @@ properties:
   actions:
     type: array
     description: |
-      Ordered list of actions the user can take. The action name is what the
-      frontend sends back in the submit request. If omitted, the engine
-      provides a default `submit` action.
+      The actions the user can take, in order. An action is something the user
+      does on the step, such as submitting the form or following a link. The
+      action name is what the frontend sends back in the submit request. If
+      omitted, the server provides a default `submit` action.
     items:
       $ref: step-action.yaml
     default: []
@@ -106,10 +108,10 @@ properties:
   gates:
     type: object
     description: |
-      Security gates that must be satisfied before submission. Keyed by gate
-      name. Each gate selects a kind (e.g. "captcha") and provider-specific
-      configuration. The engine may also inject gates dynamically based on
-      policy.
+      Security gates that must be satisfied before submission. A gate is a
+      security check, such as a captcha. Keyed by gate name. Each gate selects
+      a kind (for example "captcha") and provider-specific configuration. The
+      server may also inject gates dynamically based on policy.
     additionalProperties:
       $ref: gate.yaml
     default: {}
@@ -121,12 +123,13 @@ properties:
   sso_providers:
     type: array
     description: |
-      Slugs of the identity provider connections this step offers, in display
-      order. Each names the `slug` of a connection under `.zitadel/idps/`; the
-      connection carries the display name and template, so a rename there
-      reaches every step without editing the flow. The rendered step the client
-      receives carries the resolved `{id, name, template}` objects instead. A
-      step offers at most 20 providers.
+      Slugs of the identity providers (external sign-ins such as Google) this
+      step offers, in display order. Each names the `slug` of a connection
+      document under `.zitadel/idps/`; the document carries the display name
+      and template, so a rename there reaches every step without editing the
+      flow. The rendered step the client receives carries the resolved
+      `{id, name, template}` objects instead. A step offers at most 20
+      providers.
     uniqueItems: true
     maxItems: 20
     items:
@@ -165,7 +168,7 @@ properties:
       Maps action and outcome names to where the flow goes next.
 
       A key is either the `name` of an action in `actions` (the user chose
-      it) or an outcome the engine raises on its own:
+      it) or an outcome the server raises on its own:
 
       - `user_not_found`: an identifier with no account. Following this
         transition also switches the flow to `register`.
@@ -204,7 +207,7 @@ properties:
               enum: [switch, pivot]
             - type: 'null'
           description: |
-            Reserved for transitions to another flow definition. The engine
+            Reserved for transitions to another flow definition. The server
             does not run them yet: taking one fails with `flow.unsupported`.
             Keep transitions within one flow definition, and use `purpose`
             to move between signing in and signing up.
@@ -212,7 +215,7 @@ properties:
             How `target` will be read:
             - null (omitted): a step in the current flow.
             - switch: replace the current flow with the target flow.
-              No return — the current flow is discarded.
+              No return: the current flow is discarded.
             - pivot: push the target flow onto the stack. The current flow
               is paused and resumes when the target flow completes (auto-pop).
         purpose:

@@ -1,7 +1,8 @@
 name: id
 in: path
 required: true
-description: The unique identifier of the schema.
+description: |
+  The schema ID: the `id` that `createSchema` returns or `listSchemas` lists.
 schema:
   type: string
 example: sch_01KWHF2XY6RN7F0N9WD3P2E4YM

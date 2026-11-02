@@ -17,8 +17,7 @@ properties:
     type: string
     pattern: ^[a-z0-9][a-z0-9_-]*$
     maxLength: 64
-    description: Stable identifier, referenced by user schemas (x-auth-methods.sso.providers) and flow
-      steps (sso_providers). Unique within the Project.
+    description: "Stable identifier of the identity provider. User schemas (`x-auth-methods.sso.providers`) and flow steps (`sso_providers`) reference it. Unique within the project."
     examples:
     - google
     - corp_idp
@@ -32,7 +31,7 @@ properties:
     examples:
     - google
     - okta
-    description: "Template hint for rendering the provider (logo, colors). Carries no protocol behavior: conduct comes only from the protocol blocks."
+    description: "A hint for rendering the provider (logo, colors). It carries no protocol behavior: behavior comes only from the protocol blocks."
   display_name:
     type: string
     minLength: 1
@@ -41,14 +40,13 @@ properties:
   subject_claim:
     type: string
     minLength: 1
-    description: Claim carrying the provider's stable subject identifier. Optional; the engine uses `sub`
-      per spec. Override it where `sub` is pairwise, e.g. Entra `oid`.
+    description: "The claim (a named piece of user data the provider returns) that carries the provider's stable subject identifier. Optional; the engine uses `sub`, as the OIDC specification defines. Override it where `sub` is pairwise, for example Entra `oid`."
   claim_mapping:
     type: object
     additionalProperties:
       type: string
       pattern: ^[^$]
-    description: "Maps user-schema property names (keys) to provider claim names (values). A value is an exact top-level claim key: no path syntax, and a dot is part of the key, so nested claims (OIDC `address`) are not addressable yet. `$`-prefixed strings and non-string values are reserved for future mapping forms. Add properties defined in the user schemas; unmatched entries are ignored."
+    description: "Maps user schema property names (keys) to provider claim names (values). A value is an exact top-level claim key: no path syntax, and a dot is part of the key, so nested claims (OIDC `address`) are not addressable yet. `$`-prefixed strings and non-string values are reserved for future mapping forms. Add properties defined in the user schemas; unmatched entries are ignored."
   verified_claims:
     type: object
     additionalProperties:
@@ -56,17 +54,17 @@ properties:
       - const: true
       - type: string
         pattern: ^[^$]
-    description: 'Maps a verifiable user-schema property to its verification source: a claim name (read
-      the claim) or the literal `true` (trust this provider unconditionally). Values starting with `$`
-      are reserved for future sources. Distinct from claim_mapping, which carries values, not verification
-      state.'
+    description: "Maps a verifiable user schema property to its verification source: a claim name (read the claim) or the literal `true` (trust this provider unconditionally). Values starting with `$` are reserved for future sources. Distinct from `claim_mapping`, which carries values, not verification state."
     examples:
     - email: email_verified
     - email: true
   provisioning:
     type: object
     additionalProperties: false
-    description: "How far this provider's data is trusted. `creation` defines what happens to a subject that has no account yet. With `disabled`, a user is not created. With `auto`, the user is created without a collection step when the mapped claims fill every required property of the schema. A required property with an `x-unique` scope must also arrive verified according to `verified_claims`. When a required property is missing or such a property is unverified, the collection step is shown instead, prefilled with the claims. Gating on other properties will be added when `x-verify` returns to the dialect. The following are deferred and will be added as additive changes. The `auto_only` value creates the user from complete claims or fails without collecting. The linking policy (`is_linking_allowed`, `auto_linking`), together with the account-linking journey. `is_auto_update`, together with per-property verification state."
+    # Deferred, as additive changes: gating on other properties once `x-verify`
+    # returns to the dialect; `auto_only`; the linking policy with the
+    # account-linking journey; `is_auto_update` with per-property verification state.
+    description: "How far this provider's data is trusted. `creation` defines what happens to a subject that has no account yet. With `disabled`, a user is not created. With `auto`, the user is created without a collection step (the step that asks the user for missing data) when the mapped claims fill every required property of the schema. A required property with an `x-unique` scope must also arrive verified according to `verified_claims`. When a required property is missing or such a property is unverified, the collection step is shown instead, prefilled with the claims. Gating on other properties is not available yet. These are not available yet either: the `auto_only` value, which creates the user from complete claims or fails without collecting; the linking policy (`is_linking_allowed`, `auto_linking`), together with the account-linking journey; and `is_auto_update`, together with per-property verification state."
     properties:
       creation:
         type: string
@@ -77,7 +75,7 @@ properties:
   oidc:
     type: object
     additionalProperties: false
-    description: "OIDC connection details. Endpoints come from the issuer's discovery document. A provider that exposes no .well-known document names them all instead: authorization_endpoint, token_endpoint, jwks_uri, and userinfo_endpoint unless id_token_mapping is set. Setting any endpoint without the others is rejected with idp.endpoints_partial."
+    description: "OIDC settings of the identity provider. Endpoints come from the issuer's discovery document (its `.well-known` document). A provider that exposes no `.well-known` document names them all instead: `authorization_endpoint`, `token_endpoint`, `jwks_uri`, and `userinfo_endpoint` unless `id_token_mapping` is set. Setting any endpoint without the others is rejected with `idp.endpoints_partial`; set all of them or none."
     required:
     - issuer
     - client_id
@@ -88,8 +86,7 @@ properties:
         type: string
         format: uri
         pattern: ^(https://[^\s/?#]+|http://(localhost|127\.0\.0\.1)(:[0-9]+)?)(/[^\s?#]*)?$
-        description: Discovery base. Endpoints are resolved from its .well-known document unless the
-          connection names them all.
+        description: "Discovery base. Endpoints are resolved from its `.well-known` document unless the document names them all."
       jwks_uri:
         type: string
         format: uri
@@ -123,8 +120,7 @@ properties:
         type: string
         minLength: 1
         maxLength: 512
-        description: Either a literal in case the same client is used in all environments, or a `${{ NAME
-          }}` reference to a variable in case of separate clients per environment.
+        description: "Either a literal, when all environments use the same client, or a `${{ NAME }}` reference to a variable, when each environment has its own client."
       client_secret:
         type: string
         pattern: ^\$\{\{ *[A-Za-z0-9_]+ *\}\}$
@@ -152,13 +148,11 @@ properties:
         - openid
         - profile
         - email
-        description: Must contain `openid` - without it the provider returns no id_token and the connection
-          is not OIDC. Enforced by `required` + `contains`; the `default` is a UI-prefill hint only -
-          validators never inject it, so an omitted `scopes` is rejected regardless.
+        description: "Must contain `openid`: without it the provider returns no id_token and the sign-in is not OIDC. An omitted `scopes` is rejected. The default (`openid`, `profile`, `email`) only pre-fills editors; validators never inject it."
       pkce_enabled:
         type: boolean
         default: true
-        description: "Send PKCE (code_challenge/code_verifier). Providers that do not support PKCE typically ignore the parameters, so `true` is safe and future-proofs; set `false` only for a provider whose token endpoint rejects them."
+        description: "Send PKCE (`code_challenge` and `code_verifier`), which binds the code exchange to the client that started it. Providers that do not support PKCE typically ignore the parameters, so `true` is safe and future-proofs; set `false` only for a provider whose token endpoint rejects them."
       static_authorize_parameters:
         type: object
         propertyNames:

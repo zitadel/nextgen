@@ -8,9 +8,12 @@ post:
     `project_id` names the project to list; without it, the credential's own
     project is listed.
 
-    Accepts either a project secret (`oauth2`) or a user-bound Console
+    Accepts either a project secret (`oauth2`) or a user-bound console
     session cookie (`sessionCookie`). Cookie-authenticated requests
     follow the scheme's CSRF rules (`sessionCookie`).
+
+    Embedding `teams` with `expand`, or filtering by `team_id`, also needs
+    `team_membership.read`. Embedding `lifecycle_owner_team` needs `team.read`.
   tags:
     - Users
   # user.read alone: scopes in one requirement are ANDed, and the expansion
@@ -34,13 +37,13 @@ post:
           $ref: query-users-request.yaml
   responses:
     '200':
-      description: The list of users was returned successfully
+      description: A page of users.
       content:
         application/json:
           schema:
             $ref: query-users-response.yaml
     '400':
-      description: Invalid request (e.g., unknown filter field or unusable value).
+      description: The request was not valid, for example an unknown filter field or an unusable value.
       content:
         application/json:
           schema:

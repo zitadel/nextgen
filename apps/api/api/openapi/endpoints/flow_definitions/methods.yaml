@@ -1,17 +1,22 @@
 post:
   operationId: createFlowDefinition
-  summary: Create a new flow definition
+  summary: Create a flow definition
   description: |
-    Publishes a new flow definition revision.
-    Flow definitions are templates that define the sequence of steps (capabilities)
-    for a particular user journey (e.g., registration, login, password reset).
+    Creates a flow definition by publishing a new revision of it. It records a
+    `flowdef.created` event.
 
-    Flow definitions are created based on the flow definition schema, which includes the flow's purpose, audience, and the steps involved.
+    A [flow definition](/docs/concepts/flows-and-schemas) is a template that
+    defines the sequence of steps (capabilities) for one user journey, such as
+    registration, login or password reset. The body follows the flow
+    definition schema, which includes the flow's purpose, audience and steps.
 
-    Every call allocates a new opaque id. Revisions of one flow share its
-    `name`; posting a definition under an existing `name` publishes a new
-    revision of that flow, it is not a conflict. List with `name` to see a
-    flow's revisions, newest by creation time first.
+    Every call allocates a new opaque ID. That `id` is the `revision_id` a
+    release pins for `kind: flow_definition`.
+
+    Revisions of one flow share its `name`. Posting a definition under an
+    existing `name` publishes a new revision of that flow, which is not a
+    conflict. List with `name` to see a flow's revisions, newest by creation
+    time first.
   tags:
     - Flow Definitions
   security:
@@ -47,13 +52,13 @@ post:
             externalValue: examples/06-combined-password-passkey/flow-definition.json
   responses:
     '201':
-      description: Flow definition created successfully.
+      description: The created flow definition.
       content:
         application/json:
           schema:
             $ref: ../../components/flows/flow-definition-response.yaml
     '400':
-      description: Invalid request (e.g., missing required fields, invalid step configuration).
+      description: The request is invalid, for example because required fields are missing or a step configuration is invalid.
       content:
         application/json:
           schema:
@@ -66,9 +71,12 @@ get:
   x-zitadel-cli: flow-definitions list
   summary: List flow definitions
   description: |
-    Retrieves a list of all flow definitions, newest by creation time first.
-    This endpoint can be used to view existing flow definitions and their configurations.
-    Filter by `name` to list the revisions of one flow.
+    Lists the project's flow definitions with their configurations, newest by
+    creation time first. A flow definition sets which step of a sign-in
+    renders when, and which fields each step collects.
+
+    The `id` of an entry is the flow definition ID that `getFlowDefinition`
+    takes. Filter by `name` to list the revisions of one flow.
   tags:
     - Flow Definitions
   security:
@@ -82,7 +90,7 @@ get:
     - name: purpose
       in: query
       required: false
-      description: Filter flow definitions by purpose (e.g., registration, login).
+      description: Only flow definitions with this purpose, for example `login`.
       schema:
         type: string
         enum: [ login, register, recovery, profiling, reauth, link_account ]
@@ -100,12 +108,12 @@ get:
       in: query
       description: |
         Which revisions to return. Every revision of a flow shares its
-        `name`, so publishing a definition under an existing `name` generates
-        a new row.
+        `name`, so publishing a definition under an existing `name` adds a new
+        revision.
 
-        `all` (the default) returns every revision — the full history an
+        `all` (the default) returns every revision: the full history an
         export, an audit or a GitOps diff needs. `latest` returns the newest
-        revision of each `name`, which is one row per flow.
+        revision of each `name`, which is one entry per flow.
 
         A `page_token` is bound to the mode it was issued in and is rejected by
         the other.
@@ -125,13 +133,13 @@ get:
           $ref: flow-definition-expand.yaml
   responses:
     '200':
-      description: A list of flow definitions.
+      description: A page of flow definitions.
       content:
         application/json:
           schema:
             $ref: ../../components/flows/flow-definition-list-response.yaml
     '400':
-      description: Invalid request (e.g., invalid query parameters).
+      description: A query parameter or the page token is invalid.
       content:
         application/json:
           schema:

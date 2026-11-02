@@ -1,7 +1,8 @@
 name: release_id
 in: path
 required: true
-description: The unique identifier of the release.
+description: |
+  The release ID: the `id` that `createRelease` returns or `listReleases` lists.
 schema:
   $ref: '../schemas/release-id.yaml'
 example: rel_01KX3RG8A7F0N9WD3P2E4YM5C1

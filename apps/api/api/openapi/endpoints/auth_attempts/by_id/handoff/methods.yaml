@@ -1,19 +1,24 @@
 post:
   operationId: createHandoff
-  summary: Complete authentication and create handoff token
+  summary: Complete an authentication attempt and create a handoff token
   description: |
-    Completes the authentication attempt and mints a `handoff_token`.
-    
-    Call this after all required factors have been verified and the attempt is in `completed` state.
-    The handoff token is short-lived (≤60 seconds) and must be exchanged at
-    POST /sessions/exchange to receive the final session and session_token.
-    
-    The handoff token is:
-    - Single-use (atomic exchange, no retry)
-    - Audience-bound (requires matching project key for exchange)
-    - Idempotency-safe within a 5-minute window (see conventions)
+    Completes an authentication attempt and mints a `handoff_token`.
 
-    Revoke refusal for a sealed release happens at handoff exchange, not here.
+    A handoff token is the short-lived credential that a completed attempt hands
+    to the session exchange. Call this after every required factor is verified and
+    the attempt is in `completed` state. Otherwise it answers `409` with
+    `att.not_completed`: verify the remaining factors, then call again.
+
+    Exchange the token at `POST /sessions/exchange` (`exchangeHandoff`) within 60
+    seconds to receive the session and its `session_token`. The handoff token is:
+
+    - Single-use: exchange it once, with no retry.
+    - Bound to the project: the exchange needs the same project's credential.
+    - Safe to request again with the same idempotency key within a 5-minute
+      window, which returns the same token.
+
+    A revoked release is refused when the handoff is exchanged, not here. A
+    release is the configuration that `zitadel deploy` publishes.
   tags:
     - Authentication Attempts
   security:
@@ -23,19 +28,20 @@ post:
     - $ref: ../../../../components/parameters/attempt-id.yaml
     - $ref: ../../../../components/parameters/idempotency-key.yaml
       description: |
-        Optional retry key for safe retries of the handoff creation (Category B idempotency).
+        Optional retry key for safe retries of the handoff creation.
         Retries carrying the same key within the exchange window return the same handoff token
         without re-completing the attempt or minting a new token.
   responses:
     '200':
-      description: Handoff token created successfully
+      description: The handoff token and its expiry.
       content:
         application/json:
           schema:
             $ref: handoff-response.yaml
     '409':
       description: |
-        The attempt is not complete (`att.not_completed`).
+        The attempt is not complete (`att.not_completed`). Verify the
+        remaining required factors, then call again.
       content:
         application/json:
           schema:

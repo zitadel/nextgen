@@ -5,14 +5,14 @@ post:
   summary: Remove a preview
   description: |
     Ends a preview before it expires: the URL stops being served at once.
-    The deployments to it stay in the history.
 
-    Idempotent: a URL with no live preview, including one that has already
-    expired or was removed before, answers `204` too, so a cleanup that
-    races the expiry still succeeds.
+    The deployments to it stay in the history. The call is idempotent.
+    A URL with no live preview answers `204` too. That includes one that
+    expired or was removed before, so a cleanup that races the expiry still
+    succeeds.
 
     The URL travels in the body rather than the path because an origin
-    contains `/`.
+    contains `/`. Take it from `listPreviews`.
   tags:
     - Previews
   parameters:

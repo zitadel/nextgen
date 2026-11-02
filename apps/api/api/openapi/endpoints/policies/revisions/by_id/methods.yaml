@@ -1,11 +1,14 @@
 get:
   operationId: getPolicyRevision
-  summary: Get a policy revision
+  summary: Get a policy revision by ID
   description: |
-    Reads one revision of a policy, newest or not.
+    Returns one revision of a policy, the newest or an older one.
+
+    Pass the `revision_id` that `publishPolicy` or `listPolicyRevisions`
+    returns.
 
     The lookup is scoped to the project in `project_id`: a revision of another
-    project answers not found exactly as an unknown id does.
+    project answers not found exactly as an unknown ID does.
   tags:
     - Policies
   security:
@@ -17,7 +20,7 @@ get:
     - $ref: ../../../../components/parameters/policy-revision-id.yaml
   responses:
     '200':
-      description: The revision was retrieved.
+      description: The policy revision.
       content:
         application/json:
           schema:
