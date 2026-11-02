@@ -1,7 +1,7 @@
 {
   "$schema": "./catalog.schema.json",
   "id": "zitadel-pricing",
-  "version": "2026-11-02.4",
+  "version": "2026-11-02.5",
   "status": "proposal",
   "currency": "usd",
   "decided": ["core", "meters.monthly_active_users.price", "meters.sso_users.allowance", "packages.governance.scope", "packages.compliance.scope", "plans.pro.minimum", "packages.governance.included_in", "packages.compliance.pricing", "plans.enterprise.sla", "plans.pro.limits.requests_per_second_per_project", "plans.free.regions", "plans.pro.regions", "plans.enterprise.regions", "licensed.region", "licensed.addendum.plans", "licensed.support_priority.plans"],
@@ -9,7 +9,7 @@
     "period": "calendar month, UTC",
     "user_meters": "Core users are never billed, and requiring MFA never counts a user. Only enterprise SSO and directory integrations count users, once per project, connection or directory, and month, with a cap per connection or directory; threat intelligence counts the users checked against licensed feeds on the projects that turn it on.",
     "allowance": "The same allowance applies on every plan, per account and month; Enterprise contracts may raise it.",
-    "invoice": "Pro base fee + metered integrations and consumption beyond included allowances + capacity steps, regions outside the EU, contracted packages and support; the base fee includes Governance and is not usage credit",
+    "invoice": "Pro base fee + metered integrations and consumption beyond included allowances + extra requests, regions outside the EU, contracted packages and support; the base fee includes Governance and is not usage credit",
     "caps": "Owners opt in to paid packages and consumption. Alerts at 50, 80 and 100 percent of a budget are notifications, not a hard spending cap. A budget never switches security enforcement off.",
     "self_hosted": "Self-hosted installs pay for rights and support per production installation and are never metered.",
     "packages": "Governance and custom security settings are included in Pro. Compliance is quoted per account, with retention duration, retained-event volume, SIEM destinations and any overage prices agreed before activation. No package charges per user or per policy."
@@ -39,7 +39,7 @@
       "limits": {
         "requests_per_second_per_project": 500,
         "requests_per_month_per_account": 50000000,
-        "past_monthly_ceiling": "30 days' notice to add a capacity step, then 50 requests per second per project"
+        "past_monthly_ceiling": "30 days' notice to add extra requests, then 50 requests per second per project"
       },
       "event_retention_days": 30,
       "attribution_mark": "hideable",
@@ -201,7 +201,7 @@
       "grants_credit": 0,
       "tag": "minimum spend"
     },
-    { "id": "capacity_step", "label": "Capacity step", "amount": 700, "interval": "month", "per": "step", "plans": ["pro", "enterprise"], "requests_per_month": 50000000, "note": "more requests a month per account past Pro's included volume, added by the owner; Enterprise capacity is contracted", "tag": "scale" },
+    { "id": "capacity_step", "label": "Extra requests", "amount": 700, "interval": "month", "per": "50M requests", "plans": ["pro", "enterprise"], "requests_per_month": 50000000, "note": "more requests a month per account past Pro's included volume, added by the owner; Enterprise capacity is contracted", "tag": "scale" },
     { "id": "region", "label": "Region outside the EU, once built", "amount": 100, "interval": "month", "per": "region", "plans": ["pro"], "included_in": ["enterprise"], "tag": "compliance" },
     { "id": "support_priority", "label": "Priority support", "amount": 999, "interval": "month", "plans": ["pro", "enterprise"], "tag": "support" },
     { "id": "sla_9995", "label": "99.95% SLA", "amount": 1000, "interval": "month", "plans": ["pro"], "included_in": ["enterprise"], "tag": "compliance" },
@@ -209,7 +209,7 @@
     { "id": "addendum", "label": "Custom MSA, indemnification, DORA or BAA addendum", "amount": null, "interval": "month", "per": "addendum", "plans": ["enterprise"], "note": "Terms and pricing agreed in the Enterprise contract", "tag": "compliance" },
     { "id": "tam_hours", "label": "Extra TAM hours", "amount": 250, "interval": "hour", "plans": ["enterprise"], "tag": "support" },
     { "id": "private_slack", "label": "Private Slack", "amount": 800, "interval": "month", "plans": ["enterprise"], "tag": "support" },
-    { "id": "dedicated_deployment", "label": "Dedicated deployment", "amount": null, "interval": "month", "plans": ["enterprise"], "note": "cost plus margin", "tag": "compliance" }
+    { "id": "dedicated_infrastructure", "label": "Dedicated infrastructure", "amount": null, "interval": "month", "plans": ["enterprise"], "note": "dedicated database servers and compute, at cost plus margin", "tag": "compliance" }
   ],
   "self_hosted": {
     "unit": "production installation: a server and its database serving real end users",
@@ -241,7 +241,7 @@
     }
   ],
   "core": {
-    "platform": ["Deployments", "Releases", "Login in your own app, on your domain"],
+    "platform": ["Versioned releases, previews and rollbacks", "Login in your own app, on your domain"],
     "resources": ["Users and service users", "Teams and organizations", "Projects and applications", "Roles and credentials", "Console seats"],
     "authentication": ["Password sign-in", "Social sign-in", "Passkeys and TOTP MFA"],
     "security": ["Require MFA for everyone", "Default password rules and lockout", "Default session and token lifetimes", "Built-in bot challenge", "Edge bot verdicts", "Risk-based challenges and MFA prompts", "Revoking sessions and rotating keys"],
@@ -277,7 +277,7 @@
         "Session and token lifetimes per project",
         "Stricter rate limits of your own"
       ],
-      "note": "Free runs Zitadel's secure defaults. Turning protection on, incident response (signing out everywhere, revoking sessions, rotating keys) and setup stay free on every plan, and raising capacity is a capacity step, not a setting. Self-hosted servers keep every setting."
+      "note": "Free runs Zitadel's secure defaults. Turning protection on, incident response (signing out everywhere, revoking sessions, rotating keys) and setup stay free on every plan, and raising capacity means extra requests, not a setting. Self-hosted servers keep every setting."
     },
     {
       "id": "compliance",
