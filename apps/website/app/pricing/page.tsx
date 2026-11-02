@@ -9,12 +9,10 @@ import {
   capitalize,
   count,
   dollars,
-  licensedPrice,
   type Meter,
   meterPrice,
   mostPer,
   readCatalog,
-  regionList,
   sentence,
   short,
 } from "./catalog";
@@ -112,7 +110,6 @@ function proposalDate(catalog: Catalog): string {
 function CloudPlans({ catalog }: { catalog: Catalog }) {
   const { free, pro, enterprise } = catalog.plans;
   const addendum = catalog.licensed.find((line) => line.id === "addendum");
-  const region = catalog.licensed.find((line) => line.id === "region");
   const [proSupport = ""] = pro.support.split("; ");
   return (
     <div className="mt-12 grid gap-4 md:grid-cols-3">
@@ -125,7 +122,7 @@ function CloudPlans({ catalog }: { catalog: Catalog }) {
           "Unlimited users, teams and console seats",
           "Passkeys, TOTP and required MFA",
           "No active-user upgrade thresholds",
-          `Every ${free.regions.scope} in the ${regionList(free.regions.selection)}`,
+          "Any available region for each project",
           `${free.event_retention_days} days of audit events`,
           "The dev inbox or your own email provider",
           "Community support",
@@ -143,7 +140,6 @@ function CloudPlans({ catalog }: { catalog: Catalog }) {
           `${short(pro.limits.requests_per_month_per_account)} requests a month, then extra requests`,
           "Managed email and SMS",
           "Remove the Zitadel mark",
-          ...(region ? [`Regions outside the EU, ${licensedPrice(region)}`] : []),
           `${pro.event_retention_days} days of audit events`,
           ...(pro.sla
             ? [`${pro.sla.target_percent}% availability ${pro.sla.credits ? "SLA" : "target"}`]
@@ -163,8 +159,7 @@ function CloudPlans({ catalog }: { catalog: Catalog }) {
             ? [`${enterprise.event_retention_days} days of audit events`]
             : []),
           "Extended audit retention and reporting, by agreement",
-          regionList(enterprise.regions.selection),
-          "A dedicated deployment, on request",
+          "Dedicated infrastructure, on request",
           ...(enterprise.sla
             ? [`${enterprise.sla.target_percent}% uptime SLA with service credits`]
             : []),
@@ -306,7 +301,6 @@ function Questions({ catalog }: { catalog: Catalog }) {
   const directoriesAlike = directories !== undefined && terms(directories) === terms(sso);
   const compliance = catalog.packages.find((entry) => entry.id === "compliance");
   const step = catalog.licensed.find((line) => line.id === "capacity_step");
-  const region = catalog.licensed.find((line) => line.id === "region");
   const intelligence = catalog.meters.find((meter) => meter.id === "threat_intel_users");
   const [unitName, unitMeaning] = catalog.self_hosted.unit.split(": ");
   const questions: { question: string; answer: ReactNode }[] = [
@@ -517,13 +511,9 @@ function Questions({ catalog }: { catalog: Catalog }) {
       question: "Where do my projects run?",
       answer: (
         <p>
-          Every plan runs projects in the {regionList(free.regions.selection)}.
-          {region
-            ? ` On ${pro.label}, a project can run outside the ${regionList(free.regions.selection)} once another region opens, for ${licensedPrice(region)}.`
-            : ""}{" "}
-          {plans.enterprise.label} includes{" "}
-          {regionList(plans.enterprise.regions.selection).toLowerCase()}. A region is separate from
-          a dedicated deployment, which is available by agreement on Enterprise.
+          You choose any available region for each project, on every plan and at no charge. A region
+          is separate from dedicated infrastructure, meaning dedicated database servers and compute,
+          which is available by agreement on {plans.enterprise.label}.
         </p>
       ),
     },
@@ -553,8 +543,8 @@ function Questions({ catalog }: { catalog: Catalog }) {
       answer: (
         <p>
           Metered integrations and consumption beyond the included allowances, extra requests past
-          the included volume and regions outside the EU, plus contracted Compliance packages and
-          support add-ons. Governance is included in Pro and is never charged per user or policy.
+          the included volume, plus contracted Compliance packages and support add-ons. Governance
+          is included in Pro and is never charged per user or policy.
         </p>
       ),
     },

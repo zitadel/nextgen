@@ -144,10 +144,9 @@ export function compareGroups(catalog: Catalog): Group[] {
         ...catalog.core.resources.map((label) => ({ label, cells: each(() => text("Unlimited")) })),
         ...catalog.core.platform.map((label) => ({ label, cells: each(() => YES) })),
         {
-          label: "Regions included",
+          label: "Region, chosen per project",
           cells: each((plan) => text(regionList(plans[plan].regions.selection))),
         },
-        lineRow("region"),
         {
           label: requests.label,
           source: requests.id,

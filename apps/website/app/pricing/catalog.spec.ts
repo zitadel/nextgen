@@ -45,9 +45,9 @@ describe("the cloud's price list", () => {
     );
     const step = catalog.licensed.find((line) => line.id === "capacity_step");
     expect(step?.requests_per_month).toBeGreaterThan(0);
-    expect(free.regions).toEqual({ scope: "project", selection: ["eu"] });
-    expect(pro.regions).toEqual({ scope: "project", selection: ["eu"] });
-    expect(enterprise.regions).toEqual({ scope: "project", selection: "all_available" });
+    for (const plan of [free, pro, enterprise])
+      expect(plan.regions).toEqual({ scope: "project", selection: "all_available" });
+    expect(catalog.licensed.map((line) => line.id)).not.toContain("region");
     expect(catalog.core.authentication).toContain("Passkeys and TOTP MFA");
     expect(pro.minimum.amount).toBeGreaterThan(0);
     expect(catalog.packages.map((entry) => entry.id)).toEqual([

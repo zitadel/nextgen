@@ -73,7 +73,7 @@ type Plan = {
   delivery_modes: string[];
   support: string;
   sla: { target_percent: number; credits: boolean; note?: string } | null;
-  /** The regions the plan includes; the `region` line prices the others. */
+  /** The regions a plan's projects choose from, at no charge. */
   regions: { scope: "project"; selection: string[] | "all_available" };
 };
 
@@ -236,7 +236,7 @@ export function mostPer(meter: Meter): number | undefined {
 }
 
 /**
- * A licensed line's price: `$1,000 a month`, `$100 a month per region`, or its
+ * A licensed line's price: `$1,000 a month`, `$700 a month per 50M requests`, or its
  * note when it has no amount. A line only Enterprise takes is quoted with the
  * rest of its contract, never listed.
  */

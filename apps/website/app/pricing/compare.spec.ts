@@ -138,21 +138,13 @@ describe("free security and account-wide packages", () => {
     for (const title of titles) expect(title).not.toMatch(/B2C|B2B|consumer|business/i);
   });
 
-  it("prices extra requests and regions outside the EU on Pro, never on Free", () => {
+  it("prices extra requests on Pro, never on Free, and lets every plan choose any region", () => {
     const capacity = rows.find((entry) => entry.source === "capacity_step")!;
     expect(capacity.cells.free.kind).toBe("no");
     expect(words(capacity.cells.pro)).toBe("$700 a month per 50M requests");
     expect(words(capacity.cells.enterprise)).toBe("Custom");
-    const region = rows.find((entry) => entry.source === "region")!;
-    expect(region.cells.free.kind).toBe("no");
-    expect(words(region.cells.pro)).toBe("$100 a month per region");
-    expect(words(region.cells.enterprise)).toBe("Included");
-    const included = rows.find((entry) => entry.label === "Regions included")!;
-    expect(PLANS.map((plan) => words(included.cells[plan]))).toEqual([
-      "EU",
-      "EU",
-      "Every available region",
-    ]);
+    const region = rows.find((entry) => entry.label === "Region, chosen per project")!;
+    for (const plan of PLANS) expect(words(region.cells[plan])).toBe("Every available region");
   });
 
   it("reserves branding removal for paid plans", () => {
