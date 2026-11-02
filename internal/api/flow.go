@@ -120,17 +120,19 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 	// when that release has since been revoked). Sealing still pins which
 	// release serves the attempt after admission.
 	// Any origin the request carries is held to the project's, an opaque one
-	// (`null`) included; only the passkey params need it to have a host.
+	// (`null`) included; only the passkey params need it to have a host. With
+	// none, the server's own host stands in for those params only: a caller
+	// with no Origin, such as a native app, is not a browser on that host.
 	originStr := ""
 	if origin, ok := params.Origin.Get(); ok {
 		originStr = origin.String()
+		if originStr != "" {
+			if err := h.admitOrigin(ctx, state.ProjectID, originStr); err != nil {
+				return nil, err
+			}
+		}
 	} else if host, ok := requestOriginFromContext(ctx); ok {
 		originStr = host
-	}
-	if originStr != "" {
-		if err := h.admitOrigin(ctx, state.ProjectID, originStr); err != nil {
-			return nil, err
-		}
 	}
 	ctx, err = h.withSealedRuntime(ctx, state.ProjectID, state.DeploymentID, state.ReleaseID)
 	if err != nil {

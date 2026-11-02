@@ -47,11 +47,11 @@ const server = setupServer(
     captured.flowAuth = request.headers.get("authorization");
     return HttpResponse.json({ id: "flowdef_1" }, { status: 201 });
   }),
-  http.post(`${BASE}/releases`, async ({ request }) => {
+  http.post(`${BASE}/api/v1/releases`, async ({ request }) => {
     captured.releaseBody = (await request.json()) as Record<string, unknown>;
     return HttpResponse.json({ id: "rel_1" }, { status: 201 });
   }),
-  http.post(`${BASE}/deployments`, async ({ request }) => {
+  http.post(`${BASE}/api/v1/deployments`, async ({ request }) => {
     captured.deploymentBody = (await request.json()) as Record<string, unknown>;
     return HttpResponse.json({ id: "dep_1" }, { status: 201 });
   }),
