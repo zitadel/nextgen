@@ -1,4 +1,5 @@
-import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { mkdtempSync } from "node:fs";
+import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -7,11 +8,12 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ZitadelError } from "../../../../../../../src/lib/errors";
 import { scaffold } from "../../../../../../../src/lib/orca/patchers/rule/file-writer/index";
 import type { ScaffoldPlan } from "../../../../../../../src/lib/orca/patchers/rule/file-writer/types";
+import { rejectionOf } from "../../../../../../helpers/thrown-value";
 
-let dir: string;
+const dir = mkdtempSync(join(tmpdir(), "zitadel-scaffold-"));
 
 beforeEach(async () => {
-  dir = await mkdtemp(join(tmpdir(), "zitadel-scaffold-"));
+  await mkdir(dir, { recursive: true });
 });
 
 afterEach(async () => {
@@ -136,16 +138,13 @@ describe("scaffold - write", () => {
 
   it("throws E_CONFLICT when overwriting a different existing file without force", async () => {
     await writeFile(join(dir, "page.tsx"), "user-authored");
-    let caught: unknown;
-    try {
-      await scaffold(plan({ kind: "write", path: "page.tsx", contents: "managed" }), {
+    const caught = await rejectionOf(() =>
+      scaffold(plan({ kind: "write", path: "page.tsx", contents: "managed" }), {
         cwd: dir,
         dryRun: false,
         force: false,
-      });
-    } catch (error) {
-      caught = error;
-    }
+      }),
+    );
     expect(caught).toBeInstanceOf(ZitadelError);
     expect((caught as ZitadelError).code).toBe("E_CONFLICT");
     // file left untouched
@@ -551,16 +550,13 @@ describe("scaffold - add-dep", () => {
   });
 
   it("throws E_VALIDATION when package.json is missing", async () => {
-    let caught: unknown;
-    try {
-      await scaffold(plan({ kind: "add-dep", name: "foo", version: "1.0.0" }), {
+    const caught = await rejectionOf(() =>
+      scaffold(plan({ kind: "add-dep", name: "foo", version: "1.0.0" }), {
         cwd: dir,
         dryRun: false,
         force: false,
-      });
-    } catch (error) {
-      caught = error;
-    }
+      }),
+    );
     expect(caught).toBeInstanceOf(ZitadelError);
     expect((caught as ZitadelError).code).toBe("E_VALIDATION");
   });

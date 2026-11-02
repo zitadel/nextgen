@@ -1,6 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { promisify } from "node:util";
 
@@ -8,14 +7,15 @@ import { Command } from "@oclif/core";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { deployMessage, messageFlag } from "../../../../src/lib/release/message";
+import { tempDirs } from "../../../helpers/temp-dirs";
 
 const run = promisify(execFile);
 
-let dir: string;
+const dirs = tempDirs();
 
 /** A temp git repo whose one clean commit has `subject`. */
 async function aRepo(subject = "add company"): Promise<string> {
-  dir = await mkdtemp(join(tmpdir(), "zitadel-message-"));
+  const dir = await dirs.make("zitadel-message-");
   const git = (args: string[]): Promise<unknown> => run("git", args, { cwd: dir });
   await git(["init", "-q"]);
   await git(["config", "user.email", "test@example.com"]);
@@ -27,16 +27,14 @@ async function aRepo(subject = "add company"): Promise<string> {
 }
 
 /** A GitHub pull_request event payload on disk, as the runner writes it. */
-async function aPullRequestEvent(title: string): Promise<string> {
+async function aPullRequestEvent(dir: string, title: string): Promise<string> {
   const path = join(dir, "event.json");
   await writeFile(path, JSON.stringify({ pull_request: { title } }));
   return path;
 }
 
 afterEach(async () => {
-  if (dir) {
-    await rm(dir, { recursive: true, force: true });
-  }
+  await dirs.clean();
 });
 
 describe("deployMessage", () => {
@@ -60,14 +58,14 @@ describe("deployMessage", () => {
   });
 
   it("records nothing outside a git repository", async () => {
-    dir = await mkdtemp(join(tmpdir(), "zitadel-message-norepo-"));
+    const dir = await dirs.make("zitadel-message-norepo-");
 
     expect(await deployMessage(undefined, dir, {})).toBeUndefined();
   });
 
   it("takes a GitHub pull request's title over the merge commit's subject", async () => {
     const cwd = await aRepo("Merge 1a2b into 3c4d");
-    const event = await aPullRequestEvent("feat: add company");
+    const event = await aPullRequestEvent(cwd, "feat: add company");
 
     expect(
       await deployMessage(undefined, cwd, {

@@ -266,18 +266,18 @@ describe("local server binary helpers", () => {
   });
 
   it("signals the process group even when its leader is already dead", async () => {
-    let groupAlive = true;
+    const signals: (string | number | undefined)[] = [];
     const kill = vi
       .spyOn(process, "kill")
       .mockImplementation((pid: number, signal?: string | number) => {
         if (pid === 12345) {
           throw errno("ESRCH");
         }
+        signals.push(signal);
         if (signal === "SIGTERM") {
-          groupAlive = false;
           return true;
         }
-        if (groupAlive) {
+        if (!signals.includes("SIGTERM")) {
           return true;
         }
         throw errno("ESRCH");
@@ -399,10 +399,10 @@ describe("reading a server's log file", () => {
     const stop = new AbortController();
     const existing: string[] = [];
     const appended: string[] = [];
-    let waits = 0;
+    const waits: number[] = [];
     const clock = new ManualClock(() => {
-      waits += 1;
-      if (waits === 1) {
+      waits.push(1);
+      if (waits.length === 1) {
         appendFileSync(path, "level=WARN msg=two\n");
       } else {
         stop.abort();

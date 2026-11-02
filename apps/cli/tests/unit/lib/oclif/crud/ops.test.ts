@@ -264,12 +264,12 @@ describe("wire conventions", () => {
     // query body that nests its filters, and nothing in the factory objects.
     // The page holds its cursor as `continuation`, which only the spec's own
     // `next` reads; the envelope reports it under the wire's name.
-    let sent: unknown;
+    const sent: unknown[] = [];
     const spec: ListSpec<Ctx, Json, { rows: readonly unknown[]; continuation?: string }> = {
       body: z.object({}).passthrough(),
       filters: [{ field: "state", operations: ["equals"] }],
       call: async (_ctx, request) => {
-        sent = request;
+        sent.push(request);
         return { rows: [{ id: "r1" }], continuation: "c2" };
       },
       items: (page) => page.rows,
@@ -309,7 +309,7 @@ describe("wire conventions", () => {
       "--json",
     ]);
 
-    expect(sent).toEqual({
+    expect(sent[0]).toEqual({
       size: 5,
       where: [{ field: "state", operation: "equals", value: "active" }],
     });

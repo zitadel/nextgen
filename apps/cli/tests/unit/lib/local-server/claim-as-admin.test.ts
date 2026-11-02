@@ -15,9 +15,9 @@ const admin: LocalAdmin = {
   team_id: "team_localadmin",
 };
 
-let signIns = 0;
-let initAuth: string | null = null;
-let complete: { cookie: string | null; csrf: string | null; body: unknown } | undefined;
+const signIns: number[] = [];
+const initAuths: (string | null)[] = [];
+const completes: { cookie: string | null; csrf: string | null; body: unknown }[] = [];
 
 /** Enough of the sign-in path to mint the admin's session cookie. */
 const sessionHandlers = [
@@ -25,7 +25,7 @@ const sessionHandlers = [
     HttpResponse.json({ console_project_id: "proj_platform", publishable_key: "pk_platform" }),
   ),
   http.post(`${SERVER}/api/v1/auth_attempts`, () => {
-    signIns += 1;
+    signIns.push(1);
     return HttpResponse.json({ attempt_id: "att_1" }, { status: 201 });
   }),
   http.post(`${SERVER}/api/v1/auth_attempts/:attempt/challenges`, async ({ request }) => {
@@ -50,7 +50,7 @@ const sessionHandlers = [
 const server = setupServer(
   ...sessionHandlers,
   http.post(`${SERVER}/api/v1/projects/${PROJECT}/claim/init`, ({ request }) => {
-    initAuth = request.headers.get("authorization");
+    initAuths.push(request.headers.get("authorization"));
     return HttpResponse.json({ challenge_id: "claim_ch_1" }, { status: 201 });
   }),
   http.get(`${SERVER}/api/v1/sessions/me/csrf`, ({ request }) =>
@@ -59,11 +59,11 @@ const server = setupServer(
       : HttpResponse.json({ code: "auth.unauthorized" }, { status: 401 }),
   ),
   http.post(`${SERVER}/api/v1/projects/${PROJECT}/claim/complete`, async ({ request }) => {
-    complete = {
+    completes.push({
       cookie: request.headers.get("cookie"),
       csrf: request.headers.get("x-zitadel-csrf"),
       body: await request.json(),
-    };
+    });
     return HttpResponse.json({ team_id: "team_localadmin", claimed_at: "2027-01-01T00:00:00Z" });
   }),
 );
@@ -71,9 +71,9 @@ const server = setupServer(
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterEach(() => {
   server.resetHandlers();
-  signIns = 0;
-  initAuth = null;
-  complete = undefined;
+  signIns.length = 0;
+  initAuths.length = 0;
+  completes.length = 0;
 });
 afterAll(() => server.close());
 
@@ -92,13 +92,13 @@ describe("claiming a project as the local admin", () => {
       claimed_at: "2027-01-01T00:00:00Z",
     });
 
-    expect(initAuth).toBe("Bearer sk_project");
+    expect(initAuths[0]).toBe("Bearer sk_project");
     // The claim is completed by the admin's session, answering the challenge
     // claim/init just opened.
-    expect(complete?.cookie).toContain("zitadel_session=admin_session");
+    expect(completes[0]?.cookie).toContain("zitadel_session=admin_session");
     // A cookie-authenticated write carries the session's CSRF token (ADR 053 §5).
-    expect(complete?.csrf).toBe("csrf_admin");
-    expect(complete?.body).toEqual({ challenge_id: "claim_ch_1" });
+    expect(completes[0]?.csrf).toBe("csrf_admin");
+    expect(completes[0]?.body).toEqual({ challenge_id: "claim_ch_1" });
   });
 
   it("fails when claim/init opens no challenge", async () => {
@@ -109,6 +109,6 @@ describe("claiming a project as the local admin", () => {
     );
 
     await expect(claim()).rejects.toMatchObject({ status: 500, body: { message: "boom" } });
-    expect(signIns).toBe(0);
+    expect(signIns.length).toBe(0);
   });
 });

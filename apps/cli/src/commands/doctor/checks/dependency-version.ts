@@ -99,10 +99,16 @@ export class DependencyVersionCheck implements SanityCheck {
  * resolution choice, not a train.
  */
 export async function exactZitadelPins(cwd: string): Promise<Array<[string, string]> | undefined> {
-  let pkg: { dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
-  try {
-    pkg = JSON.parse(await readFile(join(cwd, "package.json"), "utf8")) as typeof pkg;
-  } catch {
+  const pkg = await readFile(join(cwd, "package.json"), "utf8")
+    .then(
+      (text) =>
+        JSON.parse(text) as {
+          dependencies?: Record<string, string>;
+          devDependencies?: Record<string, string>;
+        },
+    )
+    .catch(() => undefined);
+  if (pkg === undefined) {
     return undefined;
   }
   return Object.entries({ ...(pkg.dependencies ?? {}), ...(pkg.devDependencies ?? {}) })

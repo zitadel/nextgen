@@ -52,19 +52,20 @@ export function solidStartConfigEdit(): (source: string | undefined) => string {
     }
 
     const option = `middleware: ${JSON.stringify(MIDDLEWARE_PATH)}`;
-    let replacement: string;
-    if (inner === "") {
-      // solidStart()  ->  solidStart({ middleware: "./src/middleware.ts" })
-      replacement = `solidStart({ ${option} })`;
-    } else if (inner.startsWith("{")) {
-      // solidStart({ ...existing })  ->  inject the option after the opening
-      // brace. `args.text` is the whole argument list INCLUDING the parens
-      // (e.g. "({ ssr: true })"), so reuse it verbatim prefixed by `solidStart`
-      // — building from `solidStart(` + args.text would double the opening paren
-      // and produce an invalid config.
-      const braceIdx = args.text.indexOf("{");
-      replacement = `solidStart${args.text.slice(0, braceIdx + 1)} ${option},${args.text.slice(braceIdx + 1)}`;
-    } else {
+    const replacement = ((): string => {
+      if (inner === "") {
+        // solidStart()  ->  solidStart({ middleware: "./src/middleware.ts" })
+        return `solidStart({ ${option} })`;
+      }
+      if (inner.startsWith("{")) {
+        // solidStart({ ...existing })  ->  inject the option after the opening
+        // brace. `args.text` is the whole argument list INCLUDING the parens
+        // (e.g. "({ ssr: true })"), so reuse it verbatim prefixed by `solidStart`
+        // — building from `solidStart(` + args.text would double the opening paren
+        // and produce an invalid config.
+        const braceIdx = args.text.indexOf("{");
+        return `solidStart${args.text.slice(0, braceIdx + 1)} ${option},${args.text.slice(braceIdx + 1)}`;
+      }
       // Unusual: a non-object argument (e.g. a variable). Don't guess — fail loud.
       throw new ZitadelError(
         "E_VALIDATION",
@@ -73,7 +74,7 @@ export function solidStartConfigEdit(): (source: string | undefined) => string {
           hint: 'Pass an options object to solidStart(), e.g. solidStart({ middleware: "./src/middleware.ts" }).',
         },
       );
-    }
+    })();
 
     return source.slice(0, callIndex) + replacement + source.slice(args.end);
   };
@@ -85,36 +86,58 @@ export function solidStartConfigEdit(): (source: string | undefined) => string {
  * the index just past the closing `)`.
  */
 function readBalanced(source: string, openParenIndex: number): { text: string; end: number } {
-  let depth = 0;
-  let quote: string | null = null;
-  for (let i = openParenIndex; i < source.length; i += 1) {
-    const ch = source[i];
-    if (quote) {
-      if (ch === "\\") {
-        i += 1;
-      } else if (ch === quote) {
-        quote = null;
+  interface Scan {
+    readonly depth: number;
+    readonly quote: string | null;
+    readonly skipTo: number;
+    readonly end: number | undefined;
+    readonly unterminated: boolean;
+  }
+  const next = (state: Scan, patch: Partial<Scan>): Scan => Object.assign({}, state, patch);
+  const indexes = Array.from(
+    { length: source.length - openParenIndex },
+    (_unused, offset) => openParenIndex + offset,
+  );
+  const scan = indexes.reduce<Scan>(
+    (state, i) => {
+      if (state.end !== undefined || state.unterminated || i < state.skipTo) {
+        return state;
       }
-      continue;
-    }
-    if (ch === "/" && source[i + 1] === "/") {
-      const newline = source.indexOf("\n", i);
-      if (newline === -1) break;
-      i = newline;
-    } else if (ch === "/" && source[i + 1] === "*") {
-      const close = source.indexOf("*/", i + 2);
-      if (close === -1) break;
-      i = close + 1;
-    } else if (ch === '"' || ch === "'" || ch === "`") {
-      quote = ch;
-    } else if (ch === "(" || ch === "{" || ch === "[") {
-      depth += 1;
-    } else if (ch === ")" || ch === "}" || ch === "]") {
-      depth -= 1;
-      if (depth === 0) {
-        return { text: source.slice(openParenIndex, i + 1), end: i + 1 };
+      const ch = source[i];
+      if (state.quote) {
+        if (ch === "\\") {
+          return next(state, { skipTo: i + 2 });
+        }
+        return ch === state.quote ? next(state, { quote: null }) : state;
       }
-    }
+      if (ch === "/" && source[i + 1] === "/") {
+        const newline = source.indexOf("\n", i);
+        return newline === -1
+          ? next(state, { unterminated: true })
+          : next(state, { skipTo: newline + 1 });
+      }
+      if (ch === "/" && source[i + 1] === "*") {
+        const close = source.indexOf("*/", i + 2);
+        return close === -1
+          ? next(state, { unterminated: true })
+          : next(state, { skipTo: close + 2 });
+      }
+      if (ch === '"' || ch === "'" || ch === "`") {
+        return next(state, { quote: ch });
+      }
+      if (ch === "(" || ch === "{" || ch === "[") {
+        return next(state, { depth: state.depth + 1 });
+      }
+      if (ch === ")" || ch === "}" || ch === "]") {
+        const depth = state.depth - 1;
+        return depth === 0 ? next(state, { depth, end: i + 1 }) : next(state, { depth });
+      }
+      return state;
+    },
+    { depth: 0, quote: null, skipTo: 0, end: undefined, unterminated: false },
+  );
+  if (scan.end !== undefined) {
+    return { text: source.slice(openParenIndex, scan.end), end: scan.end };
   }
   throw new ZitadelError("E_VALIDATION", "Malformed Vite config: unbalanced solidStart() call");
 }

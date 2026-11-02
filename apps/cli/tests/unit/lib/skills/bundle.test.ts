@@ -1,5 +1,5 @@
-import { existsSync } from "node:fs";
-import { mkdir, mkdtemp, readdir, readFile, writeFile } from "node:fs/promises";
+import { existsSync, mkdtempSync } from "node:fs";
+import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
 
@@ -7,12 +7,13 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { bundleSkills, publicSkills } from "../../../../src/lib/skills/bundle";
 
-let repo: string;
-let out: string;
+const repo = mkdtempSync(join(tmpdir(), "zitadel-skills-repo-"));
+const outRoot = mkdtempSync(join(tmpdir(), "zitadel-skills-out-"));
+const out = join(outRoot, "skills");
 
 beforeEach(async () => {
-  repo = await mkdtemp(join(tmpdir(), "zitadel-skills-repo-"));
-  out = join(await mkdtemp(join(tmpdir(), "zitadel-skills-out-")), "skills");
+  await Promise.all([repo, outRoot].map((dir) => rm(dir, { recursive: true, force: true })));
+  await Promise.all([repo, outRoot].map((dir) => mkdir(dir, { recursive: true })));
 });
 
 async function aSkill(path: string, frontmatter: string, files: string[] = []): Promise<void> {

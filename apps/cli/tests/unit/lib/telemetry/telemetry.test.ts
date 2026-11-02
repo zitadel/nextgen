@@ -1,5 +1,5 @@
 import type { Callback, Mixpanel as MixpanelClient, Modifiers, Properties } from "mixpanel";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { Telemetry, type TelemetryDeps } from "../../../../src/lib/telemetry";
 import type { Identity } from "../../../../src/lib/telemetry/identity";
@@ -43,12 +43,12 @@ function fakeClient(
 const identity: Identity = { distinctId: "did-123", isFirstRun: false };
 
 function deps(sink: Tracked[], extra: Partial<TelemetryDeps> = {}): TelemetryDeps {
-  let counter = 0;
+  const issued: string[] = [];
   return {
     env: { ZITADEL_TELEMETRY_TOKEN: "tok" },
     initClient: () => fakeClient(sink),
     loadIdentity: () => identity,
-    newId: () => `id-${++counter}`,
+    newId: () => `id-${issued.push("id")}`,
     ...extra,
   };
 }
@@ -113,20 +113,17 @@ describe("Telemetry (generic core)", () => {
 
   it("sends Mixpanel nothing without a token, and writes no install id", () => {
     const sink: Tracked[] = [];
-    let loaded = false;
+    const loadIdentity = vi.fn(() => identity);
     const t = Telemetry.create(
       deps(sink, {
         env: {},
-        loadIdentity: () => {
-          loaded = true;
-          return identity;
-        },
+        loadIdentity,
       }),
     );
     t.track("e", {});
     expect(t.enabled).toBe(false);
     expect(sink).toHaveLength(0);
-    expect(loaded).toBe(false);
+    expect(loadIdentity).not.toHaveBeenCalled();
   });
 
   it("fails open when the client constructor throws", () => {

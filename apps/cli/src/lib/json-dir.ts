@@ -34,24 +34,23 @@ export async function readJsonDirEntries(
   absDir: string,
   { skip }: { skip?: (name: string) => boolean } = {},
 ): Promise<ReadonlyArray<JsonDirEntry>> {
-  let entries: string[];
-  try {
-    entries = await readdir(absDir);
-  } catch (error) {
+  const entries = await readdir(absDir).catch((error: unknown) => {
     if (typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT") {
-      return [];
+      return undefined;
     }
     throw error;
+  });
+  if (entries === undefined) {
+    return [];
   }
   const result: JsonDirEntry[] = [];
   for (const entry of entries.filter((name) => name.endsWith(".json") && !skip?.(name)).sort()) {
     const abs = join(absDir, entry);
-    let raw: unknown;
-    try {
-      raw = JSON.parse(await readFile(abs, "utf8"));
-    } catch {
-      throw new ZitadelError("E_VALIDATION", `${entry} is not valid JSON`);
-    }
+    const raw: unknown = await readFile(abs, "utf8")
+      .then((text): unknown => JSON.parse(text))
+      .catch(() => {
+        throw new ZitadelError("E_VALIDATION", `${entry} is not valid JSON`);
+      });
     if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
       throw new ZitadelError("E_VALIDATION", `${entry} must contain a JSON object at the root`);
     }

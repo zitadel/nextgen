@@ -1,4 +1,5 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtempSync } from "node:fs";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -64,10 +65,10 @@ describe("DEFAULT_DEV_PORT", () => {
 });
 
 describe("detectDevPort", () => {
-  let dir: string;
+  const dir = mkdtempSync(join(tmpdir(), "zitadel-port-"));
 
   beforeEach(async () => {
-    dir = await mkdtemp(join(tmpdir(), "zitadel-port-"));
+    await mkdir(dir, { recursive: true });
   });
 
   afterEach(async () => {

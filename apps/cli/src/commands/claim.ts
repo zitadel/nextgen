@@ -18,6 +18,8 @@ import { isLoopbackUrl } from "../lib/server";
 import { reportWarning } from "../lib/warnings";
 import type { SuggestedCommand } from "../lib/suggestion";
 
+type ClaimedProject = { team_id: string; claimed_at: string; dashboard_url: string };
+
 /**
  * Poll cadence while a human completes the browser step. Starts responsive so
  * a claim finished in a few seconds is reported almost immediately, then eases
@@ -205,79 +207,26 @@ export default class Claim extends EnvironmentCommand {
 
     const { client } = prompted ?? (await this.connect());
 
-    let waitFor: { challengeId: string; deadline: number };
-    let opened: boolean | undefined;
-    if (challengeId === undefined) {
-      let challenge: Awaited<ReturnType<typeof client.initClaim>>;
-      try {
-        challenge = await client.initClaim(projectId);
-      } catch (error) {
-        const claimed = alreadyClaimedDetails(error);
-        if (claimed) {
-          return this.alreadyClaimed({ project_id: projectId, ...claimed });
-        }
-        if (isClaimWindowExpired(error)) {
-          this.recordTelemetry({ claim_outcome: "window_expired" });
-          throw claimWindowExpiredError();
-        }
-        throw error;
-      }
-
-      // A local server left on the default public base advertises a claim page
-      // on a remote origin — the exact confusion this warning names. Cloud
-      // servers legitimately use a console origin different from the API one,
-      // so only a loopback API paired with a non-loopback claim page warns.
-      if (isLoopbackUrl(this.meta.source) && !isLoopbackUrl(challenge.claim_url)) {
-        reportWarning(
-          `The server at ${this.meta.source} advertised a claim page on ${new URL(challenge.claim_url).origin}. ` +
-            "If you started that server yourself, set NEXTGEN_SERVER_PUBLIC_BASE to its reachable origin (e.g. http://localhost:8080).",
-        );
-      }
-
-      // Always show the link first, before attempting anything: it is the whole
-      // instruction on its own, so a launch that never happens (headless box,
-      // no `xdg-open`, `--no-open`, an agent) needs no separate path.
-      //
-      // The URL prints as a bare line under the frame rather than inside it:
-      // it must never be split (clickability, and the journey e2e scrape reads
-      // it out of the narration), and consola pads every box line to the
-      // longest one, so a ~110-character URL inside the box would re-break the
-      // frame on any terminal narrower than the URL itself. `wrapForBox` keeps
-      // the frame's own content inside the terminal width.
-      consola.box({
-        title: "Finish in your browser",
-        message: wrapForBox(
-          "Create an account or sign in to claim your Project, make it permanent and start collaborating.",
-        ),
-        style: { padding: 1, borderStyle: "rounded", borderColor: "cyan" },
-      });
-      consola.log(challenge.claim_url);
-
-      if (flags["no-wait"]) {
-        return this.linkIssued(projectId, challenge);
-      }
-
-      const skipLaunch = flags["no-open"] || nonInteractive;
-      opened = skipLaunch ? false : (await openInBrowser(challenge.claim_url)).opened;
-      if (!opened) {
-        consola.info("Open the link above to continue.");
-      }
-      waitFor = {
-        challengeId: challenge.challenge_id,
-        deadline: claimDeadline({
-          expiresAt: challenge.expires_at,
-          timeoutSeconds: flags.timeout,
-          now: Date.now(),
-        }),
-      };
-    } else {
-      // Resuming mints nothing: the link is already with whoever opens it, so
-      // this run only waits on it.
-      waitFor = {
-        challengeId,
-        deadline: claimDeadline({ timeoutSeconds: flags.timeout, now: Date.now() }),
-      };
+    const started =
+      challengeId === undefined
+        ? await this.issueLink(client, projectId, {
+            noWait: flags["no-wait"],
+            skipLaunch: flags["no-open"] || nonInteractive,
+            timeoutSeconds: flags.timeout,
+          })
+        : {
+            // Resuming mints nothing: the link is already with whoever opens it, so
+            // this run only waits on it.
+            waitFor: {
+              challengeId,
+              deadline: claimDeadline({ timeoutSeconds: flags.timeout, now: Date.now() }),
+            },
+            opened: undefined,
+          };
+    if ("envelope" in started) {
+      return started.envelope;
     }
+    const { waitFor, opened } = started;
     consola.start("Waiting for the browser step to finish");
 
     const completed = await this.poll(
@@ -323,6 +272,93 @@ export default class Claim extends EnvironmentCommand {
   }
 
   /**
+   * Mints the claim link and shows it, then returns what the wait needs, or the
+   * envelope of a run that stops at the link (`--no-wait`, or a project that is
+   * already claimed).
+   */
+  private async issueLink(
+    client: ZitadelClient,
+    projectId: string,
+    options: {
+      noWait: boolean | undefined;
+      skipLaunch: boolean | undefined;
+      timeoutSeconds: Parameters<typeof claimDeadline>[0]["timeoutSeconds"];
+    },
+  ): Promise<
+    | { envelope: JsonEnvelope }
+    | { waitFor: { challengeId: string; deadline: number }; opened: boolean }
+  > {
+    const issued = await client.initClaim(projectId).then(
+      (challenge) => ({ challenge }),
+      (error: unknown) => {
+        const claimed = alreadyClaimedDetails(error);
+        if (claimed) {
+          return { envelope: this.alreadyClaimed({ project_id: projectId, ...claimed }) };
+        }
+        if (isClaimWindowExpired(error)) {
+          this.recordTelemetry({ claim_outcome: "window_expired" });
+          throw claimWindowExpiredError();
+        }
+        throw error;
+      },
+    );
+    if ("envelope" in issued) {
+      return issued;
+    }
+    const { challenge } = issued;
+
+    // A local server left on the default public base advertises a claim page
+    // on a remote origin — the exact confusion this warning names. Cloud
+    // servers legitimately use a console origin different from the API one,
+    // so only a loopback API paired with a non-loopback claim page warns.
+    if (isLoopbackUrl(this.meta.source) && !isLoopbackUrl(challenge.claim_url)) {
+      reportWarning(
+        `The server at ${this.meta.source} advertised a claim page on ${new URL(challenge.claim_url).origin}. ` +
+          "If you started that server yourself, set NEXTGEN_SERVER_PUBLIC_BASE to its reachable origin (e.g. http://localhost:8080).",
+      );
+    }
+
+    // Always show the link first, before attempting anything: it is the whole
+    // instruction on its own, so a launch that never happens (headless box,
+    // no `xdg-open`, `--no-open`, an agent) needs no separate path.
+    //
+    // The URL prints as a bare line under the frame rather than inside it:
+    // it must never be split (clickability, and the journey e2e scrape reads
+    // it out of the narration), and consola pads every box line to the
+    // longest one, so a ~110-character URL inside the box would re-break the
+    // frame on any terminal narrower than the URL itself. `wrapForBox` keeps
+    // the frame's own content inside the terminal width.
+    consola.box({
+      title: "Finish in your browser",
+      message: wrapForBox(
+        "Create an account or sign in to claim your Project, make it permanent and start collaborating.",
+      ),
+      style: { padding: 1, borderStyle: "rounded", borderColor: "cyan" },
+    });
+    consola.log(challenge.claim_url);
+
+    if (options.noWait) {
+      return { envelope: this.linkIssued(projectId, challenge) };
+    }
+
+    const opened = options.skipLaunch ? false : (await openInBrowser(challenge.claim_url)).opened;
+    if (!opened) {
+      consola.info("Open the link above to continue.");
+    }
+    return {
+      waitFor: {
+        challengeId: challenge.challenge_id,
+        deadline: claimDeadline({
+          expiresAt: challenge.expires_at,
+          timeoutSeconds: options.timeoutSeconds,
+          now: Date.now(),
+        }),
+      },
+      opened,
+    };
+  }
+
+  /**
    * Polls `claim/status` until the browser leg lands or the link dies.
    *
    * The two failure modes read the same to a user (the link no longer works,
@@ -336,34 +372,32 @@ export default class Claim extends EnvironmentCommand {
     challengeId: string,
     deadline: number,
     startOver: SuggestedCommand,
-  ): Promise<{ team_id: string; claimed_at: string; dashboard_url: string }> {
-    let interval = INITIAL_POLL_MS;
-    let polls = 0;
-
-    while (Date.now() < deadline) {
-      polls += 1;
-      try {
-        const status = await client.getClaimStatus(projectId, { challenge_id: challengeId });
-        if (status.status === "completed") {
-          this.recordTelemetry({ poll_count: polls });
-          return status;
-        }
-      } catch (error) {
+    interval: number = INITIAL_POLL_MS,
+    polls: number = 0,
+  ): Promise<ClaimedProject> {
+    if (Date.now() >= deadline) {
+      return this.stopWaiting(polls, startOver);
+    }
+    const attempt = polls + 1;
+    const polled = await client.getClaimStatus(projectId, { challenge_id: challengeId }).then(
+      (status): { completed: ClaimedProject } | { wait: number } =>
+        status.status === "completed" ? { completed: status } : { wait: interval },
+      (error: unknown): { wait: number } => {
         // The window can close between init and poll (a challenge minted in
         // the window's last minutes); the status route reports that as its
         // own 410 code, and it must not read as the retryable link expiry.
         if (isClaimWindowExpired(error)) {
-          this.recordTelemetry({ claim_outcome: "window_expired", poll_count: polls });
+          this.recordTelemetry({ claim_outcome: "window_expired", poll_count: attempt });
           throw claimWindowExpiredError();
         }
         if (error instanceof ApiError && error.status === 410) {
-          this.recordTelemetry({ claim_outcome: "expired", poll_count: polls });
+          this.recordTelemetry({ claim_outcome: "expired", poll_count: attempt });
           throw expiredError("The link expired before the browser step finished.", startOver);
         }
         // Only a resumed wait can name a challenge the platform never minted
         // for this project.
         if (isChallengeNotFound(error)) {
-          this.recordTelemetry({ claim_outcome: "not_found", poll_count: polls });
+          this.recordTelemetry({ claim_outcome: "not_found", poll_count: attempt });
           throw new ZitadelError(
             "E_NOT_FOUND",
             "This project has no claim link with that challenge id.",
@@ -373,23 +407,36 @@ export default class Claim extends EnvironmentCommand {
         if (error instanceof ApiError && error.status === 429) {
           // Polled too eagerly. Back off to the ceiling immediately rather
           // than easing towards it, so a rate limit is never compounded.
-          interval = MAX_POLL_MS;
-        } else {
-          this.recordTelemetry({ poll_count: polls });
-          throw error;
+          return { wait: MAX_POLL_MS };
         }
-      }
-
-      // Never sleep past the deadline: the last wait should end the loop, not
-      // overshoot it by up to a full interval.
-      const remaining = deadline - Date.now();
-      if (remaining <= 0) {
-        break;
-      }
-      await sleep(Math.min(interval, remaining));
-      interval = Math.min(interval * POLL_BACKOFF_FACTOR, MAX_POLL_MS);
+        this.recordTelemetry({ poll_count: attempt });
+        throw error;
+      },
+    );
+    if ("completed" in polled) {
+      this.recordTelemetry({ poll_count: attempt });
+      return polled.completed;
     }
 
+    // Never sleep past the deadline: the last wait should end the loop, not
+    // overshoot it by up to a full interval.
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) {
+      return this.stopWaiting(attempt, startOver);
+    }
+    await sleep(Math.min(polled.wait, remaining));
+    return this.poll(
+      client,
+      projectId,
+      challengeId,
+      deadline,
+      startOver,
+      Math.min(polled.wait * POLL_BACKOFF_FACTOR, MAX_POLL_MS),
+      attempt,
+    );
+  }
+
+  private stopWaiting(polls: number, startOver: SuggestedCommand): never {
     this.recordTelemetry({ claim_outcome: "timeout", poll_count: polls });
     throw expiredError("Stopped waiting for the browser step to finish.", startOver);
   }

@@ -1,5 +1,5 @@
-import { existsSync } from "node:fs";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { existsSync, mkdtempSync } from "node:fs";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -30,10 +30,9 @@ import { takeReportedWarnings } from "../../../src/lib/warnings";
 
 const TEST_CLI_VERSION = "0.1.0-alpha.18";
 
-let cwd: string;
+const cwd = mkdtempSync(join(tmpdir(), "zitadel-setup-resources-"));
 
 beforeEach(async () => {
-  cwd = await mkdtemp(join(tmpdir(), "zitadel-setup-resources-"));
   await mkdir(join(cwd, ".zitadel"), { recursive: true });
   await writeFile(
     join(cwd, ".zitadel/state.json"),
@@ -773,12 +772,13 @@ describe("materializeSetupResources with a social provider", () => {
   it("refuses an existing connection before creating anything", async () => {
     // Finding out after the create would leave the project holding a
     // connection that no local file tracks.
-    let created = false;
+    const creates: unknown[][] = [];
+    const created = () => creates.length > 0;
     const client = recordingClient();
     const watching = {
       ...client,
       createIdp: (...args: unknown[]) => {
-        created = true;
+        creates.push(args);
         return (client.createIdp as (...a: unknown[]) => unknown)(...args);
       },
     } as unknown as typeof client;
@@ -796,7 +796,7 @@ describe("materializeSetupResources with a social provider", () => {
       }),
     ).rejects.toMatchObject({ code: "E_CONFLICT" });
 
-    expect(created).toBe(false);
+    expect(created()).toBe(false);
   });
 
   it("refuses to replace an existing connection, even with --force", async () => {
@@ -1010,10 +1010,9 @@ describe("materializeSetupResources with a social provider", () => {
 
 /** Several providers at once: Google from the catalog, and a custom connection beside it. */
 describe("materializeSetupResources with several providers", () => {
-  let cwd: string;
+  const cwd = mkdtempSync(join(tmpdir(), "zitadel-setup-multi-"));
 
   beforeEach(async () => {
-    cwd = await mkdtemp(join(tmpdir(), "zitadel-setup-multi-"));
     await mkdir(join(cwd, ".zitadel"), { recursive: true });
     await writeFile(
       join(cwd, ".zitadel/state.json"),

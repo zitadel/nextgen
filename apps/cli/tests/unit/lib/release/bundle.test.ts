@@ -1,15 +1,15 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
 import { buildBundle } from "../../../../src/lib/release/bundle";
+import { tempDirs } from "../../../helpers/temp-dirs";
 
-let dir: string;
+const dirs = tempDirs();
 
 async function project(files: Record<string, unknown>): Promise<string> {
-  dir = await mkdtemp(join(tmpdir(), "zitadel-bundle-"));
+  const dir = await dirs.make("zitadel-bundle-");
   for (const [relPath, content] of Object.entries(files)) {
     await mkdir(join(dir, relPath, ".."), { recursive: true });
     await writeFile(join(dir, relPath), JSON.stringify(content));
@@ -18,9 +18,7 @@ async function project(files: Record<string, unknown>): Promise<string> {
 }
 
 afterEach(async () => {
-  if (dir) {
-    await rm(dir, { recursive: true, force: true });
-  }
+  await dirs.clean();
 });
 
 describe("buildBundle", () => {
@@ -100,8 +98,7 @@ describe("buildBundle", () => {
   });
 
   it("refuses an empty .zitadel/ directory", async () => {
-    const cwd = await mkdtemp(join(tmpdir(), "zitadel-bundle-empty-"));
-    dir = cwd;
+    const cwd = await dirs.make("zitadel-bundle-empty-");
 
     await expect(buildBundle(cwd)).rejects.toMatchObject({ code: "E_VALIDATION" });
   });
@@ -116,10 +113,12 @@ describe("buildBundle", () => {
   });
 
   it("refuses a bundle over the fifty-resource cap", async () => {
-    const files: Record<string, unknown> = {};
-    for (let i = 0; i < 51; i += 1) {
-      files[`.zitadel/schemas/schema-${i}.json`] = { objectType: `type-${i}` };
-    }
+    const files = Object.fromEntries(
+      Array.from({ length: 51 }, (_, i) => [
+        `.zitadel/schemas/schema-${i}.json`,
+        { objectType: `type-${i}` },
+      ]),
+    );
     const cwd = await project(files);
 
     await expect(buildBundle(cwd)).rejects.toMatchObject({ code: "E_VALIDATION" });

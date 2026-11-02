@@ -109,14 +109,12 @@ export async function appendManagedEnvValue(
   value: string,
 ): Promise<void> {
   const line = envLine(key, value);
-  let existing = "";
-  try {
-    existing = await readFile(path, "utf8");
-  } catch (error) {
+  const existing = await readFile(path, "utf8").catch((error: unknown) => {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
       throw error;
     }
-  }
+    return "";
+  });
   const next = `${existing}${existing && !existing.endsWith("\n") ? "\n" : ""}${line}\n`;
   await writeFile(path, next, { mode: SECRET_MODE });
   await enforceSecretMode(path);

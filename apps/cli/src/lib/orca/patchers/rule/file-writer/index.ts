@@ -144,20 +144,10 @@ async function editFile(
     });
   }
   // The first candidate is where the file is created when none of them exist.
-  let path = preferred;
-  let source: string | undefined;
-  let mode: number | undefined;
-  for (const candidate of candidates) {
-    const contents = await readIfExists(candidate);
-    if (contents !== undefined) {
-      path = candidate;
-      source = contents;
-      // Preserve the existing file's permission bits across the temp-file swap
-      // (mask off the file-type bits `stat` includes so `chmod` gets only perms).
-      mode = (await stat(candidate)).mode & 0o777;
-      break;
-    }
-  }
+  const found = await firstExisting(candidates);
+  const path = found?.path ?? preferred;
+  const source = found?.source;
+  const mode = found?.mode;
   const next = edit(source);
   if (next === source) {
     result.filesSkipped.push(path);
@@ -176,6 +166,20 @@ async function editFile(
   }
   await rename(tmp, path);
   record(result, path, "file", action);
+}
+
+async function firstExisting(
+  candidates: ReadonlyArray<string>,
+): Promise<{ path: string; source: string; mode: number } | undefined> {
+  for (const candidate of candidates) {
+    const contents = await readIfExists(candidate);
+    if (contents !== undefined) {
+      // Preserve the existing file's permission bits across the temp-file swap
+      // (mask off the file-type bits `stat` includes so `chmod` gets only perms).
+      return { path: candidate, source: contents, mode: (await stat(candidate)).mode & 0o777 };
+    }
+  }
+  return undefined;
 }
 
 async function ensureDir(
@@ -449,7 +453,7 @@ async function addDependency(
   // the document. Every byte outside it — key order, blank lines, inline
   // objects, line endings — stays untouched; the touched map itself is
   // name-sorted, matching what a package manager writes.
-  let contents = setTopLevelJsonKey(
+  const withDependency = setTopLevelJsonKey(
     existing,
     path,
     key,
@@ -459,14 +463,14 @@ async function addDependency(
   // refuse it outright (Qwik's starter vite.config.ts throws on start). Move a
   // devDependencies entry the developer already has into dependencies instead
   // of duplicating it.
-  if (listedInOther) {
-    contents = setTopLevelJsonKey(
-      contents,
-      path,
-      "devDependencies",
-      Object.fromEntries(Object.entries(other).filter(([name]) => name !== op.name)),
-    );
-  }
+  const contents = listedInOther
+    ? setTopLevelJsonKey(
+        withDependency,
+        path,
+        "devDependencies",
+        Object.fromEntries(Object.entries(other).filter(([name]) => name !== op.name)),
+      )
+    : withDependency;
   if (dryRun) {
     record(result, path, "file", "update");
     result.depsAdded.push(op.name);

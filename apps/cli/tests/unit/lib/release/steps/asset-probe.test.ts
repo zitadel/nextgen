@@ -135,7 +135,7 @@ describe("brandingAssetWarnings", () => {
   });
 
   it("re-validates redirects instead of following them into a private network", async () => {
-    let privateHits = 0;
+    const privateHits = vi.fn();
     server.use(
       http.head(
         LOGO,
@@ -146,22 +146,22 @@ describe("brandingAssetWarnings", () => {
           }),
       ),
       http.head("https://10.0.0.7/internal-logo.svg", () => {
-        privateHits += 1;
+        privateHits();
         return new HttpResponse(null, { headers: { "content-type": "image/svg+xml" } });
       }),
     );
 
     const warnings = await brandingAssetWarnings([{ logo_url: LOGO }]);
 
-    expect(privateHits).toBe(0);
+    expect(privateHits.mock.calls.length).toBe(0);
     expect(warnings).toEqual([]);
   });
 
   it("warns per field and probes each distinct URL once", async () => {
-    let hits = 0;
+    const hits = vi.fn();
     server.use(
       http.head("https://cdn.example.com/brand.png", () => {
-        hits += 1;
+        hits();
         return new HttpResponse(null, { status: 500 });
       }),
     );
@@ -173,7 +173,7 @@ describe("brandingAssetWarnings", () => {
       },
     ]);
 
-    expect(hits).toBe(1);
+    expect(hits.mock.calls.length).toBe(1);
     expect(warnings.map((warning) => warning.split(" ")[0])).toEqual(["logo_url", "hero_url"]);
   });
 

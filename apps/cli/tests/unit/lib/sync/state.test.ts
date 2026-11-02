@@ -1,4 +1,5 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtempSync } from "node:fs";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -6,10 +7,10 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { readState, updateState, type ZitadelState } from "../../../../src/lib/sync/state";
 
-let cwd: string;
+const cwd = mkdtempSync(join(tmpdir(), "zitadel-state-"));
 
 beforeEach(async () => {
-  cwd = await mkdtemp(join(tmpdir(), "zitadel-state-"));
+  await mkdir(cwd, { recursive: true });
 });
 
 afterEach(async () => {

@@ -1,4 +1,5 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtempSync } from "node:fs";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -6,12 +7,13 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { NextDetector } from "../../../../../src/lib/orca/detectors/next";
 import { ZitadelError } from "../../../../../src/lib/errors";
+import { rejectionOf } from "../../../../helpers/thrown-value";
 
 const detector = new NextDetector();
-let dir: string;
+const dir = mkdtempSync(join(tmpdir(), "zitadel-next-detector-"));
 
 beforeEach(async () => {
-  dir = await mkdtemp(join(tmpdir(), "zitadel-next-detector-"));
+  await mkdir(dir, { recursive: true });
 });
 
 afterEach(async () => {
@@ -103,12 +105,7 @@ describe("NextDetector", () => {
 
   it("throws E_UNSUPPORTED_PROJECT_SHAPE for a Next project with no app router", async () => {
     await writeNextPackageJson();
-    let caught: unknown;
-    try {
-      await detector.detect(dir);
-    } catch (error) {
-      caught = error;
-    }
+    const caught = await rejectionOf(() => detector.detect(dir));
     expect(caught).toBeInstanceOf(ZitadelError);
     expect((caught as ZitadelError).code).toBe("E_UNSUPPORTED_PROJECT_SHAPE");
     expect((caught as ZitadelError).message).toContain("Pages Router");
@@ -119,12 +116,7 @@ describe("NextDetector", () => {
     // user is not told to restructure to the App Router only to then hit
     // the version wall (ADR 043).
     await writeNextPackageJson({ dependencies: { next: "^14.2.0" } });
-    let caught: unknown;
-    try {
-      await detector.detect(dir);
-    } catch (error) {
-      caught = error;
-    }
+    const caught = await rejectionOf(() => detector.detect(dir));
     expect(caught).toBeInstanceOf(ZitadelError);
     expect((caught as ZitadelError).code).toBe("E_UNSUPPORTED_PROJECT_SHAPE");
     expect((caught as ZitadelError).message).toContain("below the supported floor");

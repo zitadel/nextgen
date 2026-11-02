@@ -107,21 +107,23 @@ const byId = (ref: string): ApiOperation => {
 
 /** How many single-letter edits turn `a` into `b` (Levenshtein), for a typo's suggestion. */
 const distance = (a: string, b: string): number => {
-  let previous = Array.from({ length: b.length + 1 }, (_, index) => index);
-  for (const [i, left] of [...a].entries()) {
-    const current = [i + 1];
-    for (const [j, right] of [...b].entries()) {
-      current.push(
-        Math.min(
-          (previous[j + 1] ?? 0) + 1,
-          (current[j] ?? 0) + 1,
-          (previous[j] ?? 0) + (left === right ? 0 : 1),
-        ),
-      );
-    }
-    previous = current;
-  }
-  return previous[b.length] ?? 0;
+  const last = [...a].reduce(
+    (previous, left, i) => {
+      const current = [i + 1];
+      for (const [j, right] of [...b].entries()) {
+        current.push(
+          Math.min(
+            (previous[j + 1] ?? 0) + 1,
+            (current[j] ?? 0) + 1,
+            (previous[j] ?? 0) + (left === right ? 0 : 1),
+          ),
+        );
+      }
+      return current;
+    },
+    Array.from({ length: b.length + 1 }, (_, index) => index),
+  );
+  return last[b.length] ?? 0;
 };
 
 /** A path's segments, each percent-decoded; `undefined` for a malformed escape. */
@@ -147,8 +149,7 @@ const matchOf = (
     return undefined;
   }
   const values: Record<string, string> = {};
-  let literals = 0;
-  for (const [index, part] of parts.entries()) {
+  const kinds = parts.map((part, index) => {
     const segment = segments[index] ?? "";
     const parameter = /^\{([^}]+)\}$/.exec(part)?.[1];
     if (parameter !== undefined) {
@@ -156,13 +157,14 @@ const matchOf = (
         return undefined;
       }
       values[parameter] = segment;
-    } else if (part === segment) {
-      literals++;
-    } else {
-      return undefined;
+      return "parameter";
     }
+    return part === segment ? "literal" : undefined;
+  });
+  if (kinds.includes(undefined)) {
+    return undefined;
   }
-  return { literals, values };
+  return { literals: kinds.filter((kind) => kind === "literal").length, values };
 };
 
 const byPath = (ref: string, method: string | undefined): Target => {

@@ -1,4 +1,5 @@
-import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdtempSync } from "node:fs";
+import { mkdir, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -14,10 +15,10 @@ import {
   type PackageJson,
 } from "../../../../../src/lib/orca/detectors/package-json";
 
-let dir: string;
+const dir = mkdtempSync(join(tmpdir(), "zitadel-package-json-"));
 
 beforeEach(async () => {
-  dir = await mkdtemp(join(tmpdir(), "zitadel-package-json-"));
+  await mkdir(dir, { recursive: true });
 });
 
 afterEach(async () => {

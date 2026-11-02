@@ -91,10 +91,8 @@ export async function withoutExistingTargets(
  * error handling reports the real problem.
  */
 async function dependencyDeclared(cwd: string, name: string): Promise<boolean> {
-  let contents: string;
-  try {
-    contents = await readFile(join(cwd, "package.json"), "utf8");
-  } catch {
+  const contents = await readFile(join(cwd, "package.json"), "utf8").catch(() => undefined);
+  if (contents === undefined) {
     return false;
   }
   try {

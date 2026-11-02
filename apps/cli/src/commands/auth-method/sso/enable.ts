@@ -288,11 +288,10 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     // per-schema, and they are idempotent. Enabling the provider for a second
     // user type, and finishing a run interrupted after the connection file was
     // written, both arrive here.
-    let secret: SecretOutcome | undefined;
-    let clientIdState: PublishState | undefined;
-
-    if (reusing) {
-      consola.success(`Reusing ${plan.file.path}`);
+    const reuseCredentials = async (
+      reused: Extract<typeof plan, { action: "reuse" }>,
+    ): Promise<PublishedCredentials> => {
+      consola.success(`Reusing ${reused.file.path}`);
       // Shown on reuse too: the URI moved to one per connection after the
       // first release, and rerunning this command is how a developer finds
       // the one to register now.
@@ -306,20 +305,16 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       // silently ignored. Nothing is prompted for: an unattended rerun should
       // not start asking for credentials the project already has.
       const publish = this.publisher(client, projectId);
-      if (clientIdFlag !== undefined) {
-        if (idVariable === undefined) {
-          reportWarning(
-            `${plan.file.path} holds its client id directly, so nothing was published. ` +
-              "Edit the file to change it.",
-          );
-        } else {
-          clientIdState = await publishClientId({
-            name: idVariable,
-            value: clientIdFlag,
-            publish,
-          });
-        }
+      if (clientIdFlag !== undefined && idVariable === undefined) {
+        reportWarning(
+          `${reused.file.path} holds its client id directly, so nothing was published. ` +
+            "Edit the file to change it.",
+        );
       }
+      const clientIdState =
+        clientIdFlag !== undefined && idVariable !== undefined
+          ? await publishClientId({ name: idVariable, value: clientIdFlag, publish })
+          : undefined;
       // Reuse never demands a secret: the project may already hold it, and
       // refusing an unattended rerun for a credential that has not changed
       // would be noise. It is only read so that a rerun can replace it.
@@ -331,17 +326,21 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         stdin: true,
         optional: true,
       });
-      if (piped !== undefined) {
-        if (variable === undefined) {
-          reportWarning(
-            `${plan.file.path} holds its client secret directly, so nothing was published. ` +
-              "Replace it with a ${{ NAME }} reference so the secret is not committed.",
-          );
-        } else {
-          secret = await storeClientSecret({ name: variable, value: piped, publish });
-        }
+      if (piped !== undefined && variable === undefined) {
+        reportWarning(
+          `${reused.file.path} holds its client secret directly, so nothing was published. ` +
+            "Replace it with a ${{ NAME }} reference so the secret is not committed.",
+        );
       }
-    } else {
+      const secret =
+        piped !== undefined && variable !== undefined
+          ? await storeClientSecret({ name: variable, value: piped, publish })
+          : undefined;
+      return { clientIdState, secret };
+    };
+    const createCredentials = async (
+      created: Extract<typeof plan, { action: "create" }>,
+    ): Promise<PublishedCredentials> => {
       consola.info(`${entry.displayName} needs an OAuth application.`);
       consola.info(`Callback URI   ${callbackUri}`);
       // A custom provider has no console to send the developer to: it is
@@ -389,7 +388,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
 
       const publish = this.publisher(client, projectId);
       const connection = entry.connection({
-        slug: plan.slug,
+        slug: created.slug,
         schemaProperties: schema.properties,
         schemaRef: CONNECTION_SCHEMA_REF,
         endpoints,
@@ -400,8 +399,8 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       // fills nothing, so say so now and not on the next command.
       if (!("claim_mapping" in connection)) {
         reportWarning(
-          `${schema.path} defines none of the properties ${entry.displayName} maps by default, so ${plan.path} has no claim_mapping ` +
-            `and no sign-in can fill a user. Add the properties your provider returns to claim_mapping in ${plan.path}.`,
+          `${schema.path} defines none of the properties ${entry.displayName} maps by default, so ${created.path} has no claim_mapping ` +
+            `and no sign-in can fill a user. Add the properties your provider returns to claim_mapping in ${created.path}.`,
         );
       }
       if (endpoints?.issuer !== undefined && endpoints.issuer !== entry.issuer) {
@@ -410,34 +409,37 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         // else in the output would show it.
         reportWarning(`${entry.displayName} points at ${endpoints.issuer}, not the provider`);
       }
-      const target = join(cwd, plan.path);
+      const target = join(cwd, created.path);
       await mkdir(dirname(target), { recursive: true });
       // `wx` rather than a plain write: planConnection decided this file does
       // not exist, and anything that appeared since is not ours to overwrite.
       await writeFile(target, `${stableStringify(connection)}\n`, { flag: "wx" });
       // The id first: it is the half the developer can read back afterwards,
       // and a connection missing either credential fails the same way.
-      clientIdState = await publishClientId({
+      const clientIdState = await publishClientId({
         name: scaffolded.clientId,
         value: clientId,
         publish,
       });
-      secret = await storeClientSecret({
+      const secret = await storeClientSecret({
         name: scaffolded.clientSecret,
         value: secretValue,
         publish,
       });
-      consola.success(`Wrote ${plan.path}`);
+      consola.success(`Wrote ${created.path}`);
       if (selection.kind === "custom") {
         for (const note of mappingNotes({
-          file: plan.path,
+          file: created.path,
           provider: entry.displayName,
           connection,
         })) {
           consola.info(note);
         }
       }
-    }
+      return { clientIdState, secret };
+    };
+    const { clientIdState, secret } =
+      plan.action === "reuse" ? await reuseCredentials(plan) : await createCredentials(plan);
 
     const written = await this.enableInConfiguration(cwd, schema, edits);
 
@@ -668,6 +670,12 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
   }
 }
 
+/** What a run published of the provider's credentials, by half. */
+type PublishedCredentials = {
+  readonly clientIdState: PublishState | undefined;
+  readonly secret: SecretOutcome | undefined;
+};
+
 /**
  * What the run needs from the flags before the schema is read. `selection` is
  * undefined for a custom provider whose settings a person will be asked for
@@ -717,17 +725,13 @@ async function readProject(
   // here the settings they did give are only checked, so nobody is asked before
   // being turned away. A script, a dry run or --non-interactive is held to the
   // flags and told which are missing.
-  let selection: ProviderSelection | undefined;
-  if (provider === CUSTOM_PROVIDER && interactive && !hasAllCustomSettings(values)) {
+  const asksLater = provider === CUSTOM_PROVIDER && interactive && !hasAllCustomSettings(values);
+  if (asksLater) {
     checkGivenCustomFlags(values, ENABLE_FLAG_NAMES);
-  } else {
-    selection = selectionFromFlags(
-      provider,
-      values,
-      ENABLE_FLAG_NAMES,
-      customExample(ENABLE_FLAG_NAMES),
-    );
   }
+  const selection: ProviderSelection | undefined = asksLater
+    ? undefined
+    : selectionFromFlags(provider, values, ENABLE_FLAG_NAMES, customExample(ENABLE_FLAG_NAMES));
   if (issuer === undefined) {
     throw new ZitadelError("E_VALIDATION", "This Project has no development issuer", {
       hint: "Run `zitadel setup` first, or set ZITADEL_ISSUER to the origin your app serves from.",

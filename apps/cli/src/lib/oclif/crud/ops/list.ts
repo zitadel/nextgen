@@ -181,18 +181,17 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
     // `--json` has already silenced everything.
     const progress = all && process.stdout.isTTY && !this.jsonEnabled() ? spinner() : undefined;
     progress?.start(`Fetching ${topic}`);
-    let fetched = 0;
-    let drained = false;
     // The walk begins at the page --page-token names, if any.
     const first = typeof flags["page-token"] === "string" ? flags["page-token"] : undefined;
     // The spinner owns the cursor and a SIGINT handler until it is stopped, so a
     // page that fails mid-drain has to stop it too; otherwise the error prints
     // under a live spinner and the handler outlives the command.
+    const fetched: unknown[] = [];
     const walk = pages(
       async (token) => {
         const page = await request(token ?? first);
-        fetched += 1;
-        progress?.message(`Fetching ${topic} — page ${fetched}`);
+        fetched.push(page);
+        progress?.message(`Fetching ${topic} — page ${fetched.length}`);
         return page;
       },
       { next: (response) => spec.next?.(response) || undefined },
@@ -201,16 +200,10 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
       items: (response) => sanitizeResponse(spec.items(response)),
       all,
       next: (response) => sanitizeResponse(spec.next?.(response)),
-    })
-      .then((page) => {
-        drained = true;
-        return page;
-      })
-      .finally(() => {
-        if (!drained) {
-          progress?.stop(`Fetching ${topic} failed`);
-        }
-      });
+    }).catch((error: unknown) => {
+      progress?.stop(`Fetching ${topic} failed`);
+      throw error;
+    });
     progress?.stop(`Fetched ${items.length} ${items.length === 1 ? resource.singular : topic}`);
 
     // A terminal gets the aligned table with its header and footer; a pipe (or

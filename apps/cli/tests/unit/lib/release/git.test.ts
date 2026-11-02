@@ -1,6 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdir, mkdtemp, rm, symlink, utimes, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, rm, symlink, utimes, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { promisify } from "node:util";
 
@@ -11,14 +10,15 @@ import {
   diffConfigFilesAgainst,
   worktreeIsDirty,
 } from "../../../../src/lib/release/git";
+import { tempDirs } from "../../../helpers/temp-dirs";
 
 const run = promisify(execFile);
 
-let dir: string;
+const dirs = tempDirs();
 
 /** A temp git repo with one clean commit holding a `.zitadel/` file. */
 async function cleanRepo(): Promise<string> {
-  dir = await mkdtemp(join(tmpdir(), "zitadel-git-"));
+  const dir = await dirs.make("zitadel-git-");
   await mkdir(join(dir, ".zitadel", "schemas"), { recursive: true });
   await writeFile(join(dir, ".zitadel", "schemas", "marker.json"), "{}");
   await writeFile(join(dir, "README.md"), "# app\n");
@@ -32,9 +32,7 @@ async function cleanRepo(): Promise<string> {
 }
 
 afterEach(async () => {
-  if (dir) {
-    await rm(dir, { recursive: true, force: true });
-  }
+  await dirs.clean();
 });
 
 describe("worktreeIsDirty", () => {
@@ -55,8 +53,7 @@ describe("worktreeIsDirty", () => {
   });
 
   it("is false when there is no git repository", async () => {
-    const cwd = await mkdtemp(join(tmpdir(), "zitadel-git-norepo-"));
-    dir = cwd;
+    const cwd = await dirs.make("zitadel-git-norepo-");
 
     expect(await worktreeIsDirty(cwd)).toBe(false);
   });
@@ -255,7 +252,7 @@ describe("diffConfigFilesAgainst", () => {
   });
 
   it("names files from the project, not the repository root above it", async () => {
-    dir = await mkdtemp(join(tmpdir(), "zitadel-git-monorepo-"));
+    const dir = await dirs.make("zitadel-git-monorepo-");
     const cwd = join(dir, "apps", "web");
     await mkdir(join(cwd, ".zitadel", "schemas"), { recursive: true });
     await writeFile(join(cwd, ".zitadel", "schemas", "marker.json"), "{}\n");

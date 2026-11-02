@@ -18,6 +18,7 @@ import {
   refuseChangedIssuer,
   storedCustomSettings,
 } from "../../../../src/lib/idp";
+import { thrownBy } from "../../../helpers/thrown-value";
 
 const googleBody = (over: Record<string, unknown> = {}) => ({
   slug: "google",
@@ -336,12 +337,12 @@ describe("planConnection", () => {
       slug: "google",
       oidc: { issuer: "http://localhost:9100", client_id: "a", client_secret: "b" },
     });
-    let hint = "";
-    try {
-      planConnection({ slugFlag: "--sso-slug", selection: googleSelection, files: [local] });
-    } catch (error) {
-      hint = (error as ZitadelError).hint ?? "";
-    }
+    const hint =
+      (
+        thrownBy(() =>
+          planConnection({ slugFlag: "--sso-slug", selection: googleSelection, files: [local] }),
+        ) as ZitadelError | undefined
+      )?.hint ?? "";
 
     expect(hint).toContain("in the schemas and flows that name it");
   });
@@ -351,12 +352,12 @@ describe("planConnection", () => {
       slug: "google",
       oidc: { issuer: "http://localhost:9100", client_id: "a", client_secret: "b" },
     });
-    let hint = "";
-    try {
-      planConnection({ slugFlag: "--slug", selection: googleSelection, files: [local] });
-    } catch (error) {
-      hint = (error as ZitadelError).hint ?? "";
-    }
+    const hint =
+      (
+        thrownBy(() =>
+          planConnection({ slugFlag: "--slug", selection: googleSelection, files: [local] }),
+        ) as ZitadelError | undefined
+      )?.hint ?? "";
 
     expect(hint).not.toContain("--slug");
   });
@@ -366,12 +367,12 @@ describe("planConnection", () => {
       slug: "google",
       oidc: { issuer: "http://localhost:9100", client_id: "a", client_secret: "b" },
     });
-    let hint = "";
-    try {
-      planConnection({ slugFlag: "--slug", selection: googleSelection, files: [local] });
-    } catch (error) {
-      hint = (error as ZitadelError).hint ?? "";
-    }
+    const hint =
+      (
+        thrownBy(() =>
+          planConnection({ slugFlag: "--slug", selection: googleSelection, files: [local] }),
+        ) as ZitadelError | undefined
+      )?.hint ?? "";
 
     expect(hint).not.toContain("give it the slug google");
   });
@@ -406,7 +407,7 @@ describe("planConnection", () => {
   it("reads what a hand-edited connection references, not what its slug implies", () => {
     // An okta connection pointing at GOOGLE_CLIENT_SECRET collides with
     // Google however its slug reads; deriving OKTA_CLIENT_SECRET from the
-    // slug would miss it and let the google publish overwrite a variable
+    // slug would miss it and allow the google publish overwrite a variable
     // both connections consume.
     const okta = file(
       "okta.json",
@@ -676,12 +677,12 @@ describe("planConnection for a custom connection", () => {
   it("names the slug flag of the command it is planning for in the hint", () => {
     const existing = file("acme-sso.json", acmeBody());
     const input = { ...acme, issuer: issuer("https://sso.other.example") };
-    let hint = "";
-    try {
-      planConnection({ slugFlag: "--sso-slug", selection: custom(input), files: [existing] });
-    } catch (error) {
-      hint = (error as ZitadelError).hint ?? "";
-    }
+    const hint =
+      (
+        thrownBy(() =>
+          planConnection({ slugFlag: "--sso-slug", selection: custom(input), files: [existing] }),
+        ) as ZitadelError | undefined
+      )?.hint ?? "";
 
     expect(hint).toContain("--sso-slug");
   });
@@ -712,12 +713,12 @@ describe("planConnection for a custom connection", () => {
   });
   it("names the slug flag of the command in the hint about a file that holds the name", () => {
     const occupied = file("acme-sso.json", acmeBody({ slug: "something-else" }));
-    let hint = "";
-    try {
-      planConnection({ slugFlag: "--sso-slug", selection: custom(acme), files: [occupied] });
-    } catch (error) {
-      hint = (error as ZitadelError).hint ?? "";
-    }
+    const hint =
+      (
+        thrownBy(() =>
+          planConnection({ slugFlag: "--sso-slug", selection: custom(acme), files: [occupied] }),
+        ) as ZitadelError | undefined
+      )?.hint ?? "";
 
     expect(hint).toContain("--sso-slug");
   });

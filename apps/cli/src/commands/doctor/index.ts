@@ -5,7 +5,7 @@ import consola from "consola";
 
 import { createZitadelClient } from "../../lib/api-client";
 import { claimAction, claimCommand, claimWindowClosedAction } from "../../lib/claim-state";
-import { type Environment, resolveEnvironment } from "../../lib/environment";
+import { resolveEnvironment } from "../../lib/environment";
 import { ZitadelError } from "../../lib/errors";
 import { serverLogAction } from "../../lib/journey-guidance";
 import {
@@ -528,23 +528,15 @@ async function runEnvironmentChecks(input: {
   if (input.envName === undefined && input.envFile === undefined) {
     return [];
   }
-  let environment: Environment;
-  try {
-    environment = await resolveEnvironment({
-      cwd: input.cwd,
-      env: input.env,
-      envName: input.envName,
-      envFile: input.envFile,
-      serverFlag: input.serverFlag,
-    });
-  } catch (error) {
-    return [
-      {
-        name: "environment",
-        status: "fail",
-        message: error instanceof Error ? error.message : String(error),
-      },
-    ];
+  const environment = await resolveEnvironment({
+    cwd: input.cwd,
+    env: input.env,
+    envName: input.envName,
+    envFile: input.envFile,
+    serverFlag: input.serverFlag,
+  }).catch((error: unknown) => (error instanceof Error ? error : new Error(String(error))));
+  if (environment instanceof Error) {
+    return [{ name: "environment", status: "fail", message: environment.message }];
   }
   const name = environment.name.value;
   return [
@@ -637,12 +629,9 @@ async function runLocalRuntimeChecks(
     "docker-cli",
     "Docker is reachable",
     async () => {
-      let result: Awaited<ReturnType<typeof LocalServer.dockerReachable>>;
-      try {
-        result = await LocalServer.dockerReachable();
-      } catch (error) {
+      const result = await LocalServer.dockerReachable().catch((error: unknown) => {
         throw new Error(dockerUnavailableMessage(error), { cause: error });
-      }
+      });
       if (result.status !== 0) {
         throw new Error(dockerUnavailableMessage(result.stderr || "docker version failed"));
       }

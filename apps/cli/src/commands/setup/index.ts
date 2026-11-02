@@ -385,19 +385,27 @@ export default class Setup extends Promptable(BaseCommand) {
     // it patches it, so cancelling a question leaves the directory as it was,
     // and a dry run never creates one. Until then only its framework and dev
     // port are known.
-    let app: Readonly<{ framework: string; devPort: number }>;
-    let detected: FrameworkFacts | undefined;
-    // Whether `--force` scaffolds beside entries the directory already held,
-    // other than the local runtime `start` leaves, which counts as empty.
-    let scaffoldedBesideFiles = false;
-    try {
-      detected = await orca.detect(cwd, flags.framework);
-      app = { framework: detected.id, devPort: detected.devPort };
-      consola.success(
-        `Detected ${orca.displayName(detected.id)}${detected.devPort ? ` (dev port ${detected.devPort})` : ""}`,
-      );
-    } catch (error) {
-      if (error instanceof ZitadelError && error.code === "E_FRAMEWORK_NOT_DETECTED") {
+    const detection: {
+      app: Readonly<{ framework: string; devPort: number }>;
+      detected: FrameworkFacts | undefined;
+      // Whether `--force` scaffolds beside entries the directory already held,
+      // other than the local runtime `start` leaves, which counts as empty.
+      scaffoldedBesideFiles: boolean;
+    } = await orca.detect(cwd, flags.framework).then(
+      (facts) => {
+        consola.success(
+          `Detected ${orca.displayName(facts.id)}${facts.devPort ? ` (dev port ${facts.devPort})` : ""}`,
+        );
+        return {
+          app: { framework: facts.id, devPort: facts.devPort },
+          detected: facts,
+          scaffoldedBesideFiles: false,
+        };
+      },
+      async (error: unknown) => {
+        if (!(error instanceof ZitadelError && error.code === "E_FRAMEWORK_NOT_DETECTED")) {
+          throw error;
+        }
         const target = await inspectScaffoldTarget(cwd);
         if (!target.scaffoldable && !force) {
           throw frameworkDetectionWithScaffoldTarget(error, cwd, target);
@@ -407,24 +415,26 @@ export default class Setup extends Promptable(BaseCommand) {
             ? "Fresh app directory — setup scaffolds a new project"
             : "Non-empty directory with --force — setup scaffolds a new project",
         );
-        app = await orca.planScaffold(
-          cwd,
-          await resolveScaffoldFramework(flags.framework, nonInteractive, orca, {
-            retry: retryOptionsFromFlags(flags),
-            serverFlag: this.meta.serverFlag,
-            cliVersion: this.config.version,
-            ask: wizardInput,
-          }),
-        );
-        scaffoldedBesideFiles = !target.scaffoldable;
-      } else {
-        throw error;
-      }
-    }
+        return {
+          app: await orca.planScaffold(
+            cwd,
+            await resolveScaffoldFramework(flags.framework, nonInteractive, orca, {
+              retry: retryOptionsFromFlags(flags),
+              serverFlag: this.meta.serverFlag,
+              cliVersion: this.config.version,
+              ask: wizardInput,
+            }),
+          ),
+          detected: undefined,
+          scaffoldedBesideFiles: !target.scaffoldable,
+        };
+      },
+    );
+    const { detected, scaffoldedBesideFiles } = detection;
     // A new app, created below, or on a dry run only previewed.
     const scaffoldedFramework = detected === undefined;
     this.recordTelemetry({
-      framework: app.framework,
+      framework: detection.app.framework,
       renderer: flags.renderer ?? "react",
       scaffolded_skeleton: scaffoldedFramework,
       skip_install: Boolean(flags["skip-install"]),
@@ -447,11 +457,12 @@ export default class Setup extends Promptable(BaseCommand) {
     // dev-server port only when it is unset, so a project that already pins a
     // different port in vite.config.*/angular.json keeps it — pass --dev-port to
     // match that pin (or remove it) if the origin check rejects requests.
-    if (flags["dev-port"] !== undefined) {
-      app = { ...app, devPort: assertDevPort(flags["dev-port"]) };
-    }
+    const app =
+      flags["dev-port"] === undefined
+        ? detection.app
+        : { ...detection.app, devPort: assertDevPort(flags["dev-port"]) };
 
-    let answers: SetupAnswers = {
+    const defaultAnswers: SetupAnswers = {
       server: this.meta.source,
       devPort: app.devPort,
       preset: (flags.preset as SetupPreset | undefined) ?? DEFAULT_SETUP_PRESET,
@@ -460,7 +471,7 @@ export default class Setup extends Promptable(BaseCommand) {
       passwordMinLength: passwordMinLengthFlag,
     };
 
-    if (!nonInteractive && !dryRun) {
+    const askAnswers = async (): Promise<SetupAnswers> => {
       // Asking which framework to scaffold opened the wizard already.
       if (!scaffoldedFramework || flags.framework !== undefined) {
         intro("Zitadel setup");
@@ -480,12 +491,19 @@ export default class Setup extends Promptable(BaseCommand) {
         passwordMinLengthFromFlag: flags["password-min-length"] !== undefined,
         developmentBuild: isDevelopmentBuild(),
       };
-      for (const prompt of SETUP_PROMPTS) {
-        answers = await prompt.ask(answers, promptCtx);
-      }
-      note(signInSummary(answers), "Sign-in");
+      const asked = await SETUP_PROMPTS.reduce(
+        async (previous, prompt) => prompt.ask(await previous, promptCtx),
+        Promise.resolve(defaultAnswers),
+      );
+      note(signInSummary(asked), "Sign-in");
       outro("Configuration captured");
-    } else if (
+      return asked;
+    };
+    const asks = !nonInteractive && !dryRun;
+    const answers = asks ? await askAnswers() : defaultAnswers;
+
+    if (
+      !asks &&
       flags["dev-port"] === undefined &&
       !(await LocalServer.isPortFree(answers.devPort))
     ) {
@@ -556,16 +574,17 @@ export default class Setup extends Promptable(BaseCommand) {
 
     // A new app is created only now, with every answer in hand. A dry run
     // creates none, so it has no app to patch.
-    let created = detected;
-    let newApp: UndoableScaffold | undefined;
-    if (created === undefined && dryRun) {
+    if (detected === undefined && dryRun) {
       consola.info(`Would scaffold a new ${app.framework} project (dry run)`);
-    } else if (created === undefined) {
-      consola.start(`Scaffolding a new ${app.framework} project`);
-      newApp = await orca.scaffoldUndoably(cwd, app.framework, force);
-      created = newApp.facts;
-      consola.success(`Scaffolded ${created.id} skeleton`);
     }
+    const scaffoldNewApp = async (): Promise<UndoableScaffold> => {
+      consola.start(`Scaffolding a new ${app.framework} project`);
+      const scaffold = await orca.scaffoldUndoably(cwd, app.framework, force);
+      consola.success(`Scaffolded ${scaffold.facts.id} skeleton`);
+      return scaffold;
+    };
+    const newApp = detected === undefined && !dryRun ? await scaffoldNewApp() : undefined;
+    const created = detected ?? newApp?.facts;
     // The DevPortPrompt can change the port interactively, so fold the answer
     // back into the framework: the patched dev-server config reads
     // `framework.devPort`, and it must agree with the issuer and the registered
@@ -577,10 +596,25 @@ export default class Setup extends Promptable(BaseCommand) {
     // failure before that, Ctrl-C included, removes it again and puts back
     // what the directory held, so the rerun scaffolds a new app instead of
     // taking a half-set-up one for an app the developer brought.
-    let project: CreateProject201;
-    let result: Awaited<ReturnType<typeof patcher.patch>>;
-    let resourceResult: MaterializeSetupResourcesResult;
-    try {
+    const patchProject = async (
+      facts: FrameworkFacts,
+      project: CreateProject201,
+      envFilesBefore: Awaited<ReturnType<typeof readCredentialEnvFiles>>,
+    ) =>
+      patcher
+        .patch(patchContext(facts, project), { cwd, dryRun, force })
+        .catch(async (error: unknown) => {
+          // The dry run above already ruled out conflicts, so this is an I/O
+          // failure partway through. Remove the setup markers and put
+          // `.env.local` back, as a failed resource upload does below, so a
+          // rerun starts over.
+          if (!dryRun) {
+            await removeSetupMarkers(cwd);
+            await restoreCredentialEnvFiles(cwd, envFilesBefore);
+          }
+          throw error;
+        });
+    const provision = async () => {
       if (framework !== undefined && !dryRun) {
         // Patch as a dry run first, against a placeholder project: a file setup
         // would refuse to overwrite (E_CONFLICT), such as an existing app's own
@@ -602,7 +636,7 @@ export default class Setup extends Promptable(BaseCommand) {
       const projectName = defaultProjectName(cwd, app.framework);
       // Register the app's own origin so the backend's origin check allows
       // requests the dev proxy forwards from it.
-      project = dryRun
+      const project = dryRun
         ? dryRunProject(issuer)
         : await createProjectWithLocalHint(
             unauthClient,
@@ -630,26 +664,16 @@ export default class Setup extends Promptable(BaseCommand) {
       // `.env.local` as it is before the patch merges this project's id and
       // secret into it, so a failure below can put it back.
       const envFilesBefore = await readCredentialEnvFiles(cwd);
+      // What the patch writes depends on the files the scaffold creates.
       if (framework === undefined) {
-        // What the patch writes depends on the files the scaffold creates.
         consola.info("Would patch the new project (dry run): its files come from the scaffold");
-        result = { dryRun, files: [], filesWritten: [], filesSkipped: [], depsAdded: [] };
       } else {
         consola.start(`Patching project files${dryRun ? " (dry run)" : ""}`);
-        try {
-          result = await patcher.patch(patchContext(framework, project), { cwd, dryRun, force });
-        } catch (error) {
-          // The dry run above already ruled out conflicts, so this is an I/O
-          // failure partway through. Remove the setup markers and put
-          // `.env.local` back, as a failed resource upload does below, so a
-          // rerun starts over.
-          if (!dryRun) {
-            await removeSetupMarkers(cwd);
-            await restoreCredentialEnvFiles(cwd, envFilesBefore);
-          }
-          throw error;
-        }
       }
+      const result: Awaited<ReturnType<typeof patcher.patch>> =
+        framework === undefined
+          ? { dryRun, files: [], filesWritten: [], filesSkipped: [], depsAdded: [] }
+          : await patchProject(framework, project, envFilesBefore);
       for (const file of result.filesWritten) {
         const sentence = describeWrittenFile(relativeDisplay(cwd, file), dryRun);
         if (sentence) consola.info(sentence);
@@ -657,66 +681,68 @@ export default class Setup extends Promptable(BaseCommand) {
       for (const file of result.filesSkipped) {
         consola.info(`Left ${relativeDisplay(cwd, file)} unchanged (already matches target)`);
       }
-      try {
-        resourceResult = dryRun
-          ? { filesWritten: [], passwordMinLengthSet: false }
-          : await materializeSetupResources({
-              cwd,
-              // Verbatim: what setup reads back is stored in state, never printed.
-              client: createZitadelClient(
-                { baseUrl: answers.server, token: project.project_secret },
-                { verbatim: true },
-              ),
-              projectId: project.id,
-              force,
-              preset: answers.preset,
-              useCase: answers.useCase,
-              sso: answers.sso,
-              passwordMinLength: answers.passwordMinLength,
-              cliVersion: this.meta.cliVersion,
-            });
-      } catch (error) {
-        // Setup is not atomic: the patcher already wrote `zitadel.json` (the
-        // marker the already-initialized guard skips on) and `.zitadel/secret`.
-        // Remove both so a rerun starts a fresh setup instead of being skipped
-        // forever with no default schema or login flow anywhere. The
-        // half-provisioned project has no usable resources, so its credentials
-        // are not worth keeping, and `.env.local`, where the patch merged them,
-        // goes back to what it held before.
-        // Only these, and never a connection file: those are tenant-owned, and
-        // setup neither writes over nor removes one -- unless it is part of a
-        // new app, which goes as a whole.
-        await removeSetupMarkers(cwd);
-        await restoreCredentialEnvFiles(cwd, envFilesBefore);
-        const cause = toZitadelError(error);
-        throw new ZitadelError(cause.code, `Default resource setup failed: ${cause.message}`, {
-          // The cause knows its own remedy when it has one -- a file setup
-          // declined to touch is fixed by deciding what to do with that file,
-          // not by rerunning with --force.
-          hint:
-            cause.hint ??
-            (newApp === undefined
-              ? "The project was created but its default resources (schema, login flow, " +
-                "password policy) did not all upload. Re-run `zitadel setup` to start over; " +
-                "--force overwrites the schema and flow files setup scaffolds and keeps an " +
-                "existing password policy file. It does not cover a connection under .zitadel/idps/ -- those are " +
-                "yours, so setup never replaces or removes one; delete it to scaffold a fresh " +
-                "one, or keep it and enable the provider after setup to reuse it."
-              : "The project was created but its default resources (schema, login flow, " +
-                "password policy) did not all upload, so setup removed the new app again. " +
-                "Re-run setup as before to start over."),
-          nextCommands:
-            cause.nextCommands ??
-            (newApp === undefined ? [this.suggestUnscoped("setup --force")] : []),
-          details: cause.details,
+      const uploadResources = async (): Promise<MaterializeSetupResourcesResult> =>
+        materializeSetupResources({
+          cwd,
+          // Verbatim: what setup reads back is stored in state, never printed.
+          client: createZitadelClient(
+            { baseUrl: answers.server, token: project.project_secret },
+            { verbatim: true },
+          ),
+          projectId: project.id,
+          force,
+          preset: answers.preset,
+          useCase: answers.useCase,
+          sso: answers.sso,
+          passwordMinLength: answers.passwordMinLength,
+          cliVersion: this.meta.cliVersion,
         });
-      }
-    } catch (error) {
+      const resourceResult: MaterializeSetupResourcesResult = dryRun
+        ? { filesWritten: [], passwordMinLengthSet: false }
+        : await uploadResources().catch(async (error: unknown) => {
+            // Setup is not atomic: the patcher already wrote `zitadel.json` (the
+            // marker the already-initialized guard skips on) and `.zitadel/secret`.
+            // Remove both so a rerun starts a fresh setup instead of being skipped
+            // forever with no default schema or login flow anywhere. The
+            // half-provisioned project has no usable resources, so its credentials
+            // are not worth keeping, and `.env.local`, where the patch merged them,
+            // goes back to what it held before.
+            // Only these, and never a connection file: those are tenant-owned, and
+            // setup neither writes over nor removes one -- unless it is part of a
+            // new app, which goes as a whole.
+            await removeSetupMarkers(cwd);
+            await restoreCredentialEnvFiles(cwd, envFilesBefore);
+            const cause = toZitadelError(error);
+            throw new ZitadelError(cause.code, `Default resource setup failed: ${cause.message}`, {
+              // The cause knows its own remedy when it has one -- a file setup
+              // declined to touch is fixed by deciding what to do with that file,
+              // not by rerunning with --force.
+              hint:
+                cause.hint ??
+                (newApp === undefined
+                  ? "The project was created but its default resources (schema, login flow, " +
+                    "password policy) did not all upload. Re-run `zitadel setup` to start over; " +
+                    "--force overwrites the schema and flow files setup scaffolds and keeps an " +
+                    "existing password policy file. It does not cover a connection under .zitadel/idps/ -- those are " +
+                    "yours, so setup never replaces or removes one; delete it to scaffold a fresh " +
+                    "one, or keep it and enable the provider after setup to reuse it."
+                  : "The project was created but its default resources (schema, login flow, " +
+                    "password policy) did not all upload, so setup removed the new app again. " +
+                    "Re-run setup as before to start over."),
+              nextCommands:
+                cause.nextCommands ??
+                (newApp === undefined ? [this.suggestUnscoped("setup --force")] : []),
+              details: cause.details,
+            });
+          });
+      return { project, result, resourceResult };
+    };
+    const { project, result, resourceResult } = await provision().catch(async (error: unknown) => {
       if (newApp !== undefined) {
         await removeNewApp(newApp, cwd);
       }
       throw error;
-    }
+    });
     try {
       await newApp?.keep();
     } catch (error) {
@@ -904,11 +930,12 @@ export default class Setup extends Promptable(BaseCommand) {
     // admin, so the project is attached to their team right away and
     // `zitadel claim` has nothing left to do. Claiming an anonymous project
     // stays a cloud journey.
-    let ownedByLocalAdmin: { email: string; team_id: string } | undefined;
     const isLocal = serverKind.value(answers.server) === "local";
     const hostsPlatform =
       !dryRun && isLocal ? await localServerHostsPlatform(answers.server) : false;
-    if (hostsPlatform) {
+    const attachToLocalAdmin = async (): Promise<
+      { email: string; team_id: string } | undefined
+    > => {
       // The runtime document naming the platform project does not prove a
       // claim can complete (a deployment can pin that project without the
       // platform bootstrap, which leaves the admin without a personal team),
@@ -943,15 +970,18 @@ export default class Setup extends Promptable(BaseCommand) {
             team_id: owner.team_id,
             claimed_at: owner.claimed_at,
           });
-          ownedByLocalAdmin = { email: admin.email, team_id: owner.team_id };
           consola.success(`Project owned by ${admin.email} (team ${owner.team_id})`);
+          return { email: admin.email, team_id: owner.team_id };
         }
+        return undefined;
       } catch (error) {
         reportWarning(
           `Could not attach the project to the local admin: ${toZitadelError(error).message}`,
         );
+        return undefined;
       }
-    }
+    };
+    const ownedByLocalAdmin = hostsPlatform ? await attachToLocalAdmin() : undefined;
 
     const deadline = dryRun ? undefined : claimWindowDeadline(project.created_at);
     const nudgeClaim =
@@ -987,7 +1017,6 @@ export default class Setup extends Promptable(BaseCommand) {
     // The structured report is human-only. Under `--json` we let the
     // envelope returned from `this.emit(...)` be the sole stdout
     // payload (oclif requires single-doc JSON).
-    let nextShown: StepsShown | undefined;
     if (!this.jsonEnabled()) {
       const projectFacts = await detectProjectFacts(cwd, app.framework);
       const sections = buildSummary({
@@ -1024,8 +1053,6 @@ export default class Setup extends Promptable(BaseCommand) {
         ),
         style: { padding: 1, borderStyle: "rounded", borderColor: "green" },
       });
-      // The box holds the next steps, so the base command does not repeat them.
-      nextShown = asStepsShown();
       // After the steps that start the app and test sign-in, outside the box so
       // the command can be copied without its border.
       consola.log(`\n${exploreAllCommands(this.meta.cliVersion)}`);
@@ -1041,6 +1068,8 @@ export default class Setup extends Promptable(BaseCommand) {
         cliVersion: this.meta.cliVersion,
       });
     }
+    // The box holds the next steps, so the base command does not repeat them.
+    const nextShown: StepsShown | undefined = this.jsonEnabled() ? undefined : asStepsShown();
 
     return this.emit({
       status: "ok",
@@ -1721,19 +1750,19 @@ export function retryOptionsFromFlags(flags: {
   // A custom connection is restated as typed, minus the credentials. One the
   // checks refuse is left out: it was refused, and a retry carrying it would be
   // refused again.
-  let selection: ProviderSelection | undefined;
-  if (flags.sso !== undefined) {
+  const selectionOf = (sso: string): ProviderSelection | undefined => {
     try {
-      selection = selectionFromFlags(
-        flags.sso,
+      return selectionFromFlags(
+        sso,
         customFlagValues(flags, SETUP_FLAG_KEYS),
         SETUP_FLAG_NAMES,
         "",
       );
     } catch {
-      selection = undefined;
+      return undefined;
     }
-  }
+  };
+  const selection = flags.sso === undefined ? undefined : selectionOf(flags.sso);
   // What was typed for a provider this run knows, kept when it cannot become a
   // selection yet, so a retry reproduces it.
   const typed =
@@ -1910,12 +1939,7 @@ async function assertLocalServerVersion(
   retry: SetupRetryOptions,
   cliVersion: string,
 ): Promise<void> {
-  let nearest: Awaited<ReturnType<typeof readNearestRuntimeMetadata>>;
-  try {
-    nearest = await readNearestRuntimeMetadata(cwd);
-  } catch {
-    return;
-  }
+  const nearest = await readNearestRuntimeMetadata(cwd).catch(() => undefined);
   const runtime = nearest?.runtime;
   if (!nearest || runtime?.backend !== "binary" || runtime.server_url !== server) {
     return;

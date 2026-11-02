@@ -128,17 +128,21 @@ const within = (a: string, b: string, max: number): boolean => {
   if (a === b || Math.abs(a.length - b.length) > max) {
     return a === b;
   }
-  let previous = Array.from({ length: b.length + 1 }, (_, i) => i);
-  for (let i = 1; i <= a.length; i += 1) {
-    const current = [i];
-    for (let j = 1; j <= b.length; j += 1) {
-      current[j] = Math.min(
-        (current[j - 1] ?? 0) + 1,
-        (previous[j] ?? 0) + 1,
-        (previous[j - 1] ?? 0) + (a[i - 1] === b[j - 1] ? 0 : 1),
-      );
-    }
-    previous = current;
-  }
-  return (previous[b.length] ?? max + 1) <= max;
+  const last = a.split("").reduce(
+    (previous, left, index) => {
+      const current = [index + 1];
+      for (const [j, right] of b.split("").entries()) {
+        current.push(
+          Math.min(
+            (current[j] ?? 0) + 1,
+            (previous[j + 1] ?? 0) + 1,
+            (previous[j] ?? 0) + (left === right ? 0 : 1),
+          ),
+        );
+      }
+      return current;
+    },
+    Array.from({ length: b.length + 1 }, (_, i) => i),
+  );
+  return (last[b.length] ?? max + 1) <= max;
 };

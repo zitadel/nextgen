@@ -106,13 +106,14 @@ export const sendAll = async (
   if (paging === null) {
     return send(server, token, request);
   }
-  let last: { status: number; raw: unknown } = { status: 200, raw: undefined };
+  const received: Array<{ status: number; raw: unknown }> = [];
   // Each page is fetched raw: the cursor goes back to the server exactly as it
   // came, and only the items are escaped.
   const walk = pages(
     async (cursor) => {
-      last = await sendRaw(server, token, pageOf(request, cursor));
-      return last.raw;
+      const page = await sendRaw(server, token, pageOf(request, cursor));
+      received.push(page);
+      return page.raw;
     },
     { next: nextToken },
   );
@@ -136,6 +137,7 @@ export const sendAll = async (
   // escaping, with an empty list in place of its own, which every page's
   // escaped items then fill. The check only narrows the type: the items above
   // were read off this page, so it is an object.
+  const last = received.at(-1) ?? { status: 200, raw: undefined };
   const page = isObject(last.raw) ? last.raw : {};
   const body = sanitizeResponse({ ...page, [paging.items]: [] });
   return { status: last.status, body: { ...body, [paging.items]: items } };

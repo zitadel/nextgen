@@ -23,13 +23,13 @@ import { asTerminal } from "../../../helpers/terminal";
 const SERVER = "https://api.zitadel.example";
 const server = setupServer();
 
-let created: Array<Record<string, unknown>> = [];
+const created: Array<Record<string, unknown>> = [];
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterAll(() => server.close());
 
 beforeEach(() => {
-  created = [];
+  created.length = 0;
   server.use(
     http.post(`${SERVER}/api/v1/projects`, async ({ request }) => {
       created.push((await request.json()) as Record<string, unknown>);

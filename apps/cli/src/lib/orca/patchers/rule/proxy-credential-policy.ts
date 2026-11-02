@@ -75,23 +75,23 @@ const PATH_TERMS = new Set([
 
 /** `condition`'s terms joined by `&&` outside any parentheses. */
 function andTerms(condition: string): string[] {
-  const terms: string[] = [];
-  let depth = 0;
-  let start = 0;
-  for (let index = 0; index < condition.length; index++) {
+  const scan = (index: number, depth: number, start: number): string[] => {
+    if (index >= condition.length) {
+      return [condition.slice(start)];
+    }
     const char = condition[index];
     if (char === "(") {
-      depth++;
-    } else if (char === ")") {
-      depth--;
-    } else if (depth === 0 && condition.startsWith("&&", index)) {
-      terms.push(condition.slice(start, index));
-      start = index + 2;
-      index++;
+      return scan(index + 1, depth + 1, start);
     }
-  }
-  terms.push(condition.slice(start));
-  return terms;
+    if (char === ")") {
+      return scan(index + 1, depth - 1, start);
+    }
+    if (depth === 0 && condition.startsWith("&&", index)) {
+      return [condition.slice(start, index), ...scan(index + 2, depth, index + 2)];
+    }
+    return scan(index + 1, depth, start);
+  };
+  return scan(0, 0, 0);
 }
 
 /**

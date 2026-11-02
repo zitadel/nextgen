@@ -58,14 +58,8 @@ export const unwrap = (
   schema?.def?.innerType && depth > 0 ? unwrap(schema.def.innerType, depth - 1) : schema;
 
 /** The wrappers around a field, outermost first, the field's own type last. */
-const layers = (schema: ZodLike | undefined): ZodLike[] => {
-  const found: ZodLike[] = [];
-  for (let current = schema; current && found.length <= MAX_WRAPPER_DEPTH; ) {
-    found.push(current);
-    current = current.def?.innerType;
-  }
-  return found;
-};
+const layers = (schema: ZodLike | undefined, depth = 0): ZodLike[] =>
+  schema && depth <= MAX_WRAPPER_DEPTH ? [schema, ...layers(schema.def?.innerType, depth + 1)] : [];
 
 /**
  * Whether a body may leave the field out: it is `optional`, or carries a
@@ -140,25 +134,26 @@ export const nodeAt = (
   schema: ZodLike | undefined,
   path: readonly string[],
 ): PathNode | undefined => {
-  let node = schema;
-  let open = false;
-  for (const segment of path) {
-    const type = unwrap(node);
-    if (objectOf(type)) {
-      const field = fieldOf(type, segment);
-      if (!field) {
+  return path.reduce<PathNode | undefined>(
+    (reached, segment) => {
+      if (reached === undefined) {
         return undefined;
       }
-      node = field;
-    } else if (type?.def?.type === "record") {
-      node = type.def.valueType;
-      open = true;
-    } else if (open && (!type || type.def?.type === "any" || type.def?.type === "unknown")) {
-      // Below an open record whose values the spec leaves untyped: any key.
-      node = undefined;
-    } else {
+      const { node, open } = reached;
+      const type = unwrap(node);
+      if (objectOf(type)) {
+        const field = fieldOf(type, segment);
+        return field ? { node: field, open } : undefined;
+      }
+      if (type?.def?.type === "record") {
+        return { node: type.def.valueType, open: true };
+      }
+      if (open && (!type || type.def?.type === "any" || type.def?.type === "unknown")) {
+        // Below an open record whose values the spec leaves untyped: any key.
+        return { node: undefined, open };
+      }
       return undefined;
-    }
-  }
-  return { node, open };
+    },
+    { node: schema, open: false },
+  );
 };

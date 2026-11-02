@@ -40,24 +40,22 @@ export function setTopLevelJsonKey(
   const layout = scanTopLevel(source);
   const member = layout.members.find((candidate) => candidate.key === key);
 
-  let next: string;
-  if (member) {
-    next = `${source.slice(0, member.valueStart)}${rendered}${source.slice(member.valueEnd)}`;
-  } else if (layout.members.length === 0) {
-    const inner =
-      indent === 0
-        ? `${JSON.stringify(key)}:${rendered}`
-        : `${eol}${indentString(indent)}${JSON.stringify(key)}: ${rendered}${eol}`;
-    next = `${source.slice(0, layout.open + 1)}${inner}${source.slice(layout.close)}`;
-  } else {
-    const last = layout.members.at(-1);
-    if (!last) throw new Error(`refusing to write ${path}: the JSON layout scan found no members`);
-    const inner =
-      indent === 0
-        ? `,${JSON.stringify(key)}:${rendered}`
-        : `,${eol}${indentString(indent)}${JSON.stringify(key)}: ${rendered}`;
-    next = `${source.slice(0, last.valueEnd)}${inner}${source.slice(last.valueEnd)}`;
-  }
+  const last = layout.members.at(-1);
+  const next = member
+    ? `${source.slice(0, member.valueStart)}${rendered}${source.slice(member.valueEnd)}`
+    : layout.members.length === 0
+      ? `${source.slice(0, layout.open + 1)}${
+          indent === 0
+            ? `${JSON.stringify(key)}:${rendered}`
+            : `${eol}${indentString(indent)}${JSON.stringify(key)}: ${rendered}${eol}`
+        }${source.slice(layout.close)}`
+      : last
+        ? `${source.slice(0, last.valueEnd)}${
+            indent === 0
+              ? `,${JSON.stringify(key)}:${rendered}`
+              : `,${eol}${indentString(indent)}${JSON.stringify(key)}: ${rendered}`
+          }${source.slice(last.valueEnd)}`
+        : fail(`refusing to write ${path}: the JSON layout scan found no members`);
 
   const verification = parseJsonObject(next, path);
   const expected = { ...parsed, [key]: value };
@@ -65,6 +63,10 @@ export function setTopLevelJsonKey(
     throw new Error(`refusing to write ${path}: the targeted JSON edit did not verify`);
   }
   return next;
+}
+
+function fail(message: string): never {
+  throw new Error(message);
 }
 
 /**
@@ -98,118 +100,66 @@ function renderValueAtDepthOne(value: unknown, indent: string | number, eol: str
 type TopLevelMember = { key: string; valueStart: number; valueEnd: number };
 type TopLevelLayout = { open: number; close: number; members: TopLevelMember[] };
 
+type Token = { text: string; start: number; end: number };
+
+/** A string, a bracket or separator, or a bare number, boolean or null. */
+const TOKEN = /"[^"\\]*(?:\\[\s\S][^"\\]*)*"|[{}[\],:]|[^\s"{}[\],:]+/g;
+
 /**
- * Single-pass, string-aware scan of a JSON object document, collecting the
- * exact text span of every top-level member's value plus the root braces.
- * Only structural understanding needed for the splice — the document has
- * already been validated by `JSON.parse`, so this can assume well-formed
- * input and does not re-validate.
+ * String-aware scan of a JSON object document, collecting the exact text span
+ * of every top-level member's value plus the root braces. Only structural
+ * understanding needed for the splice — the document has already been
+ * validated by `JSON.parse`, so this can assume well-formed input and does not
+ * re-validate.
  */
 function scanTopLevel(source: string): TopLevelLayout {
-  const members: TopLevelMember[] = [];
-  let open = -1;
-  let close = -1;
-  let depth = 0;
-  let index = 0;
+  const tokens: Token[] = [...source.matchAll(TOKEN)].map((match) => ({
+    text: match[0],
+    start: match.index,
+    end: match.index + match[0].length,
+  }));
+  const opens = (token: Token) => token.text === "{" || token.text === "[";
+  const closes = (token: Token) => token.text === "}" || token.text === "]";
+  // The nesting depth after each token; strings and bare values never change it.
+  const depthAfter = tokens.reduce<number[]>((depths, token) => {
+    depths.push((depths.at(-1) ?? 0) + (opens(token) ? 1 : closes(token) ? -1 : 0));
+    return depths;
+  }, []);
+  const depthBefore = (index: number) => depthAfter[index - 1] ?? 0;
 
-  while (index < source.length) {
-    const char = source.charAt(index);
-    if (char === '"') {
-      const start = index;
-      index = skipString(source, index);
-      if (depth === 1 && isKeyPosition(source, start)) {
-        const key = JSON.parse(source.slice(start, index)) as string;
-        // Skip to the value after the colon.
-        while (source[index] !== ":") index += 1;
-        index += 1;
-        while (index < source.length && isWhitespace(source.charAt(index))) index += 1;
-        const valueStart = index;
-        index = skipValue(source, index);
-        members.push({ key, valueStart, valueEnd: index });
-      }
-      continue;
+  const members = tokens.flatMap((token, index): TopLevelMember[] => {
+    const previous = tokens[index - 1]?.text;
+    if (
+      !token.text.startsWith('"') ||
+      depthBefore(index) !== 1 ||
+      (previous !== "{" && previous !== ",")
+    ) {
+      return [];
     }
-    if (char === "{" || char === "[") {
-      depth += 1;
-      if (depth === 1 && open === -1) {
-        open = index;
-      }
-    } else if (char === "}" || char === "]") {
-      depth -= 1;
-      if (depth === 0) {
-        close = index;
-      }
+    // The value follows the colon after the key.
+    const valueIndex = index + 2;
+    const value = tokens[valueIndex];
+    if (value === undefined) {
+      return [];
     }
-    index += 1;
-  }
-  return { open, close, members };
-}
-
-/** True when the string starting at `start` is a top-level key, not a value. */
-function isKeyPosition(source: string, start: number): boolean {
-  for (let index = start - 1; index >= 0; index -= 1) {
-    const char = source.charAt(index);
-    if (isWhitespace(char)) continue;
-    return char === "{" || char === ",";
-  }
-  return false;
-}
-
-/** Returns the index just past the value starting at `index`. */
-function skipValue(source: string, index: number): number {
-  const char = source.charAt(index);
-  if (char === '"') {
-    return skipString(source, index);
-  }
-  if (char === "{" || char === "[") {
-    let depth = 0;
-    let cursor = index;
-    while (cursor < source.length) {
-      const current = source.charAt(cursor);
-      if (current === '"') {
-        cursor = skipString(source, cursor);
-        continue;
-      }
-      if (current === "{" || current === "[") depth += 1;
-      if (current === "}" || current === "]") {
-        depth -= 1;
-        if (depth === 0) return cursor + 1;
-      }
-      cursor += 1;
-    }
-    return cursor;
-  }
-  // Primitive: number, boolean, null — runs until a structural delimiter.
-  let cursor = index;
-  while (
-    cursor < source.length &&
-    !",}]".includes(source.charAt(cursor)) &&
-    !isWhitespace(source.charAt(cursor))
-  ) {
-    cursor += 1;
-  }
-  return cursor;
-}
-
-/** Returns the index just past the closing quote of the string at `index`. */
-function skipString(source: string, index: number): number {
-  let cursor = index + 1;
-  while (cursor < source.length) {
-    const char = source.charAt(cursor);
-    if (char === "\\") {
-      cursor += 2;
-      continue;
-    }
-    if (char === '"') {
-      return cursor + 1;
-    }
-    cursor += 1;
-  }
-  return cursor;
-}
-
-function isWhitespace(char: string): boolean {
-  return char === " " || char === "\t" || char === "\n" || char === "\r";
+    const closeIndex = opens(value)
+      ? depthAfter.findIndex((depth, at) => at > valueIndex && depth === 1)
+      : valueIndex;
+    return [
+      {
+        key: JSON.parse(source.slice(token.start, token.end)) as string,
+        valueStart: value.start,
+        valueEnd: tokens[closeIndex]?.end ?? source.length,
+      },
+    ];
+  });
+  const opening = tokens.findIndex((token, index) => opens(token) && depthAfter[index] === 1);
+  const closing = tokens.filter((token, index) => closes(token) && depthAfter[index] === 0).at(-1);
+  return {
+    open: tokens[opening]?.start ?? -1,
+    close: closing?.start ?? -1,
+    members,
+  };
 }
 
 /**

@@ -19,7 +19,7 @@ import {
 import { pagedFunctions } from "@zitadel/api/client";
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import {
   CreateUserBody,
@@ -140,13 +140,13 @@ describe("resource registry", () => {
     const cwd = await mkdtemp(join(tmpdir(), "zitadel-resources-env-"));
     const file = join(cwd, "staging.env");
     await writeFile(file, "ZITADEL_PROJECT_ID=proj_staging\nZITADEL_PROJECT_SECRET=sk_staging\n");
-    let seen: { project?: string | null; authorization?: string | null } = {};
+    const seen: { project: string | null; authorization: string | null }[] = [];
     server.use(
       http.post(`${SERVER}/api/v1/teams/query`, ({ request }) => {
-        seen = {
+        seen.push({
           project: new URL(request.url).searchParams.get("project_id"),
           authorization: request.headers.get("authorization"),
-        };
+        });
         return HttpResponse.json({ teams: [] });
       }),
     );
@@ -154,7 +154,7 @@ describe("resource registry", () => {
     const res = await run(cwd, ["teams", "list", "--env-file", file]);
 
     expect(res.exitCode).toBe(0);
-    expect(seen).toEqual({ project: "proj_staging", authorization: "Bearer sk_staging" });
+    expect(seen.at(-1)).toEqual({ project: "proj_staging", authorization: "Bearer sk_staging" });
   });
 
   // A read and a write verb, since the flag reached both through the generated
@@ -176,7 +176,7 @@ describe("resource registry", () => {
   it("gives every field of every write a flag of its own, so none shadows another", () => {
     // A field whose flag would collide gets none (ADR 071 §2), which is safe
     // but loses the flag; this is where a schema change that causes one shows.
-    let checked = 0;
+    const checked: string[] = [];
     for (const [topic, resource] of entries()) {
       for (const [verb, spec] of [
         ["create", resource.create],
@@ -192,24 +192,24 @@ describe("resource registry", () => {
           }
           expect(field.flag, `${topic} ${verb} ${field.name}`).toBeDefined();
           expect(Object.keys(command?.flags ?? {}), `${topic} ${verb}`).toContain(field.flag);
-          checked++;
+          checked.push(`${topic}:${verb}:${field.name}`);
         }
       }
     }
-    expect(checked).toBeGreaterThan(20);
+    expect(checked.length).toBeGreaterThan(20);
   });
 
   it("advertises only filter and sort fields the generated query schemas accept", () => {
     // Only a spec carrying `body` is sent as a structured query, and that body
     // is the authority on which fields exist. A GET list has no such schema,
     // so its fields are pinned by the live tests below instead.
-    let checked = 0;
+    const checked: string[] = [];
     for (const [topic, resource] of entries()) {
       const list = resource.list;
       if (!list?.body) {
         continue;
       }
-      checked += 1;
+      checked.push(topic);
       for (const { field } of list.filters ?? []) {
         const result = list.body.safeParse({
           filter: [{ field, operation: "equals", value: "x" }],
@@ -227,7 +227,7 @@ describe("resource registry", () => {
     }
     // Guard against this check quietly covering nothing, which is what it did
     // when the registry shape changed underneath it.
-    expect(checked).toBe(6);
+    expect(checked.length).toBe(6);
   });
 });
 
@@ -270,10 +270,10 @@ describe("filter grammar", () => {
 describe("users list", () => {
   it("sends filters and sorting in the query body and returns a page", async () => {
     const cwd = await makeProject();
-    let body: unknown;
+    const bodies: unknown[] = [];
     server.use(
       http.post(`${SERVER}/api/v1/users/query`, async ({ request }) => {
-        body = await request.json();
+        bodies.push(await request.json());
         expect(request.headers.get("authorization")).toBe("Bearer sk_proj_test_full");
         return HttpResponse.json({
           users: [user("user_1"), user("user_2")],
@@ -296,7 +296,7 @@ describe("users list", () => {
     ]);
 
     expect(res.exitCode).toBe(0);
-    expect(body).toEqual({
+    expect(bodies.at(-1)).toEqual({
       limit: 2,
       sorting: { field: "created_at", direction: "desc" },
       filter: [
@@ -627,10 +627,10 @@ describe("policies", () => {
 
   it("gets a policy by its operation through the list's filter", async () => {
     const cwd = await makeProject();
-    let query: URLSearchParams | undefined;
+    const queries: URLSearchParams[] = [];
     server.use(
       http.get(`${SERVER}/api/v1/policies`, ({ request }) => {
-        query = new URL(request.url).searchParams;
+        queries.push(new URL(request.url).searchParams);
         return HttpResponse.json({ policies: [policy], next_page_token: null });
       }),
     );
@@ -638,7 +638,7 @@ describe("policies", () => {
     const res = await run(cwd, ["policies", "get", "auth.factor.password.set"]);
 
     expect(res.exitCode).toBe(0);
-    expect(query?.get("operation")).toBe("auth.factor.password.set");
+    expect(queries.at(-1)?.get("operation")).toBe("auth.factor.password.set");
     expect((parseJson(res.stdout) as { data: { id: string } }).data.id).toBe("pol_1");
   });
 
@@ -667,10 +667,10 @@ describe("policies", () => {
 
   it("lists policies narrowed to one operation", async () => {
     const cwd = await makeProject();
-    let query: URLSearchParams | undefined;
+    const queries: URLSearchParams[] = [];
     server.use(
       http.get(`${SERVER}/api/v1/policies`, ({ request }) => {
-        query = new URL(request.url).searchParams;
+        queries.push(new URL(request.url).searchParams);
         return HttpResponse.json({ policies: [policy], next_page_token: null });
       }),
     );
@@ -683,7 +683,7 @@ describe("policies", () => {
     ]);
 
     expect(res.exitCode).toBe(0);
-    expect(query?.get("operation")).toBe("auth.factor.password.set");
+    expect(queries.at(-1)?.get("operation")).toBe("auth.factor.password.set");
     expect((parseJson(res.stdout) as { data: { count: number } }).data.count).toBe(1);
   });
 });
@@ -712,12 +712,12 @@ describe("users get / create / update / delete", () => {
 
   it("creates a user from --data, scoping by project_id, and suggests the get command", async () => {
     const cwd = await makeProject();
-    let url = "";
-    let body: unknown;
+    const urls: string[] = [];
+    const bodies: unknown[] = [];
     server.use(
       http.post(`${SERVER}/api/v1/users`, async ({ request }) => {
-        url = request.url;
-        body = await request.json();
+        urls.push(request.url);
+        bodies.push(await request.json());
         return HttpResponse.json(user("user_new"), { status: 201 });
       }),
     );
@@ -728,8 +728,11 @@ describe("users get / create / update / delete", () => {
       JSON.stringify({ schema: "sch_default", attributes: { email: "new@example.com" } }),
     ]);
     expect(res.exitCode).toBe(0);
-    expect(new URL(url).searchParams.get("project_id")).toBe("proj_test");
-    expect(body).toEqual({ schema: "sch_default", attributes: { email: "new@example.com" } });
+    expect(new URL(urls.at(-1) ?? "").searchParams.get("project_id")).toBe("proj_test");
+    expect(bodies.at(-1)).toEqual({
+      schema: "sch_default",
+      attributes: { email: "new@example.com" },
+    });
     const json = parseJson(res.stdout) as { data: { id: string; next_commands: string[] } };
     expect(json.data.id).toBe("user_new");
     expect(json.data.next_commands[0]).toContain("users get user_new");
@@ -788,10 +791,10 @@ describe("users get / create / update / delete", () => {
 
   it("patches a user", async () => {
     const cwd = await makeProject();
-    let body: unknown;
+    const bodies: unknown[] = [];
     server.use(
       http.patch(`${SERVER}/api/v1/users/user_1`, async ({ request }) => {
-        body = await request.json();
+        bodies.push(await request.json());
         return HttpResponse.json(user("user_1"));
       }),
     );
@@ -803,7 +806,7 @@ describe("users get / create / update / delete", () => {
       JSON.stringify({ attributes: { givenName: "Ada" } }),
     ]);
     expect(res.exitCode).toBe(0);
-    expect(body).toEqual({ attributes: { givenName: "Ada" } });
+    expect(bodies.at(-1)).toEqual({ attributes: { givenName: "Ada" } });
   });
 
   it("requires --force to delete non-interactively", async () => {
@@ -817,16 +820,16 @@ describe("users get / create / update / delete", () => {
 
   it("deletes with --force", async () => {
     const cwd = await makeProject();
-    let called = false;
+    const hits: true[] = [];
     server.use(
       http.delete(`${SERVER}/api/v1/users/user_1`, () => {
-        called = true;
+        hits.push(true);
         return new HttpResponse(null, { status: 204 });
       }),
     );
     const res = await run(cwd, ["users", "delete", "user_1", "--force"]);
     expect(res.exitCode).toBe(0);
-    expect(called).toBe(true);
+    expect(hits.length > 0).toBe(true);
     expect((parseJson(res.stdout) as { data: unknown }).data).toEqual({
       id: "user_1",
       deleted: true,
@@ -1118,9 +1121,12 @@ describe("next page suggestion", () => {
   it("suggests nothing after --all drained every page", async () => {
     const cwd = await makeProject();
     const pages = [{ users: [user("user_1")], next_page_token: "p2" }, { users: [user("user_2")] }];
-    let call = 0;
+    const served = vi.fn();
     server.use(
-      http.post(`${SERVER}/api/v1/users/query`, () => HttpResponse.json(pages[call++] ?? {})),
+      http.post(`${SERVER}/api/v1/users/query`, () => {
+        served();
+        return HttpResponse.json(pages[served.mock.calls.length - 1] ?? {});
+      }),
     );
 
     const res = await run(cwd, ["users", "list", "--all"]);
@@ -1132,26 +1138,26 @@ describe("next page suggestion", () => {
 describe("body field flags", () => {
   it("builds the body from one flag per schema field", async () => {
     const cwd = await makeProject();
-    let body: unknown;
+    const bodies: unknown[] = [];
     server.use(
       http.post(`${SERVER}/api/v1/teams/query`, () => HttpResponse.json({ teams: [] })),
       http.post(`${SERVER}/api/v1/teams`, async ({ request }) => {
-        body = await request.json();
+        bodies.push(await request.json());
         return HttpResponse.json({ id: "team_1", name: "platform" }, { status: 201 });
       }),
     );
 
     const res = await run(cwd, ["teams", "create", "--name", "platform"]);
     expect(res.exitCode).toBe(0);
-    expect(body).toEqual({ name: "platform" });
+    expect(bodies.at(-1)).toEqual({ name: "platform" });
   });
 
   it("collects repeated key=value entries into an open record", async () => {
     const cwd = await makeProject();
-    let body: unknown;
+    const bodies: unknown[] = [];
     server.use(
       http.post(`${SERVER}/api/v1/users`, async ({ request }) => {
-        body = await request.json();
+        bodies.push(await request.json());
         return HttpResponse.json(user("user_1"), { status: 201 });
       }),
     );
@@ -1167,7 +1173,7 @@ describe("body field flags", () => {
       "givenName=Ada",
     ]);
     expect(res.exitCode).toBe(0);
-    expect(body).toEqual({
+    expect(bodies.at(-1)).toEqual({
       schema: "sch_default",
       attributes: { email: "ada@example.com", givenName: "Ada" },
     });
@@ -1175,10 +1181,10 @@ describe("body field flags", () => {
 
   it("lets a field flag override the same key in --data", async () => {
     const cwd = await makeProject();
-    let body: unknown;
+    const bodies: unknown[] = [];
     server.use(
       http.post(`${SERVER}/api/v1/teams`, async ({ request }) => {
-        body = await request.json();
+        bodies.push(await request.json());
         return HttpResponse.json({ id: "team_1", name: "flag-wins" }, { status: 201 });
       }),
     );
@@ -1192,7 +1198,7 @@ describe("body field flags", () => {
       "flag-wins",
     ]);
     expect(res.exitCode).toBe(0);
-    expect(body).toEqual({ name: "flag-wins" });
+    expect(bodies.at(-1)).toEqual({ name: "flag-wins" });
   });
 
   it("rejects a value outside a field's allowed set before any request", async () => {
@@ -1236,10 +1242,10 @@ describe("body field flags", () => {
 
   it("accepts a required field supplied through --data instead of its flag", async () => {
     const cwd = await makeProject();
-    let body: unknown;
+    const bodies: unknown[] = [];
     server.use(
       http.post(`${SERVER}/api/v1/grants`, async ({ request }) => {
-        body = await request.json();
+        bodies.push(await request.json());
         return HttpResponse.json({ id: "asgn_1" }, { status: 201 });
       }),
     );
@@ -1251,7 +1257,7 @@ describe("body field flags", () => {
       JSON.stringify({ user: { user_id: "user_1" }, relation: "viewer" }),
     ]);
     expect(res.exitCode).toBe(0);
-    expect(body).toEqual({ user: { user_id: "user_1" }, relation: "viewer" });
+    expect(bodies.at(-1)).toEqual({ user: { user_id: "user_1" }, relation: "viewer" });
   });
 
   it("reports a single missing field in the singular", async () => {
@@ -1275,17 +1281,17 @@ describe("body field flags", () => {
 
   it("updates through field flags too", async () => {
     const cwd = await makeProject();
-    let body: unknown;
+    const bodies: unknown[] = [];
     server.use(
       http.patch(`${SERVER}/api/v1/teams/team_1`, async ({ request }) => {
-        body = await request.json();
+        bodies.push(await request.json());
         return HttpResponse.json({ id: "team_1", name: "renamed" });
       }),
     );
 
     const res = await run(cwd, ["teams", "update", "team_1", "--name", "renamed"]);
     expect(res.exitCode).toBe(0);
-    expect(body).toEqual({ name: "renamed" });
+    expect(bodies.at(-1)).toEqual({ name: "renamed" });
   });
 });
 
@@ -1321,11 +1327,11 @@ describe("nested bodies", () => {
   };
 
   /** Capture the connection `POST /idps` receives. */
-  const capturingIdps = (): { body?: { idp?: Record<string, unknown> } } => {
-    const seen: { body?: { idp?: Record<string, unknown> } } = {};
+  const capturingIdps = (): { idp?: Record<string, unknown> }[] => {
+    const seen: { idp?: Record<string, unknown> }[] = [];
     server.use(
       http.post(`${SERVER}/api/v1/idps`, async ({ request }) => {
-        seen.body = (await request.json()) as typeof seen.body;
+        seen.push((await request.json()) as { idp?: Record<string, unknown> });
         return HttpResponse.json({ id: "idp_1", slug: "acme-sso" }, { status: 201 });
       }),
     );
@@ -1339,7 +1345,7 @@ describe("nested bodies", () => {
     const res = await run(cwd, ["idps", "create", ...CONNECTION_FLAGS]);
 
     expect(res.exitCode).toBe(0);
-    expect(seen.body?.idp).toMatchObject(connection);
+    expect(seen.at(-1)?.idp).toMatchObject(connection);
   });
 
   it("takes the connection document inline, its client_secret a reference", async () => {
@@ -1349,7 +1355,7 @@ describe("nested bodies", () => {
     const res = await run(cwd, ["idps", "create", "--data", JSON.stringify(connection)]);
 
     expect(res.exitCode).toBe(0);
-    expect(seen.body?.idp).toMatchObject(connection);
+    expect(seen.at(-1)?.idp).toMatchObject(connection);
   });
 
   it("refuses a literal client secret on the command line, pointing at a reference", async () => {
@@ -1380,7 +1386,7 @@ describe("nested bodies", () => {
     ]);
 
     expect(res.exitCode).toBe(0);
-    expect(seen.body).toBeUndefined();
+    expect(seen.at(-1)).toBeUndefined();
     expect(res.stdout).toContain("https://sso.acme.example/token");
   });
 
@@ -1429,10 +1435,10 @@ describe("nested bodies", () => {
         attributes: { email: "ada@example.com", givenName: "Ada" },
       }),
     );
-    let body: unknown;
+    const bodies: unknown[] = [];
     server.use(
       http.post(`${SERVER}/api/v1/users`, async ({ request }) => {
-        body = await request.json();
+        bodies.push(await request.json());
         return HttpResponse.json(user("user_1"), { status: 201 });
       }),
     );
@@ -1447,7 +1453,7 @@ describe("nested bodies", () => {
     ]);
 
     expect(res.exitCode).toBe(0);
-    expect(body).toEqual({
+    expect(bodies.at(-1)).toEqual({
       schema: "sch_default",
       attributes: { email: "ada@example.com", givenName: "Augusta" },
     });
@@ -1474,10 +1480,10 @@ describe("nested bodies", () => {
 
   it("sets a project's hashing method through its nested fields", async () => {
     const cwd = await makeProject();
-    let body: unknown;
+    const bodies: unknown[] = [];
     server.use(
       http.patch(`${SERVER}/api/v1/projects/prj_1`, async ({ request }) => {
-        body = await request.json();
+        bodies.push(await request.json());
         return HttpResponse.json({ id: "prj_1", name: "p" });
       }),
     );
@@ -1493,7 +1499,7 @@ describe("nested bodies", () => {
     ]);
 
     expect(res.exitCode).toBe(0);
-    expect(body).toEqual({ password_hash: { algorithm: "bcrypt", params: { cost: 12 } } });
+    expect(bodies.at(-1)).toEqual({ password_hash: { algorithm: "bcrypt", params: { cost: 12 } } });
   });
 
   it("previews a connection with its reference and its fixed values shown", async () => {
@@ -1629,24 +1635,24 @@ describe("other resources", () => {
 
   it("teams list scopes the query by project_id", async () => {
     const cwd = await makeProject();
-    let url = "";
+    const urls: string[] = [];
     server.use(
       http.post(`${SERVER}/api/v1/teams/query`, ({ request }) => {
-        url = request.url;
+        urls.push(request.url);
         return HttpResponse.json({ teams: [] });
       }),
     );
     const res = await run(cwd, ["teams", "list"]);
     expect(res.exitCode).toBe(0);
-    expect(new URL(url).searchParams.get("project_id")).toBe("proj_test");
+    expect(new URL(urls.at(-1) ?? "").searchParams.get("project_id")).toBe("proj_test");
   });
 
   it("events list sends the shared filter grammar as query parameters", async () => {
     const cwd = await makeProject();
-    let url = "";
+    const urls: string[] = [];
     server.use(
       http.get(`${SERVER}/api/v1/events`, ({ request }) => {
-        url = request.url;
+        urls.push(request.url);
         return HttpResponse.json({
           data: [{ id: "evt_1", event_type: "user.created", category: "entity" }],
         });
@@ -1667,7 +1673,7 @@ describe("other resources", () => {
       "5",
     ]);
     expect(res.exitCode).toBe(0);
-    const params = new URL(url).searchParams;
+    const params = new URL(urls.at(-1) ?? "").searchParams;
     expect(params.get("project_id")).toBe("proj_test");
     expect(params.getAll("category")).toEqual(["entity", "auth"]);
     expect(params.get("created_after")).toBe("2026-01-01T00:00:00Z");
@@ -1678,10 +1684,10 @@ describe("other resources", () => {
 
   it("events list maps --sort direction onto the order query parameter", async () => {
     const cwd = await makeProject();
-    let url = "";
+    const urls: string[] = [];
     server.use(
       http.get(`${SERVER}/api/v1/events`, ({ request }) => {
-        url = request.url;
+        urls.push(request.url);
         return HttpResponse.json({ data: [] });
       }),
     );
@@ -1691,7 +1697,7 @@ describe("other resources", () => {
     // audit view is `--sort occurred_at:desc`.
     const res = await run(cwd, ["events", "list", "--sort", "occurred_at:desc"]);
     expect(res.exitCode).toBe(0);
-    expect(new URL(url).searchParams.get("order")).toBe("desc");
+    expect(new URL(urls.at(-1) ?? "").searchParams.get("order")).toBe("desc");
   });
 });
 
@@ -1710,10 +1716,10 @@ describe("configuration resources are read-only", () => {
 
   it("lists schemas through the shared filter grammar", async () => {
     const cwd = await makeProject();
-    let url: URL | undefined;
+    const urls: URL[] = [];
     server.use(
       http.get(`${SERVER}/api/v1/schemas`, ({ request }) => {
-        url = new URL(request.url);
+        urls.push(new URL(request.url));
         return HttpResponse.json({
           schemas: [
             {
@@ -1736,9 +1742,9 @@ describe("configuration resources are read-only", () => {
     ]);
 
     expect(res.exitCode).toBe(0);
-    expect(url?.searchParams.get("object_type")).toBe("human-user");
-    expect(url?.searchParams.get("project_id")).toBe("proj_test");
-    expect(url?.searchParams.get("limit")).toBe("5");
+    expect(urls.at(-1)?.searchParams.get("object_type")).toBe("human-user");
+    expect(urls.at(-1)?.searchParams.get("project_id")).toBe("proj_test");
+    expect(urls.at(-1)?.searchParams.get("limit")).toBe("5");
     const json = parseJson(res.stdout) as { data: { items: Array<{ id: string }> } };
     expect(json.data.items.map((s) => s.id)).toEqual(["sch_1"]);
   });
@@ -1771,10 +1777,10 @@ describe("schemas list shows the current schemas, not the history", () => {
   // the latest of each instead, which is what the console shows.
   it("sends revisions=latest when the caller does not say", async () => {
     const cwd = await makeProject();
-    let url: URL | undefined;
+    const urls: URL[] = [];
     server.use(
       http.get(`${SERVER}/api/v1/schemas`, ({ request }) => {
-        url = new URL(request.url);
+        urls.push(new URL(request.url));
         return HttpResponse.json({
           schemas: [
             {
@@ -1795,7 +1801,7 @@ describe("schemas list shows the current schemas, not the history", () => {
     const res = await run(cwd, ["schemas", "list"]);
 
     expect(res.exitCode).toBe(0);
-    expect(url?.searchParams.get("revisions")).toBe("latest");
+    expect(urls.at(-1)?.searchParams.get("revisions")).toBe("latest");
     const json = parseJson(res.stdout) as { data: { items: Array<{ id: string }> } };
     expect(json.data.items.map((s) => s.id)).toEqual(["sch_04", "sch_05"]);
   });
@@ -1803,10 +1809,10 @@ describe("schemas list shows the current schemas, not the history", () => {
   it("still gives the full history when asked for it", async () => {
     // The behaviour #947 protected is one filter away, not gone.
     const cwd = await makeProject();
-    let url: URL | undefined;
+    const urls: URL[] = [];
     server.use(
       http.get(`${SERVER}/api/v1/schemas`, ({ request }) => {
-        url = new URL(request.url);
+        urls.push(new URL(request.url));
         return HttpResponse.json({ schemas: [] });
       }),
     );
@@ -1814,7 +1820,7 @@ describe("schemas list shows the current schemas, not the history", () => {
     const res = await run(cwd, ["schemas", "list", "--filter", "revisions=all"]);
 
     expect(res.exitCode).toBe(0);
-    expect(url?.searchParams.get("revisions")).toBe("all");
+    expect(urls.at(-1)?.searchParams.get("revisions")).toBe("all");
   });
 
   it("lets a named field beat its own default", async () => {
@@ -1838,10 +1844,10 @@ describe("schemas list shows the current schemas, not the history", () => {
 describe("a schema or flow is addressable by name as well as by id", () => {
   it("fetches a revision directly when given one", async () => {
     const cwd = await makeProject();
-    let path = "";
+    const paths: string[] = [];
     server.use(
       http.get(`${SERVER}/api/v1/schemas/sch_04`, ({ request }) => {
-        path = new URL(request.url).pathname;
+        paths.push(new URL(request.url).pathname);
         return HttpResponse.json({ id: "sch_04", schema: { objectType: "human-user" } });
       }),
     );
@@ -1849,7 +1855,7 @@ describe("a schema or flow is addressable by name as well as by id", () => {
     const res = await run(cwd, ["schemas", "get", "sch_04"]);
 
     expect(res.exitCode).toBe(0);
-    expect(path).toBe("/api/v1/schemas/sch_04");
+    expect(paths.at(-1)).toBe("/api/v1/schemas/sch_04");
   });
 
   // A customer's `$id` is any string the API accepts, so the client has to
@@ -1858,10 +1864,10 @@ describe("a schema or flow is addressable by name as well as by id", () => {
   it("encodes a revision id that is a URL", async () => {
     const cwd = await makeProject();
     const id = "https://zitadel.com/schemas/v1/default-human-user.json";
-    let path = "";
+    const paths: string[] = [];
     server.use(
       http.get(`${SERVER}/api/v1/schemas/:id`, ({ request }) => {
-        path = new URL(request.url).pathname;
+        paths.push(new URL(request.url).pathname);
         return HttpResponse.json({ id, schema: { objectType: "human-user" } });
       }),
     );
@@ -1869,7 +1875,7 @@ describe("a schema or flow is addressable by name as well as by id", () => {
     const res = await run(cwd, ["schemas", "get", id]);
 
     expect(res.exitCode).toBe(0);
-    expect(path).toBe(`/api/v1/schemas/${encodeURIComponent(id)}`);
+    expect(paths.at(-1)).toBe(`/api/v1/schemas/${encodeURIComponent(id)}`);
     const json = parseJson(res.stdout) as { data: { id: string } };
     expect(json.data.id).toBe(id);
   });
@@ -1878,10 +1884,10 @@ describe("a schema or flow is addressable by name as well as by id", () => {
   // to test for. The server decides what an id is, not a prefix check.
   it("fetches a revision whose id looks like neither a prefix nor a URL", async () => {
     const cwd = await makeProject();
-    let path = "";
+    const paths: string[] = [];
     server.use(
       http.get(`${SERVER}/api/v1/schemas/:id`, ({ request }) => {
-        path = new URL(request.url).pathname;
+        paths.push(new URL(request.url).pathname);
         return HttpResponse.json({ id: "urn:example:human", schema: { objectType: "human-user" } });
       }),
     );
@@ -1889,16 +1895,16 @@ describe("a schema or flow is addressable by name as well as by id", () => {
     const res = await run(cwd, ["schemas", "get", "urn:example:human"]);
 
     expect(res.exitCode).toBe(0);
-    expect(path).toBe(`/api/v1/schemas/${encodeURIComponent("urn:example:human")}`);
+    expect(paths.at(-1)).toBe(`/api/v1/schemas/${encodeURIComponent("urn:example:human")}`);
   });
 
   it("resolves an object type to its current revision once the fetch 404s", async () => {
     const cwd = await makeProject();
-    let url: URL | undefined;
+    const urls: URL[] = [];
     server.use(
       http.get(`${SERVER}/api/v1/schemas/:id`, () => new HttpResponse(null, { status: 404 })),
       http.get(`${SERVER}/api/v1/schemas`, ({ request }) => {
-        url = new URL(request.url);
+        urls.push(new URL(request.url));
         return HttpResponse.json({
           schemas: [{ id: "sch_04", schema: { objectType: "human-user", kind: "user-schema" } }],
         });
@@ -1908,8 +1914,8 @@ describe("a schema or flow is addressable by name as well as by id", () => {
     const res = await run(cwd, ["schemas", "get", "human-user"]);
 
     expect(res.exitCode).toBe(0);
-    expect(url?.searchParams.get("object_type")).toBe("human-user");
-    expect(url?.searchParams.get("revisions")).toBe("latest");
+    expect(urls.at(-1)?.searchParams.get("object_type")).toBe("human-user");
+    expect(urls.at(-1)?.searchParams.get("revisions")).toBe("latest");
     const json = parseJson(res.stdout) as { data: { id: string } };
     expect(json.data.id).toBe("sch_04");
   });
@@ -1933,11 +1939,11 @@ describe("a schema or flow is addressable by name as well as by id", () => {
   // Falling through to the list would turn it into a misleading E_NOT_FOUND.
   it("does not fall back to the object-type lookup on a non-404", async () => {
     const cwd = await makeProject();
-    let listed = false;
+    const hits: true[] = [];
     server.use(
       http.get(`${SERVER}/api/v1/schemas/:id`, () => new HttpResponse(null, { status: 500 })),
       http.get(`${SERVER}/api/v1/schemas`, () => {
-        listed = true;
+        hits.push(true);
         return HttpResponse.json({ schemas: [] });
       }),
     );
@@ -1945,17 +1951,17 @@ describe("a schema or flow is addressable by name as well as by id", () => {
     const res = await run(cwd, ["schemas", "get", "human-user"]);
 
     expect(res.exitCode).not.toBe(0);
-    expect(listed).toBe(false);
+    expect(hits.length > 0).toBe(false);
     const json = parseJson(res.stdout) as { code: string };
     expect(json.code).not.toBe("E_NOT_FOUND");
   });
 
   it("resolves a flow name to its newest revision", async () => {
     const cwd = await makeProject();
-    let url: URL | undefined;
+    const urls: URL[] = [];
     server.use(
       http.get(`${SERVER}/api/v1/flow_definitions`, ({ request }) => {
-        url = new URL(request.url);
+        urls.push(new URL(request.url));
         return HttpResponse.json({
           flow_definitions: [{ id: "flowdef_9", flow_definition: { name: "default-login" } }],
         });
@@ -1965,7 +1971,7 @@ describe("a schema or flow is addressable by name as well as by id", () => {
     const res = await run(cwd, ["flow-definitions", "get", "default-login"]);
 
     expect(res.exitCode).toBe(0);
-    expect(url?.searchParams.get("name")).toBe("default-login");
+    expect(urls.at(-1)?.searchParams.get("name")).toBe("default-login");
     const json = parseJson(res.stdout) as { data: { id: string } };
     expect(json.data.id).toBe("flowdef_9");
   });
@@ -1976,10 +1982,10 @@ describe("flow definitions list the current flows", () => {
   // schemas: a bare list is the current flows, not every revision of each.
   it("sends revisions=latest when the caller does not say", async () => {
     const cwd = await makeProject();
-    let url: URL | undefined;
+    const urls: URL[] = [];
     server.use(
       http.get(`${SERVER}/api/v1/flow_definitions`, ({ request }) => {
-        url = new URL(request.url);
+        urls.push(new URL(request.url));
         return HttpResponse.json({ flow_definitions: [] });
       }),
     );
@@ -1987,22 +1993,22 @@ describe("flow definitions list the current flows", () => {
     const res = await run(cwd, ["flow-definitions", "list"]);
 
     expect(res.exitCode).toBe(0);
-    expect(url?.searchParams.get("revisions")).toBe("latest");
+    expect(urls.at(-1)?.searchParams.get("revisions")).toBe("latest");
   });
 
   it("still gives the full history when asked", async () => {
     const cwd = await makeProject();
-    let url: URL | undefined;
+    const urls: URL[] = [];
     server.use(
       http.get(`${SERVER}/api/v1/flow_definitions`, ({ request }) => {
-        url = new URL(request.url);
+        urls.push(new URL(request.url));
         return HttpResponse.json({ flow_definitions: [] });
       }),
     );
 
     await run(cwd, ["flow-definitions", "list", "--filter", "revisions=all"]);
 
-    expect(url?.searchParams.get("revisions")).toBe("all");
+    expect(urls.at(-1)?.searchParams.get("revisions")).toBe("all");
   });
 });
 

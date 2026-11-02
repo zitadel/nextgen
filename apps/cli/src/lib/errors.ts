@@ -246,18 +246,18 @@ export function toZitadelError(error: unknown): ZitadelError {
  * insisted on it would go silent the day it goes away.
  */
 function listedInDetails(body: unknown, key: "fields" | "missing"): string[] {
-  const seen = new Set<string>();
-  let node: unknown = body;
-  for (let depth = 0; depth < 4 && isObject(node); depth += 1) {
-    const listed = (node as Record<string, unknown>)[key];
-    if (Array.isArray(listed)) {
-      for (const name of listed) {
-        if (typeof name === "string" && name !== "") seen.add(name);
-      }
+  const names = (node: unknown, depth: number): unknown[] => {
+    if (depth >= 4 || !isObject(node)) {
+      return [];
     }
-    node = (node as { details?: unknown }).details;
-  }
-  return [...seen];
+    const listed = node[key];
+    return [...(Array.isArray(listed) ? listed : []), ...names(node.details, depth + 1)];
+  };
+  return [
+    ...new Set(
+      names(body, 0).filter((name): name is string => typeof name === "string" && name !== ""),
+    ),
+  ];
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {

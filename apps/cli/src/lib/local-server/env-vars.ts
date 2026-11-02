@@ -83,17 +83,17 @@ export const loadEnvFiles = async (
 };
 
 const readEnvFile = async (path: string): Promise<Readonly<Record<string, string>>> => {
-  let contents: string;
-  try {
-    contents = await readFile(path, "utf8");
-  } catch (error: unknown) {
+  const contents = await readFile(path, "utf8").catch((error: unknown) => {
     if (isObject(error) && error.code === "ENOENT") {
-      return {};
+      return undefined;
     }
     throw new ZitadelError("E_VALIDATION", `Cannot read ${path}`, {
       hint: "The file exists but could not be read; fix its permissions or remove it.",
       details: { path, message: error instanceof Error ? error.message : String(error) },
     });
+  });
+  if (contents === undefined) {
+    return {};
   }
   // parseEnv types values as possibly-undefined (it never emits them); drop them for the string map.
   return Object.fromEntries(

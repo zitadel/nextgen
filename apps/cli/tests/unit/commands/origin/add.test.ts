@@ -11,13 +11,13 @@ import { parseJson, runCliForTest } from "../../../helpers/run-cli";
 const SERVER = "https://api.zitadel.example";
 const server = setupServer();
 
-let requests: Array<Record<string, unknown>> = [];
+const requests: Array<Record<string, unknown>> = [];
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterAll(() => server.close());
 
 beforeEach(() => {
-  requests = [];
+  requests.length = 0;
   server.use(
     http.post(`${SERVER}/api/v1/projects/:id/origins`, async ({ request }) => {
       const body = (await request.json()) as Record<string, unknown>;

@@ -41,10 +41,14 @@ export function telemetryConfigDir(env: NodeJS.ProcessEnv): string {
  * never load-bearing.
  */
 export function loadOrCreateIdentity(env: NodeJS.ProcessEnv): Identity {
-  let dir: string;
-  try {
-    dir = telemetryConfigDir(env);
-  } catch {
+  const dir = ((): string | undefined => {
+    try {
+      return telemetryConfigDir(env);
+    } catch {
+      return undefined;
+    }
+  })();
+  if (dir === undefined) {
     return { distinctId: randomUUID(), isFirstRun: false };
   }
   const file = join(dir, "telemetry.json");

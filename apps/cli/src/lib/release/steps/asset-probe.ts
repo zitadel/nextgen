@@ -140,59 +140,57 @@ export async function brandingAssetWarnings(brandings: ReadonlyArray<object>): P
  * the content type.
  */
 export async function probeAsset(url: string, timeoutMs: number): Promise<AssetProbeVerdict> {
-  let current: URL;
-  try {
-    current = new URL(url);
-  } catch {
+  const start = URL.canParse(url) ? new URL(url) : undefined;
+  if (start === undefined) {
     // Shape is the schema's job; an unparseable URL never reaches here.
     return { kind: "inconclusive" };
   }
   const signal = AbortSignal.timeout(timeoutMs);
-  try {
-    for (let redirects = 0; ; redirects += 1) {
-      if (!isSafeProbeUrl(current)) {
-        consola.debug(`asset probe ${url} skipped unsafe/private target: ${current.href}`);
-        return { kind: "inconclusive" };
-      }
+  const follow = async (current: URL, redirects: number): Promise<AssetProbeVerdict> => {
+    if (!isSafeProbeUrl(current)) {
+      consola.debug(`asset probe ${url} skipped unsafe/private target: ${current.href}`);
+      return { kind: "inconclusive" };
+    }
 
-      const response = await requestHead(current, signal);
+    const response = await requestHead(current, signal);
 
-      if (isRedirect(response.status)) {
-        const location = response.location;
-        if (!location) {
-          return { kind: "status", status: response.status };
-        }
-        if (redirects >= MAX_REDIRECTS) {
-          return { kind: "unreachable", detail: `more than ${MAX_REDIRECTS} redirects` };
-        }
-        current = new URL(location, current);
-        continue;
-      }
-
-      // Some origins refuse HEAD outright. That says nothing about the asset,
-      // and a false "your logo is broken" is worse than staying quiet.
-      if (response.status === 405 || response.status === 501) {
-        return { kind: "inconclusive" };
-      }
-      if (response.status < 200 || response.status >= 300) {
+    if (isRedirect(response.status)) {
+      const location = response.location;
+      if (!location) {
         return { kind: "status", status: response.status };
       }
-      // These successful statuses are explicitly bodyless. Treating them as
-      // healthy because they also omit Content-Type recreates the exact
-      // "well-formed URL that serves nothing" failure this probe exists for.
-      if (response.status === 204 || response.status === 205) {
-        return { kind: "empty", status: response.status };
+      if (redirects >= MAX_REDIRECTS) {
+        return { kind: "unreachable", detail: `more than ${MAX_REDIRECTS} redirects` };
       }
-
-      const contentType = response.contentType?.split(";")[0]?.trim().toLowerCase();
-      if (!contentType) {
-        return { kind: "ok" };
-      }
-      if (contentType.startsWith("image/") || EXTRA_IMAGE_TYPES.has(contentType)) {
-        return { kind: "ok" };
-      }
-      return { kind: "content-type", contentType };
+      return follow(new URL(location, current), redirects + 1);
     }
+
+    // Some origins refuse HEAD outright. That says nothing about the asset,
+    // and a false "your logo is broken" is worse than staying quiet.
+    if (response.status === 405 || response.status === 501) {
+      return { kind: "inconclusive" };
+    }
+    if (response.status < 200 || response.status >= 300) {
+      return { kind: "status", status: response.status };
+    }
+    // These successful statuses are explicitly bodyless. Treating them as
+    // healthy because they also omit Content-Type recreates the exact
+    // "well-formed URL that serves nothing" failure this probe exists for.
+    if (response.status === 204 || response.status === 205) {
+      return { kind: "empty", status: response.status };
+    }
+
+    const contentType = response.contentType?.split(";")[0]?.trim().toLowerCase();
+    if (!contentType) {
+      return { kind: "ok" };
+    }
+    if (contentType.startsWith("image/") || EXTRA_IMAGE_TYPES.has(contentType)) {
+      return { kind: "ok" };
+    }
+    return { kind: "content-type", contentType };
+  };
+  try {
+    return await follow(start, 0);
   } catch (error) {
     if (isUnsafeProbeTargetError(error)) {
       consola.debug(`asset probe ${url} skipped unsafe/private target`);
@@ -320,15 +318,13 @@ async function requestHead(url: URL, signal: AbortSignal): Promise<HeadResponse>
   }
 }
 
-function isUnsafeProbeTargetError(error: unknown): boolean {
-  let current = error;
-  for (let depth = 0; depth < 4 && current instanceof Error; depth += 1) {
-    if ((current as NodeJS.ErrnoException).code === UNSAFE_PROBE_TARGET_CODE) {
-      return true;
-    }
-    current = current.cause;
-  }
-  return false;
+function isUnsafeProbeTargetError(error: unknown, depth = 0): boolean {
+  return (
+    depth < 4 &&
+    error instanceof Error &&
+    ((error as NodeJS.ErrnoException).code === UNSAFE_PROBE_TARGET_CODE ||
+      isUnsafeProbeTargetError(error.cause, depth + 1))
+  );
 }
 
 function describeVerdict(

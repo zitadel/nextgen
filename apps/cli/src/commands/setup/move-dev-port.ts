@@ -72,7 +72,6 @@ export async function moveDevPort(opts: {
   const patcher = orca.patcherFor(ctx.framework.id);
   const result = await patcher.moveDevPort(ctx, previousIssuer, { cwd, dryRun, force: false });
 
-  let staleOrigin: string | undefined;
   if (!dryRun) {
     // The app's own origin is primary, so the move rewrites that list. An
     // older secret that still carries the issuer as a preview pattern is
@@ -90,14 +89,14 @@ export async function moveDevPort(opts: {
     if (manifest !== undefined) {
       await updateScaffold(cwd, { ...manifest, dev_port: devPort });
     }
-    if (moving && portFromIssuer(previousIssuer) !== undefined) {
-      try {
-        await client.removeOrigin(secret.project_id, { pattern: previousIssuer });
-      } catch {
-        staleOrigin = previousIssuer;
-      }
-    }
   }
+  const staleOrigin =
+    !dryRun && moving && portFromIssuer(previousIssuer) !== undefined
+      ? await client.removeOrigin(secret.project_id, { pattern: previousIssuer }).then(
+          () => undefined,
+          () => previousIssuer,
+        )
+      : undefined;
 
   return {
     previousIssuer,

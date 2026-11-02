@@ -101,12 +101,14 @@ function validateBundleShapes(ctx: StepContext): void {
     }
     // An unreadable `$file` reference throws here; the wire bundle dropped it,
     // so this is the only place the deploy can still catch it.
-    let template: string | undefined;
-    try {
-      template = readDescriptorTemplate(ctx.cwd, descriptor);
-    } catch (error) {
-      failures.push(`${handle}: ${error instanceof Error ? error.message : String(error)}`);
-    }
+    const template = (() => {
+      try {
+        return readDescriptorTemplate(ctx.cwd, descriptor);
+      } catch (error) {
+        failures.push(`${handle}: ${error instanceof Error ? error.message : String(error)}`);
+        return undefined;
+      }
+    })();
     // The login template runs through the same LiquidJS rules the server
     // applies (`no-script-tag`, `mandatory-gates`, ...), so a dry run, which
     // makes no server call, still catches a template the release would refuse.

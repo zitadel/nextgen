@@ -422,8 +422,6 @@ function withoutServerDefaults(step: Step): Step {
   return copy;
 }
 
-let shippedPasswordForms: string[] | undefined;
-
 /**
  * The password steps the shipped flows carry, one per preset, in the form
  * {@link withoutSsoRoutes} reduces any password step to. A step that reduces to
@@ -431,12 +429,11 @@ let shippedPasswordForms: string[] | undefined;
  * The shipped steps carry no provider routes, so the terminal does not matter.
  */
 function shippedPasswordSteps(): string[] {
-  shippedPasswordForms ??= SETUP_PRESETS.flatMap((preset) => {
+  return SETUP_PRESETS.flatMap((preset) => {
     const flow = getDefaultLoginFlow({ preset }) as unknown as Json;
     const step = stepNamed(flow, PASSWORD_STEP);
     return step === undefined ? [] : [canonical(withoutSsoRoutes(step, "done"))];
   });
-  return shippedPasswordForms;
 }
 
 /**
@@ -538,52 +535,52 @@ const LEGACY_OUTCOMES: ReadonlyArray<readonly [string, string]> = [
  * author's routing.
  */
 function migrateLegacyOutcomes(document: Json): boolean {
-  let changed = false;
-  for (const step of steps(document)) {
-    if (!isObject(step.transitions)) {
-      continue;
-    }
-    const transitions = step.transitions;
-    const actions = Array.isArray(step.actions) ? step.actions : [];
-    const actionNames = new Set(
-      actions.map((action) => (isObject(action) ? action.name : undefined)),
-    );
-    for (const [old, next] of LEGACY_OUTCOMES) {
-      if (!(old in transitions) || actionNames.has(old)) {
-        continue;
+  return steps(document)
+    .map((step) => {
+      if (!isObject(step.transitions)) {
+        return false;
       }
-      if (actionNames.has(next)) {
-        throw new ZitadelError(
-          "E_VALIDATION",
-          `steps.${String(step.name)}: transition "${old}" is renamed to "${next}", which is an action on this step`,
-          {
-            hint: `Rename the action "${next}" on step "${String(step.name)}" (and its transition), then run auth-method sso enable again.`,
-            details: { step: step.name, action: next },
-          },
-        );
-      }
-      if (!(next in transitions)) {
-        const transition = transitions[old];
-        if (
-          isObject(transition) &&
-          ((transition.purpose ?? null) !== null || (transition.action ?? null) !== null)
-        ) {
+      const transitions = step.transitions;
+      const actions = Array.isArray(step.actions) ? step.actions : [];
+      const actionNames = new Set(
+        actions.map((action) => (isObject(action) ? action.name : undefined)),
+      );
+      return LEGACY_OUTCOMES.map(([old, next]) => {
+        if (!(old in transitions) || actionNames.has(old)) {
+          return false;
+        }
+        if (actionNames.has(next)) {
           throw new ZitadelError(
             "E_VALIDATION",
-            `steps.${String(step.name)}: transition "${old}" declares purpose or action, which "${next}" cannot`,
+            `steps.${String(step.name)}: transition "${old}" is renamed to "${next}", which is an action on this step`,
             {
-              hint: `Remove purpose and action from the transition "${old}" on step "${String(step.name)}", then run auth-method sso enable again.`,
-              details: { step: step.name, transition: old },
+              hint: `Rename the action "${next}" on step "${String(step.name)}" (and its transition), then run auth-method sso enable again.`,
+              details: { step: step.name, action: next },
             },
           );
         }
-        transitions[next] = transition;
-      }
-      delete transitions[old];
-      changed = true;
-    }
-  }
-  return changed;
+        if (!(next in transitions)) {
+          const transition = transitions[old];
+          if (
+            isObject(transition) &&
+            ((transition.purpose ?? null) !== null || (transition.action ?? null) !== null)
+          ) {
+            throw new ZitadelError(
+              "E_VALIDATION",
+              `steps.${String(step.name)}: transition "${old}" declares purpose or action, which "${next}" cannot`,
+              {
+                hint: `Remove purpose and action from the transition "${old}" on step "${String(step.name)}", then run auth-method sso enable again.`,
+                details: { step: step.name, transition: old },
+              },
+            );
+          }
+          transitions[next] = transition;
+        }
+        delete transitions[old];
+        return true;
+      }).some(Boolean);
+    })
+    .some(Boolean);
 }
 
 /**
@@ -638,38 +635,32 @@ export function applySsoToFlow(
   // Before any rewrite, so a refused flow is never half edited.
   refuseOutcomeActionCollision(document);
   const skipped: SsoSkipped[] = [];
-  let changed = false;
   // `ssoEditRefusal` has already refused a flow with no terminal to route to,
   // so the caller never reaches here without one.
   const terminal = terminalStep(document) ?? "done";
-  // First, so a step the previous CLI wrote matches today's template below.
-  if (migrateLegacyOutcomes(document)) {
-    changed = true;
-  }
 
-  for (const name of providerSteps(document)) {
+  const routeProviderStep = (name: string): boolean => {
     const step = stepNamed(document, name);
     if (step === undefined) {
-      continue;
+      return false;
     }
-    if (addProvider(step, slug)) {
-      changed = true;
-    }
+    const added = addProvider(step, slug);
     const transitions = isObject(step.transitions) ? { ...step.transitions } : {};
-    for (const [outcome, target] of Object.entries(providerOutcomes(terminal))) {
+    const retargeted = Object.entries(providerOutcomes(terminal)).map(([outcome, target]) => {
       const current = transitions[outcome];
       // `user_already_exists` already points at the password step on a
       // register flow. Retargeting it is the point: the same outcome now also
       // fires for a provider return, and the conflict step offers everything
       // the password step did.
       if (isObject(current) && current.target === target) {
-        continue;
+        return false;
       }
       transitions[outcome] = { target };
-      changed = true;
-    }
+      return true;
+    });
     step.transitions = transitions;
-  }
+    return added || retargeted.some(Boolean);
+  };
 
   // The password step is where someone lands who typed their email rather than
   // clicking a provider. A user who signed up with a provider has no password,
@@ -677,120 +668,138 @@ export function applySsoToFlow(
   // providers too, unless it has been edited by hand: it is a step the
   // developer is likely to have changed, and the editors only write into what
   // they recognise.
-  const password = stepNamed(document, PASSWORD_STEP);
-  if (password !== undefined && !providerSteps(document).includes(PASSWORD_STEP)) {
+  const routePasswordStep = (): boolean => {
+    const password = stepNamed(document, PASSWORD_STEP);
+    if (password === undefined || providerSteps(document).includes(PASSWORD_STEP)) {
+      return false;
+    }
     if (offersAlready(password, slug, terminal)) {
       // Edited by hand and already carrying the provider and its routes, which
       // is what the warning asks for: there is nothing left to say.
-    } else if (!shippedPasswordSteps().includes(canonical(withoutSsoRoutes(password, terminal)))) {
+      return false;
+    }
+    if (!shippedPasswordSteps().includes(canonical(withoutSsoRoutes(password, terminal)))) {
       skipped.push({
         step: PASSWORD_STEP,
         region: `steps.${PASSWORD_STEP}`,
         reason: "hand-edited",
       });
-    } else {
-      // Every provider the entry steps carry, not only the one named: a project
-      // enabled before the password step offered providers has several to catch up.
-      const offered = providerSteps(document).flatMap((name) => {
-        const entry = stepNamed(document, name);
-        return entry !== undefined && Array.isArray(entry.sso_providers)
-          ? (entry.sso_providers as unknown[])
-          : [];
-      });
-      for (const provider of new Set([...offered, slug])) {
-        if (typeof provider === "string" && addProvider(password, provider)) {
-          changed = true;
-        }
-      }
-      const transitions = isObject(password.transitions) ? { ...password.transitions } : {};
-      // The same routes as the entry steps. A collision here binds to the
-      // identified user either way, and the conflict step says why they are
-      // back and offers the other ways in; sending them to this step again
-      // would show an unchanged form and a Back that shows it twice.
-      for (const [outcome, target] of Object.entries(providerOutcomes(terminal))) {
-        const current = transitions[outcome];
-        if (!isObject(current) || current.target !== target) {
-          transitions[outcome] = { target };
-          changed = true;
-        }
-      }
-      password.transitions = transitions;
+      return false;
     }
-  }
+    // Every provider the entry steps carry, not only the one named: a project
+    // enabled before the password step offered providers has several to catch up.
+    const offered = providerSteps(document).flatMap((name) => {
+      const entry = stepNamed(document, name);
+      return entry !== undefined && Array.isArray(entry.sso_providers)
+        ? (entry.sso_providers as unknown[])
+        : [];
+    });
+    const added = [...new Set([...offered, slug])].map(
+      (provider) => typeof provider === "string" && addProvider(password, provider),
+    );
+    const transitions = isObject(password.transitions) ? { ...password.transitions } : {};
+    // The same routes as the entry steps. A collision here binds to the
+    // identified user either way, and the conflict step says why they are
+    // back and offers the other ways in; sending them to this step again
+    // would show an unchanged form and a Back that shows it twice.
+    const retargeted = Object.entries(providerOutcomes(terminal)).map(([outcome, target]) => {
+      const current = transitions[outcome];
+      if (isObject(current) && current.target === target) {
+        return false;
+      }
+      transitions[outcome] = { target };
+      return true;
+    });
+    password.transitions = transitions;
+    return [...added, ...retargeted].some(Boolean);
+  };
 
   // The password registration step shares the outcome, so it has to route to
   // the same place or a taken email dead-ends there.
-  const registerPassword = stepNamed(document, "register-password");
-  if (registerPassword !== undefined) {
+  const routeRegisterPassword = (): boolean => {
+    const registerPassword = stepNamed(document, "register-password");
+    if (registerPassword === undefined) {
+      return false;
+    }
     const transitions = isObject(registerPassword.transitions)
       ? { ...registerPassword.transitions }
       : {};
     const current = transitions.user_already_exists;
-    if (!isObject(current) || current.target !== SSO_CONFLICT) {
-      transitions.user_already_exists = { target: SSO_CONFLICT };
-      registerPassword.transitions = transitions;
-      changed = true;
+    if (isObject(current) && current.target === SSO_CONFLICT) {
+      return false;
     }
-  }
+    transitions.user_already_exists = { target: SSO_CONFLICT };
+    registerPassword.transitions = transitions;
+    return true;
+  };
 
-  const list = steps(document);
-  const terminalIndex = list.findIndex((step) => step.name === terminal);
-  const insertAt = terminalIndex === -1 ? list.length : terminalIndex;
-  // Each step with every form the generator may have written it in before. The
-  // conflict step follows the methods enabled, so one written when passkey was
-  // off is still the generator's own output once passkey is on. `register-sso`
-  // and the password step do not depend on the methods, so they have one form.
-  const wanted: Array<{ step: Step; earlier: Step[] }> = [
-    { step: registerSsoStep(registrationFields(document), terminal), earlier: [] },
-    {
-      step: ssoConflictStep(slug, enabled, loginEntry(document), terminal),
-      earlier: [true, false].flatMap((password) =>
-        [true, false].map((passkey) =>
-          ssoConflictStep(slug, { password, passkey }, loginEntry(document), terminal),
+  const addGeneratedSteps = (): boolean => {
+    const list = steps(document);
+    const terminalIndex = list.findIndex((step) => step.name === terminal);
+    const insertAt = terminalIndex === -1 ? list.length : terminalIndex;
+    const initialLength = list.length;
+    // Each step with every form the generator may have written it in before. The
+    // conflict step follows the methods enabled, so one written when passkey was
+    // off is still the generator's own output once passkey is on. `register-sso`
+    // and the password step do not depend on the methods, so they have one form.
+    const wanted: Array<{ step: Step; earlier: Step[] }> = [
+      { step: registerSsoStep(registrationFields(document), terminal), earlier: [] },
+      {
+        step: ssoConflictStep(slug, enabled, loginEntry(document), terminal),
+        earlier: [true, false].flatMap((password) =>
+          [true, false].map((passkey) =>
+            ssoConflictStep(slug, { password, passkey }, loginEntry(document), terminal),
+          ),
         ),
-      ),
-    },
-  ];
-  let offset = 0;
-  for (const { step, earlier } of wanted) {
-    const name = step.name as string;
-    const existing = stepNamed(document, name);
-    if (existing === undefined) {
-      list.splice(insertAt + offset, 0, step);
-      offset += 1;
-      changed = true;
-      continue;
-    }
-    // The conflict step carries a provider list of its own, so a second
-    // provider is added to it rather than replacing the first — otherwise the
-    // generator would report its own output as hand-edited and leave the
-    // screen offering only the provider that was enabled first. `register-sso`
-    // declares none, so it is compared as written.
-    const merged = step.sso_providers === undefined ? undefined : mergedProviders(existing, slug);
-    const expected = merged === undefined ? step : { ...step, sso_providers: merged };
-    // Compared as if the list were already merged, but without merging it. The
-    // list is the generator's to extend; the rest of the step is not. Adding
-    // the provider first and comparing afterwards reported a hand-edited step
-    // as left alone while having already changed it -- the one thing the
-    // report promises it did not do.
-    const candidate = merged === undefined ? existing : { ...existing, sso_providers: merged };
-    if (matches(candidate, expected)) {
-      if (merged !== undefined && addProvider(existing, slug)) {
-        changed = true;
+      },
+    ];
+    const results = wanted.map(({ step, earlier }) => {
+      const name = step.name as string;
+      const existing = stepNamed(document, name);
+      if (existing === undefined) {
+        list.splice(insertAt + (list.length - initialLength), 0, step);
+        return true;
       }
-    } else if (
-      merged !== undefined &&
-      earlier.some((form) => matches(candidate, { ...form, sso_providers: merged }))
-    ) {
-      // What the generator wrote for other methods: bring it up to today's, in
-      // the place it already has, keeping the providers it lists.
-      list[list.indexOf(existing)] = expected;
-      changed = true;
-    } else {
+      // The conflict step carries a provider list of its own, so a second
+      // provider is added to it rather than replacing the first — otherwise the
+      // generator would report its own output as hand-edited and leave the
+      // screen offering only the provider that was enabled first. `register-sso`
+      // declares none, so it is compared as written.
+      const merged = step.sso_providers === undefined ? undefined : mergedProviders(existing, slug);
+      const expected = merged === undefined ? step : { ...step, sso_providers: merged };
+      // Compared as if the list were already merged, but without merging it. The
+      // list is the generator's to extend; the rest of the step is not. Adding
+      // the provider first and comparing afterwards reported a hand-edited step
+      // as left alone while having already changed it -- the one thing the
+      // report promises it did not do.
+      const candidate = merged === undefined ? existing : { ...existing, sso_providers: merged };
+      if (matches(candidate, expected)) {
+        return merged !== undefined && addProvider(existing, slug);
+      }
+      if (
+        merged !== undefined &&
+        earlier.some((form) => matches(candidate, { ...form, sso_providers: merged }))
+      ) {
+        // What the generator wrote for other methods: bring it up to today's, in
+        // the place it already has, keeping the providers it lists.
+        list[list.indexOf(existing)] = expected;
+        return true;
+      }
       skipped.push({ step: name, region: `steps.${name}`, reason: "hand-edited" });
-    }
-  }
-  document.steps = list;
+      return false;
+    });
+    document.steps = list;
+    return results.some(Boolean);
+  };
+
+  const changed = [
+    // First, so a step the previous CLI wrote matches today's template below.
+    migrateLegacyOutcomes(document),
+    ...providerSteps(document).map(routeProviderStep),
+    routePasswordStep(),
+    routeRegisterPassword(),
+    addGeneratedSteps(),
+  ].some(Boolean);
 
   return changed || skipped.length > 0
     ? { document, changed, skipped }
@@ -828,19 +837,18 @@ export function removeSsoFromSchema(schema: object, slug: string): SsoResult<obj
  */
 export function removeSsoFromFlow(flow: object, slug: string): SsoResult<object> {
   const document = clone(flow) as Json;
-  let changed = false;
-  for (const step of steps(document)) {
-    if (!Array.isArray(step.sso_providers) || !step.sso_providers.includes(slug)) {
-      continue;
-    }
+  const offering = steps(document).filter(
+    (step) => Array.isArray(step.sso_providers) && step.sso_providers.includes(slug),
+  );
+  for (const step of offering) {
     const providers = (step.sso_providers as unknown[]).filter((provider) => provider !== slug);
     if (providers.length === 0) {
       delete step.sso_providers;
     } else {
       step.sso_providers = providers;
     }
-    changed = true;
   }
+  const changed = offering.length > 0;
   return changed
     ? { document, changed, skipped: [] }
     : { document: flow, changed: false, skipped: [] };

@@ -11,13 +11,13 @@ import { parseJson, runCliForTest } from "../../../helpers/run-cli";
 const SERVER = "https://api.zitadel.example";
 const server = setupServer();
 
-let removed: Array<Record<string, unknown>> = [];
+const removed: Array<Record<string, unknown>> = [];
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterAll(() => server.close());
 
 beforeEach(() => {
-  removed = [];
+  removed.length = 0;
   server.use(
     http.post(`${SERVER}/api/v1/projects/:id/origins/remove`, async ({ request }) => {
       removed.push((await request.json()) as Record<string, unknown>);

@@ -50,12 +50,11 @@ export default class DeploymentRollback extends Promptable(EnvironmentCommand) {
 
     // Bare: undo the latest deployment by re-applying what its targets served
     // before it. With an id, re-apply exactly that one.
-    let targetId = args.deployment_id as string | undefined;
     // The bare form decides from one read of the history, so its guard comes
     // from that same read: a deploy landing after it is one the caller never
     // saw, and must make the server refuse rather than become the expected one.
-    let expectedDeploymentId: string | undefined;
-    if (targetId === undefined) {
+    const named = args.deployment_id as string | undefined;
+    const resolveBare = async (): Promise<{ targetId: string; guardId: string | undefined }> => {
       // A preview deployment is never the deploy a bare rollback undoes, nor
       // one it can restore: the server refuses to roll one back. Primary
       // deployments make one history for the project, newest first.
@@ -76,9 +75,11 @@ export default class DeploymentRollback extends Promptable(EnvironmentCommand) {
           hint: `Name a deployment to re-apply, or check \`zitadel deployment list${this.environmentSelector()}\`.`,
         });
       }
-      targetId = prior.id;
-      expectedDeploymentId = latest.id;
-    }
+      return { targetId: prior.id, guardId: latest.id };
+    };
+    const resolved =
+      named === undefined ? await resolveBare() : { targetId: named, guardId: undefined };
+    const { targetId } = resolved;
 
     // A dry run re-applies nothing, so it stops once the target is resolved,
     // before the destructive-confirm gate and the write: a rollback re-serves
@@ -98,13 +99,14 @@ export default class DeploymentRollback extends Promptable(EnvironmentCommand) {
     // write in non-interactive mode) makes the server answer 409 rather than
     // letting the rollback overwrite a change the caller never saw. Omitted
     // when nothing is live there, which an optional id cannot stand in for.
-    if (expectedDeploymentId === undefined) {
-      const deployments = await client.listDeployments.all({
-        project_id: projectId,
-        live: true,
-      });
-      expectedDeploymentId = deployments.find(servesPrimary)?.id;
-    }
+    const expectedDeploymentId =
+      resolved.guardId ??
+      (
+        await client.listDeployments.all({
+          project_id: projectId,
+          live: true,
+        })
+      ).find(servesPrimary)?.id;
 
     const confirmed = await this.input({
       kind: "confirm",
@@ -121,17 +123,17 @@ export default class DeploymentRollback extends Promptable(EnvironmentCommand) {
       ...(expectedDeploymentId === undefined ? {} : { expectedDeploymentId }),
     });
 
-    let pointers: readonly GetReleaseById200PointersItem[] | undefined;
-    try {
-      const release = await client.getReleaseById(deployment.release_id, {
+    const pointers = await client
+      .getReleaseById(deployment.release_id, {
         project_id: projectId,
+      })
+      .then((release): readonly GetReleaseById200PointersItem[] | undefined => release.pointers)
+      .catch((error: unknown) => {
+        reportWarning(
+          `Rolled back, but the revisions ${deployment.release_id} pins could not be read: ${toZitadelError(error).message}`,
+        );
+        return undefined;
       });
-      pointers = release.pointers;
-    } catch (error) {
-      reportWarning(
-        `Rolled back, but the revisions ${deployment.release_id} pins could not be read: ${toZitadelError(error).message}`,
-      );
-    }
 
     const origins = deployment.targets.map((target) => target.origin);
     return this.emit({

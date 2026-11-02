@@ -90,10 +90,8 @@ export async function writeScaffoldManifest(options: {
     if (!touched.has(key)) {
       continue;
     }
-    let contents: string;
-    try {
-      contents = await readFile(join(cwd, key), "utf8");
-    } catch {
+    const contents = await readFile(join(cwd, key), "utf8").catch(() => undefined);
+    if (contents === undefined) {
       continue;
     }
     files[key] = {

@@ -1,5 +1,5 @@
-import { existsSync } from "node:fs";
-import { mkdir, mkdtemp, readFile, symlink, writeFile } from "node:fs/promises";
+import { existsSync, mkdtempSync } from "node:fs";
+import { mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -13,12 +13,12 @@ import { addSkills, bundledSkills, skillDirs } from "../../../../src/lib/skills/
 
 const CLAUDE = { name: "claude", display: "Claude Code", detected: true, installPath: "/x" };
 
-let packageRoot: string;
-let project: string;
+const packageRoot = mkdtempSync(join(tmpdir(), "zitadel-cli-package-"));
+const project = mkdtempSync(join(tmpdir(), "zitadel-skills-project-"));
 
 beforeEach(async () => {
-  packageRoot = await mkdtemp(join(tmpdir(), "zitadel-cli-package-"));
-  project = await mkdtemp(join(tmpdir(), "zitadel-skills-project-"));
+  await Promise.all([packageRoot, project].map((dir) => rm(dir, { recursive: true, force: true })));
+  await Promise.all([packageRoot, project].map((dir) => mkdir(dir, { recursive: true })));
   await mkdir(join(packageRoot, "dist/skills/zitadel-cli/references"), { recursive: true });
   await writeFile(join(packageRoot, "dist/skills/zitadel-cli/SKILL.md"), "this version\n");
   await mkdir(join(packageRoot, "dist/skills/zitadel"), { recursive: true });

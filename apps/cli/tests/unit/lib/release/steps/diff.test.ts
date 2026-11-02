@@ -1,5 +1,6 @@
 import { execFile } from "node:child_process";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtempSync } from "node:fs";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
@@ -19,14 +20,14 @@ type Live = {
   dirty?: boolean;
 };
 
-let cwd: string;
-let written: string[];
-let asked: unknown[];
+const cwd = mkdtempSync(join(tmpdir(), "zitadel-diff-step-"));
+const written: string[] = [];
+const asked: unknown[] = [];
 
 beforeEach(async () => {
-  cwd = await mkdtemp(join(tmpdir(), "zitadel-diff-step-"));
-  written = [];
-  asked = [];
+  await mkdir(cwd, { recursive: true });
+  written.length = 0;
+  asked.length = 0;
   vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
     written.push(String(chunk));
     return true;

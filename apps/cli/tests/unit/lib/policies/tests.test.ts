@@ -1,9 +1,9 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
+import { tempDirs } from "../../../helpers/temp-dirs";
 import type { ZitadelClient } from "../../../../src/lib/api-client";
 
 import {
@@ -24,10 +24,10 @@ const CASE = {
 };
 const TEST_FILE = { operation: OPERATION, cases: [CASE] };
 
-let dir: string | undefined;
+const dirs = tempDirs();
 
 async function project(files: Record<string, unknown>): Promise<string> {
-  dir = await mkdtemp(join(tmpdir(), "zitadel-policy-tests-"));
+  const dir = await dirs.make("zitadel-policy-tests-");
   await mkdir(join(dir, ".zitadel/policies"), { recursive: true });
   for (const [name, content] of Object.entries(files)) {
     await writeFile(join(dir, ".zitadel/policies", name), JSON.stringify(content));
@@ -36,10 +36,7 @@ async function project(files: Record<string, unknown>): Promise<string> {
 }
 
 afterEach(async () => {
-  if (dir) {
-    await rm(dir, { recursive: true, force: true });
-    dir = undefined;
-  }
+  await dirs.clean();
 });
 
 describe("policyTestFileIssues", () => {

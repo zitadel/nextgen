@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -15,16 +15,16 @@ import { showSkillsHint } from "../../../src/lib/skills-hint";
 const CLAUDE = { name: "claude", display: "Claude Code", detected: true, installPath: "/x" };
 const cliVersion = "1.2.3";
 
-let config: string;
-let env: NodeJS.ProcessEnv;
+const config = mkdtempSync(join(tmpdir(), "zitadel-skills-"));
+const env: NodeJS.ProcessEnv = { XDG_CONFIG_HOME: config };
 
 beforeEach(() => {
-  config = mkdtempSync(join(tmpdir(), "zitadel-skills-"));
-  env = { XDG_CONFIG_HOME: config };
+  mkdirSync(config, { recursive: true });
   rosie.agents.mockResolvedValue([CLAUDE]);
 });
 
 afterEach(() => {
+  rmSync(config, { recursive: true, force: true });
   vi.clearAllMocks();
 });
 

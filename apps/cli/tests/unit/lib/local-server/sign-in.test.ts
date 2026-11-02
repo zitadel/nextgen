@@ -15,7 +15,7 @@ const admin: LocalAdmin = {
 };
 
 type Call = { path: string; body: unknown; authorization: string | null; origin: string | null };
-let calls: Call[] = [];
+const calls: Call[] = [];
 
 async function record(request: Request): Promise<void> {
   const url = new URL(request.url);
@@ -70,7 +70,7 @@ const server = setupServer(...signInHandlers);
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterEach(() => {
   server.resetHandlers();
-  calls = [];
+  calls.length = 0;
 });
 afterAll(() => server.close());
 
@@ -108,13 +108,13 @@ describe("local admin sign-in", () => {
   });
 
   it("exchanges the handoff token for the session cookie", async () => {
-    let exchanged: unknown;
+    const exchanges: unknown[] = [];
     server.use(
       http.post(`${SERVER}/api/v1/sessions/exchange`, async ({ request }) => {
-        exchanged = {
+        exchanges.push({
           project: new URL(request.url).searchParams.get("project_id"),
           body: await request.json(),
-        };
+        });
         return new HttpResponse(null, {
           headers: { "set-cookie": "zitadel_session=sess_cookie_value; Path=/; HttpOnly" },
         });
@@ -124,7 +124,7 @@ describe("local admin sign-in", () => {
     const cookie = await adminSessionCookie(SERVER, admin);
 
     expect(cookie).toBe("zitadel_session=sess_cookie_value");
-    expect(exchanged).toEqual({
+    expect(exchanges[0]).toEqual({
       project: "proj_platform",
       body: { handoff_token: "handoff/one+time" },
     });

@@ -271,17 +271,16 @@ export class Lifecycle<R extends ServerRecord> {
   }
 
   /** Whether a server that is alive answers, asking up to {@link HEALTH_ATTEMPTS} times. */
-  private async answers(serverUrl: string): Promise<boolean> {
+  private async answers(serverUrl: string, attempt = 1): Promise<boolean> {
     const clock = this.options.clock ?? realClock;
-    for (let attempt = 1; attempt <= HEALTH_ATTEMPTS; attempt++) {
-      if (await this.deps.health.isHealthy(serverUrl)) {
-        return true;
-      }
-      if (attempt < HEALTH_ATTEMPTS) {
-        await clock.wait(this.options.pollIntervalMs ?? 1000);
-      }
+    if (await this.deps.health.isHealthy(serverUrl)) {
+      return true;
     }
-    return false;
+    if (attempt >= HEALTH_ATTEMPTS) {
+      return false;
+    }
+    await clock.wait(this.options.pollIntervalMs ?? 1000);
+    return this.answers(serverUrl, attempt + 1);
   }
 
   /**
@@ -317,42 +316,53 @@ export class Lifecycle<R extends ServerRecord> {
     if (previous) {
       await this.terminate(previous);
     }
-    let preferred = previous?.port ?? this.options.previousPort;
-    for (let attempt = 0; ; attempt++) {
-      const claim = await claimFreePort(
-        this.deps.ports,
-        requested,
-        preferred,
-        this.options.firstPort,
-      );
+    return this.launchOnFreePort(requested, previous?.port ?? this.options.previousPort, 0);
+  }
+
+  /**
+   * Claims a port and launches on it. A port taken by someone else between the
+   * claim and the bind moves on to the next port, up to {@link PORT_RACE_RETRIES} times.
+   */
+  private async launchOnFreePort(
+    requested: number | undefined,
+    preferred: number | undefined,
+    attempt: number,
+  ): Promise<{ record: R; alreadyRunning: boolean }> {
+    const claim = await claimFreePort(
+      this.deps.ports,
+      requested,
+      preferred,
+      this.options.firstPort,
+    );
+    const outcome = await (async (): Promise<
+      { readonly record: Launched<R> } | { readonly retryFrom: number }
+    > => {
       try {
-        let record: Launched<R>;
-        try {
-          record = await this.launchAndWait(claim.port);
-        } catch (error) {
-          // Someone else took the port between claiming it and binding it (a
-          // process outside our claims, or a Docker publish that failed). The
-          // choice was automatic, so the next port is tried. A server that failed
-          // with its port still free crashed, and says so instead of being retried.
-          if (
-            requested === undefined &&
-            attempt < PORT_RACE_RETRIES &&
-            !(error instanceof ServerStopError) &&
-            (error instanceof ServerStartError ? error.reason === "exited" : true) &&
-            !(await this.deps.ports.isFree(claim.port))
-          ) {
-            preferred = claim.port + 1;
-            continue;
-          }
-          throw error;
+        return { record: await this.launchAndWait(claim.port) };
+      } catch (error) {
+        // Someone else took the port between claiming it and binding it (a
+        // process outside our claims, or a Docker publish that failed). The
+        // choice was automatic, so the next port is tried. A server that failed
+        // with its port still free crashed, and says so instead of being retried.
+        if (
+          requested === undefined &&
+          attempt < PORT_RACE_RETRIES &&
+          !(error instanceof ServerStopError) &&
+          (error instanceof ServerStartError ? error.reason === "exited" : true) &&
+          !(await this.deps.ports.isFree(claim.port))
+        ) {
+          return { retryFrom: claim.port + 1 };
         }
-        return { record, alreadyRunning: false };
+        throw error;
       } finally {
         // A claim that cannot be removed is a file whose owner is gone, which
         // the next start takes over; it must not hide how this start ended.
         await claim.release().catch(() => undefined);
       }
-    }
+    })();
+    return "record" in outcome
+      ? { record: outcome.record, alreadyRunning: false }
+      : this.launchOnFreePort(requested, outcome.retryFrom, attempt + 1);
   }
 
   /**
@@ -510,7 +520,7 @@ export async function claimFreePort(
     return { port: requested, release };
   }
   const first = preferred ?? firstPort;
-  for (let port = first; port < first + PORT_SEARCH_RANGE; port++) {
+  for (const port of Array.from({ length: PORT_SEARCH_RANGE }, (_, offset) => first + offset)) {
     if (!(await ports.isFree(port))) {
       continue;
     }

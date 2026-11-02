@@ -69,16 +69,13 @@ export class QwikScaffolder extends AbstractCLIScaffolder {
    * rethrows any other read error (e.g. `EACCES`) rather than silently leaving a
    * half-migrated app that reports success but cannot build. */
   private async repointQwikRefs(file: string): Promise<void> {
-    let source: string;
-    try {
-      source = await readFile(file, "utf8");
-    } catch (error) {
+    const source = await readFile(file, "utf8").catch((error: unknown) => {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-        return;
+        return undefined;
       }
       throw error;
-    }
-    if (!source.includes("@builder.io/qwik")) {
+    });
+    if (source === undefined || !source.includes("@builder.io/qwik")) {
       return;
     }
     await writeFile(file, source.replaceAll("@builder.io/qwik", "@qwik.dev/core"));

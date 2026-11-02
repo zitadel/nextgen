@@ -34,21 +34,21 @@ const pageAt = (token: string | null) => {
 
 describe("send", () => {
   it("sends the project secret as the bearer and the body as JSON", async () => {
-    let seen: { authorization: string | null; type: string | null; body: unknown } | undefined;
+    const seen: { authorization: string | null; type: string | null; body: unknown }[] = [];
     server.use(
       http.post(`${SERVER}/api/v1/teams`, async ({ request }) => {
-        seen = {
+        seen.push({
           authorization: request.headers.get("authorization"),
           type: request.headers.get("content-type"),
           body: await request.json(),
-        };
+        });
         return HttpResponse.json({ id: "team_1" }, { status: 201 });
       }),
     );
 
     const response = await send(SERVER, "zsec_1", requestFor("createTeam", ["name=Support"]));
 
-    expect(seen).toEqual({
+    expect(seen[0]).toEqual({
       authorization: "Bearer zsec_1",
       type: "application/json",
       body: { name: "Support" },
@@ -57,17 +57,17 @@ describe("send", () => {
   });
 
   it("sends no bearer when there is no secret", async () => {
-    let authorization: string | null = "unset";
+    const authorizations: (string | null)[] = [];
     server.use(
       http.get(`${SERVER}/api/v1/livez`, ({ request }) => {
-        authorization = request.headers.get("authorization");
+        authorizations.push(request.headers.get("authorization"));
         return HttpResponse.json({ status: "ok" });
       }),
     );
 
     await send(SERVER, undefined, requestFor("getLive"));
 
-    expect(authorization).toBeNull();
+    expect(authorizations[0]).toBeNull();
   });
 
   it("answers no body for a response without one", async () => {

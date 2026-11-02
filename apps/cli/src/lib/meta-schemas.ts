@@ -70,27 +70,33 @@ export async function metaSchemaState(
   return state;
 }
 
+function parseOrUndefined(text: string): { value: unknown } | undefined {
+  try {
+    return { value: JSON.parse(text) };
+  } catch {
+    return undefined;
+  }
+}
+
 /** {@link metaSchemaState} without the symlink rule. */
 async function contentState(
   cwd: string,
   file: ProjectMetaSchema,
 ): Promise<"current" | "missing" | "outdated"> {
-  let text: string;
-  try {
-    text = await readFile(join(cwd, file.path), "utf8");
-  } catch (error) {
+  const text = await readFile(join(cwd, file.path), "utf8").catch((error: unknown) => {
     if (isErrno(error, "ENOENT")) {
-      return "missing";
+      return undefined;
     }
     throw error;
+  });
+  if (text === undefined) {
+    return "missing";
   }
-  let held: unknown;
-  try {
-    held = JSON.parse(text);
-  } catch {
+  const held = parseOrUndefined(text);
+  if (held === undefined) {
     return "outdated";
   }
-  return isDeepStrictEqual(maskPublicCliVersion(held), maskPublicCliVersion(file.body))
+  return isDeepStrictEqual(maskPublicCliVersion(held.value), maskPublicCliVersion(file.body))
     ? "current"
     : "outdated";
 }
@@ -102,8 +108,8 @@ async function contentState(
  */
 export async function linkOnPath(cwd: string, path: string): Promise<string | undefined> {
   const segments = path.split("/");
-  for (let end = 1; end <= segments.length; end++) {
-    const segment = segments.slice(0, end).join("/");
+  for (const [index] of segments.entries()) {
+    const segment = segments.slice(0, index + 1).join("/");
     try {
       if ((await lstat(join(cwd, segment))).isSymbolicLink()) {
         return segment;

@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { type EventEmitter, on } from "node:events";
 
 import { ZitadelError, isErrno } from "../../errors";
 import { unscopedCommand } from "../../suggestion";
@@ -78,18 +79,15 @@ export class DockerLauncher implements Launcher<DockerRuntimeMetadata> {
     await DockerLauncher.remove(spec.containerName);
     await ensureImage(spec.image);
     const env = spec.env ?? EMPTY_ENV;
-    let result: DockerResult;
-    try {
-      result = await requireDocker(
-        DockerLauncher.runArgs({ ...spec, port: target.port }, env.injected),
-        "Start local Zitadel container",
-        env.values,
-      );
-    } catch (error) {
+    const result = await requireDocker(
+      DockerLauncher.runArgs({ ...spec, port: target.port }, env.injected),
+      "Start local Zitadel container",
+      env.values,
+    ).catch(async (error: unknown) => {
       // A run that failed after the container was created leaves it behind.
       await DockerLauncher.remove(spec.containerName).catch(() => false);
       throw error;
-    }
+    });
     return launched(
       DockerLauncher.metadata({
         cwdDataDir: spec.dataDir,
@@ -237,12 +235,9 @@ export class DockerLauncher implements Launcher<DockerRuntimeMetadata> {
     }
 
     const args = ["manifest", "inspect", image];
-    let result: DockerResult;
-    try {
-      result = await runDocker(args);
-    } catch (error) {
+    const result = await runDocker(args).catch((error: unknown) => {
       throw dockerError(`Inspect Docker image ${image}`, args, error);
-    }
+    });
     if (result.status === 0) {
       return "remote";
     }
@@ -279,17 +274,14 @@ export class DockerLauncher implements Launcher<DockerRuntimeMetadata> {
    * a container must not fail for want of a `docker` to ask.
    */
   static async remove(containerName: string): Promise<boolean> {
-    let inspect: Awaited<ReturnType<typeof DockerLauncher.inspect>>;
-    try {
-      inspect = await DockerLauncher.inspect(containerName);
-    } catch (error) {
+    const inspect = await DockerLauncher.inspect(containerName).catch((error: unknown) => {
       // No `docker` on PATH: Docker is not installed, so it runs no container.
       if (isErrno(error, "ENOENT")) {
-        return false;
+        return undefined;
       }
       throw error;
-    }
-    if (!inspect.exists) {
+    });
+    if (!inspect?.exists) {
       return false;
     }
     if (inspect.running) {
@@ -375,26 +367,50 @@ async function runDocker(
   args: string[],
   env: Readonly<Record<string, string>> = {},
 ): Promise<DockerResult> {
-  return new Promise((resolve, reject) => {
-    const child = spawn("docker", args, {
-      stdio: ["ignore", "pipe", "pipe"],
-      env: { ...process.env, ...env },
-    });
-    let stdout = "";
-    let stderr = "";
-    child.stdout?.setEncoding("utf8");
-    child.stderr?.setEncoding("utf8");
-    child.stdout?.on("data", (chunk: string) => {
-      stdout += chunk;
-    });
-    child.stderr?.on("data", (chunk: string) => {
-      stderr += chunk;
-    });
-    child.on("error", reject);
-    child.on("close", (code) => {
-      resolve({ status: code ?? 1, stdout, stderr });
+  const child = spawn("docker", args, {
+    stdio: ["ignore", "pipe", "pipe"],
+    env: { ...process.env, ...env },
+  });
+  child.stdout?.setEncoding("utf8");
+  child.stderr?.setEncoding("utf8");
+  const finished = new AbortController();
+  const failed = new Promise<never>((_, reject) => {
+    child.on("error", (error) => {
+      finished.abort();
+      reject(error);
     });
   });
+  const closed = new Promise<number>((resolve) => {
+    child.on("close", (code) => {
+      finished.abort();
+      resolve(code ?? 1);
+    });
+  });
+  const [stdout, stderr, status] = await Promise.race([
+    failed,
+    Promise.all([
+      collectText(child.stdout, finished.signal),
+      collectText(child.stderr, finished.signal),
+      closed,
+    ]),
+  ]);
+  return { status, stdout, stderr };
+}
+
+/** Everything a stream emits as text until `signal` aborts. */
+function collectText(stream: EventEmitter | null, signal: AbortSignal): Promise<string> {
+  const chunks = stream ? on(stream, "data", { signal }) : undefined;
+  const drain = async (collected: string): Promise<string> => {
+    try {
+      const next = await chunks?.next();
+      return next === undefined || next.done
+        ? collected
+        : drain(`${collected}${String(next.value[0])}`);
+    } catch {
+      return collected;
+    }
+  };
+  return drain("");
 }
 
 /**
@@ -441,22 +457,37 @@ function lineBreaks(text: string): number {
   return text.split("\n").length - 1;
 }
 
+/** How many of `count` line breaks `text` completes, and what follows the last of them. */
+function skipLines(count: number, text: string): { left: number; rest: string } {
+  const lineBreak = count > 0 ? text.indexOf("\n") : -1;
+  return count > 0 && lineBreak !== -1
+    ? skipLines(count - 1, text.slice(lineBreak + 1))
+    : { left: count, rest: count > 0 ? "" : text };
+}
+
+function* lineSkipper(left: number, write: (text: string) => void): Generator<void, void, string> {
+  if (left === 0) {
+    for (;;) {
+      const text = yield;
+      if (text.length > 0) {
+        write(text);
+      }
+    }
+  }
+  const text = yield;
+  const skipped = skipLines(left, text);
+  if (skipped.rest.length > 0) {
+    write(skipped.rest);
+  }
+  return yield* lineSkipper(skipped.left, write);
+}
+
 /** Passes a stream's text to `write` once its first `count` lines have gone by. */
 function afterLines(count: number, write: (text: string) => void): (text: string) => void {
-  let left = count;
+  const skipper = lineSkipper(count, write);
+  skipper.next();
   return (text) => {
-    let start = 0;
-    while (left > 0) {
-      const lineBreak = text.indexOf("\n", start);
-      if (lineBreak === -1) {
-        return;
-      }
-      left -= 1;
-      start = lineBreak + 1;
-    }
-    if (start < text.length) {
-      write(text.slice(start));
-    }
+    skipper.next(text);
   };
 }
 
@@ -468,12 +499,9 @@ async function requireDocker(
   action: string,
   env: Readonly<Record<string, string>> = {},
 ): Promise<DockerResult> {
-  let result: DockerResult;
-  try {
-    result = await runDocker(args, env);
-  } catch (error) {
+  const result = await runDocker(args, env).catch((error: unknown) => {
     throw dockerError(action, args, error);
-  }
+  });
   if (result.status !== 0) {
     throw dockerError(action, args, result);
   }
@@ -484,13 +512,10 @@ async function requireDocker(
  * Whether the image is already on this machine.
  */
 async function imageExists(image: string): Promise<boolean> {
-  let result: DockerResult;
   const args = ["image", "inspect", image];
-  try {
-    result = await runDocker(args);
-  } catch (error) {
+  const result = await runDocker(args).catch((error: unknown) => {
     throw dockerError(`Inspect Docker image ${image}`, args, error);
-  }
+  });
   return result.status === 0;
 }
 

@@ -866,7 +866,7 @@ describe("the credential env files a failed setup rolls back", () => {
   it("does not read a file it cannot open as one that is absent", async () => {
     const cwd = await makeTempDir();
     // A directory where the file should be reads as EISDIR, not ENOENT: treating
-    // it as absent would let the rollback delete something it should restore.
+    // it as absent would allow the rollback to delete something it should restore.
     await mkdir(join(cwd, ".env.development.local"));
 
     await expect(readCredentialEnvFiles(cwd)).rejects.toMatchObject({ code: "EISDIR" });
@@ -1132,9 +1132,8 @@ async function startCreateProjectCaptureServer(
   /** Makes `POST /releases/build` fail, so setup's first deploy fails. */
   rejectsReleases(): void;
 }> {
-  let body: Record<string, unknown> | null = null;
-  let rejectsSchemas = false;
-  let rejectsBuilds = false;
+  const bodies: Array<Record<string, unknown>> = [];
+  const failing = new Set<"schemas" | "builds">();
   const deployments: Array<{
     body: Record<string, unknown>;
     authorization: string | undefined;
@@ -1149,7 +1148,7 @@ async function startCreateProjectCaptureServer(
       for await (const chunk of req) {
         chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
       }
-      body = JSON.parse(Buffer.concat(chunks).toString("utf8")) as Record<string, unknown>;
+      bodies.push(JSON.parse(Buffer.concat(chunks).toString("utf8")) as Record<string, unknown>);
       await opts.onCreateProject?.();
       const n = String(projects.length + 1);
       const project = { id: `proj_test_${n}`, project_secret: `sk_proj_test_${n}_full` };
@@ -1165,7 +1164,7 @@ async function startCreateProjectCaptureServer(
       );
       return;
     }
-    if (req.method === "POST" && path === "/api/v1/schemas" && rejectsSchemas) {
+    if (req.method === "POST" && path === "/api/v1/schemas" && failing.has("schemas")) {
       res
         .writeHead(500, { "content-type": "application/json" })
         .end(JSON.stringify({ code: "internal", message: "boom" }));
@@ -1190,7 +1189,7 @@ async function startCreateProjectCaptureServer(
       return;
     }
     if (req.method === "POST" && path === "/api/v1/releases/build") {
-      if (rejectsBuilds) {
+      if (failing.has("builds")) {
         res
           .writeHead(500, { "content-type": "application/json" })
           .end(JSON.stringify({ code: "internal", message: "boom" }));
@@ -1250,19 +1249,19 @@ async function startCreateProjectCaptureServer(
   return {
     url: `http://localhost:${String(address.port)}`,
     get body() {
-      return body;
+      return bodies.at(-1) ?? null;
     },
     requests,
     projects,
     rejectsSchemaUploads() {
-      rejectsSchemas = true;
+      failing.add("schemas");
     },
     recovers() {
-      rejectsSchemas = false;
+      failing.delete("schemas");
     },
     deployments,
     rejectsReleases() {
-      rejectsBuilds = true;
+      failing.add("builds");
     },
   };
 }

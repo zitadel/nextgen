@@ -79,10 +79,10 @@ describe("createZitadelClient", () => {
       vi.fn(async () => new Response(text, { status: 200 })),
     );
 
-    let node: unknown = await client().getProject("p1");
-    for (let level = 0; level < depth; level += 1) {
-      node = (node as unknown[])[0];
-    }
+    const node = Array.from({ length: depth }).reduce<unknown>(
+      (inner) => (inner as unknown[])[0],
+      await client().getProject("p1"),
+    );
     expect(node).toBe("\\x1b");
   });
 

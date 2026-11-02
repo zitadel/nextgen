@@ -1,4 +1,5 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtempSync } from "node:fs";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -20,10 +21,10 @@ vi.mock("@clack/prompts", () => ({
   cancel: vi.fn(),
 }));
 
-let dir: string;
+const dir = mkdtempSync(join(tmpdir(), "zitadel-environment-"));
 
 beforeEach(async () => {
-  dir = await mkdtemp(join(tmpdir(), "zitadel-environment-"));
+  await mkdir(dir, { recursive: true });
 });
 
 afterEach(async () => {
@@ -393,12 +394,14 @@ describe("requireValue", () => {
   it("names the environment, the variable and every source consulted", async () => {
     const environment = await resolve({ envName: "production" });
 
-    let thrown: unknown;
-    try {
-      requireValue(environment, "ZITADEL_PROJECT_ID");
-    } catch (error) {
-      thrown = error;
-    }
+    const thrown = (() => {
+      try {
+        requireValue(environment, "ZITADEL_PROJECT_ID");
+        return undefined;
+      } catch (error) {
+        return error;
+      }
+    })();
 
     expect(thrown).toMatchObject({ code: "E_VALIDATION" });
     expect((thrown as Error).message).toBe(

@@ -1,4 +1,5 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtempSync } from "node:fs";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -9,18 +10,17 @@ import { localRuntimePaths } from "../../../src/lib/local-server/runtime";
 import { DEFAULT_SERVER, parseServer, resolveServer } from "../../../src/lib/server";
 import { aBinaryRecord } from "../../helpers/runtime-record";
 
-let dir: string;
-let servers: Server[] = [];
+const dir = mkdtempSync(join(tmpdir(), "zitadel-resolve-server-"));
+const servers: Server[] = [];
 
 beforeEach(async () => {
-  dir = await mkdtemp(join(tmpdir(), "zitadel-resolve-server-"));
+  await mkdir(dir, { recursive: true });
 });
 
 afterEach(async () => {
-  for (const server of servers) {
+  for (const server of servers.splice(0)) {
     await new Promise<void>((resolve) => server.close(() => resolve()));
   }
-  servers = [];
   await rm(dir, { recursive: true, force: true });
 });
 

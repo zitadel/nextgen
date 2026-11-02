@@ -57,12 +57,9 @@ function startupCleanupFailedError(
  * answer: better than a start that fails halfway with a raw `docker` error.
  */
 export async function assertDockerAvailable(cliVersion: string): Promise<void> {
-  let result: Awaited<ReturnType<typeof DockerLauncher.available>>;
-  try {
-    result = await DockerLauncher.available();
-  } catch (error) {
+  const result = await DockerLauncher.available().catch((error: unknown) => {
     throw dockerUnavailableError(error, cliVersion);
-  }
+  });
   if (result.status !== 0) {
     throw dockerUnavailableError(result.stderr || "docker version failed", cliVersion);
   }

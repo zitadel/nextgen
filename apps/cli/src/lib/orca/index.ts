@@ -205,15 +205,16 @@ export class Orca {
       created === undefined
         ? undoScaffold(cwd, before, stash)
         : rm(created, { recursive: true, force: true });
-    let facts: FrameworkFacts;
-    try {
-      await this.scaffolderFor(framework).scaffold(cwd, framework);
-      await restoreBesideScaffold(cwd, stash);
-      facts = await this.detect(cwd, framework);
-    } catch (error) {
-      await undo();
-      throw error;
-    }
+    const facts: FrameworkFacts = await (async () => {
+      try {
+        await this.scaffolderFor(framework).scaffold(cwd, framework);
+        await restoreBesideScaffold(cwd, stash);
+        return await this.detect(cwd, framework);
+      } catch (error) {
+        await undo();
+        throw error;
+      }
+    })();
     return { facts, undo, keep: () => dropStash(stash) };
   }
 
@@ -382,17 +383,20 @@ async function scaffoldTargetEntries(cwd: string): Promise<string[]> {
  * creates it.
  */
 export async function assertDirectoryOrMissing(cwd: string): Promise<void> {
-  let isDirectory: boolean;
-  try {
-    isDirectory = (await stat(cwd)).isDirectory();
-  } catch (error) {
-    if (isErrno(error, "ENOENT")) {
-      return;
-    }
-    if (!isErrno(error, "ENOTDIR")) {
-      throw error;
-    }
-    isDirectory = false;
+  const isDirectory = await stat(cwd).then(
+    (stats) => stats.isDirectory(),
+    (error: unknown) => {
+      if (isErrno(error, "ENOENT")) {
+        return undefined;
+      }
+      if (!isErrno(error, "ENOTDIR")) {
+        throw error;
+      }
+      return false;
+    },
+  );
+  if (isDirectory === undefined) {
+    return;
   }
   if (!isDirectory) {
     throw new ZitadelError("E_VALIDATION", `${cwd} is not a directory`, {

@@ -1,10 +1,11 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtempSync } from "node:fs";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { password, text } from "@clack/prompts";
 import { Config } from "@oclif/core";
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CREDENTIALS } from "../../../../src/lib/oclif/credentials";
 import { EnvironmentCommand, PreviewCommand } from "../../../../src/lib/oclif/environment-command";
@@ -51,15 +52,11 @@ class SelectorProbe extends EnvironmentCommand {
   }
 }
 
-let config: Config;
-let dir: string;
-
-beforeAll(async () => {
-  config = await Config.load(cliPackageRoot);
-});
+const config = await Config.load(cliPackageRoot);
+const dir = mkdtempSync(join(tmpdir(), "zitadel-environment-command-"));
 
 beforeEach(async () => {
-  dir = await mkdtemp(join(tmpdir(), "zitadel-environment-command-"));
+  await mkdir(dir, { recursive: true });
 });
 
 afterEach(async () => {

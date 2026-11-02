@@ -1,4 +1,5 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtempSync } from "node:fs";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -7,10 +8,10 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ZitadelError } from "../../../src/lib/errors";
 import { readJsonDir, readJsonDirEntries } from "../../../src/lib/json-dir";
 
-let dir: string;
+const dir = mkdtempSync(join(tmpdir(), "zitadel-json-dir-"));
 
 beforeEach(async () => {
-  dir = await mkdtemp(join(tmpdir(), "zitadel-json-dir-"));
+  await mkdir(dir, { recursive: true });
 });
 
 afterEach(async () => {

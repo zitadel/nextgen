@@ -86,22 +86,23 @@ export abstract class AbstractRulePatcher implements Patcher {
    */
   async repair(ctx: PatchContext, opts: PatchExecOptions): Promise<PatchResult> {
     const plan = this.plan(ctx);
-    let ops = opts.missingOnly
+    const reclaimable = opts.missingOnly
       ? await withoutExistingTargets(reclaimableOps(plan), opts.cwd)
       : reclaimableOps(plan);
     const excluded = new Set(opts.excludePaths ?? []);
-    if (excluded.size > 0) {
-      ops = ops.filter((op) => {
-        if (op.kind === "write") {
-          return !excluded.has(op.path);
-        }
-        if (op.kind === "edit" && op.overwrites) {
-          const candidates = typeof op.path === "string" ? [op.path] : op.path;
-          return !candidates.some((candidate) => excluded.has(candidate));
-        }
-        return true;
-      });
-    }
+    const ops =
+      excluded.size > 0
+        ? reclaimable.filter((op) => {
+            if (op.kind === "write") {
+              return !excluded.has(op.path);
+            }
+            if (op.kind === "edit" && op.overwrites) {
+              const candidates = typeof op.path === "string" ? [op.path] : op.path;
+              return !candidates.some((candidate) => excluded.has(candidate));
+            }
+            return true;
+          })
+        : reclaimable;
     const execOpts = opts.missingOnly ? { ...opts, force: false } : opts;
     return scaffold({ ops, summary: plan.summary }, execOpts);
   }
@@ -144,16 +145,9 @@ export abstract class AbstractRulePatcher implements Patcher {
         continue;
       }
       const candidates = typeof op.path === "string" ? [op.path] : op.path;
-      let path = candidates[0] ?? "";
-      let source: string | undefined;
-      for (const candidate of candidates) {
-        const contents = await readTextIfExists(join(opts.cwd, candidate));
-        if (contents !== undefined) {
-          path = candidate;
-          source = contents;
-          break;
-        }
-      }
+      const found = await firstExisting(opts.cwd, candidates);
+      const path = found?.path ?? candidates[0] ?? "";
+      const source = found?.source;
       if (source === undefined) {
         statuses.push({ path, wiring: op.wiring, state: "detached" });
         continue;
@@ -437,4 +431,17 @@ function resolveServerOrigin(source: string): string {
   } catch {
     return DEFAULT_SERVER;
   }
+}
+
+async function firstExisting(
+  cwd: string,
+  candidates: ReadonlyArray<string>,
+): Promise<{ path: string; source: string } | undefined> {
+  for (const candidate of candidates) {
+    const source = await readTextIfExists(join(cwd, candidate));
+    if (source !== undefined) {
+      return { path: candidate, source };
+    }
+  }
+  return undefined;
 }

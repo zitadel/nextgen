@@ -1,4 +1,5 @@
-import { chmod, mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { mkdtempSync } from "node:fs";
+import { chmod, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -24,10 +25,10 @@ import {
   type RuntimeMetadata,
 } from "../../../../src/lib/local-server/runtime";
 
-let cwd: string;
+const cwd = mkdtempSync(join(tmpdir(), "zitadel-server-runtime-"));
 
 beforeEach(async () => {
-  cwd = await mkdtemp(join(tmpdir(), "zitadel-server-runtime-"));
+  await mkdir(cwd, { recursive: true });
 });
 
 afterEach(async () => {

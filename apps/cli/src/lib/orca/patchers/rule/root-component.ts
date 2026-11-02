@@ -143,17 +143,14 @@ export async function viteEntry(cwd: string): Promise<string | undefined> {
  * reads a pattern replace over HTML as sanitizing it.
  */
 function withoutComments(html: string): string {
-  let text = "";
-  let from = 0;
-  for (let start = html.indexOf("<!--"); start !== -1; start = html.indexOf("<!--", from)) {
-    text += html.slice(from, start);
-    const end = html.indexOf("-->", start + 4);
-    if (end === -1) {
-      return text;
-    }
-    from = end + 3;
+  const start = html.indexOf("<!--");
+  if (start === -1) {
+    return html;
   }
-  return text + html.slice(from);
+  const end = html.indexOf("-->", start + 4);
+  return end === -1
+    ? html.slice(0, start)
+    : html.slice(0, start) + withoutComments(html.slice(end + 3));
 }
 
 /**
@@ -168,12 +165,7 @@ export async function angularEntry(cwd: string): Promise<string> {
   if (text === undefined) {
     return fallback;
   }
-  let workspace: unknown;
-  try {
-    workspace = JSON.parse(text);
-  } catch {
-    return fallback;
-  }
+  const workspace = parseJsonOrUndefined(text);
   if (!isObject(workspace) || !isObject(workspace.projects)) {
     return fallback;
   }
@@ -201,19 +193,33 @@ export async function angularEntry(cwd: string): Promise<string> {
   return typeof entry === "string" ? projectPath(entry) : fallback;
 }
 
+function parseJsonOrUndefined(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+}
+
+function parseProgram(source: string): AstNode | undefined {
+  try {
+    // magicast's `$ast` may be a babel `File` (with `.program`) or the
+    // `Program` node itself.
+    const ast = parseModule(source).$ast as AstNode;
+    return (ast.program as AstNode | undefined) ?? ast;
+  } catch {
+    return undefined;
+  }
+}
+
 /**
  * The specifiers of the local modules the entry's mount calls name as the
  * root, in source order. Empty when the entry cannot be parsed or mounts
  * nothing this recognises.
  */
 function mountedSpecifiers(source: string, root: RootMount): string[] {
-  let program: AstNode | undefined;
-  try {
-    // magicast's `$ast` may be a babel `File` (with `.program`) or the
-    // `Program` node itself.
-    const ast = parseModule(source).$ast as AstNode;
-    program = (ast.program as AstNode | undefined) ?? ast;
-  } catch {
+  const program = parseProgram(source);
+  if (program === undefined) {
     return [];
   }
   const imports = importedSpecifiers(program);
@@ -292,15 +298,16 @@ function leafComponents(node: AstNode): string[] {
 }
 
 function hasComponentChild(element: AstNode): boolean {
-  let found = false;
+  const found: string[] = [];
   for (const child of (element.children as AstNode[] | undefined) ?? []) {
     walk(child, (node) => {
-      if (componentName(node) !== undefined) {
-        found = true;
+      const name = componentName(node);
+      if (name !== undefined) {
+        found.push(name);
       }
     });
   }
-  return found;
+  return found.length > 0;
 }
 
 /** The name of a JSX element that renders a component (`<App />`), not a tag (`<div>`). */
@@ -343,18 +350,19 @@ async function resolveLocalModule(
   managed: string,
 ): Promise<string | undefined> {
   const path = stripQuery(specifier);
-  let base: string;
-  if (path.startsWith("./") || path.startsWith("../")) {
-    base = posix.join(posix.dirname(importer), path);
-  } else if (path.startsWith("/")) {
-    // Vite serves the project root at `/`.
-    base = path.slice(1);
-  } else if (path.startsWith("@/") || path.startsWith("~/")) {
-    base = posix.join("src", path.slice(2));
-  } else {
+  const joined =
+    path.startsWith("./") || path.startsWith("../")
+      ? posix.join(posix.dirname(importer), path)
+      : path.startsWith("/")
+        ? // Vite serves the project root at `/`.
+          path.slice(1)
+        : path.startsWith("@/") || path.startsWith("~/")
+          ? posix.join("src", path.slice(2))
+          : undefined;
+  if (joined === undefined) {
     return undefined;
   }
-  base = posix.normalize(base);
+  const base = posix.normalize(joined);
   if (base === ".." || base.startsWith("../")) {
     return undefined;
   }
@@ -376,13 +384,11 @@ async function resolveLocalModule(
 
 /** The import line that mounts the managed root from the entry's directory. */
 function importStatement(entry: string, root: RootMount): string {
-  let specifier = posix.relative(posix.dirname(entry), root.path);
-  if (!root.extension) {
-    specifier = specifier.slice(0, specifier.length - posix.extname(specifier).length);
-  }
-  if (!specifier.startsWith(".")) {
-    specifier = `./${specifier}`;
-  }
+  const relative = posix.relative(posix.dirname(entry), root.path);
+  const trimmed = root.extension
+    ? relative
+    : relative.slice(0, relative.length - posix.extname(relative).length);
+  const specifier = trimmed.startsWith(".") ? trimmed : `./${trimmed}`;
   const binding = root.binding.named ? `{ ${root.binding.name} }` : root.binding.name;
   return `import ${binding} from "${specifier}"`;
 }

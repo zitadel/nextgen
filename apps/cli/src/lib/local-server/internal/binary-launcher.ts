@@ -1,5 +1,5 @@
 import { execFile, spawn } from "node:child_process";
-import { type FileHandle, mkdir, open, readFile, stat } from "node:fs/promises";
+import { mkdir, open, readFile, stat } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { basename, dirname } from "node:path";
 import { StringDecoder } from "node:string_decoder";
@@ -415,12 +415,10 @@ async function ownsProcess(record: BinaryRuntimeMetadata): Promise<boolean> {
     return true;
   }
   const programs = [started, SERVER_PROGRAM];
-  let listing: string;
-  try {
-    // `ww`: without it `ps` cuts the command column to `COLUMNS` (which tools
-    // such as pnpm and moon export), and the server's long path is cut before its name.
-    listing = await ps(["axww", "-o", "pid=,pgid=,command="]);
-  } catch {
+  // `ww`: without it `ps` cuts the command column to `COLUMNS` (which tools
+  // such as pnpm and moon export), and the server's long path is cut before its name.
+  const listing = await ps(["axww", "-o", "pid=,pgid=,command="]).catch(() => undefined);
+  if (listing === undefined) {
     return true;
   }
   const candidates = listing.split(/\r?\n/).flatMap((line) => {
@@ -442,10 +440,8 @@ const DATA_DIR_VARIABLE = "NEXTGEN_SERVER_DATA_DIR=";
 
 /** Whether a process serves a data directory, or its environment does not say. */
 async function servesDataDir(pid: number, dataDir: string): Promise<boolean> {
-  let command: string;
-  try {
-    command = await ps(["eww", "-p", String(pid), "-o", "command="]);
-  } catch {
+  const command = await ps(["eww", "-p", String(pid), "-o", "command="]).catch(() => undefined);
+  if (command === undefined) {
     return true;
   }
   const at = command.indexOf(DATA_DIR_VARIABLE);
@@ -521,14 +517,14 @@ async function fileSize(path: string): Promise<number> {
 
 /** Up to `length` bytes of a file from `position` on; none for a file that is gone. */
 async function readBytes(path: string, position: number, length: number): Promise<Buffer> {
-  let file: FileHandle;
-  try {
-    file = await open(path, "r");
-  } catch (error) {
+  const file = await open(path, "r").catch((error: unknown) => {
     if (isErrno(error, "ENOENT")) {
-      return Buffer.alloc(0);
+      return undefined;
     }
     throw error;
+  });
+  if (file === undefined) {
+    return Buffer.alloc(0);
   }
   try {
     const buffer = Buffer.alloc(length);

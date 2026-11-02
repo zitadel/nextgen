@@ -134,27 +134,28 @@ describe("withUserAgent", () => {
  * dispatcher with nothing installed.
  */
 describe("on the wire", () => {
-  let server: Server;
-  let url: string;
-  let original: Dispatcher;
   const received: IncomingMessage[] = [];
+  const server: Server = createServer((req, res) => {
+    received.push(req);
+    res.end();
+  });
+  const originals: Dispatcher[] = [];
+  const original = () => originals[0] as Dispatcher;
+  const urls: string[] = [];
+  const url = () => urls[0] as string;
 
   beforeAll(async () => {
-    original = getGlobalDispatcher();
-    server = createServer((req, res) => {
-      received.push(req);
-      res.end();
-    });
+    originals.push(getGlobalDispatcher());
     await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
     const address = server.address();
     if (!address || typeof address === "string") {
       throw new Error("test server did not expose a TCP address");
     }
-    url = `http://127.0.0.1:${address.port}/`;
+    urls.push(`http://127.0.0.1:${address.port}/`);
   });
 
   beforeEach(() => {
-    setGlobalDispatcher(original);
+    setGlobalDispatcher(original());
     _resetUserAgentForTesting();
   });
 
@@ -163,14 +164,14 @@ describe("on the wire", () => {
   });
 
   afterAll(async () => {
-    setGlobalDispatcher(original);
+    setGlobalDispatcher(original());
     _resetUserAgentForTesting();
     await new Promise<void>((resolve) => server.close(() => resolve()));
   });
 
   /** Every `user-agent` value on the request the server saw for this fetch. */
   async function userAgentsOf(init?: RequestInit): Promise<string[]> {
-    const response = await fetch(url, init);
+    const response = await fetch(url(), init);
     await response.arrayBuffer();
     const raw = received.at(-1)?.rawHeaders ?? [];
     return raw.filter(
@@ -206,7 +207,7 @@ describe("on the wire", () => {
       installUserAgent("zitadel-cli/again");
       expect(await userAgentsOf()).toEqual(["zitadel-cli/again"]);
     } finally {
-      setGlobalDispatcher(original);
+      setGlobalDispatcher(original());
       await replacement.destroy();
     }
   });

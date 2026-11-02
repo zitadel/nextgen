@@ -73,12 +73,13 @@ function jsonLevel(text: string): string | undefined {
   if (!text.startsWith("{")) {
     return undefined;
   }
-  let record: unknown;
-  try {
-    record = JSON.parse(text);
-  } catch {
-    return undefined;
-  }
+  const record = ((): unknown => {
+    try {
+      return JSON.parse(text);
+    } catch {
+      return undefined;
+    }
+  })();
   const level = isObject(record) ? (record.level ?? record.severity) : undefined;
   return typeof level === "string" ? level.replace(/[+-]\d+$/, "") : undefined;
 }

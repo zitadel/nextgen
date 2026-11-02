@@ -45,30 +45,29 @@ export function methodsOf(body: Record<string, unknown>): string[] {
  */
 export async function readSchemaFiles(cwd: string): Promise<SchemaFile[]> {
   const dir = join(cwd, SCHEMAS_DIR);
-  let entries: string[];
-  try {
-    entries = await readdir(dir);
-  } catch (error) {
+  const entries = await readdir(dir).catch((error: unknown) => {
     // Only an absent directory means the Project has none. A permission or
     // I/O failure reported as "no user schema" would send the developer
     // looking for a missing file that is sitting right there.
     if (isErrno(error, "ENOENT")) {
-      return [];
+      return undefined;
     }
     throw error;
+  });
+  if (entries === undefined) {
+    return [];
   }
   const files: SchemaFile[] = [];
   for (const entry of entries.filter((e) => e.endsWith(".json")).sort()) {
     const path = `${SCHEMAS_DIR}/${entry}`;
-    let body: unknown;
-    try {
-      body = JSON.parse(await readFile(join(dir, entry), "utf8"));
-    } catch (error) {
-      throw new ZitadelError("E_VALIDATION", `${path} is not valid JSON`, {
-        hint: "Fix the file, then run the command again.",
-        details: { file: path, parse_error: String(error) },
+    const body: unknown = await readFile(join(dir, entry), "utf8")
+      .then((text): unknown => JSON.parse(text))
+      .catch((error: unknown) => {
+        throw new ZitadelError("E_VALIDATION", `${path} is not valid JSON`, {
+          hint: "Fix the file, then run the command again.",
+          details: { file: path, parse_error: String(error) },
+        });
       });
-    }
     if (!isObject(body)) {
       throw new ZitadelError("E_VALIDATION", `${path} does not contain a JSON object`, {
         details: { file: path },
@@ -135,30 +134,29 @@ export type FlowFile = {
  */
 export async function readFlowFiles(cwd: string): Promise<FlowFile[]> {
   const dir = join(cwd, FLOWS_DIR);
-  let entries: string[];
-  try {
-    entries = await readdir(dir);
-  } catch (error) {
+  const entries = await readdir(dir).catch((error: unknown) => {
     // Only an absent directory means the Project has none. A permission or
     // I/O failure reported as "no user schema" would send the developer
     // looking for a missing file that is sitting right there.
     if (isErrno(error, "ENOENT")) {
-      return [];
+      return undefined;
     }
     throw error;
+  });
+  if (entries === undefined) {
+    return [];
   }
   const files: FlowFile[] = [];
   for (const entry of entries.filter((e) => e.endsWith(".json")).sort()) {
     const path = `${FLOWS_DIR}/${entry}`;
-    let body: unknown;
-    try {
-      body = JSON.parse(await readFile(join(dir, entry), "utf8"));
-    } catch (error) {
-      throw new ZitadelError("E_VALIDATION", `${path} is not valid JSON`, {
-        hint: "Fix the file, then run the command again.",
-        details: { file: path, parse_error: String(error) },
+    const body: unknown = await readFile(join(dir, entry), "utf8")
+      .then((text): unknown => JSON.parse(text))
+      .catch((error: unknown) => {
+        throw new ZitadelError("E_VALIDATION", `${path} is not valid JSON`, {
+          hint: "Fix the file, then run the command again.",
+          details: { file: path, parse_error: String(error) },
+        });
       });
-    }
     if (!isObject(body)) {
       throw new ZitadelError("E_VALIDATION", `${path} does not contain a JSON object`, {
         details: { file: path },

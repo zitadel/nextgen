@@ -83,20 +83,20 @@ describe("mapWithConcurrency", () => {
   it("preserves input order in results and never exceeds the limit", async () => {
     const { mapWithConcurrency } = await loadModule();
 
-    let inFlight = 0;
-    let peak = 0;
+    const inFlight = new Set<number>();
+    const inFlightCounts: number[] = [];
     const results = await mapWithConcurrency([5, 4, 3, 2, 1], 2, async (item) => {
-      inFlight += 1;
-      peak = Math.max(peak, inFlight);
+      inFlight.add(item);
+      inFlightCounts.push(inFlight.size);
       // Later items finish faster to prove results are ordered by input,
       // not by completion.
       await new Promise((resolveDelay) => setTimeout(resolveDelay, item * 4));
-      inFlight -= 1;
+      inFlight.delete(item);
       return item * 10;
     });
 
     expect(results).toEqual([50, 40, 30, 20, 10]);
-    expect(peak).toBe(2);
+    expect(Math.max(...inFlightCounts)).toBe(2);
   });
 
   it("stops starting new work after a failure and rethrows the first error", async () => {

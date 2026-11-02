@@ -53,27 +53,26 @@ export type ConnectionFile = {
  */
 export async function readConnectionFiles(cwd: string): Promise<ConnectionFile[]> {
   const dir = join(cwd, IDPS_DIR);
-  let entries: string[];
-  try {
-    entries = await readdir(dir);
-  } catch (error) {
+  const entries = await readdir(dir).catch((error: unknown) => {
     if (isErrno(error, "ENOENT")) {
-      return [];
+      return undefined;
     }
     throw error;
+  });
+  if (entries === undefined) {
+    return [];
   }
   const files: ConnectionFile[] = [];
   for (const name of entries.filter((e) => e.endsWith(".json")).sort()) {
     const path = `${IDPS_DIR}/${name}`;
-    let body: unknown;
-    try {
-      body = JSON.parse(await readFile(join(dir, name), "utf8"));
-    } catch (error) {
-      throw new ZitadelError("E_VALIDATION", `${path} is not valid JSON`, {
-        hint: "Fix or remove the file, then run the command again.",
-        details: { file: path, parse_error: describeParseError(error) },
+    const body: unknown = await readFile(join(dir, name), "utf8")
+      .then((text): unknown => JSON.parse(text))
+      .catch((error: unknown) => {
+        throw new ZitadelError("E_VALIDATION", `${path} is not valid JSON`, {
+          hint: "Fix or remove the file, then run the command again.",
+          details: { file: path, parse_error: describeParseError(error) },
+        });
       });
-    }
     if (!isObject(body)) {
       throw new ZitadelError("E_VALIDATION", `${path} does not contain a JSON object`, {
         details: { file: path },

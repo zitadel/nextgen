@@ -1,4 +1,5 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtempSync } from "node:fs";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -35,10 +36,10 @@ const flow = (userSchema: string, providers: string[]) => ({
 
 const connection = (slug: string) => ({ slug, claim_mapping: { email: "email" } });
 
-let cwd: string;
+const cwd = mkdtempSync(join(tmpdir(), "sso-consistency-"));
 
 beforeEach(async () => {
-  cwd = await mkdtemp(join(tmpdir(), "sso-consistency-"));
+  await mkdir(cwd, { recursive: true });
   takeReportedWarnings();
 });
 

@@ -154,10 +154,7 @@ export default class EnvAdd extends Promptable(BaseCommand) {
       });
     }
 
-    let projectId = flags.project;
-    let projectSecret = env.ZITADEL_PROJECT_SECRET;
-    let previewToken = env.ZITADEL_PREVIEW_TOKEN;
-    if (projectId === undefined) {
+    const createBoundProject = async () => {
       const created = await createZitadelClient({ baseUrl: server }).createProject({
         name: `${basename(cwd)}-${name}`,
         ...(issuer === undefined
@@ -166,10 +163,20 @@ export default class EnvAdd extends Promptable(BaseCommand) {
         seed_defaults: false,
       });
       consola.success(`Created project ${created.id}`);
-      projectId = created.id;
-      projectSecret = created.project_secret;
-      previewToken = created.preview_secret;
-    }
+      return {
+        projectId: created.id,
+        projectSecret: created.project_secret,
+        previewToken: created.preview_secret,
+      };
+    };
+    const { projectId, projectSecret, previewToken } =
+      flags.project === undefined
+        ? await createBoundProject()
+        : {
+            projectId: flags.project,
+            projectSecret: env.ZITADEL_PROJECT_SECRET,
+            previewToken: env.ZITADEL_PREVIEW_TOKEN,
+          };
 
     const values: Record<string, string> = {
       ZITADEL_URL: server,
@@ -255,8 +262,9 @@ export default class EnvAdd extends Promptable(BaseCommand) {
     // not go through `this.input`: that one answers a confirm when `--force`
     // is given, and here `--force` permits overwriting the env file, so it
     // must never answer it.
-    let deployment: InitialDeployment | undefined;
-    if (hasSomewhereToLand && !nonInteractive && projectSecret !== undefined) {
+    const offerInitialDeployment = async (
+      secret: string,
+    ): Promise<InitialDeployment | undefined> => {
       consola.info(
         "Nothing is deployed to this environment yet, so it serves the server's default schema and login flow rather than your .zitadel/ files.",
       );
@@ -269,16 +277,20 @@ export default class EnvAdd extends Promptable(BaseCommand) {
         },
         { interactive: !nonInteractive, force: false },
       );
-      if (confirmed) {
-        deployment = await this.deployInitialRelease({
-          cwd,
-          server,
-          projectId,
-          projectSecret,
-          selector: newEnvironment,
-        });
-      }
-    }
+      return confirmed
+        ? await this.deployInitialRelease({
+            cwd,
+            server,
+            projectId,
+            projectSecret: secret,
+            selector: newEnvironment,
+          })
+        : undefined;
+    };
+    const deployment =
+      hasSomewhereToLand && !nonInteractive && projectSecret !== undefined
+        ? await offerInitialDeployment(projectSecret)
+        : undefined;
     const render = (variables: PlatformVariable[]): string[] =>
       variables.map((variable) =>
         variable.secret
