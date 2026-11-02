@@ -370,7 +370,7 @@ func TestSSOResolutionOtherSchemaReturns409(t *testing.T) {
 
 	resp := f.getStep(t, flow)
 	require.IsType(t, &api.GetFlowStepConflict{}, resp, helpers.MustMarshal(t, resp))
-	assert.Equal(t, "flow.restart_required", string(resp.(*api.GetFlowStepConflict).Code))
+	assert.Equal(t, "flow.sso_user_schema_mismatch", string(resp.(*api.GetFlowStepConflict).Code))
 	body := helpers.MustMarshal(t, resp)
 	for _, leaked := range []string{staffSchemaURL, defaultSchemaURL(), "sub-1", "alice@example.com", f.connection.ID} {
 		assert.False(t, strings.Contains(body, leaked), "the response must not carry %q: %s", leaked, body)

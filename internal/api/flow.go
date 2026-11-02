@@ -644,15 +644,16 @@ func jsonQuoted(s string) []byte {
 }
 
 var (
-	codeFlowCookieInvalid   = domain.ErrFlowCookieInvalid().Code
-	codeFlowCookieExpired   = domain.ErrFlowCookieExpired().Code
-	codeFlowNotFound        = domain.ErrFlowNotFound().Code
-	codeFlowCompleted       = domain.ErrFlowCompleted().Code
-	codeFlowInvalidAction   = domain.ErrFlowInvalidAction().Code
-	codeFlowSessionConflict = domain.ErrFlowSessionConflict().Code
-	codeFlowUnsupported     = domain.ErrFlowUnsupported().Code
-	codeFlowInvalidPurpose  = domain.ErrFlowInvalidPurpose().Code
-	codeFlowRestartRequired = domain.ErrFlowRestartRequired().Code
+	codeFlowCookieInvalid     = domain.ErrFlowCookieInvalid().Code
+	codeFlowCookieExpired     = domain.ErrFlowCookieExpired().Code
+	codeFlowNotFound          = domain.ErrFlowNotFound().Code
+	codeFlowCompleted         = domain.ErrFlowCompleted().Code
+	codeFlowInvalidAction     = domain.ErrFlowInvalidAction().Code
+	codeFlowSessionConflict   = domain.ErrFlowSessionConflict().Code
+	codeFlowUnsupported       = domain.ErrFlowUnsupported().Code
+	codeFlowInvalidPurpose    = domain.ErrFlowInvalidPurpose().Code
+	codeFlowRestartRequired   = domain.ErrFlowRestartRequired().Code
+	codeFlowSSOSchemaMismatch = domain.ErrFlowSSOUserSchemaMismatch().Code
 )
 
 func flowErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
@@ -663,7 +664,7 @@ func flowErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 		return errorResponseWithStatusCode(http.StatusNotFound, err)
 	case codeFlowCompleted:
 		return errorResponseWithStatusCode(http.StatusGone, err)
-	case codeFlowSessionConflict, codeFlowRestartRequired:
+	case codeFlowSessionConflict, codeFlowRestartRequired, codeFlowSSOSchemaMismatch:
 		return errorResponseWithStatusCode(http.StatusConflict, err)
 	case codeFlowInvalidAction, codeFlowUnsupported, codeFlowInvalidPurpose:
 		return errorResponseWithStatusCode(http.StatusBadRequest, err)
@@ -704,6 +705,7 @@ func normalizeFlowError(err error) error {
 		domain.ErrFlowUnsupported(),
 		domain.ErrFlowInvalidPurpose(),
 		domain.ErrFlowRestartRequired(),
+		domain.ErrFlowSSOUserSchemaMismatch(),
 	} {
 		if errors.Is(err, sentinel) {
 			return sentinel
@@ -722,6 +724,9 @@ func mapFlowGetError(err error) (api.GetFlowStepRes, error) {
 		return &gone, nil
 	case errors.Is(err, domain.ErrFlowRestartRequired()):
 		conflict := api.GetFlowStepConflict(domainErrorDetails(domain.ErrFlowRestartRequired()))
+		return &conflict, nil
+	case errors.Is(err, domain.ErrFlowSSOUserSchemaMismatch()):
+		conflict := api.GetFlowStepConflict(domainErrorDetails(domain.ErrFlowSSOUserSchemaMismatch()))
 		return &conflict, nil
 	case errors.Is(err, domain.ErrReleaseRevoked()):
 		conflict := api.GetFlowStepConflict(domainErrorDetails(domain.ErrReleaseRevoked()))
