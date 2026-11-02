@@ -171,11 +171,11 @@ func ResolveFlowBranding(ctx context.Context, reader flowBrandingReader, project
 	if err != nil {
 		return nil, err
 	}
-	id, ok := pins[domain.ReleaseBrandingHandle]
+	pin, ok := pins[domain.ReleaseBrandingHandle]
 	if !ok {
 		return nil, nil
 	}
-	return reader.Get(ctx, projectID, id)
+	return reader.Get(ctx, projectID, pin.RevisionID)
 }
 
 // maxBrandingListRevisions caps the list response: revisions accumulate
