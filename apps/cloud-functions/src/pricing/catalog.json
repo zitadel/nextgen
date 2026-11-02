@@ -1,7 +1,7 @@
 {
   "$schema": "./catalog.schema.json",
   "id": "zitadel-pricing",
-  "version": "2026-11-02.6",
+  "version": "2026-11-02.7",
   "status": "proposal",
   "currency": "usd",
   "decided": ["core", "meters.monthly_active_users.price", "meters.sso_users.allowance", "packages.governance.scope", "packages.compliance.scope", "plans.pro.minimum", "packages.governance.included_in", "packages.compliance.pricing", "plans.enterprise.sla", "plans.pro.limits.requests_per_second_per_project", "plans.free.regions", "plans.pro.regions", "plans.enterprise.regions", "licensed.addendum.plans", "licensed.support_priority.plans"],
@@ -44,7 +44,7 @@
       "event_retention_days": 30,
       "attribution_mark": "hideable",
       "delivery_modes": ["dev_inbox", "own_provider", "managed"],
-      "support": "24/7 tickets, next business day; priority add-on 1 h for outages",
+      "support": "tickets any time, answered the next business day; priority add-on: a 1-hour response for outages",
       "sla": { "target_percent": 99.9, "credits": false },
       "regions": { "scope": "project", "selection": "all_available" },
       "packages": ["governance", "security_settings"]
@@ -56,7 +56,7 @@
       "event_retention_days": 90,
       "attribution_mark": "hideable",
       "delivery_modes": ["dev_inbox", "own_provider", "managed"],
-      "support": "by tier: 8 h to 30 min response SLOs, TAM",
+      "support": "response times from 8 hours down to 30 minutes by tier, and a technical account manager",
       "sla": { "target_percent": 99.95, "credits": true, "note": "99.95 included; 99.99 is an upgrade requiring a second region" },
       "regions": { "scope": "project", "selection": "all_available" },
       "packages": ["governance", "security_settings"]
@@ -78,7 +78,8 @@
     },
     {
       "id": "sso_users",
-      "label": "SSO users",
+      "label": "Enterprise SSO users",
+      "unit": "user",
       "kind": "users",
       "counts": "A user who signs in through an enterprise connection, at most 750 per connection",
       "dedupe": ["project", "connection", "user", "month"],
@@ -92,7 +93,8 @@
     },
     {
       "id": "directory_users",
-      "label": "Directory users",
+      "label": "Directory-synced users (SCIM)",
+      "unit": "user",
       "kind": "users",
       "counts": "A user a directory syncs (SCIM), at most 750 per directory",
       "dedupe": ["project", "directory", "user", "month"],
@@ -106,12 +108,13 @@
     },
     {
       "id": "authz_checks",
-      "label": "Advanced authorization checks",
+      "label": "Authorization API checks",
+      "unit": "check",
       "kind": "activity",
-      "counts": "Each advanced authorization API check; core roles and permissions are free",
+      "counts": "Each authorization API check; core roles and permissions are free",
       "dedupe": null,
       "allowance": 1000000,
-      "price": { "model": "per_unit", "unit_amount": 0.000002, "display": "$2 per million" },
+      "price": { "model": "per_unit", "unit_amount": 0.000002, "display": "$2 per million checks" },
       "security": false,
       "tag": "metered feature",
       "source": { "where": "end-user authorization API", "exists": "no" },
@@ -119,12 +122,13 @@
     },
     {
       "id": "email_messages",
-      "label": "Managed email",
+      "label": "Managed email delivery",
+      "unit": "email",
       "kind": "activity",
       "counts": "Each email managed delivery sends; bringing your own provider has no Zitadel delivery charge",
       "dedupe": null,
       "allowance": 0,
-      "price": { "model": "per_unit", "unit_amount": 0.0005, "display": "$0.50 per 1,000" },
+      "price": { "model": "per_unit", "unit_amount": 0.0005, "display": "$0.50 per 1,000 emails" },
       "plans": ["pro", "enterprise"],
       "security": false,
       "tag": "delivered cost",
@@ -133,7 +137,8 @@
     },
     {
       "id": "sms_messages",
-      "label": "Managed SMS",
+      "label": "Managed SMS delivery",
+      "unit": "message",
       "kind": "activity",
       "counts": "Each SMS managed delivery sends, priced by destination; only to countries the owner allows",
       "dedupe": null,
@@ -153,12 +158,13 @@
     },
     {
       "id": "m2m_tokens",
-      "label": "M2M tokens",
+      "label": "Service access tokens",
+      "unit": "token",
       "kind": "activity",
       "counts": "Each token issued to a machine",
       "dedupe": null,
       "allowance": 1000000,
-      "price": { "model": "per_unit", "unit_amount": 0.00001, "display": "$10 per million" },
+      "price": { "model": "per_unit", "unit_amount": 0.00001, "display": "$10 per million tokens" },
       "security": false,
       "tag": "metered feature",
       "source": { "where": "the token endpoint (client credentials)", "exists": "no: no token endpoint yet" },
@@ -167,6 +173,7 @@
     {
       "id": "threat_intel_users",
       "label": "Threat intelligence",
+      "unit": "user",
       "kind": "users",
       "counts": "A user whose sign-ins are checked against feeds Zitadel licenses, on projects that turn it on: IP reputation, residential proxies included, and leaked credentials. Risk-based challenges and MFA prompts on Zitadel's own signals (device, failed attempts, location, network, bot checks) and on signals the customer brings stay free; rules on them are Governance",
       "dedupe": ["project", "user", "month"],
@@ -201,13 +208,13 @@
       "grants_credit": 0,
       "tag": "minimum spend"
     },
-    { "id": "capacity_step", "label": "Extra requests", "amount": 700, "interval": "month", "per": "50M requests", "plans": ["pro", "enterprise"], "requests_per_month": 50000000, "note": "more requests a month per account past Pro's included volume, added by the owner; Enterprise capacity is contracted", "tag": "scale" },
+    { "id": "capacity_step", "label": "Extra API requests", "amount": 700, "interval": "month", "per": "50M requests", "plans": ["pro", "enterprise"], "requests_per_month": 50000000, "note": "more requests a month per account past Pro's included volume, added by the owner; Enterprise capacity is contracted", "tag": "scale" },
     { "id": "support_priority", "label": "Priority support", "amount": 999, "interval": "month", "plans": ["pro", "enterprise"], "tag": "support" },
-    { "id": "sla_9995", "label": "99.95% SLA", "amount": 1000, "interval": "month", "plans": ["pro"], "included_in": ["enterprise"], "tag": "compliance" },
-    { "id": "sla_9999", "label": "99.99% SLA upgrade, after a second region", "amount": 2000, "interval": "month", "plans": ["enterprise"], "tag": "compliance" },
-    { "id": "addendum", "label": "Custom MSA, indemnification, DORA or BAA addendum", "amount": null, "interval": "month", "per": "addendum", "plans": ["enterprise"], "note": "Terms and pricing agreed in the Enterprise contract", "tag": "compliance" },
-    { "id": "tam_hours", "label": "Extra TAM hours", "amount": 250, "interval": "hour", "plans": ["enterprise"], "tag": "support" },
-    { "id": "private_slack", "label": "Private Slack", "amount": 800, "interval": "month", "plans": ["enterprise"], "tag": "support" },
+    { "id": "sla_9995", "label": "99.95% uptime SLA", "amount": 1000, "interval": "month", "plans": ["pro"], "included_in": ["enterprise"], "tag": "compliance" },
+    { "id": "sla_9999", "label": "99.99% uptime SLA, after a second region", "amount": 2000, "interval": "month", "plans": ["enterprise"], "tag": "compliance" },
+    { "id": "addendum", "label": "Custom contract terms: MSA, indemnification, DORA or BAA", "amount": null, "interval": "month", "per": "addendum", "plans": ["enterprise"], "note": "Terms and pricing agreed in the Enterprise contract", "tag": "compliance" },
+    { "id": "tam_hours", "label": "Extra technical account manager hours", "amount": 250, "interval": "hour", "plans": ["enterprise"], "tag": "support" },
+    { "id": "private_slack", "label": "Private Slack channel", "amount": 800, "interval": "month", "plans": ["enterprise"], "tag": "support" },
     { "id": "dedicated_infrastructure", "label": "Dedicated infrastructure", "amount": null, "interval": "month", "plans": ["enterprise"], "note": "dedicated database servers and compute, at cost plus margin", "tag": "compliance" }
   ],
   "self_hosted": {
@@ -240,10 +247,10 @@
     }
   ],
   "core": {
-    "platform": ["Versioned releases, previews and rollbacks", "Login in your own app, on your domain"],
-    "resources": ["Users and service users", "Teams and organizations", "Projects and applications", "Roles and credentials", "Console seats"],
+    "platform": ["Versioned releases, previews and rollbacks", "Login UI in your own app, on your domain"],
+    "resources": ["Users and service users", "Teams and customer organizations", "Projects and applications", "Roles and API credentials", "Console seats"],
     "authentication": ["Password sign-in", "Social sign-in", "Passkeys and TOTP MFA"],
-    "security": ["Require MFA for everyone", "Default password rules and lockout", "Default session and token lifetimes", "Built-in bot challenge", "Edge bot verdicts", "Risk-based challenges and MFA prompts", "Revoking sessions and rotating keys"],
+    "security": ["Require MFA for everyone", "Default password rules and lockout", "Default session and token lifetimes", "Built-in bot challenge", "Bot verdicts from your edge, such as Vercel or Cloudflare", "Risk-based challenges and MFA prompts", "Revoke sessions and rotate keys"],
     "billing": "Core resources and Zitadel's secure defaults are free on every plan. Active-user counts never change your plan or bill. Published request and token capacity limits still apply."
   },
   "packages": [
@@ -272,9 +279,9 @@
       "availability": "planned",
       "features": [
         "Custom lockout and password rules",
-        "Captcha thresholds, difficulty and your own provider",
-        "Session and token lifetimes per project",
-        "Stricter rate limits of your own"
+        "Custom captcha settings and your own captcha provider",
+        "Custom session and token lifetimes",
+        "Custom rate limits, stricter than the defaults"
       ],
       "note": "Free runs Zitadel's secure defaults. Turning protection on, incident response (signing out everywhere, revoking sessions, rotating keys) and setup stay free on every plan, and raising capacity means extra requests, not a setting. Self-hosted servers keep every setting."
     },
