@@ -24,10 +24,10 @@ export function currentSystems(): Systems {
   return systems;
 }
 
-/** What onboarding writes: the person's contact, subscriptions and deals, and Stripe customers. */
+/** What onboarding writes: the person's contact, lead and subscriptions, and Stripe customers. */
 export interface Onboarding {
   stripe: Pick<Billing, "hasCustomer" | "ensureCustomer">;
-  hubspot: Pick<Crm, "upsertContact" | "subscribe" | "ensureDeal">;
+  hubspot: Pick<Crm, "upsertContact" | "subscribe" | "ensureLead">;
 }
 
 /**

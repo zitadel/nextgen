@@ -163,8 +163,7 @@ it stays here deliberately rather than by oversight.
   the machine state it reads, like a free port, with a flag or a held listener.
 - No test leaves the machine: [`helpers/offline.ts`](helpers/offline.ts) fails
   any connection off loopback.
-- A unit test answers the platform with
-  `setupServer(...setupPlatformHandlers())` and
-  `onUnhandledRequest: "error"`; a spec with `usePlatformMock()`. A command
-  without `--server` talks to `DEFAULT_SERVER`, the real platform, so it needs
-  the same.
+- A unit test answers the platform with `usePlatformServer()`
+  ([helpers/platform-project.ts](helpers/platform-project.ts)); a spec with
+  `usePlatformMock()`. A command without `--server` talks to `DEFAULT_SERVER`,
+  the real platform, so it needs the same.

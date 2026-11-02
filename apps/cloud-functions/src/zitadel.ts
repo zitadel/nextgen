@@ -1,3 +1,5 @@
+import { API_PREFIX } from "@zitadel/api/runtime/base-url";
+
 import type { Directory } from "./ports";
 import { NotLiveError } from "./systems";
 
@@ -43,7 +45,7 @@ interface MyTeams {
  */
 export function liveDirectory(server: string): Directory {
   async function read<T>(cookie: string, path: string): Promise<T | undefined> {
-    const url = new URL(path, server);
+    const url = new URL(`${API_PREFIX}${path}`, server);
     const answer = await fetch(url, {
       headers: passProtection(new Headers({ accept: "application/json", cookie })),
     });

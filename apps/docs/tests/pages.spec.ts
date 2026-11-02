@@ -242,7 +242,7 @@ test("every API operation shows its call through @zitadel/api, its CLI command a
       if (!back.includes(`](${url})`)) return `${commandPage}: no link to ${url}`;
     }
     // And with cURL, as the page's last sample (lib/source.ts).
-    if (!/```bash\ncurl -X [A-Z]+ 'http:\/\/localhost:8080\//.test(markdown)) {
+    if (!/```bash\ncurl -X [A-Z]+ 'http:\/\/localhost:8080\/api\/v1\//.test(markdown)) {
       return `${markdownUrl(url)}: no cURL command`;
     }
     const html = await (await request.get(url)).text();

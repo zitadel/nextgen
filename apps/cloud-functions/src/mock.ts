@@ -147,12 +147,13 @@ export function recordingStripe(): SendToStripe {
 }
 
 /**
- * Stand-ins for the portal's own ids, which the recorder needs only to show
- * where they go; go-live takes them from HubSpot (root ADR 084 §9).
+ * The portal's own ids, which the recorder needs only to show where they go:
+ * the lead pipeline is HubSpot's default, and the subscription types are
+ * stand-ins. Go-live takes them from HubSpot (root ADR 084 §9).
  */
 const MOCK_HUBSPOT: HubspotSettings = {
-  dealPipeline: "pipeline_mock",
-  dealStage: "stage_mock_account_created",
+  leadPipeline: "lead-pipeline-id",
+  leadStage: "new-stage-id",
   subscriptions: { newsletter: 1, security: 2 },
   legalBasisExplanation: "Signed up for Zitadel Cloud.",
 };
@@ -183,11 +184,10 @@ function recordedAnswer(request: CrmRequest): HubspotAnswer {
   }
   const properties = (request.body as { properties?: Record<string, string> } | undefined)
     ?.properties;
-  if (request.method === "POST" && properties?.zitadel_user_id) {
-    return { status: 201, body: { id: `contact_mock_${properties.zitadel_user_id}` } };
-  }
-  if (request.method === "POST" && properties?.zitadel_team_id) {
-    return { status: 201, body: { id: `deal_mock_${properties.zitadel_team_id}` } };
+  // A contact and its lead are both keyed by the person's id.
+  const record = /^\/crm\/v3\/objects\/(contact|lead)s$/.exec(request.path)?.[1];
+  if (request.method === "POST" && record && properties?.zitadel_user_id) {
+    return { status: 201, body: { id: `${record}_mock_${properties.zitadel_user_id}` } };
   }
   return { status: 200, body: {} };
 }
@@ -204,7 +204,7 @@ function mockCrm(): Crm {
       if (!preferences.has(person.email)) preferences.set(person.email, { product_news: true });
       return hubspot.subscribe(person);
     },
-    ensureDeal: hubspot.ensureDeal,
+    ensureLead: hubspot.ensureLead,
     async emailPreferences(person) {
       return preferences.get(person.email) ?? { product_news: false };
     },

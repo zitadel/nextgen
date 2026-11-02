@@ -7,7 +7,6 @@ import {
   deployMessage,
   diffStep,
   headSha,
-  listLiveDeployments,
   messageFlag,
   runSteps,
   servesPrimary,
@@ -82,13 +81,15 @@ export default class Deploy extends EnvironmentCommand {
       // final deploy would report the missing origin. A dry run writes nothing
       // and never reaches the deploy, so it is exempt: it still validates and
       // previews a project that has no primary origin yet.
-      const origins = (await client.getProject(projectId)).origins ?? [];
+      const project = await client.getProject(projectId);
+      const origins = project.origins;
       landing = origins.filter((entry) => entry.kind === "primary").map((entry) => entry.pattern);
       if (landing.length === 0) {
+        const setupProject = await setupProjectId(cwd);
         throw noPrimaryOriginError({
           origins,
           issuer: this.environment.values.ZITADEL_ISSUER?.value,
-          setupProject: (await setupProjectId(cwd)) === projectId,
+          setupProject: setupProject === projectId,
           selector: this.environmentSelector(),
           cliVersion: this.meta.cliVersion,
         });
@@ -152,8 +153,11 @@ export default class Deploy extends EnvironmentCommand {
     // preview, which never targets a primary, is never it. It guards the
     // create against another deploy that raced in since we inspected: the
     // server refuses with 409 rather than overwriting that deploy unseen (#538).
-    const live = await listLiveDeployments(client, projectId);
-    const observed = live.find((deployment) =>
+    const deployments = await client.listDeployments.all({
+      project_id: projectId,
+      live: true,
+    });
+    const observed = deployments.find((deployment) =>
       deployment.targets.some((entry) => landing.includes(entry.origin)),
     )?.id;
     const targets = ["primary"];
@@ -191,7 +195,11 @@ export default class Deploy extends EnvironmentCommand {
         );
       }
       // The deployment that raced in on a primary origin, not a live preview.
-      const current = (await listLiveDeployments(client, projectId)).find(servesPrimary);
+      const deployments = await client.listDeployments.all({
+        project_id: projectId,
+        live: true,
+      });
+      const current = deployments.find(servesPrimary);
       throw new ZitadelError(
         "E_CONFLICT",
         "Another deploy changed the targets since this one was prepared",

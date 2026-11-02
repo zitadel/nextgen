@@ -69,7 +69,7 @@ describe("resolveTelemetryEndpoint", () => {
   });
 
   // Released CLIs send to this path, so the cloud has to keep forwarding it.
-  it("matches the cloud's rewrite to Mixpanel's EU host, ahead of the server's catch-all", async () => {
+  it("matches the cloud's rewrite to Mixpanel's EU host, ahead of the catch-all", async () => {
     const vercelJson = join(import.meta.dirname, "../../../../../../vercel.json");
     const { rewrites } = JSON.parse(await readFile(vercelJson, "utf8")) as {
       rewrites: { source: string; destination: unknown }[];

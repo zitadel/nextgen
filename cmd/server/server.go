@@ -460,7 +460,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	defer pinger.Close()
 
 	runtimeResolver := service.NewRuntimeResolver(serviceDBPool, releaseService, consoleHosts...)
-	oasServer, err := oasapi.NewServer(
+	apiServers, err := api.NewServers(
 		api.NewHandler(
 			flowService,
 			authAttemptSvc,
@@ -490,10 +490,10 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		api.NewSecurityHandler(tokenService).WithPlatformProject(cfg.Platform.ResolvedProjectID()),
 		apiServerOptions(telemetry.TracerProvider(), telemetry.MeterProvider(), consoleLink(cfg.Server.ConsolePath))...)
 	if err != nil {
-		return fmt.Errorf("failed to build api server: %w", err)
+		return fmt.Errorf("failed to build api servers: %w", err)
 	}
 
-	mux, err := buildHTTPMux(cfg.Server, idgen.NewULID(), oasServer,
+	mux, err := buildHTTPMux(cfg.Server, idgen.NewULID(), apiServers,
 		api.NewIDPCallbackHandler(ssoCallback),
 		standaloneRuntimeResolver(projectService, tokenService, keyService, cfg.Platform.ResolvedProjectID()),
 		requestEventBuf,
@@ -912,9 +912,10 @@ func mustBindEnv(v *viper.Viper, key string) {
 
 // ----------------------------- HTTP --------------------------------------
 
-// apiServerOptions are the options of the ogen API server that buildHTTPMux
-// mounts, shared with the test of that chain. home is the way on that the
-// error page of a path nothing answers offers a person (ADR 076).
+// apiServerOptions are the options of the ogen API servers that buildHTTPMux
+// mounts, to which api.NewServers adds each mount's own; shared with the
+// test of that chain. home is the way on that the error page of a path
+// nothing answers offers a person (ADR 076).
 func apiServerOptions(tracerProvider trace.TracerProvider, meterProvider metric.MeterProvider, home *errorpage.Link) []oasapi.ServerOption {
 	return []oasapi.ServerOption{
 		oasapi.WithMiddleware(
@@ -941,7 +942,7 @@ func consoleLink(consolePath string) *errorpage.Link {
 	return &errorpage.Link{Label: "Open the console", Href: consolePath + "/"}
 }
 
-func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiHandler, idpCallbackHandler http.Handler, runtime runtimeResolver, requestEvents *audit.RequestBuffer, retentionTrigger http.Handler) (http.Handler, error) {
+func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiServers api.Servers, idpCallbackHandler http.Handler, runtime runtimeResolver, requestEvents *audit.RequestBuffer, retentionTrigger http.Handler) (http.Handler, error) {
 	mux := http.NewServeMux()
 
 	if cfg.ConsoleEnabled {
@@ -1010,7 +1011,9 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiH
 		middleware.WithLogging,
 		api.WithRecover,
 	))
-	mux.Handle("/", chain(apiHandler))
+	// The API under /api/v1, the probes at the root, and the root alias for
+	// every other path until 1.0.0 (ADR 077).
+	api.MountAPI(mux, chain, apiServers)
 	return securityheaders.Middleware(mux), nil
 }
 

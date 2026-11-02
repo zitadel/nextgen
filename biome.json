@@ -93,7 +93,8 @@
   "plugins": [
     "./biome-plugins/no-swallowed-chmod.grit",
     "./biome-plugins/no-removed-key.grit",
-    "./biome-plugins/no-raw-next-commands.grit"
+    "./biome-plugins/no-raw-next-commands.grit",
+    "./biome-plugins/no-consent-bypass.grit"
   ],
   "overrides": [
     {

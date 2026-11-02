@@ -26,10 +26,10 @@ One Vercel deployment, six [services](https://vercel.com/docs/services):
 
 | Service | Built by | Serves |
 |---|---|---|
-| `server` | Go preset; the build command installs, because Vercel's Go builder runs no `installCommand`, and then runs `node_modules/.bin/turbo run deploy --filter=@zitadel/cloud`. turbo goes by its path because, unlike the JS builders, the Go builder puts no `node_modules/.bin` on `PATH`. `@zitadel/cloud`'s `build` compiles `apps/cloud/launcher` without the console (`-tags noconsole`), then `migrate` migrates and `deploy` hands the binary to the preset, none of them cached | every path except the console's, the docs', the website's, the cloud functions' and the Mixpanel proxy's, including `/console/runtime.json` |
+| `server` | Go preset; the build command installs, because Vercel's Go builder runs no `installCommand`, and then runs `node_modules/.bin/turbo run deploy --filter=@zitadel/cloud`. turbo goes by its path because, unlike the JS builders, the Go builder puts no `node_modules/.bin` on `PATH`. `@zitadel/cloud`'s `build` compiles `apps/cloud/launcher` without the console (`-tags noconsole`), then `migrate` migrates and `deploy` hands the binary to the preset, none of them cached | `/api/*`, the API; its own root paths, `/console/runtime.json`, `/livez`, `/readyz`, `/csp-report`, `/cron/events-retention` and the IdP callbacks (`/idp/{slug}/callback`, `/__nextgen/idp/{slug}/callback`); and until 1.0.0 the root paths of the API's resources (`/users`, `/flow`, … in one rule). Nothing else |
 | `console` | Vite; `turbo run build` with `CONSOLE_BASE_PATH=/console/` and `CONSOLE_ADDON=../cloud-console`, which compiles in the cloud's add-on ([`apps/cloud-console`](../../apps/cloud-console/AGENTS.md)): it reports Vercel Web Analytics and Speed Insights, adds the unlisted sign-up page `/console/signup`, and adds Billing and Support to Settings, which until their systems are live say the cloud is free during the preview and point to GitHub issues, starts onboarding on each signed-in page and on the CLI's claim page, and reports `signup_completed` when the sign-in widget makes an account; in previews it also adds Email and sends the sign-in widget's calls through BotID's check in `cloud-functions`; the service serves the build where it lands, `internal/staticui/console/dist` | `/console/*` (bare `/console` redirects to the slash form; `/ui/console` and `/ui/console/*` redirect here with a 307) |
 | `docs` | Next.js; `turbo run build --filter=@zitadel/docs`, after `@zitadel/components`, `@zitadel/api-mock` and the `@zitadel/api` client the mock calls, which the live examples render, and the docs' typecheck. The build's cache key holds the deployment's ID, which Skew Protection bakes into it, so it never comes from the cache; never moon, which cannot archive the symlinks Vercel's Next.js adapter writes | `/docs` and `/docs/*`: pages, assets (`/docs/_next/`), search, `llms.txt`, each page's `.md` and the MCP server |
-| `website` | Next.js; `turbo run build --filter=@zitadel/website`, after the atoms of `@zitadel/components` its showcase renders; keyed by the deployment's ID, as the docs' | `/`, the front page, `/changelog` (`/changelog/` redirects there) with its entries' pages and its feed under it, `/changelog/*`, and their assets at `/_next/*`; the host's `/llms.txt`; the host's favicons at `/favicon.ico` and `/favicons/*`, which the console, the login UI and the docs link |
+| `website` | Next.js; `turbo run build --filter=@zitadel/website`, after the atoms of `@zitadel/components` its showcase renders; keyed by the deployment's ID, as the docs' | `/`, the front page, `/changelog` (`/changelog/` redirects there) with its entries' pages and its feed under it, `/changelog/*`, and their assets at `/_next/*`; the host's `/llms.txt`; the host's favicons at `/favicon.ico` and `/favicons/*`, which the console, the login UI and the docs link; and every path no other service claims, which its 404 answers ([ADR 076](../adrs/076-error-pages-and-unmatched-routes.md)) |
 | `cloud-functions` | Next.js; `turbo run build --filter=@zitadel/cloud-functions`, route handlers and the Workflow SDK's routes, no pages ([`apps/cloud-functions`](../../apps/cloud-functions/AGENTS.md), [ADR 084](../adrs/084-hosted-cloud-business-systems.md)); keyed by the deployment's ID, as the website's. It reads Zitadel live; Stripe and HubSpot are mocks, which send nothing. Production runs onboarding on them and answers everything else `503 cloud.not_live` | `/cloud/*`: the console add-on's calls (`/cloud/api/*`), the sign-in widget's calls through BotID's check (`/cloud/zitadel/*`), Stripe's webhooks (`/cloud/hooks/stripe`) and its cron routes (`/cloud/cron/*`, none scheduled yet) |
 | `schemas` | Static files: `turbo run schemas --filter=@zitadel/cloud` renders them with [`scripts/render-builtin-schemas.mjs`](../../scripts/render-builtin-schemas.mjs) into `apps/cloud/dist/cloud-schemas`. The service is rooted at `apps/cloud`, whose `package.json` has no dependencies, so Vercel detects no framework: a service takes no `framework: null`, and a framework dependency there would change how it builds | `/schemas/v1/*`: the [built-in schemas](#built-in-schemas), as `application/schema+json`, fresh for an hour and readable from any origin |
 
@@ -44,10 +44,21 @@ The server's `/console/runtime.json` lies under the console's path, so its
 rewrite comes first in `vercel.json`, and a launcher test holds the mount,
 the build's base and the console path together.
 
+`/api/*` is the API's ([ADR 077](../adrs/077-api-path-prefix.md)): its
+rewrite to the server comes first, so no service can take a path under it.
+Until 1.0.0 the server also answers the API's root paths, with a
+`Deprecation` header, through one rule that names the API's resources. The
+list is fixed: a client released before the prefix calls only operations it
+knows, so a resource added since needs no root rule. The server gets nothing
+but these and its own root paths; every other path is the website's, whose
+404 answers it, so a scanner's or a typo's request never starts the server's
+function. A launcher test (`apps/cloud/launcher`) resolves each of the
+server's paths through `vercel.json`.
+
 `/telemetry/mixpanel/*` belongs to no service: a rewrite forwards it to
 Mixpanel's EU API, `api-eu.mixpanel.com`. The CLI's usage analytics and
 the server's service ping send to Mixpanel through it once Mixpanel is no
-longer paused: keep it, ahead of the server's catch-all.
+longer paused: keep it, ahead of the website's catch-all.
 
 The docs' live examples mock the flow API in the browser with a service
 worker scoped to `/docs/`, so the mock never answers for the console on the
@@ -102,9 +113,11 @@ document for editors and people under the same path on this project:
   and the services build in no fixed order. A change to one renderer belongs
   in the other.
 - **The routes:** the top-level rewrite sends `/schemas/v1/*` to the service,
-  ahead of the server's catch-all; a name that is no built-in is the
-  service's 404. The API keeps `/schemas` and `/schemas/{id}`: a schema id
-  never holds a slash.
+  ahead of the server's rule for the API's root paths, which takes `/schemas`
+  too; a name that is no built-in is the
+  service's 404. The API keeps `/api/v1/schemas` and `/api/v1/schemas/{id}`,
+  and until 1.0.0 `/schemas` and `/schemas/{id}`: a schema id never holds a
+  slash.
 - **zitadel.com** answers for the namespace itself by forwarding
   `/schemas/v1/:path*` to this project, or by running
   `node scripts/render-builtin-schemas.mjs` in its own build. Until it does,
@@ -353,12 +366,13 @@ service's contract suite against the deployment, today the docs'
 schemas' ([`e2e/schemas/`](../../e2e/schemas/)), and on a preview the CLI's
 ([`e2e/cli/`](../../e2e/cli/)), as the turbo tasks
 `pnpm check:cloud` runs [by hand](#checking-a-deployment-by-hand). The console's
-signs nobody in: it checks how `vercel.json` routes the console's paths and
-the Mixpanel proxy, and that the signed-out console comes up, down to the login widget's first step,
+signs nobody in: it checks how `vercel.json` routes the console's paths, the
+API's prefix and the Mixpanel proxy, and that the signed-out console comes up, down to the login widget's first step,
 which needs the server and its database behind it. The schemas' fetches every
 built-in from `/schemas/v1/` and compares it with the deployed commit's own
-rendering, checks the headers `vercel.json` gives them, and that `/schemas`
-still reaches the API; it needs no browser. The CLI's packs this commit's
+rendering, checks the headers `vercel.json` gives them, and that
+`/api/v1/schemas`, and until 1.0.0 `/schemas`, reach the API; it needs no
+browser. The CLI's packs this commit's
 CLI, as `release:pack` does, and drives it with `--non-interactive --json`
 from an empty directory: `setup --server <deployment>` creates a project,
 then `deploy`, `variable set` and `list`, `origin add` and `list`,

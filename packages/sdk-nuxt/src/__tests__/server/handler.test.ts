@@ -56,7 +56,7 @@ describe("module server handler", () => {
     const handle = await moduleHandler({ url: "http://zitadel.test", projectSecret: "" });
 
     await handle(
-      new Request("http://localhost:3000/__nextgen/sessions/exchange", { method: "POST" }),
+      new Request("http://localhost:3000/__nextgen/api/v1/sessions/exchange", { method: "POST" }),
     );
 
     const init = upstream.mock.calls[0]?.[1] as RequestInit;

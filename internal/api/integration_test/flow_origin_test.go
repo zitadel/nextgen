@@ -7,12 +7,15 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/zitadel/nextgen/api/client"
 	api "github.com/zitadel/nextgen/api/generated"
+	internalapi "github.com/zitadel/nextgen/internal/api"
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 	"github.com/zitadel/nextgen/internal/api/integration_test/test_data"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -168,6 +171,57 @@ func TestFlowSubmitFromLivePreview(t *testing.T) {
 	require.NoError(t, answered.UnmarshalJSON(body), string(body))
 }
 
+// TestOriginlessFlowContinues opens a flow with no Origin, as a native app or a
+// backend does, and submits its first step on a server reached at a host the
+// project does not list. The harness's server leaves out the production
+// request-host middleware the host fallback comes from, so this one runs
+// behind it.
+func TestOriginlessFlowContinues(t *testing.T) {
+	t.Parallel()
+
+	mux := http.NewServeMux()
+	internalapi.MountAPI(mux, internalapi.WithRequestHostMiddleware, harness.EnsureAPIServers(t))
+	server := httptest.NewServer(mux)
+	t.Cleanup(server.Close)
+	base := server.URL + client.PathPrefix
+	const host = "auth.acme.test"
+	fixture := newDeploymentFixture(t)
+	deployPrimary(t, fixture.project)
+
+	body, err := json.Marshal(map[string]string{"project_id": fixture.project, "purpose": "login"})
+	require.NoError(t, err)
+	resp, body := postFlowAtHost(t, base+"/flow", body, host, nil)
+	require.Equal(t, http.StatusCreated, resp.StatusCode, string(body))
+	var opened api.FlowResponse
+	require.NoError(t, opened.UnmarshalJSON(body), string(body))
+
+	body, err = json.Marshal(map[string]any{
+		"action": "submit",
+		"fields": map[string]string{"email": "nobody@example.test"},
+	})
+	require.NoError(t, err)
+	resp, body = postFlowAtHost(t, base+"/flow/"+opened.ID+"/submit", body, host, &http.Cookie{Name: "_zflow", Value: flowCookie(t, resp)})
+	assert.Less(t, resp.StatusCode, http.StatusBadRequest, string(body))
+}
+
+// postFlowAtHost posts to url with no Origin, as a request to host.
+func postFlowAtHost(t *testing.T, url string, body []byte, host string, cookie *http.Cookie) (*http.Response, []byte) {
+	t.Helper()
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, url, bytes.NewReader(body))
+	require.NoError(t, err)
+	req.Host = host
+	req.Header.Set("Content-Type", "application/json")
+	if cookie != nil {
+		req.AddCookie(cookie)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	respBody, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	return resp, respBody
+}
+
 // openFlow starts a login flow the way a browser on origin does. Sent raw:
 // the generated client cannot set an opaque Origin.
 func openFlow(t *testing.T, projectID, origin string) (*http.Response, []byte) {
@@ -190,7 +244,7 @@ func submitFlow(t *testing.T, flowID, zflow, origin string) (*http.Response, []b
 
 func postFlow(t *testing.T, path string, body []byte, origin string, cookie *http.Cookie) (*http.Response, []byte) {
 	t.Helper()
-	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, harness.EnsureTestServer(t).URL+path, bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, harness.APIBaseURL(t)+path, bytes.NewReader(body))
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Origin", origin)

@@ -51,7 +51,7 @@ const ROOT = fileURLToPath(new URL("..", import.meta.url));
 /**
  * The namespace the built-in schemas are published under: the server's default
  * `schema.builtin_public_base` (DEFAULT_BUILTIN_SCHEMA_BASE in
- * packages/config/src/defaults.ts, which the tests hold this to). The hosted
+ * packages/config/src/builtin-schema-base.ts, which the tests hold this to). The hosted
  * cloud serves the files at its path.
  */
 export const HOSTED_BASE = "https://zitadel.com/schemas/v1";

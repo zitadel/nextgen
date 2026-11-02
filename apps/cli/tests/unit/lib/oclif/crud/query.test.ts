@@ -4,6 +4,8 @@ import { ZitadelError } from "../../../../../src/lib/errors";
 import { parseFilter, parseSort } from "../../../../../src/lib/oclif/crud";
 
 const OPERATIONS = ["equals", "not_equals", "contains", "greater_than"] as const;
+/** Every operation the platform knows; the fields offer only some. */
+const KNOWN = [...OPERATIONS, "less_than"];
 const SORTS = ["created_at", "status"] as const;
 const FIELDS = [
   { field: "created_at", operations: OPERATIONS },
@@ -11,8 +13,22 @@ const FIELDS = [
 ] as const;
 
 describe("parseFilter", () => {
+  it("refuses an operation the platform knows but the field does not offer", () => {
+    expect(() => parseFilter("status=less_than:active", FIELDS, KNOWN)).toThrowError(
+      'Filter field "status" does not support the less_than operation',
+    );
+  });
+
+  it("reads a word no operation is called as part of an equals value", () => {
+    expect(parseFilter("status=starts_with:ab", FIELDS, KNOWN)).toEqual({
+      field: FIELDS[1],
+      operation: "equals",
+      value: "starts_with:ab",
+    });
+  });
+
   it("defaults the operation to equals", () => {
-    expect(parseFilter("status=active", FIELDS)).toEqual({
+    expect(parseFilter("status=active", FIELDS, KNOWN)).toEqual({
       field: expect.objectContaining({ field: "status" }),
       operation: "equals",
       value: "active",
@@ -20,7 +36,7 @@ describe("parseFilter", () => {
   });
 
   it("splits an explicit operation from the value", () => {
-    expect(parseFilter("created_at=greater_than:2026-01-01T00:00:00Z", FIELDS)).toEqual({
+    expect(parseFilter("created_at=greater_than:2026-01-01T00:00:00Z", FIELDS, KNOWN)).toEqual({
       field: expect.objectContaining({ field: "created_at" }),
       operation: "greater_than",
       value: "2026-01-01T00:00:00Z",
@@ -28,7 +44,7 @@ describe("parseFilter", () => {
   });
 
   it("keeps colons inside the value once the operation is consumed", () => {
-    expect(parseFilter("status=equals:a:b", FIELDS)).toEqual({
+    expect(parseFilter("status=equals:a:b", FIELDS, KNOWN)).toEqual({
       field: expect.objectContaining({ field: "status" }),
       operation: "equals",
       value: "a:b",
@@ -36,7 +52,7 @@ describe("parseFilter", () => {
   });
 
   it("treats an unknown prefix as part of an equals value", () => {
-    expect(parseFilter("status=urn:x", FIELDS)).toEqual({
+    expect(parseFilter("status=urn:x", FIELDS, KNOWN)).toEqual({
       field: expect.objectContaining({ field: "status" }),
       operation: "equals",
       value: "urn:x",
@@ -44,11 +60,11 @@ describe("parseFilter", () => {
   });
 
   it("keeps equals signs inside the value", () => {
-    expect(parseFilter("status=a=b", FIELDS).value).toBe("a=b");
+    expect(parseFilter("status=a=b", FIELDS, KNOWN).value).toBe("a=b");
   });
 
   it("requires an operation to carry a value", () => {
-    expect(parseFilter("status=contains", FIELDS)).toEqual({
+    expect(parseFilter("status=contains", FIELDS, KNOWN)).toEqual({
       field: expect.objectContaining({ field: "status" }),
       operation: "equals",
       value: "contains",
@@ -56,7 +72,7 @@ describe("parseFilter", () => {
   });
 
   it("refuses a near-miss of a real operation instead of filtering for it literally", () => {
-    expect(() => parseFilter("status=contians:active", FIELDS)).toThrowError(
+    expect(() => parseFilter("status=contians:active", FIELDS, KNOWN)).toThrowError(
       expect.objectContaining({
         code: "E_VALIDATION",
         message: 'Unknown filter operation "contians"',
@@ -66,24 +82,24 @@ describe("parseFilter", () => {
   });
 
   it("keeps a colon-bearing value that resembles no operation", () => {
-    expect(parseFilter("status=https://example.com/x.json", FIELDS)).toEqual({
+    expect(parseFilter("status=https://example.com/x.json", FIELDS, KNOWN)).toEqual({
       field: expect.objectContaining({ field: "status" }),
       operation: "equals",
       value: "https://example.com/x.json",
     });
-    expect(parseFilter("created_at=2026-01-01T00:00:00Z", FIELDS).value).toBe(
+    expect(parseFilter("created_at=2026-01-01T00:00:00Z", FIELDS, KNOWN).value).toBe(
       "2026-01-01T00:00:00Z",
     );
   });
 
   it.each(["nonsense", "=x", ""])("rejects %j with E_VALIDATION and a hint", (raw) => {
-    expect(() => parseFilter(raw, FIELDS)).toThrowError(
+    expect(() => parseFilter(raw, FIELDS, KNOWN)).toThrowError(
       expect.objectContaining({
         code: "E_VALIDATION",
         hint: expect.stringContaining("created_at=equals:"),
       }),
     );
-    expect(() => parseFilter(raw, FIELDS)).toThrow(ZitadelError);
+    expect(() => parseFilter(raw, FIELDS, KNOWN)).toThrow(ZitadelError);
   });
 });
 

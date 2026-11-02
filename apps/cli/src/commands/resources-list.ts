@@ -1,8 +1,8 @@
 import { Flags } from "@oclif/core";
 
 import { BaseCommand, type JsonEnvelope } from "../lib/oclif";
+import { Tabulatable } from "../lib/oclif/tabulatable";
 import { describeRegistry } from "../lib/oclif/crud";
-import { renderList } from "../lib/oclif/crud/table";
 import { listData } from "../lib/oclif/envelope";
 import { CommandGroups } from "../lib/oclif/groups";
 import { RESOURCES } from "./resources";
@@ -19,7 +19,7 @@ const COLUMNS = ["topic", "verbs", "filters"] as const;
  * of them from the registry at once, and `--json` makes it machine-readable.
  * The command talks to no server: it describes the CLI, not the project.
  */
-export default class ResourcesList extends BaseCommand {
+export default class ResourcesList extends Tabulatable(BaseCommand) {
   static override id = "resources";
   static override group = CommandGroups.diagnostics;
   static override description =
@@ -54,11 +54,11 @@ export default class ResourcesList extends BaseCommand {
         .join(", "),
     }));
 
-    const plain = flags.plain || !process.stdout.isTTY;
+    const plain = this.isPlain(flags.plain);
     return this.emit({
       status: "ok",
       data: listData(resources),
-      pretty: renderList(COLUMNS, rows, {
+      pretty: await this.tabulateList(COLUMNS, rows, {
         plain,
         singular: "resource",
         empty: "No resources.",

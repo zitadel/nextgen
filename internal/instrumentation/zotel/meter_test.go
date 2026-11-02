@@ -33,7 +33,8 @@ func attributeKeys(t *testing.T, reader sdkmetric.Reader) map[string][]attribute
 
 // The raw request path used to be an allowed attribute: one series per
 // distinct /users/{id}. Whatever a handler or an HTTP wrapper attaches, only
-// the operation, method, route template and status survive.
+// the operation, method, route template and status survive, and the root
+// path alias's mark.
 func TestMeterViews_HTTPAttributesAreBounded(t *testing.T) {
 	t.Parallel()
 	reader := sdkmetric.NewManualReader()
@@ -50,6 +51,7 @@ func TestMeterViews_HTTPAttributesAreBounded(t *testing.T) {
 		attribute.String("http.request.method", "GET"),
 		attribute.String("http.route", "/users/{user_id}"),
 		attribute.Int("http.response.status_code", 200),
+		attribute.Bool("zitadel.api.root_path", true),
 	}
 	counter, err := otelogen.ServerRequestCountCounter(provider.Meter(otelogen.Name))
 	require.NoError(t, err)
@@ -64,7 +66,7 @@ func TestMeterViews_HTTPAttributesAreBounded(t *testing.T) {
 	}, rogue)...))
 
 	got := attributeKeys(t, reader)
-	assert.ElementsMatch(t, []attribute.Key{"oas.operation", "http.request.method", "http.route", "http.response.status_code"}, got["ogen.server.request_count"])
+	assert.ElementsMatch(t, []attribute.Key{"oas.operation", "http.request.method", "http.route", "http.response.status_code", "zitadel.api.root_path"}, got["ogen.server.request_count"])
 	assert.ElementsMatch(t, []attribute.Key{"http.method", "http.status_code", "http.route"}, got["http.server.request.count"])
 }
 

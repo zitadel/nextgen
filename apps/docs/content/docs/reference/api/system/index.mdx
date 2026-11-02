@@ -4,6 +4,8 @@ description: OpenAPI operations for server health, liveness, and readiness probe
 ---
 
 System endpoints expose the service probes used by local development,
-automation, and deployment health checks.
+automation, and deployment health checks. Point a probe at the root path,
+`/livez` or `/readyz`: like every operation they also answer under `/api/v1`,
+but the root is where the probes stay.
 
 <Operations />

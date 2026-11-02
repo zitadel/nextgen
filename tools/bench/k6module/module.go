@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/zitadel/nextgen/api/client"
 	api "github.com/zitadel/nextgen/api/generated"
 	"go.k6.io/k6/v2/js/modules"
 	"go.k6.io/k6/v2/metrics"
@@ -84,7 +85,7 @@ func (m *ModuleInstance) api() (*api.Client, error) {
 	if st == nil {
 		return nil, errors.New("k6/x/nextgen: not available in the init context")
 	}
-	c, err := api.NewClient(m.root.target.Base, m.root.creds, api.WithClient(&doer{
+	c, err := client.New(m.root.target.Base, m.root.creds, api.WithClient(&doer{
 		st:     st,
 		ctx:    m.vu.Context,
 		origin: m.root.target.Origin,
