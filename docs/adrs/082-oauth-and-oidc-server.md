@@ -435,3 +435,10 @@ APIs under [`packages/config/defaults/`](../../packages/config/defaults/),
 `zitadel resources --json`, the CLI's
 [`SKILL.md`](../../apps/cli/skills/zitadel-cli/SKILL.md), the SDK READMEs and
 the components README.
+
+## Amendment (2026-10-31): §4, no project default target
+
+There is no project default target: a caller with no `Origin` is served the
+project's newest primary deployment
+([ADR 085](085-which-release-serves-a-request.md)). A client credentials request
+still resolves from its issuer, never from its `Origin` header.

@@ -5,7 +5,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 afterEach(() => {
   vi.useRealTimers();
-  vi.restoreAllMocks();
 });
 
 describe("node:timers/promises under the shared setup", () => {

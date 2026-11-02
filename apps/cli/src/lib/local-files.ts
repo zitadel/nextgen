@@ -16,9 +16,10 @@
  * that leads outside the project is refused.
  */
 import { lstatSync, readFileSync, realpathSync } from "node:fs";
-import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import { isErrno, ZitadelError } from "./errors";
+import { ancestors } from "./paths";
 
 export const FILE_REFERENCE_KEY = "$file";
 
@@ -55,23 +56,25 @@ function readFileReference(
   ref: string,
   options: { readonly onMissing: "throw" | "omit" },
 ): string | typeof omittedReference {
-  let content: string | undefined;
-  try {
-    content = readIfPresent(path);
-  } catch {
-    throw new ZitadelError("E_VALIDATION", `$file ${JSON.stringify(ref)} cannot be read`, {
+  const unreadable = new ZitadelError(
+    "E_VALIDATION",
+    `$file ${JSON.stringify(ref)} cannot be read`,
+    {
       hint: "Create the referenced file or fix the path.",
-    });
+    },
+  );
+  try {
+    const content = readIfPresent(path);
+    if (content !== undefined) {
+      return content;
+    }
+    if (options.onMissing === "omit") {
+      return omittedReference;
+    }
+  } catch {
+    throw unreadable;
   }
-  if (content !== undefined) {
-    return content;
-  }
-  if (options.onMissing === "omit") {
-    return omittedReference;
-  }
-  throw new ZitadelError("E_VALIDATION", `$file ${JSON.stringify(ref)} cannot be read`, {
-    hint: "Create the referenced file or fix the path.",
-  });
+  throw unreadable;
 }
 
 /** Whether `path` is `root` itself or lies beneath it. */
@@ -95,26 +98,19 @@ function isSymlink(path: string): boolean {
  * symlink that resolves nowhere, since what it names could be anywhere.
  */
 function realTarget(path: string): string | undefined {
-  const missing: string[] = [];
-  let current = path;
-  for (;;) {
+  for (const dir of ancestors(path)) {
     try {
-      return join(realpathSync(current), ...missing);
+      return join(realpathSync(dir), relative(dir, path));
     } catch (error) {
       if (!isErrno(error, "ENOENT") && !isErrno(error, "ENOTDIR")) {
         throw error;
       }
-      if (isSymlink(current)) {
+      if (isSymlink(dir)) {
         return undefined;
       }
-      const parent = dirname(current);
-      if (parent === current) {
-        return path;
-      }
-      missing.unshift(basename(current));
-      current = parent;
     }
   }
+  return path;
 }
 
 /** A `{ "$file": "<path>" }` object and nothing else. */

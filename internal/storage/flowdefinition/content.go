@@ -79,7 +79,7 @@ func (p *SSOProviderJSON) UnmarshalJSON(data []byte) error {
 type TransitionJSON struct {
 	Action  *string `json:"action,omitempty"`
 	Purpose *string `json:"purpose,omitempty"`
-	Target  string  `json:"target"`
+	Target  string  `json:"target,omitempty"`
 }
 
 // Marshal converts the domain aggregate's nested fields into JSON for the

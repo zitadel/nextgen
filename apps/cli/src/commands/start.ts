@@ -13,6 +13,7 @@ import {
   localServerUrl,
   peekRuntimeMetadata,
   type RuntimeBackend,
+  resolveRuntimeBackend,
   type RuntimeMetadata,
 } from "../lib/local-server/runtime";
 import { LocalServer } from "../lib/local-server/server";
@@ -192,20 +193,6 @@ function validatePort(port: number): void {
       hint: "Use a TCP port between 1 and 65535.",
     });
   }
-}
-
-function resolveRuntimeBackend(input: {
-  runtime: unknown;
-  image: string | undefined;
-  envImage: string | undefined;
-}): RuntimeBackend {
-  if (input.runtime === "binary" || input.runtime === "docker") {
-    return input.runtime;
-  }
-  if (input.image || input.envImage) {
-    return "docker";
-  }
-  return "binary";
 }
 
 function assertRuntimeFlags(runtime: RuntimeBackend, image: string | undefined): void {

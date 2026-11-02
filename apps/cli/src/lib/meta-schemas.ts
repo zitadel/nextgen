@@ -10,13 +10,15 @@
  * way out ({@link normalizePublicCliJson}), so they differ between CLI
  * versions.
  */
-import { lstat, readFile } from "node:fs/promises";
+import { lstat } from "node:fs/promises";
 import { join } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 
 import { META_SCHEMA_DIR, metaSchemaFiles } from "@zitadel/config/meta-schemas";
 
 import { isErrno } from "./errors";
+import { readIfExists } from "./fs";
+import { parseJsonOrUndefined } from "./json";
 import { maskPublicCliVersion, normalizePublicCliJson } from "./public-cli";
 
 /** One meta-schema file: its project-relative path, its body, and the bytes written. */
@@ -75,19 +77,12 @@ async function contentState(
   cwd: string,
   file: ProjectMetaSchema,
 ): Promise<"current" | "missing" | "outdated"> {
-  let text: string;
-  try {
-    text = await readFile(join(cwd, file.path), "utf8");
-  } catch (error) {
-    if (isErrno(error, "ENOENT")) {
-      return "missing";
-    }
-    throw error;
+  const text = await readIfExists(join(cwd, file.path));
+  if (text === undefined) {
+    return "missing";
   }
-  let held: unknown;
-  try {
-    held = JSON.parse(text);
-  } catch {
+  const held = parseJsonOrUndefined(text);
+  if (held === undefined) {
     return "outdated";
   }
   return isDeepStrictEqual(maskPublicCliVersion(held), maskPublicCliVersion(file.body))
@@ -102,8 +97,8 @@ async function contentState(
  */
 export async function linkOnPath(cwd: string, path: string): Promise<string | undefined> {
   const segments = path.split("/");
-  for (let end = 1; end <= segments.length; end++) {
-    const segment = segments.slice(0, end).join("/");
+  for (const [index] of segments.entries()) {
+    const segment = segments.slice(0, index + 1).join("/");
     try {
       if ((await lstat(join(cwd, segment))).isSymbolicLink()) {
         return segment;

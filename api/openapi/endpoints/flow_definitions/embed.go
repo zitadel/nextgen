@@ -149,7 +149,7 @@ func convertStepTransitions(transitions api.OptFlowDefinitionStepTransitions) (m
 
 		ret[name] = domain.FlowStepTransition{
 			Action:  action,
-			Target:  transition.GetTarget(),
+			Target:  transition.GetTarget().Or(""),
 			Purpose: purpose,
 		}
 	}
