@@ -1,6 +1,6 @@
 import wrapAnsi from "wrap-ansi";
 
-import type { NextSteps } from "../../lib/oclif/next-steps";
+import { type NextSteps, renderNextSteps } from "../../lib/oclif/next-steps";
 import { publicCliCommand } from "../../lib/public-cli";
 import { shellOption } from "../../lib/shell";
 import { arrow, command, dim, mark, statusColor, strong } from "../../lib/style";
@@ -280,15 +280,9 @@ function conclusion(checks: readonly CheckOutcome[]): string {
 
 /** The next steps not already shown under a row, which is why doctor draws them itself. */
 function nextLines(next: NextSteps, shownCommands: ReadonlySet<string>): string[] {
-  const actions = next.actions ?? [];
-  const commands = (next.commands ?? []).filter((suggested) => !shownCommands.has(suggested));
-  if (actions.length === 0 && commands.length === 0) {
-    return [];
-  }
-  return [
-    "",
-    "Next:",
-    ...actions.map((action) => `  ${action}`),
-    ...commands.map((suggested) => `  ${dim("$")} ${command(suggested)}`),
-  ];
+  const block = renderNextSteps({
+    actions: next.actions,
+    commands: next.commands?.filter((suggested) => !shownCommands.has(suggested)),
+  });
+  return block === "" ? [] : ["", block];
 }

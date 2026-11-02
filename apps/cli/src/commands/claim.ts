@@ -6,7 +6,7 @@ import { ApiError } from "@zitadel/api/runtime/fetch";
 import consola from "consola";
 
 import type { ZitadelClient } from "../lib/api-client";
-import { wrapForBox } from "../lib/box";
+import { BOX_STYLE, wrapForBox } from "../lib/box";
 import { openInBrowser } from "../lib/browser";
 import { CLAIM_WINDOW_DAYS, isAttached } from "../lib/claim-state";
 import { requireValue } from "../lib/environment";
@@ -249,7 +249,7 @@ export default class Claim extends EnvironmentCommand {
         message: wrapForBox(
           "Create an account or sign in to claim your Project, make it permanent and start collaborating.",
         ),
-        style: { padding: 1, borderStyle: "rounded", borderColor: "cyan" },
+        style: BOX_STYLE.info,
       });
       consola.log(challenge.claim_url);
 

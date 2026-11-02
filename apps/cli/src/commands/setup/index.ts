@@ -28,7 +28,7 @@ import semver from "semver";
 
 import { createZitadelClient } from "../../lib/api-client";
 import { isDevelopmentBuild } from "../../lib/build-channel";
-import { renderBoxActions, wrapForBox } from "../../lib/box";
+import { BOX_STYLE, renderBoxActions, wrapForBox } from "../../lib/box";
 import { setupDesignRemovedError } from "../../lib/branding/designs";
 import {
   claimAction,
@@ -1022,7 +1022,7 @@ export default class Setup extends Destructive(BaseCommand) {
             ]),
           ].join("\n"),
         ),
-        style: { padding: 1, borderStyle: "rounded", borderColor: "green" },
+        style: BOX_STYLE.success,
       });
       // After the steps that start the app and test sign-in, outside the box so
       // the command can be copied without its border.

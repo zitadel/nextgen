@@ -1,7 +1,7 @@
 import { box } from "consola/utils";
 
 import { exactZitadelPins } from "../commands/doctor/checks/dependency-version";
-import { wrapForBox } from "./box";
+import { BOX_STYLE, wrapForBox } from "./box";
 import { command } from "./style";
 import { upgradeCommand } from "./suggestion";
 import { isNewerVersion, latestCliVersion, updateCheckDisabled } from "./update-check";
@@ -38,6 +38,6 @@ export async function updateNotice(input: {
   }
   return box(wrapForBox([...behind, "", command(upgradeCommand(cliVersion))].join("\n"), columns), {
     title: "Update available",
-    style: { padding: 1, borderStyle: "rounded", borderColor: "cyan" },
+    style: BOX_STYLE.info,
   });
 }
