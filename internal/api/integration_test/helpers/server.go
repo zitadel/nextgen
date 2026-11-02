@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/zitadel/nextgen/api/client"
 	generated "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api"
 	"github.com/zitadel/nextgen/internal/api/middleware"
@@ -51,15 +52,25 @@ func (h *Harness) EnsureTestServer(t testing.TB) *httptest.Server {
 			h.EnsureHttpClient(t),
 		)))
 		// The same paths as the production mux (buildHTTPMux), not its
-		// middleware chain: the callback on both its spellings, ahead of the
-		// API catch-all.
+		// middleware chain: the callback on both its spellings, then the API's
+		// mounts, under the prefix, the probes and the root alias.
 		mux := http.NewServeMux()
 		mux.Handle(api.IDPCallbackPattern, callback)
 		mux.Handle(api.IDPCallbackUpstreamPattern, callback)
-		mux.Handle("/", h.withServerLog(api.WithSessionStateNoStore(api.WithCSRFRequest(h.EnsureGeneratedServer(t)))))
+		api.MountAPI(mux, func(next http.Handler) http.Handler {
+			return h.withServerLog(api.WithSessionStateNoStore(api.WithCSRFRequest(next)))
+		}, h.EnsureAPIServers(t))
 		h.testServer.value = httptest.NewServer(mux)
 	}
 	return h.testServer.value
+}
+
+// APIBaseURL is where the test server answers the API: its origin, then
+// client.PathPrefix (ADR 077). A raw request builds its URL on it; the
+// generated client takes the origin (NewApiClient).
+func (h *Harness) APIBaseURL(t testing.TB) string {
+	t.Helper()
+	return h.EnsureTestServer(t).URL + client.PathPrefix
 }
 
 // withServerLog hands every request a logger collecting into the harness, the
@@ -74,14 +85,13 @@ func (h *Harness) withServerLog(next http.Handler) http.Handler {
 	})
 }
 
-func (h *Harness) EnsureGeneratedServer(t testing.TB) *generated.Server {
+func (h *Harness) EnsureAPIServers(t testing.TB) api.Servers {
 	t.Helper()
-	h.generatedServer.mutex.Lock()
-	defer h.generatedServer.mutex.Unlock()
+	h.apiServers.mutex.Lock()
+	defer h.apiServers.mutex.Unlock()
 
-	if h.generatedServer.value == nil {
-		var err error
-		h.generatedServer.value, err = generated.NewServer(
+	if h.apiServers.value == nil {
+		servers, err := api.NewServers(
 			h.EnsureHandler(t),
 			h.EnsureSecurityHandler(t),
 			generated.WithErrorHandler(api.OgenErrorHandler),
@@ -90,8 +100,9 @@ func (h *Harness) EnsureGeneratedServer(t testing.TB) *generated.Server {
 			generated.WithTracerProvider(api.NewOgenTracerProvider(otel.GetTracerProvider())),
 		)
 		require.NoError(t, err)
+		h.apiServers.value = &servers
 	}
-	return h.generatedServer.value
+	return *h.apiServers.value
 }
 
 // ConsoleOrigin is the test server's own origin, the one its

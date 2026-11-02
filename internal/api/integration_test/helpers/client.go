@@ -7,6 +7,7 @@ import (
 
 	"github.com/ogen-go/ogen/ogenerrors"
 	"github.com/stretchr/testify/require"
+	"github.com/zitadel/nextgen/api/client"
 	api "github.com/zitadel/nextgen/api/generated"
 	internalapi "github.com/zitadel/nextgen/internal/api"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -55,18 +56,20 @@ type ApiClient struct {
 	securitySource *FakeSecuritySource
 }
 
+// NewApiClient is a client for the API on the server at origin, under its
+// path prefix (ADR 077).
 func NewApiClient(
-	serverURL string,
+	origin string,
 ) (*ApiClient, error) {
 	securitySource := &FakeSecuritySource{}
-	client, err := api.NewClient(serverURL, securitySource,
+	c, err := client.New(origin, securitySource,
 		//egress:allow integration-test client talking to the server under test
 		api.WithClient(&http.Client{Transport: csrfTransport{source: securitySource}}))
 	if err != nil {
 		return nil, err
 	}
 	return &ApiClient{
-		Client:         client,
+		Client:         c,
 		securitySource: securitySource,
 	}, nil
 }

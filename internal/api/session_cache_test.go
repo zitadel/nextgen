@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/zitadel/nextgen/api/client"
 )
 
 func TestWithSessionStateNoStore(t *testing.T) {
@@ -36,17 +38,33 @@ func TestWithSessionStateNoStore(t *testing.T) {
 		{name: "flow submit read", method: http.MethodGet, path: "/flow/flow_1/submit", status: http.StatusOK},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			handler := WithSessionStateNoStore(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-				w.WriteHeader(tt.status)
-			}))
-			recorder := httptest.NewRecorder()
-			handler.ServeHTTP(recorder, httptest.NewRequest(tt.method, tt.path, nil))
+	// The API answers under its prefix and, until 1.0.0, at the root (ADR 077):
+	// every case holds for both spellings.
+	for _, prefix := range []string{client.PathPrefix, ""} {
+		for _, tt := range tests {
+			t.Run(prefix+" "+tt.name, func(t *testing.T) {
+				t.Parallel()
+				handler := WithSessionStateNoStore(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+					w.WriteHeader(tt.status)
+				}))
+				recorder := httptest.NewRecorder()
+				handler.ServeHTTP(recorder, httptest.NewRequest(tt.method, prefix+tt.path, nil))
 
-			assert.Equal(t, tt.status, recorder.Code)
-			assert.Equal(t, tt.wantHeader, recorder.Header().Get("Cache-Control"))
-		})
+				assert.Equal(t, tt.status, recorder.Code)
+				assert.Equal(t, tt.wantHeader, recorder.Header().Get("Cache-Control"))
+			})
+		}
+	}
+}
+
+// Only the prefix itself is cut: a path that merely starts with its letters,
+// or another prefix, names no session state.
+func TestWithSessionStateNoStoreCutsOnlyThePrefix(t *testing.T) {
+	t.Parallel()
+	for _, path := range []string{client.PathPrefix + "sessions/me", "/api/v2/sessions/me", "/api/sessions/me"} {
+		recorder := httptest.NewRecorder()
+		WithSessionStateNoStore(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})).
+			ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, path, nil))
+		assert.Empty(t, recorder.Header().Get("Cache-Control"), path)
 	}
 }

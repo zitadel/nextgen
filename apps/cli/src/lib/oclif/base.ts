@@ -37,7 +37,7 @@ import type {
   JsonEnvelope,
   SkippedEnvelope,
 } from "./types";
-import { shellOption } from "../shell";
+import { shellArg, shellOption, withoutOptions } from "../shell";
 
 /**
  * The colour variables, which `bin/run.js` sets from `--color`/`--no-color`
@@ -180,6 +180,16 @@ export abstract class BaseCommand extends Command {
     listenForInterrupt();
     const telemetryFlag = this.argv.includes("--no-telemetry") ? false : undefined;
     installUserAgent(buildUserAgent(processUserAgentFacts(this.config.version, telemetryFlag)));
+  }
+
+  /**
+   * This run again with `words`, as a destructive command's `--force` retry
+   * suggests it: `words` are its arguments as typed, and the directory goes on as
+   * {@link suggestUnscoped} puts it. A project command keeps its environment
+   * selector instead (`EnvironmentCommand`).
+   */
+  protected retryCommand(words: readonly string[]): SuggestedCommand {
+    return this.suggestUnscoped(withoutOptions(words, ["--cwd", "-c"]).map(shellArg).join(" "));
   }
 
   /**

@@ -173,6 +173,7 @@ which ships in this package.
 * [`zitadel origin rm PATTERN`](#zitadel-origin-rm-pattern)
 * [`zitadel policies get POLICY`](#zitadel-policies-get-policy)
 * [`zitadel policies list`](#zitadel-policies-list)
+* [`zitadel policies test [OPERATION]`](#zitadel-policies-test-operation)
 * [`zitadel preview`](#zitadel-preview)
 * [`zitadel preview list`](#zitadel-preview-list)
 * [`zitadel preview rm URL`](#zitadel-preview-rm-url)
@@ -225,6 +226,7 @@ USAGE
   $ zitadel api [OPERATION...] [--json] [-c <value>] [-s <value>]
     [-n] [--dry-run] [-v] [--debug] [--color] [--telemetry] [-X
     GET|POST|PUT|PATCH|DELETE] [-F <value>...] [--input <value>] [--paginate]
+    [-f]
 
 ARGUMENTS
   [OPERATION...]  An operationId (queryUsers) or a path (/users/query), then the
@@ -239,6 +241,10 @@ FLAGS
   -X, --method=GET|POST|PUT|PATCH|DELETE  The HTTP method, to choose among a
                                           path's operations.
   -c, --cwd=<value>                       Project directory to operate on.
+  -f, --force                             Call an operation that deletes,
+                                          revokes or rolls back without the
+                                          confirmation prompt. Required when
+                                          non-interactive.
   -n, --non-interactive                   Disable prompts. Required when
                                           scripting or running as an agent.
   -s, --server=<value>                    Override the resolved server URL.
@@ -858,7 +864,9 @@ FLAGS
   -e, --env=<value>       Environment to run against, e.g. production. Defaults
                           to ZITADEL_ENV, then the hosting platform's build
                           (VERCEL_ENV, or Netlify's CONTEXT), then development.
-  -m, --message=<value>   A short summary of what this release changes.
+  -m, --message=<value>   A short summary of what this release changes. Defaults
+                          to the pull request's title or the current commit's
+                          subject.
   -n, --non-interactive   Disable prompts. Required when scripting or running as
                           an agent.
   -s, --server=<value>    Override the resolved server URL.
@@ -1037,7 +1045,7 @@ Roll back to an earlier deployment.
 USAGE
   $ zitadel deployment rollback [DEPLOYMENT_ID] [--json] [-c <value>] [-s
     <value>] [-n] [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e
-    <value>] [--env-file <value>] [-f]
+    <value>] [--env-file <value>] [-f] [-m <value>]
 
 ARGUMENTS
   [DEPLOYMENT_ID]  The deployment to re-apply. Omit to undo the last deploy.
@@ -1047,8 +1055,9 @@ FLAGS
   -e, --env=<value>       Environment to run against, e.g. production. Defaults
                           to ZITADEL_ENV, then the hosting platform's build
                           (VERCEL_ENV, or Netlify's CONTEXT), then development.
-  -f, --force             Roll back without the confirmation prompt. Required
-                          when non-interactive.
+  -f, --force             Re-apply the deployment without the confirmation
+                          prompt. Required when non-interactive.
+  -m, --message=<value>   A short summary of why this rolls back.
   -n, --non-interactive   Disable prompts. Required when scripting or running as
                           an agent.
   -s, --server=<value>    Override the resolved server URL.
@@ -1085,14 +1094,18 @@ Verify local runtime and project state.
 ```
 USAGE
   $ zitadel doctor [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--fix] [--image <value>]
-    [--port <value>] [--runtime binary|docker] [-e <value>] [--env-file <value>]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [-f --fix] [--image
+    <value>] [--port <value>] [--runtime binary|docker] [-e <value>] [--env-file
+    <value>]
 
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
   -e, --env=<value>       Environment to run against, e.g. production. Defaults
                           to ZITADEL_ENV, then the hosting platform's build
                           (VERCEL_ENV, or Netlify's CONTEXT), then development.
+  -f, --force             With --fix, make repairs that replace an origin
+                          without the confirmation prompt. Required when
+                          non-interactive.
   -n, --non-interactive   Disable prompts. Required when scripting or running as
                           an agent.
   -s, --server=<value>    Override the resolved server URL.
@@ -1132,8 +1145,8 @@ USAGE
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
-  -f, --force            Remove the managed files without the confirmation
-                         prompt.
+  -f, --force            Remove the managed files and local state without the
+                         confirmation prompt. Required when non-interactive.
   -n, --non-interactive  Disable prompts. Required when scripting or running as
                          an agent.
   -s, --server=<value>   Override the resolved server URL.
@@ -2359,6 +2372,58 @@ EXAMPLES
   $ zitadel policies list --filter operation=equals:<value>
 ```
 
+## `zitadel policies test [OPERATION]`
+
+Run the test cases in .zitadel/policies/ against the policies
+
+```
+USAGE
+  $ zitadel policies test [OPERATION] [--json] [-c <value>] [-s <value>]
+    [-n] [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>]
+    [--env-file <value>] [--release <value>]
+
+ARGUMENTS
+  [OPERATION]  Test only this operation's policy, such as
+               auth.factor.password.set.
+
+FLAGS
+  -c, --cwd=<value>       Project directory to operate on.
+  -e, --env=<value>       Environment to run against, e.g. production. Defaults
+                          to ZITADEL_ENV, then the hosting platform's build
+                          (VERCEL_ENV, or Netlify's CONTEXT), then development.
+  -n, --non-interactive   Disable prompts. Required when scripting or running as
+                          an agent.
+  -s, --server=<value>    Override the resolved server URL.
+  -v, --verbose           Verbose logging.
+      --[no-]color        Colorize human output. Disable with --no-color;
+                          NO_COLOR and FORCE_COLOR are honored too.
+      --debug             Debug logging.
+      --dry-run           Preview without mutating files or the platform.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the
+                          process environment. A relative path is read from the
+                          current directory, not from --cwd. Cannot be combined
+                          with --env.
+      --release=<value>   Test the policies a release pins (rel_…) instead of
+                          the files in .zitadel/policies/.
+      --[no-]telemetry    Send anonymous usage analytics. Disable with
+                          --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Run the test cases in .zitadel/policies/ against the policies
+
+EXAMPLES
+  $ zitadel policies test
+
+  $ zitadel policies test auth.factor.password.set
+
+  $ zitadel policies test --release rel_01KXB7C2M4N7F0N9WD3P2E4YM7
+
+  $ zitadel policies test --json
+```
+
 ## `zitadel preview`
 
 Deploy a release from .zitadel/ to a pull-request build's preview URLs.
@@ -2367,13 +2432,16 @@ Deploy a release from .zitadel/ to a pull-request build's preview URLs.
 USAGE
   $ zitadel preview [--json] [-c <value>] [-s <value>] [-n]
     [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
-    <value>] [--origin <value>...] [--ttl <value>] [--strict]
+    <value>] [--origin <value>...] [--ttl <value>] [-m <value>] [--strict]
 
 FLAGS
   -c, --cwd=<value>        Project directory to operate on.
   -e, --env=<value>        Environment to run against, e.g. production. Defaults
                            to ZITADEL_ENV, then the hosting platform's build
                            (VERCEL_ENV, or Netlify's CONTEXT), then development.
+  -m, --message=<value>    A short summary of what this release changes.
+                           Defaults to the pull request's title or the current
+                           commit's subject.
   -n, --non-interactive    Disable prompts. Required when scripting or running
                            as an agent.
   -s, --server=<value>     Override the resolved server URL.
@@ -2408,6 +2476,8 @@ EXAMPLES
   $ zitadel preview --origin https://acme-git-sso-acmeinc.vercel.app
 
   $ zitadel preview --ttl 24h
+
+  $ zitadel preview -m 'add phone_number to human-user'
 ```
 
 ## `zitadel preview list`
@@ -2903,8 +2973,8 @@ FLAGS
   -e, --env=<value>       Environment to run against, e.g. production. Defaults
                           to ZITADEL_ENV, then the hosting platform's build
                           (VERCEL_ENV, or Netlify's CONTEXT), then development.
-  -f, --force             Revoke without the confirmation prompt. Required when
-                          non-interactive.
+  -f, --force             Revoke the release without the confirmation prompt.
+                          Required when non-interactive.
   -n, --non-interactive   Disable prompts. Required when scripting or running as
                           an agent.
   -s, --server=<value>    Override the resolved server URL.
@@ -2944,7 +3014,7 @@ USAGE
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
   -f, --force            Delete the local runtime and its data without the
-                         confirmation prompt.
+                         confirmation prompt. Required when non-interactive.
   -n, --non-interactive  Disable prompts. Required when scripting or running as
                          an agent.
   -s, --server=<value>   Override the resolved server URL.
@@ -3317,7 +3387,7 @@ USAGE
     [--dry-run] [-v] [--debug] [--color] [--telemetry] [-f] [--framework
     next|nuxt|tanstack-start|react|vue|solid-start|solid|sveltekit|svelte|qwik-r
     outer|qwik|angular] [--renderer react] [--dev-port <value>] [--skip-install]
-    [--preset password-first|passkey-first] [--use-case
+    [--git] [--preset password-first|passkey-first] [--use-case
     minimal|consumer|business] [--password-min-length <value>] [--sso
     google|custom] [--sso-client-id <value>] [--sso-slug <value>]
     [--sso-display-name <value>] [--sso-issuer <value>] [--sso-scopes <value>]
@@ -3327,8 +3397,8 @@ FLAGS
       Project directory to operate on.
 
   -f, --force
-      Overwrite managed files that already exist, and scaffold into a non-empty
-      directory.
+      Overwrite managed files that already exist, scaffold into a non-empty
+      directory, and remove the previous origin when --dev-port moves the app.
 
   -n, --non-interactive
       Disable prompts. Required when scripting or running as an agent.
@@ -3359,6 +3429,12 @@ FLAGS
       Framework to target.
       <options: next|nuxt|tanstack-start|react|vue|solid-start|solid|sveltekit|sve
       lte|qwik-router|qwik|angular>
+
+  --[no-]git
+      Commit the project setup writes, initialising a repository first when there
+      is none, so a release records the commit it was built from. Refuses a
+      repository that already has uncommitted work. Use --no-git to leave version
+      control alone.
 
   --password-min-length=<value>
       Minimum password length for the project's password policy, for example 12; 0
@@ -3874,8 +3950,8 @@ USAGE
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
-  -f, --force            Remove the managed files without the confirmation
-                         prompt.
+  -f, --force            Remove the managed files and local state without the
+                         confirmation prompt. Required when non-interactive.
   -n, --non-interactive  Disable prompts. Required when scripting or running as
                          an agent.
   -s, --server=<value>   Override the resolved server URL.

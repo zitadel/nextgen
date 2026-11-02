@@ -126,7 +126,7 @@ func (r *RuntimeResolver) resolve(ctx context.Context, projectID, origin string)
 		return r.resolutionForDefault(ctx, project, matched.origin)
 	}
 
-	dep, err := r.newestDeployment(ctx, projectID, matched.origin)
+	dep, err := r.deploymentOf(ctx, projectID, matched)
 	if err != nil {
 		return nil, err
 	}
@@ -165,6 +165,23 @@ func (r *RuntimeResolver) finish(ctx context.Context, project *domain.Project, o
 		Deployment: dep,
 		Release:    release,
 	}, nil
+}
+
+// deploymentOf is the deployment an admitted origin serves, nil for none: the
+// newest deployment to it, or for a live preview URL the one the live view
+// shows, so an older primary row on that URL never answers.
+func (r *RuntimeResolver) deploymentOf(ctx context.Context, projectID string, matched *matchedOrigin) (*domain.Deployment, error) {
+	if !matched.preview {
+		return r.newestDeployment(ctx, projectID, matched.origin)
+	}
+	dep, err := r.v2Pool.Statements().GetLiveDeployment(ctx, projectID, matched.origin, r.now())
+	if err != nil {
+		if isNoRowFound(err) {
+			return nil, nil
+		}
+		return nil, domain.ErrInternal(err).WithMessage("failed to read the preview's deployment")
+	}
+	return dep, nil
 }
 
 func (r *RuntimeResolver) newestDeployment(ctx context.Context, projectID, origin string) (*domain.Deployment, error) {

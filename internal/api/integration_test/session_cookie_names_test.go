@@ -13,6 +13,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/zitadel/nextgen/api/client"
 	internalapi "github.com/zitadel/nextgen/internal/api"
 	"github.com/zitadel/nextgen/internal/domain"
 )
@@ -23,12 +24,16 @@ import (
 // production chain's request-host middleware, so every request there counts
 // as https; this one runs behind it and the loopback-cookie middleware, in the
 // production order (buildHTTPMux), and a request without X-Forwarded-Proto is
-// plain http to a loopback host.
+// plain http to a loopback host. The API answers under its prefix (ADR 077).
 func TestSessionCookieNames(t *testing.T) {
 	t.Parallel()
 
-	server := httptest.NewServer(internalapi.WithRequestHostMiddleware(internalapi.WithLoopbackSessionCookie(
-		internalapi.WithSessionStateNoStore(internalapi.WithCSRFRequest(harness.EnsureGeneratedServer(t))))))
+	mux := http.NewServeMux()
+	internalapi.MountAPI(mux, func(next http.Handler) http.Handler {
+		return internalapi.WithRequestHostMiddleware(internalapi.WithLoopbackSessionCookie(
+			internalapi.WithSessionStateNoStore(internalapi.WithCSRFRequest(next))))
+	}, harness.EnsureAPIServers(t))
+	server := httptest.NewServer(mux)
 	t.Cleanup(server.Close)
 
 	project, _, cookie := ownSessionUser(t)
@@ -36,7 +41,7 @@ func TestSessionCookieNames(t *testing.T) {
 
 	do := func(t *testing.T, method, path string, https bool, cookies string, header http.Header) *http.Response {
 		t.Helper()
-		req, err := http.NewRequestWithContext(t.Context(), method, server.URL+path, nil)
+		req, err := http.NewRequestWithContext(t.Context(), method, server.URL+client.PathPrefix+path, nil)
 		require.NoError(t, err)
 		for name, values := range header {
 			req.Header[name] = values
@@ -102,7 +107,7 @@ func TestSessionCookieNames(t *testing.T) {
 				body, err := json.Marshal(map[string]string{"handoff_token": handedOffAttempt(t, project, tc.name)})
 				require.NoError(t, err)
 				req, err := http.NewRequestWithContext(t.Context(), http.MethodPost,
-					server.URL+"/sessions/exchange?project_id="+project.ID, bytes.NewReader(body))
+					server.URL+client.PathPrefix+"/sessions/exchange?project_id="+project.ID, bytes.NewReader(body))
 				require.NoError(t, err)
 				req.Header.Set("Content-Type", "application/json")
 				req.Header.Set("Authorization", "Bearer "+secret)

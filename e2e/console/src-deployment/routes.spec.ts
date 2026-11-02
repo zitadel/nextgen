@@ -7,10 +7,10 @@ import { unlistedInlineScripts } from "../support/policy";
  * console service at /console/, the server's runtime document under that
  * path, and the old /ui/console links sent on. A wrong rule shows here by
  * name, where the browser test (console.browser.spec.ts) only times out on a
- * blank page. It also holds the Mixpanel proxy the CLI's usage analytics and
- * the server's service ping go through, which no other suite reaches, what
- * answers a path no service serves, and the security headers each service's
- * responses carry.
+ * blank page. It also holds the API's prefix, the server's own root paths and
+ * nothing else, the Mixpanel proxy the CLI's usage analytics and the server's
+ * service ping go through, which no other suite reaches, what answers a path
+ * no service serves, and the security headers each service's responses carry.
  */
 
 test("the server answers /console/runtime.json, under the console's path", async ({ request }) => {
@@ -51,10 +51,31 @@ test("/console and the old /ui/console links redirect, query kept", async ({ req
   expect(wrong).toEqual([]);
 });
 
+test("/api/v1/* is the server's API, and its root paths say they are deprecated", async ({
+  request,
+}) => {
+  // vercel.json sends /api/* to the server ahead of every other service
+  // (ADR 077). Until 1.0.0 the server also answers the API's root paths,
+  // through one rule for its resources' names, with a Deprecation header.
+  // Signed out, both spellings refuse GET /users/me with the API's envelope.
+  for (const route of ["/api/v1/users/me", "/users/me"]) {
+    const response = await request.get(route, { headers: { accept: "application/json" } });
+    expect(response.status(), route).toBe(401);
+    expect(await response.json(), route).toMatchObject({ code: "auth.unauthorized" });
+    const deprecation = response.headers().deprecation;
+    if (route.startsWith("/api/v1/")) {
+      expect(deprecation, route).toBeUndefined();
+    } else {
+      expect(deprecation, route).toMatch(/^@\d+$/);
+      expect(response.headers().link, route).toContain('rel="deprecation"');
+    }
+  }
+});
+
 test("/telemetry/mixpanel/* reaches Mixpanel's EU API", async ({ request }) => {
   // The CLI's usage analytics and the service ping go here
   // (apps/cli/src/lib/telemetry/config.ts, internal/serviceping).
-  // Without a token Mixpanel records nothing and says so; the server's
+  // Without a token Mixpanel records nothing and says so; the website's
   // catch-all would answer with anything but this.
   const events = [{ event: "route_probe", properties: {} }];
   const response = await request.post("/telemetry/mixpanel/track?verbose=1", {
@@ -64,16 +85,45 @@ test("/telemetry/mixpanel/* reaches Mixpanel's EU API", async ({ request }) => {
   expect(await response.json()).toEqual({ error: "token, missing or empty", status: 0 });
 });
 
-// A path no service answers reaches the server: a browser gets its error page
-// and a program its envelope, and both quote Vercel's ID for the request, the
-// one Vercel's logs file it under (ADR 076). The response's x-vercel-id is no
-// match for it on a protected preview, which answers through one more hop
-// with an ID of its own that Vercel does not log, so the check asks only that
-// the server quotes one of Vercel's IDs, not a req_ ID it minted.
-test("a path no service answers: a page for a browser, the envelope for a program", async ({
+// The server answers its own paths and nothing more (vercel.json): a path
+// under its root names that no operation serves reaches it, a path no service
+// claims reaches the website, and a junk path never wakes the server's
+// function (ADR 076, as amended).
+test("the server gets its own root paths, the website every other", async ({ request }) => {
+  const server = ["/livez", "/readyz", "/api/v1/readyz"];
+  const website = ["/robots.txt", "/.env", "/wp-login.php", "/userss/me"];
+  const wrong: string[] = [];
+  for (const path of server) {
+    const response = await request.get(path);
+    // Every response of the server carries its request ID (ADR 076 §3).
+    if (response.status() !== 200 || !response.headers()["x-request-id"]) {
+      wrong.push(`${path}: ${response.status()}, want the server's 200`);
+    }
+  }
+  for (const path of website) {
+    const response = await request.get(path, { headers: { accept: "text/html" } });
+    if (
+      response.status() !== 404 ||
+      response.headers()["x-request-id"] ||
+      !(await response.text()).includes("Page not found")
+    ) {
+      wrong.push(`${path}: ${response.status()}, want the website's 404`);
+    }
+  }
+  expect(wrong).toEqual([]);
+});
+
+// A path under the API's prefix that no operation matches reaches the server:
+// a browser gets its error page and a program its envelope, and both quote
+// Vercel's ID for the request, the one Vercel's logs file it under (ADR 076).
+// The response's x-vercel-id is no match for it on a protected preview, which
+// answers through one more hop with an ID of its own that Vercel does not log,
+// so the check asks only that the server quotes one of Vercel's IDs, not a
+// req_ ID it minted.
+test("an API path nothing serves: a page for a browser, the envelope for a program", async ({
   request,
 }) => {
-  const path = "/no-such-page-routes-spec";
+  const path = "/api/v1/no-such-page-routes-spec";
   // Five characters, the Unix time in milliseconds, twelve hex digits.
   const vercelRequestID = /^[0-9a-z]{5}-\d{13}-[0-9a-f]{12}$/;
 
@@ -91,6 +141,19 @@ test("a path no service answers: a page for a browser, the envelope for a progra
   expect(await envelope.json()).toEqual({ code: "req.not_found", message: expect.any(String) });
 });
 
+// A path no service claims is the website's: its 404 page answers browsers
+// and programs alike, in the website's chrome with ADR 076 §4's copy. A
+// program finds the API under its prefix, where the server answers.
+test("a path no service answers gets the website's 404", async ({ request }) => {
+  for (const accept of ["text/html", "application/json"]) {
+    const response = await request.get("/no-such-page-routes-spec", { headers: { accept } });
+    expect(response.status(), accept).toBe(404);
+    const html = await response.text();
+    expect(html, accept).toContain("Page not found");
+    expect(html, accept).toContain("There is nothing at this address.");
+  }
+});
+
 // The edge sets the same shared headers on every response, whichever service
 // answers it, the Mixpanel proxy's too; only vercel.json's own redirects,
 // which have no body, go without. A service that sets one as well sends the
@@ -104,6 +167,7 @@ test("every service's responses carry the security headers", async ({ request })
     "/console/users", // console service
     "/console/runtime.json", // server
     "/sessions/me",
+    "/api/v1/no-such-page-routes-spec",
     "/no-such-page-routes-spec",
     "/schemas/v1/user-schema.json",
   ];
@@ -139,7 +203,14 @@ test("every service's responses carry the security headers", async ({ request })
 // beside the edge's X-Frame-Options.
 test("no service's page may be framed", async ({ request }) => {
   const wrong: string[] = [];
-  for (const path of ["/", "/changelog", "/docs", "/console/users", "/no-such-page-routes-spec"]) {
+  for (const path of [
+    "/",
+    "/changelog",
+    "/docs",
+    "/console/users",
+    "/api/v1/no-such-page-routes-spec",
+    "/no-such-page-routes-spec",
+  ]) {
     const response = await request.get(path, { headers: { accept: "text/html" } });
     const policy = response.headers()["content-security-policy"] ?? "(none)";
     if (!policy.includes("frame-ancestors 'none'")) wrong.push(`${path}: ${policy}`);
@@ -155,11 +226,18 @@ test("the website's pages list a hash for each of their inline scripts", async (
   const entry = (await changelog.text()).match(/href="(\/changelog\/[^"/]+)"/)?.[1];
   expect(entry, "a changelog entry's link").toBeDefined();
   const wrong: string[] = [];
-  for (const path of ["/", "/changelog", entry ?? ""]) {
+  // Its 404 too, which now answers every path no service claims.
+  const pages = [
+    { path: "/", status: 200 },
+    { path: "/changelog", status: 200 },
+    { path: entry ?? "", status: 200 },
+    { path: "/no-such-page-routes-spec", status: 404 },
+  ];
+  for (const { path, status } of pages) {
     const response = await request.get(path, { headers: { accept: "text/html" } });
     const policy = response.headers()["content-security-policy"] ?? "";
     const unlisted = unlistedInlineScripts(await response.text(), policy);
-    if (response.status() !== 200 || unlisted.length) {
+    if (response.status() !== status || unlisted.length) {
       wrong.push(`${path}: ${response.status()}, ${unlisted.length} inline scripts without a hash`);
     }
   }
@@ -180,8 +258,8 @@ test("the console's page carries its policies", async ({ request }) => {
   expect(response.headers()["content-security-policy-report-only"]).toContain("default-src 'self'");
 });
 
-// Where every page's policy sends its violations: the server's catch-all, ahead
-// of the API, takes a browser's report without a session. The report names no
+// Where every page's policy sends its violations: a rule of the server's own,
+// outside the API, takes a browser's report without a session. The report names no
 // violation, so the deployment logs none; the API would answer 404.
 test("/csp-report takes a violation report", async ({ request }) => {
   const response = await request.post("/csp-report", {

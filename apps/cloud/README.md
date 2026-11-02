@@ -11,12 +11,20 @@ deployment as six [services](https://vercel.com/docs/services):
 
 | Service | Root | What it is | Paths |
 |---|---|---|---|
-| `server` | `.` | the Go server on Vercel's Go preset, console off and left out of the build (`-tags noconsole`) | everything else, including `/console/runtime.json` |
+| `server` | `.` | the Go server on Vercel's Go preset, console off and left out of the build (`-tags noconsole`) | `/api/*`, the API, and everything else, including `/console/runtime.json` |
 | `console` | `apps/console` | the console SPA, built for `/console/` with Vercel Web Analytics and Speed Insights | `/console/*` |
 | `docs` | `apps/docs` | the docs site, Fumadocs on Next.js, with Vercel Web Analytics and Speed Insights | `/docs`, `/docs/*` |
 | `website` | `apps/website` | the front page and the changelog, on Next.js, with Vercel Web Analytics and Speed Insights | `/`, `/changelog`, `/changelog/*`, `/llms.txt`, `/_next/*`, `/favicon.ico`, `/favicons/*` |
 | `cloud-functions` | `apps/cloud-functions` | the hosted cloud's backend on Next.js: the console add-on's calls, BotID's check in front of the sign-in widget, Stripe's webhooks and the workflows ([ADR 084](../../docs/adrs/084-hosted-cloud-business-systems.md)) | `/cloud/*` |
 | `schemas` | `apps/cloud` | the built-in schemas, static files that [`scripts/render-builtin-schemas.mjs`](../../scripts/render-builtin-schemas.mjs) renders from the server's embedded copies | `/schemas/v1/*` |
+
+The API lives under `/api/v1`
+([ADR 077](../../docs/adrs/077-api-path-prefix.md)): the first rewrite sends
+`/api/*` to the server, so no other service can take a path there. Until
+1.0.0 the server also answers the API's root paths, with a `Deprecation`
+header, through one rule that names the API's resources. Apart from those and
+its own root paths, nothing reaches the server: every other path is the
+website's.
 
 The console is served on the same origin, so the session cookie and CSRF work
 unchanged, but at `/console/` rather than a self-hosted server's
@@ -32,7 +40,8 @@ docs link the same set at `/favicons/`
 ([`apps/website/AGENTS.md`](../website/AGENTS.md)). The `schemas` service
 publishes the built-in schemas the server names under
 `https://zitadel.com/schemas/v1`: `/schemas/v1/user-schema.json` answers with
-the document whose `$id` is that URL, while the API keeps `/schemas` and
+the document whose `$id` is that URL, while the API keeps
+`/api/v1/schemas` and `/api/v1/schemas/{id}`, and until 1.0.0 `/schemas` and
 `/schemas/{id}` (the runbook's
 [Built-in schemas](../../docs/runbooks/cloud.md#built-in-schemas)).
 

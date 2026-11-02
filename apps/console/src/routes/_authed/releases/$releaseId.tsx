@@ -5,7 +5,7 @@ import { Fragment, type ReactNode, useState } from "react";
 import { api } from "@/api/zitadel";
 import { DeploySheet } from "@/components/deploy-sheet";
 import { MetaCard, MetaRule, MetaValue } from "@/components/detail-meta";
-import { DetailPanel, DetailSection, PanelTitle } from "@/components/detail-page";
+import { DetailPanel, DetailRow, DetailSection, PanelTitle } from "@/components/detail-page";
 import { DocumentViewer } from "@/components/document-viewer";
 import { Page } from "@/components/layout";
 import { ReleaseDeployments } from "@/components/release-deployments";
@@ -31,6 +31,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { formatDate } from "@/lib/date";
 import { type Deployment, listReleaseDeployments } from "@/lib/deployment";
+import type { PolicySetting } from "@/lib/policy";
 import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
 import {
   type PointerGroup,
@@ -256,19 +257,43 @@ function PointerGroupSection({ group }: { group: PointerGroup }) {
                 </Badge>
               </span>
             </AccordionTrigger>
-            <AccordionContent className="pt-4 pb-4">
+            <AccordionContent className="flex flex-col gap-4 pt-4 pb-4">
               {pointer.document === undefined ? (
                 <p className="text-sm text-muted-foreground">
                   This revision could not be read, so its document cannot be shown.
                 </p>
               ) : (
-                <DocumentViewer document={pointer.document} noun={group.noun} />
+                <>
+                  {pointer.settings?.length ? (
+                    <PolicySettingsRows settings={pointer.settings} />
+                  ) : null}
+                  <DocumentViewer document={pointer.document} noun={group.noun} />
+                </>
               )}
             </AccordionContent>
           </AccordionItem>
         ))}
       </Accordion>
     </section>
+  );
+}
+
+/**
+ * A policy's settings above its document, ruled off as the deployments below
+ * them are, with 12px from the text to each rule.
+ */
+function PolicySettingsRows({ settings }: { settings: PolicySetting[] }) {
+  return (
+    <div className="flex flex-col gap-3">
+      {settings.map((setting, index) => (
+        <Fragment key={setting.label}>
+          {index > 0 && <Separator />}
+          <DetailRow label={setting.label}>
+            <span className="min-w-0 text-sm leading-5 text-foreground">{setting.value}</span>
+          </DetailRow>
+        </Fragment>
+      ))}
+    </div>
   );
 }
 

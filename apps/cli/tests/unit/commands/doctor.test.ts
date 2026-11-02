@@ -1045,7 +1045,7 @@ describe("advisoryForWarnings", () => {
     expect(advice).toBeUndefined();
   });
 
-  it("suggests doctor --fix for an issuer held as a preview origin, in the directory doctor checked", () => {
+  it("suggests doctor --fix --force for an issuer held as a preview origin, in the directory doctor checked", () => {
     const issuerWarning = {
       name: "issuer-origin",
       status: "warn" as const,
@@ -1060,7 +1060,9 @@ describe("advisoryForWarnings", () => {
       environmentSelectorSuffix({ cwd: "apps/web" }),
     );
 
-    expect(advice?.nextCommands).toEqual([expectedPublicCliCommand("doctor --fix --cwd apps/web")]);
+    expect(advice?.nextCommands).toEqual([
+      expectedPublicCliCommand("doctor --fix --force --cwd apps/web"),
+    ]);
   });
 });
 

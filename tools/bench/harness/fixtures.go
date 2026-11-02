@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/go-faster/jx"
+	"github.com/zitadel/nextgen/api/client"
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
 	configdefaults "github.com/zitadel/nextgen/packages/config/defaults"
@@ -138,7 +139,7 @@ func deployProject(ctx context.Context, c *api.Client, projectID, schema string)
 func Bootstrap(ctx context.Context, base, lane string, fx Fixture) (Target, error) {
 	creds := NewCredentials("")
 	//egress:allow benchmark harness provisioning the server under test
-	c, err := api.NewClient(base, creds, api.WithClient(originDoer{origin: fx.Project.Origins[0].Pattern, client: &http.Client{Timeout: 30 * time.Second}}))
+	c, err := client.New(base, creds, api.WithClient(originDoer{origin: fx.Project.Origins[0].Pattern, client: &http.Client{Timeout: 30 * time.Second}}))
 	if err != nil {
 		return Target{}, err
 	}

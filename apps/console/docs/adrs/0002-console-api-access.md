@@ -4,7 +4,9 @@
 > **Date:** 2026-06-29 (accepted 2026-06-30; revised 2026-08-12 — §1/§4: the
 > Go-side `/api` shim is withdrawn, the production API base is the origin
 > root; revised 2026-08-13 — the first-party session cookie is the embedded
-> Console's operator credential)
+> Console's operator credential; revised 2026-10-25 — the server serves the
+> API under `/api/v1` (root ADR 077), so the base is empty under the dev
+> server too and its proxy forwards `/api/v1` unchanged)
 > **Scope:** `apps/console` only. See [`apps/console/AGENTS.md`](../../AGENTS.md).
 > **Context:** Console shell layout, navigation, and resource list pages
 > (issue [#440](https://github.com/zitadel/nextgen/issues/440)).
@@ -90,12 +92,12 @@ on either, and no credential added by the dev proxy.
 ```mermaid
 flowchart LR
   browser["Console SPA (browser)\nno secret"]
-  proxy["Vite dev server /api\nstrips the prefix, adds nothing"]
-  apiHandler["ogen API handler\n(Go binary, origin root)"]
+  proxy["Vite dev server /api/v1\nforwards it unchanged, adds nothing"]
+  apiHandler["ogen API handler\n(Go binary, /api/v1)"]
 
-  browser -->|"dev: /api/... , session cookie"| proxy
-  proxy -->|"/... , session cookie"| apiHandler
-  browser -->|"prod: /... , publishable key + session cookie"| apiHandler
+  browser -->|"dev: /api/v1/... , session cookie"| proxy
+  proxy -->|"/api/v1/... , session cookie"| apiHandler
+  browser -->|"prod: /api/v1/... , publishable key + session cookie"| apiHandler
 ```
 
 The console's contract is therefore: **call the API at a same-origin base path
@@ -192,29 +194,29 @@ environment**. What differs is only _where on that origin_ the API sits, and
 that follows from who serves the console:
 
 - **Production** — the built console is embedded in the Go binary, which
-  serves the ogen API at the origin **root**. The base is `""`: the console
-  calls `/flow`, `/sessions/me`, … directly. Nothing is mounted at `/api`
-  and nothing needs to be (§1).
+  serves the ogen API under `/api/v1` (root ADR 077). The base is `""`: the
+  generated client calls `/api/v1/flow`, `/api/v1/sessions/me`, … on the
+  same origin.
 - **Dev** — Vite serves the console on `:5174`, the API is on `:8080`. The
-  console calls a same-origin `/api` path that the Vite dev server proxies
-  to the Go server, so the browser still holds no project secret or
-  script-readable bearer:
+  console calls the same `/api/v1` paths on Vite's origin, and the Vite dev
+  server proxies them to the Go server unchanged, so the browser still holds
+  no project secret or script-readable bearer:
 
 ```ts
 // vite.config.ts (dev only) — illustrative
 server: {
   proxy: {
-    // Vite proxy strips the /api prefix and forwards to the Go API; no credential
-    "/api": { target: "http://localhost:8080", changeOrigin: true },
+    // Forwards /api/v1 to the Go API as it is; no credential
+    "^/api/v1(/|$)": { target: "http://localhost:8080", changeOrigin: true },
   },
 },
 ```
 
 So dev and prod differ only in whether a proxy sits in front of the API, never
 in whether the browser holds a secret — it never does. The base resolves in
-`src/api/zitadel.ts` as `VITE_CONSOLE_API_BASE || (DEV ? "/api" : "")`: the
-env var is the escape hatch for a deployment that mounts the API elsewhere,
-`/api` is the dev-proxy path, and root is what the embedded build talks to.
+`src/api/zitadel.ts` as `VITE_CONSOLE_API_BASE || ""`: the env var is the
+escape hatch for a deployment that puts the server behind a path or on
+another origin, in front of `/api/v1`.
 `vite preview` deliberately proxies nothing, so it cannot be mistaken for the
 production path — which also means it cannot _prove_ it; that job belongs to
 the embedded lane (`e2e:console-embedded`), which serves the console from

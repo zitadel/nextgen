@@ -33,7 +33,16 @@ const spannerURLEnv = "ZITADEL_TEST_SPANNER_URL"
 // than one of the caller's own. A test that must not disturb other packages'
 // schema skips on it.
 func SpannerSharesDatabase() bool {
-	return strings.TrimSpace(os.Getenv(instanceEnv)) == "" && os.Getenv(spannerURLEnv) != ""
+	return !SpannerProvisions() && os.Getenv(spannerURLEnv) != ""
+}
+
+// SpannerProvisions reports whether each SpannerDSN call provisions a database
+// of its own on the instance ZITADEL_TEST_SPANNER_INSTANCE names, so a test
+// may work in several at once. The emulator SpannerDSN starts otherwise
+// serves one schema change at a time, and SpannerDSN points the process-wide
+// SPANNER_EMULATOR_HOST at it.
+func SpannerProvisions() bool {
+	return strings.TrimSpace(os.Getenv(instanceEnv)) != ""
 }
 
 // SpannerDSN returns a Spanner database DSN for integration tests. Precedence:
@@ -50,7 +59,7 @@ func SpannerSharesDatabase() bool {
 // (internal/storage/testdb/spannerabort), which drives transactions through the
 // abort-retry path (#788) on Omni, the emulator or a real instance alike.
 func SpannerDSN(ctx context.Context) (string, func(), error) {
-	if strings.TrimSpace(os.Getenv(instanceEnv)) != "" {
+	if SpannerProvisions() {
 		return provision(ctx)
 	}
 	if SpannerSharesDatabase() {

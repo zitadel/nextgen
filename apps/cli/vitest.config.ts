@@ -38,7 +38,12 @@ export default defineConfig({
     include: ["tests/**/*.{test,spec}.ts"],
     // `offline.ts` first: it fails any test that connects past loopback, so a
     // unit test or spec cannot reach a real server, Zitadel's or anyone's.
-    setupFiles: ["./tests/helpers/offline.ts", "./tests/helpers/matchers.ts"],
+    setupFiles: [
+      "./tests/helpers/offline.ts",
+      "./tests/helpers/matchers.ts",
+      "./tests/helpers/timers.ts",
+      "./tests/helpers/console.ts",
+    ],
     // Every file running at the same time takes its ports from a block of its
     // own (tests/helpers/ports.ts), and there are PORT_WORKERS blocks. Vitest's
     // default of a worker per core but one would outnumber them on a bigger

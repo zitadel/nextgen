@@ -277,6 +277,10 @@ describe("requiresProjectSecret", () => {
     expect(requiresProjectSecret("POST", "/sessions/exchange")).toBe(true);
   });
 
+  it("allows the secret on the handoff exchange under the API prefix", () => {
+    expect(requiresProjectSecret("POST", "/api/v1/sessions/exchange")).toBe(true);
+  });
+
   it("matches the method case-insensitively", () => {
     expect(requiresProjectSecret("post", "/sessions/exchange")).toBe(true);
   });
@@ -289,6 +293,13 @@ describe("requiresProjectSecret", () => {
     ["POST", "/sessions/exchange/"],
     ["POST", "/sessions/exchangex"],
     ["POST", "/sessions"],
+    ["GET", "/api/v1/sessions/exchange"],
+    ["POST", "/api/v1"],
+    ["POST", "/api/v1/"],
+    ["POST", "/api/v1x/sessions/exchange"],
+    ["POST", "/api/sessions/exchange"],
+    ["POST", "/api/v1/api/v1/sessions/exchange"],
+    ["POST", "/v1/sessions/exchange"],
   ])("withholds the secret from %s %s", (method, pathname) => {
     expect(requiresProjectSecret(method, pathname)).toBe(false);
   });
@@ -360,7 +371,7 @@ describe("opaque session tokens", () => {
       await checkOpaqueSessionToken("tok", "http://auth.test", 1000, PROJECT);
 
       expect(fetchMock).toHaveBeenCalledWith(
-        "http://auth.test/sessions/me?project_id=proj_app",
+        "http://auth.test/api/v1/sessions/me?project_id=proj_app",
         expect.objectContaining({ headers: { cookie: "__Host-zitadel_session=tok" } }),
       );
     });
@@ -371,7 +382,7 @@ describe("opaque session tokens", () => {
       await checkOpaqueSessionToken("tok", "http://auth.test/", 1000, PROJECT);
 
       expect(fetchMock).toHaveBeenCalledWith(
-        "http://auth.test/sessions/me?project_id=proj_app",
+        "http://auth.test/api/v1/sessions/me?project_id=proj_app",
         expect.anything(),
       );
     });
@@ -477,8 +488,31 @@ describe("opaque session tokens", () => {
 
       expect(warn).toHaveBeenCalledWith(
         expect.stringContaining(
-          "http://auth.test/sessions/me (TypeError: fetch failed: connect ECONNREFUSED 127.0.0.1:4000)",
+          "http://auth.test/api/v1/sessions/me (TypeError: fetch failed: connect ECONNREFUSED 127.0.0.1:4000)",
         ),
+      );
+    });
+
+    it("says a backend without the operation is older than the SDK", async () => {
+      backend(Response.json({ code: "req.not_found" }, { status: 404 }));
+
+      expect(await checkOpaqueSessionToken("tok", "http://auth.test", 1000, PROJECT)).toEqual({
+        verdict: "undecided",
+      });
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining("does not serve the API under /api/v1"),
+      );
+    });
+
+    it("asks a backend url given with the API prefix once", async () => {
+      const fetchMock = vi.fn(async () => Response.json({ project_id: PROJECT, user_id: "u1" }));
+      vi.stubGlobal("fetch", fetchMock);
+
+      await checkOpaqueSessionToken("tok", "http://auth.test/api/v1/", 1000, PROJECT);
+
+      expect(fetchMock).toHaveBeenCalledWith(
+        `http://auth.test/api/v1/sessions/me?project_id=${PROJECT}`,
+        expect.anything(),
       );
     });
 
@@ -820,18 +854,43 @@ describe("proxySessionCookies", () => {
   describe("a session kept under the server's name", () => {
     const PROBE = { method: "GET", path: "/sessions/me", search: `?project_id=${PROJECT}` };
 
-    it("goes up to the session probe of this project", () => {
+    it.each(["/sessions/me", "/api/v1/sessions/me"])(
+      "goes up to the session probe of this project at %s",
+      (path) => {
+        const cookies = proxySessionCookies(
+          proxied({ ...PROBE, path, cookie: `${SHARED}=old` }),
+          PROJECT,
+          UPSTREAM,
+        );
+
+        expect(cookies.upstreamCookie).toBe("__Host-zitadel_session=old");
+      },
+    );
+
+    it("is copied to the project's cookie when the probe under the API prefix signs its user in", async () => {
+      const expiresAt = new Date(Date.now() + 3_600_000).toISOString();
       const cookies = proxySessionCookies(
-        proxied({ ...PROBE, cookie: `${SHARED}=old` }),
+        proxied({ ...PROBE, path: "/api/v1/sessions/me", cookie: `${SHARED}=old` }),
         PROJECT,
         UPSTREAM,
       );
 
-      expect(cookies.upstreamCookie).toBe("__Host-zitadel_session=old");
+      const { setCookies } = await cookies.toBrowser(
+        answer(200, { project_id: PROJECT, user_id: "u1", expires_at: expiresAt }),
+      );
+
+      expect(setCookies).toHaveLength(1);
+      expect(setCookies[0]).toMatch(
+        new RegExp(`^${OWN}=old; Path=/; Max-Age=(3599|3600); HttpOnly; SameSite=Lax$`),
+      );
     });
 
     it.each([
       ["DELETE /sessions/me", { method: "DELETE", path: "/sessions/me", search: PROBE.search }],
+      [
+        "DELETE /api/v1/sessions/me",
+        { method: "DELETE", path: "/api/v1/sessions/me", search: PROBE.search },
+      ],
       ["the probe without a project", { method: "GET", path: "/sessions/me", search: "" }],
       [
         "the probe of another project",
@@ -839,6 +898,14 @@ describe("proxySessionCookies", () => {
       ],
       ["GET /sessions/me/csrf", { method: "GET", path: "/sessions/me/csrf", search: "" }],
       ["GET /users/me", { method: "GET", path: "/users/me", search: "" }],
+      [
+        "the probe under a doubled prefix",
+        { method: "GET", path: "/api/v1/api/v1/sessions/me", search: PROBE.search },
+      ],
+      [
+        "the probe under another prefix",
+        { method: "GET", path: "/api/v2/sessions/me", search: PROBE.search },
+      ],
     ])("stays back from %s", (_label, request) => {
       const cookies = proxySessionCookies(
         proxied({ ...request, cookie: `${SHARED}=old` }),
@@ -979,7 +1046,7 @@ describe("proxySessionCookies", () => {
         if (init?.method === "DELETE") {
           return revoke();
         }
-        return new URL(url).pathname === "/sessions/me/csrf" ? csrf() : check();
+        return new URL(url).pathname === "/api/v1/sessions/me/csrf" ? csrf() : check();
       });
       vi.stubGlobal("fetch", fetchMock);
       return fetchMock;
@@ -1002,14 +1069,14 @@ describe("proxySessionCookies", () => {
       expect(cookies.upstreamCookie).toBe("__Host-zitadel_session=current");
       expect(setCookies).toEqual([CLEARED_OWN, CLEARED_SHARED]);
       expect(fetchMock).toHaveBeenCalledWith(
-        `http://auth.test/sessions/me?project_id=${PROJECT}`,
+        `http://auth.test/api/v1/sessions/me?project_id=${PROJECT}`,
         expect.objectContaining({
           method: "GET",
           headers: { cookie: "__Host-zitadel_session=earlier" },
         }),
       );
       expect(fetchMock).toHaveBeenCalledWith(
-        "http://auth.test/sessions/me",
+        "http://auth.test/api/v1/sessions/me",
         expect.objectContaining({
           method: "DELETE",
           headers: expect.objectContaining({ cookie: "__Host-zitadel_session=earlier" }),
@@ -1051,7 +1118,7 @@ describe("proxySessionCookies", () => {
 
       expect(fetchMock).toHaveBeenNthCalledWith(
         2,
-        `http://auth.test/sessions/me/csrf?project_id=${PROJECT}`,
+        `http://auth.test/api/v1/sessions/me/csrf?project_id=${PROJECT}`,
         expect.objectContaining({
           method: "GET",
           headers: { cookie: "__Host-zitadel_session=earlier" },
@@ -1059,7 +1126,7 @@ describe("proxySessionCookies", () => {
       );
       expect(fetchMock).toHaveBeenNthCalledWith(
         3,
-        "http://auth.test/sessions/me",
+        "http://auth.test/api/v1/sessions/me",
         expect.objectContaining({
           method: "DELETE",
           headers: { cookie: "__Host-zitadel_session=earlier", "X-Zitadel-CSRF": CSRF_TOKEN },
@@ -1105,11 +1172,40 @@ describe("proxySessionCookies", () => {
       await cookies.toBrowser(answer(204, null, [SERVER_CLEARED]));
 
       expect(fetchMock.mock.calls.map(([url, init]) => [String(url), init?.method])).toEqual([
-        [`http://auth.test/sessions/me?project_id=${PROJECT}`, "GET"],
-        [`http://auth.test/sessions/me/csrf?project_id=${PROJECT}`, "GET"],
-        ["http://auth.test/sessions/me", "DELETE"],
+        [`http://auth.test/api/v1/sessions/me?project_id=${PROJECT}`, "GET"],
+        [`http://auth.test/api/v1/sessions/me/csrf?project_id=${PROJECT}`, "GET"],
+        ["http://auth.test/api/v1/sessions/me", "DELETE"],
       ]);
     });
+
+    it.each([
+      [
+        "sign-out",
+        { ...SIGN_OUT, path: "/api/v1/sessions/me" },
+        answer(204, null, [SERVER_CLEARED]),
+      ],
+      [
+        "sign-in",
+        { ...SIGN_IN, path: "/api/v1/sessions/exchange" },
+        answer(200, {}, [
+          "__Host-zitadel_session=new; Path=/; Max-Age=3600; HttpOnly; Secure; SameSite=Lax",
+        ]),
+      ],
+    ])(
+      "clears a second session of this project on %s under the API prefix",
+      async (_label, request, response) => {
+        server(() => Response.json({ project_id: PROJECT, user_id: "earlier" }));
+        const cookies = proxySessionCookies(
+          proxied({ ...request, cookie: `${OWN}=current; ${SHARED}=earlier` }),
+          PROJECT,
+          UPSTREAM,
+        );
+
+        const { setCookies } = await cookies.toBrowser(response);
+
+        expect(setCookies).toContain(CLEARED_SHARED);
+      },
+    );
 
     it("clears a session of this project on sign-in without ending it", async () => {
       const fetchMock = server(() => Response.json({ project_id: PROJECT, user_id: "earlier" }));
@@ -1195,7 +1291,7 @@ describe("proxySessionCookies", () => {
       expect(cookies.upstreamCookie).toBeNull();
       expect(setCookies).toEqual([CLEARED_SHARED]);
       expect(fetchMock).toHaveBeenCalledWith(
-        "http://auth.test/sessions/me",
+        "http://auth.test/api/v1/sessions/me",
         expect.objectContaining({ method: "DELETE" }),
       );
     });
@@ -1606,7 +1702,7 @@ describe("resolveSession", () => {
         cookies: [],
       });
       expect(fetchMock).toHaveBeenCalledWith(
-        `${OPTIONS.url}/sessions/me?project_id=${PROJECT}`,
+        `${OPTIONS.url}/api/v1/sessions/me?project_id=${PROJECT}`,
         expect.anything(),
       );
     });

@@ -111,8 +111,24 @@ describe("variable rm", () => {
         const result = await app.run(["variable", "rm", "FOO", "--json"]);
 
         expect(result).toFailWith("E_VALIDATION");
+      });
+
+      it("says to pass --force", async () => {
+        const app = await aSetUpApp();
+        expect(await app.setVariable("FOO", "bar")).toSucceed();
+
+        const result = await app.run(["variable", "rm", "FOO", "--json"]);
+
         expect(result).toHintAt("--force");
-        expect(result).toSuggest("variable rm FOO --force");
+      });
+
+      it("suggests running it again with --force", async () => {
+        const app = await aSetUpApp();
+        expect(await app.setVariable("FOO", "bar")).toSucceed();
+
+        const result = await app.run(["variable", "rm", "FOO", "--json"]);
+
+        expect(result).toSuggestExactly(app.againAsRun("variable rm FOO --force"));
       });
 
       it("removes nothing", async () => {

@@ -166,9 +166,55 @@ describe("doctor", () => {
         const app = await aSetUpApp();
         await app.hasItsIssuerAsAPreviewOrigin();
 
-        await app.doctor(["--fix"]);
+        await app.doctor(["--fix", "--force"]);
 
         expect(await app.projectOrigins()).toEqual([SETUP_ORIGIN]);
+      });
+
+      describe("without --force when no one can be asked", () => {
+        it("still succeeds", async () => {
+          const app = await aSetUpApp();
+          await app.hasItsIssuerAsAPreviewOrigin();
+
+          const result = await app.doctor(["--fix"]);
+
+          expect(result).toSucceed();
+        });
+
+        it("says to pass --force", async () => {
+          const app = await aSetUpApp();
+          await app.hasItsIssuerAsAPreviewOrigin();
+
+          const result = await app.doctor(["--fix"]);
+
+          expect(result).toSay("Pass --force to replace the preview origin");
+        });
+
+        it("suggests running it again with --force", async () => {
+          const app = await aSetUpApp();
+          await app.hasItsIssuerAsAPreviewOrigin();
+
+          const result = await app.doctor(["--fix"]);
+
+          expect(result).toSuggestExactly(app.againAsRun("doctor --fix --force"));
+        });
+
+        it("replaces nothing", async () => {
+          const app = await aSetUpApp();
+          await app.hasItsIssuerAsAPreviewOrigin();
+
+          await app.doctor(["--fix"]);
+
+          expect(await app.projectOrigins()).toEqual([{ ...SETUP_ORIGIN, kind: "preview" }]);
+        });
+      });
+
+      it("refuses --force without --fix", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.doctor(["--force"]);
+
+        expect(result).toFail();
       });
 
       it("removes nothing while repairing", async () => {

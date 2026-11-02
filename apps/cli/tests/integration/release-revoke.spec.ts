@@ -124,19 +124,45 @@ describe("release revoke", () => {
         expect(result).toFailWith("E_CONFLICT");
       });
 
-      it("requires --force when non-interactive", async () => {
-        const app = await aSetUpApp();
-        const releaseId = await aRelease(app);
+      describe("without --force when no one can be asked", () => {
+        it("is refused", async () => {
+          const app = await aSetUpApp();
+          const releaseId = await aRelease(app);
 
-        const result = await app.run([
-          "release",
-          "revoke",
-          releaseId,
-          "--non-interactive",
-          "--json",
-        ]);
+          const result = await app.run(["release", "revoke", releaseId, "--json"]);
 
-        expect(result).toFailWith("E_VALIDATION");
+          expect(result).toFailWith("E_VALIDATION");
+        });
+
+        it("says to pass --force", async () => {
+          const app = await aSetUpApp();
+          const releaseId = await aRelease(app);
+
+          const result = await app.run(["release", "revoke", releaseId, "--json"]);
+
+          expect(result).toHintAt("--force");
+        });
+
+        it("suggests running it again with --force", async () => {
+          const app = await aSetUpApp();
+          const releaseId = await aRelease(app);
+
+          const result = await app.run(["release", "revoke", releaseId, "--json"]);
+
+          expect(result).toSuggestExactly(app.againAsRun(`release revoke ${releaseId} --force`));
+        });
+
+        it("revokes nothing", async () => {
+          const app = await aSetUpApp();
+          await app.addPrimaryOrigin();
+          const releaseId = await aRelease(app);
+
+          await app.run(["release", "revoke", releaseId, "--json"]);
+
+          expect(
+            await app.run(["deployment", "create", "--release", releaseId, "--json"]),
+          ).toSucceed();
+        });
       });
     });
   });

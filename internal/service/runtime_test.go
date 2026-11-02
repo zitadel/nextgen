@@ -303,10 +303,7 @@ func TestRuntimeResolver_Resolve(t *testing.T) {
 		statements.EXPECT().GetPreview(gomock.Any(), projectID, ownOrigin).Return(&domain.Preview{
 			ProjectID: projectID, Origin: ownOrigin, ExpiresAt: time.Now().Add(time.Hour),
 		}, nil)
-		statements.EXPECT().GetNewestPerOrigin(gomock.Any(), projectID, []string{ownOrigin}).Return([]domain.OriginDeployment{{
-			Origin: ownOrigin, DeploymentID: "dep_1", ReleaseID: "rel_1", DeployedAt: time.Now(),
-		}}, nil)
-		statements.EXPECT().GetDeploymentByID(gomock.Any(), projectID, "dep_1").Return(&domain.Deployment{
+		statements.EXPECT().GetLiveDeployment(gomock.Any(), projectID, ownOrigin, gomock.Any()).Return(&domain.Deployment{
 			ID: "dep_1", ProjectID: projectID, ReleaseID: "rel_1",
 		}, nil)
 		releases.EXPECT().Get(gomock.Any(), projectID, "rel_1").Return(&domain.Release{
@@ -395,10 +392,7 @@ func TestRuntimeResolver_Resolve(t *testing.T) {
 		statements.EXPECT().GetPreview(gomock.Any(), projectID, previewURL).Return(&domain.Preview{
 			ProjectID: projectID, Origin: previewURL, ExpiresAt: time.Now().Add(time.Hour),
 		}, nil)
-		statements.EXPECT().GetNewestPerOrigin(gomock.Any(), projectID, []string{previewURL}).Return([]domain.OriginDeployment{{
-			Origin: previewURL, DeploymentID: "dep_1", ReleaseID: "rel_1", DeployedAt: time.Now(),
-		}}, nil)
-		statements.EXPECT().GetDeploymentByID(gomock.Any(), projectID, "dep_1").Return(&domain.Deployment{
+		statements.EXPECT().GetLiveDeployment(gomock.Any(), projectID, previewURL, gomock.Any()).Return(&domain.Deployment{
 			ID: "dep_1", ProjectID: projectID, ReleaseID: "rel_1",
 		}, nil)
 		releases.EXPECT().Get(gomock.Any(), projectID, "rel_1").Return(&domain.Release{

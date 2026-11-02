@@ -1,5 +1,5 @@
 import { Flags } from "@oclif/core";
-import type { ZitadelClient } from "@zitadel/api/client";
+import type { ZitadelClient } from "../../lib/api-client";
 import { ApiError } from "@zitadel/api/runtime/fetch";
 
 import {
@@ -273,7 +273,8 @@ export default class Preview extends PreviewCommand {
  */
 async function primaryOrigins(client: ZitadelClient, projectId: string): Promise<string[]> {
   try {
-    const origins = (await client.getProject(projectId)).origins ?? [];
+    const project = await client.getProject(projectId);
+    const origins = project.origins;
     return origins.filter((entry) => entry.kind === "primary").map((entry) => entry.pattern);
   } catch (error) {
     if (error instanceof ApiError && error.status === 403) {

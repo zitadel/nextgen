@@ -80,15 +80,36 @@ type MultiselectQuestion = Common & {
   required?: boolean;
 };
 
+/**
+ * Agreement to a destructive action, which `--force` gives without asking.
+ * Only `Consent.request` asks it: an `Asker` cannot, so a command reaches it
+ * through `Destructive` and gets a `Consent` back rather than a boolean.
+ */
 type ConfirmQuestion = Common & {
   kind: "confirm";
+};
+
+/**
+ * A plain yes or no, about nothing destructive ("Deploy it now?"). `--force`
+ * never answers it, whatever the command's `--force` means.
+ */
+type YesNoQuestion = Common & {
+  kind: "yes-no";
   initialValue?: boolean;
 };
 
-type Question = TextQuestion | SelectQuestion | MultiselectQuestion | ConfirmQuestion;
+type Question =
+  | TextQuestion
+  | SelectQuestion
+  | MultiselectQuestion
+  | YesNoQuestion
+  | ConfirmQuestion;
+
+/** The questions a command may ask itself: every kind but `confirm`. */
+type Askable = Exclude<Question, ConfirmQuestion>;
 
 /** What `input` returns for a question: it follows the question's kind. */
-type Answer<Q extends Question> = Q extends { kind: "confirm" }
+type Answer<Q extends Question> = Q extends { kind: "confirm" | "yes-no" }
   ? boolean
   : Q extends { kind: "multiselect"; options: Choice<infer V>[] }
     ? V[]
@@ -104,7 +125,7 @@ type Answer<Q extends Question> = Q extends { kind: "confirm" }
 type Session = {
   /** Whether a person is at a terminal to be asked. */
   interactive: boolean;
-  /** The command's `--force`: it answers a `confirm` without asking. */
+  /** The command's `--force`: it answers a `confirm` without asking, never a `yes-no`. */
   force: boolean;
   /** The stream piped input is read from. Defaults to the process's stdin. */
   stdin?: NodeJS.ReadableStream & { isTTY?: boolean };
@@ -114,7 +135,7 @@ type Session = {
  * `input` with the session already filled in, which is what a command's
  * `this.input` and the setup wizard's prompt context hand out.
  */
-export type Asker = <Q extends Question>(question: Q) => Promise<Answer<Q>>;
+export type Asker = <Q extends Askable>(question: Q) => Promise<Answer<Q>>;
 
 /**
  * The one way the CLI takes input from a person or a script. Every command
@@ -145,11 +166,12 @@ export type Asker = <Q extends Question>(question: Q) => Promise<Answer<Q>>;
  *   error. With `optional`, the answer may be `undefined` (see its docs).
  * - `select` returns the chosen option's `value`.
  * - `multiselect` returns the chosen options' `value`s.
+ * - `yes-no` returns a boolean. With no one to ask it throws "No <name>
+ *   supplied"; `force` never answers it.
  * - `confirm` returns a boolean. The session's `force` (the command's
  *   `--force`) answers it yes without asking. With no one to ask and no
  *   `force`, it throws an `E_VALIDATION` error saying `--force` is required.
- *   A command whose `--force` means something else must not hand out a
- *   session with `force` set.
+ *   Only `Consent.request` asks it.
  *
  * Cancelling a prompt (Ctrl-C) throws `E_CANCELLED` instead of returning a
  * sentinel, so a command never carries on with a missing answer, and exits
@@ -214,14 +236,22 @@ export async function input<Q extends Question>(question: Q, session: Session): 
           `Pass --force to ${q.name}.`,
         );
       }
-      const confirmed = await confirm({
-        message: q.message,
-        initialValue: q.initialValue ?? false,
-      });
+      const confirmed = await confirm({ message: q.message, initialValue: false });
       if (isCancel(confirmed)) {
         throw cancelled();
       }
       return confirmed;
+    }
+
+    if (q.kind === "yes-no") {
+      if (!session.interactive) {
+        throw unsupplied();
+      }
+      const answered = await confirm({ message: q.message, initialValue: q.initialValue ?? false });
+      if (isCancel(answered)) {
+        throw cancelled();
+      }
+      return answered;
     }
 
     if (q.kind === "select" || q.kind === "multiselect") {

@@ -178,7 +178,7 @@ func TestCreateTeamRawRequest(t *testing.T) {
 
 			body := helpers.MustMarshal(t, api.CreateTeamRequest{Name: tc.teamName})
 			req, err := http.NewRequestWithContext(t.Context(), http.MethodPost,
-				harness.EnsureTestServer(t).URL+"/teams?project_id="+url.QueryEscape(project.ID),
+				harness.APIBaseURL(t)+"/teams?project_id="+url.QueryEscape(project.ID),
 				strings.NewReader(body),
 			)
 			require.NoError(t, err)
@@ -608,7 +608,7 @@ func TestDeleteTeam(t *testing.T) {
 				t.Parallel()
 
 				req, err := http.NewRequestWithContext(t.Context(), http.MethodDelete,
-					harness.EnsureTestServer(t).URL+"/teams/"+tc.teamID,
+					harness.APIBaseURL(t)+"/teams/"+tc.teamID,
 					nil,
 				)
 				require.NoError(t, err)
@@ -1079,7 +1079,7 @@ func TestUpdateTeamRawRequest(t *testing.T) {
 
 			body := helpers.MustMarshal(t, api.UpdateTeamRequest{Name: api.NewOptString(tc.teamName)})
 			req, err := http.NewRequestWithContext(t.Context(), http.MethodPatch,
-				harness.EnsureTestServer(t).URL+"/teams/"+url.PathEscape(team.ID),
+				harness.APIBaseURL(t)+"/teams/"+url.PathEscape(team.ID),
 				strings.NewReader(body),
 			)
 			require.NoError(t, err)
