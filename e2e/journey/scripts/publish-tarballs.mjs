@@ -61,7 +61,7 @@ await pMap(
     ]);
     console.log(`published ${manifest.name}@${manifest.version} as alpha and latest`);
   },
-  { concurrency: 16 },
+  { concurrency: 16, stopOnError: false },
 );
 
 function run(command, args) {

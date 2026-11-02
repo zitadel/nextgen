@@ -5,9 +5,7 @@ import { chmod, copyFile, mkdir, readFile, readdir, rm, stat, writeFile } from "
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import pMap from "p-map";
-
-import { run, runReplayed } from "./dev-process.mjs";
+import { mapAll, run, runReplayed } from "./dev-process.mjs";
 import {
   PUBLIC_PACKAGE_DIRS,
   PUBLIC_RELEASE_PACKAGES,
@@ -98,7 +96,7 @@ export async function buildServerBinaries(options = {}) {
 
   // The per-platform builds are independent and the Go build cache is safe
   // under concurrency, so cross-compile all platforms at once.
-  await pMap(
+  await mapAll(
     platforms,
     async (platform) => {
       const dir = platformDir(outDir, platform);
@@ -126,7 +124,7 @@ export async function buildServerBinaries(options = {}) {
         },
       );
     },
-    { concurrency: platforms.length },
+    platforms.length,
   );
 
   return { outDir, platforms, version, gitInfo: info };
@@ -180,7 +178,7 @@ export async function createArchives(options = {}) {
   // The archives are independent (one platform's binary each, distinct file
   // names) and gzip and zip use one core each, so compress all platforms at
   // once. The results keep platform order, so checksums.txt keeps its order.
-  const archives = await pMap(
+  const archives = await mapAll(
     SERVER_PLATFORMS,
     async (platform) => {
       const name = `nextgen_${version}_${platformName(platform)}`;
@@ -218,7 +216,7 @@ export async function createArchives(options = {}) {
       );
       return archivePath;
     },
-    { concurrency: SERVER_PLATFORMS.length },
+    SERVER_PLATFORMS.length,
   );
 
   const checksumLines = [];
@@ -242,7 +240,7 @@ export async function packPublicPackages(options = {}) {
   // Packs are independent (distinct package dirs, distinct tarball names in a
   // shared destination); cap concurrency so the cli prepack rebuild and the
   // larger packages do not stampede the runner.
-  await pMap(
+  await mapAll(
     options.dirs ?? PUBLIC_PACKAGE_DIRS,
     async (dir) => {
       const manifest = await readPackageManifest(repoRoot, join(dir, "package.json"));
@@ -252,7 +250,7 @@ export async function packPublicPackages(options = {}) {
         env: process.env,
       });
     },
-    { concurrency: 8 },
+    8,
   );
 
   return tarballsDir;

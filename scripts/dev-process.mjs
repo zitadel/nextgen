@@ -3,6 +3,8 @@ import { accessSync, constants, realpathSync, statSync } from "node:fs";
 import { delimiter, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import pMap from "p-map";
+
 const defaultRepoRoot = fileURLToPath(new URL("..", import.meta.url));
 
 /**
@@ -162,6 +164,18 @@ function writeAll(stream, text) {
 
 export function formatCommand(command, args = []) {
   return [command, ...args].map(shellQuote).join(" ");
+}
+
+// Maps items through an async worker with at most `concurrency` in flight,
+// in input order. Every job finishes before a failure is reported (their child
+// processes cannot be abandoned safely), and the first failure is rethrown as
+// the job's own error, so callers keep printing its message.
+export async function mapAll(items, worker, concurrency) {
+  try {
+    return await pMap(items, worker, { concurrency, stopOnError: false });
+  } catch (error) {
+    throw error instanceof AggregateError ? error.errors[0] : error;
+  }
 }
 
 export function forwardedArgs(args = process.argv.slice(2)) {

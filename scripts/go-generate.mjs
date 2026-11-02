@@ -44,9 +44,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import pMap from "p-map";
-
-import { isDirectRun, run, runCapture } from "./dev-process.mjs";
+import { isDirectRun, mapAll, run, runCapture } from "./dev-process.mjs";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 
@@ -171,7 +169,7 @@ function assertEveryDirectiveHasAPhase(packages) {
 
 async function runPhase(dirs, phase, log) {
   const limit = Math.max(1, Math.min(availableParallelism(), dirs.length));
-  await pMap(
+  await mapAll(
     dirs,
     async (dir) => {
       // Buffered per package so concurrent generators never interleave. On
@@ -186,7 +184,7 @@ async function runPhase(dirs, phase, log) {
         log(`--- ${dir} (${phase.name})\n${output}`);
       }
     },
-    { concurrency: limit },
+    limit,
   );
 }
 
