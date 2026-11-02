@@ -1,7 +1,8 @@
 import { spawn } from "node:child_process";
-import { readFile, stat } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
+import { pathExists } from "./fs";
 import { optionArgs } from "./public-cli";
 import { shellOption } from "./shell";
 
@@ -18,11 +19,11 @@ export async function detectPackageManager(cwd: string): Promise<PackageManager>
   if (declared) {
     return declared;
   }
-  if (await exists(join(cwd, "pnpm-lock.yaml"))) return "pnpm";
-  if (await exists(join(cwd, "yarn.lock"))) return "yarn";
-  if (await exists(join(cwd, "bun.lock"))) return "bun";
-  if (await exists(join(cwd, "bun.lockb"))) return "bun";
-  if (await exists(join(cwd, "package-lock.json"))) return "npm";
+  if (await pathExists(join(cwd, "pnpm-lock.yaml"))) return "pnpm";
+  if (await pathExists(join(cwd, "yarn.lock"))) return "yarn";
+  if (await pathExists(join(cwd, "bun.lock"))) return "bun";
+  if (await pathExists(join(cwd, "bun.lockb"))) return "bun";
+  if (await pathExists(join(cwd, "package-lock.json"))) return "npm";
   return "npm";
 }
 
@@ -162,13 +163,4 @@ async function packageManagerFromManifest(cwd: string): Promise<PackageManager |
 function packageManagerFromString(value: string): PackageManager | undefined {
   const name = value.split("@")[0];
   return name === "npm" || name === "pnpm" || name === "yarn" || name === "bun" ? name : undefined;
-}
-
-async function exists(path: string): Promise<boolean> {
-  try {
-    await stat(path);
-    return true;
-  } catch {
-    return false;
-  }
 }

@@ -1,7 +1,8 @@
 import { Flags } from "@oclif/core";
-import { readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { readFile, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
+import { pathExists } from "../lib/fs";
 import { BaseCommand, type CommandResult, CommandGroups, type JsonEnvelope } from "../lib/oclif";
 import { createOrca } from "../lib/orca";
 import { AGENTS_HEADER, removeGuidanceSection } from "../lib/orca/patchers/rule/guidance";
@@ -73,15 +74,6 @@ function assembleNextCommands(
     commands.push(inDir(`npm uninstall ${dep}`));
   }
   return commands;
-}
-
-async function pathExists(path: string): Promise<boolean> {
-  try {
-    await stat(path);
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 /** What {@link ejectProject} did, or with `"plan"` would do. */

@@ -1,4 +1,4 @@
-import { readFile, stat } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 
 import type { SetupPreset } from "@zitadel/config/defaults";
@@ -7,6 +7,7 @@ import { RECOMMENDED_PASSWORD_MIN_LENGTH } from "@zitadel/config/schemas";
 import pc from "picocolors";
 import semver from "semver";
 
+import { pathExists } from "../../lib/fs";
 import { detectors } from "../../lib/orca/detectors";
 import type { Detector } from "../../lib/orca/detectors/types";
 import { detectPackageManager, type PackageManager } from "../../lib/package-manager";
@@ -97,7 +98,7 @@ export type ProjectFacts = {
 export async function detectProjectFacts(cwd: string, frameworkId: string): Promise<ProjectFacts> {
   const facts: ProjectFacts = {
     framework: frameworkId,
-    typescript: await fileExists(join(cwd, "tsconfig.json")),
+    typescript: await pathExists(join(cwd, "tsconfig.json")),
     packageManager: await detectPackageManager(cwd),
   };
   try {
@@ -128,15 +129,6 @@ export function formatFrameworkLine(facts: ProjectFacts): string {
   if (facts.typescript) segments.push("TypeScript");
   segments.push(facts.packageManager);
   return segments.join(` ${pc.dim("·")} `);
-}
-
-async function fileExists(p: string): Promise<boolean> {
-  try {
-    await stat(p);
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 function detectorFor(framework: string): Detector | undefined {

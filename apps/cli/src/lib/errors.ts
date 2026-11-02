@@ -5,6 +5,7 @@ import {
   NetworkError,
   type NetworkErrorReason,
 } from "@zitadel/api/runtime/fetch";
+import { isObject } from "./json";
 import type { SuggestedCommand } from "./suggestion";
 
 /**
@@ -260,10 +261,6 @@ function listedInDetails(body: unknown, key: "fields" | "missing"): string[] {
   return [...seen];
 }
 
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
 /**
  * Whether a request reached a server that has no such endpoint: a 404 without
  * the platform's error envelope. A Zitadel API answers a miss it knows about
@@ -300,7 +297,8 @@ export function isErrno(error: unknown, code: string): boolean {
   return typeof error === "object" && error !== null && "code" in error && error.code === code;
 }
 
-function errorMessage(error: unknown): string {
+/** The message of a caught value, whatever it is. */
+export function errorMessage(error: unknown): string {
   if (error instanceof Error) {
     return error.message;
   }
