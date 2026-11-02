@@ -6,7 +6,7 @@ import { StringDecoder } from "node:string_decoder";
 
 import { resolveServerBinary, serverBinaryPath } from "@zitadel/server/binary";
 
-import { ZitadelError, isErrno } from "../../errors";
+import { ZitadelError, errorMessage, isErrno } from "../../errors";
 import { shellCommand } from "../../suggestion";
 import { EMPTY_ENV, type ResolvedEnv, envSummary } from "../env-vars";
 import type { BinaryRuntimeMetadata } from "../runtime";
@@ -590,10 +590,6 @@ async function waitForExit(pid: number, timeoutMs: number): Promise<boolean> {
     await delay(200);
   }
   return !BinaryLauncher.isRunning(pid);
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
 
 function delay(ms: number): Promise<void> {
