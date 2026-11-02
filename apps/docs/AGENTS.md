@@ -57,22 +57,52 @@ MCP, `llms.txt`, Open Graph images, `.md` pages) live under `/docs` here.
 
 ## Writing
 
-- Write for a senior engineer: direct, concrete, neutral; no marketing words.
+- Write for developers who know their stack but may be new to authentication
+  or Zitadel: direct, concrete, neutral; no marketing words.
+- Explain an authentication or Zitadel concept at its first use on a page, in
+  a clause or with a link to its page under `concepts/`.
 - Open a page with what the feature is, in plain words.
+- Start with the common task; give edge cases their own section further down.
+- Explain shared behaviour once and link to it; leave exhaustive parameters
+  and errors to the generated operation pages.
 - Aim for sentences under 20 words; split compound clauses.
 - Write procedures in the imperative: "Run `zitadel deploy`".
 - Use sentence case for titles and headings; lead a task heading with its
   outcome: "Enable passkeys", not "How to configure passkey authentication".
-- State behaviour, defaults and limits, not adjectives: "Listens on 3000".
+- State behaviour, defaults, limits and side effects, not adjectives:
+  "Listens on 3000", "Revokes every session of the user".
+- Say how to recover from a failure the reader can cause: name the command or
+  change that fixes it, not only the error.
 - Never write "seamless", "robust", "leverage", "supercharge", "tailored",
   "successor track", "harness" as a verb, "next-generation" as an adjective.
 - Never open a sentence with "Furthermore", "Moreover", "In summary", "Delve".
-- Put explanations under `concepts/`, tasks under `guides/`, first runs under
-  `get-started/`, exact parameters under `reference/`; SDK pages in `sdks/`.
+- Make a page work read on its own and as its Markdown (`<page>.md`): never
+  leave an instruction only in a live example, an image or another page.
 - Keep code blocks runnable; mark a placeholder `<like-this>`, never `...`.
-- Use the left term, never the right ones:
+- Install with the npm dist-tag of the release the page documents; check it
+  with `npm view @zitadel/cli dist-tags`.
 
-| Use | Not |
+### Page types
+
+- `concepts/` explains what something is and why it matters; it has no steps.
+- `guides/` leads to one outcome; `get-started/` does the same for a reader
+  new to Zitadel, from nothing to a working sign-in.
+- `reference/` describes the exact contract; operation pages come from the
+  spec ([`api/openapi/AGENTS.md`](../../api/openapi/AGENTS.md#descriptions--the-first-sentence-stands-alone)).
+- `sdks/` holds one page per package: install it, wire it up, check it works.
+- In a guide, list prerequisites before the first command, and say where each
+  required input comes from: "the project ID that `zitadel setup` prints".
+- In a guide, show what a step prints or returns, and end with a check that
+  the outcome works.
+- Give a page only the parts it needs; no section is required on every page.
+
+### Terms
+
+Prefer the left term in prose. Keep commands, identifiers, field names and UI
+labels exactly as they are. Use a right-hand word where it means something
+else, such as a customer's backend or a SaaS product's tenants.
+
+| Prefer | Over |
 | --- | --- |
 | sign in, sign out | log in, log out |
 | ID (`id` only as a field name) | id in prose |
@@ -84,7 +114,6 @@ MCP, `llms.txt`, Open Graph images, `.md` pages) live under `/docs` here.
 | console | Console, management console |
 | project | tenant |
 | deploy | apply |
-| `@latest` | `@alpha` |
 
 ## Content
 
