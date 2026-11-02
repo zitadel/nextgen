@@ -181,8 +181,9 @@ func decodeBeginUserPasskeyRegistrationParams(args [1]string, argsEscaped bool, 
 
 // BuildReleaseParams is parameters of buildRelease operation.
 type BuildReleaseParams struct {
-	// The project ID: the `id` that `createProject` returns, which `zitadel setup`
-	// also prints as `project_id`.
+	// The project ID: the `id` that `createProject` returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 }
 
@@ -337,8 +338,9 @@ func decodeCompleteClaimParams(args [1]string, argsEscaped bool, r *http.Request
 
 // CreateBrandingParams is parameters of createBranding operation.
 type CreateBrandingParams struct {
-	// The project ID: the `id` that `createProject` returns, which `zitadel setup`
-	// also prints as `project_id`.
+	// The project ID: the `id` that `createProject` returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 }
 
@@ -411,8 +413,9 @@ func decodeCreateBrandingParams(args [0]string, argsEscaped bool, r *http.Reques
 
 // CreateDeploymentParams is parameters of createDeployment operation.
 type CreateDeploymentParams struct {
-	// The project ID: the `id` that `createProject` returns, which `zitadel setup`
-	// also prints as `project_id`.
+	// The project ID: the `id` that `createProject` returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 }
 
@@ -552,8 +555,9 @@ func decodeCreateFlowParams(args [0]string, argsEscaped bool, r *http.Request) (
 
 // CreateGrantParams is parameters of createGrant operation.
 type CreateGrantParams struct {
-	// The project ID: the `id` that `createProject` returns, which `zitadel setup`
-	// also prints as `project_id`.
+	// The project ID: the `id` that `createProject` returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 }
 
@@ -760,8 +764,9 @@ func decodeCreateHandoffParams(args [1]string, argsEscaped bool, r *http.Request
 
 // CreateIdpParams is parameters of createIdp operation.
 type CreateIdpParams struct {
-	// The project ID: the `id` that `createProject` returns, which `zitadel setup`
-	// also prints as `project_id`.
+	// The project ID: the `id` that `createProject` returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 }
 
@@ -834,8 +839,9 @@ func decodeCreateIdpParams(args [0]string, argsEscaped bool, r *http.Request) (p
 
 // CreateReleaseParams is parameters of createRelease operation.
 type CreateReleaseParams struct {
-	// The project ID: the `id` that `createProject` returns, which `zitadel setup`
-	// also prints as `project_id`.
+	// The project ID: the `id` that `createProject` returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 }
 
@@ -908,8 +914,9 @@ func decodeCreateReleaseParams(args [0]string, argsEscaped bool, r *http.Request
 
 // CreateSchemaParams is parameters of createSchema operation.
 type CreateSchemaParams struct {
-	// The project ID: the `id` that `createProject` returns, which `zitadel setup`
-	// also prints as `project_id`.
+	// The project ID: the `id` that `createProject` returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// The team ID: the `id` that `createTeam` or `queryTeams` returns.
 	TeamID OptTeamID `json:",omitempty,omitzero"`
@@ -1056,8 +1063,9 @@ func decodeCreateSchemaParams(args [0]string, argsEscaped bool, r *http.Request)
 
 // CreateTeamParams is parameters of createTeam operation.
 type CreateTeamParams struct {
-	// The project ID: the `id` that `createProject` returns, which `zitadel setup`
-	// also prints as `project_id`.
+	// The project ID: the `id` that `createProject` returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 }
 
@@ -1130,8 +1138,9 @@ func decodeCreateTeamParams(args [0]string, argsEscaped bool, r *http.Request) (
 
 // CreateUserParams is parameters of createUser operation.
 type CreateUserParams struct {
-	// The project ID: the `id` that `createProject` returns, which `zitadel setup`
-	// also prints as `project_id`.
+	// The project ID: the `id` that `createProject` returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// Adds the new user to this team: creating the user also creates an
 	// active membership in it. Omit it to create a user with no memberships.
@@ -1289,8 +1298,9 @@ func decodeCreateUserParams(args [0]string, argsEscaped bool, r *http.Request) (
 type DeleteGrantParams struct {
 	// The grant ID (`asgn_<opaque>`): the `id` that `createGrant` returns or `queryGrants` lists.
 	ID string
-	// The project ID: the `id` that `createProject` returns, which `zitadel setup`
-	// also prints as `project_id`.
+	// The project ID: the `id` that `createProject` returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 }
 
@@ -1577,8 +1587,9 @@ func decodeDeleteUserByIDParams(args [1]string, argsEscaped bool, r *http.Reques
 
 // DeleteVariableParams is parameters of deleteVariable operation.
 type DeleteVariableParams struct {
-	// The project ID: the `id` that `createProject` returns, which `zitadel setup`
-	// also prints as `project_id`.
+	// The project ID: the `id` that `createProject` returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// The name of the variable.
 	VariableName VariableName
@@ -1787,8 +1798,9 @@ func decodeDeleteVariableParams(args [1]string, argsEscaped bool, r *http.Reques
 
 // EvaluatePolicyParams is parameters of evaluatePolicy operation.
 type EvaluatePolicyParams struct {
-	// The project ID: the `id` that `createProject` returns, which `zitadel setup`
-	// also prints as `project_id`.
+	// The project ID: the `id` that `createProject` returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 }
 
@@ -1861,8 +1873,9 @@ func decodeEvaluatePolicyParams(args [0]string, argsEscaped bool, r *http.Reques
 
 // ExchangeHandoffParams is parameters of exchangeHandoff operation.
 type ExchangeHandoffParams struct {
-	// The project ID: the `id` that `createProject` returns, which `zitadel setup`
-	// also prints as `project_id`.
+	// The project ID: the `id` that `createProject` returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// Optional retry key for safe retries of the call.
 	// Retries carrying the same key within the call window return the cached
@@ -2559,8 +2572,9 @@ func decodeGetClaimWindowParams(args [1]string, argsEscaped bool, r *http.Reques
 
 // GetDeploymentByIdParams is parameters of getDeploymentById operation.
 type GetDeploymentByIdParams struct {
-	// The project ID: the `id` that `createProject` returns, which `zitadel setup`
-	// also prints as `project_id`.
+	// The project ID: the `id` that `createProject` returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// The deployment ID: the `id` that `createDeployment` returns or
 	// `listDeployments` lists.
@@ -2703,8 +2717,9 @@ func decodeGetDeploymentByIdParams(args [1]string, argsEscaped bool, r *http.Req
 
 // GetDeploymentVariablesParams is parameters of getDeploymentVariables operation.
 type GetDeploymentVariablesParams struct {
-	// The project ID: the `id` that `createProject` returns, which `zitadel setup`
-	// also prints as `project_id`.
+	// The project ID: the `id` that `createProject` returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// The deployment ID: the `id` that `createDeployment` returns or
 	// `listDeployments` lists.
@@ -2849,8 +2864,9 @@ func decodeGetDeploymentVariablesParams(args [1]string, argsEscaped bool, r *htt
 type GetEventParams struct {
 	// The event ID (`evt_<opaque>`): the `id` that `listEvents` returns.
 	ID string
-	// The project ID: the `id` that `createProject` returns, which `zitadel setup`
-	// also prints as `project_id`.
+	// The project ID: the `id` that `createProject` returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 }
 
@@ -3161,8 +3177,9 @@ func decodeGetFlowStepParams(args [1]string, argsEscaped bool, r *http.Request) 
 type GetGrantParams struct {
 	// The grant ID (`asgn_<opaque>`): the `id` that `createGrant` returns or `queryGrants` lists.
 	ID string
-	// The project ID: the `id` that `createProject` returns, which `zitadel setup`
-	// also prints as `project_id`.
+	// The project ID: the `id` that `createProject` returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// Extra principal fields to add onto `user` or `team`. It takes the same
 	// values and needs the same `user.read` and `team.read` scopes as
@@ -3379,8 +3396,9 @@ func decodeGetGrantParams(args [1]string, argsEscaped bool, r *http.Request) (pa
 
 // GetIdpByIdParams is parameters of getIdpById operation.
 type GetIdpByIdParams struct {
-	// The project ID: the `id` that `createProject` returns, which `zitadel setup`
-	// also prints as `project_id`.
+	// The project ID: the `id` that `createProject` returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// The connection ID: the `id` that `createIdp` returns or `queryIdps` lists.
 	ID string
@@ -3507,8 +3525,9 @@ func decodeGetIdpByIdParams(args [1]string, argsEscaped bool, r *http.Request) (
 
 // GetIdpRevisionByIdParams is parameters of getIdpRevisionById operation.
 type GetIdpRevisionByIdParams struct {
-	// The project ID: the `id` that `createProject` returns, which `zitadel setup`
-	// also prints as `project_id`.
+	// The project ID: the `id` that `createProject` returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// The revision ID: the `revision_id` that `createIdp` or `updateIdp` returns,
 	// or that `listIdpRevisions` lists.
@@ -4116,8 +4135,9 @@ func decodeGetMyUserSchemaParams(args [0]string, argsEscaped bool, r *http.Reque
 
 // GetPolicyParams is parameters of getPolicy operation.
 type GetPolicyParams struct {
-	// The project ID: the `id` that `createProject` returns, which `zitadel setup`
-	// also prints as `project_id`.
+	// The project ID: the `id` that `createProject` returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// The identifier of the policy, shared by all of its revisions.
 	PolicyID PolicyID
@@ -4259,8 +4279,9 @@ func decodeGetPolicyParams(args [1]string, argsEscaped bool, r *http.Request) (p
 
 // GetPolicyRevisionParams is parameters of getPolicyRevision operation.
 type GetPolicyRevisionParams struct {
-	// The project ID: the `id` that `createProject` returns, which `zitadel setup`
-	// also prints as `project_id`.
+	// The project ID: the `id` that `createProject` returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// The identifier of the policy revision.
 	RevisionID PolicyRevisionID
@@ -4484,8 +4505,9 @@ func decodeGetProjectParams(args [1]string, argsEscaped bool, r *http.Request) (
 
 // GetReleaseByIdParams is parameters of getReleaseById operation.
 type GetReleaseByIdParams struct {
-	// The project ID: the `id` that `createProject` returns, which `zitadel setup`
-	// also prints as `project_id`.
+	// The project ID: the `id` that `createProject` returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// The release ID: the `id` that `createRelease` returns or `listReleases` lists.
 	ReleaseID ReleaseID
@@ -5255,8 +5277,9 @@ func decodeGetUserPasswordStateParams(args [1]string, argsEscaped bool, r *http.
 
 // GetVariableParams is parameters of getVariable operation.
 type GetVariableParams struct {
-	// The project ID: the `id` that `createProject` returns, which `zitadel setup`
-	// also prints as `project_id`.
+	// The project ID: the `id` that `createProject` returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// The name of the variable.
 	VariableName VariableName
@@ -5465,8 +5488,9 @@ func decodeGetVariableParams(args [1]string, argsEscaped bool, r *http.Request) 
 
 // GetVariablesParams is parameters of getVariables operation.
 type GetVariablesParams struct {
-	// The project ID: the `id` that `createProject` returns, which `zitadel setup`
-	// also prints as `project_id`.
+	// The project ID: the `id` that `createProject` returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// The kind of value to address. Omit it for both kinds.
 	Kind OptVariableKind `json:",omitempty,omitzero"`
@@ -5769,8 +5793,9 @@ func decodeIssueChallengeParams(args [1]string, argsEscaped bool, r *http.Reques
 
 // ListBrandingParams is parameters of listBranding operation.
 type ListBrandingParams struct {
-	// The project ID: the `id` that `createProject` returns, which `zitadel setup`
-	// also prints as `project_id`.
+	// The project ID: the `id` that `createProject` returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 }
 
@@ -5843,8 +5868,9 @@ func decodeListBrandingParams(args [0]string, argsEscaped bool, r *http.Request)
 
 // ListDeploymentsParams is parameters of listDeployments operation.
 type ListDeploymentsParams struct {
-	// The project ID: the `id` that `createProject` returns, which `zitadel setup`
-	// also prints as `project_id`.
+	// The project ID: the `id` that `createProject` returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// Narrows the list to the deployments that targeted this origin, given
 	// exactly as the deployment records it. An origin no deployment targeted
@@ -6282,8 +6308,9 @@ func decodeListDeploymentsParams(args [0]string, argsEscaped bool, r *http.Reque
 
 // ListEventsParams is parameters of listEvents operation.
 type ListEventsParams struct {
-	// The project ID: the `id` that `createProject` returns, which `zitadel setup`
-	// also prints as `project_id`.
+	// The project ID: the `id` that `createProject` returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// Only events of this category. Repeat the parameter to match any of
 	// several categories.
@@ -7281,8 +7308,9 @@ type ListFlowDefinitionsParams struct {
 	// Omit to start from the beginning.
 	// Its format is opaque and may change between releases.
 	PageToken OptPageToken `json:",omitempty,omitzero"`
-	// The project ID: the `id` that `createProject` returns, which `zitadel setup`
-	// also prints as `project_id`.
+	// The project ID: the `id` that `createProject` returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// Only flow definitions with this purpose, for example `login`.
 	Purpose OptListFlowDefinitionsPurpose `json:",omitempty,omitzero"`
@@ -7792,8 +7820,9 @@ func decodeListFlowDefinitionsParams(args [0]string, argsEscaped bool, r *http.R
 
 // ListIdpRevisionsParams is parameters of listIdpRevisions operation.
 type ListIdpRevisionsParams struct {
-	// The project ID: the `id` that `createProject` returns, which `zitadel setup`
-	// also prints as `project_id`.
+	// The project ID: the `id` that `createProject` returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// The connection ID: the `id` that `createIdp` returns or `queryIdps` lists.
 	ID string
@@ -9065,8 +9094,9 @@ func decodeListMyTeamsParams(args [0]string, argsEscaped bool, r *http.Request) 
 
 // ListPoliciesParams is parameters of listPolicies operation.
 type ListPoliciesParams struct {
-	// The project ID: the `id` that `createProject` returns, which `zitadel setup`
-	// also prints as `project_id`.
+	// The project ID: the `id` that `createProject` returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// Maximum number of items to return.
 	Limit OptLimit `json:",omitempty,omitzero"`
@@ -9347,8 +9377,9 @@ func decodeListPoliciesParams(args [0]string, argsEscaped bool, r *http.Request)
 
 // ListPolicyRevisionsParams is parameters of listPolicyRevisions operation.
 type ListPolicyRevisionsParams struct {
-	// The project ID: the `id` that `createProject` returns, which `zitadel setup`
-	// also prints as `project_id`.
+	// The project ID: the `id` that `createProject` returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// The identifier of the policy, shared by all of its revisions.
 	PolicyID PolicyID
@@ -10077,8 +10108,9 @@ func decodeListProjectAdminsParams(args [1]string, argsEscaped bool, r *http.Req
 
 // ListReleasesParams is parameters of listReleases operation.
 type ListReleasesParams struct {
-	// The project ID: the `id` that `createProject` returns, which `zitadel setup`
-	// also prints as `project_id`.
+	// The project ID: the `id` that `createProject` returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// Narrows the list to the release with this content digest, given in full
 	// with its `sha256:` prefix. A project holds at most one release per digest,
@@ -10372,8 +10404,9 @@ func decodeListReleasesParams(args [0]string, argsEscaped bool, r *http.Request)
 
 // ListSchemasParams is parameters of listSchemas operation.
 type ListSchemasParams struct {
-	// The project ID: the `id` that `createProject` returns, which `zitadel setup`
-	// also prints as `project_id`.
+	// The project ID: the `id` that `createProject` returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// Maximum number of items to return.
 	Limit OptLimit `json:",omitempty,omitzero"`
@@ -11837,8 +11870,9 @@ func decodePatchUserByIDParams(args [1]string, argsEscaped bool, r *http.Request
 
 // PublishPolicyParams is parameters of publishPolicy operation.
 type PublishPolicyParams struct {
-	// The project ID: the `id` that `createProject` returns, which `zitadel setup`
-	// also prints as `project_id`.
+	// The project ID: the `id` that `createProject` returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 }
 
@@ -11911,8 +11945,9 @@ func decodePublishPolicyParams(args [0]string, argsEscaped bool, r *http.Request
 
 // QueryGrantsParams is parameters of queryGrants operation.
 type QueryGrantsParams struct {
-	// The project ID: the `id` that `createProject` returns, which `zitadel setup`
-	// also prints as `project_id`.
+	// The project ID: the `id` that `createProject` returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 }
 
@@ -11985,8 +12020,9 @@ func decodeQueryGrantsParams(args [0]string, argsEscaped bool, r *http.Request) 
 
 // QueryIdpsParams is parameters of queryIdps operation.
 type QueryIdpsParams struct {
-	// The project ID: the `id` that `createProject` returns, which `zitadel setup`
-	// also prints as `project_id`.
+	// The project ID: the `id` that `createProject` returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 }
 
@@ -12059,8 +12095,9 @@ func decodeQueryIdpsParams(args [0]string, argsEscaped bool, r *http.Request) (p
 
 // QuerySessionsParams is parameters of querySessions operation.
 type QuerySessionsParams struct {
-	// The project ID: the `id` that `createProject` returns, which `zitadel setup`
-	// also prints as `project_id`.
+	// The project ID: the `id` that `createProject` returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 }
 
@@ -12569,8 +12606,9 @@ func decodeRevokeMySessionParams(args [0]string, argsEscaped bool, r *http.Reque
 
 // RevokeReleaseParams is parameters of revokeRelease operation.
 type RevokeReleaseParams struct {
-	// The project ID: the `id` that `createProject` returns, which `zitadel setup`
-	// also prints as `project_id`.
+	// The project ID: the `id` that `createProject` returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// The release ID: the `id` that `createRelease` returns or `listReleases` lists.
 	ReleaseID ReleaseID
@@ -12794,8 +12832,9 @@ func decodeRevokeSessionParams(args [1]string, argsEscaped bool, r *http.Request
 
 // RollbackDeploymentParams is parameters of rollbackDeployment operation.
 type RollbackDeploymentParams struct {
-	// The project ID: the `id` that `createProject` returns, which `zitadel setup`
-	// also prints as `project_id`.
+	// The project ID: the `id` that `createProject` returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// The deployment ID: the `id` that `createDeployment` returns or
 	// `listDeployments` lists.
@@ -13274,8 +13313,9 @@ func decodeUpdateTeamParams(args [1]string, argsEscaped bool, r *http.Request) (
 
 // UpdateVariablesParams is parameters of updateVariables operation.
 type UpdateVariablesParams struct {
-	// The project ID: the `id` that `createProject` returns, which `zitadel setup`
-	// also prints as `project_id`.
+	// The project ID: the `id` that `createProject` returns. `zitadel setup` prints
+	// it as "Project id" in its summary and as `project_id` with `--json`, and
+	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
 	// The kind of value to address. Omit it for both kinds.
 	Kind OptVariableKind `json:",omitempty,omitzero"`

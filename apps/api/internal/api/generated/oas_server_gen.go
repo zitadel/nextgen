@@ -1322,15 +1322,18 @@ type Handler interface {
 	// froze.
 	// A release is a snapshot of the project's configuration. A deployment makes
 	// a release live on origins and freezes the project's variable values with
-	// it. Pass the ID of the deployment to return to: the `id` that
-	// `listDeployments` returns.
+	// it.
+	// The deployment ID in the path is the deployment to return to, not the one
+	// to undo. Take it from the `id` that `listDeployments` returns, which lists
+	// the newest deployment first.
 	// A rollback is a new deployment, not an undo. It has `reason: rollback`,
-	// and `rollback_to` names the deployment you chose.
-	// A rollback leaves the rest alone. It uses the variable values the chosen
-	// deployment froze, not the project's current ones. It creates no release
-	// and edits no deployment record: the deployment it replaces only reads
-	// `inactive`, because `status` is computed when you read it. It records a
-	// `deployment.created` event, like any deployment.
+	// and its `rollback_to` names the deployment you returned to. It uses the
+	// variable values that deployment froze, not the project's current ones, and
+	// creates no release.
+	// To guard against a deployment that landed since you looked, set
+	// `expected_deployment_id` in the request body to the newest primary
+	// deployment, the one live now. The call then fails with `409 dep.conflict`
+	// if another deployment has replaced it.
 	// A rollback is idempotent like a deployment to `primary`. When nothing
 	// would change, it answers `200` with the newest primary deployment.
 	// If the request is refused:
