@@ -109,15 +109,17 @@ describe("free security and account-wide packages", () => {
     for (const plan of PLANS) expect(words(mau!.cells[plan])).toBe("Never billed");
   });
 
-  it("shows consumer apps what they pay for beside what is free", () => {
-    const authentication = compareGroups(catalog).find(
-      (group) => group.id === "authentication",
-    )!.rows;
-    const start = authentication.findIndex((row) => row.subgroup?.title === "B2C · Consumer apps");
-    const end = authentication.findIndex((row, index) => index > start && row.subgroup);
-    const b2c = authentication.slice(start, end);
-    expect(b2c.map((row) => row.source).filter(Boolean)).toEqual(["bot_checks", "protected_users"]);
-    const protection = b2c.find((row) => row.source === "protected_users")!;
+  it("shows paid sign-in protection beside the free basics, for every kind of app", () => {
+    const security = compareGroups(catalog).find((group) => group.id === "security")!.rows;
+    const start = security.findIndex((row) => row.subgroup?.title === "Protection");
+    const end = security.findIndex((row, index) => index > start && row.subgroup);
+    const shield = security.slice(start, end);
+    expect(shield.map((row) => row.source ?? row.label)).toEqual([
+      ...catalog.core.security,
+      "bot_checks",
+      "protected_users",
+    ]);
+    const protection = shield.find((row) => row.source === "protected_users")!;
     expect(words(protection.cells.free)).toBe("10K / month included");
     expect(words(protection.cells.pro)).toBe("10K / month included Then $0.003 per user");
   });

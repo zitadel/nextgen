@@ -332,14 +332,15 @@ function Questions({ catalog }: { catalog: Catalog }) {
             support are shared across use cases.
           </p>
           <p>
-            <strong>Consumer apps:</strong> users, sign-in and required MFA stay free. Bot checks
-            and adaptive sign-in protection are under Authentication; capacity, delivery and
-            branding under Platform; conditional policies under Security & policies.
+            <strong>Consumer apps:</strong> users, sign-in and required MFA stay free. Capacity,
+            delivery and branding are under Platform; advanced bot checks, adaptive sign-in
+            protection and conditional policies under Security & policies.
           </p>
           <p>
             <strong>Business apps:</strong> customer organizations, core roles and required MFA stay
-            free. Your customers' SSO and directories are under Authentication, advanced policies
-            and delegated administration under Security & policies.
+            free. Your customers' SSO and directories are under Authentication; protection for users
+            who sign in without SSO, advanced policies and delegated administration under Security &
+            policies.
           </p>
           <p>
             <strong>Services and agents:</strong> service identities and credentials stay free.
