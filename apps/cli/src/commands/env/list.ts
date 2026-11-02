@@ -2,7 +2,7 @@ import { Flags } from "@oclif/core";
 
 import { readBoundEnvironments } from "../../lib/environment";
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../../lib/oclif";
-import { renderList } from "../../lib/oclif/crud/table";
+import { Tabulatable } from "../../lib/oclif/tabulatable";
 import { listData } from "../../lib/oclif/envelope";
 
 /** The columns `list` renders, in order. */
@@ -14,7 +14,7 @@ const COLUMNS = ["name", "source", "server", "project_id", "resolved"] as const;
  * when it carries one. An environment that lives only in a CI secret store is
  * not visible here, which is correct.
  */
-export default class EnvList extends EnvironmentCommand {
+export default class EnvList extends Tabulatable(EnvironmentCommand) {
   static override description = "List the environments bound in this directory's .env files.";
   static override group = CommandGroups.configuration;
   static override examples = ["<%= config.bin %> env list", "<%= config.bin %> env list --plain"];
@@ -59,7 +59,7 @@ export default class EnvList extends EnvironmentCommand {
       // The canonical list envelope, plus `resolved` naming which environment
       // this run resolves to (each item also carries its own `resolved` flag).
       data: { ...listData(items), resolved: { name: name.value, source: name.source } },
-      pretty: await renderList(
+      pretty: await this.tabulateList(
         COLUMNS,
         items.map((entry) => ({ ...entry, resolved: entry.resolved ? "yes" : "" })),
         {

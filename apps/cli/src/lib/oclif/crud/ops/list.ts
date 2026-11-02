@@ -14,7 +14,7 @@ import { parseOrThrow } from "../shared";
 import { chosenColumns } from "../columns";
 import { shellOption } from "../../../shell";
 import { fieldPaths } from "../paths";
-import { renderRows, renderTable } from "../table";
+import { renderRows } from "../table";
 import type { Json, ListSpec } from "../types";
 import {
   type OperationDefinition,
@@ -249,7 +249,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
         : items.length === 0
           ? `No ${topic} found.`
           : [
-              await renderTable(columns, items),
+              await this.tabulate(columns, items),
               "",
               `${items.length} ${items.length === 1 ? resource.singular : topic}`,
               ...(next ? [`More available: ${shellOption("--page-token", next)} (or --all)`] : []),

@@ -1,3 +1,4 @@
+import { escapeControlCharacters } from "../../api-client";
 import { isObject } from "../../json";
 
 /**
@@ -19,32 +20,37 @@ export const renderRows = (columns: readonly string[], items: readonly unknown[]
 /**
  * Render `items` as an aligned text table, one column per dot-path in
  * `columns`, headed by each path's last segment. Nested paths resolve
- * through objects; missing values render empty; non-strings render as JSON.
+ * through objects; missing values render empty; non-strings render as JSON;
+ * control characters in a value are escaped, so a value from a server cannot
+ * drive the terminal.
  *
- * `@oclif/table` lays it out, so a terminal gets columns fitted to its width
- * and wide characters measured by how they are drawn. A cell is wrapped, never
- * cut, because an id or a URL that lost its tail cannot be copied. A pipe has
- * no width to fit, so it gets the table at its natural width. The library draws
- * with `ink` and `react`, which take a few hundred milliseconds to load, so it
- * is imported here and not at the top: only a command that prints a table pays.
+ * `@oclif/table` lays it out, so wide characters are measured by how they are
+ * drawn and the columns after them stay aligned. The table keeps its natural
+ * width at any terminal size: the library's way of fitting one shares the width
+ * between columns in proportion and breaks inside a word, which leaves an id or
+ * a path in pieces that cannot be read or copied, so a row wider than the
+ * terminal is left to the terminal to wrap. The library draws with `ink` and
+ * `react`, which take a few hundred milliseconds to load, so it is imported here
+ * and not at the top, and a command prints a table through `Tabulatable`, which
+ * skips it under `--json`.
  */
 export const renderTable = async (
   columns: readonly string[],
   items: readonly unknown[],
 ): Promise<string> => {
-  const headers = columns.map((column) => column.split(".").at(-1) ?? column);
-  if (items.length === 0) {
-    return headers.join("  ");
-  }
   const { makeTable } = await import("@oclif/table");
   const table = makeTable({
     data: items.map((item) =>
-      Object.fromEntries(columns.map((column) => [column, readCell(column, item)])),
+      Object.fromEntries(
+        columns.map((column) => [
+          column,
+          escapeControlCharacters(readCell(column, item), { keepLayout: false }),
+        ]),
+      ),
     ),
-    columns: columns.map((key, i) => ({ key, name: headers[i] ?? key })),
+    columns: columns.map((key) => ({ key, name: key.split(".").at(-1) ?? key })),
     borderStyle: "headers-only-with-underline",
-    overflow: "wrap",
-    ...(process.stdout.isTTY ? {} : { maxWidth: "none" as const }),
+    maxWidth: "none",
   });
   return table.replace(/\n+$/, "");
 };

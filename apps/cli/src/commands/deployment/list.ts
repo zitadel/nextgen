@@ -6,8 +6,8 @@ import {
   type JsonEnvelope,
   nonBlankString,
 } from "../../lib/oclif";
+import { Tabulatable } from "../../lib/oclif/tabulatable";
 import { collectPages } from "../../lib/oclif/crud/paging";
-import { renderList } from "../../lib/oclif/crud/table";
 import { listData } from "../../lib/oclif/envelope";
 import { shellArg } from "../../lib/shell";
 
@@ -23,7 +23,7 @@ const COLUMNS = ["id", "release_id", "reason", "origins", "deployed_at"] as cons
  * `next_page_token`; `--all` drains the history, `--limit` / `--page-token`
  * walk it a page at a time.
  */
-export default class DeploymentList extends EnvironmentCommand {
+export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
   static override description = "List the project's deployments, newest first.";
   static override group = CommandGroups.configuration;
   static override examples = [
@@ -109,7 +109,7 @@ export default class DeploymentList extends EnvironmentCommand {
       data: listData(deployments, { nextPageToken: next }),
       ...(nextCommand === undefined ? {} : { next: { commands: [nextCommand] } }),
       machineReadable: plain,
-      pretty: await renderList(COLUMNS, rows, {
+      pretty: await this.tabulateList(COLUMNS, rows, {
         plain,
         singular: "deployment",
         empty: "No deployments yet.",

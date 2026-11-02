@@ -1,8 +1,9 @@
 import { Args, Flags } from "@oclif/core";
 
 import { type ApiOperation, findOperations, uncallable } from "../../lib/api/operations";
-import { renderRows, renderTable } from "../../lib/oclif/crud/table";
+import { renderRows } from "../../lib/oclif/crud/table";
 import { BaseCommand, CommandGroups, type JsonEnvelope } from "../../lib/oclif";
+import { Tabulatable } from "../../lib/oclif/tabulatable";
 
 /** One operation as `api ls` lists it. */
 const entryOf = (operation: ApiOperation) => ({
@@ -25,7 +26,7 @@ const entryOf = (operation: ApiOperation) => ({
  * offline. `--json` carries each one's parameters, body and paging, which is
  * what an agent needs to build the call.
  */
-export default class ApiLs extends BaseCommand {
+export default class ApiLs extends Tabulatable(BaseCommand) {
   static override group = CommandGroups.diagnostics;
   static override description = "List the operations of the Zitadel API that `zitadel api` calls.";
   static override examples = [
@@ -56,7 +57,7 @@ export default class ApiLs extends BaseCommand {
       data: { operations, count: operations.length },
       pretty: process.stdout.isTTY
         ? [
-            await renderTable(columns, operations),
+            await this.tabulate(columns, operations),
             "",
             `${operations.length} operations. Call one with \`${this.config.bin} api <id>\`; --json has each one's parameters.`,
           ].join("\n")

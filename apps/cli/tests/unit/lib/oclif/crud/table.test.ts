@@ -24,19 +24,67 @@ describe("renderTable", () => {
     expect(table.split("\n")[2]).toBe("  3   true");
   });
 
-  it("renders only the header for an empty list", async () => {
-    expect(await renderTable(["id"], [])).toBe("id");
+  it("renders the header and its rule for an empty list", async () => {
+    expect((await renderTable(["id"], [])).split("\n")).toEqual(["  id", " ────"]);
   });
 
-  it("measures wide characters by how they are drawn, so the next column still lines up", async () => {
+  it("measures wide characters by how they are drawn, so the column after them lines up", async () => {
     const table = await renderTable(
-      ["id", "name"],
+      ["name", "id"],
       [
-        { id: "x", name: "你好世界" },
-        { id: "yy", name: "ab" },
+        { name: "你好世界", id: "x" },
+        { name: "ab", id: "yy" },
       ],
     );
-    expect(table.split("\n").slice(2)).toEqual(["  x    你好世界", "  yy   ab"]);
+    expect(table.split("\n")).toEqual([
+      "  name       id",
+      " ───────────────",
+      "  你好世界   x",
+      "  ab         yy",
+    ]);
+  });
+
+  it("escapes control characters so a value cannot drive the terminal or split its row", async () => {
+    const table = await renderTable(["id", "name"], [{ id: "a\u001b[2Jb", name: "x\ty\nz" }]);
+
+    expect(table).not.toContain("\u001b");
+    expect(table).not.toContain("\t");
+    expect(table.split("\n")[2]).toBe("  a\\x1b[2Jb   x\\x09y\\x0az");
+  });
+
+  describe("on a narrow terminal", () => {
+    const id = `usr_${"a".repeat(40)}`;
+    const url = `https://example.com/${"b".repeat(60)}`;
+
+    const render = async (tty: boolean): Promise<string> => {
+      const isTTY = Object.getOwnPropertyDescriptor(process.stdout, "isTTY");
+      const columns = Object.getOwnPropertyDescriptor(process.stdout, "columns");
+      Object.defineProperty(process.stdout, "isTTY", { value: tty, configurable: true });
+      Object.defineProperty(process.stdout, "columns", { value: 30, configurable: true });
+      try {
+        return await renderTable(["id", "url"], [{ id, url }]);
+      } finally {
+        for (const [key, saved] of [
+          ["isTTY", isTTY],
+          ["columns", columns],
+        ] as const) {
+          if (saved) Object.defineProperty(process.stdout, key, saved);
+          else delete (process.stdout as unknown as Record<string, unknown>)[key];
+        }
+      }
+    };
+
+    it("keeps a long id and url whole on one row instead of breaking them across lines", async () => {
+      const row = (await render(true)).split("\n")[2] ?? "";
+
+      expect(row).toContain(id);
+      expect(row).toContain(url);
+      expect((await render(true)).split("\n")).toHaveLength(3);
+    });
+
+    it("prints the same table as a pipe does", async () => {
+      expect(await render(true)).toBe(await render(false));
+    });
   });
 });
 

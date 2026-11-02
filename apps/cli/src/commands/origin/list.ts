@@ -1,7 +1,7 @@
 import { Flags } from "@oclif/core";
 
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../../lib/oclif";
-import { renderList } from "../../lib/oclif/crud/table";
+import { Tabulatable } from "../../lib/oclif/tabulatable";
 import { listData } from "../../lib/oclif/envelope";
 
 /** The columns `list` renders, in order. */
@@ -14,7 +14,7 @@ const COLUMNS = ["pattern", "kind"] as const;
  * project state, so the server is the authority. An empty list means every
  * origin is admitted until the first pattern is added.
  */
-export default class OriginList extends EnvironmentCommand {
+export default class OriginList extends Tabulatable(EnvironmentCommand) {
   static override description = "List the origin patterns on the project.";
   static override group = CommandGroups.configuration;
   static override examples = [
@@ -44,7 +44,7 @@ export default class OriginList extends EnvironmentCommand {
       status: "ok",
       // The project returns its whole origin set in one page, so the token is null.
       data: listData(origins),
-      pretty: await renderList(COLUMNS, origins, {
+      pretty: await this.tabulateList(COLUMNS, origins, {
         plain,
         singular: "origin",
         empty: "No origins on the project.",

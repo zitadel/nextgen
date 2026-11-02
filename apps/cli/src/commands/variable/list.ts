@@ -1,7 +1,7 @@
 import { Flags } from "@oclif/core";
 
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../../lib/oclif";
-import { renderList } from "../../lib/oclif/crud/table";
+import { Tabulatable } from "../../lib/oclif/tabulatable";
 import { listData } from "../../lib/oclif/envelope";
 import {
   toInventoryRows,
@@ -25,7 +25,7 @@ const INVENTORY_COLUMNS = ["name", "value", "preview"] as const;
  * `--preview` it lists the preview values alone, which are never merged with the
  * primary ones — only the names that hold one.
  */
-export default class VariableList extends EnvironmentCommand {
+export default class VariableList extends Tabulatable(EnvironmentCommand) {
   static override description = "List the variables entered on the project.";
   static override group = CommandGroups.configuration;
   static override examples = [
@@ -68,7 +68,7 @@ export default class VariableList extends EnvironmentCommand {
     return this.emit({
       status: "ok",
       data: listData(rows),
-      pretty: await renderList(flags.preview ? COLUMNS : INVENTORY_COLUMNS, cells as never, {
+      pretty: await this.tabulateList(flags.preview ? COLUMNS : INVENTORY_COLUMNS, cells as never, {
         plain,
         singular: "variable",
         empty,

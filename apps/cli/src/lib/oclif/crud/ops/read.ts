@@ -57,7 +57,10 @@ export class GetOperation<Ctx> extends ResourceCommand<Ctx, GetSpec<Ctx>> {
     if (!process.stdout.isTTY) {
       return { status: "ok", data: item, pretty: JSON.stringify(item, null, 2) };
     }
-    const sections = flags.fields === undefined ? ((await spec.sections?.(item)) ?? []) : [];
+    const sections =
+      flags.fields === undefined && !this.jsonEnabled()
+        ? ((await spec.sections?.(item)) ?? [])
+        : [];
     return {
       status: "ok",
       data: item,

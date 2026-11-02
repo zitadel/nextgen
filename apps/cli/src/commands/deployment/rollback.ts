@@ -2,7 +2,7 @@ import { Flags } from "@oclif/core";
 import type { GetReleaseById200PointersItem } from "@zitadel/api/generated/model";
 
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope, nonBlankArg } from "../../lib/oclif";
-import { renderTable } from "../../lib/oclif/crud/table";
+import { Tabulatable } from "../../lib/oclif/tabulatable";
 import { messageFlag, rollbackDeployment, servesPrimary } from "../../lib/release";
 import { toZitadelError, ZitadelError } from "../../lib/errors";
 import { Destructive } from "../../lib/oclif/destructive";
@@ -17,7 +17,7 @@ import { reportWarning } from "../../lib/warnings";
  * one. It reports the revisions that release pins, and that users keep theirs:
  * configuration rolls back, user data does not.
  */
-export default class DeploymentRollback extends Destructive(EnvironmentCommand) {
+export default class DeploymentRollback extends Tabulatable(Destructive(EnvironmentCommand)) {
   static override description = "Roll back to an earlier deployment.";
   static override group = CommandGroups.configuration;
   static override examples = [
@@ -127,7 +127,7 @@ export default class DeploymentRollback extends Destructive(EnvironmentCommand) 
           const pointerTable =
             pointers === undefined
               ? undefined
-              : await renderTable(["kind", "handle", "revision_id"], pointers);
+              : await this.tabulate(["kind", "handle", "revision_id"], pointers);
           const origins = deployment.targets.map((target) => target.origin);
           return {
             status: "ok",
