@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
+  isFile,
   pathExists,
   pathExistsStrict,
   readDirIfExists,
@@ -117,5 +118,22 @@ describe("readDirIfExists", () => {
     await writeFile(join(dir, "a.txt"), "x");
 
     await expect(readDirIfExists(join(dir, "a.txt"))).rejects.toMatchObject({ code: "ENOTDIR" });
+  });
+});
+
+describe("isFile", () => {
+  it("is true for a regular file", async () => {
+    const dir = await tmpDir();
+    await writeFile(join(dir, "a.txt"), "x");
+
+    expect(await isFile(join(dir, "a.txt"))).toBe(true);
+  });
+
+  it("is false for a directory", async () => {
+    expect(await isFile(await tmpDir())).toBe(false);
+  });
+
+  it("is false for a path that does not exist", async () => {
+    expect(await isFile(join(await tmpDir(), "missing"))).toBe(false);
   });
 });

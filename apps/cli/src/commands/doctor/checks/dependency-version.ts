@@ -1,6 +1,6 @@
 import semver from "semver";
 
-import { readPackageJsonIfExists } from "../../../lib/package-json";
+import { readPackageJsonIfExists } from "../../../lib/npm";
 import { addExactCommandFor, detectPackageManager } from "../../../lib/package-manager";
 import type { CheckContext, CheckOutcome, SanityCheck } from "./types";
 

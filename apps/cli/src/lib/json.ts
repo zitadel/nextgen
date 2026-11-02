@@ -87,7 +87,25 @@ export function parseJsonObject(contents: string, path: string): Record<string, 
   return value as Record<string, unknown>;
 }
 
-/** `text` parsed as JSON, or `undefined` when it is not JSON. */
+/**
+ * Parses `text` as JSON for callers that treat "not JSON" as an ordinary answer
+ * and have a fallback ready, such as a log line that may or may not be a JSON
+ * record, or an optional file whose contents are only used when they parse.
+ *
+ * It never throws. The result is `unknown`, so the caller has to narrow it
+ * (with {@link isObject}, for example) before using it. That also means the
+ * text `null` parses to `null`, which is different from the `undefined` this
+ * returns for text that is not JSON at all.
+ *
+ * Use {@link parseJsonObject} instead when invalid JSON should be an error.
+ *
+ * @param text The text to parse.
+ * @returns The parsed value, or `undefined` when `text` is not valid JSON.
+ *
+ * @example
+ * const record = parseJsonOrUndefined(line);
+ * const level = isObject(record) ? record.level : undefined;
+ */
 export function parseJsonOrUndefined(text: string): unknown {
   try {
     return JSON.parse(text) as unknown;

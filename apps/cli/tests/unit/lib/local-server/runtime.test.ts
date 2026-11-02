@@ -19,7 +19,9 @@ import {
   readNearestRuntimeMetadata,
   readRuntimeMetadata,
   removeLocalData,
+  resolveRuntimeBackend,
   retargetMalformedRuntime,
+  sameLocalServer,
   writeRuntimeMetadata,
   type RuntimeMetadata,
 } from "../../../../src/lib/local-server/runtime";
@@ -315,3 +317,44 @@ function runtimeFor(cwd: string): RuntimeMetadata {
     cli_version: "0.0.0-test",
   };
 }
+
+describe("resolveRuntimeBackend", () => {
+  const none = { runtime: undefined, image: undefined, envImage: undefined };
+
+  it("takes the backend that was asked for", () => {
+    expect(resolveRuntimeBackend({ ...none, runtime: "docker" })).toBe("docker");
+    expect(resolveRuntimeBackend({ ...none, runtime: "binary", image: "img" })).toBe("binary");
+  });
+
+  it("keeps the backend an existing server already uses", () => {
+    expect(resolveRuntimeBackend({ ...none, existingRuntime: { backend: "docker" } })).toBe(
+      "docker",
+    );
+  });
+
+  it("chooses Docker when an image is named, from a flag or the environment", () => {
+    expect(resolveRuntimeBackend({ ...none, image: "img" })).toBe("docker");
+    expect(resolveRuntimeBackend({ ...none, envImage: "img" })).toBe("docker");
+  });
+
+  it("falls back to the npm binary", () => {
+    expect(resolveRuntimeBackend(none)).toBe("binary");
+  });
+});
+
+describe("sameLocalServer", () => {
+  it("treats localhost and the loopback addresses as one host", () => {
+    expect(sameLocalServer("http://localhost:8080", "http://127.0.0.1:8080")).toBe(true);
+    expect(sameLocalServer("http://[::1]:8080", "http://localhost:8080")).toBe(true);
+  });
+
+  it("tells servers apart by port and protocol", () => {
+    expect(sameLocalServer("http://localhost:8080", "http://localhost:8081")).toBe(false);
+    expect(sameLocalServer("http://localhost:8080", "https://localhost:8080")).toBe(false);
+  });
+
+  it("is false for a different host or a value that is not a URL", () => {
+    expect(sameLocalServer("http://localhost:8080", "http://example.com:8080")).toBe(false);
+    expect(sameLocalServer("nope", "http://localhost:8080")).toBe(false);
+  });
+});

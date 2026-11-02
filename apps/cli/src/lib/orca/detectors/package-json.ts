@@ -5,9 +5,9 @@ import semver from "semver";
 
 import { isObject, parseJsonOrUndefined } from "../../json";
 import { ancestors } from "../../paths";
-import { type PackageJson, readPackageJson } from "../../package-json";
+import { type PackageJson, readPackageJson } from "../../npm";
 
-export { type PackageJson, readPackageJson } from "../../package-json";
+export { type PackageJson, readPackageJson } from "../../npm";
 
 /**
  * Reports whether `name` appears in either `dependencies` or `devDependencies`.

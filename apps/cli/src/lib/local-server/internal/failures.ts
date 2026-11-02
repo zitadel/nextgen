@@ -34,12 +34,14 @@ function startupCleanupFailedError(
     `${startupError.message}; cleanup did not stop the spawned local runtime`,
     {
       hint: "Inspect the local runtime process and stop it manually, then rerun `zitadel start`.",
-      nextCommands: unique([
-        ...(startupError.nextCommands ?? []),
-        unscopedCommand("stop --all", cliVersion),
-        unscopedCommand("logs", cliVersion),
-        unscopedCommand("reset --force", cliVersion),
-      ]),
+      nextCommands: [
+        ...new Set([
+          ...(startupError.nextCommands ?? []),
+          unscopedCommand("stop --all", cliVersion),
+          unscopedCommand("logs", cliVersion),
+          unscopedCommand("reset --force", cliVersion),
+        ]),
+      ],
       details: {
         startup_error: {
           code: startupError.code,
@@ -174,6 +176,3 @@ function serverExitedError(
 }
 
 /** Removes repeats while keeping order, for suggested commands. */
-function unique<T extends string>(values: T[]): T[] {
-  return [...new Set(values)];
-}

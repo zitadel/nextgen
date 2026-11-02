@@ -11,6 +11,7 @@ import { readIfExists } from "../fs";
 import { parseJsonObject } from "../json";
 import { ancestors } from "../paths";
 import { EMPTY_SUMMARY, type EnvSummary, isEnvSummary, LOCAL_DEFAULTS } from "./env-vars";
+import { isLoopbackHost } from "../host";
 
 export const LOCAL_SERVER_IMAGE_NAME = "ghcr.io/zitadel/nextgen";
 export const DEFAULT_LOCAL_SERVER_IMAGE = `${LOCAL_SERVER_IMAGE_NAME}:latest`;
@@ -59,6 +60,45 @@ export async function readPlatformRuntime(
 }
 
 export type RuntimeBackend = "binary" | "docker";
+
+/**
+ * Decides which backend (`binary` or `docker`) a command works with. The first
+ * rule that applies wins:
+ *
+ * 1. The backend asked for with `--runtime`.
+ * 2. The backend the project's existing server already uses, so a later command
+ *    keeps talking to the server that is running instead of switching.
+ * 3. Docker, when an image was named, either with `--image` or through the
+ *    environment, since an image only means something to Docker.
+ * 4. Otherwise the npm-distributed server binary.
+ *
+ * `start` has no existing server to defer to, so it leaves `existingRuntime` out
+ * and skips the second rule. `doctor` passes it.
+ *
+ * @param input.runtime The raw `--runtime` flag value. Anything other than
+ * `"binary"` or `"docker"` (including `undefined`) means "not given".
+ * @param input.image The `--image` flag value.
+ * @param input.envImage The image named by the environment, if any.
+ * @param input.existingRuntime The recorded runtime of the project's server.
+ * @returns The backend to use.
+ */
+export function resolveRuntimeBackend(input: {
+  runtime: unknown;
+  image: string | undefined;
+  envImage: string | undefined;
+  existingRuntime?: { backend: RuntimeBackend } | undefined;
+}): RuntimeBackend {
+  if (input.runtime === "binary" || input.runtime === "docker") {
+    return input.runtime;
+  }
+  if (input.existingRuntime) {
+    return input.existingRuntime.backend;
+  }
+  if (input.image || input.envImage) {
+    return "docker";
+  }
+  return "binary";
+}
 
 type RuntimeMetadataBase = {
   schema_version: 1;
@@ -230,12 +270,11 @@ async function isOwnFile(path: string): Promise<boolean> {
  * may pass `--server http://127.0.0.1:8080` for the same process.
  */
 export function sameLocalServer(a: string, b: string): boolean {
-  const LOOPBACK = new Set(["localhost", "127.0.0.1", "[::1]"]);
   try {
     const [left, right] = [new URL(a), new URL(b)];
     const sameHost =
       left.hostname === right.hostname ||
-      (LOOPBACK.has(left.hostname) && LOOPBACK.has(right.hostname));
+      (isLoopbackHost(left.hostname) && isLoopbackHost(right.hostname));
     return sameHost && left.protocol === right.protocol && left.port === right.port;
   } catch {
     return false;

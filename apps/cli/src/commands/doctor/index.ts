@@ -23,6 +23,7 @@ import {
   localServerUrl,
   readNearestRuntimeMetadata,
   type RuntimeBackend,
+  resolveRuntimeBackend,
   type RuntimeMetadata,
 } from "../../lib/local-server/runtime";
 import { LocalServer } from "../../lib/local-server/server";
@@ -529,7 +530,7 @@ export function advisoryForWarnings(
   if (nextActions.length === 0 && nextCommands.length === 0) {
     return undefined;
   }
-  return { nextActions: unique(nextActions), nextCommands: unique(nextCommands) };
+  return { nextActions: [...new Set(nextActions)], nextCommands: [...new Set(nextCommands)] };
 }
 
 /**
@@ -891,28 +892,6 @@ function hasManagedRuntimeProcesses(check: CheckOutcome | undefined): boolean {
     Array.isArray((details as { processes?: unknown }).processes) &&
     ((details as { processes?: unknown[] }).processes?.length ?? 0) > 0
   );
-}
-
-function unique<T extends string>(values: T[]): T[] {
-  return [...new Set(values)];
-}
-
-function resolveRuntimeBackend(input: {
-  runtime: unknown;
-  image: string | undefined;
-  envImage: string | undefined;
-  existingRuntime: { backend: RuntimeBackend } | undefined;
-}): RuntimeBackend {
-  if (input.runtime === "binary" || input.runtime === "docker") {
-    return input.runtime;
-  }
-  if (input.existingRuntime) {
-    return input.existingRuntime.backend;
-  }
-  if (input.image || input.envImage) {
-    return "docker";
-  }
-  return "binary";
 }
 
 async function check(

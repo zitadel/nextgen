@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { execa } from "execa";
 
 import { ZitadelError, isErrno } from "../../errors";
 import { unscopedCommand } from "../../suggestion";
@@ -324,17 +324,15 @@ export class DockerLauncher implements Launcher<DockerRuntimeMetadata> {
       const stdout = wholeLines(existing.stdout);
       const stderr = wholeLines(existing.stderr);
       sink.existing(stdout + stderr);
-      replayed.stdout = lineBreaks(stdout);
-      replayed.stderr = lineBreaks(stderr);
+      replayed.stdout = stdout.split("\n").length - 1;
+      replayed.stderr = stderr.split("\n").length - 1;
     }
     const stop = stopSignal();
     try {
       await streamDocker(
         ["logs", "--tail", String(tail), "--follow", containerName],
-        {
-          stdout: afterLines(replayed.stdout, sink.appended),
-          stderr: afterLines(replayed.stderr, sink.appended),
-        },
+        replayed,
+        sink.appended,
         stop.signal,
       );
     } finally {
@@ -361,94 +359,64 @@ export class DockerLauncher implements Launcher<DockerRuntimeMetadata> {
 
 /**
  * Runs `docker` and collects its output; the exit status is part of the result, not an exception.
+ * A `docker` that could not be started at all (none on `PATH`) is thrown, as the
+ * error Node reports for it.
  */
 async function runDocker(
   args: string[],
   env: Readonly<Record<string, string>> = {},
 ): Promise<DockerResult> {
-  return new Promise((resolve, reject) => {
-    const child = spawn("docker", args, {
-      stdio: ["ignore", "pipe", "pipe"],
-      env: { ...process.env, ...env },
-    });
-    const stdout: string[] = [];
-    const stderr: string[] = [];
-    child.stdout?.setEncoding("utf8");
-    child.stderr?.setEncoding("utf8");
-    child.stdout?.on("data", (chunk: string) => {
-      stdout.push(chunk);
-    });
-    child.stderr?.on("data", (chunk: string) => {
-      stderr.push(chunk);
-    });
-    child.on("error", reject);
-    child.on("close", (code) => {
-      resolve({ status: code ?? 1, stdout: stdout.join(""), stderr: stderr.join("") });
-    });
-  });
+  const result = await execa("docker", args, { stdin: "ignore", env, reject: false });
+  if (result.code !== undefined) {
+    throw result;
+  }
+  return { status: result.exitCode ?? 1, stdout: result.stdout, stderr: result.stderr };
 }
 
 /**
- * Runs `docker` until it ends or `signal` aborts, handing its output over as it
- * comes. Ctrl-C reaches `docker` as well; either way, a stop is not a failure.
+ * Runs `docker` until it ends or `signal` aborts, handing its whole lines over
+ * as they come, each stream past its first `skip` lines. Ctrl-C reaches `docker`
+ * as well; either way, a stop is not a failure.
  */
 async function streamDocker(
   args: string[],
-  output: { stdout: (text: string) => void; stderr: (text: string) => void },
+  skip: { stdout: number; stderr: number },
+  write: (text: string) => void,
   signal: AbortSignal,
 ): Promise<void> {
-  await new Promise<void>((resolve, reject) => {
-    const child = spawn("docker", args, {
-      stdio: ["ignore", "pipe", "pipe"],
-      env: process.env,
-    });
-    const stop = () => child.kill("SIGINT");
-    signal.addEventListener("abort", stop, { once: true });
-    child.stdout?.setEncoding("utf8");
-    child.stderr?.setEncoding("utf8");
-    child.stdout?.on("data", output.stdout);
-    child.stderr?.on("data", output.stderr);
-    child.on("error", (error) => {
-      signal.removeEventListener("abort", stop);
-      reject(error);
-    });
-    child.on("close", (code) => {
-      signal.removeEventListener("abort", stop);
-      if (code === 0 || signal.aborted) {
-        resolve();
-      } else {
-        reject(new Error(`docker ${args.join(" ")} exited with status ${code ?? 1}`));
-      }
-    });
+  const subprocess = execa("docker", args, {
+    stdin: "ignore",
+    cancelSignal: signal,
+    killSignal: "SIGINT",
+    reject: false,
   });
+  const remaining = { ...skip };
+  await Promise.all(
+    (["stdout", "stderr"] as const).map(async (stream) => {
+      for await (const line of subprocess.iterable({ from: stream, preserveNewlines: true })) {
+        // A line still being written is handed over once it is whole.
+        if (!line.endsWith("\n")) {
+          continue;
+        }
+        if (remaining[stream] > 0) {
+          remaining[stream] -= 1;
+        } else {
+          write(line);
+        }
+      }
+    }),
+  );
+  const result = await subprocess;
+  if (result.failed && !result.isCanceled) {
+    throw result.exitCode === undefined
+      ? result
+      : new Error(`docker ${args.join(" ")} exited with status ${result.exitCode}`);
+  }
 }
 
 /** `text` up to and with its last line break: its whole lines. */
 function wholeLines(text: string): string {
   return text.slice(0, text.lastIndexOf("\n") + 1);
-}
-
-function lineBreaks(text: string): number {
-  return text.split("\n").length - 1;
-}
-
-/** Passes a stream's text to `write` once its first `count` lines have gone by. */
-function afterLines(count: number, write: (text: string) => void): (text: string) => void {
-  let left = count;
-  return (text) => {
-    let start = 0;
-    while (left > 0) {
-      const lineBreak = text.indexOf("\n", start);
-      if (lineBreak === -1) {
-        return;
-      }
-      left -= 1;
-      start = lineBreak + 1;
-    }
-    if (start < text.length) {
-      write(text.slice(start));
-    }
-  };
 }
 
 /**

@@ -85,6 +85,7 @@ catalog:
   cookie-parser: ^1.4.7
   culori: ^4.0.2
   dompurify: ^3.4.16
+  execa: ^9.6.1
   express: ^4.18.2
   fastest-levenshtein: ^1.0.16
   fumadocs-core: ^16.17.1

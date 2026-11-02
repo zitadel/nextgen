@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { describe, expect } from "vitest";
 
-import { readPackageJson, readPackageJsonIfExists } from "../../../src/lib/package-json";
+import { readPackageJson, readPackageJsonIfExists } from "../../../src/lib/npm";
 import { it } from "../../helpers/fixtures";
 
 describe("readPackageJson", () => {

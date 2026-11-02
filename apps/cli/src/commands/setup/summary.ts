@@ -9,7 +9,7 @@ import semver from "semver";
 import { pathExists } from "../../lib/fs";
 import { detectors } from "../../lib/orca/detectors";
 import type { Detector } from "../../lib/orca/detectors/types";
-import { readPackageJson } from "../../lib/package-json";
+import { readPackageJson } from "../../lib/npm";
 import { detectPackageManager, type PackageManager } from "../../lib/package-manager";
 import type { PasswordMinLength } from "../../lib/policies";
 

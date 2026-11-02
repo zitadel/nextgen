@@ -1,4 +1,5 @@
 import { ZitadelError, errorMessage } from "./errors";
+import { isLoopbackHost } from "./host";
 import { LocalServer } from "./local-server/server";
 import type { Parsed } from "@zitadel/config/idp";
 import type { FlagVariable } from "./oclif/types";
@@ -95,8 +96,7 @@ export function serverOrigin(value: string): string {
  */
 export function isLoopbackUrl(value: string): boolean {
   try {
-    const hostname = new URL(value).hostname;
-    return hostname === "localhost" || hostname === "[::1]" || /^127(\.\d{1,3}){3}$/.test(hostname);
+    return isLoopbackHost(new URL(value).hostname);
   } catch {
     return false;
   }

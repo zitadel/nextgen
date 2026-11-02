@@ -1,4 +1,4 @@
-import { readFile, stat } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { join, posix } from "node:path";
 
 import { parseModule } from "magicast";
@@ -6,6 +6,7 @@ import { parseModule } from "magicast";
 import { ZitadelError } from "../../../errors";
 import { isObject, parseJsonOrUndefined } from "../../../json";
 import { PREFLIGHT_FORCE_NOTE } from "./base";
+import { isFile } from "../../../fs";
 
 /**
  * How a single-page app mounts the root component its patcher writes.
@@ -420,13 +421,5 @@ async function readTextIfExists(path: string): Promise<string | undefined> {
     return await readFile(path, "utf8");
   } catch {
     return undefined;
-  }
-}
-
-async function isFile(path: string): Promise<boolean> {
-  try {
-    return (await stat(path)).isFile();
-  } catch {
-    return false;
   }
 }

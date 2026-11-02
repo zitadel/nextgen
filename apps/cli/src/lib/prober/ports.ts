@@ -1,4 +1,6 @@
-import { execFile } from "node:child_process";
+import { execa } from "execa";
+
+import { isLoopbackHost } from "../host";
 
 export type TcpListener = Readonly<{
   address: string;
@@ -38,27 +40,11 @@ export async function listenersForPort(
   return (await listListeningTcpListeners(opts)).filter((listener) => listener.port === port);
 }
 
-/**
- * Spawn `lsof` with the canned argv and resolve to its stdout. Hand-rolled
- * rather than `util.promisify(execFile)` because the latter resolves with a
- * `{stdout, stderr}` object via its custom-promisify symbol — a heavier shape
- * to mock and worse to read at the call site, where we only ever want stdout.
- */
-function runLsof(timeoutMs: number): Promise<string> {
-  return new Promise<string>((resolve, reject) => {
-    execFile(
-      "lsof",
-      ["-iTCP", "-sTCP:LISTEN", "-P", "-n", "-F", "pcn"],
-      { timeout: timeoutMs, encoding: "utf8" },
-      (err, stdout) => {
-        if (err) {
-          reject(err);
-          return;
-        }
-        resolve(stdout);
-      },
-    );
-  });
+/** Runs `lsof` with the canned argv and resolves to its stdout. */
+async function runLsof(timeoutMs: number): Promise<string> {
+  return (
+    await execa("lsof", ["-iTCP", "-sTCP:LISTEN", "-P", "-n", "-F", "pcn"], { timeout: timeoutMs })
+  ).stdout;
 }
 
 /**
@@ -87,7 +73,7 @@ function parseLsofListeners(stdout: string): ReadonlyArray<TcpListener> {
             return [];
           }
           const host = address.slice(0, colon);
-          if (!isLoopback(host)) {
+          if (host !== "*" && !isLoopbackHost(host)) {
             return [];
           }
           const port = Number.parseInt(address.slice(colon + 1), 10);
@@ -98,9 +84,4 @@ function parseLsofListeners(stdout: string): ReadonlyArray<TcpListener> {
         });
     })
     .sort((a, b) => a.port - b.port || (a.pid ?? 0) - (b.pid ?? 0));
-}
-
-/** Recognised loopback host strings as emitted by `lsof -F n`. */
-function isLoopback(host: string): boolean {
-  return host === "*" || host === "127.0.0.1" || host === "[::1]" || host === "::1";
 }

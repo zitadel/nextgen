@@ -149,6 +149,7 @@
     "@zitadel/server": "workspace:*",
     "ajv": "catalog:",
     "consola": "^3.4.2",
+    "execa": "catalog:",
     "fastest-levenshtein": "catalog:",
     "jsonc-parser": "catalog:",
     "magicast": "^0.5.3",

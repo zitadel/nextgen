@@ -1,4 +1,4 @@
-import { execFile, spawn } from "node:child_process";
+import { spawn } from "node:child_process";
 import { createReadStream } from "node:fs";
 import { mkdir, open, readFile, stat } from "node:fs/promises";
 import { createRequire } from "node:module";
@@ -8,6 +8,7 @@ import { buffer } from "node:stream/consumers";
 import { setTimeout as delay } from "node:timers/promises";
 
 import { resolveServerBinary, serverBinaryPath } from "@zitadel/server/binary";
+import { execa } from "execa";
 
 import { ZitadelError, errorMessage, isErrno } from "../../errors";
 import { shellCommand } from "../../suggestion";
@@ -461,15 +462,8 @@ async function servesDataDir(pid: number, dataDir: string): Promise<boolean> {
 /**
  * Runs `ps` and returns its output, rejecting where `ps` is missing or fails.
  */
-function ps(args: string[]): Promise<string> {
-  return new Promise<string>((resolve, reject) => {
-    execFile(
-      "ps",
-      args,
-      { timeout: 3000, encoding: "utf8", maxBuffer: 16 * 1024 * 1024 },
-      (error, stdout) => (error ? reject(error) : resolve(stdout)),
-    );
-  });
+async function ps(args: string[]): Promise<string> {
+  return (await execa("ps", args, { timeout: 3000, maxBuffer: 16 * 1024 * 1024 })).stdout;
 }
 
 /**
