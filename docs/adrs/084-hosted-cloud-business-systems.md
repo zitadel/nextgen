@@ -304,9 +304,9 @@ website's catch-all.
   - Pro: Governance and operational tools for a monthly base fee, plus
     metered integrations and consumption beyond included allowances. The base
     fee is not usage credit. Branding removal requires a paid plan.
-  - Capacity: requests past Pro's included monthly volume take capacity
-    steps the owner adds, so scale pays for the infrastructure it uses
-    without billing users.
+  - Capacity: requests past Pro's included monthly volume are extra
+    requests the owner adds in blocks of 50M, so scale pays for the
+    infrastructure it uses without billing users.
   - Compliance: a separate quote accepted before activation. Extended audit
     retention is scoped by event volume and duration, never user count.
 
@@ -314,10 +314,11 @@ website's catch-all.
   before (decided 2026-10-29): until then eligible usage is metered on its
   customer and shown, never billed. Core MAU stays in Zitadel analytics.
 
-  Every plan includes deployments, releases and the EU region. On Pro, each
+  Every plan includes versioned releases, previews and rollbacks, and the
+  EU region. On Pro, each
   region outside the EU is an add-on per region, since each needs a database
   of its own; Enterprise includes them. Free and Pro publish their request
-  capacity in the catalog, Pro adds capacity in steps, and Enterprise
+  capacity in the catalog, Pro adds extra requests in blocks, and Enterprise
   capacity is contracted. Custom agreements, indemnification and regulatory
   addenda are Enterprise-only, as distinct from quoted audit capabilities.
 - **Entitlements.** Stripe's `customer.subscription.*` and `invoice.*`

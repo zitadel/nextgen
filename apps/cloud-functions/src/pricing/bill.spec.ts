@@ -159,10 +159,10 @@ describe("integrations and consumption", () => {
 describe("capacity and regions", () => {
   const included = CATALOG.plans.pro.limits.requests_per_month_per_account;
 
-  it("adds a capacity step for each part of Pro's included volume a month goes past", () => {
+  it("adds a block of extra requests for each part of Pro's included volume a month goes past", () => {
     expect(bill({ counts: { api_requests: included } }).total_amount).toBe(10_000);
     expect(bill({ counts: { api_requests: included + 1 } })).toMatchObject({
-      reasons: ["1 capacity step past Pro's included requests"],
+      reasons: ["50M extra requests past Pro's included volume"],
       on_top_amount: 70_000,
       total_amount: 80_000,
     });
