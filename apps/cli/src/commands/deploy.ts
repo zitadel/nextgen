@@ -19,7 +19,7 @@ import { ApiError } from "@zitadel/api/runtime/fetch";
 import { ZitadelError } from "../lib/errors";
 import { issuerHeldAsPreview, originOf, type ProjectOrigin } from "../lib/origins";
 import { readZitadelSecret } from "../lib/project";
-import { shellArg } from "../lib/shell";
+import { Cmd } from "../lib/cmd";
 import { type EnvironmentSelector, projectCommand } from "../lib/suggestion";
 import { reportWarning } from "../lib/warnings";
 
@@ -270,15 +270,15 @@ export function noPrimaryOriginError(input: {
         nextCommands: [doctor],
       });
     }
-    const remove = suggest(`origin rm ${shellArg(preview)} --force`);
-    const add = suggest(`origin add ${shellArg(preview)} --kind primary`);
+    const remove = suggest(`origin rm ${Cmd.quote(preview)} --force`);
+    const add = suggest(`origin add ${Cmd.quote(preview)} --kind primary`);
     return new ZitadelError("E_VALIDATION", message, {
       hint: `${held} Remove it with \`${remove}\`, add it back with \`${add}\`, then deploy.`,
       nextCommands: [remove, add],
     });
   }
   if (input.issuer !== undefined) {
-    const add = suggest(`origin add ${shellArg(originOf(input.issuer))} --kind primary`);
+    const add = suggest(`origin add ${Cmd.quote(originOf(input.issuer))} --kind primary`);
     return new ZitadelError("E_VALIDATION", message, {
       hint: `Add the URL the app serves from with \`${add}\`, then deploy.`,
       nextCommands: [add],

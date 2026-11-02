@@ -12,7 +12,7 @@ import { wireOf } from "../wire";
 import { type ParsedFilter, parseFilter, parseSort } from "../query";
 import { parseOrThrow } from "../shared";
 import { chosenColumns } from "../columns";
-import { shellOption } from "../../../shell";
+import { Cmd } from "../../../cmd";
 import { fieldPaths } from "../paths";
 import type { Json, ListSpec } from "../types";
 import {
@@ -221,7 +221,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
               [
                 `${topic} list`,
                 ...repeatedFlags(flags),
-                shellOption("--page-token", next),
+                Cmd.option("--page-token", next),
                 "--json",
               ].join(" "),
             ),
@@ -244,7 +244,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
               await this.tabulate(columns, items),
               "",
               `${items.length} ${items.length === 1 ? resource.singular : topic}`,
-              ...(next ? [`More available: ${shellOption("--page-token", next)} (or --all)`] : []),
+              ...(next ? [`More available: ${Cmd.option("--page-token", next)} (or --all)`] : []),
             ].join("\n"),
     };
   }
@@ -257,9 +257,9 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
  */
 const repeatedFlags = (flags: Json): readonly string[] => {
   const limit = typeof flags.limit === "number" ? [`--limit ${flags.limit}`] : [];
-  const sort = typeof flags.sort === "string" ? [shellOption("--sort", flags.sort)] : [];
+  const sort = typeof flags.sort === "string" ? [Cmd.option("--sort", flags.sort)] : [];
   const filters = (Array.isArray(flags.filter) ? flags.filter : []).map((filter) =>
-    shellOption("--filter", String(filter)),
+    Cmd.option("--filter", String(filter)),
   );
   return [...limit, ...sort, ...filters];
 };
