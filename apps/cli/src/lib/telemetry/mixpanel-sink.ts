@@ -46,7 +46,9 @@ export class MixpanelSink implements TelemetrySink {
   }
 
   track(event: string, payload: Properties): void {
-    trace(this.debug, `${event} ${JSON.stringify(payload)}`);
+    trace(this.debug, () => {
+      return `${event} ${JSON.stringify(payload)}`;
+    });
     this.outbox.add(
       this.deliver((done) => {
         this.client.track(event, payload, done);
@@ -55,7 +57,9 @@ export class MixpanelSink implements TelemetrySink {
   }
 
   profile(payload: Properties, modifiers: Modifiers): void {
-    trace(this.debug, `people.set ${JSON.stringify(payload)}`);
+    trace(this.debug, () => {
+      return `people.set ${JSON.stringify(payload)}`;
+    });
     this.outbox.add(
       this.deliver((done) => {
         this.client.people.set(this.distinctId, payload, modifiers, done);

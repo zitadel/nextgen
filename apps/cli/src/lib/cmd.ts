@@ -110,23 +110,25 @@ export class Cmd {
   }
 
   /**
-   * `words` without the options and their values. It recurses once per word,
-   * which is safe because a command line is short.
+   * `words` without the options and their values, in one pass. The loop and the
+   * value-skipping share one iterator: reading an option's value out of it takes
+   * that word out of the walk.
    */
   private static stripped(words: readonly string[], options: readonly string[]): string[] {
-    const [word, ...rest] = words;
-    if (word === undefined) {
-      return [];
+    const kept: string[] = [];
+    const remaining = words.values();
+    for (const word of remaining) {
+      if (options.includes(word)) {
+        remaining.next();
+        continue;
+      }
+      const isInlineValue = options.some((option) => {
+        return option.startsWith("--") && word.startsWith(`${option}=`);
+      });
+      if (!isInlineValue) {
+        kept.push(word);
+      }
     }
-    if (options.includes(word)) {
-      return Cmd.stripped(rest.slice(1), options);
-    }
-    const isInlineValue = options.some((option) => {
-      return option.startsWith("--") && word.startsWith(`${option}=`);
-    });
-    if (isInlineValue) {
-      return Cmd.stripped(rest, options);
-    }
-    return [word, ...Cmd.stripped(rest, options)];
+    return kept;
   }
 }

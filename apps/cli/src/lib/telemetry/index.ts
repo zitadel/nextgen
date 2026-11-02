@@ -99,14 +99,18 @@ export class Telemetry {
     };
 
     const consent = resolveConsent({ env: deps.env, flag: deps.flag });
-    trace(debug, `consent: ${consent.reason}`);
+    trace(debug, () => {
+      return `consent: ${consent.reason}`;
+    });
     if (!consent.enabled) {
       return inert(false);
     }
 
     const token = resolveTelemetryToken(deps.env);
     if (!token) {
-      trace(debug, "mixpanel: no token");
+      trace(debug, () => {
+        return "mixpanel: no token";
+      });
     }
     const vercel = VercelSink.from({
       env: deps.env,

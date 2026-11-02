@@ -34,7 +34,9 @@ export class VercelSink implements TelemetrySink {
     }
     const endpoint = resolveVercelEndpoint(settings.env);
     if (endpoint === undefined) {
-      trace(settings.debug, "vercel: no copy on the development channel");
+      trace(settings.debug, () => {
+        return "vercel: no copy on the development channel";
+      });
       return undefined;
     }
     const target = { endpoint, keys: settings.keys };
@@ -43,7 +45,9 @@ export class VercelSink implements TelemetrySink {
 
   track(event: string, payload: Properties): void {
     const body = vercelEventBody(event, payload, this.target, Date.now());
-    trace(this.debug, `vercel ${body}`);
+    trace(this.debug, () => {
+      return `vercel ${body}`;
+    });
     this.outbox.add(this.deliver(body));
   }
 
@@ -68,7 +72,9 @@ export class VercelSink implements TelemetrySink {
       })
       .then(
         (response) => {
-          trace(this.debug, `vercel answered ${response.status}`);
+          trace(this.debug, () => {
+            return `vercel answered ${response.status}`;
+          });
         },
         () => undefined,
       );
