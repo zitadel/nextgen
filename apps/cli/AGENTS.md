@@ -41,6 +41,8 @@
 
 ## Command code
 
+- Style human output with `src/lib/style.ts`, which names what text is, not
+  `picocolors` directly. A unit test fails on another import.
 - Report a warning through `reportWarning` (`src/lib/warnings.ts`) or a
   result's `warnings`, never `consola.warn`: `--json` silences consola. A unit
   test fails on any other `consola.warn`.

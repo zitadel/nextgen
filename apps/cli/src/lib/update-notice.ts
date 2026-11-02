@@ -1,7 +1,8 @@
 import { box } from "consola/utils";
 
 import { exactZitadelPins } from "../commands/doctor/checks/dependency-version";
-import { command, wrapForBox } from "./box";
+import { wrapForBox } from "./box";
+import { command } from "./style";
 import { upgradeCommand } from "./suggestion";
 import { isNewerVersion, latestCliVersion, updateCheckDisabled } from "./update-check";
 

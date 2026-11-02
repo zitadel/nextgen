@@ -1,9 +1,8 @@
-import pc from "picocolors";
 import wrapAnsi from "wrap-ansi";
 
-import { command } from "../../lib/box";
 import type { NextSteps } from "../../lib/oclif/next-steps";
 import { publicCliCommand } from "../../lib/public-cli";
+import { arrow, command, dim, mark, statusColor, strong } from "../../lib/style";
 import type { CheckOutcome } from "./checks";
 
 /** The question a check answers, which also tells who fixes it and how. On the wire, so `snake_case`. */
@@ -80,16 +79,10 @@ export function withCategories(
 type RowStatus = CheckOutcome["status"] | "skip";
 
 const ROW_MARK: Record<RowStatus, string> = {
-  pass: pc.green("[✓]"),
-  warn: pc.yellow("[!]"),
-  fail: pc.red("[✗]"),
-  skip: pc.dim("[-]"),
-};
-
-const CHECK_MARK: Record<CheckOutcome["status"], string> = {
-  pass: pc.green("✓"),
-  warn: pc.yellow("!"),
-  fail: pc.red("✗"),
+  pass: statusColor.pass("[✓]"),
+  warn: statusColor.warn("[!]"),
+  fail: statusColor.fail("[✗]"),
+  skip: dim("[-]"),
 };
 
 export type DoctorReportInput = {
@@ -117,8 +110,8 @@ export type DoctorReportInput = {
 export function renderDoctorReport(input: DoctorReportInput): string {
   const lines = [
     input.verbose
-      ? pc.bold("Zitadel doctor")
-      : `${pc.bold("Zitadel doctor")} ${pc.dim("(run with -v to see every check)")}`,
+      ? strong("Zitadel doctor")
+      : `${strong("Zitadel doctor")} ${dim("(run with -v to see every check)")}`,
     "",
   ];
   const shownCommands = new Set<string>();
@@ -166,10 +159,10 @@ function skipReason(
 }
 
 function row(status: RowStatus, label: string, summary: string | undefined): string {
-  const title = status === "pass" || status === "skip" ? label : pc.bold(label);
+  const title = status === "pass" || status === "skip" ? label : strong(label);
   return [
     `${ROW_MARK[status]} ${title}${" ".repeat(LABEL_WIDTH - label.length)}`,
-    ...(summary === undefined || summary === "" ? [] : [pc.dim(summary)]),
+    ...(summary === undefined || summary === "" ? [] : [dim(summary)]),
   ]
     .join("  ")
     .trimEnd();
@@ -227,7 +220,7 @@ function detailLines(checks: readonly CheckOutcome[], input: DoctorReportInput):
     }
     seen.add(check.message);
     const text = input.verbose ? `${check.name}: ${check.message}` : check.message;
-    lines.push(detailLine(check.status, check.status === "pass" ? pc.dim(text) : text, input));
+    lines.push(detailLine(check.status, check.status === "pass" ? dim(text) : text, input));
   }
   return lines;
 }
@@ -242,7 +235,7 @@ function detailLine(
     : wrapAnsi(text, Math.max(20, input.columns - DETAIL_INDENT), { hard: false });
   const [first = "", ...rest] = wrapped.split("\n");
   return [
-    `    ${CHECK_MARK[status]} ${first}`,
+    `    ${mark[status]} ${first}`,
     ...rest.map((line) => `${" ".repeat(DETAIL_INDENT)}${line}`),
   ].join("\n");
 }
@@ -261,7 +254,7 @@ function remediesOf(category: CheckCategory, checks: readonly CheckOutcome[]): s
 }
 
 function remedyLine(remedy: string): string {
-  return `    ${pc.dim("→")} ${command(remedy)}`;
+  return `    ${arrow} ${command(remedy)}`;
 }
 
 function conclusion(checks: readonly CheckOutcome[]): string {
@@ -270,12 +263,12 @@ function conclusion(checks: readonly CheckOutcome[]): string {
   const categories = (count: number): string =>
     count === 1 ? "1 category" : `${String(count)} categories`;
   if (checks.some((check) => check.status === "fail")) {
-    return `${CHECK_MARK.fail} Zitadel doctor found issues in ${categories(affected("fail"))}.`;
+    return `${mark.fail} Zitadel doctor found issues in ${categories(affected("fail"))}.`;
   }
   if (checks.some((check) => check.status === "warn")) {
-    return `${CHECK_MARK.warn} Zitadel doctor passed with warnings in ${categories(affected("warn"))}.`;
+    return `${mark.warn} Zitadel doctor passed with warnings in ${categories(affected("warn"))}.`;
   }
-  return `${CHECK_MARK.pass} Zitadel doctor passed.`;
+  return `${mark.pass} Zitadel doctor passed.`;
 }
 
 /** The next steps not already shown under a row, which is why doctor draws them itself. */
@@ -289,6 +282,6 @@ function nextLines(next: NextSteps, shownCommands: ReadonlySet<string>): string[
     "",
     "Next:",
     ...actions.map((action) => `  ${action}`),
-    ...commands.map((suggested) => `  ${pc.dim("$")} ${command(suggested)}`),
+    ...commands.map((suggested) => `  ${dim("$")} ${command(suggested)}`),
   ];
 }

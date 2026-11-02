@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 import consola from "consola";
 import * as rosie from "rosie-skills";
 
-import { command } from "./box";
+import { command } from "./style";
 import { publicCliCommand } from "./public-cli";
 import { telemetryConfigDir } from "./telemetry/identity";
 

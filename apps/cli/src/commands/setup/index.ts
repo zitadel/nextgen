@@ -125,16 +125,14 @@ import {
   detectProjectFacts,
   fileNameOf,
   formatFrameworkLine,
-  id as styleId,
-  path as stylePath,
   relativeDisplayPath as relativeDisplay,
   renderSummary,
   signInSummary,
-  url as styleUrl,
   type Row,
   type Section,
 } from "./summary";
 import { shellArg, shellOption } from "../../lib/shell";
+import { id as styleId, path as stylePath, url as styleUrl } from "../../lib/style";
 import { showSkillsHint } from "../../lib/skills-hint";
 import { reportWarning } from "../../lib/warnings";
 import {

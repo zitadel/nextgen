@@ -2,10 +2,8 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 
 import { execa } from "execa";
-import pc from "picocolors";
 import semver from "semver";
 
-import { command } from "../lib/box";
 import { ZitadelError, errorMessage } from "../lib/errors";
 import { BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
 import {
@@ -20,6 +18,7 @@ import { shellOption } from "../lib/shell";
 import { newestCliCommand } from "../lib/public-cli";
 import { type BreakingChange, breakingChanges, RELEASE_NOTES_URL } from "../lib/release-notes";
 import { SHARED_SKILLS_DIR } from "../lib/skills/add";
+import { arrow, command, dim, mark, strong, url } from "../lib/style";
 import { type SuggestedCommand, shellCommand, unscopedCommand } from "../lib/suggestion";
 import { isNewerVersion, latestCliVersion } from "../lib/update-check";
 import { exactZitadelPins, floatingZitadelSpecs } from "./doctor/checks/dependency-version";
@@ -203,11 +202,11 @@ async function refreshProject(
 
 function renderBreakingChanges(breaking: readonly BreakingChange[]): string {
   const notes = breaking.flatMap(({ version, note }) => [
-    `  ${pc.yellow("!")} ${pc.bold(version)}  ${note}`,
+    `  ${mark.warn} ${strong(version)}  ${note}`,
   ]);
   return [
-    ...(notes.length > 0 ? [pc.bold("Breaking changes on the way:"), ...notes] : []),
-    `Release notes: ${pc.cyan(RELEASE_NOTES_URL)}`,
+    ...(notes.length > 0 ? [strong("Breaking changes on the way:"), ...notes] : []),
+    `Release notes: ${url(RELEASE_NOTES_URL)}`,
     "",
   ].join("\n");
 }
@@ -221,21 +220,20 @@ function renderUpgrade(input: {
   installSuggestion: string | undefined;
 }): string {
   const { title, packages, leftAlone, refresh, dryRun, installSuggestion } = input;
-  const mark = dryRun ? pc.dim("→") : pc.green("✓");
+  const done = dryRun ? arrow : mark.pass;
   return [
-    pc.bold(title),
-    ...packages.map((pkg) => `  ${mark} ${pkg.name} ${pkg.from} → ${pkg.to}`),
+    strong(title),
+    ...packages.map((pkg) => `  ${done} ${pkg.name} ${pkg.from} → ${pkg.to}`),
     ...(dryRun && installSuggestion !== undefined
       ? [`  Would run ${command(installSuggestion)}`]
       : []),
-    ...(refresh === "done" ? [`  ${mark} Refreshed generated files with doctor --fix`] : []),
+    ...(refresh === "done" ? [`  ${done} Refreshed generated files with doctor --fix`] : []),
     ...(refresh === "issues"
-      ? [`  ${pc.yellow("!")} Refreshed generated files; doctor still reports issues`]
+      ? [`  ${mark.warn} Refreshed generated files; doctor still reports issues`]
       : []),
-    ...(refresh === "failed" ? [`  ${pc.yellow("!")} Could not refresh generated files`] : []),
+    ...(refresh === "failed" ? [`  ${mark.warn} Could not refresh generated files`] : []),
     ...leftAlone.map(
-      ([name, specifier]) =>
-        `  ${pc.dim(`- ${name} left at "${specifier}", not an exact version`)}`,
+      ([name, specifier]) => `  ${dim(`- ${name} left at "${specifier}", not an exact version`)}`,
     ),
   ].join("\n");
 }
