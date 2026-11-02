@@ -26,12 +26,12 @@ const ONE_LINE: EscapeOptions = { keepLayout: false };
  * reads its values here, so control characters in a value from a server are
  * escaped for all of them and none can drive the terminal.
  */
-const readCell = (column: string, item: unknown, escape?: EscapeOptions): string => {
+const readCell = (column: string, item: unknown, options?: EscapeOptions): string => {
   const value = column
     .split(".")
     .reduce<unknown>((current, key) => (isObject(current) ? current[key] : undefined), item);
   const text = value == null ? "" : typeof value === "string" ? value : JSON.stringify(value);
-  return escapeControlCharacters(text, escape);
+  return escapeControlCharacters(text, options);
 };
 
 /**
