@@ -179,25 +179,20 @@ export async function installedPackage(
   cwd: string,
   name: string,
 ): Promise<InstalledPackage | undefined> {
-  const start = await realpath(resolve(cwd)).catch(() => resolve(cwd));
-  return installedPackageFrom(start, name);
-}
-
-async function installedPackageFrom(
-  dir: string,
-  name: string,
-): Promise<InstalledPackage | undefined> {
-  const path = join(dir, "node_modules", name, "package.json");
-  const contents = await readFile(path, "utf8").catch(() => undefined);
-  if (contents !== undefined) {
-    const version = versionIn(contents);
-    return version === undefined ? undefined : { version, path };
+  let dir = await realpath(resolve(cwd)).catch(() => resolve(cwd));
+  for (;;) {
+    const path = join(dir, "node_modules", name, "package.json");
+    const contents = await readFile(path, "utf8").catch(() => undefined);
+    if (contents !== undefined) {
+      const version = versionIn(contents);
+      return version === undefined ? undefined : { version, path };
+    }
+    const parent = dirname(dir);
+    if (parent === dir || (await isWorkspaceRoot(dir))) {
+      return undefined;
+    }
+    dir = parent;
   }
-  const parent = dirname(dir);
-  if (parent === dir || (await isWorkspaceRoot(dir))) {
-    return undefined;
-  }
-  return installedPackageFrom(parent, name);
 }
 
 /** The version of `name` installed for the app at `cwd`; see {@link installedPackage}. */

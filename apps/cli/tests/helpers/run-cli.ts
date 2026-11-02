@@ -29,8 +29,8 @@ export async function runCliForTest(
   root: string = cliPackageRoot,
   machine: LocalServers = aMachineRunning(),
 ) {
-  const stdout: string[] = [];
-  const stderr: string[] = [];
+  let stdout = "";
+  let stderr = "";
   const originalOut = process.stdout.write.bind(process.stdout);
   const originalErr = process.stderr.write.bind(process.stderr);
   const originalLog = console.log;
@@ -42,44 +42,42 @@ export async function runCliForTest(
   // Capture both direct stream writes (e.g. consola) and oclif's `ux.stdout`/
   // `ux.stderr`, which go through `console.log`/`console.error`.
   process.stdout.write = ((chunk: string | Uint8Array): boolean => {
-    stdout.push(typeof chunk === "string" ? chunk : Buffer.from(chunk).toString());
+    stdout += typeof chunk === "string" ? chunk : Buffer.from(chunk).toString();
     return true;
   }) as typeof process.stdout.write;
   process.stderr.write = ((chunk: string | Uint8Array): boolean => {
-    stderr.push(typeof chunk === "string" ? chunk : Buffer.from(chunk).toString());
+    stderr += typeof chunk === "string" ? chunk : Buffer.from(chunk).toString();
     return true;
   }) as typeof process.stderr.write;
   console.log = (...args: unknown[]): void => {
-    stdout.push(`${format(...args)}\n`);
+    stdout += `${format(...args)}\n`;
   };
   console.error = (...args: unknown[]): void => {
-    stderr.push(`${format(...args)}\n`);
+    stderr += `${format(...args)}\n`;
   };
 
-  const exitCode = await (async () => {
-    try {
-      const command = await commandSeeing(argv[0], machine);
-      await (command ? command.run(argv.slice(1), root) : run(argv, root));
-      return 0;
-    } catch (error) {
-      return exitCodeOf(error);
-    } finally {
-      process.stdout.write = originalOut;
-      process.stderr.write = originalErr;
-      console.log = originalLog;
-      console.error = originalConsoleError;
-      for (const key of overlaid) {
-        const prior = previous.get(key);
-        if (prior === undefined) {
-          delete process.env[key];
-        } else {
-          process.env[key] = prior;
-        }
+  let exitCode = 0;
+  try {
+    const command = await commandSeeing(argv[0], machine);
+    await (command ? command.run(argv.slice(1), root) : run(argv, root));
+  } catch (error) {
+    exitCode = exitCodeOf(error);
+  } finally {
+    process.stdout.write = originalOut;
+    process.stderr.write = originalErr;
+    console.log = originalLog;
+    console.error = originalConsoleError;
+    for (const key of overlaid) {
+      const prior = previous.get(key);
+      if (prior === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = prior;
       }
     }
-  })();
+  }
 
-  return { exitCode, stdout: stdout.join(""), stderr: stderr.join("") };
+  return { exitCode, stdout, stderr };
 }
 
 /** A machine that runs exactly the given servers, whatever it really runs. */

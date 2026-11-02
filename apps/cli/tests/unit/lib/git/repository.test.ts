@@ -21,7 +21,6 @@ const scratch = new GitScratch();
 beforeEach(isolateGit);
 
 afterEach(async () => {
-  vi.unstubAllEnvs();
   await scratch.cleanup();
 });
 

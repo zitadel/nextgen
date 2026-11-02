@@ -1,10 +1,11 @@
 import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
-import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect } from "vitest";
+
+import { it, type Serve } from "../../../helpers/fixtures";
 
 import {
   buildSummary,
@@ -31,7 +32,6 @@ import { expectedPublicCliCommand, parseJson, runCliForTest } from "../../../hel
  * servers below instead of an api-mock.
  */
 const tempDirs: string[] = [];
-const servers: Server[] = [];
 
 async function makeTempDir(): Promise<string> {
   const cwd = await mkdtemp(join(tmpdir(), "zitadel-setup-test-"));
@@ -48,9 +48,6 @@ async function writeFiles(cwd: string, files: Record<string, string>): Promise<v
 }
 
 afterEach(async () => {
-  for (const server of servers.splice(0)) {
-    await new Promise<void>((resolve) => server.close(() => resolve()));
-  }
   while (tempDirs.length > 0) {
     const dir = tempDirs.pop();
     if (dir) {
@@ -144,9 +141,11 @@ describe("setup command pre-flight", () => {
     expect(json.hint).toContain("--framework");
   });
 
-  it("scaffolds beside the runtime start left: asks for --framework, not --force", async () => {
+  it("scaffolds beside the runtime start left: asks for --framework, not --force", async ({
+    serve,
+  }) => {
     const cwd = await makeTempDir();
-    const serverUrl = await startHealthServer();
+    const serverUrl = await startHealthServer(serve);
     await writeRuntimeMetadata(cwd, runtimeFor(cwd, serverUrl));
 
     const res = await runCliForTest([
@@ -169,11 +168,11 @@ describe("setup command pre-flight", () => {
     expect(json.hint).not.toContain("--force");
   });
 
-  it("names every framework and the rerun when there is nobody to ask", async () => {
+  it("names every framework and the rerun when there is nobody to ask", async ({ serve }) => {
     // What a coding agent meets when it runs the quickstart's `setup --server
     // local` as written: no terminal, so no prompt, and no flag saying so.
     const cwd = await makeTempDir();
-    const serverUrl = await startHealthServer();
+    const serverUrl = await startHealthServer(serve);
     await writeRuntimeMetadata(cwd, runtimeFor(cwd, serverUrl));
 
     const res = await runCliForTest(["setup", "--cwd", cwd, "--server", "local"]);
@@ -187,9 +186,11 @@ describe("setup command pre-flight", () => {
     expect(res.stderr).toContain(expectedPublicCliCommand("setup --framework next --server local"));
   });
 
-  it("refuses a local server another CLI release started, before writing anything", async () => {
+  it("refuses a local server another CLI release started, before writing anything", async ({
+    serve,
+  }) => {
     const cwd = await makeTempDir();
-    const serverUrl = await startHealthServer();
+    const serverUrl = await startHealthServer(serve);
     await writeRuntimeMetadata(cwd, binaryRuntimeFor(cwd, serverUrl, "0.0.1"));
 
     const res = await runCliForTest([
@@ -228,9 +229,9 @@ describe("setup command pre-flight", () => {
     expect(await readdir(cwd)).toEqual([".zitadel"]);
   });
 
-  it("goes on against a local server of this CLI's own version", async () => {
+  it("goes on against a local server of this CLI's own version", async ({ serve }) => {
     const cwd = await makeTempDir();
-    const serverUrl = await startHealthServer();
+    const serverUrl = await startHealthServer(serve);
     const version = LocalServer.bundledVersion();
     expect(version).toBeDefined();
     await writeRuntimeMetadata(cwd, binaryRuntimeFor(cwd, serverUrl, String(version)));
@@ -445,14 +446,14 @@ describe("setup command pre-flight", () => {
     expect(json.details.entries).toContain("README.md");
   });
 
-  it("points cloud project creation failures at the local alpha path", async () => {
+  it("points cloud project creation failures at the local alpha path", async ({ serve }) => {
     const cwd = await makeTempDir();
     await mkdir(join(cwd, "app"), { recursive: true });
     await writeFile(
       join(cwd, "package.json"),
       JSON.stringify({ name: "demo", dependencies: { next: "^16" } }),
     );
-    const serverUrl = await startNotFoundServer();
+    const serverUrl = await startNotFoundServer(serve);
 
     const res = await runCliForTest([
       "setup",
@@ -489,14 +490,14 @@ describe("setup command pre-flight", () => {
     ]);
   });
 
-  it("keeps the sign-in preset in cloud-failure retry guidance", async () => {
+  it("keeps the sign-in preset in cloud-failure retry guidance", async ({ serve }) => {
     const cwd = await makeTempDir();
     await mkdir(join(cwd, "app"), { recursive: true });
     await writeFile(
       join(cwd, "package.json"),
       JSON.stringify({ name: "demo", dependencies: { next: "^16" } }),
     );
-    const serverUrl = await startNotFoundServer();
+    const serverUrl = await startNotFoundServer(serve);
 
     const res = await runCliForTest([
       "setup",
@@ -530,14 +531,14 @@ describe("setup command pre-flight", () => {
     ]);
   });
 
-  it("sends a project name in create-project payload", async () => {
+  it("sends a project name in create-project payload", async ({ serve }) => {
     const cwd = await makeTempDir();
     await mkdir(join(cwd, "app"), { recursive: true });
     await writeFile(
       join(cwd, "package.json"),
       JSON.stringify({ name: "demo", dependencies: { next: "^16" } }),
     );
-    const capture = await startCreateProjectCaptureServer();
+    const capture = await startCreateProjectCaptureServer(serve);
 
     const res = await runCliForTest([
       "setup",
@@ -567,7 +568,7 @@ describe("setup command pre-flight", () => {
     expect(projectName.trim().length).toBeGreaterThan(0);
   });
 
-  it("stops on a file it would overwrite before it creates a project", async () => {
+  it("stops on a file it would overwrite before it creates a project", async ({ serve }) => {
     // An existing Vite React app: setup writes the app's root component, so
     // without --force it must refuse -- and before POST /projects, so nothing
     // is left behind and a rerun is not skipped as already set up.
@@ -583,7 +584,7 @@ describe("setup command pre-flight", () => {
     await mkdir(join(cwd, "src"), { recursive: true });
     const ownApp = "export default function App() {\n  return <h1>Mine</h1>;\n}\n";
     await writeFile(join(cwd, "src/App.tsx"), ownApp);
-    const capture = await startCreateProjectCaptureServer();
+    const capture = await startCreateProjectCaptureServer(serve);
 
     const res = await runCliForTest([
       "setup",
@@ -607,12 +608,12 @@ describe("setup command pre-flight", () => {
     expect(await readFile(join(cwd, "src/App.tsx"), "utf8")).toBe(ownApp);
   });
 
-  it.each(PRE_PROJECT_CONFLICTS.map((c) => [c.conflict, c] as const))(
+  it.for(PRE_PROJECT_CONFLICTS.map((c) => [c.conflict, c] as const))(
     "stops on %s before it creates a project",
-    async (_conflict, { files, named }) => {
+    async ([_conflict, { files, named }], { serve }) => {
       const cwd = await makeTempDir();
       await writeFiles(cwd, files);
-      const capture = await startCreateProjectCaptureServer();
+      const capture = await startCreateProjectCaptureServer(serve);
 
       const res = await runCliForTest([
         "setup",
@@ -636,13 +637,13 @@ describe("setup command pre-flight", () => {
 
   // Reported as no framework at all, the app would read as a directory to
   // scaffold into, and --force would scaffold a new app over it.
-  it("stops on a --framework the app is not, instead of offering --force", async () => {
+  it("stops on a --framework the app is not, instead of offering --force", async ({ serve }) => {
     const cwd = await makeTempDir();
     await writeFiles(cwd, {
       "package.json": JSON.stringify({ name: "demo", dependencies: { next: "^16" } }),
       "app/layout.tsx": "export default function Layout() {}\n",
     });
-    const capture = await startCreateProjectCaptureServer();
+    const capture = await startCreateProjectCaptureServer(serve);
 
     const res = await runCliForTest([
       "setup",
@@ -665,9 +666,9 @@ describe("setup command pre-flight", () => {
     expect(capture.requests).toEqual([]);
   });
 
-  it("deploys .zitadel/ to the primary origin with the project secret", async () => {
+  it("deploys .zitadel/ to the primary origin with the project secret", async ({ serve }) => {
     const cwd = await makeNextApp();
-    const capture = await startCreateProjectCaptureServer();
+    const capture = await startCreateProjectCaptureServer(serve);
 
     const res = await runCliForTest([
       "setup",
@@ -702,9 +703,11 @@ describe("setup command pre-flight", () => {
     });
   });
 
-  it("warns, names the deploy and still succeeds when its first deploy fails", async () => {
+  it("warns, names the deploy and still succeeds when its first deploy fails", async ({
+    serve,
+  }) => {
     const cwd = await makeNextApp();
-    const capture = await startCreateProjectCaptureServer();
+    const capture = await startCreateProjectCaptureServer(serve);
     capture.rejectsReleases();
 
     const res = await runCliForTest([
@@ -734,14 +737,14 @@ describe("setup command pre-flight", () => {
     expect(capture.deployments).toEqual([]);
   });
 
-  it("writes no login template and publishes no branding revision (#1039)", async () => {
+  it("writes no login template and publishes no branding revision (#1039)", async ({ serve }) => {
     const cwd = await makeTempDir();
     await mkdir(join(cwd, "app"), { recursive: true });
     await writeFile(
       join(cwd, "package.json"),
       JSON.stringify({ name: "demo", dependencies: { next: "^16" } }),
     );
-    const capture = await startCreateProjectCaptureServer();
+    const capture = await startCreateProjectCaptureServer(serve);
 
     const res = await runCliForTest([
       "setup",
@@ -789,9 +792,9 @@ describe("setup command pre-flight", () => {
  * keeps the rerun's app talking to a project with no schema or login flow.
  */
 describe("setup that fails after it created the project", () => {
-  it("removes the .env.local it wrote when the schema upload fails", async () => {
+  it("removes the .env.local it wrote when the schema upload fails", async ({ serve }) => {
     const cwd = await makeNextApp();
-    const capture = await startCreateProjectCaptureServer();
+    const capture = await startCreateProjectCaptureServer(serve);
     capture.rejectsSchemaUploads();
 
     const res = await runSetup(cwd, capture.url);
@@ -800,11 +803,13 @@ describe("setup that fails after it created the project", () => {
     expect(existsSync(join(cwd, ".env.local"))).toBe(false);
   });
 
-  it("puts back the .env.local the app already had when the schema upload fails", async () => {
+  it("puts back the .env.local the app already had when the schema upload fails", async ({
+    serve,
+  }) => {
     const cwd = await makeNextApp();
     const own = "# The app's own settings\nDATABASE_URL=postgres://localhost:5432/app";
     await writeFile(join(cwd, ".env.local"), own);
-    const capture = await startCreateProjectCaptureServer();
+    const capture = await startCreateProjectCaptureServer(serve);
     capture.rejectsSchemaUploads();
 
     const res = await runSetup(cwd, capture.url);
@@ -813,9 +818,9 @@ describe("setup that fails after it created the project", () => {
     expect(await readFile(join(cwd, ".env.local"), "utf8")).toBe(own);
   });
 
-  it("points the rerun's .env.local at the project the rerun created", async () => {
+  it("points the rerun's .env.local at the project the rerun created", async ({ serve }) => {
     const cwd = await makeNextApp();
-    const capture = await startCreateProjectCaptureServer();
+    const capture = await startCreateProjectCaptureServer(serve);
     capture.rejectsSchemaUploads();
     expect((await runSetup(cwd, capture.url)).exitCode).toBe(4);
     capture.recovers();
@@ -831,12 +836,14 @@ describe("setup that fails after it created the project", () => {
     });
   });
 
-  it("removes the .env.local it wrote when patching the app fails partway through", async () => {
+  it("removes the .env.local it wrote when patching the app fails partway through", async ({
+    serve,
+  }) => {
     const cwd = await makeNextApp();
     // A directory where the login page goes, put there while the project is
     // created: the dry run has passed, and the real patch merges `.env.local`
     // before it reaches the page.
-    const capture = await startCreateProjectCaptureServer({
+    const capture = await startCreateProjectCaptureServer(serve, {
       onCreateProject: async () => {
         await mkdir(join(cwd, "app/login/page.tsx"), { recursive: true });
       },
@@ -896,9 +903,9 @@ describe("setup --design removal (#1039)", () => {
     expect(res.stdout).not.toContain("--design");
   });
 
-  it("rejects --design with a targeted hint, before any project is created", async () => {
+  it("rejects --design with a targeted hint, before any project is created", async ({ serve }) => {
     const cwd = await makeTempDir();
-    const capture = await startCreateProjectCaptureServer();
+    const capture = await startCreateProjectCaptureServer(serve);
 
     const res = await runCliForTest([
       "setup",
@@ -1080,39 +1087,26 @@ describe("setup summary", () => {
   });
 });
 
-async function startHealthServer(): Promise<string> {
-  const server = createServer((req, res) => {
+function startHealthServer(serve: Serve): Promise<string> {
+  return serve((req, res) => {
     if (req.url === "/readyz") {
       res.writeHead(200).end("ok");
       return;
     }
     res.writeHead(404).end();
   });
-  servers.push(server);
-  await new Promise<void>((resolve) => server.listen(0, "localhost", () => resolve()));
-  const address = server.address();
-  if (!address || typeof address === "string") {
-    throw new Error("health server did not expose a TCP address");
-  }
-  return `http://localhost:${String(address.port)}`;
 }
 
-async function startNotFoundServer(): Promise<string> {
-  const server = createServer((_req, res) => {
+function startNotFoundServer(serve: Serve): Promise<string> {
+  return serve((_req, res) => {
     res
       .writeHead(404, { "content-type": "application/json" })
       .end(JSON.stringify({ message: "not found" }));
   });
-  servers.push(server);
-  await new Promise<void>((resolve) => server.listen(0, "localhost", () => resolve()));
-  const address = server.address();
-  if (!address || typeof address === "string") {
-    throw new Error("not-found server did not expose a TCP address");
-  }
-  return `http://localhost:${String(address.port)}`;
 }
 
 async function startCreateProjectCaptureServer(
+  serve: Serve,
   opts: {
     /** Runs before `POST /projects` is answered: after setup's dry-run patch, before its real one. */
     onCreateProject?: () => Promise<void>;
@@ -1140,7 +1134,7 @@ async function startCreateProjectCaptureServer(
   }> = [];
   const requests: string[] = [];
   const projects: Array<{ id: string; project_secret: string }> = [];
-  const server = createServer(async (req, res) => {
+  const url = await serve(async (req, res) => {
     const path = new URL(req.url ?? "/", "http://localhost").pathname;
     requests.push(`${req.method ?? "GET"} ${path}`);
     if (req.method === "POST" && path === "/api/v1/projects") {
@@ -1240,14 +1234,8 @@ async function startCreateProjectCaptureServer(
     }
     res.writeHead(404).end();
   });
-  servers.push(server);
-  await new Promise<void>((resolve) => server.listen(0, "localhost", () => resolve()));
-  const address = server.address();
-  if (!address || typeof address === "string") {
-    throw new Error("capture server did not expose a TCP address");
-  }
   return {
-    url: `http://localhost:${String(address.port)}`,
+    url,
     get body() {
       return bodies.at(-1) ?? null;
     },

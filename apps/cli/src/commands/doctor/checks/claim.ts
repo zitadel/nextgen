@@ -23,8 +23,16 @@ export class ClaimCheck implements SanityCheck {
   readonly path = ".zitadel/secret";
 
   async run(ctx: CheckContext): Promise<CheckOutcome> {
-    const state = await recordedClaimState(ctx.cwd).catch(() => undefined);
-    if (state === undefined) {
+    let state: ClaimState;
+    try {
+      state = claimState({
+        secret: await readZitadelSecret(ctx.cwd),
+        // From `zitadel.json`, not the command's own source: `doctor` pins its
+        // source to the local runtime URL, so asking it where the project lives
+        // would report every project as local.
+        server: readProjectServer(await readZitadelConfig(ctx.cwd)),
+      });
+    } catch {
       // A missing or unparseable secret/config is already reported, loudly and
       // with a repair path, by the `secret` and `config` checks. Implementing
       // `SanityCheck` directly means nothing wraps a throw here, so swallowing
@@ -81,14 +89,4 @@ export class ClaimCheck implements SanityCheck {
   async fix(_ctx: CheckContext): Promise<void> {
     return;
   }
-}
-
-async function recordedClaimState(cwd: string): Promise<ClaimState> {
-  return claimState({
-    secret: await readZitadelSecret(cwd),
-    // From `zitadel.json`, not the command's own source: `doctor` pins its
-    // source to the local runtime URL, so asking it where the project lives
-    // would report every project as local.
-    server: readProjectServer(await readZitadelConfig(cwd)),
-  });
 }

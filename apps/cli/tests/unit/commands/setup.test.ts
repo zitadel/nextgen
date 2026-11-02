@@ -1217,9 +1217,6 @@ describe("setup asked on a terminal", () => {
   beforeEach(() => {
     vi.spyOn(LocalServer, "isPortFree").mockResolvedValue(true);
   });
-  afterEach(() => {
-    vi.mocked(LocalServer.isPortFree).mockRestore();
-  });
 
   it("still asks whether to proceed with the detected framework when --force is given", async () => {
     // --force permits overwriting files here. It must never answer a question.
@@ -1250,9 +1247,6 @@ describe("setup asked on a terminal", () => {
       vi.mocked(isCancel).mockImplementation((value) => value === CANCELLED);
       vi.mocked(text).mockClear();
       vi.mocked(intro).mockClear();
-    });
-    afterEach(() => {
-      vi.unstubAllEnvs();
     });
 
     /**

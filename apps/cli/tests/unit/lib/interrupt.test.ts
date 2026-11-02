@@ -9,7 +9,6 @@ import {
 afterEach(() => {
   stopListeningForInterrupt();
   vi.useRealTimers();
-  vi.restoreAllMocks();
 });
 
 function pressCtrlC(): void {

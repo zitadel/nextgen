@@ -7,7 +7,6 @@ import { enforceMode, envLine } from "../../../../fs-safe";
 import { isObject, parseJsonObject, setTopLevelJsonKey, stableStringify } from "../../../../json";
 import type { PatchedFile } from "../../types";
 import type { FileOp, ScaffoldPlan, ScaffoldResult } from "./types";
-import { firstExisting } from "../utils/first-existing";
 
 /**
  * The executor's private, mutable accumulator. Handlers record each touched
@@ -146,17 +145,20 @@ async function editFile(
     });
   }
   // The first candidate is where the file is created when none of them exist.
-  const found = await firstExisting(candidates, async (candidate) => {
+  let path = preferred;
+  let source: string | undefined;
+  let mode: number | undefined;
+  for (const candidate of candidates) {
     const contents = await readIfExists(candidate);
-    // Preserve the existing file's permission bits across the temp-file swap
-    // (mask off the file-type bits `stat` includes so `chmod` gets only perms).
-    return contents === undefined
-      ? undefined
-      : { contents, mode: (await stat(candidate)).mode & 0o777 };
-  });
-  const path = found?.candidate ?? preferred;
-  const source = found?.found.contents;
-  const mode = found?.found.mode;
+    if (contents !== undefined) {
+      path = candidate;
+      source = contents;
+      // Preserve the existing file's permission bits across the temp-file swap
+      // (mask off the file-type bits `stat` includes so `chmod` gets only perms).
+      mode = (await stat(candidate)).mode & 0o777;
+      break;
+    }
+  }
   const next = edit(source);
   if (next === source) {
     result.filesSkipped.push(path);
@@ -448,7 +450,7 @@ async function addDependency(
   // the document. Every byte outside it — key order, blank lines, inline
   // objects, line endings — stays untouched; the touched map itself is
   // name-sorted, matching what a package manager writes.
-  const withDependency = setTopLevelJsonKey(
+  let contents = setTopLevelJsonKey(
     existing,
     path,
     key,
@@ -458,14 +460,14 @@ async function addDependency(
   // refuse it outright (Qwik's starter vite.config.ts throws on start). Move a
   // devDependencies entry the developer already has into dependencies instead
   // of duplicating it.
-  const contents = listedInOther
-    ? setTopLevelJsonKey(
-        withDependency,
-        path,
-        "devDependencies",
-        Object.fromEntries(Object.entries(other).filter(([name]) => name !== op.name)),
-      )
-    : withDependency;
+  if (listedInOther) {
+    contents = setTopLevelJsonKey(
+      contents,
+      path,
+      "devDependencies",
+      Object.fromEntries(Object.entries(other).filter(([name]) => name !== op.name)),
+    );
+  }
   if (dryRun) {
     record(result, path, "file", "update");
     result.depsAdded.push(op.name);

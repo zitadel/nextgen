@@ -346,13 +346,15 @@ export const bodyFieldFlags = (fields: readonly BodyField[]): Interfaces.FlagInp
  * can tell "no body at all" from "a body made of flags".
  */
 export const bodyFromFlags = (fields: readonly BodyField[], flags: Json): Json | undefined => {
-  return fields.reduce<Json | undefined>((body, field) => {
+  let body: Json | undefined;
+  for (const field of fields) {
     const value = field.flag === undefined ? undefined : flags[field.flag];
     if (value === undefined || field.flag === undefined) {
-      return body;
+      continue;
     }
-    return setAt(body ?? {}, field.path, field.kind === "record" ? recordOf(field, value) : value);
-  }, undefined);
+    body = setAt(body ?? {}, field.path, field.kind === "record" ? recordOf(field, value) : value);
+  }
+  return body;
 };
 
 /** The object a repeatable record flag's entries make. */

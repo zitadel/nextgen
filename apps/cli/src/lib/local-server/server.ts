@@ -220,11 +220,7 @@ export class LocalServer {
    * place of a taken one, or `undefined` when they are all taken too.
    */
   static async nextFreePort(port: number): Promise<number | undefined> {
-    const candidates = Array.from(
-      { length: Math.max(Math.min(port + 20, 65535) - port, 0) },
-      (_, offset) => port + 1 + offset,
-    );
-    for (const next of candidates) {
+    for (let next = port + 1; next <= Math.min(port + 20, 65535); next += 1) {
       if (await LocalServer.isPortFree(next)) {
         return next;
       }
@@ -400,16 +396,15 @@ export class LocalServer {
    */
   async status(): Promise<ServerStatus> {
     const runtime = await readRuntimeMetadata(this.cwd);
-    const { container, dockerError } =
-      runtime?.backend === "docker"
-        ? await DockerLauncher.inspect(runtime.container_name).then(
-            (inspected) => ({ container: inspected, dockerError: undefined }),
-            (error: unknown) => ({
-              container: undefined,
-              dockerError: error instanceof Error ? error.message : String(error),
-            }),
-          )
-        : { container: undefined, dockerError: undefined };
+    let container: Awaited<ReturnType<typeof DockerLauncher.inspect>> | undefined;
+    let dockerError: string | undefined;
+    if (runtime?.backend === "docker") {
+      try {
+        container = await DockerLauncher.inspect(runtime.container_name);
+      } catch (error) {
+        dockerError = error instanceof Error ? error.message : String(error);
+      }
+    }
     const healthy = runtime ? await checkLocalServerHealth(runtime.server_url) : false;
     const running =
       runtime?.backend === "binary" ? await BinaryLauncher.isRecordRunning(runtime) : false;

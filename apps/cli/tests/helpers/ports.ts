@@ -36,12 +36,7 @@ const PORT_BLOCK = 50;
 /** How many files can take ports at once, a block each: the most workers Vitest may run. */
 export const PORT_WORKERS = Math.floor((PORT_LAST - PORT_FIRST) / PORT_BLOCK);
 const POOL_SLOT = Math.max(1, Number(process.env.VITEST_POOL_ID ?? 1));
-/** Offsets 0 to PORT_BLOCK - 1, then round again, one per call. */
-const offsets = (function* () {
-  for (;;) {
-    yield* Array.from({ length: PORT_BLOCK }, (_, offset) => offset);
-  }
-})();
+let portOffset = 0;
 
 export function nextPort(): number {
   if (POOL_SLOT > PORT_WORKERS) {
@@ -49,5 +44,5 @@ export function nextPort(): number {
       `VITEST_POOL_ID ${POOL_SLOT} has no port block: run at most ${PORT_WORKERS} workers`,
     );
   }
-  return PORT_FIRST + (POOL_SLOT - 1) * PORT_BLOCK + (offsets.next().value as number);
+  return PORT_FIRST + (POOL_SLOT - 1) * PORT_BLOCK + (portOffset++ % PORT_BLOCK);
 }

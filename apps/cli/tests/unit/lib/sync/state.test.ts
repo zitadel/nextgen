@@ -1,45 +1,35 @@
-import { randomUUID } from "node:crypto";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { tmpdir } from "node:os";
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
+
+import { it } from "../../../helpers/fixtures";
 
 import { readState, updateState, type ZitadelState } from "../../../../src/lib/sync/state";
 
-const cwd = join(tmpdir(), `zitadel-state-${randomUUID()}`);
-
-beforeEach(async () => {
-  await mkdir(cwd, { recursive: true });
-});
-
-afterEach(async () => {
-  await rm(cwd, { recursive: true, force: true });
-});
-
-async function writeStateFile(state: ZitadelState): Promise<void> {
+async function writeStateFile(cwd: string, state: ZitadelState): Promise<void> {
   await mkdir(join(cwd, ".zitadel"), { recursive: true });
   await writeFile(join(cwd, ".zitadel/state.json"), JSON.stringify(state));
 }
 
 describe("readState", () => {
-  it("returns the parsed contents of .zitadel/state.json", async () => {
+  it("returns the parsed contents of .zitadel/state.json", async ({ dir: cwd }) => {
     const state: ZitadelState = {
       framework: "next",
       resources: { ".zitadel/schemas/user.json": { id: "schema-1", hash: "abc" } },
     };
-    await writeStateFile(state);
+    await writeStateFile(cwd, state);
 
     const result = await readState(cwd);
 
     expect(result).toEqual(state);
   });
 
-  it("throws when the state file is missing", async () => {
+  it("throws when the state file is missing", async ({ dir: cwd }) => {
     await expect(readState(cwd)).rejects.toThrow();
   });
 
-  it("throws when the state file is malformed JSON", async () => {
+  it("throws when the state file is malformed JSON", async ({ dir: cwd }) => {
     await mkdir(join(cwd, ".zitadel"), { recursive: true });
     await writeFile(join(cwd, ".zitadel/state.json"), "{ not json");
 
@@ -48,8 +38,8 @@ describe("readState", () => {
 });
 
 describe("updateState", () => {
-  it("adds a new resource entry and round-trips through readState", async () => {
-    await writeStateFile({ framework: "next", resources: {} });
+  it("adds a new resource entry and round-trips through readState", async ({ dir: cwd }) => {
+    await writeStateFile(cwd, { framework: "next", resources: {} });
 
     await updateState(cwd, ".zitadel/schemas/user.json", {
       id: "schema-1",
@@ -64,8 +54,8 @@ describe("updateState", () => {
     expect(result.framework).toBe("next");
   });
 
-  it("merges into an existing entry, preserving unspecified fields", async () => {
-    await writeStateFile({
+  it("merges into an existing entry, preserving unspecified fields", async ({ dir: cwd }) => {
+    await writeStateFile(cwd, {
       framework: "next",
       resources: { ".zitadel/flows/default.json": { id: "flow-1", hash: "old" } },
     });
@@ -79,8 +69,8 @@ describe("updateState", () => {
     });
   });
 
-  it("leaves other resource entries untouched", async () => {
-    await writeStateFile({
+  it("leaves other resource entries untouched", async ({ dir: cwd }) => {
+    await writeStateFile(cwd, {
       framework: "next",
       resources: {
         ".zitadel/schemas/a.json": { id: "a", hash: "ha" },
@@ -95,8 +85,8 @@ describe("updateState", () => {
     expect(result.resources[".zitadel/schemas/b.json"]).toEqual({ id: "b", hash: "hb" });
   });
 
-  it("writes pretty-printed JSON (two-space indent)", async () => {
-    await writeStateFile({ framework: "next", resources: {} });
+  it("writes pretty-printed JSON (two-space indent)", async ({ dir: cwd }) => {
+    await writeStateFile(cwd, { framework: "next", resources: {} });
 
     await updateState(cwd, ".zitadel/schemas/user.json", { id: "schema-1" });
 

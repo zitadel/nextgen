@@ -1693,13 +1693,9 @@ describe("loadPatchContext", () => {
     const cwd = await makeProject();
     vi.stubEnv("ZITADEL_ENV", "production");
     vi.stubEnv("ZITADEL_ISSUER", "https://auth.example.com");
-    try {
-      expect((await loadPatchContext(cwd, createOrca(), "0.1.0-alpha.0")).issuer).toBe(
-        "http://localhost:3000",
-      );
-    } finally {
-      vi.unstubAllEnvs();
-    }
+    expect((await loadPatchContext(cwd, createOrca(), "0.1.0-alpha.0")).issuer).toBe(
+      "http://localhost:3000",
+    );
   });
 
   it("falls back to the manifest dev_port for the issuer", async () => {

@@ -17,6 +17,7 @@ import { isDeepStrictEqual } from "node:util";
 import { META_SCHEMA_DIR, metaSchemaFiles } from "@zitadel/config/meta-schemas";
 
 import { isErrno } from "./errors";
+import { parseJsonOrUndefined } from "./json";
 import { maskPublicCliVersion, normalizePublicCliJson } from "./public-cli";
 
 /** One meta-schema file: its project-relative path, its body, and the bytes written. */
@@ -70,14 +71,6 @@ export async function metaSchemaState(
   return state;
 }
 
-function parseOrUndefined(text: string): { value: unknown } | undefined {
-  try {
-    return { value: JSON.parse(text) };
-  } catch {
-    return undefined;
-  }
-}
-
 /** {@link metaSchemaState} without the symlink rule. */
 async function contentState(
   cwd: string,
@@ -92,11 +85,11 @@ async function contentState(
   if (text === undefined) {
     return "missing";
   }
-  const held = parseOrUndefined(text);
+  const held = parseJsonOrUndefined(text);
   if (held === undefined) {
     return "outdated";
   }
-  return isDeepStrictEqual(maskPublicCliVersion(held.value), maskPublicCliVersion(file.body))
+  return isDeepStrictEqual(maskPublicCliVersion(held), maskPublicCliVersion(file.body))
     ? "current"
     : "outdated";
 }

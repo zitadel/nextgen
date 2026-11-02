@@ -52,32 +52,23 @@ export async function writeBackResource(
   syncer: Normalizer,
   canonical: object,
 ): Promise<{ hash: string; changed: boolean }> {
-  const normalized = syncer.normalizeWrite?.(canonical) ?? canonical;
+  let writeBody = syncer.normalizeWrite?.(canonical) ?? canonical;
   const compare = (body: object) => stableStringify(syncer.normalize?.(body) ?? body);
   const absPath = join(cwd, relPath);
-  const onDisk = await readFile(absPath, "utf8")
-    .then((text) => JSON.parse(text) as Record<string, unknown>)
-    .catch((err: unknown) => {
-      consola.debug(`read ${relPath} for write-back failed:`, err);
-      return undefined;
-    });
-  const differs = (body: object): boolean => {
-    try {
-      return compare(normalized) !== compare(body);
-    } catch (err) {
-      consola.debug(`read ${relPath} for write-back failed:`, err);
-      return true;
+  let changed = true;
+  try {
+    const onDisk = JSON.parse(await readFile(absPath, "utf8")) as Record<string, unknown>;
+    changed = compare(writeBody) !== compare(onDisk);
+    // `$schema` is a local editor affordance (points at the dialect spec in
+    // .zitadel/meta/); the server never echoes it, so a rewrite would drop it.
+    // Carry the on-disk pointer over unless the canonical body has its own
+    // (user-schema documents do).
+    if (typeof onDisk.$schema === "string" && !("$schema" in writeBody)) {
+      writeBody = { ...writeBody, $schema: onDisk.$schema };
     }
-  };
-  const changed = onDisk === undefined || differs(onDisk);
-  // `$schema` is a local editor affordance (points at the dialect spec in
-  // .zitadel/meta/); the server never echoes it, so a rewrite would drop it.
-  // Carry the on-disk pointer over unless the canonical body has its own
-  // (user-schema documents do).
-  const writeBody =
-    typeof onDisk?.$schema === "string" && !("$schema" in normalized)
-      ? { ...normalized, $schema: onDisk.$schema }
-      : normalized;
+  } catch (err) {
+    consola.debug(`read ${relPath} for write-back failed:`, err);
+  }
   if (changed) {
     await writeFile(absPath, `${stableStringify(writeBody)}\n`);
   }

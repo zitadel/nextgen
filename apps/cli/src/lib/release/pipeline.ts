@@ -68,15 +68,18 @@ export interface Step {
  * release → before-deploy steps → create deployment.
  */
 export async function runSteps(steps: readonly Step[], ctx: StepContext): Promise<StepReport> {
-  return steps.reduce<Promise<StepReport>>(async (previous, step) => {
-    const report = await previous;
+  let report: StepReport = {};
+  for (const step of steps) {
     if (!step.runsFor.includes(ctx.mode)) {
-      return report;
+      continue;
     }
     if (ctx.dryRun && step.writes) {
-      return report;
+      continue;
     }
     const reported = await step.run(ctx);
-    return reported ? { ...report, ...reported } : report;
-  }, Promise.resolve({}));
+    if (reported) {
+      report = { ...report, ...reported };
+    }
+  }
+  return report;
 }

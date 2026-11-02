@@ -77,6 +77,11 @@ describe("solidStartConfigEdit", () => {
     expect(() => edit(source)).toThrowError(/unbalanced solidStart\(\) call/);
   });
 
+  it("throws E_VALIDATION when a trailing backslash leaves a string unterminated", () => {
+    const source = 'export default { plugins: [solidStart({ banner: "oops })\\';
+    expect(() => edit(source)).toThrowError(/unbalanced solidStart\(\) call/);
+  });
+
   it("is idempotent — re-running over its own output changes nothing", () => {
     const once = edit(BARE);
     expect(edit(once)).toBe(once);

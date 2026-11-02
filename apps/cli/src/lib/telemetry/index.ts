@@ -134,15 +134,14 @@ export class Telemetry {
 
     const identity = (deps.loadIdentity ?? loadOrCreateIdentity)(deps.env);
 
-    const client = token
-      ? ((): MixpanelClient | undefined => {
-          try {
-            return (deps.initClient ?? defaultInit)(token, resolveTelemetryEndpoint(deps.env));
-          } catch {
-            return undefined;
-          }
-        })()
-      : undefined;
+    let client: MixpanelClient | undefined;
+    if (token) {
+      try {
+        client = (deps.initClient ?? defaultInit)(token, resolveTelemetryEndpoint(deps.env));
+      } catch {
+        client = undefined;
+      }
+    }
     if (!client && !vercel) {
       return inert(identity.isFirstRun);
     }
@@ -180,14 +179,10 @@ export class Telemetry {
     if (!sink) {
       return;
     }
-    const body = ((): string | undefined => {
-      try {
-        return vercelEventBody(event, payload, sink, Date.now());
-      } catch {
-        return undefined;
-      }
-    })();
-    if (body === undefined) {
+    let body: string;
+    try {
+      body = vercelEventBody(event, payload, sink, Date.now());
+    } catch {
       return;
     }
     if (this.debug) {

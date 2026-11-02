@@ -48,11 +48,12 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
 
     // Bare: undo the latest deployment by re-applying what its targets served
     // before it. With an id, re-apply exactly that one.
-    const named = args.deployment_id as string | undefined;
+    let targetId = args.deployment_id as string | undefined;
     // The bare form decides from one read of the history, so its guard comes
     // from that same read: a deploy landing after it is one the caller never
     // saw, and must make the server refuse rather than become the expected one.
-    const resolveBare = async (): Promise<{ targetId: string; guardId: string | undefined }> => {
+    let expectedDeploymentId: string | undefined;
+    if (targetId === undefined) {
       // A preview deployment is never the deploy a bare rollback undoes, nor
       // one it can restore: the server refuses to roll one back. Primary
       // deployments make one history for the project, newest first.
@@ -73,11 +74,9 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
           hint: `Name a deployment to re-apply, or check \`zitadel deployment list${this.environmentSelector()}\`.`,
         });
       }
-      return { targetId: prior.id, guardId: latest.id };
-    };
-    const resolved =
-      named === undefined ? await resolveBare() : { targetId: named, guardId: undefined };
-    const { targetId } = resolved;
+      targetId = prior.id;
+      expectedDeploymentId = latest.id;
+    }
 
     return this.emit(
       await this.confirmed({
@@ -104,7 +103,7 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
         // never saw. Omitted when nothing is live there, which an optional id
         // cannot stand in for.
         prepare: async () =>
-          resolved.guardId ??
+          expectedDeploymentId ??
           (await client.listDeployments.all({ project_id: projectId, live: true })).find(
             servesPrimary,
           )?.id,
@@ -113,19 +112,17 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
             ...(flags.message === undefined ? {} : { message: flags.message }),
             ...(guard === undefined ? {} : { expectedDeploymentId: guard }),
           });
-          const pointers = await client
-            .getReleaseById(deployment.release_id, {
+          let pointers: readonly GetReleaseById200PointersItem[] | undefined;
+          try {
+            const release = await client.getReleaseById(deployment.release_id, {
               project_id: projectId,
-            })
-            .then(
-              (release): readonly GetReleaseById200PointersItem[] | undefined => release.pointers,
-            )
-            .catch((error: unknown) => {
-              reportWarning(
-                `Rolled back, but the revisions ${deployment.release_id} pins could not be read: ${toZitadelError(error).message}`,
-              );
-              return undefined;
             });
+            pointers = release.pointers;
+          } catch (error) {
+            reportWarning(
+              `Rolled back, but the revisions ${deployment.release_id} pins could not be read: ${toZitadelError(error).message}`,
+            );
+          }
 
           const pointerTable =
             pointers === undefined

@@ -31,9 +31,6 @@ const held: Server[] = [];
 useLocalServers();
 
 afterEach(async () => {
-  vi.restoreAllMocks();
-  vi.unstubAllEnvs();
-  vi.unstubAllGlobals();
   for (const server of held.splice(0)) {
     await new Promise<void>((resolve) => server.close(() => resolve()));
   }

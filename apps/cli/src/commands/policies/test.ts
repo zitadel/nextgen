@@ -67,17 +67,17 @@ export default class PoliciesTest extends EnvironmentCommand {
     }
 
     const { client, projectId } = await this.connect();
-    const loadPolicies = async (): Promise<Map<string, PolicyUnderTest>> => {
-      if (flags.release === undefined) {
-        const fromFiles = await policiesFromFiles(cwd, operations);
-        if (fromFiles.issues.length > 0) {
-          throw new ZitadelError("E_VALIDATION", "The policy files are not valid", {
-            details: { issues: fromFiles.issues },
-            hint: fromFiles.issues.join("\n"),
-          });
-        }
-        return fromFiles.policies;
+    let policies: Map<string, PolicyUnderTest>;
+    if (flags.release === undefined) {
+      const fromFiles = await policiesFromFiles(cwd, operations);
+      if (fromFiles.issues.length > 0) {
+        throw new ZitadelError("E_VALIDATION", "The policy files are not valid", {
+          details: { issues: fromFiles.issues },
+          hint: fromFiles.issues.join("\n"),
+        });
       }
+      policies = fromFiles.policies;
+    } else {
       const fromRelease = await policiesFromRelease(client, projectId, flags.release);
       if (fromRelease.revoked) {
         reportWarning(`Release ${flags.release} is revoked, so no origin serves its policies.`);
@@ -88,9 +88,8 @@ export default class PoliciesTest extends EnvironmentCommand {
           `Release ${flags.release} pins no flow, so sign-ins served it use the newest policy revisions, not the ones tested here.`,
         );
       }
-      return fromRelease.policies;
-    };
-    const policies = await loadPolicies();
+      policies = fromRelease.policies;
+    }
 
     const results = await runPolicyTests(client, projectId, suites, policies);
     const cases = results.flatMap((result) => result.cases);

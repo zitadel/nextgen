@@ -2,12 +2,13 @@ import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 
 import defaultLogin from "@zitadel/config/defaults/default-login.json" with { type: "json" };
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
+
+import { it } from "../../../../helpers/fixtures";
 
 import { validateStep } from "../../../../../src/lib/release/steps/validate";
 import type { StepContext } from "../../../../../src/lib/release/pipeline";
 import type { SuggestedCommand } from "../../../../../src/lib/suggestion";
-import { tempDirs } from "../../../../helpers/temp-dirs";
 
 /** A valid user-schema the server would accept, so schema parsing passes. */
 const validSchema = {
@@ -24,8 +25,6 @@ const validBranding = {
   layout: "centered",
   liquid_template: "<zl-page-shell>{% mandatory_gates %}</zl-page-shell>",
 };
-
-const dirs = tempDirs();
 
 function ctx(
   bundle: Partial<StepContext["bundle"]>,
@@ -59,10 +58,6 @@ function ctx(
     suggest: (args) => args as SuggestedCommand,
   };
 }
-
-afterEach(async () => {
-  await dirs.clean();
-});
 
 describe("validate step", () => {
   it("fails naming an environment variable a resource references but the env lacks", async () => {
@@ -245,8 +240,7 @@ describe("validate step", () => {
     );
   });
 
-  it("rejects a branding $file reference that cannot be read", async () => {
-    const dir = await dirs.make("zitadel-validate-");
+  it("rejects a branding $file reference that cannot be read", async ({ dir }) => {
     await mkdir(join(dir, ".zitadel", "branding"), { recursive: true });
     const descriptor = { layout: "centered", liquid_template: { $file: "./missing.liquid" } };
     const bundle = { schemas: [], flow_definitions: [], branding: { layout: "centered" } };

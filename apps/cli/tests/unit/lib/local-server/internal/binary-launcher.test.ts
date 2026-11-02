@@ -45,8 +45,6 @@ describe("local server binary helpers", () => {
     // a `vi.fn()` module mock's `.mock.calls`, so without this a later test reads
     // an earlier test's `spawn.mock.calls[0]`.
     vi.clearAllMocks();
-    vi.restoreAllMocks();
-    vi.unstubAllEnvs();
   });
 
   it("spawns the server with the address, data dir, and public base env", async () => {

@@ -199,9 +199,10 @@ export async function findUpward(
   file: string,
   stopAt: string = homedir(),
 ): Promise<string | undefined> {
-  if (await isOwnFile(join(cwd, file))) return cwd;
-  if (cwd === stopAt || dirname(cwd) === cwd) return undefined;
-  return findUpward(dirname(cwd), file, stopAt);
+  for (let dir = cwd; ; dir = dirname(dir)) {
+    if (await isOwnFile(join(dir, file))) return dir;
+    if (dir === stopAt || dirname(dir) === dir) return undefined;
+  }
 }
 
 async function isOwnFile(path: string): Promise<boolean> {
@@ -269,11 +270,14 @@ export async function readNearestRuntimeMetadata(
   if (!dir) {
     return undefined;
   }
-  const runtime = await readRuntimeMetadata(dir).catch((error: unknown) => {
+  let runtime: RuntimeMetadata | undefined;
+  try {
+    runtime = await readRuntimeMetadata(dir);
+  } catch (error) {
     // A record in a parent is recovered where it is: the bare commands would
     // act on the working directory instead.
     throw dir === cwd ? error : retargetMalformedRuntime(error, dir);
-  });
+  }
   return runtime ? { dir, runtime } : undefined;
 }
 
@@ -292,14 +296,14 @@ export async function peekRuntimeMetadata(cwd: string): Promise<RuntimeMetadata 
 
 export async function readRuntimeMetadata(cwd: string): Promise<RuntimeMetadata | undefined> {
   const paths = localRuntimePaths(cwd);
-  const raw = await readFile(paths.runtimeFile, "utf8").catch((error: unknown) => {
+  let raw: string;
+  try {
+    raw = await readFile(paths.runtimeFile, "utf8");
+  } catch (error) {
     if (isErrno(error, "ENOENT")) {
       return undefined;
     }
     throw error;
-  });
-  if (raw === undefined) {
-    return undefined;
   }
 
   const parsed = parseJsonObject(raw, LOCAL_RUNTIME_FILE);
@@ -357,12 +361,14 @@ export function localServerNotRunning(serverUrl?: string): ZitadelError {
 
 async function appendGitignoreEntry(cwd: string, entry: string): Promise<void> {
   const path = join(cwd, ".gitignore");
-  const existing = await readFile(path, "utf8").catch((error: unknown) => {
+  let existing = "";
+  try {
+    existing = await readFile(path, "utf8");
+  } catch (error) {
     if (!isErrno(error, "ENOENT")) {
       throw error;
     }
-    return "";
-  });
+  }
 
   const lines = existing.split(/\r?\n/).map((line) => line.trim());
   if (lines.includes(entry)) {
@@ -438,28 +444,25 @@ function normalizeRuntimeMetadata(input: Record<string, unknown>): RuntimeMetada
 }
 
 async function nearestExistingDirectory(path: string): Promise<string> {
-  const missing = await stat(path).then(
-    (info) => {
+  let current = path;
+  while (true) {
+    try {
+      const info = await stat(current);
       if (!info.isDirectory()) {
-        throw new Error(`${path} exists but is not a directory`);
+        throw new Error(`${current} exists but is not a directory`);
       }
-      return undefined;
-    },
-    (error: unknown) => {
+      return current;
+    } catch (error) {
       if (!isErrno(error, "ENOENT")) {
         throw error;
       }
-      return { error };
-    },
-  );
-  if (!missing) {
-    return path;
+      const parent = dirname(current);
+      if (parent === current) {
+        throw error;
+      }
+      current = parent;
+    }
   }
-  const parent = dirname(path);
-  if (parent === path) {
-    throw missing.error;
-  }
-  return nearestExistingDirectory(parent);
 }
 
 export function runtimeSummary(metadata: RuntimeMetadata | undefined): Record<string, unknown> {

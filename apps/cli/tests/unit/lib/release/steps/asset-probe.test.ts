@@ -1,7 +1,8 @@
 import { http, HttpResponse } from "msw";
-import { setupServer } from "msw/node";
 import { Agent } from "undici";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, vi } from "vitest";
+
+import { it } from "../../../../helpers/fixtures";
 
 import {
   brandingAssetWarnings,
@@ -17,23 +18,19 @@ vi.mock("node:dns/promises", () => ({ lookup: lookupMock }));
  * worker freezes its event loop for ~10s on an unresolvable host, and a JS
  * timeout cannot rescue it. No test here may reach a real network.
  */
-const server = setupServer();
 
-beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
-afterAll(() => server.close());
 beforeEach(() => {
   lookupMock.mockReset();
   lookupMock.mockResolvedValue([{ address: "93.184.216.34", family: 4 }]);
 });
 afterEach(() => {
-  server.resetHandlers();
   delete process.env.ZITADEL_SKIP_ASSET_PROBE;
 });
 
 const LOGO = "https://cdn.example.com/logo.svg";
 
 describe("brandingAssetWarnings", () => {
-  it("stays quiet when the asset serves an image", async () => {
+  it("stays quiet when the asset serves an image", async ({ server }) => {
     server.use(
       http.head(LOGO, () =>
         HttpResponse.text("", { headers: { "content-type": "image/svg+xml" } }),
@@ -46,26 +43,22 @@ describe("brandingAssetWarnings", () => {
   // MSW answers above the dispatcher, so assert the wiring rather than the
   // header: the probe's private agent bypasses the global dispatcher and
   // would otherwise send Node's bare `node` user agent.
-  it("identifies the CLI to asset hosts", async () => {
+  it("identifies the CLI to asset hosts", async ({ server }) => {
     const compose = vi.spyOn(Agent.prototype, "compose");
-    try {
-      server.use(
-        http.head(LOGO, () =>
-          HttpResponse.text("", { headers: { "content-type": "image/svg+xml" } }),
-        ),
-      );
+    server.use(
+      http.head(LOGO, () =>
+        HttpResponse.text("", { headers: { "content-type": "image/svg+xml" } }),
+      ),
+    );
 
-      await brandingAssetWarnings([{ logo_url: LOGO }]);
+    await brandingAssetWarnings([{ logo_url: LOGO }]);
 
-      expect(compose).toHaveBeenCalledWith(userAgentInterceptor);
-    } finally {
-      compose.mockRestore();
-    }
+    expect(compose).toHaveBeenCalledWith(userAgentInterceptor);
   });
 
   // The URL clears the CLI's shape check and the server's save gate, then
   // renders as a 0×0 <img> with nothing logged anywhere.
-  it("warns when the asset 404s, naming the field and the status", async () => {
+  it("warns when the asset 404s, naming the field and the status", async ({ server }) => {
     server.use(http.head(LOGO, () => new HttpResponse(null, { status: 404 })));
 
     const warnings = await brandingAssetWarnings([{ logo_url: LOGO }]);
@@ -75,7 +68,9 @@ describe("brandingAssetWarnings", () => {
     expect(warnings[0]).toContain("HTTP 404");
   });
 
-  it("warns when the host cannot be reached, naming the switch that skips the probe", async () => {
+  it("warns when the host cannot be reached, naming the switch that skips the probe", async ({
+    server,
+  }) => {
     server.use(http.head("https://gone.example.com/hero.png", () => HttpResponse.error()));
 
     const [warning] = await brandingAssetWarnings([
@@ -86,7 +81,7 @@ describe("brandingAssetWarnings", () => {
     expect(warning).toContain("ZITADEL_SKIP_ASSET_PROBE");
   });
 
-  it("warns when the URL serves a page instead of an image", async () => {
+  it("warns when the URL serves a page instead of an image", async ({ server }) => {
     server.use(
       http.head(LOGO, () =>
         HttpResponse.text("", { headers: { "content-type": "text/html; charset=utf-8" } }),
@@ -98,7 +93,7 @@ describe("brandingAssetWarnings", () => {
     expect(warning).toContain('content-type "text/html"');
   });
 
-  it("warns when a successful response is explicitly bodyless", async () => {
+  it("warns when a successful response is explicitly bodyless", async ({ server }) => {
     server.use(http.head(LOGO, () => new HttpResponse(null, { status: 204 })));
 
     const [warning] = await brandingAssetWarnings([{ logo_url: LOGO }]);
@@ -106,7 +101,9 @@ describe("brandingAssetWarnings", () => {
     expect(warning).toContain("HTTP 204 with no representation");
   });
 
-  it("stays quiet when the origin refuses HEAD, which says nothing about the asset", async () => {
+  it("stays quiet when the origin refuses HEAD, which says nothing about the asset", async ({
+    server,
+  }) => {
     server.use(http.head(LOGO, () => new HttpResponse(null, { status: 405 })));
 
     expect(await brandingAssetWarnings([{ logo_url: LOGO }])).toEqual([]);
@@ -134,7 +131,9 @@ describe("brandingAssetWarnings", () => {
     await expect(resolvePublicAddresses("translated.example.com")).resolves.toBeUndefined();
   });
 
-  it("re-validates redirects instead of following them into a private network", async () => {
+  it("re-validates redirects instead of following them into a private network", async ({
+    server,
+  }) => {
     const privateHits = vi.fn();
     server.use(
       http.head(
@@ -157,7 +156,7 @@ describe("brandingAssetWarnings", () => {
     expect(warnings).toEqual([]);
   });
 
-  it("warns per field and probes each distinct URL once", async () => {
+  it("warns per field and probes each distinct URL once", async ({ server }) => {
     const hits = vi.fn();
     server.use(
       http.head("https://cdn.example.com/brand.png", () => {

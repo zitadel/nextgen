@@ -55,24 +55,23 @@ function readFileReference(
   ref: string,
   options: { readonly onMissing: "throw" | "omit" },
 ): string | typeof omittedReference {
-  const unreadable = () =>
-    new ZitadelError("E_VALIDATION", `$file ${JSON.stringify(ref)} cannot be read`, {
+  let content: string | undefined;
+  try {
+    content = readIfPresent(path);
+  } catch {
+    throw new ZitadelError("E_VALIDATION", `$file ${JSON.stringify(ref)} cannot be read`, {
       hint: "Create the referenced file or fix the path.",
     });
-  const content = (() => {
-    try {
-      return readIfPresent(path);
-    } catch {
-      throw unreadable();
-    }
-  })();
+  }
   if (content !== undefined) {
     return content;
   }
   if (options.onMissing === "omit") {
     return omittedReference;
   }
-  throw unreadable();
+  throw new ZitadelError("E_VALIDATION", `$file ${JSON.stringify(ref)} cannot be read`, {
+    hint: "Create the referenced file or fix the path.",
+  });
 }
 
 /** Whether `path` is `root` itself or lies beneath it. */
@@ -95,25 +94,26 @@ function isSymlink(path: string): boolean {
  * even when its last segments do not exist yet. Undefined when a segment is a
  * symlink that resolves nowhere, since what it names could be anywhere.
  */
-function realTarget(
-  path: string,
-  current: string = path,
-  missing: readonly string[] = [],
-): string | undefined {
-  try {
-    return join(realpathSync(current), ...missing);
-  } catch (error) {
-    if (!isErrno(error, "ENOENT") && !isErrno(error, "ENOTDIR")) {
-      throw error;
+function realTarget(path: string): string | undefined {
+  const missing: string[] = [];
+  let current = path;
+  for (;;) {
+    try {
+      return join(realpathSync(current), ...missing);
+    } catch (error) {
+      if (!isErrno(error, "ENOENT") && !isErrno(error, "ENOTDIR")) {
+        throw error;
+      }
+      if (isSymlink(current)) {
+        return undefined;
+      }
+      const parent = dirname(current);
+      if (parent === current) {
+        return path;
+      }
+      missing.unshift(basename(current));
+      current = parent;
     }
-    if (isSymlink(current)) {
-      return undefined;
-    }
-    const parent = dirname(current);
-    if (parent === current) {
-      return path;
-    }
-    return realTarget(path, parent, [basename(current), ...missing]);
   }
 }
 

@@ -1,6 +1,7 @@
 import { http, HttpResponse } from "msw";
-import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterEach, describe, expect } from "vitest";
+
+import { it } from "../../../helpers/fixtures";
 
 import type { LocalAdmin } from "../../../../src/lib/local-server/admin-credential";
 import { claimProjectAsAdmin } from "../../../../src/lib/local-server/claim-as-admin";
@@ -47,35 +48,34 @@ const sessionHandlers = [
   ),
 ];
 
-const server = setupServer(
-  ...sessionHandlers,
-  http.post(`${SERVER}/api/v1/projects/${PROJECT}/claim/init`, ({ request }) => {
-    initAuths.push(request.headers.get("authorization"));
-    return HttpResponse.json({ challenge_id: "claim_ch_1" }, { status: 201 });
-  }),
-  http.get(`${SERVER}/api/v1/sessions/me/csrf`, ({ request }) =>
-    request.headers.get("cookie")?.includes("zitadel_session=admin_session")
-      ? HttpResponse.json({ csrf_token: "csrf_admin" })
-      : HttpResponse.json({ code: "auth.unauthorized" }, { status: 401 }),
-  ),
-  http.post(`${SERVER}/api/v1/projects/${PROJECT}/claim/complete`, async ({ request }) => {
-    completes.push({
-      cookie: request.headers.get("cookie"),
-      csrf: request.headers.get("x-zitadel-csrf"),
-      body: await request.json(),
-    });
-    return HttpResponse.json({ team_id: "team_localadmin", claimed_at: "2027-01-01T00:00:00Z" });
-  }),
-);
+it.beforeEach(({ server }) => {
+  server.use(
+    ...sessionHandlers,
+    http.post(`${SERVER}/api/v1/projects/${PROJECT}/claim/init`, ({ request }) => {
+      initAuths.push(request.headers.get("authorization"));
+      return HttpResponse.json({ challenge_id: "claim_ch_1" }, { status: 201 });
+    }),
+    http.get(`${SERVER}/api/v1/sessions/me/csrf`, ({ request }) =>
+      request.headers.get("cookie")?.includes("zitadel_session=admin_session")
+        ? HttpResponse.json({ csrf_token: "csrf_admin" })
+        : HttpResponse.json({ code: "auth.unauthorized" }, { status: 401 }),
+    ),
+    http.post(`${SERVER}/api/v1/projects/${PROJECT}/claim/complete`, async ({ request }) => {
+      completes.push({
+        cookie: request.headers.get("cookie"),
+        csrf: request.headers.get("x-zitadel-csrf"),
+        body: await request.json(),
+      });
+      return HttpResponse.json({ team_id: "team_localadmin", claimed_at: "2027-01-01T00:00:00Z" });
+    }),
+  );
+});
 
-beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterEach(() => {
-  server.resetHandlers();
   signIns.length = 0;
   initAuths.length = 0;
   completes.length = 0;
 });
-afterAll(() => server.close());
 
 const claim = () =>
   claimProjectAsAdmin({
@@ -101,7 +101,7 @@ describe("claiming a project as the local admin", () => {
     expect(completes[0]?.body).toEqual({ challenge_id: "claim_ch_1" });
   });
 
-  it("fails when claim/init opens no challenge", async () => {
+  it("fails when claim/init opens no challenge", async ({ server }) => {
     server.use(
       http.post(`${SERVER}/api/v1/projects/${PROJECT}/claim/init`, () =>
         HttpResponse.json({ code: "internal", message: "boom" }, { status: 500 }),

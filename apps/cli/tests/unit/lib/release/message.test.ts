@@ -4,18 +4,16 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 
 import { Command } from "@oclif/core";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
+
+import { it } from "../../../helpers/fixtures";
 
 import { deployMessage, messageFlag } from "../../../../src/lib/release/message";
-import { tempDirs } from "../../../helpers/temp-dirs";
 
 const run = promisify(execFile);
 
-const dirs = tempDirs();
-
 /** A temp git repo whose one clean commit has `subject`. */
-async function aRepo(subject = "add company"): Promise<string> {
-  const dir = await dirs.make("zitadel-message-");
+async function aRepo(dir: string, subject = "add company"): Promise<string> {
   const git = (args: string[]): Promise<unknown> => run("git", args, { cwd: dir });
   await git(["init", "-q"]);
   await git(["config", "user.email", "test@example.com"]);
@@ -33,38 +31,32 @@ async function aPullRequestEvent(dir: string, title: string): Promise<string> {
   return path;
 }
 
-afterEach(async () => {
-  await dirs.clean();
-});
-
 describe("deployMessage", () => {
-  it("takes -m over everything else", async () => {
-    const cwd = await aRepo();
+  it("takes -m over everything else", async ({ dir }) => {
+    const cwd = await aRepo(dir);
 
     expect(await deployMessage("fix sign-up", cwd, {})).toBe("fix sign-up");
   });
 
-  it("falls back to the commit subject on a clean worktree", async () => {
-    const cwd = await aRepo();
+  it("falls back to the commit subject on a clean worktree", async ({ dir }) => {
+    const cwd = await aRepo(dir);
 
     expect(await deployMessage(undefined, cwd, {})).toBe("add company");
   });
 
-  it("records nothing for a dirty worktree", async () => {
-    const cwd = await aRepo();
+  it("records nothing for a dirty worktree", async ({ dir }) => {
+    const cwd = await aRepo(dir);
     await writeFile(join(cwd, "README.md"), "# edited\n");
 
     expect(await deployMessage(undefined, cwd, {})).toBeUndefined();
   });
 
-  it("records nothing outside a git repository", async () => {
-    const dir = await dirs.make("zitadel-message-norepo-");
-
+  it("records nothing outside a git repository", async ({ dir }) => {
     expect(await deployMessage(undefined, dir, {})).toBeUndefined();
   });
 
-  it("takes a GitHub pull request's title over the merge commit's subject", async () => {
-    const cwd = await aRepo("Merge 1a2b into 3c4d");
+  it("takes a GitHub pull request's title over the merge commit's subject", async ({ dir }) => {
+    const cwd = await aRepo(dir, "Merge 1a2b into 3c4d");
     const event = await aPullRequestEvent(cwd, "feat: add company");
 
     expect(
@@ -75,8 +67,8 @@ describe("deployMessage", () => {
     ).toBe("feat: add company");
   });
 
-  it("records nothing for a GitHub pull request whose event cannot be read", async () => {
-    const cwd = await aRepo("Merge 1a2b into 3c4d");
+  it("records nothing for a GitHub pull request whose event cannot be read", async ({ dir }) => {
+    const cwd = await aRepo(dir, "Merge 1a2b into 3c4d");
 
     expect(
       await deployMessage(undefined, cwd, {
@@ -86,8 +78,8 @@ describe("deployMessage", () => {
     ).toBeUndefined();
   });
 
-  it("takes the first line of Vercel's commit message", async () => {
-    const cwd = await aRepo();
+  it("takes the first line of Vercel's commit message", async ({ dir }) => {
+    const cwd = await aRepo(dir);
 
     expect(
       await deployMessage(undefined, cwd, {
@@ -96,8 +88,8 @@ describe("deployMessage", () => {
     ).toBe("feat: add company");
   });
 
-  it("cuts a long subject by code points, never splitting one", async () => {
-    const cwd = await aRepo(`${"x".repeat(1023)}😀😀`);
+  it("cuts a long subject by code points, never splitting one", async ({ dir }) => {
+    const cwd = await aRepo(dir, `${"x".repeat(1023)}😀😀`);
 
     const message = await deployMessage(undefined, cwd, {});
 

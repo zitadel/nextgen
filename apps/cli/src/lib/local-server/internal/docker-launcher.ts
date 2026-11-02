@@ -78,15 +78,18 @@ export class DockerLauncher implements Launcher<DockerRuntimeMetadata> {
     await DockerLauncher.remove(spec.containerName);
     await ensureImage(spec.image);
     const env = spec.env ?? EMPTY_ENV;
-    const result = await requireDocker(
-      DockerLauncher.runArgs({ ...spec, port: target.port }, env.injected),
-      "Start local Zitadel container",
-      env.values,
-    ).catch(async (error: unknown) => {
+    let result: DockerResult;
+    try {
+      result = await requireDocker(
+        DockerLauncher.runArgs({ ...spec, port: target.port }, env.injected),
+        "Start local Zitadel container",
+        env.values,
+      );
+    } catch (error) {
       // A run that failed after the container was created leaves it behind.
       await DockerLauncher.remove(spec.containerName).catch(() => false);
       throw error;
-    });
+    }
     return launched(
       DockerLauncher.metadata({
         cwdDataDir: spec.dataDir,
@@ -234,9 +237,12 @@ export class DockerLauncher implements Launcher<DockerRuntimeMetadata> {
     }
 
     const args = ["manifest", "inspect", image];
-    const result = await runDocker(args).catch((error: unknown) => {
+    let result: DockerResult;
+    try {
+      result = await runDocker(args);
+    } catch (error) {
       throw dockerError(`Inspect Docker image ${image}`, args, error);
-    });
+    }
     if (result.status === 0) {
       return "remote";
     }
@@ -273,14 +279,17 @@ export class DockerLauncher implements Launcher<DockerRuntimeMetadata> {
    * a container must not fail for want of a `docker` to ask.
    */
   static async remove(containerName: string): Promise<boolean> {
-    const inspect = await DockerLauncher.inspect(containerName).catch((error: unknown) => {
+    let inspect: Awaited<ReturnType<typeof DockerLauncher.inspect>>;
+    try {
+      inspect = await DockerLauncher.inspect(containerName);
+    } catch (error) {
       // No `docker` on PATH: Docker is not installed, so it runs no container.
       if (isErrno(error, "ENOENT")) {
-        return undefined;
+        return false;
       }
       throw error;
-    });
-    if (!inspect?.exists) {
+    }
+    if (!inspect.exists) {
       return false;
     }
     if (inspect.running) {
@@ -371,15 +380,19 @@ async function runDocker(
       stdio: ["ignore", "pipe", "pipe"],
       env: { ...process.env, ...env },
     });
-    const stdout: string[] = [];
-    const stderr: string[] = [];
+    let stdout = "";
+    let stderr = "";
     child.stdout?.setEncoding("utf8");
     child.stderr?.setEncoding("utf8");
-    child.stdout?.on("data", (chunk: string) => stdout.push(chunk));
-    child.stderr?.on("data", (chunk: string) => stderr.push(chunk));
+    child.stdout?.on("data", (chunk: string) => {
+      stdout += chunk;
+    });
+    child.stderr?.on("data", (chunk: string) => {
+      stderr += chunk;
+    });
     child.on("error", reject);
     child.on("close", (code) => {
-      resolve({ status: code ?? 1, stdout: stdout.join(""), stderr: stderr.join("") });
+      resolve({ status: code ?? 1, stdout, stderr });
     });
   });
 }
@@ -428,21 +441,21 @@ function lineBreaks(text: string): number {
   return text.split("\n").length - 1;
 }
 
-/**
- * Passes a stream's text to `write` once its first `count` lines have gone by.
- * `skipped` holds how many line breaks each chunk used up, so what is left to
- * skip is `count` less their sum.
- */
+/** Passes a stream's text to `write` once its first `count` lines have gone by. */
 function afterLines(count: number, write: (text: string) => void): (text: string) => void {
-  const skipped: number[] = [];
+  let left = count;
   return (text) => {
-    const left = count - skipped.reduce((sum, used) => sum + used, 0);
-    const breaks = left > 0 ? [...text.matchAll(/\n/g)].slice(0, left) : [];
-    skipped.push(breaks.length);
-    const last = breaks.at(-1);
-    const rest = left <= 0 ? text : breaks.length < left || !last ? "" : text.slice(last.index + 1);
-    if (rest.length > 0) {
-      write(rest);
+    let start = 0;
+    while (left > 0) {
+      const lineBreak = text.indexOf("\n", start);
+      if (lineBreak === -1) {
+        return;
+      }
+      left -= 1;
+      start = lineBreak + 1;
+    }
+    if (start < text.length) {
+      write(text.slice(start));
     }
   };
 }
@@ -455,9 +468,12 @@ async function requireDocker(
   action: string,
   env: Readonly<Record<string, string>> = {},
 ): Promise<DockerResult> {
-  const result = await runDocker(args, env).catch((error: unknown) => {
+  let result: DockerResult;
+  try {
+    result = await runDocker(args, env);
+  } catch (error) {
     throw dockerError(action, args, error);
-  });
+  }
   if (result.status !== 0) {
     throw dockerError(action, args, result);
   }
@@ -468,10 +484,13 @@ async function requireDocker(
  * Whether the image is already on this machine.
  */
 async function imageExists(image: string): Promise<boolean> {
+  let result: DockerResult;
   const args = ["image", "inspect", image];
-  const result = await runDocker(args).catch((error: unknown) => {
+  try {
+    result = await runDocker(args);
+  } catch (error) {
     throw dockerError(`Inspect Docker image ${image}`, args, error);
-  });
+  }
   return result.status === 0;
 }
 

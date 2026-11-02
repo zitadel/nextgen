@@ -1,31 +1,21 @@
-import { randomUUID } from "node:crypto";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
+
+import { it } from "../../../helpers/fixtures";
 
 import { writeBackResource } from "../../../../src/lib/sync/writeback";
 
-const cwd = join(tmpdir(), `zitadel-writeback-${randomUUID()}`);
-
-beforeEach(async () => {
-  await mkdir(cwd, { recursive: true });
-});
-
-afterEach(async () => {
-  await rm(cwd, { recursive: true, force: true });
-});
-
 describe("writeBackResource", () => {
-  it("writes the file when none is on disk", async () => {
+  it("writes the file when none is on disk", async ({ dir: cwd }) => {
     const result = await writeBackResource(cwd, "user.json", {}, { name: "user" });
 
     expect(result.changed).toBe(true);
     expect(JSON.parse(await readFile(join(cwd, "user.json"), "utf8"))).toEqual({ name: "user" });
   });
 
-  it("leaves a file that already matches untouched", async () => {
+  it("leaves a file that already matches untouched", async ({ dir: cwd }) => {
     await writeFile(join(cwd, "user.json"), '{ "name":   "user" }');
 
     const result = await writeBackResource(cwd, "user.json", {}, { name: "user" });
@@ -34,7 +24,7 @@ describe("writeBackResource", () => {
     expect(await readFile(join(cwd, "user.json"), "utf8")).toBe('{ "name":   "user" }');
   });
 
-  it("carries the on-disk $schema pointer over", async () => {
+  it("carries the on-disk $schema pointer over", async ({ dir: cwd }) => {
     await writeFile(join(cwd, "user.json"), '{ "$schema": "./meta/user.json", "name": "old" }');
 
     await writeBackResource(cwd, "user.json", {}, { name: "user" });
@@ -45,7 +35,7 @@ describe("writeBackResource", () => {
     });
   });
 
-  it("rewrites a file the comparison form cannot read instead of failing", async () => {
+  it("rewrites a file the comparison form cannot read instead of failing", async ({ dir: cwd }) => {
     await writeFile(join(cwd, "user.json"), "null");
     const strict = {
       normalize(data: object): object {

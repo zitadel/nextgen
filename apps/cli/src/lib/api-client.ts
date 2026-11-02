@@ -99,11 +99,7 @@ export function sanitizeResponse<T>(value: T): T {
   };
 
   const root = copy(value);
-  for (;;) {
-    const next = pending.pop();
-    if (!next) {
-      break;
-    }
+  for (let next = pending.pop(); next; next = pending.pop()) {
     const { source, target } = next;
     if (Array.isArray(source)) {
       for (const item of source) {

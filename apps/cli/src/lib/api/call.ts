@@ -4,7 +4,7 @@ import { itemsOf, nextToken, pages } from "@zitadel/api/runtime/paging";
 import { REQUEST_TIMEOUT_MS, sanitizeRejection, sanitizeResponse } from "../api-client";
 import { Consent } from "../consent";
 import { ZitadelError } from "../errors";
-import { isObject } from "../json";
+import { isObject, parseJsonOrUndefined } from "../json";
 import { interruptSignal } from "../interrupt";
 import { collectPages } from "../oclif/crud/paging";
 import { type ApiRequest, urlOf } from "./request";
@@ -24,11 +24,8 @@ const readBody = async (res: Response): Promise<unknown> => {
   if (!(res.headers.get("content-type") ?? "").includes("json")) {
     return raw;
   }
-  try {
-    return JSON.parse(raw) as unknown;
-  } catch {
-    return raw;
-  }
+  const parsed = parseJsonOrUndefined(raw);
+  return parsed === undefined ? raw : parsed;
 };
 
 /**
@@ -119,16 +116,13 @@ export const sendAll = async (
   if (paging === null) {
     return send(server, token, request);
   }
-  // Only the last page is kept: every page's items are collected as they come,
-  // so holding the pages themselves would double a wide listing in memory.
-  const last: Array<{ status: number; raw: unknown }> = [];
+  let last: { status: number; raw: unknown } = { status: 200, raw: undefined };
   // Each page is fetched raw: the cursor goes back to the server exactly as it
   // came, and only the items are escaped.
   const walk = pages(
     async (cursor) => {
-      const page = await sendRaw(server, token, pageOf(request, cursor));
-      last[0] = page;
-      return page.raw;
+      last = await sendRaw(server, token, pageOf(request, cursor));
+      return last.raw;
     },
     { next: nextToken },
   );
@@ -152,8 +146,7 @@ export const sendAll = async (
   // escaping, with an empty list in place of its own, which every page's
   // escaped items then fill. The check only narrows the type: the items above
   // were read off this page, so it is an object.
-  const final = last[0] ?? { status: 200, raw: undefined };
-  const page = isObject(final.raw) ? final.raw : {};
+  const page = isObject(last.raw) ? last.raw : {};
   const body = sanitizeResponse({ ...page, [paging.items]: [] });
-  return { status: final.status, body: { ...body, [paging.items]: items } };
+  return { status: last.status, body: { ...body, [paging.items]: items } };
 };

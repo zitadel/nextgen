@@ -2,7 +2,7 @@ import { createServer, type IncomingMessage, type Server } from "node:http";
 
 import type { Config } from "@oclif/core";
 import { Agent, type Dispatcher, getGlobalDispatcher, setGlobalDispatcher } from "undici";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { BaseCommand } from "../../../src/lib/oclif/base";
 import {
@@ -157,10 +157,6 @@ describe("on the wire", () => {
   beforeEach(() => {
     setGlobalDispatcher(original());
     _resetUserAgentForTesting();
-  });
-
-  afterEach(() => {
-    vi.unstubAllEnvs();
   });
 
   afterAll(async () => {

@@ -60,16 +60,15 @@ export function parseConfigModule(
       hint: `Run setup from a project that has ${filename}.`,
     });
   }
-  const mod = (() => {
-    try {
-      return parseModule(source, options);
-    } catch (error) {
-      throw new ZitadelError("E_VALIDATION", `Could not parse ${filename}`, {
-        hint: `Ensure ${filename} is valid, or apply the Zitadel changes manually.`,
-        details: { cause: error instanceof Error ? error.message : String(error) },
-      });
-    }
-  })();
+  let mod: ReturnType<typeof parseModule>;
+  try {
+    mod = parseModule(source, options);
+  } catch (error) {
+    throw new ZitadelError("E_VALIDATION", `Could not parse ${filename}`, {
+      hint: `Ensure ${filename} is valid, or apply the Zitadel changes manually.`,
+      details: { cause: error instanceof Error ? error.message : String(error) },
+    });
+  }
   // A CommonJS config (e.g. a `*.cjs` file or a `*.js` with `module.exports`)
   // can't evaluate the ESM `import`/`import.meta.url` these edits inject, so
   // reject it with a clear message instead of producing a broken config. Check

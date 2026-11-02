@@ -3,20 +3,17 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { HttpResponse, http } from "msw";
-import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect } from "vitest";
+
+import { it } from "../../../helpers/fixtures";
 
 import { parseJson, runCliForTest } from "../../../helpers/run-cli";
 
 const SERVER = "https://api.zitadel.example";
-const server = setupServer();
 
 const removed: Array<Record<string, unknown>> = [];
 
-beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
-afterAll(() => server.close());
-
-beforeEach(() => {
+it.beforeEach(({ server }) => {
   removed.length = 0;
   server.use(
     http.post(`${SERVER}/api/v1/projects/:id/origins/remove`, async ({ request }) => {
@@ -31,8 +28,6 @@ beforeEach(() => {
     ),
   );
 });
-
-afterEach(() => server.resetHandlers());
 
 const dirs: string[] = [];
 
@@ -87,7 +82,7 @@ describe("origin rm", () => {
     });
   });
 
-  it("still reports the removal when the remaining origins cannot be read", async () => {
+  it("still reports the removal when the remaining origins cannot be read", async ({ server }) => {
     const cwd = await anAppDir();
     server.use(
       http.get(`${SERVER}/api/v1/projects/:id`, () =>
@@ -136,7 +131,9 @@ describe("origin rm", () => {
     expect(envelope.next_commands?.[0]).toContain("--env production");
   });
 
-  it("names the environment the last origin was removed from in how to add one back", async () => {
+  it("names the environment the last origin was removed from in how to add one back", async ({
+    server,
+  }) => {
     const cwd = await anAppDir();
     await writeFile(
       join(cwd, ".env.production.local"),

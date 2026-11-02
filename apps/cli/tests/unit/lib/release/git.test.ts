@@ -3,22 +3,20 @@ import { mkdir, rm, symlink, utimes, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { promisify } from "node:util";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
+
+import { it } from "../../../helpers/fixtures";
 
 import {
   diffConfigAgainst,
   diffConfigFilesAgainst,
   worktreeIsDirty,
 } from "../../../../src/lib/release/git";
-import { tempDirs } from "../../../helpers/temp-dirs";
 
 const run = promisify(execFile);
 
-const dirs = tempDirs();
-
 /** A temp git repo with one clean commit holding a `.zitadel/` file. */
-async function cleanRepo(): Promise<string> {
-  const dir = await dirs.make("zitadel-git-");
+async function cleanRepo(dir: string): Promise<string> {
   await mkdir(join(dir, ".zitadel", "schemas"), { recursive: true });
   await writeFile(join(dir, ".zitadel", "schemas", "marker.json"), "{}");
   await writeFile(join(dir, "README.md"), "# app\n");
@@ -31,19 +29,15 @@ async function cleanRepo(): Promise<string> {
   return dir;
 }
 
-afterEach(async () => {
-  await dirs.clean();
-});
-
 describe("worktreeIsDirty", () => {
-  it("is false for a clean worktree", async () => {
-    const cwd = await cleanRepo();
+  it("is false for a clean worktree", async ({ dir }) => {
+    const cwd = await cleanRepo(dir);
 
     expect(await worktreeIsDirty(cwd)).toBe(false);
   });
 
-  it("is true for an uncommitted change outside .zitadel/", async () => {
-    const cwd = await cleanRepo();
+  it("is true for an uncommitted change outside .zitadel/", async ({ dir }) => {
+    const cwd = await cleanRepo(dir);
 
     // The change is in the repo but not under `.zitadel/`: the whole worktree
     // is dirty, which the old `.zitadel/`-only check would have missed.
@@ -52,16 +46,14 @@ describe("worktreeIsDirty", () => {
     expect(await worktreeIsDirty(cwd)).toBe(true);
   });
 
-  it("is false when there is no git repository", async () => {
-    const cwd = await dirs.make("zitadel-git-norepo-");
-
+  it("is false when there is no git repository", async ({ dir: cwd }) => {
     expect(await worktreeIsDirty(cwd)).toBe(false);
   });
 });
 
 describe("diffConfigAgainst", () => {
-  it("detects a same-size edit whose timestamp matches the index", async () => {
-    const cwd = await cleanRepo();
+  it("detects a same-size edit whose timestamp matches the index", async ({ dir }) => {
+    const cwd = await cleanRepo(dir);
     const git = (args: string[]) => run("git", args, { cwd });
     const sha = (await git(["rev-parse", "HEAD"])).stdout.trim();
     await git(["config", "core.trustctime", "false"]);
@@ -79,8 +71,8 @@ describe("diffConfigAgainst", () => {
     expect(await diffConfigAgainst(cwd, sha, false)).toContain("+[]");
   });
 
-  it("shows an untracked .zitadel/ file as an addition", async () => {
-    const cwd = await cleanRepo();
+  it("shows an untracked .zitadel/ file as an addition", async ({ dir }) => {
+    const cwd = await cleanRepo(dir);
     const sha = (await run("git", ["rev-parse", "HEAD"], { cwd })).stdout.trim();
 
     // A brand-new resource is untracked; the release bundle would include it,
@@ -93,8 +85,8 @@ describe("diffConfigAgainst", () => {
     expect(diff).toContain("added");
   });
 
-  it("still shows a tracked change, leaving files outside .zitadel/ out", async () => {
-    const cwd = await cleanRepo();
+  it("still shows a tracked change, leaving files outside .zitadel/ out", async ({ dir }) => {
+    const cwd = await cleanRepo(dir);
     const sha = (await run("git", ["rev-parse", "HEAD"], { cwd })).stdout.trim();
     await writeFile(join(cwd, ".zitadel", "schemas", "marker.json"), '{ "edited": true }\n');
     await writeFile(join(cwd, "README.md"), "# app\n\nedited\n");
@@ -105,8 +97,8 @@ describe("diffConfigAgainst", () => {
     expect(diff).not.toContain("README.md");
   });
 
-  it("shows a referenced template the bundle inlines from outside .zitadel/", async () => {
-    const cwd = await cleanRepo();
+  it("shows a referenced template the bundle inlines from outside .zitadel/", async ({ dir }) => {
+    const cwd = await cleanRepo(dir);
     const sha = (await run("git", ["rev-parse", "HEAD"], { cwd })).stdout.trim();
     await mkdir(join(cwd, "templates"), { recursive: true });
     await writeFile(join(cwd, "templates", "login.liquid"), "<p>edited</p>\n");
@@ -117,8 +109,8 @@ describe("diffConfigAgainst", () => {
     expect(diff).toContain("edited");
   });
 
-  it("leaves a referenced file out when nothing references it", async () => {
-    const cwd = await cleanRepo();
+  it("leaves a referenced file out when nothing references it", async ({ dir }) => {
+    const cwd = await cleanRepo(dir);
     const sha = (await run("git", ["rev-parse", "HEAD"], { cwd })).stdout.trim();
     await mkdir(join(cwd, "templates"), { recursive: true });
     await writeFile(join(cwd, "templates", "login.liquid"), "<p>edited</p>\n");
@@ -128,8 +120,8 @@ describe("diffConfigAgainst", () => {
     expect(diff).not.toContain("login.liquid");
   });
 
-  it("never shows .zitadel/secret, which is not part of a release", async () => {
-    const cwd = await cleanRepo();
+  it("never shows .zitadel/secret, which is not part of a release", async ({ dir }) => {
+    const cwd = await cleanRepo(dir);
     const sha = (await run("git", ["rev-parse", "HEAD"], { cwd })).stdout.trim();
     await writeFile(join(cwd, ".zitadel", "secret"), '{ "project_secret": "sk_live" }\n');
 
@@ -138,23 +130,23 @@ describe("diffConfigAgainst", () => {
     expect(diff).not.toContain("sk_live");
   });
 
-  it("returns null when the commit is not in this repository's history", async () => {
-    const cwd = await cleanRepo();
+  it("returns null when the commit is not in this repository's history", async ({ dir }) => {
+    const cwd = await cleanRepo(dir);
 
     expect(await diffConfigAgainst(cwd, "0".repeat(40), false)).toBeNull();
   });
 });
 
 /** {@link cleanRepo}, with the commit a diff is taken against. */
-async function cleanCommit(): Promise<{ cwd: string; sha: string }> {
-  const cwd = await cleanRepo();
+async function cleanCommit(dir: string): Promise<{ cwd: string; sha: string }> {
+  const cwd = await cleanRepo(dir);
   const { stdout } = await run("git", ["rev-parse", "HEAD"], { cwd });
   return { cwd, sha: stdout.trim() };
 }
 
 describe("diffConfigFilesAgainst", () => {
-  it("reports a changed file with its part of the diff", async () => {
-    const { cwd, sha } = await cleanCommit();
+  it("reports a changed file with its part of the diff", async ({ dir }) => {
+    const { cwd, sha } = await cleanCommit(dir);
     await writeFile(join(cwd, ".zitadel", "schemas", "marker.json"), '{ "edited": true }\n');
 
     const files = await diffConfigFilesAgainst(cwd, sha);
@@ -168,8 +160,8 @@ describe("diffConfigFilesAgainst", () => {
     ]);
   });
 
-  it("reports an untracked file as added", async () => {
-    const { cwd, sha } = await cleanCommit();
+  it("reports an untracked file as added", async ({ dir }) => {
+    const { cwd, sha } = await cleanCommit(dir);
     await writeFile(join(cwd, ".zitadel", "schemas", "new.json"), '{ "added": true }\n');
 
     const files = await diffConfigFilesAgainst(cwd, sha);
@@ -179,8 +171,8 @@ describe("diffConfigFilesAgainst", () => {
     ]);
   });
 
-  it("reports a removed file as deleted", async () => {
-    const { cwd, sha } = await cleanCommit();
+  it("reports a removed file as deleted", async ({ dir }) => {
+    const { cwd, sha } = await cleanCommit(dir);
     await rm(join(cwd, ".zitadel", "schemas", "marker.json"));
 
     const files = await diffConfigFilesAgainst(cwd, sha);
@@ -190,8 +182,8 @@ describe("diffConfigFilesAgainst", () => {
     ]);
   });
 
-  it("reports a moved file as renamed, with where it came from", async () => {
-    const { cwd, sha } = await cleanCommit();
+  it("reports a moved file as renamed, with where it came from", async ({ dir }) => {
+    const { cwd, sha } = await cleanCommit(dir);
     await run("git", ["mv", ".zitadel/schemas/marker.json", ".zitadel/schemas/moved.json"], {
       cwd,
     });
@@ -209,8 +201,8 @@ describe("diffConfigFilesAgainst", () => {
     ]);
   });
 
-  it("reports a file replaced by a symlink once, as modified", async () => {
-    const { cwd, sha } = await cleanCommit();
+  it("reports a file replaced by a symlink once, as modified", async ({ dir }) => {
+    const { cwd, sha } = await cleanCommit(dir);
     // git shows a change of file type as a deletion and a creation under one
     // header: both halves belong to the one file.
     await rm(join(cwd, ".zitadel", "schemas", "marker.json"));
@@ -227,8 +219,8 @@ describe("diffConfigFilesAgainst", () => {
     ]);
   });
 
-  it("joins back into exactly the diff the terminal shows", async () => {
-    const { cwd, sha } = await cleanCommit();
+  it("joins back into exactly the diff the terminal shows", async ({ dir }) => {
+    const { cwd, sha } = await cleanCommit(dir);
     await writeFile(join(cwd, ".zitadel", "schemas", "marker.json"), '{ "edited": true }\n');
     await mkdir(join(cwd, ".zitadel", "flows"), { recursive: true });
     await writeFile(join(cwd, ".zitadel", "flows", "kiosk login.json"), "{}\n");
@@ -242,8 +234,8 @@ describe("diffConfigFilesAgainst", () => {
     );
   });
 
-  it("names a file by its own path, however git would quote it", async () => {
-    const { cwd, sha } = await cleanCommit();
+  it("names a file by its own path, however git would quote it", async ({ dir }) => {
+    const { cwd, sha } = await cleanCommit(dir);
     await writeFile(join(cwd, ".zitadel", "schemas", 'say "hi" émigré.json'), "{}\n");
 
     const files = await diffConfigFilesAgainst(cwd, sha);
@@ -251,8 +243,7 @@ describe("diffConfigFilesAgainst", () => {
     expect(files?.map((file) => file.path)).toEqual(['.zitadel/schemas/say "hi" émigré.json']);
   });
 
-  it("names files from the project, not the repository root above it", async () => {
-    const dir = await dirs.make("zitadel-git-monorepo-");
+  it("names files from the project, not the repository root above it", async ({ dir }) => {
     const cwd = join(dir, "apps", "web");
     await mkdir(join(cwd, ".zitadel", "schemas"), { recursive: true });
     await writeFile(join(cwd, ".zitadel", "schemas", "marker.json"), "{}\n");
@@ -270,8 +261,8 @@ describe("diffConfigFilesAgainst", () => {
     expect(files?.map((file) => file.path)).toEqual([".zitadel/schemas/marker.json"]);
   });
 
-  it("never reports .zitadel/secret, which is not part of a release", async () => {
-    const { cwd, sha } = await cleanCommit();
+  it("never reports .zitadel/secret, which is not part of a release", async ({ dir }) => {
+    const { cwd, sha } = await cleanCommit(dir);
     await writeFile(join(cwd, ".zitadel", "secret"), '{ "project_secret": "sk_live" }\n');
 
     const files = await diffConfigFilesAgainst(cwd, sha);
@@ -279,14 +270,14 @@ describe("diffConfigFilesAgainst", () => {
     expect(files).toEqual([]);
   });
 
-  it("reports no files when nothing changed", async () => {
-    const { cwd, sha } = await cleanCommit();
+  it("reports no files when nothing changed", async ({ dir }) => {
+    const { cwd, sha } = await cleanCommit(dir);
 
     expect(await diffConfigFilesAgainst(cwd, sha)).toEqual([]);
   });
 
-  it("returns null when the commit is not in this repository's history", async () => {
-    const { cwd } = await cleanCommit();
+  it("returns null when the commit is not in this repository's history", async ({ dir }) => {
+    const { cwd } = await cleanCommit(dir);
 
     expect(await diffConfigFilesAgainst(cwd, "0".repeat(40))).toBeNull();
   });

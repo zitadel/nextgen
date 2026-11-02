@@ -60,19 +60,24 @@ export async function findLocalAdminFor(
   cwd: string,
   serverUrl: string,
 ): Promise<LocalAdmin | undefined> {
-  const dir = await findLocalAdminDir(cwd);
-  if (!dir) return undefined;
-  const runtime = await readRuntimeMetadata(dir).catch(() => undefined);
-  if (runtime && sameLocalServer(runtime.server_url, serverUrl)) {
-    return readLocalAdmin(dir);
+  for (let from = cwd; ; ) {
+    const dir = await findLocalAdminDir(from);
+    if (!dir) return undefined;
+    const runtime = await readRuntimeMetadata(dir).catch(() => undefined);
+    if (runtime && sameLocalServer(runtime.server_url, serverUrl)) {
+      return readLocalAdmin(dir);
+    }
+    if (dir === homedir() || dirname(dir) === dir) return undefined;
+    from = dirname(dir);
   }
-  if (dir === homedir() || dirname(dir) === dir) return undefined;
-  return findLocalAdminFor(dirname(dir), serverUrl);
 }
 
 /** Reads the local admin credential, or `undefined` when `start` never wrote one. */
 export async function readLocalAdmin(cwd: string): Promise<LocalAdmin | undefined> {
-  const raw = await readFile(join(cwd, LOCAL_ADMIN_FILE), "utf8").catch((error: unknown) => {
+  let raw: string;
+  try {
+    raw = await readFile(join(cwd, LOCAL_ADMIN_FILE), "utf8");
+  } catch (error) {
     // Only a missing file means `start` never created the admin. A file that
     // exists but cannot be read is still the credential the server imported,
     // and minting a replacement would leave the two holding different passwords.
@@ -81,22 +86,18 @@ export async function readLocalAdmin(cwd: string): Promise<LocalAdmin | undefine
       hint: `Check that ${LOCAL_ADMIN_FILE} is readable by you; \`zitadel start\` writes it owner-only.`,
       details: { cause: error instanceof Error ? error.message : String(error) },
     });
-  });
-  if (raw === undefined) return undefined;
+  }
 
-  const parsed = parseAdminFile(raw);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (error) {
+    throw malformedAdminFile(error);
+  }
   if (!isLocalAdmin(parsed)) {
     throw malformedAdminFile();
   }
   return parsed;
-}
-
-function parseAdminFile(raw: string): unknown {
-  try {
-    return JSON.parse(raw);
-  } catch (error) {
-    throw malformedAdminFile(error);
-  }
 }
 
 function isLocalAdmin(value: unknown): value is LocalAdmin {

@@ -1,7 +1,7 @@
 import pc from "picocolors";
 
 import { escapeControlCharacters } from "../api-client";
-import { isObject } from "../json";
+import { isObject, parseJsonOrUndefined } from "../json";
 
 /** The levels `zitadel logs --level` takes, lowest first. */
 export const LOG_LEVELS = ["debug", "info", "warn", "error"] as const;
@@ -73,13 +73,7 @@ function jsonLevel(text: string): string | undefined {
   if (!text.startsWith("{")) {
     return undefined;
   }
-  const record = ((): unknown => {
-    try {
-      return JSON.parse(text);
-    } catch {
-      return undefined;
-    }
-  })();
+  const record = parseJsonOrUndefined(text);
   const level = isObject(record) ? (record.level ?? record.severity) : undefined;
   return typeof level === "string" ? level.replace(/[+-]\d+$/, "") : undefined;
 }

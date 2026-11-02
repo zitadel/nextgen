@@ -1,10 +1,9 @@
-import { randomUUID } from "node:crypto";
-import { chmod, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
-import { createServer, type Server } from "node:http";
-import { tmpdir } from "node:os";
+import { chmod, mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
+
+import { it, type Serve } from "../../../helpers/fixtures";
 
 import { ZitadelError } from "../../../../src/lib/errors";
 import {
@@ -25,16 +24,6 @@ import {
   type RuntimeMetadata,
 } from "../../../../src/lib/local-server/runtime";
 
-const cwd = join(tmpdir(), `zitadel-server-runtime-${randomUUID()}`);
-
-beforeEach(async () => {
-  await mkdir(cwd, { recursive: true });
-});
-
-afterEach(async () => {
-  await rm(cwd, { recursive: true, force: true });
-});
-
 describe("local server runtime metadata", () => {
   it.each([
     ["0.1.0-alpha.5", "ghcr.io/zitadel/nextgen:0.1.0-alpha.5"],
@@ -46,14 +35,14 @@ describe("local server runtime metadata", () => {
     expect(defaultLocalServerImageForCliVersion(cliVersion)).toBe(image);
   });
 
-  it("creates local state and gitignores it", async () => {
+  it("creates local state and gitignores it", async ({ dir: cwd }) => {
     const paths = await ensureLocalState(cwd);
 
     expect((await stat(paths.dataDir)).isDirectory()).toBe(true);
     await expect(readFile(join(cwd, ".gitignore"), "utf8")).resolves.toContain(".zitadel/local/");
   });
 
-  it("round-trips runtime metadata", async () => {
+  it("round-trips runtime metadata", async ({ dir: cwd }) => {
     const metadata = runtimeFor(cwd);
 
     await writeRuntimeMetadata(cwd, metadata);
@@ -64,7 +53,7 @@ describe("local server runtime metadata", () => {
     );
   });
 
-  it("round-trips binary runtime metadata", async () => {
+  it("round-trips binary runtime metadata", async ({ dir: cwd }) => {
     const paths = localRuntimePaths(cwd);
     const metadata: RuntimeMetadata = {
       schema_version: 1,
@@ -86,7 +75,7 @@ describe("local server runtime metadata", () => {
     await expect(readRuntimeMetadata(cwd)).resolves.toEqual(metadata);
   });
 
-  it("treats legacy runtime metadata without backend as Docker metadata", async () => {
+  it("treats legacy runtime metadata without backend as Docker metadata", async ({ dir: cwd }) => {
     const paths = await ensureLocalState(cwd);
     const metadata = runtimeFor(cwd);
     const { backend: _backend, ...legacy } = metadata;
@@ -95,7 +84,7 @@ describe("local server runtime metadata", () => {
     await expect(readRuntimeMetadata(cwd)).resolves.toEqual(metadata);
   });
 
-  it("accepts runtime metadata with an explicit default HTTP port", async () => {
+  it("accepts runtime metadata with an explicit default HTTP port", async ({ dir: cwd }) => {
     const metadata = { ...runtimeFor(cwd), port: 80, server_url: "http://localhost:80" };
 
     await writeRuntimeMetadata(cwd, metadata);
@@ -103,13 +92,13 @@ describe("local server runtime metadata", () => {
     await expect(readRuntimeMetadata(cwd)).resolves.toEqual(metadata);
   });
 
-  it.each([
+  it.for<[string, unknown]>([
     ["server_url", "localhost:8080"],
     ["server_url", "http://localhost"],
     ["server_url", "http://localhost:8082"],
     ["port", 0],
     ["port", 8080.5],
-  ])("rejects runtime metadata with invalid %s", async (field, value) => {
+  ])("rejects runtime metadata with invalid %s", async ([field, value], { dir: cwd }) => {
     const paths = await ensureLocalState(cwd);
     await writeFile(
       paths.runtimeFile,
@@ -122,7 +111,7 @@ describe("local server runtime metadata", () => {
     });
   });
 
-  it("writes container identity files for host-user Docker runs", async () => {
+  it("writes container identity files for host-user Docker runs", async ({ dir: cwd }) => {
     const identity = await ensureContainerIdentity(cwd, { uid: 501, gid: 20 });
 
     expect(identity).toMatchObject({ uid: 501, gid: 20 });
@@ -134,7 +123,7 @@ describe("local server runtime metadata", () => {
     );
   });
 
-  it("deletes only local data when reset removes the data directory", async () => {
+  it("deletes only local data when reset removes the data directory", async ({ dir: cwd }) => {
     const paths = await ensureLocalState(cwd);
     await writeFile(join(paths.dataDir, "sample"), "data");
 
@@ -150,7 +139,7 @@ describe("findUpward", () => {
   // Root reads through any mode, so the unreadable directory proves nothing there.
   it.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
     "refuses to look past local state it cannot read",
-    async () => {
+    async ({ dir: cwd }) => {
       await writeRuntimeMetadata(cwd, runtimeFor(cwd));
       const app = join(cwd, "my-app");
       await mkdir(join(app, ".zitadel/local"), { recursive: true });
@@ -166,7 +155,7 @@ describe("findUpward", () => {
     },
   );
 
-  it("stops looking for local state at the boundary it is given", async () => {
+  it("stops looking for local state at the boundary it is given", async ({ dir: cwd }) => {
     await writeRuntimeMetadata(cwd, runtimeFor(cwd));
     const home = join(cwd, "home");
     const app = join(home, "my-app");
@@ -183,7 +172,7 @@ describe("readNearestRuntimeMetadata", () => {
     await writeFile(join(dir, LOCAL_RUNTIME_FILE), JSON.stringify({ backend: "nope" }));
   }
 
-  it("recovers a malformed record in a parent where it is", async () => {
+  it("recovers a malformed record in a parent where it is", async ({ dir: cwd }) => {
     await malformedRecordAt(cwd);
     const app = join(cwd, "my-app");
     await mkdir(app);
@@ -193,7 +182,9 @@ describe("readNearestRuntimeMetadata", () => {
     });
   });
 
-  it("recovers a malformed record in the working directory without naming it", async () => {
+  it("recovers a malformed record in the working directory without naming it", async ({
+    dir: cwd,
+  }) => {
     await malformedRecordAt(cwd);
 
     await expect(readNearestRuntimeMetadata(cwd)).rejects.toMatchObject({
@@ -205,7 +196,7 @@ describe("readNearestRuntimeMetadata", () => {
 describe("loopbackReach", () => {
   const ALLOW_LIST = { injected: ["NEXTGEN_HTTPCLIENT_ALLOW_LIST"] };
 
-  function binaryRuntime(env = ALLOW_LIST): RuntimeMetadata {
+  function binaryRuntime(cwd: string, env = ALLOW_LIST): RuntimeMetadata {
     return {
       ...runtimeFor(cwd),
       backend: "binary",
@@ -218,8 +209,10 @@ describe("loopbackReach", () => {
     };
   }
 
-  it("allows loopback on a process server that got the allow list, from a subdirectory too", async () => {
-    await writeRuntimeMetadata(cwd, binaryRuntime());
+  it("allows loopback on a process server that got the allow list, from a subdirectory too", async ({
+    dir: cwd,
+  }) => {
+    await writeRuntimeMetadata(cwd, binaryRuntime(cwd));
     const app = join(cwd, "my-app");
     await mkdir(app);
 
@@ -227,57 +220,50 @@ describe("loopbackReach", () => {
     await expect(loopbackReach(app, "http://127.0.0.1:8081/")).resolves.toBe("allowed");
   });
 
-  it("names a container server, whose localhost is the container", async () => {
+  it("names a container server, whose localhost is the container", async ({ dir: cwd }) => {
     await writeRuntimeMetadata(cwd, runtimeFor(cwd));
     await expect(loopbackReach(cwd, "http://localhost:8081")).resolves.toBe("container");
   });
 
-  it("knows nothing of a process server started with the allow list off", async () => {
-    await writeRuntimeMetadata(cwd, binaryRuntime({ injected: [] }));
+  it("knows nothing of a process server started with the allow list off", async ({ dir: cwd }) => {
+    await writeRuntimeMetadata(cwd, binaryRuntime(cwd, { injected: [] }));
     await expect(loopbackReach(cwd, "http://localhost:8081")).resolves.toBe("unknown");
   });
 
-  it("knows nothing of a server the record does not name, or of no record", async () => {
+  it("knows nothing of a server the record does not name, or of no record", async ({
+    dir: cwd,
+  }) => {
     await expect(loopbackReach(cwd, "http://localhost:8081")).resolves.toBe("unknown");
-    await writeRuntimeMetadata(cwd, binaryRuntime());
+    await writeRuntimeMetadata(cwd, binaryRuntime(cwd));
     await expect(loopbackReach(cwd, "http://localhost:9999")).resolves.toBe("unknown");
     await expect(loopbackReach(cwd, "https://example.zitadel.cloud")).resolves.toBe("unknown");
   });
 });
 
 describe("checkLocalServerHealth", () => {
-  const servers: Server[] = [];
-
-  afterEach(async () => {
-    for (const server of servers.splice(0)) {
-      await new Promise<void>((resolve) => server.close(() => resolve()));
-    }
-  });
-
   /** A server whose process answers, and whose database answers as `database` says. */
-  async function aServerWhoseDatabaseIs(database: "up" | "down"): Promise<string> {
-    const server = createServer((req, res) => {
+  function aServerWhoseDatabaseIs(serve: Serve, database: "up" | "down"): Promise<string> {
+    return serve((req, res) => {
       if (req.url === "/readyz") {
         res.writeHead(database === "up" ? 200 : 503).end(database === "up" ? "ok" : "fail");
         return;
       }
       res.writeHead(req.url === "/livez" ? 200 : 404).end("ok");
     });
-    servers.push(server);
-    await new Promise<void>((resolve) => server.listen(0, "localhost", () => resolve()));
-    const address = server.address();
-    if (!address || typeof address === "string") {
-      throw new Error("server did not expose a TCP address");
-    }
-    return `http://localhost:${String(address.port)}`;
   }
 
-  it("is healthy once the server's database answers", async () => {
-    await expect(checkLocalServerHealth(await aServerWhoseDatabaseIs("up"))).resolves.toBe(true);
+  it("is healthy once the server's database answers", async ({ serve }) => {
+    await expect(checkLocalServerHealth(await aServerWhoseDatabaseIs(serve, "up"))).resolves.toBe(
+      true,
+    );
   });
 
-  it("is not healthy while the database does not answer, though the process does", async () => {
-    await expect(checkLocalServerHealth(await aServerWhoseDatabaseIs("down"))).resolves.toBe(false);
+  it("is not healthy while the database does not answer, though the process does", async ({
+    serve,
+  }) => {
+    await expect(checkLocalServerHealth(await aServerWhoseDatabaseIs(serve, "down"))).resolves.toBe(
+      false,
+    );
   });
 });
 
@@ -286,11 +272,11 @@ describe("retargetMalformedRuntime", () => {
     details: { x: 1 },
   });
 
-  it.each([
+  it.for<[string, string]>([
     ["a Windows path with a space", "C:\\work\\my app"],
     ["a Windows path with an apostrophe", "C:\\work\\it's"],
     ["a POSIX path with a space", "/home/dev/my app"],
-  ])("hands over %s as arguments, not as commands", (_name, dir) => {
+  ])("hands over %s as arguments, not as commands", ([_name, dir]) => {
     const retargeted = retargetMalformedRuntime(malformed, dir) as ZitadelError;
 
     expect(retargeted.nextCommands).toBeUndefined();

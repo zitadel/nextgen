@@ -11,6 +11,11 @@ export default defineConfig({
     ...baseTest,
     name: "@zitadel/cli",
     environment: "node",
+    // Undo `vi.spyOn`, `vi.stubEnv` and `vi.stubGlobal` before every test, so no
+    // file restores them by hand.
+    restoreMocks: true,
+    unstubEnvs: true,
+    unstubGlobals: true,
     // The integration specs drive the built CLI; keep their telemetry off with
     // the cross-tool standard (https://consoledonottrack.com) so a unit run
     // never ships events, independent of the moon/CI env.

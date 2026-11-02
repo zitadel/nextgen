@@ -356,6 +356,9 @@ catalogs:
     express:
       specifier: ^4.18.2
       version: 4.22.2
+    fastest-levenshtein:
+      specifier: ^1.0.16
+      version: 1.0.16
     fumadocs-core:
       specifier: ^16.17.1
       version: 16.17.1
@@ -662,6 +665,9 @@ importers:
       consola:
         specifier: ^3.4.2
         version: 3.4.2
+      fastest-levenshtein:
+        specifier: 'catalog:'
+        version: 1.0.16
       magicast:
         specifier: ^0.5.3
         version: 0.5.3

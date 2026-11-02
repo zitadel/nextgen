@@ -75,25 +75,23 @@ const PATH_TERMS = new Set([
 
 /** `condition`'s terms joined by `&&` outside any parentheses. */
 function andTerms(condition: string): string[] {
-  const scan = [...condition.matchAll(/[()]|&&/g)].reduce(
-    (state, match) => {
-      if (match[0] === "(") {
-        return { depth: state.depth + 1, start: state.start, terms: state.terms };
-      }
-      if (match[0] === ")") {
-        return { depth: state.depth - 1, start: state.start, terms: state.terms };
-      }
-      return state.depth === 0
-        ? {
-            depth: 0,
-            start: match.index + 2,
-            terms: state.terms.concat(condition.slice(state.start, match.index)),
-          }
-        : state;
-    },
-    { depth: 0, start: 0, terms: [] as string[] },
-  );
-  return scan.terms.concat(condition.slice(scan.start));
+  const terms: string[] = [];
+  let depth = 0;
+  let start = 0;
+  for (let index = 0; index < condition.length; index++) {
+    const char = condition[index];
+    if (char === "(") {
+      depth++;
+    } else if (char === ")") {
+      depth--;
+    } else if (depth === 0 && condition.startsWith("&&", index)) {
+      terms.push(condition.slice(start, index));
+      start = index + 2;
+      index++;
+    }
+  }
+  terms.push(condition.slice(start));
+  return terms;
 }
 
 /**

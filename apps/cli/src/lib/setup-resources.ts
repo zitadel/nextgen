@@ -52,7 +52,7 @@ import {
   readConnectionFiles,
   ssoEnableArgs,
 } from "./idp";
-import { stableStringify } from "./json";
+import { parseJsonOrUndefined, stableStringify } from "./json";
 import { normalizePublicCliProse } from "./public-cli";
 import { hashForState } from "./sync";
 import { updateState } from "./sync/state";
@@ -445,13 +445,7 @@ async function readPasswordPolicyFile(cwd: string): Promise<PolicyFile | undefin
   if (raw === undefined) {
     return undefined;
   }
-  const data: unknown = (() => {
-    try {
-      return JSON.parse(raw);
-    } catch {
-      return undefined;
-    }
-  })();
+  const data = parseJsonOrUndefined(raw);
   const result = policyConfigSchema.safeParse(data);
   if (!result.success || result.data.operation !== PASSWORD_POLICY_OPERATION) {
     throw new ZitadelError(

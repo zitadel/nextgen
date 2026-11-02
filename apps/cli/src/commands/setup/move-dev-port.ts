@@ -78,6 +78,8 @@ export async function moveDevPort(opts: {
   const patcher = orca.patcherFor(ctx.framework.id);
   const result = await patcher.moveDevPort(ctx, previousIssuer, { cwd, dryRun, force: false });
 
+  let staleOrigin: string | undefined;
+  let refused: true | undefined;
   if (!dryRun) {
     // The app's own origin is primary, so the move rewrites that list. An
     // older secret that still carries the issuer as a preview pattern is
@@ -95,43 +97,42 @@ export async function moveDevPort(opts: {
     if (manifest !== undefined) {
       await updateScaffold(cwd, { ...manifest, dev_port: devPort });
     }
+    if (moving && portFromIssuer(previousIssuer) !== undefined) {
+      // A refusal for want of --force leaves the origin behind and says so;
+      // anything else the request for consent throws (Ctrl-C, a bug) stops
+      // the run.
+      const consent = await opts
+        .consent({
+          verb: "replace",
+          name: `remove ${previousIssuer} from the project's origins`,
+          message: `Remove ${previousIssuer}, the app's previous origin, from the project? ${issuer} replaces it.`,
+        })
+        .catch((error: unknown) => {
+          if (isRefusal(error)) {
+            refused = true;
+            return undefined;
+          }
+          throw error;
+        });
+      if (consent === undefined) {
+        staleOrigin = previousIssuer;
+      } else {
+        try {
+          await consent.unlock(client).removeOrigin(secret.project_id, { pattern: previousIssuer });
+        } catch {
+          staleOrigin = previousIssuer;
+        }
+      }
+    }
   }
-  // A refusal for want of --force leaves the origin behind and says so;
-  // anything else the request for consent throws (Ctrl-C, a bug) stops the run.
-  const removal: { staleOrigin?: string; refused?: true } =
-    !dryRun && moving && portFromIssuer(previousIssuer) !== undefined
-      ? await opts
-          .consent({
-            verb: "replace",
-            name: `remove ${previousIssuer} from the project's origins`,
-            message: `Remove ${previousIssuer}, the app's previous origin, from the project? ${issuer} replaces it.`,
-          })
-          .then(
-            async (consent) =>
-              consent === undefined
-                ? { staleOrigin: previousIssuer }
-                : await consent
-                    .unlock(client)
-                    .removeOrigin(secret.project_id, { pattern: previousIssuer })
-                    .then(
-                      () => ({}),
-                      () => ({ staleOrigin: previousIssuer }),
-                    ),
-            (error: unknown) => {
-              if (isRefusal(error)) {
-                return { staleOrigin: previousIssuer, refused: true as const };
-              }
-              throw error;
-            },
-          )
-      : {};
 
   return {
     previousIssuer,
     issuer,
     result,
     ssoProviders: moving ? await connectionSlugs(cwd) : [],
-    ...removal,
+    ...(staleOrigin === undefined ? {} : { staleOrigin }),
+    ...(refused === undefined ? {} : { refused }),
   };
 }
 

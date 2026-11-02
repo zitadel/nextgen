@@ -99,16 +99,13 @@ export class IssuerOriginCheck implements SanityCheck {
   }
 }
 
-async function readRecords(cwd: string): Promise<{ secret: ZitadelSecret; server: string }> {
-  return {
-    secret: await readZitadelSecret(cwd),
-    server: readProjectServer(await readZitadelConfig(cwd)),
-  };
-}
-
 async function inspect(cwd: string): Promise<Finding> {
-  const records = await readRecords(cwd).catch(() => undefined);
-  if (records === undefined) {
+  let secret: ZitadelSecret;
+  let server: string;
+  try {
+    secret = await readZitadelSecret(cwd);
+    server = readProjectServer(await readZitadelConfig(cwd));
+  } catch {
     // A missing or unparseable secret or config is the `secret` and `config`
     // checks' to report, with a repair path.
     return {
@@ -116,7 +113,6 @@ async function inspect(cwd: string): Promise<Finding> {
       message: "Skipped: could not read the project files that record its origins",
     };
   }
-  const { secret, server } = records;
   const issuer = await configuredIssuer(cwd);
   if (issuer === undefined) {
     return { status: "pass", message: "Skipped: no file sets ZITADEL_ISSUER" };
@@ -126,14 +122,14 @@ async function inspect(cwd: string): Promise<Finding> {
   }
 
   const client = createZitadelClient({ baseUrl: server, token: secret.project_secret });
-  const origins: ReadonlyArray<{ pattern: string; kind: string }> | Error = await client
-    .getProject(secret.project_id)
-    .then((project) => project.origins)
-    .catch((error: unknown) => (error instanceof Error ? error : new Error(String(error))));
-  if (origins instanceof Error) {
+  let origins: ReadonlyArray<{ pattern: string; kind: string }>;
+  try {
+    const project = await client.getProject(secret.project_id);
+    origins = project.origins;
+  } catch (error) {
     return {
       status: "pass",
-      message: `Skipped: could not read the project's origins from ${server}: ${origins.message}`,
+      message: `Skipped: could not read the project's origins from ${server}: ${error instanceof Error ? error.message : String(error)}`,
     };
   }
   const pattern = issuerHeldAsPreview(origins, issuer);

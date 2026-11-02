@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { ApiError } from "@zitadel/api/runtime/fetch";
 
@@ -36,10 +36,6 @@ describe("escapeControlCharacters", () => {
 });
 
 describe("createZitadelClient", () => {
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
   const client = () => createZitadelClient({ baseUrl: "http://localhost:8080", token: "t" });
 
   it("escapes a hostile string at any depth of a response", async () => {

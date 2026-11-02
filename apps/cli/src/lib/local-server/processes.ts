@@ -46,11 +46,11 @@ export async function discoverManagedRuntimeProcesses(opts?: {
     return { supported: false, processes: [], error: "process sweep is not available on Windows" };
   }
 
-  const rows = await runPs(["axo", "pid=,ppid=,command="], opts?.timeoutMs ?? 1000)
-    .then(parsePsRows)
-    .catch((error: unknown) => errorMessage(error));
-  if (typeof rows === "string") {
-    return { supported: false, processes: [], error: rows };
+  let rows: ReadonlyArray<ProcessRow>;
+  try {
+    rows = parsePsRows(await runPs(["axo", "pid=,ppid=,command="], opts?.timeoutMs ?? 1000));
+  } catch (error) {
+    return { supported: false, processes: [], error: errorMessage(error) };
   }
 
   const candidates = rows.filter((row) => isRuntimeCandidate(row.command));

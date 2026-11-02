@@ -27,7 +27,6 @@ import type {
   PatchView,
 } from "../types";
 import { reclaimableOps, withoutExistingTargets } from "./reclaim";
-import { firstExisting } from "./utils/first-existing";
 
 /**
  * Closes every {@link AbstractRulePatcher.preflight} refusal. `--force` is the
@@ -87,23 +86,22 @@ export abstract class AbstractRulePatcher implements Patcher {
    */
   async repair(ctx: PatchContext, opts: PatchExecOptions): Promise<PatchResult> {
     const plan = this.plan(ctx);
-    const reclaimable = opts.missingOnly
+    let ops = opts.missingOnly
       ? await withoutExistingTargets(reclaimableOps(plan), opts.cwd)
       : reclaimableOps(plan);
     const excluded = new Set(opts.excludePaths ?? []);
-    const ops =
-      excluded.size > 0
-        ? reclaimable.filter((op) => {
-            if (op.kind === "write") {
-              return !excluded.has(op.path);
-            }
-            if (op.kind === "edit" && op.overwrites) {
-              const candidates = typeof op.path === "string" ? [op.path] : op.path;
-              return !candidates.some((candidate) => excluded.has(candidate));
-            }
-            return true;
-          })
-        : reclaimable;
+    if (excluded.size > 0) {
+      ops = ops.filter((op) => {
+        if (op.kind === "write") {
+          return !excluded.has(op.path);
+        }
+        if (op.kind === "edit" && op.overwrites) {
+          const candidates = typeof op.path === "string" ? [op.path] : op.path;
+          return !candidates.some((candidate) => excluded.has(candidate));
+        }
+        return true;
+      });
+    }
     const execOpts = opts.missingOnly ? { ...opts, force: false } : opts;
     return scaffold({ ops, summary: plan.summary }, execOpts);
   }
@@ -146,11 +144,16 @@ export abstract class AbstractRulePatcher implements Patcher {
         continue;
       }
       const candidates = typeof op.path === "string" ? [op.path] : op.path;
-      const found = await firstExisting(candidates, (candidate) =>
-        readTextIfExists(join(opts.cwd, candidate)),
-      );
-      const path = found?.candidate ?? candidates[0] ?? "";
-      const source = found?.found;
+      let path = candidates[0] ?? "";
+      let source: string | undefined;
+      for (const candidate of candidates) {
+        const contents = await readTextIfExists(join(opts.cwd, candidate));
+        if (contents !== undefined) {
+          path = candidate;
+          source = contents;
+          break;
+        }
+      }
       if (source === undefined) {
         statuses.push({ path, wiring: op.wiring, state: "detached" });
         continue;
