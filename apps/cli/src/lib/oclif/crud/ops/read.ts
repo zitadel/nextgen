@@ -3,7 +3,6 @@ import { nonBlankString } from "../../flags";
 import { chosenColumns } from "../columns";
 import { fieldPaths } from "../paths";
 import { idArg, idName, idValue } from "../shared";
-import { renderDetail } from "../table";
 import type { GetSpec } from "../types";
 import type { CommandResult } from "../../types";
 import {
@@ -57,12 +56,15 @@ export class GetOperation<Ctx> extends ResourceCommand<Ctx, GetSpec<Ctx>> {
     if (!process.stdout.isTTY) {
       return { status: "ok", data: item, pretty: JSON.stringify(item, null, 2) };
     }
-    const sections = flags.fields === undefined ? (spec.sections?.(item) ?? []) : [];
+    const sections =
+      flags.fields === undefined && !this.jsonEnabled()
+        ? ((await spec.sections?.(item, (columns, rows) => this.tabulate(columns, rows))) ?? [])
+        : [];
     return {
       status: "ok",
       data: item,
       pretty: [
-        renderDetail(headingOf(resource.heading ?? resource.idField, item), fields, item),
+        this.tabulateDetail(headingOf(resource.heading ?? resource.idField, item), fields, item),
         ...sections,
       ].join("\n\n"),
     };

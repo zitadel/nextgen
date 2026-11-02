@@ -66,7 +66,6 @@ import {
   type GetSpec,
   type Json,
   type ListSpec,
-  renderTable,
   type ResourceDescriptor,
   type ResourceRegistry,
   type Schema,
@@ -74,6 +73,7 @@ import {
   type WriteResult,
   type WriteShape,
 } from "../lib/oclif/crud";
+import type { Tabulate } from "../lib/oclif/tabulatable";
 
 /**
  * The platform connection every resource verb calls through: the typed
@@ -279,9 +279,12 @@ const OPERATIONS: readonly Operation[] = [
 ];
 
 /** A release's pointers as an indented table, one pinned revision per row. */
-export const releasePointers = (release: Pick<GetReleaseById200, "pointers">): string => {
+export const releasePointers = async (
+  release: Pick<GetReleaseById200, "pointers">,
+  tabulate: Tabulate,
+): Promise<string> => {
   const { pointers } = release;
-  const table = renderTable(["kind", "handle", "revision_id"], pointers)
+  const table = (await tabulate(["kind", "handle", "revision_id"], pointers))
     .split("\n")
     .map((line) => `  ${line}`);
   return ["resources", ...table].join("\n");
@@ -663,7 +666,7 @@ export const RESOURCES = {
     get: get({
       call: ({ client, projectId }, id) => client.getReleaseById(id, { project_id: projectId }),
       response: GetReleaseByIdResponse,
-      sections: (release) => [releasePointers(release)],
+      sections: async (release, tabulate) => [await releasePointers(release, tabulate)],
     }),
   }),
 

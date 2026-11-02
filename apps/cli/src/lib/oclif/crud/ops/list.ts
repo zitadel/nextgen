@@ -14,7 +14,6 @@ import { parseOrThrow } from "../shared";
 import { chosenColumns } from "../columns";
 import { shellOption } from "../../../shell";
 import { fieldPaths } from "../paths";
-import { renderRows, renderTable } from "../table";
 import type { Json, ListSpec } from "../types";
 import {
   type OperationDefinition,
@@ -209,7 +208,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
     // A terminal gets the aligned table with its header and footer; a pipe (or
     // `--plain`) gets one tab-separated record per line, which `cut` and `awk`
     // can split and nothing else has to parse around.
-    const plain = flags.plain === true || !process.stdout.isTTY;
+    const plain = this.isPlain(flags.plain === true);
     const columns = early ?? chosenColumns(flags.fields, resource.columns, items);
     // A page token is only valid alongside the sorting and filters that issued
     // it, so the suggested next page repeats the whole invocation rather than
@@ -238,11 +237,11 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
       ...(nextCommands.length > 0 ? { next: { commands: nextCommands } } : {}),
       machineReadable: plain,
       pretty: plain
-        ? renderRows(columns, items)
+        ? this.tabulateRows(columns, items)
         : items.length === 0
           ? `No ${topic} found.`
           : [
-              renderTable(columns, items),
+              await this.tabulate(columns, items),
               "",
               `${items.length} ${items.length === 1 ? resource.singular : topic}`,
               ...(next ? [`More available: ${shellOption("--page-token", next)} (or --all)`] : []),

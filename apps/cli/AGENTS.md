@@ -68,6 +68,12 @@
   - Leave names and ids in a prompt unquoted ("What is the value of user_id?",
     "Remove FOO from the project?"); a terminal does not render backticks.
   - Ask the same thing the same way in every command that asks it.
+- A command that prints a table, a list or a record extends `Tabulatable(...)`
+  (`src/lib/oclif/tabulatable.ts`) and draws it with `this.tabulate`,
+  `this.tabulateList`, `this.tabulateRows` or `this.tabulateDetail`; it asks
+  `this.isPlain(flags.plain)` whether a list is for a script. A table draws
+  nothing under `--json`, and a unit test fails on any other import of
+  `@oclif/table`.
 - A command that deletes, revokes or rolls back extends `Destructive(...)`
   (`src/lib/oclif/destructive.ts`) and does it in `this.confirmed({ ... })`.
 - Every destructive operation takes a `Consent` (`src/lib/consent.ts`); the

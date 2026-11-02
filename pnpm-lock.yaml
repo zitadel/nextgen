@@ -236,6 +236,9 @@ catalogs:
     '@oclif/plugin-which':
       specifier: ^3.2.55
       version: 3.2.55
+    '@oclif/table':
+      specifier: ^0.5.9
+      version: 0.5.9
     '@playwright/test':
       specifier: ^1.64.1
       version: 1.64.1
@@ -641,6 +644,9 @@ importers:
       '@oclif/plugin-which':
         specifier: 'catalog:'
         version: 3.2.55
+      '@oclif/table':
+        specifier: 'catalog:'
+        version: 0.5.9
       '@zitadel/api':
         specifier: workspace:*
         version: link:../../packages/api

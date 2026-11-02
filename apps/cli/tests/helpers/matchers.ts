@@ -175,6 +175,22 @@ expect.extend({
     };
   },
 
+  toPrintRow(received: CliResult, ...cells: string[]) {
+    const row = new RegExp(
+      cells.map((cell) => cell.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("\\s+"),
+    );
+    const pass = received.stdout.split("\n").some((line) => row.test(line));
+    return {
+      pass,
+      message: () =>
+        pass
+          ? `expected stdout not to have a row with ${cells.map((cell) => `"${cell}"`).join(", ")}, but it did`
+          : `expected stdout to have a row with ${cells.map((cell) => `"${cell}"`).join(", ")} in order, but stdout was:\n\n${
+              received.stdout.trim().slice(0, 600) || "(empty)"
+            }`,
+    };
+  },
+
   toPrintNoJson(received: CliResult) {
     const printed = received.stdout.trim();
     const pass = printed.length > 0 && !printed.startsWith("{");
@@ -231,6 +247,8 @@ declare module "vitest" {
     toSuggestExactly(command: string): T;
     /** stdout contains this text. Prefer it over `toSay` for rendered output. */
     toPrint(text: string): T;
+    /** One line of stdout holds these cells in this order, whatever the spacing between them. */
+    toPrintRow(...cells: string[]): T;
     /** stdout carries rendered text, and is neither empty nor a JSON envelope. */
     toPrintNoJson(): T;
     /** The output, stdout or stderr, contains this text. */
