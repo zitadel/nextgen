@@ -60,7 +60,7 @@ Your origin appears in the `origins` column. The terminal output of `deploy` sho
 
 `deploy` refuses before it uploads anything, or stops with a conflict. Each error names its fix in `hint`, and most also in `next_commands`.
 
-- `E_VALIDATION`, "The project has no primary origin to deploy to": run `origin add <url> --kind primary` with your app's URL, then deploy. If the hint says the issuer is held as a preview origin, a project from `zitadel setup` 0.1.0 registered its URL that way. Run `doctor --fix` instead, which asks first (non-interactive, add `--force`).
+- `E_VALIDATION`, "The project has no primary origin to deploy to": run `origin add <url> --kind primary` with your app's URL, then deploy. If the hint says the issuer is held as a preview origin, a project from `zitadel setup` 0.1.0 registered its URL that way. Run the commands the hint names. For the project setup recorded, that is `doctor --fix`, which asks first (non-interactive, add `--force`). For another project, it is `origin rm <url> --force`, then `origin add <url> --kind primary`.
 - `E_VALIDATION`, "A deploy needs a message in non-interactive mode": pass `-m "<why this release changes>"`.
 - `E_VALIDATION` listing fields, flows or files: the configuration breaks a rule ([What deploy checks](#what-deploy-checks-before-it-publishes)). Fix the files it names, then run `deploy --dry-run`.
 - `E_CONFLICT`, "Another deploy changed the targets since this one was prepared": run `deployment list --live` to see it, then run `deploy` again.
@@ -78,7 +78,7 @@ It asks first. Add `--force` when non-interactive and `-m "<why>"` to record the
 
 It prints `Rolled back to <release id> on <origins>`, then a table of the revisions that release pins (`kind`, `handle`, `revision_id`). A revision is one immutable version of a schema, flow or branding resource. The `schema` row is the revision new registrations use. With `--json`, `data` carries `deployment_id`, `release_id`, `rolled_back_to`, `origins` and `pointers`.
 
-A rollback restores configuration, not user data. Users keep the schema revision and attributes they have, including users you migrated to a newer revision. Your files in `.zitadel/` stay as they are, so the next `deploy` builds from them again. With no earlier deployment, it stops with `E_VALIDATION`: "There is no earlier deployment to roll back to".
+A rollback restores configuration, not user data. Users keep the schema revision and attributes they have, including users you migrated to a newer revision. Your files in `.zitadel/` stay as they are, so the next `deploy` builds from them again. With only one deployment, it stops with `E_VALIDATION`: "There is no earlier deployment to roll back to". With none, the message is "There is no deployment to roll back".
 
 
 ## Releases, deployments and rollback

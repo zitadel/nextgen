@@ -19,7 +19,7 @@ The Angular SDK (`@zitadel/sdk-angular`) is the single-page-app wrapper for the 
 - Node.js 24 or newer. Run `node --version` to check.
 - Angular 17 or newer. To create a new Angular app, use a Node version the Angular CLI accepts ([Node versions](/docs/get-started/quickstart#node-versions)).
 - A Zitadel project from `zitadel setup`. Start the local runtime with `npx @zitadel/cli@latest start`, then run `npx @zitadel/cli@latest setup --server local` in your app's directory. See the [Quickstart](/docs/get-started/quickstart#scaffold-the-app-with-sign-in), or [Add Zitadel to an existing app](/docs/get-started/existing-app).
-- The project ID and secret. Setup writes them to `.env.local` as `ZITADEL_PROJECT_ID` and `ZITADEL_PROJECT_SECRET`.
+- The project ID, the project secret and the server URL. Setup writes them to `.env.local` as `ZITADEL_PROJECT_ID`, `ZITADEL_PROJECT_SECRET` and `ZITADEL_URL`. The dev proxy stops with an error when `ZITADEL_URL` or `ZITADEL_PROJECT_SECRET` is missing.
 
 ## Install the SDK
 

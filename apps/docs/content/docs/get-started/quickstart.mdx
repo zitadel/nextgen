@@ -42,7 +42,7 @@ cd myapp
 npx @zitadel/cli@latest doctor
 ```
 
-Before setup, `doctor` checks local runtime prerequisites. After setup, it also verifies generated app files and local config. It ends with `Zitadel doctor passed.`, `Zitadel doctor passed with warnings.`, or `Zitadel doctor found issues.` The last means a check failed: the output names it and the fix. Apply it and run `doctor` again.
+Before setup, `doctor` checks local runtime prerequisites. After setup, it also verifies generated app files and local config. It prints `Zitadel doctor passed.` or `Zitadel doctor passed with warnings.` first, then each check. When a check fails, it prints `Error <CODE>: Zitadel doctor found issues` and a hint with the fix, and exits non-zero. `doctor --json` names the failed check. Apply the fix and run `doctor` again.
 
 ## Start Zitadel locally
 
@@ -52,7 +52,7 @@ npx @zitadel/cli@latest start
 
 This runs the `@zitadel/server` npm binary that matches the CLI's version, on the first free port from 8080, usually `http://localhost:8080`. It also creates a local admin, `admin@zitadel.localhost`.
 
-`start` prints `Local Zitadel server is ready.` with the server's API and console URLs, and names `setup` as the next step. It prints no console sign-in link: you get one after `setup` ([Open the console](#open-the-console)). Use the URLs it prints: when 8080 is taken, `start` takes the next free port. A port you pass with `--port <port>` must be free, or `start` fails with `E_PORT_IN_USE`. [Run Zitadel locally](/docs/guides/local-runtime) covers the runtime's state and ports.
+`start` prints `Local Zitadel server is ready.`, then the server's host, such as `(server: localhost:8080)`, and names `setup` as the next step. `start --json` lists the API and console URLs. It prints no console sign-in link: you get one after `setup` ([Open the console](#open-the-console)). When 8080 is taken, `start` takes the next free port, and the host line shows it. A port you pass with `--port <port>` must be free, or `start` fails with `E_PORT_IN_USE`. [Run Zitadel locally](/docs/guides/local-runtime) covers the runtime's state and ports.
 
 ## Scaffold the app with sign-in
 
@@ -74,7 +74,7 @@ Setup writes the app files, `.env.example`, `.env.local` (read by your app), `.e
 
 ### What setup prints
 
-Setup ends with a box titled `Zitadel is ready`. Its last section lists the project: `Project id`, `Server` (`http://localhost:8080` for the first local runtime) and `App will run`, the URL to open in your browser. The box ends with the next steps, among them starting the dev server. Setup does not print the project secret.
+Setup prints a box titled `Zitadel is ready`. Its last section lists the project: `Project id`, `Server` (`http://localhost:8080` for the first local runtime) and `App will run`, the URL to open in your browser. The box ends with the next steps, among them starting the dev server. After the box, setup prints `Explore all commands:` with the command that lists them, and on a machine's first run a note about the Agent Skills. Setup does not print the project secret.
 
 ### Where the project ID and secret are
 
@@ -118,11 +118,10 @@ The command opens a one-time link in your browser that signs you in as the local
 
 ## Make a first API request
 
-This check confirms the project secret works. In the second terminal, set two variables from `.env.local`:
+This check confirms the project secret works. In the second terminal, in your app's directory, load `ZITADEL_URL` and `ZITADEL_PROJECT_SECRET` from `.env.local`:
 
 ```sh
-export ZITADEL_URL=<ZITADEL_URL from .env.local>
-export ZITADEL_PROJECT_SECRET=<ZITADEL_PROJECT_SECRET from .env.local>
+set -a; . ./.env.local; set +a
 ```
 
 Then list the project's users. The request sends the project secret as a Bearer token in the `Authorization` header:
@@ -134,7 +133,7 @@ curl -X POST "$ZITADEL_URL/api/v1/users/query" \
   -d '{}'
 ```
 
-A `200` response is a JSON page with a `users` array, which holds the user you registered, and a `next_page_token` while more users follow. A `401` means the server rejected the credentials: copy the values from `.env.local` again. The [API reference](/docs/reference/api#authentication) covers authentication and paging.
+A `200` response is a JSON page with a `users` array, which holds the user you registered, and a `next_page_token` while more users follow. A `401` means the server rejected the credentials: check that you loaded `.env.local` from your app's directory. The [API reference](/docs/reference/api#authentication) covers authentication and paging.
 
 The CLI makes the same call and reads the server and secret from the project's files:
 
