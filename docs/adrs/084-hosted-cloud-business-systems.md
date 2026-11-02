@@ -259,9 +259,12 @@ website's catch-all.
 
 ### 6. Pricing and billing (priority 4)
 
-- **Pricing boundary** (revised 2026-11-01). Core resources and basic MFA,
-  including basic require-MFA enforcement, are free. MAU is an analytics
-  gauge, never a billable meter or upgrade trigger. Paid Governance is an
+- **Pricing boundary** (revised 2026-11-02). Core resources and basic MFA,
+  including requiring MFA for everyone, are free: CISA's Secure by Design
+  principles count charging for MFA as a hidden tax, and a charge would push
+  apps to enforce MFA outside Zitadel. Opt-in adaptive protection (risk
+  scoring and risk-based step-up) is metered per user it scores. MAU is an
+  analytics gauge, never a billable meter or upgrade trigger. Paid Governance is an
   account-wide package included in Pro; Compliance is quoted per account
   with agreed retention, retained-event volume and SIEM destinations.
   Neither package charges per user or per policy. The proposed catalog in

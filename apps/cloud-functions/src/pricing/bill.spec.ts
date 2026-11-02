@@ -26,7 +26,7 @@ describe("free core identity", () => {
     });
   });
 
-  it("never charges legacy policy or retained-user counts, including basic require-MFA", () => {
+  it("never charges legacy policy or retained-user counts, so requiring MFA stays free", () => {
     const month = bill({
       counts: {
         monthly_active_users: 1_000_000,
@@ -122,6 +122,18 @@ describe("integrations and consumption", () => {
     ]);
   });
 
+  it("charges adaptive protection per scored user past its allowance", () => {
+    expect(bill({ counts: { protected_users: 10_000 } })).toMatchObject({
+      plan: "free",
+      total_amount: 0,
+    });
+    expect(bill({ counts: { protected_users: 210_000 } })).toMatchObject({
+      plan: "pro",
+      usage_amount: 60_000,
+      total_amount: 70_000,
+    });
+  });
+
   it("refuses an unpriced destination", () => {
     expect(() => meterLines({ counts: { sms_messages_other: 1 } })).toThrow(/no price yet/);
   });
@@ -134,10 +146,10 @@ describe("capacity and regions", () => {
     expect(bill({ counts: { api_requests: included } }).total_amount).toBe(10_000);
     expect(bill({ counts: { api_requests: included + 1 } })).toMatchObject({
       reasons: ["1 capacity step past Pro's included requests"],
-      on_top_amount: 200_000,
-      total_amount: 210_000,
+      on_top_amount: 70_000,
+      total_amount: 80_000,
     });
-    expect(bill({ counts: { api_requests: 3 * included } }).total_amount).toBe(410_000);
+    expect(bill({ counts: { api_requests: 3 * included } }).total_amount).toBe(150_000);
   });
 
   it("prices a consumer app at scale by its requests, never by its users", () => {
@@ -145,7 +157,7 @@ describe("capacity and regions", () => {
     const month = bill({
       counts: { monthly_active_users: 10_000_000, api_requests: 1_300_000_000 },
     });
-    expect(month).toMatchObject({ plan: "pro", usage_amount: 0, total_amount: 1_610_000 });
+    expect(month).toMatchObject({ plan: "pro", usage_amount: 0, total_amount: 1_760_000 });
   });
 
   it("charges each region outside the EU on Pro", () => {
@@ -177,6 +189,7 @@ describe("catalog entitlements", () => {
       sso_users: 1_000,
       directory_users: 1_000,
       bot_checks: 1_000,
+      protected_users: 10_000,
     });
     expect(entitlementsFor("free").allowances).not.toHaveProperty("email_messages");
     expect(entitlementsFor("pro").allowances).toHaveProperty("email_messages", 0);
