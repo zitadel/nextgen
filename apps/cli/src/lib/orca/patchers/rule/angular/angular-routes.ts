@@ -50,16 +50,12 @@ export function angularRoutesEdit(): (source: string | undefined) => string {
         (path): path is string => typeof path === "string",
       ),
     );
-    let changed = false;
-    for (const path of AUTH_ROUTE_PATHS) {
-      if (present.has(path)) {
-        continue;
-      }
+    const missing = AUTH_ROUTE_PATHS.filter((path) => !present.has(path));
+    for (const path of missing) {
       routes.push(builders.raw(`{ path: ${JSON.stringify(path)}, children: [] }`));
-      changed = true;
     }
 
-    if (!changed && source !== undefined) {
+    if (missing.length === 0 && source !== undefined) {
       return source;
     }
     const code = generateCode(mod).code;

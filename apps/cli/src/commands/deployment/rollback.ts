@@ -112,17 +112,15 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
             ...(flags.message === undefined ? {} : { message: flags.message }),
             ...(guard === undefined ? {} : { expectedDeploymentId: guard }),
           });
-          let pointers: readonly GetReleaseById200PointersItem[] | undefined;
-          try {
-            const release = await client.getReleaseById(deployment.release_id, {
-              project_id: projectId,
+          const release = await client
+            .getReleaseById(deployment.release_id, { project_id: projectId })
+            .catch((error: unknown) => {
+              reportWarning(
+                `Rolled back, but the revisions ${deployment.release_id} pins could not be read: ${toZitadelError(error).message}`,
+              );
+              return undefined;
             });
-            pointers = release.pointers;
-          } catch (error) {
-            reportWarning(
-              `Rolled back, but the revisions ${deployment.release_id} pins could not be read: ${toZitadelError(error).message}`,
-            );
-          }
+          const pointers: readonly GetReleaseById200PointersItem[] | undefined = release?.pointers;
 
           const pointerTable =
             pointers === undefined

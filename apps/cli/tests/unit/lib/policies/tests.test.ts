@@ -1,8 +1,9 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
+
+import { it } from "../../../helpers/fixtures";
 
 import type { ZitadelClient } from "../../../../src/lib/api-client";
 
@@ -24,23 +25,13 @@ const CASE = {
 };
 const TEST_FILE = { operation: OPERATION, cases: [CASE] };
 
-let dir: string | undefined;
-
-async function project(files: Record<string, unknown>): Promise<string> {
-  dir = await mkdtemp(join(tmpdir(), "zitadel-policy-tests-"));
+async function project(dir: string, files: Record<string, unknown>): Promise<string> {
   await mkdir(join(dir, ".zitadel/policies"), { recursive: true });
   for (const [name, content] of Object.entries(files)) {
     await writeFile(join(dir, ".zitadel/policies", name), JSON.stringify(content));
   }
   return dir;
 }
-
-afterEach(async () => {
-  if (dir) {
-    await rm(dir, { recursive: true, force: true });
-    dir = undefined;
-  }
-});
 
 describe("policyTestFileIssues", () => {
   it("accepts a test file named after its operation", () => {
@@ -68,8 +59,8 @@ describe("policyTestFileIssues", () => {
 });
 
 describe("readPolicyTests", () => {
-  it("reads only the test files", async () => {
-    const cwd = await project({
+  it("reads only the test files", async ({ dir }) => {
+    const cwd = await project(dir, {
       [`${OPERATION}.json`]: { operation: OPERATION, config: {} },
       [`${OPERATION}.test.json`]: TEST_FILE,
     });
@@ -80,8 +71,8 @@ describe("readPolicyTests", () => {
     expect(suites).toEqual([{ file: `.zitadel/policies/${OPERATION}.test.json`, test: TEST_FILE }]);
   });
 
-  it("names an operation asked for that has no test file", async () => {
-    const cwd = await project({ [`${OPERATION}.test.json`]: TEST_FILE });
+  it("names an operation asked for that has no test file", async ({ dir }) => {
+    const cwd = await project(dir, { [`${OPERATION}.test.json`]: TEST_FILE });
 
     const { suites, issues } = await readPolicyTests(cwd, ["auth.unknown"]);
 
@@ -89,8 +80,8 @@ describe("readPolicyTests", () => {
     expect(issues).toEqual([".zitadel/policies/auth.unknown.test.json does not exist"]);
   });
 
-  it("never reads another operation's test file when one is asked for", async () => {
-    const cwd = await project({
+  it("never reads another operation's test file when one is asked for", async ({ dir }) => {
+    const cwd = await project(dir, {
       [`${OPERATION}.test.json`]: TEST_FILE,
       "scratch.test.json": { cases: "not a test" },
     });
@@ -103,8 +94,8 @@ describe("readPolicyTests", () => {
 });
 
 describe("policiesFromFiles", () => {
-  it("maps each policy file to its operation, without the test files", async () => {
-    const cwd = await project({
+  it("maps each policy file to its operation, without the test files", async ({ dir }) => {
+    const cwd = await project(dir, {
       [`${OPERATION}.json`]: { operation: OPERATION, config: { min_length: 12 } },
       [`${OPERATION}.test.json`]: TEST_FILE,
     });
@@ -118,8 +109,8 @@ describe("policiesFromFiles", () => {
     });
   });
 
-  it("reports an invalid policy file rather than testing no policy", async () => {
-    const cwd = await project({
+  it("reports an invalid policy file rather than testing no policy", async ({ dir }) => {
+    const cwd = await project(dir, {
       [`${OPERATION}.json`]: { operation: OPERATION, config: { min_length: 0 } },
     });
 
@@ -129,8 +120,8 @@ describe("policiesFromFiles", () => {
     expect(issues).toHaveLength(1);
   });
 
-  it("never reads another operation's policy file when one is asked for", async () => {
-    const cwd = await project({
+  it("never reads another operation's policy file when one is asked for", async ({ dir }) => {
+    const cwd = await project(dir, {
       [`${OPERATION}.json`]: { operation: OPERATION, config: { min_length: 12 } },
       "scratch.json": { operation: "auth.unknown", config: { nope: true } },
     });
