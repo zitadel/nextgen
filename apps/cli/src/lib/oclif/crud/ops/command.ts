@@ -5,6 +5,7 @@ import { EnvironmentCommand } from "../../environment-command";
 import type { CommandResult, GlobalOptions, JsonEnvelope } from "../../types";
 import type { Json, ResourceCommandOptions, ResourceDescriptor } from "../types";
 import { Destructive } from "../../destructive";
+import { Tabulatable } from "../../tabulatable";
 
 /** Everything an operation needs to know about the resource it serves. */
 export type OperationDefinition<Ctx, Spec> = Readonly<{
@@ -42,7 +43,7 @@ export type OperationClass<Ctx, Spec> = typeof ResourceCommand<Ctx, Spec> & {
  * definition is bound onto a subclass by {@link bindOperation}; the operation
  * classes themselves are never registered with oclif directly.
  */
-export class ResourceCommand<Ctx, Spec> extends Destructive(EnvironmentCommand) {
+export class ResourceCommand<Ctx, Spec> extends Tabulatable(Destructive(EnvironmentCommand)) {
   protected get definition(): OperationDefinition<Ctx, Spec> {
     const definition = definitionOf(this.constructor as typeof Command);
     if (!definition) {

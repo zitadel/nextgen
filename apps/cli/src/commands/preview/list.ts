@@ -1,8 +1,8 @@
 import { Flags } from "@oclif/core";
 
 import { CommandGroups, type JsonEnvelope, nonBlankString, PreviewCommand } from "../../lib/oclif";
+import { Tabulatable } from "../../lib/oclif/tabulatable";
 import { collectPages } from "../../lib/oclif/crud/paging";
-import { renderList } from "../../lib/oclif/crud/table";
 import { listData } from "../../lib/oclif/envelope";
 import { shellArg } from "../../lib/shell";
 
@@ -18,7 +18,7 @@ const COLUMNS = ["url", "expires", "created"] as const;
  * fetches one page and reports `next_page_token`; `--all` drains them,
  * `--limit` / `--page-token` walk them a page at a time.
  */
-export default class PreviewList extends PreviewCommand {
+export default class PreviewList extends Tabulatable(PreviewCommand) {
   static override description = "List the project's live previews, newest first.";
   static override group = CommandGroups.configuration;
   static override examples = [
@@ -87,13 +87,13 @@ export default class PreviewList extends PreviewCommand {
           )
         : undefined;
 
-    const plain = flags.plain || !process.stdout.isTTY;
+    const plain = this.isPlain(flags.plain);
     return this.emit({
       status: "ok",
       data: listData(previews, { nextPageToken: next }),
       ...(nextCommand === undefined ? {} : { next: { commands: [nextCommand] } }),
       machineReadable: plain,
-      pretty: renderList(COLUMNS, rows, {
+      pretty: await this.tabulateList(COLUMNS, rows, {
         plain,
         singular: "preview",
         empty: "No live previews.",

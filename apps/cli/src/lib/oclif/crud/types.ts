@@ -1,3 +1,4 @@
+import type { Tabulate } from "../tabulatable";
 import type { Interfaces } from "@oclif/core";
 
 import type { Consent } from "../../consent";
@@ -165,7 +166,7 @@ export type GetSpec<Ctx, R = unknown> = Readonly<{
    * Blocks a terminal shows under the fields, for a value that does not read
    * on one line (a release's pointers). Skipped when `--fields` picks the view.
    */
-  sections?(item: R): readonly string[];
+  sections?(item: R, tabulate: Tabulate): readonly string[] | Promise<readonly string[]>;
 }>;
 /**
  * What a write answers with: a record, or nothing for a write that answers

@@ -42,6 +42,7 @@ export default defineConfig({
       "./tests/helpers/offline.ts",
       "./tests/helpers/matchers.ts",
       "./tests/helpers/timers.ts",
+      "./tests/helpers/console.ts",
     ],
     // Every file running at the same time takes its ports from a block of its
     // own (tests/helpers/ports.ts), and there are PORT_WORKERS blocks. Vitest's
