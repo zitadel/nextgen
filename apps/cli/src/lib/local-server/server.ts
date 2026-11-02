@@ -220,7 +220,8 @@ export class LocalServer {
    * place of a taken one, or `undefined` when they are all taken too.
    */
   static async nextFreePort(port: number): Promise<number | undefined> {
-    for (let next = port + 1; next <= Math.min(port + 20, 65535); next += 1) {
+    const count = Math.max(0, Math.min(port + 20, 65535) - port);
+    for (const next of Array.from({ length: count }, (_, index) => port + 1 + index)) {
       if (await LocalServer.isPortFree(next)) {
         return next;
       }

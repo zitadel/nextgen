@@ -74,10 +74,7 @@ export async function findLocalAdminFor(
 
 /** Reads the local admin credential, or `undefined` when `start` never wrote one. */
 export async function readLocalAdmin(cwd: string): Promise<LocalAdmin | undefined> {
-  let raw: string;
-  try {
-    raw = await readFile(join(cwd, LOCAL_ADMIN_FILE), "utf8");
-  } catch (error) {
+  const raw = await readFile(join(cwd, LOCAL_ADMIN_FILE), "utf8").catch((error: unknown) => {
     // Only a missing file means `start` never created the admin. A file that
     // exists but cannot be read is still the credential the server imported,
     // and minting a replacement would leave the two holding different passwords.
@@ -86,18 +83,16 @@ export async function readLocalAdmin(cwd: string): Promise<LocalAdmin | undefine
       hint: `Check that ${LOCAL_ADMIN_FILE} is readable by you; \`zitadel start\` writes it owner-only.`,
       details: { cause: error instanceof Error ? error.message : String(error) },
     });
-  }
+  });
+  if (raw === undefined) return undefined;
 
-  let parsed: unknown;
   try {
-    parsed = JSON.parse(raw);
+    const parsed: unknown = JSON.parse(raw);
+    if (isLocalAdmin(parsed)) return parsed;
   } catch (error) {
     throw malformedAdminFile(error);
   }
-  if (!isLocalAdmin(parsed)) {
-    throw malformedAdminFile();
-  }
-  return parsed;
+  throw malformedAdminFile();
 }
 
 function isLocalAdmin(value: unknown): value is LocalAdmin {

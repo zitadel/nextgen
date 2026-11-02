@@ -450,7 +450,7 @@ async function addDependency(
   // the document. Every byte outside it — key order, blank lines, inline
   // objects, line endings — stays untouched; the touched map itself is
   // name-sorted, matching what a package manager writes.
-  let contents = setTopLevelJsonKey(
+  const withDependency = setTopLevelJsonKey(
     existing,
     path,
     key,
@@ -460,14 +460,14 @@ async function addDependency(
   // refuse it outright (Qwik's starter vite.config.ts throws on start). Move a
   // devDependencies entry the developer already has into dependencies instead
   // of duplicating it.
-  if (listedInOther) {
-    contents = setTopLevelJsonKey(
-      contents,
-      path,
-      "devDependencies",
-      Object.fromEntries(Object.entries(other).filter(([name]) => name !== op.name)),
-    );
-  }
+  const contents = listedInOther
+    ? setTopLevelJsonKey(
+        withDependency,
+        path,
+        "devDependencies",
+        Object.fromEntries(Object.entries(other).filter(([name]) => name !== op.name)),
+      )
+    : withDependency;
   if (dryRun) {
     record(result, path, "file", "update");
     result.depsAdded.push(op.name);

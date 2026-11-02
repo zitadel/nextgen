@@ -68,39 +68,36 @@ function runLsof(timeoutMs: number): Promise<string> {
  * external interface bindings are ignored.
  */
 function parseLsofListeners(stdout: string): ReadonlyArray<TcpListener> {
-  const listeners: TcpListener[] = [];
-  let pid: number | undefined;
-  let command: string | undefined;
-  for (const line of stdout.split(/\r?\n/)) {
-    if (line.startsWith("p")) {
-      const parsed = Number.parseInt(line.slice(1), 10);
-      pid = Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
-      command = undefined;
-      continue;
-    }
-    if (line.startsWith("c")) {
-      command = line.slice(1) || undefined;
-      continue;
-    }
-    if (!line.startsWith("n")) {
-      continue;
-    }
-    const address = line.slice(1);
-    const colon = address.lastIndexOf(":");
-    if (colon < 0) {
-      continue;
-    }
-    const host = address.slice(0, colon);
-    const portStr = address.slice(colon + 1);
-    if (!isLoopback(host)) {
-      continue;
-    }
-    const port = Number.parseInt(portStr, 10);
-    if (Number.isFinite(port) && port > 0 && port < 65536) {
-      listeners.push({ address, command, host, pid, port });
-    }
-  }
-  return listeners.sort((a, b) => a.port - b.port || (a.pid ?? 0) - (b.pid ?? 0));
+  return stdout
+    .split(/\r?\n(?=p)/)
+    .flatMap((block): TcpListener[] => {
+      const lines = block.split(/\r?\n/);
+      const pidLine = lines[0] ?? "";
+      const parsedPid = pidLine.startsWith("p")
+        ? Number.parseInt(pidLine.slice(1), 10)
+        : Number.NaN;
+      const pid = Number.isFinite(parsedPid) && parsedPid > 0 ? parsedPid : undefined;
+      const command = lines.find((line) => line.startsWith("c"))?.slice(1) || undefined;
+      return lines
+        .filter((line) => line.startsWith("n"))
+        .flatMap((line): TcpListener[] => {
+          const address = line.slice(1);
+          const colon = address.lastIndexOf(":");
+          if (colon < 0) {
+            return [];
+          }
+          const host = address.slice(0, colon);
+          if (!isLoopback(host)) {
+            return [];
+          }
+          const port = Number.parseInt(address.slice(colon + 1), 10);
+          if (!Number.isFinite(port) || port <= 0 || port >= 65536) {
+            return [];
+          }
+          return [{ address, command, host, pid, port }];
+        });
+    })
+    .sort((a, b) => a.port - b.port || (a.pid ?? 0) - (b.pid ?? 0));
 }
 
 /** Recognised loopback host strings as emitted by `lsof -F n`. */

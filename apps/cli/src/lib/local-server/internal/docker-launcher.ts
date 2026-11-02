@@ -78,18 +78,15 @@ export class DockerLauncher implements Launcher<DockerRuntimeMetadata> {
     await DockerLauncher.remove(spec.containerName);
     await ensureImage(spec.image);
     const env = spec.env ?? EMPTY_ENV;
-    let result: DockerResult;
-    try {
-      result = await requireDocker(
-        DockerLauncher.runArgs({ ...spec, port: target.port }, env.injected),
-        "Start local Zitadel container",
-        env.values,
-      );
-    } catch (error) {
+    const result = await requireDocker(
+      DockerLauncher.runArgs({ ...spec, port: target.port }, env.injected),
+      "Start local Zitadel container",
+      env.values,
+    ).catch(async (error: unknown) => {
       // A run that failed after the container was created leaves it behind.
       await DockerLauncher.remove(spec.containerName).catch(() => false);
       throw error;
-    }
+    });
     return launched(
       DockerLauncher.metadata({
         cwdDataDir: spec.dataDir,
@@ -237,12 +234,9 @@ export class DockerLauncher implements Launcher<DockerRuntimeMetadata> {
     }
 
     const args = ["manifest", "inspect", image];
-    let result: DockerResult;
-    try {
-      result = await runDocker(args);
-    } catch (error) {
+    const result = await runDocker(args).catch((error: unknown) => {
       throw dockerError(`Inspect Docker image ${image}`, args, error);
-    }
+    });
     if (result.status === 0) {
       return "remote";
     }
@@ -279,17 +273,14 @@ export class DockerLauncher implements Launcher<DockerRuntimeMetadata> {
    * a container must not fail for want of a `docker` to ask.
    */
   static async remove(containerName: string): Promise<boolean> {
-    let inspect: Awaited<ReturnType<typeof DockerLauncher.inspect>>;
-    try {
-      inspect = await DockerLauncher.inspect(containerName);
-    } catch (error) {
+    const inspect = await DockerLauncher.inspect(containerName).catch((error: unknown) => {
       // No `docker` on PATH: Docker is not installed, so it runs no container.
       if (isErrno(error, "ENOENT")) {
-        return false;
+        return undefined;
       }
       throw error;
-    }
-    if (!inspect.exists) {
+    });
+    if (!inspect?.exists) {
       return false;
     }
     if (inspect.running) {
@@ -380,19 +371,19 @@ async function runDocker(
       stdio: ["ignore", "pipe", "pipe"],
       env: { ...process.env, ...env },
     });
-    let stdout = "";
-    let stderr = "";
+    const stdout: string[] = [];
+    const stderr: string[] = [];
     child.stdout?.setEncoding("utf8");
     child.stderr?.setEncoding("utf8");
     child.stdout?.on("data", (chunk: string) => {
-      stdout += chunk;
+      stdout.push(chunk);
     });
     child.stderr?.on("data", (chunk: string) => {
-      stderr += chunk;
+      stderr.push(chunk);
     });
     child.on("error", reject);
     child.on("close", (code) => {
-      resolve({ status: code ?? 1, stdout, stderr });
+      resolve({ status: code ?? 1, stdout: stdout.join(""), stderr: stderr.join("") });
     });
   });
 }
@@ -468,12 +459,9 @@ async function requireDocker(
   action: string,
   env: Readonly<Record<string, string>> = {},
 ): Promise<DockerResult> {
-  let result: DockerResult;
-  try {
-    result = await runDocker(args, env);
-  } catch (error) {
+  const result = await runDocker(args, env).catch((error: unknown) => {
     throw dockerError(action, args, error);
-  }
+  });
   if (result.status !== 0) {
     throw dockerError(action, args, result);
   }
@@ -484,13 +472,10 @@ async function requireDocker(
  * Whether the image is already on this machine.
  */
 async function imageExists(image: string): Promise<boolean> {
-  let result: DockerResult;
   const args = ["image", "inspect", image];
-  try {
-    result = await runDocker(args);
-  } catch (error) {
+  const result = await runDocker(args).catch((error: unknown) => {
     throw dockerError(`Inspect Docker image ${image}`, args, error);
-  }
+  });
   return result.status === 0;
 }
 

@@ -1,7 +1,9 @@
 import { readFile, realpath } from "node:fs/promises";
-import { dirname, join, resolve } from "node:path";
+import { join, resolve } from "node:path";
 
 import semver from "semver";
+
+import { ancestors } from "../../paths";
 
 /**
  * Minimal shape of the `package.json` fields detectors read. Intentionally
@@ -179,20 +181,19 @@ export async function installedPackage(
   cwd: string,
   name: string,
 ): Promise<InstalledPackage | undefined> {
-  let dir = await realpath(resolve(cwd)).catch(() => resolve(cwd));
-  for (;;) {
+  const start = await realpath(resolve(cwd)).catch(() => resolve(cwd));
+  for (const dir of ancestors(start)) {
     const path = join(dir, "node_modules", name, "package.json");
     const contents = await readFile(path, "utf8").catch(() => undefined);
     if (contents !== undefined) {
       const version = versionIn(contents);
       return version === undefined ? undefined : { version, path };
     }
-    const parent = dirname(dir);
-    if (parent === dir || (await isWorkspaceRoot(dir))) {
+    if (await isWorkspaceRoot(dir)) {
       return undefined;
     }
-    dir = parent;
   }
+  return undefined;
 }
 
 /** The version of `name` installed for the app at `cwd`; see {@link installedPackage}. */

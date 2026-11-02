@@ -143,17 +143,12 @@ export async function viteEntry(cwd: string): Promise<string | undefined> {
  * reads a pattern replace over HTML as sanitizing it.
  */
 function withoutComments(html: string): string {
-  let text = "";
-  let from = 0;
-  for (let start = html.indexOf("<!--"); start !== -1; start = html.indexOf("<!--", from)) {
-    text += html.slice(from, start);
-    const end = html.indexOf("-->", start + 4);
-    if (end === -1) {
-      return text;
-    }
-    from = end + 3;
-  }
-  return text + html.slice(from);
+  // An unterminated comment runs to the end of the input, so everything from
+  // its `<!--` on is dropped.
+  const comments = [...html.matchAll(/<!--[\s\S]*?(?:-->|$)/g)];
+  const textStarts = [0, ...comments.map((comment) => comment.index + comment[0].length)];
+  const textEnds = [...comments.map((comment) => comment.index), html.length];
+  return textEnds.map((end, i) => html.slice(textStarts[i], end)).join("");
 }
 
 /**
@@ -338,18 +333,18 @@ async function resolveLocalModule(
   managed: string,
 ): Promise<string | undefined> {
   const path = stripQuery(specifier);
-  let base: string;
-  if (path.startsWith("./") || path.startsWith("../")) {
-    base = posix.join(posix.dirname(importer), path);
-  } else if (path.startsWith("/")) {
-    // Vite serves the project root at `/`.
-    base = path.slice(1);
-  } else if (path.startsWith("@/") || path.startsWith("~/")) {
-    base = posix.join("src", path.slice(2));
-  } else {
+  const isRelative = path.startsWith("./") || path.startsWith("../");
+  const isAlias = path.startsWith("@/") || path.startsWith("~/");
+  if (!isRelative && !path.startsWith("/") && !isAlias) {
     return undefined;
   }
-  base = posix.normalize(base);
+  const joined = isRelative
+    ? posix.join(posix.dirname(importer), path)
+    : isAlias
+      ? posix.join("src", path.slice(2))
+      : // Vite serves the project root at `/`.
+        path.slice(1);
+  const base = posix.normalize(joined);
   if (base === ".." || base.startsWith("../")) {
     return undefined;
   }
@@ -371,13 +366,11 @@ async function resolveLocalModule(
 
 /** The import line that mounts the managed root from the entry's directory. */
 function importStatement(entry: string, root: RootMount): string {
-  let specifier = posix.relative(posix.dirname(entry), root.path);
-  if (!root.extension) {
-    specifier = specifier.slice(0, specifier.length - posix.extname(specifier).length);
-  }
-  if (!specifier.startsWith(".")) {
-    specifier = `./${specifier}`;
-  }
+  const relative = posix.relative(posix.dirname(entry), root.path);
+  const stripped = root.extension
+    ? relative
+    : relative.slice(0, relative.length - posix.extname(relative).length);
+  const specifier = stripped.startsWith(".") ? stripped : `./${stripped}`;
   const binding = root.binding.named ? `{ ${root.binding.name} }` : root.binding.name;
   return `import ${binding} from "${specifier}"`;
 }

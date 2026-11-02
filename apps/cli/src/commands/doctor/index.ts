@@ -663,12 +663,9 @@ async function runLocalRuntimeChecks(
     "docker-cli",
     "Docker is reachable",
     async () => {
-      let result: Awaited<ReturnType<typeof LocalServer.dockerReachable>>;
-      try {
-        result = await LocalServer.dockerReachable();
-      } catch (error) {
+      const result = await LocalServer.dockerReachable().catch((error: unknown) => {
         throw new Error(dockerUnavailableMessage(error), { cause: error });
-      }
+      });
       if (result.status !== 0) {
         throw new Error(dockerUnavailableMessage(result.stderr || "docker version failed"));
       }

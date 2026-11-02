@@ -40,24 +40,21 @@ export function setTopLevelJsonKey(
   const layout = scanTopLevel(source);
   const member = layout.members.find((candidate) => candidate.key === key);
 
-  let next: string;
-  if (member) {
-    next = `${source.slice(0, member.valueStart)}${rendered}${source.slice(member.valueEnd)}`;
-  } else if (layout.members.length === 0) {
-    const inner =
-      indent === 0
-        ? `${JSON.stringify(key)}:${rendered}`
-        : `${eol}${indentString(indent)}${JSON.stringify(key)}: ${rendered}${eol}`;
-    next = `${source.slice(0, layout.open + 1)}${inner}${source.slice(layout.close)}`;
-  } else {
-    const last = layout.members.at(-1);
-    if (!last) throw new Error(`refusing to write ${path}: the JSON layout scan found no members`);
-    const inner =
-      indent === 0
-        ? `,${JSON.stringify(key)}:${rendered}`
-        : `,${eol}${indentString(indent)}${JSON.stringify(key)}: ${rendered}`;
-    next = `${source.slice(0, last.valueEnd)}${inner}${source.slice(last.valueEnd)}`;
-  }
+  const last = layout.members.at(-1);
+  const quotedKey = JSON.stringify(key);
+  const next = member
+    ? `${source.slice(0, member.valueStart)}${rendered}${source.slice(member.valueEnd)}`
+    : last === undefined
+      ? `${source.slice(0, layout.open + 1)}${
+          indent === 0
+            ? `${quotedKey}:${rendered}`
+            : `${eol}${indentString(indent)}${quotedKey}: ${rendered}${eol}`
+        }${source.slice(layout.close)}`
+      : `${source.slice(0, last.valueEnd)}${
+          indent === 0
+            ? `,${quotedKey}:${rendered}`
+            : `,${eol}${indentString(indent)}${quotedKey}: ${rendered}`
+        }${source.slice(last.valueEnd)}`;
 
   const verification = parseJsonObject(next, path);
   const expected = { ...parsed, [key]: value };
@@ -147,12 +144,8 @@ function scanTopLevel(source: string): TopLevelLayout {
 
 /** True when the string starting at `start` is a top-level key, not a value. */
 function isKeyPosition(source: string, start: number): boolean {
-  for (let index = start - 1; index >= 0; index -= 1) {
-    const char = source.charAt(index);
-    if (isWhitespace(char)) continue;
-    return char === "{" || char === ",";
-  }
-  return false;
+  const char = source.slice(0, start).trimEnd().at(-1);
+  return char === "{" || char === ",";
 }
 
 /** Returns the index just past the value starting at `index`. */

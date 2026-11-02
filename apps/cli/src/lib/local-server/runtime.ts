@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { access, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { access, mkdir, rm, stat, writeFile } from "node:fs/promises";
 import { constants } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -7,7 +7,9 @@ import { dirname, join, resolve } from "node:path";
 import { isErrno, ZitadelError } from "../errors";
 import { isPortableShellWord, isTrainVersion } from "../public-cli";
 import { unscopedCommand } from "../suggestion";
+import { readIfExists } from "../fs";
 import { parseJsonObject } from "../json";
+import { ancestors } from "../paths";
 import { EMPTY_SUMMARY, type EnvSummary, isEnvSummary, LOCAL_DEFAULTS } from "./env-vars";
 
 export const LOCAL_SERVER_IMAGE_NAME = "ghcr.io/zitadel/nextgen";
@@ -199,10 +201,10 @@ export async function findUpward(
   file: string,
   stopAt: string = homedir(),
 ): Promise<string | undefined> {
-  for (let dir = cwd; ; dir = dirname(dir)) {
+  for (const dir of ancestors(cwd, stopAt)) {
     if (await isOwnFile(join(dir, file))) return dir;
-    if (dir === stopAt || dirname(dir) === dir) return undefined;
   }
+  return undefined;
 }
 
 async function isOwnFile(path: string): Promise<boolean> {
@@ -270,14 +272,11 @@ export async function readNearestRuntimeMetadata(
   if (!dir) {
     return undefined;
   }
-  let runtime: RuntimeMetadata | undefined;
-  try {
-    runtime = await readRuntimeMetadata(dir);
-  } catch (error) {
+  const runtime = await readRuntimeMetadata(dir).catch((error: unknown) => {
     // A record in a parent is recovered where it is: the bare commands would
     // act on the working directory instead.
     throw dir === cwd ? error : retargetMalformedRuntime(error, dir);
-  }
+  });
   return runtime ? { dir, runtime } : undefined;
 }
 
@@ -296,14 +295,9 @@ export async function peekRuntimeMetadata(cwd: string): Promise<RuntimeMetadata 
 
 export async function readRuntimeMetadata(cwd: string): Promise<RuntimeMetadata | undefined> {
   const paths = localRuntimePaths(cwd);
-  let raw: string;
-  try {
-    raw = await readFile(paths.runtimeFile, "utf8");
-  } catch (error) {
-    if (isErrno(error, "ENOENT")) {
-      return undefined;
-    }
-    throw error;
+  const raw = await readIfExists(paths.runtimeFile);
+  if (raw === undefined) {
+    return undefined;
   }
 
   const parsed = parseJsonObject(raw, LOCAL_RUNTIME_FILE);
@@ -361,14 +355,7 @@ export function localServerNotRunning(serverUrl?: string): ZitadelError {
 
 async function appendGitignoreEntry(cwd: string, entry: string): Promise<void> {
   const path = join(cwd, ".gitignore");
-  let existing = "";
-  try {
-    existing = await readFile(path, "utf8");
-  } catch (error) {
-    if (!isErrno(error, "ENOENT")) {
-      throw error;
-    }
-  }
+  const existing = (await readIfExists(path)) ?? "";
 
   const lines = existing.split(/\r?\n/).map((line) => line.trim());
   if (lines.includes(entry)) {
@@ -444,25 +431,21 @@ function normalizeRuntimeMetadata(input: Record<string, unknown>): RuntimeMetada
 }
 
 async function nearestExistingDirectory(path: string): Promise<string> {
-  let current = path;
-  while (true) {
-    try {
-      const info = await stat(current);
-      if (!info.isDirectory()) {
-        throw new Error(`${current} exists but is not a directory`);
-      }
-      return current;
-    } catch (error) {
-      if (!isErrno(error, "ENOENT")) {
+  for (const current of ancestors(path)) {
+    const info = await stat(current).catch((error: unknown) => {
+      // Missing is the only miss to walk past, and the root has nothing above it.
+      if (!isErrno(error, "ENOENT") || dirname(current) === current) {
         throw error;
       }
-      const parent = dirname(current);
-      if (parent === current) {
-        throw error;
-      }
-      current = parent;
+      return undefined;
+    });
+    if (info === undefined) continue;
+    if (!info.isDirectory()) {
+      throw new Error(`${current} exists but is not a directory`);
     }
+    return current;
   }
+  throw new Error(`${path} has no existing directory above it`);
 }
 
 export function runtimeSummary(metadata: RuntimeMetadata | undefined): Record<string, unknown> {

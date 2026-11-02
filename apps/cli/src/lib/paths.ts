@@ -1,4 +1,4 @@
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 
 /**
  * Resolve the working directory the CLI should operate against, defaulting to
@@ -17,3 +17,13 @@ export function resolveCwd(cwd?: string): string {
  * without mistaking newer managed files for hand-edited ones.
  */
 export const MANAGED_MARKER = "// zitadel-cli: managed-file v1";
+
+/**
+ * `path` and each directory above it, nearest first, ending at `stopAt` (which
+ * is included) or at the filesystem root. For the walks up from a working
+ * directory that look for a file, a record or a workspace root.
+ */
+export function ancestors(path: string, stopAt?: string): string[] {
+  const parent = dirname(path);
+  return path === stopAt || parent === path ? [path] : [path, ...ancestors(parent, stopAt)];
+}

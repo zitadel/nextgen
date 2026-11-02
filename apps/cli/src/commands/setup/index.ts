@@ -553,16 +553,18 @@ export default class Setup extends Destructive(BaseCommand) {
 
     // A new app is created only now, with every answer in hand. A dry run
     // creates none, so it has no app to patch.
-    let created = detected;
-    let newApp: UndoableScaffold | undefined;
-    if (created === undefined && dryRun) {
+    const scaffolding = detected === undefined && !dryRun;
+    if (detected === undefined && dryRun) {
       consola.info(`Would scaffold a new ${app.framework} project (dry run)`);
-    } else if (created === undefined) {
-      consola.start(`Scaffolding a new ${app.framework} project`);
-      newApp = await orca.scaffoldUndoably(cwd, app.framework, force);
-      created = newApp.facts;
-      consola.success(`Scaffolded ${created.id} skeleton`);
     }
+    if (scaffolding) {
+      consola.start(`Scaffolding a new ${app.framework} project`);
+    }
+    const newApp = scaffolding ? await orca.scaffoldUndoably(cwd, app.framework, force) : undefined;
+    if (newApp !== undefined) {
+      consola.success(`Scaffolded ${newApp.facts.id} skeleton`);
+    }
+    const created = detected ?? newApp?.facts;
     // The DevPortPrompt can change the port interactively, so fold the answer
     // back into the framework: the patched dev-server config reads
     // `framework.devPort`, and it must agree with the issuer and the registered
@@ -1929,12 +1931,7 @@ async function assertLocalServerVersion(
   retry: SetupRetryOptions,
   cliVersion: string,
 ): Promise<void> {
-  let nearest: Awaited<ReturnType<typeof readNearestRuntimeMetadata>>;
-  try {
-    nearest = await readNearestRuntimeMetadata(cwd);
-  } catch {
-    return;
-  }
+  const nearest = await readNearestRuntimeMetadata(cwd).catch(() => undefined);
   const runtime = nearest?.runtime;
   if (!nearest || runtime?.backend !== "binary" || runtime.server_url !== server) {
     return;
