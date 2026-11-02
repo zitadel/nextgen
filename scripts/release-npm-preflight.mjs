@@ -1,7 +1,8 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { mapAll, runCapture } from "./dev-process.mjs";
+import { runCapture } from "./dev-process.mjs";
+import { mapAll } from "./map-all.mjs";
 
 // Releases publish through npm trusted publishing, which cannot create a
 // package: a maintainer publishes a placeholder once and adds the trusted

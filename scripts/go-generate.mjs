@@ -44,7 +44,8 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { isDirectRun, mapAll, run, runCapture } from "./dev-process.mjs";
+import { isDirectRun, run, runCapture } from "./dev-process.mjs";
+import { mapAll } from "./map-all.mjs";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 

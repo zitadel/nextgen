@@ -5,7 +5,8 @@ import { chmod, copyFile, mkdir, readFile, readdir, rm, stat, writeFile } from "
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { mapAll, run, runReplayed } from "./dev-process.mjs";
+import { run, runReplayed } from "./dev-process.mjs";
+import { mapAll } from "./map-all.mjs";
 import {
   PUBLIC_PACKAGE_DIRS,
   PUBLIC_RELEASE_PACKAGES,

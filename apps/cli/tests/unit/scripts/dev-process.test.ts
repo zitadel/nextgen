@@ -2,7 +2,6 @@ import { execFile as execFileCallback } from "node:child_process";
 import { mkdir, symlink, writeFile } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { setTimeout as delay } from "node:timers/promises";
 import { promisify } from "node:util";
 
 import { describe, expect } from "vitest";
@@ -15,11 +14,6 @@ const devProcessUrl = new URL("../../../../../scripts/dev-process.mjs", import.m
 
 type DevProcessModule = {
   isDirectRun: (moduleUrl: string, argv?: string[]) => boolean;
-  mapAll: <T, R>(
-    items: T[],
-    worker: (item: T, index: number) => Promise<R>,
-    concurrency: number,
-  ) => Promise<R[]>;
 };
 
 async function loadModule(): Promise<DevProcessModule> {
@@ -73,47 +67,5 @@ if (isDirectRun(import.meta.url)) console.log("main block ran");
     const { stdout } = await execFile(process.execPath, [join(dir, "link", "main.mjs")]);
 
     expect(stdout).toBe("main block ran\n");
-  });
-});
-
-describe("mapAll", () => {
-  it("returns the results in input order", async () => {
-    const { mapAll } = await loadModule();
-
-    await expect(mapAll([3, 1, 2], async (item) => item * 10, 2)).resolves.toEqual([30, 10, 20]);
-  });
-
-  it("rethrows the failed job's own error, not a wrapper around it", async () => {
-    const { mapAll } = await loadModule();
-
-    await expect(
-      mapAll(
-        ["a", "b"],
-        async (item) => {
-          throw new Error(`boom on ${item}`);
-        },
-        1,
-      ),
-    ).rejects.toThrow("boom on a");
-  });
-
-  it("lets the jobs already running finish before it fails", async () => {
-    const { mapAll } = await loadModule();
-    const started = performance.now();
-
-    await expect(
-      mapAll(
-        [0, 1],
-        async (item) => {
-          if (item === 0) {
-            throw new Error("boom");
-          }
-          await delay(40);
-        },
-        2,
-      ),
-    ).rejects.toThrow("boom");
-
-    expect(performance.now() - started).toBeGreaterThanOrEqual(35);
   });
 });
