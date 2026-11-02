@@ -6,7 +6,7 @@ import {
 } from "@zitadel/config/schemas";
 
 import { assertNoLegacyTemplateKey, readDescriptorTemplate } from "../../branding";
-import { ZitadelError } from "../../errors";
+import { ZitadelError, errorMessage } from "../../errors";
 import { flowEnvRefs } from "../../flows";
 import { POLICIES_DIR, policyFileIssues } from "../../policies";
 import { reportWarning } from "../../warnings";
@@ -90,7 +90,7 @@ function validateBundleShapes(ctx: StepContext): void {
       assertNoLegacyTemplateKey(descriptor);
     } catch (error) {
       const hint = error instanceof ZitadelError && error.hint ? ` ${error.hint}` : "";
-      failures.push(`${handle}: ${error instanceof Error ? error.message : String(error)}.${hint}`);
+      failures.push(`${handle}: ${errorMessage(error)}.${hint}`);
       return;
     }
     const result = brandingConfigSchema.safeParse(descriptor);
@@ -105,7 +105,7 @@ function validateBundleShapes(ctx: StepContext): void {
     try {
       template = readDescriptorTemplate(ctx.cwd, descriptor);
     } catch (error) {
-      failures.push(`${handle}: ${error instanceof Error ? error.message : String(error)}`);
+      failures.push(`${handle}: ${errorMessage(error)}`);
     }
     // The login template runs through the same LiquidJS rules the server
     // applies (`no-script-tag`, `mandatory-gates`, ...), so a dry run, which

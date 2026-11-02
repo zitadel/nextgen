@@ -27,16 +27,16 @@ export function nuxtConfigEdit(): (source: string | undefined) => string {
     const mod = parseConfigModule(source, label);
     const config = resolveDefaultExportObject(mod, label);
 
-    let changed = ensureArrayItem(config, "modules", NUXT_MODULE);
+    const addsModule = ensureArrayItem(config, "modules", NUXT_MODULE);
 
     const nextgen = ensureEditableObject(config, "nextgen");
-    if (nextgen.loginPath === undefined) {
+    const addsLoginPath = nextgen.loginPath === undefined;
+    if (addsLoginPath) {
       nextgen.loginPath = "/login";
-      changed = true;
     }
-    if (nextgen.protectedRoutes === undefined) {
+    const addsProtectedRoutes = nextgen.protectedRoutes === undefined;
+    if (addsProtectedRoutes) {
       nextgen.protectedRoutes = ["/profile"];
-      changed = true;
     }
 
     // Tell Vue's template compiler the `zitadel-*` Lit elements are custom
@@ -44,10 +44,11 @@ export function nuxtConfigEdit(): (source: string | undefined) => string {
     // instead of logging "Failed to resolve component" and mis-binding props.
     const vue = ensureEditableObject(config, "vue");
     const compilerOptions = ensureEditableObject(vue, "compilerOptions");
-    if (compilerOptions.isCustomElement === undefined) {
+    const addsCustomElement = compilerOptions.isCustomElement === undefined;
+    if (addsCustomElement) {
       compilerOptions.isCustomElement = builders.raw(`(tag) => tag.startsWith("zitadel-")`);
-      changed = true;
     }
+    const changed = addsModule || addsLoginPath || addsProtectedRoutes || addsCustomElement;
 
     // Nothing was missing — return the source untouched so the file-writer skips
     // it instead of letting magicast reformat an already-patched config.

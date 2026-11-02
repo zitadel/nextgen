@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process";
+import { execaSync } from "execa";
 
 import { ZitadelError } from "../../errors";
 import { reportWarning } from "../../warnings";
@@ -97,26 +97,27 @@ export abstract class AbstractCLIScaffolder implements Scaffolder {
    * "binary not on PATH" (`ENOENT` from the spawn itself) from "binary ran but
    * exited non-zero" — the former previously got masked as a generic
    * `exited with status 1`, leaving users to guess. Tests stub
-   * `node:child_process` to assert the command without spawning.
+   * `execa` to assert the command without spawning.
    */
   protected runCommand(command: string, args: ReadonlyArray<string>, cwd: string): void {
-    const result = spawnSync(command, [...args], { cwd, encoding: "utf8" });
-    if (result.error) {
-      const err = result.error as NodeJS.ErrnoException;
-      const notFound = err.code === "ENOENT";
+    const result = execaSync(command, [...args], { cwd, reject: false });
+    if (result.code !== undefined) {
+      const notFound = result.code === "ENOENT";
       throw new ZitadelError(
         "E_VALIDATION",
-        notFound ? `Command not found: ${command}` : `Failed to spawn "${command}": ${err.message}`,
+        notFound
+          ? `Command not found: ${command}`
+          : `Failed to spawn "${command}": ${result.originalMessage ?? result.message}`,
         {
           hint: notFound ? `Ensure '${command}' is installed and on PATH.` : undefined,
-          details: { command, args: [...args], code: err.code },
+          details: { command, args: [...args], code: result.code },
         },
       );
     }
-    const status = result.status ?? 1;
+    const status = result.exitCode ?? 1;
     if (status !== 0) {
-      const stdout = String(result.stdout ?? "");
-      const stderr = String(result.stderr ?? "");
+      const stdout = String(result.stdout);
+      const stderr = String(result.stderr);
       const output = truncateCommandOutput([stderr, stdout].filter(Boolean).join("\n").trim());
       throw new ZitadelError(
         "E_VALIDATION",

@@ -72,28 +72,27 @@ export default class Deploy extends EnvironmentCommand {
     const { client, projectId } = await this.connect();
 
     // The origins this deploy lands on, for the optimistic guard below.
-    let landing: string[] = [];
-    if (!dryRun) {
-      // The deploy goes to every primary origin, so the project must have at
-      // least one. Checked here, before the bundle is built and the IdP
-      // connections are synced, so a project with no primary origin fails
-      // before the IdP step does a partial write rather than after it, when the
-      // final deploy would report the missing origin. A dry run writes nothing
-      // and never reaches the deploy, so it is exempt: it still validates and
-      // previews a project that has no primary origin yet.
-      const project = await client.getProject(projectId);
-      const origins = project.origins;
-      landing = origins.filter((entry) => entry.kind === "primary").map((entry) => entry.pattern);
-      if (landing.length === 0) {
-        const setupProject = await setupProjectId(cwd);
-        throw noPrimaryOriginError({
-          origins,
-          issuer: this.environment.values.ZITADEL_ISSUER?.value,
-          setupProject: setupProject === projectId,
-          selector: this.environmentSelector(),
-          cliVersion: this.meta.cliVersion,
-        });
-      }
+    // The deploy goes to every primary origin, so the project must have at
+    // least one. Checked here, before the bundle is built and the IdP
+    // connections are synced, so a project with no primary origin fails
+    // before the IdP step does a partial write rather than after it, when the
+    // final deploy would report the missing origin. A dry run writes nothing
+    // and never reaches the deploy, so it is exempt: it still validates and
+    // previews a project that has no primary origin yet.
+    const project = dryRun ? undefined : await client.getProject(projectId);
+    const origins = project?.origins ?? [];
+    const landing = origins
+      .filter((entry) => entry.kind === "primary")
+      .map((entry) => entry.pattern);
+    if (project !== undefined && landing.length === 0) {
+      const setupProject = await setupProjectId(cwd);
+      throw noPrimaryOriginError({
+        origins,
+        issuer: this.environment.values.ZITADEL_ISSUER?.value,
+        setupProject: setupProject === projectId,
+        selector: this.environmentSelector(),
+        cliVersion: this.meta.cliVersion,
+      });
     }
 
     const { bundle, resourceCount, brandingSources, idpFiles, policyFiles } =
@@ -160,20 +159,17 @@ export default class Deploy extends EnvironmentCommand {
     const observed = deployments.find((deployment) =>
       deployment.targets.some((entry) => landing.includes(entry.origin)),
     )?.id;
-    let deployment: Awaited<ReturnType<typeof createDeployment>>;
-    try {
-      deployment = await createDeployment(client, projectId, {
-        releaseId: release.id,
-        targets: "primary",
-        message,
-        // On a project's first deploy nothing is live, so there is no
-        // deployment to guard against: the field is omitted rather than sent
-        // empty or as a placeholder, which an optional id cannot stand in for.
-        // When a deployment is live its id is sent so a racing deploy is caught
-        // with a 409 (#538).
-        ...(observed === undefined ? {} : { expectedDeploymentId: observed }),
-      });
-    } catch (error) {
+    const deployment = await createDeployment(client, projectId, {
+      releaseId: release.id,
+      targets: "primary",
+      message,
+      // On a project's first deploy nothing is live, so there is no
+      // deployment to guard against: the field is omitted rather than sent
+      // empty or as a placeholder, which an optional id cannot stand in for.
+      // When a deployment is live its id is sent so a racing deploy is caught
+      // with a 409 (#538).
+      ...(observed === undefined ? {} : { expectedDeploymentId: observed }),
+    }).catch(async (error: unknown): Promise<never> => {
       // A 409 means another deploy landed between our inspection and this
       // create. Re-read what the targets serve now and report that actual
       // deployment, so the caller re-runs against current state (#538).
@@ -208,7 +204,7 @@ export default class Deploy extends EnvironmentCommand {
           nextCommands: [this.suggest("deployment list --live")],
         },
       );
-    }
+    });
 
     const servedOrigins = deployment.targets.map((target) => target.origin);
     this.recordTelemetry({ origin_count: servedOrigins.length });

@@ -218,11 +218,10 @@ async function mapBounded<T, R>(
   fn: (item: T) => Promise<R>,
 ): Promise<R[]> {
   const out = new Array<R>(items.length);
-  let next = 0;
+  const queue = items.entries();
   const worker = async (): Promise<void> => {
-    while (next < items.length) {
-      const index = next++;
-      out[index] = await fn(items[index] as T);
+    for (const [index, item] of queue) {
+      out[index] = await fn(item);
     }
   };
   await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
@@ -312,28 +311,23 @@ export function renderPolicyTestResults(
   results: readonly PolicySuiteResult[],
   release?: string,
 ): string {
-  const lines: string[] = [];
-  let passed = 0;
-  let failed = 0;
-  for (const result of results) {
-    lines.push(`${result.operation}  (${describePolicy(result.policy, release)})`);
-    for (const testCase of result.cases) {
+  const lines = results.flatMap((result) => [
+    `${result.operation}  (${describePolicy(result.policy, release)})`,
+    ...result.cases.map((testCase) => {
       if (testCase.passed) {
-        passed++;
-        lines.push(`  ✓ ${testCase.name}`);
-        continue;
+        return `  ✓ ${testCase.name}`;
       }
-      failed++;
       const actual = describeDecision({
         allowed: testCase.actual.allowed,
         code: testCase.actual.code,
         violations: Object.keys(testCase.actual.violations ?? {}),
       });
-      lines.push(
-        `  ✗ ${testCase.name}: expected ${describeDecision(testCase.expected)}, got ${actual}`,
-      );
-    }
-  }
+      return `  ✗ ${testCase.name}: expected ${describeDecision(testCase.expected)}, got ${actual}`;
+    }),
+  ]);
+  const cases = results.flatMap((result) => result.cases);
+  const passed = cases.filter((testCase) => testCase.passed).length;
+  const failed = cases.length - passed;
   lines.push("", failed === 0 ? `${passed} passed` : `${passed} passed, ${failed} failed`);
   return lines.join("\n");
 }

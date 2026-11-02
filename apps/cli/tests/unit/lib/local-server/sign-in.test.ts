@@ -1,6 +1,7 @@
 import { http, HttpResponse } from "msw";
-import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterEach, describe, expect } from "vitest";
+
+import { it } from "../../../helpers/fixtures";
 
 import type { LocalAdmin } from "../../../../src/lib/local-server/admin-credential";
 import { adminSessionCookie, consoleSignInUrl } from "../../../../src/lib/local-server/sign-in";
@@ -15,7 +16,7 @@ const admin: LocalAdmin = {
 };
 
 type Call = { path: string; body: unknown; authorization: string | null; origin: string | null };
-let calls: Call[] = [];
+const calls: Call[] = [];
 
 async function record(request: Request): Promise<void> {
   const url = new URL(request.url);
@@ -65,14 +66,13 @@ const signInHandlers = [
   }),
 ];
 
-const server = setupServer(...signInHandlers);
-
-beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
-afterEach(() => {
-  server.resetHandlers();
-  calls = [];
+it.beforeEach(({ server }) => {
+  server.use(...signInHandlers);
 });
-afterAll(() => server.close());
+
+afterEach(() => {
+  calls.length = 0;
+});
 
 describe("local admin sign-in", () => {
   it("proves the identifier, then the password, and links the handoff token", async () => {
@@ -107,14 +107,14 @@ describe("local admin sign-in", () => {
     }
   });
 
-  it("exchanges the handoff token for the session cookie", async () => {
-    let exchanged: unknown;
+  it("exchanges the handoff token for the session cookie", async ({ server }) => {
+    const exchanges: unknown[] = [];
     server.use(
       http.post(`${SERVER}/api/v1/sessions/exchange`, async ({ request }) => {
-        exchanged = {
+        exchanges.push({
           project: new URL(request.url).searchParams.get("project_id"),
           body: await request.json(),
-        };
+        });
         return new HttpResponse(null, {
           headers: { "set-cookie": "zitadel_session=sess_cookie_value; Path=/; HttpOnly" },
         });
@@ -124,14 +124,16 @@ describe("local admin sign-in", () => {
     const cookie = await adminSessionCookie(SERVER, admin);
 
     expect(cookie).toBe("zitadel_session=sess_cookie_value");
-    expect(exchanged).toEqual({
+    expect(exchanges[0]).toEqual({
       project: "proj_platform",
       body: { handoff_token: "handoff/one+time" },
     });
   });
 
   // A server reached over https sets the prefixed name, and takes it back.
-  it("keeps the session cookie under the prefixed name an https server sets", async () => {
+  it("keeps the session cookie under the prefixed name an https server sets", async ({
+    server,
+  }) => {
     server.use(
       http.post(
         `${SERVER}/api/v1/sessions/exchange`,
@@ -149,13 +151,13 @@ describe("local admin sign-in", () => {
     expect(cookie).toBe("__Host-zitadel_session=sess_cookie_value");
   });
 
-  it.each([
+  it.for<[string, Record<string, string>]>([
     ["sets no session cookie", {}],
     [
       "sets only a session cookie from before ADR 083",
       { "set-cookie": "__nextgen_session=sess_cookie_value; Path=/; HttpOnly" },
     ],
-  ])("fails when the exchange %s", async (_label, headers) => {
+  ])("fails when the exchange %s", async ([_label, headers], { server }) => {
     server.use(
       http.post(`${SERVER}/api/v1/sessions/exchange`, () =>
         HttpResponse.json({}, { status: 200, headers }),
@@ -167,7 +169,9 @@ describe("local admin sign-in", () => {
     );
   });
 
-  it("refuses a server that does not host the platform project, and says how to fix it", async () => {
+  it("refuses a server that does not host the platform project, and says how to fix it", async ({
+    server,
+  }) => {
     server.use(
       http.get(`${SERVER}/console/runtime.json`, () =>
         HttpResponse.json({ console_project_id: "proj_other", publishable_key: "pk_other" }),
@@ -188,7 +192,9 @@ describe("local admin sign-in", () => {
   // The server reports a failed lookup with the same code as a missing user, so
   // the advice names both causes and never suggests the destructive reset as a
   // command an agent would run.
-  it("explains a rejected identifier without steering an agent into a reset", async () => {
+  it("explains a rejected identifier without steering an agent into a reset", async ({
+    server,
+  }) => {
     server.use(
       http.post(`${SERVER}/api/v1/auth_attempts/:attempt/challenges/:challenge/verify`, () =>
         HttpResponse.json(
@@ -211,7 +217,7 @@ describe("local admin sign-in", () => {
     );
   });
 
-  it("reports a rejected password with the server's own message", async () => {
+  it("reports a rejected password with the server's own message", async ({ server }) => {
     server.use(
       http.post(`${SERVER}/api/v1/auth_attempts/:attempt/challenges/ch_password/verify`, () =>
         HttpResponse.json(

@@ -37,7 +37,7 @@ import {
   claimState,
   claimWindowDeadline,
 } from "../../lib/claim-state";
-import { isErrno, toZitadelError, ZitadelError } from "../../lib/errors";
+import { isErrno, toZitadelError, ZitadelError, errorMessage } from "../../lib/errors";
 import {
   callbackUriFor,
   customFlagText,
@@ -448,7 +448,7 @@ export default class Setup extends Destructive(BaseCommand) {
       app = { ...app, devPort: assertDevPort(flags["dev-port"]) };
     }
 
-    let answers: SetupAnswers = {
+    const defaultAnswers: SetupAnswers = {
       server: this.meta.source,
       devPort: app.devPort,
       preset: (flags.preset as SetupPreset | undefined) ?? DEFAULT_SETUP_PRESET,
@@ -457,29 +457,33 @@ export default class Setup extends Destructive(BaseCommand) {
       passwordMinLength: passwordMinLengthFlag,
     };
 
-    if (!nonInteractive && !dryRun) {
+    const asks = !nonInteractive && !dryRun;
+    if (asks && (!scaffoldedFramework || flags.framework !== undefined)) {
       // Asking which framework to scaffold opened the wizard already.
-      if (!scaffoldedFramework || flags.framework !== undefined) {
-        intro("Zitadel setup");
-      }
-      const promptCtx = {
-        input: wizardInput,
-        framework: { id: app.framework, displayName: orca.displayName(app.framework) },
-        suggest: (args: string) =>
-          projectCommand(args, recoverySelector(flags.cwd), this.meta.cliVersion),
-        cwd,
-        frameworkChosen: scaffoldedFramework || flags.framework !== undefined,
-        serverFlag: this.meta.serverFlag,
-        devPortFromFlag: flags["dev-port"] !== undefined,
-        presetFromFlag: flags.preset !== undefined,
-        useCaseFromFlag: flags["use-case"] !== undefined,
-        ssoFromFlag: flags.sso !== undefined,
-        passwordMinLengthFromFlag: flags["password-min-length"] !== undefined,
-        developmentBuild: isDevelopmentBuild(),
-      };
-      for (const prompt of SETUP_PROMPTS) {
-        answers = await prompt.ask(answers, promptCtx);
-      }
+      intro("Zitadel setup");
+    }
+    const promptCtx = {
+      input: wizardInput,
+      framework: { id: app.framework, displayName: orca.displayName(app.framework) },
+      suggest: (args: string) =>
+        projectCommand(args, recoverySelector(flags.cwd), this.meta.cliVersion),
+      cwd,
+      frameworkChosen: scaffoldedFramework || flags.framework !== undefined,
+      serverFlag: this.meta.serverFlag,
+      devPortFromFlag: flags["dev-port"] !== undefined,
+      presetFromFlag: flags.preset !== undefined,
+      useCaseFromFlag: flags["use-case"] !== undefined,
+      ssoFromFlag: flags.sso !== undefined,
+      passwordMinLengthFromFlag: flags["password-min-length"] !== undefined,
+      developmentBuild: isDevelopmentBuild(),
+    };
+    const answers = asks
+      ? await SETUP_PROMPTS.reduce(
+          async (previous, prompt) => prompt.ask(await previous, promptCtx),
+          Promise.resolve(defaultAnswers),
+        )
+      : defaultAnswers;
+    if (asks) {
       note(signInSummary(answers), "Sign-in");
       outro("Configuration captured");
     } else if (
@@ -553,16 +557,18 @@ export default class Setup extends Destructive(BaseCommand) {
 
     // A new app is created only now, with every answer in hand. A dry run
     // creates none, so it has no app to patch.
-    let created = detected;
-    let newApp: UndoableScaffold | undefined;
-    if (created === undefined && dryRun) {
+    const scaffolding = detected === undefined && !dryRun;
+    if (detected === undefined && dryRun) {
       consola.info(`Would scaffold a new ${app.framework} project (dry run)`);
-    } else if (created === undefined) {
-      consola.start(`Scaffolding a new ${app.framework} project`);
-      newApp = await orca.scaffoldUndoably(cwd, app.framework, force);
-      created = newApp.facts;
-      consola.success(`Scaffolded ${created.id} skeleton`);
     }
+    if (scaffolding) {
+      consola.start(`Scaffolding a new ${app.framework} project`);
+    }
+    const newApp = scaffolding ? await orca.scaffoldUndoably(cwd, app.framework, force) : undefined;
+    if (newApp !== undefined) {
+      consola.success(`Scaffolded ${newApp.facts.id} skeleton`);
+    }
+    const created = detected ?? newApp?.facts;
     // The DevPortPrompt can change the port interactively, so fold the answer
     // back into the framework: the patched dev-server config reads
     // `framework.devPort`, and it must agree with the issuer and the registered
@@ -984,7 +990,6 @@ export default class Setup extends Destructive(BaseCommand) {
     // The structured report is human-only. Under `--json` we let the
     // envelope returned from `this.emit(...)` be the sole stdout
     // payload (oclif requires single-doc JSON).
-    let nextShown: StepsShown | undefined;
     if (!this.jsonEnabled()) {
       const projectFacts = await detectProjectFacts(cwd, app.framework);
       const sections = buildSummary({
@@ -1021,8 +1026,6 @@ export default class Setup extends Destructive(BaseCommand) {
         ),
         style: { padding: 1, borderStyle: "rounded", borderColor: "green" },
       });
-      // The box holds the next steps, so the base command does not repeat them.
-      nextShown = asStepsShown();
       // After the steps that start the app and test sign-in, outside the box so
       // the command can be copied without its border.
       consola.log(`\n${exploreAllCommands(this.meta.cliVersion)}`);
@@ -1038,6 +1041,9 @@ export default class Setup extends Destructive(BaseCommand) {
         cliVersion: this.meta.cliVersion,
       });
     }
+
+    // The box holds the next steps, so the base command does not repeat them.
+    const nextShown: StepsShown | undefined = this.jsonEnabled() ? undefined : asStepsShown();
 
     return this.emit({
       status: "ok",
@@ -1477,7 +1483,7 @@ export async function restoreCredentialEnvFiles(
         await writeFile(path, content);
       }
     } catch (error) {
-      const reason = error instanceof Error ? error.message : String(error);
+      const reason = errorMessage(error);
       reportWarning(
         `Could not restore ${file} after the failed setup (${reason}); it may still name the abandoned project.`,
       );
@@ -1929,12 +1935,7 @@ async function assertLocalServerVersion(
   retry: SetupRetryOptions,
   cliVersion: string,
 ): Promise<void> {
-  let nearest: Awaited<ReturnType<typeof readNearestRuntimeMetadata>>;
-  try {
-    nearest = await readNearestRuntimeMetadata(cwd);
-  } catch {
-    return;
-  }
+  const nearest = await readNearestRuntimeMetadata(cwd).catch(() => undefined);
   const runtime = nearest?.runtime;
   if (!nearest || runtime?.backend !== "binary" || runtime.server_url !== server) {
     return;

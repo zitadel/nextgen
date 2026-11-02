@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 type Capture = (command: string, args: string[]) => Promise<{ stdout: string }>;
 
@@ -20,14 +20,10 @@ type ReleaseNpmPreflightModule = {
   readPublishedVersions: (name: string, options: { capture: Capture }) => Promise<string[]>;
 };
 
-let preflight: ReleaseNpmPreflightModule;
+const preflight = (await import(
+  new URL("../../../../../scripts/release-npm-preflight.mjs", import.meta.url).href
+)) as ReleaseNpmPreflightModule;
 const tempDirs: string[] = [];
-
-beforeAll(async () => {
-  preflight = (await import(
-    new URL("../../../../../scripts/release-npm-preflight.mjs", import.meta.url).href
-  )) as ReleaseNpmPreflightModule;
-});
 
 afterEach(async () => {
   for (const dir of tempDirs.splice(0)) {

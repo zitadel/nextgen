@@ -3,6 +3,7 @@ import { API_PREFIX } from "@zitadel/api/runtime/base-url";
 
 import { ZitadelError } from "../errors";
 import { unscopedCommand } from "../suggestion";
+import { distance } from "fastest-levenshtein";
 
 export type { ApiOperation };
 
@@ -103,25 +104,6 @@ const byId = (ref: string): ApiOperation => {
         : "List them with `zitadel api ls`, or give a path such as /users/query.",
     nextCommands: [LIST],
   });
-};
-
-/** How many single-letter edits turn `a` into `b` (Levenshtein), for a typo's suggestion. */
-const distance = (a: string, b: string): number => {
-  let previous = Array.from({ length: b.length + 1 }, (_, index) => index);
-  for (const [i, left] of [...a].entries()) {
-    const current = [i + 1];
-    for (const [j, right] of [...b].entries()) {
-      current.push(
-        Math.min(
-          (previous[j + 1] ?? 0) + 1,
-          (current[j] ?? 0) + 1,
-          (previous[j] ?? 0) + (left === right ? 0 : 1),
-        ),
-      );
-    }
-    previous = current;
-  }
-  return previous[b.length] ?? 0;
 };
 
 /** A path's segments, each percent-decoded; `undefined` for a malformed escape. */
