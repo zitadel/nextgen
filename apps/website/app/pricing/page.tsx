@@ -333,8 +333,8 @@ function Questions({ catalog }: { catalog: Catalog }) {
           </p>
           <p>
             <strong>Consumer apps:</strong> users, sign-in and required MFA stay free. Capacity,
-            delivery and branding are under Platform; advanced bot checks, adaptive sign-in
-            protection and conditional policies under Security & policies.
+            delivery and branding are under Platform; adaptive sign-in protection and conditional
+            policies under Security & policies.
           </p>
           <p>
             <strong>Business apps:</strong> customer organizations, core roles and required MFA stay
@@ -386,6 +386,29 @@ function Questions({ catalog }: { catalog: Catalog }) {
               ? ` ${protection.label} goes further: it scores each sign-in's risk and steps up or blocks it, for ${meterPrice(protection)[0]} past ${count(protection.allowance)} a month.`
               : ""}
           </p>
+        </>
+      ),
+    },
+    {
+      question: "How do bot checks work?",
+      answer: (
+        <>
+          <p>
+            Every bot check is free, on every plan and when you host Zitadel yourself. Zitadel
+            brings its own challenge: an invisible proof of work that gets harder after failed
+            attempts, with no third-party account and no data leaving your deployment.
+          </p>
+          <p>
+            You can use your own provider instead: Cloudflare Turnstile, hCaptcha or reCAPTCHA with
+            your own keys, or the bot verdict of your app's edge, such as Vercel BotID or
+            Cloudflare. That provider bills you directly, if it charges, and Zitadel adds nothing.
+          </p>
+          {protection && (
+            <p>
+              {protection.label} is the paid layer: it reads those verdicts with other signals to
+              decide when a sign-in needs a step-up or a block.
+            </p>
+          )}
         </>
       ),
     },
