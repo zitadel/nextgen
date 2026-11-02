@@ -51,13 +51,11 @@ export async function fetchUsers(
   pageToken?: string,
   expand = true,
   filter: UserFilter = [],
-  sorting?: UserSorting,
 ): Promise<UsersPage & { teamsExpanded: boolean }> {
   const body = {
     limit: PAGE_SIZE,
     page_token: pageToken,
     ...(filter.length > 0 ? { filter } : {}),
-    ...(sorting ? { sorting } : {}),
   };
   const params = { project_id: projectId };
   if (!expand) {
@@ -74,21 +72,15 @@ export async function fetchUsers(
   }
 }
 
-/** What the Users list is narrowed to and ordered by, as the URL carries it. */
+/** What the Users list is narrowed to, as the URL carries it. */
 export interface UsersSearch {
   /** A schema's object type; absent for every schema. */
   schema?: string;
   /** One revision's id; absent for every revision. */
   revision?: string;
-  /** The revision order, newest or oldest first; absent for the server's own order, newest users first. */
-  sort?: UsersSort;
 }
 
 type UserFilter = NonNullable<Parameters<typeof api.queryUsers>[0]["filter"]>;
-type UserSorting = NonNullable<Parameters<typeof api.queryUsers>[0]["sorting"]>;
-
-/** The two orders by revision the Users list offers. */
-export type UsersSort = "latest" | "oldest";
 
 /** One schema as the Users filter offers it: its object type, title and newest revision. */
 export interface SchemaOption {
@@ -136,18 +128,6 @@ export function userFilter(search: UsersSearch): UserFilter {
     criteria.push({ field: "schema", operation: "equals", value: search.revision });
   }
   return criteria;
-}
-
-/**
- * The order for a search (#2502, decisions log D25): by the revision each
- * user is on, once one is asked for. Minted revision ids are ULIDs, so their
- * order is their creation order; a schema named by a URI `$id` sorts by that
- * string instead, after every minted one. Unasked, or with one revision
- * chosen, the server's own order stands: newest users first.
- */
-export function userSorting(search: UsersSearch): UserSorting | undefined {
-  if (search.revision || !search.sort) return undefined;
-  return { field: "schema", direction: search.sort === "oldest" ? "asc" : "desc" };
 }
 
 /**

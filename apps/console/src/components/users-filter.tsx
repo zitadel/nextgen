@@ -15,15 +15,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { SchemaRevision } from "@/lib/schema";
-import type { SchemaOption, UsersSearch, UsersSort } from "@/lib/user-list";
+import type { SchemaOption, UsersSearch } from "@/lib/user-list";
 
 /**
- * The Users list's controls on the title row: a schema by object type, one
- * revision of it, and the order by revision (#1669, #2502). Filtering and
- * sorting are separate controls. The revision filter stays in view, disabled
- * until a schema is chosen. The sort is opt-in, so a new user stays on top
- * until someone asks for revision order, and it is disabled once one
- * revision is chosen, since every row is then on it.
+ * The Users list's filters on the title row (#1669, #2502): a schema by object
+ * type, then one revision of it. The revision filter stays in view, disabled
+ * until a schema is chosen. There is no sort: revision ids carry no creation
+ * order (a URI `$id`, a UUID on Spanner), and the user query cannot sort by
+ * the revision's creation time.
  *
  * Nothing here counts users: the API has no total, by design. A value the URL
  * carries that no option matches (a deleted schema, an unreadable history)
@@ -49,7 +48,7 @@ export function UsersFilter({
         name="schema"
         value={search.schema}
         display={<span className="truncate">{chosen?.title ?? search.schema}</span>}
-        onChange={(schema) => onChange({ schema, sort: search.sort })}
+        onChange={(schema) => onChange({ schema })}
       >
         {options.map((option) => (
           <SelectItem key={option.objectType} value={option.objectType}>
@@ -72,37 +71,11 @@ export function UsersFilter({
           )
         }
         disabled={!search.schema}
-        // One revision has no order, so choosing one drops the sort.
-        onChange={(next) =>
-          onChange({
-            schema: search.schema,
-            revision: next,
-            ...(next ? {} : { sort: search.sort }),
-          })
-        }
+        onChange={(revision) => onChange({ schema: search.schema, revision })}
         menuClassName={REVISION_MENU}
       >
         <RevisionItems revisions={revisions} />
       </FilterSelect>
-      {/* Unset, the list keeps the server's order, newest users first, and the
-          trigger names what it would sort by rather than an order it does
-          not apply. */}
-      <Select
-        value={search.sort ?? ""}
-        onValueChange={(value) => onChange({ ...search, sort: value as UsersSort })}
-        disabled={Boolean(search.revision)}
-      >
-        <SelectTrigger
-          aria-label="Sort by revision"
-          className={`${CONTROL} data-[placeholder]:text-foreground`}
-        >
-          <SelectValue placeholder="Sort by revision" />
-        </SelectTrigger>
-        <SelectContent position="popper" align="end">
-          <SelectItem value="latest">Sort by latest</SelectItem>
-          <SelectItem value="oldest">Sort by oldest</SelectItem>
-        </SelectContent>
-      </Select>
     </>
   );
 }
