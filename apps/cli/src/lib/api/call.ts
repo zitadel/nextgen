@@ -5,7 +5,6 @@ import { REQUEST_TIMEOUT_MS, sanitizeRejection, sanitizeResponse } from "../api-
 import { Consent } from "../consent";
 import { ZitadelError, errorMessage } from "../errors";
 import { isObject, parseJsonOrUndefined } from "../json";
-import { interruptSignal } from "../interrupt";
 import { type ApiRequest, urlOf } from "./request";
 
 /** What the server answered. `body` is `undefined` for a response without one. */
@@ -29,8 +28,8 @@ const readBody = async (res: Response): Promise<unknown> => {
 
 /**
  * Send one request to `server`, with the project secret as the bearer when
- * there is one. It is bounded and cancelled as every platform call is
- * (`createZitadelClient`), and what the server says is escaped the same way:
+ * there is one. It is bounded, and cancelled when `signal` aborts, as every
+ * platform call is (`createZitadelClient`), and what the server says is escaped the same way:
  * a non-2xx is the {@link ApiError} `toZitadelError` maps to an exit code.
  *
  * A destructive request (one whose operation the spec marks) is sent only with the
@@ -40,9 +39,10 @@ export const send = async (
   server: string,
   token: string | undefined,
   request: ApiRequest,
+  signal: AbortSignal,
   consent?: Consent,
 ): Promise<ApiResponse> => {
-  const { status, raw } = await sendRaw(server, token, request, consent);
+  const { status, raw } = await sendRaw(server, token, request, signal, consent);
   return { status, body: sanitizeResponse(raw) };
 };
 
@@ -58,6 +58,7 @@ const sendRaw = async (
   server: string,
   token: string | undefined,
   request: ApiRequest,
+  signal: AbortSignal,
   consent?: Consent,
 ): Promise<RawResponse> => {
   if (request.operation.destructive) {
@@ -79,7 +80,7 @@ const sendRaw = async (
       headers,
       ...(request.body === undefined ? {} : { body: JSON.stringify(request.body) }),
     },
-    { signal: interruptSignal(), timeoutMs: REQUEST_TIMEOUT_MS },
+    { signal, timeoutMs: REQUEST_TIMEOUT_MS },
     readBody,
   );
   if (!res.ok) {
@@ -113,10 +114,11 @@ export const sendAll = async (
   server: string,
   token: string | undefined,
   request: ApiRequest,
+  signal: AbortSignal,
 ): Promise<ApiResponse> => {
   const paging = request.operation.paging;
   if (paging === null) {
-    return send(server, token, request);
+    return send(server, token, request, signal);
   }
   const fields = Paging.byField(paging.items);
   const responses = new Paging<RawResponse, unknown>({
@@ -134,7 +136,7 @@ export const sendAll = async (
     },
   });
   const walk = responses.walk(async (cursor) => {
-    return sendRaw(server, token, pageOf(request, cursor));
+    return sendRaw(server, token, pageOf(request, cursor), signal);
   });
   const { items, last } = await responses.collect(walk, { all: true });
   const page = isObject(last?.raw) ? last.raw : {};

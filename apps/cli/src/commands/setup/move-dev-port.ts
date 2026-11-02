@@ -47,17 +47,23 @@ export async function moveDevPort(opts: {
   orca: Orca;
   cliVersion: string;
   dryRun: boolean;
+  /** Aborts the requests, as Ctrl-C does for the command that sent them. */
+  signal: AbortSignal;
   /** Asks to remove the previous origin; the command's own confirmation. */
   consent: (gate: Gate) => Promise<Consent | undefined>;
 }): Promise<DevPortMove> {
-  const { cwd, devPort, source, orca, cliVersion, dryRun } = opts;
+  const { cwd, devPort, source, orca, cliVersion, dryRun, signal } = opts;
   const context = await loadPatchContext(cwd, orca, cliVersion);
   const previousIssuer = context.issuer;
   const issuer = issuerFromPort(devPort);
   const secret = await readZitadelSecret(cwd);
   const moving = previousIssuer !== issuer;
 
-  const client = createZitadelClient({ baseUrl: source, token: secret.project_secret });
+  const client = createZitadelClient({
+    baseUrl: source,
+    token: secret.project_secret,
+    signal,
+  });
   if (!dryRun) {
     try {
       await client.addOrigin(secret.project_id, { pattern: issuer, kind: "primary" });

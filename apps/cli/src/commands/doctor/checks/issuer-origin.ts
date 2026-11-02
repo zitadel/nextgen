@@ -43,7 +43,7 @@ export class IssuerOriginCheck implements SanityCheck {
   readonly path = ".zitadel/secret";
 
   async run(ctx: CheckContext): Promise<CheckOutcome> {
-    const finding = await inspect(ctx.cwd);
+    const finding = await inspect(ctx.cwd, ctx.signal);
     if (finding.status === "pass") {
       return { name: this.name, status: "pass", message: finding.message, path: this.path };
     }
@@ -70,7 +70,7 @@ export class IssuerOriginCheck implements SanityCheck {
     if (ctx.dryRun) {
       return;
     }
-    const finding = await inspect(ctx.cwd);
+    const finding = await inspect(ctx.cwd, ctx.signal);
     if (finding.status === "pass") {
       return;
     }
@@ -100,7 +100,7 @@ export class IssuerOriginCheck implements SanityCheck {
   }
 }
 
-async function inspect(cwd: string): Promise<Finding> {
+async function inspect(cwd: string, signal: AbortSignal): Promise<Finding> {
   const records = await readZitadelSecret(cwd)
     .then(async (secret) => ({
       secret,
@@ -124,7 +124,11 @@ async function inspect(cwd: string): Promise<Finding> {
     return { status: "pass", message: `${issuer} is not recorded as a preview origin` };
   }
 
-  const client = createZitadelClient({ baseUrl: server, token: secret.project_secret });
+  const client = createZitadelClient({
+    baseUrl: server,
+    token: secret.project_secret,
+    signal,
+  });
   const read = await client
     .getProject(secret.project_id)
     .then(({ origins }) => ({ origins }))

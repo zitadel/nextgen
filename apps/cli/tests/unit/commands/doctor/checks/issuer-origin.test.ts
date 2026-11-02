@@ -11,6 +11,8 @@ import { Consent } from "../../../../../src/lib/consent";
 import { createOrca } from "../../../../../src/lib/orca";
 import { usePlatformServer } from "../../../../helpers/platform-project";
 
+const signal = new AbortController().signal;
+
 const SERVER = "https://api.zitadel.example";
 const ISSUER = "http://localhost:3000";
 const { server, dirs: tempDirs } = usePlatformServer();
@@ -64,6 +66,7 @@ function ctxFor(cwd: string, dryRun = false, declined = false): CheckContext {
     orca: createOrca(),
     cliVersion: "0.2.0",
     dryRun,
+    signal,
     consent: (gate) =>
       declined
         ? Promise.resolve(undefined)
@@ -72,7 +75,7 @@ function ctxFor(cwd: string, dryRun = false, declined = false): CheckContext {
 }
 
 async function serverOrigins(project: Project) {
-  const client = createZitadelClient({ baseUrl: SERVER, token: project.project_secret });
+  const client = createZitadelClient({ signal, baseUrl: SERVER, token: project.project_secret });
   return (await client.getProject(project.id)).origins;
 }
 

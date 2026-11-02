@@ -152,6 +152,7 @@ export default class Doctor extends Destructive(BaseCommand) {
       orca: createOrca(),
       cliVersion: this.meta.cliVersion,
       dryRun,
+      signal: this.signal,
       consent: (gate) => this.consent(gate),
     };
 
@@ -190,6 +191,7 @@ export default class Doctor extends Destructive(BaseCommand) {
       envName: typeof flags.env === "string" ? flags.env : undefined,
       envFile: typeof flags["env-file"] === "string" ? flags["env-file"] : undefined,
       serverFlag: typeof flags.server === "string" ? flags.server : undefined,
+      signal: this.signal,
     });
     const checks = [...runtimeChecks, ...projectChecks, ...environmentChecks];
     const failed = checks.filter((check) => check.status === "fail");
@@ -551,6 +553,7 @@ async function runEnvironmentChecks(input: {
   envName?: string;
   envFile?: string;
   serverFlag?: string;
+  signal: AbortSignal;
 }): Promise<CheckOutcome[]> {
   if (input.envName === undefined && input.envFile === undefined) {
     return [];
@@ -591,7 +594,11 @@ async function runEnvironmentChecks(input: {
           `ZITADEL_PROJECT_SECRET must resolve to verify project ${projectId} on ${server}`,
         );
       }
-      const project = await createZitadelClient({ baseUrl: server, token }).getProject(projectId);
+      const project = await createZitadelClient({
+        baseUrl: server,
+        token,
+        signal: input.signal,
+      }).getProject(projectId);
       if (project.id !== projectId) {
         throw new Error(`${server} returned project ${project.id}, not the resolved ${projectId}`);
       }

@@ -155,7 +155,7 @@ export default class EnvAdd extends Promptable(BaseCommand) {
 
     const project =
       flags.project === undefined
-        ? await createZitadelClient({ baseUrl: server }).createProject({
+        ? await createZitadelClient({ baseUrl: server, signal: this.signal }).createProject({
             name: `${basename(cwd)}-${name}`,
             ...(issuer === undefined
               ? {}
@@ -411,7 +411,11 @@ export default class EnvAdd extends Promptable(BaseCommand) {
     consola.start("Deploying .zitadel/ to the new environment");
     try {
       const deployment = await deployInitialRelease({
-        client: createZitadelClient({ baseUrl: opts.server, token: opts.projectSecret }),
+        client: createZitadelClient({
+          baseUrl: opts.server,
+          token: opts.projectSecret,
+          signal: this.signal,
+        }),
         projectId: opts.projectId,
         cwd: opts.cwd,
         env: this.meta.env,

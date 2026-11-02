@@ -187,7 +187,10 @@ export abstract class EnvironmentCommand extends BaseCommand {
       consola.info(`Server    ${server}`);
     }
     return {
-      client: createZitadelClient({ baseUrl: server, token }, { verbatim: options.verbatim }),
+      client: createZitadelClient(
+        { baseUrl: server, token, signal: this.signal },
+        { verbatim: options.verbatim },
+      ),
       projectId,
       server,
       environment,

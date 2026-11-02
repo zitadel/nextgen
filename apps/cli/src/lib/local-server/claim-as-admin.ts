@@ -17,20 +17,23 @@ export async function claimProjectAsAdmin(input: {
   projectId: string;
   projectSecret: string;
   admin: LocalAdmin;
+  /** Aborts the requests, as Ctrl-C does for the command that sent them. */
+  signal: AbortSignal;
 }): Promise<ProjectOwner> {
-  const { serverUrl, projectId, projectSecret, admin } = input;
+  const { serverUrl, projectId, projectSecret, admin, signal } = input;
 
   const { challenge_id } = await createZitadelClient({
     baseUrl: serverUrl,
     token: projectSecret,
+    signal,
   }).initClaim(projectId, localAdminRequest(serverUrl));
 
   // claim/complete authenticates by the admin's session cookie, not a bearer
   // token, so this client carries none. As a cookie-authenticated write it
   // also needs the session's CSRF token (ADR 053 §5), which the same cookie
   // reads from GET /sessions/me/csrf.
-  const cookie = await adminSessionCookie(serverUrl, admin);
-  const session = createZitadelClient({ baseUrl: serverUrl });
+  const cookie = await adminSessionCookie(serverUrl, admin, signal);
+  const session = createZitadelClient({ baseUrl: serverUrl, signal });
   const { csrf_token } = await session.getMySessionCsrfToken(
     undefined,
     localAdminRequest(serverUrl, { cookie }),
