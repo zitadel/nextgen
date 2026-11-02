@@ -8,7 +8,6 @@ import { createZitadelClient } from "../../lib/api-client";
 import { toZitadelError, ZitadelError } from "../../lib/errors";
 import { isEnvironmentName } from "../../lib/environment";
 import { writeManagedEnvFile } from "../../lib/fs-safe";
-import { input } from "../../lib/input";
 import { isObject } from "../../lib/json";
 import { DEPLOY_ARGS, deployInitialRelease, type InitialDeployment } from "../../lib/release";
 import { reportWarning } from "../../lib/warnings";
@@ -251,25 +250,21 @@ export default class EnvAdd extends Promptable(BaseCommand) {
     // someone else's and may already serve a release of its own, so it is
     // never offered one, and a run with nobody to ask gets the suggestion in
     // the envelope instead — there is no flag to deploy without being asked,
-    // because an agent that wants one runs `deploy` itself. The question does
-    // not go through `this.input`: that one answers a confirm when `--force`
-    // is given, and here `--force` permits overwriting the env file, so it
-    // must never answer it.
+    // because an agent that wants one runs `deploy` itself. `--force`, which
+    // permits overwriting the env file, never answers a `yes-no`.
     let deployment: InitialDeployment | undefined;
     if (hasSomewhereToLand && !nonInteractive && projectSecret !== undefined) {
       consola.info(
         "Nothing is deployed to this environment yet, so it serves the server's default schema and login flow rather than your .zitadel/ files.",
       );
-      const confirmed = await input(
-        {
-          kind: "confirm",
+      if (
+        await this.input({
+          kind: "yes-no",
           name: "deploy .zitadel/ to the new environment",
           message: "Would you like to deploy .zitadel/ to it now?",
           initialValue: true,
-        },
-        { interactive: !nonInteractive, force: false },
-      );
-      if (confirmed) {
+        })
+      ) {
         deployment = await this.deployInitialRelease({
           cwd,
           server,

@@ -2,6 +2,7 @@ import { join } from "node:path";
 
 import consola from "consola";
 
+import { Consent } from "../consent";
 import { ZitadelError } from "../errors";
 import { unscopedCommand } from "../suggestion";
 import type { ResolvedEnv } from "./env-vars";
@@ -434,9 +435,11 @@ export class LocalServer {
    * Stops the directory's server and deletes its data and its record. The
    * server is stopped first so its database is not deleted from under it. The
    * local admin credential is kept: deleting it would leave a start that cannot
-   * sign in, because the server only imports the admin once.
+   * sign in, because the server only imports the admin once. The data cannot
+   * be recovered, so it takes the consent `reset` asked for.
    */
-  async reset(): Promise<StopReport> {
+  async reset(consent: Consent): Promise<StopReport> {
+    Consent.assert(consent);
     const report = await this.halt();
     await removeLocalData(this.cwd);
     await removeRuntimeMetadata(this.cwd);

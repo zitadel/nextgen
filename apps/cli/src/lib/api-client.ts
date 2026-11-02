@@ -1,10 +1,12 @@
 import {
   createZitadelClient as createRawClient,
-  type ZitadelClient,
+  type ZitadelClient as FullClient,
   type ZitadelClientOptions,
 } from "@zitadel/api/client";
+import type { DestructiveOperation } from "@zitadel/api/generated/operations";
 import { ApiError } from "@zitadel/api/runtime/fetch";
 
+import { withholdDestructive } from "./consent";
 import { interruptSignal } from "./interrupt";
 
 /**
@@ -139,6 +141,14 @@ export function sanitizeRejection(error: unknown): never {
   throw sanitized;
 }
 
+/**
+ * The client every command gets: the API without its destructive operations
+ * (every `DELETE`, and what the spec marks `x-zitadel-destructive`), in its
+ * type and at run time. Only `Consent.unlock` gives them back, so nothing
+ * deletes, revokes or rolls back without a confirmation.
+ */
+export type ZitadelClient = Omit<FullClient, DestructiveOperation>;
+
 /** Options for {@link createZitadelClient}. */
 export type SanitizeOptions = {
   /**
@@ -176,13 +186,16 @@ export function createZitadelClient(
   sanitize: SanitizeOptions = {},
 ): ZitadelClient {
   // The client applies both to every call, each page of a paged one included.
-  return createRawClient({
-    signal: interruptSignal(),
-    timeoutMs: REQUEST_TIMEOUT_MS,
-    ...opts,
-    ...(sanitize.verbatim ? {} : { onResponse: sanitizeResponse }),
-    onError: sanitizeRejection,
-  });
+  return withholdDestructive(
+    createRawClient({
+      signal: interruptSignal(),
+      timeoutMs: REQUEST_TIMEOUT_MS,
+      ...opts,
+      ...(sanitize.verbatim ? {} : { onResponse: sanitizeResponse }),
+      onError: sanitizeRejection,
+    }),
+  );
 }
 
-export type { ZitadelClient, ZitadelClientOptions };
+export { pagedFunctions } from "@zitadel/api/client";
+export type { ZitadelClientOptions };

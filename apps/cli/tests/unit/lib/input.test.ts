@@ -460,6 +460,42 @@ describe("input", () => {
     });
   });
 
+  describe("yes-no", () => {
+    const question = {
+      kind: "yes-no" as const,
+      name: "deploy it now",
+      message: "Deploy it now?",
+      initialValue: true,
+    };
+
+    it.each([true, false])("returns %s as answered", async (answer) => {
+      vi.mocked(confirm).mockResolvedValueOnce(answer as never);
+
+      expect(await input(question, ask)).toBe(answer);
+    });
+
+    it("is never answered by force", async () => {
+      vi.mocked(confirm).mockResolvedValueOnce(false as never);
+
+      expect(await input(question, { interactive: true, force: true })).toBe(false);
+    });
+
+    it("offers its initial value", async () => {
+      vi.mocked(confirm).mockResolvedValueOnce(true as never);
+
+      await input(question, ask);
+
+      expect(vi.mocked(confirm).mock.calls[0]?.[0]).toMatchObject({ initialValue: true });
+    });
+
+    it("refuses when nobody is there to ask, even with force", async () => {
+      await expect(input(question, { interactive: false, force: true })).rejects.toMatchObject({
+        code: "E_VALIDATION",
+        message: "No deploy it now supplied",
+      });
+    });
+  });
+
   describe("cancelling", () => {
     const prompts: Array<[string, () => unknown, Parameters<typeof input>[0]]> = [
       ["a text prompt", () => vi.mocked(text), typed()],

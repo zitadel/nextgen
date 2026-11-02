@@ -121,7 +121,7 @@
         {
           "name": "force",
           "char": "f",
-          "description": "Overwrite managed files that already exist, and scaffold into a non-empty directory.",
+          "description": "Overwrite managed files that already exist, scaffold into a non-empty directory, and remove the previous origin when --dev-port moves the app.",
           "type": "boolean"
         },
         {
@@ -442,7 +442,7 @@
         {
           "name": "force",
           "char": "f",
-          "description": "Delete the local runtime and its data without the confirmation prompt.",
+          "description": "Delete the local runtime and its data without the confirmation prompt. Required when non-interactive.",
           "type": "boolean"
         }
       ],
@@ -460,7 +460,7 @@
         {
           "name": "force",
           "char": "f",
-          "description": "Remove the managed files without the confirmation prompt.",
+          "description": "Remove the managed files and local state without the confirmation prompt. Required when non-interactive.",
           "type": "boolean"
         }
       ],
@@ -2279,7 +2279,7 @@
         {
           "name": "force",
           "char": "f",
-          "description": "Roll back without the confirmation prompt. Required when non-interactive.",
+          "description": "Re-apply the deployment without the confirmation prompt. Required when non-interactive.",
           "type": "boolean"
         },
         {
@@ -3248,7 +3248,7 @@
         {
           "name": "force",
           "char": "f",
-          "description": "Revoke without the confirmation prompt. Required when non-interactive.",
+          "description": "Revoke the release without the confirmation prompt. Required when non-interactive.",
           "type": "boolean"
         },
         {
@@ -3621,6 +3621,12 @@
           "type": "boolean"
         },
         {
+          "name": "force",
+          "char": "f",
+          "description": "With --fix, make repairs that replace an origin without the confirmation prompt. Required when non-interactive.",
+          "type": "boolean"
+        },
+        {
           "name": "image",
           "description": "Container image to check.",
           "type": "option"
@@ -3663,6 +3669,7 @@
           "description": "An operationId (queryUsers) or a path (/users/query), then the path parameters. Omit it to choose one."
         }
       ],
+      "variadic": true,
       "flags": [
         {
           "name": "method",
@@ -3685,6 +3692,12 @@
         {
           "name": "paginate",
           "description": "Follow next_page_token to the last page, and answer with every page's items in one list.",
+          "type": "boolean"
+        },
+        {
+          "name": "force",
+          "char": "f",
+          "description": "Call an operation that deletes, revokes or rolls back without the confirmation prompt. Required when non-interactive.",
           "type": "boolean"
         }
       ],

@@ -61,9 +61,9 @@ export class IssuerOriginCheck implements SanityCheck {
   /**
    * Makes the preview issuer primary on the server, then in `.zitadel/secret`.
    * The API has no kind change, and adding the pattern as primary conflicts
-   * with the stored preview one, so it is removed and added back. Should the
-   * add fail, the preview pattern is put back: a project left with no origins
-   * admits every origin.
+   * with the stored preview one, so it is removed and added back, which takes
+   * consent. Should the add fail, the preview pattern is put back: a project
+   * left with no origins admits every origin.
    */
   async fix(ctx: CheckContext): Promise<void> {
     if (ctx.dryRun) {
@@ -74,7 +74,15 @@ export class IssuerOriginCheck implements SanityCheck {
       return;
     }
     const { client, pattern, secret } = finding;
-    await client.removeOrigin(secret.project_id, { pattern });
+    const consent = await ctx.consent({
+      verb: "replace",
+      name: `replace the preview origin ${pattern} with a primary one`,
+      message: `Make ${pattern} a primary origin? It is removed and added back as primary.`,
+    });
+    if (consent === undefined) {
+      return;
+    }
+    await consent.unlock(client).removeOrigin(secret.project_id, { pattern });
     try {
       await client.addOrigin(secret.project_id, { pattern, kind: "primary" });
     } catch (error) {

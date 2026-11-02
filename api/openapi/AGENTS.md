@@ -67,6 +67,15 @@ reference shows it beside the samples. The CLI's
 fails until every command names exactly one operation it calls, and on a name
 no command answers to.
 
+## Destructive operations — `x-zitadel-destructive`
+
+- Every `DELETE` is destructive; a `POST` that removes, revokes or rolls back
+  says so with `x-zitadel-destructive: true` after its `x-zitadel-cli`.
+- A `PATCH` is not marked, though a merge-patch `null` removes what it names:
+  updates are not guarded yet, and need a follow-up of their own.
+- The CLI's client only exposes a destructive operation behind a confirmation
+  ([consent](../../apps/cli/src/lib/consent.ts)).
+
 ## Descriptions — the first sentence stands alone
 
 Every operation and webhook has a `description`, the body of its API reference

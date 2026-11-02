@@ -117,7 +117,8 @@ nothing; `data.skills` and `data.directories` say what it added where.
   one; its `next_commands` name the step that gives the project one. `setup`
   0.1.0 registered the app's URL (`ZITADEL_ISSUER`) as a `preview` origin,
   which `origin add --kind primary` refuses with `E_CONFLICT`: `doctor` warns
-  (`issuer-origin`) and `doctor --fix` makes it primary.
+  (`issuer-origin`) and `doctor --fix` makes it primary, which asks first;
+  non-interactive, pass `--force` too, or `warnings` says the repair waited.
 - **Telemetry.** The CLI sends anonymous usage telemetry by default, and
   agent-driven runs are exactly the ones worth learning from — leave it on.
   Don't add `--no-telemetry` to commands. An opt-out exists for users who need
@@ -143,9 +144,13 @@ nothing; `data.skills` and `data.directories` say what it added where.
   (`name`), `flag` (`null` when only `--set` reaches it), `kind` and
   `required`; `--dry-run --json` returns the body that would be sent. For a
   deeply nested body, writing the document and passing it with `--file -` is
-  often simplest.
+  often simplest. An `update` body holding a `null` removes what it names
+  (a user attribute, a project's own password hash) without asking first.
 - **Calling an operation no command covers.** `zitadel api <operation>` calls
-  any operation of the API with the resolved server and `.zitadel/secret`.
+  any operation of the API with the resolved server and `.zitadel/secret`. One
+  that deletes, revokes or rolls back asks first and needs `--force` when
+  non-interactive, as the command that covers it does. An update is not
+  asked about, even one whose `null` removes what it names.
   Name it by its `operationId` (`queryUsers`, as the API reference and
   `@zitadel/api` spell it) or by its path as the spec has it (`/users/query`,
   which the server serves at `/api/v1/users/query`; a path copied with the
@@ -527,7 +532,9 @@ one file by hand. In a directory with a
 It allows the new origin on the server first, and a refusal changes nothing.
 It then rewrites the dev script or dev-server config, `ZITADEL_ISSUER` in
 `.env.local`, `zitadel.json`, `.zitadel/secret` and the README/AGENTS.md
-guidance, and removes the old origin. `data.previous_issuer` and `data.issuer`
+guidance, and removes the old origin, which asks first: non-interactive, pass
+`--force` to remove it, or `warnings` says it was kept and `next_commands`
+holds the `origin rm … --force` that removes it. `data.previous_issuer` and `data.issuer`
 name both origins, and `data.moved` is `false` when the app was already on that
 port. A social sign-in provider still redirects to the old port: `warnings`
 names the redirect URI to add at each provider. Restart the dev server

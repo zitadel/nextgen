@@ -7,6 +7,27 @@
  * characters is returned as-is; anything else is wrapped in single quotes with
  * embedded quotes escaped.
  */
+/**
+ * `words` without the named options, in both spellings (`--cwd dir` and
+ * `--cwd=dir`), each with its value. For a command line that is rebuilt with
+ * those options appended again.
+ */
+export const withoutOptions = (words: readonly string[], options: readonly string[]): string[] => {
+  const kept: string[] = [];
+  for (let i = 0; i < words.length; i += 1) {
+    const word = words[i] ?? "";
+    if (options.includes(word)) {
+      i += 1;
+      continue;
+    }
+    if (options.some((option) => option.startsWith("--") && word.startsWith(`${option}=`))) {
+      continue;
+    }
+    kept.push(word);
+  }
+  return kept;
+};
+
 export const shellArg = (value: string): string =>
   /^[A-Za-z0-9_.:@/=+-]+$/.test(value) ? value : `'${value.replaceAll("'", `'\\''`)}'`;
 

@@ -1,4 +1,5 @@
-import type { ZitadelClient } from "@zitadel/api/client";
+import type { ZitadelClient } from "../api-client";
+import type { Consent } from "../consent";
 import { BuildReleaseBody as BuildReleaseBodySchema } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import type {
   BuildRelease200,
@@ -68,9 +69,10 @@ function assertBuildReleaseBody(body: unknown): asserts body is BuildReleaseBody
 
 /** Revoke a release so its content is never served again. Idempotent. */
 export async function revokeRelease(
+  consent: Consent,
   client: ZitadelClient,
   projectId: string,
   releaseId: string,
 ): Promise<Release> {
-  return client.revokeRelease(releaseId, { project_id: projectId });
+  return consent.unlock(client).revokeRelease(releaseId, { project_id: projectId });
 }
