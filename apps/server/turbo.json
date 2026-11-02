@@ -168,7 +168,8 @@
     },
     // The test binary embeds the console's dist. Listed directly and not only
     // through vet: turbo hashes every dependency's result, but the direct edge
-    // keeps the intent visible, as in moon.yml.
+    // keeps the intent visible, as in moon.yml. Go's result cache stays off
+    // (-count=1 in the script): the drift tests read files outside the module.
     "test": {
       "cache": false,
       "dependsOn": ["go-sources", "go-tests", "openapi", "format", "vet", "lint", "@zitadel/console#build"],

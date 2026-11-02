@@ -2,4 +2,4 @@
 "@zitadel/cli": patch
 ---
 
-`zitadel setup` links the worked flow examples at their new place in the repository, `apps/api/api/openapi/endpoints/flow_definitions/examples`, in the guidance it writes into `AGENTS.md`.
+`zitadel setup` writes a working link to the worked flow examples into `AGENTS.md` again.
