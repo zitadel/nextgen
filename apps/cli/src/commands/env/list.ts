@@ -59,7 +59,7 @@ export default class EnvList extends EnvironmentCommand {
       // The canonical list envelope, plus `resolved` naming which environment
       // this run resolves to (each item also carries its own `resolved` flag).
       data: { ...listData(items), resolved: { name: name.value, source: name.source } },
-      pretty: renderList(
+      pretty: await renderList(
         COLUMNS,
         items.map((entry) => ({ ...entry, resolved: entry.resolved ? "yes" : "" })),
         {

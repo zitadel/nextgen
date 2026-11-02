@@ -56,7 +56,7 @@ export default class ApiLs extends BaseCommand {
       data: { operations, count: operations.length },
       pretty: process.stdout.isTTY
         ? [
-            renderTable(columns, operations),
+            await renderTable(columns, operations),
             "",
             `${operations.length} operations. Call one with \`${this.config.bin} api <id>\`; --json has each one's parameters.`,
           ].join("\n")

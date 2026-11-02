@@ -37,7 +37,7 @@ export default class DeploymentGet extends EnvironmentCommand {
         `  reason    ${deployment.metadata.reason ?? "deploy"}`,
         `  deployed  ${deployment.deployed_at}`,
         `  origins   ${origins.join(", ")}`,
-        ...(variables === undefined ? [] : ["", frozenVariables(toVariableRows(variables))]),
+        ...(variables === undefined ? [] : ["", await frozenVariables(toVariableRows(variables))]),
       ].join("\n"),
     });
   }

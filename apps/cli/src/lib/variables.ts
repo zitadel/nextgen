@@ -99,11 +99,11 @@ const SECRET_MARKER = "(secret)";
  * The variables a deployment froze, as `deployment get` shows them: the
  * `variable resolve` table, indented under a heading.
  */
-export function frozenVariables(rows: readonly VariableRow[]): string {
+export async function frozenVariables(rows: readonly VariableRow[]): Promise<string> {
   if (rows.length === 0) {
     return "  variables  none";
   }
-  const table = renderTable(["name", "value"], variableCells(rows))
+  const table = (await renderTable(["name", "value"], variableCells(rows)))
     .split("\n")
     .map((line) => `    ${line}`);
   return ["  variables", ...table].join("\n");

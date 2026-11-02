@@ -44,7 +44,7 @@ export default class OriginList extends EnvironmentCommand {
       status: "ok",
       // The project returns its whole origin set in one page, so the token is null.
       data: listData(origins),
-      pretty: renderList(COLUMNS, origins, {
+      pretty: await renderList(COLUMNS, origins, {
         plain,
         singular: "origin",
         empty: "No origins on the project.",

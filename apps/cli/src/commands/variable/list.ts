@@ -68,7 +68,7 @@ export default class VariableList extends EnvironmentCommand {
     return this.emit({
       status: "ok",
       data: listData(rows),
-      pretty: renderList(flags.preview ? COLUMNS : INVENTORY_COLUMNS, cells as never, {
+      pretty: await renderList(flags.preview ? COLUMNS : INVENTORY_COLUMNS, cells as never, {
         plain,
         singular: "variable",
         empty,

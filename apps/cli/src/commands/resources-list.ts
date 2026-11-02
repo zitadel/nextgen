@@ -58,7 +58,7 @@ export default class ResourcesList extends BaseCommand {
     return this.emit({
       status: "ok",
       data: listData(resources),
-      pretty: renderList(COLUMNS, rows, {
+      pretty: await renderList(COLUMNS, rows, {
         plain,
         singular: "resource",
         empty: "No resources.",

@@ -63,10 +63,10 @@ export default class Env extends EnvironmentCommand {
       pretty: [
         `Environment  ${name.value} (from ${name.source})`,
         "",
-        renderTable(["variable", "value", "source"], resolved),
+        await renderTable(["variable", "value", "source"], resolved),
         "",
         "Consulted, in order:",
-        renderTable(["source", "present", "supplied"], lookups),
+        await renderTable(["source", "present", "supplied"], lookups),
       ].join("\n"),
     });
   }

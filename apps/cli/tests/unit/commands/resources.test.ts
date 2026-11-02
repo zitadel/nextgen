@@ -2019,7 +2019,7 @@ describe("the release resource", () => {
     );
   });
 
-  it("shows the resources a release pins as a table under its fields", () => {
+  it("shows the resources a release pins as a table under its fields", async () => {
     const release: GetReleaseById200 = {
       id: "rel_1",
       project_id: "proj_1",
@@ -2032,14 +2032,16 @@ describe("the release resource", () => {
       ],
     };
 
-    expect(RESOURCES.release.get.sections?.(release)).toEqual([releasePointers(release)]);
-    expect(releasePointers(release)).toBe(
+    expect(await RESOURCES.release.get.sections?.(release)).toEqual([
+      await releasePointers(release),
+    ]);
+    expect(await releasePointers(release)).toBe(
       [
         "resources",
-        "  kind             handle         revision_id",
-        "  ---------------  -------------  -----------",
-        "  schema           human-user     sch_1",
-        "  flow_definition  default-login  fd_1",
+        "    kind              handle          revision_id",
+        "   ───────────────────────────────────────────────",
+        "    schema            human-user      sch_1",
+        "    flow_definition   default-login   fd_1",
       ].join("\n"),
     );
   });

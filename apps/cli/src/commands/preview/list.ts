@@ -93,7 +93,7 @@ export default class PreviewList extends PreviewCommand {
       data: listData(previews, { nextPageToken: next }),
       ...(nextCommand === undefined ? {} : { next: { commands: [nextCommand] } }),
       machineReadable: plain,
-      pretty: renderList(COLUMNS, rows, {
+      pretty: await renderList(COLUMNS, rows, {
         plain,
         singular: "preview",
         empty: "No live previews.",

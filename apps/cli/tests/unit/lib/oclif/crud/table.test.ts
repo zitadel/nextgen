@@ -3,8 +3,8 @@ import { describe, expect, it } from "vitest";
 import { renderDetail, renderRows, renderTable } from "../../../../../src/lib/oclif/crud";
 
 describe("renderTable", () => {
-  it("aligns columns, heads them by the path's last segment, and resolves nested paths", () => {
-    const table = renderTable(
+  it("aligns columns, heads them by the path's last segment, and resolves nested paths", async () => {
+    const table = await renderTable(
       ["id", "metadata.status", "created_at"],
       [
         { id: "user_1", metadata: { status: "active" }, created_at: "2026-01-01T00:00:00Z" },
@@ -12,21 +12,31 @@ describe("renderTable", () => {
       ],
     );
     expect(table.split("\n")).toEqual([
-      "id       status     created_at",
-      "-------  ---------  --------------------",
-      "user_1   active     2026-01-01T00:00:00Z",
-      "user_22  suspended",
+      "  id        status      created_at",
+      " ────────────────────────────────────────────",
+      "  user_1    active      2026-01-01T00:00:00Z",
+      "  user_22   suspended",
     ]);
   });
 
-  it("renders missing values empty and non-strings as JSON", () => {
-    expect(
-      renderTable(["n", "flag", "gone"], [{ n: 3, flag: true, gone: null }]).split("\n")[2],
-    ).toBe("3  true");
+  it("renders missing values empty and non-strings as JSON", async () => {
+    const table = await renderTable(["n", "flag", "gone"], [{ n: 3, flag: true, gone: null }]);
+    expect(table.split("\n")[2]).toBe("  3   true");
   });
 
-  it("renders only the header for an empty list", () => {
-    expect(renderTable(["id"], [])).toBe("id\n--");
+  it("renders only the header for an empty list", async () => {
+    expect(await renderTable(["id"], [])).toBe("id");
+  });
+
+  it("measures wide characters by how they are drawn, so the next column still lines up", async () => {
+    const table = await renderTable(
+      ["id", "name"],
+      [
+        { id: "x", name: "你好世界" },
+        { id: "yy", name: "ab" },
+      ],
+    );
+    expect(table.split("\n").slice(2)).toEqual(["  x    你好世界", "  yy   ab"]);
   });
 });
 

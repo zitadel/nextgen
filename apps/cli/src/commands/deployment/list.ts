@@ -109,7 +109,7 @@ export default class DeploymentList extends EnvironmentCommand {
       data: listData(deployments, { nextPageToken: next }),
       ...(nextCommand === undefined ? {} : { next: { commands: [nextCommand] } }),
       machineReadable: plain,
-      pretty: renderList(COLUMNS, rows, {
+      pretty: await renderList(COLUMNS, rows, {
         plain,
         singular: "deployment",
         empty: "No deployments yet.",

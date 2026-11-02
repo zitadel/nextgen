@@ -104,7 +104,7 @@ export default class VariableResolve extends EnvironmentCommand {
         : rows.length === 0
           ? `${live.id} froze no variables for ${where}.`
           : [
-              renderTable(COLUMNS, cells),
+              await renderTable(COLUMNS, cells),
               "",
               `${rows.length} ${rows.length === 1 ? "variable" : "variables"} frozen by ${live.id} for ${where}`,
             ].join("\n"),

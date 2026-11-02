@@ -20,24 +20,33 @@ export const renderRows = (columns: readonly string[], items: readonly unknown[]
  * Render `items` as an aligned text table, one column per dot-path in
  * `columns`, headed by each path's last segment. Nested paths resolve
  * through objects; missing values render empty; non-strings render as JSON.
+ *
+ * `@oclif/table` lays it out, so a terminal gets columns fitted to its width
+ * and wide characters measured by how they are drawn. A cell is wrapped, never
+ * cut, because an id or a URL that lost its tail cannot be copied. A pipe has
+ * no width to fit, so it gets the table at its natural width. The library draws
+ * with `ink` and `react`, which take a few hundred milliseconds to load, so it
+ * is imported here and not at the top: only a command that prints a table pays.
  */
-export const renderTable = (columns: readonly string[], items: readonly unknown[]): string => {
+export const renderTable = async (
+  columns: readonly string[],
+  items: readonly unknown[],
+): Promise<string> => {
   const headers = columns.map((column) => column.split(".").at(-1) ?? column);
-  const rows = items.map((item) => columns.map((column) => readCell(column, item)));
-  // Folded rather than spread into `Math.max`: a wide `--all` can return more
-  // rows than the engine accepts as arguments in one call.
-  const widths = rows.reduce<number[]>(
-    (current, row) => current.map((width, i) => Math.max(width, row[i]?.length ?? 0)),
-    headers.map((header) => header.length),
-  );
-  const line = (cells: readonly string[]): string =>
-    cells
-      .map((cell, i) => cell.padEnd(widths[i] ?? 0))
-      .join("  ")
-      .trimEnd();
-  return [line(headers), line(widths.map((width) => "-".repeat(width))), ...rows.map(line)].join(
-    "\n",
-  );
+  if (items.length === 0) {
+    return headers.join("  ");
+  }
+  const { makeTable } = await import("@oclif/table");
+  const table = makeTable({
+    data: items.map((item) =>
+      Object.fromEntries(columns.map((column) => [column, readCell(column, item)])),
+    ),
+    columns: columns.map((key, i) => ({ key, name: headers[i] ?? key })),
+    borderStyle: "headers-only-with-underline",
+    overflow: "wrap",
+    ...(process.stdout.isTTY ? {} : { maxWidth: "none" as const }),
+  });
+  return table.replace(/\n+$/, "");
 };
 
 /**
@@ -48,7 +57,7 @@ export const renderTable = (columns: readonly string[], items: readonly unknown[
  * `${n} ${singular|plural}` count, and any `footer` lines. Pair it with
  * `listData()` for the JSON envelope.
  */
-export const renderList = (
+export const renderList = async (
   columns: readonly string[],
   rows: readonly unknown[],
   opts: {
@@ -58,7 +67,7 @@ export const renderList = (
     empty: string;
     footer?: readonly string[];
   },
-): string => {
+): Promise<string> => {
   if (opts.plain) {
     return renderRows(columns, rows);
   }
@@ -66,7 +75,7 @@ export const renderList = (
     return opts.empty;
   }
   const count = `${rows.length} ${rows.length === 1 ? opts.singular : (opts.plural ?? `${opts.singular}s`)}`;
-  return [renderTable(columns, rows), "", count, ...(opts.footer ?? [])].join("\n");
+  return [await renderTable(columns, rows), "", count, ...(opts.footer ?? [])].join("\n");
 };
 
 /** One cell: a dot-path resolved through objects, rendered as text. */

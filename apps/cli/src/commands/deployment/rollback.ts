@@ -124,6 +124,10 @@ export default class DeploymentRollback extends Destructive(EnvironmentCommand) 
             );
           }
 
+          const pointerTable =
+            pointers === undefined
+              ? undefined
+              : await renderTable(["kind", "handle", "revision_id"], pointers);
           const origins = deployment.targets.map((target) => target.origin);
           return {
             status: "ok",
@@ -136,9 +140,7 @@ export default class DeploymentRollback extends Destructive(EnvironmentCommand) 
             },
             pretty: [
               `Rolled back to ${deployment.release_id} on ${origins.join(", ")}`,
-              ...(pointers === undefined
-                ? []
-                : ["", renderTable(["kind", "handle", "revision_id"], pointers)]),
+              ...(pointerTable === undefined ? [] : ["", pointerTable]),
               "",
               "Users keep the schema revision and attributes they have: a rollback does not migrate them back.",
             ].join("\n"),

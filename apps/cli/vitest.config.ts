@@ -36,6 +36,10 @@ export default defineConfig({
     // renamed suite must not vanish silently. Specs are `*.spec.ts`, unit
     // tests `*.test.ts` (tests/AGENTS.md).
     include: ["tests/**/*.{test,spec}.ts"],
+    // `@oclif/table` draws with ink, which builds its own `console.Console` when
+    // it renders; Vitest's replacement console has none, so any test that
+    // renders a table in-process would throw.
+    disableConsoleIntercept: true,
     // `offline.ts` first: it fails any test that connects past loopback, so a
     // unit test or spec cannot reach a real server, Zitadel's or anyone's.
     setupFiles: [

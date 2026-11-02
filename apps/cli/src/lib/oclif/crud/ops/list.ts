@@ -249,7 +249,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
         : items.length === 0
           ? `No ${topic} found.`
           : [
-              renderTable(columns, items),
+              await renderTable(columns, items),
               "",
               `${items.length} ${items.length === 1 ? resource.singular : topic}`,
               ...(next ? [`More available: ${shellOption("--page-token", next)} (or --all)`] : []),
