@@ -1,4 +1,4 @@
-import { ZitadelError } from "../../lib/errors";
+import { ZitadelError, errorMessage } from "../../lib/errors";
 import { type Author, Repository, RepositoryError } from "../../lib/git";
 import { isLocalRuntimePath, isSecretPath } from "../../lib/secret-paths";
 
@@ -191,7 +191,7 @@ function firstLineOf(error: unknown): string {
 
 /** git's own message, so the warning names the real cause. */
 function messageOf(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+  return errorMessage(error);
 }
 
 /** What `setup --json` reports under `git`: whether setup ran `git init`, even if the commit then failed, and the commit, or null. */

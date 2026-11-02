@@ -10,38 +10,41 @@ export const cliPackageRoot = fileURLToPath(new URL("../../", import.meta.url));
 const builtEntries = ["index", "lib/oclif/help"] as const;
 
 export async function waitForBuiltCli(): Promise<void> {
-  const startedAt = Date.now();
-  let lastError: unknown;
-
-  while (Date.now() - startedAt < 5000) {
-    try {
-      await waitForCommandFilesReady();
-      await assertOclifDiscoversStatus();
-      return;
-    } catch (error) {
-      lastError = error;
-      await delay(50);
-    }
+  const failure = await retryFor(5000, async () => {
+    await waitForCommandFilesReady();
+    await assertOclifDiscoversStatus();
+  });
+  if (failure) {
+    throw new Error(`CLI build was not ready after tsdown completed: ${messageOf(failure.error)}`);
   }
-
-  throw new Error(`CLI build was not ready after tsdown completed: ${messageOf(lastError)}`);
 }
 
 async function waitForCommandFilesReady(): Promise<void> {
-  const startedAt = Date.now();
-  let lastError: unknown;
-
-  while (Date.now() - startedAt < 5000) {
-    try {
-      await assertCommandFilesReady();
-      return;
-    } catch (error) {
-      lastError = error;
-      await delay(50);
-    }
+  const failure = await retryFor(5000, assertCommandFilesReady);
+  if (failure) {
+    throw new Error(`CLI command files were not ready: ${messageOf(failure.error)}`);
   }
+}
 
-  throw new Error(`CLI command files were not ready: ${messageOf(lastError)}`);
+/** Runs `attempt` until it succeeds or `ms` have passed; the last error if it never did. */
+async function retryFor(
+  ms: number,
+  attempt: () => Promise<void>,
+): Promise<{ error: unknown } | undefined> {
+  const startedAt = Date.now();
+  const poll = async (lastError: unknown): Promise<{ error: unknown } | undefined> => {
+    if (Date.now() - startedAt >= ms) {
+      return { error: lastError };
+    }
+    return attempt().then(
+      () => undefined,
+      async (error: unknown) => {
+        await delay(50);
+        return poll(error);
+      },
+    );
+  };
+  return poll(undefined);
 }
 
 async function assertCommandFilesReady(): Promise<void> {
@@ -63,26 +66,26 @@ async function assertOclifDiscoversStatus(): Promise<void> {
 }
 
 async function captureOclifOutput(argv: string[]): Promise<{ stdout: string; stderr: string }> {
-  let stdout = "";
-  let stderr = "";
+  const stdout: string[] = [];
+  const stderr: string[] = [];
   const originalOut = process.stdout.write.bind(process.stdout);
   const originalErr = process.stderr.write.bind(process.stderr);
   const originalLog = console.log;
   const originalConsoleError = console.error;
 
   process.stdout.write = ((chunk: string | Uint8Array): boolean => {
-    stdout += typeof chunk === "string" ? chunk : Buffer.from(chunk).toString();
+    stdout.push(typeof chunk === "string" ? chunk : Buffer.from(chunk).toString());
     return true;
   }) as typeof process.stdout.write;
   process.stderr.write = ((chunk: string | Uint8Array): boolean => {
-    stderr += typeof chunk === "string" ? chunk : Buffer.from(chunk).toString();
+    stderr.push(typeof chunk === "string" ? chunk : Buffer.from(chunk).toString());
     return true;
   }) as typeof process.stderr.write;
   console.log = (...args: unknown[]): void => {
-    stdout += `${format(...args)}\n`;
+    stdout.push(`${format(...args)}\n`);
   };
   console.error = (...args: unknown[]): void => {
-    stderr += `${format(...args)}\n`;
+    stderr.push(`${format(...args)}\n`);
   };
 
   try {
@@ -94,7 +97,7 @@ async function captureOclifOutput(argv: string[]): Promise<{ stdout: string; std
     console.error = originalConsoleError;
   }
 
-  return { stdout, stderr };
+  return { stdout: stdout.join(""), stderr: stderr.join("") };
 }
 
 function delay(ms: number): Promise<void> {

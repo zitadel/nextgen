@@ -28,16 +28,13 @@ const flowDefinitionBodySchema = flowConfigSchema;
 export function validateFlows(
   flows: ReadonlyArray<unknown>,
 ): ReadonlyArray<CreateFlowDefinitionBodyFlowDefinition> {
-  const issues: Array<{ index: number; issues: unknown }> = [];
-  const parsed: CreateFlowDefinitionBodyFlowDefinition[] = [];
-  for (let i = 0; i < flows.length; i += 1) {
-    const result = flowDefinitionBodySchema.safeParse(flows[i]);
-    if (!result.success) {
-      issues.push({ index: i, issues: result.error.issues });
-      continue;
-    }
-    parsed.push(result.data as CreateFlowDefinitionBodyFlowDefinition);
-  }
+  const results = flows.map((flow) => flowDefinitionBodySchema.safeParse(flow));
+  const issues = results.flatMap((result, index) =>
+    result.success ? [] : [{ index, issues: result.error.issues as unknown }],
+  );
+  const parsed = results.flatMap((result) =>
+    result.success ? [result.data as CreateFlowDefinitionBodyFlowDefinition] : [],
+  );
   if (issues.length > 0) {
     throw new ZitadelError("E_VALIDATION", "One or more flow definitions are invalid", {
       details: { issues },

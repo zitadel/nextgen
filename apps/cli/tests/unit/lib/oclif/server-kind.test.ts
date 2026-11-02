@@ -9,6 +9,8 @@ describe("serverKind", () => {
     expect(serverKind.value("https://acme.zitadel.cloud")).toBe("cloud");
     expect(serverKind.value("http://localhost:8080")).toBe("local");
     expect(serverKind.value("http://127.0.0.1:8080")).toBe("local");
+    expect(serverKind.value("http://127.0.0.2:8080")).toBe("local");
+    expect(serverKind.value("http://[::1]:8080")).toBe("local");
     expect(serverKind.value("mock")).toBe("local");
     expect(serverKind.value("https://auth.internal.acme.com")).toBe("self_hosted");
     expect(serverKind.value("not a url")).toBe("unknown");

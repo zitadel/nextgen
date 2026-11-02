@@ -1,11 +1,13 @@
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import type { SetupServer } from "msw/node";
 import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { HttpResponse, http } from "msw";
-import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, vi } from "vitest";
+
+import { it } from "../../../helpers/fixtures";
 
 vi.mock("@clack/prompts", async () => (await import("../../../helpers/clack")).clackDouble());
 
@@ -21,15 +23,11 @@ import {
 import { asTerminal } from "../../../helpers/terminal";
 
 const SERVER = "https://api.zitadel.example";
-const server = setupServer();
 
-let created: Array<Record<string, unknown>> = [];
+const created: Array<Record<string, unknown>> = [];
 
-beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
-afterAll(() => server.close());
-
-beforeEach(() => {
-  created = [];
+it.beforeEach(({ server }) => {
+  created.length = 0;
   server.use(
     http.post(`${SERVER}/api/v1/projects`, async ({ request }) => {
       created.push((await request.json()) as Record<string, unknown>);
@@ -47,8 +45,6 @@ beforeEach(() => {
     }),
   );
 });
-
-afterEach(() => server.resetHandlers());
 
 const dirs: string[] = [];
 
@@ -685,7 +681,7 @@ describe("env add asked on a terminal", () => {
   }
 
   /** The platform accepts the release and the deployment. */
-  function platformDeploys(): void {
+  function platformDeploys(server: SetupServer): void {
     server.use(
       http.post(`${SERVER}/api/v1/releases/build`, () =>
         HttpResponse.json({ id: "rel_1", content_hash: "sha256:abc" }, { status: 201 }),
@@ -700,7 +696,7 @@ describe("env add asked on a terminal", () => {
   }
 
   /** The platform refuses to build the release. */
-  function platformRefusesTheRelease(): void {
+  function platformRefusesTheRelease(server: SetupServer): void {
     server.use(
       http.post(`${SERVER}/api/v1/releases/build`, () =>
         HttpResponse.json({ code: "rel.invalid", message: "no" }, { status: 400 }),
@@ -726,9 +722,9 @@ describe("env add asked on a terminal", () => {
     vi.mocked(confirm).mockReset();
   });
 
-  it("deploys the project when the offer is accepted", async () => {
+  it("deploys the project when the offer is accepted", async ({ server }) => {
     const cwd = await makeDeployableProject();
-    platformDeploys();
+    platformDeploys(server);
     vi.mocked(confirm).mockResolvedValueOnce(true as never);
 
     const envelope = (await adding(cwd)) as { data: { deployment: unknown } };
@@ -774,9 +770,9 @@ describe("env add asked on a terminal", () => {
     expect(envelope.data.next_commands.some((command) => command.includes("deploy -m"))).toBe(true);
   });
 
-  it("binds the environment even when the deploy fails", async () => {
+  it("binds the environment even when the deploy fails", async ({ server }) => {
     const cwd = await makeDeployableProject();
-    platformRefusesTheRelease();
+    platformRefusesTheRelease(server);
     vi.mocked(confirm).mockResolvedValueOnce(true as never);
 
     const envelope = (await adding(cwd)) as { status: string; data: { deployment: unknown } };
@@ -785,9 +781,9 @@ describe("env add asked on a terminal", () => {
     expect(envelope.data.deployment).toBeNull();
   });
 
-  it("warns, naming the deploy to re-run, when the deploy fails", async () => {
+  it("warns, naming the deploy to re-run, when the deploy fails", async ({ server }) => {
     const cwd = await makeDeployableProject();
-    platformRefusesTheRelease();
+    platformRefusesTheRelease(server);
     vi.mocked(confirm).mockResolvedValueOnce(true as never);
 
     const envelope = (await adding(cwd)) as { warnings: string[] };

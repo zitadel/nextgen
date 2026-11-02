@@ -1,8 +1,9 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect } from "vitest";
+
+import { it } from "../../../../helpers/fixtures";
 
 import { ZitadelError } from "../../../../../src/lib/errors";
 import { validateSsoConsistency } from "../../../../../src/lib/release/steps/sso-consistency";
@@ -35,23 +36,16 @@ const flow = (userSchema: string, providers: string[]) => ({
 
 const connection = (slug: string) => ({ slug, claim_mapping: { email: "email" } });
 
-let cwd: string;
-
 beforeEach(async () => {
-  cwd = await mkdtemp(join(tmpdir(), "sso-consistency-"));
   takeReportedWarnings();
 });
 
-afterEach(async () => {
-  await rm(cwd, { recursive: true, force: true });
-});
-
-async function write(path: string, body: object): Promise<void> {
+async function write(cwd: string, path: string, body: object): Promise<void> {
   await mkdir(join(cwd, path, ".."), { recursive: true });
   await writeFile(join(cwd, path), JSON.stringify(body));
 }
 
-async function failure(): Promise<ZitadelError | undefined> {
+async function failure(cwd: string): Promise<ZitadelError | undefined> {
   try {
     await validateSsoConsistency(cwd);
   } catch (error) {
@@ -62,104 +56,111 @@ async function failure(): Promise<ZitadelError | undefined> {
 }
 
 describe("validateSsoConsistency", () => {
-  it("accepts a project whose files agree", async () => {
-    await write(SCHEMA, schema(["acme"]));
-    await write(FLOW, flow("staff", ["acme"]));
-    await write(CONNECTION, connection("acme"));
+  it("accepts a project whose files agree", async ({ dir: cwd }) => {
+    await write(cwd, SCHEMA, schema(["acme"]));
+    await write(cwd, FLOW, flow("staff", ["acme"]));
+    await write(cwd, CONNECTION, connection("acme"));
 
-    expect(await failure()).toBeUndefined();
+    expect(await failure(cwd)).toBeUndefined();
   });
 
-  it("accepts a project with no SSO files at all", async () => {
-    expect(await failure()).toBeUndefined();
+  it("accepts a project with no SSO files at all", async ({ dir: cwd }) => {
+    expect(await failure(cwd)).toBeUndefined();
   });
 
-  it("stops on a provider the pinned schema does not list, naming the flow file", async () => {
-    await write(SCHEMA, schema(["other"]));
-    await write(FLOW, flow("staff", ["acme"]));
-    await write(CONNECTION, connection("acme"));
+  it("stops on a provider the pinned schema does not list, naming the flow file", async ({
+    dir: cwd,
+  }) => {
+    await write(cwd, SCHEMA, schema(["other"]));
+    await write(cwd, FLOW, flow("staff", ["acme"]));
+    await write(cwd, CONNECTION, connection("acme"));
 
-    const error = await failure();
+    const error = await failure(cwd);
 
     expect(error?.code).toBe("E_VALIDATION");
     expect(error?.message).toContain(`${FLOW}: step "identifier"`);
     expect(error?.message).toContain('"acme" is not listed in sso.providers');
   });
 
-  it("stops on a schema that lists a provider with no connection file", async () => {
-    await write(SCHEMA, schema(["acme"]));
+  it("stops on a schema that lists a provider with no connection file", async ({ dir: cwd }) => {
+    await write(cwd, SCHEMA, schema(["acme"]));
 
-    const error = await failure();
+    const error = await failure(cwd);
 
     expect(error?.message).toContain(SCHEMA);
   });
 
-  it("stops on two connection files that claim one slug", async () => {
-    await write(CONNECTION, connection("acme"));
-    await write(".zitadel/idps/acme-copy.json", connection("acme"));
+  it("stops on two connection files that claim one slug", async ({ dir: cwd }) => {
+    await write(cwd, CONNECTION, connection("acme"));
+    await write(cwd, ".zitadel/idps/acme-copy.json", connection("acme"));
 
-    const error = await failure();
+    const error = await failure(cwd);
 
     expect(error?.message).toContain("SSO configuration is not consistent");
   });
 
-  it("reports every problem in one error", async () => {
-    await write(SCHEMA, schema(["acme", "ghost"]));
+  it("reports every problem in one error", async ({ dir: cwd }) => {
+    await write(cwd, SCHEMA, schema(["acme", "ghost"]));
 
-    const error = await failure();
+    const error = await failure(cwd);
 
     expect(error?.message).toContain("(2 issues)");
   });
 
-  it("lists each issue under details with the file as its path", async () => {
-    await write(SCHEMA, schema(["acme"]));
+  it("lists each issue under details with the file as its path", async ({ dir: cwd }) => {
+    await write(cwd, SCHEMA, schema(["acme"]));
 
-    const error = await failure();
+    const error = await failure(cwd);
 
     const details = error?.details as { issues: Array<{ path: string; rule: string }> } | undefined;
     expect(details?.issues.map((issue) => issue.path)).toEqual([SCHEMA]);
   });
 
-  it("says nothing was changed", async () => {
-    await write(SCHEMA, schema(["acme"]));
+  it("says nothing was changed", async ({ dir: cwd }) => {
+    await write(cwd, SCHEMA, schema(["acme"]));
 
-    const error = await failure();
+    const error = await failure(cwd);
 
     expect(error?.hint).toContain("no changes were made");
   });
 
   describe("finding the schema a flow pins", () => {
-    it("matches a flow's user_schema to a schema's objectType", async () => {
-      await write(SCHEMA, schema(["other"]));
-      await write(FLOW, flow("staff", ["acme"]));
-      await write(CONNECTION, connection("acme"));
+    it("matches a flow's user_schema to a schema's objectType", async ({ dir: cwd }) => {
+      await write(cwd, SCHEMA, schema(["other"]));
+      await write(cwd, FLOW, flow("staff", ["acme"]));
+      await write(cwd, CONNECTION, connection("acme"));
 
-      expect((await failure())?.message).toContain('"acme" is not listed in sso.providers');
+      expect((await failure(cwd))?.message).toContain('"acme" is not listed in sso.providers');
     });
 
-    it("matches a flow's user_schema to a schema's $id", async () => {
-      await write(SCHEMA, { ...schema(["other"]), $id: "https://schemas.example.test/staff.json" });
-      await write(FLOW, flow("https://schemas.example.test/staff.json", ["acme"]));
-      await write(CONNECTION, connection("acme"));
+    it("matches a flow's user_schema to a schema's $id", async ({ dir: cwd }) => {
+      await write(cwd, SCHEMA, {
+        ...schema(["other"]),
+        $id: "https://schemas.example.test/staff.json",
+      });
+      await write(cwd, FLOW, flow("https://schemas.example.test/staff.json", ["acme"]));
+      await write(cwd, CONNECTION, connection("acme"));
 
-      expect((await failure())?.message).toContain('"acme" is not listed in sso.providers');
+      expect((await failure(cwd))?.message).toContain('"acme" is not listed in sso.providers');
     });
 
-    it("warns instead of failing when the pinned schema is not a local file", async () => {
-      await write(FLOW, flow("not-kept-here", ["acme"]));
-      await write(CONNECTION, connection("acme"));
+    it("warns instead of failing when the pinned schema is not a local file", async ({
+      dir: cwd,
+    }) => {
+      await write(cwd, FLOW, flow("not-kept-here", ["acme"]));
+      await write(cwd, CONNECTION, connection("acme"));
 
-      await failure();
+      await failure(cwd);
 
       expect(takeReportedWarnings().join("\n")).toContain(
         `${FLOW}: could not tell which local schema this flow pins`,
       );
     });
 
-    it("does not warn about a flow that offers no provider", async () => {
-      await write(FLOW, flow("not-kept-here", []));
+    it("does not warn about a flow that offers no provider", async ({ dir: cwd }) => {
+      await write(cwd, FLOW, flow("not-kept-here", []));
 
-      await failure();
+      await failure(cwd);
 
       expect(takeReportedWarnings()).toEqual([]);
     });

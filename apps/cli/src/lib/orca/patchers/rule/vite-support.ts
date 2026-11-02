@@ -167,47 +167,51 @@ export function viteProxyEdit(
 ): (source: string | undefined) => string {
   return (source) => {
     const label = "the Vite config (vite.config.*)";
-    let workingSource = source;
-    if (workingSource !== undefined && isLegacyManagedProxy(workingSource)) {
-      // Replace only the generated bearer listener. User changes elsewhere in
-      // the proxy entry (target, rewrite, TLS options, comments) remain intact.
-      workingSource = workingSource.replace(
-        LEGACY_PROXY_REQUEST_LISTENER,
-        (_listener, indent: string) => exchangeOnlyProxyRequestListener(indent),
-      );
-    } else if (workingSource !== undefined) {
-      assertNoUnreviewedProjectSecretProxy(workingSource, label);
+    if (source !== undefined && !isLegacyManagedProxy(source)) {
+      assertNoUnreviewedProjectSecretProxy(source, label);
     }
-    if (workingSource !== undefined) {
-      workingSource = forwardAppOrigin(workingSource);
-    }
+    // Replace only the generated bearer listener. User changes elsewhere in
+    // the proxy entry (target, rewrite, TLS options, comments) remain intact.
+    const migrated =
+      source !== undefined && isLegacyManagedProxy(source)
+        ? source.replace(LEGACY_PROXY_REQUEST_LISTENER, (_listener, indent: string) =>
+            exchangeOnlyProxyRequestListener(indent),
+          )
+        : source;
+    const workingSource = migrated === undefined ? undefined : forwardAppOrigin(migrated);
 
     const mod = parseConfigModule(workingSource, label);
     const config = resolveDefaultExportObject(mod, label);
-    let changed = workingSource !== source;
     const serverConfig = ensureEditableObject(config, "server");
-    if (
+    const movesPort =
       serverConfig.port === undefined ||
-      (previousPort !== undefined && serverConfig.port === previousPort && devPort !== previousPort)
-    ) {
+      (previousPort !== undefined &&
+        serverConfig.port === previousPort &&
+        devPort !== previousPort);
+    if (movesPort) {
       serverConfig.port = devPort;
-      changed = true;
     }
-    if (serverConfig.strictPort === undefined) {
+    const pinsStrictPort = serverConfig.strictPort === undefined;
+    if (pinsStrictPort) {
       serverConfig.strictPort = true;
-      changed = true;
     }
     const proxyConfig = ensureEditableObject(serverConfig, "proxy");
-    if (proxyConfig[PROXY_PATH] === undefined) {
+    const addsProxy = proxyConfig[PROXY_PATH] === undefined;
+    if (addsProxy) {
       proxyConfig[PROXY_PATH] = builders.raw(proxyEntryCode(server));
-      changed = true;
     }
-    for (const imp of PROXY_IMPORTS) {
-      if (!importIsPresent(mod, imp.local, imp.from)) {
-        mod.imports.$add({ ...imp });
-        changed = true;
-      }
+    const missingImports = PROXY_IMPORTS.filter(
+      (imp) => !importIsPresent(mod, imp.local, imp.from),
+    );
+    for (const imp of missingImports) {
+      mod.imports.$add({ ...imp });
     }
+    const changed =
+      workingSource !== source ||
+      movesPort ||
+      pinsStrictPort ||
+      addsProxy ||
+      missingImports.length > 0;
     // Nothing was missing — return the source untouched so the file-writer skips
     // it instead of letting magicast reformat an already-patched config.
     if (!changed && source !== undefined) {

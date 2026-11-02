@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 import type { CreateIdpBodyIdp, PublishPolicy201 } from "@zitadel/api/generated/model";
@@ -52,13 +52,13 @@ import {
   readConnectionFiles,
   ssoEnableArgs,
 } from "./idp";
-import { stableStringify } from "./json";
+import { parseJsonOrUndefined, stableStringify } from "./json";
 import { normalizePublicCliProse } from "./public-cli";
 import { hashForState } from "./sync";
 import { updateState } from "./sync/state";
 import { SCHEMAS_DIR } from "./user-schema";
 import { isErrno, isMissingEndpoint, ZitadelError } from "./errors";
-import { pathExists } from "./fs";
+import { pathExists, readIfExists } from "./fs";
 import { type SuggestedCommand, unscopedCommand } from "./suggestion";
 import { reportWarning } from "./warnings";
 
@@ -249,21 +249,21 @@ export async function materializeSetupResources(opts: {
     kept === undefined
       ? passwordPolicyFile(opts.passwordMinLength)
       : withMinLength(kept, opts.passwordMinLength);
-  let published: PublishPolicy201 | undefined;
-  try {
-    published = await opts.client.publishPolicy(toPolicyWireBody(policy), {
+  const published: PublishPolicy201 | undefined = await opts.client
+    .publishPolicy(toPolicyWireBody(policy), {
       project_id: opts.projectId,
+    })
+    .catch((error: unknown) => {
+      if (!isMissingEndpoint(error)) {
+        throw error;
+      }
+      // A server from before operation policies: the project works without
+      // one, so setup goes on without the file rather than failing.
+      reportWarning(
+        "The server has no policy endpoints yet, so setup wrote no password policy. Upgrade the server, then add .zitadel/policies/ and run `zitadel deploy`.",
+      );
+      return undefined;
     });
-  } catch (error) {
-    if (!isMissingEndpoint(error)) {
-      throw error;
-    }
-    // A server from before operation policies: the project works without
-    // one, so setup goes on without the file rather than failing.
-    reportWarning(
-      "The server has no policy endpoints yet, so setup wrote no password policy. Upgrade the server, then add .zitadel/policies/ and run `zitadel deploy`.",
-    );
-  }
   if (published !== undefined) {
     await mkdir(join(opts.cwd, POLICIES_DIR), { recursive: true });
     if (
@@ -436,21 +436,11 @@ function withMinLength(kept: PolicyFile, minLength: PasswordMinLength | undefine
  * it as it is, so a broken one is refused here, before it reaches the server.
  */
 async function readPasswordPolicyFile(cwd: string): Promise<PolicyFile | undefined> {
-  let raw: string;
-  try {
-    raw = await readFile(join(cwd, PASSWORD_POLICY_PATH), "utf8");
-  } catch (error) {
-    if (isErrno(error, "ENOENT")) {
-      return undefined;
-    }
-    throw error;
+  const raw = await readIfExists(join(cwd, PASSWORD_POLICY_PATH));
+  if (raw === undefined) {
+    return undefined;
   }
-  let data: unknown;
-  try {
-    data = JSON.parse(raw);
-  } catch {
-    data = undefined;
-  }
+  const data = parseJsonOrUndefined(raw);
   const result = policyConfigSchema.safeParse(data);
   if (!result.success || result.data.operation !== PASSWORD_POLICY_OPERATION) {
     throw new ZitadelError(

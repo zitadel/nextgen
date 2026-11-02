@@ -273,7 +273,7 @@ export class Lifecycle<R extends ServerRecord> {
   /** Whether a server that is alive answers, asking up to {@link HEALTH_ATTEMPTS} times. */
   private async answers(serverUrl: string): Promise<boolean> {
     const clock = this.options.clock ?? realClock;
-    for (let attempt = 1; attempt <= HEALTH_ATTEMPTS; attempt++) {
+    for (const attempt of Array.from({ length: HEALTH_ATTEMPTS }, (_, index) => index + 1)) {
       if (await this.deps.health.isHealthy(serverUrl)) {
         return true;
       }
@@ -510,7 +510,7 @@ export async function claimFreePort(
     return { port: requested, release };
   }
   const first = preferred ?? firstPort;
-  for (let port = first; port < first + PORT_SEARCH_RANGE; port++) {
+  for (const port of Array.from({ length: PORT_SEARCH_RANGE }, (_, index) => first + index)) {
     if (!(await ports.isFree(port))) {
       continue;
     }

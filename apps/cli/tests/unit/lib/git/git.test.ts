@@ -17,7 +17,6 @@ async function git(cwd: string, args: string[]): Promise<string> {
 beforeEach(isolateGit);
 
 afterEach(async () => {
-  vi.unstubAllEnvs();
   await scratch.cleanup();
 });
 

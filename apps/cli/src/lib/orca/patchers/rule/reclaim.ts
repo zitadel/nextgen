@@ -1,8 +1,7 @@
-import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { pathExists } from "../../../fs";
-import { isObject } from "../../../json";
+import { readPackageJson } from "../../../npm";
 import { MANAGED_MARKER } from "../../../paths";
 import type { FileOp, ScaffoldPlan } from "./file-writer/types";
 
@@ -92,20 +91,6 @@ export async function withoutExistingTargets(
  * error handling reports the real problem.
  */
 async function dependencyDeclared(cwd: string, name: string): Promise<boolean> {
-  let contents: string;
-  try {
-    contents = await readFile(join(cwd, "package.json"), "utf8");
-  } catch {
-    return false;
-  }
-  try {
-    const pkg = JSON.parse(contents) as unknown;
-    if (!isObject(pkg)) {
-      return false;
-    }
-    const declared = (key: string): boolean => isObject(pkg[key]) && name in (pkg[key] as object);
-    return declared("dependencies") || declared("devDependencies");
-  } catch {
-    return false;
-  }
+  const pkg = await readPackageJson(cwd).catch(() => undefined);
+  return pkg?.dependencies?.[name] !== undefined || pkg?.devDependencies?.[name] !== undefined;
 }
