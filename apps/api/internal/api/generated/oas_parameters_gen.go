@@ -3529,8 +3529,8 @@ type GetIdpRevisionByIdParams struct {
 	// it as "Project id" in its summary and as `project_id` with `--json`, and
 	// writes it to `.env.local` as `ZITADEL_PROJECT_ID`.
 	ProjectID ProjectID
-	// The revision ID: the `revision_id` that `createIdp` or `updateIdp` returns,
-	// or that `listIdpRevisions` lists.
+	// The revision ID: the `revision_id` that `createIdp` returns, or that
+	// `listIdpRevisions` lists.
 	RevisionID string
 }
 

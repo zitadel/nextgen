@@ -1259,8 +1259,11 @@ type Invoker interface {
 	// Accepts either a project secret (`oauth2`) or a user-bound console
 	// session cookie (`sessionCookie`). Cookie-authenticated requests
 	// follow the scheme's CSRF rules (`sessionCookie`).
-	// Embedding `teams` with `expand`, or filtering by `team_id`, also needs
-	// `team_membership.read`. Embedding `lifecycle_owner_team` needs `team.read`.
+	// With a project secret, embedding `teams` with `expand`, or filtering by
+	// `team_id`, also needs `team_membership.read`. Embedding
+	// `lifecycle_owner_team` needs `team.read`. A console session carries no
+	// scopes: it may do both when it may read the whole project, and gets
+	// `403 user.permission_denied` otherwise.
 	//
 	// POST /users/query
 	QueryUsers(ctx context.Context, request *QueryUsersRequest, params QueryUsersParams) (QueryUsersRes, error)
@@ -15311,8 +15314,11 @@ func (c *Client) sendQueryTeams(ctx context.Context, request *QueryTeamsRequest,
 // Accepts either a project secret (`oauth2`) or a user-bound console
 // session cookie (`sessionCookie`). Cookie-authenticated requests
 // follow the scheme's CSRF rules (`sessionCookie`).
-// Embedding `teams` with `expand`, or filtering by `team_id`, also needs
-// `team_membership.read`. Embedding `lifecycle_owner_team` needs `team.read`.
+// With a project secret, embedding `teams` with `expand`, or filtering by
+// `team_id`, also needs `team_membership.read`. Embedding
+// `lifecycle_owner_team` needs `team.read`. A console session carries no
+// scopes: it may do both when it may read the whole project, and gets
+// `403 user.permission_denied` otherwise.
 //
 // POST /users/query
 func (c *Client) QueryUsers(ctx context.Context, request *QueryUsersRequest, params QueryUsersParams) (QueryUsersRes, error) {
