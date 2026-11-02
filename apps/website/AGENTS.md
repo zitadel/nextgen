@@ -109,6 +109,20 @@ Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
   of the users' installs, `zitadel skills add` and
   `npx skills add zitadel/nextgen --full-depth`.
 
+## The pricing page
+
+- `/pricing` shows the cloud's price list, which `app/pricing/catalog.ts`
+  reads from `apps/cloud-functions/src/pricing/catalog.json` when the site
+  builds; never type a price into the page.
+- Enterprise is quoted, never listed: its cards say Custom and link
+  `links.contact`, and its column says Custom wherever a price would stand.
+- Give a new meter or line a group in `app/pricing/compare.ts`;
+  `compare.spec.ts` fails while one sits in Other.
+- Put an explanation in the page's questions, never under a price or a
+  section's title.
+- A field the page reads gets a type in `catalog.ts`; the specs run the
+  page's formatting over the real file, so a reshaped catalog fails there.
+
 ## Analytics
 
 - Send a custom event only through `app/analytics.ts`, and list it in
