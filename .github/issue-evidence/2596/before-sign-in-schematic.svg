@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="900" viewBox="0 0 1280 900">
+<rect width="1280" height="900" fill="#070707"/>
+<text x="640" y="260" font-size="20" fill="#f3f3f3" text-anchor="middle" font-weight="600" font-family="Arial,sans-serif">Sign in to the Zitadel console</text>
+<text x="640" y="291" font-size="13" fill="#a6a6a6" text-anchor="middle" font-weight="400" font-family="Arial,sans-serif">Where you manage your Zitadel projects. Your app's users sign in</text>
+<text x="640" y="309" font-size="13" fill="#a6a6a6" text-anchor="middle" font-weight="400" font-family="Arial,sans-serif">through your app, not here.</text>
+<rect x="440" y="350" width="400" height="283" rx="14" fill="#141414" stroke="#303030" stroke-width="1"/>
+<text x="463" y="390" font-size="19" fill="#f2f2f2" text-anchor="start" font-weight="600" font-family="Arial,sans-serif">Anmelden</text>
+<text x="463" y="414" font-size="13" fill="#a1a1a1" text-anchor="start" font-weight="400" font-family="Arial,sans-serif">Gib deine E-Mail-Adresse ein, um fortzufahren</text>
+<text x="463" y="456" font-size="13" fill="#eee" text-anchor="start" font-weight="600" font-family="Arial,sans-serif">E-Mail *</text>
+<rect x="463" y="471" width="354" height="37" rx="7" fill="#1e1e1e" stroke="#414141"/>
+<text x="475" y="495" font-size="13" fill="#959595" text-anchor="start" font-weight="400" font-family="Arial,sans-serif">du@beispiel.de</text>
+<rect x="463" y="527" width="354" height="37" rx="6" fill="#e5e5e5"/>
+<text x="640" y="551" font-size="13" fill="#181818" text-anchor="middle" font-weight="500" font-family="Arial,sans-serif">Weiter</text>
+<text x="640" y="595" font-size="13" fill="#b1b1b1" text-anchor="middle" font-weight="400" font-family="Arial,sans-serif">Noch kein Konto? Registrieren</text>
+<text x="640" y="676" font-size="13" fill="#e5e5e5" text-anchor="middle" font-weight="400" font-family="Arial,sans-serif">Secured with ◆ Zitadel</text>
+</svg>
