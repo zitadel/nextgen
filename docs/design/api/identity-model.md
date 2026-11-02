@@ -5,7 +5,9 @@
 >
 > **Date:** 2026-10-28
 >
-> **Builds on:** [#1425](https://github.com/zitadel/nextgen/issues/1425)
+> **Builds on:** [#1283](https://github.com/zitadel/nextgen/issues/1283)
+> (the resource and access model),
+> [#1425](https://github.com/zitadel/nextgen/issues/1425)
 > (Application and Client),
 > [#2430](https://github.com/zitadel/nextgen/pull/2430) (apps, machine
 > identities and client credentials),
@@ -71,9 +73,12 @@ a config before it deploys it.
 
 An app is one piece of software, and it holds as many configs as it needs:
 
-- **Clients**, OAuth or OIDC, any number: a web client, a mobile client, a
-  backend, a deploy job. Each has its own type, credentials, grants and
-  redirect URIs.
+- **Clients**, any number: a web client, a mobile client, a backend, a deploy
+  job. Each has its own type, credentials and grants, and at most one
+  protocol config, OAuth or OIDC, with its grant types and redirect URIs. A
+  confidential client without one holds only credentials, such as PATs for a
+  tool that accepts nothing else, and can turn on client credentials later
+  without becoming a new principal.
 - **SAML IdP configs**, for a service provider that signs its users in
   through SAML.
 - **SCIM provisioning configs**, for an app with its own user store: Zitadel
@@ -107,6 +112,11 @@ it holds rights the way a user does ([Principals](#principals)):
 - **Impersonate**: the same, without `act`, so APIs see only the user. It is
   the narrower right.
 
+A principal client can also carry attributes, such as a warehouse ID,
+validated by a schema the developer ships and mapped to claims the way user
+properties are ([#1283](https://github.com/zitadel/nextgen/issues/1283)
+scenario 6). The model allows them, so they can ship later.
+
 A public client, such as a SPA or a mobile app, is never a principal: it only
 acts for the user who signed in.
 
@@ -115,6 +125,15 @@ That covers machines without machine users:
 - A **service account** is an app whose client is a principal.
 - A **backend that serves an API and calls others** is one app, with an API
   and a client, not v4's two apps and a machine user.
+
+**A confidential client holds several credentials at once**, of any kind:
+secrets, keys and PATs. Each is named and is rotated or revoked on its own,
+so moving from a PAT to client credentials, or from a secret to a key, adds
+the new one and revokes the old one later, and the client, its `sub`, its
+grants and its history stay
+([#1283](https://github.com/zitadel/nextgen/issues/1283) scenario 5). So a
+client's authentication methods are a set, not RFC 7591's single
+`token_endpoint_auth_method`.
 
 **An agent is an app too**, whoever built it. How it gets tokens depends on
 whom it works for, whose API it calls, and who vouches for it:
@@ -217,9 +236,19 @@ token, which breaks when that person leaves.
 scopes for the user who signed in, and a PAT is capped by its owner's rights
 and the scopes it was minted with, so no layer goes on top. Today scopes cap
 only project secrets (`project.read`, `project.write`) and a session token
-carries no scope, so the ceiling holds once checks intersect a user's roles
-with the token's scopes, which [authz](authz.md) leaves to
-[#420](https://github.com/zitadel/nextgen/issues/420).
+carries no scope, so the ceiling needs two things:
+
+- for the APIs apps serve, minting their scopes per
+  [ADR 082 §5](../../adrs/082-oauth-and-oidc-server.md#5-protected-apis-and-scopes);
+- for Zitadel's own API, checks that intersect a principal's roles with the
+  token's scopes, which no issue tracks yet.
+
+**One `principals` table underneath.** Users and principal clients each point
+to a row with the id, the kind, the status, the owning team, the schema, the
+attributes and the `subject`. Token issuance, introspection and authz then
+resolve a `sub` in one lookup, and suspension sits in one place. `subject` is
+a v4 import's legacy subject, immutable and unique per project, and `sub` is
+`coalesce(subject, id)`. The API never shows the table.
 
 ## How it looks
 
@@ -308,9 +337,14 @@ Each app and each connection is one document, and one call writes it:
   connections today: a project's setup lands whole or not at all.
 - **The answer says what comes next**: each client's id, the issuer, and a
   registered client's secret, shown once.
-- **Credentials have calls of their own.** A client's secrets and keys, and
-  every PAT, are added, rotated and revoked outside the document, which at
-  most names them, so a rotation never revises the app.
+- **Credentials are a resource of their own**, with their own writer. The
+  server mints a PAT or a generated secret, shows it once and stores its
+  hash, without a release, so a rotation never revises the app. A declared
+  client keeps its config in the release and can also hold credentials
+  written through the API, which a deploy never removes. A public key in its
+  file, or a secret it names as `${{ NAME }}` for the server to read from the
+  project's variables, stays possible
+  ([ADR 082 §3](../../adrs/082-oauth-and-oidc-server.md#3-apps)).
 
 **The console filters instead of adding nouns.** Apps hold many kinds of
 configs, so the console gives the common ones lists of their own: apps with
@@ -325,14 +359,20 @@ holds it.
 
 ```bash
 zitadel app create shop --preset web --redirect-uri https://shop.example.com/callback
-zitadel app create repricer --preset service-account --role catalog.write
+zitadel app create repricer --preset service --role catalog.write
 ```
 
-- A preset fills the document for a common shape: a web app, a SPA, a mobile
-  app, a backend with an API, a service account, an agent. Nobody picks grant
-  types or authentication methods, and `--file` takes a whole document
-  instead. The presets ship beside the JSON Schemas, so the console offers
-  the same ones and an agent can start from them.
+- A preset fills a client's OAuth fields as a starting point, and the kinds
+  of [ADR 082 §3](../../adrs/082-oauth-and-oidc-server.md#3-apps) become the
+  presets: web, SPA or native, and service. Refresh tokens, token exchange,
+  and client credentials for a web app's backend tasks are opt-in on top, as
+  in v4, and `--file` takes a whole document instead. The presets ship
+  beside the JSON Schemas, so the console offers the same ones and an agent
+  can start from them.
+- Where the developer can't tell which preset fits, the CLI and the console
+  ask questions the developer can answer: do users sign in, where do they
+  come back, does it work without a user. Without answers, as with `--json`
+  or an agent, a client starts public with PKCE.
 - A command writes every file its task needs. `app create` turns the
   project's issuer on in `.zitadel/oauth.json` when it is off
   ([ADR 081 §7](../../adrs/081-customer-hosted-login-and-oidc-provider.md#7-what-the-scaffold-reserves)),
@@ -356,10 +396,11 @@ decision.
 
 | | As code, in the release | Through the API |
 | --- | --- | --- |
-| Apps | The developer's own: web and mobile apps, backends, service accounts, agents | Apps the product creates for its customers, and third parties that registered |
+| Apps | The developer's own: web and mobile apps, backends, service accounts, agents | Team-owned apps, such as a customer's own integration, and third parties that registered |
 | Connections | The developer's own: social providers, the company's IdP, its CI | Each B2B customer's SSO and SCIM, which the customer's admin sets up |
+| Credentials | A client's public key, or a secret it names from the project's variables | PATs and the secrets the server mints |
 | Grants | The developer's own clients' rights | Users' and teams' roles, and the rights a customer gives its own staff and tools |
-| Self-service rules | What a customer may set up, and what it must map | — |
+| Self-service rules | What a customer may set up and must map, and what its own integrations may get | — |
 
 **Self-service splits in two.** The developer declares the rules once, as
 code, and each customer's admin writes a connection within them:
@@ -392,6 +433,21 @@ code, and each customer's admin writes a connection within them:
   ([permission catalog](system-permission-catalog.md)), and the setup screen
   calls the API with that admin's own session.
 
+**A customer's own integration is an app its team owns**
+([#1283](https://github.com/zitadel/nextgen/issues/1283) scenario 3),
+written through the API, with a principal client. It mirrors a team's
+connection:
+
+- `team_admin` manages it, within rules the developer keeps as code: which
+  APIs, scopes and roles a customer's integration may get, as the
+  self-service rules do for connections.
+- Its grants stay within the team's scope.
+- Offboarding the team deactivates its apps.
+- A deploy never touches it.
+
+Keeping it out of the developer's apps keeps each of them one piece of
+software, and offboarding simple.
+
 **The developer builds no setup screen.** A product with a screen of its own
 calls the API; any other embeds an element in its admin page, as it embeds
 the login and ADR 082's connected-apps element. The element shows the
@@ -401,10 +457,10 @@ metadata, verifies the domain, checks the mapping and runs a test sign-in.
 **What code cannot do, and how the model copes:**
 
 - **A deploy touches only what it declares.** It never revises or removes a
-  customer's connection or a registered app. A connection the developer
-  manages for a customer, through the API or a Terraform provider, is
-  read-only in that customer's setup screen, so every connection has one
-  writer.
+  team's connections or apps, a registered app, or a credential written
+  through the API. A connection the developer manages for a customer,
+  through the API or a Terraform provider, is read-only in that customer's
+  setup screen, so every connection has one writer.
 - **A customer's connection may name code, never the reverse.** It names the
   user schema whose properties it fills, and a release that removes or
   renames a property still in use fails its build, naming the connections.
@@ -421,7 +477,7 @@ metadata, verifies the domain, checks the mapping and runs a test sign-in.
 | --- | --- | --- | --- |
 | **User** | A person who signs in | "human user", "identity" | Everyone's word |
 | **App** | Anything that uses Zitadel, agents and service accounts included | v4's project, app and machine user; the glossary's `app_group` | Auth0, Okta, Entra and GitHub all say app |
-| **Client** | An OAuth or OIDC config of an app; can be a principal | the glossary's `app`, ADR 082's app kinds | The protocol's word, which developers and agents already know |
+| **Client** | A technical integration of an app: its credentials and at most one OAuth or OIDC config; can be a principal | the glossary's `app`, ADR 082's app kinds | The protocol's word, which developers and agents already know |
 | **API** | What an app serves: an identifier and scopes | "resource server", v4's API app | Auth0's word |
 | **Connection** | Anything Zitadel trusts upstream, with its configs and mappings | "IdP", "provider", v4's identity providers | Auth0's and WorkOS's word. "Provider" already names Zitadel itself, the OIDC provider, and the server side of SCIM |
 | **WIF config** | A connection's trust in the tokens workloads get from CI systems, clusters and clouds | keys and secrets stored in CI | The clouds' name: workload identity federation |
@@ -435,12 +491,12 @@ Measured against what the repo has today:
 | Area | Today | With this model |
 | --- | --- | --- |
 | Glossary | `app` is one OIDC client or SAML SP; `app_group` (LOCKED) holds roles; `idp` is an upstream provider | `app` is the software and holds its configs; one OIDC client is a client; `idp` becomes connection |
-| Authz | Principal types `user`, `team`, `agent`, `sk_proj`, `sk_team`; `agent` is unused; team members are users; scopes cap only project secrets; only `project_admin` writes connections | A `client` principal type, which `agent` becomes, with grants and team memberships like a user's; delegate and impersonate as roles; `sk_proj` and `sk_team` become PATs with an owner type; a client's scopes cap every token; `team_admin` manages its team's connections |
+| Authz | Principal types `user`, `team`, `agent`, `sk_proj`, `sk_team`; `agent` is unused; team members are users; scopes cap only project secrets; only `project_admin` writes connections | A `client` principal type, which `agent` becomes, with grants and team memberships like a user's; delegate and impersonate as roles; `sk_proj` and `sk_team` become PATs with an owner type; a client's scopes cap every token; `team_admin` manages its team's connections and apps |
 | #2430 | Machines are users of a `service` or `agent` kind; a client is owned by an app, an identity or both; client methods sit in `x-auth-methods` | Machines are apps; every client belongs to an app and can be a principal itself; client methods move to the client, and `x-auth-methods` keeps sign-in methods. Its secret format, hashing, import rules and named credentials per client carry over, and its PATs gain an owner type; its client table loses the identity column |
 | IdP connections | Project-level, OIDC only, one `protocol` block per connection | A connection holds several configs (OIDC, OAuth, WIF, SAML, SCIM) and the mappings between them; the developer's are declared, and a B2B customer's belongs to its team and is written through the API within the developer's rules |
-| ADR 082 | `Service` app kind; APIs are separate files; registered clients belong to the project; token exchange later; no introspection | Any confidential client can be a principal; APIs are an app's config, still one audience per token; registered clients register at the project and join the app whose API they first ask for; token exchange moves up for delegation, impersonation and WIF; an API names the clients that may introspect its tokens |
+| ADR 082 | App kinds, `Service` among them; the server never generates a declared app's credential; APIs are separate files; registered clients belong to the project; token exchange later; no introspection | The kinds become presets, and any confidential client can be a principal; credentials are a resource of their own, so the server mints PATs and secrets for declared clients too; APIs are an app's config, still one audience per token; registered clients register at the project and join the app whose API they first ask for; token exchange moves up for delegation, impersonation and WIF; an API names the clients that may introspect its tokens |
 | CLI | ADR 082 §12: `oauth enable`, `apps create` and `apis create`, each writing a file | `app create` writes an app with its clients and APIs from a preset, and turns the issuer on if it is off |
-| v4 import | — | v4 projects become apps; v4 apps become clients, SAML configs or APIs, and keep their client ids (`<id>@<project>`); a v4 machine user becomes an app with a principal client, whose id is the v4 user id that APIs stored as `sub`, or which carries that id as a legacy subject; its PATs move onto that client |
+| v4 import | — | v4 projects become apps; v4 apps become clients, SAML configs or APIs, and keep their client ids (`<id>@<project>`); a v4 machine user becomes an app with a principal client, whose id is the v4 user id that APIs stored as `sub`, or which carries that id as its legacy `subject` ([Principals](#principals)); its PATs move onto that client |
 
 Clients become a sub-resource of their app, so a declared app and the clients
 registered into it keep separate writers. Tokens stay single-audience, and
@@ -477,11 +533,14 @@ consents stay per user, client and scope.
    it ([Principals](#principals)). Still open: APIs that accept only user
    tokens, and Entra's agent paired one to one with a user account, which a
    connection could map to a user.
-9. **Presets.** Which shapes get one. An app does not keep its preset: the
-   console lists apps by what they hold (a client that acts as itself or
-   delegates, an API, a registered third party), and nothing in the model
-   treats an agent differently from a service account, since `act` and a
-   non-user principal already mark what only a person may do.
+9. **Presets.** Answered: ADR 082 §3's kinds, with opt-ins on top
+   ([One call](#one-call)). A client stores the OAuth fields its preset
+   filled, never the preset, so registered, declared and imported clients
+   share one shape. The console lists apps by what they hold (a client that
+   acts as itself or delegates, an API, a registered third party), and
+   nothing in the model treats an agent differently from a service account,
+   since `act` and a non-user principal already mark what only a person may
+   do.
 
 ## Prior art
 
