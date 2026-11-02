@@ -1,6 +1,7 @@
 {
   "name": "@zitadel/source",
   "version": "0.0.0",
+  "description": "Zitadel nextgen monorepo",
   "private": true,
   "type": "module",
   "license": "AGPL-3.0-only",
