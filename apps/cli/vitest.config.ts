@@ -36,6 +36,9 @@ export default defineConfig({
     // renamed suite must not vanish silently. Specs are `*.spec.ts`, unit
     // tests `*.test.ts` (tests/AGENTS.md).
     include: ["tests/**/*.{test,spec}.ts"],
+    // Before anything runs, ends the fake servers an interrupted earlier run
+    // left on ports from the test band (tests/helpers/stale-servers.ts).
+    globalSetup: ["./tests/helpers/stale-servers.ts"],
     // `offline.ts` first: it fails any test that connects past loopback, so a
     // unit test or spec cannot reach a real server, Zitadel's or anyone's.
     setupFiles: [
