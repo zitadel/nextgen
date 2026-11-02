@@ -127,28 +127,20 @@ func (UnimplementedHandler) CreateBranding(ctx context.Context, req *Branding, p
 // atomically: on success every target serves the release and the record
 // exists; on failure nothing changes and no record is written.
 // Name the release by exactly one of `release_id` or `content_hash`; it
-// must already exist in the project. `targets` is `primary` or preview
-// URLs. The deployment freezes the project's variable values for its kind,
-// with no fallback between primary and preview values. The newest primary
-// deployment also serves a caller with no origin.
+// must already exist in the project. `targets` is `primary` or a list of
+// preview URLs.
+// `primary` deploys to every primary origin of the project. The project's
+// newest primary deployment also serves every request with no `Origin`,
+// such as a backend, a native app or the CLI, and the console's login
+// preview of a project that does not list the console's origin. A preview
+// URL serves only itself.
+// The deployment freezes the project's variable values for its kind, with
+// no fallback between primary and preview values.
 // A deployment to `primary` changes nothing when the project's newest
 // primary deployment has the same release and frozen values and covers
 // exactly the current primary origins: the call answers `200` with that
 // deployment. Any other request writes a new deployment and answers `201`;
 // for preview URLs that record renews their previews.
-// Failures:
-// - `400 dep.invalid`: both or neither of `release_id` and `content_hash`;
-// a primary origin among the preview URLs;
-// `primary` on a project with no primary origin; `ttl` with `primary`;
-// `ttl` above 365 days (`P365D`).
-// - `400 dep.variables_missing`: a referenced variable has no value for
-// the kind; `details` names the kind and every missing variable.
-// - `403 proj.origin_not_allowed`: a preview URL matches no preview
-// pattern, or is a loopback URL.
-// - `404 rel.not_found`: the release id or digest names no release here.
-// - `409 dep.conflict`: `expected_deployment_id` is not the deployment
-// this write replaces; `details.deployment` is that deployment.
-// - `409 rel.revoked`: the release is revoked.
 //
 // POST /deployments
 func (UnimplementedHandler) CreateDeployment(ctx context.Context, req *CreateDeploymentRequest, params CreateDeploymentParams) (r CreateDeploymentRes, _ error) {

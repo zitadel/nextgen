@@ -22263,7 +22263,7 @@ func (s *DeploymentMetadataDeployedByType) UnmarshalText(data []byte) error {
 
 type DeploymentPreviewUrls []string
 
-// Every primary origin of the project.
+// Every primary origin of the project, and every request with no `Origin`.
 // Ref: #
 type DeploymentPrimaryTarget string
 
