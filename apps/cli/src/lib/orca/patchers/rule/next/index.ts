@@ -270,7 +270,6 @@ function nextCodeOps(ctx: PatchContext, renderer: RendererSpec): FileOp[] {
 function homePageTemplate(): string {
   return `${MANAGED_MARKER}
 import { redirect } from "next/navigation";
-import { isFile } from "../../../../fs";
 
 // A redirect is never an instant navigation: tell Next.js not to validate it.
 export const instant = false;
