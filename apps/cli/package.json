@@ -150,6 +150,7 @@
     "ajv": "catalog:",
     "consola": "^3.4.2",
     "fastest-levenshtein": "catalog:",
+    "jsonc-parser": "catalog:",
     "magicast": "^0.5.3",
     "mixpanel": "^0.18.1",
     "picocolors": "^1.1.1",

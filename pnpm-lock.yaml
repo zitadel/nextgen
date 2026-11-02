@@ -374,6 +374,9 @@ catalogs:
     jsdom:
       specifier: ^29.0.2
       version: 29.0.2
+    jsonc-parser:
+      specifier: ^3.3.1
+      version: 3.3.1
     lightningcss:
       specifier: ^1.30.1
       version: 1.33.0
@@ -668,6 +671,9 @@ importers:
       fastest-levenshtein:
         specifier: 'catalog:'
         version: 1.0.16
+      jsonc-parser:
+        specifier: 'catalog:'
+        version: 3.3.1
       magicast:
         specifier: ^0.5.3
         version: 0.5.3
