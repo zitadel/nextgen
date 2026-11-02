@@ -1,11 +1,12 @@
 import { spawnSync } from "node:child_process";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { availableParallelism, tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { describe, expect, it, onTestFinished } from "vitest";
 
 import config from "../../../vitest.config";
+import { PORT_WORKERS } from "../../helpers/ports";
 import { ownerIsAlive, staleFakeServers } from "../../helpers/stale-servers";
 
 const LEFT_BEHIND =
@@ -63,5 +64,11 @@ describe("ownerIsAlive", () => {
 describe("the vitest config", () => {
   it("sweeps stale fake servers before any test runs", () => {
     expect(config.test?.globalSetup).toContain("./tests/helpers/stale-servers.ts");
+  });
+
+  it("leaves three cores free and never outnumbers the port blocks", () => {
+    expect(config.test?.maxWorkers).toBe(
+      Math.min(Math.max(availableParallelism() - 3, 1), PORT_WORKERS),
+    );
   });
 });
