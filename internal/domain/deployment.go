@@ -283,7 +283,7 @@ func resolvePrimaryTarget(projectOrigins []Origin, deploymentTargets []string) (
 	if len(primary) == 0 {
 		return 0, nil, ErrDeploymentInvalid().WithMessage("the project has no primary origin")
 	}
-	// TODO(#1572): cap primary origins at MaxDeploymentTargets.
+	// TODO(#2594): cap primary origins at MaxDeploymentTargets.
 	return DeploymentOriginKindPrimary, primary, nil
 }
 
