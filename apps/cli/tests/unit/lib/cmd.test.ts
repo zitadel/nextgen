@@ -88,6 +88,16 @@ describe("Cmd#without", () => {
   });
 });
 
+describe("Cmd#without on a long line", () => {
+  it("strips a very long argument list without recursing", () => {
+    const words = ["rm", ...Array.from({ length: 200_000 }, (_, at) => `arg${at}`), "--cwd", "app"];
+
+    const line = Cmd.of(words).without(["--cwd"]);
+
+    expect(line.toString().endsWith("arg199999")).toBe(true);
+  });
+});
+
 describe("Cmd immutability", () => {
   it("leaves the line it was called on unchanged", () => {
     const original = Cmd.of(["rm", "--cwd", "app", "FOO"]);

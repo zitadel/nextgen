@@ -19,9 +19,15 @@ export interface TelemetrySink {
   flush(timeoutMs: number): Promise<void>;
 }
 
-/** Writes one line of the `--debug` trace to stderr, and nothing without `--debug`. */
-export function trace(debug: boolean, line: string): void {
+/**
+ * Writes one line of the `--debug` trace to stderr, and nothing without `--debug`.
+ *
+ * @param debug - Whether `--debug` is on.
+ * @param line - Builds the line. It runs only when `debug` is on, so a payload
+ * that cannot be serialised cannot fail a run that is not being traced.
+ */
+export function trace(debug: boolean, line: () => string): void {
   if (debug) {
-    process.stderr.write(`[telemetry] ${line}\n`);
+    process.stderr.write(`[telemetry] ${line()}\n`);
   }
 }
