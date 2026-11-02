@@ -40,8 +40,8 @@ there, not a new color at the call site.
 - Say one cause once. `-v` is the exception: it lists every check by name.
 - Wrap to the terminal's width. Do not wrap piped output, or a terminal that
   reports no width.
-- Name files as the user knows them. Never print a system error such as `ENOENT`
-  or an absolute path the user did not type.
+- Never print a raw system error such as `ENOENT`: say what is wrong in the
+  user's terms. Show a path relative to the project where one exists.
 
 ## Boxes
 
