@@ -226,7 +226,7 @@ describe("Tabulatable", () => {
     const importing: string[] = [];
 
     for (const file of await readdir(root, { recursive: true })) {
-      if (!file.endsWith(".ts") || file === "lib/oclif/tabulatable.ts") continue;
+      if (!file.endsWith(".ts") || file === join("lib", "oclif", "tabulatable.ts")) continue;
       if (/["']@oclif\/table["']/.test(await readFile(join(root, file), "utf8"))) {
         importing.push(file);
       }
