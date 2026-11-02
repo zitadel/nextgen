@@ -438,7 +438,10 @@ function transitionTarget(def: FlowDef, t: FlowTransition): string {
 }
 
 /** Adjacency over local (current-flow) transitions: step → target steps. */
-function localAdjacency(def: FlowDef, skip: ReadonlySet<string> = new Set()): Map<string, string[]> {
+function localAdjacency(
+  def: FlowDef,
+  skip: ReadonlySet<string> = new Set(),
+): Map<string, string[]> {
   const adj = new Map<string, string[]>();
   for (const step of def.steps) {
     for (const [event, t] of step.transitions) {
