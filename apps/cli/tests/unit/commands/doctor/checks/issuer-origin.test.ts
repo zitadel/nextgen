@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 
 import { IssuerOriginCheck, type CheckContext } from "../../../../../src/commands/doctor/checks";
 import { createZitadelClient } from "../../../../../src/lib/api-client";
+import { Consent } from "../../../../../src/lib/consent";
 import { createOrca } from "../../../../../src/lib/orca";
 import { usePlatformServer } from "../../../../helpers/platform-project";
 
@@ -56,8 +57,18 @@ function aProjectFrom010(): Promise<Project> {
   return aProject([{ pattern: ISSUER, kind: "preview" }]);
 }
 
-function ctxFor(cwd: string, dryRun = false): CheckContext {
-  return { cwd, orca: createOrca(), cliVersion: "0.2.0", dryRun };
+/** A context whose consent is `--force`'s, or a person's no with `declined`. */
+function ctxFor(cwd: string, dryRun = false, declined = false): CheckContext {
+  return {
+    cwd,
+    orca: createOrca(),
+    cliVersion: "0.2.0",
+    dryRun,
+    consent: (gate) =>
+      declined
+        ? Promise.resolve(undefined)
+        : Consent.request(gate, { interactive: false, force: true, dryRun }),
+  };
 }
 
 async function serverOrigins(project: Project) {
@@ -202,6 +213,31 @@ describe("IssuerOriginCheck", () => {
       await check.fix(ctxFor(project.cwd));
 
       expect((await check.run(ctxFor(project.cwd))).status).toBe("pass");
+    });
+
+    it("changes nothing when the replacement is declined", async () => {
+      const project = await aProjectFrom010();
+
+      await check.fix(ctxFor(project.cwd, false, true));
+
+      expect(await serverOrigins(project)).toEqual([{ pattern: ISSUER, kind: "preview" }]);
+    });
+
+    it("asks to replace the preview origin", async () => {
+      const project = await aProjectFrom010();
+      const asked: string[] = [];
+
+      await check.fix({
+        ...ctxFor(project.cwd, false, true),
+        consent: (gate) => {
+          asked.push(gate.message);
+          return Promise.resolve(undefined);
+        },
+      });
+
+      expect(asked).toEqual([
+        `Make ${ISSUER} a primary origin? It is removed and added back as primary.`,
+      ]);
     });
 
     it("changes nothing under dryRun", async () => {

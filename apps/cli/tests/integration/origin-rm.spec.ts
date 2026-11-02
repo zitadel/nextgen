@@ -111,17 +111,45 @@ describe("origin rm", () => {
         expect(result).toSucceed();
       });
 
-      it("refuses to remove without --force when non-interactive", async () => {
-        const app = await aSetUpApp();
-        await app.addOrigin("https://app.acme.com", "primary");
+      describe("without --force when no one can be asked", () => {
+        it("is refused", async () => {
+          const app = await aSetUpApp();
+          await app.addOrigin("https://app.acme.com", "primary");
 
-        const result = await app.run(["origin", "rm", "https://app.acme.com", "--json"]);
+          const result = await app.run(["origin", "rm", "https://app.acme.com", "--json"]);
 
-        expect(result).toFailWith("E_VALIDATION");
-        expect(await app.projectOrigins()).toEqual([
-          SETUP_ORIGIN,
-          { pattern: "https://app.acme.com", kind: "primary" },
-        ]);
+          expect(result).toFailWith("E_VALIDATION");
+        });
+
+        it("says to pass --force", async () => {
+          const app = await aSetUpApp();
+          await app.addOrigin("https://app.acme.com", "primary");
+
+          const result = await app.run(["origin", "rm", "https://app.acme.com", "--json"]);
+
+          expect(result).toHintAt("--force");
+        });
+
+        it("suggests running it again with --force", async () => {
+          const app = await aSetUpApp();
+          await app.addOrigin("https://app.acme.com", "primary");
+
+          const result = await app.run(["origin", "rm", "https://app.acme.com", "--json"]);
+
+          expect(result).toSuggestExactly(app.againAsRun("origin rm https://app.acme.com --force"));
+        });
+
+        it("removes nothing", async () => {
+          const app = await aSetUpApp();
+          await app.addOrigin("https://app.acme.com", "primary");
+
+          await app.run(["origin", "rm", "https://app.acme.com", "--json"]);
+
+          expect(await app.projectOrigins()).toEqual([
+            SETUP_ORIGIN,
+            { pattern: "https://app.acme.com", kind: "primary" },
+          ]);
+        });
       });
     });
 

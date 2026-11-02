@@ -607,9 +607,12 @@ describe("get sections", () => {
 
 describe("delete confirmation", () => {
   const deleting = (verb: "delete" | "revoke" | "deactivate", call = async () => undefined) =>
-    bindOperation(
-      DeleteOperation as OperationClass<Ctx, DeleteSpec<Ctx>>,
-      definition<DeleteSpec<Ctx>>({ verb, call }),
+    Object.assign(
+      bindOperation(
+        DeleteOperation as OperationClass<Ctx, DeleteSpec<Ctx>>,
+        definition<DeleteSpec<Ctx>>({ verb, call }),
+      ),
+      { id: `teams:${verb}` },
     ) as unknown as { run(argv: string[]): Promise<unknown> };
 
   /** What a failing command prints, which is how an agent or a person reads the failure. */
@@ -657,6 +660,29 @@ describe("delete confirmation", () => {
         message: `Cannot ${verb} team team_1 without --force in non-interactive mode`,
         next_commands: [expect.stringContaining(`teams ${verb} team_1 --force`)],
       });
+    },
+  );
+
+  it.each(["delete", "revoke", "deactivate"] as const)(
+    "sends no %s when it refuses without --force",
+    async (verb) => {
+      const call = vi.fn(async () => undefined);
+
+      await printedByFailing(() => deleting(verb, call).run(["team_1", "--json"]));
+
+      expect(call).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(["delete", "revoke", "deactivate"] as const)(
+    "sends no %s when the answer is no",
+    async (verb) => {
+      vi.mocked(confirm).mockResolvedValueOnce(false as never);
+      const call = vi.fn(async () => undefined);
+
+      await asTerminal(() => deleting(verb, call).run(["team_1"]));
+
+      expect(call).not.toHaveBeenCalled();
     },
   );
 

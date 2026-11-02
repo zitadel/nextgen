@@ -2,6 +2,7 @@ import { ApiError, request as fetchWithPolicy } from "@zitadel/api/runtime/fetch
 import { itemsOf, nextToken, pages } from "@zitadel/api/runtime/paging";
 
 import { REQUEST_TIMEOUT_MS, sanitizeRejection, sanitizeResponse } from "../api-client";
+import { Consent } from "../consent";
 import { ZitadelError } from "../errors";
 import { isObject } from "../json";
 import { interruptSignal } from "../interrupt";
@@ -35,22 +36,34 @@ const readBody = async (res: Response): Promise<unknown> => {
  * there is one. It is bounded and cancelled as every platform call is
  * (`createZitadelClient`), and what the server says is escaped the same way:
  * a non-2xx is the {@link ApiError} `toZitadelError` maps to an exit code.
+ *
+ * A destructive request (one whose operation the spec marks) is sent only with the
+ * `consent` its command asked for, as the client's are.
  */
 export const send = async (
   server: string,
   token: string | undefined,
   request: ApiRequest,
+  consent?: Consent,
 ): Promise<ApiResponse> => {
-  const { status, raw } = await sendRaw(server, token, request);
+  const { status, raw } = await sendRaw(server, token, request, consent);
   return { status, body: sanitizeResponse(raw) };
 };
 
-/** {@link send}, answering the body as the server sent it; a failure is escaped all the same. */
+/**
+ * {@link send}, answering the body as the server sent it; a failure is escaped
+ * all the same. Every request goes out here, so a destructive one without
+ * `consent` is refused here, whichever caller sent it.
+ */
 const sendRaw = async (
   server: string,
   token: string | undefined,
   request: ApiRequest,
+  consent?: Consent,
 ): Promise<{ status: number; raw: unknown }> => {
+  if (request.operation.destructive) {
+    Consent.assert(consent);
+  }
   const url = urlOf(server, request);
   const { method } = request.operation;
   const headers = new Headers({ accept: "application/json" });

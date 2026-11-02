@@ -1,5 +1,6 @@
 import type { Interfaces } from "@oclif/core";
 
+import type { Consent } from "../../consent";
 import type { CommandGroup } from "../groups";
 import type { Connection } from "../environment-command";
 import type { References } from "./secrets";
@@ -223,7 +224,8 @@ export type DeleteSpec<Ctx> = Readonly<{
    * to the verb's own past tense (`deleted`, `revoked`, `deactivated`).
    */
   outcome?: string;
-  call: (ctx: Ctx, id: string) => Promise<void>;
+  /** The deletion, which reaches the client's destructive operations through `consent`. */
+  call: (ctx: Ctx, id: string, consent: Consent) => Promise<void>;
 }>;
 
 /** One CLI topic. The factory turns it into up to five command classes. */
