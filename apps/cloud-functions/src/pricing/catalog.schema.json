@@ -82,7 +82,13 @@
           "additionalProperties": false,
           "properties": {
             "scope": { "const": "project" },
-            "selection": { "const": "all_available" }
+            "selection": {
+              "oneOf": [
+                { "type": "array", "items": { "type": "string", "pattern": "^[a-z]{2,}$" }, "minItems": 1 },
+                { "const": "all_available" }
+              ],
+              "description": "The regions a plan includes; the `region` line prices the others on plans that may take it"
+            }
           }
         }
       }
@@ -185,6 +191,7 @@
         "plans": { "type": "array", "items": { "$ref": "#/$defs/plan_id" } },
         "included_in": { "type": "array", "items": { "$ref": "#/$defs/plan_id" } },
         "grants_credit": { "$ref": "#/$defs/money" },
+        "requests_per_month": { "type": "integer", "minimum": 1, "description": "The requests a month one unit of a capacity line adds" },
         "note": { "type": "string" },
         "tag": { "enum": ["minimum spend", "metered feature", "delivered cost", "scale", "compliance", "certification", "support"] }
       }

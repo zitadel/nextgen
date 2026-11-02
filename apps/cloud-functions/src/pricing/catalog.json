@@ -1,15 +1,15 @@
 {
   "$schema": "./catalog.schema.json",
   "id": "zitadel-pricing",
-  "version": "2026-11-01.4",
+  "version": "2026-11-01.5",
   "status": "proposal",
   "currency": "usd",
-  "decided": ["core", "meters.monthly_active_users.price", "packages.governance.scope", "packages.compliance.scope", "plans.pro.minimum", "packages.governance.included_in", "packages.compliance.pricing", "plans.enterprise.sla", "plans.pro.limits", "plans.free.regions", "plans.pro.regions", "plans.enterprise.regions", "licensed.addendum.plans", "licensed.support_priority.plans"],
+  "decided": ["core", "meters.monthly_active_users.price", "meters.sso_users.allowance", "packages.governance.scope", "packages.compliance.scope", "plans.pro.minimum", "packages.governance.included_in", "packages.compliance.pricing", "plans.enterprise.sla", "plans.pro.limits.requests_per_second_per_project", "plans.free.regions", "plans.pro.regions", "plans.enterprise.regions", "licensed.region", "licensed.addendum.plans", "licensed.support_priority.plans"],
   "conventions": {
     "period": "calendar month, UTC",
     "user_meters": "Core users are never billed. Only enterprise SSO and directory integrations count users, once per project, connection or directory, and month, with a cap per connection or directory.",
     "allowance": "The same allowance applies on every plan, per account and month; Enterprise contracts may raise it.",
-    "invoice": "Pro base fee + metered integrations and consumption beyond included allowances + contracted packages and support; the base fee includes Governance and is not usage credit",
+    "invoice": "Pro base fee + metered integrations and consumption beyond included allowances + capacity steps, regions outside the EU, contracted packages and support; the base fee includes Governance and is not usage credit",
     "caps": "Owners opt in to paid packages and consumption. Alerts at 50, 80 and 100 percent of a budget are notifications, not a hard spending cap. A budget never switches security enforcement off.",
     "self_hosted": "Self-hosted installs pay for rights and support per production installation and are never metered.",
     "packages": "Governance is included in Pro. Compliance is quoted per account, with retention duration, retained-event volume, SIEM destinations and any overage prices agreed before activation. Neither package charges per user or per policy."
@@ -30,19 +30,23 @@
       "delivery_modes": ["dev_inbox", "own_provider"],
       "support": "community",
       "sla": null,
-      "regions": { "scope": "project", "selection": "all_available" }
+      "regions": { "scope": "project", "selection": ["eu"] }
     },
     "pro": {
       "label": "Pro",
       "minimum": { "amount": 100, "interval": "month", "is_credit": false, "credit_applies_to": null },
       "card_required": true,
-      "limits": { "requests_per_second_per_project": 500 },
+      "limits": {
+        "requests_per_second_per_project": 500,
+        "requests_per_month_per_account": 150000000,
+        "past_monthly_ceiling": "30 days' notice to add a capacity step, then 50 requests per second per project"
+      },
       "event_retention_days": 30,
       "attribution_mark": "hideable",
       "delivery_modes": ["dev_inbox", "own_provider", "managed"],
       "support": "24/7 tickets, next business day; priority add-on 1 h for outages",
       "sla": { "target_percent": 99.9, "credits": false },
-      "regions": { "scope": "project", "selection": "all_available" },
+      "regions": { "scope": "project", "selection": ["eu"] },
       "packages": ["governance"]
     },
     "enterprise": {
@@ -177,7 +181,7 @@
       "id": "api_requests",
       "label": "API requests",
       "kind": "gauge",
-      "counts": "Each request; shown and used for Free's limits, never billed",
+      "counts": "Each request; shown and counted against each plan's capacity, never billed per request",
       "dedupe": null,
       "allowance": null,
       "price": null,
@@ -197,6 +201,8 @@
       "grants_credit": 0,
       "tag": "minimum spend"
     },
+    { "id": "capacity_step", "label": "Capacity step", "amount": 2000, "interval": "month", "per": "step", "plans": ["pro", "enterprise"], "requests_per_month": 150000000, "note": "more requests a month per account past Pro's included volume, added by the owner; Enterprise capacity is contracted", "tag": "scale" },
+    { "id": "region", "label": "Region outside the EU, once built", "amount": 100, "interval": "month", "per": "region", "plans": ["pro"], "included_in": ["enterprise"], "tag": "compliance" },
     { "id": "support_priority", "label": "Priority support", "amount": 999, "interval": "month", "plans": ["pro", "enterprise"], "tag": "support" },
     { "id": "sla_9995", "label": "99.95% SLA", "amount": 1000, "interval": "month", "plans": ["pro"], "included_in": ["enterprise"], "tag": "compliance" },
     { "id": "sla_9999", "label": "99.99% SLA upgrade, after a second region", "amount": 2000, "interval": "month", "plans": ["enterprise"], "tag": "compliance" },
