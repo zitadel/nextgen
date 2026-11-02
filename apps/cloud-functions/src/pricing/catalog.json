@@ -1,13 +1,13 @@
 {
   "$schema": "./catalog.schema.json",
   "id": "zitadel-pricing",
-  "version": "2026-11-02.2",
+  "version": "2026-11-02.3",
   "status": "proposal",
   "currency": "usd",
   "decided": ["core", "meters.monthly_active_users.price", "meters.sso_users.allowance", "packages.governance.scope", "packages.compliance.scope", "plans.pro.minimum", "packages.governance.included_in", "packages.compliance.pricing", "plans.enterprise.sla", "plans.pro.limits.requests_per_second_per_project", "plans.free.regions", "plans.pro.regions", "plans.enterprise.regions", "licensed.region", "licensed.addendum.plans", "licensed.support_priority.plans"],
   "conventions": {
     "period": "calendar month, UTC",
-    "user_meters": "Core users are never billed, and requiring MFA never counts a user. Only enterprise SSO and directory integrations count users, once per project, connection or directory, and month, with a cap per connection or directory; adaptive protection counts the users it scores on the projects that turn it on.",
+    "user_meters": "Core users are never billed, and requiring MFA never counts a user. Only enterprise SSO and directory integrations count users, once per project, connection or directory, and month, with a cap per connection or directory; threat intelligence counts the users checked against licensed feeds on the projects that turn it on.",
     "allowance": "The same allowance applies on every plan, per account and month; Enterprise contracts may raise it.",
     "invoice": "Pro base fee + metered integrations and consumption beyond included allowances + capacity steps, regions outside the EU, contracted packages and support; the base fee includes Governance and is not usage credit",
     "caps": "Owners opt in to paid packages and consumption. Alerts at 50, 80 and 100 percent of a budget are notifications, not a hard spending cap. A budget never switches security enforcement off.",
@@ -165,17 +165,17 @@
       "stripe": { "event_name": "m2m_tokens", "aggregation": "sum", "price_lookup_key": "m2m_tokens" }
     },
     {
-      "id": "protected_users",
-      "label": "Adaptive sign-in protection",
+      "id": "threat_intel_users",
+      "label": "Threat intelligence",
       "kind": "users",
-      "counts": "A user whose sign-ins adaptive protection scores, on projects that turn it on: risk scoring from bot verdicts, device signals, compromised credentials and IP reputation, then risk-based step-up or blocking. Requiring MFA, brute-force guards, a breached-password check when a password is set and every bot check stay free",
+      "counts": "A user whose sign-ins are checked against feeds Zitadel licenses, on projects that turn it on: IP reputation, residential proxies included, and leaked credentials. Risk-based challenges and MFA prompts on Zitadel's own signals (device, failed attempts, location, network, bot checks) and on signals the customer brings stay free; rules on them are Governance",
       "dedupe": ["project", "user", "month"],
       "allowance": 10000,
-      "price": { "model": "per_unit", "unit_amount": 0.003 },
+      "price": { "model": "per_unit", "unit_amount": 0.003, "note": "placeholder until a feed vendor is chosen" },
       "security": true,
       "tag": "metered feature",
-      "source": { "where": "risk signals in the login flow", "exists": "no: needs risk signals in the login flow and an IP-reputation feed" },
-      "stripe": { "event_name": "protected_users", "aggregation": "sum", "price_lookup_key": "protected_users" }
+      "source": { "where": "the risk evaluator, when it queries a licensed feed", "exists": "no: needs the risk evaluator and a feed vendor" },
+      "stripe": { "event_name": "threat_intel_users", "aggregation": "sum", "price_lookup_key": "threat_intel_users" }
     },
     {
       "id": "api_requests",
@@ -244,7 +244,7 @@
     "platform": ["Deployments", "Releases", "Login in your own app, on your domain"],
     "resources": ["Users and service users", "Teams and organizations", "Projects and applications", "Roles and credentials", "Console seats"],
     "authentication": ["Password sign-in", "Social sign-in", "Passkeys and TOTP MFA"],
-    "security": ["Require MFA for everyone", "Password rules and lockout", "Built-in bot challenge", "Your own captcha or edge bot check"],
+    "security": ["Require MFA for everyone", "Password rules and lockout", "Built-in bot challenge", "Your own captcha or edge bot check", "Risk-based challenges and MFA prompts"],
     "billing": "Core resources and basic security are free on every plan. Active-user counts never change your plan or bill. Published request and token capacity limits still apply."
   },
   "packages": [
@@ -257,7 +257,7 @@
       "included_in": ["pro", "enterprise"],
       "availability": "planned",
       "features": [
-        "Conditional access and session policies",
+        "Conditional access on device, network and location, and session policies",
         "Granular exceptions and delegated administration",
         "Policy versioning and approval workflows"
       ],

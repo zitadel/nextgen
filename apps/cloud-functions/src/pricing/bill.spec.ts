@@ -130,12 +130,12 @@ describe("integrations and consumption", () => {
     ]);
   });
 
-  it("charges adaptive protection per scored user past its allowance", () => {
-    expect(bill({ counts: { protected_users: 10_000 } })).toMatchObject({
+  it("charges threat intelligence per checked user past its allowance", () => {
+    expect(bill({ counts: { threat_intel_users: 10_000 } })).toMatchObject({
       plan: "free",
       total_amount: 0,
     });
-    expect(bill({ counts: { protected_users: 210_000 } })).toMatchObject({
+    expect(bill({ counts: { threat_intel_users: 210_000 } })).toMatchObject({
       plan: "pro",
       usage_amount: 60_000,
       total_amount: 70_000,
@@ -197,7 +197,7 @@ describe("catalog entitlements", () => {
     expect(entitlementsFor("free").allowances).toMatchObject({
       sso_users: 1_000,
       directory_users: 1_000,
-      protected_users: 10_000,
+      threat_intel_users: 10_000,
     });
     expect(entitlementsFor("free").allowances).not.toHaveProperty("email_messages");
     expect(entitlementsFor("pro").allowances).toHaveProperty("email_messages", 0);

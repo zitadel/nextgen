@@ -265,9 +265,11 @@ website's catch-all.
   apps to enforce MFA outside Zitadel. Bot checks are free too: the built-in
   Altcha challenge, a project's own Turnstile, hCaptcha or reCAPTCHA keys, and
   an edge verdict such as BotID's (ADR 078 §5). None costs Zitadel per check,
-  and a customer's own provider bills the customer. Opt-in adaptive protection
-  (risk scoring from those verdicts and other signals, then risk-based
-  step-up) is metered per user it scores. MAU is an
+  and a customer's own provider bills the customer. Risk-based challenges and
+  MFA prompts on Zitadel's own signals and the customer's are free, and rules
+  on them belong to Governance. Only opt-in threat intelligence, feeds Zitadel
+  licenses (IP reputation, leaked credentials), is metered per user checked.
+  MAU is an
   analytics gauge, never a billable meter or upgrade trigger. Paid Governance is an
   account-wide package included in Pro; Compliance is quoted per account
   with agreed retention, retained-event volume and SIEM destinations.
