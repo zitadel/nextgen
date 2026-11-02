@@ -339,22 +339,6 @@ export class DockerLauncher implements Launcher<DockerRuntimeMetadata> {
       stop.dispose();
     }
   }
-
-  /**
-   * The user the container runs as, so files it writes into the mounted data
-   * directory belong to the developer and not to root. Empty where there are no
-   * user ids (Windows).
-   */
-  static currentUser(): { uid?: number; gid?: number } {
-    const getuid = process.getuid;
-    const getgid = process.getgid;
-    if (typeof getuid !== "function") {
-      return {};
-    }
-    const uid = getuid();
-    const gid = typeof getgid === "function" ? getgid() : uid;
-    return { uid, gid };
-  }
 }
 
 /**

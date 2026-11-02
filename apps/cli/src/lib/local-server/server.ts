@@ -5,6 +5,7 @@ import consola from "consola";
 import { Consent } from "../consent";
 import { ZitadelError, errorMessage } from "../errors";
 import { unscopedCommand } from "../suggestion";
+import { currentUser } from "../uidgid";
 import type { ResolvedEnv } from "./env-vars";
 import { assertDockerAvailable, startFailure } from "./internal/failures";
 import { BinaryLauncher, type StopBinaryRuntimeResult } from "./internal/binary-launcher";
@@ -373,7 +374,7 @@ export class LocalServer {
           containerName: localContainerName(this.cwd),
           image,
           dataDir: paths.dataDir,
-          identity: await ensureContainerIdentity(this.cwd, DockerLauncher.currentUser()),
+          identity: await ensureContainerIdentity(this.cwd, currentUser()),
           env: config.env,
           userFile: config.userFile,
         }),
