@@ -61,7 +61,7 @@ delete:
   operationId: revokeMySession
   summary: Revoke my session
   description: |
-    Revokes the caller's own session, which signs the user out.
+    Revokes the caller's own session by deleting it, which signs the user out.
 
     The request needs the session cookie issued at creation (or superseded by a
     handoff exchange). It also needs the session's CSRF token from

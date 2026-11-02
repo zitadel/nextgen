@@ -169,8 +169,9 @@ type Handler interface {
 	// - `409 dep.conflict`: `expected_deployment_id` is not the deployment this
 	// write replaces, and `details.deployment` is that deployment. Inspect it,
 	// then retry with its ID as `expected_deployment_id`, or stop.
-	// - `409 rel.revoked`: the release is revoked and cannot be deployed. Build
-	// a new release.
+	// - `409 rel.revoked`: the release is revoked and cannot be deployed. Change
+	// the configuration and build a new release, or deploy a release that is
+	// not revoked. Rebuilding unchanged content returns the same revoked release.
 	//
 	// POST /deployments
 	CreateDeployment(ctx context.Context, req *CreateDeploymentRequest, params CreateDeploymentParams) (CreateDeploymentRes, error)
@@ -293,7 +294,7 @@ type Handler interface {
 	// during creation, the request is rejected.
 	// OIDC is the only protocol.
 	// The document is validated against the `idp-connection.json` schema before
-	// anything is stored. The rules the engine applies when it starts a sign-in
+	// anything is stored. The rules the server applies when it starts a sign-in
 	// then run on the document, so a document that could never start one is
 	// refused here with `idp.endpoints_partial`: the OIDC block sets an endpoint
 	// without the others. Set no endpoint, and discovery fills them, or set
@@ -1268,7 +1269,7 @@ type Handler interface {
 	RemovePreview(ctx context.Context, req *RemovePreviewRequest, params RemovePreviewParams) (RemovePreviewRes, error)
 	// RevokeMySession implements revokeMySession operation.
 	//
-	// Revokes the caller's own session, which signs the user out.
+	// Revokes the caller's own session by deleting it, which signs the user out.
 	// The request needs the session cookie issued at creation (or superseded by a
 	// handoff exchange). It also needs the session's CSRF token from
 	// `GET /sessions/me/csrf` in the `X-Zitadel-CSRF` header. Idempotent: if the session is already gone,
@@ -1303,7 +1304,8 @@ type Handler interface {
 	RevokeRelease(ctx context.Context, params RevokeReleaseParams) (RevokeReleaseRes, error)
 	// RevokeSession implements revokeSession operation.
 	//
-	// Revokes a session, ending it immediately and for good.
+	// Revokes a session by deleting it, immediately and for good. A later
+	// `getSession` for it answers `404`.
 	// This is the operator revoke path. It requires the `session.delete` scope on a
 	// project-bound credential. End-user sign-out with the session cookie is
 	// `DELETE /sessions/me` (`sessionCookie` scheme).
@@ -1384,7 +1386,7 @@ type Handler interface {
 	// The frontend never sees a `complete` for intermediate flows.
 	// ## External sign-in
 	// `{action: "sso", sso_provider_id, return_target}` on a step that offers
-	// `sso_providers` returns the engine-emitted `sso-redirect` step, whose
+	// `sso_providers` returns the server-emitted `sso-redirect` step, whose
 	// `redirect_url` the frontend navigates to.
 	// - The flow state does not change, but `_zflow` is re-sealed like on
 	// every response, so its ten-minute window restarts at this submission;
@@ -1397,9 +1399,9 @@ type Handler interface {
 	// `__Host-` prefix is dropped because it requires `Secure`.
 	// An identity provider (an external sign-in such as Google) whose
 	// `client_id` is a `${{ NAME }}` reference has it filled from the project's
-	// variables. A provider the engine cannot start a sign-in with, including a
+	// variables. A provider the server cannot start a sign-in with, including a
 	// reference with no variable behind it, re-renders the step with
-	// `error.sso_unavailable`. Define the missing variable, then submit again.
+	// `error.sso_unavailable`.
 	// Reuses the deployment sealed into `_zflow` at `createFlow`; it does not
 	// re-resolve from `Origin`. If that release was revoked since the attempt
 	// started, the response is `409` with `rel.revoked`.

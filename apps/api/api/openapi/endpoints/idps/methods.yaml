@@ -26,7 +26,7 @@ post:
     OIDC is the only protocol.
 
     The document is validated against the `idp-connection.json` schema before
-    anything is stored. The rules the engine applies when it starts a sign-in
+    anything is stored. The rules the server applies when it starts a sign-in
     then run on the document, so a document that could never start one is
     refused here with `idp.endpoints_partial`: the OIDC block sets an endpoint
     without the others. Set no endpoint, and discovery fills them, or set
@@ -207,7 +207,7 @@ post:
                       prompt: select_account
     '400':
       description: |
-        The document failed schema validation, the engine could not start a
+        The document failed schema validation, the server could not start a
         sign-in with it, or it revises an existing identity provider and
         changes a field that is fixed for its life. Fix the document and send
         it again.

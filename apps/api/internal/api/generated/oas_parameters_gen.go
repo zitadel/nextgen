@@ -3510,7 +3510,8 @@ type GetIdpRevisionByIdParams struct {
 	// The project ID: the `id` that `createProject` returns, which `zitadel setup`
 	// also prints as `project_id`.
 	ProjectID ProjectID
-	// The revision ID: the `revision_id` that `listIdpRevisions` lists.
+	// The revision ID: the `revision_id` that `createIdp` or `updateIdp` returns,
+	// or that `listIdpRevisions` lists.
 	RevisionID string
 }
 

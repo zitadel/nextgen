@@ -40,8 +40,9 @@ post:
     - `409 dep.conflict`: `expected_deployment_id` is not the deployment this
       write replaces, and `details.deployment` is that deployment. Inspect it,
       then retry with its ID as `expected_deployment_id`, or stop.
-    - `409 rel.revoked`: the release is revoked and cannot be deployed. Build
-      a new release.
+    - `409 rel.revoked`: the release is revoked and cannot be deployed. Change
+      the configuration and build a new release, or deploy a release that is
+      not revoked. Rebuilding unchanged content returns the same revoked release.
   tags:
     - Deployments
   parameters:

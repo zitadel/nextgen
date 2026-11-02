@@ -35,7 +35,7 @@ post:
     ## External sign-in
 
     `{action: "sso", sso_provider_id, return_target}` on a step that offers
-    `sso_providers` returns the engine-emitted `sso-redirect` step, whose
+    `sso_providers` returns the server-emitted `sso-redirect` step, whose
     `redirect_url` the frontend navigates to.
 
     - The flow state does not change, but `_zflow` is re-sealed like on
@@ -50,9 +50,9 @@ post:
 
     An identity provider (an external sign-in such as Google) whose
     `client_id` is a `${{ NAME }}` reference has it filled from the project's
-    variables. A provider the engine cannot start a sign-in with, including a
+    variables. A provider the server cannot start a sign-in with, including a
     reference with no variable behind it, re-renders the step with
-    `error.sso_unavailable`. Define the missing variable, then submit again.
+    `error.sso_unavailable`.
 
     Reuses the deployment sealed into `_zflow` at `createFlow`; it does not
     re-resolve from `Origin`. If that release was revoked since the attempt

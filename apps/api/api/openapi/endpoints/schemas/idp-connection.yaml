@@ -40,7 +40,7 @@ properties:
   subject_claim:
     type: string
     minLength: 1
-    description: "The claim (a named piece of user data the provider returns) that carries the provider's stable subject identifier. Optional; the engine uses `sub`, as the OIDC specification defines. Override it where `sub` is pairwise, for example Entra `oid`."
+    description: "The claim (a named piece of user data the provider returns) that carries the provider's stable subject identifier. Optional; the server uses `sub`, as the OIDC specification defines. Override it where `sub` is pairwise, for example Entra `oid`."
   claim_mapping:
     type: object
     additionalProperties:
@@ -126,7 +126,7 @@ properties:
         pattern: ^\$\{\{ *[A-Za-z0-9_]+ *\}\}$
         description: 'A reference to the variable holding the client secret, never the secret itself.
           A secret may only be referenced as the entire value: text around the placeholder would be rendered
-          into the resolved credential, so it is rejected. The engine resolves it against the environment
+          into the resolved credential, so it is rejected. The server resolves it against the environment
           serving the request.'
       token_endpoint_auth_method:
         type: string
@@ -174,7 +174,7 @@ properties:
             - client_assertion
         additionalProperties:
           type: string
-        description: "Extra provider-specific authorize parameters (for example `prompt`). Engine-owned protocol parameters are reserved and rejected by `propertyNames`: the engine composes them itself, and an override of `state` or `nonce` would silently defeat CSRF and token binding. `client_secret` and `client_assertion` are rejected as they could be appended to the public authorize URL."
+        description: "Extra provider-specific authorize parameters (for example `prompt`). Engine-owned protocol parameters are reserved and rejected by `propertyNames`: the server composes them itself, and an override of `state` or `nonce` would silently defeat CSRF and token binding. `client_secret` and `client_assertion` are rejected as they could be appended to the public authorize URL."
 allOf:
 - if:
     properties:
