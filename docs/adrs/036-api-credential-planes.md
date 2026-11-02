@@ -329,10 +329,10 @@ first submit is refused, while previewing a project's login keeps working.
 
 ## Amendment (2026-10-31): callers with no origin
 
-A request with no `Origin`, and one admitted without a project pattern with
-nothing deployed to its origin, is served the project's newest primary
-deployment when there is one. So a console origin the platform project does not
-list still opens a flow.
+A request with no `Origin` is served the project's newest primary deployment when
+there is one. So is a request from a console origin the project does not list,
+such as `https://console.example.com` or a console on `http://localhost:8080`. So
+a console origin the platform project does not list still opens a flow.
 
 ## Amendment (2026-10-31): an empty allowlist admits nothing
 
