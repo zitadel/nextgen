@@ -74,7 +74,7 @@ async function lockoutWarnings(ctx: StepContext): Promise<string[]> {
     const missing = users.filter((user) => !carries(user, identifier));
     if (missing.length === 0) continue;
     warnings.push(
-      `${count(missing.length, truncated)} of ${count(users.length, truncated)} existing ${plural(users.length, "user")} of ${quote(objectType)} ${missing.length === 1 ? "has" : "have"} no ${quote(identifier)}, the identifier the schema now signs in with, so they cannot sign in with a password. Move each to the new revision and set it in one update: zitadel users update <user_id> --schema <revision_id> --attributes ${identifier}=<value>`,
+      `${count(missing.length, truncated)} of ${count(users.length, truncated)} existing ${plural(users.length, "user")} of ${quote(objectType)} ${missing.length === 1 ? "has" : "have"} no ${quote(identifier)}, the identifier the schema now signs in with, so they cannot sign in with a password. Move each to the new revision and set it in one update: zitadel users update <user_id> --schema <revision_id> --set attributes.${identifier}=<value>`,
     );
   }
 
@@ -85,11 +85,17 @@ async function lockoutWarnings(ctx: StepContext): Promise<string[]> {
     ctx,
     served.map((value) => ({ field: "schema_object_type", operation: "not_equals", value })),
   );
+  // Its own boundary: a link read that fails (a user deleted since the query)
+  // must not discard the identifier warnings already computed above.
   const hasLink = await inBatches(stranded, async (user) => {
-    const { identity_links: links } = await ctx.client.listUserIdentityLinks(user.id, {
-      limit: 1,
-    });
-    return links.length > 0;
+    try {
+      const { identity_links: links } = await ctx.client.listUserIdentityLinks(user.id, {
+        limit: 1,
+      });
+      return links.length > 0;
+    } catch {
+      return false;
+    }
   });
   // Revisions of one schema share an object type, so they are one count.
   const linked = new Map<string, number>();
@@ -141,6 +147,7 @@ function carries(user: QueriedUser, path: string): boolean {
   let node: unknown = user.attributes;
   for (const key of path.split(".")) {
     if (typeof node !== "object" || node === null) return false;
+    if (!Object.hasOwn(node, key)) return false;
     node = (node as Record<string, unknown>)[key];
   }
   return node !== undefined && node !== null && node !== "";

@@ -156,6 +156,46 @@ describe("lockoutStep", () => {
     expect(takeReportedWarnings()).toEqual([]);
   });
 
+  it("suggests the dot-path form for a dotted identifier", async () => {
+    await lockoutStep.run(
+      ctx({
+        schemas: [{ objectType: "human-user", "x-identifier": "account.handle" }],
+        flows: [flow("human-user")],
+        users: [user("u1", "human-user", {})],
+      }),
+    );
+
+    expect(takeReportedWarnings()[0]).toContain("--set attributes.account.handle=<value>");
+  });
+
+  it("does not read an inherited property as the identifier", async () => {
+    await lockoutStep.run(
+      ctx({
+        schemas: [{ objectType: "human-user", "x-identifier": "constructor" }],
+        flows: [flow("human-user")],
+        users: [user("u1", "human-user", {})],
+      }),
+    );
+
+    expect(takeReportedWarnings()).toHaveLength(1);
+  });
+
+  it("keeps the identifier warning when a link read fails", async () => {
+    const c = ctx({
+      schemas: [{ objectType: "human-user", "x-identifier": "username" }],
+      flows: [flow("human-user")],
+      users: [user("u1", "human-user", {}), user("u2", "other")],
+    });
+    (c.client as unknown as { listUserIdentityLinks: unknown }).listUserIdentityLinks =
+      async () => {
+        throw new Error("404");
+      };
+
+    await lockoutStep.run(c);
+
+    expect(takeReportedWarnings()).toHaveLength(1);
+  });
+
   it("never fails the deploy when users cannot be read", async () => {
     await expect(
       lockoutStep.run(
