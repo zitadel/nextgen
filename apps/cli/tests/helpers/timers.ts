@@ -6,9 +6,11 @@ import { vi } from "vitest";
  * real delay under fake timers. This routes that module through the global
  * `setTimeout`, which is the real one until a test fakes it and the fake one
  * after, so a test advances every wait the same way. It honours the `signal`
- * and `ref` options the real one takes, which the code under test relies on.
+ * and `ref` options the real one takes, which the code under test relies on, and
+ * leaves every other export of the module as it is.
  */
-vi.mock("node:timers/promises", () => ({
+vi.mock("node:timers/promises", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("node:timers/promises")>()),
   setTimeout: <T = void>(
     ms: number,
     value?: T,

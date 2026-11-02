@@ -1,3 +1,4 @@
+import * as timers from "node:timers/promises";
 import { setTimeout as sleep } from "node:timers/promises";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -40,5 +41,11 @@ describe("node:timers/promises under the shared setup", () => {
     const timer = setTimeoutSpy.mock.results[0]?.value as NodeJS.Timeout;
     expect(timer.hasRef()).toBe(false);
     await waited;
+  });
+
+  it("leaves the other exports of the module as they are", () => {
+    expect(timers.setImmediate).toBeTypeOf("function");
+    expect(timers.setInterval).toBeTypeOf("function");
+    expect(timers.scheduler).toBeDefined();
   });
 });
