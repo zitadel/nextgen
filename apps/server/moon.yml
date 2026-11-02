@@ -213,12 +213,18 @@ tasks:
       runFromWorkspaceRoot: true
 
   test:
+    # -count=1 disables go's test-result cache. Go keys a cached result on the
+    # files a test opens only inside the module (apps/api), and the drift
+    # tests read files outside it (serverTests, the events catalog), so a
+    # change to one of those alone would come back "ok (cached)": locally, and
+    # in CI, whose Go cache carries results between runs.
     command: "go"
     args:
       - "-C"
       - "apps/api"
       - "test"
       - "-v"
+      - "-count=1"
       - "-timeout"
       - "10m"
       - "./..."
