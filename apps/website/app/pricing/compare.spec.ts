@@ -109,17 +109,23 @@ describe("free security and account-wide packages", () => {
     for (const plan of PLANS) expect(words(mau!.cells[plan])).toBe("Never billed");
   });
 
-  it("shows free bot and risk checks beside paid threat intelligence, for every kind of app", () => {
+  it("shows free secure defaults, Pro settings and paid threat intelligence, for every kind of app", () => {
     const security = compareGroups(catalog).find((group) => group.id === "security")!.rows;
     const start = security.findIndex((row) => row.subgroup?.title === "Protection");
     const end = security.findIndex((row, index) => index > start && row.subgroup);
     const shield = security.slice(start, end);
+    const settings = catalog.packages.find((entry) => entry.id === "security_settings")!;
     expect(shield.map((row) => row.source ?? row.label)).toEqual([
       ...catalog.core.security,
+      ...settings.features,
       "threat_intel_users",
     ]);
-    for (const row of shield.filter((entry) => /bot|risk/i.test(entry.label)))
+    for (const row of shield.filter((entry) => catalog.core.security.includes(entry.label)))
       for (const plan of PLANS) expect(row.cells[plan].kind, row.label).not.toBe("no");
+    for (const row of shield.filter((entry) => entry.packageId === settings.id)) {
+      expect(row.cells.free.kind, row.label).toBe("no");
+      expect(words(row.cells.pro), row.label).toBe("Included Planned");
+    }
     const intelligence = shield.find((row) => row.source === "threat_intel_users")!;
     expect(words(intelligence.cells.free)).toBe("10K / month included");
     expect(words(intelligence.cells.pro)).toBe("10K / month included Then $0.003 per user");

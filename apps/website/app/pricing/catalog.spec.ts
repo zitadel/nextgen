@@ -50,7 +50,11 @@ describe("the cloud's price list", () => {
     expect(enterprise.regions).toEqual({ scope: "project", selection: "all_available" });
     expect(catalog.core.authentication).toContain("Passkeys and TOTP MFA");
     expect(pro.minimum.amount).toBeGreaterThan(0);
-    expect(catalog.packages.map((entry) => entry.id)).toEqual(["governance", "compliance"]);
+    expect(catalog.packages.map((entry) => entry.id)).toEqual([
+      "governance",
+      "security_settings",
+      "compliance",
+    ]);
     expect(enterprise.support).not.toBe("");
     expect(catalog.self_hosted.pro.prices.length).toBeGreaterThan(0);
   });

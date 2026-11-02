@@ -395,14 +395,14 @@ function Questions({ catalog }: { catalog: Catalog }) {
       answer: (
         <>
           <p>
-            Every bot check is free, on every plan and when you host Zitadel yourself. Zitadel
-            brings its own challenge: an invisible proof of work that gets harder after failed
-            attempts, with no third-party account and no data leaving your deployment.
+            Zitadel never charges per bot check. Every plan, and every server you host yourself,
+            runs Zitadel's own challenge: an invisible proof of work that gets harder after failed
+            attempts, with no third-party account and no data leaving your deployment. Your app's
+            edge can add its bot verdict, such as Vercel BotID's or Cloudflare's, on every plan.
           </p>
           <p>
-            You can use your own provider instead: Cloudflare Turnstile, hCaptcha or reCAPTCHA with
-            your own keys, or the bot verdict of your app's edge, such as Vercel BotID or
-            Cloudflare. That provider bills you directly, if it charges, and Zitadel adds nothing.
+            On {pro.label}, you can tune the challenge or use Cloudflare Turnstile, hCaptcha or
+            reCAPTCHA with your own keys. That provider bills you directly, if it charges.
           </p>
           <p>
             Zitadel's free risk checks combine those verdicts with the device, failed attempts,
