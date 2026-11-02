@@ -82,14 +82,12 @@ export const MOCK_PROJECTS = [
  * sign in through 20 SSO connections of 1,000 with MFA required, the pricing
  * proposal's example bill, $1,500 on Pro; basic MFA is free. The SSO meter
  * counts at most 750 of a connection's users. Most use the customer portal. The partner API's
- * machines take tokens and the portal's sign-up runs bot checks, both within
- * their allowances.
+ * machines take tokens within their allowance.
  */
 const MOCK_PROJECT_MONTHS: Record<string, Record<string, number>> = {
   proj_mock_portal: {
     monthly_active_users: 14_000,
     sso_users: 10_500,
-    bot_checks: 700,
   },
   proj_mock_api: {
     monthly_active_users: 6_000,
