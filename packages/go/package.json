@@ -7,6 +7,6 @@
   "scripts": {
     "format": "node ../../scripts/go-format-check.mjs",
     "vet": "go vet ./...",
-    "test": "go test -timeout 5m ./..."
+    "test": "go test -count=1 -timeout 5m ./..."
   }
 }

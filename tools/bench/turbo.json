@@ -20,6 +20,8 @@
         "$TURBO_ROOT$/apps/api/go.mod",
         "$TURBO_ROOT$/apps/api/go.sum",
         "$TURBO_ROOT$/packages/go/**/*.go",
+        "!$TURBO_ROOT$/packages/go/**/*_test.go",
+        "!$TURBO_ROOT$/packages/go/**/testdata/**",
         "$TURBO_ROOT$/packages/go/go.mod",
         "$TURBO_ROOT$/packages/go/go.sum",
         "$TURBO_ROOT$/apps/api/api/openapi/endpoints/schemas/*.json",

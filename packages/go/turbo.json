@@ -19,7 +19,9 @@
       "cache": false,
       "dependsOn": ["format", "vet"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
-      // api/client_test.go holds PathPrefix to the spec's servers URL.
+      // api/client_test.go holds PathPrefix to the spec's servers URL, a file
+      // outside the module that Go's result cache does not see (-count=1 in
+      // the script, as in moon.yml).
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/apps/api/api/openapi/openapi-spec.yaml"]
     }
   }

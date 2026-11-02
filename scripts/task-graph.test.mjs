@@ -143,6 +143,8 @@ beforeAll(() => {
     "apps/api/internal/build/info_test.go",
     "tools/bench/main.go",
     "tools/oidc-mock/main.go",
+    "packages/go/api/client.go",
+    "packages/go/api/client_test.go",
   ]) {
     write(file, "package main\n");
   }
@@ -298,6 +300,32 @@ describe.sequential("task graph cache and ordering contracts", () => {
         expect(affected.has("server:test")).toBe(true);
       });
     }
+    // The client module's tests are its own: the server compiles only its
+    // non-test files, through the replace directive.
+    changed("packages/go/api/client_test.go", "package main\n// changed test\n", () => {
+      const next = dry();
+      for (const task of [
+        "@zitadel/server#check-generate",
+        "@zitadel/server#build",
+        "@zitadel/bench#build",
+        "@zitadel/cloud#build",
+      ]) {
+        expect(next.get(task).hash, task).toBe(baseline.get(task).hash);
+      }
+      expect(next.get("@zitadel/go#test").hash).not.toBe(baseline.get("@zitadel/go#test").hash);
+      const affected = moonAffected();
+      expect(affected.has("server:build")).toBe(false);
+      expect(affected.has("bench:build")).toBe(false);
+      expect(affected.has("go:test")).toBe(true);
+    });
+    changed("packages/go/api/client.go", "package main\n// changed client\n", () => {
+      const next = dry();
+      for (const project of ["server", "bench", "cloud"]) {
+        expect(next.get(`@zitadel/${project}#build`).hash, project).not.toBe(
+          baseline.get(`@zitadel/${project}#build`).hash,
+        );
+      }
+    });
     changed("tools/oidc-mock/main.go", "package main\n// changed mock\n", () => {
       const next = dry();
       for (const project of ["server", "bench", "cloud"]) {

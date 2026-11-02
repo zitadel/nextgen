@@ -44,6 +44,8 @@
         "$TURBO_ROOT$/apps/api/api/.ogen.yaml",
         "$TURBO_ROOT$/apps/api/api/.ogen-client.yaml",
         "$TURBO_ROOT$/packages/go/**/*.go",
+        "!$TURBO_ROOT$/packages/go/**/*_test.go",
+        "!$TURBO_ROOT$/packages/go/**/testdata/**",
         "$TURBO_ROOT$/packages/go/go.mod",
         "$TURBO_ROOT$/packages/go/go.sum",
         "$TURBO_ROOT$/scripts/check-go-generate.mjs",
