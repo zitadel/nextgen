@@ -21,7 +21,7 @@ export class FrameworkConfirmPrompt implements SetupPrompt {
       return answers;
     }
     const ack = await ctx.input({
-      kind: "confirm",
+      kind: "yes-no",
       name: "confirm the framework",
       message: `Would you like to set up Zitadel in this ${ctx.framework.displayName} app?`,
       initialValue: true,

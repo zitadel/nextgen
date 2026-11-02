@@ -522,7 +522,7 @@ function flowResponse(r: FlowDefinitionRecord): GetFlowDefinition200 {
 }
 
 function defaultHumanUserSchema(): GetSchemaById200Schema {
-  return getDefaultHumanUserSchema() as unknown as GetSchemaById200Schema;
+  return getDefaultHumanUserSchema();
 }
 
 function seedDefaultProjectResources(projectID: string, createdAt: string): void {

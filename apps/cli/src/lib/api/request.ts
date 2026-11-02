@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { text } from "node:stream/consumers";
 
 import * as schemas from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
+import { apiBaseUrl } from "@zitadel/api/runtime/base-url";
 
 import { ZitadelError } from "../errors";
 import { parseJsonObject } from "../json";
@@ -26,13 +27,13 @@ export type ApiRequest = Readonly<{
   body?: unknown;
 }>;
 
-/** The URL a request goes to on `server`. */
+/** The URL a request goes to on `server`: the API under `/api/v1` there, then the spec's path. */
 export const urlOf = (server: string, request: ApiRequest): string => {
   const query = new URLSearchParams(
     request.query.map(([name, value]) => [name, value] as [string, string]),
   );
   const search = query.size > 0 ? `?${query}` : "";
-  return `${server.replace(/\/+$/, "")}${request.path}${search}`;
+  return `${apiBaseUrl(server)}${request.path}${search}`;
 };
 
 /**

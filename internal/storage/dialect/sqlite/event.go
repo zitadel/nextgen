@@ -14,6 +14,12 @@ import (
 )
 
 const (
+	// insertEventStmt stamps created_at after every event already stored in
+	// the project, even when the clock read earlier: the clock is read before
+	// the insert waits for the connection and the write lock, and it can step
+	// back. SQLite has one writer, which holds the lock from this stamp to its
+	// commit, so the project's events commit in created_at order and a
+	// reader's cursor never passes one that commits later.
 	insertEventStmt = `
 INSERT INTO events (
     project_id, id, event_type, category,
@@ -25,7 +31,7 @@ INSERT INTO events (
     payload, metadata
 ) VALUES (
     ?, ?, ?, ?,
-    ?, ?,
+    ?, max(?, coalesce((SELECT max(created_at) FROM events WHERE project_id = ?), 0) + 1),
     ?, ?, ?,
     ?, ?,
     ?, ?, ?, ?, ?, ?,
@@ -101,7 +107,7 @@ func (e eventStatements) InsertEvent(ctx context.Context, event *domain.Event) e
 	var occurredOut, createdOut int64
 	err := e.client.QueryRow(ctx, insertEventStmt,
 		event.ProjectID, event.ID, string(event.EventType), string(event.Category),
-		occurredNano, createdNano,
+		occurredNano, createdNano, event.ProjectID,
 		nullString(event.TeamID), nullString(event.ActorID), nullActorType(event.ActorType),
 		nullString(event.EntityType), nullString(event.EntityID),
 		event.ClientID, event.TokenID, event.DelegationType, event.DelegationID, event.Grantor, event.Fingerprint,
@@ -233,6 +239,13 @@ func (e eventStatements) UpsertEventSinkCursor(ctx context.Context, cursor *doma
 		cursor.SinkID, cursor.ProjectID, cursor.LastCreatedAt.UTC().UnixNano(), cursor.LastEventID,
 	)
 	return wrapError(err)
+}
+
+// EventsSettledBefore implements [service.EventStatements]. Every committed
+// event is settled: insertEventStmt stamps under the write lock, after every
+// event already stored in the project.
+func (e eventStatements) EventsSettledBefore(context.Context, string) (time.Time, error) {
+	return time.Time{}, nil
 }
 
 // ListEventsAfterCursor implements [service.EventStatements].

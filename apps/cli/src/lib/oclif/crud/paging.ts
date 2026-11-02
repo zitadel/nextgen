@@ -1,82 +1,35 @@
-import { ZitadelError } from "../../errors";
-import { isObject } from "../../json";
-import type { Page } from "./types";
-
-/** How a command spells draining every page, and fetching one at a time, for its errors. */
-export type PagingFlags = Readonly<{ all: string; onePage: string }>;
-
-/** The list commands' own: `--all`, and `--limit` with `--page-token`. */
-const LIST_FLAGS: PagingFlags = { all: "--all", onePage: "--limit and --page-token" };
-
 /**
- * Walk a cursor-paginated endpoint. `request` performs one page; the
- * response must carry the items under `items` and, while more remain, a
- * the cursor property `nextPageToken` names. With `all` the pages are drained
- * in order and `next`
- * is `null`; otherwise one page is fetched and `next` is its token. `flags`
- * names the caller's own flags in the errors.
+ * The first page `pages` yields, or with `all` every page in order, as one
+ * list of the items `items` takes from each page. `next` reads a page's
+ * cursor to report it: the cursor to the page after the first, or `null` once
+ * `all` has read the last page.
+ *
+ * Following the cursor is the walk's job, not this one's: a client function's
+ * `.pages()` reads it from the page as the server sent it, before the CLI
+ * escapes the page, so it goes back to the server unchanged. Without `all`
+ * the walk is left after its first page, so no second one is fetched.
  */
-export const collectPages = async (
-  request: (token?: string) => Promise<unknown>,
+export const collectPages = async <P, T>(
+  pages: AsyncIterable<P>,
   {
     items,
     all,
-    token,
-    nextPageToken,
-    flags = LIST_FLAGS,
+    next,
   }: Readonly<{
-    items?: string;
+    items: (page: P) => readonly T[];
     all: boolean;
-    token?: string;
-    nextPageToken: string;
-    flags?: PagingFlags;
+    next: (page: P) => string | null | undefined;
   }>,
-): Promise<Page> => {
+): Promise<{ items: T[]; next: string | null }> => {
   // Accumulated in one array rather than by concatenating each page onto the
   // last: these resources are unbounded, and a wide `--all` would otherwise
   // copy every record once per remaining page.
-  const collected: unknown[] = [];
-  // A server that returns a cursor it already issued — a bug, a cache — would
-  // otherwise have the drain fetch the same page forever behind a spinner that
-  // looks like progress.
-  const seen = new Set<string>();
-  let cursor = token;
-  for (;;) {
-    const response = await request(cursor);
-    // A wrapped page names the array; an endpoint that answers with the
-    // collection itself has nothing to name, and the body is the array.
-    const page = items === undefined ? response : isObject(response) ? response[items] : undefined;
-    if (!Array.isArray(page)) {
-      throw new ZitadelError(
-        "E_VALIDATION",
-        items === undefined
-          ? "Unexpected list response: expected an array"
-          : `Unexpected list response: missing "${items}" array`,
-        { details: { response } },
-      );
-    }
-    collected.push(...(page as readonly unknown[]));
-    const cursor_ = isObject(response) ? response[nextPageToken] : undefined;
-    const next = typeof cursor_ === "string" ? cursor_ || null : null;
+  const collected: T[] = [];
+  for await (const page of pages) {
+    collected.push(...items(page));
     if (!all) {
-      return { items: collected, next };
+      return { items: collected, next: next(page) || null };
     }
-    if (!next) {
-      return { items: collected, next: null };
-    }
-    if (seen.has(next)) {
-      throw new ZitadelError(
-        "E_VALIDATION",
-        `The server repeated a page cursor, so ${flags.all} would never finish`,
-        {
-          hint: `Fetch one page at a time with ${flags.onePage}, and report the repeated cursor.`,
-          // Named for what it is rather than for the platform's spelling of
-          // it, so the error shape does not vary with the wire vocabulary.
-          details: { cursor: next, pages_fetched: seen.size + 1 },
-        },
-      );
-    }
-    seen.add(next);
-    cursor = next;
   }
+  return { items: collected, next: null };
 };

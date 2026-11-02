@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/zitadel/nextgen/api/client"
 	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/domain"
 )
@@ -202,4 +203,44 @@ func TestRequestEventMiddleware_CarriesTheAuthorizationMark(t *testing.T) {
 	require.NotNil(t, meta.Authorization)
 	assert.Equal(t, domain.EventAuthorizationPathPlatformOperator, meta.Authorization.Path)
 	assert.Equal(t, "proj_platform", meta.Authorization.ActorHomeProjectID)
+}
+
+// The operation names the route an event records. The API is mounted under
+// its prefix and at the root alias (ADR 077), so the mux pattern there names
+// only the mount: a request refused before the operation ran records no
+// route. A path of its own, the IdP callback, records its pattern.
+func TestRequestEventMiddleware_RecordsTheOperationAsTheRoute(t *testing.T) {
+	for _, tt := range []struct {
+		name, pattern, path, operationID, want string
+	}{
+		{name: "under the prefix", pattern: client.PathPrefix + "/", path: client.PathPrefix + "/users/me", operationID: "getMyUser", want: "getMyUser"},
+		{name: "at the root alias", pattern: "/", path: "/users/me", operationID: "getMyUser", want: "getMyUser"},
+		{name: "refused under the prefix", pattern: client.PathPrefix + "/", path: client.PathPrefix + "/users/me"},
+		{name: "refused at the root alias", pattern: "/", path: "/users/me"},
+		{name: "a path of its own", pattern: "/idp/{slug}/callback", path: "/idp/google/callback", want: "/idp/{slug}/callback"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			ins, buf := startPathA(t)
+			mux := http.NewServeMux()
+			mux.Handle(tt.pattern, WithRequestEventMiddleware(buf, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if tt.operationID != "" {
+					// What the ogen middleware does once the operation runs.
+					middleware.WithOperationIDContext(r.Context(), tt.operationID)
+				}
+				stampProject("proj_1").ServeHTTP(w, r)
+			})))
+			// The holder the operation fills, which WithLogging plants outside.
+			req := httptest.NewRequest(http.MethodGet, tt.path, nil)
+			mux.ServeHTTP(httptest.NewRecorder(), req.WithContext(middleware.WithOperationIDContext(req.Context(), "")))
+
+			require.Eventually(t, func() bool { return buf.Flushed() >= 1 }, 2*time.Second, 10*time.Millisecond)
+			ins.mu.Lock()
+			defer ins.mu.Unlock()
+			require.Len(t, ins.events, 1)
+			var payload domain.RequestAPIPayload
+			require.NoError(t, json.Unmarshal(ins.events[0].Payload, &payload))
+			assert.Equal(t, tt.want, payload.RouteTemplate)
+			assert.Equal(t, tt.operationID, payload.OperationID)
+		})
+	}
 }

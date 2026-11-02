@@ -14,11 +14,36 @@ afterEach(() => {
 });
 
 describe("the sign-in widget's calls", () => {
-  it("checks only the two calls that start or advance a flow", () => {
-    expect(isFlowWrite("POST", "/flow")).toBe(true);
-    expect(isFlowWrite("POST", "/flow/flw_1/submit")).toBe(true);
-    expect(isFlowWrite("GET", "/flow/flw_1")).toBe(false);
-    expect(isFlowWrite("POST", "/sessions/exchange")).toBe(false);
+  it.each(["", "/api/v1"])(
+    "checks only the two calls that start or advance a flow at '%s'",
+    (prefix) => {
+      expect(isFlowWrite("POST", `${prefix}/flow`)).toBe(true);
+      expect(isFlowWrite("POST", `${prefix}/flow/flw_1/submit`)).toBe(true);
+      expect(isFlowWrite("GET", `${prefix}/flow/flw_1`)).toBe(false);
+      expect(isFlowWrite("POST", `${prefix}/sessions/exchange`)).toBe(false);
+    },
+  );
+
+  // The server answers neither, so neither starts a flow there.
+  it.each(["/api/v1/api/v1/flow", "/api/v2/flow", "/api/v1flow"])(
+    "does not take %s for a flow write",
+    (path) => {
+      expect(isFlowWrite("POST", path)).toBe(false);
+    },
+  );
+
+  it("refuses a flow write under the API prefix from a bot, without forwarding it", async () => {
+    const upstream = vi.fn();
+    vi.stubGlobal("fetch", upstream);
+    const answer = await forwardSignIn(
+      new Request("https://cloud.example/cloud/zitadel/api/v1/flow", {
+        method: "POST",
+        body: "{}",
+      }),
+      bot,
+    );
+    expect(answer.status).toBe(403);
+    expect(upstream).not.toHaveBeenCalled();
   });
 
   it("refuses a flow write from a bot in the server's error envelope, without forwarding it", async () => {
@@ -43,7 +68,7 @@ describe("the sign-in widget's calls", () => {
     );
     vi.stubGlobal("fetch", upstream);
     const answer = await forwardSignIn(
-      new Request("https://cloud.example/cloud/zitadel/flow/flw_1/submit?x=1", {
+      new Request("https://cloud.example/cloud/zitadel/api/v1/flow/flw_1/submit?x=1", {
         method: "POST",
         headers: { cookie: "__Host-zitadel_session=old", origin: "https://cloud.example" },
         body: "{}",
@@ -51,7 +76,7 @@ describe("the sign-in widget's calls", () => {
       human,
     );
     const [url, init] = upstream.mock.calls[0] as unknown as [URL, RequestInit];
-    expect(url.href).toBe("https://cloud.example/flow/flw_1/submit?x=1");
+    expect(url.href).toBe("https://cloud.example/api/v1/flow/flw_1/submit?x=1");
     expect(new Headers(init.headers).get("cookie")).toBe("__Host-zitadel_session=old");
     expect(answer.headers.getSetCookie()).toEqual(["__Host-zitadel_session=new; Path=/; Secure"]);
   });

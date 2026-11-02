@@ -73,7 +73,7 @@ async function settle(): Promise<void> {
 
 function flowPurposes(): string[] {
   return fetchCalls
-    .filter((call) => new URL(call.url, "http://localhost").pathname === "/__nextgen/flow")
+    .filter((call) => new URL(call.url, "http://localhost").pathname === "/__nextgen/api/v1/flow")
     .map((call) => (JSON.parse(call.body) as { purpose?: string }).purpose ?? "");
 }
 

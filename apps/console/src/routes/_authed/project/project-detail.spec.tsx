@@ -16,7 +16,7 @@ vi.mock("@/auth/session", async (importOriginal) => {
 });
 
 const PROJECT_ID = "proj_1";
-const PROJECT_URL = `http://localhost/api/projects/${PROJECT_ID}`;
+const PROJECT_URL = `http://localhost/api/v1/projects/${PROJECT_ID}`;
 // The page also reads the project's admins and grants for its admins tab (#1238,
 // #1462), its variables and its password policy; empty answers keep these tests
 // about the project itself. The person can act on the project, so the context
@@ -25,12 +25,12 @@ const PROJECT_URL = `http://localhost/api/projects/${PROJECT_ID}`;
 beforeEach(() =>
   server.use(
     http.get(`${PROJECT_URL}/admins`, () => HttpResponse.json({ admins: [] })),
-    http.post("http://localhost/api/grants/query", () => HttpResponse.json({ grants: [] })),
-    http.get("http://localhost/api/variables", () => HttpResponse.json({})),
-    http.get("http://localhost/api/policies", () =>
+    http.post("http://localhost/api/v1/grants/query", () => HttpResponse.json({ grants: [] })),
+    http.get("http://localhost/api/v1/variables", () => HttpResponse.json({})),
+    http.get("http://localhost/api/v1/policies", () =>
       HttpResponse.json({ policies: [], next_page_token: null }),
     ),
-    http.get("http://localhost/api/users/me/projects", () =>
+    http.get("http://localhost/api/v1/users/me/projects", () =>
       HttpResponse.json({ projects: [{ id: PROJECT_ID, name: "River" }] }),
     ),
   ),

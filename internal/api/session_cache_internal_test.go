@@ -10,6 +10,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
+
+	"github.com/zitadel/nextgen/api/client"
 )
 
 // TestWithSessionStateNoStoreCoversTheSpec ties the middleware's hand-kept path
@@ -57,11 +59,14 @@ func TestWithSessionStateNoStoreCoversTheSpec(t *testing.T) {
 			if !strings.Contains(string(out), "cache-control-private-no-store.yaml") {
 				continue
 			}
-			rec := httptest.NewRecorder()
-			WithSessionStateNoStore(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})).
-				ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
-			require.Equal(t, sessionStateCacheControl, rec.Header().Get("Cache-Control"),
-				"GET %s promises no-store on %s; add it to WithSessionStateNoStore", path, status)
+			// Under the prefix and, until 1.0.0, at the root (ADR 077).
+			for _, spelling := range []string{client.PathPrefix + path, path} {
+				rec := httptest.NewRecorder()
+				WithSessionStateNoStore(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})).
+					ServeHTTP(rec, httptest.NewRequest(http.MethodGet, spelling, nil))
+				require.Equal(t, sessionStateCacheControl, rec.Header().Get("Cache-Control"),
+					"GET %s promises no-store on %s; add it to WithSessionStateNoStore", spelling, status)
+			}
 			covered = append(covered, path)
 			break
 		}

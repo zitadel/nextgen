@@ -1,20 +1,13 @@
 import { Flags } from "@oclif/core";
 
 import { CommandGroups, type JsonEnvelope, nonBlankString, PreviewCommand } from "../../lib/oclif";
+import { Tabulatable } from "../../lib/oclif/tabulatable";
 import { collectPages } from "../../lib/oclif/crud/paging";
-import { renderList } from "../../lib/oclif/crud/table";
 import { listData } from "../../lib/oclif/envelope";
 import { shellArg } from "../../lib/shell";
 
 /** The columns `list` renders, in order. */
 const COLUMNS = ["url", "expires", "created"] as const;
-
-/** A preview as the list endpoint returns it, narrowed to what the table reads. */
-type PreviewRow = {
-  origin: string;
-  expires_at: string;
-  created_at: string;
-};
 
 /**
  * `zitadel preview list` — show the project's live previews.
@@ -25,7 +18,7 @@ type PreviewRow = {
  * fetches one page and reports `next_page_token`; `--all` drains them,
  * `--limit` / `--page-token` walk them a page at a time.
  */
-export default class PreviewList extends PreviewCommand {
+export default class PreviewList extends Tabulatable(PreviewCommand) {
   static override description = "List the project's live previews, newest first.";
   static override group = CommandGroups.configuration;
   static override examples = [
@@ -58,19 +51,20 @@ export default class PreviewList extends PreviewCommand {
     await this.toMeta(flags);
     const { client, projectId } = await this.connect();
 
-    const request = (token?: string): Promise<unknown> =>
-      client.listPreviews(projectId, {
-        ...(flags.limit === undefined ? {} : { limit: flags.limit }),
-        ...(token === undefined ? {} : { page_token: token }),
-      });
-
-    const { items, next } = await collectPages(request, {
-      items: "previews",
-      all: flags.all === true,
-      token: flags["page-token"],
-      nextPageToken: "next_page_token",
-    });
-    const previews = items as PreviewRow[];
+    const params = {
+      limit: flags.limit,
+      page_token: flags["page-token"],
+    };
+    // One page unless `--all`, as every list does; the walk starts at
+    // `--page-token`, and a drain leaves no next page to report.
+    const { items: previews, next } = await collectPages(
+      client.listPreviews.pages(projectId, params),
+      {
+        items: (page) => page.previews,
+        all: flags.all === true,
+        next: (page) => page.next_page_token,
+      },
+    );
 
     const rows = previews.map((preview) => ({
       url: preview.origin,
@@ -93,13 +87,13 @@ export default class PreviewList extends PreviewCommand {
           )
         : undefined;
 
-    const plain = flags.plain || !process.stdout.isTTY;
+    const plain = this.isPlain(flags.plain);
     return this.emit({
       status: "ok",
       data: listData(previews, { nextPageToken: next }),
       ...(nextCommand === undefined ? {} : { next: { commands: [nextCommand] } }),
       machineReadable: plain,
-      pretty: renderList(COLUMNS, rows, {
+      pretty: await this.tabulateList(COLUMNS, rows, {
         plain,
         singular: "preview",
         empty: "No live previews.",
