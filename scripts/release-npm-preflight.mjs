@@ -1,7 +1,9 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { mapWithConcurrency, runCapture } from "./dev-process.mjs";
+import pMap from "p-map";
+
+import { runCapture } from "./dev-process.mjs";
 
 // Releases publish through npm trusted publishing, which cannot create a
 // package: a maintainer publishes a placeholder once and adds the trusted
@@ -60,9 +62,9 @@ export async function readPublishedVersions(name, { capture = runCapture } = {})
 
 /** The packages trusted publishing cannot publish: npm has never seen them. */
 export async function findPublishBlockers(packages, options = {}) {
-  const versions = await mapWithConcurrency(packages, 4, (pkg) =>
-    readPublishedVersions(pkg.name, options),
-  );
+  const versions = await pMap(packages, (pkg) => readPublishedVersions(pkg.name, options), {
+    concurrency: 4,
+  });
   return { unpublished: packages.filter((_, index) => versions[index].length === 0) };
 }
 

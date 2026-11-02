@@ -44,7 +44,9 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { isDirectRun, mapWithConcurrency, run, runCapture } from "./dev-process.mjs";
+import pMap from "p-map";
+
+import { isDirectRun, run, runCapture } from "./dev-process.mjs";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 
@@ -169,19 +171,23 @@ function assertEveryDirectiveHasAPhase(packages) {
 
 async function runPhase(dirs, phase, log) {
   const limit = Math.max(1, Math.min(availableParallelism(), dirs.length));
-  await mapWithConcurrency(dirs, limit, async (dir) => {
-    // Buffered per package so concurrent generators never interleave. On
-    // failure runCapture folds both streams into the thrown error's message.
-    const { stdout, stderr } = await runCapture("go", ["generate", "-run", phase.filter, "."], {
-      cwd: join(ROOT, dir),
-    });
-    const output = `${stdout}${stderr}`.trim();
-    // Most packages have nothing to do in a given phase; only say so when
-    // something actually ran.
-    if (output) {
-      log(`--- ${dir} (${phase.name})\n${output}`);
-    }
-  });
+  await pMap(
+    dirs,
+    async (dir) => {
+      // Buffered per package so concurrent generators never interleave. On
+      // failure runCapture folds both streams into the thrown error's message.
+      const { stdout, stderr } = await runCapture("go", ["generate", "-run", phase.filter, "."], {
+        cwd: join(ROOT, dir),
+      });
+      const output = `${stdout}${stderr}`.trim();
+      // Most packages have nothing to do in a given phase; only say so when
+      // something actually ran.
+      if (output) {
+        log(`--- ${dir} (${phase.name})\n${output}`);
+      }
+    },
+    { concurrency: limit },
+  );
 }
 
 /**

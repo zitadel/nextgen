@@ -5,10 +5,10 @@ import { createRequire } from "node:module";
 import { basename, dirname } from "node:path";
 import { StringDecoder } from "node:string_decoder";
 import { buffer } from "node:stream/consumers";
-import { setTimeout as delay } from "node:timers/promises";
 
 import { resolveServerBinary, serverBinaryPath } from "@zitadel/server/binary";
 import { execa } from "execa";
+import pWaitFor from "p-wait-for";
 
 import { ZitadelError, errorMessage, isErrno } from "../../errors";
 import { shellCommand } from "../../suggestion";
@@ -567,14 +567,12 @@ function signalRuntime(
  * process's child, so there is no exit event to wait on.
  */
 async function waitForExit(pid: number, timeoutMs: number): Promise<boolean> {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    if (!BinaryLauncher.isRunning(pid)) {
-      return true;
-    }
-    await delay(200);
-  }
-  return !BinaryLauncher.isRunning(pid);
+  const gone = () => !BinaryLauncher.isRunning(pid);
+  await pWaitFor(gone, {
+    interval: 200,
+    timeout: { milliseconds: timeoutMs, fallback: () => undefined },
+  });
+  return gone();
 }
 
 /**

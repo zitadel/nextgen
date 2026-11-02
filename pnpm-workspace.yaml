@@ -85,6 +85,7 @@ catalog:
   cookie-parser: ^1.4.7
   culori: ^4.0.2
   dompurify: ^3.4.16
+  escape-string-regexp: ^5.0.0
   execa: ^9.6.1
   express: ^4.18.2
   fastest-levenshtein: ^1.0.16
@@ -107,6 +108,9 @@ catalog:
   nuxt: ^4.5.1
   oclif: ^4.17.46
   orval: ^8.42.0
+  p-map: ^7.1.1
+  p-timeout: ^8.0.0
+  p-wait-for: ^7.0.0
   playwright: ^1.64.1
   publint: ^0.3.25
   radix-ui: ^1.6.4

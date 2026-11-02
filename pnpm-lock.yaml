@@ -353,6 +353,9 @@ catalogs:
     dompurify:
       specifier: ^3.4.16
       version: 3.4.17
+    escape-string-regexp:
+      specifier: ^5.0.0
+      version: 5.0.0
     execa:
       specifier: ^9.6.1
       version: 9.6.1
@@ -416,6 +419,15 @@ catalogs:
     orval:
       specifier: ^8.42.0
       version: 8.42.0
+    p-map:
+      specifier: ^7.1.1
+      version: 7.1.1
+    p-timeout:
+      specifier: ^8.0.0
+      version: 8.0.0
+    p-wait-for:
+      specifier: ^7.0.0
+      version: 7.0.0
     playwright:
       specifier: ^1.64.1
       version: 1.64.1
@@ -599,6 +611,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.1.11(@vitest/browser@4.1.11)(vitest@4.1.11)
+      p-map:
+        specifier: 'catalog:'
+        version: 7.1.1
       publint:
         specifier: 'catalog:'
         version: 0.3.25
@@ -674,6 +689,9 @@ importers:
       consola:
         specifier: ^3.4.2
         version: 3.4.2
+      escape-string-regexp:
+        specifier: 'catalog:'
+        version: 5.0.0
       execa:
         specifier: 'catalog:'
         version: 9.6.1
@@ -689,6 +707,12 @@ importers:
       mixpanel:
         specifier: ^0.18.1
         version: 0.18.1(supports-color@8.1.1)
+      p-timeout:
+        specifier: 'catalog:'
+        version: 8.0.0
+      p-wait-for:
+        specifier: 'catalog:'
+        version: 7.0.0
       picocolors:
         specifier: ^1.1.1
         version: 1.1.1
@@ -13894,9 +13918,21 @@ packages:
     resolution: {integrity: sha512-wPrq66Llhl7/4AGC6I+cqxT07LhXvWL08LNXz1fENOw0Ap4sRZZ/gZpTTJ5jpurzzzfS2W/Ge9BY3LgLjCShcw==}
     engines: {node: ^12.20.0 || ^14.13.1 || >=16.0.0}
 
+  p-map@7.1.1:
+    resolution: {integrity: sha512-6Lh3jQPLthYujSrlw6ccWXBGZTkoTCz27Hd92g79LH/kjAbgoEu0t442cCCNbegPSJsA0lwDX8z0bcKtkpA32g==}
+    engines: {node: '>=18'}
+
   p-timeout@6.1.4:
     resolution: {integrity: sha512-MyIV3ZA/PmyBN/ud8vV9XzwTrNtR4jFrObymZYnZqMmW0zA8Z17vnT0rBgFE/TlohB+YCHqXMgZzb3Csp49vqg==}
     engines: {node: '>=14.16'}
+
+  p-timeout@8.0.0:
+    resolution: {integrity: sha512-IHjMTvwSvMPKVfGAVTRxI+Ea6Vu5soB0oaC3fuEc58EI01T36AiVclDTTYoHBO8M1gjxqAvgkRLm33TGUCzEDw==}
+    engines: {node: '>=22'}
+
+  p-wait-for@7.0.0:
+    resolution: {integrity: sha512-zDQ/3GyUFSwklDAT7jeBu4FQgxw0o0yayyP4qizTl5yDYlAWbk71npDC1zhOqD4iqnEN2/4Ssr8Xc2aUQtvdAg==}
+    engines: {node: '>=22'}
 
   package-json-from-dist@1.0.1:
     resolution: {integrity: sha512-UEZIS3/by4OC8vL3P2dTXRETpebLI2NiI5vIrjaD/5UtrkFX/tNbwjTSRAGC/+7CAo2pIcBaRgWmcBBHcsaCIw==}
@@ -31239,7 +31275,13 @@ snapshots:
     dependencies:
       p-limit: 4.0.0
 
+  p-map@7.1.1: {}
+
   p-timeout@6.1.4: {}
+
+  p-timeout@8.0.0: {}
+
+  p-wait-for@7.0.0: {}
 
   package-json-from-dist@1.0.1: {}
 
