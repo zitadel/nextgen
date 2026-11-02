@@ -59,7 +59,7 @@ const project = await client.getProject(process.env.ZITADEL_PROJECT_ID!);
 
 `baseUrl` is the server's origin: the client calls the API under `/api/v1` there, and keeps a single prefix when the origin already ends in it. Every operation in the [API reference](/docs/reference/api) shows its call through this client, beside its request and response shapes. The method is named after the operation and takes its path parameters, its body, then its query parameters; an optional body comes after required query parameters.
 
-`getProject` sends `GET /projects/{project_id}` with the secret as a bearer token. It resolves to the project: its `id`, `name`, `origins`, `created_at`, `updated_at` and `owning_team_id`. Run the script with the variables from `.env.local` in its environment.
+`getProject` sends `GET /projects/{project_id}` with the secret as a bearer token. It resolves to the project, with fields such as `id`, `name` and `origins`. Run the script with the variables from `.env.local` in its environment.
 
 If the secret is missing or wrong, the server answers `401` and the call throws an `ApiError`. If the project ID names no project, the server answers `404` and the call throws the same error.
 

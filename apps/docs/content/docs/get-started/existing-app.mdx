@@ -33,3 +33,13 @@ To check that it worked, start your app and prove the browser flow as the [Quick
 If you pass `--framework`, name the one your app uses: when setup detects another, it stops with `E_CONFLICT` instead of treating your app as a directory to scaffold into. The files setup writes under `.zitadel/`, such as the default schema and login flow, are checked before it creates the project too, so a conflict leaves nothing behind.
 
 After an `E_CONFLICT`, the error's `hint` says what to change. For a file at a path setup writes, move it aside and rerun. Or rerun with `--force` to let setup replace it, then merge your version back from git. `--force` doesn't help with your root component or request boundary at another path, or with a connection under `.zitadel/idps/`, which setup never replaces.
+
+## When setup scaffolds a new app
+
+Setup scaffolds a new app only into an empty directory. What `start` wrote there, `.zitadel/local/` and the `.gitignore` line that ignores it, doesn't count. In a directory with other files but no app that setup recognizes, setup stops and points at `--force`. Pass it only when those files may go: setup replaces the ones that collide with the new app's (`package.json`, `src/`, and so on).
+
+Setup creates the app only once it has asked all its questions, so cancelling one leaves the directory as it was. `--dry-run` previews setup without creating the app. If setup fails or you cancel it after it has created the app, it removes the app again, so you can run the same command once more.
+
+## Edit the files setup wrote
+
+The pages and the request boundary that setup writes are yours to change. Setup records each file, and `doctor` reports one you changed as edited, or as adopted once you delete its `zitadel-cli: managed-file` comment. `doctor --fix` brings back only a file that is missing, never one you changed.
