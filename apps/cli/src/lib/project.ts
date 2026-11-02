@@ -1,7 +1,8 @@
-import { readFile, rename, stat, writeFile } from "node:fs/promises";
+import { readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { isErrno, ZitadelError } from "./errors";
+import { pathExistsStrict } from "./fs";
 import { enforceMode } from "./fs-safe";
 import { isObject, parseJsonObject, stableStringify } from "./json";
 import { DEFAULT_SERVER } from "./server";
@@ -12,7 +13,7 @@ import { unscopedCommand } from "./suggestion";
  * `zitadel.json` exists. Used to decide whether setup should run or skip.
  */
 export async function hasZitadelConfig(cwd: string): Promise<boolean> {
-  return exists(join(cwd, "zitadel.json"));
+  return pathExistsStrict(join(cwd, "zitadel.json"));
 }
 
 /**
@@ -20,19 +21,7 @@ export async function hasZitadelConfig(cwd: string): Promise<boolean> {
  * commands that need credentials, and signals that secrets were already pulled.
  */
 export async function hasZitadelSecret(cwd: string): Promise<boolean> {
-  return exists(join(cwd, ".zitadel/secret"));
-}
-
-async function exists(path: string): Promise<boolean> {
-  try {
-    await stat(path);
-    return true;
-  } catch (error) {
-    if (isErrno(error, "ENOENT")) {
-      return false;
-    }
-    throw error;
-  }
+  return pathExistsStrict(join(cwd, ".zitadel/secret"));
 }
 
 /**

@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { pathExists, readIfExists } from "../../../src/lib/fs";
+import { pathExists, pathExistsStrict, readIfExists, readIfReadable } from "../../../src/lib/fs";
 
 const tmpDir = (): Promise<string> => mkdtemp(join(tmpdir(), "zitadel-fs-"));
 
@@ -56,4 +56,40 @@ describe("readIfExists", () => {
       await expect(readIfExists(file)).rejects.toMatchObject({ code: "EACCES" });
     },
   );
+});
+
+describe("pathExistsStrict", () => {
+  it("is true for an existing path and false for a missing one", async () => {
+    const dir = await tmpDir();
+    await writeFile(join(dir, "a.txt"), "x");
+
+    expect(await pathExistsStrict(join(dir, "a.txt"))).toBe(true);
+    expect(await pathExistsStrict(join(dir, "missing"))).toBe(false);
+  });
+
+  it("throws when the parent is a file rather than a directory", async () => {
+    const dir = await tmpDir();
+    await writeFile(join(dir, "a.txt"), "x");
+
+    await expect(pathExistsStrict(join(dir, "a.txt", "child"))).rejects.toMatchObject({
+      code: "ENOTDIR",
+    });
+  });
+});
+
+describe("readIfReadable", () => {
+  it("returns the text of a readable file", async () => {
+    const dir = await tmpDir();
+    await writeFile(join(dir, "a.txt"), "hello");
+
+    expect(await readIfReadable(join(dir, "a.txt"))).toBe("hello");
+  });
+
+  it("returns undefined for a missing file and for one that cannot be read", async () => {
+    const dir = await tmpDir();
+    await mkdir(join(dir, "folder"));
+
+    expect(await readIfReadable(join(dir, "missing"))).toBeUndefined();
+    expect(await readIfReadable(join(dir, "folder"))).toBeUndefined();
+  });
 });

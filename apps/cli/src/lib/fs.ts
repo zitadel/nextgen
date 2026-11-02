@@ -31,3 +31,29 @@ export async function readIfExists(path: string): Promise<string | undefined> {
     throw error;
   }
 }
+
+/**
+ * Whether anything exists at `path`, false only when it is missing. A path that
+ * cannot be looked at for another reason (permissions, a file where a directory
+ * should be) throws, so it is not mistaken for an absent one.
+ */
+export async function pathExistsStrict(path: string): Promise<boolean> {
+  try {
+    await access(path);
+    return true;
+  } catch (error) {
+    if (isErrno(error, "ENOENT")) {
+      return false;
+    }
+    throw error;
+  }
+}
+
+/**
+ * A file's text, or `undefined` when it is absent or cannot be read. For a
+ * report on the state of files, where one that cannot be read is shown as
+ * missing instead of aborting the rest.
+ */
+export function readIfReadable(path: string): Promise<string | undefined> {
+  return readIfExists(path).catch(() => undefined);
+}
