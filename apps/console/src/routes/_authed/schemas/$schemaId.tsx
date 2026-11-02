@@ -17,7 +17,6 @@ import {
 import { Select, SelectContent, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { DOCS_URL } from "@/lib/docs";
 import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
 import { field } from "@/lib/record";
 import {
@@ -57,8 +56,8 @@ export const Route = createFileRoute("/_authed/schemas/$schemaId")({
  * (#1670). A revision is identified by its id and its creation time (decisions
  * log D10), and the newest is marked `Latest`; none is called active, because
  * which revision serves new registrations is the release's choice, not the
- * schema's. Users stay on the revision they were created on until they are
- * migrated through the API, which an older revision says under the card title.
+ * schema's. The picker's `Latest` and `In use` badges say where the shown
+ * revision stands.
  *
  * The header is `DetailTitle`, the title over one line of identity, as the
  * design draws this screen. Each tab is a `DetailSection`; the Fields card
@@ -70,24 +69,9 @@ function SchemaDetail() {
   const name = schemaDisplayName(schema, schemaId);
   const methods = schemaAuthMethods(schema);
   // A document the history leaves out (stored without `kind`) has no place
-  // in the picker, and is not older than a list it is not on.
+  // in the picker.
   const listed = revisions.some((revision) => revision.id === schemaId);
-  const older = listed && revisions[0]?.id !== schemaId;
   const picker = listed && <RevisionSelect revisions={revisions} current={schemaId} />;
-  const note = older && (
-    <p className="text-muted-foreground text-sm">
-      Not the newest revision. Users stay on the revision they were created on until they are
-      migrated.{" "}
-      <a
-        href={`${DOCS_URL}/guides/migrate-user-schema`}
-        target="_blank"
-        rel="noreferrer"
-        className="text-foreground underline underline-offset-2"
-      >
-        Migration guide
-      </a>
-    </p>
-  );
 
   return (
     <Page>
@@ -102,7 +86,7 @@ function SchemaDetail() {
         </TabsList>
 
         <TabsContent value="fields">
-          <DetailSection title="Field definitions" action={picker} note={note}>
+          <DetailSection title="Field definitions" action={picker}>
             {/* The field table and the viewer split the card, matching height;
                 stacked below `lg`, where the design puts the viewer under the
                 table. */}

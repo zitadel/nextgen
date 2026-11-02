@@ -401,7 +401,6 @@ describe("user schema detail", () => {
     const picker = screen.getByRole("combobox", { name: "Schema revision" });
     expect(picker).toHaveTextContent("Revisionsch_business");
     expect(picker).not.toHaveTextContent("Latest");
-    expect(screen.getByText(/Not the newest revision/)).toBeInTheDocument();
 
     await userEvent.click(picker);
     const options = within(await screen.findByRole("listbox")).getAllByRole("option");
@@ -419,13 +418,12 @@ describe("user schema detail", () => {
         "LatestIn use",
       ),
     );
-    expect(screen.queryByText(/Not the newest revision/)).not.toBeInTheDocument();
   });
 
   it("offers no revision picker for a schema the history leaves out", async () => {
     // The list reads `kind` from the document and leaves out one stored
     // without it; `GET /schemas/{id}` does not. A schema absent from its own
-    // history is not on the picker and is not called older than it.
+    // history is not on the picker.
     const newer = envelope("sch_business_2", BUSINESS, "2026-08-01T09:30:00Z");
     server.use(
       http.get(SCHEMAS_URL, () => HttpResponse.json({ schemas: [newer] })),
@@ -437,7 +435,6 @@ describe("user schema detail", () => {
     await screen.findByRole("heading", { name: "Business" });
 
     expect(screen.queryByRole("combobox", { name: "Schema revision" })).not.toBeInTheDocument();
-    expect(screen.queryByText(/Not the newest revision/)).not.toBeInTheDocument();
   });
 
   it("keeps the schema on screen when its history cannot be read", async () => {
@@ -472,7 +469,6 @@ describe("user schema detail", () => {
     await screen.findByRole("heading", { name: "Deep" });
 
     expect(screen.queryByRole("combobox", { name: "Schema revision" })).not.toBeInTheDocument();
-    expect(screen.queryByText(/Not the newest revision/)).not.toBeInTheDocument();
     expect(lists).toBe(0);
   });
 

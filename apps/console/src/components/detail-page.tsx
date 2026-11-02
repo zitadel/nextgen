@@ -43,14 +43,12 @@ export const DETAIL_CARD = "gap-0 py-0";
 
 /**
  * A body card with a titled section: the title (an `h2` in `SECTION_HEADING`), an
- * optional action beside it, an optional note under them, a rule, then
- * `children`. Inset 24px, 20px top and bottom, 16px between parts.
+ * optional action beside it, a rule, then `children`. Inset 24px, 20px top and bottom, 16px between parts.
  */
 export function DetailSection({
   title,
   titleId,
   action,
-  note,
   className,
   children,
   ...props
@@ -59,8 +57,6 @@ export function DetailSection({
   /** Sets the title's id, for a card labelled by it. */
   titleId?: string;
   action?: ReactNode;
-  /** A line between the header and the rule. */
-  note?: ReactNode;
 }) {
   const heading = (
     <h2 id={titleId} className={SECTION_HEADING}>
@@ -80,7 +76,6 @@ export function DetailSection({
         ) : (
           heading
         )}
-        {note}
         <Separator />
         {children}
       </CardContent>
