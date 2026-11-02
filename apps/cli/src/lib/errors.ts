@@ -169,7 +169,9 @@ export function toZitadelError(error: unknown): ZitadelError {
     // the endpoints a connection left out only in `missing`.
     const fields = listedInDetails(error.body, "fields");
     const missing = listedInDetails(error.body, "missing");
+    const resources = rejectedResources(error.body);
     const hint = [
+      ...(resources.length > 0 ? [`${resources.join("; ")}.`] : []),
       ...(fields.length > 0
         ? [
             `The server rejected ${fields.length === 1 ? "this field" : "these fields"}: ${fields.join(", ")}.`,
@@ -259,6 +261,32 @@ function listedInDetails(body: unknown, key: "fields" | "missing"): string[] {
     node = (node as { details?: unknown }).details;
   }
   return [...seen];
+}
+
+/**
+ * The resources a refusal names, one line each: `<kind> <handle>: <message>`.
+ * A rejected release carries the reason per schema or flow under
+ * `details.resources`, and the top-level message only says the release was
+ * invalid, so without these lines the reason shows only in `--json`.
+ */
+function rejectedResources(body: unknown): string[] {
+  const lines: string[] = [];
+  let node: unknown = body;
+  for (let depth = 0; depth < 4 && isObject(node); depth += 1) {
+    const listed = (node as Record<string, unknown>).resources;
+    if (Array.isArray(listed)) {
+      for (const item of listed) {
+        if (!isObject(item)) continue;
+        const { kind, handle, message } = item as Record<string, unknown>;
+        if (typeof message !== "string" || message === "") continue;
+        const subject = [kind, handle].filter((v) => typeof v === "string" && v !== "").join(" ");
+        lines.push(subject === "" ? message : `${subject}: ${message}`);
+      }
+      break;
+    }
+    node = (node as { details?: unknown }).details;
+  }
+  return lines;
 }
 
 /**

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"strings"
 	"testing"
 
 	"go.uber.org/mock/gomock"
@@ -109,6 +110,29 @@ func TestSchemaService_CreateSchemaUniqueViolation(t *testing.T) {
 			require.ErrorIs(t, err, tc.wantErr)
 		})
 	}
+}
+
+// A schema the meta-schema refuses is answered with the property path and the
+// keyword that failed, not a bare "invalid request": the parent error is never
+// serialized, so the message is the only place the client can read it.
+func TestSchemaService_CreateSchemaNamesTheFailingKeyword(t *testing.T) {
+	t.Parallel()
+
+	validator, err := domain.NewSchemaValidator(conflictSchemaBase)
+	require.NoError(t, err)
+	svc, _, _ := newMockedSchemaServiceWithPool(t, validator)
+
+	doc := strings.Replace(
+		string(conflictSchemaDocument("https://schemas.example.com/schemas/broken.json")),
+		`"givenName": { "type": "string" }`, `"givenName": { "type": "strng" }`, 1)
+
+	_, err = svc.CreateSchema(t.Context(), service.CreateSchemaInput{ProjectID: "proj_a", Schema: []byte(doc)})
+
+	require.ErrorIs(t, err, domain.ErrJSONSchemaInvalid())
+	de, ok := errors.AsType[domain.Error](err)
+	require.True(t, ok)
+	assert.Contains(t, de.Message, "givenName")
+	assert.Contains(t, de.Message, "type")
 }
 
 // listSchemasOpts builds the full statement input the service is expected to
