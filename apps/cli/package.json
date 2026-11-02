@@ -172,6 +172,7 @@
     "msw": "catalog:",
     "oclif": "catalog:",
     "tsdown": "catalog:",
+    "type-fest": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vitest": "catalog:",

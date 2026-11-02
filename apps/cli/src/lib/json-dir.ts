@@ -1,7 +1,8 @@
-import { readdir, readFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { ZitadelError } from "./errors";
+import { readDirIfExists } from "./fs";
 
 /** One `*.json` file read by {@link readJsonDirEntries}: its file name and parsed body. */
 export type JsonDirEntry = { name: string; body: Record<string, unknown> };
@@ -34,15 +35,7 @@ export async function readJsonDirEntries(
   absDir: string,
   { skip }: { skip?: (name: string) => boolean } = {},
 ): Promise<ReadonlyArray<JsonDirEntry>> {
-  const entries = await readdir(absDir).catch((error: unknown) => {
-    if (typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT") {
-      return undefined;
-    }
-    throw error;
-  });
-  if (entries === undefined) {
-    return [];
-  }
+  const entries = await readDirIfExists(absDir);
   const result: JsonDirEntry[] = [];
   for (const entry of entries.filter((name) => name.endsWith(".json") && !skip?.(name)).sort()) {
     const abs = join(absDir, entry);

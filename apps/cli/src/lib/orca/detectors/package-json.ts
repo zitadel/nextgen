@@ -5,28 +5,9 @@ import semver from "semver";
 
 import { isObject, parseJsonOrUndefined } from "../../json";
 import { ancestors } from "../../paths";
+import { type PackageJson, readPackageJson } from "../../package-json";
 
-/**
- * Minimal shape of the `package.json` fields detectors read. Intentionally
- * partial: only the keys detection logic depends on are modeled, all optional
- * since a project may omit any of them.
- */
-export type PackageJson = {
-  name?: string;
-  scripts?: Record<string, string>;
-  dependencies?: Record<string, string>;
-  devDependencies?: Record<string, string>;
-};
-
-/**
- * Reads and parses the `package.json` at `cwd`. Rejects if the file is absent
- * or malformed; callers that treat those as "not a project" are expected to
- * catch and fall back rather than have detection swallow the error here.
- */
-export async function readPackageJson(cwd: string): Promise<PackageJson> {
-  const contents = await readFile(join(cwd, "package.json"), "utf8");
-  return JSON.parse(contents) as PackageJson;
-}
+export { type PackageJson, readPackageJson } from "../../package-json";
 
 /**
  * Reports whether `name` appears in either `dependencies` or `devDependencies`.
@@ -159,14 +140,8 @@ async function isWorkspaceRoot(dir: string): Promise<boolean> {
   ) {
     return true;
   }
-  try {
-    const { workspaces } = JSON.parse(await readFile(join(dir, "package.json"), "utf8")) as {
-      workspaces?: unknown;
-    };
-    return workspaces !== undefined && workspaces !== null;
-  } catch {
-    return false;
-  }
+  const pkg = await readPackageJson(dir).catch(() => undefined);
+  return pkg?.workspaces !== undefined && pkg.workspaces !== null;
 }
 
 /**

@@ -1,8 +1,10 @@
 import { execFile, spawn } from "node:child_process";
+import { createReadStream } from "node:fs";
 import { mkdir, open, readFile, stat } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { basename, dirname } from "node:path";
 import { StringDecoder } from "node:string_decoder";
+import { buffer } from "node:stream/consumers";
 import { setTimeout as delay } from "node:timers/promises";
 
 import { resolveServerBinary, serverBinaryPath } from "@zitadel/server/binary";
@@ -518,21 +520,13 @@ async function fileSize(path: string): Promise<number> {
 
 /** Up to `length` bytes of a file from `position` on; none for a file that is gone. */
 async function readBytes(path: string, position: number, length: number): Promise<Buffer> {
-  const file = await open(path, "r").catch((error: unknown) => {
+  try {
+    return await buffer(createReadStream(path, { start: position, end: position + length - 1 }));
+  } catch (error) {
     if (isErrno(error, "ENOENT")) {
-      return undefined;
+      return Buffer.alloc(0);
     }
     throw error;
-  });
-  if (file === undefined) {
-    return Buffer.alloc(0);
-  }
-  try {
-    const buffer = Buffer.alloc(length);
-    const { bytesRead } = await file.read(buffer, 0, length, position);
-    return buffer.subarray(0, bytesRead);
-  } finally {
-    await file.close();
   }
 }
 

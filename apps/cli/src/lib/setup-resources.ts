@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 import type { CreateIdpBodyIdp, PublishPolicy201 } from "@zitadel/api/generated/model";
@@ -58,7 +58,7 @@ import { hashForState } from "./sync";
 import { updateState } from "./sync/state";
 import { SCHEMAS_DIR } from "./user-schema";
 import { isErrno, isMissingEndpoint, ZitadelError } from "./errors";
-import { pathExists } from "./fs";
+import { pathExists, readIfExists } from "./fs";
 import { type SuggestedCommand, unscopedCommand } from "./suggestion";
 import { reportWarning } from "./warnings";
 
@@ -436,12 +436,7 @@ function withMinLength(kept: PolicyFile, minLength: PasswordMinLength | undefine
  * it as it is, so a broken one is refused here, before it reaches the server.
  */
 async function readPasswordPolicyFile(cwd: string): Promise<PolicyFile | undefined> {
-  const raw = await readFile(join(cwd, PASSWORD_POLICY_PATH), "utf8").catch((error: unknown) => {
-    if (isErrno(error, "ENOENT")) {
-      return undefined;
-    }
-    throw error;
-  });
+  const raw = await readIfExists(join(cwd, PASSWORD_POLICY_PATH));
   if (raw === undefined) {
     return undefined;
   }

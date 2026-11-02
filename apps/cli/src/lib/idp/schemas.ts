@@ -1,9 +1,10 @@
-import { readdir, readFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 
 import { FLOWS_DIR } from "../flows";
 import { SCHEMAS_DIR } from "../user-schema";
-import { isErrno, ZitadelError } from "../errors";
+import { ZitadelError } from "../errors";
+import { readDirIfExists } from "../fs";
 import { isObject } from "../json";
 
 /** A user-schema file, with what the command has to show about it. */
@@ -45,18 +46,10 @@ export function methodsOf(body: Record<string, unknown>): string[] {
  */
 export async function readSchemaFiles(cwd: string): Promise<SchemaFile[]> {
   const dir = join(cwd, SCHEMAS_DIR);
-  const entries = await readdir(dir).catch((error: unknown) => {
-    // Only an absent directory means the Project has none. A permission or
-    // I/O failure reported as "no user schema" would send the developer
-    // looking for a missing file that is sitting right there.
-    if (isErrno(error, "ENOENT")) {
-      return undefined;
-    }
-    throw error;
-  });
-  if (entries === undefined) {
-    return [];
-  }
+  // Only an absent directory means the Project has none. A permission or
+  // I/O failure reported as "no user schema" would send the developer
+  // looking for a missing file that is sitting right there.
+  const entries = await readDirIfExists(dir);
   const files: SchemaFile[] = [];
   for (const entry of entries.filter((e) => e.endsWith(".json")).sort()) {
     const path = `${SCHEMAS_DIR}/${entry}`;
@@ -134,18 +127,10 @@ export type FlowFile = {
  */
 export async function readFlowFiles(cwd: string): Promise<FlowFile[]> {
   const dir = join(cwd, FLOWS_DIR);
-  const entries = await readdir(dir).catch((error: unknown) => {
-    // Only an absent directory means the Project has none. A permission or
-    // I/O failure reported as "no user schema" would send the developer
-    // looking for a missing file that is sitting right there.
-    if (isErrno(error, "ENOENT")) {
-      return undefined;
-    }
-    throw error;
-  });
-  if (entries === undefined) {
-    return [];
-  }
+  // Only an absent directory means the Project has none. A permission or
+  // I/O failure reported as "no user schema" would send the developer
+  // looking for a missing file that is sitting right there.
+  const entries = await readDirIfExists(dir);
   const files: FlowFile[] = [];
   for (const entry of entries.filter((e) => e.endsWith(".json")).sort()) {
     const path = `${FLOWS_DIR}/${entry}`;

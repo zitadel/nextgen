@@ -1,4 +1,4 @@
-import { readdir, readFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import {
@@ -16,7 +16,8 @@ import {
   type IdpProvider,
 } from "@zitadel/config/idp";
 
-import { isErrno, ZitadelError } from "../errors";
+import { ZitadelError } from "../errors";
+import { readDirIfExists } from "../fs";
 import { isObject } from "../json";
 
 /**
@@ -53,15 +54,7 @@ export type ConnectionFile = {
  */
 export async function readConnectionFiles(cwd: string): Promise<ConnectionFile[]> {
   const dir = join(cwd, IDPS_DIR);
-  const entries = await readdir(dir).catch((error: unknown) => {
-    if (isErrno(error, "ENOENT")) {
-      return undefined;
-    }
-    throw error;
-  });
-  if (entries === undefined) {
-    return [];
-  }
+  const entries = await readDirIfExists(dir);
   const files: ConnectionFile[] = [];
   for (const name of entries.filter((e) => e.endsWith(".json")).sort()) {
     const path = `${IDPS_DIR}/${name}`;

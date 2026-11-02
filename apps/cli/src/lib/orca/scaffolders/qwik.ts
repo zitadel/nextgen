@@ -1,6 +1,7 @@
 import { readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
+import { readIfExists } from "../../fs";
 import { AbstractCLIScaffolder } from "./cli";
 import { CREATE_VITE_NODE_ENGINES, CREATE_VITE_VERSION } from "./node-engines";
 
@@ -69,12 +70,7 @@ export class QwikScaffolder extends AbstractCLIScaffolder {
    * rethrows any other read error (e.g. `EACCES`) rather than silently leaving a
    * half-migrated app that reports success but cannot build. */
   private async repointQwikRefs(file: string): Promise<void> {
-    const source = await readFile(file, "utf8").catch((error: unknown) => {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-        return undefined;
-      }
-      throw error;
-    });
+    const source = await readIfExists(file);
     if (source === undefined || !source.includes("@builder.io/qwik")) {
       return;
     }

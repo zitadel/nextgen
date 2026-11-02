@@ -1,8 +1,6 @@
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
-
 import semver from "semver";
 
+import { readPackageJsonIfExists } from "../../../lib/package-json";
 import { addExactCommandFor, detectPackageManager } from "../../../lib/package-manager";
 import type { CheckContext, CheckOutcome, SanityCheck } from "./types";
 
@@ -38,7 +36,7 @@ export class DependencyVersionCheck implements SanityCheck {
         message: `CLI version ${ctx.cliVersion} is not an exact release; skipping the pin comparison`,
       };
     }
-    const exact = await exactZitadelPins(ctx.cwd);
+    const exact = await exactZitadelPins(ctx.cwd).catch(() => undefined);
     if (exact === undefined) {
       // A missing or unparsable package.json is the dependency check's
       // failure to report; double-flagging the same root cause helps nobody.
@@ -94,25 +92,17 @@ export class DependencyVersionCheck implements SanityCheck {
 
 /**
  * The `@zitadel/*` dependencies `package.json` pins to an exact version, as
- * `[name, version]`, or undefined without a readable `package.json`. Ranges,
- * dist-tags and `file:`/`workspace:` specifiers are left out: they express a
- * resolution choice, not a train.
+ * `[name, version]`, or undefined without a `package.json`. A `package.json`
+ * that is not valid JSON rejects. Ranges, dist-tags and `file:`/`workspace:`
+ * specifiers are left out: they express a resolution choice, not a train.
  */
 export async function exactZitadelPins(cwd: string): Promise<Array<[string, string]> | undefined> {
-  const pkg = await readFile(join(cwd, "package.json"), "utf8")
-    .then(
-      (text) =>
-        JSON.parse(text) as {
-          dependencies?: Record<string, string>;
-          devDependencies?: Record<string, string>;
-        },
-    )
-    .catch(() => undefined);
-  if (pkg === undefined) {
-    return undefined;
-  }
-  return Object.entries({ ...(pkg.dependencies ?? {}), ...(pkg.devDependencies ?? {}) })
-    .filter(([name]) => name.startsWith("@zitadel/"))
-    .map(([name, version]): [string, string] => [name, version.trim()])
-    .filter(([, version]) => semver.valid(version) !== null);
+  const pkg = await readPackageJsonIfExists(cwd);
+  return (
+    pkg &&
+    Object.entries({ ...pkg.dependencies, ...pkg.devDependencies })
+      .filter(([name]) => name.startsWith("@zitadel/"))
+      .map(([name, version]): [string, string] => [name, (version ?? "").trim()])
+      .filter(([, version]) => semver.valid(version) !== null)
+  );
 }

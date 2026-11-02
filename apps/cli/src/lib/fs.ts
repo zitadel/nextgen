@@ -1,4 +1,4 @@
-import { access, readFile } from "node:fs/promises";
+import { access, readdir, readFile } from "node:fs/promises";
 
 import { isErrno } from "./errors";
 
@@ -27,6 +27,22 @@ export async function readIfExists(path: string): Promise<string | undefined> {
   } catch (error) {
     if (isErrno(error, "ENOENT")) {
       return undefined;
+    }
+    throw error;
+  }
+}
+
+/**
+ * A directory's entry names, or none when it does not exist. A directory that
+ * exists but cannot be listed (permissions, a file in its place) still throws,
+ * so it is not mistaken for an empty one.
+ */
+export async function readDirIfExists(path: string): Promise<string[]> {
+  try {
+    return await readdir(path);
+  } catch (error) {
+    if (isErrno(error, "ENOENT")) {
+      return [];
     }
     throw error;
   }

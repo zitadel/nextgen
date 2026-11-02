@@ -10,13 +10,14 @@
  * way out ({@link normalizePublicCliJson}), so they differ between CLI
  * versions.
  */
-import { lstat, readFile } from "node:fs/promises";
+import { lstat } from "node:fs/promises";
 import { join } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 
 import { META_SCHEMA_DIR, metaSchemaFiles } from "@zitadel/config/meta-schemas";
 
 import { isErrno } from "./errors";
+import { readIfExists } from "./fs";
 import { parseJsonOrUndefined } from "./json";
 import { maskPublicCliVersion, normalizePublicCliJson } from "./public-cli";
 
@@ -76,12 +77,7 @@ async function contentState(
   cwd: string,
   file: ProjectMetaSchema,
 ): Promise<"current" | "missing" | "outdated"> {
-  const text = await readFile(join(cwd, file.path), "utf8").catch((error: unknown) => {
-    if (isErrno(error, "ENOENT")) {
-      return undefined;
-    }
-    throw error;
-  });
+  const text = await readIfExists(join(cwd, file.path));
   if (text === undefined) {
     return "missing";
   }

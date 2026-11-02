@@ -1,4 +1,3 @@
-import { readFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 
 import type { SetupPreset } from "@zitadel/config/defaults";
@@ -10,6 +9,7 @@ import semver from "semver";
 import { pathExists } from "../../lib/fs";
 import { detectors } from "../../lib/orca/detectors";
 import type { Detector } from "../../lib/orca/detectors/types";
+import { readPackageJson } from "../../lib/package-json";
 import { detectPackageManager, type PackageManager } from "../../lib/package-manager";
 import type { PasswordMinLength } from "../../lib/policies";
 
@@ -101,22 +101,15 @@ export async function detectProjectFacts(cwd: string, frameworkId: string): Prom
     typescript: await pathExists(join(cwd, "tsconfig.json")),
     packageManager: await detectPackageManager(cwd),
   };
-  try {
-    const raw = await readFile(join(cwd, "package.json"), "utf8");
-    const pj = JSON.parse(raw) as {
-      dependencies?: Record<string, string>;
-      devDependencies?: Record<string, string>;
-    };
-    const depPkg = depFromFramework(frameworkId);
-    const range = pj.dependencies?.[depPkg] ?? pj.devDependencies?.[depPkg];
-    const version = range ? stripRange(range) : undefined;
-    if (version) {
-      facts.frameworkVersion = version;
-    }
-  } catch {
-    // Missing or unreadable package.json — version stays undefined; the
-    // renderer skips that segment, which is the same as the user not
-    // having declared the framework dep yet.
+  // A missing or unreadable package.json leaves the version undefined; the
+  // renderer skips that segment, which is the same as the user not having
+  // declared the framework dep yet.
+  const pj = await readPackageJson(cwd).catch(() => undefined);
+  const depPkg = depFromFramework(frameworkId);
+  const range = pj?.dependencies?.[depPkg] ?? pj?.devDependencies?.[depPkg];
+  const version = range ? stripRange(range) : undefined;
+  if (version) {
+    facts.frameworkVersion = version;
   }
   return facts;
 }
