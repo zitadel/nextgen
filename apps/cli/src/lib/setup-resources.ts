@@ -1,4 +1,4 @@
-import { access, mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 import type { CreateIdpBodyIdp, PublishPolicy201 } from "@zitadel/api/generated/model";
@@ -57,7 +57,8 @@ import { normalizePublicCliProse } from "./public-cli";
 import { hashForState } from "./sync";
 import { updateState } from "./sync/state";
 import { SCHEMAS_DIR } from "./user-schema";
-import { isMissingEndpoint, ZitadelError } from "./errors";
+import { isErrno, isMissingEndpoint, ZitadelError } from "./errors";
+import { pathExists } from "./fs";
 import { type SuggestedCommand, unscopedCommand } from "./suggestion";
 import { reportWarning } from "./warnings";
 
@@ -389,7 +390,7 @@ async function refuseResourceConflicts(
   const files = connections.length > 0 ? await readConnectionFiles(cwd) : [];
   for (const { connectionPath, selection } of connections) {
     const existing = planConnection({ selection, files, slugFlag: SETUP_FLAG_NAMES.slug });
-    if (existing.action === "reuse" || (await exists(join(cwd, connectionPath)))) {
+    if (existing.action === "reuse" || (await pathExists(join(cwd, connectionPath)))) {
       throw resourceExists(
         existing.action === "reuse" ? existing.file.path : connectionPath,
         connectionExists(selection),
@@ -403,11 +404,11 @@ async function refuseResourceConflicts(
     return;
   }
   for (const path of [DEFAULT_SCHEMA_CONFIG_PATH, DEFAULT_FLOW_CONFIG_PATH]) {
-    if (await exists(join(cwd, path))) {
+    if (await pathExists(join(cwd, path))) {
       throw resourceExists(path);
     }
   }
-  if (await exists(join(cwd, PASSWORD_POLICY_PATH))) {
+  if (await pathExists(join(cwd, PASSWORD_POLICY_PATH))) {
     throw resourceExists(PASSWORD_POLICY_PATH, {
       hint: "Rerun setup with --force to keep this policy and publish it to the new project, or move the file aside to start from an empty one.",
     });
@@ -507,16 +508,6 @@ function connectionExists(selection: ProviderSelection): {
   };
 }
 
-/** Whether a path is there, without caring why it is not. */
-async function exists(path: string): Promise<boolean> {
-  try {
-    await access(path);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 async function writeResourceFile(
   cwd: string,
   relPath: string,
@@ -546,13 +537,4 @@ function resourceExists(
       "Move the file aside or rerun setup with --force if you want setup to replace it.",
     nextCommands: onExists?.nextCommands,
   });
-}
-
-function isErrno(error: unknown, code: string): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    (error as NodeJS.ErrnoException).code === code
-  );
 }

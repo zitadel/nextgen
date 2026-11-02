@@ -16,7 +16,7 @@ import { BRANDING_FILE_SCHEMA_REF, META_SCHEMA_DIR } from "@zitadel/config/meta-
 
 import { BRANDING_DIR } from "../../lib/branding";
 import { BRANDING_DESIGN_INFO, resolveBrandingDesign } from "../../lib/branding/designs";
-import { ZitadelError } from "../../lib/errors";
+import { isErrno, ZitadelError } from "../../lib/errors";
 import { stableStringify } from "../../lib/json";
 import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../../lib/oclif";
 import { hasZitadelConfig } from "../../lib/project";
@@ -161,13 +161,4 @@ function swallowConflict(error: unknown): void {
     return;
   }
   throw error;
-}
-
-function isErrno(error: unknown, code: string): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    (error as NodeJS.ErrnoException).code === code
-  );
 }

@@ -1,7 +1,7 @@
 import { readFile, rename, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { ZitadelError } from "./errors";
+import { isErrno, ZitadelError } from "./errors";
 import { enforceMode } from "./fs-safe";
 import { isObject, parseJsonObject, stableStringify } from "./json";
 import { DEFAULT_SERVER } from "./server";
@@ -28,7 +28,7 @@ async function exists(path: string): Promise<boolean> {
     await stat(path);
     return true;
   } catch (error) {
-    if (isNotFound(error)) {
+    if (isErrno(error, "ENOENT")) {
       return false;
     }
     throw error;
@@ -69,7 +69,7 @@ export async function readZitadelConfig(cwd: string): Promise<Record<string, unk
   try {
     return parseJsonObject(await readFile(join(cwd, "zitadel.json"), "utf8"), "zitadel.json");
   } catch (error) {
-    if (isNotFound(error)) {
+    if (isErrno(error, "ENOENT")) {
       throw new ZitadelError("E_VALIDATION", "zitadel.json was not found", {
         hint: "Run `zitadel setup` first.",
         nextCommands: [unscopedCommand("setup")],
@@ -111,7 +111,7 @@ export async function readZitadelSecret(cwd: string): Promise<ZitadelSecret> {
     }
     return secret as ZitadelSecret;
   } catch (error) {
-    if (isNotFound(error)) {
+    if (isErrno(error, "ENOENT")) {
       throw new ZitadelError("E_VALIDATION", ".zitadel/secret was not found", {
         hint: "Run `zitadel setup` first, or restore the project secret with `zitadel doctor --fix`.",
         nextCommands: [unscopedCommand("setup"), unscopedCommand("doctor --fix")],
@@ -185,13 +185,4 @@ export function readUseCase(config: Record<string, unknown>): string | undefined
  */
 export function readProjectServer(config: Record<string, unknown>): string {
   return typeof config.server === "string" ? config.server : DEFAULT_SERVER;
-}
-
-function isNotFound(error: unknown): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    (error as { code?: string }).code === "ENOENT"
-  );
 }

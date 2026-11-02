@@ -16,6 +16,7 @@ import { getDefaultLoginFlow, SETUP_PRESETS } from "@zitadel/config/defaults";
 import type { ConnectionSlug } from "@zitadel/config/idp";
 
 import { ZitadelError } from "../errors";
+import { isObject, stableStringify } from "../json";
 
 /**
  * Steps a flow starts at, by purpose, plus the steps that collect an
@@ -127,10 +128,6 @@ export type SsoResult<T> = {
 
 function clone<T>(value: T): T {
   return structuredClone(value);
-}
-
-function isObject(value: unknown): value is Json {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function steps(flow: Json): Step[] {
@@ -387,7 +384,10 @@ function ssoConflictStep(
  * output as hand-edited.
  */
 function matches(step: Step, expected: Step): boolean {
-  return canonical(withoutServerDefaults(step)) === canonical(withoutServerDefaults(expected));
+  return (
+    stableStringify(withoutServerDefaults(step)) ===
+    stableStringify(withoutServerDefaults(expected))
+  );
 }
 
 /**
@@ -434,7 +434,7 @@ function shippedPasswordSteps(): string[] {
   shippedPasswordForms ??= SETUP_PRESETS.flatMap((preset) => {
     const flow = getDefaultLoginFlow({ preset }) as unknown as Json;
     const step = stepNamed(flow, PASSWORD_STEP);
-    return step === undefined ? [] : [canonical(withoutSsoRoutes(step, "done"))];
+    return step === undefined ? [] : [stableStringify(withoutSsoRoutes(step, "done"))];
   });
   return shippedPasswordForms;
 }
@@ -500,25 +500,6 @@ function addProvider(step: Step, slug: string): boolean {
   providers.push(slug);
   step.sso_providers = providers;
   return true;
-}
-
-/** Stable JSON: object keys sorted at every depth, arrays left in order. */
-function canonical(value: unknown): string {
-  return JSON.stringify(sortKeys(value));
-}
-
-function sortKeys(value: unknown): unknown {
-  if (Array.isArray(value)) {
-    return value.map(sortKeys);
-  }
-  if (isObject(value)) {
-    return Object.fromEntries(
-      Object.keys(value)
-        .sort()
-        .map((key) => [key, sortKeys(value[key])]),
-    );
-  }
-  return value;
 }
 
 /** Outcome keys the previous CLI wrote, and the names the engine now raises. */
@@ -682,7 +663,9 @@ export function applySsoToFlow(
     if (offersAlready(password, slug, terminal)) {
       // Edited by hand and already carrying the provider and its routes, which
       // is what the warning asks for: there is nothing left to say.
-    } else if (!shippedPasswordSteps().includes(canonical(withoutSsoRoutes(password, terminal)))) {
+    } else if (
+      !shippedPasswordSteps().includes(stableStringify(withoutSsoRoutes(password, terminal)))
+    ) {
       skipped.push({
         step: PASSWORD_STEP,
         region: `steps.${PASSWORD_STEP}`,

@@ -1,7 +1,8 @@
-import { access, mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 
 import { isErrno, ZitadelError } from "../errors";
+import { pathExists } from "../fs";
 import { LOCAL_RUNTIME_DIR } from "../local-server/runtime";
 import { detectors } from "./detectors";
 import { detectDevPort } from "./detectors/port";
@@ -544,13 +545,4 @@ async function mergeGitignore(stashed: string, dest: string): Promise<void> {
     return;
   }
   await writeFile(dest, `${into}${into.endsWith("\n") ? "" : "\n"}${missing.join("\n")}\n`);
-}
-
-async function pathExists(path: string): Promise<boolean> {
-  try {
-    await access(path);
-    return true;
-  } catch {
-    return false;
-  }
 }
