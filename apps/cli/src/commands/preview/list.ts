@@ -1,9 +1,10 @@
+import { Paging } from "@zitadel/api/runtime/paging";
 import { Flags } from "@oclif/core";
 
 import { CommandGroups, type JsonEnvelope, nonBlankString, PreviewCommand } from "../../lib/oclif";
 import { Tabulatable } from "../../lib/oclif/tabulatable";
-import { collectPages } from "../../lib/oclif/crud/paging";
 import { listData } from "../../lib/oclif/envelope";
+import { pagedFunctions } from "../../lib/api-client";
 import { Cmd } from "../../lib/cmd";
 
 /** The columns `list` renders, in order. */
@@ -57,13 +58,10 @@ export default class PreviewList extends Tabulatable(PreviewCommand) {
     };
     // One page unless `--all`, as every list does; the walk starts at
     // `--page-token`, and a drain leaves no next page to report.
-    const { items: previews, next } = await collectPages(
+    const paging = new Paging(pagedFunctions.listPreviews);
+    const { items: previews, next } = await paging.collect(
       client.listPreviews.pages(projectId, params),
-      {
-        items: (page) => page.previews,
-        all: flags.all === true,
-        next: (page) => page.next_page_token,
-      },
+      { all: flags.all === true },
     );
 
     const rows = previews.map((preview) => ({

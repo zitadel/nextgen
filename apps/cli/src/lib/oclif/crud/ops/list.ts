@@ -1,13 +1,12 @@
 import { spinner } from "@clack/prompts";
 import { Flags } from "@oclif/core";
-import { pages } from "@zitadel/api/runtime/paging";
+import { Paging } from "@zitadel/api/runtime/paging";
 
 import { sanitizeResponse } from "../../../api-client";
 
 import { nonBlankString } from "../../flags";
 
 import type { CommandResult, GlobalOptions } from "../../types";
-import { collectPages } from "../paging";
 import { wireOf } from "../wire";
 import { type ParsedFilter, parseFilter, parseSort } from "../query";
 import { parseOrThrow } from "../shared";
@@ -180,30 +179,29 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
     // `--json` has already silenced everything.
     const progress = all && process.stdout.isTTY && !this.jsonEnabled() ? spinner() : undefined;
     progress?.start(`Fetching ${topic}`);
-    // Counted across the fetches: `pages` hands the callback no page number.
-    let fetched = 0;
     // The walk begins at the page --page-token names, if any.
     const first = typeof flags["page-token"] === "string" ? flags["page-token"] : undefined;
+    const pages = new Paging({
+      items: (response) => {
+        return spec.items(response);
+      },
+      next: (response) => {
+        return spec.next?.(response);
+      },
+    });
+    const walk = pages.walk(async (token, number) => {
+      progress?.message(`Fetching ${topic} — page ${number}`);
+      return request(token ?? first);
+    });
     // The spinner owns the cursor and a SIGINT handler until it is stopped, so a
     // page that fails mid-drain has to stop it too; otherwise the error prints
     // under a live spinner and the handler outlives the command.
-    const walk = pages(
-      async (token) => {
-        const page = await request(token ?? first);
-        fetched += 1;
-        progress?.message(`Fetching ${topic} — page ${fetched}`);
-        return page;
-      },
-      { next: (response) => spec.next?.(response) || undefined },
-    );
-    const { items, next } = await collectPages(walk, {
-      items: (response) => sanitizeResponse(spec.items(response)),
-      all,
-      next: (response) => sanitizeResponse(spec.next?.(response)),
-    }).catch((error: unknown) => {
+    const collected = await pages.collect(walk, { all }).catch((error: unknown) => {
       progress?.stop(`Fetching ${topic} failed`);
       throw error;
     });
+    const items = sanitizeResponse(collected.items);
+    const next = sanitizeResponse(collected.next);
     progress?.stop(`Fetched ${items.length} ${items.length === 1 ? resource.singular : topic}`);
 
     // A terminal gets the aligned table with its header and footer; a pipe (or

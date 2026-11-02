@@ -1,12 +1,11 @@
 import { ApiError, request as fetchWithPolicy } from "@zitadel/api/runtime/fetch";
-import { itemsOf, nextToken, pages } from "@zitadel/api/runtime/paging";
+import { Paging } from "@zitadel/api/runtime/paging";
 
 import { REQUEST_TIMEOUT_MS, sanitizeRejection, sanitizeResponse } from "../api-client";
 import { Consent } from "../consent";
 import { ZitadelError, errorMessage } from "../errors";
 import { isObject, parseJsonOrUndefined } from "../json";
 import { interruptSignal } from "../interrupt";
-import { collectPages } from "../oclif/crud/paging";
 import { type ApiRequest, urlOf } from "./request";
 
 /** What the server answered. `body` is `undefined` for a response without one. */
@@ -47,6 +46,9 @@ export const send = async (
   return { status, body: sanitizeResponse(raw) };
 };
 
+/** A response as it came off the wire: its status, and its body not yet escaped. */
+type RawResponse = Readonly<{ status: number; raw: unknown }>;
+
 /**
  * {@link send}, answering the body as the server sent it; a failure is escaped
  * all the same. Every request goes out here, so a destructive one without
@@ -57,7 +59,7 @@ const sendRaw = async (
   token: string | undefined,
   request: ApiRequest,
   consent?: Consent,
-): Promise<{ status: number; raw: unknown }> => {
+): Promise<RawResponse> => {
   if (request.operation.destructive) {
     Consent.assert(consent);
   }
@@ -116,36 +118,29 @@ export const sendAll = async (
   if (paging === null) {
     return send(server, token, request);
   }
-  // Set by each fetch as `collectPages` walks the pages: it hands back only the items, and the last page's status and body are needed too.
-  let last: { status: number; raw: unknown } = { status: 200, raw: undefined };
-  // Each page is fetched raw: the cursor goes back to the server exactly as it
-  // came, and only the items are escaped.
-  const walk = pages(
-    async (cursor) => {
-      last = await sendRaw(server, token, pageOf(request, cursor));
-      return last.raw;
-    },
-    { next: nextToken },
-  );
-  const { items } = await collectPages(walk, {
-    // The one list read by a field named only at runtime, so the one checked.
-    items: (raw) => {
+  const fields = Paging.byField(paging.items);
+  const responses = new Paging<RawResponse, unknown>({
+    items: (response) => {
       try {
-        return sanitizeResponse(itemsOf(raw, paging.items));
+        return fields.items(response.raw);
       } catch (error) {
         throw new ZitadelError("E_VALIDATION", errorMessage(error), {
-          details: { response: sanitizeResponse(raw) },
+          details: { response: sanitizeResponse(response.raw) },
         });
       }
     },
-    all: true,
-    next: nextToken,
+    next: (response) => {
+      return fields.next(response.raw);
+    },
   });
-  // The last page escaped as one object, so its keys keep their collision-safe
-  // escaping, with an empty list in place of its own, which every page's
-  // escaped items then fill. The check only narrows the type: the items above
-  // were read off this page, so it is an object.
-  const page = isObject(last.raw) ? last.raw : {};
+  const walk = responses.walk(async (cursor) => {
+    return sendRaw(server, token, pageOf(request, cursor));
+  });
+  const { items, last } = await responses.collect(walk, { all: true });
+  const page = isObject(last?.raw) ? last.raw : {};
   const body = sanitizeResponse({ ...page, [paging.items]: [] });
-  return { status: last.status, body: { ...body, [paging.items]: items } };
+  return {
+    status: last?.status ?? 200,
+    body: { ...body, [paging.items]: sanitizeResponse(items) },
+  };
 };
