@@ -177,13 +177,12 @@ describe("capacity and regions", () => {
     expect(month).toMatchObject({ plan: "pro", usage_amount: 0, total_amount: 1_760_000 });
   });
 
-  it("charges each region outside the EU on Pro", () => {
-    expect(bill({ counts: {}, regions: 2 })).toMatchObject({
-      plan: "pro",
-      reasons: ["runs in a region outside the EU"],
-      on_top_amount: 20_000,
-      total_amount: 30_000,
-    });
+  it("lets every plan choose any available region at no charge", () => {
+    // The typed catalog leaves regions out: nothing bills them.
+    const plans = CATALOG.plans as Record<string, { regions?: unknown }>;
+    for (const plan of ["free", "pro", "enterprise"])
+      expect(plans[plan]?.regions).toEqual({ scope: "project", selection: "all_available" });
+    expect(CATALOG.licensed.map((line) => line.id)).not.toContain("region");
   });
 });
 

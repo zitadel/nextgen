@@ -87,7 +87,7 @@
                 { "type": "array", "items": { "type": "string", "pattern": "^[a-z]{2,}$" }, "minItems": 1 },
                 { "const": "all_available" }
               ],
-              "description": "The regions a plan includes; the `region` line prices the others on plans that may take it"
+              "description": "The regions a plan's projects may choose from, at no charge"
             }
           }
         }

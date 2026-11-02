@@ -314,10 +314,9 @@ website's catch-all.
   before (decided 2026-10-29): until then eligible usage is metered on its
   customer and shown, never billed. Core MAU stays in Zitadel analytics.
 
-  Every plan includes versioned releases, previews and rollbacks, and the
-  EU region. On Pro, each
-  region outside the EU is an add-on per region, since each needs a database
-  of its own; Enterprise includes them. Free and Pro publish their request
+  Every plan includes versioned releases, previews and rollbacks, and each
+  project chooses any available region at no charge (decided 2026-11-02): a
+  region's database is a fixed cost for Zitadel, not one per customer. Free and Pro publish their request
   capacity in the catalog, Pro adds extra requests in blocks, and Enterprise
   capacity is contracted. Custom agreements, indemnification and regulatory
   addenda are Enterprise-only, as distinct from quoted audit capabilities.

@@ -11,8 +11,6 @@ export interface Usage {
   plan?: "free" | "pro";
   /** Branding removal requires Pro; Free keeps the mark. */
   hide_mark?: boolean;
-  /** Regions outside the EU the account runs projects in, each a Pro add-on. */
-  regions?: number;
   /** Quoted packages require a contract and cannot use the self-service estimator. */
   packages?: PackageId[];
   support_priority?: boolean;
@@ -121,9 +119,7 @@ export function bill(usage: Usage, catalog: Catalog = CATALOG): Bill {
   }
   const price = (id: string) => minor(catalog.licensed.find((line) => line.id === id)?.amount ?? 0);
   const onTop =
-    (usage.support_priority ? price("support_priority") : 0) +
-    steps * price("capacity_step") +
-    (usage.regions ?? 0) * price("region");
+    (usage.support_priority ? price("support_priority") : 0) + steps * price("capacity_step");
   const minimum = minor(catalog.plans.pro.minimum.amount);
   return {
     plan: "pro",
@@ -156,7 +152,6 @@ function paidReasons(
   }
   if (usage.plan === "pro") reasons.push("Pro selected by the owner");
   if (usage.hide_mark) reasons.push("hides the Zitadel mark");
-  if (usage.regions) reasons.push("runs in a region outside the EU");
   for (const id of new Set(usage.packages ?? [])) {
     const selected = catalog.packages.find((entry) => entry.id === id);
     if (selected && !selected.plans.includes("free")) reasons.push(`${selected.label} package`);
