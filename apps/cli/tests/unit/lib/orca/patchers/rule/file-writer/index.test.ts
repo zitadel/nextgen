@@ -1,4 +1,4 @@
-import { readFile, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { describe, expect } from "vitest";
@@ -130,6 +130,18 @@ describe("scaffold - write", () => {
     const second = await scaffold(plan(op), { cwd: dir, dryRun: false, force: false });
     expect(second.filesWritten).toEqual([]);
     expect(second.filesSkipped).toEqual([join(dir, "page.tsx")]);
+  });
+
+  it("edits the first candidate that exists without reading the ones after it", async ({ dir }) => {
+    await writeFile(join(dir, "vite.config.ts"), "before");
+    await mkdir(join(dir, "vite.config.js"));
+
+    await scaffold(
+      plan({ kind: "edit", path: ["vite.config.ts", "vite.config.js"], edit: (s) => `${s}!` }),
+      { cwd: dir, dryRun: false, force: false },
+    );
+
+    expect(await readFile(join(dir, "vite.config.ts"), "utf8")).toBe("before!");
   });
 
   it("throws E_CONFLICT when overwriting a different existing file without force", async ({

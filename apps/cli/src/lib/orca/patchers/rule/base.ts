@@ -145,12 +145,16 @@ export abstract class AbstractRulePatcher implements Patcher {
         continue;
       }
       const candidates = typeof op.path === "string" ? [op.path] : op.path;
-      const contents = await Promise.all(
-        candidates.map((candidate) => readTextIfExists(join(opts.cwd, candidate))),
-      );
-      const found = contents.findIndex((text) => text !== undefined);
-      const path = candidates[Math.max(found, 0)] ?? "";
-      const source = contents[found];
+      let path = candidates[0] ?? "";
+      let source: string | undefined;
+      for (const candidate of candidates) {
+        const contents = await readTextIfExists(join(opts.cwd, candidate));
+        if (contents !== undefined) {
+          path = candidate;
+          source = contents;
+          break;
+        }
+      }
       if (source === undefined) {
         statuses.push({ path, wiring: op.wiring, state: "detached" });
         continue;

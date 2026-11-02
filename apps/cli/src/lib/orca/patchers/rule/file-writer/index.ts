@@ -145,13 +145,22 @@ async function editFile(
     });
   }
   // The first candidate is where the file is created when none of them exist.
-  const contents = await Promise.all(candidates.map((candidate) => readIfExists(candidate)));
-  const found = contents.findIndex((text) => text !== undefined);
-  const path = candidates[found] ?? preferred;
-  const source = contents[found];
-  // Preserve the existing file's permission bits across the temp-file swap
-  // (mask off the file-type bits `stat` includes so `chmod` gets only perms).
-  const mode = source === undefined ? undefined : (await stat(path)).mode & 0o777;
+  let path = preferred;
+  let source: string | undefined;
+  let mode: number | undefined;
+  // Candidates are read in order and the rest are left alone once one exists, so
+  // an unreadable fallback cannot fail an edit of the file that was found.
+  for (const candidate of candidates) {
+    const contents = await readIfExists(candidate);
+    if (contents !== undefined) {
+      path = candidate;
+      source = contents;
+      // Preserve the existing file's permission bits across the temp-file swap
+      // (mask off the file-type bits `stat` includes so `chmod` gets only perms).
+      mode = (await stat(candidate)).mode & 0o777;
+      break;
+    }
+  }
   const next = edit(source);
   if (next === source) {
     result.filesSkipped.push(path);
