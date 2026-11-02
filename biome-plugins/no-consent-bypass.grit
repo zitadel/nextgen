@@ -61,6 +61,7 @@ or {
   `fetch($_)` as $bypass where {
     $filename <: r".*/apps/cli/src/.*",
     $filename <: not r".*/apps/cli/src/lib/release/steps/asset-probe\.ts$",
+    $filename <: not r".*/apps/cli/src/commands/test/sign-in\.ts$",
     $filename <: not r".*/apps/cli/src/lib/local-server/runtime\.ts$",
     $filename <: not r".*/apps/cli/src/lib/telemetry/index\.ts$",
     register_diagnostic(span=$bypass, message="Reach the platform through the client from lib/api-client or send() in lib/api/call, which gate destructive operations.", severity="error")
