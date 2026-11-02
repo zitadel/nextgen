@@ -61,7 +61,7 @@ export default class VariableList extends Tabulatable(EnvironmentCommand) {
     // tab-separated record per line, with no header and nothing at all when
     // empty, so `cut`, `awk` and `wc -l` work on it; a terminal gets a table.
     const cells = flags.preview ? variableCells(rows) : variableInventoryCells(rows);
-    const plain = flags.plain || !process.stdout.isTTY;
+    const plain = this.isPlain(flags.plain);
     const empty = flags.preview
       ? "No preview values on the project."
       : "No variables on the project.";

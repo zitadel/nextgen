@@ -44,7 +44,6 @@ export { parseFilter, parseSort } from "./query";
 export { chosenColumns } from "./columns";
 export { allows, fieldPaths, observedPaths, suggestable } from "./paths";
 export type { FieldPaths } from "./paths";
-export { renderDetail, renderRows, renderTable } from "./table";
 export { bindOperation, definitionOf, ResourceCommand } from "./ops/command";
 export type {
   OperationClass,

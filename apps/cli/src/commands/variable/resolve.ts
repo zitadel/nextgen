@@ -3,7 +3,6 @@ import type { ZitadelClient } from "../../lib/api-client";
 
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../../lib/oclif";
 import { Tabulatable } from "../../lib/oclif/tabulatable";
-import { renderRows } from "../../lib/oclif/crud/table";
 import { listData } from "../../lib/oclif/envelope";
 import { DEPLOY_ARGS, originMatchesPattern } from "../../lib/release";
 import { ZitadelError } from "../../lib/errors";
@@ -96,12 +95,12 @@ export default class VariableResolve extends Tabulatable(EnvironmentCommand) {
     // The resource commands' list rendering: a pipe (or `--plain`) gets one
     // tab-separated record per line, with no header; a terminal gets a table.
     const cells = variableCells(rows);
-    const plain = flags.plain || !process.stdout.isTTY;
+    const plain = this.isPlain(flags.plain);
     return this.emit({
       status: "ok",
       data: { deployment_id: live.id, origins: servedOrigins, ...listData(rows) },
       pretty: plain
-        ? renderRows(COLUMNS, cells)
+        ? this.tabulateRows(COLUMNS, cells)
         : rows.length === 0
           ? `${live.id} froze no variables for ${where}.`
           : [

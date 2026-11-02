@@ -62,7 +62,7 @@ describe("deployment get", () => {
 
         const result = await app.run(["deployment", "get", deployed.deployment_id ?? ""]);
 
-        expect(result).toPrint("HOST   app.acme.com");
+        expect(result).toPrintRow("HOST", "app.acme.com");
       });
     });
   });

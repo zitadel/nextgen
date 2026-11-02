@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { tabulate } from "../../helpers/tabulate";
 import {
   assertVariableName,
   frozenVariables,
@@ -84,7 +85,10 @@ describe("variableCells", () => {
 describe("frozenVariables", () => {
   it("tables each frozen variable with its value, a secret masked", async () => {
     expect(
-      await frozenVariables(toVariableRows({ TOKEN: { secret: true }, HOST: "app.acme.com" })),
+      await frozenVariables(
+        toVariableRows({ TOKEN: { secret: true }, HOST: "app.acme.com" }),
+        tabulate,
+      ),
     ).toBe(
       [
         "  variables",
@@ -97,7 +101,7 @@ describe("frozenVariables", () => {
   });
 
   it("says none when the deployment froze nothing", async () => {
-    expect(await frozenVariables([])).toBe("  variables  none");
+    expect(await frozenVariables([], tabulate)).toBe("  variables  none");
   });
 });
 

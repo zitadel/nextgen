@@ -54,7 +54,7 @@ export default class ResourcesList extends Tabulatable(BaseCommand) {
         .join(", "),
     }));
 
-    const plain = flags.plain || !process.stdout.isTTY;
+    const plain = this.isPlain(flags.plain);
     return this.emit({
       status: "ok",
       data: listData(resources),

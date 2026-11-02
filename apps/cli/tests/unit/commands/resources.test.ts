@@ -43,6 +43,7 @@ import {
   update,
 } from "../../../src/commands/resources";
 import { COMMANDS } from "../../../src/index";
+import { tabulate } from "../../helpers/tabulate";
 import {
   definitionOf,
   describeBody,
@@ -2032,10 +2033,10 @@ describe("the release resource", () => {
       ],
     };
 
-    expect(await RESOURCES.release.get.sections?.(release)).toEqual([
-      await releasePointers(release),
+    expect(await RESOURCES.release.get.sections?.(release, tabulate)).toEqual([
+      await releasePointers(release, tabulate),
     ]);
-    expect(await releasePointers(release)).toBe(
+    expect(await releasePointers(release, tabulate)).toBe(
       [
         "resources",
         "    kind              handle          revision_id",

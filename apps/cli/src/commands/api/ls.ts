@@ -1,7 +1,6 @@
 import { Args, Flags } from "@oclif/core";
 
 import { type ApiOperation, findOperations, uncallable } from "../../lib/api/operations";
-import { renderRows } from "../../lib/oclif/crud/table";
 import { BaseCommand, CommandGroups, type JsonEnvelope } from "../../lib/oclif";
 import { Tabulatable } from "../../lib/oclif/tabulatable";
 
@@ -61,7 +60,7 @@ export default class ApiLs extends Tabulatable(BaseCommand) {
             "",
             `${operations.length} operations. Call one with \`${this.config.bin} api <id>\`; --json has each one's parameters.`,
           ].join("\n")
-        : renderRows(columns, operations),
+        : this.tabulateRows(columns, operations),
     });
   }
 }

@@ -53,7 +53,7 @@ export default class EnvList extends Tabulatable(EnvironmentCommand) {
       resolved: entry.source === values.ZITADEL_PROJECT_ID?.source,
     }));
 
-    const plain = flags.plain || !process.stdout.isTTY;
+    const plain = this.isPlain(flags.plain);
     return this.emit({
       status: "ok",
       // The canonical list envelope, plus `resolved` naming which environment

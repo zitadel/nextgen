@@ -39,7 +39,7 @@ export default class OriginList extends Tabulatable(EnvironmentCommand) {
     // The resource commands' list rendering: a pipe (or `--plain`) gets one
     // tab-separated record per line, with no header and nothing at all when
     // empty, so `cut`, `awk` and `wc -l` work on it; a terminal gets a table.
-    const plain = flags.plain || !process.stdout.isTTY;
+    const plain = this.isPlain(flags.plain);
     return this.emit({
       status: "ok",
       // The project returns its whole origin set in one page, so the token is null.

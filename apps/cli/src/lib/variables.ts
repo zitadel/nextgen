@@ -4,7 +4,7 @@ import type { Parsed } from "@zitadel/config/idp";
 
 import { escapeControlCharacters } from "./api-client";
 import { ZitadelError } from "./errors";
-import { renderTable } from "./oclif/crud/table";
+import type { Tabulate } from "./oclif/tabulatable";
 
 /** The kinds of value a name can hold: what primary deploys freeze, and what preview deploys freeze. */
 export type VariableKind = "primary" | "preview";
@@ -99,11 +99,14 @@ const SECRET_MARKER = "(secret)";
  * The variables a deployment froze, as `deployment get` shows them: the
  * `variable resolve` table, indented under a heading.
  */
-export async function frozenVariables(rows: readonly VariableRow[]): Promise<string> {
+export async function frozenVariables(
+  rows: readonly VariableRow[],
+  tabulate: Tabulate,
+): Promise<string> {
   if (rows.length === 0) {
     return "  variables  none";
   }
-  const table = (await renderTable(["name", "value"], variableCells(rows)))
+  const table = (await tabulate(["name", "value"], variableCells(rows)))
     .split("\n")
     .map((line) => `    ${line}`);
   return ["  variables", ...table].join("\n");
