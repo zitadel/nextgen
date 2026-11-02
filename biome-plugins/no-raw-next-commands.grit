@@ -1,14 +1,17 @@
 language js
 
-// A command's data carries suggestions through nextCommandsData() in
-// apps/cli/src/lib/oclif/envelope.ts, which takes SuggestedCommand[] — the
-// branded type only the lib/suggestion builders make. A `next_commands:` key
-// written by hand skips that check, and a suggestion that forgets the run's
-// --env/--env-file/--server quietly targets the default project (#1689).
-`next_commands: $_` as $member where {
+// A command's next steps go on its result as `next` (apps/cli/src/lib/oclif/
+// next-steps.ts), which the base command writes into the envelope and prints.
+// A `next_commands:` or `next_actions:` key written by hand into data reaches
+// the envelope without being printed, and its commands skip the
+// SuggestedCommand check that keeps the run's --env/--env-file/--server (#1689).
+or {
+  `next_commands: $_`,
+  `next_actions: $_`
+} as $member where {
   $filename <: r".*/apps/cli/src/.*",
-  $filename <: not r".*/lib/oclif/envelope\.ts$",
+  $filename <: not r".*/lib/oclif/next-steps\.ts$",
   $filename <: not r".*/lib/oclif/base\.ts$",
   $filename <: not r".*/lib/oclif/types\.ts$",
-  register_diagnostic(span=$member, message="Build a command's next_commands with nextCommandsData() from lib/oclif/envelope, so each entry is a SuggestedCommand.", severity="error")
+  register_diagnostic(span=$member, message="Pass a command's next steps as the result's `next` (lib/oclif/next-steps), never as next_commands or next_actions in its data.", severity="error")
 }

@@ -14,6 +14,7 @@ import { cliPackageRoot } from "./oclif-build";
 import { nextPort } from "./ports";
 import { aBinaryRecord } from "./runtime-record";
 import { parseJson, runCliForTest } from "./run-cli";
+import { assertRunnableSuggestions } from "./suggestions";
 
 const execFileAsync = promisify(execFile);
 
@@ -48,8 +49,8 @@ export interface Envelope<T = Record<string, unknown>> {
 }
 
 /**
- * A non-interactive `deploy` needs a `-m` message, so the helpers default one
- * unless the spec already supplied its own.
+ * A non-interactive `deploy` outside a git repository, as `aSetUpApp` arranges,
+ * needs a `-m` message, so the helpers default one unless the spec supplied its own.
  */
 function withDeployMessage(extraArgs: readonly string[]): string[] {
   const hasMessage = extraArgs.some((arg) => arg === "-m" || arg === "--message");
@@ -709,6 +710,20 @@ export class ScaffoldedApp {
     return this.envelopeOf<{ count: number }>(result).data.count;
   }
 
+  /** The message a release records, as `release get` reports it. */
+  async releaseMessage(releaseId: string): Promise<string | null> {
+    const result = await this.cli(["release", "get", releaseId, "--json"]);
+    expect(result, "release get should have succeeded").toSucceed();
+    return this.envelopeOf<{ metadata: { message: string | null } }>(result).data.metadata.message;
+  }
+
+  /** The message a deployment records, as `deployment get` reports it. */
+  async deploymentMessage(deploymentId: string): Promise<string | null> {
+    const result = await this.cli(["deployment", "get", deploymentId, "--json"]);
+    expect(result, "deployment get should have succeeded").toSucceed();
+    return this.envelopeOf<{ metadata: { message: string | null } }>(result).data.metadata.message;
+  }
+
   /** Build a release from `.zitadel/` and deploy it to every primary origin. */
   deploy(extraArgs: string[] = []): Promise<CliResult> {
     return this.cli(["deploy", "--non-interactive", "--json", ...withDeployMessage(extraArgs)]);
@@ -782,6 +797,14 @@ export class ScaffoldedApp {
 
   run(args: string[], env: NodeJS.ProcessEnv = {}): Promise<CliResult> {
     return this.cli(args, env);
+  }
+
+  /**
+   * `command` as this fixture's runs suggest it again: with the server and
+   * `--cwd` every run is given, so a spec states the whole suggestion.
+   */
+  againAsRun(command: string): string {
+    return `${command} --server ${MOCK_SERVER_URL} --cwd ${this.path}`;
   }
 
   /** For output oclif owns rather than our envelope: `--help`, `--version`. */
@@ -1060,6 +1083,32 @@ export class ScaffoldedApp {
   /** Edits the committed user schema, as the developer owning it would. */
   editUserSchema(edit: (schema: UserSchemaDocument) => void): Promise<void> {
     return this.editDocument(SCHEMA_FILE, edit);
+  }
+
+  /**
+   * Leaves `method` the schema's only way to sign in, with no login flow that
+   * would refuse removing it, so disabling it removes the last way in.
+   */
+  async signsInOnlyWith(method: "password" | "passkey"): Promise<void> {
+    await this.editUserSchema((schema) => {
+      schema["x-auth-methods"] = {
+        password: { enabled: method === "password" },
+        passkey: { enabled: method === "passkey" },
+      };
+    });
+    await this.deleteProjectFile(FLOW_FILE);
+  }
+
+  /** {@link signsInOnlyWith} for an SSO provider the project already offers. */
+  async signsInOnlyWithSso(provider: string): Promise<void> {
+    await this.editUserSchema((schema) => {
+      schema["x-auth-methods"] = {
+        password: { enabled: false },
+        passkey: { enabled: false },
+        sso: { enabled: true, providers: [provider] },
+      };
+    });
+    await this.deleteProjectFile(FLOW_FILE);
   }
 
   /** Edits the password step of the committed login flow, as the developer owning it would. */
@@ -1411,6 +1460,7 @@ export function assertEnvelope(result: CliResult, args: string[] = []): void {
   if (envelope.status === "error") {
     expect(envelope.code, `${where}: error envelope carries no code`).toBeTypeOf("string");
   }
+  assertRunnableSuggestions(where, envelope);
   assertDataShape(where, envelope);
 }
 

@@ -1,6 +1,7 @@
 post:
   operationId: revokeRelease
   x-zitadel-cli: release revoke
+  x-zitadel-destructive: true
   summary: Revoke a release
   description: |
     Marks the release revoked, so that its content is never served again.

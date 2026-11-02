@@ -278,23 +278,13 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	)
 
 	// Bootstrap runs here rather than straight after the migrations because it
-	// now seeds a usable project (keys, user schema, login flows) and so needs
-	// the project service, which needs the key service. It must still precede
-	// the user import: that import creates a bare, unseeded project row for any
-	// project id a bootstrap user names, and a project row that already exists
-	// would make this a no-op and leave the platform project unseeded.
+	// creates the project's keys and so needs the project service, which needs
+	// the key service. It must still precede the user import: that import
+	// creates a bare project row for any project id a bootstrap user names, and
+	// a project row that already exists would make this a no-op and leave the
+	// platform project without keys.
 	if err := platform.Ensure(ctx, projectService, serviceDBPool, cfg.Platform.BootstrapProject); err != nil {
 		return fmt.Errorf("failed to bootstrap platform project: %w", err)
-	}
-
-	if err := users.Import(ctx, serviceDBPool, passwordHasher, users.DialectFromConfig(cfg.Database.Raw), builtinBases, userFiles); err != nil {
-		return fmt.Errorf("failed to bootstrap users: %w", err)
-	}
-
-	// After the import, so a bootstrap admin named in platform.operators
-	// exists by the time it is granted (ADR 075 §4).
-	if err := platform.ReconcileOperators(ctx, serviceDBPool, cfg.Platform.ResolvedProjectID(), cfg.Platform.Operators); err != nil {
-		return fmt.Errorf("failed to reconcile platform operators: %w", err)
 	}
 
 	schemaService := service.NewSchemaService(serviceDBPool, schemaResolverWithHTTP, schemaValidator, builtinBases)
@@ -345,6 +335,28 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		policyService,
 		builtinBases,
 	)
+	// The console signs operators in to the platform project from the public
+	// base, the first console origin, so that project serves a deployed release
+	// there like any other project. Before the user import, which needs the
+	// platform user schema this release stores.
+	if cfg.Platform.BootstrapProject {
+		if err := platform.EnsureDeployed(ctx, cfg.Schema.BuiltinPublicBase, build.Date(), consoleHosts[0], projectService, releaseService, deploymentService); err != nil {
+			return fmt.Errorf("failed to deploy the platform project: %w", err)
+		}
+		for _, origin := range consoleHosts[1:] {
+			slog.Info("console origin can preview a project's login but not sign in to the platform project", slog.String("origin", origin))
+		}
+	}
+
+	if err := users.Import(ctx, serviceDBPool, passwordHasher, users.DialectFromConfig(cfg.Database.Raw), builtinBases, userFiles); err != nil {
+		return fmt.Errorf("failed to bootstrap users: %w", err)
+	}
+
+	// After the import, so a bootstrap admin named in platform.operators
+	// exists by the time it is granted (ADR 075 §4).
+	if err := platform.ReconcileOperators(ctx, serviceDBPool, cfg.Platform.ResolvedProjectID(), cfg.Platform.Operators); err != nil {
+		return fmt.Errorf("failed to reconcile platform operators: %w", err)
+	}
 	passwordPolicy, err := service.NewPasswordPolicy(policyEngine, policyService, passwordHasher, serviceDBPool)
 	if err != nil {
 		return err
@@ -448,7 +460,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	defer pinger.Close()
 
 	runtimeResolver := service.NewRuntimeResolver(serviceDBPool, releaseService, consoleHosts...)
-	oasServer, err := oasapi.NewServer(
+	apiServers, err := api.NewServers(
 		api.NewHandler(
 			flowService,
 			authAttemptSvc,
@@ -478,10 +490,10 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		api.NewSecurityHandler(tokenService).WithPlatformProject(cfg.Platform.ResolvedProjectID()),
 		apiServerOptions(telemetry.TracerProvider(), telemetry.MeterProvider(), consoleLink(cfg.Server.ConsolePath))...)
 	if err != nil {
-		return fmt.Errorf("failed to build api server: %w", err)
+		return fmt.Errorf("failed to build api servers: %w", err)
 	}
 
-	mux, err := buildHTTPMux(cfg.Server, idgen.NewULID(), oasServer,
+	mux, err := buildHTTPMux(cfg.Server, idgen.NewULID(), apiServers,
 		api.NewIDPCallbackHandler(ssoCallback),
 		standaloneRuntimeResolver(projectService, tokenService, keyService, cfg.Platform.ResolvedProjectID()),
 		requestEventBuf,
@@ -900,9 +912,10 @@ func mustBindEnv(v *viper.Viper, key string) {
 
 // ----------------------------- HTTP --------------------------------------
 
-// apiServerOptions are the options of the ogen API server that buildHTTPMux
-// mounts, shared with the test of that chain. home is the way on that the
-// error page of a path nothing answers offers a person (ADR 076).
+// apiServerOptions are the options of the ogen API servers that buildHTTPMux
+// mounts, to which api.NewServers adds each mount's own; shared with the
+// test of that chain. home is the way on that the error page of a path
+// nothing answers offers a person (ADR 076).
 func apiServerOptions(tracerProvider trace.TracerProvider, meterProvider metric.MeterProvider, home *errorpage.Link) []oasapi.ServerOption {
 	return []oasapi.ServerOption{
 		oasapi.WithMiddleware(
@@ -929,7 +942,7 @@ func consoleLink(consolePath string) *errorpage.Link {
 	return &errorpage.Link{Label: "Open the console", Href: consolePath + "/"}
 }
 
-func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiHandler, idpCallbackHandler http.Handler, runtime runtimeResolver, requestEvents *audit.RequestBuffer, retentionTrigger http.Handler) (http.Handler, error) {
+func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiServers api.Servers, idpCallbackHandler http.Handler, runtime runtimeResolver, requestEvents *audit.RequestBuffer, retentionTrigger http.Handler) (http.Handler, error) {
 	mux := http.NewServeMux()
 
 	if cfg.ConsoleEnabled {
@@ -998,7 +1011,9 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiH
 		middleware.WithLogging,
 		api.WithRecover,
 	))
-	mux.Handle("/", chain(apiHandler))
+	// The API under /api/v1, the probes at the root, and the root alias for
+	// every other path until 1.0.0 (ADR 077).
+	api.MountAPI(mux, chain, apiServers)
 	return securityheaders.Middleware(mux), nil
 }
 

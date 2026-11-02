@@ -68,6 +68,18 @@ func (s *EventService) List(ctx context.Context, req ListEventsRequest) (_ *List
 	if err != nil {
 		return nil, err
 	}
+	if opts.Pagination.OrderBy.Direction == database.OrderAsc {
+		// Paging forward, a token passes every event before its page. An
+		// event that commits behind a page would be skipped for good, so an
+		// ascending list stops where events are still settling.
+		settled, err := s.v2Pool.Statements().EventsSettledBefore(ctx, req.ProjectID)
+		if err != nil {
+			return nil, domain.ErrInternal(err).WithMessage("failed to list events")
+		}
+		if !settled.IsZero() {
+			opts.Filter = database.And(opts.Filter, database.LessThan(database.Col(domain.EventFieldCreatedAt), settled))
+		}
+	}
 
 	result, err := s.v2Pool.Statements().ListEvents(ctx, opts)
 	if err != nil {

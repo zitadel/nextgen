@@ -535,7 +535,7 @@ func (s *releaseService) autoPinReferences(
 	}
 
 	for handle := range needSchema {
-		latest, err := latestSchemaByObjectType(ctx, stmts, projectID, handle)
+		latest, err := LatestSchemaByObjectType(ctx, stmts, projectID, handle)
 		if err != nil {
 			return err
 		}

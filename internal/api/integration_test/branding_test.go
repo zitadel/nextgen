@@ -179,7 +179,7 @@ func TestBranding(t *testing.T) {
 	postBranding := func(t *testing.T, body string) (int, string) {
 		t.Helper()
 		req, err := http.NewRequestWithContext(t.Context(), http.MethodPost,
-			harness.EnsureTestServer(t).URL+"/branding?project_id="+project.ID,
+			harness.APIBaseURL(t)+"/branding?project_id="+project.ID,
 			strings.NewReader(body))
 		require.NoError(t, err)
 		req.Header.Set("Content-Type", "application/json")

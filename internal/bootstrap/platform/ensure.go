@@ -1,9 +1,9 @@
 // Package platform bootstraps deployment-level platform resources at server
 // startup. Today that is the single, flag-gated platform project (#605): when
 // explicitly enabled, the server idempotently ensures the well-known platform
-// project (domain.PlatformProjectID) exists, seeded well enough to serve a
-// registration and a sign-in. Disabled (the default) is a no-op, so no
-// deployment gets a platform project created silently.
+// project (domain.PlatformProjectID) exists, and deploys the configuration the
+// server ships to it (EnsureDeployed). Disabled (the default) is a no-op, so
+// no deployment gets a platform project created silently.
 package platform
 
 import (
@@ -22,12 +22,9 @@ type ProjectCreator interface {
 	CreateWithID(ctx context.Context, id, name string, origins []domain.Origin, seedDefaults bool) (*domain.Project, error)
 }
 
-// Ensure idempotently creates the platform project when enabled, with the
-// defaults a project needs to be usable: encryption and signing keys, the
-// default user schema, and the default login flow definitions. A bare project
-// row would satisfy the foreign keys and nothing else, so a deployment that
-// bootstrapped one could not actually serve the registration the platform
-// plane exists for.
+// Ensure idempotently creates the platform project when enabled, with its
+// encryption and signing keys. Its user schema and login flows are the release
+// EnsureDeployed builds and deploys.
 //
 // The row carries the well-known domain.PlatformProjectID; the server owns
 // that id, so there is nothing for a caller to pass. Disabled (the default) is
@@ -37,7 +34,7 @@ func Ensure(ctx context.Context, projects ProjectCreator, pool service.Statement
 		return nil
 	}
 
-	_, err := projects.CreateWithID(ctx, domain.PlatformProjectID, "Platform", []domain.Origin{}, true)
+	_, err := projects.CreateWithID(ctx, domain.PlatformProjectID, "Platform", []domain.Origin{}, false)
 	if err != nil {
 		// A duplicate primary key means another replica (or a previous start)
 		// already created the project. The project service wraps the failure as
@@ -49,7 +46,7 @@ func Ensure(ctx context.Context, projects ProjectCreator, pool service.Statement
 		return fmt.Errorf("ensure platform project %q: %w", domain.PlatformProjectID, err)
 	}
 
-	slog.Info("platform bootstrap: created platform project with default schema and login flows",
+	slog.Info("platform bootstrap: created platform project",
 		slog.String("project_id", domain.PlatformProjectID))
 	return nil
 }
@@ -67,11 +64,11 @@ func Ensure(ctx context.Context, projects ProjectCreator, pool service.Statement
 // The probe is an active token key: it is what the session exchange reaches
 // for first, and the bare row this targets has none. That is a detector for
 // the case at hand, not a full health check — it does not verify the signing
-// key, the user schema, or the login flows. Everything this bootstrap seeds
-// shares one transaction, so a project it created has all of them or none, and
-// a project it did not create is the bare row. A project assembled some other
-// way could still pass; validating each resource belongs with in-place seeding
-// (#527's provisioner), which is the real fix and is not implemented here.
+// key. Everything this bootstrap creates shares one transaction, so a project
+// it created has all of them or none, and a project it did not create is the
+// bare row. A project assembled some other way could still pass; validating
+// each resource belongs with in-place seeding (#527's provisioner), which is the
+// real fix and is not implemented here.
 func confirmSeeded(ctx context.Context, pool service.StatementPool) error {
 	_, err := pool.Statements().GetEncryptionKey(ctx, database.And(
 		database.Equal(database.Col(domain.EncryptionKeyFieldProjectID), domain.PlatformProjectID),

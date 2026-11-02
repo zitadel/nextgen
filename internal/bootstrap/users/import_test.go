@@ -262,6 +262,60 @@ func TestImport_legacySchemaURLUsesSeededRow(t *testing.T) {
 	require.True(t, missing, "no placeholder may be created under the legacy URL, got %v", err)
 }
 
+// A project whose release stored the default schema holds it under an id the
+// build minted. A document naming the built-in URL, as the bootstrap admin's
+// does, imports the user against that schema.
+func TestImport_defaultSchemaURLUsesTheDeployedSchema(t *testing.T) {
+	ctx := t.Context()
+	v2Pool := testPool(t)
+	stmts := v2Pool.Statements()
+
+	suffix := rand.Text()
+	projectID := "proj_" + suffix
+	userID := "user_" + suffix
+	require.NoError(t, stmts.CreateProject(ctx, &domain.Project{
+		ID:      projectID,
+		Name:    "project-" + projectID,
+		Origins: []domain.Origin{},
+	}))
+	t.Cleanup(func() { _, _ = stmts.DeleteProjectByID(context.Background(), projectID) })
+
+	objectType := "human-user"
+	deployed := &domain.JSONSchema{
+		ProjectID:  projectID,
+		ObjectType: &objectType,
+		Kind:       domain.JSONSchemaKindUnknown,
+		Schema: []byte(`{"type":"object","objectType":"human-user","properties":{` +
+			`"email":{"type":"string","x-unique":"project"}}}`),
+	}
+	require.NoError(t, stmts.CreateJSONSchema(ctx, deployed))
+
+	builtinURL := testBuiltinBases.Canonical() + "/default-human-user.json"
+	doc := validDocument()
+	doc.Header.ProjectID = projectID
+	doc.Header.TeamID = "team_" + suffix
+	doc.Header.ID = userID
+	doc.Header.SchemaURL = builtinURL
+	doc.Attributes["email"] = json.RawMessage(`"admin-` + suffix + `@example.com"`)
+	raw, err := json.Marshal(doc)
+	require.NoError(t, err)
+	path := filepath.Join(t.TempDir(), "user.json")
+	require.NoError(t, os.WriteFile(path, raw, 0o600))
+
+	require.NoError(t, users.Import(ctx, v2Pool, testHasher(t), "postgres", testBuiltinBases, []string{path}))
+
+	got, err := stmts.GetUser(ctx, database.And(
+		database.Equal(database.Col(domain.UserFieldProjectID), projectID),
+		database.Equal(database.Col(domain.UserFieldID), userID),
+	), service.UserQueryOptions{})
+	require.NoError(t, err)
+	require.Equal(t, deployed.URL, got.SchemaURL)
+
+	_, err = stmts.GetJSONSchemaByID(ctx, projectID, builtinURL)
+	_, missing := errors.AsType[*database.NoRowFoundError](err)
+	require.True(t, missing, "no placeholder may be created under the built-in URL, got %v", err)
+}
+
 // writeUserFile writes a valid user document carrying the given IDs and returns
 // its path.
 func writeUserFile(t *testing.T, projectID, teamID, userID string) string {

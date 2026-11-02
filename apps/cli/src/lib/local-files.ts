@@ -18,7 +18,7 @@
 import { lstatSync, readFileSync, realpathSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
-import { ZitadelError } from "./errors";
+import { isErrno, ZitadelError } from "./errors";
 
 export const FILE_REFERENCE_KEY = "$file";
 
@@ -37,10 +37,6 @@ const omittedReference = Symbol("omittedReference");
 
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
-
-function isErrno(error: unknown, code: string): boolean {
-  return typeof error === "object" && error !== null && "code" in error && error.code === code;
-}
 
 /** A file's content, or undefined when it is absent. */
 function readIfPresent(path: string): string | undefined {

@@ -8,7 +8,6 @@ import {
 import { LocalServer } from "../lib/local-server/server";
 import { BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
 import { resolveCwd } from "../lib/paths";
-import { nextCommandsData } from "../lib/oclif/envelope";
 
 export default class Stop extends BaseCommand {
   static override description = "Stop the local Zitadel server.";
@@ -48,8 +47,8 @@ export default class Stop extends BaseCommand {
             data_preserved: true,
             data_dir: runtime?.data_dir,
           },
-          ...nextCommandsData([this.suggestUnscoped("stop")]),
         },
+        next: { commands: [this.suggestUnscoped("stop")] },
       });
     }
 

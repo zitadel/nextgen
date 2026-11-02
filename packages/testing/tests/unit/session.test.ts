@@ -49,13 +49,13 @@ const terminalStep = {
 };
 
 const userHandlers = [
-  http.post(`${BASE}/users`, () => HttpResponse.json({ id: "user_1" }, { status: 201 })),
-  http.put(`${BASE}/users/:userId/password`, () => new HttpResponse(null, { status: 204 })),
+  http.post(`${BASE}/api/v1/users`, () => HttpResponse.json({ id: "user_1" }, { status: 201 })),
+  http.put(`${BASE}/api/v1/users/:userId/password`, () => new HttpResponse(null, { status: 204 })),
 ];
 
 const server = setupServer(
   ...userHandlers,
-  http.post(`${BASE}/flow`, async ({ request }) => {
+  http.post(`${BASE}/api/v1/flow`, async ({ request }) => {
     captured.flowStart = (await request.json()) as Record<string, unknown>;
     captured.flowStartOrigin = request.headers.get("origin");
     return HttpResponse.json(identifierStep, {
@@ -63,7 +63,7 @@ const server = setupServer(
       headers: { "set-cookie": "_zflow=state-1; HttpOnly; Path=/" },
     });
   }),
-  http.post(`${BASE}/flow/:id/submit`, async ({ request }) => {
+  http.post(`${BASE}/api/v1/flow/:id/submit`, async ({ request }) => {
     const body = (await request.json()) as Record<string, unknown>;
     captured.submits.push(body);
     captured.submitCookies.push(request.headers.get("cookie"));
@@ -71,7 +71,7 @@ const server = setupServer(
       headers: { "set-cookie": `_zflow=state-${captured.submits.length + 1}; HttpOnly; Path=/` },
     });
   }),
-  http.post(`${BASE}/sessions/exchange`, async ({ request }) => {
+  http.post(`${BASE}/api/v1/sessions/exchange`, async ({ request }) => {
     captured.exchangeBody = (await request.json()) as Record<string, unknown>;
     captured.exchangeProject = new URL(request.url).searchParams.get("project_id") ?? "";
     return HttpResponse.json({
@@ -140,7 +140,7 @@ describe("seedSession", () => {
     const zitadel = connectZitadel(handle);
     const user = { id: "user_9", email: "kept@acme.com", password: "Fixed-pw-1" };
     server.use(
-      http.post(`${BASE}/users`, () => {
+      http.post(`${BASE}/api/v1/users`, () => {
         throw new Error("must not seed when a user is provided");
       }),
     );
@@ -162,7 +162,7 @@ describe("seedSession", () => {
 
   it("fails loudly on a step declaring fields it cannot fill", async () => {
     server.use(
-      http.post(`${BASE}/flow`, () =>
+      http.post(`${BASE}/api/v1/flow`, () =>
         HttpResponse.json(
           {
             id: "flow_1",
@@ -181,7 +181,7 @@ describe("seedSession", () => {
 
   it("explains a missing Origin when the allowlist rejects the call", async () => {
     server.use(
-      http.post(`${BASE}/flow`, () =>
+      http.post(`${BASE}/api/v1/flow`, () =>
         HttpResponse.json(
           { code: "req.invalid", message: 'origin "x" is not allowed for this project' },
           { status: 400 },
@@ -193,7 +193,9 @@ describe("seedSession", () => {
   });
 
   it("caps the number of flow steps instead of looping", async () => {
-    server.use(http.post(`${BASE}/flow/:id/submit`, () => HttpResponse.json(identifierStep)));
+    server.use(
+      http.post(`${BASE}/api/v1/flow/:id/submit`, () => HttpResponse.json(identifierStep)),
+    );
     const zitadel = connectZitadel(handle);
     await expect(zitadel.seedSession()).rejects.toThrow(/did not complete within 6 steps/);
   });

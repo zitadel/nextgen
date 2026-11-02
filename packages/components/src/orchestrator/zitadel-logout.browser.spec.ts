@@ -107,9 +107,9 @@ describe("<zitadel-logout> open/close (chromium)", () => {
     shadowQuery<HTMLButtonElement>(element, ".signout-btn").click();
     await waitFor(() => (fetchMock.mock.calls.length > 1 ? fetchMock : null));
     const [tokenUrl] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
-    expect(String(tokenUrl).startsWith(`${API_BASE}/sessions/me/csrf`)).toBe(true);
+    expect(String(tokenUrl).startsWith(`${API_BASE}/api/v1/sessions/me/csrf`)).toBe(true);
     const [url, init] = fetchMock.mock.calls[1] as unknown as [string, RequestInit];
-    expect(String(url).startsWith(`${API_BASE}/sessions/me`)).toBe(true);
+    expect(String(url).startsWith(`${API_BASE}/api/v1/sessions/me`)).toBe(true);
     expect(init.method).toBe("DELETE");
     expect(init.credentials).toBe("include");
     expect(new Headers(init.headers).get("X-Zitadel-CSRF")).toBe("csrf_test");

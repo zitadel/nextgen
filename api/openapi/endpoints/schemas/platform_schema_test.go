@@ -32,7 +32,7 @@ func TestPlatformHumanUserSchemaExtendsTheDefault(t *testing.T) {
 	require.NoError(t, json.Unmarshal(doc, &platform))
 	require.NoError(t, json.Unmarshal(schemas.DefaultHumanUserSchema(testBase), &base))
 
-	assert.Equal(t, base["$id"], platform["$id"])
+	assert.NotContains(t, platform, "$id")
 	assert.Equal(t, base["required"], platform["required"])
 	assert.Equal(t, []string{schemas.PlatformDisplayNameProperty}, domain.DesignatedDisplay(doc))
 

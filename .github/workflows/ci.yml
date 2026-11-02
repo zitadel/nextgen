@@ -210,6 +210,18 @@ jobs:
           MOON_BASE: ${{ env.CI_BASE }}
         run: moon ci :lint :typecheck :build :test :check-typecheck :check-openapi-rules :check-adrs :check-moon-graph --downstream deep --include-relations
 
+      - name: Upload component test diagnostics
+        if: ${{ failure() && steps.moon-ci.outcome == 'failure' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: component-test-diagnostics
+          path: |
+            packages/components/test-output/vitest/junit.xml
+            packages/components/src/**/__screenshots__/**
+            packages/api-mock/test-output/vitest/junit.xml
+          if-no-files-found: ignore
+          retention-days: 7
+
       # The graph step above runs the Go database lanes whenever moon finds
       # them affected, as dependents of the console and login UI builds their
       # binary embeds. When ci-mode forces a full run for files neither lane

@@ -1,4 +1,4 @@
-import { readFile, rm, writeFile } from "node:fs/promises";
+import { access, readFile, rm, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 
 import { intro, note, outro } from "@clack/prompts";
@@ -89,7 +89,7 @@ import {
   RENDERER_IDS,
 } from "../../lib/orca/patchers/rule/next/renderers/registry";
 import type { PatchContext } from "../../lib/orca/patchers/types";
-import { type Asker, input } from "../../lib/input";
+import type { Asker } from "../../lib/input";
 import { hasZitadelConfig, hasZitadelSecret } from "../../lib/project";
 import {
   PASSWORD_POLICY_PATH,
@@ -134,7 +134,7 @@ import {
   type Row,
   type Section,
 } from "./summary";
-import { shellOption } from "../../lib/shell";
+import { shellArg, shellOption } from "../../lib/shell";
 import { showSkillsHint } from "../../lib/skills-hint";
 import { reportWarning } from "../../lib/warnings";
 import {
@@ -144,8 +144,8 @@ import {
   type SuggestedCommand,
   unscopedCommand,
 } from "../../lib/suggestion";
-import { nextCommandsData } from "../../lib/oclif/envelope";
-import { Promptable } from "../../lib/oclif/promptable";
+import { asStepsShown, type StepsShown } from "../../lib/oclif/next-steps";
+import { Destructive } from "../../lib/oclif/destructive";
 
 /**
  * The frameworks `--framework` accepts, derived from Orca's registry so the
@@ -218,7 +218,7 @@ function localRecoverySelector(cwd: string | undefined): EnvironmentSelector {
  * — each entry is a small class) and {@link PickFrameworkPrompt} (the
  * empty-directory framework choice, before the main wizard).
  */
-export default class Setup extends Promptable(BaseCommand) {
+export default class Setup extends Destructive(BaseCommand) {
   static override description =
     "Create a Zitadel project and scaffold local auth. An interactive setup ends with a note about the Zitadel agent skills, shown once per machine; set NO_SKILLS_PROMPT=1 to hide it.";
   static override group = CommandGroups.gettingStarted;
@@ -231,7 +231,7 @@ export default class Setup extends Promptable(BaseCommand) {
     force: Flags.boolean({
       char: "f",
       description:
-        "Overwrite managed files that already exist, and scaffold into a non-empty directory.",
+        "Overwrite managed files that already exist, scaffold into a non-empty directory, and remove the previous origin when --dev-port moves the app.",
     }),
     framework: Flags.string({ description: "Framework to target.", options: FRAMEWORK_OPTIONS }),
     renderer: Flags.string({
@@ -333,7 +333,7 @@ export default class Setup extends Promptable(BaseCommand) {
       // An app already set up has nothing left to scaffold, but an explicit
       // --dev-port is how it moves to another port.
       if (flags["dev-port"] !== undefined) {
-        return this.moveToDevPort(cwd, assertDevPort(flags["dev-port"]), dryRun);
+        return this.moveToDevPort(cwd, flags.cwd, assertDevPort(flags["dev-port"]), dryRun);
       }
       return this.emit({ status: "skipped", reason: "already-initialized" });
     }
@@ -363,12 +363,9 @@ export default class Setup extends Promptable(BaseCommand) {
     // inconsistent set of --sso flags is a mistake in the command line, and
     // reporting it after a project has been created would leave the developer
     // to clean up.
-    // Not `this.input`: that one answers a confirm when `--force` is given, and
-    // here `--force` permits overwriting files, so it must never answer a
-    // question. Interactive only when a person is there, which is also the only
-    // time the wizard runs.
-    const wizardInput: Asker = (question) =>
-      input(question, { interactive: !nonInteractive, force: false });
+    // It cannot ask a `confirm`, so setup's `--force`, which permits
+    // overwriting files, never answers one of its questions.
+    const wizardInput: Asker = this.input;
     const ssoFromCommandLine = await ssoFromFlags(
       flags,
       nonInteractive,
@@ -987,6 +984,7 @@ export default class Setup extends Promptable(BaseCommand) {
     // The structured report is human-only. Under `--json` we let the
     // envelope returned from `this.emit(...)` be the sole stdout
     // payload (oclif requires single-doc JSON).
+    let nextShown: StepsShown | undefined;
     if (!this.jsonEnabled()) {
       const projectFacts = await detectProjectFacts(cwd, app.framework);
       const sections = buildSummary({
@@ -1023,6 +1021,8 @@ export default class Setup extends Promptable(BaseCommand) {
         ),
         style: { padding: 1, borderStyle: "rounded", borderColor: "green" },
       });
+      // The box holds the next steps, so the base command does not repeat them.
+      nextShown = asStepsShown();
       // After the steps that start the app and test sign-in, outside the box so
       // the command can be copied without its border.
       consola.log(`\n${exploreAllCommands(this.meta.cliVersion)}`);
@@ -1102,7 +1102,9 @@ export default class Setup extends Promptable(BaseCommand) {
                 deployment_id: deployment.deploymentId,
                 origins: [...deployment.origins],
               },
-        next_actions: [
+      },
+      next: {
+        actions: [
           ...deployStep.actions,
           ...installOutcome.nextActions,
           brandingGuidanceAction(this.meta.cliVersion),
@@ -1112,7 +1114,7 @@ export default class Setup extends Promptable(BaseCommand) {
         // A JSON run prints no warnings, so a credential the project never
         // received would otherwise appear only as a `published` status with
         // nothing to act on. `auth-method sso enable` reports the same recovery step.
-        ...nextCommandsData([
+        commands: [
           ...republishCommands(
             answers.sso.flatMap((answer) => {
               const slug = providerOf(answer.selection).slug;
@@ -1137,8 +1139,9 @@ export default class Setup extends Promptable(BaseCommand) {
           ...installOutcome.nextCommands,
           ...consoleStep.commands,
           ...claimNudge.commands,
-        ]),
+        ],
       },
+      nextShown,
     });
   }
 
@@ -1235,6 +1238,7 @@ export default class Setup extends Promptable(BaseCommand) {
    */
   private async moveToDevPort(
     cwd: string,
+    typedCwd: string | undefined,
     devPort: number,
     dryRun: boolean,
   ): Promise<JsonEnvelope> {
@@ -1248,13 +1252,31 @@ export default class Setup extends Promptable(BaseCommand) {
       orca: createOrca(),
       cliVersion: this.meta.cliVersion,
       dryRun,
+      consent: (gate) => this.consent(gate),
     });
     for (const file of move.result.filesWritten) {
       consola.info(`${dryRun ? "Would update" : "Updated"} ${relativeDisplay(cwd, file)}`);
     }
+    // Not setup again: the app is on the new port by now, so a rerun moves
+    // nothing and never reaches the old origin. Pinned to the project just
+    // moved, as the other recoveries are: its env file, or the server the move
+    // used for a project setup gave none, never what the shell has exported.
+    const cleanup =
+      move.refused && move.staleOrigin !== undefined
+        ? projectCommand(
+            `origin rm ${shellArg(move.staleOrigin)} --force`,
+            (await access(join(cwd, ".env.development.local")).then(
+              () => true,
+              () => false,
+            ))
+              ? recoverySelector(typedCwd)
+              : environmentSelectorSuffix({ server, cwd: typedCwd }),
+            this.meta.cliVersion,
+          )
+        : undefined;
     if (move.staleOrigin !== undefined) {
       reportWarning(
-        `Could not remove ${move.staleOrigin} from the project's origins; it admits a port nothing serves any more.`,
+        `${move.staleOrigin} is still among the project's origins; it admits a port nothing serves any more.${cleanup === undefined ? "" : ` Remove it with \`${cleanup}\`.`}`,
       );
     }
     for (const slug of move.ssoProviders) {
@@ -1277,7 +1299,10 @@ export default class Setup extends Promptable(BaseCommand) {
         issuer: move.issuer,
         dev_port: devPort,
         files_written: move.result.filesWritten.map((file) => relativeDisplay(cwd, file)),
-        next_actions: [`Restart the dev server and open ${move.issuer}/login.`],
+      },
+      next: {
+        actions: [`Restart the dev server and open ${move.issuer}/login.`],
+        ...(cleanup === undefined ? {} : { commands: [cleanup] }),
       },
     });
   }

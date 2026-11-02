@@ -64,7 +64,7 @@ test("a local project is owned from setup, and the console signs the local admin
   await page.goto(signInUrl);
   await expect(page).not.toHaveURL(/\/login/, { timeout: 60_000 });
   const me = await page.evaluate(async () => {
-    const res = await fetch("/sessions/me", { credentials: "include" });
+    const res = await fetch("/api/v1/sessions/me", { credentials: "include" });
     return { status: res.status, body: (await res.json()) as { user?: { identifier?: string } } };
   });
   expect(me.status).toBe(200);
