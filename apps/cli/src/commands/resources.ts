@@ -1,4 +1,16 @@
 import {
+  type GetReleaseById200,
+  ListEventsCategoryItem,
+  ListFlowDefinitionsRevisions,
+  ListSchemasRevisions,
+  QueryGrantsBodyFilterItemOperation,
+  QueryIdpsBodyFilterItemOperation,
+  QueryProjectsBodyFilterItemOperation,
+  QuerySessionsBodyFilterItemOperation,
+  QueryTeamsBodyFilterItemOperation,
+  QueryUsersBodyFilterItemOperation,
+} from "@zitadel/api/generated/model";
+import {
   CreateGrantBody,
   CreateTeamBody,
   CreateUserBody,
@@ -44,14 +56,22 @@ import { isVariableReference } from "@zitadel/config/idp";
 
 import type { ZitadelClient } from "../lib/api-client";
 import { CommandGroups } from "../lib/oclif/groups";
+import { pagedFunctions } from "../lib/api-client";
 import { ZitadelError } from "../lib/errors";
 import {
   buildResourceCommands,
   type CreateSpec,
+  type FieldPath,
+  type FilterField,
+  type GetSpec,
+  type Json,
   type ListSpec,
+  renderTable,
+  type ResourceDescriptor,
   type ResourceRegistry,
   type Schema,
   type UpdateSpec,
+  type WriteResult,
   type WriteShape,
 } from "../lib/oclif/crud";
 
@@ -65,35 +85,207 @@ export type Platform = Readonly<{ client: ZitadelClient; projectId: string }>;
 
 // Builders that infer a verb's body type from its Zod schema, so `call` gets
 // the typed body straight from `parseOrThrow` — no cast from `Json`.
-const create = <B>(
+export const create = <B, C>(
   schema: Schema<B>,
-  call: (ctx: Platform, body: B) => Promise<unknown>,
+  call: (ctx: Platform, body: B) => Promise<C>,
   shape: WriteShape = {},
-): CreateSpec<Platform, B> => ({ ...shape, schema, call });
+): NoInfer<CreateSpec<Platform, B, C>> => ({ ...shape, schema, call });
 
-const update = <B>(
+export const update = <B, U>(
   schema: Schema<B>,
-  call: (ctx: Platform, id: string, body: B) => Promise<unknown>,
+  call: (ctx: Platform, id: string, body: B) => Promise<U>,
   shape: WriteShape = {},
-): UpdateSpec<Platform, B> => ({ ...shape, schema, call });
+): NoInfer<UpdateSpec<Platform, B, U>> => ({ ...shape, schema, call });
 
-// Infers a structured-query list's request type `B` from its `body` schema. A
-// `GET` list has no body, so it is written as a plain object (request stays `Json`).
-const list = <B>(spec: ListSpec<Platform, B>): ListSpec<Platform, B> => spec;
+// Marks a descriptor `resource()` checked; `RESOURCES` takes no other, so an
+// entry written as a plain object cannot skip the checks.
+const checked = Symbol("checked");
+type Checked = ResourceDescriptor<Platform> & { readonly [checked]: true };
 
-/** Filter operations of `POST /<resource>/query` endpoints (ADR 031). */
-const FILTER_OPERATIONS = [
-  "equals",
-  "not_equals",
-  "contains",
-  "not_contains",
-  "less_than",
-  "less_than_or_equal",
-  "greater_than",
-  "greater_than_or_equal",
-] as const;
+/** A registry of descriptors `resource()` checked: the type `RESOURCES` satisfies. */
+export type CheckedRegistry = ResourceRegistry<Platform> & Readonly<Record<string, Checked>>;
 
-const EVENT_CATEGORIES = ["request", "auth", "session", "admin", "entity", "signal"] as const;
+// The fields of `T`, each of any type: what a response schema must parse into
+// at least. A schema copied from another operation names other fields. The
+// types below them may differ: a schema applies the spec's defaults, and types
+// a recursive field as `unknown` where the generated type spells it out.
+type FieldsOf<T> = { [K in keyof T]: unknown };
+
+// What a write must answer with: a record carrying the resource's id under
+// `Id`, or the empty answer `WriteResult` allows (`grants create` by
+// identifier answers 202).
+type Written<Id extends string> = Readonly<Record<Id, unknown>> | Exclude<WriteResult, Json>;
+
+// What a structured query's body filters and sorts by: the enums of its
+// `filter[].field`, `filter[].operation` and `sorting.field`.
+type BodyFilter<B> = B extends { filter?: readonly (infer F)[] | null } ? F : never;
+type BodyFilterField<B> = BodyFilter<B> extends { field: infer N } ? N & string : never;
+type BodyFilterOperation<B> = BodyFilter<B> extends { operation: infer O } ? O & string : never;
+type BodySortField<B> = B extends { sorting?: infer S }
+  ? NonNullable<S> extends { field: infer N }
+    ? N & string
+    : never
+  : never;
+
+// A structured query's filter: a field and operations its body takes. The body
+// carries every value as one free-form scalar, so `values` and `default` are
+// plain strings, and repeats of a field all apply, so none widens.
+type QueryFilter<B> = FilterField & {
+  readonly field: BodyFilterField<B>;
+  readonly operations: readonly BodyFilterOperation<B>[];
+  readonly combine?: undefined;
+};
+
+// What a `GET` query parameter takes: one entry of it, when it repeats.
+type ParamValue<V> = NonNullable<V> extends readonly (infer E)[] ? E : NonNullable<V>;
+
+// A `GET` list's filter: a query parameter, which carries a value as it is and
+// so filters only by `equals`, and whose `values` and `default` are of the type
+// it takes; or a range, sent as one parameter per operation, which only
+// `range()` makes. A parameter that takes a list widens with each repeat, so
+// it says so, and one that takes a single value cannot.
+type GetFilter<B> =
+  | {
+      [K in keyof B & string]: FilterField & {
+        readonly field: K;
+        readonly operations: readonly "equals"[];
+        readonly params?: undefined;
+        readonly values?: readonly (ParamValue<B[K]> & string)[];
+        readonly default?: ParamValue<B[K]> & string;
+      } & (NonNullable<B[K]> extends readonly unknown[]
+          ? { readonly combine: "or" }
+          : { readonly combine?: undefined });
+    }[keyof B & string]
+  | (FilterField & {
+      readonly params: Readonly<Record<string, keyof B & string>>;
+      readonly combine?: undefined;
+      readonly [ranged]: true;
+    });
+
+// Marks the operations and parameters `range()` paired; a `GET` list takes no
+// other range, so none can offer an operation it has no parameter for.
+const ranged = Symbol("ranged");
+
+/**
+ * A field a `GET` list sends as one parameter per operation (a range, such as
+ * `created_after` and `created_before`), keyed by operation: the operations it
+ * offers are the keys, so each has the parameter it travels as.
+ */
+export const range = <const M extends { readonly [O in Operation]?: string }>(
+  params: M & { readonly [K in Exclude<keyof M, Operation>]: never },
+) => ({ operations: Object.keys(params), params, [ranged]: true as const });
+
+// A list's filters and sorts, checked against the request it sends. A list with
+// a `body` is a structured query, sorted by a field the body names. A `GET` list
+// orders by one implicit field of its item, so its sort names that field, and
+// `sortParam` the parameter carrying the direction.
+type QueryList<B> = Readonly<{
+  body: Schema<B>;
+  filters?: readonly NoInfer<QueryFilter<B>>[];
+  sorts?: readonly NoInfer<BodySortField<B>>[];
+  sortParam?: undefined;
+}>;
+// A `GET` list whose call parameter is untyped has a request of any key, which
+// would check nothing, so it takes no filters or `sortParam` at all.
+type GetList<B, T> = Readonly<{
+  body?: undefined;
+  filters?: string extends keyof B ? never : readonly NoInfer<GetFilter<B>>[];
+  sorts?: readonly NoInfer<FieldPath<T>>[];
+  sortParam?: string extends keyof B ? never : NoInfer<keyof B & string>;
+}>;
+
+/** What a `GET` list's call takes: the client function's query, less what the platform fills. */
+type Query<K extends keyof ZitadelClient> = Omit<
+  NonNullable<Parameters<ZitadelClient[K]>[0]>,
+  "project_id"
+>;
+
+// Infers a list's page `P` from `call` and its item `T` from `items`, which
+// reads the list off that page, and checks `item` against `T`. Infers a
+// structured query's request type `B` from its `body` schema, and a `GET` list's
+// from its call's parameter, which must be typed (`params: Query<"listX">`) for
+// the list to take filters or a `sortParam`. `items` comes after `call`, so the
+// page is known when `items` is read.
+export const list = <B = Json, P = unknown, T = unknown, S extends FieldsOf<T> = FieldsOf<T>>(
+  spec: ListSpec<Platform, B, P, T> & { item?: Schema<S> } & (QueryList<B> | GetList<B, T>),
+): NoInfer<ListSpec<Platform, B, P, T>> => spec;
+
+// Infers the record `get` answers with, so `sections` reads it typed.
+export const get = <R, S extends FieldsOf<R> = FieldsOf<R>>(
+  spec: GetSpec<Platform, R> & { response?: Schema<S> },
+): NoInfer<GetSpec<Platform, R>> => spec;
+
+// Checks a resource's paths against what its verbs answer with: `columns` name
+// fields of a listed item, `heading` and `detail` fields of the record `get`
+// answers with, and `idField` a field of both that `create` and `update`
+// answer with. It builds `idOf` from `idField`, the typed read a write's
+// suggested `get` takes its id from.
+export const resource = <
+  P,
+  T,
+  R,
+  B extends Json,
+  CB extends Json,
+  UB extends Json,
+  Id extends keyof T & keyof R & string,
+>(
+  descriptor: Omit<
+    ResourceDescriptor<Platform>,
+    "list" | "get" | "create" | "update" | "idField" | "idOf" | "columns" | "heading" | "detail"
+  > & {
+    list: ListSpec<Platform, B, P, T>;
+    get: GetSpec<Platform, R>;
+    create?: CreateSpec<Platform, CB, Written<NoInfer<Id>>>;
+    update?: UpdateSpec<Platform, UB, Written<NoInfer<Id>>>;
+    idField: Id;
+    columns: readonly NoInfer<FieldPath<T>>[];
+    heading: NoInfer<FieldPath<R>>;
+    detail: readonly NoInfer<FieldPath<R>>[];
+  },
+): Checked & { readonly get: GetSpec<Platform, R> } => ({
+  ...descriptor,
+  idOf: (written: Readonly<Record<Id, unknown>>) => written[descriptor.idField],
+  [checked]: true,
+});
+
+// The filter operations each `POST /<resource>/query` endpoint takes (ADR 031),
+// from its own body's enum, so a query that gains one offers it.
+const USER_OPERATIONS = Object.values(QueryUsersBodyFilterItemOperation);
+const TEAM_OPERATIONS = Object.values(QueryTeamsBodyFilterItemOperation);
+const SESSION_OPERATIONS = Object.values(QuerySessionsBodyFilterItemOperation);
+const GRANT_OPERATIONS = Object.values(QueryGrantsBodyFilterItemOperation);
+const IDP_OPERATIONS = Object.values(QueryIdpsBodyFilterItemOperation);
+const PROJECT_OPERATIONS = Object.values(QueryProjectsBodyFilterItemOperation);
+
+/** A filter operation any of the API's structured queries takes. */
+type Operation =
+  | QueryUsersBodyFilterItemOperation
+  | QueryTeamsBodyFilterItemOperation
+  | QuerySessionsBodyFilterItemOperation
+  | QueryGrantsBodyFilterItemOperation
+  | QueryIdpsBodyFilterItemOperation
+  | QueryProjectsBodyFilterItemOperation;
+
+/** Every filter operation the API knows, so `--filter` tells one from a value. */
+const OPERATIONS: readonly Operation[] = [
+  ...new Set([
+    ...USER_OPERATIONS,
+    ...TEAM_OPERATIONS,
+    ...SESSION_OPERATIONS,
+    ...GRANT_OPERATIONS,
+    ...IDP_OPERATIONS,
+    ...PROJECT_OPERATIONS,
+  ]),
+];
+
+/** A release's pointers as an indented table, one pinned revision per row. */
+export const releasePointers = (release: Pick<GetReleaseById200, "pointers">): string => {
+  const { pointers } = release;
+  const table = renderTable(["kind", "handle", "revision_id"], pointers)
+    .split("\n")
+    .map((line) => `  ${line}`);
+  return ["resources", ...table].join("\n");
+};
 
 /** The operations a policy can guard, as the generated publish body names them. */
 const POLICY_OPERATIONS = PublishPolicyBody.shape.operation.options;
@@ -106,7 +298,7 @@ const POLICY_OPERATIONS = PublishPolicyBody.shape.operation.options;
  * truth. Adding a backend resource is adding an entry here.
  */
 export const RESOURCES = {
-  users: {
+  users: resource({
     group: CommandGroups.usersAndTeams,
     groupOrder: 1,
     singular: "user",
@@ -125,32 +317,33 @@ export const RESOURCES = {
       "metadata.updated_at",
     ],
     list: list({
-      items: "users",
       body: QueryUsersBody,
-      response: QueryUsersResponse,
+      item: QueryUsersResponse.shape.users.element,
       filters: [
-        { field: "created_at", operations: FILTER_OPERATIONS },
-        { field: "id", operations: FILTER_OPERATIONS },
-        { field: "schema", operations: FILTER_OPERATIONS },
+        { field: "created_at", operations: USER_OPERATIONS },
+        { field: "id", operations: USER_OPERATIONS },
+        { field: "schema", operations: USER_OPERATIONS },
         { field: "schema_object_type", operations: ["equals", "not_equals", "contains"] },
-        { field: "status", operations: FILTER_OPERATIONS },
-        { field: "team_id", operations: FILTER_OPERATIONS },
-        { field: "lifecycle_owner_team_id", operations: FILTER_OPERATIONS },
+        { field: "status", operations: USER_OPERATIONS },
+        { field: "team_id", operations: USER_OPERATIONS },
+        { field: "lifecycle_owner_team_id", operations: USER_OPERATIONS },
       ],
       sorts: ["created_at", "id", "schema", "status", "lifecycle_owner_team_id"],
       // No project_id: the users query defaults to the token's own project,
       // which is the only one a project secret can list.
       call: ({ client }, body) => client.queryUsers(body),
+      items: pagedFunctions.queryUsers.items,
+      next: pagedFunctions.queryUsers.next,
     }),
-    get: { call: ({ client }, id) => client.getUserByID(id), response: GetUserByIDResponse },
+    get: get({ call: ({ client }, id) => client.getUserByID(id), response: GetUserByIDResponse }),
     create: create(CreateUserBody, ({ client, projectId }, body) =>
       client.createUser(body, { project_id: projectId }),
     ),
     update: update(PatchUserByIDBody, ({ client }, id, body) => client.patchUserByID(id, body)),
-    delete: { call: ({ client }, id) => client.deleteUserByID(id) },
-  },
+    delete: { call: ({ client }, id, consent) => consent.unlock(client).deleteUserByID(id) },
+  }),
 
-  teams: {
+  teams: resource({
     group: CommandGroups.usersAndTeams,
     groupOrder: 2,
     singular: "team",
@@ -159,28 +352,32 @@ export const RESOURCES = {
     heading: "name",
     detail: ["id", "status", "created_at", "updated_at"],
     list: list({
-      items: "teams",
       body: QueryTeamsBody,
-      response: QueryTeamsResponse,
+      item: QueryTeamsResponse.shape.teams.element,
       filters: [
-        { field: "created_at", operations: FILTER_OPERATIONS },
-        { field: "name", operations: FILTER_OPERATIONS },
-        { field: "status", operations: FILTER_OPERATIONS },
+        { field: "created_at", operations: TEAM_OPERATIONS },
+        { field: "name", operations: TEAM_OPERATIONS },
+        { field: "status", operations: TEAM_OPERATIONS },
       ],
       sorts: ["created_at", "name", "status"],
       call: ({ client, projectId }, body) => client.queryTeams(body, { project_id: projectId }),
+      items: pagedFunctions.queryTeams.items,
+      next: pagedFunctions.queryTeams.next,
     }),
-    get: { call: ({ client }, id) => client.getTeam(id), response: GetTeamResponse },
+    get: get({ call: ({ client }, id) => client.getTeam(id), response: GetTeamResponse }),
     create: create(CreateTeamBody, ({ client, projectId }, body) =>
       client.createTeam(body, { project_id: projectId }),
     ),
     update: update(UpdateTeamBody, ({ client }, id, body) => client.updateTeam(id, body)),
     // A team's DELETE deactivates it and leaves it readable (ADR 024), so the
     // command is named after that rather than claiming the team is gone.
-    delete: { verb: "deactivate", call: ({ client }, id) => client.deleteTeam(id) },
-  },
+    delete: {
+      verb: "deactivate",
+      call: ({ client }, id, consent) => consent.unlock(client).deleteTeam(id),
+    },
+  }),
 
-  sessions: {
+  sessions: resource({
     group: CommandGroups.authentication,
     singular: "session",
     idField: "session_id",
@@ -188,25 +385,29 @@ export const RESOURCES = {
     heading: "session_id",
     detail: ["project_id", "state", "user_id", "created_at", "expires_at"],
     list: list({
-      items: "sessions",
       body: QuerySessionsBody,
-      response: QuerySessionsResponse,
+      item: QuerySessionsResponse.shape.sessions.element,
       filters: [
-        { field: "created_at", operations: FILTER_OPERATIONS },
-        { field: "user_id", operations: FILTER_OPERATIONS },
-        { field: "state", operations: FILTER_OPERATIONS },
-        { field: "lifecycle_owner_team_id", operations: FILTER_OPERATIONS },
+        { field: "created_at", operations: SESSION_OPERATIONS },
+        { field: "user_id", operations: SESSION_OPERATIONS },
+        { field: "state", operations: SESSION_OPERATIONS },
+        { field: "lifecycle_owner_team_id", operations: SESSION_OPERATIONS },
       ],
       sorts: ["created_at", "user_id"],
       call: ({ client, projectId }, body) => client.querySessions(body, { project_id: projectId }),
+      items: pagedFunctions.querySessions.items,
+      next: pagedFunctions.querySessions.next,
     }),
-    get: { call: ({ client }, id) => client.getSession(id), response: GetSessionResponse },
+    get: get({ call: ({ client }, id) => client.getSession(id), response: GetSessionResponse }),
     // The endpoint terminates the session rather than removing a record, so
     // the command says `revoke`. `delete` would tell the caller it is gone.
-    delete: { verb: "revoke", call: ({ client }, id) => client.revokeSession(id) },
-  },
+    delete: {
+      verb: "revoke",
+      call: ({ client }, id, consent) => consent.unlock(client).revokeSession(id),
+    },
+  }),
 
-  events: {
+  events: resource({
     group: CommandGroups.diagnostics,
     singular: "event",
     idField: "id",
@@ -222,9 +423,8 @@ export const RESOURCES = {
       "request_id",
       "occurred_at",
     ],
-    list: {
-      items: "data",
-      response: ListEventsResponse,
+    list: list({
+      item: ListEventsResponse.shape.data.element,
       // `GET /events` spells its filters as flat query parameters, and a range
       // as two of them. Declaring the parameter each operation travels as lets
       // the caller write the same `field=operation:value` they write for every
@@ -234,7 +434,7 @@ export const RESOURCES = {
         {
           field: "category",
           operations: ["equals"],
-          values: EVENT_CATEGORIES,
+          values: Object.values(ListEventsCategoryItem),
           combine: "or",
         },
         { field: "event_type", operations: ["equals"], combine: "or" },
@@ -247,23 +447,23 @@ export const RESOURCES = {
         { field: "team_id", operations: ["equals"] },
         {
           field: "created_at",
-          operations: ["greater_than_or_equal", "less_than"],
-          params: {
-            greater_than_or_equal: "created_after",
-            less_than: "created_before",
-          },
+          ...range({ greater_than_or_equal: "created_after", less_than: "created_before" }),
         },
       ],
       // The endpoint orders by `occurred_at` and takes only the direction.
       sorts: ["occurred_at"],
       sortParam: "order",
-      call: ({ client, projectId }, params) =>
+      call: ({ client, projectId }: Platform, params: Query<"listEvents">) =>
         client.listEvents({ project_id: projectId, ...params }),
-    },
-    get: { call: ({ client, projectId }, id) => client.getEvent(id, { project_id: projectId }) },
-  },
+      items: pagedFunctions.listEvents.items,
+      next: pagedFunctions.listEvents.next,
+    }),
+    get: get({
+      call: ({ client, projectId }, id) => client.getEvent(id, { project_id: projectId }),
+    }),
+  }),
 
-  grants: {
+  grants: resource({
     group: CommandGroups.usersAndTeams,
     groupOrder: 3,
     singular: "grant",
@@ -272,23 +472,24 @@ export const RESOURCES = {
     heading: "id",
     detail: ["user.user_id", "team.team_id", "relation", "object_type", "created_at", "expires_at"],
     list: list({
-      items: "grants",
       body: QueryGrantsBody,
-      response: QueryGrantsResponse,
+      item: QueryGrantsResponse.shape.grants.element,
       filters: [
-        { field: "created_at", operations: FILTER_OPERATIONS },
-        { field: "user_id", operations: FILTER_OPERATIONS },
-        { field: "team_id", operations: FILTER_OPERATIONS },
-        { field: "relation", operations: FILTER_OPERATIONS },
-        { field: "expires_at", operations: FILTER_OPERATIONS },
+        { field: "created_at", operations: GRANT_OPERATIONS },
+        { field: "user_id", operations: GRANT_OPERATIONS },
+        { field: "team_id", operations: GRANT_OPERATIONS },
+        { field: "relation", operations: GRANT_OPERATIONS },
+        { field: "expires_at", operations: GRANT_OPERATIONS },
       ],
       sorts: ["created_at", "expires_at", "id"],
       call: ({ client, projectId }, body) => client.queryGrants(body, { project_id: projectId }),
+      items: pagedFunctions.queryGrants.items,
+      next: pagedFunctions.queryGrants.next,
     }),
-    get: {
+    get: get({
       call: ({ client, projectId }, id) => client.getGrant(id, { project_id: projectId }),
       response: GetGrantResponse,
-    },
+    }),
     create: create(
       CreateGrantBody,
       ({ client, projectId }, body) => client.createGrant(body, { project_id: projectId }),
@@ -297,15 +498,16 @@ export const RESOURCES = {
       { example: "--relation viewer --user-identifier alice@acme.com" },
     ),
     delete: {
-      call: ({ client, projectId }, id) => client.deleteGrant(id, { project_id: projectId }),
+      call: ({ client, projectId }, id, consent) =>
+        consent.unlock(client).deleteGrant(id, { project_id: projectId }),
     },
-  },
+  }),
 
   // Identity provider connections (#1217). They carry ADR 063's shape already:
   // a fixed `id` shared by every revision, and a `revision_id` per revision.
   // The revision routes are not modelled here — the CLI has no grammar for a
   // sub-resource listing yet, so `idps revisions` is deliberately absent.
-  idps: {
+  idps: resource({
     group: CommandGroups.authentication,
     singular: "identity provider connection",
     idField: "id",
@@ -313,20 +515,21 @@ export const RESOURCES = {
     heading: "slug",
     detail: ["id", "revision_id", "slug", "created_at", "updated_at"],
     list: list({
-      items: "idps",
       body: QueryIdpsBody,
-      response: QueryIdpsResponse,
+      item: QueryIdpsResponse.shape.idps.element,
       filters: [
-        { field: "slug", operations: FILTER_OPERATIONS },
-        { field: "created_at", operations: FILTER_OPERATIONS },
+        { field: "slug", operations: IDP_OPERATIONS },
+        { field: "created_at", operations: IDP_OPERATIONS },
       ],
       sorts: ["slug", "created_at"],
       call: ({ client, projectId }, body) => client.queryIdps(body, { project_id: projectId }),
+      items: pagedFunctions.queryIdps.items,
+      next: pagedFunctions.queryIdps.next,
     }),
-    get: {
+    get: get({
       call: ({ client, projectId }, id) => client.getIdpById(id, { project_id: projectId }),
       response: GetIdpByIdResponse,
-    },
+    }),
     // The body nests the connection under `idp`. Rooted there, the flags and
     // `--set` paths address the connection itself (`--oidc-issuer`), and
     // `--file` takes the same document as `.zitadel/idps/<slug>.json`. A slug
@@ -342,9 +545,9 @@ export const RESOURCES = {
           "--slug acme-sso --protocol oidc --display-name 'Acme SSO' --oidc-issuer https://sso.acme.example --oidc-client-id <client_id> --oidc-client-secret '${{ ACME_SSO_CLIENT_SECRET }}' --oidc-scopes openid --oidc-scopes profile --oidc-scopes email",
       },
     ),
-  },
+  }),
 
-  projects: {
+  projects: resource({
     group: CommandGroups.configuration,
     singular: "project",
     idField: "id",
@@ -352,22 +555,23 @@ export const RESOURCES = {
     heading: "name",
     detail: ["id", "origins", "created_at", "updated_at"],
     list: list({
-      items: "projects",
       body: QueryProjectsBody,
-      response: QueryProjectsResponse,
-      filters: [{ field: "created_at", operations: FILTER_OPERATIONS }],
+      item: QueryProjectsResponse.shape.projects.element,
+      filters: [{ field: "created_at", operations: PROJECT_OPERATIONS }],
       sorts: ["created_at"],
       call: ({ client }, body) => client.queryProjects(body),
+      items: pagedFunctions.queryProjects.items,
+      next: pagedFunctions.queryProjects.next,
     }),
-    get: { call: ({ client }, id) => client.getProject(id), response: GetProjectResponse },
+    get: get({ call: ({ client }, id) => client.getProject(id), response: GetProjectResponse }),
     update: update(PatchProjectBody, ({ client }, id, body) => client.patchProject(id, body)),
-  },
+  }),
 
   // Configuration resources (ADR 035) are read-only here. They are authored as
   // files under `.zitadel/` and shipped through a release, so a write verb
   // would be a second writer over the same state; reading what the server
   // currently holds is how you check that a deploy landed.
-  schemas: {
+  schemas: resource({
     group: CommandGroups.configuration,
     singular: "schema",
     idField: "id",
@@ -378,27 +582,28 @@ export const RESOURCES = {
     columns: ["id", "schema.objectType", "schema.kind", "metadata.created_at"],
     heading: "schema.objectType",
     detail: ["id", "schema.objectType", "schema.kind", "metadata.created_at"],
-    list: {
-      items: "schemas",
-      response: ListSchemasResponse,
+    list: list({
+      item: ListSchemasResponse.shape.schemas.element,
       filters: [
         { field: "object_type", operations: ["equals"] },
         { field: "kind", operations: ["equals"] },
         {
           field: "revisions",
           operations: ["equals"],
-          values: ["all", "latest"],
+          values: Object.values(ListSchemasRevisions),
           // Editing a schema mints a new revision rather than changing the old
           // one, so the unfiltered list is a history: the same object type over
           // and over. Someone typing `schemas list` means "what schemas do I
           // have", which is one row each. The console made the same choice.
-          default: "latest",
+          default: ListSchemasRevisions.latest,
         },
       ],
-      call: ({ client, projectId }, params) =>
+      call: ({ client, projectId }: Platform, params: Query<"listSchemas">) =>
         client.listSchemas({ ...params, project_id: projectId }),
-    },
-    get: {
+      items: pagedFunctions.listSchemas.items,
+      next: pagedFunctions.listSchemas.next,
+    }),
+    get: get({
       response: GetSchemaByIdResponse,
       // A schema is addressed two ways: a revision id names one immutable
       // revision and fetches directly, an object type resolves to the current
@@ -430,14 +635,14 @@ export const RESOURCES = {
         }
         return current;
       },
-    },
-  },
+    }),
+  }),
 
-  release: {
+  release: resource({
     group: CommandGroups.configuration,
     singular: "release",
     idField: "id",
-    columns: ["id", "metadata.message", "metadata.git_sha", "revoked_at"],
+    columns: ["id", "metadata.message", "metadata.git_sha", "revoked_at", "metadata.created_at"],
     heading: "id",
     detail: [
       "id",
@@ -448,19 +653,21 @@ export const RESOURCES = {
       "metadata.git_sha",
       "metadata.git_dirty",
     ],
-    list: {
-      items: "releases",
-      response: ListReleasesResponse,
-      call: ({ client, projectId }, params) =>
+    list: list({
+      item: ListReleasesResponse.shape.releases.element,
+      call: ({ client, projectId }: Platform, params: Query<"listReleases">) =>
         client.listReleases({ ...params, project_id: projectId }),
-    },
-    get: {
+      items: pagedFunctions.listReleases.items,
+      next: pagedFunctions.listReleases.next,
+    }),
+    get: get({
       call: ({ client, projectId }, id) => client.getReleaseById(id, { project_id: projectId }),
       response: GetReleaseByIdResponse,
-    },
-  },
+      sections: (release) => [releasePointers(release)],
+    }),
+  }),
 
-  "flow-definitions": {
+  "flow-definitions": resource({
     group: CommandGroups.configuration,
     singular: "flow definition",
     idField: "id",
@@ -470,29 +677,30 @@ export const RESOURCES = {
     columns: ["id", "flow_definition.name", "flow_definition.status", "created_at"],
     heading: "flow_definition.name",
     detail: ["id", "flow_definition.name", "flow_definition.status", "created_at", "updated_at"],
-    list: {
-      items: "flow_definitions",
-      response: ListFlowDefinitionsResponse,
+    list: list({
+      item: ListFlowDefinitionsResponse.shape.flow_definitions.element,
       filters: [
         { field: "name", operations: ["equals"] },
         { field: "purpose", operations: ["equals"] },
         {
           field: "revisions",
           operations: ["equals"],
-          values: ["all", "latest"],
+          values: Object.values(ListFlowDefinitionsRevisions),
           // Publishing under an existing name mints a new row (#1246), so the
           // unfiltered list is a history of the same flows. Same reasoning as
           // `schemas`: a bare list is the current flows.
-          default: "latest",
+          default: ListFlowDefinitionsRevisions.latest,
         },
       ],
-      call: ({ client, projectId }, params) =>
+      call: ({ client, projectId }: Platform, params: Query<"listFlowDefinitions">) =>
         client.listFlowDefinitions({
           ...params,
           project_id: projectId,
         }),
-    },
-    get: {
+      items: pagedFunctions.listFlowDefinitions.items,
+      next: pagedFunctions.listFlowDefinitions.next,
+    }),
+    get: get({
       response: GetFlowDefinitionResponse,
       // `flowdef_…` names one revision. Anything else is a flow name, and the
       // endpoint returns that flow's revisions newest first, so the first row
@@ -514,35 +722,36 @@ export const RESOURCES = {
         }
         return current;
       },
-    },
-  },
+    }),
+  }),
 
-  branding: {
+  branding: resource({
     group: CommandGroups.configuration,
     singular: "branding revision",
     idField: "id",
     columns: ["id", "created_at"],
     heading: "id",
     detail: ["id", "created_at"],
-    list: {
+    list: list({
       // `GET /branding` answers with the array itself and takes no cursor, so
       // the paging flags are not generated for it.
       paged: false,
-      response: ListBrandingResponse,
+      item: ListBrandingResponse.element,
       call: ({ client, projectId }) => client.listBranding({ project_id: projectId }),
-    },
-    get: {
+      items: (page) => page,
+    }),
+    get: get({
       call: ({ client }, id) => client.getBrandingById(id),
       response: GetBrandingByIdResponse,
-    },
-  },
+    }),
+  }),
 
   // Operation policies (ADR 066). Configuration: carried from
   // .zitadel/policies/ by `deploy`, so only read here (`policies test` is a
   // hand-written command). A project has one
   // policy per operation, and the list shows each at its newest revision.
   // The revision routes are not modelled, for the reason `idps` gives.
-  policies: {
+  policies: resource({
     group: CommandGroups.configuration,
     singular: "policy",
     idField: "id",
@@ -553,14 +762,15 @@ export const RESOURCES = {
     columns: ["id", "operation", "revision_id", "updated_at"],
     heading: "operation",
     detail: ["id", "operation", "config", "revision_id", "project_id", "created_at", "updated_at"],
-    list: {
-      items: "policies",
-      response: ListPoliciesResponse,
+    list: list({
+      item: ListPoliciesResponse.shape.policies.element,
       filters: [{ field: "operation", operations: ["equals"] }],
-      call: ({ client, projectId }, params) =>
+      call: ({ client, projectId }: Platform, params: Query<"listPolicies">) =>
         client.listPolicies({ ...params, project_id: projectId }),
-    },
-    get: {
+      items: pagedFunctions.listPolicies.items,
+      next: pagedFunctions.listPolicies.next,
+    }),
+    get: get({
       response: GetPolicyResponse,
       // An id names the policy; a catalogued operation resolves through the
       // list's filter, which answers with the operation's policy or nothing.
@@ -585,9 +795,9 @@ export const RESOURCES = {
         }
         return current;
       },
-    },
-  },
-} satisfies ResourceRegistry<Platform>;
+    }),
+  }),
+} satisfies CheckedRegistry;
 
 /**
  * The `<resource> <verb>` commands, ready for the explicit command table. They
@@ -595,7 +805,7 @@ export const RESOURCES = {
  * `EnvironmentCommand`), so they take `--env` and `--env-file` too.
  */
 export const RESOURCE_COMMANDS = buildResourceCommands<Platform>(RESOURCES, {
-  operations: FILTER_OPERATIONS,
+  operations: OPERATIONS,
   // A `${{ NAME }}` reference to a project variable (ADR 062) names a
   // credential without revealing it, and is the only form a connection's
   // `client_secret` takes, so it may stand on a command line.

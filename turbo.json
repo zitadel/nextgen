@@ -14,9 +14,12 @@
   // `--affected` and `turbo query affected` match changed files against each
   // task's `inputs` and follow task edges, the artifact edges included (the
   // server embeds the console): the same answer as the cache key gives
-  // (docs/design/build/turborepo-graph.md).
+  // (docs/design/build/turborepo-graph.md). `turbo watch` reruns by the same
+  // inputs; matched by package instead, it ignored every Go edit, because the
+  // Go code lives in the root package.
   "futureFlags": {
-    "affectedUsingTaskInputs": true
+    "affectedUsingTaskInputs": true,
+    "watchUsingTaskInputs": true
   },
   // Tasks see only the variables listed on them, turbo's built-in list (PATH,
   // HOME, SHELL, CI, TERM, GITHUB_ACTIONS, ...) and what framework inference
@@ -31,10 +34,15 @@
   "globalEnv": ["!VITE_VERCEL_*"],
   "globalPassThroughEnv": [
     // Where Go keeps its toolchain, module and build caches; their contents
-    // are keyed by Go itself. GOFLAGS and the target platform change outputs,
-    // so the Go tasks list those as hashed `env` instead.
+    // are keyed by Go itself. GOCACHEPROG is the cache program Depot's CI
+    // runners set (`depot gocache`), which authenticates with the job's
+    // DEPOT_CACHE_TOKEN. Native Go commands are not runner-cached: Go hashes
+    // the effective compiler and target defaults itself. The Go tasks list
+    // GOFLAGS and explicit target variables as `env` so strict mode passes them.
     "GOPATH",
     "GOCACHE",
+    "GOCACHEPROG",
+    "DEPOT_CACHE_TOKEN",
     "GOMODCACHE",
     "GOTMPDIR",
     "GOTOOLCHAIN",
@@ -63,9 +71,8 @@
   ],
   // The files moon's .moon/tasks/*.yml list as implicitInputs: a change to
   // any of them re-runs every task. Turbo hashes each package's slice of
-  // pnpm-lock.yaml on its own, so the lockfile is not listed. Every test
-  // config spreads @zitadel/vitest-config, but no task edge reaches that
-  // package, so its files are listed here.
+  // pnpm-lock.yaml on its own, so the lockfile is not listed. Shared test
+  // configuration belongs to test and typecheck inputs, not every build.
   "globalDependencies": [
     ".nvmrc",
     ".npmrc",
@@ -74,9 +81,7 @@
     "devbox.json",
     "devbox.lock",
     "tsconfig.base.json",
-    "biome.json",
-    "packages/vitest-config/vitest.shared.mjs",
-    "packages/vitest-config/vitest.shared.d.mts"
+    "biome.json"
   ],
   "tasks": {
     // ---- The standard tasks of every TypeScript package (.moon/tasks/
@@ -96,6 +101,8 @@
     "typecheck": {
       "inputs": [
         "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/packages/vitest-config/vitest.shared.mjs",
+        "$TURBO_ROOT$/packages/vitest-config/vitest.shared.d.mts",
         "!**/README.md",
         "!**/AGENTS.md",
         "!**/CLAUDE.md",
@@ -131,6 +138,8 @@
     "test": {
       "inputs": [
         "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/packages/vitest-config/vitest.shared.mjs",
+        "$TURBO_ROOT$/packages/vitest-config/vitest.shared.d.mts",
         "!**/README.md",
         "!**/AGENTS.md",
         "!**/CLAUDE.md",
@@ -255,8 +264,31 @@
     },
     "//#test": {
       "inputs": [
+        "packages/vitest-config/vitest.shared.mjs",
+        "packages/vitest-config/vitest.shared.d.mts",
         "scripts/ci-mode.mjs",
         "scripts/ci-mode.test.mjs",
+        "scripts/go-generate.mjs",
+        "scripts/go-generate.test.mjs",
+        "scripts/task-graph.test.mjs",
+        "moon.yml",
+        "turbo.json",
+        "apps/*/moon.yml",
+        "apps/*/turbo.json",
+        "apps/*/package.json",
+        "packages/*/moon.yml",
+        "packages/*/turbo.json",
+        "packages/*/package.json",
+        "tools/*/moon.yml",
+        "tools/*/turbo.json",
+        "tools/*/package.json",
+        "e2e/moon.yml",
+        "e2e/turbo.json",
+        "e2e/package.json",
+        ".moon/**/*.yml",
+        ".github/workflows/ci.yml",
+        ".github/workflows/ci-turbo.yml",
+        ".gitignore",
         "scripts/dev-process.mjs",
         "scripts/dev-process.test.mjs",
         "scripts/shims/pnpm",
@@ -271,16 +303,16 @@
         "scripts/render-builtin-schemas.test.mjs",
         "api/openapi/endpoints/schemas/*.json",
         // The built-in schemas' renderer matches the server's default
-        // namespace, which packages/config/src/defaults.ts reads from its
-        // defaults.
-        "packages/config/src/defaults.ts",
-        "packages/config/defaults/**",
+        // namespace.
+        "packages/config/src/builtin-schema-base.ts",
         "scripts/assert-file.mjs",
         "vitest.config.ts"
       ]
     },
     "//#check-typecheck": {
       "inputs": [
+        "packages/vitest-config/vitest.shared.mjs",
+        "packages/vitest-config/vitest.shared.d.mts",
         "scripts/check-typecheck-programs.mjs",
         "scripts/check-typecheck-programs.test.mjs",
         "scripts/assert-file.mjs",
@@ -298,6 +330,8 @@
     },
     "//#check-openapi-rules": {
       "inputs": [
+        "packages/vitest-config/vitest.shared.mjs",
+        "packages/vitest-config/vitest.shared.d.mts",
         "scripts/openapi-casing-rules.test.mjs",
         "scripts/assert-file.mjs",
         "scripts/testdata/openapi-casing/**",
@@ -332,10 +366,13 @@
     },
     // `workspace:cli` is not a turbo task: it is interactive, which turbo only
     // supports inside its terminal UI. Run `pnpm run cli -- ...` directly.
+    // Under `turbo watch server` a Go or console edit restarts the server
+    // (`interruptible`): its edges reach both.
     "//#server": {
       "cache": false,
       "persistent": true,
-      "dependsOn": ["@zitadel/console#build"],
+      "interruptible": true,
+      "dependsOn": ["@zitadel/console#build", "@zitadel/server#go-sources"],
       "inputs": ["scripts/run-server.mjs", "scripts/dev-process.mjs", "scripts/task-runner.mjs"],
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "GOFLAGS"]
     },

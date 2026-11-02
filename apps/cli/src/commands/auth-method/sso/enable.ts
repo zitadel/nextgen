@@ -489,6 +489,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       secret?.published === "stored" && (clientIdState === undefined || clientIdState === "stored");
     const stored = credentialsStored ? ["Provider credentials are stored on your Project."] : [];
     const name = entry.displayName;
+    const followUps = this.followUps(unpublished, scopeArgs, recovery);
 
     return this.emit({
       status: "ok",
@@ -498,13 +499,6 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         title: unpublished
           ? [`${name} sign-in is configured locally.`, ...stored].join(" ")
           : `${name} sign-in is already configured locally.`,
-        ...(unpublished
-          ? {
-              next_actions: [
-                `Deploy the configuration to make ${name} sign-in available in your app, then reload your app and test ${name} sign-in.`,
-              ],
-            }
-          : {}),
         ...this.payload({
           projectId,
           provider,
@@ -517,9 +511,17 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
           changed: written,
           skipped: edits.skipped,
         }),
-        // An ok result carries its follow-ups in data.next_commands (errors
-        // use the top-level nextCommands instead).
-        ...this.followUps(unpublished, scopeArgs, recovery),
+        next_args: followUps.args,
+      },
+      next: {
+        ...(unpublished
+          ? {
+              actions: [
+                `Deploy the configuration to make ${name} sign-in available in your app, then reload your app and test ${name} sign-in.`,
+              ],
+            }
+          : {}),
+        commands: followUps.commands,
       },
     });
   }

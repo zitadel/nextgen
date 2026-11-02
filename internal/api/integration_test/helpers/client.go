@@ -7,6 +7,7 @@ import (
 
 	"github.com/ogen-go/ogen/ogenerrors"
 	"github.com/stretchr/testify/require"
+	"github.com/zitadel/nextgen/api/client"
 	api "github.com/zitadel/nextgen/api/generated"
 	internalapi "github.com/zitadel/nextgen/internal/api"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -34,16 +35,16 @@ func (f FakeSecuritySource) OAuth2(ctx context.Context, operationName api.Operat
 	}, nil
 }
 
-// NextgenSession provides the __nextgen_session cookie. With an empty
+// SessionCookie provides the session cookie. With an empty
 // SessionToken the scheme is skipped and the generated client fails fast with
 // "security requirement is not satisfied" instead of sending the request —
 // to exercise the server's missing-credential path, send a raw HTTP request
 // (see TestGetMyUser/missing_session_cookie).
-func (f FakeSecuritySource) NextgenSession(ctx context.Context, operationName api.OperationName) (api.NextgenSession, error) {
+func (f FakeSecuritySource) SessionCookie(ctx context.Context, operationName api.OperationName) (api.SessionCookie, error) {
 	if f.SessionToken == "" {
-		return api.NextgenSession{}, ogenerrors.ErrSkipClientSecurity
+		return api.SessionCookie{}, ogenerrors.ErrSkipClientSecurity
 	}
-	return api.NextgenSession{
+	return api.SessionCookie{
 		APIKey: f.SessionToken,
 	}, nil
 }
@@ -55,18 +56,20 @@ type ApiClient struct {
 	securitySource *FakeSecuritySource
 }
 
+// NewApiClient is a client for the API on the server at origin, under its
+// path prefix (ADR 077).
 func NewApiClient(
-	serverURL string,
+	origin string,
 ) (*ApiClient, error) {
 	securitySource := &FakeSecuritySource{}
-	client, err := api.NewClient(serverURL, securitySource,
+	c, err := client.New(origin, securitySource,
 		//egress:allow integration-test client talking to the server under test
 		api.WithClient(&http.Client{Transport: csrfTransport{source: securitySource}}))
 	if err != nil {
 		return nil, err
 	}
 	return &ApiClient{
-		Client:         client,
+		Client:         c,
 		securitySource: securitySource,
 	}, nil
 }
@@ -101,7 +104,7 @@ func (c csrfTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	switch req.Method {
 	case http.MethodGet, http.MethodHead, http.MethodOptions:
 	default:
-		if cookie, err := req.Cookie("__nextgen_session"); err == nil && !c.source.OmitCSRF &&
+		if cookie, err := req.Cookie("__Host-zitadel_session"); err == nil && !c.source.OmitCSRF &&
 			req.Header.Get(internalapi.CSRFHeader) == "" {
 			req = req.Clone(req.Context())
 			req.Header.Set(internalapi.CSRFHeader, internalapi.CSRFToken(cookie.Value))

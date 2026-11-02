@@ -48,19 +48,21 @@ integrating Zitadel into an app; [AGENTS.md](AGENTS.md) is for agents
 contributing to this repository. The documentation site publishes LLM-friendly
 text at `/docs/llms.txt`, `/docs/llms-full.txt`, and page-level `.md` URLs.
 
-Install the skill into any skills-compatible agent (Claude Code, Cursor,
-Copilot, Codex, and more) straight from this repo:
+The CLI ships the Zitadel skills — the `zitadel` router skill, the CLI skill,
+and the per-framework SDK and component skills — and adds the ones of its
+version to your project, for any skills-compatible agent (Claude Code, Cursor,
+Copilot, Codex, and more):
 
 ```sh
-npx skills add zitadel/nextgen --full-depth
+npx @zitadel/cli@latest skills add
 ```
 
-`--full-depth` installs the whole set — the `zitadel` router skill, the CLI
-skill, and the per-framework SDK and component skills. Without it, only the
-top-level router skill is installed. The CLI skill also ships inside the
-`@zitadel/cli` package.
+They land in `.agents/skills/`, and in `.claude/skills/` for Claude Code. Run it
+again after updating the CLI to keep them in step. To install them from this
+repo's `main` instead, run `npx skills add zitadel/nextgen --full-depth`;
+without `--full-depth`, only the router skill is installed.
 
-After a successful interactive `setup`, the CLI suggests this command once if it
+After a successful interactive `setup`, the CLI suggests `skills add` once if it
 finds a coding agent on your machine. "Once" is per machine, not per project: the
 CLI records it in your user config directory. Set `NO_SKILLS_PROMPT=1` to never
 see it.

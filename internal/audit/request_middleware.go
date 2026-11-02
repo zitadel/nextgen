@@ -9,6 +9,7 @@ import (
 
 	"go.opentelemetry.io/otel/trace"
 
+	"github.com/zitadel/nextgen/api/client"
 	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/events"
@@ -82,11 +83,15 @@ func WithRequestEventMiddleware(buf *RequestBuffer, next http.Handler) http.Hand
 			status = http.StatusOK
 		}
 		operationID, _ := middleware.GetOperationIDContext(r.Context())
-		// Prefer ServeMux pattern when available; ogen mounts under "/" so fall
-		// back to operation_id (stable) instead of raw path (leaks resource ids).
-		route := r.Pattern
-		if route == "" || route == "/" {
-			route = operationID
+		// The operation names the route, never the raw path, which leaks
+		// resource ids. The API answers under client.PathPrefix and, until
+		// 1.0.0, at the root (ADR 077), so a ServeMux pattern there names only
+		// the mount: a request the server refused before the operation ran
+		// records no route. A path of its own (the IdP callback) records its
+		// pattern.
+		route := operationID
+		if route == "" && !isAPIMount(r.Pattern) {
+			route = r.Pattern
 		}
 		payload, err := events.MarshalPayload(domain.RequestAPIPayload{
 			OperationID:   operationID,
@@ -108,6 +113,12 @@ func WithRequestEventMiddleware(buf *RequestBuffer, next http.Handler) http.Hand
 		}
 		buf.EnqueueSince(ctx, ev, start)
 	})
+}
+
+// isAPIMount reports a ServeMux pattern the API is mounted at: the prefix,
+// bare and as a subtree, and the root alias.
+func isAPIMount(pattern string) bool {
+	return pattern == "/" || pattern == client.PathPrefix || pattern == client.PathPrefix+"/"
 }
 
 // withClient merges the requestor context into the metadata FromContext wrote,

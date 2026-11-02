@@ -20,7 +20,7 @@ import (
 )
 
 // TestConsoleManagementAcceptsSession pins #1300 §1: the embedded Console
-// holds only __nextgen_session, so every management operation its screens
+// holds only its session cookie, so every management operation its screens
 // call must accept that cookie as the signed-in user. The caller holds a
 // direct admin grant on the platform project it signed in to, so home and
 // target project are the same -- the single-project deployment. (The owning
@@ -1142,12 +1142,12 @@ func TestConsoleManagementBearerIgnoresStaleCookie(t *testing.T) {
 
 	console := harness.EnsurePlatformProject(t)
 	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost,
-		harness.EnsureTestServer(t).URL+"/teams?project_id="+console.ID,
+		harness.APIBaseURL(t)+"/teams?project_id="+console.ID,
 		strings.NewReader(`{"name":"`+helpers.TeamName()+`"}`))
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+harness.ProjectSecret(t, console))
-	req.AddCookie(&http.Cookie{Name: "__nextgen_session", Value: "stale-or-garbage"})
+	req.AddCookie(&http.Cookie{Name: "__Host-zitadel_session", Value: "stale-or-garbage"})
 
 	resp, err := harness.EnsureHttpClient(t).Do(req)
 	require.NoError(t, err)
@@ -1174,7 +1174,7 @@ func TestConsoleSessionRevokedStopsAuthorizing(t *testing.T) {
 	queryUsers := func() int {
 		t.Helper()
 		req, err := http.NewRequestWithContext(t.Context(), http.MethodPost,
-			harness.EnsureTestServer(t).URL+"/users/query?project_id="+home.ID, strings.NewReader(`{}`))
+			harness.APIBaseURL(t)+"/users/query?project_id="+home.ID, strings.NewReader(`{}`))
 		require.NoError(t, err)
 		req.Header.Set("Content-Type", "application/json")
 		req.AddCookie(cookie)

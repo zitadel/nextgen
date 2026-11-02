@@ -13,8 +13,8 @@
  *   @zitadel/cloud's `deploy` instead, which compiles the same package
  *   through turbo. The launcher, without
  *   CLOUD_DATABASE_URL, serves from SQLite and migrates it at startup.
- * - console: its `devCommand` builds it and serves the build, as the
- *   deployment serves it, behind the same service rewrites. Its dev server
+ * - console: its `devCommand` builds it with the add-on and serves the
+ *   build, as the deployment serves it, behind the same service rewrites. Its dev server
  *   cannot sit behind those rewrites: the console's live loop stays
  *   `moon run console:dev-real`.
  *
@@ -62,6 +62,11 @@ try {
     BOOTSTRAP_ADMIN_USER_JSON_B64: secrets.adminUserB64,
     NEXTGEN_SERVER_DATA_DIR: join(localDir, "data"),
     NEXTGEN_SERVER_PUBLIC_BASE: origin,
+    // Where cloud-functions forwards the sign-in widget's calls: the server,
+    // on this origin. `vercel dev` hands a service its own port as the
+    // request's host, so the origin a deployment forwards to would be the
+    // functions themselves (apps/cloud-functions/src/sign-in.ts).
+    CLOUD_ZITADEL_URL: origin,
     NEXTGEN_INSTRUMENTATION_LOG_FORMAT: process.env.NEXTGEN_INSTRUMENTATION_LOG_FORMAT || "text",
     GOFLAGS: [process.env.GOFLAGS, "-tags=noconsole"].filter(Boolean).join(" "),
   };

@@ -16,7 +16,7 @@ get:
   security:
     - oauth2:
         - user.read
-    - nextgenSession: []
+    - sessionCookie: []
   responses:
     '200':
       description: The state of the user's password

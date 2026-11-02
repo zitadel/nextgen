@@ -38,7 +38,7 @@ post:
   security:
     - oauth2:
         - deployment.write
-    - nextgenSession: []
+    - sessionCookie: []
   requestBody:
     required: true
     content:
@@ -292,7 +292,7 @@ get:
   security:
     - oauth2:
         - deployment.read
-    - nextgenSession: []
+    - sessionCookie: []
   responses:
     '200':
       description: The deployments were listed successfully.

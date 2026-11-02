@@ -1,9 +1,11 @@
+import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it, vi } from "vitest";
 import { _setRuntimeForTesting } from "@/runtime/runtime";
 import { server } from "@/test/msw";
+import { createAppRouter } from "../../../router";
 
 // The `_authed` layout guards every screen behind `GET /sessions/me`
 // (Console ADR 0003); mock the auth module so routes render as signed in.
@@ -16,7 +18,7 @@ vi.mock("@/auth/session", async (importOriginal) => {
 // `GET /users/me/projects`: the projects the signed-in person can act on, read
 // with the session cookie (#1237). Not `POST /projects/query`, which the server
 // pins to the calling credential's one home project.
-const PROJECTS_URL = "http://localhost/api/users/me/projects";
+const PROJECTS_URL = "http://localhost/api/v1/users/me/projects";
 
 /** A project as `GET /users/me/projects` lists it. */
 function listed(id: string, name: string) {
@@ -33,10 +35,6 @@ function expectedDate(value: string): string {
 }
 
 async function renderProjects(path = "/projects") {
-  const [{ RouterProvider, createMemoryHistory }, { createAppRouter }] = await Promise.all([
-    import("@tanstack/react-router"),
-    import("../../../router"),
-  ]);
   const router = createAppRouter({
     history: createMemoryHistory({ initialEntries: [path] }),
   });
@@ -241,7 +239,7 @@ describe("projects screen", () => {
   it("never asks the scope-pinned project query", async () => {
     let pinned = 0;
     server.use(
-      http.post("http://localhost/api/projects/query", () => {
+      http.post("http://localhost/api/v1/projects/query", () => {
         pinned += 1;
         return HttpResponse.json({ projects: [] });
       }),
@@ -271,7 +269,7 @@ describe("projects screen", () => {
     await renderProjects();
 
     await userEvent.click(await screen.findByRole("button", { name: "Actions for River" }));
-    const item = await screen.findByRole("menuitem", { name: "Project settings" });
+    const item = await screen.findByRole("menuitem", { name: "View project" });
     expect(item).toHaveAttribute("href", "/project?project=proj_1");
   });
 

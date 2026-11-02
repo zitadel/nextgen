@@ -1125,12 +1125,41 @@ func (o *DeleteUserAction) Prepare(_ context.Context) error {
 }
 
 func (o *DeleteUserAction) Apply(ctx context.Context, stmts AllStatements) error {
-	err := stmts.DeleteUserByID(ctx, o.ProjectID, o.UserID)
+	exists, err := stmts.UserExists(ctx, o.ProjectID, o.UserID)
+	if err != nil {
+		return domain.ErrInternal(err).WithMessage("failed to delete user")
+	}
+	// A missing user stays the idempotent success below, and deletes nothing,
+	// so there is no owner to keep. The check runs first: DeleteUserByID
+	// drops the membership edges it reads.
+	if exists {
+		if err := ensureProjectOwnerRemains(ctx, stmts, o.UserID); err != nil {
+			return err
+		}
+	}
+	err = stmts.DeleteUserByID(ctx, o.ProjectID, o.UserID)
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return nil
 		}
 		return domain.ErrInternal(err).WithMessage("failed to delete user")
+	}
+	// Only after the delete matched: the user is known to live in the
+	// caller's project, so the revoke cannot reach another project's user.
+	// Deleting a user removes their access (ADR 024), and an id is never
+	// minted twice, so a grant left behind could never apply again.
+	revoked, err := stmts.RevokeAuthzAssignmentsByPrincipal(ctx, domain.AuthzPrincipalTypeUser, o.UserID)
+	if err != nil {
+		return domain.ErrInternal(err).WithMessage("failed to revoke the user's grants")
+	}
+	for _, asgn := range revoked {
+		if err := emitManagedGrant(ctx, stmts, domain.EventTypeAuthzRevoked, asgn, domain.AuthzRevokedPayload{
+			PrincipalType: asgn.PrincipalType.String(),
+			PrincipalID:   asgn.PrincipalID,
+			Relation:      asgn.Relation,
+		}); err != nil {
+			return err
+		}
 	}
 	return audit.Emit(ctx, stmts, audit.EmitSpec{
 		Type:       domain.EventTypeUserDeleted,

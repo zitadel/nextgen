@@ -1,0 +1,89 @@
+language js
+
+// Every destructive operation in the CLI takes a Consent (apps/cli/src/lib/
+// consent.ts), which only a confirmation makes. The type system enforces it;
+// these are the ways around the type system, closed here: casting something
+// to a Consent, minting one outside the mixin that asks for it, casting a
+// client to reach what it hides, reaching the unnarrowed client, sending raw
+// HTTP past it, and asking a `confirm` that returns a bare boolean instead of
+// a Consent.
+or {
+  `$_ as Consent` as $bypass where {
+    $filename <: r".*/apps/cli/src/.*",
+    register_diagnostic(span=$bypass, message="Never cast to Consent: ask for one with Destructive's confirmed() or consent().", severity="error")
+  },
+  `$client as $_` as $bypass where {
+    $filename <: r".*/apps/cli/src/.*",
+    $client <: r"(?i)^[\w.]*client$|^[\w.]*client\(\)$",
+    $filename <: not r".*/apps/cli/src/lib/api-client\.ts$",
+    $filename <: not r".*/apps/cli/src/lib/consent\.ts$",
+    register_diagnostic(span=$bypass, message="Never cast a client: its destructive operations are reached only through Consent.unlock.", severity="error")
+  },
+  or {
+    `Consent.request`,
+    `Consent["request"]`,
+    `{ $_ } = Consent`
+  } as $bypass where {
+    $filename <: r".*/apps/cli/src/.*",
+    $filename <: not r".*/apps/cli/src/lib/oclif/destructive\.ts$",
+    register_diagnostic(span=$bypass, message="Ask for consent with Destructive's confirmed() or consent(), which take --force and the terminal from the run.", severity="error")
+  },
+  or {
+    `import $names from $source`,
+    `import type $names from $source`,
+    `export { $names } from $source`
+  } as $bypass where {
+    $filename <: r".*/apps/cli/src/.*",
+    $source <: r".*/consent[\"']$",
+    $names <: r"(?s).*\bConsent\s+as\b.*|(?s)^\*\s+as\b.*",
+    register_diagnostic(span=$bypass, message="Import Consent by its own name, so the consent rules can see it.", severity="error")
+  },
+  or {
+    `const $_ = Consent`,
+    `let $_ = Consent`,
+    `var $_ = Consent`,
+    `$_ = Consent`
+  } as $bypass where {
+    $filename <: r".*/apps/cli/src/.*",
+    register_diagnostic(span=$bypass, message="Never alias Consent: ask for one with Destructive's confirmed() or consent().", severity="error")
+  },
+  `import * as $_ from "@zitadel/api/runtime/fetch"` as $bypass where {
+    $filename <: r".*/apps/cli/src/.*",
+    register_diagnostic(span=$bypass, message="Import what you need from @zitadel/api/runtime/fetch by name; its senders go through send() in lib/api/call.", severity="error")
+  },
+  `import $names from "@zitadel/api/runtime/fetch"` as $bypass where {
+    $filename <: r".*/apps/cli/src/.*",
+    $names <: r"(?s).*\brequest\b.*|(?s).*\bcustomFetch\b.*",
+    $filename <: not r".*/apps/cli/src/lib/api/call\.ts$",
+    $filename <: not r".*/apps/cli/src/lib/local-server/sign-in\.ts$",
+    register_diagnostic(span=$bypass, message="Send a request through send() in lib/api/call, which refuses a destructive operation without a Consent.", severity="error")
+  },
+  `fetch($_)` as $bypass where {
+    $filename <: r".*/apps/cli/src/.*",
+    $filename <: not r".*/apps/cli/src/lib/release/steps/asset-probe\.ts$",
+    $filename <: not r".*/apps/cli/src/commands/test/sign-in\.ts$",
+    $filename <: not r".*/apps/cli/src/lib/local-server/runtime\.ts$",
+    $filename <: not r".*/apps/cli/src/lib/telemetry/index\.ts$",
+    register_diagnostic(span=$bypass, message="Reach the platform through the client from lib/api-client or send() in lib/api/call, which gate destructive operations.", severity="error")
+  },
+  `Consent.prototype` as $bypass where {
+    $filename <: r".*/apps/cli/src/.*",
+    register_diagnostic(span=$bypass, message="Never build a Consent from its prototype: ask for one with Destructive's confirmed() or consent().", severity="error")
+  },
+  or {
+    `"@zitadel/api/client"`,
+    `"@zitadel/api/config"`,
+    `"@zitadel/api/generated/endpoints/zitadelNextGen"`
+  } as $bypass where {
+    $filename <: r".*/apps/cli/src/.*",
+    $filename <: not r".*/apps/cli/src/lib/api-client\.ts$",
+    $filename <: not r".*/apps/cli/src/lib/consent\.ts$",
+    register_diagnostic(span=$bypass, message="Use the client from lib/api-client, whose destructive operations only Consent.unlock reaches.", severity="error")
+  },
+  `kind: "confirm"` as $bypass where {
+    $filename <: r".*/apps/cli/src/.*",
+    $filename <: not r".*/apps/cli/src/lib/consent\.ts$",
+    $filename <: not r".*/apps/cli/src/lib/input\.ts$",
+    register_diagnostic(span=$bypass, message="Ask for consent with Destructive's confirmed() or consent(); a plain question is kind \"yes-no\".", severity="error")
+  }
+}

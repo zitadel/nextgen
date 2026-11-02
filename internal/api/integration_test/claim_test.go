@@ -32,15 +32,15 @@ func mustInitClaim(t *testing.T, client *helpers.ApiClient, projectID string) *a
 	return resp.(*api.InitClaimResponse)
 }
 
-// exchangeForSessionCookie trades a handoff token for the __nextgen_session
-// cookie over the real /sessions/exchange endpoint (session_me_test pattern).
+// exchangeForSessionCookie trades a handoff token for the session cookie
+// over the real /sessions/exchange endpoint (session_me_test pattern).
 func exchangeForSessionCookie(t *testing.T, projectID, projectSecret, handoffToken string) *http.Cookie {
 	t.Helper()
 
 	body, err := json.Marshal(map[string]string{"handoff_token": handoffToken})
 	require.NoError(t, err)
 	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost,
-		harness.EnsureTestServer(t).URL+"/sessions/exchange?project_id="+projectID, bytes.NewReader(body))
+		harness.APIBaseURL(t)+"/sessions/exchange?project_id="+projectID, bytes.NewReader(body))
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+projectSecret)
@@ -53,11 +53,11 @@ func exchangeForSessionCookie(t *testing.T, projectID, projectSecret, handoffTok
 	require.Equal(t, http.StatusOK, resp.StatusCode, string(raw))
 
 	for _, cookie := range resp.Cookies() {
-		if cookie.Name == "__nextgen_session" {
+		if cookie.Name == "__Host-zitadel_session" {
 			return cookie
 		}
 	}
-	t.Fatal("exchange must set the __nextgen_session cookie")
+	t.Fatal("exchange must set the __Host-zitadel_session cookie")
 	return nil
 }
 
@@ -93,7 +93,7 @@ func sessionCookieIn(t *testing.T, project *domain.Project, userID string) *http
 	require.NoError(t, err)
 	token, err := session.Token(crypter)
 	require.NoError(t, err)
-	return &http.Cookie{Name: "__nextgen_session", Value: token}
+	return &http.Cookie{Name: "__Host-zitadel_session", Value: token}
 }
 
 // TestClaimHappyPath is the ticket's end-to-end leg: init → pending status →
@@ -257,7 +257,7 @@ func TestInitClaimAlreadyClaimed(t *testing.T) {
 	harness.SeedOwningTeam(t, project.ID, team.ID)
 
 	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost,
-		harness.EnsureTestServer(t).URL+"/projects/"+project.ID+"/claim/init", nil)
+		harness.APIBaseURL(t)+"/projects/"+project.ID+"/claim/init", nil)
 	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+harness.ProjectSecret(t, project))
 
@@ -587,7 +587,7 @@ func TestClaimAuthNegatives(t *testing.T) {
 
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
-	serverURL := harness.EnsureTestServer(t).URL
+	serverURL := harness.APIBaseURL(t)
 
 	do := func(t *testing.T, method, url string, body io.Reader) (int, *api.ErrorDetails) {
 		t.Helper()

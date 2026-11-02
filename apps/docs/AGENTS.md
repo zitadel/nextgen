@@ -44,6 +44,17 @@ MCP, `llms.txt`, Open Graph images, `.md` pages) live under `/docs` here.
 - Link the website (`/`) with a plain `<a>`, never `next/link`: it is another
   deployment, which `next/link` would prefetch and route to in this app.
 
+## Content-Security-Policy
+
+- `csp-adapter.mjs` enforces each prerendered page's script hashes, and the
+  404's for other URLs in place of `next.config.mjs`' scriptless fallback.
+- Never give a page a nonce or `'unsafe-inline'`: pages stay prerendered
+  ([why](../../docs/design/cloud/csp-docs-and-website.md)).
+- `csp-adapter.mjs` copies `apps/website/csp-adapter.mjs` but for the policy:
+  change both. `next dev` keeps only the base policy for its runtime.
+- Load nothing from another origin without widening the enforced policy
+  in the same change; `tests/` fail on a violation or an unhashed script.
+
 ## Content
 
 - Leave `index` out of a folder's `meta.json` `pages`: Fumadocs then opens it
@@ -95,6 +106,8 @@ Fumadocs stories (`components/examples/`).
   once per page: every login on a page walks the same mock flow.
 - Never widen the mock's worker's scope beyond `/docs/`: on the cloud's host
   it would answer for the console.
+- Keep the mock's request guard in `mock.ts`: only same-origin
+  `/docs/mock-api/` calls may reach its handlers; worker scope limits pages, not requests.
 - A page's Markdown leaves its examples out (`lib/source.ts`): write the prose
   around one so it reads without it.
 - Type an atom an example renders in `elements.d.ts`, from the example's props.
@@ -115,6 +128,9 @@ moon run docs:e2e     # tests/ against the local build
 CLOUD_URL=https://cloud-….vercel.app moon run docs:e2e-deployment
 ```
 
+- Try the API playground on `moon run workspace:cloud`: it sends reads to its
+  page's origin with the reader's session, and no API answers on the docs'
+  port 3003.
 - Vercel builds with `turbo run build --filter=@zitadel/docs`, never moon:
   moon cannot archive the symlinks Vercel's Next.js adapter writes into
   `.next/output`. The build's key holds the deployment's ID, so Vercel never

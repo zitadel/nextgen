@@ -49,33 +49,27 @@ export class DeleteOperation<Ctx> extends ResourceCommand<Ctx, DeleteSpec<Ctx>> 
 
   protected override async execute(
     { args }: OperationInput,
-    meta: GlobalOptions,
+    _meta: GlobalOptions,
   ): Promise<CommandResult> {
     const { topic, resource, spec } = this.definition;
     const verb = spec.verb ?? "delete";
     const past = spec.outcome ?? PAST[verb] ?? "deleted";
     const id = idValue(resource, args);
 
-    // A dry run makes no request, so it answers before the guard — the order
-    // `reset` uses, and it keeps `--dry-run --non-interactive` usable.
-    if (meta.dryRun) {
-      return dryRunResult(verb, topic, id);
-    }
-
-    const confirmed = await this.input({
-      kind: "confirm",
+    return this.confirmed({
+      verb,
       name: `${verb} ${resource.singular} ${id}`,
       message: `${capitalize(verb)} ${resource.singular} ${id}?`,
-      retry: this.suggest(`${topic} ${verb} ${id} --force`),
+      preview: () => dryRunResult(verb, topic, id),
+      prepare: () => this.context(),
+      apply: async (consent, context) => {
+        await spec.call(context, id, consent);
+        return {
+          status: "ok",
+          data: past === "deleted" ? deletedData({ id }) : mutatedData({ id }, past),
+          pretty: `${capitalize(past)} ${resource.singular} ${id}`,
+        };
+      },
     });
-    if (!confirmed) {
-      return { status: "skipped", reason: `${verb}-cancelled` };
-    }
-    await spec.call(await this.context(), id);
-    return {
-      status: "ok",
-      data: past === "deleted" ? deletedData({ id }) : mutatedData({ id }, past),
-      pretty: `${capitalize(past)} ${resource.singular} ${id}`,
-    };
   }
 }

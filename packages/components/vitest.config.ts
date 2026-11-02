@@ -1,4 +1,5 @@
 import { playwright } from "@vitest/browser-playwright";
+import { apiMockPublicDir } from "@zitadel/api-mock/public-dir";
 import { defineConfig } from "vitest/config";
 
 import { baseTest, edgeProject, edgeSpecs, sourceConditions } from "@zitadel/vitest-config";
@@ -50,6 +51,7 @@ export default defineConfig({
       },
       {
         cacheDir: ".vitest/browser",
+        publicDir: apiMockPublicDir,
         plugins: sharedPlugins(),
         resolve: { conditions: sourceConditions },
         test: {

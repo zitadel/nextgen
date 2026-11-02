@@ -138,6 +138,7 @@ func (c Config) Validate() error {
 		c.Platform.Validate,
 		c.HTTPClient.Validate,
 		c.Schema.Validate,
+		c.Events.Retention.Validate,
 	} {
 		if err := validate(); err != nil {
 			return err
@@ -189,6 +190,11 @@ type ServerConfig struct {
 	// stays on schema.builtin_public_base, which is an identifier namespace,
 	// not an address.
 	PublicBase string `mapstructure:"public_base"`
+	// ConsoleOrigins are origins the console is also reached at, beside the
+	// origin of PublicBase, such as another hostname in front of the same
+	// deployment. Opening a flow from one is exempt from a project's origins,
+	// as from PublicBase's.
+	ConsoleOrigins []string `mapstructure:"console_origins"`
 	// RequestIDHeader names a header that a proxy in front of the server sets
 	// to its own ID for each request, such as Vercel's x-vercel-id. The server
 	// then uses that ID as the request ID, so its logs, events and error pages
@@ -199,6 +205,12 @@ type ServerConfig struct {
 }
 
 func (c ServerConfig) Validate() error {
+	// Checked here rather than at startup, so `migrate` refuses an entry the
+	// server could not serve with, before anything is written. It applies with
+	// the embedded console off too.
+	if _, err := configuredConsoleOrigins(c.ConsoleOrigins); err != nil {
+		return err
+	}
 	// ensure there are no path collisions between idp callbacks and the console path
 	if !c.ConsoleEnabled {
 		return nil

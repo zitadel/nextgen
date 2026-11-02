@@ -36,6 +36,7 @@ import Reset from "./commands/reset";
 import { RESOURCE_COMMANDS } from "./commands/resources";
 import ResourcesList from "./commands/resources-list";
 import Setup from "./commands/setup/index";
+import SkillsAdd from "./commands/skills/add";
 import Start from "./commands/start";
 import Status from "./commands/status";
 import Stop from "./commands/stop";
@@ -95,6 +96,7 @@ export const COMMANDS: Record<string, typeof Command> = {
   "preview:rm": PreviewRm,
   "release:create": ReleaseCreate,
   "release:revoke": ReleaseRevoke,
+  "skills:add": SkillsAdd,
   "variable:set": VariableSet,
   "variable:get": VariableGet,
   "variable:list": VariableList,

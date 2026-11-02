@@ -46,7 +46,7 @@ describe("getSession()", () => {
     const result = await getSession();
 
     expect(fetchMock).toHaveBeenCalledWith(
-      "/__nextgen/sessions/me?project_id=proj-1",
+      "/__nextgen/api/v1/sessions/me?project_id=proj-1",
       expect.objectContaining({ cache: "no-store", credentials: "include" }),
     );
     expect(result).toEqual({
@@ -133,7 +133,7 @@ describe("getSession()", () => {
     await getSession({ proxyPath: "/__nextgen/" });
 
     expect(fetchMock).toHaveBeenCalledWith(
-      "/__nextgen/sessions/me?project_id=proj-1",
+      "/__nextgen/api/v1/sessions/me?project_id=proj-1",
       expect.anything(),
     );
   });
@@ -145,7 +145,7 @@ describe("getSession()", () => {
     await getSession({ proxyPath: "/explicit" });
 
     expect(fetchMock).toHaveBeenCalledWith(
-      "/explicit/sessions/me?project_id=proj",
+      "/explicit/api/v1/sessions/me?project_id=proj",
       expect.anything(),
     );
   });
@@ -157,7 +157,7 @@ describe("getSession()", () => {
     await getSession();
 
     expect(fetchMock).toHaveBeenCalledWith(
-      "/configured/sessions/me?project_id=proj",
+      "/configured/api/v1/sessions/me?project_id=proj",
       expect.anything(),
     );
   });
@@ -189,7 +189,7 @@ describe("getSession()", () => {
     const result = await getSession({ projectId: "proj-explicit" });
 
     expect(fetchMock).toHaveBeenCalledWith(
-      "/__nextgen/sessions/me?project_id=proj-explicit",
+      "/__nextgen/api/v1/sessions/me?project_id=proj-explicit",
       expect.anything(),
     );
     expect(result.isAuthenticated).toBe(true);

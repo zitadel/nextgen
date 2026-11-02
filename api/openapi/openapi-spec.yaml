@@ -12,15 +12,21 @@ info:
     identifier: MIT
 
 servers:
-  - url: /
-    description: Current API origin. Use http://localhost:8080 for local development.
+  # The resource API lives under /api/v1 on the deployment's host (ADR 077).
+  # Until 1.0.0 the server also answers every operation at its root path,
+  # with a Deprecation header.
+  - url: /api/v1
+    description: The API on the current origin. Use http://localhost:8080/api/v1 for local development.
   # Add the public production API once that endpoint is available.
   # - url: https://api.zitadel.com
   #   description: Production API
 
 tags:
   - name: System
-    description: Health, liveness, and readiness endpoints.
+    description: |
+      Liveness and readiness probes. They answer under `/api/v1` like every
+      operation, and at the root, `/livez` and `/readyz`, where orchestrators
+      probe them.
   - name: Flows
     description: Runtime flow orchestration endpoints for login, registration, and recovery screens.
   - name: Flow Definitions
@@ -367,5 +373,5 @@ components:
   securitySchemes:
     oauth2:
       $ref: security/oauth2.yaml
-    nextgenSession:
+    sessionCookie:
       $ref: security/session-cookie.yaml

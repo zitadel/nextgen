@@ -24,41 +24,41 @@ const sessionHandlers = [
   http.get(`${SERVER}/console/runtime.json`, () =>
     HttpResponse.json({ console_project_id: "proj_platform", publishable_key: "pk_platform" }),
   ),
-  http.post(`${SERVER}/auth_attempts`, () => {
+  http.post(`${SERVER}/api/v1/auth_attempts`, () => {
     signIns += 1;
     return HttpResponse.json({ attempt_id: "att_1" }, { status: 201 });
   }),
-  http.post(`${SERVER}/auth_attempts/:attempt/challenges`, async ({ request }) => {
+  http.post(`${SERVER}/api/v1/auth_attempts/:attempt/challenges`, async ({ request }) => {
     const { method } = (await request.json()) as { method: string };
     return HttpResponse.json({ challenge_id: `ch_${method}` }, { status: 201 });
   }),
-  http.post(`${SERVER}/auth_attempts/:attempt/challenges/:challenge/verify`, () =>
+  http.post(`${SERVER}/api/v1/auth_attempts/:attempt/challenges/:challenge/verify`, () =>
     HttpResponse.json({ attempt_id: "att_1" }),
   ),
-  http.post(`${SERVER}/auth_attempts/:attempt/handoff`, () =>
+  http.post(`${SERVER}/api/v1/auth_attempts/:attempt/handoff`, () =>
     HttpResponse.json({ handoff_token: "handoff_1" }),
   ),
   http.post(
-    `${SERVER}/sessions/exchange`,
+    `${SERVER}/api/v1/sessions/exchange`,
     () =>
       new HttpResponse(null, {
-        headers: { "set-cookie": "__nextgen_session=admin_session; Path=/; HttpOnly" },
+        headers: { "set-cookie": "zitadel_session=admin_session; Path=/; HttpOnly" },
       }),
   ),
 ];
 
 const server = setupServer(
   ...sessionHandlers,
-  http.post(`${SERVER}/projects/${PROJECT}/claim/init`, ({ request }) => {
+  http.post(`${SERVER}/api/v1/projects/${PROJECT}/claim/init`, ({ request }) => {
     initAuth = request.headers.get("authorization");
     return HttpResponse.json({ challenge_id: "claim_ch_1" }, { status: 201 });
   }),
-  http.get(`${SERVER}/sessions/me/csrf`, ({ request }) =>
-    request.headers.get("cookie")?.includes("__nextgen_session=admin_session")
+  http.get(`${SERVER}/api/v1/sessions/me/csrf`, ({ request }) =>
+    request.headers.get("cookie")?.includes("zitadel_session=admin_session")
       ? HttpResponse.json({ csrf_token: "csrf_admin" })
       : HttpResponse.json({ code: "auth.unauthorized" }, { status: 401 }),
   ),
-  http.post(`${SERVER}/projects/${PROJECT}/claim/complete`, async ({ request }) => {
+  http.post(`${SERVER}/api/v1/projects/${PROJECT}/claim/complete`, async ({ request }) => {
     complete = {
       cookie: request.headers.get("cookie"),
       csrf: request.headers.get("x-zitadel-csrf"),
@@ -95,7 +95,7 @@ describe("claiming a project as the local admin", () => {
     expect(initAuth).toBe("Bearer sk_project");
     // The claim is completed by the admin's session, answering the challenge
     // claim/init just opened.
-    expect(complete?.cookie).toContain("__nextgen_session=admin_session");
+    expect(complete?.cookie).toContain("zitadel_session=admin_session");
     // A cookie-authenticated write carries the session's CSRF token (ADR 053 §5).
     expect(complete?.csrf).toBe("csrf_admin");
     expect(complete?.body).toEqual({ challenge_id: "claim_ch_1" });
@@ -103,7 +103,7 @@ describe("claiming a project as the local admin", () => {
 
   it("fails when claim/init opens no challenge", async () => {
     server.use(
-      http.post(`${SERVER}/projects/${PROJECT}/claim/init`, () =>
+      http.post(`${SERVER}/api/v1/projects/${PROJECT}/claim/init`, () =>
         HttpResponse.json({ code: "internal", message: "boom" }, { status: 500 }),
       ),
     );

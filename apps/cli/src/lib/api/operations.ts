@@ -1,4 +1,5 @@
 import { type ApiOperation, operations } from "@zitadel/api/generated/operations";
+import { API_PREFIX } from "@zitadel/api/runtime/base-url";
 
 import { ZitadelError } from "../errors";
 import { unscopedCommand } from "../suggestion";
@@ -58,12 +59,17 @@ export const pathParameterNames = (operation: ApiOperation): readonly string[] =
 
 /**
  * The operation an argument names: an `operationId` (in any case, as the docs
- * and `@zitadel/api` spell it), or a path starting with `/`, matched against
- * the spec's templates. `method` is `-X`: with a path it picks among the
+ * and `@zitadel/api` spell it), or a path starting with `/`, with or without
+ * the API prefix, matched against the spec's templates. `method` is `-X`: with a path it picks among the
  * path's methods; with an id it must be the operation's own.
  */
 export const resolveTarget = (ref: string, method?: string): Target => {
   const wanted = method?.toUpperCase();
+  // The spec's paths leave out the prefix the server serves them under, so a
+  // path copied from a URL, with it, names the same operation.
+  if (ref.startsWith(`${API_PREFIX}/`)) {
+    return byPath(ref.slice(API_PREFIX.length), wanted);
+  }
   if (!ref.startsWith("/")) {
     const operation = byId(ref);
     if (wanted !== undefined && wanted !== operation.method) {

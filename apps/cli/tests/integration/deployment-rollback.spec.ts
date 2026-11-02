@@ -51,6 +51,29 @@ describe("deployment rollback", () => {
         );
       });
 
+      it("records -m on the rollback", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        await app.deployData();
+        await app.editUserSchema((schema) => {
+          schema.properties.company = { type: "string" };
+        });
+        await app.deployData();
+
+        const result = await app.run([
+          "deployment",
+          "rollback",
+          "--force",
+          "-m",
+          "company broke sign-up",
+          "--non-interactive",
+          "--json",
+        ]);
+
+        const { deployment_id } = app.envelopeOf<{ deployment_id: string }>(result).data;
+        expect(await app.deploymentMessage(deployment_id)).toBe("company broke sign-up");
+      });
+
       it("guards a bare rollback with the deployment it undoes", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin();
@@ -134,6 +157,7 @@ describe("deployment rollback", () => {
           schema.properties.company = { type: "string" };
         });
         await app.deployData();
+        const before = await app.liveDeploymentCount();
 
         // A dry run is exempt from the destructive-confirm gate, so it succeeds
         // without --force even non-interactively.
@@ -147,16 +171,13 @@ describe("deployment rollback", () => {
 
         expect(result).toSucceed();
         expect(app.envelopeOf<{ dry_run: boolean }>(result).data.dry_run).toBe(true);
-        // No rollback deployment was written: the history still holds the two
-        // deploys and nothing more.
-        const listed = await app.run(["deployment", "list", "--json"]);
-        expect(app.envelopeOf<{ count: number }>(listed).data.count).toBe(2);
+        // No rollback deployment was written: the history holds what it held.
+        expect(await app.liveDeploymentCount()).toBe(before);
       });
 
       it("fails when there is no earlier deployment", async () => {
+        // Setup's deployment is the only one.
         const app = await aSetUpApp();
-        await app.addPrimaryOrigin();
-        await app.deployData();
 
         const result = await app.run([
           "deployment",
@@ -169,20 +190,105 @@ describe("deployment rollback", () => {
         expect(result).toFailWith("E_VALIDATION");
       });
 
-      it("requires --force when non-interactive", async () => {
-        const app = await aSetUpApp();
-        await app.addPrimaryOrigin();
-        const first = await app.deployData();
+      describe("without --force when no one can be asked", () => {
+        it("is refused", async () => {
+          const app = await aSetUpApp();
+          await app.addPrimaryOrigin();
+          const first = await app.deployData();
 
-        const result = await app.run([
-          "deployment",
-          "rollback",
-          first.deployment_id ?? "",
-          "--non-interactive",
-          "--json",
-        ]);
+          const result = await app.run([
+            "deployment",
+            "rollback",
+            first.deployment_id ?? "",
+            "--json",
+          ]);
 
-        expect(result).toFailWith("E_VALIDATION");
+          expect(result).toFailWith("E_VALIDATION");
+        });
+
+        it("says to pass --force", async () => {
+          const app = await aSetUpApp();
+          await app.addPrimaryOrigin();
+          const first = await app.deployData();
+
+          const result = await app.run([
+            "deployment",
+            "rollback",
+            first.deployment_id ?? "",
+            "--json",
+          ]);
+
+          expect(result).toHintAt("--force");
+        });
+
+        it("suggests running it again with --force", async () => {
+          const app = await aSetUpApp();
+          await app.addPrimaryOrigin();
+          const first = await app.deployData();
+
+          const result = await app.run([
+            "deployment",
+            "rollback",
+            first.deployment_id ?? "",
+            "--json",
+          ]);
+
+          expect(result).toSuggestExactly(
+            app.againAsRun(`deployment rollback ${first.deployment_id ?? ""} --force`),
+          );
+        });
+
+        it("suggests the deployment it resolved when none was named", async () => {
+          const app = await aSetUpApp();
+          await app.addPrimaryOrigin();
+          const first = await app.deployData();
+          await app.editUserSchema((schema) => {
+            schema.properties.company = { type: "string" };
+          });
+          await app.deployData();
+
+          const result = await app.run(["deployment", "rollback", "--json"]);
+
+          expect(result).toSuggestExactly(
+            app.againAsRun(`deployment rollback ${first.deployment_id ?? ""} --force`),
+          );
+        });
+
+        it("suggests the deployment once when it is named after a flag", async () => {
+          const app = await aSetUpApp();
+          await app.addPrimaryOrigin();
+          const first = await app.deployData();
+
+          const result = await app.run([
+            "deployment",
+            "rollback",
+            "--message",
+            "restore",
+            first.deployment_id ?? "",
+            "--json",
+          ]);
+
+          expect(result).toSuggestExactly(
+            app.againAsRun(
+              `deployment rollback ${first.deployment_id ?? ""} --force --message restore`,
+            ),
+          );
+        });
+
+        it("rolls back nothing", async () => {
+          const app = await aSetUpApp();
+          await app.addPrimaryOrigin();
+          const first = await app.deployData();
+          await app.editUserSchema((schema) => {
+            schema.properties.company = { type: "string" };
+          });
+          await app.deployData();
+          const before = await app.liveDeploymentCount();
+
+          await app.run(["deployment", "rollback", first.deployment_id ?? "", "--json"]);
+
+          expect(await app.liveDeploymentCount()).toBe(before);
+        });
       });
     });
   });

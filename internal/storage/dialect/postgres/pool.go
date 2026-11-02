@@ -5,6 +5,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
+	"github.com/zitadel/nextgen/internal/instrumentation/metrics"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/dialect/postgres/migration"
@@ -13,13 +14,24 @@ import (
 type Pool struct {
 	pool       *pgxpool.Pool
 	isMigrated bool
+	// stopMetrics stops reporting the pool's connections.
+	stopMetrics func() error
 	statements
 }
 
 func newPool(pool *pgxpool.Pool) *Pool {
+	stopMetrics := metrics.RegisterPool(metrics.PoolPostgres, func() metrics.PoolStats {
+		stat := pool.Stat()
+		return metrics.PoolStats{
+			Used: int(stat.AcquiredConns()),
+			Idle: int(stat.IdleConns()),
+			Max:  int(stat.MaxConns()),
+		}
+	})
 	return &Pool{
-		pool:       pool,
-		statements: newStatements(pool),
+		pool:        pool,
+		stopMetrics: stopMetrics,
+		statements:  newStatements(pool),
 	}
 }
 
@@ -30,8 +42,11 @@ func (p *Pool) Transaction(ctx context.Context, fn func(ctx context.Context, tx 
 
 // Close implements [database.Pool].
 func (p *Pool) Close(ctx context.Context) error {
+	// Stop reporting first, so a collection during Close does not read a
+	// closed pool.
+	err := p.stopMetrics()
 	p.pool.Close()
-	return nil
+	return err
 }
 
 // Ping implements [database.Pool].

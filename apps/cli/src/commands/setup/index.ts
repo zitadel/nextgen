@@ -1,4 +1,4 @@
-import { readFile, rm, writeFile } from "node:fs/promises";
+import { access, readFile, rm, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 
 import { intro, note, outro } from "@clack/prompts";
@@ -89,7 +89,7 @@ import {
   RENDERER_IDS,
 } from "../../lib/orca/patchers/rule/next/renderers/registry";
 import type { PatchContext } from "../../lib/orca/patchers/types";
-import { type Asker, input } from "../../lib/input";
+import type { Asker } from "../../lib/input";
 import { hasZitadelConfig, hasZitadelSecret } from "../../lib/project";
 import {
   PASSWORD_POLICY_PATH,
@@ -103,11 +103,14 @@ import {
   materializeSetupResources,
   type MaterializeSetupResourcesResult,
 } from "../../lib/setup-resources";
+import { DEPLOY_ARGS, deployInitialRelease, type InitialDeployment } from "../../lib/release";
 import { installDependenciesForSetup } from "./install";
 import {
   assertCleanWorktree,
   ensureInitialCommit,
+  gitReport,
   type InitialCommitOutcome,
+  unavailableWarning,
 } from "./initial-commit";
 import { moveDevPort } from "./move-dev-port";
 import {
@@ -131,7 +134,7 @@ import {
   type Row,
   type Section,
 } from "./summary";
-import { shellOption } from "../../lib/shell";
+import { shellArg, shellOption } from "../../lib/shell";
 import { showSkillsHint } from "../../lib/skills-hint";
 import { reportWarning } from "../../lib/warnings";
 import {
@@ -141,8 +144,8 @@ import {
   type SuggestedCommand,
   unscopedCommand,
 } from "../../lib/suggestion";
-import { nextCommandsData } from "../../lib/oclif/envelope";
-import { Promptable } from "../../lib/oclif/promptable";
+import { asStepsShown, type StepsShown } from "../../lib/oclif/next-steps";
+import { Destructive } from "../../lib/oclif/destructive";
 
 /**
  * The frameworks `--framework` accepts, derived from Orca's registry so the
@@ -167,6 +170,9 @@ const RENDERER_FLAG_DESCRIPTION =
   UNAVAILABLE_RENDERER_IDS.length === 0
     ? "Renderer (default: react)."
     : `Renderer (default: react). Not yet available: ${UNAVAILABLE_RENDERER_IDS.join(", ")}.`;
+
+/** The message the release setup publishes carries. */
+const INITIAL_DEPLOY_MESSAGE = "Initial deployment from zitadel setup";
 
 /**
  * The selector appended to setup's credential-recovery commands. `variable set`
@@ -212,7 +218,7 @@ function localRecoverySelector(cwd: string | undefined): EnvironmentSelector {
  * — each entry is a small class) and {@link PickFrameworkPrompt} (the
  * empty-directory framework choice, before the main wizard).
  */
-export default class Setup extends Promptable(BaseCommand) {
+export default class Setup extends Destructive(BaseCommand) {
   static override description =
     "Create a Zitadel project and scaffold local auth. An interactive setup ends with a note about the Zitadel agent skills, shown once per machine; set NO_SKILLS_PROMPT=1 to hide it.";
   static override group = CommandGroups.gettingStarted;
@@ -225,7 +231,7 @@ export default class Setup extends Promptable(BaseCommand) {
     force: Flags.boolean({
       char: "f",
       description:
-        "Overwrite managed files that already exist, and scaffold into a non-empty directory.",
+        "Overwrite managed files that already exist, scaffold into a non-empty directory, and remove the previous origin when --dev-port moves the app.",
     }),
     framework: Flags.string({ description: "Framework to target.", options: FRAMEWORK_OPTIONS }),
     renderer: Flags.string({
@@ -327,7 +333,7 @@ export default class Setup extends Promptable(BaseCommand) {
       // An app already set up has nothing left to scaffold, but an explicit
       // --dev-port is how it moves to another port.
       if (flags["dev-port"] !== undefined) {
-        return this.moveToDevPort(cwd, assertDevPort(flags["dev-port"]), dryRun);
+        return this.moveToDevPort(cwd, flags.cwd, assertDevPort(flags["dev-port"]), dryRun);
       }
       return this.emit({ status: "skipped", reason: "already-initialized" });
     }
@@ -357,12 +363,9 @@ export default class Setup extends Promptable(BaseCommand) {
     // inconsistent set of --sso flags is a mistake in the command line, and
     // reporting it after a project has been created would leave the developer
     // to clean up.
-    // Not `this.input`: that one answers a confirm when `--force` is given, and
-    // here `--force` permits overwriting files, so it must never answer a
-    // question. Interactive only when a person is there, which is also the only
-    // time the wizard runs.
-    const wizardInput: Asker = (question) =>
-      input(question, { interactive: !nonInteractive, force: false });
+    // It cannot ask a `confirm`, so setup's `--force`, which permits
+    // overwriting files, never answers one of its questions.
+    const wizardInput: Asker = this.input;
     const ssoFromCommandLine = await ssoFromFlags(
       flags,
       nonInteractive,
@@ -841,6 +844,37 @@ export default class Setup extends Promptable(BaseCommand) {
     // one after it can show no diff (#1651).
     const commit = await this.makeInitialCommit(cwd, dryRun, flags.git !== false);
 
+    // Setup publishes what it scaffolded, after the commit so the release
+    // records it, so the sign-in setup asks the developer to verify next is
+    // served that release rather than the newest stored revisions (#2331).
+    const deployment = await this.deployScaffoldedProject({
+      cwd,
+      server: answers.server,
+      project,
+      dryRun,
+      selector: recoverySelector(flags.cwd),
+    });
+    // A failed deploy leaves the project on its newest stored revisions
+    // rather than a release, so the deploy that fixes it leads both surfaces.
+    const deployCommand = projectCommand(
+      DEPLOY_ARGS,
+      recoverySelector(flags.cwd),
+      this.meta.cliVersion,
+    );
+    const deployStep =
+      deployment === undefined && !dryRun
+        ? {
+            actions: [`Deploy .zitadel/ so the project serves its release: ${deployCommand}`],
+            boxActions: [
+              {
+                text: "Deploy .zitadel/ so the project serves its release:",
+                command: deployCommand,
+              },
+            ],
+            commands: [deployCommand],
+          }
+        : { actions: [], boxActions: [], commands: [] as SuggestedCommand[] };
+
     const writtenRel = allFilesWritten.map((file) => relativeDisplay(cwd, file));
     // The nudge rides both surfaces from one decision: the box for humans, the
     // envelope for agents.
@@ -950,6 +984,7 @@ export default class Setup extends Promptable(BaseCommand) {
     // The structured report is human-only. Under `--json` we let the
     // envelope returned from `this.emit(...)` be the sole stdout
     // payload (oclif requires single-doc JSON).
+    let nextShown: StepsShown | undefined;
     if (!this.jsonEnabled()) {
       const projectFacts = await detectProjectFacts(cwd, app.framework);
       const sections = buildSummary({
@@ -977,6 +1012,7 @@ export default class Setup extends Promptable(BaseCommand) {
             renderSummary(sections),
             "",
             renderBoxActions([
+              ...deployStep.boxActions,
               ...installOutcome.boxActions,
               ...consoleStep.boxActions,
               ...claimNudge.boxActions,
@@ -985,6 +1021,8 @@ export default class Setup extends Promptable(BaseCommand) {
         ),
         style: { padding: 1, borderStyle: "rounded", borderColor: "green" },
       });
+      // The box holds the next steps, so the base command does not repeat them.
+      nextShown = asStepsShown();
       // After the steps that start the app and test sign-in, outside the box so
       // the command can be copied without its border.
       consola.log(`\n${exploreAllCommands(this.meta.cliVersion)}`);
@@ -997,6 +1035,7 @@ export default class Setup extends Promptable(BaseCommand) {
           !dryRun &&
           !flags["non-interactive"] &&
           Boolean(process.stdout.isTTY && process.stdin.isTTY),
+        cliVersion: this.meta.cliVersion,
       });
     }
 
@@ -1024,14 +1063,7 @@ export default class Setup extends Promptable(BaseCommand) {
         })),
         files_skipped: result.filesSkipped.map((file) => relativeDisplay(cwd, file)),
         install: installOutcome.install,
-        // Whether setup created the repository, and the commit it made.
-        // `initialized` is false when the project was already in one, which it
-        // is still committed into; the commit is `null` only under `--no-git`
-        // or when git could not be used.
-        git: {
-          initialized: commit.kind === "created",
-          commit: commit.kind === "created" || commit.kind === "committed" ? commit.sha : null,
-        },
+        git: gitReport(commit),
         // The provider enabled during scaffolding, or null. `secret` reports
         // where the value went, never the value itself — `published` is the
         // one that decides whether the provider button works.
@@ -1059,7 +1091,21 @@ export default class Setup extends Promptable(BaseCommand) {
         }),
         // Branding guidance before the claim nudge: make it yours, then
         // claim to keep it (the same order the manifesto's journey walks).
-        next_actions: [
+        // What setup's first deploy published, or null when there was none:
+        // a dry run, or a deploy that failed, which is a warning.
+        deployment:
+          deployment === undefined
+            ? null
+            : {
+                release_id: deployment.releaseId,
+                content_hash: deployment.contentHash,
+                deployment_id: deployment.deploymentId,
+                origins: [...deployment.origins],
+              },
+      },
+      next: {
+        actions: [
+          ...deployStep.actions,
           ...installOutcome.nextActions,
           brandingGuidanceAction(this.meta.cliVersion),
           ...consoleStep.actions,
@@ -1068,7 +1114,7 @@ export default class Setup extends Promptable(BaseCommand) {
         // A JSON run prints no warnings, so a credential the project never
         // received would otherwise appear only as a `published` status with
         // nothing to act on. `auth-method sso enable` reports the same recovery step.
-        ...nextCommandsData([
+        commands: [
           ...republishCommands(
             answers.sso.flatMap((answer) => {
               const slug = providerOf(answer.selection).slug;
@@ -1089,11 +1135,13 @@ export default class Setup extends Promptable(BaseCommand) {
             this.meta.cliVersion,
             recoverySelector(flags.cwd),
           ),
+          ...deployStep.commands,
           ...installOutcome.nextCommands,
           ...consoleStep.commands,
           ...claimNudge.commands,
-        ]),
+        ],
       },
+      nextShown,
     });
   }
 
@@ -1135,11 +1183,53 @@ export default class Setup extends Promptable(BaseCommand) {
       }
     }
     if (outcome.kind === "unavailable") {
-      reportWarning(
-        `Could not commit the scaffolded project (${outcome.reason}); the first release records no commit, so the next deploy cannot show a diff.`,
-      );
+      reportWarning(unavailableWarning(outcome));
     }
     return outcome;
+  }
+
+  /**
+   * Deploy `.zitadel/` to the project setup just created, to its primary
+   * origin. Narrated but never fatal: the app is scaffolded and committed, and
+   * a failure leaves the deploy one command away.
+   */
+  private async deployScaffoldedProject(opts: {
+    cwd: string;
+    server: string;
+    project: CreateProject201;
+    dryRun: boolean;
+    selector: EnvironmentSelector;
+  }): Promise<InitialDeployment | undefined> {
+    if (opts.dryRun) {
+      consola.info("Would deploy .zitadel/ to the project (dry run)");
+      return undefined;
+    }
+    const json = this.jsonEnabled();
+    consola.start("Deploying .zitadel/ to the project");
+    try {
+      const deployment = await deployInitialRelease({
+        client: createZitadelClient({
+          baseUrl: opts.server,
+          token: opts.project.project_secret,
+        }),
+        projectId: opts.project.id,
+        cwd: opts.cwd,
+        env: this.meta.env,
+        json,
+        color: !json && Boolean(process.stdout.isTTY) && !process.env.NO_COLOR,
+        message: INITIAL_DEPLOY_MESSAGE,
+        suggest: (args) => projectCommand(args, opts.selector, this.meta.cliVersion),
+      });
+      consola.success(
+        `Deployed ${deployment.contentHash} to ${deployment.origins.length} origin${deployment.origins.length === 1 ? "" : "s"}`,
+      );
+      return deployment;
+    } catch (error) {
+      reportWarning(
+        `The project was set up but its first deploy failed: ${toZitadelError(error).message}. Run \`zitadel ${DEPLOY_ARGS}${opts.selector}\` to publish .zitadel/.`,
+      );
+      return undefined;
+    }
   }
 
   /**
@@ -1148,6 +1238,7 @@ export default class Setup extends Promptable(BaseCommand) {
    */
   private async moveToDevPort(
     cwd: string,
+    typedCwd: string | undefined,
     devPort: number,
     dryRun: boolean,
   ): Promise<JsonEnvelope> {
@@ -1161,13 +1252,31 @@ export default class Setup extends Promptable(BaseCommand) {
       orca: createOrca(),
       cliVersion: this.meta.cliVersion,
       dryRun,
+      consent: (gate) => this.consent(gate),
     });
     for (const file of move.result.filesWritten) {
       consola.info(`${dryRun ? "Would update" : "Updated"} ${relativeDisplay(cwd, file)}`);
     }
+    // Not setup again: the app is on the new port by now, so a rerun moves
+    // nothing and never reaches the old origin. Pinned to the project just
+    // moved, as the other recoveries are: its env file, or the server the move
+    // used for a project setup gave none, never what the shell has exported.
+    const cleanup =
+      move.refused && move.staleOrigin !== undefined
+        ? projectCommand(
+            `origin rm ${shellArg(move.staleOrigin)} --force`,
+            (await access(join(cwd, ".env.development.local")).then(
+              () => true,
+              () => false,
+            ))
+              ? recoverySelector(typedCwd)
+              : environmentSelectorSuffix({ server, cwd: typedCwd }),
+            this.meta.cliVersion,
+          )
+        : undefined;
     if (move.staleOrigin !== undefined) {
       reportWarning(
-        `Could not remove ${move.staleOrigin} from the project's origins; it admits a port nothing serves any more.`,
+        `${move.staleOrigin} is still among the project's origins; it admits a port nothing serves any more.${cleanup === undefined ? "" : ` Remove it with \`${cleanup}\`.`}`,
       );
     }
     for (const slug of move.ssoProviders) {
@@ -1190,7 +1299,10 @@ export default class Setup extends Promptable(BaseCommand) {
         issuer: move.issuer,
         dev_port: devPort,
         files_written: move.result.filesWritten.map((file) => relativeDisplay(cwd, file)),
-        next_actions: [`Restart the dev server and open ${move.issuer}/login.`],
+      },
+      next: {
+        actions: [`Restart the dev server and open ${move.issuer}/login.`],
+        ...(cleanup === undefined ? {} : { commands: [cleanup] }),
       },
     });
   }

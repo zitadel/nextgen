@@ -81,19 +81,42 @@ func TestEventService_List_claimedAppliesFilters(t *testing.T) {
 	assert.Equal(t, "evt_1", resp.Events[0].ID)
 }
 
-func TestEventService_List_orderAsc(t *testing.T) {
-	svc, stmts := newMockedEventService(t)
+// Paging forward, a token passes every event before its page, so an ascending
+// list ends where the project's events are still settling: an event that
+// commits behind a page would be skipped for good.
+func TestEventService_List_orderAscEndsWhereEventsSettle(t *testing.T) {
+	settled := time.Date(2026, 10, 30, 12, 0, 0, 0, time.UTC)
+	bound := database.LessThan(database.Col(domain.EventFieldCreatedAt), settled)
+	for name, tc := range map[string]struct {
+		settled time.Time
+		bounded bool
+	}{
+		"events still settling": {settled: settled, bounded: true},
+		"every event settled":   {settled: time.Time{}, bounded: false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			svc, stmts := newMockedEventService(t)
 
-	stmts.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(&domain.Project{ID: "proj_1"}, nil)
-	stmts.EXPECT().GetActiveOwningTeamGrant(gomock.Any(), "proj_1").Return(&domain.AuthzAssignment{PrincipalID: "team_1"}, nil)
-	stmts.EXPECT().ListEvents(gomock.Any(), gomock.Any()).
-		DoAndReturn(func(_ context.Context, opts *database.ListOptions[domain.EventField]) (*database.ListResult[*domain.Event], error) {
-			assert.Equal(t, database.OrderAsc, opts.Pagination.OrderBy.Direction)
-			return &database.ListResult[*domain.Event]{}, nil
+			stmts.EXPECT().GetProjectByID(gomock.Any(), "proj_1").Return(&domain.Project{ID: "proj_1"}, nil)
+			stmts.EXPECT().GetActiveOwningTeamGrant(gomock.Any(), "proj_1").Return(&domain.AuthzAssignment{PrincipalID: "team_1"}, nil)
+			stmts.EXPECT().EventsSettledBefore(gomock.Any(), "proj_1").Return(tc.settled, nil)
+			stmts.EXPECT().ListEvents(gomock.Any(), gomock.Any()).
+				DoAndReturn(func(_ context.Context, opts *database.ListOptions[domain.EventField]) (*database.ListResult[*domain.Event], error) {
+					assert.Equal(t, database.OrderAsc, opts.Pagination.OrderBy.Direction)
+					filter, ok := opts.Filter.(database.AndFilter[domain.EventField])
+					require.True(t, ok, "filter %T", opts.Filter)
+					if tc.bounded {
+						assert.Contains(t, filter.Filters, bound)
+					} else {
+						assert.False(t, filter.Restricts(database.Col(domain.EventFieldCreatedAt)))
+					}
+					return &database.ListResult[*domain.Event]{}, nil
+				})
+
+			_, err := svc.List(context.Background(), service.ListEventsRequest{ProjectID: "proj_1", Order: "asc"})
+			require.NoError(t, err)
 		})
-
-	_, err := svc.List(context.Background(), service.ListEventsRequest{ProjectID: "proj_1", Order: "asc"})
-	require.NoError(t, err)
+	}
 }
 
 func TestEventService_List_invalidOrder(t *testing.T) {

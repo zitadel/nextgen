@@ -5,9 +5,20 @@ import type { FileOp, WiringVerdict } from "./file-writer/types";
 import { PROXY_PATH } from "./proxy";
 import {
   assertNoUnreviewedProjectSecretProxy,
+  EXCHANGE_PATH_CHECK,
+  hasProxyCredentialPolicyMarker,
   PROXY_CREDENTIAL_POLICY_MARKER,
+  PREFIXED_EXCHANGE_PATH,
+  PROXY_CREDENTIAL_POLICY_V2_MARKER,
+  V2_EXCHANGE_PATH_CHECK,
 } from "./proxy-credential-policy";
-import { indented, SESSION_COOKIE_MARKER, viteSessionCookieStatements } from "./session-cookie";
+import {
+  indented,
+  SESSION_COOKIE_MARKER,
+  SESSION_COOKIE_MARKER_V1,
+  viteSessionCookieStatements,
+  viteSessionCookieStatementsV1,
+} from "./session-cookie";
 import { lfText, withLfLineEnds } from "./utils/line-ends";
 import {
   ensureEditableObject,
@@ -22,7 +33,8 @@ import {
  * `/__nextgen/*` calls to the
  * backend, strips the prefix, and attaches the project's service-key secret
  * (read from `ZITADEL_PROJECT_SECRET` in `.env.local`) only to the current
- * app-plane `POST /sessions/exchange` operation. The secret stays server-side:
+ * app-plane `POST /sessions/exchange` operation, which it knows with and
+ * without the API prefix (`/api/v1`, ADR 077). The secret stays server-side:
  * Vite only exposes vars with the configured `envPrefix` (default `VITE_`) to
  * client bundles, so this server-only key never leaks into the browser.
  *
@@ -36,7 +48,8 @@ import {
  * browser's `Origin`, which the proxy passes on untouched.
  *
  * The session cookie travels under the app's project's name in the browser and
- * the server's name upstream ({@link viteSessionCookieStatements}, ADR 073).
+ * the server's name upstream ({@link viteSessionCookieStatements}, ADR 073,
+ * ADR 083).
  */
 function proxyEntryCode(server: string): string {
   return `/* ${PROXY_CREDENTIAL_POLICY_MARKER} */ {
@@ -56,13 +69,17 @@ ${indented(viteSessionCookieStatements(), "    ")}
 }`;
 }
 
-/** The generated hook that attaches the project secret to the session exchange only. */
-function bearerListener(indent: string): string {
+/**
+ * The generated hook that attaches the project secret to the session exchange
+ * only. `pathCheck` is the exchange's path test: both spellings, or the one a
+ * v2 proxy knew.
+ */
+function bearerListener(indent: string, pathCheck = EXCHANGE_PATH_CHECK): string {
   return `${indent}proxy.on("proxyReq", (proxyReq) => {
 ${indent}  const pathname = new URL(proxyReq.path, "http://zitadel.local").pathname;
 ${indent}  if (
 ${indent}    proxyReq.method === "POST" &&
-${indent}    pathname === "/sessions/exchange" &&
+${indent}    ${pathCheck} &&
 ${indent}    !proxyReq.getHeader("authorization")
 ${indent}  ) {
 ${indent}    proxyReq.setHeader("authorization", bearer);
@@ -84,7 +101,7 @@ ${bearerListener(indent)}`;
  * surrounding `/__nextgen` proxy and any user changes elsewhere in the entry.
  */
 function isLegacyManagedProxy(source: string): boolean {
-  if (source.includes(PROXY_CREDENTIAL_POLICY_MARKER)) {
+  if (hasProxyCredentialPolicyMarker(source)) {
     return false;
   }
   return (
@@ -104,7 +121,7 @@ function isLegacyManagedProxy(source: string): boolean {
  * remote https server.
  */
 const HOST_KEEPING_ENTRY =
-  /(["']\/__nextgen["']:\s*(?:\/\* zitadel:proxy:v2 \*\/\s*)?\{\r?\n([\t ]+)target: [^\r\n]+,\r?\n)\2changeOrigin: false,(\r?\n)/;
+  /(["']\/__nextgen["']:\s*(?:\/\* zitadel:proxy:v[23] \*\/\s*)?\{\r?\n([\t ]+)target: [^\r\n]+,\r?\n)\2changeOrigin: false,(\r?\n)/;
 
 /**
  * Moves the CLI's own host-keeping entry to the origin-forwarding shape of
@@ -114,7 +131,7 @@ const HOST_KEEPING_ENTRY =
  * is never touched.
  */
 function forwardAppOrigin(source: string): string {
-  if (!source.includes(PROXY_CREDENTIAL_POLICY_MARKER) || /\bxfwd\s*:/.test(source)) {
+  if (!hasProxyCredentialPolicyMarker(source) || /\bxfwd\s*:/.test(source)) {
     return source;
   }
   return source.replace(
@@ -201,7 +218,7 @@ export function viteProxyEdit(
   };
 }
 
-/** The slice of a babel AST node {@link cliConfigureStatements} walks. */
+/** The slice of a babel AST node {@link cliEntryOf} walks. */
 interface AstNode {
   readonly type: string;
   readonly start: number;
@@ -237,57 +254,112 @@ function fingerprint(source: string): string {
     .replace(/(^|[(,:=])([A-Za-z_$][\w$]*)=>/g, "$1($2)=>");
 }
 
+/** The `/__nextgen` entry the CLI wrote, found in a config's syntax tree. */
+interface CliEntry {
+  /** The entry's property: its key, the marker and the object literal the CLI wrote. */
+  readonly entry: AstNode;
+  /** The statements of its `configure(proxy)` body. */
+  readonly statements: ReadonlyArray<AstNode>;
+  /**
+   * The bearer hook among them, and whether it knows the API prefix (`v3`) or
+   * only the unprefixed exchange (`v2`).
+   */
+  readonly hook: { readonly node: AstNode; readonly version: "v2" | "v3" };
+}
+
+/** The bearer hook as the CLI writes it now, and as a v2 proxy carries it, fingerprinted. */
+const HOOK_FINGERPRINTS = [
+  { version: "v3", fingerprint: fingerprint(bearerListener("")) },
+  { version: "v2", fingerprint: fingerprint(bearerListener("", V2_EXCHANGE_PATH_CHECK)) },
+] as const;
+
 /**
- * The statements of the `configure(proxy)` body of the `/__nextgen` entry the
- * CLI wrote: one carrying the credential-policy marker and the CLI's own
- * exchange-only bearer hook, however it was formatted since. A hand-written
- * entry, or one whose hook was changed, yields `undefined`.
+ * The `/__nextgen` entry the CLI wrote: one carrying the credential-policy
+ * marker and the CLI's own exchange-only bearer hook, of either version,
+ * however it was formatted since. A hand-written entry, or one whose hook was
+ * changed, yields `undefined`.
  */
-function cliConfigureStatements(
-  config: unknown,
-  source: string,
-): ReadonlyArray<AstNode> | undefined {
+function cliEntryOf(config: unknown, source: string): CliEntry | undefined {
   const root = (config as { $ast?: AstNode }).$ast;
   const proxy = propertyOf(propertyOf(root, "server")?.value, "proxy")?.value;
   const entry = propertyOf(proxy, PROXY_PATH);
   const configure = propertyOf(entry?.value, "configure");
   const fn = configure?.type === "ObjectMethod" ? configure : configure?.value;
   const body = fn?.body;
-  if (!entry || !body || Array.isArray(body) || (body as AstNode).type !== "BlockStatement") {
+  if (
+    !entry ||
+    !body ||
+    Array.isArray(body) ||
+    (body as AstNode).type !== "BlockStatement" ||
+    !hasProxyCredentialPolicyMarker(source.slice(entry.start, entry.end))
+  ) {
     return undefined;
   }
-  const block = body as AstNode;
-  const statements = block.body as ReadonlyArray<AstNode>;
-  const owned =
-    source.slice(entry.start, entry.end).includes(PROXY_CREDENTIAL_POLICY_MARKER) &&
-    fingerprint(source.slice(block.start, block.end)).includes(fingerprint(bearerListener("")));
-  return owned && statements.length > 0 ? statements : undefined;
+  const statements = (body as AstNode).body as ReadonlyArray<AstNode>;
+  for (const node of statements) {
+    const printed = fingerprint(source.slice(node.start, node.end));
+    const known = HOOK_FINGERPRINTS.find((hook) => hook.fingerprint === printed);
+    if (known) {
+      return { entry, statements, hook: { node, version: known.version } };
+    }
+  }
+  return undefined;
 }
 
 /** What the session-cookie edit and its verdict call the file they read. */
 const VITE_CONFIG_LABEL = "the Vite config (vite.config.*)";
 
 /**
- * The statements of the CLI's own `/__nextgen` entry's `configure(proxy)` body
- * in `source` (LF line ends), or `undefined` when there is no such entry.
+ * The CLI's own `/__nextgen` entry in `source` (LF line ends), or `undefined`
+ * when there is no such entry.
  */
-function cliEntryStatements(source: string): ReadonlyArray<AstNode> | undefined {
+function cliEntry(source: string): CliEntry | undefined {
   // At tabWidth 1 the node offsets index the source itself; at recast's
   // default a tab counts as four, which a tab-indented config would expose.
   const mod = parseConfigModule(source, VITE_CONFIG_LABEL, { tabWidth: 1 });
-  return cliConfigureStatements(resolveDefaultExportObject(mod, VITE_CONFIG_LABEL), source);
+  return cliEntryOf(resolveDefaultExportObject(mod, VITE_CONFIG_LABEL), source);
+}
+
+/** How many statements the hooks before ADR 083 are: the project id, the cookie name and the two listeners. */
+const V1_HOOK_STATEMENTS = 4;
+
+/**
+ * `text` (LF line ends) with the session-cookie hooks the CLI wrote before
+ * ADR 083 replaced by the current ones, at their indentation, or `undefined`
+ * when the CLI's entry does not carry them as the CLI wrote them, whatever a
+ * formatter did to their layout.
+ */
+function withCurrentHooks(text: string): string | undefined {
+  const marker = text.indexOf(`/* ${SESSION_COOKIE_MARKER_V1} */`);
+  const statements = marker === -1 ? undefined : cliEntry(text)?.statements;
+  const first = statements?.findIndex((statement) => statement.start > marker) ?? -1;
+  const last = statements?.[first + V1_HOOK_STATEMENTS - 1];
+  if (first === -1 || !last) {
+    return undefined;
+  }
+  const lineStart = text.lastIndexOf("\n", marker - 1) + 1;
+  if (
+    fingerprint(text.slice(lineStart, last.end)) !==
+    fingerprint(viteSessionCookieStatementsV1().join("\n"))
+  ) {
+    return undefined;
+  }
+  const indent = /^[\t ]*/.exec(text.slice(lineStart, marker))?.[0] ?? "";
+  return `${text.slice(0, lineStart)}${indented(viteSessionCookieStatements(), indent)}${text.slice(last.end)}`;
 }
 
 /**
  * Builds the `edit` transform that gives the CLI's own `/__nextgen` entry the
- * session-cookie hooks (ADR 073), for apps set up before the entry carried
- * them: the hooks go after the last statement of its `configure(proxy)` body,
- * at that statement's indentation, and nothing else in the file changes. A
- * config whose entry carries them already, a hand-written entry, and one whose
- * bearer hook was changed are returned untouched; {@link viteSessionCookieVerdict}
- * tells the doctor which it is. Line ends are the file's own (CRLF or LF).
- * Throws `E_VALIDATION`, as {@link viteProxyEdit} does, when the file is absent
- * or unreadable.
+ * session-cookie hooks (ADR 073, ADR 083), for apps set up before the entry
+ * carried them: the hooks go after the last statement of its `configure(proxy)`
+ * body, at that statement's indentation, and nothing else in the file changes.
+ * The hooks the CLI wrote before ADR 083 are replaced where they stand. A
+ * config whose entry carries the current hooks already, a hand-written entry,
+ * one whose bearer hook was changed and one whose hooks before ADR 083 were
+ * changed are returned untouched; {@link viteSessionCookieVerdict} tells the
+ * doctor which it is. Line ends are the file's own (CRLF or LF). Throws
+ * `E_VALIDATION`, as {@link viteProxyEdit} does, when the file is absent or
+ * unreadable.
  */
 export function viteSessionCookieEdit(): (source: string | undefined) => string {
   return (source) => {
@@ -300,7 +372,10 @@ export function viteSessionCookieEdit(): (source: string | undefined) => string 
       if (text.includes(SESSION_COOKIE_MARKER)) {
         return text;
       }
-      const last = cliEntryStatements(text)?.at(-1);
+      if (text.includes(SESSION_COOKIE_MARKER_V1)) {
+        return withCurrentHooks(text) ?? text;
+      }
+      const last = cliEntry(text)?.statements.at(-1);
       if (!last) {
         return text;
       }
@@ -316,22 +391,103 @@ export function viteSessionCookieEdit(): (source: string | undefined) => string 
  * The CLI's entry without them is `detached` (`doctor --fix` adds them), and so
  * is a config without the CLI's entry, which the proxy edit writes with them.
  * An entry the CLI wrote whose bearer hook was changed by hand is `unknown`:
- * the edit cannot place the hooks there, and only the developer can.
+ * the edit cannot place the hooks there, and only the developer can. Hooks
+ * from before ADR 083 are `outdated`: they keep the session in cookies the
+ * server no longer reads.
  */
 export function viteSessionCookieVerdict(source: string): WiringVerdict {
   const text = lfText(source);
   if (text.includes(SESSION_COOKIE_MARKER)) {
     return "applied";
   }
-  if (cliEntryStatements(text)) {
+  if (text.includes(SESSION_COOKIE_MARKER_V1)) {
+    return {
+      outdated:
+        withCurrentHooks(text) === undefined
+          ? "its session-cookie hooks name the session cookies before ADR 083 and were changed since zitadel setup wrote them, so they must be updated by hand"
+          : "its session-cookie hooks name the session cookies before ADR 083; doctor --fix updates them",
+    };
+  }
+  if (cliEntry(text)) {
     return "detached";
   }
-  return text.includes(PROXY_CREDENTIAL_POLICY_MARKER)
+  return hasProxyCredentialPolicyMarker(text)
     ? {
         unknown:
           "its /__nextgen proxy entry was changed since zitadel setup wrote it, so the session-cookie hooks (ADR 073) must be added by hand",
       }
     : "detached";
+}
+
+/**
+ * Builds the `edit` transform that moves the CLI's own `/__nextgen` entry from
+ * v2, whose bearer hook knew only `/sessions/exchange`, to v3, which knows the
+ * exchange under the API prefix too (ADR 077): once an app's packages call
+ * `/api/v1`, a v2 proxy no longer attaches the project secret to the exchange.
+ * Only the hook statement and the entry's marker change, whatever the
+ * formatter did to the rest; a hand-written entry, a hook changed by hand and
+ * a v3 entry are returned untouched, and {@link viteApiPrefixVerdict} tells
+ * the doctor which it is. Line ends are the file's own. Throws `E_VALIDATION`,
+ * as {@link viteProxyEdit} does, when the file is absent or unreadable.
+ */
+export function viteApiPrefixEdit(): (source: string | undefined) => string {
+  return (source) => {
+    if (source === undefined) {
+      // Throws the E_VALIDATION a missing config gets everywhere.
+      parseConfigModule(source, VITE_CONFIG_LABEL, { tabWidth: 1 });
+      return "";
+    }
+    return withLfLineEnds(source, (text) => {
+      const found = cliEntry(text);
+      if (found?.hook.version !== "v2") {
+        return text;
+      }
+      const { entry, hook } = found;
+      const lineStart = text.lastIndexOf("\n", hook.node.start - 1) + 1;
+      const indent = /^[\t ]*/.exec(text.slice(lineStart, hook.node.start))?.[0] ?? "";
+      const migrated =
+        text.slice(entry.start, hook.node.start) +
+        bearerListener(indent).slice(indent.length) +
+        text.slice(hook.node.end, entry.end);
+      return (
+        text.slice(0, entry.start) +
+        migrated.replaceAll(PROXY_CREDENTIAL_POLICY_V2_MARKER, PROXY_CREDENTIAL_POLICY_MARKER) +
+        text.slice(entry.end)
+      );
+    });
+  };
+}
+
+/**
+ * Whether the Vite config's dev proxy attaches the project secret to the
+ * exchange under the API prefix too, for the doctor. The CLI's v2 entry is
+ * `detached` (`doctor --fix` moves it to v3); an entry the CLI wrote whose hook
+ * was changed by hand, and a hand-written proxy that attaches the secret but
+ * never names `/api/v1/sessions/exchange`, are `unknown`: only the developer can
+ * change them. A config with no proxy that attaches the secret has nothing to
+ * move.
+ */
+export function viteApiPrefixVerdict(source: string): WiringVerdict {
+  const text = lfText(source);
+  const found = cliEntry(text);
+  if (found) {
+    return found.hook.version === "v3" ? "applied" : "detached";
+  }
+  if (hasProxyCredentialPolicyMarker(text)) {
+    return {
+      unknown: `its /__nextgen proxy entry was changed since zitadel setup wrote it, so its project-secret check must accept ${PREFIXED_EXCHANGE_PATH} by hand (ADR 077)`,
+    };
+  }
+  if (
+    text.includes(PROXY_PATH) &&
+    text.includes("ZITADEL_PROJECT_SECRET") &&
+    !text.includes(PREFIXED_EXCHANGE_PATH)
+  ) {
+    return {
+      unknown: `its /__nextgen proxy is not the one zitadel setup writes, so its project-secret check must accept ${PREFIXED_EXCHANGE_PATH} by hand (ADR 077)`,
+    };
+  }
+  return "applied";
 }
 
 /**
@@ -345,8 +501,8 @@ export const VITE_CONFIG_PATHS = configCandidates("vite.config");
  * Capability shared by every Vite-based patcher (React, Vue, and any future
  * Vite framework): contributes the file-ops that non-destructively merge the
  * `/__nextgen` dev proxy into the project's Vite config. A patcher opts in by
- * declaring `implements ViteSupport` and spreading {@link viteProxyOp} and
- * {@link viteSessionCookieOp} into its `routeOps`, so the proxy logic is
+ * declaring `implements ViteSupport` and spreading {@link viteProxyOp},
+ * {@link viteApiPrefixOp} and {@link viteSessionCookieOp} into its `routeOps`, so the proxy logic is
  * written once and reused everywhere — no per-framework duplication.
  */
 export interface ViteSupport {
@@ -354,6 +510,8 @@ export interface ViteSupport {
   viteProxyOp(devPort: number, server: string, previousPort?: number): FileOp;
   /** The `edit` file-op that gives a proxy setup wrote before its session-cookie hooks. */
   viteSessionCookieOp(): FileOp;
+  /** The `edit` file-op that moves a v2 proxy's exchange check to the API prefix as well. */
+  viteApiPrefixOp(): FileOp;
 }
 
 /** Builds the shared Vite-config proxy {@link FileOp} for a {@link ViteSupport} patcher. */
@@ -376,8 +534,23 @@ export function buildViteSessionCookieOp(): FileOp {
     edit: viteSessionCookieEdit(),
     // A session cookie per project (ADR 073) keeps the Console and the app
     // from signing each other out on localhost. Sign-in works without it, so
-    // the doctor only warns while it is missing.
+    // the doctor only warns while it is missing; hooks from before ADR 083
+    // fail it (`outdated`).
     wiring: "convenience",
     verify: viteSessionCookieVerdict,
+  };
+}
+
+/** Builds the shared API-prefix {@link FileOp} for a {@link ViteSupport} patcher. */
+export function buildViteApiPrefixOp(): FileOp {
+  return {
+    kind: "edit",
+    path: [...VITE_CONFIG_PATHS],
+    edit: viteApiPrefixEdit(),
+    // The packages call the API under /api/v1 (ADR 077), and a v2 proxy
+    // attaches the project secret only to the exchange at the root, so sign-in
+    // fails: the doctor fails until `doctor --fix` moves the proxy to v3.
+    wiring: "infrastructure",
+    verify: viteApiPrefixVerdict,
   };
 }

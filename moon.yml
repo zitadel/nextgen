@@ -94,6 +94,28 @@ tasks:
     inputs:
       - "scripts/ci-mode.mjs"
       - "scripts/ci-mode.test.mjs"
+      - "scripts/go-generate.mjs"
+      - "scripts/go-generate.test.mjs"
+      - "scripts/task-graph.test.mjs"
+      # The regression fixture reads both runners' real graphs and CI gates.
+      - "moon.yml"
+      - "turbo.json"
+      - "apps/*/moon.yml"
+      - "apps/*/turbo.json"
+      - "apps/*/package.json"
+      - "packages/*/moon.yml"
+      - "packages/*/turbo.json"
+      - "packages/*/package.json"
+      - "tools/*/moon.yml"
+      - "tools/*/turbo.json"
+      - "tools/*/package.json"
+      - "e2e/moon.yml"
+      - "e2e/turbo.json"
+      - "e2e/package.json"
+      - ".moon/**/*.yml"
+      - ".github/workflows/ci.yml"
+      - ".github/workflows/ci-turbo.yml"
+      - ".gitignore"
       - "scripts/server-build.mjs"
       - "scripts/dev-process.mjs"
       - "scripts/dev-process.test.mjs"
@@ -108,10 +130,8 @@ tasks:
       - "scripts/render-builtin-schemas.test.mjs"
       # Read by that test: it renders every built-in schema.
       - "api/openapi/endpoints/schemas/*.json"
-      # The server's default schema namespace, which the renderer must match,
-      # and the defaults it reads it from.
-      - "packages/config/src/defaults.ts"
-      - "packages/config/defaults/**/*"
+      # The server's default schema namespace, which the renderer must match.
+      - "packages/config/src/builtin-schema-base.ts"
       # The task delegates to the package `test` script and its file-existence
       # guard, so both are behavioral inputs.
       - "package.json"

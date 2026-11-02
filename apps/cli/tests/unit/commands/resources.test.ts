@@ -2,15 +2,51 @@ import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import {
+  type GetReleaseById200,
+  type ListEvents200,
+  type ListEventsParams,
+  type ListSchemas200,
+  type ListSchemasParams,
+  QueryGrantsBodyFilterItemOperation,
+  QueryIdpsBodyFilterItemOperation,
+  QueryProjectsBodyFilterItemOperation,
+  QuerySessionsBodyFilterItemOperation,
+  QueryTeamsBodyFilterItemOperation,
+  type QueryUsers200,
+  QueryUsersBodyFilterItemOperation,
+} from "@zitadel/api/generated/model";
+import { pagedFunctions } from "@zitadel/api/client";
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
-import { type Platform, RESOURCES } from "../../../src/commands/resources";
+import {
+  CreateUserBody,
+  GetTeamResponse,
+  GetUserByIDResponse,
+  PatchUserByIDBody,
+  QueryUsersBody,
+  QueryUsersResponse,
+} from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
+
+import {
+  type CheckedRegistry,
+  create,
+  get,
+  list,
+  type Platform,
+  RESOURCES,
+  range,
+  releasePointers,
+  resource,
+  update,
+} from "../../../src/commands/resources";
 import { COMMANDS } from "../../../src/index";
 import {
   definitionOf,
   describeBody,
+  type Json,
   parseFilter,
   parseSort,
   type ResourceDescriptor,
@@ -106,7 +142,7 @@ describe("resource registry", () => {
     await writeFile(file, "ZITADEL_PROJECT_ID=proj_staging\nZITADEL_PROJECT_SECRET=sk_staging\n");
     let seen: { project?: string | null; authorization?: string | null } = {};
     server.use(
-      http.post(`${SERVER}/teams/query`, ({ request }) => {
+      http.post(`${SERVER}/api/v1/teams/query`, ({ request }) => {
         seen = {
           project: new URL(request.url).searchParams.get("project_id"),
           authorization: request.headers.get("authorization"),
@@ -202,19 +238,21 @@ describe("filter grammar", () => {
       { field: "created_at", operations: OPERATIONS },
       { field: "id", operations: OPERATIONS },
     ];
-    expect(parseFilter("status=active", fields)).toMatchObject({
+    expect(parseFilter("status=active", fields, OPERATIONS)).toMatchObject({
       operation: "equals",
       value: "active",
     });
-    expect(parseFilter("created_at=greater_than:2026-01-01T00:00:00Z", fields)).toMatchObject({
+    expect(
+      parseFilter("created_at=greater_than:2026-01-01T00:00:00Z", fields, OPERATIONS),
+    ).toMatchObject({
       operation: "greater_than",
       value: "2026-01-01T00:00:00Z",
     });
-    expect(parseFilter("id=equals:a:b", fields)).toMatchObject({
+    expect(parseFilter("id=equals:a:b", fields, OPERATIONS)).toMatchObject({
       operation: "equals",
       value: "a:b",
     });
-    expect(() => parseFilter("nonsense", fields)).toThrow(/Invalid --filter/);
+    expect(() => parseFilter("nonsense", fields, OPERATIONS)).toThrow(/Invalid --filter/);
   });
 
   it("parses field:direction and defaults to asc", () => {
@@ -234,7 +272,7 @@ describe("users list", () => {
     const cwd = await makeProject();
     let body: unknown;
     server.use(
-      http.post(`${SERVER}/users/query`, async ({ request }) => {
+      http.post(`${SERVER}/api/v1/users/query`, async ({ request }) => {
         body = await request.json();
         expect(request.headers.get("authorization")).toBe("Bearer sk_proj_test_full");
         return HttpResponse.json({
@@ -282,7 +320,7 @@ describe("users list", () => {
     const cwd = await makeProject();
     const tokens: unknown[] = [];
     server.use(
-      http.post(`${SERVER}/users/query`, async ({ request }) => {
+      http.post(`${SERVER}/api/v1/users/query`, async ({ request }) => {
         const body = (await request.json()) as { page_token?: string };
         tokens.push(body.page_token ?? null);
         return body.page_token
@@ -299,6 +337,61 @@ describe("users list", () => {
     expect(json.data.next_page_token).toBeNull();
   });
 
+  it("follows a cursor back as the server wrote it with --all", async () => {
+    const cwd = await makeProject();
+    const tokens: unknown[] = [];
+    server.use(
+      http.post<never, { page_token?: string }>(
+        `${SERVER}/api/v1/users/query`,
+        async ({ request }) => {
+          const body = await request.json();
+          tokens.push(body.page_token ?? null);
+          return body.page_token
+            ? HttpResponse.json({ users: [user("user_2")] })
+            : HttpResponse.json({ users: [user("user_1")], next_page_token: "p\u001b2" });
+        },
+      ),
+    );
+
+    await run(cwd, ["users", "list", "--all"]);
+
+    expect(tokens).toEqual([null, "p\u001b2"]);
+  });
+
+  it("follows a cursor back as the server wrote it on a GET list with --all", async () => {
+    const cwd = await makeProject();
+    const tokens: (string | null)[] = [];
+    server.use(
+      http.get(`${SERVER}/api/v1/events`, ({ request }) => {
+        const token = new URL(request.url).searchParams.get("page_token");
+        tokens.push(token);
+        return HttpResponse.json({ data: [], next_page_token: token === null ? "p\u001b2" : null });
+      }),
+    );
+
+    await run(cwd, ["events", "list", "--all"]);
+
+    expect(tokens).toEqual([null, "p\u001b2"]);
+  });
+
+  it("escapes the items and the next cursor a list answers with", async () => {
+    const cwd = await makeProject();
+    server.use(
+      http.post(`${SERVER}/api/v1/users/query`, () =>
+        HttpResponse.json({
+          users: [{ ...user("user_1"), identifier: "a\u001b[2J" }],
+          next_page_token: "p\u001b2",
+        }),
+      ),
+    );
+
+    const res = await run(cwd, ["users", "list"]);
+
+    expect(parseJson(res.stdout)).toMatchObject({
+      data: { items: [{ identifier: "a\\x1b[2J" }], next_page_token: "p\\x1b2" },
+    });
+  });
+
   it("rejects an unknown filter field before any request", async () => {
     const cwd = await makeProject();
     const res = await run(cwd, ["users", "list", "--filter", "email=a@b.c"]);
@@ -312,7 +405,7 @@ describe("users list", () => {
   it("emits tab-separated rows when stdout is not a terminal", async () => {
     const cwd = await makeProject();
     server.use(
-      http.post(`${SERVER}/users/query`, () =>
+      http.post(`${SERVER}/api/v1/users/query`, () =>
         HttpResponse.json({ users: [user("user_1"), user("user_2")] }),
       ),
     );
@@ -343,7 +436,9 @@ describe("users list", () => {
   it("takes --plain to force the machine form", async () => {
     const cwd = await makeProject();
     server.use(
-      http.post(`${SERVER}/users/query`, () => HttpResponse.json({ users: [user("user_1")] })),
+      http.post(`${SERVER}/api/v1/users/query`, () =>
+        HttpResponse.json({ users: [user("user_1")] }),
+      ),
     );
     const res = await runCliForTest([
       "users",
@@ -373,7 +468,7 @@ describe("get rendering", () => {
 
   it("lays the record out field by field on a terminal", async () => {
     const cwd = await makeProject();
-    server.use(http.get(`${SERVER}/users/user_1`, () => HttpResponse.json(user("user_1"))));
+    server.use(http.get(`${SERVER}/api/v1/users/user_1`, () => HttpResponse.json(user("user_1"))));
 
     const res = await asTerminal(() =>
       runCliForTest([
@@ -397,7 +492,7 @@ describe("get rendering", () => {
 
   it("still prints the whole object when piped", async () => {
     const cwd = await makeProject();
-    server.use(http.get(`${SERVER}/users/user_1`, () => HttpResponse.json(user("user_1"))));
+    server.use(http.get(`${SERVER}/api/v1/users/user_1`, () => HttpResponse.json(user("user_1"))));
 
     const res = await runCliForTest([
       "users",
@@ -416,7 +511,7 @@ describe("get rendering", () => {
 
   it("takes --fields on a terminal too", async () => {
     const cwd = await makeProject();
-    server.use(http.get(`${SERVER}/users/user_1`, () => HttpResponse.json(user("user_1"))));
+    server.use(http.get(`${SERVER}/api/v1/users/user_1`, () => HttpResponse.json(user("user_1"))));
 
     const res = await asTerminal(() =>
       runCliForTest([
@@ -440,7 +535,7 @@ describe("get rendering", () => {
   it("shows a policy's config, the setting a reader looks it up for", async () => {
     const cwd = await makeProject();
     server.use(
-      http.get(`${SERVER}/policies/pol_1`, () =>
+      http.get(`${SERVER}/api/v1/policies/pol_1`, () =>
         HttpResponse.json({
           id: "pol_1",
           revision_id: "polrev_1",
@@ -473,7 +568,7 @@ describe("get rendering", () => {
   it("shows an empty config, which says the policy enforces nothing", async () => {
     const cwd = await makeProject();
     server.use(
-      http.get(`${SERVER}/policies/pol_1`, () =>
+      http.get(`${SERVER}/api/v1/policies/pol_1`, () =>
         HttpResponse.json({
           id: "pol_1",
           revision_id: "polrev_1",
@@ -518,7 +613,7 @@ describe("policies", () => {
   it("gets a policy by id", async () => {
     const cwd = await makeProject();
     server.use(
-      http.get(`${SERVER}/policies/pol_1`, ({ request }) => {
+      http.get(`${SERVER}/api/v1/policies/pol_1`, ({ request }) => {
         expect(new URL(request.url).searchParams.get("project_id")).toBe("proj_test");
         return HttpResponse.json(policy);
       }),
@@ -534,7 +629,7 @@ describe("policies", () => {
     const cwd = await makeProject();
     let query: URLSearchParams | undefined;
     server.use(
-      http.get(`${SERVER}/policies`, ({ request }) => {
+      http.get(`${SERVER}/api/v1/policies`, ({ request }) => {
         query = new URL(request.url).searchParams;
         return HttpResponse.json({ policies: [policy], next_page_token: null });
       }),
@@ -550,7 +645,7 @@ describe("policies", () => {
   it("answers E_NOT_FOUND for an operation the project has no policy for", async () => {
     const cwd = await makeProject();
     server.use(
-      http.get(`${SERVER}/policies`, () =>
+      http.get(`${SERVER}/api/v1/policies`, () =>
         HttpResponse.json({ policies: [], next_page_token: null }),
       ),
     );
@@ -574,7 +669,7 @@ describe("policies", () => {
     const cwd = await makeProject();
     let query: URLSearchParams | undefined;
     server.use(
-      http.get(`${SERVER}/policies`, ({ request }) => {
+      http.get(`${SERVER}/api/v1/policies`, ({ request }) => {
         query = new URL(request.url).searchParams;
         return HttpResponse.json({ policies: [policy], next_page_token: null });
       }),
@@ -596,7 +691,7 @@ describe("policies", () => {
 describe("users get / create / update / delete", () => {
   it("gets one user by id", async () => {
     const cwd = await makeProject();
-    server.use(http.get(`${SERVER}/users/user_1`, () => HttpResponse.json(user("user_1"))));
+    server.use(http.get(`${SERVER}/api/v1/users/user_1`, () => HttpResponse.json(user("user_1"))));
     const res = await run(cwd, ["users", "get", "user_1"]);
     expect(res.exitCode).toBe(0);
     const json = parseJson(res.stdout) as { data: { id: string } };
@@ -606,7 +701,7 @@ describe("users get / create / update / delete", () => {
   it("maps a platform 404 to E_NOT_FOUND", async () => {
     const cwd = await makeProject();
     server.use(
-      http.get(`${SERVER}/users/user_missing`, () =>
+      http.get(`${SERVER}/api/v1/users/user_missing`, () =>
         HttpResponse.json({ code: "user.not_found", message: "no such user" }, { status: 404 }),
       ),
     );
@@ -620,7 +715,7 @@ describe("users get / create / update / delete", () => {
     let url = "";
     let body: unknown;
     server.use(
-      http.post(`${SERVER}/users`, async ({ request }) => {
+      http.post(`${SERVER}/api/v1/users`, async ({ request }) => {
         url = request.url;
         body = await request.json();
         return HttpResponse.json(user("user_new"), { status: 201 });
@@ -645,7 +740,9 @@ describe("users get / create / update / delete", () => {
     const file = join(cwd, "user.json");
     await writeFile(file, JSON.stringify({ schema: "sch_default", attributes: {} }));
     server.use(
-      http.post(`${SERVER}/users`, () => HttpResponse.json(user("user_file"), { status: 201 })),
+      http.post(`${SERVER}/api/v1/users`, () =>
+        HttpResponse.json(user("user_file"), { status: 201 }),
+      ),
     );
     const res = await run(cwd, ["users", "create", "--file", file]);
     expect(res.exitCode).toBe(0);
@@ -693,7 +790,7 @@ describe("users get / create / update / delete", () => {
     const cwd = await makeProject();
     let body: unknown;
     server.use(
-      http.patch(`${SERVER}/users/user_1`, async ({ request }) => {
+      http.patch(`${SERVER}/api/v1/users/user_1`, async ({ request }) => {
         body = await request.json();
         return HttpResponse.json(user("user_1"));
       }),
@@ -722,7 +819,7 @@ describe("users get / create / update / delete", () => {
     const cwd = await makeProject();
     let called = false;
     server.use(
-      http.delete(`${SERVER}/users/user_1`, () => {
+      http.delete(`${SERVER}/api/v1/users/user_1`, () => {
         called = true;
         return new HttpResponse(null, { status: 204 });
       }),
@@ -759,7 +856,9 @@ describe("piped output", () => {
   it("omits the project and server lines when stdout is not a terminal", async () => {
     const cwd = await makeProject();
     server.use(
-      http.post(`${SERVER}/users/query`, () => HttpResponse.json({ users: [user("user_1")] })),
+      http.post(`${SERVER}/api/v1/users/query`, () =>
+        HttpResponse.json({ users: [user("user_1")] }),
+      ),
     );
 
     // The harness captures stdout, so process.stdout.isTTY is undefined here —
@@ -786,7 +885,7 @@ describe("the drain spinner", () => {
   it("is stopped when a page fails, so it does not outlive the command", async () => {
     const cwd = await makeProject();
     server.use(
-      http.post(`${SERVER}/users/query`, () =>
+      http.post(`${SERVER}/api/v1/users/query`, () =>
         HttpResponse.json({ code: "boom" }, { status: 500 }),
       ),
     );
@@ -831,7 +930,7 @@ describe("field validation is independent of the data", () => {
 
   it("refuses the same path on an empty page, where sampling could not judge", async () => {
     const cwd = await makeProject();
-    server.use(http.post(`${SERVER}/users/query`, () => HttpResponse.json({ users: [] })));
+    server.use(http.post(`${SERVER}/api/v1/users/query`, () => HttpResponse.json({ users: [] })));
 
     const res = await run(cwd, ["users", "list", "--fields", "id,emial"]);
     expect(res.exitCode).toBe(3);
@@ -843,7 +942,9 @@ describe("field validation is independent of the data", () => {
   it("accepts a path under the open attributes record", async () => {
     const cwd = await makeProject();
     server.use(
-      http.post(`${SERVER}/users/query`, () => HttpResponse.json({ users: [user("user_1")] })),
+      http.post(`${SERVER}/api/v1/users/query`, () =>
+        HttpResponse.json({ users: [user("user_1")] }),
+      ),
     );
 
     const res = await run(cwd, ["users", "list", "--fields", "id,attributes.email"]);
@@ -855,7 +956,9 @@ describe("chosen columns", () => {
   it("takes --fields, resolving nested paths", async () => {
     const cwd = await makeProject();
     server.use(
-      http.post(`${SERVER}/users/query`, () => HttpResponse.json({ users: [user("user_1")] })),
+      http.post(`${SERVER}/api/v1/users/query`, () =>
+        HttpResponse.json({ users: [user("user_1")] }),
+      ),
     );
 
     const res = await run(cwd, ["users", "list", "--fields", "id,attributes.email"]);
@@ -881,7 +984,9 @@ describe("chosen columns", () => {
   it("names the columns a record actually has when a path is wrong", async () => {
     const cwd = await makeProject();
     server.use(
-      http.post(`${SERVER}/users/query`, () => HttpResponse.json({ users: [user("user_1")] })),
+      http.post(`${SERVER}/api/v1/users/query`, () =>
+        HttpResponse.json({ users: [user("user_1")] }),
+      ),
     );
 
     const res = await run(cwd, ["users", "list", "--fields", "id,nope"]);
@@ -902,7 +1007,7 @@ describe("chosen columns", () => {
 
   it("validates --fields on get whether the output is piped or not", async () => {
     const cwd = await makeProject();
-    server.use(http.get(`${SERVER}/users/user_1`, () => HttpResponse.json(user("user_1"))));
+    server.use(http.get(`${SERVER}/api/v1/users/user_1`, () => HttpResponse.json(user("user_1"))));
 
     const res = await run(cwd, ["users", "get", "user_1", "--fields", "nope"]);
     expect(res.exitCode).toBe(3);
@@ -914,7 +1019,9 @@ describe("chosen columns", () => {
   it("rejects an empty --fields", async () => {
     const cwd = await makeProject();
     server.use(
-      http.post(`${SERVER}/users/query`, () => HttpResponse.json({ users: [user("user_1")] })),
+      http.post(`${SERVER}/api/v1/users/query`, () =>
+        HttpResponse.json({ users: [user("user_1")] }),
+      ),
     );
     const res = await run(cwd, ["users", "list", "--fields", " , "]);
     expect(res.exitCode).toBe(3);
@@ -928,7 +1035,7 @@ describe("next page suggestion", () => {
   it("suggests a runnable next page that repeats the sorting and filters", async () => {
     const cwd = await makeProject();
     server.use(
-      http.post(`${SERVER}/users/query`, () =>
+      http.post(`${SERVER}/api/v1/users/query`, () =>
         HttpResponse.json({ users: [user("user_1")], next_page_token: "p2" }),
       ),
     );
@@ -955,7 +1062,7 @@ describe("next page suggestion", () => {
   it("repeats the named parameters of a GET-backed list", async () => {
     const cwd = await makeProject();
     server.use(
-      http.get(`${SERVER}/events`, () =>
+      http.get(`${SERVER}/api/v1/events`, () =>
         HttpResponse.json({ data: [{ id: "evt_1" }], next_page_token: "p2" }),
       ),
     );
@@ -981,7 +1088,7 @@ describe("next page suggestion", () => {
   it("quotes a value a shell would otherwise split", async () => {
     const cwd = await makeProject();
     server.use(
-      http.post(`${SERVER}/teams/query`, () =>
+      http.post(`${SERVER}/api/v1/teams/query`, () =>
         HttpResponse.json({ teams: [], next_page_token: "p2" }),
       ),
     );
@@ -995,7 +1102,9 @@ describe("next page suggestion", () => {
   it("suggests nothing on the last page", async () => {
     const cwd = await makeProject();
     server.use(
-      http.post(`${SERVER}/users/query`, () => HttpResponse.json({ users: [user("user_1")] })),
+      http.post(`${SERVER}/api/v1/users/query`, () =>
+        HttpResponse.json({ users: [user("user_1")] }),
+      ),
     );
 
     const res = await run(cwd, ["users", "list"]);
@@ -1010,7 +1119,9 @@ describe("next page suggestion", () => {
     const cwd = await makeProject();
     const pages = [{ users: [user("user_1")], next_page_token: "p2" }, { users: [user("user_2")] }];
     let call = 0;
-    server.use(http.post(`${SERVER}/users/query`, () => HttpResponse.json(pages[call++] ?? {})));
+    server.use(
+      http.post(`${SERVER}/api/v1/users/query`, () => HttpResponse.json(pages[call++] ?? {})),
+    );
 
     const res = await run(cwd, ["users", "list", "--all"]);
     const json = parseJson(res.stdout) as { data: { next_commands?: string[] } };
@@ -1023,8 +1134,8 @@ describe("body field flags", () => {
     const cwd = await makeProject();
     let body: unknown;
     server.use(
-      http.post(`${SERVER}/teams/query`, () => HttpResponse.json({ teams: [] })),
-      http.post(`${SERVER}/teams`, async ({ request }) => {
+      http.post(`${SERVER}/api/v1/teams/query`, () => HttpResponse.json({ teams: [] })),
+      http.post(`${SERVER}/api/v1/teams`, async ({ request }) => {
         body = await request.json();
         return HttpResponse.json({ id: "team_1", name: "platform" }, { status: 201 });
       }),
@@ -1039,7 +1150,7 @@ describe("body field flags", () => {
     const cwd = await makeProject();
     let body: unknown;
     server.use(
-      http.post(`${SERVER}/users`, async ({ request }) => {
+      http.post(`${SERVER}/api/v1/users`, async ({ request }) => {
         body = await request.json();
         return HttpResponse.json(user("user_1"), { status: 201 });
       }),
@@ -1066,7 +1177,7 @@ describe("body field flags", () => {
     const cwd = await makeProject();
     let body: unknown;
     server.use(
-      http.post(`${SERVER}/teams`, async ({ request }) => {
+      http.post(`${SERVER}/api/v1/teams`, async ({ request }) => {
         body = await request.json();
         return HttpResponse.json({ id: "team_1", name: "flag-wins" }, { status: 201 });
       }),
@@ -1127,7 +1238,7 @@ describe("body field flags", () => {
     const cwd = await makeProject();
     let body: unknown;
     server.use(
-      http.post(`${SERVER}/grants`, async ({ request }) => {
+      http.post(`${SERVER}/api/v1/grants`, async ({ request }) => {
         body = await request.json();
         return HttpResponse.json({ id: "asgn_1" }, { status: 201 });
       }),
@@ -1166,7 +1277,7 @@ describe("body field flags", () => {
     const cwd = await makeProject();
     let body: unknown;
     server.use(
-      http.patch(`${SERVER}/teams/team_1`, async ({ request }) => {
+      http.patch(`${SERVER}/api/v1/teams/team_1`, async ({ request }) => {
         body = await request.json();
         return HttpResponse.json({ id: "team_1", name: "renamed" });
       }),
@@ -1213,7 +1324,7 @@ describe("nested bodies", () => {
   const capturingIdps = (): { body?: { idp?: Record<string, unknown> } } => {
     const seen: { body?: { idp?: Record<string, unknown> } } = {};
     server.use(
-      http.post(`${SERVER}/idps`, async ({ request }) => {
+      http.post(`${SERVER}/api/v1/idps`, async ({ request }) => {
         seen.body = (await request.json()) as typeof seen.body;
         return HttpResponse.json({ id: "idp_1", slug: "acme-sso" }, { status: 201 });
       }),
@@ -1320,7 +1431,7 @@ describe("nested bodies", () => {
     );
     let body: unknown;
     server.use(
-      http.post(`${SERVER}/users`, async ({ request }) => {
+      http.post(`${SERVER}/api/v1/users`, async ({ request }) => {
         body = await request.json();
         return HttpResponse.json(user("user_1"), { status: 201 });
       }),
@@ -1365,7 +1476,7 @@ describe("nested bodies", () => {
     const cwd = await makeProject();
     let body: unknown;
     server.use(
-      http.patch(`${SERVER}/projects/prj_1`, async ({ request }) => {
+      http.patch(`${SERVER}/api/v1/projects/prj_1`, async ({ request }) => {
         body = await request.json();
         return HttpResponse.json({ id: "prj_1", name: "p" });
       }),
@@ -1429,7 +1540,7 @@ describe("dry runs", () => {
 describe("an empty list writes nothing", () => {
   it("leaves stdout empty when piped, so `wc -l` counts no records", async () => {
     const cwd = await makeProject();
-    server.use(http.post(`${SERVER}/users/query`, () => HttpResponse.json({ users: [] })));
+    server.use(http.post(`${SERVER}/api/v1/users/query`, () => HttpResponse.json({ users: [] })));
 
     const res = await runCliForTest([
       "users",
@@ -1447,7 +1558,7 @@ describe("an empty list writes nothing", () => {
 
   it("still reports the empty page in the envelope", async () => {
     const cwd = await makeProject();
-    server.use(http.post(`${SERVER}/users/query`, () => HttpResponse.json({ users: [] })));
+    server.use(http.post(`${SERVER}/api/v1/users/query`, () => HttpResponse.json({ users: [] })));
 
     const res = await run(cwd, ["users", "list"]);
     expect((parseJson(res.stdout) as { data: { count: number } }).data.count).toBe(0);
@@ -1458,7 +1569,7 @@ describe("delete outcomes", () => {
   it("names the command after what the endpoint does, not after removal", async () => {
     const cwd = await makeProject();
     server.use(
-      http.delete(`${SERVER}/teams/team_1`, () => new HttpResponse(null, { status: 204 })),
+      http.delete(`${SERVER}/api/v1/teams/team_1`, () => new HttpResponse(null, { status: 204 })),
     );
 
     const res = await run(cwd, ["teams", "deactivate", "team_1", "--force"]);
@@ -1473,7 +1584,7 @@ describe("delete outcomes", () => {
   it("still reports a user delete as deleted", async () => {
     const cwd = await makeProject();
     server.use(
-      http.delete(`${SERVER}/users/user_1`, () => new HttpResponse(null, { status: 204 })),
+      http.delete(`${SERVER}/api/v1/users/user_1`, () => new HttpResponse(null, { status: 204 })),
     );
 
     const res = await run(cwd, ["users", "delete", "user_1", "--force"]);
@@ -1488,7 +1599,7 @@ describe("page tokens are opaque", () => {
   it("quotes a token that would otherwise be split by a shell", async () => {
     const cwd = await makeProject();
     server.use(
-      http.post(`${SERVER}/users/query`, () =>
+      http.post(`${SERVER}/api/v1/users/query`, () =>
         HttpResponse.json({ users: [user("user_1")], next_page_token: "tok en;rm -rf /" }),
       ),
     );
@@ -1503,7 +1614,10 @@ describe("other resources", () => {
   it("sessions revoke terminates the session and says so", async () => {
     const cwd = await makeProject();
     server.use(
-      http.delete(`${SERVER}/sessions/sess_1`, () => new HttpResponse(null, { status: 204 })),
+      http.delete(
+        `${SERVER}/api/v1/sessions/sess_1`,
+        () => new HttpResponse(null, { status: 204 }),
+      ),
     );
     const res = await run(cwd, ["sessions", "revoke", "sess_1", "--force"]);
     expect(res.exitCode).toBe(0);
@@ -1517,7 +1631,7 @@ describe("other resources", () => {
     const cwd = await makeProject();
     let url = "";
     server.use(
-      http.post(`${SERVER}/teams/query`, ({ request }) => {
+      http.post(`${SERVER}/api/v1/teams/query`, ({ request }) => {
         url = request.url;
         return HttpResponse.json({ teams: [] });
       }),
@@ -1531,7 +1645,7 @@ describe("other resources", () => {
     const cwd = await makeProject();
     let url = "";
     server.use(
-      http.get(`${SERVER}/events`, ({ request }) => {
+      http.get(`${SERVER}/api/v1/events`, ({ request }) => {
         url = request.url;
         return HttpResponse.json({
           data: [{ id: "evt_1", event_type: "user.created", category: "entity" }],
@@ -1566,7 +1680,7 @@ describe("other resources", () => {
     const cwd = await makeProject();
     let url = "";
     server.use(
-      http.get(`${SERVER}/events`, ({ request }) => {
+      http.get(`${SERVER}/api/v1/events`, ({ request }) => {
         url = request.url;
         return HttpResponse.json({ data: [] });
       }),
@@ -1598,7 +1712,7 @@ describe("configuration resources are read-only", () => {
     const cwd = await makeProject();
     let url: URL | undefined;
     server.use(
-      http.get(`${SERVER}/schemas`, ({ request }) => {
+      http.get(`${SERVER}/api/v1/schemas`, ({ request }) => {
         url = new URL(request.url);
         return HttpResponse.json({
           schemas: [
@@ -1632,7 +1746,7 @@ describe("configuration resources are read-only", () => {
   it("offers no paging flags for an unpaginated collection and reads the bare array", async () => {
     const cwd = await makeProject();
     server.use(
-      http.get(`${SERVER}/branding`, () =>
+      http.get(`${SERVER}/api/v1/branding`, () =>
         HttpResponse.json([{ id: "brand_1", created_at: "2026-01-01T00:00:00Z" }]),
       ),
     );
@@ -1659,7 +1773,7 @@ describe("schemas list shows the current schemas, not the history", () => {
     const cwd = await makeProject();
     let url: URL | undefined;
     server.use(
-      http.get(`${SERVER}/schemas`, ({ request }) => {
+      http.get(`${SERVER}/api/v1/schemas`, ({ request }) => {
         url = new URL(request.url);
         return HttpResponse.json({
           schemas: [
@@ -1691,7 +1805,7 @@ describe("schemas list shows the current schemas, not the history", () => {
     const cwd = await makeProject();
     let url: URL | undefined;
     server.use(
-      http.get(`${SERVER}/schemas`, ({ request }) => {
+      http.get(`${SERVER}/api/v1/schemas`, ({ request }) => {
         url = new URL(request.url);
         return HttpResponse.json({ schemas: [] });
       }),
@@ -1707,7 +1821,7 @@ describe("schemas list shows the current schemas, not the history", () => {
     const cwd = await makeProject();
     const seen: Array<string | null> = [];
     server.use(
-      http.get(`${SERVER}/schemas`, ({ request }) => {
+      http.get(`${SERVER}/api/v1/schemas`, ({ request }) => {
         seen.push(new URL(request.url).searchParams.get("revisions"));
         return HttpResponse.json({ schemas: [] });
       }),
@@ -1726,7 +1840,7 @@ describe("a schema or flow is addressable by name as well as by id", () => {
     const cwd = await makeProject();
     let path = "";
     server.use(
-      http.get(`${SERVER}/schemas/sch_04`, ({ request }) => {
+      http.get(`${SERVER}/api/v1/schemas/sch_04`, ({ request }) => {
         path = new URL(request.url).pathname;
         return HttpResponse.json({ id: "sch_04", schema: { objectType: "human-user" } });
       }),
@@ -1735,7 +1849,7 @@ describe("a schema or flow is addressable by name as well as by id", () => {
     const res = await run(cwd, ["schemas", "get", "sch_04"]);
 
     expect(res.exitCode).toBe(0);
-    expect(path).toBe("/schemas/sch_04");
+    expect(path).toBe("/api/v1/schemas/sch_04");
   });
 
   // A customer's `$id` is any string the API accepts, so the client has to
@@ -1746,7 +1860,7 @@ describe("a schema or flow is addressable by name as well as by id", () => {
     const id = "https://zitadel.com/schemas/v1/default-human-user.json";
     let path = "";
     server.use(
-      http.get(`${SERVER}/schemas/:id`, ({ request }) => {
+      http.get(`${SERVER}/api/v1/schemas/:id`, ({ request }) => {
         path = new URL(request.url).pathname;
         return HttpResponse.json({ id, schema: { objectType: "human-user" } });
       }),
@@ -1755,7 +1869,7 @@ describe("a schema or flow is addressable by name as well as by id", () => {
     const res = await run(cwd, ["schemas", "get", id]);
 
     expect(res.exitCode).toBe(0);
-    expect(path).toBe(`/schemas/${encodeURIComponent(id)}`);
+    expect(path).toBe(`/api/v1/schemas/${encodeURIComponent(id)}`);
     const json = parseJson(res.stdout) as { data: { id: string } };
     expect(json.data.id).toBe(id);
   });
@@ -1766,7 +1880,7 @@ describe("a schema or flow is addressable by name as well as by id", () => {
     const cwd = await makeProject();
     let path = "";
     server.use(
-      http.get(`${SERVER}/schemas/:id`, ({ request }) => {
+      http.get(`${SERVER}/api/v1/schemas/:id`, ({ request }) => {
         path = new URL(request.url).pathname;
         return HttpResponse.json({ id: "urn:example:human", schema: { objectType: "human-user" } });
       }),
@@ -1775,15 +1889,15 @@ describe("a schema or flow is addressable by name as well as by id", () => {
     const res = await run(cwd, ["schemas", "get", "urn:example:human"]);
 
     expect(res.exitCode).toBe(0);
-    expect(path).toBe(`/schemas/${encodeURIComponent("urn:example:human")}`);
+    expect(path).toBe(`/api/v1/schemas/${encodeURIComponent("urn:example:human")}`);
   });
 
   it("resolves an object type to its current revision once the fetch 404s", async () => {
     const cwd = await makeProject();
     let url: URL | undefined;
     server.use(
-      http.get(`${SERVER}/schemas/:id`, () => new HttpResponse(null, { status: 404 })),
-      http.get(`${SERVER}/schemas`, ({ request }) => {
+      http.get(`${SERVER}/api/v1/schemas/:id`, () => new HttpResponse(null, { status: 404 })),
+      http.get(`${SERVER}/api/v1/schemas`, ({ request }) => {
         url = new URL(request.url);
         return HttpResponse.json({
           schemas: [{ id: "sch_04", schema: { objectType: "human-user", kind: "user-schema" } }],
@@ -1803,8 +1917,8 @@ describe("a schema or flow is addressable by name as well as by id", () => {
   it("says so when the ref is neither a revision nor an object type", async () => {
     const cwd = await makeProject();
     server.use(
-      http.get(`${SERVER}/schemas/:id`, () => new HttpResponse(null, { status: 404 })),
-      http.get(`${SERVER}/schemas`, () => HttpResponse.json({ schemas: [] })),
+      http.get(`${SERVER}/api/v1/schemas/:id`, () => new HttpResponse(null, { status: 404 })),
+      http.get(`${SERVER}/api/v1/schemas`, () => HttpResponse.json({ schemas: [] })),
     );
 
     const res = await run(cwd, ["schemas", "get", "nonexistent"]);
@@ -1821,8 +1935,8 @@ describe("a schema or flow is addressable by name as well as by id", () => {
     const cwd = await makeProject();
     let listed = false;
     server.use(
-      http.get(`${SERVER}/schemas/:id`, () => new HttpResponse(null, { status: 500 })),
-      http.get(`${SERVER}/schemas`, () => {
+      http.get(`${SERVER}/api/v1/schemas/:id`, () => new HttpResponse(null, { status: 500 })),
+      http.get(`${SERVER}/api/v1/schemas`, () => {
         listed = true;
         return HttpResponse.json({ schemas: [] });
       }),
@@ -1840,7 +1954,7 @@ describe("a schema or flow is addressable by name as well as by id", () => {
     const cwd = await makeProject();
     let url: URL | undefined;
     server.use(
-      http.get(`${SERVER}/flow_definitions`, ({ request }) => {
+      http.get(`${SERVER}/api/v1/flow_definitions`, ({ request }) => {
         url = new URL(request.url);
         return HttpResponse.json({
           flow_definitions: [{ id: "flowdef_9", flow_definition: { name: "default-login" } }],
@@ -1864,7 +1978,7 @@ describe("flow definitions list the current flows", () => {
     const cwd = await makeProject();
     let url: URL | undefined;
     server.use(
-      http.get(`${SERVER}/flow_definitions`, ({ request }) => {
+      http.get(`${SERVER}/api/v1/flow_definitions`, ({ request }) => {
         url = new URL(request.url);
         return HttpResponse.json({ flow_definitions: [] });
       }),
@@ -1880,7 +1994,7 @@ describe("flow definitions list the current flows", () => {
     const cwd = await makeProject();
     let url: URL | undefined;
     server.use(
-      http.get(`${SERVER}/flow_definitions`, ({ request }) => {
+      http.get(`${SERVER}/api/v1/flow_definitions`, ({ request }) => {
         url = new URL(request.url);
         return HttpResponse.json({ flow_definitions: [] });
       }),
@@ -1893,13 +2007,490 @@ describe("flow definitions list the current flows", () => {
 });
 
 describe("the release resource", () => {
-  it("lists whether each release is revoked", () => {
-    expect(RESOURCES.release.columns).toContain("revoked_at");
+  it("lists whether each release is revoked, and when it was created", () => {
+    expect(RESOURCES.release.columns).toEqual(
+      expect.arrayContaining(["revoked_at", "metadata.created_at"]),
+    );
   });
 
   it("shows a release's content hash and revocation", () => {
     expect(RESOURCES.release.detail).toEqual(
       expect.arrayContaining(["content_hash", "revoked_at"]),
     );
+  });
+
+  it("shows the resources a release pins as a table under its fields", () => {
+    const release: GetReleaseById200 = {
+      id: "rel_1",
+      project_id: "proj_1",
+      content_hash: "sha256:1",
+      metadata: { git_dirty: false, created_at: "2026-01-01T00:00:00.000Z" },
+      revoked_at: null,
+      pointers: [
+        { kind: "schema", handle: "human-user", revision_id: "sch_1" },
+        { kind: "flow_definition", handle: "default-login", revision_id: "fd_1" },
+      ],
+    };
+
+    expect(RESOURCES.release.get.sections?.(release)).toEqual([releasePointers(release)]);
+    expect(releasePointers(release)).toBe(
+      [
+        "resources",
+        "  kind             handle         revision_id",
+        "  ---------------  -------------  -----------",
+        "  schema           human-user     sch_1",
+        "  flow_definition  default-login  fd_1",
+      ].join("\n"),
+    );
+  });
+});
+
+describe("the query resources' filters", () => {
+  it.each([
+    ["users", QueryUsersBodyFilterItemOperation],
+    ["teams", QueryTeamsBodyFilterItemOperation],
+    ["sessions", QuerySessionsBodyFilterItemOperation],
+    ["grants", QueryGrantsBodyFilterItemOperation],
+    ["idps", QueryIdpsBodyFilterItemOperation],
+    ["projects", QueryProjectsBodyFilterItemOperation],
+  ] as const)("offer the operations the %s query takes, and no other", (topic, operations) => {
+    const offered = new Set(
+      (RESOURCES[topic].list?.filters ?? []).flatMap((filter) => filter.operations),
+    );
+
+    expect([...offered].sort()).toEqual(Object.values(operations).sort());
+  });
+});
+
+describe("the registry builders", () => {
+  const users = list({
+    body: QueryUsersBody,
+    item: QueryUsersResponse.shape.users.element,
+    call: ({ client }, body) => client.queryUsers(body),
+    items: (page) => page.users,
+    next: (page) => page.next_page_token,
+  });
+  const user = get({
+    call: ({ client }, id) => client.getUserByID(id),
+    response: GetUserByIDResponse,
+  });
+
+  it("takes paths the list and get answer with", () => {
+    const checked = resource({
+      singular: "user",
+      idField: "id",
+      columns: ["id", "metadata.status"],
+      heading: "identifier",
+      detail: ["id", "metadata.created_at"],
+      list: users,
+      get: user,
+    });
+
+    expect(checked.columns).toEqual(["id", "metadata.status"]);
+  });
+
+  it("reads the id a write answered with off its id field", () => {
+    const checked = resource({
+      singular: "user",
+      idField: "id",
+      columns: ["id"],
+      heading: "identifier",
+      detail: ["id"],
+      list: users,
+      get: user,
+    });
+
+    expect(checked.idOf({ id: "user_1", identifier: "a" })).toBe("user_1");
+  });
+
+  it("refuses a column a listed item does not have", () => {
+    resource({
+      singular: "user",
+      idField: "id",
+      // @ts-expect-error a listed user has no `metadata.statu`
+      columns: ["id", "metadata.statu"],
+      heading: "identifier",
+      detail: ["id"],
+      list: users,
+      get: user,
+    });
+  });
+
+  it("refuses a heading the record does not have", () => {
+    resource({
+      singular: "user",
+      idField: "id",
+      columns: ["id"],
+      // @ts-expect-error a user has no `nam`
+      heading: "nam",
+      detail: ["id"],
+      list: users,
+      get: user,
+    });
+  });
+
+  it("refuses detail the record does not have", () => {
+    resource({
+      singular: "user",
+      idField: "id",
+      columns: ["id"],
+      heading: "identifier",
+      // @ts-expect-error a user has no `metadata.updated`
+      detail: ["id", "metadata.updated"],
+      list: users,
+      get: user,
+    });
+  });
+
+  it("refuses an id field a listed item does not have", () => {
+    resource({
+      singular: "user",
+      // @ts-expect-error a listed user carries `user_id`, not `id`
+      idField: "id",
+      columns: ["user_id"],
+      heading: "identifier",
+      detail: ["id"],
+      list: list({
+        body: QueryUsersBody,
+        call: async () => ({ users: [{ user_id: "user_1" }] }),
+        items: (page) => page.users,
+        next: () => undefined,
+      }),
+      get: user,
+    });
+  });
+
+  it("refuses an id field the record does not have", () => {
+    resource({
+      singular: "user",
+      // @ts-expect-error the record carries `identifier`, not `id`
+      idField: "id",
+      columns: ["id"],
+      heading: "identifier",
+      detail: ["identifier"],
+      list: users,
+      get: get({ call: async () => ({ identifier: "a" }) }),
+    });
+  });
+
+  it("refuses an id field the created resource does not answer with", () => {
+    resource({
+      singular: "user",
+      idField: "id",
+      columns: ["id"],
+      heading: "identifier",
+      detail: ["id"],
+      list: users,
+      get: user,
+      // @ts-expect-error this create answers with `user_id`, not the `id` field
+      create: create(CreateUserBody, async () => ({ user_id: "user_1" })),
+    });
+  });
+
+  it("refuses an id field the updated resource does not answer with", () => {
+    resource({
+      singular: "user",
+      idField: "id",
+      columns: ["id"],
+      heading: "identifier",
+      detail: ["id"],
+      list: users,
+      get: user,
+      // @ts-expect-error this update answers with `user_id`, not the `id` field
+      update: update(PatchUserByIDBody, async () => ({ user_id: "user_1" })),
+    });
+  });
+
+  it("refuses items the page does not hold", () => {
+    list({
+      body: QueryUsersBody,
+      call: ({ client }, body) => client.queryUsers(body),
+      // @ts-expect-error the page holds its users under `users`
+      items: (page) => page.user,
+      next: (page) => page.next_page_token,
+    });
+  });
+
+  it("takes an unpaged list without a cursor", () => {
+    const branding = list({
+      paged: false,
+      call: ({ client, projectId }) => client.listBranding({ project_id: projectId }),
+      items: (page) => page,
+    });
+
+    expect(branding.paged).toBe(false);
+  });
+
+  it("refuses a paged list without a cursor", () => {
+    // @ts-expect-error a paged list reads its cursor with `next`
+    list({
+      body: QueryUsersBody,
+      call: ({ client }, body) => client.queryUsers(body),
+      items: (page: QueryUsers200) => page.users,
+    });
+  });
+
+  it("refuses a filter field the query body does not filter by", () => {
+    list({
+      body: QueryUsersBody,
+      // @ts-expect-error a user query filters by `status`, not `state`
+      filters: [{ field: "state", operations: ["equals"] }],
+      call: ({ client }, body) => client.queryUsers(body),
+      items: (page: QueryUsers200) => page.users,
+      next: (page: QueryUsers200) => page.next_page_token,
+    });
+  });
+
+  it("refuses a sort field the query body does not sort by", () => {
+    list({
+      body: QueryUsersBody,
+      // @ts-expect-error a user query sorts by `created_at`, not `created`
+      sorts: ["created"],
+      call: ({ client }, body) => client.queryUsers(body),
+      items: (page: QueryUsers200) => page.users,
+      next: (page: QueryUsers200) => page.next_page_token,
+    });
+  });
+
+  it("refuses a filter that is no query parameter of a GET list", () => {
+    // @ts-expect-error schemas are listed by `object_type`, not `objectType`
+    list({
+      filters: [{ field: "objectType", operations: ["equals"] }],
+      call: ({ client, projectId }: Platform, params: Omit<ListSchemasParams, "project_id">) =>
+        client.listSchemas({ ...params, project_id: projectId }),
+      items: (page: ListSchemas200) => page.schemas,
+      next: (page: ListSchemas200) => page.next_page_token,
+    });
+  });
+
+  it("refuses a sort parameter a GET list does not take", () => {
+    list({
+      sorts: ["metadata.created_at"],
+      // @ts-expect-error schemas take no `order` parameter
+      sortParam: "order",
+      call: ({ client, projectId }: Platform, params: Omit<ListSchemasParams, "project_id">) =>
+        client.listSchemas({ ...params, project_id: projectId }),
+      items: (page: ListSchemas200) => page.schemas,
+      next: (page: ListSchemas200) => page.next_page_token,
+    });
+  });
+
+  it("refuses an operation the query body does not take", () => {
+    list({
+      body: QueryUsersBody,
+      // @ts-expect-error a user query takes no `starts_with` operation
+      filters: [{ field: "status", operations: ["starts_with"] }],
+      call: ({ client }, body) => client.queryUsers(body),
+      items: (page: QueryUsers200) => page.users,
+      next: (page: QueryUsers200) => page.next_page_token,
+    });
+  });
+
+  it("refuses a value a GET parameter does not take", () => {
+    // @ts-expect-error schemas list `all` or `latest` revisions, not `newest`
+    list({
+      filters: [{ field: "revisions", operations: ["equals"], values: ["all", "newest"] }],
+      call: ({ client, projectId }: Platform, params: Omit<ListSchemasParams, "project_id">) =>
+        client.listSchemas({ ...params, project_id: projectId }),
+      items: (page: ListSchemas200) => page.schemas,
+      next: (page: ListSchemas200) => page.next_page_token,
+    });
+  });
+
+  it("refuses a default a GET parameter does not take", () => {
+    // @ts-expect-error schemas list `all` or `latest` revisions, not `newest`
+    list({
+      filters: [{ field: "revisions", operations: ["equals"], default: "newest" }],
+      call: ({ client, projectId }: Platform, params: Omit<ListSchemasParams, "project_id">) =>
+        client.listSchemas({ ...params, project_id: projectId }),
+      items: (page: ListSchemas200) => page.schemas,
+      next: (page: ListSchemas200) => page.next_page_token,
+    });
+  });
+
+  it("refuses a range parameter a GET list does not take", () => {
+    // @ts-expect-error events take `created_after`, not `created_afer`
+    list({
+      filters: [
+        {
+          field: "created_at",
+          ...range({ greater_than_or_equal: "created_afer" }),
+        },
+      ],
+      call: ({ client, projectId }: Platform, params: Omit<ListEventsParams, "project_id">) =>
+        client.listEvents({ ...params, project_id: projectId }),
+      items: (page: ListEvents200) => page.data,
+      next: (page: ListEvents200) => page.next_page_token,
+    });
+  });
+
+  it("offers exactly the operations a range names a parameter for", () => {
+    expect(
+      range({ greater_than: "created_after", less_than: "created_before" }).operations,
+    ).toEqual(["greater_than", "less_than"]);
+  });
+
+  it("refuses a range operation no query takes", () => {
+    // @ts-expect-error no query takes a `between` operation
+    range({ between: "created_after" });
+  });
+
+  it("refuses a repeat that widens on a query body", () => {
+    list({
+      body: QueryUsersBody,
+      // @ts-expect-error a user query applies every repeat of a field, so none widens
+      filters: [{ field: "status", operations: ["equals"], combine: "or" }],
+      call: ({ client }, body) => client.queryUsers(body),
+      items: (page: QueryUsers200) => page.users,
+      next: (page: QueryUsers200) => page.next_page_token,
+    });
+  });
+
+  it("refuses a repeat that widens on a GET parameter taking one value", () => {
+    list({
+      // @ts-expect-error events take one `actor_id`, so its repeats cannot widen
+      filters: [{ field: "actor_id", operations: ["equals"], combine: "or" }],
+      call: ({ client, projectId }: Platform, params: Omit<ListEventsParams, "project_id">) =>
+        client.listEvents({ ...params, project_id: projectId }),
+      items: (page: ListEvents200) => page.data,
+      next: (page: ListEvents200) => page.next_page_token,
+    });
+  });
+
+  it("refuses a GET parameter taking a list that does not say its repeats widen", () => {
+    // @ts-expect-error events take a list of `event_type`, whose repeats widen
+    list({
+      filters: [{ field: "event_type", operations: ["equals"] }],
+      call: ({ client, projectId }: Platform, params: Omit<ListEventsParams, "project_id">) =>
+        client.listEvents({ ...params, project_id: projectId }),
+      items: (page: ListEvents200) => page.data,
+      next: (page: ListEvents200) => page.next_page_token,
+    });
+  });
+
+  it("refuses a range written without range()", () => {
+    // @ts-expect-error only range() pairs a range's operations with their parameters
+    list({
+      filters: [
+        {
+          field: "created_at",
+          operations: ["greater_than_or_equal", "less_than"],
+          params: { greater_than_or_equal: "created_after" },
+        },
+      ],
+      call: ({ client, projectId }: Platform, params: Omit<ListEventsParams, "project_id">) =>
+        client.listEvents({ ...params, project_id: projectId }),
+      items: (page: ListEvents200) => page.data,
+      next: (page: ListEvents200) => page.next_page_token,
+    });
+  });
+
+  it("refuses an operation other than equals on a GET parameter", () => {
+    // @ts-expect-error a parameter carries its value as it is, so it filters by equals
+    list({
+      filters: [{ field: "created_after", operations: ["greater_than"] }],
+      call: ({ client, projectId }: Platform, params: Omit<ListEventsParams, "project_id">) =>
+        client.listEvents({ ...params, project_id: projectId }),
+      items: (page: ListEvents200) => page.data,
+      next: (page: ListEvents200) => page.next_page_token,
+    });
+  });
+
+  it("refuses a GET sort the listed item does not have", () => {
+    list({
+      // @ts-expect-error events are ordered by `occurred_at`
+      sorts: ["occured_at"],
+      sortParam: "order",
+      call: ({ client, projectId }: Platform, params: Omit<ListEventsParams, "project_id">) =>
+        client.listEvents({ ...params, project_id: projectId }),
+      items: (page: ListEvents200) => page.data,
+      next: (page: ListEvents200) => page.next_page_token,
+    });
+  });
+
+  it("sends each operation of the events' created_at range as its own parameter", () => {
+    expect(RESOURCES.events.list?.filters?.find((f) => f.field === "created_at")).toMatchObject({
+      operations: ["greater_than_or_equal", "less_than"],
+      params: { greater_than_or_equal: "created_after", less_than: "created_before" },
+    });
+  });
+
+  it("refuses filters on a GET list whose call parameter is untyped", () => {
+    list({
+      // @ts-expect-error an untyped parameter would check no filter, so none is taken
+      filters: [{ field: "object_type", operations: ["equals"] }],
+      call: ({ client, projectId }: Platform, params: Json) =>
+        client.listSchemas({ ...params, project_id: projectId }),
+      items: (page: ListSchemas200) => page.schemas,
+      next: (page: ListSchemas200) => page.next_page_token,
+    });
+  });
+
+  it("checks a GET list by its parameters even when one is called filter", () => {
+    const filtered = list({
+      filters: [{ field: "filter", operations: ["equals"] }],
+      call: ({ client, projectId }: Platform, _params: { filter?: string }) =>
+        client.listSchemas({ project_id: projectId }),
+      items: (page) => page.schemas,
+      next: (page) => page.next_page_token,
+    });
+
+    expect(filtered.filters?.[0]?.field).toBe("filter");
+  });
+
+  it("refuses an item schema of another operation", () => {
+    list({
+      body: QueryUsersBody,
+      // @ts-expect-error a team's schema does not parse into a listed user
+      item: GetTeamResponse,
+      call: ({ client }, body) => client.queryUsers(body),
+      items: (page) => page.users,
+      next: (page) => page.next_page_token,
+    });
+  });
+
+  it("refuses a response schema of another operation", () => {
+    get({
+      call: ({ client }, id) => client.getUserByID(id),
+      // @ts-expect-error a team's schema does not parse into a user
+      response: GetTeamResponse,
+    });
+  });
+
+  it("refuses an entry resource() did not check", () => {
+    const registry = {
+      // @ts-expect-error a plain descriptor skips every check above
+      users: {
+        singular: "user",
+        idField: "id",
+        columns: ["id"],
+        heading: "identifier",
+        detail: ["id"],
+        list: users,
+        get: user,
+      },
+    } satisfies CheckedRegistry;
+
+    expect(Object.keys(registry)).toEqual(["users"]);
+  });
+});
+
+describe("the paged resources' lists", () => {
+  it.each([
+    ["users", pagedFunctions.queryUsers],
+    ["teams", pagedFunctions.queryTeams],
+    ["sessions", pagedFunctions.querySessions],
+    ["events", pagedFunctions.listEvents],
+    ["grants", pagedFunctions.queryGrants],
+    ["idps", pagedFunctions.queryIdps],
+    ["projects", pagedFunctions.queryProjects],
+    ["schemas", pagedFunctions.listSchemas],
+    ["release", pagedFunctions.listReleases],
+    ["flow-definitions", pagedFunctions.listFlowDefinitions],
+    ["policies", pagedFunctions.listPolicies],
+  ] as const)("read %s's pages with the readers the client generates", (topic, readers) => {
+    const list = RESOURCES[topic].list;
+
+    expect([list?.items, list?.next]).toEqual([readers.items, readers.next]);
   });
 });

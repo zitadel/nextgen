@@ -38,7 +38,7 @@ get:
   security:
     - oauth2:
         - user.read
-    - nextgenSession: []
+    - sessionCookie: []
   responses:
     '200':
       description: Current user information retrieved successfully
@@ -77,7 +77,7 @@ patch:
   security:
     - oauth2:
         - user.write
-    - nextgenSession: []
+    - sessionCookie: []
   requestBody:
     description: The changes to merge into the user.
     required: true
@@ -150,11 +150,15 @@ delete:
     x-zitadel-cli: users delete
     summary: Delete user by ID
     description: |
-      Deletes a user and removes them from every team they belong to.
+      Deletes a user, removes them from every team they belong to, and revokes
+      every grant they hold, on any project.
 
-      The user is removed, not deactivated, and the deletion emits `user.deleted`.
+      The user is removed, not deactivated, and the deletion emits `user.deleted`,
+      plus `authz.revoked` for each grant on that grant's project.
       With a project secret the request is idempotent: deleting a user that exists
-      in no project succeeds without changing anything.
+      in no project succeeds without changing anything. Deleting the last active
+      member of a project's owning team returns 409 `proj.last_owner` and changes
+      nothing.
     tags:
       - Users
     parameters:
@@ -162,7 +166,7 @@ delete:
     security:
       - oauth2:
           - user.delete
-      - nextgenSession: []
+      - sessionCookie: []
     responses:
       '204':
         description: User deleted successfully.
@@ -174,6 +178,15 @@ delete:
               $ref: ../../../components/error-details.yaml
       '404':
         description: User not found.
+        content:
+          application/json:
+            schema:
+              $ref: ../../../components/error-details.yaml
+      '409':
+        description: |
+          The user is the last active member of a project's owning team
+          (`proj.last_owner`). Add another member to that team, then retry.
+          `details.details.project_ids` names the projects.
         content:
           application/json:
             schema:

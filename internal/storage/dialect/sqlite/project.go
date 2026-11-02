@@ -26,6 +26,12 @@ RETURNING id, name, password_hash_policy, created_at, updated_at`
 RETURNING id`
 
 	projectQuery = `SELECT id, name, password_hash_policy, created_at, updated_at FROM projects`
+
+	// No FOR UPDATE: the dialect begins every transaction with
+	// _txlock=immediate (BEGIN IMMEDIATE) on a single connection, so the
+	// database write lock is already held from BEGIN and a second writer waits
+	// for the first to commit. The select only reports an unknown project.
+	lockProjectStmt = `SELECT id FROM projects WHERE id = ?`
 )
 
 type projectStatements struct{ statement }
@@ -247,6 +253,12 @@ func (ps projectStatements) GetProject(ctx context.Context, id string, opts serv
 	}
 	project.OwningTeamID = owningTeamID.String
 	return project, nil
+}
+
+// LockProject implements [service.ProjectStatements].
+func (ps projectStatements) LockProject(ctx context.Context, id string) error {
+	var locked string
+	return wrapError(ps.client.QueryRow(ctx, lockProjectStmt, id).Scan(&locked))
 }
 
 var _ service.ProjectStatements = (*projectStatements)(nil)

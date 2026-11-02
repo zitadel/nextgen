@@ -28,6 +28,47 @@ describe("auth-method passkey disable", () => {
 
   describe("against a valid server", () => {
     describe("--json", () => {
+      describe("removing the last way to sign in without --force when no one can be asked", () => {
+        it("is refused", async () => {
+          const app = await aSetUpApp();
+          await app.signsInOnlyWith("passkey");
+
+          const result = await app.disableMethod("passkey");
+
+          expect(result).toFailWith("E_VALIDATION");
+        });
+
+        it("says to pass --force", async () => {
+          const app = await aSetUpApp();
+          await app.signsInOnlyWith("passkey");
+
+          const result = await app.disableMethod("passkey");
+
+          expect(result).toHintAt("--force");
+        });
+
+        it("suggests running it again with --force", async () => {
+          const app = await aSetUpApp();
+          await app.signsInOnlyWith("passkey");
+
+          const result = await app.disableMethod("passkey");
+
+          expect(result).toSuggestExactly(
+            `auth-method passkey disable --schema default-human-user --cwd ${app.path} --force`,
+          );
+        });
+
+        it("disables nothing", async () => {
+          const app = await aSetUpApp();
+          await app.signsInOnlyWith("passkey");
+          const files = await app.snapshot();
+
+          await app.disableMethod("passkey");
+
+          expect(await files.changes()).toMatchObject({ added: [], modified: [], removed: [] });
+        });
+      });
+
       it("leaves the change for deploy to publish", async () => {
         const app = await aSetUpApp();
 

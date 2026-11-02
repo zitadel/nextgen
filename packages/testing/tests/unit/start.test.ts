@@ -10,14 +10,14 @@ const PORT = 18095;
 const BASE = `http://localhost:${PORT}`;
 
 const okHandlers = [
-  http.post(`${BASE}/projects`, () =>
+  http.post(`${BASE}/api/v1/projects`, () =>
     HttpResponse.json(
       { id: "proj_1", project_secret: "secret_1", preview_secret: "preview_1" },
       { status: 201 },
     ),
   ),
-  http.post(`${BASE}/schemas`, () => HttpResponse.json({ id: "sch_1" }, { status: 201 })),
-  http.post(`${BASE}/flow_definitions`, () =>
+  http.post(`${BASE}/api/v1/schemas`, () => HttpResponse.json({ id: "sch_1" }, { status: 201 })),
+  http.post(`${BASE}/api/v1/flow_definitions`, () =>
     HttpResponse.json({ id: "flowdef_1" }, { status: 201 }),
   ),
 ];
@@ -30,7 +30,7 @@ afterAll(() => server.close());
 
 const failProjects = () =>
   server.use(
-    http.post(`${BASE}/projects`, () =>
+    http.post(`${BASE}/api/v1/projects`, () =>
       HttpResponse.json({ code: "req.invalid", message: "nope" }, { status: 400 }),
     ),
   );

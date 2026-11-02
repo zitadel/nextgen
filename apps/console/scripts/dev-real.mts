@@ -38,6 +38,7 @@ import { access, mkdir, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { apiBaseUrl } from "@zitadel/api/runtime/base-url";
 import { startLocalZitadel, type LocalZitadel, type SeededUser } from "@zitadel/testing";
 
 import { runnerCommand, runnerLabel } from "../../../scripts/task-runner.mjs";
@@ -200,6 +201,8 @@ await writeFile(
 );
 
 const { baseUrl, projectId, projectSecret } = zitadel.handle;
+/** Where the instance serves the API: under `/api/v1` (ADR 077). */
+const api = apiBaseUrl(baseUrl);
 
 /**
  * Makes the dev account an admin of the seeded project.
@@ -213,7 +216,7 @@ const { baseUrl, projectId, projectSecret } = zitadel.handle;
 async function grantDevUserAdmin(userId: string): Promise<boolean> {
   try {
     const query = new URLSearchParams({ project_id: projectId });
-    const response = await fetch(`${baseUrl}/grants?${query.toString()}`, {
+    const response = await fetch(`${api}/grants?${query.toString()}`, {
       method: "POST",
       headers: { authorization: `Bearer ${projectSecret}`, "content-type": "application/json" },
       body: JSON.stringify({ user: { user_id: userId }, relation: "admin" }),
@@ -258,7 +261,7 @@ async function seedAuthentication(): Promise<boolean> {
     "content-type": "application/json",
   };
   const scoped = (path: string, extra: Record<string, string> = {}) =>
-    `${baseUrl}${path}?${new URLSearchParams({ project_id: projectId, ...extra }).toString()}`;
+    `${api}${path}?${new URLSearchParams({ project_id: projectId, ...extra }).toString()}`;
   const post = (path: string, body: unknown) =>
     fetch(scoped(path), {
       method: "POST",
@@ -467,7 +470,7 @@ if (releaseSeedFailure !== null) {
  */
 async function mintClaimUrl(): Promise<string | null> {
   try {
-    const response = await fetch(`${baseUrl}/projects/${projectId}/claim/init`, {
+    const response = await fetch(`${api}/projects/${projectId}/claim/init`, {
       method: "POST",
       headers: { authorization: `Bearer ${projectSecret}`, "content-type": "application/json" },
       body: "{}",

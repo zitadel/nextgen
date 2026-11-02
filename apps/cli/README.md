@@ -194,6 +194,7 @@ which ships in this package.
 * [`zitadel sessions list`](#zitadel-sessions-list)
 * [`zitadel sessions revoke ID`](#zitadel-sessions-revoke-id)
 * [`zitadel setup`](#zitadel-setup)
+* [`zitadel skills add`](#zitadel-skills-add)
 * [`zitadel start`](#zitadel-start)
 * [`zitadel status`](#zitadel-status)
 * [`zitadel stop`](#zitadel-stop)
@@ -224,7 +225,7 @@ Call any operation of the Zitadel API, with this project's server and project se
 ```
 USAGE
   $ zitadel api [OPERATION...] [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug]
-    [--color] [--telemetry] [-X GET|POST|PUT|PATCH|DELETE] [-F <value>...] [--input <value>] [--paginate]
+    [--color] [--telemetry] [-X GET|POST|PUT|PATCH|DELETE] [-F <value>...] [--input <value>] [--paginate] [-f]
 
 ARGUMENTS
   [OPERATION...]  An operationId (queryUsers) or a path (/users/query), then the path parameters. Omit it to choose one.
@@ -235,6 +236,8 @@ FLAGS
                                           Repeatable.
   -X, --method=GET|POST|PUT|PATCH|DELETE  The HTTP method, to choose among a path's operations.
   -c, --cwd=<value>                       Project directory to operate on.
+  -f, --force                             Call an operation that deletes, revokes or rolls back without the confirmation
+                                          prompt. Required when non-interactive.
   -n, --non-interactive                   Disable prompts. Required when scripting or running as an agent.
   -s, --server=<value>                    Override the resolved server URL.
   -v, --verbose                           Verbose logging.
@@ -761,7 +764,8 @@ FLAGS
   -c, --cwd=<value>       Project directory to operate on.
   -e, --env=<value>       Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting
                           platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.
-  -m, --message=<value>   A short summary of what this release changes.
+  -m, --message=<value>   A short summary of what this release changes. Defaults to the pull request's title or the
+                          current commit's subject.
   -n, --non-interactive   Disable prompts. Required when scripting or running as an agent.
   -s, --server=<value>    Override the resolved server URL.
   -v, --verbose           Verbose logging.
@@ -910,7 +914,7 @@ Roll back to an earlier deployment.
 ```
 USAGE
   $ zitadel deployment rollback [DEPLOYMENT_ID] [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug]
-    [--color] [--telemetry] [-e <value>] [--env-file <value>] [-f]
+    [--color] [--telemetry] [-e <value>] [--env-file <value>] [-f] [-m <value>]
 
 ARGUMENTS
   [DEPLOYMENT_ID]  The deployment to re-apply. Omit to undo the last deploy.
@@ -919,7 +923,8 @@ FLAGS
   -c, --cwd=<value>       Project directory to operate on.
   -e, --env=<value>       Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting
                           platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.
-  -f, --force             Roll back without the confirmation prompt. Required when non-interactive.
+  -f, --force             Re-apply the deployment without the confirmation prompt. Required when non-interactive.
+  -m, --message=<value>   A short summary of why this rolls back.
   -n, --non-interactive   Disable prompts. Required when scripting or running as an agent.
   -s, --server=<value>    Override the resolved server URL.
   -v, --verbose           Verbose logging.
@@ -951,12 +956,15 @@ Verify local runtime and project state.
 ```
 USAGE
   $ zitadel doctor [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [--fix] [--image <value>] [--port <value>] [--runtime binary|docker] [-e <value>] [--env-file <value>]
+    [--telemetry] [-f --fix] [--image <value>] [--port <value>] [--runtime binary|docker] [-e <value>] [--env-file
+    <value>]
 
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
   -e, --env=<value>       Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting
                           platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.
+  -f, --force             With --fix, make repairs that replace an origin without the confirmation prompt. Required when
+                          non-interactive.
   -n, --non-interactive   Disable prompts. Required when scripting or running as an agent.
   -s, --server=<value>    Override the resolved server URL.
   -v, --verbose           Verbose logging.
@@ -990,7 +998,8 @@ USAGE
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
-  -f, --force            Remove the managed files without the confirmation prompt.
+  -f, --force            Remove the managed files and local state without the confirmation prompt. Required when
+                         non-interactive.
   -n, --non-interactive  Disable prompts. Required when scripting or running as an agent.
   -s, --server=<value>   Override the resolved server URL.
   -v, --verbose          Verbose logging.
@@ -2008,12 +2017,14 @@ Deploy a release from .zitadel/ to a pull-request build's preview URLs.
 ```
 USAGE
   $ zitadel preview [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-e <value>] [--env-file <value>] [--origin <value>...] [--ttl <value>] [--strict]
+    [--telemetry] [-e <value>] [--env-file <value>] [--origin <value>...] [--ttl <value>] [-m <value>] [--strict]
 
 FLAGS
   -c, --cwd=<value>        Project directory to operate on.
   -e, --env=<value>        Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting
                            platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.
+  -m, --message=<value>    A short summary of what this release changes. Defaults to the pull request's title or the
+                           current commit's subject.
   -n, --non-interactive    Disable prompts. Required when scripting or running as an agent.
   -s, --server=<value>     Override the resolved server URL.
   -v, --verbose            Verbose logging.
@@ -2040,6 +2051,8 @@ EXAMPLES
   $ zitadel preview --origin https://acme-git-sso-acmeinc.vercel.app
 
   $ zitadel preview --ttl 24h
+
+  $ zitadel preview -m 'add phone_number to human-user'
 ```
 
 ## `zitadel preview list`
@@ -2450,7 +2463,7 @@ FLAGS
   -c, --cwd=<value>       Project directory to operate on.
   -e, --env=<value>       Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting
                           platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.
-  -f, --force             Revoke without the confirmation prompt. Required when non-interactive.
+  -f, --force             Revoke the release without the confirmation prompt. Required when non-interactive.
   -n, --non-interactive   Disable prompts. Required when scripting or running as an agent.
   -s, --server=<value>    Override the resolved server URL.
   -v, --verbose           Verbose logging.
@@ -2484,7 +2497,8 @@ USAGE
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
-  -f, --force            Delete the local runtime and its data without the confirmation prompt.
+  -f, --force            Delete the local runtime and its data without the confirmation prompt. Required when
+                         non-interactive.
   -n, --non-interactive  Disable prompts. Required when scripting or running as an agent.
   -s, --server=<value>   Override the resolved server URL.
   -v, --verbose          Verbose logging.
@@ -2814,8 +2828,8 @@ USAGE
 
 FLAGS
   -c, --cwd=<value>                  Project directory to operate on.
-  -f, --force                        Overwrite managed files that already exist, and scaffold into a non-empty
-                                     directory.
+  -f, --force                        Overwrite managed files that already exist, scaffold into a non-empty directory,
+                                     and remove the previous origin when --dev-port moves the app.
   -n, --non-interactive              Disable prompts. Required when scripting or running as an agent.
   -s, --server=<value>               Override the resolved server URL.
   -v, --verbose                      Verbose logging.
@@ -2869,6 +2883,39 @@ EXAMPLES
   $ zitadel setup --framework next
 
   $ zitadel setup --framework react --dev-port 3000
+```
+
+## `zitadel skills add`
+
+Add the Zitadel agent skills to this project.
+
+```
+USAGE
+  $ zitadel skills add [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color] [--telemetry]
+
+FLAGS
+  -c, --cwd=<value>      Project directory to operate on.
+  -n, --non-interactive  Disable prompts. Required when scripting or running as an agent.
+  -s, --server=<value>   Override the resolved server URL.
+  -v, --verbose          Verbose logging.
+      --[no-]color       Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
+      --debug            Debug logging.
+      --dry-run          Preview without mutating files or the platform.
+      --[no-]telemetry   Send anonymous usage analytics. Disable with --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Add the Zitadel agent skills to this project.
+
+  Adds the skills of this CLI's version to .agents/skills, which most coding agents read, and to .claude/skills for
+  Claude Code. Run it again after updating the CLI to replace them with the new version's.
+
+EXAMPLES
+  $ zitadel skills add
+
+  $ zitadel skills add --cwd my-app
 ```
 
 ## `zitadel start`
@@ -3228,7 +3275,8 @@ USAGE
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
-  -f, --force            Remove the managed files without the confirmation prompt.
+  -f, --force            Remove the managed files and local state without the confirmation prompt. Required when
+                         non-interactive.
   -n, --non-interactive  Disable prompts. Required when scripting or running as an agent.
   -s, --server=<value>   Override the resolved server URL.
   -v, --verbose          Verbose logging.

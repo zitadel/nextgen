@@ -99,22 +99,22 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
       // Before the last-method guard: these refusals have no override, so
       // nobody should be asked to confirm a change that fails anyway.
       refuseBrokenFlows(schema, after, flowChanges);
-      const proceed = await this.confirmLastMethod({
-        schema,
-        after,
-        disabling: provider,
-        retryArgs: [
-          "auth-method",
-          "sso",
-          "disable",
-          ...optionArgs("--provider", provider),
-          ...optionArgs("--schema", schema.name),
-        ],
-        cwdArgs,
-      });
-      if (!proceed) {
-        return this.emit({ status: "skipped", reason: "disable-cancelled" });
-      }
+    }
+    const permit = await this.lastMethodPermit({
+      schema,
+      after,
+      disabling: provider,
+      retryArgs: [
+        "auth-method",
+        "sso",
+        "disable",
+        ...optionArgs("--provider", provider),
+        ...optionArgs("--schema", schema.name),
+      ],
+      cwdArgs,
+    });
+    if (permit === undefined) {
+      return this.emit({ status: "skipped", reason: "disable-cancelled" });
     }
 
     // When only a flow still offered the provider, say so: the schema itself
@@ -148,7 +148,7 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
       });
     }
     if (schemaChange.changed) {
-      await writeFile(join(cwd, schema.path), `${stableStringify(after)}\n`);
+      await this.writeSchema(cwd, schema, after, permit);
     }
     for (const { file, after: body } of changedFlows) {
       await writeFile(join(cwd, file.path), `${stableStringify(body)}\n`);
@@ -160,9 +160,11 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
       consola.info(`${schema.name} does not offer ${provider}`);
     }
     this.reportOutcome(outcome);
+    const followUps = this.followUps(changed.length > 0, cwdArgs);
     return this.emit({
       status: "ok",
-      data: { ...data, ...this.followUps(changed.length > 0, cwdArgs) },
+      data: { ...data, next_args: followUps.args },
+      next: { commands: followUps.commands },
       pretty:
         changed.length > 0
           ? `Removed ${provider} from ${where}`

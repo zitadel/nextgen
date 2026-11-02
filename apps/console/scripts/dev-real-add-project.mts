@@ -52,8 +52,12 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 
+import { apiBaseUrl } from "@zitadel/api/runtime/base-url";
+
 const consoleOrigin = process.env.CONSOLE_DEV_ORIGIN ?? "http://localhost:5174";
 const backendUrl = `http://localhost:${process.env.CONSOLE_DEV_ZITADEL_PORT ?? 8094}`;
+/** Where the server serves the API: under `/api/v1` (ADR 077). */
+const api = apiBaseUrl(backendUrl);
 
 /** Secrets of projects this run created, keyed by id — the server hands each out once. */
 const createdSecrets = new Map<string, string>();
@@ -119,7 +123,7 @@ async function resolveUserId(identifier: string): Promise<string> {
 
 /** Unauthenticated; the response carries the new project's secret exactly once. */
 async function createProject(projectName: string): Promise<string> {
-  const response = await request(`${backendUrl}/projects`, {
+  const response = await request(`${api}/projects`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
@@ -140,7 +144,7 @@ type Principal = { user_id: string } | { identifier: string };
 
 async function grant(targetProjectId: string, principal: Principal, rel: string): Promise<void> {
   const query = new URLSearchParams({ project_id: targetProjectId });
-  await request(`${backendUrl}/grants?${query.toString()}`, {
+  await request(`${api}/grants?${query.toString()}`, {
     method: "POST",
     headers: {
       authorization: `Bearer ${secretFor(targetProjectId)}`,
@@ -164,7 +168,7 @@ function secretFor(targetProjectId: string): string {
  */
 async function readBack(targetProjectId: string): Promise<unknown[]> {
   const query = new URLSearchParams({ project_id: targetProjectId });
-  const response = await request(`${backendUrl}/grants/query?${query.toString()}`, {
+  const response = await request(`${api}/grants/query?${query.toString()}`, {
     method: "POST",
     headers: {
       authorization: `Bearer ${secretFor(targetProjectId)}`,

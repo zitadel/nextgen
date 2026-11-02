@@ -69,6 +69,17 @@ SET revoked_at = CURRENT_TIMESTAMP(), updated_at = CURRENT_TIMESTAMP(),
 WHERE project_id = @p1 AND id = @p2 AND revoked_at IS NULL
 THEN RETURN revoked_at, updated_at`
 
+	revokeAuthzAssignmentsByPrincipalStmt = `
+UPDATE authz_assignments
+SET revoked_at = CURRENT_TIMESTAMP(), updated_at = CURRENT_TIMESTAMP(),
+    active_unique_key = NULL, owning_team_key = NULL
+WHERE principal_type = @p1 AND principal_id = @p2 AND revoked_at IS NULL
+THEN RETURN id, project_id, catalog_id,
+            principal_type, principal_id, object_type, relation,
+            scope_kind, scope_team_id, scope_resource_id,
+            grantor_type, grantor_id, delegation_id,
+            expires_at, revoked_at, created_at, updated_at`
+
 	getActiveOwningTeamGrantStmt = `
 SELECT id, project_id, catalog_id,
        principal_type, principal_id, object_type, relation,
@@ -208,6 +219,18 @@ func (s authzAssignmentStatements) RevokeAuthzAssignment(ctx context.Context, pr
 		})
 		return err
 	})
+}
+
+// RevokeAuthzAssignmentsByPrincipal implements [service.AuthzAssignmentStatements].
+func (s authzAssignmentStatements) RevokeAuthzAssignmentsByPrincipal(ctx context.Context, principalType domain.AuthzPrincipalType, principalID string) ([]*domain.AuthzAssignment, error) {
+	var assignments []*domain.AuthzAssignment
+	stmt := buildStatement(revokeAuthzAssignmentsByPrincipalStmt, principalType.String(), principalID).statement()
+	err := s.db.Write(ctx, stmt, func(iter *spanner.RowIterator) error {
+		var qErr error
+		assignments, qErr = collectRows(iter, scanAuthzAssignment)
+		return qErr
+	})
+	return assignments, err
 }
 
 func scanAuthzAssignment(row *spanner.Row) (*domain.AuthzAssignment, error) {
@@ -386,4 +409,39 @@ func (s authzAssignmentStatements) ListProjectAdmins(ctx context.Context, projec
 		return nil, err
 	}
 	return &database.ListResult[*domain.ProjectAdminRecord]{Items: admins, NextCursor: next}, nil
+}
+
+// ListProjectsOwnedThroughMember implements [service.AuthzAssignmentStatements].
+func (s authzAssignmentStatements) ListProjectsOwnedThroughMember(ctx context.Context, userID string) ([]string, error) {
+	return s.listOwnerProjects(ctx, userID, false)
+}
+
+// ListProjectsLosingLastOwner implements [service.AuthzAssignmentStatements].
+func (s authzAssignmentStatements) ListProjectsLosingLastOwner(ctx context.Context, userID string) ([]string, error) {
+	return s.listOwnerProjects(ctx, userID, true)
+}
+
+func (s authzAssignmentStatements) listOwnerProjects(ctx context.Context, userID string, losing bool) ([]string, error) {
+	var c statementCompiler
+	if losing {
+		authz.WriteProjectsLosingLastOwner(&c, spannerAuthzEnv(), userID)
+	} else {
+		authz.WriteProjectsOwnedThroughMember(&c, spannerAuthzEnv(), userID)
+	}
+	var ids []string
+	err := s.db.Query(ctx, c.statement(), func(iter *spanner.RowIterator) error {
+		var qErr error
+		ids, qErr = collectRows(iter, func(row *spanner.Row) (string, error) {
+			var id string
+			if err := row.Columns(&id); err != nil {
+				return "", err
+			}
+			return id, nil
+		})
+		return qErr
+	})
+	if err != nil {
+		return nil, err
+	}
+	return ids, nil
 }

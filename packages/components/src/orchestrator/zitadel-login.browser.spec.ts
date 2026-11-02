@@ -14,10 +14,9 @@ import type { ZitadelLogin } from "./zitadel-login.js";
  * The orchestrator calls the typed `@zitadel/api` client
  * directly. This suite swaps `globalThis.fetch` for a queue of pre-baked
  * `CreateFlow201` payloads — equivalent to swapping the previous
- * `transport` property, one level lower in the stack. Fetch is stubbed
- * (rather than running `msw/browser`) because vitest's browser provider
- * has no out-of-the-box service-worker registration; the unit suite
- * covers the MSW-handler-driven contract.
+ * `transport` property, one level lower in the stack. Fetch is stubbed so
+ * each test pins its exact step payloads; `zitadel-login-submit.browser.spec.ts`
+ * drives the api-mock flow walker through `msw/browser` instead.
  */
 
 const identifierStep: CreateFlow201 = {
@@ -347,24 +346,6 @@ describe("<zitadel-login> form + focus (chromium)", () => {
       fields?: Record<string, string>;
     };
     expect(body.fields).toEqual({ email: "alice@acme.com", password: "hunter3" });
-  });
-
-  it("ignores a duplicate submit while the first request is in-flight", async () => {
-    const element = await mount();
-    const root = element.shadowRoot!;
-    await fillSignInFields(root);
-    const event = new CustomEvent("zl-submit", {
-      bubbles: true,
-      composed: true,
-      detail: { action: "submit" },
-    });
-    root.dispatchEvent(event);
-    root.dispatchEvent(event);
-    await waitFor(() => {
-      const title = element.shadowRoot?.querySelector(".zl-card-title");
-      return title?.textContent?.includes("Sign in faster") ? title : null;
-    });
-    expect(stub.calls).toHaveLength(2);
   });
 
   it("moves focus to the first focusable control after a step swap", async () => {

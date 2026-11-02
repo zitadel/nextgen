@@ -4,7 +4,11 @@ import { apiMockPublicDir } from "@zitadel/api-mock/public-dir";
 import { defineConfig } from "vitest/config";
 
 import { baseTest, edgeProject, edgeSpecs } from "@zitadel/vitest-config";
-import { renderServerLogin } from "./src/__tests__/server-markup.ts";
+import {
+  closeServerLogin,
+  loadServerLogin,
+  renderServerLogin,
+} from "./src/__tests__/server-markup.ts";
 
 /**
  * Two projects in one config:
@@ -28,6 +32,13 @@ export default defineConfig({
       {
         // Each project is its own Vite instance, so each gets its own cacheDir.
         cacheDir: ".vitest/browser",
+        // Vite's dependency scan compiles JSX itself, for React unless told
+        // otherwise (it reads neither the tsconfig nor qwikVite). Then
+        // `react/jsx-dev-runtime` fails to resolve, nothing is pre-bundled, and
+        // Vite reloads Chromium mid-run for each dependency it finds late.
+        optimizeDeps: {
+          rolldownOptions: { transform: { jsx: { importSource: "@qwik.dev/core" } } },
+        },
         // Serves api-mock's `mockServiceWorker.js` from the test origin, where the
         // MSW worker started in `src/test-setup.ts` registers it.
         publicDir: apiMockPublicDir,
@@ -48,7 +59,7 @@ export default defineConfig({
             headless: true,
             instances: [{ browser: "chromium" }],
             // Node-side helpers a browser spec calls through `commands`.
-            commands: { renderServerLogin },
+            commands: { loadServerLogin, renderServerLogin, closeServerLogin },
           },
         },
       },

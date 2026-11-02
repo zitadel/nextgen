@@ -60,6 +60,8 @@ export type CommandReference = {
   /** oclif's `state`, such as `beta` or `deprecated`. */
   state?: string;
   args: ArgReference[];
+  /** Takes more arguments than it names, as `api` takes its path parameters. */
+  variadic?: true;
   flags: FlagReference[];
   examples: ExampleReference[];
 };
@@ -169,6 +171,7 @@ function commandReference(
         ...(arg.required === true && { required: true as const }),
         ...(arg.options !== undefined && { options: arg.options.map(String) }),
       })),
+    ...(command.strict === false && { variadic: true as const }),
     flags: flagReferences({ ...own, ...Object.fromEntries(family) }, render),
     examples: (command.examples ?? []).map((example) => exampleReference(example, render, id, bin)),
   };

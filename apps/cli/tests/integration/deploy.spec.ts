@@ -4,7 +4,14 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "../helpers/platform";
-import { aCommittedApp, aSetUpApp, PASSWORD_POLICY, SETUP_ORIGIN } from "../helpers/project";
+import {
+  aCommittedApp,
+  anUndeployedEnvironment,
+  aSetUpApp,
+  type DeployResult,
+  PASSWORD_POLICY,
+  SETUP_ORIGIN,
+} from "../helpers/project";
 
 const platform = usePlatformMock();
 
@@ -105,7 +112,7 @@ describe("deploy", () => {
         expect(result.stdout + result.stderr).toContain("pol.invalid");
       });
 
-      it("requires -m when non-interactive", async () => {
+      it("requires -m when non-interactive outside a git repository", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin();
 
@@ -114,7 +121,22 @@ describe("deploy", () => {
         expect(result).toFailWith("E_VALIDATION");
       });
 
-      it("rejects a blank -m when non-interactive", async () => {
+      it("records the commit subject when non-interactive and -m is omitted", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        await app.editUserSchema((schema) => {
+          schema.properties.company = { type: "string" };
+        });
+        await app.commit();
+
+        const result = await app.run(["deploy", "--non-interactive", "--json"]);
+
+        const data = app.envelopeOf<DeployResult>(result).data;
+        expect(await app.releaseMessage(data.release_id ?? "")).toBe("wip");
+        expect(await app.deploymentMessage(data.deployment_id ?? "")).toBe("wip");
+      });
+
+      it("rejects a blank -m rather than falling back", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin();
 
@@ -226,17 +248,16 @@ describe("deploy", () => {
       });
 
       it("omits the guard on a first deploy, when nothing is live", async () => {
-        const app = await aSetUpApp();
-        await app.addPrimaryOrigin();
+        const app = await anUndeployedEnvironment();
 
-        // Nothing is deployed yet, so there is no deployment to guard against.
-        // The deploy must omit expected_deployment_id entirely: an empty or
-        // placeholder id would be rejected by the request schema, so a
+        // Nothing is deployed to it yet, so there is no deployment to guard
+        // against. The deploy must omit expected_deployment_id entirely: an
+        // empty or placeholder id would be rejected by the request schema, so a
         // succeeding first deploy proves the field was left off.
-        const data = await app.deployData();
+        const data = await app.deployData(["--env", "staging"]);
 
         expect(data.deployment_id).toMatch(/^dep_/);
-        const listed = await app.run(["deployment", "list", "--json"]);
+        const listed = await app.run(["deployment", "list", "--env", "staging", "--json"]);
         expect(app.envelopeOf<{ count: number }>(listed).data.count).toBe(1);
       });
 
@@ -304,18 +325,16 @@ describe("deploy", () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin();
 
+        const before = await app.liveDeploymentCount();
+
         const dry = await app.deployDryRun();
 
         expect(dry).toSucceed();
-        const listed = await app.run(["deployment", "list", "--json"]);
-        expect(app.envelopeOf<{ count: number }>(listed).data.count).toBe(0);
+        expect(await app.liveDeploymentCount()).toBe(before);
       });
 
       it("shows what a dry run would change since the live release", async () => {
-        const app = await aSetUpApp();
-        await app.addPrimaryOrigin();
-        await app.commit();
-        await app.deployData();
+        const app = await aCommittedApp();
         await app.editUserSchema((schema) => {
           schema.properties.nickname = { type: "string" };
         });
@@ -331,10 +350,7 @@ describe("deploy", () => {
       });
 
       it("reports what a deploy changed since the release it replaced", async () => {
-        const app = await aSetUpApp();
-        await app.addPrimaryOrigin();
-        await app.commit();
-        await app.deployData();
+        const app = await aCommittedApp();
         await app.editUserSchema((schema) => {
           schema.properties.nickname = { type: "string" };
         });
@@ -360,10 +376,18 @@ describe("deploy", () => {
         expect(result).toPrint("Deployed sha256:");
       });
 
-      it("has no baseline to diff against on the first deploy", async () => {
+      it("diffs a deploy right after setup against the release setup deployed", async () => {
         const app = await aCommittedApp();
 
         const result = await app.deployRendered();
+
+        expect(result).toPrint("No changes to .zitadel/ since");
+      });
+
+      it("has no baseline to diff against on an environment's first deploy", async () => {
+        const app = await anUndeployedEnvironment();
+
+        const result = await app.deployRendered(["--env", "staging"]);
 
         expect(result).toPrint("No diff available");
       });

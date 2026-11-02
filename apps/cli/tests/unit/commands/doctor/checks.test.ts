@@ -34,7 +34,7 @@ import {
 import { loadPatchContext } from "../../../../src/commands/doctor/patch-context";
 import { createOrca } from "../../../../src/lib/orca";
 import { proxyConfTemplate } from "../../../../src/lib/orca/patchers/rule/angular/templates";
-import { bearerOnlyProxyConf } from "../../../helpers/proxy-conf";
+import { bearerOnlyProxyConf, v1ProxyConf } from "../../../helpers/proxy-conf";
 import { projectMetaSchemas } from "../../../../src/lib/meta-schemas";
 import { MANAGED_MARKER } from "../../../../src/lib/paths";
 import { hashScaffoldFile } from "../../../../src/lib/scaffold-manifest";
@@ -134,8 +134,15 @@ async function readScaffoldState(cwd: string): Promise<ScaffoldManifest> {
   return state.scaffold;
 }
 
+/** A context for checks whose repairs remove nothing, so none of them asks for consent. */
 function ctxFor(cwd: string, dryRun = false): CheckContext {
-  return { cwd, orca: createOrca(), cliVersion: "0.1.0-alpha.0", dryRun };
+  return {
+    cwd,
+    orca: createOrca(),
+    cliVersion: "0.1.0-alpha.0",
+    dryRun,
+    consent: (gate) => Promise.reject(new Error(`unexpected request to ${gate.name}`)),
+  };
 }
 
 /**
@@ -1171,6 +1178,68 @@ describe("ManagedFilesCheck", () => {
     expect((await check.run(ctxFor(cwd))).status).toBe("pass");
   });
 
+  // The packages call /api/v1 (ADR 077), and a v2 proxy attaches the project
+  // secret only to the exchange at the root: sign-in fails.
+  it("fails while the managed proxy knows only the bare exchange, and --fix moves it to both paths", async () => {
+    const cwd = await makeAngularProject();
+    const proxyPath = join(cwd, "proxy.conf.cjs");
+    const v2 = proxyConfTemplate()
+      .replace("/* zitadel:proxy:v3 */", "/* zitadel:proxy:v2 */")
+      .replace(
+        '(pathname === "/sessions/exchange" || pathname === "/api/v1/sessions/exchange")',
+        'pathname === "/sessions/exchange"',
+      );
+    expect(v2).not.toBe(proxyConfTemplate());
+    await writeFile(proxyPath, v2);
+    const check = new ManagedFilesCheck();
+
+    const outcome = await check.run(ctxFor(cwd));
+    expect(outcome.status).toBe("fail");
+    expect(outcome.message).toContain("detached managed config wiring: proxy.conf.cjs");
+
+    await check.fix(ctxFor(cwd));
+
+    expect(await readFile(proxyPath, "utf8")).toBe(proxyConfTemplate());
+    expect((await check.run(ctxFor(cwd))).status).toBe("pass");
+  });
+
+  // Hooks from before ADR 083 keep the session in cookies the server no longer
+  // reads: there is no interval in which they count as compatible.
+  it("fails on the session-cookie hooks from before ADR 083, and --fix replaces them", async () => {
+    const cwd = await makeAngularProject();
+    const proxyPath = join(cwd, "proxy.conf.cjs");
+    await writeFile(proxyPath, v1ProxyConf());
+    const check = new ManagedFilesCheck();
+
+    const outcome = await check.run(ctxFor(cwd));
+    expect(outcome.status).toBe("fail");
+    expect(outcome.message).toContain("outdated managed config wiring: proxy.conf.cjs");
+    expect(outcome.message).toContain("doctor --fix updates them");
+
+    await check.fix(ctxFor(cwd));
+
+    expect(await readFile(proxyPath, "utf8")).toBe(proxyConfTemplate());
+    expect((await check.run(ctxFor(cwd))).status).toBe("pass");
+  });
+
+  it("fails on hooks from before ADR 083 changed by hand, and leaves them to the developer", async () => {
+    const cwd = await makeAngularProject();
+    const proxyPath = join(cwd, "proxy.conf.cjs");
+    const changed = v1ProxyConf().replace(
+      "function renameSessionCookie(proxyRes) {",
+      'function renameSessionCookie(proxyRes) {\n  console.debug("cookies");',
+    );
+    await writeFile(proxyPath, changed);
+    const check = new ManagedFilesCheck();
+
+    const outcome = await check.run(ctxFor(cwd));
+
+    expect(outcome.status).toBe("fail");
+    expect(outcome.message).toContain("must be updated by hand");
+    await check.fix(ctxFor(cwd));
+    expect(await readFile(proxyPath, "utf8")).toBe(changed);
+  });
+
   // The edit leaves a managed proxy it cannot recognize as it is, so that
   // --fix does not fail; the doctor must not read that as applied.
   it("warns that the session-cookie hooks need adding by hand to a managed proxy changed since", async () => {
@@ -1195,13 +1264,14 @@ describe("ManagedFilesCheck", () => {
   it("warns when an unrecognized legacy proxy may still over-forward the project secret", async () => {
     const cwd = await makeAngularProject();
     const proxyPath = join(cwd, "proxy.conf.cjs");
-    const unsafe = (await readFile(proxyPath, "utf8")).replace(
-      `/* zitadel:proxy:v2 */
+    const managed = await readFile(proxyPath, "utf8");
+    const unsafe = managed.replace(
+      `/* zitadel:proxy:v3 */
 function setBearer(proxyReq) {
   const pathname = new URL(proxyReq.path, "http://zitadel.local").pathname;
   if (
     proxyReq.method === "POST" &&
-    pathname === "/sessions/exchange" &&
+    (pathname === "/sessions/exchange" || pathname === "/api/v1/sessions/exchange") &&
     !proxyReq.getHeader("authorization")
   ) {
     proxyReq.setHeader("authorization", bearer);
@@ -1212,6 +1282,7 @@ function setBearer(proxyReq) {
     .setHeader("authorization", bearer);
 }`,
     );
+    expect(unsafe).not.toBe(managed);
     await writeFile(proxyPath, unsafe);
 
     const outcome = await new ManagedFilesCheck().run(ctxFor(cwd));

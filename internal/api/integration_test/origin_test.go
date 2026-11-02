@@ -134,14 +134,14 @@ func TestOriginsAddRemove(t *testing.T) {
 		console := harness.EnsurePlatformProject(t)
 		claimerID, _ := harness.CreateUserOwnedByTeam(t, console.ID)
 		cookie := platformSessionCookie(t, claimerID).Value
-		base := harness.EnsureTestServer(t).URL
+		base := harness.APIBaseURL(t)
 
 		body := []byte(`{"pattern":"https://session.example.com","kind":"primary"}`)
 		req, err := http.NewRequestWithContext(t.Context(), http.MethodPost,
 			base+"/projects/"+project.ID+"/origins", bytes.NewReader(body))
 		require.NoError(t, err)
 		req.Header.Set("Content-Type", "application/json")
-		req.AddCookie(&http.Cookie{Name: "__nextgen_session", Value: cookie})
+		req.AddCookie(&http.Cookie{Name: "__Host-zitadel_session", Value: cookie})
 
 		resp, err := harness.EnsureHttpClient(t).Do(req)
 		require.NoError(t, err)

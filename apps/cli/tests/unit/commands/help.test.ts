@@ -30,6 +30,7 @@ Getting started
   start             Start a local Zitadel server
   status            Summarize the local Zitadel server and project state
   claim             Claim this project to make it permanent
+  skills            Give coding agents the Zitadel skills
 
 Local development
   console           Open the local console, signed in as the local admin

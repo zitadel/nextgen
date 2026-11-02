@@ -2,6 +2,8 @@ import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import * as endpoints from "@zitadel/api/generated/endpoints/zitadelNextGen";
+import { destructiveOperations } from "@zitadel/api/generated/operations";
+import { API_PREFIX } from "@zitadel/api/runtime/base-url";
 import { describe, expect, it } from "vitest";
 
 import { RESOURCES } from "../../../src/commands/resources";
@@ -145,12 +147,13 @@ type ClientOperations = ReadonlyMap<string, string>;
  * arguments and taking the first path segment, so a sub-resource
  * (`/users/{id}/passkeys`) counts against its parent.
  */
-/** The path an operation addresses, with placeholder path parameters. */
+/** The spec's path of an operation, with placeholder path parameters and without the API prefix. */
 const urlOf = (operation: string): string => {
   const module = endpoints as unknown as Record<string, unknown>;
   const build = module[`get${capitalize(operation)}Url`];
   expect(typeof build, `no URL builder paired with ${operation}`).toBe("function");
-  return String((build as (...args: unknown[]) => string)("ID", "NAME")).replace(/\?.*$/, "");
+  const url = String((build as (...args: unknown[]) => string)("ID", "NAME")).replace(/\?.*$/, "");
+  return url.startsWith(`${API_PREFIX}/`) ? url.slice(API_PREFIX.length) : url;
 };
 
 const clientOperations = (): ClientOperations => {
@@ -223,14 +226,18 @@ const PIPELINE_SOURCES: readonly string[] = [
 /**
  * The client operations each standalone command calls, read from its source
  * and keyed by its command (`variables set`). The registry's evidence is which
- * client properties its verbs touch; a `client.<operation>(` call site is the
- * same evidence, so a command that stops calling an operation leaves that
+ * client properties its verbs touch; a `client.<operation>(` call site, or a
+ * destructive one's `consent.unlock(client).<operation>(`, is the same evidence, so a command that stops calling an operation leaves that
  * operation unaccounted and this test fails. The release and deployment
  * commands reach their operations through the pipeline modules above.
  */
 const standaloneCommandOperations = async (): Promise<ReadonlyMap<string, ReadonlySet<string>>> => {
-  const callsIn = async (path: string): Promise<string[]> =>
-    [...(await readFile(path, "utf8")).matchAll(/\bclient\.(\w+)\(/g)].map((m) => m[1] as string);
+  const callsIn = async (path: string): Promise<string[]> => {
+    const source = await readFile(path, "utf8");
+    return [...source.matchAll(/\bclient\)?\s*\.(\w+)(?:\.(?:all|items|pages))?\(/g)].map(
+      (m) => m[1] as string,
+    );
+  };
   const pipeline = (
     await Promise.all(
       PIPELINE_SOURCES.map((file) => callsIn(join(import.meta.dirname, "../../../src", file))),
@@ -280,8 +287,10 @@ const verbOperations = async (): Promise<ReadonlyMap<string, ReadonlySet<string>
       // client call behind the untaken one would look unused. The recording
       // client resolves `{}`, so a call that inspects its response throws;
       // only the property that was reached matters, so the throw is discarded.
+      // A delete reaches the client through its consent, which hands it back.
+      const consent = { unlock: (unlocked: unknown) => unlocked };
       for (const ref of REFS) {
-        await spec.call(context, ref as never, {} as never).catch(() => undefined);
+        await spec.call(context, ref as never, consent as never).catch(() => undefined);
       }
       // A delete may be named after what it does instead (`deactivate`).
       operations.set(`${topic} ${verb === "delete" ? (spec.verb ?? verb) : verb}`, called);
@@ -499,5 +508,36 @@ describe("the spec names the command behind each operation", () => {
       `The spec names commands that do not run these operations: ${wrong.join("; ")}. ` +
         "Correct the command, or remove the line from the operation.",
     ).toEqual([]);
+  });
+});
+
+/** Every operation the CLI reaches through `consent.unlock(client)`, read from its source. */
+const unlockedOperations = async (): Promise<ReadonlySet<string>> => {
+  const src = join(import.meta.dirname, "../../../src");
+  const files = (await readdir(src, { recursive: true })).filter((file) => file.endsWith(".ts"));
+  const called = await Promise.all(
+    files.map(async (file) =>
+      [...(await readFile(join(src, file), "utf8")).matchAll(/unlock\(\w+\)\s*\.(\w+)\(/g)].map(
+        (match) => match[1] as string,
+      ),
+    ),
+  );
+  return new Set(called.flat());
+};
+
+describe("the spec marks what the CLI confirms as destructive", () => {
+  it("marks every operation the CLI calls only with consent", async () => {
+    const unmarked = [...(await unlockedOperations())].filter(
+      (operation) => !(destructiveOperations as readonly string[]).includes(operation),
+    );
+
+    expect(
+      unmarked,
+      "Give each in api/openapi/endpoints an `x-zitadel-destructive: true` line after its x-zitadel-cli, or stop asking for consent to run it.",
+    ).toEqual([]);
+  });
+
+  it("finds the operations the CLI calls with consent", async () => {
+    expect((await unlockedOperations()).size).toBeGreaterThan(5);
   });
 });

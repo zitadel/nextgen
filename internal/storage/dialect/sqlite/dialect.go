@@ -13,6 +13,7 @@ import (
 	_ "modernc.org/sqlite" // register "sqlite" driver
 
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/dialect/sqlite/migration"
 )
 
 func init() {
@@ -77,7 +78,7 @@ func (c Config) dsn() (dsn string, filePath string, err error) {
 		// Shared cache so multiple pool connections see the same in-memory DB;
 		// unique name so separate Connect calls stay isolated.
 		name := fmt.Sprintf("zitadel-%d", memoryDBSeq.Add(1))
-		return "file:" + name + "?mode=memory&cache=shared&" + sqlitePragmaQuery, "", nil
+		return "file:" + name + "?mode=memory&cache=shared&" + migration.PragmaQuery, "", nil
 	}
 	dir := filepath.Dir(c.Path)
 	if dir != "" && dir != "." {
@@ -94,7 +95,7 @@ func (c Config) dsn() (dsn string, filePath string, err error) {
 	u := &url.URL{
 		Scheme:   "file",
 		Path:     filepath.ToSlash(abs),
-		RawQuery: sqlitePragmaQuery,
+		RawQuery: migration.PragmaQuery,
 	}
 	return u.String(), abs, nil
 }
@@ -120,7 +121,7 @@ func mergeSQLitePragmas(dsn string) (string, error) {
 	}
 
 	var missing []string
-	for _, pair := range strings.Split(sqlitePragmaQuery, "&") {
+	for _, pair := range strings.Split(migration.PragmaQuery, "&") {
 		key, val, ok := strings.Cut(pair, "=")
 		if !ok {
 			continue
@@ -157,12 +158,6 @@ func tightenDBFilePerms(path string) {
 		_ = os.Chmod(path+suffix, 0o600)
 	}
 }
-
-// _txlock=immediate acquires the write lock at BEGIN so deferred read
-// transactions cannot upgrade into SQLITE_BUSY_SNAPSHOT after another writer
-// commits. busy_timeout covers remaining lock waits if MaxOpenConns is raised.
-// Pragmas are applied via DSN so every opened connection gets them.
-const sqlitePragmaQuery = "_txlock=immediate&_pragma=busy_timeout(30000)&_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)&_pragma=case_sensitive_like(1)"
 
 // Name implements [database.Dialect].
 func (c Config) Name() string {

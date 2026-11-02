@@ -1,6 +1,7 @@
 post:
   operationId: rollbackDeployment
   x-zitadel-cli: deployment rollback
+  x-zitadel-destructive: true
   summary: Roll back to a deployment
   description: |
     Re-deploys the release of the deployment named in the path to `primary`,
@@ -25,7 +26,7 @@ post:
   security:
     - oauth2:
         - deployment.write
-    - nextgenSession: []
+    - sessionCookie: []
   requestBody:
     required: false
     content:

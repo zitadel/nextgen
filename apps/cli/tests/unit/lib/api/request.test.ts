@@ -180,7 +180,7 @@ describe("urlOf", () => {
     const request = requestFor("listSchemas", ["limit=5"], { projectId: "p 1" });
 
     expect(urlOf("http://localhost:8080/", request)).toBe(
-      "http://localhost:8080/schemas?limit=5&project_id=p+1",
+      "http://localhost:8080/api/v1/schemas?limit=5&project_id=p+1",
     );
   });
 });

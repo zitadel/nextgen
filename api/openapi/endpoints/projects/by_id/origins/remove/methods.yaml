@@ -1,6 +1,7 @@
 post:
   operationId: removeOrigin
   x-zitadel-cli: origin rm
+  x-zitadel-destructive: true
   summary: Remove an origin pattern
   description: |
     Removes one pattern from the project's origins. Requests from URLs only
@@ -14,7 +15,7 @@ post:
   security:
     - oauth2:
         - origin.delete
-    - nextgenSession: []
+    - sessionCookie: []
   requestBody:
     required: true
     content:

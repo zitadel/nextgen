@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 
+import { recordPolicyViolations } from "../support/policy";
+
 /**
  * The console signed out, as the deployment serves it. A deep link proves the
  * console service's fallback to its index.html and the build's base (every
@@ -13,6 +15,7 @@ test("a deep link lands on the sign-in screen, whose widget asks for an email", 
 }) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
+  const violations = await recordPolicyViolations(page);
   // Every response that failed, but the guard's GET /sessions/me, whose 401 is
   // what signed out looks like, and Vercel's analytics scripts, which no
   // contract here depends on.
@@ -21,7 +24,7 @@ test("a deep link lands on the sign-in screen, whose widget asks for an email", 
     const { pathname } = new URL(response.url());
     if (
       response.status() >= 400 &&
-      pathname !== "/sessions/me" &&
+      pathname !== "/api/v1/sessions/me" &&
       !pathname.startsWith("/_vercel/")
     ) {
       failed.push(`${response.status()} ${response.request().method()} ${pathname}`);
@@ -43,5 +46,6 @@ test("a deep link lands on the sign-in screen, whose widget asks for an email", 
     // that failed say why.
     expect.soft(failed, "requests that failed").toEqual([]);
     expect.soft(errors, "uncaught errors").toEqual([]);
+    expect.soft(violations, "policy violations").toEqual([]);
   }
 });

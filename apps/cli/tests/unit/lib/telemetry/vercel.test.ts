@@ -49,6 +49,15 @@ describe("vercelEventBody", () => {
     );
     expect(Object.keys(body.ed)).toEqual(keys.slice(0, VERCEL_MAX_PROPERTIES));
   });
+
+  it("gives a key that holds no value's place to the next one", () => {
+    const keys = Array.from({ length: VERCEL_MAX_PROPERTIES + 1 }, (_, i) => `k${i}`);
+    const properties = Object.fromEntries(keys.map((key) => [key, key === "k1" ? "" : 1]));
+    const body = JSON.parse(
+      vercelEventBody("e", properties, { endpoint: VERCEL_ENDPOINT, keys }, 0),
+    );
+    expect(Object.keys(body.ed)).toEqual(keys.filter((key) => key !== "k1"));
+  });
 });
 
 describe("resolveVercelEndpoint", () => {

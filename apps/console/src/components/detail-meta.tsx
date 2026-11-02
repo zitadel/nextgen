@@ -11,9 +11,9 @@ import { EYEBROW } from "./typography";
  * what a detail screen shows: stacked below `sm`, where the rule becomes a tick
  * on its own row, and in a row above it.
  *
- * A resource (user, team) draws the card. A configuration screen (schema,
- * login flow, identity provider, release) passes `bordered={false}` and sets
- * the values on the page with no border or fill.
+ * A resource (user, team) draws the card. A configuration screen (login flow,
+ * identity provider, release) passes `bordered={false}` and sets the values on
+ * the page with no border or fill.
  *
  * `max-w-full` + `overflow-x-auto`: its width is set by the id, which is never
  * truncated, so a narrow screen scrolls the card rather than the page.
@@ -85,17 +85,9 @@ export function MetaValue({
         >
           {value}
         </span>
-        {/* Sized under the 19px value line so the copy affordance never drives
-            the row height — the card is 66px tall in the design, and a 24px
-            button pushes it to 71. */}
-        {copyable && (
-          <CopyButton
-            value={value}
-            label={`Copy ${label}`}
-            size="icon-xs"
-            className="size-4 shrink-0"
-          />
-        )}
+        {/* Inline, under the 19px value line: the card is 66px tall in the
+            design, and a 24px button pushes it to 71. */}
+        {copyable && <CopyButton value={value} label={`Copy ${label}`} size="inline" />}
       </div>
     </div>
   );

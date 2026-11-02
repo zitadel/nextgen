@@ -28,6 +28,47 @@ describe("auth-method password disable", () => {
 
   describe("against a valid server", () => {
     describe("--json", () => {
+      describe("removing the last way to sign in without --force when no one can be asked", () => {
+        it("is refused", async () => {
+          const app = await aSetUpApp();
+          await app.signsInOnlyWith("password");
+
+          const result = await app.disableMethod("password");
+
+          expect(result).toFailWith("E_VALIDATION");
+        });
+
+        it("says to pass --force", async () => {
+          const app = await aSetUpApp();
+          await app.signsInOnlyWith("password");
+
+          const result = await app.disableMethod("password");
+
+          expect(result).toHintAt("--force");
+        });
+
+        it("suggests running it again with --force", async () => {
+          const app = await aSetUpApp();
+          await app.signsInOnlyWith("password");
+
+          const result = await app.disableMethod("password");
+
+          expect(result).toSuggestExactly(
+            `auth-method password disable --schema default-human-user --cwd ${app.path} --force`,
+          );
+        });
+
+        it("disables nothing", async () => {
+          const app = await aSetUpApp();
+          await app.signsInOnlyWith("password");
+          const files = await app.snapshot();
+
+          await app.disableMethod("password");
+
+          expect(await files.changes()).toMatchObject({ added: [], modified: [], removed: [] });
+        });
+      });
+
       it("refuses while a login flow still asks for a password", async () => {
         const app = await aSetUpApp();
 

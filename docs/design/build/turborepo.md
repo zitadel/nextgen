@@ -6,9 +6,11 @@ phase of [turborepo-migration.md](turborepo-migration.md)), every task exists
 twice — in `moon.yml` ([.moon/AGENTS.md](../../../.moon/AGENTS.md)) and in a
 `turbo.json` — and a change goes into both (where the two differ on purpose
 is listed in `.moon/AGENTS.md`). Moon is the runner of record; the
-turbo version runs in CI as the non-required `ci-turbo` job (on pull
+turbo version runs in CI as the non-required `ci-turbo` workflow (on pull
 requests, in the merge queue, on pushes to main and nightly), on Vercel for
-the hosted cloud's builds, and locally with `NEXTGEN_TASK_RUNNER=turbo`.
+the hosted cloud's builds, and locally with `turbo run`. Run directly, the
+contributor scripts build through moon, or through turbo with
+`NEXTGEN_TASK_RUNNER=turbo`.
 
 ## Layout
 
@@ -40,8 +42,9 @@ the hosted cloud's builds, and locally with `NEXTGEN_TASK_RUNNER=turbo`.
   `console-deployment`, `demo-next-mock`, `demo-next-real`, `demo-nuxt-mock`,
   `journey`, `journey-local` and `e2e-local` (the journey runner with its
   options from `JOURNEY_*`), plus the docs' `e2e` and `e2e-deployment`. Unlike
-  moon there is no `all` aggregate: ci-turbo.yml names every lane in one
-  `turbo run --affected`, which runs the affected ones side by side.
+  moon there is no `all` aggregate: ci-turbo.yml runs `journey-local` in a
+  job of its own and names every other lane in one `turbo run --affected`,
+  which runs the affected ones side by side.
 
 ## Dependencies
 
@@ -54,6 +57,15 @@ the hosted cloud's builds, and locally with `NEXTGEN_TASK_RUNNER=turbo`.
   remove.
 - A task cannot depend on a persistent task (`dev`, `start`, `preview`,
   `//#server`).
+- A script that builds part of the workspace (`scripts/task-runner.mjs`)
+  builds through turbo when a turbo task runs it (turbo sets `TURBO_HASH`).
+  The task lists the same targets as `dependsOn`, so the script's own build
+  can reuse cached package builds and the graph shows what the task needs: `//#server`,
+  `@zitadel/console#dev:real`, `@zitadel/cloud#dev`.
+- A task that opens Chromium depends on its package's `install-browsers`
+  (`playwright install chromium`, never cached), so a run installs it only
+  when such a task runs: the browser test suites, the e2e lanes,
+  `@zitadel/testing#test:integration`.
 - A package imports only its own files and the workspace packages its
   `package.json` declares; `turbo boundaries` checks it in CI. Shared config
   is a package of its own (`@zitadel/vitest-config`). An import that cannot
@@ -61,6 +73,8 @@ the hosted cloud's builds, and locally with `NEXTGEN_TASK_RUNNER=turbo`.
   depend on the workspace root) or a module the runtime provides (k6's),
   carries `// @boundaries-ignore <reason>` on the line above, and its task
   lists the file in its inputs.
+  The root Vitest config uses that waiver for a direct shared-config import:
+  Turbo otherwise hashes a root workspace dependency into every task.
 - Each release build cleans and rewrites the `dist/` that dev builds and
   tests of the same graph read, so the release builds start after
   `cli#test` (`api#build-release` depends on it, and every other release
@@ -71,6 +85,11 @@ the hosted cloud's builds, and locally with `NEXTGEN_TASK_RUNNER=turbo`.
   build: its output would replace the release output they bundle) and wait
   for `@zitadel/release#build-public-packages`. Give a new public package
   those edges and add it to `release-manifest.mjs`.
+- `api#build-release` also depends on `@zitadel/server#test`, which the other
+  release builds reach. This finishes the normal console build and its Go
+  readers before any release dist is cleaned. Turbo has no order-only edge,
+  so `pack` and `publish` run the Go tests as well; moon orders them only in
+  `snapshot`, its one release entry point with Go tasks.
 
 ## Inputs and outputs
 
@@ -81,12 +100,22 @@ the hosted cloud's builds, and locally with `NEXTGEN_TASK_RUNNER=turbo`.
   `CHANGELOG.md`, `docs/`, `skills/**/*.md`, …), and `build` and `generate`
   also its tests. A task that reads more lists it after `$TURBO_EXTENDS$`:
   `["$TURBO_EXTENDS$", "$TURBO_ROOT$/api/openapi/**/*.yaml"]`.
-- A negation wins over every inclusion, wherever it stands, and matches
-  package-relative paths only. A task that reads a file of an excluded class
+- A negation wins over every inclusion, wherever it stands. Anchor excludes
+  outside the package with `$TURBO_ROOT$`. A task that reads an excluded class
   replaces `inputs` instead of extending them (`cli#test` reads its
   `README.md`). Release tasks keep every file: the tarballs ship the docs.
-- The Go tasks list the server's inputs in full (`apps/server/turbo.json`);
-  turbo has no file groups, so the list is repeated per task.
+- Turbo has no file groups. The Go production inputs (moon's
+  `serverInputs` and `benchInputs`, excluding tests) belong to a `go-sources`
+  task with no script, in `apps/server/turbo.json` and `tools/bench/turbo.json`:
+  turbo hashes it but runs nothing, and each Go task depends on it, so an
+  edit to one of those files marks its consumers affected. The server's
+  `go-tests` adds `_test.go`, `testdata` and test-only files for format, vet,
+  lint and tests. Nested modules own their tasks; changing the OIDC mock does
+  not select the server or benchmark. A Go task's own `inputs` list only what
+  that task alone reads (its script, a lint config).
+- Shared Vitest configuration is an input of tests and typechecks, not a
+  global dependency. Apps without Vitest remove it from typecheck inputs;
+  console's Vitest config is separate from the Vite production config.
 - An explicit glob matches ignored files too. A repository-wide one
   (`$TURBO_ROOT$/**/*.go`, `//#lint`'s) names the ignored trees it would
   otherwise walk: `node_modules`, build output, `.claude/`, and `.vercel/`,
@@ -101,16 +130,26 @@ the hosted cloud's builds, and locally with `NEXTGEN_TASK_RUNNER=turbo`.
   the nightly `ci-turbo` run executes every task without the cache and fails
   on what such an edit broke.
 - An ignored file a task reads is not a default input either, so the task
-  lists it. The console's build reads its `.env*` files (Vite's `loadEnv`)
-  and lists `["$TURBO_EXTENDS$", ".env*"]`; without them, a changed
-  `.env.local` would restore a build made without it. Moon hashes only what
-  git sees, listed or not ([.moon/AGENTS.md](../../../.moon/AGENTS.md)).
+  lists it. Console, docs and website builds list `.env*`; without them, a
+  changed `.env.local` would restore a build made without it. Moon lists each
+  supported dotenv path explicitly as `file://.env.local?optional` (and its
+  peers): its glob inputs skip ignored files.
 - Outputs may lie outside the package (`$TURBO_ROOT$/internal/staticui/
   console/dist/**`). Framework caches are excluded (`!.next/cache/**`).
 - `cache: false` for anything that is not a pure function of its inputs: the
   e2e lanes, the database lanes, `install-browsers`, the release builds, dev
-  servers. Their inputs still decide when they count as affected, which
-  gates the CI lanes.
+  servers, and native Go commands. Their inputs still decide when they count
+  as affected, which gates the CI lanes.
+- Go owns its compiler and ordinary test-result caches. Both runners always
+  invoke native Go commands when selected: their task keys do not capture
+  the effective host/target/compiler when Go variables are unset, and the
+  local server binary stamps Git HEAD, commit date and branch metadata.
+  Database tests additionally use `-count=1` to disable Go's result cache.
+  Generation stays cached: go.mod pins its toolchain, and nothing it writes
+  depends on the host or the commit.
+- `moon run workspace:test` probes both real graphs in an isolated fixture:
+  source/test invalidation, shared config scope, release ordering and ignored
+  dotenv changes. CI runs these tests through each runner's `test` task.
 
 ## Environment
 
@@ -118,7 +157,7 @@ the hosted cloud's builds, and locally with `NEXTGEN_TASK_RUNNER=turbo`.
   `GITHUB_ACTIONS`, `RUNNER_TEMP`, `VERCEL`, `COREPACK_*`, `TURBO_*`, what
   framework inference adds (`VITE_*` for Vite packages, `NEXT_*` for Next.js)
   and what the task lists. `env` names variables that change the output and
-  are hashed (`CONSOLE_VERCEL_INSIGHTS`, `GOFLAGS`); `passThroughEnv`
+  are hashed (`CONSOLE_ADDON`, `GOFLAGS`); `passThroughEnv`
   names variables a task reads at run time without affecting its output
   (`NEXTGEN_*` for the e2e lanes, `DOCKER_*` for the database lanes). The Go
   cache locations pass through globally.
@@ -179,7 +218,7 @@ packages calls Vitest without the guard, so no suite retries under both.
 | package boundaries | `turbo boundaries` |
 | affected tasks, task-level | `turbo query affected --base origin/main --tasks test` (its prerequisites carry the reason "required by an affected task") |
 | every task without the cache (CI's nightly run) | `turbo run lint typecheck build test --force` |
-| a run summary for the failure report | `--summarize` → `.turbo/runs/<id>.json`, `node scripts/report-turbo-failures.mjs` |
+| a run summary (per-task exit codes) | `--summarize` → `.turbo/runs/<id>.json` |
 | check a deployment of the cloud | `CLOUD_URL=<url> pnpm check:cloud`: every deployment suite, `--continue` ([runbook](../../runbooks/cloud.md#checking-a-deployment-by-hand)) |
 
 Arguments after `--` reach only the named task, but turbo puts them into the
@@ -194,12 +233,24 @@ runner (`e2e/journey/README.md`).
 `--affected` and `turbo query affected` match the diff against each task's
 `inputs` and follow task edges, so a console change still reaches the
 server's tests, which embed it (`futureFlags.affectedUsingTaskInputs`).
-ci-turbo.yml passes `--affected` to every `turbo run`, from the pull
-request's base, the merge group's or the commit a push to main replaced, and
-runs the setup a lane needs when `turbo query affected --exit-code` finds the
-lane affected; a change no task reads, such as a workflow edit, runs nothing
-there. Nightly it runs every task and lane with `TURBO_FORCE` instead.
-`--filter=…[ref]` still selects packages: do not use it for the gate.
+ci-turbo.yml runs three jobs side by side, each on a runner of its own: the
+gate, with the Go database lanes in its `turbo run`; the journey, the release
+snapshot and then its lane; and the other e2e lanes. On its own runner the
+snapshot rewrites no `dist/` the gate or the other lanes read, so the journey
+does not wait for the gate. The jobs share results through the remote cache:
+a cached task two jobs need, such as the CLI's tests in the snapshot's graph,
+runs in the job that reaches it first and is restored in the other, unless
+both start it at once. Native Go tasks run in each job, using Go's own cache. Each job first asks `turbo query
+affected --exit-code` about its own tasks, before it installs anything, and
+skips its other steps when none is affected; within a job, `--affected` from
+the pull request's base, the merge group's or the commit a push to main
+replaced picks the tasks the change reaches. A change no task reads, such as
+a workflow edit, runs nothing there. `full-pr-turbo` needs the three jobs:
+it is the one check name to require. Nightly every job runs every task and
+lane with `TURBO_FORCE` instead.
+`--filter=…[ref]` still selects packages: do not use it for the gate. In
+GitHub Actions turbo groups each task's log and annotates every failed task
+itself (`::error::`), so no script reads the run summary.
 
 Turbo needs a `pnpm` binary on `PATH` (`corepack enable`). A checkout has no
 `turbo` on `PATH`: install it globally (`npm install --global turbo`), which

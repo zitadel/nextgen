@@ -27,7 +27,6 @@ import {
   type JsonEnvelope,
   nonBlankString,
 } from "../../lib/oclif";
-import { nextCommandsData } from "../../lib/oclif/envelope";
 import { reportWarning } from "../../lib/warnings";
 
 const REQUEST_TIMEOUT_MS = 10_000;
@@ -161,12 +160,11 @@ export default class TestSignIn extends EnvironmentCommand {
     const [only] = providers;
     return this.emit({
       status: "ok",
-      data: {
-        ...data,
-        next_actions: ["Sign in once to be sure: these checks cannot prove the whole journey."],
-        ...nextCommandsData(
+      data,
+      next: {
+        actions: ["Sign in once to be sure: these checks cannot prove the whole journey."],
+        commands:
           only === undefined ? [] : [this.suggest(`test sign-in --provider ${only.provider}`)],
-        ),
       },
     });
   }
