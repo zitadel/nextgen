@@ -226,3 +226,5 @@ skills:
 # platform, pnpm 12's check reinstalls them all over an install made with
 # --os=current --cpu=current, which breaks the Vercel services' shared node_modules.
 verifyDepsBeforeRun: false
+
+# Spike: touched to invalidate turbo's global dependencies and force a full run.
