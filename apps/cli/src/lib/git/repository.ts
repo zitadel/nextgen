@@ -7,6 +7,7 @@ import { Git } from "./git";
 import type { Operation } from "./operation";
 import { CommitAll } from "./operations/commit-all";
 import { CurrentCommit } from "./operations/current-commit";
+import { CurrentSubject } from "./operations/current-subject";
 import { DiffFilesSince } from "./operations/diff-files-since";
 import { DiffSince } from "./operations/diff-since";
 import { IsDirty } from "./operations/is-dirty";
@@ -141,6 +142,11 @@ export class Repository {
   /** The commit it is at, or null before its first commit. */
   currentCommit(): Promise<string | null> {
     return this.perform(new CurrentCommit());
+  }
+
+  /** The subject line of the commit it is at, or null before its first commit. */
+  currentSubject(): Promise<string | null> {
+    return this.perform(new CurrentSubject());
   }
 
   /** Whether anything in the whole repository is uncommitted. */

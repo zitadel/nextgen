@@ -6,9 +6,9 @@ get:
   description: |
     Answers whether the server can serve requests, which takes its database answering within a second.
 
-    Point a readiness probe here, so that a server whose database does not
-    answer gets no requests until it does. The check is one round trip to the
-    database.
+    Point a readiness probe at `/readyz` at the root, where the probes stay,
+    not under `/api/v1`, so that a server whose database does not answer gets
+    no requests until it does. The check is one round trip to the database.
   security: []
   responses:
     '200':

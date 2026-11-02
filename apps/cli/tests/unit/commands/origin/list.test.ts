@@ -20,7 +20,7 @@ afterAll(() => server.close());
 beforeEach(() => {
   origins = [];
   server.use(
-    http.get(`${SERVER}/projects/:id`, ({ params }) =>
+    http.get(`${SERVER}/api/v1/projects/:id`, ({ params }) =>
       HttpResponse.json({
         id: String(params.id),
         name: "demo",

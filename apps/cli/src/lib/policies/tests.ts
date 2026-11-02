@@ -13,7 +13,7 @@
  */
 import { join } from "node:path";
 
-import type { EvaluatePolicy200 } from "@zitadel/api/generated/model";
+import type { EvaluatePolicy200, EvaluatePolicyBody } from "@zitadel/api/generated/model";
 import { policyTestFileSchema } from "@zitadel/config/schemas";
 import type { z } from "zod";
 
@@ -100,7 +100,7 @@ export async function readPolicyTests(
 export type PolicySource = { file: string } | { revision_id: string } | null;
 
 /** The policy a suite is evaluated against, by operation. */
-export type PolicyUnderTest = { config: Record<string, unknown>; source: PolicySource };
+export type PolicyUnderTest = { config: EvaluatePolicyBody["config"]; source: PolicySource };
 
 /**
  * The policies in `.zitadel/policies/`, by operation, and the problems found.
@@ -126,9 +126,10 @@ export async function policiesFromFiles(
       issues.push(...problems);
       continue;
     }
+    // Checked against the policy file schema just above.
     const { operation, config } = entry.body as {
       operation: string;
-      config: Record<string, unknown>;
+      config: EvaluatePolicyBody["config"];
     };
     policies.set(operation, { config, source: { file } });
   }
@@ -155,19 +156,17 @@ export async function policiesFromRelease(
   const release = await client.getReleaseById(releaseId, { project_id: projectId });
   const pinned = release.pointers.filter((pointer) => pointer.kind === "policy");
   const revisions = await Promise.all(
-    pinned.map((pointer) =>
-      client.getPolicyRevision(pointer.revision_id, { project_id: projectId }),
-    ),
+    pinned.map(async (pointer): Promise<[string, PolicyUnderTest]> => {
+      const revision = await client.getPolicyRevision(pointer.revision_id, {
+        project_id: projectId,
+      });
+      return [
+        pointer.handle,
+        { config: revision.config, source: { revision_id: pointer.revision_id } },
+      ];
+    }),
   );
-  const policies = new Map<string, PolicyUnderTest>(
-    pinned.map((pointer, index) => [
-      pointer.handle,
-      {
-        config: revisions[index]?.config as Record<string, unknown>,
-        source: { revision_id: pointer.revision_id },
-      },
-    ]),
-  );
+  const policies = new Map(revisions);
   return {
     policies,
     revoked: release.revoked_at !== null,

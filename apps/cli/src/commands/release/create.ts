@@ -10,7 +10,6 @@ import {
   validateStep,
   worktreeIsDirty,
 } from "../../lib/release";
-import { nextCommandsData } from "../../lib/oclif/envelope";
 import { ZitadelError } from "../../lib/errors";
 
 /**
@@ -101,8 +100,8 @@ export default class ReleaseCreate extends EnvironmentCommand {
         release_id: release.id,
         content_hash: release.content_hash,
         resources: resourceCount,
-        ...nextCommandsData([this.suggest(`deployment create --release ${release.id}`)]),
       },
+      next: { commands: [this.suggest(`deployment create --release ${release.id}`)] },
       pretty: `Created ${release.id} (${release.content_hash})`,
     });
   }

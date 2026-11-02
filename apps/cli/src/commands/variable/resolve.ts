@@ -1,10 +1,10 @@
 import { Flags } from "@oclif/core";
-import type { ZitadelClient } from "@zitadel/api/client";
+import type { ZitadelClient } from "../../lib/api-client";
 
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../../lib/oclif";
-import { renderRows, renderTable } from "../../lib/oclif/crud/table";
+import { Tabulatable } from "../../lib/oclif/tabulatable";
 import { listData } from "../../lib/oclif/envelope";
-import { DEPLOY_ARGS, listLiveDeployments, originMatchesPattern } from "../../lib/release";
+import { DEPLOY_ARGS, originMatchesPattern } from "../../lib/release";
 import { ZitadelError } from "../../lib/errors";
 import { shellArg } from "../../lib/shell";
 import { toVariableRows, variableCells } from "../../lib/variables";
@@ -23,7 +23,7 @@ const COLUMNS = ["name", "value"] as const;
  * and `--origin` is required rather than resolving from an arbitrary one
  * (#1617). A target with nothing deployed is a miss.
  */
-export default class VariableResolve extends EnvironmentCommand {
+export default class VariableResolve extends Tabulatable(EnvironmentCommand) {
   static override description = "Show the variables the live deployment froze for a target.";
   static override group = CommandGroups.configuration;
   static override examples = [
@@ -51,11 +51,11 @@ export default class VariableResolve extends EnvironmentCommand {
     // arbitrary deployment.
     // Drained across pages, so a project with many live previews still names
     // every origin, primaries included.
-    const deployments = await listLiveDeployments(
-      client,
-      projectId,
-      origin === undefined ? {} : { origin },
-    );
+    const deployments = await client.listDeployments.all({
+      project_id: projectId,
+      live: true,
+      origin,
+    });
 
     // Without `--origin`, more than one live deployment means there is no single
     // frozen map to show: each origin may run a different one. The live origins
@@ -95,16 +95,16 @@ export default class VariableResolve extends EnvironmentCommand {
     // The resource commands' list rendering: a pipe (or `--plain`) gets one
     // tab-separated record per line, with no header; a terminal gets a table.
     const cells = variableCells(rows);
-    const plain = flags.plain || !process.stdout.isTTY;
+    const plain = this.isPlain(flags.plain);
     return this.emit({
       status: "ok",
       data: { deployment_id: live.id, origins: servedOrigins, ...listData(rows) },
       pretty: plain
-        ? renderRows(COLUMNS, cells)
+        ? this.tabulateRows(COLUMNS, cells)
         : rows.length === 0
           ? `${live.id} froze no variables for ${where}.`
           : [
-              renderTable(COLUMNS, cells),
+              await this.tabulate(COLUMNS, cells),
               "",
               `${rows.length} ${rows.length === 1 ? "variable" : "variables"} frozen by ${live.id} for ${where}`,
             ].join("\n"),
@@ -128,7 +128,8 @@ export default class VariableResolve extends EnvironmentCommand {
         nextCommands: [this.suggest(DEPLOY_ARGS)],
       });
     }
-    const origins = (await client.getProject(projectId)).origins ?? [];
+    const project = await client.getProject(projectId);
+    const origins = project.origins;
     if (origins.some((entry) => entry.kind === "primary" && entry.pattern === origin)) {
       return new ZitadelError("E_NOT_FOUND", `Nothing is deployed to ${origin}.`, {
         hint: `Deploy to it first with \`zitadel ${DEPLOY_ARGS}${this.environmentSelector()}\`, then resolve its variables.`,

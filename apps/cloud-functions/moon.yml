@@ -2,9 +2,18 @@ id: "cloud-functions"
 language: "typescript"
 layer: "application"
 stack: "backend"
+dependsOn:
+  # The API's prefix, which the sign-in forwarder's bot check reads
+  # (src/sign-in.ts).
+  - "api"
 
 tasks:
-  # lint and test are the inherited tasks unchanged.
+  # lint is the inherited task unchanged.
+  test:
+    deps:
+      # The specs import @zitadel/api's dist/, as Next does.
+      - "api:build"
+
   typecheck:
     deps:
       # After the build, never beside it, for apps/website/moon.yml's reason:
@@ -12,6 +21,9 @@ tasks:
       - "build"
 
   build:
+    deps:
+      # Next resolves @zitadel/api to its dist/.
+      - "api:build"
     outputs:
       - ".next/**/*"
       # `next dev`'s own folder, which is no part of the build; its links into
@@ -23,6 +35,8 @@ tasks:
 
   dev:
     command: "corepack pnpm run dev"
+    deps:
+      - "api:build"
     env:
       # The Zitadel server the sign-in widget's calls go on to (src/sign-in.ts).
       # Deployed, it answers on the functions' own origin. Here the functions

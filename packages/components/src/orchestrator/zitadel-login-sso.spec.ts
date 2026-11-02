@@ -394,8 +394,8 @@ describe("<zitadel-login> with identity providers", () => {
       // A fresh page load: a widget that ignored `?flow=` would start a new
       // flow and leave the user on a blank sign-in screen.
       const { element, seen } = await landOn(location, 'zl-field[name="given_name"]');
-      expect(seen).toContain("GET /flow/flow_mock");
-      expect(seen).not.toContain("POST /flow");
+      expect(seen).toContain("GET /api/v1/flow/flow_mock");
+      expect(seen).not.toContain("POST /api/v1/flow");
       expect(element.shadowRoot?.querySelector('zl-field[name="given_name"]')).not.toBeNull();
     });
 
@@ -431,7 +431,7 @@ describe("<zitadel-login> with identity providers", () => {
       const { element, seen, url } = await resumeStale();
       await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
 
-      expect(seen.filter((r) => r === "POST /flow")).toHaveLength(1);
+      expect(seen.filter((r) => r === "POST /api/v1/flow")).toHaveLength(1);
       // A reload must not resume the refused flow again.
       expect(url).toBe("?keep=1#top");
       expect(element.shadowRoot?.textContent).toContain(
@@ -445,7 +445,7 @@ describe("<zitadel-login> with identity providers", () => {
       const { element, seen } = await resumeStale();
       await new Promise((resolve) => setTimeout(resolve, 100));
 
-      expect(seen.filter((r) => r === "POST /flow")).toHaveLength(1);
+      expect(seen.filter((r) => r === "POST /api/v1/flow")).toHaveLength(1);
       expect(element.shadowRoot?.querySelector("zl-alert")).not.toBeNull();
     });
 
@@ -553,8 +553,8 @@ describe("<zitadel-login> with identity providers", () => {
         warn.mockRestore();
       }
 
-      expect(seen).toContain("GET /flow/flow_stale");
-      expect(seen).toContain("POST /flow");
+      expect(seen).toContain("GET /api/v1/flow/flow_stale");
+      expect(seen).toContain("POST /api/v1/flow");
       expect(warned).toEqual([expect.stringContaining("flow_stale")]);
     },
   );

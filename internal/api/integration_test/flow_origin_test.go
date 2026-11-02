@@ -111,7 +111,7 @@ func submitFlow(t *testing.T, flowID, zflow, origin string) (*http.Response, []b
 
 func postFlow(t *testing.T, path string, body []byte, origin string, cookie *http.Cookie) (*http.Response, []byte) {
 	t.Helper()
-	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, harness.EnsureTestServer(t).URL+path, bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, harness.APIBaseURL(t)+path, bytes.NewReader(body))
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Origin", origin)

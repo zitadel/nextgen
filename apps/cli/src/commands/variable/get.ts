@@ -2,7 +2,7 @@ import { Flags } from "@oclif/core";
 
 import { ZitadelError } from "../../lib/errors";
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope, nonBlankArg } from "../../lib/oclif";
-import { renderDetail } from "../../lib/oclif/crud/table";
+import { Tabulatable } from "../../lib/oclif/tabulatable";
 import {
   assertVariableName,
   toVariableRow,
@@ -18,7 +18,7 @@ import {
  * `--preview` it reads the primary value; with it, the preview value. A name with
  * no value of the kind asked for is a miss.
  */
-export default class VariableGet extends EnvironmentCommand {
+export default class VariableGet extends Tabulatable(EnvironmentCommand) {
   static override description = "Get one variable from the project.";
   static override group = CommandGroups.configuration;
   static override examples = [
@@ -70,7 +70,7 @@ export default class VariableGet extends EnvironmentCommand {
     return this.emit({
       status: "ok",
       data,
-      pretty: renderDetail(name, ["value"], {
+      pretty: this.tabulateDetail(name, ["value"], {
         // The detail view drops an empty field, which would hide a value that
         // is legitimately the empty string.
         value: cell?.value === "" ? '""' : cell?.value,

@@ -16,9 +16,9 @@ vi.mock("@/auth/session", async (importOriginal) => {
   return { ...actual, fetchSession: vi.fn(async () => makeTestSession()) };
 });
 
-const USERS_URL = "http://localhost/api/users";
+const USERS_URL = "http://localhost/api/v1/users";
 const USERS_QUERY_URL = `${USERS_URL}/query`;
-const SCHEMAS_URL = "http://localhost/api/schemas";
+const SCHEMAS_URL = "http://localhost/api/v1/schemas";
 
 async function renderUsers(path = scopedPath("/users")) {
   const router = createAppRouter({
@@ -99,7 +99,7 @@ describe("users screen", () => {
     // not the one selected here.
     const projects: (string | null)[] = [];
     server.use(
-      http.get("*/api/projects/proj_other", () =>
+      http.get("*/api/v1/projects/proj_other", () =>
         HttpResponse.json({ id: "proj_other", name: "Other project" }),
       ),
       http.post(USERS_QUERY_URL, async ({ request }) => {
@@ -135,7 +135,7 @@ describe("users screen", () => {
     // ambiguous one in the caller's own project unless `project_id` names it.
     const schemaProjects: Record<string, string | null> = {};
     server.use(
-      http.get("*/api/projects/proj_other", () =>
+      http.get("*/api/v1/projects/proj_other", () =>
         HttpResponse.json({ id: "proj_other", name: "Other project" }),
       ),
       http.post(USERS_QUERY_URL, async ({ request }) => {
@@ -663,7 +663,7 @@ describe("users screen", () => {
     );
     vi.stubGlobal("localStorage", storage);
     server.use(
-      http.get("*/api/projects/proj_other", () =>
+      http.get("*/api/v1/projects/proj_other", () =>
         HttpResponse.json({ id: "proj_other", name: "Other project" }),
       ),
       http.post(USERS_QUERY_URL, () =>

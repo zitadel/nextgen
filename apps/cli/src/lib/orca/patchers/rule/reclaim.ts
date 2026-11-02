@@ -1,6 +1,7 @@
-import { access, readFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
+import { pathExists } from "../../../fs";
 import { isObject } from "../../../json";
 import { MANAGED_MARKER } from "../../../paths";
 import type { FileOp, ScaffoldPlan } from "./file-writer/types";
@@ -58,7 +59,7 @@ export async function withoutExistingTargets(
   const kept: FileOp[] = [];
   for (const op of ops) {
     if (op.kind === "write") {
-      if (!(await exists(join(cwd, op.path)))) {
+      if (!(await pathExists(join(cwd, op.path)))) {
         kept.push(op);
       }
       continue;
@@ -66,7 +67,7 @@ export async function withoutExistingTargets(
     if (op.kind === "edit" && op.overwrites) {
       const candidates = typeof op.path === "string" ? [op.path] : op.path;
       const present = await Promise.all(
-        candidates.map((candidate) => exists(join(cwd, candidate))),
+        candidates.map((candidate) => pathExists(join(cwd, candidate))),
       );
       if (!present.includes(true)) {
         kept.push(op);
@@ -104,15 +105,6 @@ async function dependencyDeclared(cwd: string, name: string): Promise<boolean> {
     }
     const declared = (key: string): boolean => isObject(pkg[key]) && name in (pkg[key] as object);
     return declared("dependencies") || declared("devDependencies");
-  } catch {
-    return false;
-  }
-}
-
-async function exists(path: string): Promise<boolean> {
-  try {
-    await access(path);
-    return true;
   } catch {
     return false;
   }

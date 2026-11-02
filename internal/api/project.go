@@ -367,7 +367,8 @@ func projectErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 	case domain.ErrProjectNameInvalid().Code, domain.ErrProjectMissingID().Code,
 		domain.ErrProjectPasswordHashInvalid().Code:
 		return errorResponseWithStatusCode(http.StatusBadRequest, err)
-	case domain.ErrProjectAlreadyClaimed().Code:
+	case domain.ErrProjectAlreadyClaimed().Code,
+		domain.ErrProjectLastOwner(nil).Code:
 		return errorResponseWithStatusCode(http.StatusConflict, err)
 	case domain.ErrProjectClaimExpired().Code:
 		return errorResponseWithStatusCode(http.StatusGone, err)

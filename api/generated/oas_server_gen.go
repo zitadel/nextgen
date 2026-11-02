@@ -356,7 +356,9 @@ type Handler interface {
 	// The user is removed, not deactivated, and the deletion emits `user.deleted`,
 	// plus `authz.revoked` for each grant on that grant's project.
 	// With a project secret the request is idempotent: deleting a user that exists
-	// in no project succeeds without changing anything.
+	// in no project succeeds without changing anything. Deleting the last active
+	// member of a project's owning team returns 409 `proj.last_owner` and changes
+	// nothing.
 	//
 	// DELETE /users/{user_id}
 	DeleteUserByID(ctx context.Context, params DeleteUserByIDParams) (DeleteUserByIDRes, error)
@@ -548,9 +550,10 @@ type Handler interface {
 	// GetLive implements getLive operation.
 	//
 	// Answers `ok` while the server process serves HTTP, and checks nothing behind it.
-	// Point a liveness probe here. It never checks the database, so an outage
-	// of the database does not restart every instance; `GET /readyz` takes an
-	// instance out of rotation instead.
+	// Point a liveness probe at `/livez` at the root, where the probes stay,
+	// not under `/api/v1`. It never checks the database, so an outage of the
+	// database does not restart every instance; `GET /readyz` takes an instance
+	// out of rotation instead.
 	//
 	// GET /livez
 	GetLive(ctx context.Context) (GetLiveRes, error)
@@ -633,9 +636,9 @@ type Handler interface {
 	// GetReady implements getReady operation.
 	//
 	// Answers whether the server can serve requests, which takes its database answering within a second.
-	// Point a readiness probe here, so that a server whose database does not
-	// answer gets no requests until it does. The check is one round trip to the
-	// database.
+	// Point a readiness probe at `/readyz` at the root, where the probes stay,
+	// not under `/api/v1`, so that a server whose database does not answer gets
+	// no requests until it does. The check is one round trip to the database.
 	//
 	// GET /readyz
 	GetReady(ctx context.Context) (GetReadyRes, error)

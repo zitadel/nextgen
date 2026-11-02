@@ -27,6 +27,9 @@ import {
 } from "../../lib/local-server/runtime";
 import { LocalServer } from "../../lib/local-server/server";
 import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../../lib/oclif";
+import { Destructive } from "../../lib/oclif/destructive";
+import { isRefusal } from "../../lib/consent";
+import { reportWarning } from "../../lib/warnings";
 import {
   environmentFlags,
   environmentSelectorSuffix,
@@ -52,7 +55,7 @@ import {
   type SuggestedCommand,
   unscopedCommand,
 } from "../../lib/suggestion";
-import { nextCommandsData } from "../../lib/oclif/envelope";
+import { type NextSteps, nextStepsData } from "../../lib/oclif/next-steps";
 
 const LOCAL_RUNTIME_CHECK_NAMES = new Set([
   "server-binary",
@@ -77,12 +80,18 @@ const LOCAL_RUNTIME_CHECK_NAMES = new Set([
  * level and skipped, not propagated — the post-fix re-verify still reports
  * whatever remains broken.
  */
-export default class Doctor extends BaseCommand {
+export default class Doctor extends Destructive(BaseCommand) {
   static override description = "Verify local runtime and project state.";
   static override group = CommandGroups.diagnostics;
   static override groupOrder = 1;
   static override flags = {
     fix: Flags.boolean({ description: "Repair missing files and stale managed wiring." }),
+    force: Flags.boolean({
+      char: "f",
+      description:
+        "With --fix, make repairs that replace an origin without the confirmation prompt. Required when non-interactive.",
+      dependsOn: ["fix"],
+    }),
     image: nonBlankString({ description: "Container image to check." }),
     port: Flags.integer({
       description: "Local HTTP port to check. Defaults to the port this directory's server uses.",
@@ -137,7 +146,13 @@ export default class Doctor extends BaseCommand {
           )
         : [];
     const hasConfig = await hasZitadelConfig(cwd);
-    const ctx: CheckContext = { cwd, orca: createOrca(), cliVersion: this.meta.cliVersion, dryRun };
+    const ctx: CheckContext = {
+      cwd,
+      orca: createOrca(),
+      cliVersion: this.meta.cliVersion,
+      dryRun,
+      consent: (gate) => this.consent(gate),
+    };
 
     if (hasConfig && flags.fix) {
       const before = await Promise.all(SANITY_CHECKS.map((check) => check.run(ctx)));
@@ -150,6 +165,16 @@ export default class Doctor extends BaseCommand {
         try {
           await check.fix(ctx);
         } catch (error) {
+          // Ctrl-C stops the run. A repair refused for want of --force is the
+          // person's to approve, not one that failed: it is said, the other
+          // repairs still run, and the check below still reports what is left.
+          if (error instanceof ZitadelError && error.code === "E_CANCELLED") {
+            throw error;
+          }
+          if (isRefusal(error) && error instanceof ZitadelError) {
+            reportWarning(`${error.message}. ${error.hint ?? ""}`.trim());
+            continue;
+          }
           consola.debug(`doctor --fix: ${check.name} repair failed`, error);
         }
       }
@@ -250,8 +275,10 @@ export default class Doctor extends BaseCommand {
         lifecycle: hasConfig ? "configured" : "not-configured",
       },
       checks,
-      ...(nextActions.length > 0 ? { next_actions: nextActions } : {}),
-      ...(warningAdvice ? nextCommandsData(warningAdvice.nextCommands) : {}),
+    };
+    const next: NextSteps<SuggestedCommand> = {
+      ...(nextActions.length > 0 ? { actions: nextActions } : {}),
+      ...(warningAdvice ? { commands: warningAdvice.nextCommands } : {}),
     };
 
     if (failed.length > 0) {
@@ -267,7 +294,9 @@ export default class Doctor extends BaseCommand {
       // A check that failed with a typed CLI error advertises its own
       // category (e.g. the framework floor's E_UNSUPPORTED_PROJECT_SHAPE) —
       // surface that instead of the generic validation class so agents can
-      // branch on it. The port check keeps its dedicated code first.
+      // branch on it. The port check keeps its dedicated code first. The
+      // details are the report a passing run would emit, next steps included.
+      const report = { ...data, ...nextStepsData(next) };
       const code = failed.some((check) => check.name === "port")
         ? "E_PORT_IN_USE"
         : (failed.find((check) => check.code !== undefined)?.code ?? "E_VALIDATION");
@@ -276,14 +305,15 @@ export default class Doctor extends BaseCommand {
         nextCommands: advice.nextCommands,
         details:
           advice.suggestedArgs === undefined
-            ? data
-            : { ...data, suggested_args: advice.suggestedArgs },
+            ? report
+            : { ...report, suggested_args: advice.suggestedArgs },
       });
     }
 
     return this.emit({
       status: "ok",
       data,
+      next,
       warnings: warnings.map((warning) => `${warning.name}: ${warning.message}`),
     });
   }
@@ -485,7 +515,8 @@ export function advisoryForWarnings(
     nextActions.push(
       "Make the app's issuer a primary origin; `zitadel deploy` lands only on primary origins, and `zitadel setup` 0.1.0 registered it as a preview one.",
     );
-    nextCommands.push(projectCommand("doctor --fix", selector, cliVersion));
+    // The repair removes the origin and adds it back, which needs consent.
+    nextCommands.push(projectCommand("doctor --fix --force", selector, cliVersion));
   }
 
   if (hasRepairableMetaSchemas(warnings.find((check) => check.name === "meta-schemas"))) {

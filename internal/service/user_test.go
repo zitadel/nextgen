@@ -826,6 +826,8 @@ func TestDeleteUserAction_RevokesTheUsersGrants(t *testing.T) {
 			},
 		).AnyTimes()
 		gomock.InOrder(
+			stmts.EXPECT().UserExists(gomock.Any(), "proj_platform", "user_1").Return(true, nil),
+			stmts.EXPECT().ListProjectsOwnedThroughMember(gomock.Any(), "user_1"),
 			stmts.EXPECT().DeleteUserByID(gomock.Any(), "proj_platform", "user_1"),
 			stmts.EXPECT().RevokeAuthzAssignmentsByPrincipal(gomock.Any(), domain.AuthzPrincipalTypeUser, "user_1").
 				Return([]*domain.AuthzAssignment{
@@ -860,6 +862,7 @@ func TestDeleteUserAction_RevokesTheUsersGrants(t *testing.T) {
 		t.Parallel()
 		ctrl := gomock.NewController(t)
 		stmts := servicemocks.NewMockAllStatements(ctrl)
+		stmts.EXPECT().UserExists(gomock.Any(), "proj_other", "user_1").Return(false, nil)
 		stmts.EXPECT().DeleteUserByID(gomock.Any(), "proj_other", "user_1").Return(database.NewNoRowFoundError(nil))
 
 		err := service.NewDeleteUserAction(service.DeleteUserInput{ProjectID: "proj_other", UserID: "user_1"}).

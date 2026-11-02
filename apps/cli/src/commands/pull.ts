@@ -2,14 +2,14 @@ import { mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 import { Args } from "@oclif/core";
+import type { GetReleaseById200PointersItemKind } from "@zitadel/api/generated/model";
 
 import type { ZitadelClient } from "../lib/api-client";
 import { ZitadelError } from "../lib/errors";
 import { FLOWS_DIR } from "../lib/flows";
 import { readJsonDirEntries } from "../lib/json-dir";
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../lib/oclif";
-import { nextCommandsData } from "../lib/oclif/envelope";
-import { DEPLOY_ARGS, listLiveDeployments, servesPrimary } from "../lib/release";
+import { DEPLOY_ARGS, servesPrimary } from "../lib/release";
 import { writeBackResource } from "../lib/sync";
 import { SCHEMAS_DIR } from "../lib/user-schema";
 import { reportWarning } from "../lib/warnings";
@@ -24,23 +24,27 @@ import { reportWarning } from "../lib/warnings";
  * is the id their read endpoint takes. A release also pins `branding` and `idp`,
  * but those pin a revision id the per-kind read endpoints do not accept yet, so
  * a release that carries them is pulled for the kinds it can and warns for the
- * rest — they gain a pull path when their reads are revision-addressable.
+ * rest — they gain a pull path when their reads are revision-addressable. A
+ * pinned `policy` is skipped the same way until pull learns to write one.
  */
 type Reconstructable = {
   readonly dir: string;
-  read(client: ZitadelClient, revisionId: string): Promise<Record<string, unknown>>;
+  read(client: ZitadelClient, revisionId: string): Promise<object>;
   handleOf(body: Record<string, unknown>): string | undefined;
 };
 
 /** The release-pointer kinds `pull` can rebuild on disk. */
 type ReconstructableKind = "schema" | "flow_definition";
 
-export const RECONSTRUCTABLE: Readonly<Record<ReconstructableKind, Reconstructable>> = {
+// Keyed by every kind a release pins, so a kind pull cannot rebuild yet
+// (branding, idp, policy) looks up as missing.
+export const RECONSTRUCTABLE: Readonly<Record<ReconstructableKind, Reconstructable>> &
+  Readonly<Partial<Record<GetReleaseById200PointersItemKind, Reconstructable>>> = {
   schema: {
     dir: SCHEMAS_DIR,
     read: async (client, revisionId) => {
       const response = await client.getSchemaById(revisionId);
-      return response.schema as Record<string, unknown>;
+      return response.schema;
     },
     handleOf: (body) => (typeof body.objectType === "string" ? body.objectType : undefined),
   },
@@ -48,7 +52,7 @@ export const RECONSTRUCTABLE: Readonly<Record<ReconstructableKind, Reconstructab
     dir: FLOWS_DIR,
     read: async (client, revisionId) => {
       const response = await client.getFlowDefinition(revisionId);
-      return response.flow_definition as Record<string, unknown>;
+      return response.flow_definition;
     },
     handleOf: (body) => (typeof body.name === "string" ? body.name : undefined),
   },
@@ -144,9 +148,7 @@ export default class Pull extends EnvironmentCommand {
     const pulled: { kind: string; handle: string; path: string }[] = [];
     const skipped: { kind: string; handle: string }[] = [];
     for (const pointer of release.pointers) {
-      // A release may pin kinds pull cannot rebuild yet (branding, idp), so the
-      // lookup is over the broad pointer kind and may miss.
-      const kind = (RECONSTRUCTABLE as Record<string, Reconstructable | undefined>)[pointer.kind];
+      const kind = RECONSTRUCTABLE[pointer.kind];
       if (kind === undefined) {
         skipped.push({ kind: pointer.kind, handle: pointer.handle });
         continue;
@@ -176,8 +178,8 @@ export default class Pull extends EnvironmentCommand {
         pulled,
         skipped,
         ...(dryRun ? { dry_run: true } : {}),
-        ...nextCommandsData(nextCommands),
       },
+      next: { commands: nextCommands },
       pretty: dryRun
         ? `Would write ${pulled.length} file${pulled.length === 1 ? "" : "s"} from ${release.id} (dry run).\n${summary}`
         : `Pulled ${pulled.length} file${pulled.length === 1 ? "" : "s"} from ${release.id}.\n${summary}`,
@@ -200,14 +202,17 @@ export default class Pull extends EnvironmentCommand {
       return classified.id;
     }
     if (classified.kind === "deployment") {
-      const deployment = (await client.getDeploymentById(classified.id, {
+      const deployment = await client.getDeploymentById(classified.id, {
         project_id: projectId,
-      })) as { release_id: string };
+      });
       return deployment.release_id;
     }
     if (classified.kind === "latest") {
-      const live = await listLiveDeployments(client, projectId);
-      const deployment = live.find(servesPrimary);
+      const deployments = await client.listDeployments.all({
+        project_id: projectId,
+        live: true,
+      });
+      const deployment = deployments.find(servesPrimary);
       if (deployment === undefined) {
         throw new ZitadelError("E_NOT_FOUND", "Nothing is deployed to a primary origin yet.", {
           hint: `Deploy first with \`zitadel ${DEPLOY_ARGS}${this.environmentSelector()}\`, then pull.`,

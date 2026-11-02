@@ -132,8 +132,9 @@ one login app share a relying-party ID.
 ### 6. One namespace on the server
 
 A project's authorization server lives under `/oauth/{project_id}/` on the
-server, outside the resource API; the cloud's catch-all already receives it
-(ADR 076). Two paths under it are fixed now:
+server, outside the resource API; the cloud routes it to the server with a
+`vercel.json` rule of its own when it ships, as it does the server's other root
+paths (ADR 076, amended). Two paths under it are fixed now:
 `.well-known/openid-configuration`
 ([OpenID Connect Discovery](https://openid.net/specs/openid-connect-discovery-1_0.html))
 and `.well-known/oauth-authorization-server`

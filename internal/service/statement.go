@@ -82,6 +82,12 @@ type ProjectStatements interface {
 	ListProjects(ctx context.Context, filter *database.ListOptions[domain.ProjectField]) (*database.ListResult[*domain.Project], error)
 	// DeleteProjectByID removes the project. changed is false when no row matched.
 	DeleteProjectByID(ctx context.Context, id string) (changed bool, err error)
+	// LockProject locks the project row until the transaction ends. Callers
+	// that lock several projects do it in project id order, one row at a time.
+	// Postgres and Spanner take FOR UPDATE; SQLite already holds the write lock
+	// from BEGIN IMMEDIATE, so its statement is a plain read. Returns
+	// [database.NoRowFoundError] when no project carries the id.
+	LockProject(ctx context.Context, id string) error
 }
 
 // OriginStatements persists project origin patterns under the natural key
@@ -771,6 +777,15 @@ type AuthzAssignmentStatements interface {
 	// project's admin teams that viewerUserID is also an active member of.
 	// Each carries every way they administer the project.
 	ListProjectAdmins(ctx context.Context, projectID, viewerUserID string, page database.Page[domain.ProjectAdminField]) (*database.ListResult[*domain.ProjectAdminRecord], error)
+	// ListProjectsOwnedThroughMember returns the projects, ordered by project
+	// id, whose active owning team has userID as an active member (a
+	// membership edge). Admin grants, platform operators and the project
+	// secret are not owners.
+	ListProjectsOwnedThroughMember(ctx context.Context, userID string) ([]string, error)
+	// ListProjectsLosingLastOwner returns the projects from
+	// ListProjectsOwnedThroughMember where userID is the owning team's only
+	// active member.
+	ListProjectsLosingLastOwner(ctx context.Context, userID string) ([]string, error)
 	// GetActiveOwningTeamGrant returns the project's active owning-team grant
 	// (object project, relation team) or NoRowFoundError when the project is
 	// unclaimed. The unique active grant is the claim source of truth
@@ -895,5 +910,15 @@ type EventStatements interface {
 	// GetEventSinkCursor returns (nil, nil) when no cursor row exists.
 	GetEventSinkCursor(ctx context.Context, sinkID, projectID string) (*domain.EventSinkCursor, error)
 	UpsertEventSinkCursor(ctx context.Context, cursor *domain.EventSinkCursor) error
+	// ListEventsAfterCursor lists the project's settled events after the
+	// cursor, oldest first (see EventsSettledBefore): once it has returned an
+	// event, no event that commits later sorts at or before it.
 	ListEventsAfterCursor(ctx context.Context, projectID string, afterCreatedAt time.Time, afterID string, limit uint32) ([]*domain.Event, error)
+	// EventsSettledBefore returns the instant before which the project's
+	// events are settled: every event with an earlier created_at has committed,
+	// so a reader that pages forward on (created_at, id) only up to it skips
+	// none that commits later. The zero time means every committed event is
+	// settled, because the dialect stamps events in commit order. Call it
+	// outside a transaction, or at READ COMMITTED, before the list it bounds.
+	EventsSettledBefore(ctx context.Context, projectID string) (time.Time, error)
 }

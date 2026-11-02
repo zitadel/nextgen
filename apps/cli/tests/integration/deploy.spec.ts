@@ -8,6 +8,7 @@ import {
   aCommittedApp,
   anUndeployedEnvironment,
   aSetUpApp,
+  type DeployResult,
   PASSWORD_POLICY,
   SETUP_ORIGIN,
 } from "../helpers/project";
@@ -111,7 +112,7 @@ describe("deploy", () => {
         expect(result.stdout + result.stderr).toContain("pol.invalid");
       });
 
-      it("requires -m when non-interactive", async () => {
+      it("requires -m when non-interactive outside a git repository", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin();
 
@@ -120,7 +121,22 @@ describe("deploy", () => {
         expect(result).toFailWith("E_VALIDATION");
       });
 
-      it("rejects a blank -m when non-interactive", async () => {
+      it("records the commit subject when non-interactive and -m is omitted", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        await app.editUserSchema((schema) => {
+          schema.properties.company = { type: "string" };
+        });
+        await app.commit();
+
+        const result = await app.run(["deploy", "--non-interactive", "--json"]);
+
+        const data = app.envelopeOf<DeployResult>(result).data;
+        expect(await app.releaseMessage(data.release_id ?? "")).toBe("wip");
+        expect(await app.deploymentMessage(data.deployment_id ?? "")).toBe("wip");
+      });
+
+      it("rejects a blank -m rather than falling back", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin();
 

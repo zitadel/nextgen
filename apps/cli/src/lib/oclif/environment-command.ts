@@ -9,6 +9,7 @@ import { environmentFlags, environmentSelectorSuffix } from "./environment-flags
 import type { GlobalOptions } from "./types";
 import { type EnvironmentSelector, projectCommand, type SuggestedCommand } from "../suggestion";
 import { optionArgs } from "../public-cli";
+import { shellArg, withoutOptions } from "../shell";
 
 /** The platform connection {@link EnvironmentCommand.connect} opens. */
 export type Connection = Readonly<{
@@ -129,6 +130,19 @@ export abstract class EnvironmentCommand extends BaseCommand {
   }
 
   /**
+   * The run again through {@link suggest}, which puts its selector back on.
+   * A run that resolved no environment (an `auth-method` edit) has none to
+   * put back, so it keeps the words as typed.
+   */
+  protected override retryCommand(words: readonly string[]): SuggestedCommand {
+    if ((this.environment as Environment | undefined) === undefined) {
+      return super.retryCommand(words);
+    }
+    const selector = ["--env", "-e", "--env-file", "--server", "-s", "--cwd", "-c"];
+    return this.suggest(withoutOptions(words, selector).map(shellArg).join(" "));
+  }
+
+  /**
    * Open the platform connection, authenticated with this command's
    * credential. It fails, naming the variable, when the server, the project or
    * the credential is missing.
@@ -138,8 +152,8 @@ export abstract class EnvironmentCommand extends BaseCommand {
    * terminal: on a pipe the result travels alone, and `--json` silences them
    * either way. `quiet` is for a command whose own output is that summary.
    *
-   * `verbatim` is for a caller that stores or compares what it reads (see
-   * `SanitizeOptions`).
+   * `verbatim` is for a caller that stores, compares or sends back what it
+   * reads (see `SanitizeOptions`).
    * `prompt: false` is for a best-effort probe that must never stop to ask
    * (or write `.env.<name>.local`): a missing value then fails as it would
    * non-interactively.

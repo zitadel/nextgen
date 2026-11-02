@@ -16,7 +16,27 @@ import (
 )
 
 const (
+	// eventLockEpoch is where the second key of an event writer's lock
+	// counts from: an int4 holds the seconds since 2026-01-01 until 2094.
+	eventLockEpoch = `1767225600`
+
+	// insertEventStmt stamps created_at with clock_timestamp(), the moment of
+	// the insert, not now(), the start of its transaction. Before stamping it
+	// takes a shared advisory lock keyed by the project and the current
+	// second, which the transaction holds until it ends: that is how
+	// eventsSettledBeforeStmt sees which of the project's events are still in
+	// flight, and since when. Each materialized CTE is computed before the one
+	// that reads it, so the lock comes first and a writer that a reader missed
+	// in pg_locks stamps after that reader looked.
 	insertEventStmt = `
+WITH writer AS MATERIALIZED (
+    SELECT pg_advisory_xact_lock_shared(
+        hashtext($1),
+        (floor(extract(epoch FROM clock_timestamp())) - ` + eventLockEpoch + `)::int4
+    )
+), stamp AS MATERIALIZED (
+    SELECT clock_timestamp() AS at FROM writer
+)
 INSERT INTO zitadel_nextgen.events (
     project_id, id, event_type, category,
     occurred_at, created_at,
@@ -25,15 +45,31 @@ INSERT INTO zitadel_nextgen.events (
     client_id, token_id, delegation_type, delegation_id, grantor, fingerprint,
     request_id, session_id, flow_id,
     payload, metadata
-) VALUES (
+)
+SELECT
     $1, $2, $3, $4,
-    now() - ($5 * interval '1 second'), now(),
+    stamp.at - ($5 * interval '1 second'), stamp.at,
     $6, $7, $8,
     $9, $10,
     $11, $12, $13, $14, $15, $16,
     $17, $18, $19,
     $20, $21
-) RETURNING occurred_at, created_at`
+FROM stamp
+RETURNING occurred_at, created_at`
+
+	// eventsSettledBeforeStmt returns the oldest second from which a writer
+	// of the project's events still holds its lock (insertEventStmt), or
+	// now() when none does. pg_locks lists the locks of every session,
+	// whatever its role, and a transaction releases its locks only after its
+	// commit is visible. A hash collision with another project only makes the
+	// bound earlier.
+	eventsSettledBeforeStmt = `
+SELECT least(now(), min(to_timestamp(objid::int8 + ` + eventLockEpoch + `)))
+FROM pg_locks
+WHERE locktype = 'advisory'
+    AND database = (SELECT oid FROM pg_database WHERE datname = current_database())
+    AND classid = (hashtext($1)::int8 & 4294967295)::oid
+    AND objsubid = 2`
 
 	eventQuery = `SELECT
     project_id, id, event_type, category,
@@ -225,13 +261,29 @@ func (e eventStatements) UpsertEventSinkCursor(ctx context.Context, cursor *doma
 	return wrapError(err)
 }
 
+// EventsSettledBefore implements [service.EventStatements].
+func (e eventStatements) EventsSettledBefore(ctx context.Context, projectID string) (time.Time, error) {
+	var before time.Time
+	if err := e.client.QueryRow(ctx, eventsSettledBeforeStmt, projectID).Scan(&before); err != nil {
+		return time.Time{}, wrapError(err)
+	}
+	return before.UTC(), nil
+}
+
 // ListEventsAfterCursor implements [service.EventStatements].
 func (e eventStatements) ListEventsAfterCursor(ctx context.Context, projectID string, afterCreatedAt time.Time, afterID string, limit uint32) ([]*domain.Event, error) {
 	if limit == 0 {
 		limit = 100
 	}
+	// Read before the list, so the list's snapshot holds every commit the
+	// bound counted as done.
+	settled, err := e.EventsSettledBefore(ctx, projectID)
+	if err != nil {
+		return nil, err
+	}
 	filters := []database.Filter[domain.EventField]{
 		database.Equal(database.Col(domain.EventFieldProjectID), projectID),
+		database.LessThan(database.Col(domain.EventFieldCreatedAt), settled),
 	}
 	if !afterCreatedAt.IsZero() || afterID != "" {
 		filters = append(filters, database.CompareGreater(

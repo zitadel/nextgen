@@ -15,10 +15,10 @@ vi.mock("@/auth/session", async (importOriginal) => {
   return { ...actual, fetchSession: vi.fn(async () => makeTestSession()) };
 });
 
-const USERS_URL = "http://localhost/api/users";
+const USERS_URL = "http://localhost/api/v1/users";
 const USERS_QUERY_URL = `${USERS_URL}/query`;
-const SCHEMAS_URL = "http://localhost/api/schemas";
-const PROJECTS_QUERY_URL = "http://localhost/api/projects/query";
+const SCHEMAS_URL = "http://localhost/api/v1/schemas";
+const PROJECTS_QUERY_URL = "http://localhost/api/v1/projects/query";
 
 /** The `business` shape from the design: one required email plus three optional strings. */
 const BUSINESS = {

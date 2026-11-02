@@ -17,11 +17,15 @@ takes Stripe's webhooks and runs the workflows that talk to Stripe and HubSpot.
 - Put work a person does not wait for in a workflow (`src/workflows/`), with
   each side effect in its own `"use step"` that finds what an earlier attempt
   made.
-- Never let production answer from `src/mock.ts`; `currentSystems()` refuses.
+- Let production answer from `src/mock.ts` only through `onboardingSystems()`,
+  whose recorders send nothing; everything else refuses until it is live.
+- Have a mocked write's step return the calls it would send; log ids, never
+  an email.
 - Local loop:
 
   ```sh
   moon run cloud-functions:dev      # http://localhost:5180, runs kept in .next/workflow-data
+  npx workflow inspect runs --web   # in apps/cloud-functions: runs, steps, payloads
   moon run cloud-functions:typecheck cloud-functions:test cloud-functions:build
   ```
 

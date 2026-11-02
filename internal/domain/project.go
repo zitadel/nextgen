@@ -58,6 +58,25 @@ func ErrProjectClaimWindowExpired() Error {
 	)
 }
 
+// ProjectLastOwnerDetails names the projects whose owning team would be left
+// without an active member. The wire nests this under details.details.
+type ProjectLastOwnerDetails struct {
+	ProjectIDs []string `json:"project_ids"`
+}
+
+// ErrProjectLastOwner refuses removing the last active member of a project's
+// owning team (ADR 054 §8). The literal message is what the error schema
+// records; the call site overrides it with [Error.WithMessage] so the text a
+// client reads names projectIDs. Code stays proj.last_owner either way.
+func ErrProjectLastOwner(projectIDs []string) Error {
+	return newError(
+		PrefixProject.ErrorCodePrefix("last_owner"),
+		"This user is the last active member of the team that owns a project. Add another member to that team, then try again.",
+		ProjectLastOwnerDetails{ProjectIDs: projectIDs},
+		nil,
+	)
+}
+
 // Project is a minimal representation of the object defined [here](https://github.com/zitadel/nextgen/blob/main/docs/design/api/resource-map.md#projects)
 // It is hardly ever modified but read a lot therefore it should be stored in global tables.
 type Project struct {

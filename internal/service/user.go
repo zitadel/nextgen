@@ -1125,7 +1125,19 @@ func (o *DeleteUserAction) Prepare(_ context.Context) error {
 }
 
 func (o *DeleteUserAction) Apply(ctx context.Context, stmts AllStatements) error {
-	err := stmts.DeleteUserByID(ctx, o.ProjectID, o.UserID)
+	exists, err := stmts.UserExists(ctx, o.ProjectID, o.UserID)
+	if err != nil {
+		return domain.ErrInternal(err).WithMessage("failed to delete user")
+	}
+	// A missing user stays the idempotent success below, and deletes nothing,
+	// so there is no owner to keep. The check runs first: DeleteUserByID
+	// drops the membership edges it reads.
+	if exists {
+		if err := ensureProjectOwnerRemains(ctx, stmts, o.UserID); err != nil {
+			return err
+		}
+	}
+	err = stmts.DeleteUserByID(ctx, o.ProjectID, o.UserID)
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return nil

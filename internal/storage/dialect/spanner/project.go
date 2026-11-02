@@ -20,6 +20,13 @@ const (
 	projectQuery          = "SELECT id, name, password_hash_policy, created_at, updated_at FROM projects"
 
 	setProjectPasswordHashPolicyStmt = `UPDATE projects SET password_hash_policy = @p2, updated_at = CURRENT_TIMESTAMP() WHERE id = @p1 THEN RETURN id`
+
+	// FOR UPDATE takes an exclusive lock on the project row. A plain read would
+	// take only a shared lock, which two changes can hold at once, so both
+	// could remove the project's last owner. With the exclusive lock a
+	// concurrent change of the same project aborts, and ReadWriteTransaction
+	// replays it after the first commits.
+	lockProjectStmt = `SELECT id FROM projects WHERE id = @p1 FOR UPDATE`
 )
 
 var projectColumns = []string{
@@ -251,6 +258,14 @@ func (ps projectStatements) GetProject(ctx context.Context, id string, opts serv
 		return nil, err
 	}
 	return project, nil
+}
+
+// LockProject implements [service.ProjectStatements].
+func (ps projectStatements) LockProject(ctx context.Context, id string) error {
+	return ps.db.Query(ctx, buildStatement(lockProjectStmt, id).statement(), func(iter *spanner.RowIterator) error {
+		_, err := collectOneRow(iter, func(*spanner.Row) (struct{}, error) { return struct{}{}, nil })
+		return err
+	})
 }
 
 var _ service.ProjectStatements = (*projectStatements)(nil)

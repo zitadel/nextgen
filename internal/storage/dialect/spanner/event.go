@@ -79,6 +79,13 @@ func newEventStatements(db queryExecutor) eventStatements {
 // emulator serializes one transaction at a time; intermediate THEN RETURN
 // inserts lengthened compound TXs enough to blow the abort-retry budget under
 // parallel integration tests.
+//
+// created_at is the commit timestamp, so the project's events sort in the
+// order they commit: a strong read sees every event up to its timestamp, and
+// one that commits later sorts after them all. Outside a transaction the
+// insert applies at once and CreatedAt is that timestamp; inside one it is
+// known only when the transaction commits, and CreatedAt stays zero.
+// occurred_at comes from this server's clock.
 func (e eventStatements) InsertEvent(ctx context.Context, event *domain.Event) error {
 	if event.ProjectID == "" {
 		return domain.ErrEventInvalid("missing project_id", nil)
@@ -103,8 +110,7 @@ func (e eventStatements) InsertEvent(ctx context.Context, event *domain.Event) e
 	if wait < 0 {
 		wait = 0
 	}
-	createdAt := time.Now().UTC()
-	occurredAt := createdAt.Add(-wait)
+	occurredAt := time.Now().UTC().Add(-wait)
 
 	m := spanner.InsertMap(eventsTable, map[string]any{
 		"project_id":      event.ProjectID,
@@ -112,7 +118,7 @@ func (e eventStatements) InsertEvent(ctx context.Context, event *domain.Event) e
 		"event_type":      string(event.EventType),
 		"category":        string(event.Category),
 		"occurred_at":     occurredAt,
-		"created_at":      createdAt,
+		"created_at":      spanner.CommitTimestamp,
 		"team_id":         nullString(event.TeamID),
 		"actor_id":        nullString(event.ActorID),
 		"actor_type":      nullActorType(event.ActorType),
@@ -130,11 +136,12 @@ func (e eventStatements) InsertEvent(ctx context.Context, event *domain.Event) e
 		"payload":         payload,
 		"metadata":        metadata,
 	})
-	if err := e.db.BufferWrite(ctx, []*spanner.Mutation{m}); err != nil {
+	createdAt, err := e.db.BufferWrite(ctx, []*spanner.Mutation{m})
+	if err != nil {
 		return err
 	}
 	event.OccurredAt = occurredAt
-	event.CreatedAt = createdAt
+	event.CreatedAt = createdAt.UTC()
 	event.Payload = payloadRaw
 	event.Metadata = metadataRaw
 	return nil
@@ -269,6 +276,12 @@ func (e eventStatements) UpsertEventSinkCursor(ctx context.Context, cursor *doma
 		cursor.SinkID, cursor.ProjectID, cursor.LastCreatedAt.UTC(), cursor.LastEventID,
 	).statement())
 	return err
+}
+
+// EventsSettledBefore implements [service.EventStatements]. Every committed
+// event is settled: created_at is its commit timestamp (InsertEvent).
+func (e eventStatements) EventsSettledBefore(context.Context, string) (time.Time, error) {
+	return time.Time{}, nil
 }
 
 // ListEventsAfterCursor implements [service.EventStatements].

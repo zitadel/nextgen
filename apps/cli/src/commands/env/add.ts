@@ -8,7 +8,6 @@ import { createZitadelClient } from "../../lib/api-client";
 import { toZitadelError, ZitadelError } from "../../lib/errors";
 import { isEnvironmentName } from "../../lib/environment";
 import { writeManagedEnvFile } from "../../lib/fs-safe";
-import { input } from "../../lib/input";
 import { isObject } from "../../lib/json";
 import { DEPLOY_ARGS, deployInitialRelease, type InitialDeployment } from "../../lib/release";
 import { reportWarning } from "../../lib/warnings";
@@ -24,7 +23,6 @@ import { readZitadelConfig } from "../../lib/project";
 import { DEFAULT_SERVER, parseServer, resolveServer } from "../../lib/server";
 import { shellArg, shellOption } from "../../lib/shell";
 import { environmentSelectorSuffix, projectEnvFile } from "../../lib/oclif/environment-flags";
-import { nextCommandsData } from "../../lib/oclif/envelope";
 import { type EnvironmentSelector, projectCommand } from "../../lib/suggestion";
 import { Promptable } from "../../lib/oclif/promptable";
 
@@ -252,25 +250,21 @@ export default class EnvAdd extends Promptable(BaseCommand) {
     // someone else's and may already serve a release of its own, so it is
     // never offered one, and a run with nobody to ask gets the suggestion in
     // the envelope instead — there is no flag to deploy without being asked,
-    // because an agent that wants one runs `deploy` itself. The question does
-    // not go through `this.input`: that one answers a confirm when `--force`
-    // is given, and here `--force` permits overwriting the env file, so it
-    // must never answer it.
+    // because an agent that wants one runs `deploy` itself. `--force`, which
+    // permits overwriting the env file, never answers a `yes-no`.
     let deployment: InitialDeployment | undefined;
     if (hasSomewhereToLand && !nonInteractive && projectSecret !== undefined) {
       consola.info(
         "Nothing is deployed to this environment yet, so it serves the server's default schema and login flow rather than your .zitadel/ files.",
       );
-      const confirmed = await input(
-        {
-          kind: "confirm",
+      if (
+        await this.input({
+          kind: "yes-no",
           name: "deploy .zitadel/ to the new environment",
           message: "Would you like to deploy .zitadel/ to it now?",
           initialValue: true,
-        },
-        { interactive: !nonInteractive, force: false },
-      );
-      if (confirmed) {
+        })
+      ) {
         deployment = await this.deployInitialRelease({
           cwd,
           server,
@@ -313,15 +307,17 @@ export default class EnvAdd extends Promptable(BaseCommand) {
                 deployment_id: deployment.deploymentId,
                 origins: [...deployment.origins],
               },
-        // A bound project admits every origin until the first pattern closes
-        // it, so the first step is to add one — `origin add` — before anything
-        // ships. `next_commands` is machine-readable, so the entry is included
-        // only when it is actually runnable: a concrete origin (without
-        // `--app-url` it would be a `<your-app-url>` placeholder the shell
-        // reads as redirection) and a project secret in the file for it to
-        // authenticate with (a `--project` bind with no secret cannot). The
-        // human-facing line below still spells it out.
-        ...nextCommandsData([
+      },
+      // A bound project admits every origin until the first pattern closes
+      // it, so the first step is to add one — `origin add` — before anything
+      // ships. `next_commands` is machine-readable, so the entry is included
+      // only when it is actually runnable: a concrete origin (without
+      // `--app-url` it would be a `<your-app-url>` placeholder the shell
+      // reads as redirection) and a project secret in the file for it to
+      // authenticate with (a `--project` bind with no secret cannot). When it
+      // is not runnable, the human-facing line below spells it out instead.
+      next: {
+        commands: [
           ...(needsOrigin && issuer !== undefined && writtenKeys.has("ZITADEL_PROJECT_SECRET")
             ? // shellArg quotes the origin: an IPv6 issuer like http://[::1]:3000
               // carries brackets a shell such as zsh would treat as a glob.
@@ -342,36 +338,42 @@ export default class EnvAdd extends Promptable(BaseCommand) {
             ? [projectCommand(DEPLOY_ARGS, newEnvironment, cliVersion)]
             : []),
           projectCommand("env", newEnvironment, cliVersion),
-        ]),
+        ],
       },
       pretty: [
         `Wrote ${file} with ${Object.keys(values).join(", ")}`,
-        "",
-        // Quoted like the machine command, and only offered when it can run:
-        // without the project secret in the file it would fail to authenticate.
-        ...(needsOrigin
-          ? [
-              writtenKeys.has("ZITADEL_PROJECT_SECRET")
-                ? `Allow this project's origin: zitadel origin add ${issuer === undefined ? "'<your-app-url>'" : shellArg(issuer)} --kind primary${newEnvironment}`
-                : `Allow this project's origin once ZITADEL_PROJECT_SECRET is in ${file}: zitadel origin add ${issuer === undefined ? "'<your-app-url>'" : shellArg(issuer)} --kind primary${newEnvironment}`,
-            ]
-          : []),
-        // Said even when nobody could be asked, because it is the one thing
-        // standing between this environment and a working app: until a
-        // release is deployed the project serves the server's own defaults,
-        // not the `.zitadel/` files in this directory.
-        ...(createdProject && deployment === undefined
-          ? [
-              `Nothing is deployed to ${name} yet, so it serves the server's defaults rather than .zitadel/.`,
-              ...(hasSomewhereToLand
-                ? [`Deploy to it: zitadel ${DEPLOY_ARGS}${newEnvironment}`]
-                : [
-                    `Give it an origin first: zitadel origin add '<your-app-url>' --kind primary${newEnvironment}`,
-                    `Then deploy to it: zitadel ${DEPLOY_ARGS}${newEnvironment}`,
-                  ]),
-            ]
-          : []),
-        `Check what resolves: zitadel env${newEnvironment}`,
+        ...guidanceBlock([
+          // The runnable `origin add` is in the next steps; the line here is
+          // for the one they cannot hold: a placeholder origin, or a file
+          // without the project secret it would authenticate with.
+          ...(needsOrigin
+            ? writtenKeys.has("ZITADEL_PROJECT_SECRET")
+              ? issuer === undefined
+                ? [
+                    `Allow this project's origin: zitadel origin add '<your-app-url>' --kind primary${newEnvironment}`,
+                  ]
+                : []
+              : [
+                  `Allow this project's origin once ZITADEL_PROJECT_SECRET is in ${file}: zitadel origin add ${issuer === undefined ? "'<your-app-url>'" : shellArg(issuer)} --kind primary${newEnvironment}`,
+                ]
+            : []),
+          // Said even when nobody could be asked, because it is the one thing
+          // standing between this environment and a working app: until a
+          // release is deployed the project serves the server's own defaults,
+          // not the `.zitadel/` files in this directory.
+          ...(createdProject && deployment === undefined
+            ? [
+                `Nothing is deployed to ${name} yet, so it serves the server's defaults rather than .zitadel/.`,
+                // With an origin, the deploy is in the next steps.
+                ...(hasSomewhereToLand
+                  ? []
+                  : [
+                      `Give it an origin first: zitadel origin add '<your-app-url>' --kind primary${newEnvironment}`,
+                      `Then deploy to it: zitadel ${DEPLOY_ARGS}${newEnvironment}`,
+                    ]),
+              ]
+            : []),
+        ]),
         "",
         "The deployed app never reads that file. Set these where it is built and run.",
         "",
@@ -427,4 +429,9 @@ export default class EnvAdd extends Promptable(BaseCommand) {
       return undefined;
     }
   }
+}
+
+/** Lines under a blank line that sets them apart, or nothing when there are none. */
+function guidanceBlock(lines: string[]): string[] {
+  return lines.length === 0 ? [] : ["", ...lines];
 }

@@ -40,6 +40,7 @@ catalog:
   '@oclif/plugin-search': ^1.2.50
   '@oclif/plugin-version': ^2.2.46
   '@oclif/plugin-which': ^3.2.55
+  '@oclif/table': ^0.5.9
   "@playwright/test": ^1.64.1
   # rc.3 (2026-10-13) is younger than the one-day minimumReleaseAge; one entry
   # so sdk-qwik and sdk-qwik-router build and test against the same Qwik.

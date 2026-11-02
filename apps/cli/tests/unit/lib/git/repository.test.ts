@@ -255,6 +255,20 @@ describe("Repository.currentCommit", () => {
   });
 });
 
+describe("Repository.currentSubject", () => {
+  it("is the subject of the commit it is at", async () => {
+    const cwd = await scratch.committed({ "a.txt": "a\n" });
+
+    expect(await (await open(cwd)).currentSubject()).toBe(
+      (await git(cwd, "log", "-1", "--format=%s")).trim(),
+    );
+  });
+
+  it("is null before the first commit", async () => {
+    expect(await (await open(await scratch.repository())).currentSubject()).toBeNull();
+  });
+});
+
 describe("Repository.isDirty", () => {
   it("is false for a clean tree", async () => {
     expect(await (await open(await scratch.committed({ "a.txt": "a\n" }))).isDirty()).toBe(false);

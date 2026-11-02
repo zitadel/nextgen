@@ -8,17 +8,17 @@ import {
 import { LocalServer } from "../lib/local-server/server";
 import { BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
 import { resolveCwd } from "../lib/paths";
-import { nextCommandsData } from "../lib/oclif/envelope";
-import { Promptable } from "../lib/oclif/promptable";
+import { Destructive } from "../lib/oclif/destructive";
 
-export default class Reset extends Promptable(BaseCommand) {
+export default class Reset extends Destructive(BaseCommand) {
   static override description = "Delete the local Zitadel server runtime and data.";
   static override group = CommandGroups.localDevelopment;
   static override groupOrder = 4;
   static override flags = {
     force: Flags.boolean({
       char: "f",
-      description: "Delete the local runtime and its data without the confirmation prompt.",
+      description:
+        "Delete the local runtime and its data without the confirmation prompt. Required when non-interactive.",
     }),
   };
 
@@ -33,47 +33,32 @@ export default class Reset extends Promptable(BaseCommand) {
 
     const containerName =
       runtime?.backend === "docker" ? runtime.container_name : localContainerName(this.meta.cwd);
-    if (this.meta.dryRun) {
-      return this.emit({
-        status: "ok",
-        data: {
-          title: "Local Zitadel server runtime reset plan.",
-          runtime: {
-            backend: runtime?.backend ?? "missing",
-            ...(runtime?.backend === "binary"
-              ? { pid: runtime.pid, log_path: runtime.log_path }
-              : { container_name: containerName }),
-            data_deleted: true,
-          },
-          ...nextCommandsData([this.suggestUnscoped("reset --force")]),
+    const described = {
+      backend: runtime?.backend ?? "missing",
+      ...(runtime?.backend === "binary"
+        ? { pid: runtime.pid, log_path: runtime.log_path }
+        : { container_name: containerName }),
+      data_deleted: true,
+    };
+
+    return this.emit(
+      await this.confirmed({
+        verb: "reset",
+        name: "delete the local runtime and its data",
+        message: "Delete the local Zitadel runtime and .zitadel/local/nextgen-data?",
+        preview: () => ({
+          status: "ok",
+          data: { title: "Local Zitadel server runtime reset plan.", runtime: described },
+          next: { commands: [this.suggestUnscoped("reset --force")] },
+        }),
+        apply: async (consent) => {
+          await LocalServer.at(this.meta.cwd, { cliVersion: this.meta.cliVersion }).reset(consent);
+          return {
+            status: "ok",
+            data: { title: "Local Zitadel server runtime reset.", runtime: described },
+          };
         },
-      });
-    }
-
-    const confirmed = await this.input({
-      kind: "confirm",
-      name: "delete the local runtime and its data",
-      message: "Delete the local Zitadel runtime and .zitadel/local/nextgen-data?",
-      retry: this.suggestUnscoped("reset --force"),
-    });
-    if (!confirmed) {
-      return this.emit({ status: "skipped", reason: "reset-cancelled" });
-    }
-
-    await LocalServer.at(this.meta.cwd, { cliVersion: this.meta.cliVersion }).reset();
-
-    return this.emit({
-      status: "ok",
-      data: {
-        title: "Local Zitadel server runtime reset.",
-        runtime: {
-          backend: runtime?.backend ?? "missing",
-          ...(runtime?.backend === "binary"
-            ? { pid: runtime.pid, log_path: runtime.log_path }
-            : { container_name: containerName }),
-          data_deleted: true,
-        },
-      },
-    });
+      }),
+    );
   }
 }

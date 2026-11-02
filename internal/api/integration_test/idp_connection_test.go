@@ -99,7 +99,7 @@ func (f idpFixture) queryOK(t *testing.T, req *api.QueryIdpsRequest) *api.QueryI
 func (f idpFixture) postRaw(t *testing.T, body string) (int, api.ErrorDetails) {
 	t.Helper()
 	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost,
-		harness.EnsureTestServer(t).URL+"/idps?project_id="+url.QueryEscape(f.project.ID),
+		harness.APIBaseURL(t)+"/idps?project_id="+url.QueryEscape(f.project.ID),
 		strings.NewReader(body))
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", "application/json")
