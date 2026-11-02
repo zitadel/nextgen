@@ -56,3 +56,41 @@ func TestISODurationEncode(t *testing.T) {
 	d.Encode(encoder)
 	require.Equal(t, `"PT2H"`, encoder.String())
 }
+
+func TestFormatISODuration(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		d    time.Duration
+		want string
+	}{
+		{name: "zero", d: 0, want: "PT0S"},
+		{name: "negative", d: -time.Second, want: "PT0S"},
+		{name: "one day", d: 24 * time.Hour, want: "P1D"},
+		{name: "composite", d: 24*time.Hour + 2*time.Hour + 3*time.Minute + 4*time.Second, want: "P1DT2H3M4S"},
+		{name: "under a second", d: 500 * time.Millisecond, want: "PT0.5S"},
+		{name: "fractional seconds", d: 1500 * time.Millisecond, want: "PT1.5S"},
+		{name: "one nanosecond", d: time.Nanosecond, want: "PT0.000000001S"},
+		{name: "minutes and a fraction", d: 3*time.Minute + 250*time.Millisecond, want: "PT3M0.25S"},
+		{name: "largest duration", d: time.Duration(math.MaxInt64), want: "P106751DT23H47M16.854775807S"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, formatISODuration(tt.d))
+		})
+	}
+}
+
+// A duration the client encodes is the duration the server decodes.
+func TestFormatISODurationRoundTrips(t *testing.T) {
+	for _, d := range []time.Duration{
+		time.Nanosecond,
+		999 * time.Millisecond,
+		time.Second + time.Nanosecond,
+		90 * time.Minute,
+		7*24*time.Hour + 30*time.Second + 125*time.Millisecond,
+		time.Duration(math.MaxInt64),
+	} {
+		got, err := ParseISODuration(formatISODuration(d))
+		require.NoError(t, err, d)
+		require.Equal(t, d, got)
+	}
+}

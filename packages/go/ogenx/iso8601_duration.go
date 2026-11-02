@@ -116,26 +116,28 @@ func addSeconds(total time.Duration, raw string) (time.Duration, error) {
 	return total, nil
 }
 
+// formatISODuration writes d in the units ParseISODuration reads, with the
+// seconds' fraction to the nanosecond, so every non-negative duration round
+// trips. ISO-8601 has no negative duration; one is written as zero, which the
+// server refuses wherever it takes a duration.
 func formatISODuration(d time.Duration) string {
-	if d < 0 {
+	if d <= 0 {
 		return "PT0S"
 	}
-	if d == 0 {
-		return "PT0S"
-	}
+	days := d / (24 * time.Hour)
+	d -= days * 24 * time.Hour
+	hours := d / time.Hour
+	d -= hours * time.Hour
+	minutes := d / time.Minute
+	d -= minutes * time.Minute
 	seconds := d / time.Second
-	days := seconds / (24 * 3600)
-	seconds -= days * 24 * 3600
-	hours := seconds / 3600
-	seconds -= hours * 3600
-	minutes := seconds / 60
-	seconds -= minutes * 60
+	nanos := d - seconds*time.Second
 
 	out := "P"
 	if days > 0 {
 		out += fmt.Sprintf("%dD", days)
 	}
-	if hours > 0 || minutes > 0 || seconds > 0 {
+	if hours > 0 || minutes > 0 || d > 0 {
 		out += "T"
 		if hours > 0 {
 			out += fmt.Sprintf("%dH", hours)
@@ -143,8 +145,12 @@ func formatISODuration(d time.Duration) string {
 		if minutes > 0 {
 			out += fmt.Sprintf("%dM", minutes)
 		}
-		if seconds > 0 {
-			out += fmt.Sprintf("%dS", seconds)
+		if d > 0 {
+			out += strconv.FormatInt(int64(seconds), 10)
+			if nanos > 0 {
+				out += "." + strings.TrimRight(fmt.Sprintf("%09d", int64(nanos)), "0")
+			}
+			out += "S"
 		}
 	}
 	return out
