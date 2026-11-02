@@ -3,6 +3,7 @@ import { type FileHandle, mkdir, open, readFile, stat } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { basename, dirname } from "node:path";
 import { StringDecoder } from "node:string_decoder";
+import { setTimeout as delay } from "node:timers/promises";
 
 import { resolveServerBinary, serverBinaryPath } from "@zitadel/server/binary";
 
@@ -590,10 +591,6 @@ async function waitForExit(pid: number, timeoutMs: number): Promise<boolean> {
     await delay(200);
   }
   return !BinaryLauncher.isRunning(pid);
-}
-
-function delay(ms: number): Promise<void> {
-  return new Promise((resolveDelay) => setTimeout(resolveDelay, ms));
 }
 
 /**
