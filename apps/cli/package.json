@@ -157,6 +157,7 @@
     "magicast": "^0.5.3",
     "mixpanel": "^0.18.1",
     "open": "catalog:",
+    "p-retry": "catalog:",
     "p-timeout": "catalog:",
     "p-wait-for": "catalog:",
     "picocolors": "^1.1.1",

@@ -8,7 +8,7 @@ import {
   expireClaimWindow,
   snapshotPlatformStore,
 } from "@zitadel/api-mock/platform";
-import { http, passthrough } from "msw";
+import { HttpResponse, http, passthrough } from "msw";
 import { text } from "@clack/prompts";
 import { beforeEach, describe, expect, vi } from "vitest";
 
@@ -318,6 +318,21 @@ describe("claim", () => {
     const secret = await readSecret(cwd);
     expect(secret.claimed_at).toBeUndefined();
     expect(secret.team_id).toBeUndefined();
+  });
+
+  it("keeps waiting after the platform rate-limits a status check", async () => {
+    const { cwd, project } = await makeProject();
+    const rateLimited = vi.fn(() => new HttpResponse(null, { status: 429 }));
+    server.use(http.get("*/projects/:project_id/claim/status", rateLimited, { once: true }));
+
+    const [res] = await Promise.all([
+      claim(cwd),
+      onChallengeMinted((challengeId) => completeClaimChallenge(challengeId, project.id)),
+    ]);
+
+    expect(rateLimited).toHaveBeenCalledOnce();
+    expect(res.exitCode).toBe(0);
+    expect((await readSecret(cwd)).team_id).toMatch(/^team-/);
   });
 
   it("stops waiting at --timeout and leaves the secret untouched", async () => {

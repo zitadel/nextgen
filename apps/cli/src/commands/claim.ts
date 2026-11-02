@@ -1,9 +1,8 @@
-import { setTimeout as sleep } from "node:timers/promises";
-
 import { Flags } from "@oclif/core";
 import { getClaimStatusQueryChallengeIdRegExp } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import { ApiError } from "@zitadel/api/runtime/fetch";
 import consola from "consola";
+import pRetry, { AbortError } from "p-retry";
 
 import type { ZitadelClient } from "../lib/api-client";
 import { wrapForBox } from "../lib/box";
@@ -27,6 +26,16 @@ import type { SuggestedCommand } from "../lib/suggestion";
 const INITIAL_POLL_MS = 1000;
 const MAX_POLL_MS = 5000;
 const POLL_BACKOFF_FACTOR = 1.5;
+
+/** A status check that found the claim unfinished: the poll waits and asks again. */
+class NotFinished extends Error {
+  readonly attempt: number;
+
+  constructor(attempt: number) {
+    super("The claim is not finished");
+    this.attempt = attempt;
+  }
+}
 
 /**
  * Backstop for the poll deadline, used only when the server's own `expires_at`
@@ -341,63 +350,67 @@ export default class Claim extends EnvironmentCommand {
     deadline: number,
     startOver: SuggestedCommand,
   ): Promise<{ team_id: string; claimed_at: string; dashboard_url: string }> {
-    // The backoff and the attempt count change on every turn of a loop bounded by
-    // the deadline; recursion would nest one call per poll.
-    let interval = INITIAL_POLL_MS;
-    let polls = 0;
-
-    while (Date.now() < deadline) {
-      polls += 1;
-      try {
-        const status = await client.getClaimStatus(projectId, { challenge_id: challengeId });
-        if (status.status === "completed") {
-          this.recordTelemetry({ poll_count: polls });
-          return status;
+    return pRetry(
+      async (attempt) => {
+        try {
+          const status = await client.getClaimStatus(projectId, { challenge_id: challengeId });
+          if (status.status === "completed") {
+            this.recordTelemetry({ poll_count: attempt });
+            return status;
+          }
+        } catch (error) {
+          // The window can close between init and poll (a challenge minted in
+          // the window's last minutes); the status route reports that as its
+          // own 410 code, and it must not read as the retryable link expiry.
+          if (isClaimWindowExpired(error)) {
+            this.recordTelemetry({ claim_outcome: "window_expired", poll_count: attempt });
+            throw new AbortError(claimWindowExpiredError());
+          }
+          if (error instanceof ApiError && error.status === 410) {
+            this.recordTelemetry({ claim_outcome: "expired", poll_count: attempt });
+            throw new AbortError(
+              expiredError("The link expired before the browser step finished.", startOver),
+            );
+          }
+          // Only a resumed wait can name a challenge the platform never minted
+          // for this project.
+          if (isChallengeNotFound(error)) {
+            this.recordTelemetry({ claim_outcome: "not_found", poll_count: attempt });
+            throw new AbortError(
+              new ZitadelError(
+                "E_NOT_FOUND",
+                "This project has no claim link with that challenge id.",
+                {
+                  hint: "Start a new link.",
+                  nextCommands: [startOver],
+                },
+              ),
+            );
+          }
+          // A 429 is polled again like an unfinished claim: the wait grows anyway.
+          if (!(error instanceof ApiError && error.status === 429)) {
+            this.recordTelemetry({ poll_count: attempt });
+            throw new AbortError(error instanceof Error ? error : new Error(String(error)));
+          }
         }
-      } catch (error) {
-        // The window can close between init and poll (a challenge minted in
-        // the window's last minutes); the status route reports that as its
-        // own 410 code, and it must not read as the retryable link expiry.
-        if (isClaimWindowExpired(error)) {
-          this.recordTelemetry({ claim_outcome: "window_expired", poll_count: polls });
-          throw claimWindowExpiredError();
-        }
-        if (error instanceof ApiError && error.status === 410) {
-          this.recordTelemetry({ claim_outcome: "expired", poll_count: polls });
-          throw expiredError("The link expired before the browser step finished.", startOver);
-        }
-        // Only a resumed wait can name a challenge the platform never minted
-        // for this project.
-        if (isChallengeNotFound(error)) {
-          this.recordTelemetry({ claim_outcome: "not_found", poll_count: polls });
-          throw new ZitadelError(
-            "E_NOT_FOUND",
-            "This project has no claim link with that challenge id.",
-            { hint: "Start a new link.", nextCommands: [startOver] },
-          );
-        }
-        if (error instanceof ApiError && error.status === 429) {
-          // Polled too eagerly. Back off to the ceiling immediately rather
-          // than easing towards it, so a rate limit is never compounded.
-          interval = MAX_POLL_MS;
-        } else {
-          this.recordTelemetry({ poll_count: polls });
-          throw error;
-        }
+        throw new NotFinished(attempt);
+      },
+      {
+        // Never sleeps past the deadline: the last wait ends the retries.
+        maxRetryTime: Math.max(deadline - Date.now(), 0),
+        retries: Number.POSITIVE_INFINITY,
+        minTimeout: INITIAL_POLL_MS,
+        maxTimeout: MAX_POLL_MS,
+        factor: POLL_BACKOFF_FACTOR,
+        randomize: false,
+      },
+    ).catch((error: unknown) => {
+      if (!(error instanceof NotFinished)) {
+        throw error;
       }
-
-      // Never sleep past the deadline: the last wait should end the loop, not
-      // overshoot it by up to a full interval.
-      const remaining = deadline - Date.now();
-      if (remaining <= 0) {
-        break;
-      }
-      await sleep(Math.min(interval, remaining));
-      interval = Math.min(interval * POLL_BACKOFF_FACTOR, MAX_POLL_MS);
-    }
-
-    this.recordTelemetry({ claim_outcome: "timeout", poll_count: polls });
-    throw expiredError("Stopped waiting for the browser step to finish.", startOver);
+      this.recordTelemetry({ claim_outcome: "timeout", poll_count: error.attempt });
+      throw expiredError("Stopped waiting for the browser step to finish.", startOver);
+    });
   }
 
   /**
