@@ -34,11 +34,15 @@ function Alert({
   );
 }
 
+// Stock shadcn clamps the title to one line. FormError puts the server's whole
+// message here, and the reason and next step sit past the first line.
+// `wrap-anywhere`: an id in the message has no break point, and without the
+// clamp's overflow it would widen the dialog around it.
 function AlertTitle({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="alert-title"
-      className={cn("col-start-2 line-clamp-1 min-h-4 font-medium tracking-tight", className)}
+      className={cn("col-start-2 min-h-4 font-medium tracking-tight wrap-anywhere", className)}
       {...props}
     />
   );
