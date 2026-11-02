@@ -1,6 +1,8 @@
 import { execFile } from "node:child_process";
 import { basename } from "node:path";
 
+import { errorMessage } from "../errors";
+
 export type ManagedRuntimeProcess = Readonly<{
   command: string;
   data_dir?: string;
@@ -179,8 +181,4 @@ function uniqueByPid(
     byPid.set(processInfo.pid, processInfo);
   }
   return [...byPid.values()].sort((a, b) => a.pid - b.pid);
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
