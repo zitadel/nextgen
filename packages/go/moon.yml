@@ -32,8 +32,11 @@ tasks:
     options:
       cache: false
 
+  # -count=1 disables go's test-result cache: Go keys a cached result on the
+  # files a test opens only inside this module, and api/client_test.go reads
+  # the spec from apps/api, so a spec change alone would come back cached.
   test:
-    command: "go test -timeout 5m ./..."
+    command: "go test -count=1 -timeout 5m ./..."
     deps:
       - "format"
       - "vet"
