@@ -6,8 +6,28 @@
  * own wire.
  *
  * Every path is beneath `/cloud/api/` on the cloud's origin, so the
- * console's session cookie reaches it and no CORS is involved.
+ * console's session cookie reaches it and no CORS is involved. The sign-in
+ * widget's calls are beneath `SIGN_IN_PREFIX` instead.
  */
+
+import { apiBaseUrl } from "@zitadel/api/runtime/base-url";
+
+/**
+ * Where the add-on points the sign-in widget (`signInApiBase`): the functions
+ * forward its calls to the server after BotID's check (root ADR 084 §5).
+ */
+export const SIGN_IN_PREFIX = "/cloud/zitadel";
+
+/**
+ * The widget's two calls that start or advance a sign-in or sign-up, at the
+ * base its API client builds from `SIGN_IN_PREFIX`; `*` is a flow's id.
+ * BotID's client marks exactly these, so a write it misses reaches the
+ * functions' check unmarked and is refused.
+ */
+export const FLOW_WRITES: readonly { method: "POST"; path: string }[] = [
+  { method: "POST", path: `${apiBaseUrl(SIGN_IN_PREFIX)}/flow` },
+  { method: "POST", path: `${apiBaseUrl(SIGN_IN_PREFIX)}/flow/*/submit` },
+];
 
 /**
  * `POST /cloud/api/account/ensure`'s body: where the page that sent it says

@@ -383,10 +383,9 @@ website's catch-all.
   action yet. The live adapters replace the mocks in production only;
   previews keep them, whatever keys their environment holds.
 - The add-on's production build (`CLOUD_STAGE`) leaves out what has no
-  preview state: Email, since nothing sends marketing email yet, and the
-  sign-in hop and BotID client until a preview has shown them working.
-  Previews get all of it; local runs get all but BotID's client, whose
-  challenge only a deployment serves.
+  preview state: Email, since nothing sends marketing email yet. Every build
+  sends the sign-in widget through the functions; BotID's client starts in a
+  deployment's build alone, since only a deployment serves its challenge.
 - The hourly cron is not in `vercel.json` yet. Cron runs in production only,
   where it would answer 503 every hour; it lands with the live Stripe
   adapter. `erase-account` is not scaffolded: it starts from the event
@@ -405,7 +404,7 @@ website's catch-all.
      - the onboarding workflow of §7, and the notices' segment;
      - a private app with the contacts, leads and communication-preferences
        scopes, whose token only Production holds.
-  2. BotID: verified on a preview, and open question 1 answered.
+  2. BotID: verified on a preview and on in production (2026-11-02).
   3. Support and Email: HubSpot's tickets and subscriptions, live.
   4. Billing: §8.3, Stripe's meters and prices, the live adapter, the
      webhooks and the cron.

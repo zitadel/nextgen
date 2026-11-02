@@ -1,3 +1,4 @@
+import { SIGN_IN_PREFIX } from "@zitadel/cloud-functions/contract";
 import type { ConsoleAddon } from "@zitadel/console/addon";
 
 import { track } from "./analytics";
@@ -9,22 +10,22 @@ import { signUpScreen } from "./screens/sign-up";
 import { supportScreen } from "./screens/support";
 
 /**
- * What waits for its functions to go live or for its check on a preview
- * (root ADR 084 §9): previews and local runs get it, production does not.
+ * What waits for its functions to go live (root ADR 084 §9): previews and
+ * local runs get it, production does not.
  * Billing and Support are in both, since each shows its preview state while
  * the functions answer `cloud.not_live`; Email has none, as nothing sends
  * marketing email yet. Sign-up calls no function, and the provisioning call
  * only starts onboarding, which records what it would send, so production has
- * both too. The build inlines the stage, so a production bundle carries none
- * of what it leaves out.
+ * both too, as it has the sign-in widget's bot check. The build inlines the
+ * stage, so a production bundle carries none of what it leaves out.
  */
 const unreleased = import.meta.env.CLOUD_STAGE !== "production";
 
 // BotID's client loads its challenge from paths only a Vercel deployment
-// serves, so it starts in a preview's build alone. A local production build
+// serves, so it starts in a deployment's build alone. A local production build
 // (`workspace:cloud`) would fail every flow write without the challenge,
 // while the functions' check answers human outside Vercel anyway.
-if (import.meta.env.CLOUD_STAGE === "preview") startBotCheck();
+if (["preview", "production"].includes(import.meta.env.CLOUD_STAGE)) startBotCheck();
 
 /**
  * The hosted cloud's add-on to the console (Console ADR 0006): what only the
@@ -39,11 +40,12 @@ export const addon: ConsoleAddon = unreleased
       track,
       screens: [billingScreen, supportScreen, emailScreen],
       signedOutScreens: [signUpScreen],
-      signInApiBase: "/cloud/zitadel",
+      signInApiBase: SIGN_IN_PREFIX,
     }
   : {
       Root: CloudRoot,
       track,
       screens: [billingScreen, supportScreen],
       signedOutScreens: [signUpScreen],
+      signInApiBase: SIGN_IN_PREFIX,
     };
