@@ -116,6 +116,7 @@ export const sendAll = async (
   if (paging === null) {
     return send(server, token, request);
   }
+  // Set by each fetch as `collectPages` walks the pages: it hands back only the items, and the last page's status and body are needed too.
   let last: { status: number; raw: unknown } = { status: 200, raw: undefined };
   // Each page is fetched raw: the cursor goes back to the server exactly as it
   // came, and only the items are escaped.

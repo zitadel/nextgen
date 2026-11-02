@@ -10,6 +10,7 @@ import { expect } from "vitest";
 
 import { aFakeAppGeneratorPath } from "./app-generator";
 import { aFakeServerBinary, trackLocalServerDir, type ServerShape } from "./local-server";
+import { parseJsonOrUndefined } from "../../src/lib/json";
 import { cliPackageRoot } from "./oclif-build";
 import { nextPort } from "./ports";
 import { aBinaryRecord } from "./runtime-record";
@@ -1444,15 +1445,14 @@ export function assertEnvelope(result: CliResult, args: string[] = []): void {
   // inside a string value is safe — `JSON.stringify` escapes it to `\u001b`, so
   // this only trips on a raw control byte on stdout.)
   expect(result.stdout, `${where}: JSON output contains ANSI colour codes`).not.toContain("\u001B");
-  let envelope: Envelope;
-  try {
-    envelope = parseJson(result.stdout) as Envelope;
-  } catch {
+  const parsed = parseJsonOrUndefined(result.stdout);
+  if (parsed === undefined) {
     throw new Error(
       `${where} emitted no JSON envelope on stdout.\n` +
         `stdout: ${result.stdout || "(empty)"}\nstderr: ${result.stderr || "(empty)"}`,
     );
   }
+  const envelope = parsed as Envelope;
   expect(envelope.cli_version, `${where}: cli_version missing`).toBeTypeOf("string");
   expect(envelope.command, `${where}: command missing`).toBeTypeOf("string");
   expect(envelope.source, `${where}: source missing`).toBeTypeOf("string");

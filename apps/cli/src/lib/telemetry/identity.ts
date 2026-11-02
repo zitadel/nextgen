@@ -41,6 +41,7 @@ export function telemetryConfigDir(env: NodeJS.ProcessEnv): string {
  * never load-bearing.
  */
 export function loadOrCreateIdentity(env: NodeJS.ProcessEnv): Identity {
+  // Assigned in a `try` whose `catch` returns, which has no `const` form.
   let dir: string;
   try {
     dir = telemetryConfigDir(env);

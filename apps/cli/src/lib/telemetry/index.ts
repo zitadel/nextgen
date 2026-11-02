@@ -134,6 +134,7 @@ export class Telemetry {
 
     const identity = (deps.loadIdentity ?? loadOrCreateIdentity)(deps.env);
 
+    // Assigned in a `try` whose failure means "no client".
     let client: MixpanelClient | undefined;
     if (token) {
       try {
@@ -179,6 +180,7 @@ export class Telemetry {
     if (!sink) {
       return;
     }
+    // Assigned in a `try` whose `catch` returns, and only the build is guarded.
     let body: string;
     try {
       body = vercelEventBody(event, payload, sink, Date.now());

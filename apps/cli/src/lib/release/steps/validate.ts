@@ -101,6 +101,7 @@ function validateBundleShapes(ctx: StepContext): void {
     }
     // An unreadable `$file` reference throws here; the wire bundle dropped it,
     // so this is the only place the deploy can still catch it.
+    // Assigned in a `try` (the read throws), and only the read is guarded.
     let template: string | undefined;
     try {
       template = readDescriptorTemplate(ctx.cwd, descriptor);

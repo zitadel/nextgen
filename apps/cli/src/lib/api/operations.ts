@@ -129,7 +129,6 @@ const matchOf = (
     return undefined;
   }
   const values: Record<string, string> = {};
-  let literals = 0;
   for (const [index, part] of parts.entries()) {
     const segment = segments[index] ?? "";
     const parameter = /^\{([^}]+)\}$/.exec(part)?.[1];
@@ -138,12 +137,13 @@ const matchOf = (
         return undefined;
       }
       values[parameter] = segment;
-    } else if (part === segment) {
-      literals++;
-    } else {
+    } else if (part !== segment) {
       return undefined;
     }
   }
+  // Every part that is not a parameter matched its segment, or the loop would
+  // have returned.
+  const literals = parts.filter((part) => !/^\{[^}]+\}$/.test(part)).length;
   return { literals, values };
 };
 

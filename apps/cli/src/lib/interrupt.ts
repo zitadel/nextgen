@@ -17,6 +17,7 @@ import { ZitadelError } from "./errors";
  */
 const GRACE_MS = 1_000;
 
+// Module state: the signal handler and the next command's setup each replace these, so they cannot be constants.
 let controller = new AbortController();
 let grace: NodeJS.Timeout | undefined;
 

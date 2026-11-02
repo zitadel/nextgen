@@ -125,16 +125,17 @@ async function inspect(cwd: string): Promise<Finding> {
   }
 
   const client = createZitadelClient({ baseUrl: server, token: secret.project_secret });
-  let origins: ReadonlyArray<{ pattern: string; kind: string }>;
-  try {
-    const project = await client.getProject(secret.project_id);
-    origins = project.origins;
-  } catch (error) {
+  const read = await client.getProject(secret.project_id).then(
+    ({ origins }) => ({ origins }),
+    (error: unknown) => ({ failure: error }),
+  );
+  if ("failure" in read) {
     return {
       status: "pass",
-      message: `Skipped: could not read the project's origins from ${server}: ${errorMessage(error)}`,
+      message: `Skipped: could not read the project's origins from ${server}: ${errorMessage(read.failure)}`,
     };
   }
+  const { origins } = read;
   const pattern = issuerHeldAsPreview(origins, issuer);
   if (pattern !== undefined) {
     return { status: "warn", pattern, server, secret, client };

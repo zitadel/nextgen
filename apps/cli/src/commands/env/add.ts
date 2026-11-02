@@ -153,22 +153,24 @@ export default class EnvAdd extends Promptable(BaseCommand) {
       });
     }
 
-    let projectId = flags.project;
-    let projectSecret = env.ZITADEL_PROJECT_SECRET;
-    let previewToken = env.ZITADEL_PREVIEW_TOKEN;
-    if (projectId === undefined) {
-      const created = await createZitadelClient({ baseUrl: server }).createProject({
-        name: `${basename(cwd)}-${name}`,
-        ...(issuer === undefined
-          ? {}
-          : { origins: [{ pattern: issuer, kind: "primary" as const }] }),
-        seed_defaults: false,
-      });
-      consola.success(`Created project ${created.id}`);
-      projectId = created.id;
-      projectSecret = created.project_secret;
-      previewToken = created.preview_secret;
+    const project =
+      flags.project === undefined
+        ? await createZitadelClient({ baseUrl: server }).createProject({
+            name: `${basename(cwd)}-${name}`,
+            ...(issuer === undefined
+              ? {}
+              : { origins: [{ pattern: issuer, kind: "primary" as const }] }),
+            seed_defaults: false,
+          })
+        : {
+            id: flags.project,
+            project_secret: env.ZITADEL_PROJECT_SECRET,
+            preview_secret: env.ZITADEL_PREVIEW_TOKEN,
+          };
+    if (flags.project === undefined) {
+      consola.success(`Created project ${project.id}`);
     }
+    const { id: projectId, project_secret: projectSecret, preview_secret: previewToken } = project;
 
     const values: Record<string, string> = {
       ZITADEL_URL: server,
@@ -252,28 +254,28 @@ export default class EnvAdd extends Promptable(BaseCommand) {
     // the envelope instead — there is no flag to deploy without being asked,
     // because an agent that wants one runs `deploy` itself. `--force`, which
     // permits overwriting the env file, never answers a `yes-no`.
-    let deployment: InitialDeployment | undefined;
-    if (hasSomewhereToLand && !nonInteractive && projectSecret !== undefined) {
+    const offerDeployment = hasSomewhereToLand && !nonInteractive && projectSecret !== undefined;
+    if (offerDeployment) {
       consola.info(
         "Nothing is deployed to this environment yet, so it serves the server's default schema and login flow rather than your .zitadel/ files.",
       );
-      if (
-        await this.input({
-          kind: "yes-no",
-          name: "deploy .zitadel/ to the new environment",
-          message: "Would you like to deploy .zitadel/ to it now?",
-          initialValue: true,
-        })
-      ) {
-        deployment = await this.deployInitialRelease({
-          cwd,
-          server,
-          projectId,
-          projectSecret,
-          selector: newEnvironment,
-        });
-      }
     }
+    const deployment: InitialDeployment | undefined =
+      offerDeployment &&
+      (await this.input({
+        kind: "yes-no",
+        name: "deploy .zitadel/ to the new environment",
+        message: "Would you like to deploy .zitadel/ to it now?",
+        initialValue: true,
+      }))
+        ? await this.deployInitialRelease({
+            cwd,
+            server,
+            projectId,
+            projectSecret,
+            selector: newEnvironment,
+          })
+        : undefined;
     const render = (variables: PlatformVariable[]): string[] =>
       variables.map((variable) =>
         variable.secret

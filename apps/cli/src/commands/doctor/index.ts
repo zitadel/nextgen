@@ -5,7 +5,7 @@ import consola from "consola";
 
 import { createZitadelClient } from "../../lib/api-client";
 import { claimAction, claimCommand, claimWindowClosedAction } from "../../lib/claim-state";
-import { type Environment, resolveEnvironment } from "../../lib/environment";
+import { resolveEnvironment } from "../../lib/environment";
 import { ZitadelError, errorMessage } from "../../lib/errors";
 import { serverLogAction } from "../../lib/journey-guidance";
 import {
@@ -555,24 +555,26 @@ async function runEnvironmentChecks(input: {
   if (input.envName === undefined && input.envFile === undefined) {
     return [];
   }
-  let environment: Environment;
-  try {
-    environment = await resolveEnvironment({
-      cwd: input.cwd,
-      env: input.env,
-      envName: input.envName,
-      envFile: input.envFile,
-      serverFlag: input.serverFlag,
-    });
-  } catch (error) {
+  const resolved = await resolveEnvironment({
+    cwd: input.cwd,
+    env: input.env,
+    envName: input.envName,
+    envFile: input.envFile,
+    serverFlag: input.serverFlag,
+  }).then(
+    (environment) => ({ environment }),
+    (error: unknown) => ({ failure: error }),
+  );
+  if ("failure" in resolved) {
     return [
       {
         name: "environment",
         status: "fail",
-        message: errorMessage(error),
+        message: errorMessage(resolved.failure),
       },
     ];
   }
+  const { environment } = resolved;
   const name = environment.name.value;
   return [
     await check(`environment`, `Resolved ${name} environment connects`, async () => {

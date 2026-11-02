@@ -14,6 +14,7 @@
  */
 export const withoutOptions = (words: readonly string[], options: readonly string[]): string[] => {
   const kept: string[] = [];
+  // An option's value is skipped by moving the index, so this stays a counted loop.
   for (let i = 0; i < words.length; i += 1) {
     const word = words[i] ?? "";
     if (options.includes(word)) {

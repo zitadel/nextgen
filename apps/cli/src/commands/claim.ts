@@ -205,23 +205,27 @@ export default class Claim extends EnvironmentCommand {
 
     const { client } = prompted ?? (await this.connect());
 
+    // Set by whichever branch runs: minting a link has early returns and prompts
+    // in the middle, so it cannot be one expression.
     let waitFor: { challengeId: string; deadline: number };
     let opened: boolean | undefined;
     if (challengeId === undefined) {
-      let challenge: Awaited<ReturnType<typeof client.initClaim>>;
-      try {
-        challenge = await client.initClaim(projectId);
-      } catch (error) {
-        const claimed = alreadyClaimedDetails(error);
+      const init = await client.initClaim(projectId).then(
+        (minted) => ({ challenge: minted }),
+        (error: unknown) => ({ failure: error }),
+      );
+      if ("failure" in init) {
+        const claimed = alreadyClaimedDetails(init.failure);
         if (claimed) {
           return this.alreadyClaimed({ project_id: projectId, ...claimed });
         }
-        if (isClaimWindowExpired(error)) {
+        if (isClaimWindowExpired(init.failure)) {
           this.recordTelemetry({ claim_outcome: "window_expired" });
           throw claimWindowExpiredError();
         }
-        throw error;
+        throw init.failure;
       }
+      const { challenge } = init;
 
       // A local server left on the default public base advertises a claim page
       // on a remote origin — the exact confusion this warning names. Cloud
@@ -337,6 +341,8 @@ export default class Claim extends EnvironmentCommand {
     deadline: number,
     startOver: SuggestedCommand,
   ): Promise<{ team_id: string; claimed_at: string; dashboard_url: string }> {
+    // The backoff and the attempt count change on every turn of a loop bounded by
+    // the deadline; recursion would nest one call per poll.
     let interval = INITIAL_POLL_MS;
     let polls = 0;
 

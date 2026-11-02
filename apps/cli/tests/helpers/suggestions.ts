@@ -27,33 +27,20 @@ const REFERENCE = JSON.parse(
 /** The CLI as a suggestion runs it: `npx @zitadel/cli@<version>` or `zitadel`. */
 const RUNNER = /^(?:@zitadel\/cli(?:@\S+)?|zitadel)$/;
 
+/** One shell word: unquoted characters, escapes and quoted runs, up to the next blank. */
+const SHELL_WORD = /(?:[^\s'"\\]|\\[\s\S]|'[^']*'|"(?:\\[\s\S]|[^"\\])*")+/g;
+/** A quoted run or an escape inside a word, which the shell replaces with its text. */
+const SHELL_QUOTING = /'([^']*)'|"((?:\\[\s\S]|[^"\\])*)"|\\([\s\S])/g;
+
 /** The words a POSIX shell splits a command into, and the operators between them. */
 function shellWords(command: string): string[] {
-  const words: string[] = [];
-  let word: string | undefined;
-  for (let at = 0; at < command.length; at++) {
-    const char = command[at] as string;
-    if (char === "'") {
-      const end = command.indexOf("'", at + 1);
-      word = (word ?? "") + command.slice(at + 1, end);
-      at = end;
-    } else if (char === '"') {
-      let text = "";
-      for (at++; at < command.length && command[at] !== '"'; at++) {
-        text += command[at] === "\\" ? (command[++at] ?? "") : command[at];
-      }
-      word = (word ?? "") + text;
-    } else if (char === "\\") {
-      word = (word ?? "") + (command[++at] ?? "");
-    } else if (/\s/.test(char)) {
-      if (word !== undefined) words.push(word);
-      word = undefined;
-    } else {
-      word = (word ?? "") + char;
-    }
-  }
-  if (word !== undefined) words.push(word);
-  return words;
+  return (command.match(SHELL_WORD) ?? []).map((word) =>
+    word.replaceAll(
+      SHELL_QUOTING,
+      (_, single?: string, double?: string, escaped?: string) =>
+        single ?? double?.replaceAll(/\\([\s\S])/g, "$1") ?? escaped ?? "",
+    ),
+  );
 }
 
 /**
@@ -82,6 +69,7 @@ function problemWith(command: string): string | undefined {
   }
   const flags = [...reference.flags, ...REFERENCE.globalFlags];
   const seen = new Map<string, number>();
+  // Walks the tokens by hand: an option takes the token after it, which the walk then skips.
   let positional = 0;
   const tokens = rest.slice(reference.id.split(" ").length);
   for (let at = 0; at < tokens.length; at++) {
