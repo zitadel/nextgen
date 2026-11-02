@@ -137,6 +137,7 @@
       "properties": {
         "id": { "type": "string", "pattern": "^[a-z0-9_]+$", "description": "Also the Stripe meter's event name" },
         "label": { "type": "string" },
+        "unit": { "type": "string", "description": "One counted unit, singular: user, token, check" },
         "kind": { "enum": ["users", "activity", "gauge"] },
         "counts": { "type": "string" },
         "dedupe": {
