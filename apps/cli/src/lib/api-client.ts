@@ -99,8 +99,8 @@ export function sanitizeResponse<T>(value: T): T {
   };
 
   const root = copy(value);
-  for (let next = pending.pop(); next; next = pending.pop()) {
-    const { source, target } = next;
+  // Iterating the array also visits the entries `copy` appends meanwhile.
+  for (const { source, target } of pending) {
     if (Array.isArray(source)) {
       for (const item of source) {
         (target as unknown[]).push(copy(item));

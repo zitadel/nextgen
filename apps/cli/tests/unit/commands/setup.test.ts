@@ -665,11 +665,11 @@ describe("setup command", () => {
 
   it("creates CLI-managed projects with a name and without server default seeding", async () => {
     const cwd = await makeNextProject();
-    let createProjectBody: unknown;
+    const createProjectBodies: unknown[] = [];
 
     server.use(
       http.post("*/projects", async ({ request }) => {
-        createProjectBody = await request.json();
+        createProjectBodies.push(await request.json());
         return HttpResponse.json(
           {
             id: "proj-test",
@@ -687,6 +687,7 @@ describe("setup command", () => {
     const res = await setup(cwd, ["--non-interactive", "--skip-install", "--framework", "next"]);
 
     expect(res.exitCode).toBe(0);
+    const [createProjectBody] = createProjectBodies;
     expect(createProjectBody).toMatchObject({
       name: expect.any(String),
       origins: expect.arrayContaining([{ pattern: "http://localhost:3000", kind: "primary" }]),
@@ -1213,12 +1214,8 @@ describe("setup asked on a terminal", () => {
 
   // The port question is asked only when the app's port is taken; whether 3000
   // is free on the machine running the tests must not decide what is asked.
-  let portFree: ReturnType<typeof vi.spyOn>;
   beforeEach(() => {
-    portFree = vi.spyOn(LocalServer, "isPortFree").mockResolvedValue(true);
-  });
-  afterEach(() => {
-    portFree.mockRestore();
+    vi.spyOn(LocalServer, "isPortFree").mockResolvedValue(true);
   });
 
   it("still asks whether to proceed with the detected framework when --force is given", async () => {
@@ -1250,9 +1247,6 @@ describe("setup asked on a terminal", () => {
       vi.mocked(isCancel).mockImplementation((value) => value === CANCELLED);
       vi.mocked(text).mockClear();
       vi.mocked(intro).mockClear();
-    });
-    afterEach(() => {
-      vi.unstubAllEnvs();
     });
 
     /**

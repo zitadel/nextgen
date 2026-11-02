@@ -1,5 +1,5 @@
 import type { Consent, Gate } from "../../../lib/consent";
-import { ZitadelError, type ZitadelErrorCode } from "../../../lib/errors";
+import { ZitadelError, type ZitadelErrorCode, errorMessage } from "../../../lib/errors";
 import type { Orca } from "../../../lib/orca";
 
 /** Pass/fail/advisory outcome of a single {@link SanityCheck}. */
@@ -73,7 +73,7 @@ export abstract class AbstractSanityCheck implements SanityCheck {
       return {
         name: this.name,
         status: "fail",
-        message: error instanceof Error ? error.message : String(error),
+        message: errorMessage(error),
         path: this.path,
         ...(error instanceof ZitadelError
           ? { code: error.code, ...(error.hint === undefined ? {} : { hint: error.hint }) }

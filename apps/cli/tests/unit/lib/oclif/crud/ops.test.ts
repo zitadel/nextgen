@@ -264,12 +264,12 @@ describe("wire conventions", () => {
     // query body that nests its filters, and nothing in the factory objects.
     // The page holds its cursor as `continuation`, which only the spec's own
     // `next` reads; the envelope reports it under the wire's name.
-    let sent: unknown;
+    const sent: unknown[] = [];
     const spec: ListSpec<Ctx, Json, { rows: readonly unknown[]; continuation?: string }> = {
       body: z.object({}).passthrough(),
       filters: [{ field: "state", operations: ["equals"] }],
       call: async (_ctx, request) => {
-        sent = request;
+        sent.push(request);
         return { rows: [{ id: "r1" }], continuation: "c2" };
       },
       items: (page) => page.rows,
@@ -309,7 +309,7 @@ describe("wire conventions", () => {
       "--json",
     ]);
 
-    expect(sent).toEqual({
+    expect(sent[0]).toEqual({
       size: 5,
       where: [{ field: "state", operation: "equals", value: "active" }],
     });
@@ -392,19 +392,16 @@ async function printed(
   const prototype = (command as { prototype: BaseCommand }).prototype;
   const stdout: string[] = [];
   const stderr: string[] = [];
-  const log = vi.spyOn(prototype, "log").mockImplementation((message?: string) => {
+  vi.spyOn(prototype, "log").mockImplementation((message?: string) => {
     stdout.push(message ?? "");
   });
-  const logToStderr = vi.spyOn(prototype, "logToStderr").mockImplementation((message?: string) => {
+  vi.spyOn(prototype, "logToStderr").mockImplementation((message?: string) => {
     stderr.push(message ?? "");
   });
   try {
     await (command as { run(argv: string[]): Promise<unknown> }).run(argv);
   } catch (error) {
     throw new Error(`${String(error)}\n${stderr.join("\n")}`);
-  } finally {
-    log.mockRestore();
-    logToStderr.mockRestore();
   }
   return { stdout, stderr };
 }
@@ -580,19 +577,14 @@ describe("get sections", () => {
   /** What a run prints on a terminal. */
   const printed = async (argv: string[]): Promise<string> => {
     const written: string[] = [];
-    const write = vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
+    vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
       written.push(String(chunk));
       return true;
     });
-    const log = vi.spyOn(console, "log").mockImplementation((...args) => {
+    vi.spyOn(console, "log").mockImplementation((...args) => {
       written.push(`${args.join(" ")}\n`);
     });
-    try {
-      await asTerminal(() => getting.run(argv));
-    } finally {
-      write.mockRestore();
-      log.mockRestore();
-    }
+    await asTerminal(() => getting.run(argv));
     return written.join("");
   };
 
@@ -621,24 +613,18 @@ describe("delete confirmation", () => {
   ): Promise<{ stdout: string; stderr: string }> => {
     const written: string[] = [];
     const errors: string[] = [];
-    const write = vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
+    vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
       written.push(String(chunk));
       return true;
     });
-    const err = vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
+    vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
       errors.push(String(chunk));
       return true;
     });
-    const log = vi.spyOn(console, "log").mockImplementation((...args) => {
+    vi.spyOn(console, "log").mockImplementation((...args) => {
       written.push(`${args.join(" ")}\n`);
     });
-    try {
-      await run().catch(() => undefined);
-    } finally {
-      write.mockRestore();
-      log.mockRestore();
-      err.mockRestore();
-    }
+    await run().catch(() => undefined);
     return { stdout: written.join(""), stderr: errors.join("") };
   };
 

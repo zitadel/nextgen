@@ -158,16 +158,13 @@ export default class Preview extends PreviewCommand {
     }
 
     // Preview URLs come from `--origin`, else from the platform build variables.
-    let urls = requested;
-    if (urls.length === 0) {
-      const detected = detectPreviewUrls(env);
-      if (detected.urls.length === 0) {
-        throw new ZitadelError("E_VALIDATION", "No preview URLs to deploy to", {
-          hint: `Pass --origin, or run inside a pull-request build that sets one of: ${detected.variablesLookedFor.join(", ")}.`,
-        });
-      }
-      urls = [...detected.urls];
+    const detected = requested.length === 0 ? detectPreviewUrls(env) : undefined;
+    if (detected !== undefined && detected.urls.length === 0) {
+      throw new ZitadelError("E_VALIDATION", "No preview URLs to deploy to", {
+        hint: `Pass --origin, or run inside a pull-request build that sets one of: ${detected.variablesLookedFor.join(", ")}.`,
+      });
     }
+    const urls = detected === undefined ? requested : [...detected.urls];
 
     const { client, projectId } = await this.connect();
 

@@ -94,14 +94,13 @@ function validateConnection(data: object, file: string, suggest: StepContext["su
 
 /** The value a Zod issue path points at, or undefined when it is absent. */
 function valueAt(data: object, path: ReadonlyArray<PropertyKey>): unknown {
-  let current: unknown = data;
-  for (const key of path) {
-    if (typeof current !== "object" || current === null) {
-      return undefined;
-    }
-    current = (current as Record<PropertyKey, unknown>)[key];
-  }
-  return current;
+  return path.reduce<unknown>(
+    (current, key) =>
+      typeof current !== "object" || current === null
+        ? undefined
+        : (current as Record<PropertyKey, unknown>)[key],
+    data,
+  );
 }
 
 /**
@@ -112,14 +111,16 @@ function valueAt(data: object, path: ReadonlyArray<PropertyKey>): unknown {
  */
 async function heldVariables(ctx: StepContext): Promise<Map<string, boolean> | undefined> {
   const kind = ctx.mode === "preview" ? "preview" : "primary";
-  let held: Awaited<ReturnType<StepContext["client"]["getVariables"]>>;
-  try {
-    held = await ctx.client.getVariables({ project_id: ctx.projectId, kind });
-  } catch (error) {
-    if (ctx.mode === "preview" && error instanceof ApiError && error.status === 403) {
-      return undefined;
-    }
-    throw error;
+  const held = await ctx.client
+    .getVariables({ project_id: ctx.projectId, kind })
+    .catch((error: unknown) => {
+      if (ctx.mode === "preview" && error instanceof ApiError && error.status === 403) {
+        return undefined;
+      }
+      throw error;
+    });
+  if (held === undefined) {
+    return undefined;
   }
   // A secret reads back as `{ secret: true }`, a plain value as the value.
   return new Map(

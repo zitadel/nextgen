@@ -4,7 +4,14 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { pathExists, pathExistsStrict, readIfExists, readIfReadable } from "../../../src/lib/fs";
+import {
+  isFile,
+  pathExists,
+  pathExistsStrict,
+  readDirIfExists,
+  readIfExists,
+  readIfReadable,
+} from "../../../src/lib/fs";
 
 const tmpDir = (): Promise<string> => mkdtemp(join(tmpdir(), "zitadel-fs-"));
 
@@ -91,5 +98,42 @@ describe("readIfReadable", () => {
 
     expect(await readIfReadable(join(dir, "missing"))).toBeUndefined();
     expect(await readIfReadable(join(dir, "folder"))).toBeUndefined();
+  });
+});
+
+describe("readDirIfExists", () => {
+  it("lists the entries of an existing directory", async () => {
+    const dir = await tmpDir();
+    await writeFile(join(dir, "a.txt"), "x");
+
+    expect(await readDirIfExists(dir)).toEqual(["a.txt"]);
+  });
+
+  it("returns an empty list for a missing directory", async () => {
+    expect(await readDirIfExists(join(await tmpDir(), "missing"))).toEqual([]);
+  });
+
+  it("rethrows when the path is a file rather than a directory", async () => {
+    const dir = await tmpDir();
+    await writeFile(join(dir, "a.txt"), "x");
+
+    await expect(readDirIfExists(join(dir, "a.txt"))).rejects.toMatchObject({ code: "ENOTDIR" });
+  });
+});
+
+describe("isFile", () => {
+  it("is true for a regular file", async () => {
+    const dir = await tmpDir();
+    await writeFile(join(dir, "a.txt"), "x");
+
+    expect(await isFile(join(dir, "a.txt"))).toBe(true);
+  });
+
+  it("is false for a directory", async () => {
+    expect(await isFile(await tmpDir())).toBe(false);
+  });
+
+  it("is false for a path that does not exist", async () => {
+    expect(await isFile(join(await tmpDir(), "missing"))).toBe(false);
   });
 });

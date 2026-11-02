@@ -31,6 +31,7 @@ import {
   SecretPermissionsCheck,
   type CheckContext,
 } from "../../../../src/commands/doctor/checks";
+import { exactZitadelPins } from "../../../../src/commands/doctor/checks/dependency-version";
 import { loadPatchContext } from "../../../../src/commands/doctor/patch-context";
 import { createOrca } from "../../../../src/lib/orca";
 import { proxyConfTemplate } from "../../../../src/lib/orca/patchers/rule/angular/templates";
@@ -1693,13 +1694,9 @@ describe("loadPatchContext", () => {
     const cwd = await makeProject();
     vi.stubEnv("ZITADEL_ENV", "production");
     vi.stubEnv("ZITADEL_ISSUER", "https://auth.example.com");
-    try {
-      expect((await loadPatchContext(cwd, createOrca(), "0.1.0-alpha.0")).issuer).toBe(
-        "http://localhost:3000",
-      );
-    } finally {
-      vi.unstubAllEnvs();
-    }
+    expect((await loadPatchContext(cwd, createOrca(), "0.1.0-alpha.0")).issuer).toBe(
+      "http://localhost:3000",
+    );
   });
 
   it("falls back to the manifest dev_port for the issuer", async () => {
@@ -1853,5 +1850,25 @@ describe("DependencyVersionCheck", () => {
     });
     // The dependency check owns that failure; this one only compares pins.
     expect(outcome.status).toBe("pass");
+  });
+
+  it("passes quietly when package.json is not valid JSON", async () => {
+    const cwd = await makeProject();
+    await writeFile(join(cwd, "package.json"), "{ not json");
+    const outcome = await new DependencyVersionCheck().run({
+      ...ctxFor(cwd),
+      cliVersion: "0.1.0-alpha.18",
+    });
+    expect(outcome.status).toBe("pass");
+  });
+});
+
+describe("exactZitadelPins", () => {
+  it("is undefined without a package.json and rejects one that is not valid JSON", async () => {
+    const cwd = await makeProject();
+    await rm(join(cwd, "package.json"));
+    expect(await exactZitadelPins(cwd)).toBeUndefined();
+    await writeFile(join(cwd, "package.json"), "{ not json");
+    await expect(exactZitadelPins(cwd)).rejects.toThrow(SyntaxError);
   });
 });

@@ -1,3 +1,4 @@
+import { isLoopbackHost } from "../host";
 import { DEFAULT_SERVER } from "../server";
 import type { Property } from "../telemetry/property";
 
@@ -22,7 +23,7 @@ class ServerKind implements Property<string, "cloud" | "local" | "self_hosted" |
     ) {
       return "cloud";
     }
-    if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1") {
+    if (isLoopbackHost(hostname)) {
       return "local";
     }
     return "self_hosted";
