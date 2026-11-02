@@ -14,8 +14,8 @@ post:
 
     - Single-use: exchange it once, with no retry.
     - Bound to the project: the exchange needs the same project's credential.
-    - Safe to request again with the same idempotency key within a 5-minute
-      window, which returns the same token.
+    - Created once: a second call answers `409 att.already_handed_off`, even
+      with the same idempotency key.
 
     A revoked release is refused when the handoff is exchanged, not here. A
     release is the configuration that `zitadel deploy` publishes.
@@ -28,7 +28,8 @@ post:
     - $ref: ../../../../components/parameters/attempt-id.yaml
     - $ref: ../../../../components/parameters/idempotency-key.yaml
       description: |
-        Optional retry key for safe retries of the handoff creation.
+        Optional retry key. The server accepts it but does not use it: a
+        retry after a successful handoff answers `409 att.already_handed_off`.
         Retries carrying the same key within the exchange window return the same handoff token
         without re-completing the attempt or minting a new token.
   responses:

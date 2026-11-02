@@ -7,8 +7,7 @@ post:
     user. `registration_id` is the one that call returned. The attestation is
     the browser's answer from `navigator.credentials.create()`.
 
-    A rejected attestation counts against the ceremony's failure budget and the
-    ceremony stays open for a retry. An expired ceremony answers
+    A rejected attestation leaves the ceremony open for a retry. An expired ceremony answers
     `att.stale_challenge`: begin a new registration. An unknown or
     already-consumed registration ID answers `att.not_found`.
   tags:

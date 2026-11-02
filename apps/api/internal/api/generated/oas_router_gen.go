@@ -4826,7 +4826,7 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 						switch method {
 						case "DELETE":
 							r.name = DeleteTeamOperation
-							r.summary = "Delete a team"
+							r.summary = "Deactivate a team"
 							r.operationID = "deleteTeam"
 							r.operationGroup = ""
 							r.pathPattern = "/teams/{team_id}"

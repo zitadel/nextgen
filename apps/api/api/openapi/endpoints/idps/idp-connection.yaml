@@ -165,4 +165,4 @@ properties:
               - client_assertion
         additionalProperties:
           type: string
-        description: "Extra provider-specific authorize parameters (for example `prompt`). Engine-owned protocol parameters are reserved and rejected by `propertyNames`: the server composes them itself, and an override of `state` or `nonce` would silently defeat CSRF and token binding. `client_secret` and `client_assertion` are rejected as they could be appended to the public authorize URL."
+        description: "Extra provider-specific authorize parameters (for example `prompt`). Protocol parameters the server sets are reserved and rejected by `propertyNames`: the server composes them itself, and an override of `state` or `nonce` would silently defeat CSRF and token binding. `client_secret` and `client_assertion` are rejected as they could be appended to the public authorize URL."

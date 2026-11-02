@@ -20,7 +20,9 @@ post:
 
     The call is idempotent: revoking a release that is already revoked answers
     `200` with the release unchanged, and `revoked_at` still names the first
-    revocation. There is no un-revoke, so build a new release instead.
+    revocation. There is no un-revoke. To serve that configuration again,
+    change it and build a new release: rebuilding unchanged content returns
+    the same revoked release.
 
     The call takes no body. The lookup is scoped to the project in
     `project_id`, so a release ID of another project answers not found exactly

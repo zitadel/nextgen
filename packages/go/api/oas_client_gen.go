@@ -143,8 +143,9 @@ type Invoker interface {
 	//
 	// Publishes a new immutable branding revision for the project, and records a
 	// `branding.created` event. Branding revisions cannot be updated or deleted.
-	// Every edit publishes a new revision, and flow responses resolve the latest
-	// revision per project.
+	// Every edit publishes a new revision. When the deployed release pins a
+	// flow, flow responses carry the branding revision that release pins.
+	// Otherwise they carry the newest revision.
 	// The `id` of the new revision is the revision ID a release pins for
 	// `kind: branding`.
 	// The `liquid_template` is validated lexically on save (size, encoding,
@@ -268,7 +269,9 @@ type Invoker interface {
 	// `404` or `409` when the principal is missing or the grant already exists.
 	// Creating by `user.identifier` answers `202` with no body on every outcome.
 	// Granting the session caller's own user is `grant.invalid` on either user
-	// locator. Read the grant back with `getGrant` for the identifier and display.
+	// locator. A `201` grant names its user or team by ID only: read it back
+	// with `getGrant` for the identifier and display name. A `202` returns no
+	// grant ID: find the grant with `queryGrants`, filtered by `user_id`.
 	// Authenticate with a project secret (`oauth2`) or a console session cookie
 	// (`sessionCookie`). A session caller is authorized as the signed-in person
 	// against the target project, even when the session belongs to another project.
@@ -287,8 +290,8 @@ type Invoker interface {
 	// seconds to receive the session and its `session_token`. The handoff token is:
 	// - Single-use: exchange it once, with no retry.
 	// - Bound to the project: the exchange needs the same project's credential.
-	// - Safe to request again with the same idempotency key within a 5-minute
-	// window, which returns the same token.
+	// - Created once: a second call answers `409 att.already_handed_off`, even
+	// with the same idempotency key.
 	// A revoked release is refused when the handoff is exchanged, not here. A
 	// release is the configuration that `zitadel deploy` publishes.
 	//
@@ -541,8 +544,7 @@ type Invoker interface {
 	// `beginUserPasskeyRegistration` started and stores the new passkey for the
 	// user. `registration_id` is the one that call returned. The attestation is
 	// the browser's answer from `navigator.credentials.create()`.
-	// A rejected attestation counts against the ceremony's failure budget and the
-	// ceremony stays open for a retry. An expired ceremony answers
+	// A rejected attestation leaves the ceremony open for a retry. An expired ceremony answers
 	// `att.stale_challenge`: begin a new registration. An unknown or
 	// already-consumed registration ID answers `att.not_found`.
 	//
@@ -916,8 +918,8 @@ type Invoker interface {
 	// ListBranding invokes listBranding operation.
 	//
 	// Lists a project's branding revisions, newest first, capped at the 100 most
-	// recent and not paginated. The first entry is the revision flow responses
-	// currently resolve.
+	// recent and not paginated. The first entry is the newest revision, which
+	// flow responses carry when the deployed release pins no flow.
 	// The `id` of an entry is the revision ID that `getBrandingById` takes and
 	// that a release pins for `kind: branding`.
 	//
@@ -1318,7 +1320,9 @@ type Invoker interface {
 	// the history.
 	// The call is idempotent: revoking a release that is already revoked answers
 	// `200` with the release unchanged, and `revoked_at` still names the first
-	// revocation. There is no un-revoke, so build a new release instead.
+	// revocation. There is no un-revoke. To serve that configuration again,
+	// change it and build a new release: rebuilding unchanged content returns
+	// the same revoked release.
 	// The call takes no body. The lookup is scoped to the project in
 	// `project_id`, so a release ID of another project answers not found exactly
 	// as an unknown ID does.
@@ -1364,8 +1368,9 @@ type Invoker interface {
 	// rolled back. Deploy to the preview again with `createDeployment`. The
 	// error also appears when the project has no primary origin. Add one with
 	// `zitadel origin add`.
-	// - `404 dep.not_found`: no deployment of the project has that ID. List
-	// them with `listDeployments`.
+	// - `404 dep.not_found`: no deployment of the project has that ID, or that
+	// deployment recorded no variables to restore, so it cannot be a rollback
+	// target. List them with `listDeployments` and pick another.
 	// - `409 dep.conflict`: `expected_deployment_id` is not the project's
 	// newest primary deployment, and `details.deployment` is that deployment.
 	// Inspect it, then retry with its ID, or stop.
@@ -1478,7 +1483,7 @@ type Invoker interface {
 	// attempt moves to the next pending challenge, or completes when every required
 	// factor is verified. Then call `createHandoff`.
 	// A `409` with `att.proof_rejected` means the proof was wrong. Check it and try
-	// again. After too many failed proofs the attempt fails, and you create a new one.
+	// again. There is no retry limit: you can retry until the attempt expires.
 	//
 	// POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify
 	VerifyChallengeProof(ctx context.Context, request *VerifyChallengeRequest, params VerifyChallengeProofParams) (VerifyChallengeProofRes, error)
@@ -2304,8 +2309,9 @@ func (c *Client) sendCreateAuthAttempt(ctx context.Context, request *CreateAuthA
 //
 // Publishes a new immutable branding revision for the project, and records a
 // `branding.created` event. Branding revisions cannot be updated or deleted.
-// Every edit publishes a new revision, and flow responses resolve the latest
-// revision per project.
+// Every edit publishes a new revision. When the deployed release pins a
+// flow, flow responses carry the branding revision that release pins.
+// Otherwise they carry the newest revision.
 // The `id` of the new revision is the revision ID a release pins for
 // `kind: branding`.
 // The `liquid_template` is validated lexically on save (size, encoding,
@@ -2919,7 +2925,9 @@ func (c *Client) sendCreateFlowDefinition(ctx context.Context, request *CreateFl
 // `404` or `409` when the principal is missing or the grant already exists.
 // Creating by `user.identifier` answers `202` with no body on every outcome.
 // Granting the session caller's own user is `grant.invalid` on either user
-// locator. Read the grant back with `getGrant` for the identifier and display.
+// locator. A `201` grant names its user or team by ID only: read it back
+// with `getGrant` for the identifier and display name. A `202` returns no
+// grant ID: find the grant with `queryGrants`, filtered by `user_id`.
 // Authenticate with a project secret (`oauth2`) or a console session cookie
 // (`sessionCookie`). A session caller is authorized as the signed-in person
 // against the target project, even when the session belongs to another project.
@@ -3084,8 +3092,8 @@ func (c *Client) sendCreateGrant(ctx context.Context, request *CreateGrantReques
 // seconds to receive the session and its `session_token`. The handoff token is:
 // - Single-use: exchange it once, with no retry.
 // - Bound to the project: the exchange needs the same project's credential.
-// - Safe to request again with the same idempotency key within a 5-minute
-// window, which returns the same token.
+// - Created once: a second call answers `409 att.already_handed_off`, even
+// with the same idempotency key.
 // A revoked release is refused when the handoff is exchanged, not here. A
 // release is the configuration that `zitadel deploy` publishes.
 //
@@ -5261,8 +5269,7 @@ func (c *Client) sendExchangeHandoff(ctx context.Context, request *ExchangeReque
 // `beginUserPasskeyRegistration` started and stores the new passkey for the
 // user. `registration_id` is the one that call returned. The attestation is
 // the browser's answer from `navigator.credentials.create()`.
-// A rejected attestation counts against the ceremony's failure budget and the
-// ceremony stays open for a retry. An expired ceremony answers
+// A rejected attestation leaves the ceremony open for a retry. An expired ceremony answers
 // `att.stale_challenge`: begin a new registration. An unknown or
 // already-consumed registration ID answers `att.not_found`.
 //
@@ -10107,8 +10114,8 @@ func (c *Client) sendIssueChallenge(ctx context.Context, request *IssueChallenge
 // ListBranding invokes listBranding operation.
 //
 // Lists a project's branding revisions, newest first, capped at the 100 most
-// recent and not paginated. The first entry is the revision flow responses
-// currently resolve.
+// recent and not paginated. The first entry is the newest revision, which
+// flow responses carry when the deployed release pins no flow.
 // The `id` of an entry is the revision ID that `getBrandingById` takes and
 // that a release pins for `kind: branding`.
 //
@@ -15920,7 +15927,9 @@ func (c *Client) sendRevokeMySession(ctx context.Context, params RevokeMySession
 // the history.
 // The call is idempotent: revoking a release that is already revoked answers
 // `200` with the release unchanged, and `revoked_at` still names the first
-// revocation. There is no un-revoke, so build a new release instead.
+// revocation. There is no un-revoke. To serve that configuration again,
+// change it and build a new release: rebuilding unchanged content returns
+// the same revoked release.
 // The call takes no body. The lookup is scoped to the project in
 // `project_id`, so a release ID of another project answers not found exactly
 // as an unknown ID does.
@@ -16244,8 +16253,9 @@ func (c *Client) sendRevokeSession(ctx context.Context, params RevokeSessionPara
 // rolled back. Deploy to the preview again with `createDeployment`. The
 // error also appears when the project has no primary origin. Add one with
 // `zitadel origin add`.
-// - `404 dep.not_found`: no deployment of the project has that ID. List
-// them with `listDeployments`.
+// - `404 dep.not_found`: no deployment of the project has that ID, or that
+// deployment recorded no variables to restore, so it cannot be a rollback
+// target. List them with `listDeployments` and pick another.
 // - `409 dep.conflict`: `expected_deployment_id` is not the project's
 // newest primary deployment, and `details.deployment` is that deployment.
 // Inspect it, then retry with its ID, or stop.
@@ -17088,7 +17098,7 @@ func (c *Client) sendUpdateVariables(ctx context.Context, request UpdateVariable
 // attempt moves to the next pending challenge, or completes when every required
 // factor is verified. Then call `createHandoff`.
 // A `409` with `att.proof_rejected` means the proof was wrong. Check it and try
-// again. After too many failed proofs the attempt fails, and you create a new one.
+// again. There is no retry limit: you can retry until the attempt expires.
 //
 // POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify
 func (c *Client) VerifyChallengeProof(ctx context.Context, request *VerifyChallengeRequest, params VerifyChallengeProofParams) (VerifyChallengeProofRes, error) {

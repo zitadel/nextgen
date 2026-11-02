@@ -20,7 +20,9 @@ post:
     `404` or `409` when the principal is missing or the grant already exists.
     Creating by `user.identifier` answers `202` with no body on every outcome.
     Granting the session caller's own user is `grant.invalid` on either user
-    locator. Read the grant back with `getGrant` for the identifier and display.
+    locator. A `201` grant names its user or team by ID only: read it back
+    with `getGrant` for the identifier and display name. A `202` returns no
+    grant ID: find the grant with `queryGrants`, filtered by `user_id`.
 
     Authenticate with a project secret (`oauth2`) or a console session cookie
     (`sessionCookie`). A session caller is authorized as the signed-in person

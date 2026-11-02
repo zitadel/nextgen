@@ -34,8 +34,9 @@ post:
       rolled back. Deploy to the preview again with `createDeployment`. The
       error also appears when the project has no primary origin. Add one with
       `zitadel origin add`.
-    - `404 dep.not_found`: no deployment of the project has that ID. List
-      them with `listDeployments`.
+    - `404 dep.not_found`: no deployment of the project has that ID, or that
+      deployment recorded no variables to restore, so it cannot be a rollback
+      target. List them with `listDeployments` and pick another.
     - `409 dep.conflict`: `expected_deployment_id` is not the project's
       newest primary deployment, and `details.deployment` is that deployment.
       Inspect it, then retry with its ID, or stop.

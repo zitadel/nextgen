@@ -16,7 +16,7 @@ post:
     factor is verified. Then call `createHandoff`.
 
     A `409` with `att.proof_rejected` means the proof was wrong. Check it and try
-    again. After too many failed proofs the attempt fails, and you create a new one.
+    again. There is no retry limit: you can retry until the attempt expires.
   tags:
     - Authentication Attempts
   security:

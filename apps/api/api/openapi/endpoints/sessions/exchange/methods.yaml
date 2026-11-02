@@ -42,9 +42,9 @@ post:
     - $ref: ../../../components/parameters/project-id.yaml
     - $ref: ../../../components/parameters/idempotency-key.yaml
       description: |
-        Optional retry key for safe retries of the handoff exchange.
-        Retries carrying the same key within the exchange window return the cached session
-        payload without consuming the one-time handoff token again.
+        Optional retry key. The server accepts it but does not use it: a
+        handoff token exchanges once, and a retry with the same key answers
+        `400 sess.invalid_handoff_token`.
   requestBody:
     required: true
     content:

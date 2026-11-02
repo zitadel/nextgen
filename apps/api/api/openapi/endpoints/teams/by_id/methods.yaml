@@ -39,7 +39,7 @@ get:
 delete:
   operationId: deleteTeam
   x-zitadel-cli: teams deactivate
-  summary: Delete a team
+  summary: Deactivate a team
   description: |
     Deactivates a team and removes its memberships.
 

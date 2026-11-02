@@ -9,8 +9,7 @@ required:
   - handoff_token
   - expires_at
 properties:
-  # The token is consumed atomically on exchange (`GETDEL`); the idempotency
-  # window is the Category B window.
+  # The token is consumed atomically on exchange (`GETDEL`).
   handoff_token:
     type: string
     description: |
@@ -22,7 +21,6 @@ properties:
       - Single-use
       - Valid for 60 seconds at most
       - Bound to the project: the exchange needs `sk_proj_…` of the matching project
-      - Safe to request again with the same idempotency key within a 5-minute window
     example: handoff_abc123def456xyz
   expires_at:
     type: string
