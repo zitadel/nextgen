@@ -79,8 +79,9 @@ func NewRuntimeResolver(v2Pool *DB, releases ReleaseService, ownOrigins ...strin
 // Resolve walks the three layers: the gate refuses an origin no pattern
 // admits, the target is the newest deployment to that exact origin, and the
 // release is that deployment's release unless it is revoked. A request with
-// no origin, and one admitted openly with nothing deployed to its origin, is
-// served the newest primary deployment.
+// no origin is served the newest primary deployment. So is one the project does
+// not list but admits anyway (empty allowlist, loopback or a console origin) with
+// nothing deployed to its origin.
 func (r *RuntimeResolver) Resolve(ctx context.Context, projectID, origin string) (*RuntimeResolution, error) {
 	logger := getLoggingContext(ctx, "runtime").With(
 		slog.String("project_id", projectID),
