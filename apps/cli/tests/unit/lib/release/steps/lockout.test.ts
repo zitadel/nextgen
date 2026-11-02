@@ -110,7 +110,38 @@ describe("lockoutStep", () => {
     const warnings = takeReportedWarnings();
     expect(warnings).toHaveLength(1);
     expect(warnings[0]).toContain('1 existing user of "human-user" has an SSO link');
-    expect(warnings[0]).toContain('"employee"');
+    expect(warnings[0]).toContain('keep or restore a flow on "human-user"');
+  });
+
+  it("resolves a flow's schema given by its $id before checking either case", async () => {
+    await lockoutStep.run(
+      ctx({
+        schemas: [{ objectType: "employee", $id: EMPLOYEE, "x-identifier": "username" }],
+        flows: [flow(EMPLOYEE)],
+        users: [user("u1", "employee", { email: "a@example.com" }), user("u2", "human-user")],
+        links: { u2: 1, u1: 1 },
+      }),
+    );
+
+    const warnings = takeReportedWarnings();
+    expect(warnings).toHaveLength(2);
+    expect(warnings[0]).toContain('of "employee"');
+    expect(warnings[1]).toContain('of "human-user"');
+  });
+
+  it("counts the revisions of one schema together", async () => {
+    await lockoutStep.run(
+      ctx({
+        schemas: [{ objectType: "employee" }],
+        flows: [flow("employee")],
+        users: [user("u1", "human-user"), user("u2", "human-user")],
+        links: { u1: 1, u2: 1 },
+      }),
+    );
+
+    const warnings = takeReportedWarnings();
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain('2 existing users of "human-user" have an SSO link');
   });
 
   it("does not warn about users of the old schema who have no SSO link", async () => {

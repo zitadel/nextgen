@@ -5,6 +5,8 @@ import type { Step, StepContext } from "../pipeline";
 /** Users read per page, and the most this check reads in all. */
 const PAGE_SIZE = 100;
 const SCAN_CAP = 1000;
+/** Identity-link reads in flight at once. */
+const CONCURRENCY = 10;
 
 type QueriedUser = Awaited<ReturnType<ZitadelClient["queryUsers"]>>["users"][number];
 type UserFilter = { field: string; operation: string; value: string };
@@ -44,9 +46,20 @@ async function lockoutWarnings(ctx: StepContext): Promise<string[]> {
   for (const schema of ctx.bundle.schemas) {
     if (typeof schema.objectType === "string") schemas.set(schema.objectType, schema);
   }
+  // A flow's `user_schema` is an object type, or a schema id or `$id` URL that
+  // the server resolves to one.
+  const byId = new Map<string, string>();
+  for (const schema of ctx.bundle.schemas) {
+    if (typeof schema.$id === "string" && typeof schema.objectType === "string") {
+      byId.set(schema.$id, schema.objectType);
+    }
+  }
+  const names = await objectTypes(ctx);
+  const resolve = (ref: string) =>
+    schemas.has(ref) ? ref : (byId.get(ref) ?? names.get(ref) ?? ref);
   const flows = ctx.bundle.flow_definitions.flatMap((flow) =>
     typeof flow.name === "string" && typeof flow.user_schema === "string"
-      ? [{ name: flow.name, schema: flow.user_schema }]
+      ? [{ name: flow.name, schema: resolve(flow.user_schema) }]
       : [],
   );
   const warnings: string[] = [];
@@ -68,25 +81,38 @@ async function lockoutWarnings(ctx: StepContext): Promise<string[]> {
   // Case 2: users on a schema no flow serves any more, with a provider linked.
   const served = [...new Set(flows.map((flow) => flow.schema))];
   if (served.length === 0) return warnings;
-  const { users: stranded } = await readUsers(
+  const { users: stranded, truncated } = await readUsers(
     ctx,
     served.map((value) => ({ field: "schema_object_type", operation: "not_equals", value })),
   );
-  const linked = new Map<string, number>();
-  for (const user of stranded) {
+  const hasLink = await inBatches(stranded, async (user) => {
     const { identity_links: links } = await ctx.client.listUserIdentityLinks(user.id, {
       limit: 1,
     });
-    if (links.length > 0) linked.set(user.schema, (linked.get(user.schema) ?? 0) + 1);
-  }
-  if (linked.size === 0) return warnings;
-  const names = await objectTypes(ctx);
-  for (const [schemaUrl, total] of linked) {
+    return links.length > 0;
+  });
+  // Revisions of one schema share an object type, so they are one count.
+  const linked = new Map<string, number>();
+  stranded.forEach((user, index) => {
+    if (!hasLink[index]) return;
+    const name = names.get(user.schema) ?? user.schema;
+    linked.set(name, (linked.get(name) ?? 0) + 1);
+  });
+  for (const [name, total] of linked) {
     warnings.push(
-      `${total} existing ${plural(total, "user")} of ${quote(names.get(schemaUrl) ?? schemaUrl)} ${total === 1 ? "has" : "have"} an SSO link, but no flow in this release uses that schema, so they cannot sign in with SSO. Passkey sign-in is not affected. Keep a flow on that schema, or move the users to ${served.map(quote).join(" or ")}.`,
+      `${count(total, truncated)} existing ${plural(total, "user")} of ${quote(name)} ${total === 1 ? "has" : "have"} an SSO link, but no flow in this release uses that schema, so they cannot sign in with SSO. Passkey sign-in is not affected. Users cannot move between schemas, so keep or restore a flow on ${quote(name)}.`,
     );
   }
   return warnings;
+}
+
+/** Run `task` over `items`, a few at a time, keeping the results in order. */
+async function inBatches<T, R>(items: readonly T[], task: (item: T) => Promise<R>): Promise<R[]> {
+  const results: R[] = [];
+  for (let start = 0; start < items.length; start += CONCURRENCY) {
+    results.push(...(await Promise.all(items.slice(start, start + CONCURRENCY).map(task))));
+  }
+  return results;
 }
 
 async function readUsers(
