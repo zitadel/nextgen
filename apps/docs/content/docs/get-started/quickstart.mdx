@@ -50,9 +50,9 @@ Before setup, `doctor` checks local runtime prerequisites. After setup, it also 
 npx @zitadel/cli@latest start
 ```
 
-This runs the `@zitadel/server` npm binary that matches the CLI's version, on `http://localhost:8080` for the first run in a directory. It also creates a local admin, `admin@zitadel.localhost`.
+This runs the `@zitadel/server` npm binary that matches the CLI's version, on the first free port from 8080, usually `http://localhost:8080`. It also creates a local admin, `admin@zitadel.localhost`.
 
-`start` prints `Local Zitadel server is ready.` with the server's API and console URLs, and names `setup` as the next step. It prints no console sign-in link: you get one after `setup` ([Open the console](#open-the-console)). If the port is taken, `start` fails with `E_PORT_IN_USE`: stop the process that holds it, or pass `--port <port>`. [Run Zitadel locally](/docs/guides/local-runtime) covers the runtime's state and ports.
+`start` prints `Local Zitadel server is ready.` with the server's API and console URLs, and names `setup` as the next step. It prints no console sign-in link: you get one after `setup` ([Open the console](#open-the-console)). Use the URLs it prints: when 8080 is taken, `start` takes the next free port. A port you pass with `--port <port>` must be free, or `start` fails with `E_PORT_IN_USE`. [Run Zitadel locally](/docs/guides/local-runtime) covers the runtime's state and ports.
 
 ## Scaffold the app with sign-in
 
@@ -68,7 +68,7 @@ Setup asks how users should sign in (`--preset`):
 
 Both presets enable password and passkey in the schema, but each user still registers a password or a passkey themselves. Setup writes the schema and login flow to `.zitadel/schemas/` and `.zitadel/flows/`; each folder has a README on what you can change.
 
-Run setup in the directory `start` ran in, or one inside it. Setup looks there for the local admin and attaches the project to the admin's team. A team groups users and can own projects, and attaching the project is what claiming one means ([Claim](/docs/concepts/project-team-user#claim)). Setup prints `Project owned by admin@zitadel.localhost (team <team-id>)`, and there is nothing left to claim. Without the admin, the project has no team and the console does not list it: rerun setup from the right directory.
+Run setup in the directory `start` ran in, or one inside it. Setup looks there for the local admin and attaches the project to the admin's team. A team groups users and can own projects, and attaching the project is what claiming one means ([Claim](/docs/concepts/project-team-user#claim)). Setup prints `Project owned by admin@zitadel.localhost (team <team-id>)`, and there is nothing left to claim. Without the admin, the project has no team and the console does not list it. Rerunning setup does not fix this, because setup skips a directory that has `zitadel.json`. Run `npx @zitadel/cli@latest claim` in the app's directory instead.
 
 Setup writes the app files, `.env.example`, `.env.local` (read by your app), `.env.development.local` (read by the CLI), `zitadel.json` and `.zitadel/**`. It adds the files that hold secrets to `.gitignore` ([Configuration as code](/docs/concepts/repo-config)), then installs dependencies unless you pass `--skip-install`. If the directory holds other files, or setup fails or you cancel it, see [When setup scaffolds a new app](/docs/get-started/existing-app#when-setup-scaffolds-a-new-app).
 

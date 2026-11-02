@@ -77,7 +77,7 @@ npx @zitadel/cli@latest deploy
 2. Sign in at the provider. The provider sends you back to the callback URI, and your app shows you signed in.
 3. Check that the user exists with `npx @zitadel/cli@latest users list`.
 
-If the button is missing, check that you ran `deploy`, not only `deploy --dry-run`, and reload. If the sign-in fails, keep `npx @zitadel/cli@latest logs --level warn` open in a second terminal: the login only shows a generic message, and the runtime's log has the cause ([Run Zitadel locally](/docs/guides/local-runtime#read-the-runtimes-log)).
+If the button is missing, check that you ran `deploy`, not only `deploy --dry-run`, and reload. If the sign-in fails, keep `npx @zitadel/cli@latest logs --level warn --follow` open in a second terminal: the login only shows a generic message, and the runtime's log has the cause ([Run Zitadel locally](/docs/guides/local-runtime#read-the-runtimes-log)).
 
 ## First sign-in and registration
 

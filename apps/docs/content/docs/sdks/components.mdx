@@ -29,20 +29,22 @@ import { story as LoginStory } from "@/components/examples/login.story";
 
 ## Install the package
 
+Install the components with `@zitadel/api`, which provides `configureZitadel`:
+
 <Tabs groupId="package-manager" items={["pnpm", "npm", "yarn"]}>
   <Tab>
     ```sh
-    pnpm add @zitadel/components@latest
+    pnpm add @zitadel/components@latest @zitadel/api@latest
     ```
   </Tab>
   <Tab>
     ```sh
-    npm install @zitadel/components@latest
+    npm install @zitadel/components@latest @zitadel/api@latest
     ```
   </Tab>
   <Tab>
     ```sh
-    yarn add @zitadel/components@latest
+    yarn add @zitadel/components@latest @zitadel/api@latest
     ```
   </Tab>
 </Tabs>
@@ -107,7 +109,7 @@ If your app renders on the server, mount the component on the client only, after
 
 ## Check that it works
 
-Open the page. The login component renders the first step of the flow. An error in its place means the component started before its configuration arrived: run `configureZitadel` first.
+Open the page. The login component renders the first step of the flow. If the error says `<zitadel-login> requires a configured project`, the component started before its configuration arrived: run `configureZitadel` first. Any other error comes from the flow API: check that the local runtime is running and that the proxy at `/__nextgen` forwards to it ([SDK proxy](/docs/sdks/proxy)).
 
 ## See also
 
