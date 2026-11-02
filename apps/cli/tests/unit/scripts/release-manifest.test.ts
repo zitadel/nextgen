@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { supportedPlatforms } from "@zitadel/server/binary";
-import { beforeAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 type ReleasePackage = {
   buildTarget?: string;
@@ -22,13 +22,9 @@ type ReleaseManifestModule = {
 };
 
 const repoRoot = fileURLToPath(new URL("../../../../../", import.meta.url));
-let manifest: ReleaseManifestModule;
-
-beforeAll(async () => {
-  manifest = (await import(
-    new URL("../../../../../scripts/release-manifest.mjs", import.meta.url).href
-  )) as ReleaseManifestModule;
-});
+const manifest = (await import(
+  new URL("../../../../../scripts/release-manifest.mjs", import.meta.url).href
+)) as ReleaseManifestModule;
 
 describe("release manifest", () => {
   it("releases exactly the platform packages the server resolves its binary from", () => {

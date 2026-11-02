@@ -1,5 +1,4 @@
 import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
-import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -11,7 +10,9 @@ import {
 } from "@zitadel/api-mock/platform";
 import { http, passthrough } from "msw";
 import { text } from "@clack/prompts";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, vi } from "vitest";
+
+import { it, type Serve } from "../../helpers/fixtures";
 
 import {
   localRuntimePaths,
@@ -35,14 +36,6 @@ import { aBinaryRecord } from "../../helpers/runtime-record";
  */
 const SERVER = "https://api.zitadel.cloud";
 const { server, dirs: tempDirs } = usePlatformServer();
-const servers: Server[] = [];
-
-afterEach(async () => {
-  for (const httpServer of servers.splice(0)) {
-    await new Promise<void>((resolve) => httpServer.close(() => resolve()));
-  }
-});
-
 type Project = { id: string; project_secret: string };
 
 /**
@@ -624,9 +617,9 @@ describe("claim", () => {
       expect(json.code).toBe("E_LOCAL_SERVER_NOT_RUNNING");
     });
 
-    it("claims against the resolved local server", async () => {
+    it("claims against the resolved local server", async ({ serve }) => {
       const { cwd } = await makeProject();
-      const serverUrl = await startClaimServer();
+      const serverUrl = await startClaimServer(serve);
       await writeRuntimeMetadata(cwd, runtimeFor(cwd, serverUrl));
 
       const res = await runCliForTest([
@@ -649,9 +642,10 @@ describe("claim", () => {
 
     // No `--json` in the next two: the warning is consola narration, and the
     // envelope silences it.
-    it("warns when a local server advertises a remote claim page", async () => {
+    it("warns when a local server advertises a remote claim page", async ({ serve }) => {
       const { cwd } = await makeProject();
       const serverUrl = await startClaimServer(
+        serve,
         "https://nextgen.zitadel.cloud/ui/console/claim?challenge_id=ch_localstub",
       );
       await writeRuntimeMetadata(cwd, runtimeFor(cwd, serverUrl));
@@ -662,9 +656,9 @@ describe("claim", () => {
       expect(`${res.stdout}${res.stderr}`).toContain("NEXTGEN_SERVER_PUBLIC_BASE");
     });
 
-    it("does not warn when the claim page is on the local server itself", async () => {
+    it("does not warn when the claim page is on the local server itself", async ({ serve }) => {
       const { cwd } = await makeProject();
-      const serverUrl = await startClaimServer();
+      const serverUrl = await startClaimServer(serve);
       await writeRuntimeMetadata(cwd, runtimeFor(cwd, serverUrl));
 
       const res = await runCliForTest(["claim", "--cwd", cwd, "--server", "local", "--no-open"]);
@@ -682,8 +676,11 @@ describe("claim", () => {
  * a port only known at runtime; a real socket is simpler than reshaping the
  * handlers.
  */
-async function startClaimServer(claimUrl = "http://localhost/claim/ch_localstub"): Promise<string> {
-  const httpServer = createServer((req, res) => {
+function startClaimServer(
+  serve: Serve,
+  claimUrl = "http://localhost/claim/ch_localstub",
+): Promise<string> {
+  return serve((req, res) => {
     const url = req.url ?? "";
     if (url === "/readyz") {
       res.writeHead(200).end("ok");
@@ -712,13 +709,6 @@ async function startClaimServer(claimUrl = "http://localhost/claim/ch_localstub"
     }
     res.writeHead(404).end();
   });
-  servers.push(httpServer);
-  await new Promise<void>((resolve) => httpServer.listen(0, "localhost", () => resolve()));
-  const address = httpServer.address();
-  if (!address || typeof address === "string") {
-    throw new Error("claim server did not expose a TCP address");
-  }
-  return `http://localhost:${String(address.port)}`;
 }
 
 /** A runtime record of a server that is running: this process, answering at `serverUrl`. */

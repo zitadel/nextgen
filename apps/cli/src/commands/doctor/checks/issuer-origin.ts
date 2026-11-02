@@ -9,6 +9,7 @@ import {
 } from "../../../lib/project";
 import { configuredIssuer } from "../patch-context";
 import type { CheckContext, CheckOutcome, SanityCheck } from "./types";
+import { errorMessage } from "../../../lib/errors";
 
 /** What {@link inspect} found: a pass, or the preview issuer `fix` makes primary. */
 type Finding =
@@ -100,12 +101,13 @@ export class IssuerOriginCheck implements SanityCheck {
 }
 
 async function inspect(cwd: string): Promise<Finding> {
-  let secret: ZitadelSecret;
-  let server: string;
-  try {
-    secret = await readZitadelSecret(cwd);
-    server = readProjectServer(await readZitadelConfig(cwd));
-  } catch {
+  const records = await readZitadelSecret(cwd)
+    .then(async (secret) => ({
+      secret,
+      server: readProjectServer(await readZitadelConfig(cwd)),
+    }))
+    .catch(() => undefined);
+  if (records === undefined) {
     // A missing or unparseable secret or config is the `secret` and `config`
     // checks' to report, with a repair path.
     return {
@@ -113,6 +115,7 @@ async function inspect(cwd: string): Promise<Finding> {
       message: "Skipped: could not read the project files that record its origins",
     };
   }
+  const { secret, server } = records;
   const issuer = await configuredIssuer(cwd);
   if (issuer === undefined) {
     return { status: "pass", message: "Skipped: no file sets ZITADEL_ISSUER" };
@@ -129,7 +132,7 @@ async function inspect(cwd: string): Promise<Finding> {
   } catch (error) {
     return {
       status: "pass",
-      message: `Skipped: could not read the project's origins from ${server}: ${error instanceof Error ? error.message : String(error)}`,
+      message: `Skipped: could not read the project's origins from ${server}: ${errorMessage(error)}`,
     };
   }
   const pattern = issuerHeldAsPreview(origins, issuer);

@@ -1,3 +1,5 @@
+import pTimeout from "p-timeout";
+
 import {
   claimAction,
   claimCommand,
@@ -243,15 +245,13 @@ async function detectUserPresence(connect: () => Promise<Connection>): Promise<U
       .catch((): UserPresence => "unknown");
     // The abort signal alone is not enough: DNS resolution can outlive it
     // (getaddrinfo runs on the threadpool and some environments take many
-    // seconds to fail), and `status` must stay snappy. Race a detached timer
-    // so the answer degrades to "unknown" at the deadline no matter what the
-    // socket layer does; unref'd so it never keeps the CLI process alive.
-    return await Promise.race([
-      probe,
-      new Promise<UserPresence>((resolve) => {
-        setTimeout(() => resolve("unknown"), PRESENCE_PROBE_TIMEOUT_MS + 250).unref();
-      }),
-    ]);
+    // seconds to fail), and `status` must stay snappy. A timer beside the
+    // probe degrades the answer to "unknown" at the deadline no matter what the
+    // socket layer does.
+    return await pTimeout(probe, {
+      milliseconds: PRESENCE_PROBE_TIMEOUT_MS + 250,
+      fallback: (): UserPresence => "unknown",
+    });
   } catch {
     return "unknown";
   }

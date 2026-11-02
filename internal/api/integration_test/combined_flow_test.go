@@ -140,9 +140,9 @@ func combinedPasswordFlowDefinition(userSchema string) api.FlowDefinition {
 					{Name: "register", Kind: api.StepActionKindSubmit},
 				},
 				Transitions: api.NewOptFlowDefinitionStepTransitions(api.FlowDefinitionStepTransitions{
-					"submit":         api.FlowDefinitionStepTransitionsItem{Target: "password"},
-					"register":       api.FlowDefinitionStepTransitionsItem{Target: "register-identifier"},
-					"user_not_found": api.FlowDefinitionStepTransitionsItem{Target: "register-identifier"},
+					"submit":         api.FlowDefinitionStepTransitionsItem{Target: api.NewOptString("password")},
+					"register":       api.FlowDefinitionStepTransitionsItem{Target: api.NewOptString("register-identifier")},
+					"user_not_found": api.FlowDefinitionStepTransitionsItem{Target: api.NewOptString("register-identifier")},
 				}),
 			},
 			{
@@ -152,7 +152,7 @@ func combinedPasswordFlowDefinition(userSchema string) api.FlowDefinition {
 					{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)},
 				},
 				Transitions: api.NewOptFlowDefinitionStepTransitions(api.FlowDefinitionStepTransitions{
-					"submit": api.FlowDefinitionStepTransitionsItem{Target: "done"},
+					"submit": api.FlowDefinitionStepTransitionsItem{Target: api.NewOptString("done")},
 				}),
 			},
 			{
@@ -163,9 +163,9 @@ func combinedPasswordFlowDefinition(userSchema string) api.FlowDefinition {
 					{Name: "login", Kind: api.StepActionKindSubmit},
 				},
 				Transitions: api.NewOptFlowDefinitionStepTransitions(api.FlowDefinitionStepTransitions{
-					"submit":              api.FlowDefinitionStepTransitionsItem{Target: "register-password"},
-					"login":               api.FlowDefinitionStepTransitionsItem{Target: "identifier"},
-					"user_already_exists": api.FlowDefinitionStepTransitionsItem{Target: "password"},
+					"submit":              api.FlowDefinitionStepTransitionsItem{Target: api.NewOptString("register-password")},
+					"login":               api.FlowDefinitionStepTransitionsItem{Target: api.NewOptString("identifier")},
+					"user_already_exists": api.FlowDefinitionStepTransitionsItem{Target: api.NewOptString("password")},
 				}),
 			},
 			{
@@ -176,7 +176,7 @@ func combinedPasswordFlowDefinition(userSchema string) api.FlowDefinition {
 					{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)},
 				},
 				Transitions: api.NewOptFlowDefinitionStepTransitions(api.FlowDefinitionStepTransitions{
-					"submit": api.FlowDefinitionStepTransitionsItem{Target: "done"},
+					"submit": api.FlowDefinitionStepTransitionsItem{Target: api.NewOptString("done")},
 				}),
 			},
 			{
@@ -448,9 +448,9 @@ func purposeNavFlowDefinition(userSchema string) api.FlowDefinition {
 					{Name: "register", Kind: api.StepActionKindNavigate},
 				},
 				Transitions: api.NewOptFlowDefinitionStepTransitions(api.FlowDefinitionStepTransitions{
-					"submit":         api.FlowDefinitionStepTransitionsItem{Target: "password"},
-					"register":       api.FlowDefinitionStepTransitionsItem{Target: "register-identifier", Purpose: registerPurpose},
-					"user_not_found": api.FlowDefinitionStepTransitionsItem{Target: "register-identifier"},
+					"submit":         api.FlowDefinitionStepTransitionsItem{Target: api.NewOptString("password")},
+					"register":       api.FlowDefinitionStepTransitionsItem{Target: api.NewOptString("register-identifier"), Purpose: registerPurpose},
+					"user_not_found": api.FlowDefinitionStepTransitionsItem{Target: api.NewOptString("register-identifier")},
 				}),
 			},
 			{
@@ -460,7 +460,7 @@ func purposeNavFlowDefinition(userSchema string) api.FlowDefinition {
 					{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)},
 				},
 				Transitions: api.NewOptFlowDefinitionStepTransitions(api.FlowDefinitionStepTransitions{
-					"submit": api.FlowDefinitionStepTransitionsItem{Target: "done"},
+					"submit": api.FlowDefinitionStepTransitionsItem{Target: api.NewOptString("done")},
 				}),
 			},
 			{
@@ -471,9 +471,9 @@ func purposeNavFlowDefinition(userSchema string) api.FlowDefinition {
 					{Name: "sign_in", Kind: api.StepActionKindNavigate},
 				},
 				Transitions: api.NewOptFlowDefinitionStepTransitions(api.FlowDefinitionStepTransitions{
-					"submit":              api.FlowDefinitionStepTransitionsItem{Target: "register-password"},
-					"sign_in":             api.FlowDefinitionStepTransitionsItem{Target: "identifier", Purpose: loginPurpose},
-					"user_already_exists": api.FlowDefinitionStepTransitionsItem{Target: "password"},
+					"submit":              api.FlowDefinitionStepTransitionsItem{Target: api.NewOptString("register-password")},
+					"sign_in":             api.FlowDefinitionStepTransitionsItem{Target: api.NewOptString("identifier"), Purpose: loginPurpose},
+					"user_already_exists": api.FlowDefinitionStepTransitionsItem{Target: api.NewOptString("password")},
 				}),
 			},
 			{
@@ -484,7 +484,7 @@ func purposeNavFlowDefinition(userSchema string) api.FlowDefinition {
 					{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)},
 				},
 				Transitions: api.NewOptFlowDefinitionStepTransitions(api.FlowDefinitionStepTransitions{
-					"submit": api.FlowDefinitionStepTransitionsItem{Target: "done"},
+					"submit": api.FlowDefinitionStepTransitionsItem{Target: api.NewOptString("done")},
 				}),
 			},
 			{

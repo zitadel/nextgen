@@ -1,5 +1,4 @@
-import { spawnSync } from "node:child_process";
-
+import { execaSync } from "execa";
 import semver from "semver";
 
 /**
@@ -104,7 +103,7 @@ export function describeAcceptedNode(range: string): string {
 /**
  * The Node range the framework CLI that setup will run publishes, asked of
  * npm. Falls back to the declared range when npm is unavailable, takes longer
- * than {@link NODE_ENGINES_TIMEOUT_MS} (a killed spawn has no exit status), or
+ * than {@link NODE_ENGINES_TIMEOUT_MS} (a killed spawn has failed), or
  * answers with something that is not a range.
  *
  * On Windows npm is a `.cmd` shim, which `spawnSync` cannot start without a
@@ -119,13 +118,13 @@ export function nodeEnginesRange(
   cwd: string,
   platform: NodeJS.Platform,
 ): string {
-  const result = spawnSync("npm", ["view", engines.spec, "engines.node"], {
+  const result = execaSync("npm", ["view", engines.spec, "engines.node"], {
     cwd,
-    encoding: "utf8",
     timeout: NODE_ENGINES_TIMEOUT_MS,
     shell: platform === "win32",
+    reject: false,
   });
-  const range = result.status === 0 ? String(result.stdout ?? "").trim() : "";
+  const range = result.failed ? "" : String(result.stdout).trim();
   return range && semver.validRange(range) ? range : engines.fallback;
 }
 

@@ -1,7 +1,7 @@
 import { parseModule } from "magicast";
 import type { ProxifiedModule, ProxifiedObject } from "magicast";
 
-import { ZitadelError } from "../../../../errors";
+import { ZitadelError, errorMessage } from "../../../../errors";
 
 /**
  * Generic magicast helpers shared by the config-editing patchers (Vite, Nuxt).
@@ -66,7 +66,7 @@ export function parseConfigModule(
   } catch (error) {
     throw new ZitadelError("E_VALIDATION", `Could not parse ${filename}`, {
       hint: `Ensure ${filename} is valid, or apply the Zitadel changes manually.`,
-      details: { cause: error instanceof Error ? error.message : String(error) },
+      details: { cause: errorMessage(error) },
     });
   }
   // A CommonJS config (e.g. a `*.cjs` file or a `*.js` with `module.exports`)
