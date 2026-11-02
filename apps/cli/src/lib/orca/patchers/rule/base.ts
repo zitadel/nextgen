@@ -86,22 +86,23 @@ export abstract class AbstractRulePatcher implements Patcher {
    */
   async repair(ctx: PatchContext, opts: PatchExecOptions): Promise<PatchResult> {
     const plan = this.plan(ctx);
-    let ops = opts.missingOnly
+    const reclaimable = opts.missingOnly
       ? await withoutExistingTargets(reclaimableOps(plan), opts.cwd)
       : reclaimableOps(plan);
     const excluded = new Set(opts.excludePaths ?? []);
-    if (excluded.size > 0) {
-      ops = ops.filter((op) => {
-        if (op.kind === "write") {
-          return !excluded.has(op.path);
-        }
-        if (op.kind === "edit" && op.overwrites) {
-          const candidates = typeof op.path === "string" ? [op.path] : op.path;
-          return !candidates.some((candidate) => excluded.has(candidate));
-        }
-        return true;
-      });
-    }
+    const ops =
+      excluded.size === 0
+        ? reclaimable
+        : reclaimable.filter((op) => {
+            if (op.kind === "write") {
+              return !excluded.has(op.path);
+            }
+            if (op.kind === "edit" && op.overwrites) {
+              const candidates = typeof op.path === "string" ? [op.path] : op.path;
+              return !candidates.some((candidate) => excluded.has(candidate));
+            }
+            return true;
+          });
     const execOpts = opts.missingOnly ? { ...opts, force: false } : opts;
     return scaffold({ ops, summary: plan.summary }, execOpts);
   }

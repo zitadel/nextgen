@@ -84,23 +84,31 @@ export async function writeScaffoldManifest(options: {
 }): Promise<void> {
   const { cwd, actions, written, scaffoldedFramework, devPort, posture } = options;
   const touched = new Set(written.map((path) => relativePosix(cwd, path)));
-  const files: ScaffoldManifest["files"] = {};
-  for (const path of actions.markedFiles) {
-    const key = relativePosix(cwd, path);
-    if (!touched.has(key)) {
-      continue;
-    }
-    let contents: string;
-    try {
-      contents = await readFile(join(cwd, key), "utf8");
-    } catch {
-      continue;
-    }
-    files[key] = {
-      hash: hashScaffoldFile(contents),
-      class: actions.fileClasses?.[path] ?? "presentation",
-    };
-  }
+  const marked = actions.markedFiles
+    .map((path) => ({ path, key: relativePosix(cwd, path) }))
+    .filter(({ key }) => touched.has(key));
+  const read = await Promise.all(
+    marked.map(async ({ path, key }) => ({
+      path,
+      key,
+      contents: await readFile(join(cwd, key), "utf8").catch(() => undefined),
+    })),
+  );
+  const files: ScaffoldManifest["files"] = Object.fromEntries(
+    read.flatMap(({ path, key, contents }) =>
+      contents === undefined
+        ? []
+        : [
+            [
+              key,
+              {
+                hash: hashScaffoldFile(contents),
+                class: actions.fileClasses?.[path] ?? "presentation",
+              },
+            ],
+          ],
+    ),
+  );
   await updateScaffold(cwd, {
     files,
     ...(scaffoldedFramework ? { scaffolded_framework: true } : {}),

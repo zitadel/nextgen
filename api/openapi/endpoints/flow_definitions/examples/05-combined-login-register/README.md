@@ -12,10 +12,12 @@ user enters via the wrong purpose; explicit navigation CTAs (`register` /
 
 - **Multi-purpose definition.** `purposes` maps `login` and `register` to
   distinct entry steps in the same definition.
-- **Flip-table coverage.** Because both purposes are served, the validator
-  requires:
-  - Login entry (`identifier`) to wire `user_not_found`.
-  - Register entry (`register-identifier`) to wire `user_already_exists`.
+- **Automatic switch.** Because both purposes are served, the entry steps
+  wire the outcomes that switch between them:
+  - Login entry (`identifier`) wires `user_not_found`.
+  - Register entry (`register-identifier`) wires `user_already_exists`.
+
+  Both are optional; leaving one out shows that outcome's error instead.
 - **Purpose flip.** When the engine emits one of these outcomes, it flips
   `state.CurrentPurpose` so dispatch on subsequent steps follows the other
   sub-flow's semantics (password verify vs. password create).
@@ -115,8 +117,9 @@ flowchart TD
 - The "ancestor-chain" manifest pattern unlocks multi-step register flows
   with password credentials. The validator pass that enforces it is
   `validateOnSuccessManifests`.
-- The flip table is `purposeFlipTargets` in the validator. It mirrors the
-  engine's runtime flip behavior.
+- The automatic switch is `applyOutcomeFlip` in the engine. Wiring its
+  outcomes is optional: an entry step without `user_not_found` (or
+  `user_already_exists`) shows that outcome's error instead of switching.
 - Both terminal paths feed the same `done` step. Multiple terminal nodes are
   also fine; the engine doesn't care about layout, only that every
   non-terminal step has a path to one.

@@ -5,6 +5,7 @@ import { dryRunResult } from "../../lib/oclif/crud/shared";
 import { deletedData } from "../../lib/oclif/envelope";
 import { reportWarning } from "../../lib/warnings";
 import { Destructive } from "../../lib/oclif/destructive";
+import { errorMessage } from "../../lib/errors";
 
 /**
  * `zitadel origin rm <pattern>` — remove one origin pattern from the project.
@@ -57,7 +58,7 @@ export default class OriginRm extends Destructive(EnvironmentCommand) {
             (project) => project.origins,
             (error: unknown) => {
               reportWarning(
-                `${pattern} was removed, but the project's remaining origins could not be read: ${error instanceof Error ? error.message : String(error)}`,
+                `${pattern} was removed, but the project's remaining origins could not be read: ${errorMessage(error)}`,
               );
               return undefined;
             },

@@ -543,20 +543,20 @@ const OTHER_SESSION_COOKIES = [
 
 describe("the generated proxy.conf.cjs, run by Vite against a remote https server", () => {
   const remote = useRemoteServer();
-  let app: DevApp | undefined;
+  const apps: DevApp[] = [];
 
   afterEach(async () => {
-    await app?.close();
-    app = undefined;
+    await Promise.all(apps.splice(0).map((app) => app.close()));
     remote.answerWith(undefined);
   });
 
   async function serve(proxyConf: string, projectId = ""): Promise<DevApp> {
-    app = await aProxyConfApp(proxyConf, {
+    const app = await aProxyConfApp(proxyConf, {
       ZITADEL_URL: remote.url,
       ZITADEL_PROJECT_SECRET: "sk_proj_test",
       ZITADEL_PROJECT_ID: projectId,
     });
+    apps.push(app);
     return app;
   }
 

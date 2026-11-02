@@ -23,8 +23,8 @@ properties:
     pattern: '^[a-z][a-z0-9-]*$'
     examples: [ standard-login, combined-auth ]
     description: |
-      Stable identifier for this flow, used as the target of cross-flow
-      `switch` and `pivot` transitions. Every revision of a flow shares its
+      Stable identifier for this flow, and the name a cross-flow `switch` or
+      `pivot` transition will target once the engine runs them. Every revision of a flow shares its
       `name`; publishing a definition under an existing `name` adds a
       revision to that flow. Renaming is not supported — the `name` is part
       of the public contract another definition may reference. Acts as the
@@ -53,7 +53,15 @@ properties:
       Maps each purpose this definition handles to its entry-point step.
       Keys are purpose names; values must match a `name` in `steps`. A
       definition can serve multiple purposes (e.g. a combined login/register
-      flow) by listing one entry per purpose.
+      flow) by listing one entry per purpose, or just one: a sign-in-only
+      flow lists `login` alone.
+
+      - `login`: verify an existing user.
+      - `register`: create a user.
+      - `recovery`, `profiling`, `reauth`, `link_account`: reserved. A
+        definition may declare them, but the engine does not run their
+        journeys yet; `recovery` only asks a password field for a new
+        password.
     minProperties: 1
     propertyNames:
       type: string
@@ -80,12 +88,11 @@ properties:
       - name: identify
         fields: [ email ]
         actions:
-          - name: submit 
+          - name: submit
             kind: submit
             primary: true
         transitions:
           submit: { target: authenticate }
-          user_not_found: { target: register, action: switch }
       - name: authenticate
         fields: [ 'x-auth-methods#password' ]
         actions:

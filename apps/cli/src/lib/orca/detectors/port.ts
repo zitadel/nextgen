@@ -133,12 +133,11 @@ export function portFromIssuer(issuer: string): number | undefined {
   // Re-parse under a scheme the URL standard treats as non-special. Those
   // have no default port, so an explicitly written 80/443 survives, while
   // host parsing (IPv6 brackets, userinfo) stays the standard's job.
-  let probe: URL;
-  try {
-    probe = new URL(issuer.replace(/^[a-zA-Z][a-zA-Z0-9+.-]*:/, "zl-issuer-probe:"));
-  } catch {
+  const probeUrl = issuer.replace(/^[a-zA-Z][a-zA-Z0-9+.-]*:/, "zl-issuer-probe:");
+  if (!URL.canParse(probeUrl)) {
     return undefined;
   }
+  const probe = new URL(probeUrl);
   const port = Number.parseInt(probe.port, 10);
   return Number.isFinite(port) && port > 0 ? port : undefined;
 }
