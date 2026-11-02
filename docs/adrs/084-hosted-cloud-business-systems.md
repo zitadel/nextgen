@@ -262,8 +262,12 @@ website's catch-all.
 - **Pricing boundary** (revised 2026-11-02). Core resources and basic MFA,
   including requiring MFA for everyone, are free: CISA's Secure by Design
   principles count charging for MFA as a hidden tax, and a charge would push
-  apps to enforce MFA outside Zitadel. Opt-in adaptive protection (risk
-  scoring and risk-based step-up) is metered per user it scores. MAU is an
+  apps to enforce MFA outside Zitadel. Bot checks are free too: the built-in
+  Altcha challenge, a project's own Turnstile, hCaptcha or reCAPTCHA keys, and
+  an edge verdict such as BotID's (ADR 078 §5). None costs Zitadel per check,
+  and a customer's own provider bills the customer. Opt-in adaptive protection
+  (risk scoring from those verdicts and other signals, then risk-based
+  step-up) is metered per user it scores. MAU is an
   analytics gauge, never a billable meter or upgrade trigger. Paid Governance is an
   account-wide package included in Pro; Compliance is quoted per account
   with agreed retention, retained-event volume and SIEM destinations.

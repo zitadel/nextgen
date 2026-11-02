@@ -11,7 +11,7 @@ describe("the hours a usage report covers", () => {
   });
 });
 
-it("keeps core analytics and retired policy meters out of Stripe", () => {
+it("keeps core analytics and retired policy and bot meters out of Stripe", () => {
   const records = [
     "monthly_active_users",
     "api_requests",
@@ -20,6 +20,7 @@ it("keeps core analytics and retired policy meters out of Stripe", () => {
     "sso_users",
     "sms_messages_us_ca",
     "sms_messages_other",
+    "bot_checks",
   ].map((metric) => ({
     team_id: "team_a",
     metric,

@@ -36,6 +36,14 @@ describe("free core identity", () => {
     });
     expect(month).toMatchObject({ plan: "free", reasons: [], total_amount: 0 });
   });
+
+  it("never charges for bot checks, whichever provider runs them", () => {
+    expect(bill({ counts: { bot_checks: 1_000_000 } })).toMatchObject({
+      plan: "free",
+      reasons: [],
+      total_amount: 0,
+    });
+  });
 });
 
 describe("paid packages", () => {
@@ -171,7 +179,7 @@ describe("capacity and regions", () => {
 });
 
 describe("catalog entitlements", () => {
-  it("never sends core users or policy counts as a billing allowance", () => {
+  it("never sends core users, policy counts or bot checks as a billing allowance", () => {
     for (const plan of ["free", "pro", "enterprise"] as const) {
       const allowances = entitlementsFor(plan).allowances;
       for (const id of [
@@ -179,6 +187,7 @@ describe("catalog entitlements", () => {
         "policy_users",
         "retained_users_90d",
         "retained_users_400d",
+        "bot_checks",
       ])
         expect(allowances).not.toHaveProperty(id);
     }
@@ -188,7 +197,6 @@ describe("catalog entitlements", () => {
     expect(entitlementsFor("free").allowances).toMatchObject({
       sso_users: 1_000,
       directory_users: 1_000,
-      bot_checks: 1_000,
       protected_users: 10_000,
     });
     expect(entitlementsFor("free").allowances).not.toHaveProperty("email_messages");

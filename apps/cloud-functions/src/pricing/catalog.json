@@ -1,7 +1,7 @@
 {
   "$schema": "./catalog.schema.json",
   "id": "zitadel-pricing",
-  "version": "2026-11-02.1",
+  "version": "2026-11-02.2",
   "status": "proposal",
   "currency": "usd",
   "decided": ["core", "meters.monthly_active_users.price", "meters.sso_users.allowance", "packages.governance.scope", "packages.compliance.scope", "plans.pro.minimum", "packages.governance.included_in", "packages.compliance.pricing", "plans.enterprise.sla", "plans.pro.limits.requests_per_second_per_project", "plans.free.regions", "plans.pro.regions", "plans.enterprise.regions", "licensed.region", "licensed.addendum.plans", "licensed.support_priority.plans"],
@@ -165,23 +165,10 @@
       "stripe": { "event_name": "m2m_tokens", "aggregation": "sum", "price_lookup_key": "m2m_tokens" }
     },
     {
-      "id": "bot_checks",
-      "label": "Advanced bot checks",
-      "kind": "activity",
-      "counts": "Each advanced check; basic challenges are free and unmetered",
-      "dedupe": null,
-      "allowance": 1000,
-      "price": { "model": "per_unit", "unit_amount": 0.002, "display": "$2 per 1,000" },
-      "security": true,
-      "tag": "delivered cost",
-      "source": { "where": "the flow's bot gate, when it calls BotID", "exists": "no: Altcha gates designed, not wired" },
-      "stripe": { "event_name": "bot_checks", "aggregation": "sum", "price_lookup_key": "bot_checks" }
-    },
-    {
       "id": "protected_users",
       "label": "Adaptive sign-in protection",
       "kind": "users",
-      "counts": "A user whose sign-ins adaptive protection scores, on projects that turn it on: risk scoring, compromised-credential checks and risk-based step-up or blocking. Requiring MFA, brute-force guards and a breached-password check when a password is set stay free",
+      "counts": "A user whose sign-ins adaptive protection scores, on projects that turn it on: risk scoring from bot verdicts, device signals, compromised credentials and IP reputation, then risk-based step-up or blocking. Requiring MFA, brute-force guards, a breached-password check when a password is set and every bot check stay free",
       "dedupe": ["project", "user", "month"],
       "allowance": 10000,
       "price": { "model": "per_unit", "unit_amount": 0.003 },
@@ -251,21 +238,13 @@
       "paid_part": "Funnels, conversion, sign-in method mix, per-tenant views, anomaly alerts and exports over 90 days",
       "price": null,
       "needs": ["request events in an analytics store rather than Postgres"]
-    },
-    {
-      "id": "bot_checks_advanced",
-      "label": "Bot and fraud defence: fingerprinting and SMS-fraud scoring",
-      "free_part": "Basic challenges, unlimited; 1,000 advanced checks a month",
-      "paid_part": "Device fingerprinting and SMS-fraud scoring on top of today's advanced checks",
-      "price": { "model": "per_unit", "unit_amount": 0.002, "note": "per check, the bot_checks rate" },
-      "needs": ["a fingerprinting vendor beside BotID"]
     }
   ],
   "core": {
     "platform": ["Deployments", "Releases", "Login in your own app, on your domain"],
     "resources": ["Users and service users", "Teams and organizations", "Projects and applications", "Roles and credentials", "Console seats"],
     "authentication": ["Password sign-in", "Social sign-in", "Passkeys and TOTP MFA"],
-    "security": ["Require MFA for everyone", "Password rules and lockout", "Basic bot challenges"],
+    "security": ["Require MFA for everyone", "Password rules and lockout", "Built-in bot challenge", "Your own captcha or edge bot check"],
     "billing": "Core resources and basic security are free on every plan. Active-user counts never change your plan or bill. Published request and token capacity limits still apply."
   },
   "packages": [
