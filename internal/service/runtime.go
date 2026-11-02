@@ -324,16 +324,10 @@ func RuntimeResolutionFromContext(ctx context.Context) *RuntimeResolution {
 
 // runtimePins is what the request's release pins of one kind, by handle. A
 // request with no release is not deployed.
-func runtimePins(ctx context.Context, kind domain.ReleasePointerKind) (map[string]domain.ReleasePointer, error) {
+func runtimePins(ctx context.Context, kind domain.ReleasePointerKind) (domain.ReleasePins, error) {
 	resolution := RuntimeResolutionFromContext(ctx)
 	if resolution == nil || resolution.Release == nil {
 		return nil, domain.ErrReleaseNotDeployed(nil)
 	}
-	pinned := make(map[string]domain.ReleasePointer)
-	for _, pointer := range resolution.Release.Pointers {
-		if pointer.Kind == kind {
-			pinned[pointer.Handle] = pointer
-		}
-	}
-	return pinned, nil
+	return resolution.Release.Pins(kind), nil
 }

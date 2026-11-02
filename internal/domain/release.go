@@ -153,6 +153,20 @@ func (r *Release) Revoked() bool {
 	return r != nil && r.RevokedAt != nil
 }
 
+// ReleasePins is what a release pins of one kind, by handle.
+type ReleasePins map[string]ReleasePointer
+
+// Pins is what the release pins of kind.
+func (r *Release) Pins(kind ReleasePointerKind) ReleasePins {
+	pins := make(ReleasePins)
+	for _, pointer := range r.Pointers {
+		if pointer.Kind == kind {
+			pins[pointer.Handle] = pointer
+		}
+	}
+	return pins
+}
+
 // ReleaseField enumerates the fields of Release which can be used for
 // filtering and ordering in list operations. Pointers and metadata live in
 // columns no query filters on, so they are not bound.
