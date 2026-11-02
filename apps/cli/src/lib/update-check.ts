@@ -7,7 +7,8 @@ import { npmDistTagForCliVersion } from "./public-cli";
 import { isCI } from "./skills-hint";
 import { telemetryConfigDir } from "./telemetry/identity";
 
-const CLI_PACKAGE_NAME = "@zitadel/cli";
+/** `@zitadel/cli`, escaped as npm itself escapes a scoped name in a registry path. */
+const DIST_TAGS_PATH = "/-/package/@zitadel%2fcli/dist-tags";
 const DEFAULT_REGISTRY = "https://registry.npmjs.org";
 const LOOKUP_TIMEOUT_MS = 1500;
 const CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
@@ -76,10 +77,9 @@ export function isNewerVersion(latest: string | undefined, current: string): boo
 async function fetchDistTag(distTag: string, env: NodeJS.ProcessEnv): Promise<string | undefined> {
   try {
     const registry = (env.npm_config_registry?.trim() || DEFAULT_REGISTRY).replace(/\/+$/, "");
-    const response = await fetch(
-      `${registry}/-/package/${CLI_PACKAGE_NAME.replace("/", "%2f")}/dist-tags`,
-      { signal: AbortSignal.timeout(LOOKUP_TIMEOUT_MS) },
-    );
+    const response = await fetch(`${registry}${DIST_TAGS_PATH}`, {
+      signal: AbortSignal.timeout(LOOKUP_TIMEOUT_MS),
+    });
     if (!response.ok) {
       return undefined;
     }
