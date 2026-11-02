@@ -126,6 +126,26 @@ func TestNoOriginServesNewestPrimaryDeployment(t *testing.T) {
 	}
 }
 
+// TestReaddedPrimaryOriginIsNotDeployed adds back a primary origin the newest
+// primary deployment left out. It serves nothing until the next deploy, not
+// an older deployment that named it.
+func TestReaddedPrimaryOriginIsNotDeployed(t *testing.T) {
+	t.Parallel()
+
+	fixture := newDeploymentFixture(t)
+	first := fixture.deploy(t, fixture.release.ID)
+	require.IsType(t, &api.CreateDeploymentCreated{}, first, helpers.MustMarshal(t, first))
+
+	projects := harness.EnsureProjectService(t)
+	require.NoError(t, projects.RemoveOrigin(t.Context(), fixture.project, wwwOrigin))
+	second := fixture.deploy(t, fixture.otherRelease(t))
+	require.IsType(t, &api.CreateDeploymentCreated{}, second, helpers.MustMarshal(t, second))
+	assert.Equal(t, []string{appOrigin}, origins(second.(*api.CreateDeploymentCreated).Targets))
+	fixture.addOrigin(t, domain.Origin{Pattern: wwwOrigin, Kind: domain.OriginKindPrimary})
+
+	assertFlowCode(t, fixture.project, wwwOrigin, domain.ErrReleaseNotDeployed(nil).Code)
+}
+
 // releaseID is the id of a created release. The same pointer set answers 200
 // with the release that already pins it.
 func releaseID(t *testing.T, resp api.CreateReleaseRes) api.ReleaseID {
