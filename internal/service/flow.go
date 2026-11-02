@@ -108,11 +108,11 @@ func (s *flowService) Resolve(ctx context.Context, req ResolveFlowRequest) (_ *d
 		return nil, err
 	}
 	if req.Name != nil {
-		revisionID, ok := pinned[*req.Name]
+		pin, ok := pinned[*req.Name]
 		if !ok {
 			return nil, domain.ErrFlowDefinitionNotFound()
 		}
-		def, err := s.v2Pool.Statements().GetFlowDefinitionByID(ctx, req.ProjectID, revisionID)
+		def, err := s.v2Pool.Statements().GetFlowDefinitionByID(ctx, req.ProjectID, pin.RevisionID)
 		if err != nil {
 			if isNoRowFound(err) {
 				return nil, domain.ErrFlowDefinitionNotFound()
@@ -135,8 +135,8 @@ func (s *flowService) Resolve(ctx context.Context, req ResolveFlowRequest) (_ *d
 		return nil, domain.ErrFlowDefinitionNotFound()
 	}
 	revisionIDs := make([]string, 0, len(pinned))
-	for _, revisionID := range pinned {
-		revisionIDs = append(revisionIDs, revisionID)
+	for _, pin := range pinned {
+		revisionIDs = append(revisionIDs, pin.RevisionID)
 	}
 	result, err := s.v2Pool.Statements().ListFlowDefinitions(WithAuthzListUnrestricted(ctx), &database.ListOptions[domain.FlowDefinitionField]{
 		Filter: flowdefinition.ByIDs(req.ProjectID, revisionIDs),

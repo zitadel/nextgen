@@ -34,11 +34,11 @@ func resolveUserSchema(ctx context.Context, stmts userSchemaStatements, bases do
 	if err != nil {
 		return nil, err
 	}
-	revisionID, ok := pins[handle]
+	pin, ok := pins[handle]
 	if !ok {
 		return nil, domain.ErrInternal(nil).WithMessage(fmt.Sprintf("release does not pin user schema %q", handle))
 	}
-	schema, err := stmts.GetJSONSchemaByID(ctx, projectID, revisionID)
+	schema, err := stmts.GetJSONSchemaByID(ctx, projectID, pin.RevisionID)
 	if _, missing := errors.AsType[*database.NoRowFoundError](err); missing {
 		return nil, domain.ErrInternal(err).WithMessage(fmt.Sprintf("release pins a missing user schema %q", handle))
 	}

@@ -42,11 +42,11 @@ func pinnedIDPConnection(ctx context.Context, connections IDPConnectionService, 
 	if err != nil {
 		return nil, err
 	}
-	revisionID, ok := pins[slug]
+	pin, ok := pins[slug]
 	if !ok {
 		return nil, domain.ErrInternal(nil).WithMessage(fmt.Sprintf("release does not pin identity provider %q", slug))
 	}
-	connection, err := connections.GetRevision(ctx, projectID, revisionID)
+	connection, err := connections.GetRevision(ctx, projectID, pin.RevisionID)
 	if errors.Is(err, domain.ErrIDPConnectionNotFound()) {
 		return nil, domain.ErrInternal(err).WithMessage(fmt.Sprintf("release pins a missing identity provider %q", slug))
 	}

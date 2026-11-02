@@ -375,11 +375,11 @@ func (s *PolicyService) ResolvePolicy(ctx context.Context, projectID, operation 
 	if err != nil {
 		return nil, err
 	}
-	revisionID, ok := pins[operation]
+	pin, ok := pins[operation]
 	if !ok {
 		return nil, nil
 	}
-	entity, err := s.v2Pool.Statements().GetPolicyRevision(ctx, projectID, revisionID)
+	entity, err := s.v2Pool.Statements().GetPolicyRevision(ctx, projectID, pin.RevisionID)
 	if isNoRowFound(err) {
 		return nil, domain.ErrInternal(err).WithMessage(fmt.Sprintf("release pins a missing policy revision for %q", operation))
 	}
