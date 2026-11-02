@@ -5,12 +5,20 @@ import { defineConfig } from "vitest/config";
 import { baseTest } from "@zitadel/vitest-config";
 import { PORT_WORKERS } from "./tests/helpers/ports";
 
+/** Cores the pool leaves free for the rest of the machine. */
+const WORKER_HEADROOM = 3;
+
 export default defineConfig({
   cacheDir: ".vitest",
   test: {
     ...baseTest,
     name: "@zitadel/cli",
     environment: "node",
+    // Undo `vi.spyOn`, `vi.stubEnv` and `vi.stubGlobal` before every test, so no
+    // file restores them by hand.
+    restoreMocks: true,
+    unstubEnvs: true,
+    unstubGlobals: true,
     // The integration specs drive the built CLI; keep their telemetry off with
     // the cross-tool standard (https://consoledonottrack.com) so a unit run
     // never ships events, independent of the moon/CI env.
@@ -36,6 +44,9 @@ export default defineConfig({
     // renamed suite must not vanish silently. Specs are `*.spec.ts`, unit
     // tests `*.test.ts` (tests/AGENTS.md).
     include: ["tests/**/*.{test,spec}.ts"],
+    // Before anything runs, ends the fake servers an interrupted earlier run
+    // left on ports from the test band (tests/helpers/stale-servers.ts).
+    globalSetup: ["./tests/helpers/stale-servers.ts"],
     // `offline.ts` first: it fails any test that connects past loopback, so a
     // unit test or spec cannot reach a real server, Zitadel's or anyone's.
     setupFiles: [
@@ -45,10 +56,12 @@ export default defineConfig({
       "./tests/helpers/console.ts",
     ],
     // Every file running at the same time takes its ports from a block of its
-    // own (tests/helpers/ports.ts), and there are PORT_WORKERS blocks. Vitest's
-    // default of a worker per core but one would outnumber them on a bigger
-    // machine, so it stops there.
-    maxWorkers: Math.min(Math.max(availableParallelism() - 1, 1), PORT_WORKERS),
+    // own (tests/helpers/ports.ts), and there are PORT_WORKERS blocks, so the
+    // pool stops there on a bigger machine. It also leaves three cores free
+    // instead of Vitest's one: each worker holds about 600 MB (a fresh process
+    // per file that builds the generated API schemas again), and this suite
+    // runs beside the rest of CI's task graph, where memory is the limit.
+    maxWorkers: Math.min(Math.max(availableParallelism() - WORKER_HEADROOM, 1), PORT_WORKERS),
     // The integration specs drive the built CLI against a `usePlatformMock()`
     // HTTP server. Under CI's parallel worker pool that mock occasionally
     // isn't ready when a spec's `aSetUpApp()` arrange runs, and the

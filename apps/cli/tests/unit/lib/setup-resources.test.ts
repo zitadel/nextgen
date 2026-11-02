@@ -1,12 +1,13 @@
 import { existsSync } from "node:fs";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 import type { ZitadelClient } from "@zitadel/api/client";
 import { ApiError } from "@zitadel/api/runtime/fetch";
 import { DEFAULT_FLOW_CONFIG_PATH, DEFAULT_SCHEMA_CONFIG_PATH } from "@zitadel/config/defaults";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, vi } from "vitest";
+
+import { it } from "../../helpers/fixtures";
 
 import {
   normalizeFlowBody,
@@ -30,10 +31,7 @@ import { takeReportedWarnings } from "../../../src/lib/warnings";
 
 const TEST_CLI_VERSION = "0.1.0-alpha.18";
 
-let cwd: string;
-
-beforeEach(async () => {
-  cwd = await mkdtemp(join(tmpdir(), "zitadel-setup-resources-"));
+it.beforeEach(async ({ dir: cwd }) => {
   await mkdir(join(cwd, ".zitadel"), { recursive: true });
   await writeFile(
     join(cwd, ".zitadel/state.json"),
@@ -44,12 +42,10 @@ beforeEach(async () => {
   );
 });
 
-afterEach(async () => {
-  await rm(cwd, { recursive: true, force: true });
-});
-
 describe("materializeSetupResources", () => {
-  it("persists schema state before creating the flow so apply can recover partial setup", async () => {
+  it("persists schema state before creating the flow so apply can recover partial setup", async ({
+    dir: cwd,
+  }) => {
     const client = {
       createSchema: vi.fn().mockResolvedValue({ id: "sch_01KWHF" }),
       createFlowDefinition: vi.fn().mockRejectedValue(new Error("flow create failed")),
@@ -75,7 +71,7 @@ describe("materializeSetupResources", () => {
     });
   });
 
-  it("names the schema by its objectType on the flow", async () => {
+  it("names the schema by its objectType on the flow", async ({ dir: cwd }) => {
     const client = {
       createSchema: vi.fn().mockResolvedValue({ id: "sch_01KWHF" }),
       createFlowDefinition: vi
@@ -102,7 +98,7 @@ describe("materializeSetupResources", () => {
     expect(flowFile.user_schema).toBe("human-user");
   });
 
-  it("keeps the schema file as written and seeds its hash from it", async () => {
+  it("keeps the schema file as written and seeds its hash from it", async ({ dir: cwd }) => {
     const client = {
       createSchema: vi.fn().mockResolvedValue({ id: "sch_01KWHF" }),
       createFlowDefinition: vi.fn().mockResolvedValue({
@@ -131,7 +127,9 @@ describe("materializeSetupResources", () => {
     );
   });
 
-  it("keeps the server's empty audience echo out of the flow file and hashes past it", async () => {
+  it("keeps the server's empty audience echo out of the flow file and hashes past it", async ({
+    dir: cwd,
+  }) => {
     const client = {
       createSchema: vi.fn().mockResolvedValue({ id: "sch_01KWHF" }),
       createFlowDefinition: vi
@@ -165,7 +163,9 @@ describe("materializeSetupResources", () => {
     );
   });
 
-  it("scaffolds the business use case's companyName into the written schema and register step", async () => {
+  it("scaffolds the business use case's companyName into the written schema and register step", async ({
+    dir: cwd,
+  }) => {
     const client = {
       createSchema: vi.fn().mockResolvedValue({ id: "sch_01KWHF" }),
       createFlowDefinition: vi
@@ -209,7 +209,7 @@ describe("materializeSetupResources", () => {
     expect(register?.fields).toEqual(["email", "givenName", "familyName", "companyName"]);
   });
 
-  it("writes schemas and flows READMEs the first time", async () => {
+  it("writes schemas and flows READMEs the first time", async ({ dir: cwd }) => {
     const client = {
       createSchema: vi.fn().mockResolvedValue({ id: "sch_01KWHF" }),
       createFlowDefinition: vi.fn().mockResolvedValue({
@@ -246,7 +246,9 @@ describe("materializeSetupResources", () => {
     }
   });
 
-  it("preserves an existing README so a developer's edits are not overwritten", async () => {
+  it("preserves an existing README so a developer's edits are not overwritten", async ({
+    dir: cwd,
+  }) => {
     await mkdir(join(cwd, SCHEMAS_DIR), { recursive: true });
     await writeFile(join(cwd, SCHEMAS_DIR, "README.md"), "# custom README\n");
     const client = {
@@ -282,7 +284,7 @@ describe("materializeSetupResources password policy", () => {
     } as unknown as ZitadelClient;
   }
 
-  it("publishes and writes the recommended minimum when none was given", async () => {
+  it("publishes and writes the recommended minimum when none was given", async ({ dir: cwd }) => {
     const platform = client();
 
     const result = await materializeSetupResources({
@@ -306,7 +308,7 @@ describe("materializeSetupResources password policy", () => {
     expect(result.passwordMinLengthSet).toBe(true);
   });
 
-  it("publishes and writes an empty policy for an explicit none", async () => {
+  it("publishes and writes an empty policy for an explicit none", async ({ dir: cwd }) => {
     const platform = client();
 
     const result = await materializeSetupResources({
@@ -329,7 +331,7 @@ describe("materializeSetupResources password policy", () => {
     expect(result.passwordMinLengthSet).toBe(false);
   });
 
-  it("says no minimum was published when a kept policy file has none", async () => {
+  it("says no minimum was published when a kept policy file has none", async ({ dir: cwd }) => {
     // Telemetry reports what was published: a kept file without a minimum
     // stays without one when none was given, whatever the default.
     await mkdir(join(cwd, POLICIES_DIR), { recursive: true });
@@ -349,7 +351,7 @@ describe("materializeSetupResources password policy", () => {
     expect(result.passwordMinLengthSet).toBe(false);
   });
 
-  it("puts the given minimum into the published policy and its file", async () => {
+  it("puts the given minimum into the published policy and its file", async ({ dir: cwd }) => {
     const platform = client();
 
     await materializeSetupResources({
@@ -371,7 +373,7 @@ describe("materializeSetupResources password policy", () => {
     expect(written.config).toEqual({ min_length: 12 });
   });
 
-  it("records the policy id and the hash setup records for its resources", async () => {
+  it("records the policy id and the hash setup records for its resources", async ({ dir: cwd }) => {
     await materializeSetupResources({
       cwd,
       cliVersion: TEST_CLI_VERSION,
@@ -394,7 +396,7 @@ describe("materializeSetupResources password policy", () => {
     });
   });
 
-  it("writes the policies README with runnable commands", async () => {
+  it("writes the policies README with runnable commands", async ({ dir: cwd }) => {
     const result = await materializeSetupResources({
       cwd,
       cliVersion: TEST_CLI_VERSION,
@@ -410,7 +412,7 @@ describe("materializeSetupResources password policy", () => {
     expect(result.filesWritten).toContain(join(cwd, POLICIES_DIR, "README.md"));
   });
 
-  it("refuses an existing policy file before creating anything", async () => {
+  it("refuses an existing policy file before creating anything", async ({ dir: cwd }) => {
     const platform = client();
     await mkdir(join(cwd, POLICIES_DIR), { recursive: true });
     await writeFile(join(cwd, PASSWORD_POLICY_PATH), "{}\n");
@@ -432,7 +434,9 @@ describe("materializeSetupResources password policy", () => {
     });
   });
 
-  it("keeps an existing policy file under --force and publishes it as it is", async () => {
+  it("keeps an existing policy file under --force and publishes it as it is", async ({
+    dir: cwd,
+  }) => {
     const platform = client();
     const existing = `{"$schema":"../meta/policy.json","operation":"auth.factor.password.set","config":{"min_length":14,"history_depth":2}}\n`;
     await mkdir(join(cwd, POLICIES_DIR), { recursive: true });
@@ -454,7 +458,9 @@ describe("materializeSetupResources password policy", () => {
     expect(result.filesWritten).not.toContain(join(cwd, PASSWORD_POLICY_PATH));
   });
 
-  it("puts a given minimum into an existing policy file under --force, keeping its other settings", async () => {
+  it("puts a given minimum into an existing policy file under --force, keeping its other settings", async ({
+    dir: cwd,
+  }) => {
     const platform = client();
     await mkdir(join(cwd, POLICIES_DIR), { recursive: true });
     await writeFile(
@@ -481,7 +487,9 @@ describe("materializeSetupResources password policy", () => {
     expect(written.config).toEqual({ min_length: 10, history_depth: 2 });
   });
 
-  it("leaves a kept policy file untouched when the given minimum is the one it has", async () => {
+  it("leaves a kept policy file untouched when the given minimum is the one it has", async ({
+    dir: cwd,
+  }) => {
     const existing = `{"operation":"auth.factor.password.set","config":{"min_length":14}}\n`;
     await mkdir(join(cwd, POLICIES_DIR), { recursive: true });
     await writeFile(join(cwd, PASSWORD_POLICY_PATH), existing);
@@ -499,7 +507,9 @@ describe("materializeSetupResources password policy", () => {
     expect(result.filesWritten).not.toContain(join(cwd, PASSWORD_POLICY_PATH));
   });
 
-  it("removes the minimum from an existing policy file under --force on an explicit none", async () => {
+  it("removes the minimum from an existing policy file under --force on an explicit none", async ({
+    dir: cwd,
+  }) => {
     const platform = client();
     await mkdir(join(cwd, POLICIES_DIR), { recursive: true });
     await writeFile(
@@ -526,7 +536,9 @@ describe("materializeSetupResources password policy", () => {
     expect(written.config).toEqual({ history_depth: 2 });
   });
 
-  it("refuses an invalid existing policy file under --force in the preflight, before anything is created", async () => {
+  it("refuses an invalid existing policy file under --force in the preflight, before anything is created", async ({
+    dir: cwd,
+  }) => {
     await mkdir(join(cwd, POLICIES_DIR), { recursive: true });
     await writeFile(
       join(cwd, PASSWORD_POLICY_PATH),
@@ -538,7 +550,9 @@ describe("materializeSetupResources password policy", () => {
     });
   });
 
-  it("refuses an invalid existing policy file under --force before publishing it", async () => {
+  it("refuses an invalid existing policy file under --force before publishing it", async ({
+    dir: cwd,
+  }) => {
     const platform = client();
     await mkdir(join(cwd, POLICIES_DIR), { recursive: true });
     await writeFile(
@@ -558,7 +572,9 @@ describe("materializeSetupResources password policy", () => {
     expect(vi.mocked(platform.publishPolicy)).not.toHaveBeenCalled();
   });
 
-  it("goes on without a policy against a server that has no policy endpoints", async () => {
+  it("goes on without a policy against a server that has no policy endpoints", async ({
+    dir: cwd,
+  }) => {
     takeReportedWarnings();
     const platform = client();
     vi.mocked(platform.publishPolicy).mockRejectedValue(
@@ -584,7 +600,7 @@ describe("materializeSetupResources password policy", () => {
     expect(result.passwordMinLengthSet).toBe(false);
   });
 
-  it("still fails on a policy the server refuses", async () => {
+  it("still fails on a policy the server refuses", async ({ dir: cwd }) => {
     const platform = client();
     vi.mocked(platform.publishPolicy).mockRejectedValue(
       new ApiError(
@@ -608,7 +624,9 @@ describe("materializeSetupResources password policy", () => {
 });
 
 describe("materializeSetupResources branding", () => {
-  it("never scaffolds branding files or publishes a branding revision (#1039)", async () => {
+  it("never scaffolds branding files or publishes a branding revision (#1039)", async ({
+    dir: cwd,
+  }) => {
     const createBranding = vi.fn();
     const client = {
       createSchema: vi.fn().mockResolvedValue({ id: "sch_01KWHF" }),
@@ -660,7 +678,7 @@ describe("materializeSetupResources with a social provider", () => {
   // A list now: setup enables any number of providers in one run.
   const google = [{ selection: googleSelection }];
 
-  it("writes the connection and records the id the platform assigned", async () => {
+  it("writes the connection and records the id the platform assigned", async ({ dir: cwd }) => {
     const client = recordingClient();
 
     await materializeSetupResources({
@@ -690,7 +708,7 @@ describe("materializeSetupResources with a social provider", () => {
     expect(state.resources[`${IDPS_DIR}/google.json`]).toMatchObject({ id: "idp_01KWHE" });
   });
 
-  it("writes the connection it uploaded, whatever the server stored", async () => {
+  it("writes the connection it uploaded, whatever the server stored", async ({ dir: cwd }) => {
     // The server spells out defaults the file leaves to it, and a server that
     // resolved the secret would hand back a credential: neither reaches the
     // committed file, which holds what setup uploaded and nothing else.
@@ -725,7 +743,7 @@ describe("materializeSetupResources with a social provider", () => {
     expect(written).not.toContain("pkce_enabled");
   });
 
-  it("records the hash plan computes for the connection file", async () => {
+  it("records the hash plan computes for the connection file", async ({ dir: cwd }) => {
     const client = recordingClient();
 
     await materializeSetupResources({
@@ -746,7 +764,7 @@ describe("materializeSetupResources with a social provider", () => {
     );
   });
 
-  it("leaves no connection file behind when the create fails", async () => {
+  it("leaves no connection file behind when the create fails", async ({ dir: cwd }) => {
     // Setup does not remove a connection file it wrote, so writing before the
     // create would leave one behind on any failure and the retry would refuse
     // on it -- with nothing able to clear it but the developer.
@@ -770,15 +788,16 @@ describe("materializeSetupResources with a social provider", () => {
     expect(existsSync(join(cwd, IDPS_DIR, "google.json"))).toBe(false);
   });
 
-  it("refuses an existing connection before creating anything", async () => {
+  it("refuses an existing connection before creating anything", async ({ dir: cwd }) => {
     // Finding out after the create would leave the project holding a
     // connection that no local file tracks.
-    let created = false;
+    const creates: unknown[][] = [];
+    const created = () => creates.length > 0;
     const client = recordingClient();
     const watching = {
       ...client,
       createIdp: (...args: unknown[]) => {
-        created = true;
+        creates.push(args);
         return (client.createIdp as (...a: unknown[]) => unknown)(...args);
       },
     } as unknown as typeof client;
@@ -796,10 +815,10 @@ describe("materializeSetupResources with a social provider", () => {
       }),
     ).rejects.toMatchObject({ code: "E_CONFLICT" });
 
-    expect(created).toBe(false);
+    expect(created()).toBe(false);
   });
 
-  it("refuses to replace an existing connection, even with --force", async () => {
+  it("refuses to replace an existing connection, even with --force", async ({ dir: cwd }) => {
     // --force is for setup's own scaffolding. A connection may hold a client
     // id someone registered with the vendor and a slug the schemas and flows
     // already name, and the IdP contract makes these files tenant-owned.
@@ -823,7 +842,7 @@ describe("materializeSetupResources with a social provider", () => {
     expect(kept.mine).toBe(true);
   });
 
-  it("does not read the connection files when no provider was chosen", async () => {
+  it("does not read the connection files when no provider was chosen", async ({ dir: cwd }) => {
     await mkdir(join(cwd, IDPS_DIR), { recursive: true });
     await writeFile(join(cwd, IDPS_DIR, "draft.json"), "{not json");
 
@@ -838,7 +857,9 @@ describe("materializeSetupResources with a social provider", () => {
     ).resolves.toBeDefined();
   });
 
-  it("names setup's own slug flag when it refuses a connection to another issuer", async () => {
+  it("names setup's own slug flag when it refuses a connection to another issuer", async ({
+    dir: cwd,
+  }) => {
     await mkdir(join(cwd, IDPS_DIR), { recursive: true });
     await writeFile(
       join(cwd, IDPS_DIR, "acme.json"),
@@ -857,7 +878,7 @@ describe("materializeSetupResources with a social provider", () => {
     expect((error as { hint?: string }).hint).toContain("--sso-slug");
   });
 
-  it("suggests enabling the provider that was chosen, not always Google", async () => {
+  it("suggests enabling the provider that was chosen, not always Google", async ({ dir: cwd }) => {
     await mkdir(join(cwd, IDPS_DIR), { recursive: true });
     await writeFile(
       join(cwd, IDPS_DIR, "acme.json"),
@@ -878,7 +899,9 @@ describe("materializeSetupResources with a social provider", () => {
     );
   });
 
-  it("refuses a connection another file already holds the slug of, before creating anything", async () => {
+  it("refuses a connection another file already holds the slug of, before creating anything", async ({
+    dir: cwd,
+  }) => {
     await mkdir(join(cwd, IDPS_DIR), { recursive: true });
     await writeFile(
       join(cwd, IDPS_DIR, "elsewhere.json"),
@@ -897,7 +920,9 @@ describe("materializeSetupResources with a social provider", () => {
     ).rejects.toMatchObject({ code: "E_CONFLICT" });
   });
 
-  it("refuses a custom connection whose variables another file would share", async () => {
+  it("refuses a custom connection whose variables another file would share", async ({
+    dir: cwd,
+  }) => {
     await mkdir(join(cwd, IDPS_DIR), { recursive: true });
     await writeFile(
       join(cwd, IDPS_DIR, "other.json"),
@@ -925,7 +950,9 @@ describe("materializeSetupResources with a social provider", () => {
 
   // Setup does not remove a connection file it wrote, so a schema refused
   // after the connection exists would leave a file the retry refuses on.
-  it("refuses an existing default schema before it creates the connection", async () => {
+  it("refuses an existing default schema before it creates the connection", async ({
+    dir: cwd,
+  }) => {
     const client = recordingClient();
     await mkdir(join(cwd, SCHEMAS_DIR), { recursive: true });
     await writeFile(join(cwd, DEFAULT_SCHEMA_CONFIG_PATH), "{}\n");
@@ -945,7 +972,7 @@ describe("materializeSetupResources with a social provider", () => {
     expect(existsSync(join(cwd, IDPS_DIR, "google.json"))).toBe(false);
   });
 
-  it("creates the connection before the flow that names it", async () => {
+  it("creates the connection before the flow that names it", async ({ dir: cwd }) => {
     const client = recordingClient();
 
     await materializeSetupResources({
@@ -962,7 +989,7 @@ describe("materializeSetupResources with a social provider", () => {
     expect(idpCall).toBeLessThan(flowCall);
   });
 
-  it("enables the provider on the published schema and login flow", async () => {
+  it("enables the provider on the published schema and login flow", async ({ dir: cwd }) => {
     const client = recordingClient();
 
     await materializeSetupResources({
@@ -989,7 +1016,7 @@ describe("materializeSetupResources with a social provider", () => {
     );
   });
 
-  it("leaves the schema and flow untouched when no provider was chosen", async () => {
+  it("leaves the schema and flow untouched when no provider was chosen", async ({ dir: cwd }) => {
     const client = recordingClient();
 
     await materializeSetupResources({
@@ -1010,10 +1037,7 @@ describe("materializeSetupResources with a social provider", () => {
 
 /** Several providers at once: Google from the catalog, and a custom connection beside it. */
 describe("materializeSetupResources with several providers", () => {
-  let cwd: string;
-
-  beforeEach(async () => {
-    cwd = await mkdtemp(join(tmpdir(), "zitadel-setup-multi-"));
+  it.beforeEach(async ({ dir: cwd }) => {
     await mkdir(join(cwd, ".zitadel"), { recursive: true });
     await writeFile(
       join(cwd, ".zitadel/state.json"),
@@ -1021,11 +1045,7 @@ describe("materializeSetupResources with several providers", () => {
     );
   });
 
-  afterEach(async () => {
-    await rm(cwd, { recursive: true, force: true });
-  });
-
-  it("creates a connection per provider and names every slug", async () => {
+  it("creates a connection per provider and names every slug", async ({ dir: cwd }) => {
     const client = {
       createIdp: vi.fn().mockImplementation(async (body: { idp: { slug?: string } }) => ({
         // A distinct id per connection, so a first-only bug cannot hide behind
@@ -1078,9 +1098,9 @@ describe("materializeSetupResources with several providers", () => {
  * keeps its id and secret.
  */
 describe("assertNoSetupResourceConflicts", () => {
-  it.each([DEFAULT_SCHEMA_CONFIG_PATH, DEFAULT_FLOW_CONFIG_PATH])(
+  it.for([DEFAULT_SCHEMA_CONFIG_PATH, DEFAULT_FLOW_CONFIG_PATH])(
     "refuses an existing %s without --force",
-    async (path) => {
+    async (path, { dir: cwd }) => {
       await mkdir(join(cwd, dirname(path)), { recursive: true });
       await writeFile(join(cwd, path), "{}\n");
 
@@ -1092,7 +1112,7 @@ describe("assertNoSetupResourceConflicts", () => {
     },
   );
 
-  it("lets --force replace the default schema and flow", async () => {
+  it("lets --force replace the default schema and flow", async ({ dir: cwd }) => {
     for (const path of [DEFAULT_SCHEMA_CONFIG_PATH, DEFAULT_FLOW_CONFIG_PATH]) {
       await mkdir(join(cwd, dirname(path)), { recursive: true });
       await writeFile(join(cwd, path), "{}\n");
@@ -1101,7 +1121,9 @@ describe("assertNoSetupResourceConflicts", () => {
     await expect(assertNoSetupResourceConflicts({ cwd, force: true })).resolves.toBe(undefined);
   });
 
-  it("refuses an existing connection for a chosen provider, even with --force", async () => {
+  it("refuses an existing connection for a chosen provider, even with --force", async ({
+    dir: cwd,
+  }) => {
     await mkdir(join(cwd, IDPS_DIR), { recursive: true });
     await writeFile(
       join(cwd, IDPS_DIR, "google.json"),
@@ -1117,7 +1139,9 @@ describe("assertNoSetupResourceConflicts", () => {
     });
   });
 
-  it("refuses a chosen provider whose slug another connection file holds, before the project exists", async () => {
+  it("refuses a chosen provider whose slug another connection file holds, before the project exists", async ({
+    dir: cwd,
+  }) => {
     await mkdir(join(cwd, IDPS_DIR), { recursive: true });
     await writeFile(
       join(cwd, IDPS_DIR, "elsewhere.json"),
@@ -1129,7 +1153,7 @@ describe("assertNoSetupResourceConflicts", () => {
     ).rejects.toMatchObject({ code: "E_CONFLICT" });
   });
 
-  it("ignores a connection for a provider nobody chose", async () => {
+  it("ignores a connection for a provider nobody chose", async ({ dir: cwd }) => {
     await mkdir(join(cwd, IDPS_DIR), { recursive: true });
     await writeFile(join(cwd, IDPS_DIR, "google.json"), JSON.stringify({ slug: "google" }));
 

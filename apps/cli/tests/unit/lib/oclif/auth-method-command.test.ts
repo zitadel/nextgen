@@ -48,7 +48,6 @@ afterEach(async () => {
   // Back to "not cancelled", so a one-off answer a failing test left unused
   // cannot leak into the next test.
   vi.mocked(isCancel).mockReset().mockReturnValue(false);
-  vi.restoreAllMocks();
 });
 
 /**

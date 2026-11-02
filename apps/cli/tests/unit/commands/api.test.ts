@@ -37,7 +37,6 @@ afterEach(() => {
   restore(process.stdin, tty.stdin);
   vi.mocked(select).mockReset();
   vi.mocked(text).mockReset();
-  vi.restoreAllMocks();
 });
 
 /** Run `zitadel api` from source with its output kept out of the test log. */

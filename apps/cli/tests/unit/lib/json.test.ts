@@ -60,6 +60,12 @@ describe("setTopLevelJsonKey", () => {
     expect(out).toBe('{"name":"demo","extra":1}');
   });
 
+  it("keeps a compact document compact when the new key needs escaping", () => {
+    const next = setTopLevelJsonKey('{"name":"demo"}', "package.json", 'say "hi"', 1);
+
+    expect(next).toBe('{"name":"demo","say \\"hi\\"":1}');
+  });
+
   it("does not invent a trailing newline", () => {
     const out = setTopLevelJsonKey('{\n  "name": "demo"\n}', "package.json", "extra", 1);
     expect(out).toBe('{\n  "name": "demo",\n  "extra": 1\n}');

@@ -1,8 +1,9 @@
-import { spawn } from "node:child_process";
-import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
+import { execa } from "execa";
+
 import { pathExists } from "./fs";
+import { readPackageJson } from "./npm";
 import { optionArgs } from "./public-cli";
 import { shellOption } from "./shell";
 
@@ -114,30 +115,31 @@ export async function runPackageCommand(
     redirectStdoutToStderr?: boolean;
   },
 ): Promise<void> {
-  await new Promise<void>((resolve, reject) => {
-    const child = spawn(packageCommand.command, packageCommand.args, {
-      cwd: options.cwd,
-      env: options.env ?? process.env,
-      stdio: options.redirectStdoutToStderr ? ["ignore", "pipe", "pipe"] : "inherit",
-    });
-
-    if (options.redirectStdoutToStderr) {
-      child.stdout?.on("data", (chunk) => process.stderr.write(chunk));
-      child.stderr?.on("data", (chunk) => process.stderr.write(chunk));
-    }
-
-    child.on("error", reject);
-    child.on("close", (code, signal) => {
-      if (code === 0) {
-        resolve();
-        return;
-      }
-      const detail = signal ? `signal ${signal}` : `exit ${String(code ?? 1)}`;
-      const error = new Error(`${packageCommand.display} failed with ${detail}`);
-      Object.assign(error, { code: code ?? 1, signal });
-      reject(error);
-    });
+  const subprocess = execa(packageCommand.command, packageCommand.args, {
+    cwd: options.cwd,
+    env: options.env ?? process.env,
+    extendEnv: false,
+    stdio: options.redirectStdoutToStderr ? ["ignore", "pipe", "pipe"] : "inherit",
+    reject: false,
   });
+  // Piped through `process.stderr.write` rather than handed the descriptor, so
+  // anything that wraps that stream (the test harness, a progress UI) sees it.
+  subprocess.stdout?.pipe(process.stderr, { end: false });
+  subprocess.stderr?.pipe(process.stderr, { end: false });
+  const result = await subprocess;
+  if (result.code !== undefined && result.exitCode === undefined) {
+    throw Object.assign(new Error(result.originalMessage ?? result.message), {
+      code: result.code,
+    });
+  }
+  if (result.failed) {
+    const detail = result.signal
+      ? `signal ${result.signal}`
+      : `exit ${String(result.exitCode ?? 1)}`;
+    const error = new Error(`${packageCommand.display} failed with ${detail}`);
+    Object.assign(error, { code: result.exitCode ?? 1, signal: result.signal ?? null });
+    throw error;
+  }
 }
 
 function command(packageManager: PackageManager, args: string[]): PackageCommand {
@@ -149,15 +151,10 @@ function command(packageManager: PackageManager, args: string[]): PackageCommand
 }
 
 async function packageManagerFromManifest(cwd: string): Promise<PackageManager | undefined> {
-  try {
-    const raw = await readFile(join(cwd, "package.json"), "utf8");
-    const parsed = JSON.parse(raw) as { packageManager?: unknown };
-    return typeof parsed.packageManager === "string"
-      ? packageManagerFromString(parsed.packageManager)
-      : undefined;
-  } catch {
-    return undefined;
-  }
+  const pkg = await readPackageJson(cwd).catch(() => undefined);
+  return typeof pkg?.packageManager === "string"
+    ? packageManagerFromString(pkg.packageManager)
+    : undefined;
 }
 
 function packageManagerFromString(value: string): PackageManager | undefined {

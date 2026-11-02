@@ -177,7 +177,7 @@ export const buildRequest = ({
     });
   }
 
-  let body: unknown = input ?? (operation.body === "required" ? {} : undefined);
+  const fragments: unknown[] = [];
   const given = new Set<string>();
   const bodySchema = schemaOf(operation, "Body");
   for (const raw of fields) {
@@ -228,8 +228,12 @@ export const buildRequest = ({
       );
     }
     const assignment = readAssignment(raw, bodySchema, bodyFields(bodySchema), FIELD);
-    body = mergeDocuments(body ?? {}, fragmentOf(assignment));
+    fragments.push(fragmentOf(assignment));
   }
+  const body = fragments.reduce<unknown>(
+    (merged, fragment) => mergeDocuments(merged ?? {}, fragment),
+    input ?? (operation.body === "required" ? {} : undefined),
+  );
 
   const projectParameter = operation.parameters.find(
     (candidate) => candidate.in === "query" && candidate.name === "project_id",

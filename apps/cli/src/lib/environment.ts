@@ -1,8 +1,9 @@
-import { readdir, readFile } from "node:fs/promises";
+import { readdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { parseEnv } from "node:util";
 
 import { ZitadelError } from "./errors";
+import { readIfExists } from "./fs";
 import { input } from "./input";
 import { hasZitadelSecret, readZitadelSecret } from "./project";
 import { appendManagedEnvValue } from "./fs-safe";
@@ -167,14 +168,8 @@ function pick(values: Readonly<Record<string, string | undefined>>): Values {
  * in `local-server/env-vars.ts`: that one is hard-coded to its own keys.
  */
 async function readEnvFile(path: string): Promise<Values | undefined> {
-  try {
-    return pick(parseEnv(await readFile(path, "utf8")));
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-      return undefined;
-    }
-    throw error;
-  }
+  const text = await readIfExists(path);
+  return text === undefined ? undefined : pick(parseEnv(text));
 }
 
 /**

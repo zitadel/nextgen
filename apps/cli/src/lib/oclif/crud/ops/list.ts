@@ -181,7 +181,6 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
     const progress = all && process.stdout.isTTY && !this.jsonEnabled() ? spinner() : undefined;
     progress?.start(`Fetching ${topic}`);
     let fetched = 0;
-    let drained = false;
     // The walk begins at the page --page-token names, if any.
     const first = typeof flags["page-token"] === "string" ? flags["page-token"] : undefined;
     // The spinner owns the cursor and a SIGINT handler until it is stopped, so a
@@ -200,16 +199,10 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
       items: (response) => sanitizeResponse(spec.items(response)),
       all,
       next: (response) => sanitizeResponse(spec.next?.(response)),
-    })
-      .then((page) => {
-        drained = true;
-        return page;
-      })
-      .finally(() => {
-        if (!drained) {
-          progress?.stop(`Fetching ${topic} failed`);
-        }
-      });
+    }).catch((error: unknown) => {
+      progress?.stop(`Fetching ${topic} failed`);
+      throw error;
+    });
     progress?.stop(`Fetched ${items.length} ${items.length === 1 ? resource.singular : topic}`);
 
     // A terminal gets the aligned table with its header and footer; a pipe (or

@@ -166,19 +166,15 @@ describe("report-moon-failures", () => {
     // Captured, not printed: CI replays a failed task's output, and GitHub
     // turns a `::error` line in it into an annotation for a task that ran fine.
     const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
-    try {
-      const result = await reportMoonFailures({ cacheDir, summaryPath });
-      expect(result).toEqual({
-        failedCount: 1,
-        skipped: false,
-        path: join(cacheDir, "ciReport.json"),
-      });
-      expect(log).toHaveBeenCalledWith(
-        "::error title=Moon task failed::server:format failed (exit 1)",
-      );
-    } finally {
-      log.mockRestore();
-    }
+    const result = await reportMoonFailures({ cacheDir, summaryPath });
+    expect(result).toEqual({
+      failedCount: 1,
+      skipped: false,
+      path: join(cacheDir, "ciReport.json"),
+    });
+    expect(log).toHaveBeenCalledWith(
+      "::error title=Moon task failed::server:format failed (exit 1)",
+    );
 
     const summary = await readFile(summaryPath, "utf8");
     expect(summary).toContain("## Failed Moon tasks");
