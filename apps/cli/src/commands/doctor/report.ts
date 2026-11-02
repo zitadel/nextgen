@@ -2,6 +2,7 @@ import wrapAnsi from "wrap-ansi";
 
 import type { NextSteps } from "../../lib/oclif/next-steps";
 import { publicCliCommand } from "../../lib/public-cli";
+import { shellOption } from "../../lib/shell";
 import { arrow, command, dim, mark, statusColor, strong } from "../../lib/style";
 import type { CheckOutcome } from "./checks";
 
@@ -88,6 +89,8 @@ const ROW_MARK: Record<RowStatus, string> = {
 export type DoctorReportInput = {
   checks: readonly CheckOutcome[];
   cliVersion: string;
+  /** `--cwd` as typed, which a suggested command carries. */
+  typedCwd?: string;
   /** Whether this directory has a `zitadel.json`; without one no project check ran. */
   projectConfigured: boolean;
   /** The project's hosted server, when it uses no local one and no local check ran. */
@@ -152,7 +155,10 @@ function skipReason(
   if (category === "project" && !input.projectConfigured) {
     return {
       reason: "no zitadel.json in this directory",
-      command: publicCliCommand("setup", input.cliVersion),
+      command: publicCliCommand(
+        input.typedCwd === undefined ? "setup" : `setup ${shellOption("--cwd", input.typedCwd)}`,
+        input.cliVersion,
+      ),
     };
   }
   return undefined;
@@ -206,7 +212,8 @@ function detailsOf(check: CheckOutcome | undefined): Record<string, unknown> | u
 
 /**
  * What a row expands to. Several checks can fail for one cause, as every check
- * that reads a missing `.zitadel/secret` does, so a message is said only once.
+ * that reads a missing `.zitadel/secret` does, so a collapsed row says a message
+ * only once; `--verbose` lists every check, by name.
  */
 function detailLines(checks: readonly CheckOutcome[], input: DoctorReportInput): string[] {
   const seen = new Set<string>();
@@ -215,7 +222,7 @@ function detailLines(checks: readonly CheckOutcome[], input: DoctorReportInput):
     if (check.status === "pass" && !input.verbose) {
       continue;
     }
-    if (seen.has(check.message)) {
+    if (!input.verbose && seen.has(check.message)) {
       continue;
     }
     seen.add(check.message);

@@ -2,6 +2,7 @@ import semver from "semver";
 
 const RELEASES_API = "https://api.github.com/repos/zitadel/nextgen/releases?per_page=100";
 const LOOKUP_TIMEOUT_MS = 3000;
+const BREAKING_MARKER = "**Breaking:**";
 
 /** The page a person reads a release's notes on, whatever {@link breakingChanges} could fetch. */
 export const RELEASE_NOTES_URL = "https://github.com/zitadel/nextgen/releases";
@@ -37,9 +38,22 @@ export async function breakingChanges(from: string, to: string): Promise<Breakin
   }
 }
 
+/**
+ * Each whole paragraph that says what breaks, on one line. The marker may open
+ * a paragraph or follow an entry's package names (`release-github.mjs` writes
+ * `- \`@zitadel/cli\`: **Breaking:** …`), and a note may wrap onto more lines,
+ * so a paragraph ends at a blank line or the next entry, not at its line break.
+ */
 function breakingNotes(body: string): string[] {
-  return body.split(/\r?\n/).flatMap((line) => {
-    const note = /^\s*(?:[-*]\s+)?\*\*Breaking:\*\*\s*(.+)$/.exec(line)?.[1];
-    return note === undefined ? [] : [note.trim()];
+  return body.split(/\r?\n[ \t]*\r?\n|\r?\n(?=[-*#] )/).flatMap((paragraph) => {
+    const at = paragraph.indexOf(BREAKING_MARKER);
+    const note =
+      at === -1
+        ? ""
+        : paragraph
+            .slice(at + BREAKING_MARKER.length)
+            .replace(/\s+/g, " ")
+            .trim();
+    return note === "" ? [] : [note];
   });
 }

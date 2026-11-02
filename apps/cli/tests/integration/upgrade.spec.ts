@@ -96,6 +96,15 @@ describe("upgrade", () => {
         ]);
       });
 
+      it("passes --no-telemetry on to the new release's doctor", async () => {
+        const app = await aSetUpApp();
+        platform.publishesCli(NEWEST);
+
+        await app.upgrade(["--no-telemetry"]);
+
+        await expect(app.refreshInvocation()).resolves.toContain("--no-telemetry");
+      });
+
       it("keeps the upgrade and suggests doctor when the refresh finds issues", async () => {
         const app = await aSetUpApp();
         platform.publishesCli(NEWEST);

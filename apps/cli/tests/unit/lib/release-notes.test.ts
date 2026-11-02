@@ -39,8 +39,41 @@ describe("breakingChanges", () => {
     ]);
   });
 
+  it("keeps a note that wraps onto more lines whole", async () => {
+    released([
+      {
+        tag_name: "v2.0.0",
+        body: "- `@zitadel/cli`: A change.\n\n  **Breaking:** the old fields are gone,\n  so update the\n  server first.\n\n- `@zitadel/api`: Another.",
+      },
+    ]);
+
+    await expect(breakingChanges("1.0.0", "2.0.0")).resolves.toEqual([
+      { version: "2.0.0", note: "the old fields are gone, so update the server first." },
+    ]);
+  });
+
+  it("reads a marker that follows an entry's package names", async () => {
+    released([
+      { tag_name: "v2.0.0", body: "- `@zitadel/cli`, `@zitadel/api`: **Breaking:** it broke" },
+    ]);
+
+    await expect(breakingChanges("1.0.0", "2.0.0")).resolves.toEqual([
+      { version: "2.0.0", note: "it broke" },
+    ]);
+  });
+
+  it("ends a note at the next entry, even with no blank line before it", async () => {
+    released([
+      { tag_name: "v2.0.0", body: "- **Breaking:** it broke\n- `@zitadel/api`: Another." },
+    ]);
+
+    await expect(breakingChanges("1.0.0", "2.0.0")).resolves.toEqual([
+      { version: "2.0.0", note: "it broke" },
+    ]);
+  });
+
   it("lists several notes of one release", async () => {
-    released([{ tag_name: "v2.0.0", body: "**Breaking:** a\n**Breaking:** b" }]);
+    released([{ tag_name: "v2.0.0", body: "**Breaking:** a\n\n**Breaking:** b" }]);
 
     await expect(breakingChanges("1.0.0", "2.0.0")).resolves.toEqual([
       { version: "2.0.0", note: "a" },

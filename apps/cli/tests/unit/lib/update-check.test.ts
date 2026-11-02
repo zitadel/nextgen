@@ -87,6 +87,7 @@ describe("latestCliVersion", () => {
     await cacheHolds({
       checked_at: Date.now() - 25 * 60 * 60 * 1000,
       dist_tag: "latest",
+      registry: "https://registry.npmjs.org",
       version: "1.5.0",
     });
     publishes({ latest: "2.0.0" });
@@ -95,7 +96,47 @@ describe("latestCliVersion", () => {
   });
 
   it("does not take another dist-tag's answer", async () => {
-    await cacheHolds({ checked_at: Date.now(), dist_tag: "alpha", version: "9.0.0-alpha.1" });
+    await cacheHolds({
+      checked_at: Date.now(),
+      dist_tag: "alpha",
+      registry: "https://registry.npmjs.org",
+      version: "9.0.0-alpha.1",
+    });
+    publishes({ latest: "2.0.0" });
+
+    await expect(latestCliVersion({ cliVersion: "1.0.0", env: env() })).resolves.toBe("2.0.0");
+  });
+
+  it("does not take another registry's answer", async () => {
+    await cacheHolds({
+      checked_at: Date.now(),
+      dist_tag: "latest",
+      registry: "https://mirror.example/npm",
+      version: "9.0.0",
+    });
+    publishes({ latest: "2.0.0" });
+
+    await expect(latestCliVersion({ cliVersion: "1.0.0", env: env() })).resolves.toBe("2.0.0");
+  });
+
+  it("does not carry another registry's answer past a failed lookup", async () => {
+    await cacheHolds({
+      checked_at: Date.now(),
+      dist_tag: "latest",
+      registry: "https://mirror.example/npm",
+      version: "9.0.0",
+    });
+    server.use(http.get(REGISTRY, () => HttpResponse.error()));
+
+    await expect(latestCliVersion({ cliVersion: "1.0.0", env: env() })).resolves.toBeUndefined();
+  });
+
+  it("does not take another registry's failure", async () => {
+    await cacheHolds({
+      checked_at: Date.now(),
+      dist_tag: "latest",
+      registry: "https://mirror.example/npm",
+    });
     publishes({ latest: "2.0.0" });
 
     await expect(latestCliVersion({ cliVersion: "1.0.0", env: env() })).resolves.toBe("2.0.0");
@@ -105,6 +146,7 @@ describe("latestCliVersion", () => {
     await cacheHolds({
       checked_at: Date.now() - 25 * 60 * 60 * 1000,
       dist_tag: "latest",
+      registry: "https://registry.npmjs.org",
       version: "1.5.0",
     });
     server.use(http.get(REGISTRY, () => HttpResponse.error()));
@@ -127,7 +169,12 @@ describe("latestCliVersion", () => {
   });
 
   it("skips the cache when asked for a fresh answer", async () => {
-    await cacheHolds({ checked_at: Date.now(), dist_tag: "latest", version: "1.5.0" });
+    await cacheHolds({
+      checked_at: Date.now(),
+      dist_tag: "latest",
+      registry: "https://registry.npmjs.org",
+      version: "1.5.0",
+    });
     publishes({ latest: "2.0.0" });
 
     await expect(latestCliVersion({ cliVersion: "1.0.0", env: env(), fresh: true })).resolves.toBe(
@@ -136,7 +183,12 @@ describe("latestCliVersion", () => {
   });
 
   it("answers nothing fresh when the registry is down, whatever it knew", async () => {
-    await cacheHolds({ checked_at: Date.now(), dist_tag: "latest", version: "1.5.0" });
+    await cacheHolds({
+      checked_at: Date.now(),
+      dist_tag: "latest",
+      registry: "https://registry.npmjs.org",
+      version: "1.5.0",
+    });
     server.use(http.get(REGISTRY, () => HttpResponse.error()));
 
     await expect(

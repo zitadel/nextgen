@@ -17,6 +17,7 @@ const CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 type CachedLookup = {
   checked_at: number;
   dist_tag: string;
+  registry: string;
   version?: string;
 };
 
@@ -41,16 +42,18 @@ export async function latestCliVersion(options: {
 }): Promise<string | undefined> {
   const { cliVersion, env, fresh = false } = options;
   const distTag = npmDistTagForCliVersion(cliVersion);
+  const registry = registryOf(env);
   const file = cacheFile(env);
-  const cached = file === undefined ? undefined : await readCache(file, distTag);
+  const cached = file === undefined ? undefined : await readCache(file, distTag, registry);
   if (!fresh && cached !== undefined && Date.now() - cached.checked_at < CACHE_MAX_AGE_MS) {
     return cached.version;
   }
-  const version = await fetchDistTag(distTag, env);
+  const version = await fetchDistTag(distTag, registry);
   if (file !== undefined) {
     await writeCache(file, {
       checked_at: Date.now(),
       dist_tag: distTag,
+      registry,
       ...((version ?? cached?.version) === undefined
         ? {}
         : { version: version ?? cached?.version }),
@@ -70,13 +73,17 @@ export function isNewerVersion(latest: string | undefined, current: string): boo
 }
 
 /**
- * Asks the registry for the package's dist-tags alone, far less than its full
- * document. `npm_config_registry` is where npm and npx themselves were pointed,
- * so a mirror keeps working and a private registry sees the request npx made.
+ * The registry to ask. `npm_config_registry` is where npm and npx themselves
+ * were pointed, so a mirror keeps working and a private registry sees the
+ * request npx made.
  */
-async function fetchDistTag(distTag: string, env: NodeJS.ProcessEnv): Promise<string | undefined> {
+function registryOf(env: NodeJS.ProcessEnv): string {
+  return (env.npm_config_registry?.trim() || DEFAULT_REGISTRY).replace(/\/+$/, "");
+}
+
+/** Asks the registry for the package's dist-tags alone, far less than its full document. */
+async function fetchDistTag(distTag: string, registry: string): Promise<string | undefined> {
   try {
-    const registry = (env.npm_config_registry?.trim() || DEFAULT_REGISTRY).replace(/\/+$/, "");
     const response = await fetch(`${registry}${DIST_TAGS_PATH}`, {
       signal: AbortSignal.timeout(LOOKUP_TIMEOUT_MS),
     });
@@ -99,10 +106,17 @@ function cacheFile(env: NodeJS.ProcessEnv): string | undefined {
   }
 }
 
-async function readCache(file: string, distTag: string): Promise<CachedLookup | undefined> {
+/** The answer kept for this dist-tag on this registry; another registry's says nothing about it. */
+async function readCache(
+  file: string,
+  distTag: string,
+  registry: string,
+): Promise<CachedLookup | undefined> {
   try {
     const cached = JSON.parse(await readFile(file, "utf8")) as CachedLookup;
-    return cached.dist_tag === distTag && typeof cached.checked_at === "number"
+    return cached.dist_tag === distTag &&
+      cached.registry === registry &&
+      typeof cached.checked_at === "number"
       ? cached
       : undefined;
   } catch {

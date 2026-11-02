@@ -121,6 +121,20 @@ describe("renderDoctorReport", () => {
     expect(text).not.toContain("run with -v");
   });
 
+  it("names every check that shares a cause with --verbose", () => {
+    const missing = ".zitadel/secret was not found";
+    const text = report(
+      [
+        { name: "secret", status: "fail", message: missing },
+        { name: "project-match", status: "fail", message: missing },
+      ],
+      { verbose: true },
+    );
+
+    expect(text).toContain(`secret: ${missing}`);
+    expect(text).toContain(`project-match: ${missing}`);
+  });
+
   it("orders the categories whatever order the checks ran in", () => {
     const text = report([pass("config"), pass("port"), pass("cli-version")]);
 
@@ -182,6 +196,12 @@ describe("renderDoctorReport", () => {
     expect(text).toContain("no zitadel.json in this directory");
     expect(text).toContain("→ npx @zitadel/cli@1.0.0 setup");
     expect(text).not.toContain("Credentials");
+  });
+
+  it("carries --cwd in the setup it offers", () => {
+    const text = report([pass("port")], { projectConfigured: false, typedCwd: "apps/web" });
+
+    expect(text).toContain("→ npx @zitadel/cli@1.0.0 setup --cwd apps/web");
   });
 
   it("says a hosted project uses no local server", () => {

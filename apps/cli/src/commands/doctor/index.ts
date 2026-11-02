@@ -290,6 +290,7 @@ export default class Doctor extends Destructive(BaseCommand) {
     const pretty = renderDoctorReport({
       checks,
       cliVersion: this.meta.cliVersion,
+      typedCwd: cwdFlag,
       projectConfigured: hasConfig,
       hostedServer,
       runtime: runtimeBackend,

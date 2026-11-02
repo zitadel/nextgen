@@ -95,7 +95,7 @@ export default class Upgrade extends BaseCommand {
     }
     const refresh: Refresh =
       install !== undefined && !dryRun && (await hasZitadelConfig(cwd))
-        ? await refreshProject(target, cwd, env)
+        ? await refreshProject(target, cwd, env, flags.telemetry === false)
         : "skipped";
 
     // At the new version, and from the shell's directory like every suggestion.
@@ -179,11 +179,21 @@ async function refreshProject(
   target: string,
   cwd: string,
   env: NodeJS.ProcessEnv,
+  /** `--no-telemetry` was given: it reaches this run only, not the child, without being passed on. */
+  noTelemetry: boolean,
 ): Promise<Refresh> {
   try {
     const result = await execa(
       "npx",
-      ["--yes", `@zitadel/cli@${target}`, "doctor", "--fix", "--non-interactive", "--json"],
+      [
+        "--yes",
+        `@zitadel/cli@${target}`,
+        "doctor",
+        "--fix",
+        "--non-interactive",
+        "--json",
+        ...(noTelemetry ? ["--no-telemetry"] : []),
+      ],
       {
         cwd,
         env: { ...env, ZITADEL_UPDATE_CHECK: "0" },
