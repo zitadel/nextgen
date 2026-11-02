@@ -37,12 +37,15 @@ import type {
   JsonEnvelope,
   SkippedEnvelope,
 } from "./types";
-import { shellArg, shellOption, withoutOptions } from "../shell";
+import { Cmd } from "../cmd";
 
 /**
  * The colour variables, which `bin/run.js` sets from `--color`/`--no-color`
  * and the colour libraries read. The libraries agree that off wins.
  */
+/** The spellings of the option that names the project directory. */
+const CWD_OPTIONS: readonly string[] = ["--cwd", "-c"];
+
 const NO_COLOR: FlagVariable = {
   name: "NO_COLOR",
   flag: "color",
@@ -189,7 +192,8 @@ export abstract class BaseCommand extends Command {
    * selector instead (`EnvironmentCommand`).
    */
   protected retryCommand(words: readonly string[]): SuggestedCommand {
-    return this.suggestUnscoped(withoutOptions(words, ["--cwd", "-c"]).map(shellArg).join(" "));
+    const line = Cmd.of(words).without(CWD_OPTIONS);
+    return this.suggestUnscoped(line.toString());
   }
 
   /**
@@ -203,7 +207,7 @@ export abstract class BaseCommand extends Command {
     // A follow-up run from the shell's directory would act on whatever project
     // is there, so the directory this run addressed goes with it.
     return unscopedCommand(
-      this.typedCwd === undefined ? args : `${args} ${shellOption("--cwd", this.typedCwd)}`,
+      this.typedCwd === undefined ? args : `${args} ${Cmd.option("--cwd", this.typedCwd)}`,
       this.meta.cliVersion,
     );
   }

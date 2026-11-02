@@ -21,7 +21,7 @@ import {
 import { PUBLIC_PROJECT_ID_VARIABLE } from "../../lib/orca/patchers/rule/public-project-id";
 import { readZitadelConfig } from "../../lib/project";
 import { DEFAULT_SERVER, parseServer, resolveServer } from "../../lib/server";
-import { shellArg, shellOption } from "../../lib/shell";
+import { Cmd } from "../../lib/cmd";
 import { environmentSelectorSuffix, projectEnvFile } from "../../lib/oclif/environment-flags";
 import { type EnvironmentSelector, projectCommand } from "../../lib/suggestion";
 import { Promptable } from "../../lib/oclif/promptable";
@@ -112,12 +112,12 @@ export default class EnvAdd extends Promptable(BaseCommand) {
           // (`--project`) stays a bind rather than creating a new project.
           retry: this.suggestUnscoped(
             [
-              `env add ${shellArg(name)}`,
+              `env add ${Cmd.quote(name)}`,
               "--server https://api.zitadel.cloud",
-              ...(flags.project === undefined ? [] : [shellOption("--project", flags.project)]),
+              ...(flags.project === undefined ? [] : [Cmd.option("--project", flags.project)]),
               ...(flags["app-url"] === undefined
                 ? []
-                : [shellOption("--app-url", flags["app-url"])]),
+                : [Cmd.option("--app-url", flags["app-url"])]),
               ...(flags.force ? ["--force"] : []),
             ].join(" "),
           ),
@@ -321,11 +321,11 @@ export default class EnvAdd extends Promptable(BaseCommand) {
       next: {
         commands: [
           ...(needsOrigin && issuer !== undefined && writtenKeys.has("ZITADEL_PROJECT_SECRET")
-            ? // shellArg quotes the origin: an IPv6 issuer like http://[::1]:3000
+            ? // Cmd.quote quotes the origin: an IPv6 issuer like http://[::1]:3000
               // carries brackets a shell such as zsh would treat as a glob.
               [
                 projectCommand(
-                  `origin add ${shellArg(issuer)} --kind primary`,
+                  `origin add ${Cmd.quote(issuer)} --kind primary`,
                   newEnvironment,
                   cliVersion,
                 ),
@@ -356,7 +356,7 @@ export default class EnvAdd extends Promptable(BaseCommand) {
                   ]
                 : []
               : [
-                  `Allow this project's origin once ZITADEL_PROJECT_SECRET is in ${file}: zitadel origin add ${issuer === undefined ? "'<your-app-url>'" : shellArg(issuer)} --kind primary${newEnvironment}`,
+                  `Allow this project's origin once ZITADEL_PROJECT_SECRET is in ${file}: zitadel origin add ${issuer === undefined ? "'<your-app-url>'" : Cmd.quote(issuer)} --kind primary${newEnvironment}`,
                 ]
             : []),
           // Said even when nobody could be asked, because it is the one thing

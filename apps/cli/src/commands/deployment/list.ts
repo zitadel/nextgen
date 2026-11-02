@@ -9,7 +9,7 @@ import {
 import { Tabulatable } from "../../lib/oclif/tabulatable";
 import { collectPages } from "../../lib/oclif/crud/paging";
 import { listData } from "../../lib/oclif/envelope";
-import { shellArg } from "../../lib/shell";
+import { Cmd } from "../../lib/cmd";
 
 /** The columns `list` renders, in order. */
 const COLUMNS = ["id", "release_id", "reason", "origins", "deployed_at"] as const;
@@ -91,13 +91,13 @@ export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
         ? this.suggest(
             [
               "deployment list",
-              ...(flags.origin === undefined ? [] : [`--origin ${shellArg(flags.origin)}`]),
+              ...(flags.origin === undefined ? [] : [`--origin ${Cmd.quote(flags.origin)}`]),
               ...(flags.live ? ["--live"] : []),
               ...(flags.limit === undefined ? [] : [`--limit ${flags.limit}`]),
               // `next` is an opaque server cursor: quote it so whitespace or shell
               // metacharacters in a copied command cannot execute as server-controlled
               // text or break the suggestion.
-              `--page-token ${shellArg(next)}`,
+              `--page-token ${Cmd.quote(next)}`,
               "--json",
             ].join(" "),
           )
@@ -113,7 +113,7 @@ export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
         plain,
         singular: "deployment",
         empty: "No deployments yet.",
-        footer: next ? [`More available: --page-token ${shellArg(next)} (or --all)`] : [],
+        footer: next ? [`More available: --page-token ${Cmd.quote(next)} (or --all)`] : [],
       }),
     });
   }

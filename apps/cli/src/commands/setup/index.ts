@@ -134,7 +134,7 @@ import {
   type Row,
   type Section,
 } from "./summary";
-import { shellArg, shellOption } from "../../lib/shell";
+import { Cmd } from "../../lib/cmd";
 import { showSkillsHint } from "../../lib/skills-hint";
 import { reportWarning } from "../../lib/warnings";
 import {
@@ -1270,7 +1270,7 @@ export default class Setup extends Destructive(BaseCommand) {
     const cleanup =
       move.refused && move.staleOrigin !== undefined
         ? projectCommand(
-            `origin rm ${shellArg(move.staleOrigin)} --force`,
+            `origin rm ${Cmd.quote(move.staleOrigin)} --force`,
             (await access(join(cwd, ".env.development.local")).then(
               () => true,
               () => false,
@@ -1819,7 +1819,7 @@ function ssoCredentialPublisher(
  */
 /** `--cwd` for a suggested command, when setup was pointed at a directory. */
 function cwdArg(retry: SetupRetryOptions): string {
-  return retry.cwd === undefined ? "" : ` ${shellOption("--cwd", retry.cwd)}`;
+  return retry.cwd === undefined ? "" : ` ${Cmd.option("--cwd", retry.cwd)}`;
 }
 
 function ssoRecovery(
@@ -1960,7 +1960,7 @@ async function assertLocalServerVersion(
         `halfway. Run start to restart it on ${expected}; its data stays. ${where}` +
         "Then rerun setup.",
       nextCommands: [
-        unscopedCommand(`start ${shellOption("--cwd", nearest.dir)}`, cliVersion),
+        unscopedCommand(`start ${Cmd.option("--cwd", nearest.dir)}`, cliVersion),
         unscopedCommand(`setup ${setupRetryFlags(retry)}`, cliVersion),
       ],
       details: {
