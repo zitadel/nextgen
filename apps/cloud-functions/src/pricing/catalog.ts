@@ -35,7 +35,7 @@ export interface PerUnit {
   unit_amount: number;
 }
 
-export type PackageId = "governance" | "compliance";
+export type PackageId = "governance" | "security_settings" | "compliance";
 
 /** Packages are selected per account, never counted per user or policy. */
 export interface Package {
