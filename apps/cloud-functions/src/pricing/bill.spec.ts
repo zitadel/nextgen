@@ -13,6 +13,19 @@ describe("free core identity", () => {
     },
   );
 
+  it("keeps Free within its monthly request ceiling and estimates Pro past it", () => {
+    const ceiling = CATALOG.plans.free.limits.requests_per_month_per_account;
+    expect(bill({ counts: { api_requests: ceiling } })).toMatchObject({
+      plan: "free",
+      total_amount: 0,
+    });
+    expect(bill({ counts: { api_requests: ceiling + 1 } })).toMatchObject({
+      plan: "pro",
+      reasons: ["requests past Free's monthly ceiling"],
+      total_amount: 10_000,
+    });
+  });
+
   it("never charges legacy policy or retained-user counts, including basic require-MFA", () => {
     const month = bill({
       counts: {
@@ -111,6 +124,37 @@ describe("integrations and consumption", () => {
 
   it("refuses an unpriced destination", () => {
     expect(() => meterLines({ counts: { sms_messages_other: 1 } })).toThrow(/no price yet/);
+  });
+});
+
+describe("capacity and regions", () => {
+  const included = CATALOG.plans.pro.limits.requests_per_month_per_account;
+
+  it("adds a capacity step for each part of Pro's included volume a month goes past", () => {
+    expect(bill({ counts: { api_requests: included } }).total_amount).toBe(10_000);
+    expect(bill({ counts: { api_requests: included + 1 } })).toMatchObject({
+      reasons: ["1 capacity step past Pro's included requests"],
+      on_top_amount: 200_000,
+      total_amount: 210_000,
+    });
+    expect(bill({ counts: { api_requests: 3 * included } }).total_amount).toBe(410_000);
+  });
+
+  it("prices a consumer app at scale by its requests, never by its users", () => {
+    // Ten million users at the pricing proposal's 130 requests each a month.
+    const month = bill({
+      counts: { monthly_active_users: 10_000_000, api_requests: 1_300_000_000 },
+    });
+    expect(month).toMatchObject({ plan: "pro", usage_amount: 0, total_amount: 1_610_000 });
+  });
+
+  it("charges each region outside the EU on Pro", () => {
+    expect(bill({ counts: {}, regions: 2 })).toMatchObject({
+      plan: "pro",
+      reasons: ["runs in a region outside the EU"],
+      on_top_amount: 20_000,
+      total_amount: 30_000,
+    });
   });
 });
 

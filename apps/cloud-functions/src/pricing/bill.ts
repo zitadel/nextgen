@@ -11,6 +11,8 @@ export interface Usage {
   plan?: "free" | "pro";
   /** Branding removal requires Pro; Free keeps the mark. */
   hide_mark?: boolean;
+  /** Regions outside the EU the account runs projects in, each a Pro add-on. */
+  regions?: number;
   /** Quoted packages require a contract and cannot use the self-service estimator. */
   packages?: PackageId[];
   support_priority?: boolean;
@@ -76,8 +78,22 @@ export function meterLines(usage: Usage, catalog: Catalog = CATALOG): MeteredLin
 }
 
 /**
+ * The capacity steps a month's requests need past Pro's included volume.
+ * Requests are never billed one by one: the owner adds steps, and the
+ * estimate prices the ones the month needs.
+ */
+export function capacitySteps(usage: Usage, catalog: Catalog = CATALOG): number {
+  const step = catalog.licensed.find((line) => line.id === "capacity_step");
+  if (!step?.requests_per_month) return 0;
+  const included = catalog.plans.pro.limits.requests_per_month_per_account;
+  const past = Math.max(0, (usage.counts.api_requests ?? 0) - included);
+  return Math.ceil(past / step.requests_per_month);
+}
+
+/**
  * The month's estimate: Free while nothing needs a paid plan, otherwise Pro's
- * base fee plus metered usage beyond allowances and selected add-ons.
+ * base fee plus metered usage beyond allowances, the capacity steps the
+ * month's requests need and selected add-ons.
  * This estimate never starts a subscription.
  */
 export function bill(usage: Usage, catalog: Catalog = CATALOG): Bill {
@@ -90,7 +106,8 @@ export function bill(usage: Usage, catalog: Catalog = CATALOG): Bill {
   }
   const lines = meterLines(usage, catalog);
   const usageAmount = lines.reduce((sum, line) => sum + line.amount, 0);
-  const reasons = paidReasons(usage, lines, usageAmount, catalog);
+  const steps = capacitySteps(usage, catalog);
+  const reasons = paidReasons(usage, lines, usageAmount, steps, catalog);
   if (reasons.length === 0) {
     return {
       plan: "free",
@@ -103,7 +120,10 @@ export function bill(usage: Usage, catalog: Catalog = CATALOG): Bill {
     };
   }
   const price = (id: string) => minor(catalog.licensed.find((line) => line.id === id)?.amount ?? 0);
-  const onTop = usage.support_priority ? price("support_priority") : 0;
+  const onTop =
+    (usage.support_priority ? price("support_priority") : 0) +
+    steps * price("capacity_step") +
+    (usage.regions ?? 0) * price("region");
   const minimum = minor(catalog.plans.pro.minimum.amount);
   return {
     plan: "pro",
@@ -121,12 +141,20 @@ function paidReasons(
   usage: Usage,
   lines: MeteredLine[],
   usageAmount: number,
+  steps: number,
   catalog: Catalog,
 ): string[] {
   const reasons: string[] = [];
+  const requests = usage.counts.api_requests ?? 0;
   if (usageAmount > 0) reasons.push("usage past an allowance");
+  if (steps > 0) {
+    reasons.push(`${steps} capacity step${steps === 1 ? "" : "s"} past Pro's included requests`);
+  } else if (requests > catalog.plans.free.limits.requests_per_month_per_account) {
+    reasons.push("requests past Free's monthly ceiling");
+  }
   if (usage.plan === "pro") reasons.push("Pro selected by the owner");
   if (usage.hide_mark) reasons.push("hides the Zitadel mark");
+  if (usage.regions) reasons.push("runs in a region outside the EU");
   for (const id of new Set(usage.packages ?? [])) {
     const selected = catalog.packages.find((entry) => entry.id === id);
     if (selected && !selected.plans.includes("free")) reasons.push(`${selected.label} package`);

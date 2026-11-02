@@ -278,8 +278,8 @@ website's catch-all.
   - Each run sends the last three hours again, and Stripe counts an
     identifier once for at least 24 hours. A skipped or doubled cron run
     therefore changes nothing.
-  - MAU becomes a sum: an hour's count is the users whose first activity of
-    the month falls in it, so the month's events add up to its MAU.
+  - A user meter becomes a sum: an hour's count is the users first counted
+    that month in it, so the month's events add up to the month's count.
   - Stripe's grace period goes to 24 hours, so a late hour still reaches its
     invoice.
   - Why not one queue message per event: every sign-in would become a
@@ -291,6 +291,9 @@ website's catch-all.
   - Pro: Governance and operational tools for a monthly base fee, plus
     metered integrations and consumption beyond included allowances. The base
     fee is not usage credit. Branding removal requires a paid plan.
+  - Capacity: requests past Pro's included monthly volume take capacity
+    steps the owner adds, so scale pays for the infrastructure it uses
+    without billing users.
   - Compliance: a separate quote accepted before activation. Extended audit
     retention is scoped by event volume and duration, never user count.
 
@@ -298,8 +301,10 @@ website's catch-all.
   before (decided 2026-10-29): until then eligible usage is metered on its
   customer and shown, never billed. Core MAU stays in Zitadel analytics.
 
-  Every plan includes deployments, releases and region choice per project.
-  Free and Pro publish their request capacity in the catalog; Enterprise
+  Every plan includes deployments, releases and the EU region. On Pro, each
+  region outside the EU is an add-on per region, since each needs a database
+  of its own; Enterprise includes them. Free and Pro publish their request
+  capacity in the catalog, Pro adds capacity in steps, and Enterprise
   capacity is contracted. Custom agreements, indemnification and regulatory
   addenda are Enterprise-only, as distinct from quoted audit capabilities.
 - **Entitlements.** Stripe's `customer.subscription.*` and `invoice.*`

@@ -13,8 +13,12 @@ export interface Catalog {
   version: string;
   currency: string;
   plans: {
-    free: { event_retention_days: number };
-    pro: { minimum: { amount: number; is_credit: boolean }; event_retention_days: number };
+    free: { event_retention_days: number; limits: { requests_per_month_per_account: number } };
+    pro: {
+      minimum: { amount: number; is_credit: boolean };
+      limits: { requests_per_month_per_account: number };
+      event_retention_days: number;
+    };
     enterprise: {
       minimum: { tiers_per_year: Record<string, number>; is_credit: boolean };
       event_retention_days: number;
@@ -70,6 +74,8 @@ export interface Licensed {
   label: string;
   amount: number | null;
   plans: Plan["id"][];
+  /** The requests a month one unit of a capacity line adds. */
+  requests_per_month?: number;
 }
 
 export const CATALOG = data as Catalog;
