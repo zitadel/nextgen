@@ -109,6 +109,23 @@ describe("free security and account-wide packages", () => {
     for (const plan of PLANS) expect(words(mau!.cells[plan])).toBe("Never billed");
   });
 
+  it("prices capacity steps and regions outside the EU on Pro, never on Free", () => {
+    const capacity = rows.find((entry) => entry.source === "capacity_step")!;
+    expect(capacity.cells.free.kind).toBe("no");
+    expect(words(capacity.cells.pro)).toBe("$2,000 a month per step Adds 150M requests a month");
+    expect(words(capacity.cells.enterprise)).toBe("Custom");
+    const region = rows.find((entry) => entry.source === "region")!;
+    expect(region.cells.free.kind).toBe("no");
+    expect(words(region.cells.pro)).toBe("$100 a month per region");
+    expect(words(region.cells.enterprise)).toBe("Included");
+    const included = rows.find((entry) => entry.label === "Regions included")!;
+    expect(PLANS.map((plan) => words(included.cells[plan]))).toEqual([
+      "EU",
+      "EU",
+      "Every available region",
+    ]);
+  });
+
   it("reserves branding removal for paid plans", () => {
     const row = rows.find((entry) => entry.label === "Hide the Zitadel mark")!;
     expect(row.cells.free.kind).toBe("no");

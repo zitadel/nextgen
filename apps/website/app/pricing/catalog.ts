@@ -35,7 +35,11 @@ export type Catalog = {
     };
     pro: Plan & {
       minimum: { amount: number; interval: string };
-      limits: { requests_per_second_per_project: number };
+      limits: {
+        requests_per_second_per_project: number;
+        requests_per_month_per_account: number;
+        past_monthly_ceiling: string;
+      };
     };
     // Quoted, never listed: the page reads none of its minimums or rates.
     enterprise: Plan;
@@ -69,7 +73,8 @@ type Plan = {
   delivery_modes: string[];
   support: string;
   sla: { target_percent: number; credits: boolean; note?: string } | null;
-  regions: { scope: "project"; selection: "all_available" };
+  /** The regions the plan includes; the `region` line prices the others. */
+  regions: { scope: "project"; selection: string[] | "all_available" };
 };
 
 export type PerUnit = { model: "per_unit"; unit_amount: number; display?: string };
@@ -121,6 +126,8 @@ export type Licensed = {
   per?: string;
   plans: PlanId[];
   included_in?: PlanId[];
+  /** The requests a month one capacity step adds. */
+  requests_per_month?: number;
   note?: string;
   tag: string;
 };
@@ -158,6 +165,13 @@ export function short(value: number): string {
 
 export function capitalize(text: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+/** A plan's regions as the page writes them: `EU`, or every available one. */
+export function regionList(selection: string[] | "all_available"): string {
+  return selection === "all_available"
+    ? "Every available region"
+    : and(selection.map((code) => code.toUpperCase()));
 }
 
 /** The catalog's notes as sentences: capitalized, ending in a period. */

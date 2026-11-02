@@ -22,12 +22,6 @@ export function CompareTable({
     // with the table rather than widening the page.
     <div className="relative mt-8 max-md:overflow-x-auto">
       <table className="w-full min-w-[40rem] table-fixed border-collapse text-sm">
-        <caption className="pb-6 text-left text-text-secondary leading-6">
-          <span className="block max-md:sticky max-md:left-0 max-md:w-[calc(100vw-3rem)]">
-            Combine B2C, B2B and M2M under one plan. Platform, sign-in, security, audit and support
-            capabilities are shared across use cases.
-          </span>
-        </caption>
         <colgroup>
           <col className="w-[28%] md:w-[34%]" />
           {PLANS.map((plan) => (
@@ -71,9 +65,6 @@ export function CompareTable({
                       <div className="max-md:sticky max-md:left-0 max-md:w-[calc(100vw-3rem)]">
                         <span className="block font-medium text-text-primary">
                           {row.subgroup.title}
-                        </span>
-                        <span className="mt-1 block max-w-3xl font-normal text-text-secondary leading-6">
-                          {row.subgroup.guidance}
                         </span>
                       </div>
                     </th>

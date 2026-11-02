@@ -8,6 +8,7 @@ import {
   type Meter,
   meterPrice,
   readCatalog,
+  regionList,
 } from "./catalog";
 
 const ROOT = fileURLToPath(new URL("../../../../", import.meta.url));
@@ -39,9 +40,14 @@ describe("the cloud's price list", () => {
     const { free, pro, enterprise } = catalog.plans;
     expect(free.limits.requests_per_month_per_account).toBeGreaterThan(0);
     expect(pro.limits.requests_per_second_per_project).toBeGreaterThan(0);
-    for (const plan of [free, pro, enterprise]) {
-      expect(plan.regions).toEqual({ scope: "project", selection: "all_available" });
-    }
+    expect(pro.limits.requests_per_month_per_account).toBeGreaterThan(
+      free.limits.requests_per_month_per_account,
+    );
+    const step = catalog.licensed.find((line) => line.id === "capacity_step");
+    expect(step?.requests_per_month).toBeGreaterThan(0);
+    expect(free.regions).toEqual({ scope: "project", selection: ["eu"] });
+    expect(pro.regions).toEqual({ scope: "project", selection: ["eu"] });
+    expect(enterprise.regions).toEqual({ scope: "project", selection: "all_available" });
     expect(catalog.core.authentication).toContain("Passkeys and TOTP MFA");
     expect(pro.minimum.amount).toBeGreaterThan(0);
     expect(catalog.packages.map((entry) => entry.id)).toEqual(["governance", "compliance"]);
@@ -82,6 +88,14 @@ describe("meterPrice", () => {
       "United States and Canada: $0.015 per message",
       "Other countries: quote required",
     ]);
+  });
+});
+
+describe("regionList", () => {
+  it("names a plan's regions, or every available one", () => {
+    expect(regionList(["eu"])).toBe("EU");
+    expect(regionList(["eu", "ch"])).toBe("EU and CH");
+    expect(regionList("all_available")).toBe("Every available region");
   });
 });
 

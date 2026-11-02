@@ -9,9 +9,11 @@ import {
   capitalize,
   count,
   dollars,
+  licensedPrice,
   type Meter,
   mostPer,
   readCatalog,
+  regionList,
   sentence,
   short,
 } from "./catalog";
@@ -109,6 +111,7 @@ function proposalDate(catalog: Catalog): string {
 function CloudPlans({ catalog }: { catalog: Catalog }) {
   const { free, pro, enterprise } = catalog.plans;
   const addendum = catalog.licensed.find((line) => line.id === "addendum");
+  const region = catalog.licensed.find((line) => line.id === "region");
   const [proSupport = ""] = pro.support.split("; ");
   return (
     <div className="mt-12 grid gap-4 md:grid-cols-3">
@@ -121,7 +124,7 @@ function CloudPlans({ catalog }: { catalog: Catalog }) {
           "Unlimited users, teams and console seats",
           "Passkeys, TOTP MFA and basic require-MFA",
           "No active-user upgrade thresholds",
-          `Choose a region per ${free.regions.scope}`,
+          `Every ${free.regions.scope} in the ${regionList(free.regions.selection)}`,
           `${free.event_retention_days} days of audit events`,
           "The dev inbox or your own email provider",
           "Community support",
@@ -136,9 +139,10 @@ function CloudPlans({ catalog }: { catalog: Catalog }) {
         includes={`All ${free.label} features, plus:`}
         features={[
           "Conditional policies and delegated administration",
-          `${pro.limits.requests_per_second_per_project} RPS per project`,
+          `${short(pro.limits.requests_per_month_per_account)} requests a month, then capacity steps`,
           "Managed email and SMS",
           "Remove the Zitadel mark",
+          ...(region ? [`Regions outside the EU, ${licensedPrice(region)}`] : []),
           `${pro.event_retention_days} days of audit events`,
           ...(pro.sla
             ? [`${pro.sla.target_percent}% availability ${pro.sla.credits ? "SLA" : "target"}`]
@@ -158,6 +162,7 @@ function CloudPlans({ catalog }: { catalog: Catalog }) {
             ? [`${enterprise.event_retention_days} days of audit events`]
             : []),
           "Extended audit retention and reporting, by agreement",
+          regionList(enterprise.regions.selection),
           "A dedicated deployment, on request",
           ...(enterprise.sla
             ? [`${enterprise.sla.target_percent}% uptime SLA with service credits`]
@@ -299,6 +304,8 @@ function Questions({ catalog }: { catalog: Catalog }) {
     JSON.stringify([meter?.price, meter?.allowance, meter?.counted_per?.at_most]);
   const directoriesAlike = directories !== undefined && terms(directories) === terms(sso);
   const compliance = catalog.packages.find((entry) => entry.id === "compliance");
+  const step = catalog.licensed.find((line) => line.id === "capacity_step");
+  const region = catalog.licensed.find((line) => line.id === "region");
   const [unitName, unitMeaning] = catalog.self_hosted.unit.split(": ");
   const questions: { question: string; answer: ReactNode }[] = [
     ...(catalog.status === "proposal"
@@ -314,6 +321,31 @@ function Questions({ catalog }: { catalog: Catalog }) {
           },
         ]
       : []),
+    {
+      question: "Which rows apply to my app?",
+      answer: (
+        <>
+          <p>
+            One plan covers B2C, B2B and M2M together: platform, sign-in, security, audit and
+            support are shared across use cases.
+          </p>
+          <p>
+            <strong>Consumer apps:</strong> users, sign-in and basic MFA stay free. Delivery and
+            branding are under Platform, advanced policies and bot checks under Security & policies.
+          </p>
+          <p>
+            <strong>Business apps:</strong> customer organizations, core roles and basic MFA stay
+            free. Your customers' SSO and directories are under Authentication, advanced policies
+            and delegated administration under Security & policies.
+          </p>
+          <p>
+            <strong>Services and agents:</strong> service identities and credentials stay free.
+            Tokens are under Authentication, advanced authorization checks under Security &
+            policies.
+          </p>
+        </>
+      ),
+    },
     {
       question: `How is ${pro.label} billed?`,
       answer: (
@@ -417,30 +449,38 @@ function Questions({ catalog }: { catalog: Catalog }) {
           },
         ]
       : []),
-    ...(requests
+    ...(requests && step?.amount && step.requests_per_month
       ? [
           {
-            question: "Are API requests billed?",
+            question: "How is capacity priced?",
             answer: (
               <p>
-                No: {requests.counts.replace(/^Each request; /, "they are ")}. {free.label} allows{" "}
-                {free.limits.requests_per_second_per_project} requests a second per project and{" "}
+                By requests, never by users:{" "}
+                {requests.counts.replace(/^Each request; /, "requests are ")}. {free.label} allows{" "}
+                {free.limits.requests_per_second_per_project} a second per project and{" "}
                 {short(free.limits.requests_per_month_per_account)} a month per account; past that,{" "}
                 {free.limits.past_monthly_ceiling}. {pro.label} includes{" "}
-                {pro.limits.requests_per_second_per_project} requests a second per project.
-                Enterprise capacity is agreed in the contract.
+                {pro.limits.requests_per_second_per_project} a second per project and{" "}
+                {short(pro.limits.requests_per_month_per_account)} a month per account; past that,{" "}
+                {pro.limits.past_monthly_ceiling}. Each step adds {short(step.requests_per_month)}{" "}
+                requests a month for {dollars(step.amount)} a {step.interval}. Enterprise capacity
+                is agreed in the contract.
               </p>
             ),
           },
         ]
       : []),
     {
-      question: "Can I choose where each project runs?",
+      question: "Where do my projects run?",
       answer: (
         <p>
-          Yes. Every plan includes a choice of the available regions for each project. Region
-          selection is separate from a dedicated deployment, which is available by agreement on
-          Enterprise.
+          Every plan runs projects in the {regionList(free.regions.selection)}.
+          {region
+            ? ` On ${pro.label}, a project can run outside the ${regionList(free.regions.selection)} once another region opens, for ${licensedPrice(region)}.`
+            : ""}{" "}
+          {plans.enterprise.label} includes{" "}
+          {regionList(plans.enterprise.regions.selection).toLowerCase()}. A region is separate from
+          a dedicated deployment, which is available by agreement on Enterprise.
         </p>
       ),
     },
@@ -469,9 +509,9 @@ function Questions({ catalog }: { catalog: Catalog }) {
       question: "What is billed on top of the Pro base fee?",
       answer: (
         <p>
-          Metered integrations and consumption beyond the included allowances, plus contracted
-          Compliance packages and support add-ons. Governance is included in Pro and is never
-          charged per user or policy.
+          Metered integrations and consumption beyond the included allowances, capacity steps past
+          the included requests and regions outside the EU, plus contracted Compliance packages and
+          support add-ons. Governance is included in Pro and is never charged per user or policy.
         </p>
       ),
     },

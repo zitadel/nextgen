@@ -7,6 +7,7 @@ import {
   meterPrice,
   type PlanId,
   type Package,
+  regionList,
   short,
 } from "./catalog";
 
@@ -26,8 +27,8 @@ export type Cell =
 export type Row = {
   label: string;
   cells: Record<PlanId, Cell>;
-  /** Introduce a use case before its authentication rows. */
-  subgroup?: { title: string; guidance: string };
+  /** Name a use case before its authentication rows; the questions explain it. */
+  subgroup?: { title: string };
   /** The catalog meter or licensed line the row prices. */
   source?: string;
   /** The commercial package that includes this capability. */
@@ -48,8 +49,8 @@ function each(cell: (plan: PlanId) => Cell): Record<PlanId, Cell> {
   return { free: cell("free"), pro: cell("pro"), enterprise: cell("enterprise") };
 }
 
-function subgroup(title: string, guidance: string, rows: Row[]): Row[] {
-  return rows.map((row, index) => (index === 0 ? { ...row, subgroup: { title, guidance } } : row));
+function subgroup(title: string, rows: Row[]): Row[] {
+  return rows.map((row, index) => (index === 0 ? { ...row, subgroup: { title } } : row));
 }
 
 /**
@@ -118,6 +119,7 @@ export function compareGroups(catalog: Catalog): Group[] {
 
   const mau = meter("monthly_active_users");
   const requests = meter("api_requests");
+  const step = line("capacity_step");
   const [proSupport = "", ...proSupportMore] = pro.support.split("; ");
   const packageRows = (id: string): Row[] => {
     const entry = catalog.packages.find((candidate) => candidate.id === id);
@@ -142,9 +144,10 @@ export function compareGroups(catalog: Catalog): Group[] {
         ...catalog.core.resources.map((label) => ({ label, cells: each(() => text("Unlimited")) })),
         ...catalog.core.platform.map((label) => ({ label, cells: each(() => YES) })),
         {
-          label: "Region selection",
-          cells: each((plan) => text(`Choose per ${plans[plan].regions.scope}`)),
+          label: "Regions included",
+          cells: each((plan) => text(regionList(plans[plan].regions.selection))),
         },
+        lineRow("region"),
         {
           label: requests.label,
           source: requests.id,
@@ -152,8 +155,20 @@ export function compareGroups(catalog: Catalog): Group[] {
             free: text(`${free.limits.requests_per_second_per_project} RPS per project`, [
               `${short(free.limits.requests_per_month_per_account)} / month per account`,
             ]),
-            pro: text(`${pro.limits.requests_per_second_per_project} RPS per project`),
+            pro: text(`${pro.limits.requests_per_second_per_project} RPS per project`, [
+              `${short(pro.limits.requests_per_month_per_account)} / month per account`,
+            ]),
             enterprise: CUSTOM,
+          },
+        },
+        {
+          label: step.label,
+          source: step.id,
+          cells: {
+            ...each((plan) => lineCell(step, plan)),
+            pro: text(licensedPrice(step), [
+              `Adds ${short(step.requests_per_month ?? 0)} requests a month`,
+            ]),
           },
         },
         meterRow("email_messages"),
@@ -175,19 +190,10 @@ export function compareGroups(catalog: Catalog): Group[] {
       rows: [
         ...subgroup(
           "B2C · Consumer apps",
-          "Users, sign-in and basic MFA stay free. Find shared delivery and branding in Platform, and advanced policies and bot checks in Security & policies.",
           catalog.core.authentication.map((label) => ({ label, cells: each(() => YES) })),
         ),
-        ...subgroup(
-          "B2B · Business apps",
-          "Customer organizations, core roles and basic MFA stay free. Add your customers' SSO and directories below; advanced policies and delegated administration are in Security & policies.",
-          [meterRow("sso_users"), meterRow("directory_users")],
-        ),
-        ...subgroup(
-          "M2M · Services & agents",
-          "Service identities and credentials stay free. Compare token usage below; advanced authorization checks are in Security & policies.",
-          [meterRow("m2m_tokens")],
-        ),
+        ...subgroup("B2B · Business apps", [meterRow("sso_users"), meterRow("directory_users")]),
+        ...subgroup("M2M · Services & agents", [meterRow("m2m_tokens")]),
       ],
     },
     {
