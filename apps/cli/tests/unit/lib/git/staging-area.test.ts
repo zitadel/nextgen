@@ -26,7 +26,6 @@ const scratch = new GitScratch();
 beforeEach(isolateGit);
 
 afterEach(async () => {
-  vi.unstubAllEnvs();
   await scratch.cleanup();
 });
 
@@ -210,14 +209,14 @@ describe("StagingArea", () => {
 
   it("removes its staging area when the work throws", async () => {
     const cwd = await scratch.committed({ "a.txt": "a\n" });
-    let index = "";
+    const indexes: string[] = [];
 
     await StagingArea.temporary(new Git(cwd), async (staging) => {
-      index = await indexOf(staging);
+      indexes.push(await indexOf(staging));
       throw new Error("failed");
     }).catch(() => undefined);
 
-    expect(existsSync(dirname(index))).toBe(false);
+    expect(existsSync(dirname(indexes[0] ?? ""))).toBe(false);
   });
 
   it("starts empty before the first commit", async () => {

@@ -1,7 +1,8 @@
-import { mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
+import { mkdir, rename, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 import { ZitadelError } from "../../../../errors";
+import { readIfExists } from "../../../../fs";
 import { enforceMode, envLine } from "../../../../fs-safe";
 import { isObject, parseJsonObject, setTopLevelJsonKey, stableStringify } from "../../../../json";
 import type { PatchedFile } from "../../types";
@@ -147,6 +148,8 @@ async function editFile(
   let path = preferred;
   let source: string | undefined;
   let mode: number | undefined;
+  // Candidates are read in order and the rest are left alone once one exists, so
+  // an unreadable fallback cannot fail an edit of the file that was found.
   for (const candidate of candidates) {
     const contents = await readIfExists(candidate);
     if (contents !== undefined) {
@@ -449,7 +452,7 @@ async function addDependency(
   // the document. Every byte outside it — key order, blank lines, inline
   // objects, line endings — stays untouched; the touched map itself is
   // name-sorted, matching what a package manager writes.
-  let contents = setTopLevelJsonKey(
+  const withDependency = setTopLevelJsonKey(
     existing,
     path,
     key,
@@ -459,14 +462,14 @@ async function addDependency(
   // refuse it outright (Qwik's starter vite.config.ts throws on start). Move a
   // devDependencies entry the developer already has into dependencies instead
   // of duplicating it.
-  if (listedInOther) {
-    contents = setTopLevelJsonKey(
-      contents,
-      path,
-      "devDependencies",
-      Object.fromEntries(Object.entries(other).filter(([name]) => name !== op.name)),
-    );
-  }
+  const contents = listedInOther
+    ? setTopLevelJsonKey(
+        withDependency,
+        path,
+        "devDependencies",
+        Object.fromEntries(Object.entries(other).filter(([name]) => name !== op.name)),
+      )
+    : withDependency;
   if (dryRun) {
     record(result, path, "file", "update");
     result.depsAdded.push(op.name);
@@ -480,17 +483,6 @@ async function addDependency(
 /** Rebuilds an object with lexicographically sorted keys (dependency maps). */
 function sortByKey(value: Record<string, unknown>): Record<string, unknown> {
   return Object.fromEntries(Object.entries(value).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
-}
-
-async function readIfExists(path: string): Promise<string | undefined> {
-  try {
-    return await readFile(path, "utf8");
-  } catch (error) {
-    if (typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT") {
-      return undefined;
-    }
-    throw error;
-  }
 }
 
 function abs(cwd: string, path: string): string {

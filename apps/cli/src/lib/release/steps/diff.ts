@@ -2,7 +2,7 @@ import { brandingReferencePaths } from "../../branding";
 import type { DiffedFile } from "../../git";
 import { diffConfigAgainst, diffConfigFilesAgainst } from "../git";
 import type { Step, StepContext, StepReport } from "../pipeline";
-import { listLiveDeployments, servesPrimary } from "../deployment";
+import { servesPrimary } from "../deployment";
 
 /**
  * The diff as `--json` reports it, in `data.diff`: what the terminal shows,
@@ -36,8 +36,10 @@ export const diffStep: Step = {
   name: "diff",
   runsFor: ["deploy", "preview"],
   async run(ctx: StepContext): Promise<StepReport | undefined> {
-    const deployments = await listLiveDeployments(ctx.client, ctx.projectId, {
-      withRelease: true,
+    const deployments = await ctx.client.listDeployments.all({
+      project_id: ctx.projectId,
+      live: true,
+      expand: ["release"],
     });
     // What the primary origins serve: a live preview deployment is never the
     // baseline, even when it is the newest one in the project.

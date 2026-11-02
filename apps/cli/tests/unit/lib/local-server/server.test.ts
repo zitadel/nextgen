@@ -20,6 +20,7 @@ import {
   trackLocalServer,
   useLocalServers,
 } from "../../../helpers/local-server";
+import { forcedConsent } from "../../../helpers/consent";
 import { nextPort } from "../../../helpers/ports";
 import { aBinaryRecord, aDockerRecord } from "../../../helpers/runtime-record";
 
@@ -30,9 +31,6 @@ const held: Server[] = [];
 useLocalServers();
 
 afterEach(async () => {
-  vi.restoreAllMocks();
-  vi.unstubAllEnvs();
-  vi.unstubAllGlobals();
   for (const server of held.splice(0)) {
     await new Promise<void>((resolve) => server.close(() => resolve()));
   }
@@ -175,10 +173,19 @@ describe("LocalServer", () => {
     it("deletes the data and the record, even when the recorded process is gone", async () => {
       const cwd = await directoryWithAGoneServer();
 
-      await at(cwd).reset();
+      await at(cwd).reset(await forcedConsent());
 
       await expect(stat(join(cwd, LOCAL_DATA_DIR))).rejects.toMatchObject({ code: "ENOENT" });
       await expect(stat(join(cwd, LOCAL_RUNTIME_FILE))).rejects.toMatchObject({ code: "ENOENT" });
+    });
+
+    it("refuses without consent, and deletes nothing", async () => {
+      const cwd = await directoryWithAGoneServer();
+
+      await expect(at(cwd).reset({} as never)).rejects.toThrow(
+        "A destructive operation ran without consent",
+      );
+      await expect(stat(join(cwd, LOCAL_DATA_DIR))).resolves.toBeDefined();
     });
   });
 

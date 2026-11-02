@@ -236,6 +236,9 @@ catalogs:
     '@oclif/plugin-which':
       specifier: ^3.2.55
       version: 3.2.55
+    '@oclif/table':
+      specifier: ^0.5.9
+      version: 0.5.9
     '@playwright/test':
       specifier: ^1.64.1
       version: 1.64.1
@@ -350,9 +353,18 @@ catalogs:
     dompurify:
       specifier: ^3.4.16
       version: 3.4.17
+    escape-string-regexp:
+      specifier: ^5.0.0
+      version: 5.0.0
+    execa:
+      specifier: ^9.6.1
+      version: 9.6.1
     express:
       specifier: ^4.18.2
       version: 4.22.2
+    fastest-levenshtein:
+      specifier: ^1.0.16
+      version: 1.0.16
     fumadocs-core:
       specifier: ^16.17.1
       version: 16.17.1
@@ -365,9 +377,15 @@ catalogs:
     fumadocs-ui:
       specifier: npm:@fumadocs/base-ui@^16.17.1
       version: 16.17.1
+    is-wsl:
+      specifier: ^3.1.0
+      version: 3.1.1
     jsdom:
       specifier: ^29.0.2
       version: 29.0.2
+    jsonc-parser:
+      specifier: ^3.3.1
+      version: 3.3.1
     lightningcss:
       specifier: ^1.30.1
       version: 1.33.0
@@ -401,9 +419,21 @@ catalogs:
     oclif:
       specifier: ^4.17.46
       version: 4.23.8
+    open:
+      specifier: ^11.0.4
+      version: 11.0.4
     orval:
       specifier: ^8.42.0
       version: 8.42.0
+    p-map:
+      specifier: ^7.1.1
+      version: 7.1.1
+    p-timeout:
+      specifier: ^8.0.0
+      version: 8.0.0
+    p-wait-for:
+      specifier: ^7.0.0
+      version: 7.0.0
     playwright:
       specifier: ^1.64.1
       version: 1.64.1
@@ -482,6 +512,9 @@ catalogs:
     tw-animate-css:
       specifier: ^1.4.0
       version: 1.4.0
+    type-fest:
+      specifier: ^5.10.0
+      version: 5.10.0
     typescript:
       specifier: ^6.0.3
       version: 6.0.3
@@ -587,6 +620,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.1.11(@vitest/browser@4.1.11)(vitest@4.1.11)
+      p-map:
+        specifier: 'catalog:'
+        version: 7.1.1
       publint:
         specifier: 'catalog:'
         version: 0.3.25
@@ -644,6 +680,9 @@ importers:
       '@oclif/plugin-which':
         specifier: 'catalog:'
         version: 3.2.55
+      '@oclif/table':
+        specifier: 'catalog:'
+        version: 0.5.9
       '@zitadel/api':
         specifier: workspace:*
         version: link:../../packages/api
@@ -659,12 +698,36 @@ importers:
       consola:
         specifier: ^3.4.2
         version: 3.4.2
+      escape-string-regexp:
+        specifier: 'catalog:'
+        version: 5.0.0
+      execa:
+        specifier: 'catalog:'
+        version: 9.6.1
+      fastest-levenshtein:
+        specifier: 'catalog:'
+        version: 1.0.16
+      is-wsl:
+        specifier: 'catalog:'
+        version: 3.1.1
+      jsonc-parser:
+        specifier: 'catalog:'
+        version: 3.3.1
       magicast:
         specifier: ^0.5.3
         version: 0.5.3
       mixpanel:
         specifier: ^0.18.1
         version: 0.18.1(supports-color@8.1.1)
+      open:
+        specifier: 'catalog:'
+        version: 11.0.4
+      p-timeout:
+        specifier: 'catalog:'
+        version: 8.0.0
+      p-wait-for:
+        specifier: 'catalog:'
+        version: 7.0.0
       picocolors:
         specifier: ^1.1.1
         version: 1.1.1
@@ -717,6 +780,9 @@ importers:
       tsdown:
         specifier: 'catalog:'
         version: 0.23.0(@arethetypeswrong/core@0.18.5)(@tsdown/css@0.23.0)(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.2.8)(oxc-resolver@11.20.0)(publint@0.3.25)(tsx@4.21.0)(typescript@6.0.3)(unrun@0.2.37(synckit@0.11.12))(vue-tsc@3.2.8(typescript@6.0.3))
+      type-fest:
+        specifier: 'catalog:'
+        version: 5.10.0
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
@@ -1313,6 +1379,9 @@ importers:
       '@zitadel/vitest-config':
         specifier: workspace:*
         version: link:../packages/vitest-config
+      p-map:
+        specifier: 'catalog:'
+        version: 7.1.1
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
@@ -10902,6 +10971,10 @@ packages:
     resolution: {integrity: sha512-H9LMLr5zwIbSxrmvikGuI/5KGhZ8E2zH3stkMgM5LpOWDutGM2JZaj460Udnf1a+946zc7YBgrqEWwbk7zHvGw==}
     engines: {node: '>=18'}
 
+  default-browser@5.5.1:
+    resolution: {integrity: sha512-m1pAzaJgZ/gssEqlOhJkPJp8Xly7QyW6xcrkUa2KKcDeDSEMP7X8xipU3snUcfisTQx0w1AGae+9UtJSfVnXGw==}
+    engines: {node: '>=18'}
+
   defaults@1.0.4:
     resolution: {integrity: sha512-eFuaLoy/Rxalv2kr+lqMlUnrDWV+3j4pljOIJgLIhI058IQfWJ7vXhyEIHu+HtC738klGALYxOKDO0bQP3tg8A==}
 
@@ -13849,6 +13922,10 @@ packages:
     resolution: {integrity: sha512-smsWv2LzFjP03xmvFoJ331ss6h+jixfA4UUV/Bsiyuu4YJPfN+FIQGOIiv4w9/+MoHkfkJ22UIaQWRVFRfH6Vw==}
     engines: {node: '>=20'}
 
+  open@11.0.4:
+    resolution: {integrity: sha512-++Zlftm0kVLPmzC06t6epuWmcRMDbI4z5P3NNX979WA/k23+NtSOynEGzsVfZwguKw2mi5umVgnBlJQMwRz4Pg==}
+    engines: {node: '>=20'}
+
   open@8.4.0:
     resolution: {integrity: sha512-XgFPPM+B28FtCCgSb9I+s9szOC1vZRSwgWsRUA5ylIxRTgKozqjOCrVOqGsYABPYK5qnfqClxZTFBa8PKt2v6Q==}
     engines: {node: '>=12'}
@@ -13974,9 +14051,21 @@ packages:
     resolution: {integrity: sha512-wPrq66Llhl7/4AGC6I+cqxT07LhXvWL08LNXz1fENOw0Ap4sRZZ/gZpTTJ5jpurzzzfS2W/Ge9BY3LgLjCShcw==}
     engines: {node: ^12.20.0 || ^14.13.1 || >=16.0.0}
 
+  p-map@7.1.1:
+    resolution: {integrity: sha512-6Lh3jQPLthYujSrlw6ccWXBGZTkoTCz27Hd92g79LH/kjAbgoEu0t442cCCNbegPSJsA0lwDX8z0bcKtkpA32g==}
+    engines: {node: '>=18'}
+
   p-timeout@6.1.4:
     resolution: {integrity: sha512-MyIV3ZA/PmyBN/ud8vV9XzwTrNtR4jFrObymZYnZqMmW0zA8Z17vnT0rBgFE/TlohB+YCHqXMgZzb3Csp49vqg==}
     engines: {node: '>=14.16'}
+
+  p-timeout@8.0.0:
+    resolution: {integrity: sha512-IHjMTvwSvMPKVfGAVTRxI+Ea6Vu5soB0oaC3fuEc58EI01T36AiVclDTTYoHBO8M1gjxqAvgkRLm33TGUCzEDw==}
+    engines: {node: '>=22'}
+
+  p-wait-for@7.0.0:
+    resolution: {integrity: sha512-zDQ/3GyUFSwklDAT7jeBu4FQgxw0o0yayyP4qizTl5yDYlAWbk71npDC1zhOqD4iqnEN2/4Ssr8Xc2aUQtvdAg==}
+    engines: {node: '>=22'}
 
   package-json-from-dist@1.0.1:
     resolution: {integrity: sha512-UEZIS3/by4OC8vL3P2dTXRETpebLI2NiI5vIrjaD/5UtrkFX/tNbwjTSRAGC/+7CAo2pIcBaRgWmcBBHcsaCIw==}
@@ -14429,6 +14518,10 @@ packages:
 
   powershell-utils@0.1.0:
     resolution: {integrity: sha512-dM0jVuXJPsDN6DvRpea484tCUaMiXWjuCn++HGTqUWzGDjv5tZkEZldAJ/UMlqRYGFrD/etByo4/xOuC/snX2A==}
+    engines: {node: '>=20'}
+
+  powershell-utils@0.2.1:
+    resolution: {integrity: sha512-C+y9x90UElAddDZmV4qOx9W53B61PO7cIqWz2dQsWlwswuq4mr8NEwytdGKboYbQlGZ3awrkTeNvcZiZNHnQ8A==}
     engines: {node: '>=20'}
 
   prelude-ls@1.2.1:
@@ -16900,6 +16993,10 @@ packages:
 
   wsl-utils@0.3.1:
     resolution: {integrity: sha512-g/eziiSUNBSsdDJtCLB8bdYEUMj4jR7AGeUo96p/3dTafgjHhpF4RiCFPiRILwjQoDXx5MqkBr4fwWtR3Ky4Wg==}
+    engines: {node: '>=20'}
+
+  wsl-utils@1.0.1:
+    resolution: {integrity: sha512-c16PKLIRxBYpR3jSWsdS7SFp0COm5SOQdiFjY818dYFHJbMGuLBszpF07LBWmOS1uzrHa9VGdynsEgoeKy0oOQ==}
     engines: {node: '>=20'}
 
   xdg-app-paths@5.1.0:
@@ -26843,6 +26940,11 @@ snapshots:
       bundle-name: 4.1.0
       default-browser-id: 5.0.1
 
+  default-browser@5.5.1:
+    dependencies:
+      bundle-name: 4.1.0
+      default-browser-id: 5.0.1
+
   defaults@1.0.4:
     dependencies:
       clone: 1.0.4
@@ -31106,6 +31208,15 @@ snapshots:
       powershell-utils: 0.1.0
       wsl-utils: 0.3.1
 
+  open@11.0.4:
+    dependencies:
+      default-browser: 5.5.1
+      define-lazy-prop: 3.0.0
+      is-in-ssh: 1.0.0
+      is-inside-container: 1.0.0
+      powershell-utils: 0.2.1
+      wsl-utils: 1.0.1
+
   open@8.4.0:
     dependencies:
       define-lazy-prop: 2.0.0
@@ -31441,7 +31552,13 @@ snapshots:
     dependencies:
       p-limit: 4.0.0
 
+  p-map@7.1.1: {}
+
   p-timeout@6.1.4: {}
+
+  p-timeout@8.0.0: {}
+
+  p-wait-for@7.0.0: {}
 
   package-json-from-dist@1.0.1: {}
 
@@ -31870,6 +31987,8 @@ snapshots:
       source-map-js: 1.2.2
 
   powershell-utils@0.1.0: {}
+
+  powershell-utils@0.2.1: {}
 
   prelude-ls@1.2.1:
     optional: true
@@ -35231,6 +35350,11 @@ snapshots:
     dependencies:
       is-wsl: 3.1.1
       powershell-utils: 0.1.0
+
+  wsl-utils@1.0.1:
+    dependencies:
+      is-wsl: 3.1.1
+      powershell-utils: 0.2.1
 
   xdg-app-paths@5.1.0:
     dependencies:

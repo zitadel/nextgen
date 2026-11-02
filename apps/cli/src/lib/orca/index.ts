@@ -1,7 +1,8 @@
-import { access, mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 
 import { isErrno, ZitadelError } from "../errors";
+import { pathExists, readDirIfExists } from "../fs";
 import { LOCAL_RUNTIME_DIR } from "../local-server/runtime";
 import { detectors } from "./detectors";
 import { detectDevPort } from "./detectors/port";
@@ -343,7 +344,10 @@ export async function inspectScaffoldTarget(cwd: string): Promise<ScaffoldTarget
   // and then `setup` work in a new directory: the local runtime, and the
   // `.gitignore` line that keeps it out of git. `scaffold()` moves both aside
   // while the generator runs and merges the `.gitignore` back.
-  const names = [...(await scaffoldTargetEntries(cwd))].sort();
+  // A scaffold target that does not exist yet has no entries: the scaffold
+  // creates it, as a framework's own generator creates `my-app`, so a `--cwd`
+  // naming the new app's directory works before that directory does.
+  const names = [...(await readDirIfExists(cwd))].sort();
   const others: string[] = [];
   for (const name of names) {
     if (!(await isLocalRuntimeEntry(cwd, name))) {
@@ -358,22 +362,6 @@ export async function inspectScaffoldTarget(cwd: string): Promise<ScaffoldTarget
     reason: `Directory is not empty (contains ${others.join(", ")}).`,
     entries: names,
   };
-}
-
-/**
- * The entries of a scaffold target, or none when it does not exist yet: the
- * scaffold creates it, as a framework's own generator creates `my-app`, so a
- * `--cwd` naming the new app's directory works before that directory does.
- */
-async function scaffoldTargetEntries(cwd: string): Promise<string[]> {
-  try {
-    return await readdir(cwd);
-  } catch (error) {
-    if (isErrno(error, "ENOENT")) {
-      return [];
-    }
-    throw error;
-  }
 }
 
 /**
@@ -544,13 +532,4 @@ async function mergeGitignore(stashed: string, dest: string): Promise<void> {
     return;
   }
   await writeFile(dest, `${into}${into.endsWith("\n") ? "" : "\n"}${missing.join("\n")}\n`);
-}
-
-async function pathExists(path: string): Promise<boolean> {
-  try {
-    await access(path);
-    return true;
-  } catch {
-    return false;
-  }
 }

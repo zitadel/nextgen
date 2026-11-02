@@ -720,16 +720,16 @@ describe("the generated proxy, run by Vite against a remote https server", () =>
   const env = { ZITADEL_PROJECT_SECRET: "sk_proj_test" };
   /** An app whose `.env.local` names its project, as setup writes it. */
   const withProject = { ...env, ZITADEL_PROJECT_ID: "proj_spa" };
-  let app: DevApp | undefined;
+  const apps: DevApp[] = [];
 
   afterEach(async () => {
-    await app?.close();
-    app = undefined;
+    await Promise.all(apps.splice(0).map((app) => app.close()));
     remote.answerWith(undefined);
   });
 
   async function serve(config: string, appEnv: Record<string, string> = env): Promise<DevApp> {
-    app = await aViteApp(config, appEnv);
+    const app = await aViteApp(config, appEnv);
+    apps.push(app);
     return app;
   }
 

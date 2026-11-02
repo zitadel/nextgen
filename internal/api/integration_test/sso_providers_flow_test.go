@@ -75,11 +75,11 @@ func ssoLoginFlowDefinition(userSchema string) api.FlowDefinition {
 					{Name: "submit", Kind: api.StepActionKindSubmit, Primary: api.NewOptBool(true)},
 				},
 				Transitions: api.NewOptFlowDefinitionStepTransitions(api.FlowDefinitionStepTransitions{
-					"submit":            api.FlowDefinitionStepTransitionsItem{Target: "done"},
-					"sso_authenticated": api.FlowDefinitionStepTransitionsItem{Target: "done"},
+					"submit":            api.FlowDefinitionStepTransitionsItem{Target: api.NewOptString("done")},
+					"sso_authenticated": api.FlowDefinitionStepTransitionsItem{Target: api.NewOptString("done")},
 					// An SSO collision binds the owner only when the step
 					// routes this outcome; the owner then signs in here.
-					"user_already_exists": api.FlowDefinitionStepTransitionsItem{Target: "identifier"},
+					"user_already_exists": api.FlowDefinitionStepTransitionsItem{Target: api.NewOptString("identifier")},
 				}),
 			},
 			{

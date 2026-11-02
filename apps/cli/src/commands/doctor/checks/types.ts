@@ -1,4 +1,5 @@
-import { ZitadelError, type ZitadelErrorCode } from "../../../lib/errors";
+import type { Consent, Gate } from "../../../lib/consent";
+import { ZitadelError, type ZitadelErrorCode, errorMessage } from "../../../lib/errors";
 import type { Orca } from "../../../lib/orca";
 
 /** Pass/fail/advisory outcome of a single {@link SanityCheck}. */
@@ -25,6 +26,11 @@ export type CheckContext = {
   readonly cliVersion: string;
   /** When true, {@link SanityCheck.fix} must preview without writing. */
   readonly dryRun: boolean;
+  /**
+   * Asks for consent to a destructive repair: `doctor`'s own confirmation,
+   * which `--force` answers. `undefined` is a no. Never called on a dry run.
+   */
+  readonly consent: (gate: Gate) => Promise<Consent | undefined>;
 };
 
 /**
@@ -67,7 +73,7 @@ export abstract class AbstractSanityCheck implements SanityCheck {
       return {
         name: this.name,
         status: "fail",
-        message: error instanceof Error ? error.message : String(error),
+        message: errorMessage(error),
         path: this.path,
         ...(error instanceof ZitadelError
           ? { code: error.code, ...(error.hint === undefined ? {} : { hint: error.hint }) }

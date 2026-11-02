@@ -164,6 +164,75 @@ describe("release detail", () => {
     expect(within(region).getByText(/Edit the definition locally/)).toBeInTheDocument();
   });
 
+  it("summarises a pinned policy's settings above its document", async () => {
+    serveDeployments();
+    let requestedProject: string | null = null;
+    server.use(
+      http.get(`${RELEASES_URL}/rel_1`, () =>
+        HttpResponse.json(
+          release({
+            pointers: [
+              { kind: "policy", handle: "auth.factor.password.set", revision_id: "polrev_1" },
+            ],
+          }),
+        ),
+      ),
+      http.get(`${API}/policies/revisions/polrev_1`, ({ request }) => {
+        requestedProject = new URL(request.url).searchParams.get("project_id");
+        return HttpResponse.json({
+          id: "pol_1",
+          revision_id: "polrev_1",
+          project_id: "proj_test",
+          operation: "auth.factor.password.set",
+          config: { min_length: 15, history_depth: 4 },
+          created_at: CREATED_AT,
+          updated_at: CREATED_AT,
+        });
+      }),
+    );
+    await renderAt("/releases/rel_1");
+
+    expect(await screen.findByRole("heading", { name: "Policies" })).toBeInTheDocument();
+    expect(requestedProject).toBe("proj_test");
+    const trigger = screen.getByRole("button", { name: /^Password policy polrev_1$/ });
+    await userEvent.click(trigger);
+
+    const region = await screen.findByRole("region", { name: /^Password policy polrev_1$/ });
+    const length = within(region).getByText("Length");
+    const source = region.querySelector("pre");
+    expect(source).not.toBeNull();
+    expect(
+      length.compareDocumentPosition(source as Node) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(within(region).getByText(/Edit the policy locally/)).toBeInTheDocument();
+  });
+
+  it("names a policy from its handle when its revision cannot be read", async () => {
+    serveDeployments();
+    server.use(
+      http.get(`${RELEASES_URL}/rel_1`, () =>
+        HttpResponse.json(
+          release({
+            pointers: [
+              { kind: "policy", handle: "auth.factor.password.set", revision_id: "polrev_gone" },
+            ],
+          }),
+        ),
+      ),
+      http.get(`${API}/policies/revisions/polrev_gone`, () =>
+        HttpResponse.json(
+          { code: "pol.not_found", message: "Policy revision not found" },
+          { status: 404 },
+        ),
+      ),
+    );
+    await renderAt("/releases/rel_1");
+
+    expect(
+      await screen.findByRole("button", { name: /^Password policy polrev_gone$/ }),
+    ).toBeInTheDocument();
+  });
+
   it("keeps the screen when a pinned revision cannot be read", async () => {
     serveDeployments();
     server.use(

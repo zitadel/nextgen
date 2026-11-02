@@ -9,6 +9,7 @@ import {
 } from "../../../lib/project";
 import { configuredIssuer } from "../patch-context";
 import type { CheckContext, CheckOutcome, SanityCheck } from "./types";
+import { errorMessage } from "../../../lib/errors";
 
 /** What {@link inspect} found: a pass, or the preview issuer `fix` makes primary. */
 type Finding =
@@ -61,9 +62,9 @@ export class IssuerOriginCheck implements SanityCheck {
   /**
    * Makes the preview issuer primary on the server, then in `.zitadel/secret`.
    * The API has no kind change, and adding the pattern as primary conflicts
-   * with the stored preview one, so it is removed and added back. Should the
-   * add fail, the preview pattern is put back: a project left with no origins
-   * admits every origin.
+   * with the stored preview one, so it is removed and added back, which takes
+   * consent. Should the add fail, the preview pattern is put back: a project
+   * left with no origins admits every origin.
    */
   async fix(ctx: CheckContext): Promise<void> {
     if (ctx.dryRun) {
@@ -74,7 +75,15 @@ export class IssuerOriginCheck implements SanityCheck {
       return;
     }
     const { client, pattern, secret } = finding;
-    await client.removeOrigin(secret.project_id, { pattern });
+    const consent = await ctx.consent({
+      verb: "replace",
+      name: `replace the preview origin ${pattern} with a primary one`,
+      message: `Make ${pattern} a primary origin? It is removed and added back as primary.`,
+    });
+    if (consent === undefined) {
+      return;
+    }
+    await consent.unlock(client).removeOrigin(secret.project_id, { pattern });
     try {
       await client.addOrigin(secret.project_id, { pattern, kind: "primary" });
     } catch (error) {
@@ -92,12 +101,13 @@ export class IssuerOriginCheck implements SanityCheck {
 }
 
 async function inspect(cwd: string): Promise<Finding> {
-  let secret: ZitadelSecret;
-  let server: string;
-  try {
-    secret = await readZitadelSecret(cwd);
-    server = readProjectServer(await readZitadelConfig(cwd));
-  } catch {
+  const records = await readZitadelSecret(cwd)
+    .then(async (secret) => ({
+      secret,
+      server: readProjectServer(await readZitadelConfig(cwd)),
+    }))
+    .catch(() => undefined);
+  if (records === undefined) {
     // A missing or unparseable secret or config is the `secret` and `config`
     // checks' to report, with a repair path.
     return {
@@ -105,6 +115,7 @@ async function inspect(cwd: string): Promise<Finding> {
       message: "Skipped: could not read the project files that record its origins",
     };
   }
+  const { secret, server } = records;
   const issuer = await configuredIssuer(cwd);
   if (issuer === undefined) {
     return { status: "pass", message: "Skipped: no file sets ZITADEL_ISSUER" };
@@ -116,11 +127,12 @@ async function inspect(cwd: string): Promise<Finding> {
   const client = createZitadelClient({ baseUrl: server, token: secret.project_secret });
   let origins: ReadonlyArray<{ pattern: string; kind: string }>;
   try {
-    origins = (await client.getProject(secret.project_id)).origins ?? [];
+    const project = await client.getProject(secret.project_id);
+    origins = project.origins;
   } catch (error) {
     return {
       status: "pass",
-      message: `Skipped: could not read the project's origins from ${server}: ${error instanceof Error ? error.message : String(error)}`,
+      message: `Skipped: could not read the project's origins from ${server}: ${errorMessage(error)}`,
     };
   }
   const pattern = issuerHeldAsPreview(origins, issuer);

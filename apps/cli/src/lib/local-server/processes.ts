@@ -1,5 +1,8 @@
-import { execFile } from "node:child_process";
 import { basename } from "node:path";
+
+import { execa } from "execa";
+
+import { errorMessage } from "../errors";
 
 export type ManagedRuntimeProcess = Readonly<{
   command: string;
@@ -64,16 +67,8 @@ export async function discoverManagedRuntimeProcesses(opts?: {
   return { supported: true, processes: uniqueByPid(processes) };
 }
 
-function runPs(args: string[], timeoutMs: number): Promise<string> {
-  return new Promise<string>((resolve, reject) => {
-    execFile("ps", args, { timeout: timeoutMs, encoding: "utf8" }, (err, stdout) => {
-      if (err) {
-        reject(err);
-        return;
-      }
-      resolve(stdout);
-    });
-  });
+async function runPs(args: string[], timeoutMs: number): Promise<string> {
+  return (await execa("ps", args, { timeout: timeoutMs })).stdout;
 }
 
 async function hydrateCommand(pid: number, fallback: string, timeoutMs: number): Promise<string> {
@@ -179,8 +174,4 @@ function uniqueByPid(
     byPid.set(processInfo.pid, processInfo);
   }
   return [...byPid.values()].sort((a, b) => a.pid - b.pid);
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
