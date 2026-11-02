@@ -23,12 +23,24 @@ contributor scripts build through moon, or through turbo with
   sets `dependsOn` keeps the root's `outputs`, `inputs` and `env`.
 - A task runs the `package.json` script of its name, in the package. No script
   means no task for that package (moon's `inheritedTasks.exclude`), so do not
-  add an empty script to fill a gap. Moon's `server`, `bench` and `release`
-  projects are the packages `@zitadel/server`, `@zitadel/bench`
-  (`tools/bench`) and `@zitadel/release` (`tools/release`); their scripts
-  `cd` to the directory the command needs. `@zitadel/cloud` (`apps/cloud`,
-  the hosted cloud's launcher and schemas) has no moon project: its `dev` is
-  moon's `workspace:cloud`.
+  add an empty script to fill a gap. Moon's `server` and `release` projects
+  are the packages `@zitadel/server` and `@zitadel/release` (`tools/release`);
+  their scripts `cd` to the directory the command needs. `@zitadel/cloud`
+  (`apps/cloud`, the hosted cloud's launcher and schemas) has no moon
+  project: its `dev` is moon's `workspace:cloud`.
+- The Go modules in `go.work` are packages too
+  (`experimentalGoWorkspaces`), named after the last element of their module
+  path: `nextgen` (`apps/api`), `zitadel/v5` (`packages/go`), `bench`,
+  `oidc-mock`, `defaults` and `design-tokens`. Moon's `go`, `bench` and
+  `oidc-mock` projects are the packages `zitadel/v5`, `bench` and
+  `oidc-mock`. A module has no scripts: its `turbo.json` gives each task
+  moon's command as a `command` array (`experimentalTaskCommand`, no shell,
+  run in the module). Turbo adds `build`, `test`, `lint` (go vet), `format`
+  (go fmt, which rewrites) and `dev` to every module; a module replaces the
+  ones moon has and drops the rest with `"extends": false`. `defaults` and
+  `design-tokens` have no `turbo.json` of their own (the design tokens share
+  `@zitadel/design-tokens`'s, and `packages/config/defaults` ships to npm), so
+  they keep the cheap built-ins and the root replaces their `format` by name.
 - A script does its own task's work only. A step that is a task of its own,
   such as the package's `generate` or another package's `build`, is a
   `dependsOn` edge here and a `deps` entry in `moon.yml`, never `a && b` in
@@ -51,7 +63,8 @@ contributor scripts build through moon, or through turbo with
 - Edges are explicit (`dependsOn: ["@zitadel/components#build"]`) and mirror
   the moon task's `deps`. `^build` is not used: it follows devDependencies,
   and the console's `@zitadel/testing` would pull the CLI and the server build
-  into every console build (and close a cycle).
+  into every console build (and close a cycle). The one `^` edge is the Go
+  modules' `^go-sources`, which follows their go.mod requires.
 - Every dependency's result is part of a task's hash, whether or not it has
   outputs, so there is no "unhashed edge" to work around and no duplicate to
   remove.
@@ -104,15 +117,22 @@ contributor scripts build through moon, or through turbo with
   outside the package with `$TURBO_ROOT$`. A task that reads an excluded class
   replaces `inputs` instead of extending them (`cli#test` reads its
   `README.md`). Release tasks keep every file: the tarballs ship the docs.
-- Turbo has no file groups. The Go production inputs (moon's
-  `serverInputs` and `benchInputs`, excluding tests) belong to a `go-sources`
-  task with no script, in `apps/server/turbo.json` and `tools/bench/turbo.json`:
-  turbo hashes it but runs nothing, and each Go task depends on it, so an
-  edit to one of those files marks its consumers affected. The server's
-  `go-tests` adds `_test.go`, `testdata` and test-only files for format, vet,
-  lint and tests. Nested modules own their tasks; changing the OIDC mock does
-  not select the server or benchmark. A Go task's own `inputs` list only what
-  that task alone reads (its script, a lint config).
+- Turbo has no file groups. A Go module's production files (no tests, no
+  docs) are the inputs of its `go-sources`, a task in the root `turbo.json`
+  with no command: turbo hashes it but runs nothing. It depends on the
+  `go-sources` of every module the module requires, so the graph, not an
+  input list, says which modules a build compiles (moon lists them:
+  `serverInputs`, `benchInputs`). Each Go task depends on its module's;
+  `@zitadel/server#go-sources` depends on `nextgen#go-sources` and adds what
+  generation reads outside the modules. The server's `go-tests` adds
+  `_test.go`, `testdata` and test-only files for format, vet, lint and tests.
+  Changing the OIDC mock, which no module requires, does not select the server
+  or benchmark. A Go task's own `inputs` list only what that task alone reads
+  (its script, a lint config).
+- Turbo hashes every file of a module and of the modules it requires into the
+  built-in Go tasks (`build`, `test`, `lint`, `format`), tests included, even
+  with a `command`. A built-in task that must not see other modules' tests
+  excludes them with `$TURBO_ROOT$` negations (`bench#build`, `bench#test`).
 - Shared Vitest configuration is an input of tests and typechecks, not a
   global dependency. Apps without Vitest remove it from typecheck inputs;
   console's Vitest config is separate from the Vite production config.
