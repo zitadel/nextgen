@@ -94,6 +94,12 @@ Any `NEXTGEN_*` variable overrides a default. The URLs Vercel serves a
 deployment at are added to `NEXTGEN_SERVER_CONSOLE_ORIGINS`, never replaced
 by it.
 
+In production, Vercel's URL is `VERCEL_PROJECT_PRODUCTION_URL`, which Vercel
+sets to the project's shortest production domain. The public base is where
+the claim and dashboard links point and the only origin the console signs in
+from, so adding a domain shorter than `preview.zitadel.com` moves both there
+on the next deploy, unless `NEXTGEN_SERVER_PUBLIC_BASE` pins it first.
+
 ## Built-in schemas
 
 The server names its built-in schemas (the user schema, the flow definition,
@@ -777,7 +783,7 @@ every path on the host with its one page
 ([`apps/cloud/go-import/public/index.html`](../../apps/cloud/go-import/public/index.html)):
 the first top-level rewrite in `vercel.json` routes every request with host
 `go.zitadel.com` to the service, ahead of the catch-all that sends everything
-else to the server, and the service's own rewrite maps every path to
+else to the website, and the service's own rewrite maps every path to
 `index.html`. A launcher test (`apps/api/cmd/cloud-launcher`) holds the page's
 prefix to the `module` line of `packages/go/go.mod`, its directory to
 `packages/go`, and the host rewrite ahead of the catch-all.
@@ -785,7 +791,11 @@ prefix to the `module` line of `packages/go/go.mod`, its directory to
 What the repository cannot do: add `go.zitadel.com` as a domain of the Vercel
 project (Settings → Domains) and point its DNS at Vercel (a `CNAME` to
 `cname.vercel-dns.com`, or the `A` record Vercel shows for an apex). Until then
-the rewrite never matches. Attach the domain only once `packages/go` is in
+the rewrite never matches. Before adding it, set `NEXTGEN_SERVER_PUBLIC_BASE`
+to `https://preview.zitadel.com` for Production and deploy: `go.zitadel.com`
+is the shorter domain, so it would otherwise become the public base
+([Layout](#layout)), and the console's sign-in and the claim links would land
+on the go-import page. Attach the domain only once `packages/go` is in
 `zitadel/zitadel` and a `packages/go/v5.x.y` tag exists there: the page names
 that repository, so until then the curl check below passes while
 `go get go.zitadel.com/zitadel/v5` fails, as `go` finds no module at the
