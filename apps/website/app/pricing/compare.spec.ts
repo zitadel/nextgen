@@ -138,10 +138,10 @@ describe("free security and account-wide packages", () => {
     for (const title of titles) expect(title).not.toMatch(/B2C|B2B|consumer|business/i);
   });
 
-  it("prices capacity steps and regions outside the EU on Pro, never on Free", () => {
+  it("prices extra requests and regions outside the EU on Pro, never on Free", () => {
     const capacity = rows.find((entry) => entry.source === "capacity_step")!;
     expect(capacity.cells.free.kind).toBe("no");
-    expect(words(capacity.cells.pro)).toBe("$700 a month per step Adds 50M requests a month");
+    expect(words(capacity.cells.pro)).toBe("$700 a month per 50M requests");
     expect(words(capacity.cells.enterprise)).toBe("Custom");
     const region = rows.find((entry) => entry.source === "region")!;
     expect(region.cells.free.kind).toBe("no");

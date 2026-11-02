@@ -140,7 +140,7 @@ function CloudPlans({ catalog }: { catalog: Catalog }) {
         includes={`All ${free.label} features, plus:`}
         features={[
           "Conditional policies and delegated administration",
-          `${short(pro.limits.requests_per_month_per_account)} requests a month, then capacity steps`,
+          `${short(pro.limits.requests_per_month_per_account)} requests a month, then extra requests`,
           "Managed email and SMS",
           "Remove the Zitadel mark",
           ...(region ? [`Regions outside the EU, ${licensedPrice(region)}`] : []),
@@ -505,9 +505,9 @@ function Questions({ catalog }: { catalog: Catalog }) {
                 {free.limits.past_monthly_ceiling}. {pro.label} includes{" "}
                 {pro.limits.requests_per_second_per_project} a second per project and{" "}
                 {short(pro.limits.requests_per_month_per_account)} a month per account; past that,{" "}
-                {pro.limits.past_monthly_ceiling}. Each step adds {short(step.requests_per_month)}{" "}
-                requests a month for {dollars(step.amount)} a {step.interval}. Enterprise capacity
-                is agreed in the contract.
+                {pro.limits.past_monthly_ceiling}. Extra requests come in blocks of{" "}
+                {short(step.requests_per_month)} a month for {dollars(step.amount)} a{" "}
+                {step.interval}. Enterprise capacity is agreed in the contract.
               </p>
             ),
           },
@@ -552,8 +552,8 @@ function Questions({ catalog }: { catalog: Catalog }) {
       question: "What is billed on top of the Pro base fee?",
       answer: (
         <p>
-          Metered integrations and consumption beyond the included allowances, capacity steps past
-          the included requests and regions outside the EU, plus contracted Compliance packages and
+          Metered integrations and consumption beyond the included allowances, extra requests past
+          the included volume and regions outside the EU, plus contracted Compliance packages and
           support add-ons. Governance is included in Pro and is never charged per user or policy.
         </p>
       ),

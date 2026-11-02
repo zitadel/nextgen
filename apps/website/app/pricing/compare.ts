@@ -161,16 +161,7 @@ export function compareGroups(catalog: Catalog): Group[] {
             enterprise: CUSTOM,
           },
         },
-        {
-          label: step.label,
-          source: step.id,
-          cells: {
-            ...each((plan) => lineCell(step, plan)),
-            pro: text(licensedPrice(step), [
-              `Adds ${short(step.requests_per_month ?? 0)} requests a month`,
-            ]),
-          },
-        },
+        lineRow(step.id),
         meterRow("email_messages"),
         meterRow("sms_messages"),
         {
@@ -181,7 +172,7 @@ export function compareGroups(catalog: Catalog): Group[] {
           label: "Hide the Zitadel mark",
           cells: each((plan) => (plans[plan].attribution_mark === "hideable" ? YES : NO)),
         },
-        lineRow("dedicated_deployment"),
+        lineRow("dedicated_infrastructure"),
       ],
     },
     {

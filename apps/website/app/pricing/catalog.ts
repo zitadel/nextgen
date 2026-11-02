@@ -126,7 +126,7 @@ export type Licensed = {
   per?: string;
   plans: PlanId[];
   included_in?: PlanId[];
-  /** The requests a month one capacity step adds. */
+  /** The requests a month one block of extra requests adds. */
   requests_per_month?: number;
   note?: string;
   tag: string;
