@@ -28,8 +28,9 @@ Opening a flow takes four steps:
    Anything else answers `403` with `proj.origin_not_allowed` or
    `proj.preview_not_live`. The console's origins (`server.public_base`'s and
    `server.console_origins`) can open any project's flow, but cannot take a
-   later step. An unlisted loopback origin passes, but no deployment names it,
-   so it answers `409 rel.not_deployed` rather than `403`.
+   later step unless the origin passes on its own, as a loopback one does. Any
+   other unlisted loopback origin passes, but no deployment names it, so it
+   answers `409 rel.not_deployed` rather than `403`.
 2. Find the deployment. A live preview URL uses its own newest deployment. Any
    other origin uses the project's newest primary deployment, if that deployment
    names the origin. A request with no `Origin`, and a console origin the project
