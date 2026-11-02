@@ -403,6 +403,7 @@ export default class Claim extends EnvironmentCommand {
         maxTimeout: MAX_POLL_MS,
         factor: POLL_BACKOFF_FACTOR,
         randomize: false,
+        signal: this.signal,
       },
     ).catch((error: unknown) => {
       if (!(error instanceof NotFinished)) {

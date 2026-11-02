@@ -9,6 +9,8 @@ import { buildRequest, pathValuesOf } from "../../../../src/lib/api/request";
 import { forcedConsent } from "../../../helpers/consent";
 import { toZitadelError } from "../../../../src/lib/errors";
 
+const signal = new AbortController().signal;
+
 const SERVER = "http://localhost:8080";
 
 const requestFor = (ref: string, fields: string[] = [], positionals: string[] = []) => {
@@ -43,7 +45,12 @@ describe("send", () => {
       }),
     );
 
-    const response = await send(SERVER, "zsec_1", requestFor("createTeam", ["name=Support"]));
+    const response = await send(
+      SERVER,
+      "zsec_1",
+      requestFor("createTeam", ["name=Support"]),
+      signal,
+    );
 
     expect(seen[0]).toEqual({
       authorization: "Bearer zsec_1",
@@ -62,7 +69,7 @@ describe("send", () => {
       }),
     );
 
-    await send(SERVER, undefined, requestFor("getLive"));
+    await send(SERVER, undefined, requestFor("getLive"), signal);
 
     expect(authorizations[0]).toBeNull();
   });
@@ -73,7 +80,7 @@ describe("send", () => {
     );
 
     await expect(
-      send(SERVER, "s", requestFor("deleteTeam", [], ["team_1"]), await forcedConsent()),
+      send(SERVER, "s", requestFor("deleteTeam", [], ["team_1"]), signal, await forcedConsent()),
     ).resolves.toEqual({
       status: 204,
       body: undefined,
@@ -81,9 +88,9 @@ describe("send", () => {
   });
 
   it("refuses a destructive operation without consent", async () => {
-    await expect(send(SERVER, "s", requestFor("deleteTeam", [], ["team_1"]))).rejects.toThrow(
-      "A destructive operation ran without consent",
-    );
+    await expect(
+      send(SERVER, "s", requestFor("deleteTeam", [], ["team_1"]), signal),
+    ).rejects.toThrow("A destructive operation ran without consent");
   });
 
   it("sends nothing for a destructive operation without consent", async ({ server }) => {
@@ -95,7 +102,9 @@ describe("send", () => {
       }),
     );
 
-    await send(SERVER, "s", requestFor("deleteTeam", [], ["team_1"])).catch(() => undefined);
+    await send(SERVER, "s", requestFor("deleteTeam", [], ["team_1"]), signal).catch(
+      () => undefined,
+    );
 
     expect(sent).toEqual([]);
   });
@@ -108,14 +117,14 @@ describe("send", () => {
     );
 
     await expect(
-      send(SERVER, "s", requestFor("updateVariables", ["FOO:=null", "project_id=proj_1"])),
+      send(SERVER, "s", requestFor("updateVariables", ["FOO:=null", "project_id=proj_1"]), signal),
     ).resolves.toMatchObject({ status: 200 });
   });
 
   it("answers text for a response that is not JSON", async ({ server }) => {
     server.use(http.get(`${SERVER}/api/v1/livez`, () => HttpResponse.text("alive")));
 
-    await expect(send(SERVER, undefined, requestFor("getLive"))).resolves.toMatchObject({
+    await expect(send(SERVER, undefined, requestFor("getLive"), signal)).resolves.toMatchObject({
       body: "alive",
     });
   });
@@ -127,7 +136,9 @@ describe("send", () => {
       ),
     );
 
-    await expect(send(SERVER, "s", requestFor("getTeam", [], ["team_1"]))).resolves.toMatchObject({
+    await expect(
+      send(SERVER, "s", requestFor("getTeam", [], ["team_1"]), signal),
+    ).resolves.toMatchObject({
       body: { name: "\\x1b[2Jwiped" },
     });
   });
@@ -144,7 +155,7 @@ describe("send", () => {
       ),
     );
 
-    const error = await send(SERVER, "s", requestFor("getTeam", [], ["team_1"])).catch(
+    const error = await send(SERVER, "s", requestFor("getTeam", [], ["team_1"]), signal).catch(
       (caught: unknown) => caught,
     );
 
@@ -164,7 +175,12 @@ describe("sendAll", () => {
       }),
     );
 
-    const response = await sendAll(SERVER, "s", requestFor("listUserPasskeys", [], ["user_1"]));
+    const response = await sendAll(
+      SERVER,
+      "s",
+      requestFor("listUserPasskeys", [], ["user_1"]),
+      signal,
+    );
 
     expect(response.body).toEqual({ passkeys: LETTERS, next_page_token: "" });
   });
@@ -178,7 +194,7 @@ describe("sendAll", () => {
       }),
     );
 
-    const response = await sendAll(SERVER, "s", requestFor("queryUsers", ["limit=3"]));
+    const response = await sendAll(SERVER, "s", requestFor("queryUsers", ["limit=3"]), signal);
 
     expect(response.body).toEqual({ users: LETTERS, next_page_token: "" });
   });
@@ -191,7 +207,7 @@ describe("sendAll", () => {
     );
 
     await expect(
-      sendAll(SERVER, "s", requestFor("listUserPasskeys", [], ["user_1"])),
+      sendAll(SERVER, "s", requestFor("listUserPasskeys", [], ["user_1"]), signal),
     ).rejects.toMatchObject({
       code: "E_VALIDATION",
       message: 'Unexpected list response: missing "passkeys" array',
@@ -211,6 +227,7 @@ describe("sendAll", () => {
       SERVER,
       "s",
       requestFor("listUserPasskeys", ["page_token=cursor-3"], ["user_1"]),
+      signal,
     );
 
     expect(response.body).toMatchObject({ passkeys: ["d", "e", "f", "g"] });
@@ -228,7 +245,12 @@ describe("sendAll", () => {
       ),
     );
 
-    const response = await sendAll(SERVER, "s", requestFor("queryUsers", ["page_token=cursor-3"]));
+    const response = await sendAll(
+      SERVER,
+      "s",
+      requestFor("queryUsers", ["page_token=cursor-3"]),
+      signal,
+    );
 
     expect(response.body).toMatchObject({ users: ["d", "e", "f", "g"] });
   });
@@ -247,7 +269,12 @@ describe("sendAll", () => {
       }),
     );
 
-    const response = await sendAll(SERVER, "s", requestFor("listUserPasskeys", [], ["user_1"]));
+    const response = await sendAll(
+      SERVER,
+      "s",
+      requestFor("listUserPasskeys", [], ["user_1"]),
+      signal,
+    );
 
     expect([asked, response.body]).toEqual([
       [null, "c\u001b2"],
@@ -264,7 +291,12 @@ describe("sendAll", () => {
       ),
     );
 
-    const response = await sendAll(SERVER, "s", requestFor("listUserPasskeys", [], ["user_1"]));
+    const response = await sendAll(
+      SERVER,
+      "s",
+      requestFor("listUserPasskeys", [], ["user_1"]),
+      signal,
+    );
 
     expect(JSON.stringify(response.body)).toBe(
       JSON.stringify({ note: "\\x1b[2J", passkeys: ["a"], next_page_token: "" }),
@@ -278,7 +310,12 @@ describe("sendAll", () => {
       ),
     );
 
-    const response = await sendAll(SERVER, "s", requestFor("listUserPasskeys", [], ["user_1"]));
+    const response = await sendAll(
+      SERVER,
+      "s",
+      requestFor("listUserPasskeys", [], ["user_1"]),
+      signal,
+    );
 
     expect(Object.keys(Object(response.body))).toHaveLength(4);
   });
