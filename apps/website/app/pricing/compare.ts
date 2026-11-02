@@ -189,11 +189,11 @@ export function compareGroups(catalog: Catalog): Group[] {
       title: "Authentication",
       rows: [
         ...subgroup(
-          "B2C · Consumer apps",
+          "Sign-in methods",
           catalog.core.authentication.map((label) => ({ label, cells: each(() => YES) })),
         ),
-        ...subgroup("B2B · Business apps", [meterRow("sso_users"), meterRow("directory_users")]),
-        ...subgroup("M2M · Services & agents", [meterRow("m2m_tokens")]),
+        ...subgroup("Enterprise connections", [meterRow("sso_users"), meterRow("directory_users")]),
+        ...subgroup("Machine-to-machine", [meterRow("m2m_tokens")]),
       ],
     },
     {

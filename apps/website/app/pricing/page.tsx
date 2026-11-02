@@ -328,23 +328,24 @@ function Questions({ catalog }: { catalog: Catalog }) {
       answer: (
         <>
           <p>
-            One plan covers B2C, B2B and M2M together: platform, sign-in, security, audit and
-            support are shared across use cases.
+            One plan covers consumer apps, business apps and services together. Rows are grouped by
+            what they are, not by who uses them: every sign-in method, MFA and protection work the
+            same for consumers and business users.
           </p>
           <p>
-            <strong>Consumer apps:</strong> users, sign-in and required MFA stay free. Capacity,
-            delivery and branding are under Platform; threat intelligence and conditional policies
-            under Security & policies.
+            <strong>Consumer apps:</strong> users, every sign-in method and required MFA stay free.
+            Capacity, delivery and branding are under Platform; threat intelligence and conditional
+            policies under Security & policies.
           </p>
           <p>
-            <strong>Business apps:</strong> customer organizations, core roles and required MFA stay
-            free. Your customers' SSO and directories are under Authentication; protection for users
-            who sign in without SSO, advanced policies and delegated administration under Security &
-            policies.
+            <strong>Business apps:</strong> customer organizations, core roles, every sign-in method
+            and required MFA stay free. Your customers' SSO and directories are under Enterprise
+            connections; protection for users who sign in without SSO, advanced policies and
+            delegated administration under Security & policies.
           </p>
           <p>
             <strong>Services and agents:</strong> service identities and credentials stay free.
-            Tokens are under Authentication, advanced authorization checks under Security &
+            Tokens are under Machine-to-machine, advanced authorization checks under Security &
             policies.
           </p>
         </>

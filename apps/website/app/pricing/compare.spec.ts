@@ -131,6 +131,13 @@ describe("free security and account-wide packages", () => {
     expect(words(intelligence.cells.pro)).toBe("10K / month included Then $0.003 per user");
   });
 
+  it("groups rows by what they are, never by who uses them", () => {
+    const titles = compareGroups(catalog)
+      .flatMap((group) => group.rows)
+      .flatMap((row) => (row.subgroup ? [row.subgroup.title] : []));
+    for (const title of titles) expect(title).not.toMatch(/B2C|B2B|consumer|business/i);
+  });
+
   it("prices capacity steps and regions outside the EU on Pro, never on Free", () => {
     const capacity = rows.find((entry) => entry.source === "capacity_step")!;
     expect(capacity.cells.free.kind).toBe("no");
