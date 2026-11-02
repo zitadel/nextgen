@@ -1,5 +1,14 @@
 # @zitadel/sdk-vue
 
+## 0.5.0
+
+### Patch Changes
+
+- Updated dependencies [[`cbab822`](https://github.com/zitadel/nextgen/commit/cbab822b77f9c9dc5d53cf985a983df95cabfa99)]:
+  - @zitadel/api@0.5.0
+  - @zitadel/components@0.5.0
+  - @zitadel/sdk-core@0.5.0
+
 ## 0.4.0
 
 ### Patch Changes
