@@ -188,10 +188,11 @@ export function compareGroups(catalog: Catalog): Group[] {
       id: "authentication",
       title: "Authentication",
       rows: [
-        ...subgroup(
-          "B2C · Consumer apps",
-          catalog.core.authentication.map((label) => ({ label, cells: each(() => YES) })),
-        ),
+        ...subgroup("B2C · Consumer apps", [
+          ...catalog.core.authentication.map((label) => ({ label, cells: each(() => YES) })),
+          meterRow("bot_checks"),
+          meterRow("protected_users"),
+        ]),
         ...subgroup("B2B · Business apps", [meterRow("sso_users"), meterRow("directory_users")]),
         ...subgroup("M2M · Services & agents", [meterRow("m2m_tokens")]),
       ],
@@ -201,7 +202,6 @@ export function compareGroups(catalog: Catalog): Group[] {
       title: "Security & policies",
       rows: [
         ...catalog.core.security.map((label) => ({ label, cells: each(() => YES) })),
-        meterRow("bot_checks"),
         meterRow("authz_checks"),
         ...packageRows("governance"),
       ],

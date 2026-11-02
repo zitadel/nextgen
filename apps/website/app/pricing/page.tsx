@@ -11,6 +11,7 @@ import {
   dollars,
   licensedPrice,
   type Meter,
+  meterPrice,
   mostPer,
   readCatalog,
   regionList,
@@ -122,7 +123,7 @@ function CloudPlans({ catalog }: { catalog: Catalog }) {
         line="For building and launching, no card needed."
         features={[
           "Unlimited users, teams and console seats",
-          "Passkeys, TOTP MFA and basic require-MFA",
+          "Passkeys, TOTP and required MFA",
           "No active-user upgrade thresholds",
           `Every ${free.regions.scope} in the ${regionList(free.regions.selection)}`,
           `${free.event_retention_days} days of audit events`,
@@ -306,6 +307,7 @@ function Questions({ catalog }: { catalog: Catalog }) {
   const compliance = catalog.packages.find((entry) => entry.id === "compliance");
   const step = catalog.licensed.find((line) => line.id === "capacity_step");
   const region = catalog.licensed.find((line) => line.id === "region");
+  const protection = catalog.meters.find((meter) => meter.id === "protected_users");
   const [unitName, unitMeaning] = catalog.self_hosted.unit.split(": ");
   const questions: { question: string; answer: ReactNode }[] = [
     ...(catalog.status === "proposal"
@@ -330,11 +332,12 @@ function Questions({ catalog }: { catalog: Catalog }) {
             support are shared across use cases.
           </p>
           <p>
-            <strong>Consumer apps:</strong> users, sign-in and basic MFA stay free. Delivery and
-            branding are under Platform, advanced policies and bot checks under Security & policies.
+            <strong>Consumer apps:</strong> users, sign-in and required MFA stay free. Bot checks
+            and adaptive sign-in protection are under Authentication; capacity, delivery and
+            branding under Platform; conditional policies under Security & policies.
           </p>
           <p>
-            <strong>Business apps:</strong> customer organizations, core roles and basic MFA stay
+            <strong>Business apps:</strong> customer organizations, core roles and required MFA stay
             free. Your customers' SSO and directories are under Authentication, advanced policies
             and delegated administration under Security & policies.
           </p>
@@ -364,12 +367,25 @@ function Questions({ catalog }: { catalog: Catalog }) {
       ),
     },
     {
-      question: "Do more users or basic MFA trigger an upgrade?",
+      question: "Why are users and MFA free?",
       answer: (
-        <p>
-          {catalog.core.billing} Basic require-MFA enforcement is included, with no per-user or
-          per-policy fee.
-        </p>
+        <>
+          <p>{catalog.core.billing}</p>
+          <p>
+            Requiring MFA for everyone is included on every plan, with no per-user or per-policy
+            fee. A charge would push apps to enforce MFA in their own code, and CISA's{" "}
+            <a
+              href="https://www.cisa.gov/securebydesign"
+              className="text-text-primary underline underline-offset-4"
+            >
+              Secure by Design
+            </a>{" "}
+            principles count it as a hidden tax.
+            {protection?.price?.model === "per_unit" && protection.allowance
+              ? ` ${protection.label} goes further: it scores each sign-in's risk and steps up or blocks it, for ${meterPrice(protection)[0]} past ${count(protection.allowance)} a month.`
+              : ""}
+          </p>
+        </>
       ),
     },
     {

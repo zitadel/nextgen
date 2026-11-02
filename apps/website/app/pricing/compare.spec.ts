@@ -109,10 +109,23 @@ describe("free security and account-wide packages", () => {
     for (const plan of PLANS) expect(words(mau!.cells[plan])).toBe("Never billed");
   });
 
+  it("shows consumer apps what they pay for beside what is free", () => {
+    const authentication = compareGroups(catalog).find(
+      (group) => group.id === "authentication",
+    )!.rows;
+    const start = authentication.findIndex((row) => row.subgroup?.title === "B2C · Consumer apps");
+    const end = authentication.findIndex((row, index) => index > start && row.subgroup);
+    const b2c = authentication.slice(start, end);
+    expect(b2c.map((row) => row.source).filter(Boolean)).toEqual(["bot_checks", "protected_users"]);
+    const protection = b2c.find((row) => row.source === "protected_users")!;
+    expect(words(protection.cells.free)).toBe("10K / month included");
+    expect(words(protection.cells.pro)).toBe("10K / month included Then $0.003 per user");
+  });
+
   it("prices capacity steps and regions outside the EU on Pro, never on Free", () => {
     const capacity = rows.find((entry) => entry.source === "capacity_step")!;
     expect(capacity.cells.free.kind).toBe("no");
-    expect(words(capacity.cells.pro)).toBe("$2,000 a month per step Adds 150M requests a month");
+    expect(words(capacity.cells.pro)).toBe("$700 a month per step Adds 50M requests a month");
     expect(words(capacity.cells.enterprise)).toBe("Custom");
     const region = rows.find((entry) => entry.source === "region")!;
     expect(region.cells.free.kind).toBe("no");
