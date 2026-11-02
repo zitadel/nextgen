@@ -307,7 +307,7 @@ function Questions({ catalog }: { catalog: Catalog }) {
   const compliance = catalog.packages.find((entry) => entry.id === "compliance");
   const step = catalog.licensed.find((line) => line.id === "capacity_step");
   const region = catalog.licensed.find((line) => line.id === "region");
-  const protection = catalog.meters.find((meter) => meter.id === "protected_users");
+  const intelligence = catalog.meters.find((meter) => meter.id === "threat_intel_users");
   const [unitName, unitMeaning] = catalog.self_hosted.unit.split(": ");
   const questions: { question: string; answer: ReactNode }[] = [
     ...(catalog.status === "proposal"
@@ -333,8 +333,8 @@ function Questions({ catalog }: { catalog: Catalog }) {
           </p>
           <p>
             <strong>Consumer apps:</strong> users, sign-in and required MFA stay free. Capacity,
-            delivery and branding are under Platform; adaptive sign-in protection and conditional
-            policies under Security & policies.
+            delivery and branding are under Platform; threat intelligence and conditional policies
+            under Security & policies.
           </p>
           <p>
             <strong>Business apps:</strong> customer organizations, core roles and required MFA stay
@@ -381,9 +381,10 @@ function Questions({ catalog }: { catalog: Catalog }) {
             >
               Secure by Design
             </a>{" "}
-            principles count it as a hidden tax.
-            {protection?.price?.model === "per_unit" && protection.allowance
-              ? ` ${protection.label} goes further: it scores each sign-in's risk and steps up or blocks it, for ${meterPrice(protection)[0]} past ${count(protection.allowance)} a month.`
+            principles count it as a hidden tax. Asking for MFA only when a sign-in looks risky is
+            free too.
+            {intelligence?.price?.model === "per_unit" && intelligence.allowance
+              ? ` ${intelligence.label} adds feeds Zitadel licenses, IP reputation and leaked credentials, for ${meterPrice(intelligence)[0]} past ${count(intelligence.allowance)} a month.`
               : ""}
           </p>
         </>
@@ -403,12 +404,13 @@ function Questions({ catalog }: { catalog: Catalog }) {
             your own keys, or the bot verdict of your app's edge, such as Vercel BotID or
             Cloudflare. That provider bills you directly, if it charges, and Zitadel adds nothing.
           </p>
-          {protection && (
-            <p>
-              {protection.label} is the paid layer: it reads those verdicts with other signals to
-              decide when a sign-in needs a step-up or a block.
-            </p>
-          )}
+          <p>
+            Zitadel's free risk checks combine those verdicts with the device, failed attempts,
+            location and network to show a challenge, ask for MFA or block a sign-in.
+            {intelligence
+              ? ` ${intelligence.label} is the paid add-on: feeds Zitadel licenses.`
+              : ""}
+          </p>
         </>
       ),
     },

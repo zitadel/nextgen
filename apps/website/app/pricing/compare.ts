@@ -202,7 +202,7 @@ export function compareGroups(catalog: Catalog): Group[] {
       rows: [
         ...subgroup("Protection", [
           ...catalog.core.security.map((label) => ({ label, cells: each(() => YES) })),
-          meterRow("protected_users"),
+          meterRow("threat_intel_users"),
         ]),
         ...subgroup("Policies", [meterRow("authz_checks"), ...packageRows("governance")]),
       ],
