@@ -17,7 +17,6 @@ async function git(cwd: string, args: string[]): Promise<string> {
 beforeEach(isolateGit);
 
 afterEach(async () => {
-  vi.unstubAllEnvs();
   await scratch.cleanup();
 });
 
@@ -128,7 +127,8 @@ describe("Git", () => {
     vi.stubEnv("LC_ALL", "de_DE.UTF-8");
     vi.stubEnv("PATH", bin);
 
-    await expect(git(await scratch.directory(), ["log"])).rejects.toThrow(/^de_DE\.UTF-8$/);
+    // Unanchored: bash as /bin/sh warns first where de_DE is not installed.
+    await expect(git(await scratch.directory(), ["log"])).rejects.toThrow(/de_DE\.UTF-8$/);
   });
 
   it("throws a GitDidNotStartError when there is no git on PATH", async () => {

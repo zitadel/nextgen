@@ -1,4 +1,4 @@
-import type { ZitadelClient } from "@zitadel/api/client";
+import type { ZitadelClient } from "../api-client";
 
 import type { SuggestedCommand } from "../suggestion";
 import type { ConfigurationBundle } from "./bundle";
@@ -68,18 +68,12 @@ export interface Step {
  * release → before-deploy steps → create deployment.
  */
 export async function runSteps(steps: readonly Step[], ctx: StepContext): Promise<StepReport> {
-  let report: StepReport = {};
-  for (const step of steps) {
-    if (!step.runsFor.includes(ctx.mode)) {
-      continue;
-    }
-    if (ctx.dryRun && step.writes) {
-      continue;
+  return steps.reduce<Promise<StepReport>>(async (previous, step) => {
+    const report = await previous;
+    if (!step.runsFor.includes(ctx.mode) || (ctx.dryRun && step.writes)) {
+      return report;
     }
     const reported = await step.run(ctx);
-    if (reported) {
-      report = { ...report, ...reported };
-    }
-  }
-  return report;
+    return reported ? { ...report, ...reported } : report;
+  }, Promise.resolve({}));
 }

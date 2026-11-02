@@ -5,6 +5,7 @@ import {
   NetworkError,
   type NetworkErrorReason,
 } from "@zitadel/api/runtime/fetch";
+import { isObject } from "./json";
 import type { SuggestedCommand } from "./suggestion";
 
 /**
@@ -245,23 +246,22 @@ export function toZitadelError(error: unknown): ZitadelError {
  * the serialiser's doing rather than part of the contract, and a reader that
  * insisted on it would go silent the day it goes away.
  */
-function listedInDetails(body: unknown, key: "fields" | "missing"): string[] {
-  const seen = new Set<string>();
-  let node: unknown = body;
-  for (let depth = 0; depth < 4 && isObject(node); depth += 1) {
-    const listed = (node as Record<string, unknown>)[key];
-    if (Array.isArray(listed)) {
-      for (const name of listed) {
-        if (typeof name === "string" && name !== "") seen.add(name);
-      }
-    }
-    node = (node as { details?: unknown }).details;
+function listedInDetails(
+  body: unknown,
+  key: "fields" | "missing",
+  seen = new Set<string>(),
+  depth = 0,
+): string[] {
+  if (depth >= 4 || !isObject(body)) {
+    return [...seen];
   }
-  return [...seen];
-}
-
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
+  const listed = (body as Record<string, unknown>)[key];
+  if (Array.isArray(listed)) {
+    for (const name of listed) {
+      if (typeof name === "string" && name !== "") seen.add(name);
+    }
+  }
+  return listedInDetails((body as { details?: unknown }).details, key, seen, depth + 1);
 }
 
 /**
@@ -300,7 +300,8 @@ export function isErrno(error: unknown, code: string): boolean {
   return typeof error === "object" && error !== null && "code" in error && error.code === code;
 }
 
-function errorMessage(error: unknown): string {
+/** The message of a caught value, whatever it is. */
+export function errorMessage(error: unknown): string {
   if (error instanceof Error) {
     return error.message;
   }

@@ -1,10 +1,11 @@
 import { execFile } from "node:child_process";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { promisify } from "node:util";
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, vi } from "vitest";
+
+import { it } from "../../../../helpers/fixtures";
 
 import type { StepContext } from "../../../../../src/lib/release/pipeline";
 import { diffStep } from "../../../../../src/lib/release/steps/diff";
@@ -19,34 +20,39 @@ type Live = {
   dirty?: boolean;
 };
 
-let cwd: string;
-let written: string[];
+const written: string[] = [];
+const asked: unknown[] = [];
 
 beforeEach(async () => {
-  cwd = await mkdtemp(join(tmpdir(), "zitadel-diff-step-"));
-  written = [];
+  written.length = 0;
+  asked.length = 0;
   vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
     written.push(String(chunk));
     return true;
   });
 });
 
-afterEach(async () => {
-  vi.restoreAllMocks();
-  await rm(cwd, { recursive: true, force: true });
-});
-
-function ctx(live: Live[], json = false, env: Record<string, string> = {}): StepContext {
+function ctx(
+  cwd: string,
+  live: Live[],
+  json = false,
+  env: Record<string, string> = {},
+): StepContext {
   return {
     cwd,
     client: {
-      listDeployments: async () => ({
-        deployments: live.map((deployment) => ({
-          targets: deployment.targets,
-          release_id: deployment.release ?? "rel_1",
-          release: { metadata: { git_sha: deployment.sha, git_dirty: deployment.dirty ?? false } },
-        })),
-      }),
+      listDeployments: {
+        all: async (params: unknown) => {
+          asked.push(params);
+          return live.map((deployment) => ({
+            targets: deployment.targets,
+            release_id: deployment.release ?? "rel_1",
+            release: {
+              metadata: { git_sha: deployment.sha, git_dirty: deployment.dirty ?? false },
+            },
+          }));
+        },
+      },
     } as never,
     projectId: "proj_1",
     env,
@@ -63,7 +69,7 @@ function ctx(live: Live[], json = false, env: Record<string, string> = {}): Step
 }
 
 /** Commits a user schema in `cwd`, as the live release was built, and returns the commit. */
-async function liveCommit(): Promise<string> {
+async function liveCommit(cwd: string): Promise<string> {
   const git = (args: string[]) => run("git", args, { cwd });
   await mkdir(join(cwd, ".zitadel", "schemas"), { recursive: true });
   await writeFile(join(cwd, ".zitadel", "schemas", "user.json"), '{ "type": "object" }\n');
@@ -76,7 +82,7 @@ async function liveCommit(): Promise<string> {
 }
 
 /** Edits the committed user schema, as a developer would before deploying. */
-function editSchema(): Promise<void> {
+function editSchema(cwd: string): Promise<void> {
   return writeFile(join(cwd, ".zitadel", "schemas", "user.json"), '{ "type": "string" }\n');
 }
 
@@ -85,33 +91,41 @@ const SECOND_PRIMARY = { origin: "https://www.acme.com", expires_at: null };
 const PREVIEW = { origin: "https://pr-7.acme.com", expires_at: "2026-12-01T00:00:00Z" };
 
 describe("diffStep", () => {
-  it("says there is nothing to diff against before the first deploy", async () => {
-    await diffStep.run(ctx([]));
+  it("reads what is live, with the release each deployment serves", async ({ dir: cwd }) => {
+    await diffStep.run(ctx(cwd, []));
+
+    expect(asked).toEqual([{ project_id: "proj_1", live: true, expand: ["release"] }]);
+  });
+
+  it("says there is nothing to diff against before the first deploy", async ({ dir: cwd }) => {
+    await diffStep.run(ctx(cwd, []));
 
     expect(written.join("")).toContain("No diff available: nothing is deployed yet");
   });
 
-  it("says so when the live commit is not in this repository", async () => {
-    await diffStep.run(ctx([{ targets: [PRIMARY], sha: "0123456789abcdef" }]));
+  it("says so when the live commit is not in this repository", async ({ dir: cwd }) => {
+    await diffStep.run(ctx(cwd, [{ targets: [PRIMARY], sha: "0123456789abcdef" }]));
 
     expect(written.join("")).toContain("0123456789ab is not in this repository's history");
   });
 
-  it("refuses to diff against a release built from an uncommitted tree", async () => {
-    await diffStep.run(ctx([{ targets: [PRIMARY], sha: "0123456789abcdef", dirty: true }]));
+  it("refuses to diff against a release built from an uncommitted tree", async ({ dir: cwd }) => {
+    await diffStep.run(ctx(cwd, [{ targets: [PRIMARY], sha: "0123456789abcdef", dirty: true }]));
 
     expect(written.join("")).toContain("No reliable diff available");
   });
 
-  it("names the uncommitted baseline's commit, so the reader can check it", async () => {
-    await diffStep.run(ctx([{ targets: [PRIMARY], sha: "0123456789abcdef", dirty: true }]));
+  it("names the uncommitted baseline's commit, so the reader can check it", async ({
+    dir: cwd,
+  }) => {
+    await diffStep.run(ctx(cwd, [{ targets: [PRIMARY], sha: "0123456789abcdef", dirty: true }]));
 
     expect(written.join("")).toContain("0123456789ab");
   });
 
-  it("never takes a live preview as the baseline", async () => {
+  it("never takes a live preview as the baseline", async ({ dir: cwd }) => {
     await diffStep.run(
-      ctx([
+      ctx(cwd, [
         { targets: [PREVIEW], sha: "ffffffffffffffff" },
         { targets: [PRIMARY], sha: "0123456789abcdef" },
       ]),
@@ -120,9 +134,9 @@ describe("diffStep", () => {
     expect(written.join("")).toContain("0123456789ab");
   });
 
-  it("says so when the primary origins serve different releases", async () => {
+  it("says so when the primary origins serve different releases", async ({ dir: cwd }) => {
     await diffStep.run(
-      ctx([
+      ctx(cwd, [
         { targets: [PRIMARY], sha: "0123456789abcdef", release: "rel_2" },
         { targets: [SECOND_PRIMARY], sha: "fedcba9876543210", release: "rel_1" },
       ]),
@@ -131,35 +145,35 @@ describe("diffStep", () => {
     expect(written.join("")).toContain("The primary origins serve 2 different releases");
   });
 
-  it("prints the diff against the live commit", async () => {
-    const sha = await liveCommit();
-    await editSchema();
+  it("prints the diff against the live commit", async ({ dir: cwd }) => {
+    const sha = await liveCommit(cwd);
+    await editSchema(cwd);
 
-    await diffStep.run(ctx([{ targets: [PRIMARY], sha }]));
+    await diffStep.run(ctx(cwd, [{ targets: [PRIMARY], sha }]));
 
     expect(written.join("")).toContain('+{ "type": "string" }');
   });
 
-  it("says when nothing changed since the live commit", async () => {
-    const sha = await liveCommit();
+  it("says when nothing changed since the live commit", async ({ dir: cwd }) => {
+    const sha = await liveCommit(cwd);
 
-    await diffStep.run(ctx([{ targets: [PRIMARY], sha }]));
+    await diffStep.run(ctx(cwd, [{ targets: [PRIMARY], sha }]));
 
     expect(written.join("")).toContain(`No changes to .zitadel/ since ${sha.slice(0, 12)}`);
   });
 
   describe("--json", () => {
-    it("writes nothing to stdout", async () => {
-      await diffStep.run(ctx([], true));
+    it("writes nothing to stdout", async ({ dir: cwd }) => {
+      await diffStep.run(ctx(cwd, [], true));
 
       expect(written).toEqual([]);
     });
 
-    it("reports each changed file against the live commit", async () => {
-      const sha = await liveCommit();
-      await editSchema();
+    it("reports each changed file against the live commit", async ({ dir: cwd }) => {
+      const sha = await liveCommit(cwd);
+      await editSchema(cwd);
 
-      const report = await diffStep.run(ctx([{ targets: [PRIMARY], sha }], true));
+      const report = await diffStep.run(ctx(cwd, [{ targets: [PRIMARY], sha }], true));
 
       expect(report).toEqual({
         diff: {
@@ -175,16 +189,18 @@ describe("diffStep", () => {
       });
     });
 
-    it("reports no files when nothing changed since the live commit", async () => {
-      const sha = await liveCommit();
+    it("reports no files when nothing changed since the live commit", async ({ dir: cwd }) => {
+      const sha = await liveCommit(cwd);
 
-      const report = await diffStep.run(ctx([{ targets: [PRIMARY], sha }], true));
+      const report = await diffStep.run(ctx(cwd, [{ targets: [PRIMARY], sha }], true));
 
       expect(report).toEqual({ diff: { against: sha, files: [] } });
     });
 
-    it("shows a variable reference as written, never the value it resolves to", async () => {
-      const sha = await liveCommit();
+    it("shows a variable reference as written, never the value it resolves to", async ({
+      dir: cwd,
+    }) => {
+      const sha = await liveCommit(cwd);
       await mkdir(join(cwd, ".zitadel", "idps"), { recursive: true });
       await writeFile(
         join(cwd, ".zitadel", "idps", "google.json"),
@@ -192,7 +208,9 @@ describe("diffStep", () => {
       );
 
       const report = await diffStep.run(
-        ctx([{ targets: [PRIMARY], sha }], true, { GOOGLE_CLIENT_SECRET: "the-client-secret" }),
+        ctx(cwd, [{ targets: [PRIMARY], sha }], true, {
+          GOOGLE_CLIENT_SECRET: "the-client-secret",
+        }),
       );
 
       const reported = JSON.stringify(report);
@@ -200,11 +218,14 @@ describe("diffStep", () => {
       expect(reported).not.toContain("the-client-secret");
     });
 
-    it("notes that the primary origins serve different releases beside the diff", async () => {
-      const sha = await liveCommit();
+    it("notes that the primary origins serve different releases beside the diff", async ({
+      dir: cwd,
+    }) => {
+      const sha = await liveCommit(cwd);
 
       const report = await diffStep.run(
         ctx(
+          cwd,
           [
             { targets: [PRIMARY], sha, release: "rel_2" },
             { targets: [SECOND_PRIMARY], sha: "fedcba9876543210", release: "rel_1" },
@@ -222,8 +243,8 @@ describe("diffStep", () => {
       });
     });
 
-    it("reports why there is no diff before the first deploy", async () => {
-      const report = await diffStep.run(ctx([], true));
+    it("reports why there is no diff before the first deploy", async ({ dir: cwd }) => {
+      const report = await diffStep.run(ctx(cwd, [], true));
 
       expect(report).toEqual({
         diff: {
@@ -234,9 +255,9 @@ describe("diffStep", () => {
       });
     });
 
-    it("reports the live commit it cannot find in this repository", async () => {
+    it("reports the live commit it cannot find in this repository", async ({ dir: cwd }) => {
       const report = await diffStep.run(
-        ctx([{ targets: [PRIMARY], sha: "0123456789abcdef" }], true),
+        ctx(cwd, [{ targets: [PRIMARY], sha: "0123456789abcdef" }], true),
       );
 
       expect(report).toEqual({
@@ -248,9 +269,9 @@ describe("diffStep", () => {
       });
     });
 
-    it("reports no diff against a release built from an uncommitted tree", async () => {
+    it("reports no diff against a release built from an uncommitted tree", async ({ dir: cwd }) => {
       const report = await diffStep.run(
-        ctx([{ targets: [PRIMARY], sha: "0123456789abcdef", dirty: true }], true),
+        ctx(cwd, [{ targets: [PRIMARY], sha: "0123456789abcdef", dirty: true }], true),
       );
 
       expect(report).toEqual({

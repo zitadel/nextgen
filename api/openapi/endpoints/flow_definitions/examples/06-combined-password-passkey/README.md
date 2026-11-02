@@ -28,7 +28,7 @@ folded in here.
   verify), and a navigation CTA (`login` → `identifier`).
 - **Navigation CTAs.** `identifier` adds `register`, `register` adds `login`.
   Plain step transitions — neither is a reserved outcome — that let users hop
-  sub-flows by intent rather than via the flip table.
+  sub-flows by intent rather than through the automatic switch.
 - **Profile field collection on the password branch.** `register` collects
   `email + name`; `register-password` collects `password + phoneNumber`. The
   `create_user` writer iterates `state.CollectedData` and persists every

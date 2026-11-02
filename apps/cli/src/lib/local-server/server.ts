@@ -2,8 +2,10 @@ import { join } from "node:path";
 
 import consola from "consola";
 
-import { ZitadelError } from "../errors";
+import { Consent } from "../consent";
+import { ZitadelError, errorMessage } from "../errors";
 import { unscopedCommand } from "../suggestion";
+import { currentUser } from "../uidgid";
 import type { ResolvedEnv } from "./env-vars";
 import { assertDockerAvailable, startFailure } from "./internal/failures";
 import { BinaryLauncher, type StopBinaryRuntimeResult } from "./internal/binary-launcher";
@@ -219,7 +221,8 @@ export class LocalServer {
    * place of a taken one, or `undefined` when they are all taken too.
    */
   static async nextFreePort(port: number): Promise<number | undefined> {
-    for (let next = port + 1; next <= Math.min(port + 20, 65535); next += 1) {
+    const count = Math.max(0, Math.min(port + 20, 65535) - port);
+    for (const next of Array.from({ length: count }, (_, index) => port + 1 + index)) {
       if (await LocalServer.isPortFree(next)) {
         return next;
       }
@@ -371,7 +374,7 @@ export class LocalServer {
           containerName: localContainerName(this.cwd),
           image,
           dataDir: paths.dataDir,
-          identity: await ensureContainerIdentity(this.cwd, DockerLauncher.currentUser()),
+          identity: await ensureContainerIdentity(this.cwd, currentUser()),
           env: config.env,
           userFile: config.userFile,
         }),
@@ -401,7 +404,7 @@ export class LocalServer {
       try {
         container = await DockerLauncher.inspect(runtime.container_name);
       } catch (error) {
-        dockerError = error instanceof Error ? error.message : String(error);
+        dockerError = errorMessage(error);
       }
     }
     const healthy = runtime ? await checkLocalServerHealth(runtime.server_url) : false;
@@ -434,9 +437,11 @@ export class LocalServer {
    * Stops the directory's server and deletes its data and its record. The
    * server is stopped first so its database is not deleted from under it. The
    * local admin credential is kept: deleting it would leave a start that cannot
-   * sign in, because the server only imports the admin once.
+   * sign in, because the server only imports the admin once. The data cannot
+   * be recovered, so it takes the consent `reset` asked for.
    */
-  async reset(): Promise<StopReport> {
+  async reset(consent: Consent): Promise<StopReport> {
+    Consent.assert(consent);
     const report = await this.halt();
     await removeLocalData(this.cwd);
     await removeRuntimeMetadata(this.cwd);

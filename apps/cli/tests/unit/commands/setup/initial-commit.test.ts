@@ -185,13 +185,9 @@ describe("ensureInitialCommit", () => {
       vi.stubEnv("GIT_CONFIG_SYSTEM", "/dev/null");
       vi.stubEnv("GIT_AUTHOR_NAME", "");
       vi.stubEnv("GIT_AUTHOR_EMAIL", "");
-      try {
-        const outcome = await ensureInitialCommit(cwd);
+      const outcome = await ensureInitialCommit(cwd);
 
-        expect(outcome).toMatchObject({ kind: "created", guessedIdentity: true });
-      } finally {
-        vi.unstubAllEnvs();
-      }
+      expect(outcome).toMatchObject({ kind: "created", guessedIdentity: true });
     });
 
     it("commits even when the machine has no git identity configured", async () => {
@@ -207,13 +203,9 @@ describe("ensureInitialCommit", () => {
       ]) {
         vi.stubEnv(name, undefined as unknown as string);
       }
-      try {
-        const outcome = await ensureInitialCommit(cwd);
+      const outcome = await ensureInitialCommit(cwd);
 
-        expect(outcome).toMatchObject({ kind: "created", guessedIdentity: true });
-      } finally {
-        vi.unstubAllEnvs();
-      }
+      expect(outcome).toMatchObject({ kind: "created", guessedIdentity: true });
     });
 
     it("reports there was nothing to commit when only secrets are there", async () => {
@@ -558,17 +550,13 @@ describe("ensureInitialCommit when git cannot run", () => {
       const cwd = await aProject();
       const binDir = await aBrokenGit();
       vi.stubEnv("PATH", binDir);
-      try {
-        const outcome = await ensureInitialCommit(cwd);
+      const outcome = await ensureInitialCommit(cwd);
 
-        expect(outcome).toEqual({
-          kind: "unavailable",
-          reason: "git: not available",
-          createdRepository: false,
-        });
-      } finally {
-        vi.unstubAllEnvs();
-      }
+      expect(outcome).toEqual({
+        kind: "unavailable",
+        reason: "git: not available",
+        createdRepository: false,
+      });
     });
   });
 });
@@ -598,15 +586,11 @@ describe("ensureInitialCommit when git explains at length", () => {
     );
     await chmod(join(binDir, "git"), 0o755);
     vi.stubEnv("PATH", binDir);
-    try {
-      expect(await ensureInitialCommit(cwd)).toEqual({
-        kind: "unavailable",
-        reason: "fatal: one",
-        createdRepository: false,
-      });
-    } finally {
-      vi.unstubAllEnvs();
-    }
+    expect(await ensureInitialCommit(cwd)).toEqual({
+      kind: "unavailable",
+      reason: "fatal: one",
+      createdRepository: false,
+    });
   });
 });
 
@@ -713,12 +697,8 @@ describe("ensureInitialCommit when git warns before it fails", () => {
     );
     await chmod(join(binDir, "git"), 0o755);
     vi.stubEnv("PATH", binDir);
-    try {
-      expect(await ensureInitialCommit(cwd)).toMatchObject({
-        reason: "fatal: adding files failed",
-      });
-    } finally {
-      vi.unstubAllEnvs();
-    }
+    expect(await ensureInitialCommit(cwd)).toMatchObject({
+      reason: "fatal: adding files failed",
+    });
   });
 });

@@ -1,6 +1,6 @@
-import { spawnSync } from "node:child_process";
+import { execaSync } from "execa";
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { type MockInstance, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AbstractCLIScaffolder } from "../../src/lib/orca/scaffolders/cli";
 import {
@@ -34,21 +34,28 @@ export interface NodeEnginesCase {
   readonly refused: ReadonlyArray<string>;
 }
 
-const mockSpawn = vi.mocked(spawnSync);
+const mockSpawn = vi.mocked(execaSync) as unknown as MockInstance<
+  (
+    file: string,
+    args: ReadonlyArray<string>,
+    options: Record<string, unknown>,
+  ) => ReturnType<typeof execaSync>
+>;
 
-function spawnResult(status: number, stdout = ""): ReturnType<typeof spawnSync> {
-  return { status, stderr: "", stdout, pid: 1, output: [], signal: null } as ReturnType<
-    typeof spawnSync
+function spawnResult(status: number, stdout = ""): ReturnType<typeof execaSync> {
+  return { exitCode: status, failed: status !== 0, stderr: "", stdout } as ReturnType<
+    typeof execaSync
   >;
 }
 
 /** A spawn npm's lookup never finished: killed at the timeout, with no exit status. */
-function timedOut(): ReturnType<typeof spawnSync> {
+function timedOut(): ReturnType<typeof execaSync> {
   return {
     ...spawnResult(0),
-    status: null,
+    exitCode: undefined,
+    failed: true,
+    timedOut: true,
     signal: "SIGTERM",
-    error: Object.assign(new Error("spawn npm ETIMEDOUT"), { code: "ETIMEDOUT" }),
   };
 }
 
@@ -62,9 +69,9 @@ export function scaffoldingCalls(): ReadonlyArray<unknown[]> {
 }
 
 /** npm answers the engine lookup with `answer`, and every other command succeeds. */
-function lookupAnswers(answer: ReturnType<typeof spawnSync>): void {
+function lookupAnswers(answer: ReturnType<typeof execaSync>): void {
   mockSpawn.mockImplementation((command, args) =>
-    command === "npm" && args?.[0] === "view" ? answer : spawnResult(0),
+    command === "npm" && args[0] === "view" ? answer : spawnResult(0),
   );
 }
 
@@ -76,7 +83,7 @@ function npmPublishes(range: string): void {
  * The Node check every scaffolder that runs a framework CLI carries, as one
  * matrix: each scaffolder's test file calls it with its own CLI's package,
  * fallback range and sample Node versions, so the test names and wording are
- * the same everywhere. The calling file mocks `node:child_process`.
+ * the same everywhere. The calling file mocks `execa`.
  */
 export function describeNodeEngines(c: NodeEnginesCase): void {
   describe("Node check", () => {

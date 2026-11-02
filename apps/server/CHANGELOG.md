@@ -1,5 +1,51 @@
 # @zitadel/server
 
+## 0.4.0
+
+### Minor Changes
+
+- [#2359](https://github.com/zitadel/nextgen/pull/2359) [`eb363f0`](https://github.com/zitadel/nextgen/commit/eb363f04586c594ae893253a6089b21e6e2e390a) - The SDKs, the login components, the console and the `zitadel` CLI now call the API under `/api/v1`, where the server serves it. `@zitadel/api`'s client puts `/api/v1` after the proxy path or server origin it is given, and keeps a single prefix when the origin already ends in it. `zitadel api` takes a path with or without the prefix and shows the full URL with it. A call the server knows no operation for now says the server may be older than the client.
+  
+  **Breaking:** clients from this release need a server that serves `/api/v1`, so upgrade a self-hosted server before the apps that call it. In a single-page app set up by an earlier `zitadel setup`, run `zitadel doctor --fix`: the dev proxy it wrote adds the project secret only to the old path of the session exchange, so sign-in fails until it is updated, and `zitadel doctor` now fails on it. A production proxy you wrote for a single-page app must add the project secret to `POST /api/v1/sessions/exchange`. Until 1.0.0 the server also answers every operation at its old path, with a `Deprecation` header.
+
+- [#2335](https://github.com/zitadel/nextgen/pull/2335) [`02677c2`](https://github.com/zitadel/nextgen/commit/02677c2658d7287e88af9c35b03235f57492a396) - The console's release detail shows a pinned policy revision: a Policies group with the policy's settings summarised above the document the CLI publishes.
+
+- [#2447](https://github.com/zitadel/nextgen/pull/2447) [`3f4da33`](https://github.com/zitadel/nextgen/commit/3f4da3399a755ee7c39430844bbba598ffe00c79) - The user schema screen lists every revision of the schema, newest first and marked latest, and opens any of them read-only. An older revision says that users stay on the revision they were created on until they are migrated, and links the [migration guide](https://preview.zitadel.com/docs/guides/migrate-user-schema).
+
+- [#2398](https://github.com/zitadel/nextgen/pull/2398) [`26097dd`](https://github.com/zitadel/nextgen/commit/26097dd104c9b6fd6b9e8183921464b54f851a10) - Deleting a user who is the last active member of a project's owning team now fails with `409 proj.last_owner` and changes nothing. The message names the projects and says to add another member to that team, then retry. `details.details.project_ids` lists the same ids. Admin grants stay freely revocable, suspending or deactivating a user is still allowed, and a project whose owning team already has no active member is left alone.
+
+- [#2469](https://github.com/zitadel/nextgen/pull/2469) [`3b43b2c`](https://github.com/zitadel/nextgen/commit/3b43b2c3956fb4514cc5fde29bc9fe31bf0a493d) - The platform project is now deployed like any project: console sign-in is served a release of the configuration the server ships, including the recommended password policy (at least 15 characters, as `zitadel setup` writes), and a new server version's defaults reach the console on its first start.
+  
+  **Breaking:** the console signs in only at `server.public_base` (or a loopback address), and new console passwords need at least 15 characters. Set `server.public_base` to the address you use. Configuration set on the platform project through the API no longer applies: every start deploys what the server ships.
+
+- [#2477](https://github.com/zitadel/nextgen/pull/2477) [`eaa07c3`](https://github.com/zitadel/nextgen/commit/eaa07c36f3c76a963214faa8a230f3befa2cff9b) - `POST /teams/query` now accepts an omitted `project_id` and defaults to the credential's project, matching `POST /users/query`; explicit project IDs still use the existing authorization checks.
+
+- [#2480](https://github.com/zitadel/nextgen/pull/2480) [`2cd409d`](https://github.com/zitadel/nextgen/commit/2cd409d650e7ed792a768ff3ecf831518a4476ef) - The server prevents other sites from framing its pages, blocks MIME sniffing, limits referrers, and disables camera, microphone and geolocation while preserving passkeys and clipboard use. The console restricts scripts with Content-Security-Policy and logs violations through `/csp-report`. The hosted website and docs enforce script hashes, their 404 pages included.
+
+- [#2358](https://github.com/zitadel/nextgen/pull/2358) [`aa38122`](https://github.com/zitadel/nextgen/commit/aa3812211a789227b55fe276ff0fdc9e729ae8c8) - The server now answers the API under `/api/v1` (`POST /api/v1/projects`, `GET /api/v1/users/me`), so a proxy, firewall or rate limit in front of it can select API traffic by one prefix. The console, the IdP callbacks and the health probes `/livez` and `/readyz` stay at the root. Until 1.0.0 the server also answers every operation at its path without the prefix, and those responses carry a `Deprecation` header and a `Link` to the docs on the base URL: move clients that still call them to `/api/v1`, since 1.0.0 drops them.
+
+- [#2462](https://github.com/zitadel/nextgen/pull/2462) [`ff2f926`](https://github.com/zitadel/nextgen/commit/ff2f9266979a6882117a469ef2fbdd919f523655) - `server.console_origins` (`NEXTGEN_SERVER_CONSOLE_ORIGINS`) names more origins the console is reached at, beside `server.public_base`'s, and the console previews a project's login from each of them. On the hosted cloud, a preview's console now works on its deployment URL as well as on its branch alias.
+
+- [#2488](https://github.com/zitadel/nextgen/pull/2488) [`db05fbb`](https://github.com/zitadel/nextgen/commit/db05fbb18b1bf33251694382787be8445da608da) - The session cookie is now `__Host-zitadel_session`, which a browser accepts only from Zitadel's own host over https, so another site under the same domain can no longer plant a session. On `http://localhost` it is `zitadel_session`, so sign-in keeps working in Safari. An app's own, behind a server SDK or dev proxy, adds `_<project id>`.
+  
+  **Breaking:** every browser signs in again: cookies named `__nextgen_session` are no longer read. Update the server, the server SDKs, the CLI and `@zitadel/testing` together; an SDK from before this release keeps no session with this server, nor the other way round. In `@zitadel/testing`, `SESSION_COOKIE_NAME` is `__Host-zitadel_session`, and `sessionCookieName(projectId, url)` and the new `browserSessionCookieName(url)` name the cookies for the app's URL. `zitadel doctor` fails on the dev proxy of a single-page app set up before this release until `zitadel doctor --fix` updates it.
+
+### Patch Changes
+
+- [#2437](https://github.com/zitadel/nextgen/pull/2437) [`8680159`](https://github.com/zitadel/nextgen/commit/8680159e6e483f92119ab3a32cd053c184d85db4) - Project settings lists everyone with admin access to the project and how each holds it: as a member of the owning team, through a grant to a team they are in, or through a grant of their own. The person who claimed the project appears through the owning team. Removing a grant from someone who also has team access says they keep it.
+
+- [#2474](https://github.com/zitadel/nextgen/pull/2474) [`01ed930`](https://github.com/zitadel/nextgen/commit/01ed930a5a31665d01ad1190944535b56e63e6ae) - The console's sign-in page says what the console is: where you manage your Zitadel projects. It also says that your app's users sign in through your app, not there.
+
+- [#2529](https://github.com/zitadel/nextgen/pull/2529) [`7541fd7`](https://github.com/zitadel/nextgen/commit/7541fd79059226e1b13b0a040972bf3513dfbd88) - The console's user detail screen now counts and dates every passkey a user has registered, not only those on the first page.
+
+- [#2448](https://github.com/zitadel/nextgen/pull/2448) [`3dd0da3`](https://github.com/zitadel/nextgen/commit/3dd0da3ff84c0b0739982625924e1ba5897d2783) - The console's Users list shows the schema revision each user is on and narrows the list to one schema and to its latest or older revisions, or to one revision.
+
+- [#2551](https://github.com/zitadel/nextgen/pull/2551) [`d1fe7aa`](https://github.com/zitadel/nextgen/commit/d1fe7aae9db9b1635754f947942a017c6c4e244b) - Event webhook and stdout sinks no longer miss an event whose write commits after a later one, and paging `GET /events?order=asc` forward no longer skips it.
+
+- [#2499](https://github.com/zitadel/nextgen/pull/2499) [`f34a0a5`](https://github.com/zitadel/nextgen/commit/f34a0a58fa0694f34d0b0ad09a2593d405a112bd) - Prevent PostgreSQL migration deadlocks when multiple servers start while an index is being built concurrently.
+
+- [#2475](https://github.com/zitadel/nextgen/pull/2475) [`d1ab5d2`](https://github.com/zitadel/nextgen/commit/d1ab5d27431bb966b166b25cabd5b8f00295283a) - The API document names its session cookie's security scheme `sessionCookie` instead of `nextgenSession`, as the [API reference](https://preview.zitadel.com/docs/reference/api) now shows it. The id never goes over the wire; a client you generate from the document gets the new name, such as `SessionCookie` for `NextgenSession`.
+
 ## 0.3.0
 
 ### Minor Changes

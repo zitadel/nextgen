@@ -22,6 +22,7 @@ export default defineConfig({
     "runtime/base-url": "src/runtime/base-url.ts",
     "runtime/auth": "src/runtime/auth.ts",
     "runtime/fetch": "src/runtime/fetch.ts",
+    "runtime/paging": "src/runtime/paging.ts",
     "runtime/api-factory": "src/runtime/api-factory.ts",
     "runtime/config": "src/runtime/config.ts",
     "generated/model/index": "src/generated/model/index.ts",

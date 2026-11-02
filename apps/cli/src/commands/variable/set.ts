@@ -3,7 +3,6 @@ import { ApiError } from "@zitadel/api/runtime/fetch";
 
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope, nonBlankArg } from "../../lib/oclif";
 import { dryRunResult } from "../../lib/oclif/crud/shared";
-import { renderDetail } from "../../lib/oclif/crud/table";
 import { ZitadelError } from "../../lib/errors";
 import {
   assertVariableName,
@@ -20,6 +19,7 @@ import {
 } from "../../lib/variables";
 import { inShell } from "../../lib/suggestion";
 import { Promptable } from "../../lib/oclif/promptable";
+import { Tabulatable } from "../../lib/oclif/tabulatable";
 
 /**
  * `zitadel variable set NAME [VALUE]` — enter or replace one variable on the
@@ -36,7 +36,7 @@ import { Promptable } from "../../lib/oclif/promptable";
  * the primary kind only, removing any preview value so a preview never keeps a
  * plaintext copy. `--preview` writes the preview kind alone.
  */
-export default class VariableSet extends Promptable(EnvironmentCommand) {
+export default class VariableSet extends Tabulatable(Promptable(EnvironmentCommand)) {
   static override description = "Set one variable on the project.";
   static override group = CommandGroups.configuration;
   static override examples = [
@@ -205,7 +205,7 @@ export default class VariableSet extends Promptable(EnvironmentCommand) {
     return this.emit({
       status: "ok",
       data: { name, type, kinds, primary, preview: previewState },
-      pretty: renderDetail(`Set ${name} on the project`, ["primary", "preview"], {
+      pretty: this.tabulateDetail(`Set ${name} on the project`, ["primary", "preview"], {
         primary: stateCell(primary),
         preview: stateCell(previewState),
       }),

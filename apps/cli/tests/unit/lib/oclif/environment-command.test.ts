@@ -1,10 +1,11 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { password, text } from "@clack/prompts";
 import { Config } from "@oclif/core";
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, vi } from "vitest";
+
+import { it } from "../../../helpers/fixtures";
 
 import { CREDENTIALS } from "../../../../src/lib/oclif/credentials";
 import { EnvironmentCommand, PreviewCommand } from "../../../../src/lib/oclif/environment-command";
@@ -51,22 +52,9 @@ class SelectorProbe extends EnvironmentCommand {
   }
 }
 
-let config: Config;
-let dir: string;
+const config = await Config.load(cliPackageRoot);
 
-beforeAll(async () => {
-  config = await Config.load(cliPackageRoot);
-});
-
-beforeEach(async () => {
-  dir = await mkdtemp(join(tmpdir(), "zitadel-environment-command-"));
-});
-
-afterEach(async () => {
-  await rm(dir, { recursive: true, force: true });
-});
-
-async function envFile(contents: string): Promise<string> {
+async function envFile(dir: string, contents: string): Promise<string> {
   const file = join(dir, "staging.env");
   await writeFile(file, contents);
   return file;
@@ -84,8 +72,8 @@ describe("the credentials", () => {
 });
 
 describe("EnvironmentCommand.connect", () => {
-  it("authenticates with the project secret unless the command says otherwise", async () => {
-    const file = await envFile(`${URL_AND_PROJECT}ZITADEL_PROJECT_SECRET=sk_staging\n`);
+  it("authenticates with the project secret unless the command says otherwise", async ({ dir }) => {
+    const file = await envFile(dir, `${URL_AND_PROJECT}ZITADEL_PROJECT_SECRET=sk_staging\n`);
 
     const { connection } = await new ProjectProbe(["--cwd", dir, "--env-file", file], config).run();
 
@@ -95,8 +83,8 @@ describe("EnvironmentCommand.connect", () => {
     });
   });
 
-  it("names the variable when the credential is missing", async () => {
-    const file = await envFile(URL_AND_PROJECT);
+  it("names the variable when the credential is missing", async ({ dir }) => {
+    const file = await envFile(dir, URL_AND_PROJECT);
 
     await expect(
       new ProjectProbe(["--cwd", dir, "--env-file", file], config).run(),
@@ -106,8 +94,8 @@ describe("EnvironmentCommand.connect", () => {
     });
   });
 
-  it("never asks for a missing value on a dry run, even on a terminal", async () => {
-    const file = await envFile(URL_AND_PROJECT);
+  it("never asks for a missing value on a dry run, even on a terminal", async ({ dir }) => {
+    const file = await envFile(dir, URL_AND_PROJECT);
 
     await expect(
       asTerminal(() =>
@@ -117,16 +105,16 @@ describe("EnvironmentCommand.connect", () => {
     expect(vi.mocked(text)).not.toHaveBeenCalled();
   });
 
-  it("does not fall back to the preview token for the project secret", async () => {
-    const file = await envFile(`${URL_AND_PROJECT}ZITADEL_PREVIEW_TOKEN=preview_staging\n`);
+  it("does not fall back to the preview token for the project secret", async ({ dir }) => {
+    const file = await envFile(dir, `${URL_AND_PROJECT}ZITADEL_PREVIEW_TOKEN=preview_staging\n`);
 
     await expect(
       new ProjectProbe(["--cwd", dir, "--env-file", file], config).run(),
     ).rejects.toMatchObject({ message: expect.stringContaining("ZITADEL_PROJECT_SECRET") });
   });
 
-  it("does not fall back to the project secret for the preview token", async () => {
-    const file = await envFile(`${URL_AND_PROJECT}ZITADEL_PROJECT_SECRET=sk_staging\n`);
+  it("does not fall back to the project secret for the preview token", async ({ dir }) => {
+    const file = await envFile(dir, `${URL_AND_PROJECT}ZITADEL_PROJECT_SECRET=sk_staging\n`);
 
     await expect(
       new PreviewProbe(["--cwd", dir, "--env-file", file], config).run(),
@@ -136,31 +124,31 @@ describe("EnvironmentCommand.connect", () => {
     });
   });
 
-  it("connects with the preview token when that is the credential declared", async () => {
-    const file = await envFile(`${URL_AND_PROJECT}ZITADEL_PREVIEW_TOKEN=preview_staging\n`);
+  it("connects with the preview token when that is the credential declared", async ({ dir }) => {
+    const file = await envFile(dir, `${URL_AND_PROJECT}ZITADEL_PREVIEW_TOKEN=preview_staging\n`);
 
     const { connection } = await new PreviewProbe(["--cwd", dir, "--env-file", file], config).run();
 
     expect(connection.projectId).toBe("proj_staging");
   });
 
-  it("names the server when there is none", async () => {
-    const file = await envFile("ZITADEL_PROJECT_ID=proj_staging\nZITADEL_PROJECT_SECRET=sk\n");
+  it("names the server when there is none", async ({ dir }) => {
+    const file = await envFile(dir, "ZITADEL_PROJECT_ID=proj_staging\nZITADEL_PROJECT_SECRET=sk\n");
 
     await expect(
       new ProjectProbe(["--cwd", dir, "--env-file", file], config).run(),
     ).rejects.toMatchObject({ message: expect.stringContaining("ZITADEL_URL") });
   });
 
-  it("records the credential kind and that a file was used, never its name", async () => {
-    const file = await envFile(`${URL_AND_PROJECT}ZITADEL_PREVIEW_TOKEN=preview_staging\n`);
+  it("records the credential kind and that a file was used, never its name", async ({ dir }) => {
+    const file = await envFile(dir, `${URL_AND_PROJECT}ZITADEL_PREVIEW_TOKEN=preview_staging\n`);
 
     const { telemetry } = await new PreviewProbe(["--cwd", dir, "--env-file", file], config).run();
 
     expect(telemetry).toEqual({ credential: "preview", has_env_file: true });
   });
 
-  it("records that no file was used when there was none", async () => {
+  it("records that no file was used when there was none", async ({ dir }) => {
     await writeFile(
       join(dir, ".env.development.local"),
       `${URL_AND_PROJECT}ZITADEL_PROJECT_SECRET=sk\n`,
@@ -179,27 +167,27 @@ describe("EnvironmentCommand.environmentSelector", () => {
     expect(selector).toBe("");
   });
 
-  it("reflects --cwd, which the other flags resolve against", async () => {
+  it("reflects --cwd, which the other flags resolve against", async ({ dir }) => {
     const { selector } = await new SelectorProbe(["--cwd", dir], config).run();
 
     expect(selector).toBe(` --cwd ${dir}`);
   });
 
-  it("reflects a non-default --env", async () => {
+  it("reflects a non-default --env", async ({ dir }) => {
     const { selector } = await new SelectorProbe(["--cwd", dir, "--env", "staging"], config).run();
 
     expect(selector).toBe(` --env staging --cwd ${dir}`);
   });
 
-  it("reflects --env-file", async () => {
-    const file = await envFile(URL_AND_PROJECT);
+  it("reflects --env-file", async ({ dir }) => {
+    const file = await envFile(dir, URL_AND_PROJECT);
 
     const { selector } = await new SelectorProbe(["--cwd", dir, "--env-file", file], config).run();
 
     expect(selector).toBe(` --env-file ${file} --cwd ${dir}`);
   });
 
-  it("reflects --server as the resolved origin", async () => {
+  it("reflects --server as the resolved origin", async ({ dir }) => {
     const { selector } = await new SelectorProbe(
       ["--cwd", dir, "--server", "https://staging.example"],
       config,
@@ -210,8 +198,8 @@ describe("EnvironmentCommand.environmentSelector", () => {
 });
 
 describe("PreviewCommand.connect", () => {
-  it("fails on a terminal rather than asking for a missing preview token", async () => {
-    const file = await envFile(URL_AND_PROJECT);
+  it("fails on a terminal rather than asking for a missing preview token", async ({ dir }) => {
+    const file = await envFile(dir, URL_AND_PROJECT);
 
     await expect(
       asTerminal(() => new PreviewCommandProbe(["--cwd", dir, "--env-file", file], config).run()),
