@@ -6,6 +6,7 @@ import {
   createReleaseFromBundle,
   deployMessage,
   diffStep,
+  lockoutStep,
   headSha,
   messageFlag,
   runSteps,
@@ -116,7 +117,7 @@ export default class Deploy extends EnvironmentCommand {
 
     // Before-release steps: validate, then diff, which `--json` reports as
     // `diff` on a dry run and a deploy alike.
-    const reported = await runSteps([validateStep, diffStep], ctx);
+    const reported = await runSteps([validateStep, lockoutStep, diffStep], ctx);
 
     if (dryRun) {
       return this.emit({
