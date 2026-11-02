@@ -31,8 +31,10 @@ Opening a flow takes four steps:
    later step unless the origin passes on its own, as a loopback one does. Any
    other unlisted loopback origin passes, but nothing is deployed to it, so it
    answers `409 rel.not_deployed` rather than `403`.
-2. Find the deployment. An admitted origin uses the newest deployment to that
-   exact origin. A request with no `Origin`, and a console origin the project
+2. Find the deployment. A primary origin uses the project's newest primary
+   deployment when that deployment names it, and an older deployment that
+   named it never answers. A live preview URL uses the newest deployment to
+   that exact URL. A request with no `Origin`, and a console origin the project
    does not list, a loopback one included, use the project's newest primary
    deployment.
 3. With no deployment, the request answers `409`: `rel.not_deployed` for an
@@ -44,7 +46,7 @@ Opening a flow takes four steps:
 flowchart TD
     open([Open a flow]) --> check{Origin?}
     check -- not admitted --> forbidden[403]
-    check -- admitted --> own[Its newest deployment]
+    check -- admitted --> own[Newest primary deployment naming it, or the preview URL's newest]
     check -- none, or a console origin the project does not list --> primary[Newest primary deployment]
     own --> usable{Found and not revoked?}
     primary --> usable
@@ -66,7 +68,8 @@ always live, whatever the project lists, and its release cannot be revoked.
 ### Example
 
 A project lists three primary origins and a preview pattern, trimmed here to the
-columns that decide. `new.acme.com` was added after `dep_2`.
+columns that decide. `www.acme.com` was removed before `dep_2` and added back
+after it, and `new.acme.com` was added after `dep_2`.
 
 `project_origins`:
 
@@ -92,7 +95,6 @@ columns that decide. `new.acme.com` was added after `dep_2`.
 | `dep_1` | `https://app.acme.com` | 1 |
 | `dep_1` | `https://www.acme.com` | 1 |
 | `dep_2` | `https://app.acme.com` | 2 |
-| `dep_2` | `https://www.acme.com` | 2 |
 | `dep_3` | `https://pr-7-acme.vercel.app` | 1 |
 
 `previews` holds `https://pr-7-acme.vercel.app` with an `expires_at` in the
@@ -104,6 +106,7 @@ future. Requests then resolve like this:
 | none | `dep_2` | serves `rel_2` |
 | a console origin the project does not list | `dep_2` | serves `rel_2` |
 | `https://pr-7-acme.vercel.app` | `dep_3` | serves `rel_3` |
+| `https://www.acme.com` | none: `dep_2` does not name it | `409 rel.not_deployed` |
 | `https://new.acme.com` | none: nothing is deployed to it | `409 rel.not_deployed` |
 | `https://other.acme.com` | none | `403 proj.origin_not_allowed` |
 
@@ -137,7 +140,8 @@ still read the newest revisions, because no release serves them.
 - A project with no primary origin cannot deploy to `primary`, so a project with
   no web app lists one anyway to serve callers with no `Origin`.
 - Callers with no `Origin` cannot stay on an older release than the web origins.
-- An origin added to a project serves nothing until the next deploy.
+- An origin added to a project serves nothing until the next deploy, even one
+  an older deployment named.
 - A dev server on a loopback origin the project does not list, such as `:5173`
   with `:3000` listed, answers `409 rel.not_deployed`.
 - The console's login preview of a project it does not list shows the newest
