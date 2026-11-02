@@ -1,15 +1,20 @@
-import { existsSync, mkdtempSync } from "node:fs";
+import { randomUUID } from "node:crypto";
+import { existsSync } from "node:fs";
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
 
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeEach, describe, expect, it } from "vitest";
 
 import { bundleSkills, publicSkills } from "../../../../src/lib/skills/bundle";
 
-const repo = mkdtempSync(join(tmpdir(), "zitadel-skills-repo-"));
-const outRoot = mkdtempSync(join(tmpdir(), "zitadel-skills-out-"));
+const repo = join(tmpdir(), `zitadel-skills-repo-${randomUUID()}`);
+const outRoot = join(tmpdir(), `zitadel-skills-out-${randomUUID()}`);
 const out = join(outRoot, "skills");
+
+afterAll(async () => {
+  await Promise.all([repo, outRoot].map((dir) => rm(dir, { recursive: true, force: true })));
+});
 
 beforeEach(async () => {
   await Promise.all([repo, outRoot].map((dir) => rm(dir, { recursive: true, force: true })));

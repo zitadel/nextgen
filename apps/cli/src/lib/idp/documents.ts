@@ -428,12 +428,19 @@ function withoutServerDefaults(step: Step): Step {
  * one of these is the one `setup` wrote, however many providers it offers.
  * The shipped steps carry no provider routes, so the terminal does not matter.
  */
+const shippedPasswordForms: string[] = [];
+
 function shippedPasswordSteps(): string[] {
-  return SETUP_PRESETS.flatMap((preset) => {
-    const flow = getDefaultLoginFlow({ preset }) as unknown as Json;
-    const step = stepNamed(flow, PASSWORD_STEP);
-    return step === undefined ? [] : [canonical(withoutSsoRoutes(step, "done"))];
-  });
+  if (shippedPasswordForms.length === 0) {
+    shippedPasswordForms.push(
+      ...SETUP_PRESETS.flatMap((preset) => {
+        const flow = getDefaultLoginFlow({ preset }) as unknown as Json;
+        const step = stepNamed(flow, PASSWORD_STEP);
+        return step === undefined ? [] : [canonical(withoutSsoRoutes(step, "done"))];
+      }),
+    );
+  }
+  return shippedPasswordForms;
 }
 
 /**

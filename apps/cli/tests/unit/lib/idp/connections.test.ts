@@ -407,7 +407,7 @@ describe("planConnection", () => {
   it("reads what a hand-edited connection references, not what its slug implies", () => {
     // An okta connection pointing at GOOGLE_CLIENT_SECRET collides with
     // Google however its slug reads; deriving OKTA_CLIENT_SECRET from the
-    // slug would miss it and allow the google publish overwrite a variable
+    // slug would miss it and let the google publish overwrite a variable
     // both connections consume.
     const okta = file(
       "okta.json",

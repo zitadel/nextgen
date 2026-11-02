@@ -1,4 +1,5 @@
-import { existsSync, mkdtempSync } from "node:fs";
+import { randomUUID } from "node:crypto";
+import { existsSync } from "node:fs";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -30,7 +31,7 @@ import { takeReportedWarnings } from "../../../src/lib/warnings";
 
 const TEST_CLI_VERSION = "0.1.0-alpha.18";
 
-const cwd = mkdtempSync(join(tmpdir(), "zitadel-setup-resources-"));
+const cwd = join(tmpdir(), `zitadel-setup-resources-${randomUUID()}`);
 
 beforeEach(async () => {
   await mkdir(join(cwd, ".zitadel"), { recursive: true });
@@ -1010,7 +1011,7 @@ describe("materializeSetupResources with a social provider", () => {
 
 /** Several providers at once: Google from the catalog, and a custom connection beside it. */
 describe("materializeSetupResources with several providers", () => {
-  const cwd = mkdtempSync(join(tmpdir(), "zitadel-setup-multi-"));
+  const cwd = join(tmpdir(), `zitadel-setup-multi-${randomUUID()}`);
 
   beforeEach(async () => {
     await mkdir(join(cwd, ".zitadel"), { recursive: true });

@@ -86,58 +86,31 @@ export function solidStartConfigEdit(): (source: string | undefined) => string {
  * the index just past the closing `)`.
  */
 function readBalanced(source: string, openParenIndex: number): { text: string; end: number } {
-  interface Scan {
-    readonly depth: number;
-    readonly quote: string | null;
-    readonly skipTo: number;
-    readonly end: number | undefined;
-    readonly unterminated: boolean;
+  // Strings and comments are single tokens, so only a bracket outside them counts;
+  // an unterminated one runs to the end of the source, which then has no closing paren.
+  const tokens = source.slice(openParenIndex).matchAll(TOKEN);
+  const closeAt = (depth: number): number | undefined => {
+    const next = tokens.next();
+    if (next.done) {
+      return undefined;
+    }
+    const [text] = next.value;
+    if (text.length !== 1 || !BRACKETS.includes(text)) {
+      return closeAt(depth);
+    }
+    if ("([{".includes(text)) {
+      return closeAt(depth + 1);
+    }
+    return depth === 1 ? next.value.index + 1 : closeAt(depth - 1);
+  };
+  const end = closeAt(0);
+  if (end === undefined) {
+    throw new ZitadelError("E_VALIDATION", "Malformed Vite config: unbalanced solidStart() call");
   }
-  const next = (state: Scan, patch: Partial<Scan>): Scan => Object.assign({}, state, patch);
-  const indexes = Array.from(
-    { length: source.length - openParenIndex },
-    (_unused, offset) => openParenIndex + offset,
-  );
-  const scan = indexes.reduce<Scan>(
-    (state, i) => {
-      if (state.end !== undefined || state.unterminated || i < state.skipTo) {
-        return state;
-      }
-      const ch = source[i];
-      if (state.quote) {
-        if (ch === "\\") {
-          return next(state, { skipTo: i + 2 });
-        }
-        return ch === state.quote ? next(state, { quote: null }) : state;
-      }
-      if (ch === "/" && source[i + 1] === "/") {
-        const newline = source.indexOf("\n", i);
-        return newline === -1
-          ? next(state, { unterminated: true })
-          : next(state, { skipTo: newline + 1 });
-      }
-      if (ch === "/" && source[i + 1] === "*") {
-        const close = source.indexOf("*/", i + 2);
-        return close === -1
-          ? next(state, { unterminated: true })
-          : next(state, { skipTo: close + 2 });
-      }
-      if (ch === '"' || ch === "'" || ch === "`") {
-        return next(state, { quote: ch });
-      }
-      if (ch === "(" || ch === "{" || ch === "[") {
-        return next(state, { depth: state.depth + 1 });
-      }
-      if (ch === ")" || ch === "}" || ch === "]") {
-        const depth = state.depth - 1;
-        return depth === 0 ? next(state, { depth, end: i + 1 }) : next(state, { depth });
-      }
-      return state;
-    },
-    { depth: 0, quote: null, skipTo: 0, end: undefined, unterminated: false },
-  );
-  if (scan.end !== undefined) {
-    return { text: source.slice(openParenIndex, scan.end), end: scan.end };
-  }
-  throw new ZitadelError("E_VALIDATION", "Malformed Vite config: unbalanced solidStart() call");
+  return { text: source.slice(openParenIndex, openParenIndex + end), end: openParenIndex + end };
 }
+
+/** A comment, a string or template literal, or one bracket. */
+const TOKEN =
+  /\/\/[^\n]*|\/\*[\s\S]*?(?:\*\/|$)|(["'`])(?:\\[\s\S]|(?!\1)[^\\])*(?:\1|$)|[()[\]{}]/g;
+const BRACKETS = "()[]{}";

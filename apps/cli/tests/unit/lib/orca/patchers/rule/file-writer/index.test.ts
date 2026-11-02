@@ -1,4 +1,4 @@
-import { mkdtempSync } from "node:fs";
+import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -10,7 +10,7 @@ import { scaffold } from "../../../../../../../src/lib/orca/patchers/rule/file-w
 import type { ScaffoldPlan } from "../../../../../../../src/lib/orca/patchers/rule/file-writer/types";
 import { rejectionOf } from "../../../../../../helpers/thrown-value";
 
-const dir = mkdtempSync(join(tmpdir(), "zitadel-scaffold-"));
+const dir = join(tmpdir(), `zitadel-scaffold-${randomUUID()}`);
 
 beforeEach(async () => {
   await mkdir(dir, { recursive: true });

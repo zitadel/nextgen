@@ -1,4 +1,4 @@
-import { mkdtempSync } from "node:fs";
+import { randomUUID } from "node:crypto";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
@@ -10,7 +10,7 @@ import { localRuntimePaths } from "../../../src/lib/local-server/runtime";
 import { DEFAULT_SERVER, parseServer, resolveServer } from "../../../src/lib/server";
 import { aBinaryRecord } from "../../helpers/runtime-record";
 
-const dir = mkdtempSync(join(tmpdir(), "zitadel-resolve-server-"));
+const dir = join(tmpdir(), `zitadel-resolve-server-${randomUUID()}`);
 const servers: Server[] = [];
 
 beforeEach(async () => {

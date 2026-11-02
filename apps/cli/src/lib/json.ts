@@ -40,22 +40,9 @@ export function setTopLevelJsonKey(
   const layout = scanTopLevel(source);
   const member = layout.members.find((candidate) => candidate.key === key);
 
-  const last = layout.members.at(-1);
   const next = member
     ? `${source.slice(0, member.valueStart)}${rendered}${source.slice(member.valueEnd)}`
-    : layout.members.length === 0
-      ? `${source.slice(0, layout.open + 1)}${
-          indent === 0
-            ? `${JSON.stringify(key)}:${rendered}`
-            : `${eol}${indentString(indent)}${JSON.stringify(key)}: ${rendered}${eol}`
-        }${source.slice(layout.close)}`
-      : last
-        ? `${source.slice(0, last.valueEnd)}${
-            indent === 0
-              ? `,${JSON.stringify(key)}:${rendered}`
-              : `,${eol}${indentString(indent)}${JSON.stringify(key)}: ${rendered}`
-          }${source.slice(last.valueEnd)}`
-        : fail(`refusing to write ${path}: the JSON layout scan found no members`);
+    : withAppended({ source, path, layout, key, rendered, indent, eol });
 
   const verification = parseJsonObject(next, path);
   const expected = { ...parsed, [key]: value };
@@ -65,8 +52,33 @@ export function setTopLevelJsonKey(
   return next;
 }
 
-function fail(message: string): never {
-  throw new Error(message);
+/** `source` with a new `key` member added after the last one, or inside an empty object. */
+function withAppended(input: {
+  source: string;
+  path: string;
+  layout: TopLevelLayout;
+  key: string;
+  rendered: string;
+  indent: ReturnType<typeof detectIndent>;
+  eol: string;
+}): string {
+  const { source, path, layout, key, rendered, indent, eol } = input;
+  const last = layout.members.at(-1);
+  if (layout.members.length === 0) {
+    const inner =
+      indent === 0
+        ? `${JSON.stringify(key)}:${rendered}`
+        : `${eol}${indentString(indent)}${JSON.stringify(key)}: ${rendered}${eol}`;
+    return `${source.slice(0, layout.open + 1)}${inner}${source.slice(layout.close)}`;
+  }
+  if (!last) {
+    throw new Error(`refusing to write ${path}: the JSON layout scan found no members`);
+  }
+  const inner =
+    indent === 0
+      ? `,${JSON.stringify(key)}:${rendered}`
+      : `,${eol}${indentString(indent)}${JSON.stringify(key)}: ${rendered}`;
+  return `${source.slice(0, last.valueEnd)}${inner}${source.slice(last.valueEnd)}`;
 }
 
 /**
@@ -142,9 +154,7 @@ function scanTopLevel(source: string): TopLevelLayout {
     if (value === undefined) {
       return [];
     }
-    const closeIndex = opens(value)
-      ? depthAfter.findIndex((depth, at) => at > valueIndex && depth === 1)
-      : valueIndex;
+    const closeIndex = opens(value) ? depthAfter.indexOf(1, valueIndex + 1) : valueIndex;
     return [
       {
         key: JSON.parse(source.slice(token.start, token.end)) as string,

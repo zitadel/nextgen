@@ -1,4 +1,4 @@
-import { mkdtempSync } from "node:fs";
+import { randomUUID } from "node:crypto";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -36,7 +36,7 @@ const flow = (userSchema: string, providers: string[]) => ({
 
 const connection = (slug: string) => ({ slug, claim_mapping: { email: "email" } });
 
-const cwd = mkdtempSync(join(tmpdir(), "sso-consistency-"));
+const cwd = join(tmpdir(), `sso-consistency-${randomUUID()}`);
 
 beforeEach(async () => {
   await mkdir(cwd, { recursive: true });

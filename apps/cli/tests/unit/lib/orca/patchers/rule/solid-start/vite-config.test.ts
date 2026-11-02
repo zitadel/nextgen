@@ -55,6 +55,28 @@ describe("solidStartConfigEdit", () => {
     expect(out).toContain("nitro()");
   });
 
+  it("ignores a closing paren inside a string in the solidStart() options", () => {
+    const source = BARE.replace("solidStart()", 'solidStart({ banner: ")" })');
+    expect(edit(source)).toContain(
+      'solidStart({ middleware: "./src/middleware.ts", banner: ")" })',
+    );
+  });
+
+  it("throws E_VALIDATION when the solidStart() call never closes", () => {
+    const source = "export default { plugins: [solidStart({ ssr: true }";
+    expect(() => edit(source)).toThrowError(/unbalanced solidStart\(\) call/);
+  });
+
+  it("throws E_VALIDATION when an unterminated comment swallows the closing paren", () => {
+    const source = BARE.replace("solidStart()", "solidStart({ ssr: true } /* ) ");
+    expect(() => edit(source)).toThrowError(/unbalanced solidStart\(\) call/);
+  });
+
+  it("throws E_VALIDATION when an unterminated string swallows the closing paren", () => {
+    const source = BARE.replace("solidStart()", 'solidStart({ banner: "oops })');
+    expect(() => edit(source)).toThrowError(/unbalanced solidStart\(\) call/);
+  });
+
   it("is idempotent — re-running over its own output changes nothing", () => {
     const once = edit(BARE);
     expect(edit(once)).toBe(once);

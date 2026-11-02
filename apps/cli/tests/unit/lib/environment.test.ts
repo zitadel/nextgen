@@ -1,4 +1,4 @@
-import { mkdtempSync } from "node:fs";
+import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -21,7 +21,7 @@ vi.mock("@clack/prompts", () => ({
   cancel: vi.fn(),
 }));
 
-const dir = mkdtempSync(join(tmpdir(), "zitadel-environment-"));
+const dir = join(tmpdir(), `zitadel-environment-${randomUUID()}`);
 
 beforeEach(async () => {
   await mkdir(dir, { recursive: true });

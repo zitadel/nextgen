@@ -1,5 +1,5 @@
+import { randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
-import { mkdtempSync } from "node:fs";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -20,7 +20,7 @@ type Live = {
   dirty?: boolean;
 };
 
-const cwd = mkdtempSync(join(tmpdir(), "zitadel-diff-step-"));
+const cwd = join(tmpdir(), `zitadel-diff-step-${randomUUID()}`);
 const written: string[] = [];
 const asked: unknown[] = [];
 

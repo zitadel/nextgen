@@ -186,12 +186,12 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
     // The spinner owns the cursor and a SIGINT handler until it is stopped, so a
     // page that fails mid-drain has to stop it too; otherwise the error prints
     // under a live spinner and the handler outlives the command.
-    const fetched: unknown[] = [];
+    const fetched: null[] = [];
     const walk = pages(
       async (token) => {
         const page = await request(token ?? first);
-        fetched.push(page);
-        progress?.message(`Fetching ${topic} — page ${fetched.length}`);
+        // Only the count is kept, never the page: a wide `--all` must not hold them all.
+        progress?.message(`Fetching ${topic} — page ${fetched.push(null)}`);
         return page;
       },
       { next: (response) => spec.next?.(response) || undefined },

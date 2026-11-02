@@ -670,7 +670,7 @@ describe("claimFreePort", () => {
   });
 
   describe("when another start binds a port between the look and the claim", () => {
-    /** Free when first looked at, taken once anyone has claimed it, as after a start that bound it and released it. */
+    /** Free when first looked at, taken once anyone has claimed it, as after a start that bound it and let go. */
     const takenOnceClaimed = (claimed: number[]): PortProbe => ({
       isFree: async (port) => !claimed.includes(port),
       reserve: async (port) => {

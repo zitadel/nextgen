@@ -1,5 +1,4 @@
 import { spawn } from "node:child_process";
-import { type EventEmitter, on } from "node:events";
 
 import { ZitadelError, isErrno } from "../../errors";
 import { unscopedCommand } from "../../suggestion";
@@ -367,50 +366,22 @@ async function runDocker(
   args: string[],
   env: Readonly<Record<string, string>> = {},
 ): Promise<DockerResult> {
-  const child = spawn("docker", args, {
-    stdio: ["ignore", "pipe", "pipe"],
-    env: { ...process.env, ...env },
-  });
-  child.stdout?.setEncoding("utf8");
-  child.stderr?.setEncoding("utf8");
-  const finished = new AbortController();
-  const failed = new Promise<never>((_, reject) => {
-    child.on("error", (error) => {
-      finished.abort();
-      reject(error);
+  return new Promise((resolve, reject) => {
+    const child = spawn("docker", args, {
+      stdio: ["ignore", "pipe", "pipe"],
+      env: { ...process.env, ...env },
     });
-  });
-  const closed = new Promise<number>((resolve) => {
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+    child.stdout?.setEncoding("utf8");
+    child.stderr?.setEncoding("utf8");
+    child.stdout?.on("data", (chunk: string) => stdout.push(chunk));
+    child.stderr?.on("data", (chunk: string) => stderr.push(chunk));
+    child.on("error", reject);
     child.on("close", (code) => {
-      finished.abort();
-      resolve(code ?? 1);
+      resolve({ status: code ?? 1, stdout: stdout.join(""), stderr: stderr.join("") });
     });
   });
-  const [stdout, stderr, status] = await Promise.race([
-    failed,
-    Promise.all([
-      collectText(child.stdout, finished.signal),
-      collectText(child.stderr, finished.signal),
-      closed,
-    ]),
-  ]);
-  return { status, stdout, stderr };
-}
-
-/** Everything a stream emits as text until `signal` aborts. */
-function collectText(stream: EventEmitter | null, signal: AbortSignal): Promise<string> {
-  const chunks = stream ? on(stream, "data", { signal }) : undefined;
-  const drain = async (collected: string): Promise<string> => {
-    try {
-      const next = await chunks?.next();
-      return next === undefined || next.done
-        ? collected
-        : drain(`${collected}${String(next.value[0])}`);
-    } catch {
-      return collected;
-    }
-  };
-  return drain("");
 }
 
 /**
@@ -457,37 +428,22 @@ function lineBreaks(text: string): number {
   return text.split("\n").length - 1;
 }
 
-/** How many of `count` line breaks `text` completes, and what follows the last of them. */
-function skipLines(count: number, text: string): { left: number; rest: string } {
-  const lineBreak = count > 0 ? text.indexOf("\n") : -1;
-  return count > 0 && lineBreak !== -1
-    ? skipLines(count - 1, text.slice(lineBreak + 1))
-    : { left: count, rest: count > 0 ? "" : text };
-}
-
-function* lineSkipper(left: number, write: (text: string) => void): Generator<void, void, string> {
-  if (left === 0) {
-    for (;;) {
-      const text = yield;
-      if (text.length > 0) {
-        write(text);
-      }
-    }
-  }
-  const text = yield;
-  const skipped = skipLines(left, text);
-  if (skipped.rest.length > 0) {
-    write(skipped.rest);
-  }
-  return yield* lineSkipper(skipped.left, write);
-}
-
-/** Passes a stream's text to `write` once its first `count` lines have gone by. */
+/**
+ * Passes a stream's text to `write` once its first `count` lines have gone by.
+ * `skipped` holds how many line breaks each chunk used up, so what is left to
+ * skip is `count` less their sum.
+ */
 function afterLines(count: number, write: (text: string) => void): (text: string) => void {
-  const skipper = lineSkipper(count, write);
-  skipper.next();
+  const skipped: number[] = [];
   return (text) => {
-    skipper.next(text);
+    const left = count - skipped.reduce((sum, used) => sum + used, 0);
+    const breaks = left > 0 ? [...text.matchAll(/\n/g)].slice(0, left) : [];
+    skipped.push(breaks.length);
+    const last = breaks.at(-1);
+    const rest = left <= 0 ? text : breaks.length < left || !last ? "" : text.slice(last.index + 1);
+    if (rest.length > 0) {
+      write(rest);
+    }
   };
 }
 

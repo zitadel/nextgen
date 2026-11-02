@@ -1,4 +1,4 @@
-import { mkdtempSync } from "node:fs";
+import { randomUUID } from "node:crypto";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -10,7 +10,7 @@ import { ZitadelError } from "../../../../../src/lib/errors";
 import { rejectionOf } from "../../../../helpers/thrown-value";
 
 const detector = new NextDetector();
-const dir = mkdtempSync(join(tmpdir(), "zitadel-next-detector-"));
+const dir = join(tmpdir(), `zitadel-next-detector-${randomUUID()}`);
 
 beforeEach(async () => {
   await mkdir(dir, { recursive: true });

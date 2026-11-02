@@ -1,4 +1,5 @@
-import { existsSync, mkdtempSync } from "node:fs";
+import { randomUUID } from "node:crypto";
+import { existsSync } from "node:fs";
 import { mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -13,8 +14,8 @@ import { addSkills, bundledSkills, skillDirs } from "../../../../src/lib/skills/
 
 const CLAUDE = { name: "claude", display: "Claude Code", detected: true, installPath: "/x" };
 
-const packageRoot = mkdtempSync(join(tmpdir(), "zitadel-cli-package-"));
-const project = mkdtempSync(join(tmpdir(), "zitadel-skills-project-"));
+const packageRoot = join(tmpdir(), `zitadel-cli-package-${randomUUID()}`);
+const project = join(tmpdir(), `zitadel-skills-project-${randomUUID()}`);
 
 beforeEach(async () => {
   await Promise.all([packageRoot, project].map((dir) => rm(dir, { recursive: true, force: true })));

@@ -1,4 +1,4 @@
-import { mkdtempSync } from "node:fs";
+import { randomUUID } from "node:crypto";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -53,7 +53,7 @@ class SelectorProbe extends EnvironmentCommand {
 }
 
 const config = await Config.load(cliPackageRoot);
-const dir = mkdtempSync(join(tmpdir(), "zitadel-environment-command-"));
+const dir = join(tmpdir(), `zitadel-environment-command-${randomUUID()}`);
 
 beforeEach(async () => {
   await mkdir(dir, { recursive: true });

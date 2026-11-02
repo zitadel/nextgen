@@ -1,4 +1,4 @@
-import { mkdtempSync } from "node:fs";
+import { randomUUID } from "node:crypto";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ZitadelError } from "../../../src/lib/errors";
 import { readJsonDir, readJsonDirEntries } from "../../../src/lib/json-dir";
 
-const dir = mkdtempSync(join(tmpdir(), "zitadel-json-dir-"));
+const dir = join(tmpdir(), `zitadel-json-dir-${randomUUID()}`);
 
 beforeEach(async () => {
   await mkdir(dir, { recursive: true });

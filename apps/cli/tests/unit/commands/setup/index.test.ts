@@ -866,7 +866,7 @@ describe("the credential env files a failed setup rolls back", () => {
   it("does not read a file it cannot open as one that is absent", async () => {
     const cwd = await makeTempDir();
     // A directory where the file should be reads as EISDIR, not ENOENT: treating
-    // it as absent would allow the rollback to delete something it should restore.
+    // it as absent would let the rollback delete something it should restore.
     await mkdir(join(cwd, ".env.development.local"));
 
     await expect(readCredentialEnvFiles(cwd)).rejects.toMatchObject({ code: "EISDIR" });

@@ -1,4 +1,4 @@
-import { mkdtempSync } from "node:fs";
+import { randomUUID } from "node:crypto";
 import { mkdir, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -15,7 +15,7 @@ import {
   type PackageJson,
 } from "../../../../../src/lib/orca/detectors/package-json";
 
-const dir = mkdtempSync(join(tmpdir(), "zitadel-package-json-"));
+const dir = join(tmpdir(), `zitadel-package-json-${randomUUID()}`);
 
 beforeEach(async () => {
   await mkdir(dir, { recursive: true });

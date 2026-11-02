@@ -27,6 +27,7 @@ import type {
   PatchView,
 } from "../types";
 import { reclaimableOps, withoutExistingTargets } from "./reclaim";
+import { firstExisting } from "./utils/first-existing";
 
 /**
  * Closes every {@link AbstractRulePatcher.preflight} refusal. `--force` is the
@@ -145,9 +146,11 @@ export abstract class AbstractRulePatcher implements Patcher {
         continue;
       }
       const candidates = typeof op.path === "string" ? [op.path] : op.path;
-      const found = await firstExisting(opts.cwd, candidates);
-      const path = found?.path ?? candidates[0] ?? "";
-      const source = found?.source;
+      const found = await firstExisting(candidates, (candidate) =>
+        readTextIfExists(join(opts.cwd, candidate)),
+      );
+      const path = found?.candidate ?? candidates[0] ?? "";
+      const source = found?.found;
       if (source === undefined) {
         statuses.push({ path, wiring: op.wiring, state: "detached" });
         continue;
@@ -431,17 +434,4 @@ function resolveServerOrigin(source: string): string {
   } catch {
     return DEFAULT_SERVER;
   }
-}
-
-async function firstExisting(
-  cwd: string,
-  candidates: ReadonlyArray<string>,
-): Promise<{ path: string; source: string } | undefined> {
-  for (const candidate of candidates) {
-    const source = await readTextIfExists(join(cwd, candidate));
-    if (source !== undefined) {
-      return { path: candidate, source };
-    }
-  }
-  return undefined;
 }

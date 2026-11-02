@@ -1,4 +1,4 @@
-import { mkdtempSync } from "node:fs";
+import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { writeBackResource } from "../../../../src/lib/sync/writeback";
 
-const cwd = mkdtempSync(join(tmpdir(), "zitadel-writeback-"));
+const cwd = join(tmpdir(), `zitadel-writeback-${randomUUID()}`);
 
 beforeEach(async () => {
   await mkdir(cwd, { recursive: true });

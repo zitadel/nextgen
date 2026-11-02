@@ -169,13 +169,16 @@ describe("variable list", () => {
 
   it("prints tab-separated rows with no header on a pipe, and nothing when empty", async () => {
     const cwd = await makeProject();
-    const calls: unknown[] = [];
+    const listed = vi.fn();
     server.use(
-      http.get("*/variables", () =>
-        HttpResponse.json(
-          calls.push(null) === 1 ? { B: { primary: "two" }, A: { primary: { secret: true } } } : {},
-        ),
-      ),
+      http.get("*/variables", () => {
+        listed();
+        return HttpResponse.json(
+          listed.mock.calls.length === 1
+            ? { B: { primary: "two" }, A: { primary: { secret: true } } }
+            : {},
+        );
+      }),
     );
 
     const rows = await runCliForTest(["variable", "list", ...plainArgs(cwd)]);

@@ -1,4 +1,4 @@
-import { mkdtempSync } from "node:fs";
+import { randomUUID } from "node:crypto";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -65,7 +65,7 @@ describe("DEFAULT_DEV_PORT", () => {
 });
 
 describe("detectDevPort", () => {
-  const dir = mkdtempSync(join(tmpdir(), "zitadel-port-"));
+  const dir = join(tmpdir(), `zitadel-port-${randomUUID()}`);
 
   beforeEach(async () => {
     await mkdir(dir, { recursive: true });

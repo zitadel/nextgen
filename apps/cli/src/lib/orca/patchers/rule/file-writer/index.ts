@@ -6,6 +6,7 @@ import { enforceMode, envLine } from "../../../../fs-safe";
 import { isObject, parseJsonObject, setTopLevelJsonKey, stableStringify } from "../../../../json";
 import type { PatchedFile } from "../../types";
 import type { FileOp, ScaffoldPlan, ScaffoldResult } from "./types";
+import { firstExisting } from "../utils/first-existing";
 
 /**
  * The executor's private, mutable accumulator. Handlers record each touched
@@ -144,10 +145,17 @@ async function editFile(
     });
   }
   // The first candidate is where the file is created when none of them exist.
-  const found = await firstExisting(candidates);
-  const path = found?.path ?? preferred;
-  const source = found?.source;
-  const mode = found?.mode;
+  const found = await firstExisting(candidates, async (candidate) => {
+    const contents = await readIfExists(candidate);
+    // Preserve the existing file's permission bits across the temp-file swap
+    // (mask off the file-type bits `stat` includes so `chmod` gets only perms).
+    return contents === undefined
+      ? undefined
+      : { contents, mode: (await stat(candidate)).mode & 0o777 };
+  });
+  const path = found?.candidate ?? preferred;
+  const source = found?.found.contents;
+  const mode = found?.found.mode;
   const next = edit(source);
   if (next === source) {
     result.filesSkipped.push(path);
@@ -166,20 +174,6 @@ async function editFile(
   }
   await rename(tmp, path);
   record(result, path, "file", action);
-}
-
-async function firstExisting(
-  candidates: ReadonlyArray<string>,
-): Promise<{ path: string; source: string; mode: number } | undefined> {
-  for (const candidate of candidates) {
-    const contents = await readIfExists(candidate);
-    if (contents !== undefined) {
-      // Preserve the existing file's permission bits across the temp-file swap
-      // (mask off the file-type bits `stat` includes so `chmod` gets only perms).
-      return { path: candidate, source: contents, mode: (await stat(candidate)).mode & 0o777 };
-    }
-  }
-  return undefined;
 }
 
 async function ensureDir(

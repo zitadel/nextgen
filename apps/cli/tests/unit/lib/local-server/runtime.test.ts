@@ -1,4 +1,4 @@
-import { mkdtempSync } from "node:fs";
+import { randomUUID } from "node:crypto";
 import { chmod, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
@@ -25,7 +25,7 @@ import {
   type RuntimeMetadata,
 } from "../../../../src/lib/local-server/runtime";
 
-const cwd = mkdtempSync(join(tmpdir(), "zitadel-server-runtime-"));
+const cwd = join(tmpdir(), `zitadel-server-runtime-${randomUUID()}`);
 
 beforeEach(async () => {
   await mkdir(cwd, { recursive: true });

@@ -43,12 +43,12 @@ function fakeClient(
 const identity: Identity = { distinctId: "did-123", isFirstRun: false };
 
 function deps(sink: Tracked[], extra: Partial<TelemetryDeps> = {}): TelemetryDeps {
-  const issued: string[] = [];
+  const newId = vi.fn(() => `id-${newId.mock.calls.length}`);
   return {
     env: { ZITADEL_TELEMETRY_TOKEN: "tok" },
     initClient: () => fakeClient(sink),
     loadIdentity: () => identity,
-    newId: () => `id-${issued.push("id")}`,
+    newId,
     ...extra,
   };
 }

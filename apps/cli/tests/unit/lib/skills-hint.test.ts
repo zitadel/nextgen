@@ -1,4 +1,5 @@
-import { existsSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { randomUUID } from "node:crypto";
+import { existsSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -15,7 +16,7 @@ import { showSkillsHint } from "../../../src/lib/skills-hint";
 const CLAUDE = { name: "claude", display: "Claude Code", detected: true, installPath: "/x" };
 const cliVersion = "1.2.3";
 
-const config = mkdtempSync(join(tmpdir(), "zitadel-skills-"));
+const config = join(tmpdir(), `zitadel-skills-${randomUUID()}`);
 const env: NodeJS.ProcessEnv = { XDG_CONFIG_HOME: config };
 
 beforeEach(() => {
