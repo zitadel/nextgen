@@ -37,6 +37,9 @@
       "identifier": "COMMANDS"
     },
     "helpClass": "./dist/lib/oclif/help",
+    "hooks": {
+      "finally": "./dist/lib/oclif/hooks/version-notice"
+    },
     "topicSeparator": " ",
     "plugins": [
       "@oclif/plugin-help",

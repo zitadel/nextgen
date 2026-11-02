@@ -25,7 +25,7 @@ export const command = (s: string): string => pc.bold(pc.cyan(s));
 export function wrapForBox(message: string, columns = process.stdout.columns): string {
   const width = Math.max(
     MIN_CONTENT_WIDTH,
-    Math.min(columns ?? MAX_TERMINAL_WIDTH, MAX_TERMINAL_WIDTH) - BOX_OVERHEAD,
+    Math.min(columns || MAX_TERMINAL_WIDTH, MAX_TERMINAL_WIDTH) - BOX_OVERHEAD,
   );
   return wrapAnsi(message, width, { hard: false, trim: false });
 }

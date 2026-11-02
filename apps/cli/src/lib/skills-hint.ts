@@ -84,7 +84,7 @@ export async function showSkillsHint({
   }
 }
 
-function isCI(env: NodeJS.ProcessEnv): boolean {
+export function isCI(env: NodeJS.ProcessEnv): boolean {
   return Boolean(env.CI) && env.CI !== "0" && env.CI !== "false";
 }
 

@@ -3660,6 +3660,21 @@
       "examples": []
     },
     {
+      "id": "upgrade",
+      "group": "Diagnostics and utilities",
+      "description": "Upgrade this project to the latest Zitadel release.\n\nRe-pins the project's exactly-pinned @zitadel/* packages with its own package manager, then runs the new release's doctor --fix to refresh generated files. Run it as npx @zitadel/cli@latest upgrade so the newest release does the upgrading.",
+      "args": [],
+      "flags": [],
+      "examples": [
+        {
+          "command": "upgrade"
+        },
+        {
+          "command": "upgrade --dry-run"
+        }
+      ]
+    },
+    {
       "id": "api",
       "group": "Diagnostics and utilities",
       "description": "Call any operation of the Zitadel API, with this project's server and project secret.",

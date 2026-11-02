@@ -186,8 +186,8 @@ describe("local runtime commands", () => {
     );
 
     expect(result.exitCode).toBe(0);
-    expect(result.stdout).toContain("[warn] docker-cli:");
-    expect(result.stdout).toContain("[warn] image:");
+    expect(result.stdout).toContain("[!] Local server");
+    expect(result.stdout).toContain("Docker is not reachable");
     expect(result.stdout).not.toContain("Warning: docker-cli:");
     expect(result.stdout).not.toContain("Warning: image:");
   });
