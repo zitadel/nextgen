@@ -15,6 +15,8 @@ npx @zitadel/cli@alpha deploy
 npx @zitadel/cli@alpha deploy --dry-run
 ```
 
+After the diff, a dry run prints a box for each sign-in connection under `.zitadel/idps/` — what it maps (user attribute → claim), what verifies it, and its scopes, read from the file, which holds variable references and never a secret — so you can review the mapping before you publish.
+
 A release carries a content digest, so re-running `deploy` on unchanged configuration returns the same release and changes nothing.
 
 ## Walkthrough: add a field to registration
@@ -119,6 +121,7 @@ Run `preview` on pull requests and `deploy` on pushes to the main branch:
 ## How publishing works
 
 - **Flows are validated before the release is built** against the same rules the platform enforces — transition wiring, step reachability, schema field references, and cross-purpose invariants (e.g. a login entry step must wire `user_not_found` when `register` is also a purpose). Violations fail `deploy` before anything is uploaded, with the same error text the server would return. Non-blocking product guidance is reported as warnings.
+- **SSO configuration is checked across files** — the user schemas, login flows and connection files are read together, and a deploy stops before anything is sent when they disagree, naming the file, the step and the name at fault. A claim mapping that fills nothing, a verification that can never pass, a mistyped mapping target (with a "Did you mean"), or a `subject_claim` the user can change all fail here; a few softer mistakes, such as a scope a custom connection omits, warn without stopping. [Configuration as code](/docs/concepts/repo-config) lists every rule.
 - The release carries the resources as authored. The server reuses the revision it already holds when the content matches and allocates a new one otherwise, so an unchanged resource is never re-revisioned.
 - Every `${VAR}` and `*_env` reference is checked against the running environment before the release is built, so a missing variable fails locally rather than shipping a placeholder.
 - Flow files carry `"$schema": "../meta/flow-definition.json"` — a pointer at the flow dialect spec setup copies into `.zitadel/meta/`, so editors validate and autocomplete flow edits offline. It is local-only and stripped before upload.

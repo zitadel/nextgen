@@ -23,6 +23,7 @@ import {
   type ConnectionSlug,
   type ProviderSelection,
   providerOf,
+  uniquePropertyNames,
 } from "@zitadel/config/idp";
 import {
   normalizeFlowBody,
@@ -357,6 +358,7 @@ function planConnections(
     const connection = provider.connection({
       endpoints: chosen.endpoints,
       schemaProperties: Object.keys(schemaTemplate.properties ?? {}),
+      uniqueProperties: uniquePropertyNames(schemaTemplate),
       schemaRef: CONNECTION_SCHEMA_REF,
     });
     planned.push({

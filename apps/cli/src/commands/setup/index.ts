@@ -28,7 +28,7 @@ import semver from "semver";
 
 import { createZitadelClient } from "../../lib/api-client";
 import { isDevelopmentBuild } from "../../lib/build-channel";
-import { renderBoxActions, wrapForBox } from "../../lib/box";
+import { printBox, renderBoxActions } from "../../lib/box";
 import { setupDesignRemovedError } from "../../lib/branding/designs";
 import {
   claimAction,
@@ -42,12 +42,18 @@ import {
   callbackUriFor,
   customFlagText,
   checkGivenCustomFlags,
+  type ConnectionFile,
+  connectionSummaryBody,
   customExample,
   customFlagValues,
   flagText,
   givenCustomFlags,
   loopbackIssuerWarning,
   publishClientId,
+  readConnectionFiles,
+  readMappings,
+  readSchemaFiles,
+  type SchemaFile,
   type PublishState,
   selectionFromFlags,
   reportClientIdOutcome,
@@ -56,6 +62,9 @@ import {
   SETUP_FLAG_KEYS,
   SETUP_FLAG_NAMES,
   ssoEnableArgs,
+  statusLine,
+  stepLines,
+  stillToConfigure,
   storeClientSecret,
   type SecretOutcome,
   type SecretPublisher,
@@ -123,6 +132,7 @@ import {
 } from "./prompts";
 import {
   detectProjectFacts,
+  dim,
   fileNameOf,
   formatFrameworkLine,
   id as styleId,
@@ -292,6 +302,40 @@ export default class Setup extends Destructive(BaseCommand) {
         "With --sso custom: the scopes to request, separated by spaces or commas. Must include openid. Default: openid profile email.",
     }),
   };
+
+  /**
+   * For each provider enabled while scaffolding: what its connection file maps,
+   * and what is still to do. Read from the file, so it reports what is on disk
+   * and not what setup meant to write.
+   */
+  private connectionBlocks(
+    sso: readonly SsoDraft[],
+    files: readonly ConnectionFile[],
+    schemas: readonly SchemaFile[],
+  ): string[] {
+    return sso.flatMap((answer) => {
+      const provider = providerOf(answer.selection);
+      const file = files.find((entry) => entry.path === `.zitadel/idps/${provider.slug}.json`);
+      if (file === undefined) {
+        return [];
+      }
+      return [
+        "",
+        dim(`SIGN IN WITH ${provider.displayName.toUpperCase()}`),
+        ...connectionSummaryBody(file, schemas),
+        "",
+        statusLine("applied"),
+        "Still to do:",
+        ...stepLines(
+          stillToConfigure({
+            status: "applied",
+            file: file.path,
+            provider: provider.displayName,
+          }),
+        ),
+      ];
+    });
+  }
 
   async run(): Promise<JsonEnvelope> {
     const { flags } = await this.parse(Setup);
@@ -981,6 +1025,11 @@ export default class Setup extends Destructive(BaseCommand) {
           commands: [consoleCommand],
         }
       : { actions: [], boxActions: [], commands: [] as SuggestedCommand[] };
+    // Read from disk, so both the box and the envelope report what the
+    // connection files say and not what setup meant to write.
+    const connectionFiles =
+      dryRun || answers.sso.length === 0 ? [] : await readConnectionFiles(cwd);
+    const schemaFiles = dryRun || answers.sso.length === 0 ? [] : await readSchemaFiles(cwd);
     // The structured report is human-only. Under `--json` we let the
     // envelope returned from `this.emit(...)` be the sole stdout
     // payload (oclif requires single-doc JSON).
@@ -998,28 +1047,26 @@ export default class Setup extends Destructive(BaseCommand) {
         scaffoldedBesideFiles,
         sso: answers.sso,
       });
-      // Frame the report in a consola box so it reads as a distinct
+      // Frame the report in a box so it reads as a distinct
       // status panel separate from the per-step narration above it.
       // `box` accepts ANSI-styled text in the message body, so our
       // pre-coloured rows (path/url/id helpers) survive intact.
-      // `wrapForBox` caps the content at the terminal width: consola sizes
+      // `printBox` caps the content at the terminal width: consola sizes
       // the frame to the longest line, so an unwrapped sentence wider than
       // the window would break the right border.
-      consola.box({
+      printBox({
         title: "Zitadel is ready",
-        message: wrapForBox(
-          [
-            renderSummary(sections),
-            "",
-            renderBoxActions([
-              ...deployStep.boxActions,
-              ...installOutcome.boxActions,
-              ...consoleStep.boxActions,
-              ...claimNudge.boxActions,
-            ]),
-          ].join("\n"),
-        ),
-        style: { padding: 1, borderStyle: "rounded", borderColor: "green" },
+        message: [
+          renderSummary(sections),
+          ...this.connectionBlocks(answers.sso, connectionFiles, schemaFiles),
+          "",
+          renderBoxActions([
+            ...deployStep.boxActions,
+            ...installOutcome.boxActions,
+            ...consoleStep.boxActions,
+            ...claimNudge.boxActions,
+          ]),
+        ].join("\n"),
       });
       // The box holds the next steps, so the base command does not repeat them.
       nextShown = asStepsShown();
@@ -1078,6 +1125,8 @@ export default class Setup extends Destructive(BaseCommand) {
             slug,
             client_id: answer.credentials.clientId ?? null,
             connection: `.zitadel/idps/${slug}.json`,
+            ...connectionMappings(connectionFiles, slug),
+            ...(outcome === undefined ? {} : { state: "applied" }),
             // What the developer registers at the provider: the connection's
             // own route, as `auth-method sso enable` reports it.
             callback_uri: callbackUriFor(issuer, slug),
@@ -2235,4 +2284,21 @@ export function buildSummary(opts: {
     { title: "Customize", rows: customizeRows },
     { title: "Project", rows: projectRows },
   ];
+}
+
+/** The mapping a connection file holds, for the result an agent reads. Empty when the file was not written. */
+function connectionMappings(
+  files: readonly ConnectionFile[],
+  slug: string,
+): Record<string, unknown> {
+  const file = files.find((entry) => entry.path === `.zitadel/idps/${slug}.json`);
+  if (file === undefined) {
+    return {};
+  }
+  const { mapping, verification, scopes } = readMappings(file.body);
+  return {
+    claim_mapping: Object.fromEntries(mapping.map((row) => [row.attribute, row.claim])),
+    verified_claims: Object.fromEntries(verification.map((row) => [row.attribute, row.claim])),
+    scopes,
+  };
 }

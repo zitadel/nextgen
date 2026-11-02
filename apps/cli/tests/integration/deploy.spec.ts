@@ -10,10 +10,102 @@ import {
   aSetUpApp,
   type DeployResult,
   PASSWORD_POLICY,
+  type ScaffoldedApp,
   SETUP_ORIGIN,
 } from "../helpers/project";
 
 const platform = usePlatformMock();
+
+const GOOGLE = {
+  clientId: "1234-abc.apps.googleusercontent.com",
+  secret: "the-client-secret",
+};
+
+/** A set-up app with Google sign-in enabled, ready for a deploy. */
+async function anAppWithGoogle(): Promise<ScaffoldedApp> {
+  const app = await aSetUpApp();
+  expect(await app.enableSso("google", GOOGLE)).toSucceed();
+  return app;
+}
+
+/** A set-up app with a custom OIDC connection enabled, ready for a deploy. */
+async function anAppWithCustomSso(): Promise<ScaffoldedApp> {
+  const app = await aSetUpApp();
+  expect(
+    await app.enableCustomSso(
+      { slug: "acme-sso", displayName: "Acme SSO", issuer: "https://sso.acme.example" },
+      { clientId: "acme-client-id", secret: "acme-client-secret" },
+    ),
+  ).toSucceed();
+  return app;
+}
+
+/** Mapping mistakes a deploy must refuse, each applied to a Google connection. */
+const HARD_ERRORS: ReadonlyArray<[string, (app: ScaffoldedApp) => Promise<void>]> = [
+  [
+    "a mapping target the schema does not define",
+    (app) =>
+      app.editConnection("google", (c) => {
+        c.claim_mapping = { ...c.claim_mapping, contactEmial: "mail" };
+      }),
+  ],
+  [
+    "a mapping key that contains a dot",
+    (app) =>
+      app.editConnection("google", (c) => {
+        c.claim_mapping = { ...c.claim_mapping, "profile.email": "mail" };
+      }),
+  ],
+];
+
+/**
+ * Mapping mistakes that almost certainly do not do what was meant, which a
+ * deploy warns about and carries on past: the admin may know better, and what
+ * the warning says.
+ */
+const SOFT_WARNINGS: ReadonlyArray<[string, (app: ScaffoldedApp) => Promise<void>, string]> = [
+  [
+    "a standard claim the catalog connection's scopes do not return",
+    async (app) => {
+      await app.editUserSchema((schema) => {
+        schema.properties.givenName = { type: "string" };
+      });
+      await app.editConnection("google", (c) => {
+        c.oidc.scopes = ["openid", "email"];
+        c.claim_mapping = { ...c.claim_mapping, givenName: "given_name" };
+      });
+    },
+    "only returns for",
+  ],
+  [
+    "a claim whose type the property cannot hold",
+    async (app) => {
+      await app.editUserSchema((schema) => {
+        schema.properties.refreshedAt = { type: "string" };
+      });
+      await app.editConnection("google", (c) => {
+        c.claim_mapping = { ...c.claim_mapping, refreshedAt: "updated_at" };
+      });
+    },
+    "updated_at",
+  ],
+  [
+    "a verification that reads a claim which is not a boolean",
+    (app) =>
+      app.editConnection("google", (c) => {
+        c.verified_claims = { email: "email" };
+      }),
+    "never verifies",
+  ],
+  [
+    "a subject that is a claim the user can change",
+    (app) =>
+      app.editConnection("google", (c) => {
+        c.subject_claim = "email";
+      }),
+    "subject_claim",
+  ],
+];
 
 describe("deploy", () => {
   describe("against an invalid server", () => {
@@ -363,6 +455,114 @@ describe("deploy", () => {
             patch: expect.stringContaining('"nickname"'),
           }),
         ]);
+      });
+    });
+
+    describe("SSO configuration across files", () => {
+      describe("refuses a mapping that cannot work", () => {
+        it.each(HARD_ERRORS)("deploy stops on %s", async (_name, edit) => {
+          const app = await anAppWithGoogle();
+          await edit(app);
+
+          expect(await app.deploy()).toFailWith("E_VALIDATION");
+        });
+
+        it.each(HARD_ERRORS)("deploy --dry-run stops on %s", async (_name, edit) => {
+          const app = await anAppWithGoogle();
+          await edit(app);
+
+          expect(await app.deployDryRun()).toFailWith("E_VALIDATION");
+        });
+      });
+
+      describe("warns about a mapping that probably does not do what was meant", () => {
+        it.each(SOFT_WARNINGS)("deploy --dry-run carries on past %s", async (_name, edit) => {
+          const app = await anAppWithGoogle();
+          await edit(app);
+
+          expect(await app.deployDryRun()).toSucceed();
+        });
+
+        it.each(SOFT_WARNINGS)("deploy --dry-run warns about %s", async (_name, edit, says) => {
+          const app = await anAppWithGoogle();
+          await edit(app);
+
+          expect(await app.deployRendered(["--dry-run"])).toSay(says);
+        });
+
+        it("says nothing about a changeable subject once the connection is deployed", async () => {
+          const app = await anAppWithGoogle();
+          await app.editConnection("google", (c) => {
+            c.subject_claim = "email";
+          });
+          await app.deploy();
+
+          expect(await app.deployRendered(["--dry-run"])).not.toSay("subject_claim");
+        });
+      });
+
+      it("suggests the property a mistyped mapping target was meant for", async () => {
+        const app = await anAppWithGoogle();
+        await app.editUserSchema((schema) => {
+          schema.properties.contactEmail = { type: "string" };
+        });
+        await app.editConnection("google", (c) => {
+          c.claim_mapping = { ...c.claim_mapping, contactEmial: "mail" };
+        });
+
+        expect(await app.deployDryRun()).toExplain('Did you mean "contactEmail"?');
+      });
+
+      it("lets a verification of a property nothing reads through", async () => {
+        const app = await anAppWithGoogle();
+        await app.editUserSchema((schema) => {
+          schema.properties.nickname = { type: "string" };
+        });
+        await app.editConnection("google", (c) => {
+          c.claim_mapping = { ...c.claim_mapping, nickname: "nickname" };
+          c.verified_claims = { ...c.verified_claims, nickname: "nickname_ok" };
+        });
+
+        expect(await app.deployDryRun()).toSucceed();
+      });
+
+      it("lets a custom connection whose scopes omit a claim it reads through", async () => {
+        const app = await anAppWithCustomSso();
+        await app.editConnection("acme-sso", (c) => {
+          c.oidc.scopes = ["openid"];
+        });
+
+        expect(await app.deployDryRun()).toSucceed();
+      });
+
+      it("warns that a custom connection reads a claim its scopes do not return", async () => {
+        const app = await anAppWithCustomSso();
+        await app.editConnection("acme-sso", (c) => {
+          c.oidc.scopes = ["openid"];
+        });
+
+        expect(await app.deployRendered(["--dry-run"])).toSay("only returns for");
+      });
+
+      it("prints the mapping box for each connection on a dry run", async () => {
+        const app = await anAppWithGoogle();
+
+        expect(await app.deployRendered(["--dry-run"])).toPrint("SIGN IN WITH GOOGLE");
+      });
+
+      it("names an attribute the connection leaves without a claim", async () => {
+        const app = await aSetUpApp(["--use-case", "business"]);
+        expect(await app.enableSso("google", GOOGLE)).toSucceed();
+
+        expect(await app.deployRendered(["--dry-run"])).toPrint("companyName");
+      });
+
+      it("names the schema that signs in through the connection", async () => {
+        const app = await anAppWithGoogle();
+
+        expect(await app.deployRendered(["--dry-run"])).toPrint(
+          "default-human-user signs in through this connection",
+        );
       });
     });
 

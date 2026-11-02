@@ -7,6 +7,7 @@ import { FLOWS_DIR } from "../../flows";
 import { IDPS_DIR } from "../../idp";
 import { type JsonDirEntry, readJsonDirEntries } from "../../json-dir";
 import { SCHEMAS_DIR } from "../../user-schema";
+import type { StepContext } from "../pipeline";
 import { reportWarning } from "../../warnings";
 
 /**
@@ -22,7 +23,11 @@ import { reportWarning } from "../../warnings";
  * A deploy publishes everything under `.zitadel/`, so everything is judged;
  * there is no narrower set of files a deploy "touches".
  */
-export async function validateSsoConsistency(cwd: string): Promise<void> {
+export async function validateSsoConsistency(
+  cwd: string,
+  suggest: StepContext["suggest"],
+  deployed?: ReadonlySet<string>,
+): Promise<void> {
   const [schemas, flows, connections] = await Promise.all([
     readJsonDirEntries(join(cwd, SCHEMAS_DIR)),
     readJsonDirEntries(join(cwd, FLOWS_DIR)),
@@ -49,24 +54,40 @@ export async function validateSsoConsistency(cwd: string): Promise<void> {
       }),
     ),
     connections: keyed(IDPS_DIR, connections),
+    ...(deployed ? { deployed } : {}),
   };
 
   const issues = validateProject(tree);
-  if (issues.length === 0) {
+
+  // A warning-severity issue almost certainly does not do what was meant but
+  // may be what the admin intends: a claim the scopes may not return, a claim
+  // type that does not fit its property, a verification read from a claim
+  // that is not a flag, or a subject_claim the user can change. It is worth
+  // saying, but it must not stop a deploy, so it is reported as a non-blocking
+  // warning and does not join the thrown error.
+  for (const issue of issues.filter((entry) => entry.severity === "warning")) {
+    reportWarning(`${issue.file}: ${issue.message}`);
+  }
+
+  // Only error-severity issues block. When every issue was a warning, the
+  // deploy proceeds.
+  const errors = issues.filter((entry) => entry.severity === "error");
+  if (errors.length === 0) {
     return;
   }
-  const noun = issues.length === 1 ? "issue" : "issues";
+  const noun = errors.length === 1 ? "issue" : "issues";
   throw new ZitadelError(
     "E_VALIDATION",
-    `SSO configuration is not consistent (${issues.length} ${noun}):\n` +
-      issues.map((issue) => `  - ${issue.file}: ${issue.message}`).join("\n"),
+    `SSO configuration is not consistent (${errors.length} ${noun}):\n` +
+      errors.map((issue) => `  - ${issue.file}: ${issue.message}`).join("\n"),
     {
       hint:
         "These checks read the schemas, flows and connection files together. " +
-        "Fix the files named above and re-run; no changes were made. " +
+        "Fix the files named above, then check again; no changes were made. " +
         "Only the CLI makes these checks.",
+      nextCommands: [suggest("deploy --dry-run")],
       details: {
-        issues: issues.map(({ rule, file, steps, message }) => ({
+        issues: errors.map(({ rule, file, steps, message }) => ({
           rule,
           path: file,
           ...(steps === undefined ? {} : { steps }),
@@ -75,6 +96,23 @@ export async function validateSsoConsistency(cwd: string): Promise<void> {
       },
     },
   );
+}
+
+/**
+ * The slugs of the connections the project already has on the server, or
+ * `undefined` when it cannot say. Some advice only holds before a connection's
+ * first deploy, so a server that does not answer only means that advice is
+ * given anyway: it never fails the check.
+ */
+export async function deployedSlugs(
+  ctx: Pick<StepContext, "client" | "projectId">,
+): Promise<ReadonlySet<string> | undefined> {
+  try {
+    const idps = await ctx.client.queryIdps.all({ limit: 100 }, { project_id: ctx.projectId });
+    return new Set(idps.map((idp) => idp.slug));
+  } catch {
+    return undefined;
+  }
 }
 
 /** The provider slugs the steps of a flow offer. */

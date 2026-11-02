@@ -167,6 +167,47 @@ describe("auth-method sso enable", () => {
           });
         });
 
+        it("reports the claim mapping of the connection file", async () => {
+          const app = await aSetUpApp();
+
+          const result = await provider.enable(app);
+
+          const { data } = app.envelopeOf<{
+            connection: { claim_mapping: Record<string, string> };
+          }>(result);
+          expect(data.connection.claim_mapping).toEqual({ email: "email" });
+        });
+
+        it("reports what verifies the email apart from the mapping", async () => {
+          const app = await aSetUpApp();
+
+          const result = await provider.enable(app);
+
+          const { data } = app.envelopeOf<{
+            connection: { verified_claims: Record<string, string> };
+          }>(result);
+          expect(data.connection.verified_claims).toEqual({ email: "email_verified" });
+        });
+
+        it("reports that the connection is saved and not yet applied", async () => {
+          const app = await aSetUpApp();
+
+          const result = await provider.enable(app);
+
+          const { data } = app.envelopeOf<{ connection: { state: string } }>(result);
+          expect(data.connection.state).toBe("saved");
+        });
+
+        it("reports that a connection already in the project is present", async () => {
+          const app = await aSetUpApp();
+          await provider.enable(app);
+
+          const result = await provider.enable(app);
+
+          const { data } = app.envelopeOf<{ connection: { state: string } }>(result);
+          expect(data.connection.state).toBe("present");
+        });
+
         it("reports the variable the secret was stored as", async () => {
           const app = await aSetUpApp();
 
@@ -661,12 +702,20 @@ describe("auth-method sso enable", () => {
     });
 
     describe("rendered for a terminal", () => {
-      it("says the provider is configured locally and not yet live", async () => {
+      it("says the provider is saved locally and not yet live", async () => {
         const app = await aSetUpApp();
 
         const result = await app.enableSsoRendered(GOOGLE, CREDENTIALS);
 
-        expect(result).toPrint("Google sign-in is configured locally.");
+        expect(result).toPrint("Saved in your project. Not applied, not tested.");
+      });
+
+      it("prints nothing after its box to repeat what the box says", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.enableSsoRendered(GOOGLE, CREDENTIALS);
+
+        expect(result).not.toPrint("Next:");
       });
 
       it("renders text rather than a json envelope", async () => {
@@ -675,6 +724,48 @@ describe("auth-method sso enable", () => {
         const result = await app.enableSsoRendered(GOOGLE, CREDENTIALS);
 
         expect(result).toPrintNoJson();
+      });
+
+      it("ends with a box that summarises the connection", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.enableSsoRendered(GOOGLE, CREDENTIALS);
+
+        expect(result).toPrint("Google is set up");
+      });
+
+      it("prints no mapping on a dry run, which writes no connection", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.enableSsoDryRun(GOOGLE, CREDENTIALS);
+
+        expect(result).toSucceed();
+        expect(result).not.toPrint("comes from the");
+      });
+
+      it("shows the mapping a developer edited when enabled again, not a regenerated one", async () => {
+        const app = await aSetUpApp();
+        await app.enableSsoRendered(GOOGLE, CREDENTIALS);
+        await app.editConnection("google", (connection) => {
+          connection.claim_mapping = { email: "mail" };
+        });
+
+        const result = await app.enableSsoRendered(GOOGLE, CREDENTIALS);
+
+        expect(result).toPrint("email comes from the mail claim");
+      });
+
+      it("leaves a mapping the developer edited in the file when enabled again", async () => {
+        const app = await aSetUpApp();
+        await app.enableSsoRendered(GOOGLE, CREDENTIALS);
+        await app.editConnection("google", (connection) => {
+          connection.claim_mapping = { email: "mail" };
+        });
+        await app.enableSsoRendered(GOOGLE, CREDENTIALS);
+
+        expect(await app.connectionOf("google")).toMatchObject({
+          claim_mapping: { email: "mail" },
+        });
       });
     });
   });

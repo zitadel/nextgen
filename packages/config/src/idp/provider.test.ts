@@ -5,6 +5,7 @@ import {
   credentialVariables,
   isVariableReference,
   referencedVariable,
+  uniquePropertyNames,
   variableReference,
 } from "./provider.js";
 import { secretVariable, slug } from "./test-support.js";
@@ -55,5 +56,43 @@ describe("variable references", () => {
     expect(referencedVariable("prefix ${{ ACME }}")).toBeUndefined();
     expect(referencedVariable("${{ ACME }} suffix")).toBeUndefined();
     expect(isVariableReference("824.apps.googleusercontent.com")).toBe(false);
+  });
+});
+
+describe("the unique properties of a schema", () => {
+  it("names a property that scopes its uniqueness to the project or the team", () => {
+    expect(
+      uniquePropertyNames({
+        properties: {
+          email: { "x-unique": "project" },
+          handle: { "x-unique": "team" },
+          name: {},
+        },
+      }),
+    ).toEqual(["email", "handle"]);
+  });
+
+  it("does not count an unspecified or null scope", () => {
+    expect(
+      uniquePropertyNames({
+        properties: { a: { "x-unique": "unspecified" }, b: { "x-unique": null } },
+      }),
+    ).toEqual([]);
+  });
+
+  it("counts an object that holds a unique property, as the engine asks at the top level", () => {
+    expect(
+      uniquePropertyNames({
+        properties: {
+          address: { type: "object", properties: { street: { "x-unique": "project" } } },
+        },
+      }),
+    ).toEqual(["address"]);
+  });
+
+  it("reads a schema with no properties, or odd ones, as having none", () => {
+    expect(uniquePropertyNames({})).toEqual([]);
+    expect(uniquePropertyNames({ properties: null })).toEqual([]);
+    expect(uniquePropertyNames({ properties: { a: null, b: "x" } })).toEqual([]);
   });
 });

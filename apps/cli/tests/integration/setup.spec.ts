@@ -616,6 +616,37 @@ describe("setup", () => {
           expect((await app.registeredIdps()).map((idp) => idp.slug)).toEqual([provider.slug]);
         });
 
+        it("reports the claim mapping the connection was written with", async () => {
+          const app = await anApp();
+
+          const result = await provider.setUp(app);
+
+          const { data } = app.envelopeOf<{ sso: { claim_mapping: Record<string, string> }[] }>(
+            result,
+          );
+          expect(data.sso[0]?.claim_mapping).toEqual({ email: "email" });
+        });
+
+        it("reports what makes the email verified apart from the mapping", async () => {
+          const app = await anApp();
+
+          const result = await provider.setUp(app);
+
+          const { data } = app.envelopeOf<{ sso: { verified_claims: Record<string, string> }[] }>(
+            result,
+          );
+          expect(data.sso[0]?.verified_claims).toEqual({ email: "email_verified" });
+        });
+
+        it("reports that the connection reached the server", async () => {
+          const app = await anApp();
+
+          const result = await provider.setUp(app);
+
+          const { data } = app.envelopeOf<{ sso: { state: string }[] }>(result);
+          expect(data.sso[0]?.state).toBe("applied");
+        });
+
         it("publishes the client id as a readable project variable", async () => {
           const app = await anApp();
           expect(await provider.setUp(app)).toSucceed();
@@ -732,6 +763,16 @@ describe("setup", () => {
           expect(await provider.setUp(app)).toSucceed();
 
           expect(await app.deployDryRun()).toSucceed();
+        });
+      });
+
+      describe("rendered for a terminal", () => {
+        it("ends with a box that summarises the connection", async () => {
+          const app = await anApp();
+
+          const result = await app.setupWithCustomSsoRendered(ACME, ACME_CREDENTIALS);
+
+          expect(result).toPrint("SIGN IN WITH ACME SSO");
         });
       });
 

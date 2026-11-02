@@ -19,6 +19,7 @@ import {
   type Parsed,
   parseScopes,
   type ProviderName,
+  uniquePropertyNames,
   type ProviderSelection,
   providerOf,
   RESERVED_SLUGS,
@@ -29,6 +30,7 @@ import {
 import type { ZitadelClient } from "../../../lib/api-client";
 import { loopbackReach } from "../../../lib/local-server/runtime";
 import { refuseBrokenFlows, refuseUneditable } from "../../../lib/auth-methods";
+import { printBox } from "../../../lib/box";
 import { isDevelopmentBuild } from "../../../lib/build-channel";
 import { ZitadelError } from "../../../lib/errors";
 import { stableStringify } from "../../../lib/json";
@@ -43,6 +45,7 @@ import {
   enabledMethods,
   type ConnectionFile,
   type ConnectionPlan,
+  type ConnectionStatus,
   type FlowFile,
   credentialVariablesOf,
   type CustomFlagValues,
@@ -50,17 +53,23 @@ import {
   customFlagValues,
   ENABLE_FLAG_KEYS,
   ENABLE_FLAG_NAMES,
+  connectionSummaryBody,
   loopbackIssuerWarning,
+  readMappings,
   planConnection,
   publishClientId,
   type PublishState,
   readConnectionFiles,
+  readSchemaFiles,
   refuseChangedIssuer,
   reportClientIdOutcome,
   republishArgs,
   selectionFromFlags,
   type StoredVariables,
   ssoEditRefusal,
+  statusLine,
+  stepLines,
+  stillToConfigure,
   type SsoResult,
   type SsoSkipped,
   reportSecretOutcome,
@@ -77,6 +86,7 @@ import {
   nonBlankString,
 } from "../../../lib/oclif";
 import { environmentFlags } from "../../../lib/oclif/environment-flags";
+import { asStepsShown } from "../../../lib/oclif/next-steps";
 import { inShell, type SuggestedCommand } from "../../../lib/suggestion";
 import { reportWarning } from "../../../lib/warnings";
 
@@ -290,9 +300,12 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     // written, both arrive here.
     let secret: SecretOutcome | undefined;
     let clientIdState: PublishState | undefined;
+    // The connection as it stands in the file, for the summary below.
+    let connectionBody: object;
 
     if (reusing) {
       consola.success(`Reusing ${plan.file.path}`);
+      connectionBody = plan.file.body;
       // Shown on reuse too: the URI moved to one per connection after the
       // first release, and rerunning this command is how a developer finds
       // the one to register now.
@@ -391,6 +404,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       const connection = entry.connection({
         slug: plan.slug,
         schemaProperties: schema.properties,
+        uniqueProperties: uniquePropertyNames(schema.body),
         schemaRef: CONNECTION_SCHEMA_REF,
         endpoints,
       });
@@ -410,6 +424,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         // else in the output would show it.
         reportWarning(`${entry.displayName} points at ${endpoints.issuer}, not the provider`);
       }
+      connectionBody = connection;
       const target = join(cwd, plan.path);
       await mkdir(dirname(target), { recursive: true });
       // `wx` rather than a plain write: planConnection decided this file does
@@ -428,15 +443,6 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         publish,
       });
       consola.success(`Wrote ${plan.path}`);
-      if (selection.kind === "custom") {
-        for (const note of mappingNotes({
-          file: plan.path,
-          provider: entry.displayName,
-          connection,
-        })) {
-          consola.info(note);
-        }
-      }
     }
 
     const written = await this.enableInConfiguration(cwd, schema, edits);
@@ -490,9 +496,29 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     const stored = credentialsStored ? ["Provider credentials are stored on your Project."] : [];
     const name = entry.displayName;
     const followUps = this.followUps(unpublished, scopeArgs, recovery);
+    // Commands come back only when every argument can be run as written: the
+    // credential ones first, then the two deploy commands.
+    const commands = followUps.commands.map(String);
+    await this.reportConnection({
+      cwd,
+      body: connectionBody,
+      file: reusing ? plan.file.path : plan.path,
+      provider: name,
+      status: reusing ? "present" : "saved",
+      stored: credentialsStored,
+      deploy: unpublished,
+      republish: commands.slice(0, recovery.length),
+      deployCommands: commands.slice(recovery.length),
+    });
+    // The box ends with these steps, so the base command does not repeat them.
+    const nextShown = this.jsonEnabled() ? undefined : asStepsShown();
 
     return this.emit({
       status: "ok",
+      // The box is the human output and ends with what is left to do, as
+      // `setup`'s does, so the generic summary would only repeat it. `--json`
+      // still carries the title and the follow-ups.
+      pretty: "",
       data: {
         // Configured is not live, and stored credentials are only claimed once
         // they reached the Project (a failed or deferred publish warns instead).
@@ -510,6 +536,8 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
           idVariable,
           changed: written,
           skipped: edits.skipped,
+          body: connectionBody,
+          status: reusing ? "present" : "saved",
         }),
         next_args: followUps.args,
       },
@@ -523,6 +551,46 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
           : {}),
         commands: followUps.commands,
       },
+      nextShown,
+    });
+  }
+
+  /**
+   * The run's whole human result, in one box as `setup` ends with: the
+   * connection file and what it maps, where the connection stands, and what is
+   * left to do with the commands that do it, so nothing follows the box to
+   * repeat it. Not shown under `--json`, which carries all of it in its payload.
+   */
+  private async reportConnection(input: {
+    cwd: string;
+    body: object;
+    file: string;
+    provider: string;
+    status: ConnectionStatus;
+    /** Whether both credentials reached the project. */
+    stored: boolean;
+    /** Whether a file changed that only a deploy publishes. */
+    deploy: boolean;
+    republish: readonly string[];
+    deployCommands: readonly string[];
+  }): Promise<void> {
+    const schemas = await readSchemaFiles(input.cwd);
+    printBox({
+      title: `${input.provider} is set up`,
+      message: [
+        `Connection file   ${input.file}`,
+        "",
+        ...connectionSummaryBody(
+          { path: input.file, body: input.body as Record<string, unknown> },
+          schemas,
+        ),
+        "",
+        statusLine(input.status),
+        ...(input.stored ? ["Provider credentials are stored on your Project."] : []),
+        "",
+        "Still to do:",
+        ...stepLines(stillToConfigure(input)),
+      ].join("\n"),
     });
   }
 
@@ -643,7 +711,12 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     idVariable: ClientIdVariable | undefined;
     changed?: string[];
     skipped?: SsoSkipped[];
+    /** The connection as it stands in the file, when the run read or wrote it. */
+    body?: object;
+    /** Where the connection stands, for a result that wrote or read its file. */
+    status?: ConnectionStatus;
   }): Record<string, unknown> {
+    const mappings = input.body === undefined ? undefined : readMappings(input.body);
     return {
       project_id: input.projectId,
       provider: input.provider,
@@ -652,6 +725,18 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         action: input.plan.action,
         slug: input.plan.slug,
         file: input.plan.action === "reuse" ? input.plan.file.path : input.plan.path,
+        ...(input.status === undefined ? {} : { state: input.status }),
+        ...(mappings === undefined
+          ? {}
+          : {
+              claim_mapping: Object.fromEntries(
+                mappings.mapping.map((r) => [r.attribute, r.claim]),
+              ),
+              verified_claims: Object.fromEntries(
+                mappings.verification.map((r) => [r.attribute, r.claim]),
+              ),
+              scopes: mappings.scopes,
+            }),
       },
       callback_uri: input.callbackUri,
       changed: input.changed ?? [],
@@ -860,40 +945,5 @@ function editedFiles(schema: SchemaFile, edits: PlannedEdits): string[] {
   return [
     ...(edits.schema.changed ? [schema.path] : []),
     ...edits.flows.filter(({ result }) => result.changed).map(({ flow }) => flow.path),
-  ];
-}
-
-/**
- * What a person needs to know about the claim mappings a custom connection was
- * written with, in two parts: the mappings (where they are, which side of each
- * line is their user schema's and which is the claim the provider must return),
- * then what verifies a value, which a mapping alone does not. Nothing here
- * edits a mapping; the connection file is where that happens.
- */
-function mappingNotes(options: { file: string; provider: string; connection: object }): string[] {
-  const { file, provider, connection } = options;
-  const document = connection as {
-    claim_mapping?: Readonly<Record<string, string>>;
-    verified_claims?: Readonly<Record<string, string | true>>;
-  };
-  const mappings = Object.entries(document.claim_mapping ?? {});
-  if (mappings.length === 0) {
-    return [];
-  }
-  const verified = Object.entries(document.verified_claims ?? {});
-  return [
-    `Claim mappings in ${file}. Each line is an attribute of your user schema, then the claim ${provider} must return for it:`,
-    ...mappings.map(([attribute, claim]) => `  ${attribute} ← ${claim}`),
-    ...(verified.length === 0
-      ? ["Nothing is treated as verified."]
-      : [
-          "Verification, which a mapping alone does not give:",
-          ...verified.map(([attribute, how]) =>
-            how === true
-              ? `  ${attribute} is treated as verified.`
-              : `  ${attribute} is treated as verified only when ${provider} says so in the ${how} claim.`,
-          ),
-        ]),
-    "Edit the mappings in that file if your provider returns other claims.",
   ];
 }

@@ -15,6 +15,8 @@
  * sideways only on shared utilities under `apps/cli/src/lib/` — today
  * `lib/errors` (`ZitadelError`) and `lib/json` (`isObject`).
  */
+export { connectionSummaryBody, renderConnectionSummaries } from "./connection-summary";
+
 export {
   CONNECTION_SCHEMA_REF,
   IDPS_DIR,
@@ -33,6 +35,7 @@ export {
 export {
   applySsoToFlow,
   applySsoToSchema,
+  schemaProviders,
   removeSsoFromFlow,
   removeSsoFromSchema,
   ssoEditRefusal,
@@ -88,3 +91,18 @@ export {
   type SchemaFile,
   selectSchema,
 } from "./schemas";
+
+export {
+  type ConnectionMappings,
+  type ConnectionStatus,
+  mappingLines,
+  readMappings,
+  type Step,
+  statusLine,
+  stepLines,
+  stillToConfigure,
+  type UnmappedAttribute,
+  unmappedAttributes,
+  unmappedLines,
+  usedByLines,
+} from "./mappings";
