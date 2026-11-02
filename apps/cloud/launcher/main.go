@@ -18,11 +18,12 @@
 //     the server re-wraps every project key to the current one at startup.
 //   - The optional bootstrap admin document, BOOTSTRAP_ADMIN_USER_JSON_B64,
 //     becomes a --user-file.
-//   - The audit event purge. A function runs only while it serves a request,
-//     so the server's own hourly purge cannot run here: a Vercel Cron Job
-//     (repo-root vercel.json) calls the server's retention trigger instead,
-//     with CRON_SECRET as its bearer token, which becomes
-//     events.retention.trigger_secret in <data_dir>/nextgen.yaml.
+//   - The audit event purge and the usage count. A function runs only while
+//     it serves a request, so the server's own loops cannot run here: Vercel
+//     Cron Jobs (repo-root vercel.json) call the server's retention and usage
+//     triggers instead, with CRON_SECRET as their bearer token, which becomes
+//     events.retention.trigger_secret and usage.trigger_secret in
+//     <data_dir>/nextgen.yaml.
 //   - The deployment's shape. The listen address follows PORT, the data dir
 //     is the function's writable /tmp, and the console is a service of its own
 //     (repo-root vercel.json). The platform project is bootstrapped, logs are
@@ -683,10 +684,14 @@ func renderConfig(s *serving) []byte {
 	}
 	if s.cronSecret != "" {
 		// Single quotes: parseServing let through printable ASCII only, and a
-		// quote is the one character to escape.
+		// quote is the one character to escape. One secret for both triggers:
+		// Vercel sends the project's CRON_SECRET to every cron path.
+		quoted := "'" + strings.ReplaceAll(s.cronSecret, "'", "''") + "'"
 		b.WriteString("events:\n")
 		b.WriteString("  retention:\n")
-		b.WriteString("    trigger_secret: '" + strings.ReplaceAll(s.cronSecret, "'", "''") + "'\n")
+		b.WriteString("    trigger_secret: " + quoted + "\n")
+		b.WriteString("usage:\n")
+		b.WriteString("  trigger_secret: " + quoted + "\n")
 	}
 	return []byte(b.String())
 }

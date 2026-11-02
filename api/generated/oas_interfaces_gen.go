@@ -277,6 +277,10 @@ type GetTeamRes interface {
 	getTeamRes()
 }
 
+type GetUsageRes interface {
+	getUsageRes()
+}
+
 type GetUserByIDRes interface {
 	getUserByIDRes()
 }

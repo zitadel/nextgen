@@ -38,6 +38,7 @@ const NAV_ORDER = [
   "Branding",
   "Deployments",
   "Authentication",
+  "Usage",
   "Settings",
 ];
 // Absent for two different reasons, both deliberate:

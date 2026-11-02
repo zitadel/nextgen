@@ -26,7 +26,7 @@ One Vercel deployment, six [services](https://vercel.com/docs/services):
 
 | Service | Built by | Serves |
 |---|---|---|
-| `server` | Go preset; the build command installs, because Vercel's Go builder runs no `installCommand`, and then runs `node_modules/.bin/turbo run deploy --filter=@zitadel/cloud`. turbo goes by its path because, unlike the JS builders, the Go builder puts no `node_modules/.bin` on `PATH`. `@zitadel/cloud`'s `build` compiles `apps/cloud/launcher` without the console (`-tags noconsole`), then `migrate` migrates and `deploy` hands the binary to the preset, none of them cached | `/api/*`, the API; its own root paths, `/console/runtime.json`, `/livez`, `/readyz`, `/csp-report`, `/cron/events-retention` and the IdP callbacks (`/idp/{slug}/callback`, `/__nextgen/idp/{slug}/callback`); and until 1.0.0 the root paths of the API's resources (`/users`, `/flow`, … in one rule). Nothing else |
+| `server` | Go preset; the build command installs, because Vercel's Go builder runs no `installCommand`, and then runs `node_modules/.bin/turbo run deploy --filter=@zitadel/cloud`. turbo goes by its path because, unlike the JS builders, the Go builder puts no `node_modules/.bin` on `PATH`. `@zitadel/cloud`'s `build` compiles `apps/cloud/launcher` without the console (`-tags noconsole`), then `migrate` migrates and `deploy` hands the binary to the preset, none of them cached | `/api/*`, the API; its own root paths, `/console/runtime.json`, `/livez`, `/readyz`, `/csp-report`, `/cron/events-retention`, `/cron/usage` and the IdP callbacks (`/idp/{slug}/callback`, `/__nextgen/idp/{slug}/callback`); and until 1.0.0 the root paths of the API's resources (`/users`, `/flow`, … in one rule). Nothing else |
 | `console` | Vite; `turbo run build` with `CONSOLE_BASE_PATH=/console/` and `CONSOLE_ADDON=../cloud-console`, which compiles in the cloud's add-on ([`apps/cloud-console`](../../apps/cloud-console/AGENTS.md)): it reports Vercel Web Analytics and Speed Insights, adds the unlisted sign-up page `/console/signup`, and adds Billing and Support to Settings, which until their systems are live say the cloud is free during the preview and point to GitHub issues, starts onboarding on each signed-in page and on the CLI's claim page, and reports `signup_completed` when the sign-in widget makes an account; in previews it also adds Email and sends the sign-in widget's calls through BotID's check in `cloud-functions`; the service serves the build where it lands, `internal/staticui/console/dist` | `/console/*` (bare `/console` redirects to the slash form; `/ui/console` and `/ui/console/*` redirect here with a 307) |
 | `docs` | Next.js; `turbo run build --filter=@zitadel/docs`, after `@zitadel/components`, `@zitadel/api-mock` and the `@zitadel/api` client the mock calls, which the live examples render, and the docs' typecheck. The build's cache key holds the deployment's ID, which Skew Protection bakes into it, so it never comes from the cache; never moon, which cannot archive the symlinks Vercel's Next.js adapter writes | `/docs` and `/docs/*`: pages, assets (`/docs/_next/`), search, `llms.txt`, each page's `.md` and the MCP server |
 | `website` | Next.js; `turbo run build --filter=@zitadel/website`, after the atoms of `@zitadel/components` its showcase renders; keyed by the deployment's ID, as the docs' | `/`, the front page, `/changelog` (`/changelog/` redirects there) with its entries' pages and its feed under it, `/changelog/*`, and their assets at `/_next/*`; the host's `/llms.txt`; the host's favicons at `/favicon.ico` and `/favicons/*`, which the console, the login UI and the docs link; and every path no other service claims, which its 404 answers ([ADR 076](../adrs/076-error-pages-and-unmatched-routes.md)) |
@@ -687,6 +687,17 @@ project and imports the root admin.
       SELECT project_id, id FROM zitadel_nextgen.events
       WHERE created_at < now() - interval '30 days' LIMIT 50000);
     ```
+
+- **Usage:** for the same reason a second Cron Job calls `/cron/usage`
+  every five minutes with `CRON_SECRET`, and the server counts each
+  project's new events into its usage rollups
+  ([ADR 085](../adrs/085-usage-rollups-and-api.md)).
+  - Each run logs `usage: counted events` with the projects it walked and
+    the events it counted, or `usage: count failed` with the cause, and
+    answers 500.
+  - While usage is counted the purge keeps every event a project's cursor
+    has not passed, so a count that keeps failing grows `events` instead of
+    losing usage. Start a run by hand as for the purge, with `/cron/usage`.
 
 - **Analytics:** the console reports page views and Web Vitals per route
   pattern (`/console/users/$userId`), the docs and the website per page,

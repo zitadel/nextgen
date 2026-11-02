@@ -100,6 +100,11 @@ tags:
       identity, session, admin, and entity events; filter by `category` /
       `event_type`. Response items are a discriminated Event union on
       `event_type` with typed payloads per docs/design/api/events-catalog.md.
+  - name: Usage
+    description: |
+      A project's usage per meter, by UTC day or hour (ADR 085): counted from
+      its events by the server's usage projector, kept after the events age
+      out, and served as counts that a hosted cloud prices.
   - name: Event Webhooks
     description: |
       Events the server POSTs to a webhook sink as it stores them (ADR 049),
@@ -264,6 +269,8 @@ paths:
     $ref: endpoints/events/methods.yaml
   /events/{id}:
     $ref: endpoints/events/by_id/methods.yaml
+  /usage:
+    $ref: endpoints/usage/methods.yaml
   /variables:
     $ref: endpoints/variables/methods.yaml
   /variables/{variable_name}:

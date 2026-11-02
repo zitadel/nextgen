@@ -140,6 +140,20 @@ curl -fsS -H "Authorization: Bearer $TRIGGER_SECRET" https://zitadel.example.com
 The hosted cloud calls it from a Vercel Cron Job
 ([runbook](../runbooks/cloud.md#operating)).
 
+## Usage
+
+| YAML key               | Environment                    | Default | Description                                                             |
+| ---------------------- | ------------------------------ | ------- | ----------------------------------------------------------------------- |
+| `usage.enabled`        | `NEXTGEN_USAGE_ENABLED`        | `true`  | Count each project's usage from its events, for `GET /usage` (ADR 085)  |
+| `usage.interval`       | `NEXTGEN_USAGE_INTERVAL`       | `5m`    | How often the server counts; the first count runs as it starts          |
+| `usage.trigger_secret` | `NEXTGEN_USAGE_TRIGGER_SECRET` | (empty) | Leaves the schedule to a scheduler outside the server, as for the purge |
+
+The server counts monthly active users per project and hour, and keeps the
+counts after the events age out. While it counts, the purge keeps every event
+it has not counted yet. With `trigger_secret` set, it counts once per `GET` or
+`POST` to `/cron/usage` that carries the secret as a bearer token, and answers
+`{"projects":3,"events":42}`.
+
 ## Logging
 
 | YAML key                                     | Environment                                          | Default                                       | Description                                                 |

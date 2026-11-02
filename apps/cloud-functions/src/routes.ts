@@ -9,8 +9,10 @@ import type {
   Plan,
   SignupAttribution,
   TicketList,
+  UsageOverview,
 } from "./contract";
 import type { Caller, Systems, Team } from "./ports";
+import { periodSoFar, teamUsage } from "./pricing/days";
 import { authenticate, failure, json } from "./request";
 
 /** What a route may do besides calling the systems: start a workflow run. */
@@ -67,6 +69,25 @@ export const routes: Record<string, Handler> = {
     const teams = await systems.zitadel.administeredTeams(auth.cookie);
     const overview: BillingOverview = {
       teams: await Promise.all(teams.map((team) => systems.stripe.overview(team))),
+    };
+    return json(overview);
+  },
+
+  // The period so far by day and project, from the server's counts, priced by
+  // the catalog; the plan and period are Stripe's.
+  "GET /cloud/api/usage": async (request, { systems }) => {
+    const auth = await authenticate(request, systems.zitadel);
+    if (auth instanceof Response) return auth;
+    const teams = await systems.zitadel.administeredTeams(auth.cookie);
+    const now = new Date();
+    const overview: UsageOverview = {
+      teams: await Promise.all(
+        teams.map(async (team) => {
+          const billing = await systems.stripe.overview(team);
+          const days = periodSoFar(billing.period, now);
+          return teamUsage(billing, await systems.zitadel.usageByDay(auth.cookie, team, days));
+        }),
+      ),
     };
     return json(overview);
   },

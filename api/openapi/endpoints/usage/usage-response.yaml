@@ -1,0 +1,31 @@
+type: object
+description: A project's usage per meter and bucket (ADR 085).
+required:
+  - data
+  - sealed_through
+  - team_id
+properties:
+  data:
+    type: array
+    description: |
+      One bucket per meter and day or hour that counted something, ordered
+      by meter, then start.
+    items:
+      $ref: usage-bucket.yaml
+  sealed_through:
+    description: |
+      The start of the first hour that is not sealed yet: every bucket that
+      starts before it is final. Null until the project's events are first
+      counted.
+    oneOf:
+      - type: string
+        format: date-time
+      - type: 'null'
+    example: '2026-10-30T14:00:00Z'
+  team_id:
+    description: |
+      The team that has claimed the project (ADR 046), which a hosted cloud
+      bills the project's usage to. Null for a project nobody has claimed.
+    oneOf:
+      - $ref: ../../components/schemas/team-id.yaml
+      - type: 'null'

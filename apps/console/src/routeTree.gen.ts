@@ -29,6 +29,7 @@ import { Route as AuthedSettingsProfileRouteImport } from './routes/_authed/sett
 import { Route as AuthedSystemIndexRouteImport } from './routes/_authed/system/index'
 import { Route as AuthedTeamsIndexRouteImport } from './routes/_authed/teams/index'
 import { Route as AuthedTeamsTeamIdRouteImport } from './routes/_authed/teams/$teamId'
+import { Route as AuthedUsageIndexRouteImport } from './routes/_authed/usage/index'
 import { Route as AuthedUsersIndexRouteImport } from './routes/_authed/users/index'
 import { Route as AuthedUsersUserIdRouteImport } from './routes/_authed/users/$userId'
 import { Route as AuthedAuthenticationIdpsIdpIdRouteImport } from './routes/_authed/authentication/idps/$idpId'
@@ -135,6 +136,11 @@ const AuthedTeamsTeamIdRoute = AuthedTeamsTeamIdRouteImport.update({
   path: '/teams/$teamId',
   getParentRoute: () => AuthedRoute,
 } as any)
+const AuthedUsageIndexRoute = AuthedUsageIndexRouteImport.update({
+  id: '/usage/',
+  path: '/usage/',
+  getParentRoute: () => AuthedRoute,
+} as any)
 const AuthedUsersIndexRoute = AuthedUsersIndexRouteImport.update({
   id: '/users/',
   path: '/users/',
@@ -173,6 +179,7 @@ export interface FileRoutesByFullPath {
   '/settings/': typeof AuthedSettingsIndexRoute
   '/system/': typeof AuthedSystemIndexRoute
   '/teams/': typeof AuthedTeamsIndexRoute
+  '/usage/': typeof AuthedUsageIndexRoute
   '/users/': typeof AuthedUsersIndexRoute
   '/authentication/idps/$idpId': typeof AuthedAuthenticationIdpsIdpIdRoute
 }
@@ -197,6 +204,7 @@ export interface FileRoutesByTo {
   '/settings': typeof AuthedSettingsIndexRoute
   '/system': typeof AuthedSystemIndexRoute
   '/teams': typeof AuthedTeamsIndexRoute
+  '/usage': typeof AuthedUsageIndexRoute
   '/users': typeof AuthedUsersIndexRoute
   '/authentication/idps/$idpId': typeof AuthedAuthenticationIdpsIdpIdRoute
 }
@@ -223,6 +231,7 @@ export interface FileRoutesById {
   '/_authed/settings/': typeof AuthedSettingsIndexRoute
   '/_authed/system/': typeof AuthedSystemIndexRoute
   '/_authed/teams/': typeof AuthedTeamsIndexRoute
+  '/_authed/usage/': typeof AuthedUsageIndexRoute
   '/_authed/users/': typeof AuthedUsersIndexRoute
   '/_authed/authentication/idps/$idpId': typeof AuthedAuthenticationIdpsIdpIdRoute
 }
@@ -249,6 +258,7 @@ export interface FileRouteTypes {
     | '/settings/'
     | '/system/'
     | '/teams/'
+    | '/usage/'
     | '/users/'
     | '/authentication/idps/$idpId'
   fileRoutesByTo: FileRoutesByTo
@@ -273,6 +283,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/system'
     | '/teams'
+    | '/usage'
     | '/users'
     | '/authentication/idps/$idpId'
   id:
@@ -298,6 +309,7 @@ export interface FileRouteTypes {
     | '/_authed/settings/'
     | '/_authed/system/'
     | '/_authed/teams/'
+    | '/_authed/usage/'
     | '/_authed/users/'
     | '/_authed/authentication/idps/$idpId'
   fileRoutesById: FileRoutesById
@@ -450,6 +462,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedTeamsTeamIdRouteImport
       parentRoute: typeof AuthedRoute
     }
+    '/_authed/usage/': {
+      id: '/_authed/usage/'
+      path: '/usage'
+      fullPath: '/usage/'
+      preLoaderRoute: typeof AuthedUsageIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/_authed/users/': {
       id: '/_authed/users/'
       path: '/users'
@@ -493,6 +512,7 @@ interface AuthedRouteChildren {
   AuthedSettingsIndexRoute: typeof AuthedSettingsIndexRoute
   AuthedSystemIndexRoute: typeof AuthedSystemIndexRoute
   AuthedTeamsIndexRoute: typeof AuthedTeamsIndexRoute
+  AuthedUsageIndexRoute: typeof AuthedUsageIndexRoute
   AuthedUsersIndexRoute: typeof AuthedUsersIndexRoute
   AuthedAuthenticationIdpsIdpIdRoute: typeof AuthedAuthenticationIdpsIdpIdRoute
 }
@@ -517,6 +537,7 @@ const AuthedRouteChildren: AuthedRouteChildren = {
   AuthedSettingsIndexRoute: AuthedSettingsIndexRoute,
   AuthedSystemIndexRoute: AuthedSystemIndexRoute,
   AuthedTeamsIndexRoute: AuthedTeamsIndexRoute,
+  AuthedUsageIndexRoute: AuthedUsageIndexRoute,
   AuthedUsersIndexRoute: AuthedUsersIndexRoute,
   AuthedAuthenticationIdpsIdpIdRoute: AuthedAuthenticationIdpsIdpIdRoute,
 }

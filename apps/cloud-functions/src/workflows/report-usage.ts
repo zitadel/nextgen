@@ -1,4 +1,5 @@
 import type { UsageRecord, UsageWindow } from "../ports";
+import { CATALOG, type Catalog } from "../pricing/catalog";
 import { currentSystems } from "../systems";
 
 /**
@@ -39,10 +40,25 @@ export function lastHours(until: string, count: number): UsageWindow[] {
 
 async function readUsage(hour: UsageWindow): Promise<UsageRecord[]> {
   "use step";
-  return currentSystems().zitadel.usage(hour);
+  return billableUsage(await currentSystems().zitadel.usage(hour));
 }
 
 async function sendUsage(records: UsageRecord[]): Promise<void> {
   "use step";
   await currentSystems().stripe.reportUsage(records);
+}
+
+/** Only priced catalog metrics reach Stripe; core MAU stays in Zitadel's usage views. */
+export function billableUsage(records: UsageRecord[], catalog: Catalog = CATALOG): UsageRecord[] {
+  const metrics = new Set(
+    catalog.meters.flatMap((meter) => {
+      if (meter.price === null) return [];
+      return meter.price.model === "per_band"
+        ? meter.price.bands
+            .filter((band) => band.unit_amount !== null)
+            .map((band) => `${meter.id}_${band.id}`)
+        : [meter.id];
+    }),
+  );
+  return records.filter((record) => metrics.has(record.metric));
 }

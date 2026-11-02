@@ -1,18 +1,23 @@
 import type { EmailPreferences, Plan, TeamBilling, Ticket } from "./contract";
 import { type HubspotAnswer, type Send, hubspotCrm } from "./hubspot/crm";
 import type { HubspotSettings } from "./hubspot/requests";
-import { type Send as SendToStripe, stripeBilling } from "./stripe/billing";
 import type {
   Billing,
   BillingRequest,
   Caller,
   Crm,
   CrmRequest,
+  DayCount,
   Directory,
+  Entitlements,
   Systems,
   Team,
   UsageRecord,
 } from "./ports";
+import { type Usage, bill, estimateForPlan } from "./pricing/bill";
+import { CATALOG } from "./pricing/catalog";
+import { periodSoFar, usageLine } from "./pricing/days";
+import { type Send as SendToStripe, stripeBilling } from "./stripe/billing";
 
 /**
  * Every system in memory (root ADR 084 §9), for local runs, previews and
@@ -24,8 +29,12 @@ import type {
  * `src/systems.ts`).
  */
 export function mockSystems(): Systems {
-  const plans = new Map<string, Plan["id"]>();
-  return { zitadel: mockDirectory(plans), stripe: mockBilling(plans), hubspot: mockCrm() };
+  const entitlements = new Map<string, Entitlements>();
+  return {
+    zitadel: mockDirectory(entitlements),
+    stripe: mockBilling(entitlements),
+    hubspot: mockCrm(),
+  };
 }
 
 export const MOCK_PERSON: Caller = {
@@ -36,17 +45,72 @@ export const MOCK_PERSON: Caller = {
 
 export const MOCK_TEAM: Team = { id: "team_mock", name: "Ada's team", personal: true };
 
+/** The plans at the price catalog's minimums, Enterprise at its first tier's by the month. */
 const PLANS: Record<Plan["id"], Plan> = {
-  free: { id: "free", name: "Free", base_amount: 0, currency: "usd" },
-  pro: { id: "pro", name: "Pro", base_amount: 10_000, currency: "usd" },
-  enterprise: { id: "enterprise", name: "Enterprise", base_amount: 0, currency: "usd" },
+  free: {
+    id: "free",
+    name: "Free",
+    minimum_amount: 0,
+    credit_amount: 0,
+    currency: CATALOG.currency,
+  },
+  pro: {
+    id: "pro",
+    name: "Pro",
+    minimum_amount: CATALOG.plans.pro.minimum.amount * 100,
+    credit_amount: CATALOG.plans.pro.minimum.is_credit ? CATALOG.plans.pro.minimum.amount * 100 : 0,
+    currency: CATALOG.currency,
+  },
+  enterprise: {
+    id: "enterprise",
+    name: "Enterprise",
+    minimum_amount: ((CATALOG.plans.enterprise.minimum.tiers_per_year.essential ?? 0) * 100) / 12,
+    credit_amount: CATALOG.plans.enterprise.minimum.is_credit
+      ? ((CATALOG.plans.enterprise.minimum.tiers_per_year.essential ?? 0) * 100) / 12
+      : 0,
+    currency: CATALOG.currency,
+  },
 };
+
+export const MOCK_PROJECTS = [
+  { id: "proj_mock_portal", name: "Customer portal" },
+  { id: "proj_mock_api", name: "Partner API" },
+];
+
+/**
+ * The mock team's month by project: a growing B2B SaaS whose 20,000 users all
+ * sign in through 20 SSO connections of 1,000 with MFA required, the pricing
+ * proposal's example bill, $1,500 on Pro; basic MFA is free. The SSO meter
+ * counts at most 750 of a connection's users. Most use the customer portal. The partner API's
+ * machines take tokens and the portal's sign-up runs bot checks, both within
+ * their allowances.
+ */
+const MOCK_PROJECT_MONTHS: Record<string, Record<string, number>> = {
+  proj_mock_portal: {
+    monthly_active_users: 14_000,
+    sso_users: 10_500,
+    bot_checks: 700,
+  },
+  proj_mock_api: {
+    monthly_active_users: 6_000,
+    sso_users: 4_500,
+    m2m_tokens: 600_000,
+  },
+};
+
+/** The mock team's whole month, its projects together. */
+export const MOCK_MONTH: Usage = { counts: mockCounts(0, Number.POSITIVE_INFINITY) };
 
 /** The server's session cookie: `__Host-zitadel_session`, or `zitadel_session` on a loopback origin (root ADR 083). */
 const SESSION_COOKIE = /(?:^|;\s*)(?:__Host-)?zitadel_session=/;
 
-/** Any session cookie is the mock person; none is no one. */
-function mockDirectory(plans: Map<string, Plan["id"]>): Directory {
+const DAY = 86_400_000;
+
+/**
+ * Any session cookie is the mock person; none is no one. The mock team's
+ * usage is its projects' months, cut into hours or days by `mockCount`.
+ */
+function mockDirectory(entitlements: Map<string, Entitlements>): Directory {
   return {
     async caller(cookie) {
       return SESSION_COOKIE.test(cookie) ? MOCK_PERSON : undefined;
@@ -55,22 +119,87 @@ function mockDirectory(plans: Map<string, Plan["id"]>): Directory {
       return [MOCK_TEAM];
     },
     async usage(hour) {
-      const record: UsageRecord = {
-        team_id: MOCK_TEAM.id,
-        metric: "monthly_active_users",
-        value: 3,
-        at: hour.start,
-        identifier: `${MOCK_TEAM.id}:monthly_active_users:${hour.start}`,
-      };
-      return [record];
+      const counts = mockCounts(Date.parse(hour.start), Date.parse(hour.end));
+      return Object.entries(counts).flatMap(([metric, value]): UsageRecord[] => {
+        if (value === 0) return [];
+        const identifier = `${MOCK_TEAM.id}:${metric}:${hour.start}`;
+        return [{ team_id: MOCK_TEAM.id, metric, value, at: hour.start, identifier }];
+      });
     },
-    async applyPlan(teamId, plan) {
-      plans.set(teamId, plan);
+    async usageByDay(_cookie, _team, days) {
+      const end = Date.parse(days.end);
+      const counts: DayCount[] = [];
+      for (let day = Date.parse(days.start); day < end; day += DAY) {
+        for (const [project_id, month] of Object.entries(MOCK_PROJECT_MONTHS)) {
+          for (const [metric, total] of Object.entries(month)) {
+            const value = mockCount(total, metric, day, Math.min(day + DAY, end));
+            if (value > 0)
+              counts.push({ day: new Date(day).toISOString(), project_id, metric, value });
+          }
+        }
+      }
+      return { projects: MOCK_PROJECTS, counts };
+    },
+    async applyEntitlements(teamId, next) {
+      entitlements.set(teamId, next);
     },
   };
 }
 
-function mockBilling(plans: Map<string, Plan["id"]>): Billing {
+/** The mock team's counts between `start` and `end`, in milliseconds, its projects together. */
+function mockCounts(start: number, end: number): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const month of Object.values(MOCK_PROJECT_MONTHS)) {
+    for (const [metric, total] of Object.entries(month)) {
+      const value = end === Number.POSITIVE_INFINITY ? total : mockCount(total, metric, start, end);
+      counts[metric] = (counts[metric] ?? 0) + value;
+    }
+  }
+  return counts;
+}
+
+/**
+ * What a month's count of `metric` comes to between `start` and `end`, in
+ * milliseconds within one UTC month, by `monthShare`: whole numbers that add
+ * up exactly, whether the month is cut into hours or days.
+ */
+export function mockCount(month: number, metric: string, start: number, end: number): number {
+  const users = CATALOG.meters.find((meter) => meter.id === metric)?.kind === "users";
+  const at = new Date(start);
+  const first = Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), 1);
+  return (
+    Math.floor(month * monthShare(first, end, users)) -
+    Math.floor(month * monthShare(first, start, users))
+  );
+}
+
+/**
+ * How much of the month starting at `first` a count has reached by `at`, from
+ * 0 at its start to 1 at its end. Users come in mostly over the first days,
+ * since a user counts on the first day of the month they are seen; activity
+ * comes in evenly over the working days. A weekend day sees a third of a
+ * weekday's.
+ */
+function monthShare(first: number, at: number, users: boolean): number {
+  const start = new Date(first);
+  const days = (Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 1) - first) / DAY;
+  if (at <= first) return 0;
+  if (at >= first + days * DAY) return 1;
+  const weights = Array.from({ length: days }, (_, index) => {
+    const weekday = new Date(first + index * DAY).getUTCDay();
+    const weekend = weekday === 0 || weekday === 6 ? 1 / 3 : 1;
+    return users ? weekend * (Math.exp(-index / 3) + 0.1) : weekend;
+  });
+  const total = weights.reduce((sum, weight) => sum + weight, 0);
+  const elapsed = (at - first) / DAY;
+  const whole = Math.floor(elapsed);
+  const reached =
+    weights.slice(0, whole).reduce((sum, weight) => sum + weight, 0) +
+    (weights[whole] ?? 0) * (elapsed - whole);
+  return reached / total;
+}
+
+function mockBilling(entitlements: Map<string, Entitlements>): Billing {
   const customers = new Map<string, string>();
   const reported = new Map<string, UsageRecord>();
   const stripe = stripeBilling(recordingStripe());
@@ -84,26 +213,33 @@ function mockBilling(plans: Map<string, Plan["id"]>): Billing {
       customers.set(team.id, write.customer_id);
       return write;
     },
+    // This period's reported usage priced by the catalog; before the first
+    // report, the mock team's period so far, as Settings → Usage shows it.
     async overview(team): Promise<TeamBilling> {
       const now = new Date();
       const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
       const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
-      const used = [...reported.values()]
-        .filter((record) => record.team_id === team.id && record.at >= start.toISOString())
-        .reduce((sum, record) => sum + record.value, 0);
+      const period = { start: start.toISOString(), end: end.toISOString() };
+      const counts: Record<string, number> = {};
+      for (const record of reported.values()) {
+        if (record.team_id !== team.id || record.at < period.start) continue;
+        counts[record.metric] = (counts[record.metric] ?? 0) + record.value;
+      }
+      const soFar = periodSoFar(period, now);
+      const month = bill({
+        counts:
+          Object.keys(counts).length > 0
+            ? counts
+            : mockCounts(Date.parse(soFar.start), Date.parse(soFar.end)),
+      });
+      const plan = PLANS[entitlements.get(team.id)?.plan ?? "free"];
       return {
         team_id: team.id,
         team_name: team.name,
-        plan: PLANS[plans.get(team.id) ?? "free"],
-        period: { start: start.toISOString(), end: end.toISOString() },
-        usage: [
-          {
-            metric: "monthly_active_users",
-            label: "Monthly active users",
-            used: used || 812,
-            included: 1000,
-          },
-        ],
+        plan,
+        period,
+        usage: month.lines.map(usageLine),
+        estimate: estimateForPlan(month, plan),
         invoices: [],
       };
     },

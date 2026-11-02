@@ -92,3 +92,40 @@ describe("the person's teams", () => {
     ]);
   });
 });
+
+describe("a team's usage", () => {
+  const days = { start: "2026-10-01T00:00:00.000Z", end: "2026-10-03T00:00:00.000Z" };
+  const usageOf = (project: string) =>
+    `/api/v1/usage?project_id=${project}&from=${encodeURIComponent(days.start)}&to=${encodeURIComponent(days.end)}&granularity=day`;
+
+  it("is the usage of the person's projects that the team claimed, day by day", async () => {
+    serve({
+      "/api/v1/users/me/projects?limit=100": {
+        projects: [
+          { id: "proj_a", name: "Portal" },
+          { id: "proj_b", name: "Elsewhere" },
+          { id: "proj_c", name: "Locked" },
+        ],
+      },
+      [usageOf("proj_a")]: {
+        data: [{ meter: "monthly_active_users", start: "2026-10-02T00:00:00Z", value: 4 }],
+        sealed_through: "2026-10-02T09:00:00Z",
+        team_id: "team_1",
+      },
+      [usageOf("proj_b")]: { data: [], sealed_through: null, team_id: "team_2" },
+      // proj_c answers 404: the person lists it but cannot read its usage.
+    });
+    const team = { id: "team_1", name: "Acme", personal: false };
+    expect(await liveDirectory(SERVER).usageByDay(COOKIE, team, days)).toEqual({
+      projects: [{ id: "proj_a", name: "Portal" }],
+      counts: [
+        {
+          day: "2026-10-02T00:00:00.000Z",
+          project_id: "proj_a",
+          metric: "monthly_active_users",
+          value: 4,
+        },
+      ],
+    });
+  });
+});

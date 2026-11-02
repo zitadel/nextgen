@@ -1,0 +1,95 @@
+get:
+  operationId: getUsage
+  summary: Get a project's usage
+  description: |
+    Returns a project's usage per meter, by UTC day or hour, over a range of
+    up to 31 days. The range starts at `from` and ends before `to`. These are
+    counts only, which the hosted cloud prices and a self-hosted deployment
+    reads as they are (ADR 085). A `users` meter such as
+    `monthly_active_users` counts each user once a month, in the hour of their
+    first activity, so a month's buckets add up to its count.
+
+    A bucket that counted nothing is left out. One that starts at or after
+    `sealed_through` is still open and may grow; the ones before it never
+    change. A project nobody has claimed answers its usage too, with no
+    `team_id`: the counts carry no event content.
+
+    Failures:
+    - `400 usage.invalid`: `from` or `to` is not on a UTC day boundary (`day`)
+      or hour boundary (`hour`), `to` is not after `from`, they are more than
+      31 days apart, or a `meter` is unknown.
+    - `404 usage.disabled`: this deployment does not count usage.
+  tags:
+    - Usage
+  security:
+    - oauth2:
+        - usage.read
+    - sessionCookie: []
+  parameters:
+    - $ref: ../../components/parameters/project-id.yaml
+    - name: from
+      in: query
+      required: true
+      description: The first bucket's start, in UTC.
+      schema:
+        type: string
+        format: date-time
+      example: '2026-10-01T00:00:00Z'
+    - name: to
+      in: query
+      required: true
+      description: Where the buckets end, exclusive; at most 31 days after `from`.
+      schema:
+        type: string
+        format: date-time
+      example: '2026-11-01T00:00:00Z'
+    - name: granularity
+      in: query
+      description: The bucket a count covers. Default `day`.
+      schema:
+        type: string
+        enum:
+          - day
+          - hour
+        default: day
+    - name: meter
+      in: query
+      description: |
+        Only these meters. Repeatable (OR within the parameter); every meter
+        when left out.
+      style: form
+      explode: true
+      schema:
+        type: array
+        items:
+          type: string
+  responses:
+    '200':
+      description: The project's usage.
+      headers:
+        Cache-Control:
+          $ref: ../../components/headers/cache-control-private-no-store.yaml
+      content:
+        application/json:
+          schema:
+            $ref: usage-response.yaml
+    '400':
+      description: Invalid request (e.g., a range off its boundaries or too long).
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '401':
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '403':
+      description: Insufficient permissions.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    default:
+      $ref: getUsage-error-response.yaml
