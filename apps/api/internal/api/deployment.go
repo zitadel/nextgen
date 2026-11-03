@@ -30,9 +30,11 @@ func (h *Handler) CreateDeployment(ctx context.Context, req *api.CreateDeploymen
 		ReleaseID: string(req.ReleaseID.Value),
 	}
 	if urls, ok := req.Targets.GetDeploymentPreviewUrls(); ok {
-		input.PreviewURLs = urls
+		input.To = domain.DeployToPreviews(urls)
 	}
-	_, input.Primary = req.Targets.GetDeploymentPrimaryTarget()
+	if _, ok := req.Targets.GetDeploymentPrimaryTarget(); ok {
+		input.To = domain.DeployToPrimary()
+	}
 	if ttl, ok := req.TTL.Get(); ok {
 		input.TTL = new(time.Duration(ttl))
 	}

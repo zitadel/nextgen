@@ -66,7 +66,7 @@ func EnsureDeployed(
 	_, err = deployments.Deploy(ctx, service.DeployInput{
 		ProjectID: domain.PlatformProjectID,
 		ReleaseID: built.Release.ID,
-		Primary:   true,
+		To:        domain.DeployToPrimary(),
 		Reason:    domain.DeploymentReasonDeploy,
 		Message:   &message,
 	})

@@ -35,16 +35,14 @@ type CreateDeploymentOutput struct {
 	Created    bool
 }
 
-// DeployInput names where a release goes: Primary for every primary origin, or
-// PreviewURLs.
+// DeployInput names the release to deploy and where it goes.
 type DeployInput struct {
 	// TTL is the request's ttl, which only a preview deploy takes; nil uses
 	// domain.DefaultPreviewTTL.
 	TTL                  *time.Duration
 	ProjectID            string
 	ReleaseID            string
-	Primary              bool
-	PreviewURLs          []string
+	To                   domain.DeployTo
 	Reason               domain.DeploymentReason
 	Message              *string
 	RollbackTo           *string
@@ -147,7 +145,7 @@ func (s *DeploymentService) Deploy(ctx context.Context, input DeployInput) (_ *C
 	if err != nil {
 		return nil, err
 	}
-	kind, resolved, err := domain.ResolveDeploymentTargets(origins, input.Primary, input.PreviewURLs)
+	kind, resolved, err := domain.ResolveDeploymentTargets(origins, input.To)
 	if err != nil {
 		return nil, err
 	}
@@ -189,7 +187,7 @@ func (s *DeploymentService) Rollback(ctx context.Context, input RollbackDeployme
 	return s.Deploy(ctx, DeployInput{
 		ProjectID:            input.ProjectID,
 		ReleaseID:            previous.ReleaseID,
-		Primary:              true,
+		To:                   domain.DeployToPrimary(),
 		Reason:               domain.DeploymentReasonRollback,
 		Message:              input.Message,
 		RollbackTo:           &previous.ID,

@@ -254,17 +254,34 @@ func NewDeployment(projectID, releaseID string, kind DeploymentOriginKind, origi
 	}, nil
 }
 
-// ResolveDeploymentTargets resolves a deployment's origins against
-// projectOrigins: every primary origin when primary, or previewURLs. It takes
-// exactly one of them, so that no empty value can reach the primary origins.
-// Primary origins are deployed as a whole, so naming one is invalid. A preview
-// URL must match a preview pattern and is never a loopback origin.
-func ResolveDeploymentTargets(projectOrigins []Origin, primary bool, previewURLs []string) (DeploymentOriginKind, []string, error) {
-	if primary == (len(previewURLs) > 0) {
-		return 0, nil, ErrDeploymentInvalid().WithMessage("deploy to primary or to preview URLs")
-	}
-	if !primary {
-		return resolvePreviewTargets(projectOrigins, previewURLs)
+// DeployTo is where a deploy goes: every primary origin of the project, or a
+// list of preview URLs. Its zero value goes nowhere, so that no empty value can
+// reach the primary origins.
+type DeployTo struct {
+	primary     bool
+	previewURLs []string
+}
+
+// DeployToPrimary deploys to every primary origin of the project.
+func DeployToPrimary() DeployTo {
+	return DeployTo{primary: true}
+}
+
+// DeployToPreviews deploys to the preview URLs.
+func DeployToPreviews(urls []string) DeployTo {
+	return DeployTo{previewURLs: urls}
+}
+
+// ResolveDeploymentTargets resolves where a deploy goes against
+// projectOrigins. Primary origins are deployed as a whole, so naming one is
+// invalid. A preview URL must match a preview pattern and is never a loopback
+// origin.
+func ResolveDeploymentTargets(projectOrigins []Origin, to DeployTo) (DeploymentOriginKind, []string, error) {
+	if !to.primary {
+		if len(to.previewURLs) == 0 {
+			return 0, nil, ErrDeploymentInvalid().WithMessage("deploy to primary or to preview URLs")
+		}
+		return resolvePreviewTargets(projectOrigins, to.previewURLs)
 	}
 	var origins []string
 	for _, o := range projectOrigins {
