@@ -1,12 +1,12 @@
-import { type ReactNode, useCallback, useEffect, useId, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 
 import { api } from "@/api/zitadel";
 import { FormSheet, FormSheetForm, SHEET_SECTION } from "@/components/form-sheet";
+import { SchemaFields, type SchemaFieldsLayout } from "@/components/schema-fields";
 import { type SchemaOption, SchemaPicker } from "@/components/schema-picker";
 import { Field, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
-import { FieldOptionalIndicator } from "@/components/ui/field-optional-indicator";
 import { Separator } from "@/components/ui/separator";
+import { useSchemaForm } from "@/hooks/use-schema-form";
 import { useSubmit } from "@/hooks/use-submit";
 import { describeError } from "@/lib/api-error";
 import { useRequiredProjectScope } from "@/lib/project-scope";
@@ -16,19 +16,20 @@ import { useRequiredProjectScope } from "@/lib/project-scope";
 //   type ProjectAccessRow,
 //   type ProjectOption,
 // } from "./project-access";
+import { fetchAllSchemas, schemaDisplayName, schemaFieldSummary, schemaFields } from "@/lib/schema";
 import {
-  attributeValue,
-  fetchAllSchemas,
-  inputAttributes,
-  type SchemaField,
-  schemaDisplayName,
-  schemaFieldSummary,
-  schemaFields,
-} from "@/lib/schema";
+  draftValue,
+  formRoot,
+  newDraft,
+  unwritableMessage,
+  unwritableRequired,
+} from "@/lib/schema-form";
 
 // The design wraps the label in a row so a marker can sit beside it, rather
 // than appending to the label text itself.
 const LABEL_ROW = "flex w-full items-center gap-2";
+
+const SHEET_LAYOUT: SchemaFieldsLayout = { orientation: "vertical", labelRow: LABEL_ROW };
 
 /**
  * The Add user drawer.
@@ -72,7 +73,6 @@ function AddUserForm({
   const projectId = useRequiredProjectScope();
   const [schemas, setSchemas] = useState<SchemaOption[] | undefined>(undefined);
   const [schemaId, setSchemaId] = useState<string | undefined>(undefined);
-  const [values, setValues] = useState<Record<string, string>>({});
   // const [projects, setProjects] = useState<ProjectOption[]>([]);
   // The design's resting state already shows one empty row.
   // const [access, setAccess] = useState<ProjectAccessRow[]>([{ roles: [] }]);
@@ -119,22 +119,26 @@ function AddUserForm({
   }, [projectId]);
 
   const selected = schemas?.find((option) => option.id === schemaId);
-  const fields = selected ? schemaFields(selected.schema) : [];
-  const missingRequired = fields.some((entry) => entry.required && !values[entry.key]?.trim());
+  const root = useMemo(() => formRoot(selected ? schemaFields(selected.schema) : []), [selected]);
+  // Values are keyed by property name and schemas do not share a namespace, so a
+  // leftover value could be written to a property the new schema never declared.
+  // A new schema starts a new draft rather than merging.
+  const blank = useMemo(() => newDraft(root), [root]);
+  const form = useSchemaForm(root, blank, "create");
+  // Nothing this form sends can satisfy these, so say so rather than let it try.
+  const unwritable = unwritableRequired(root, form.draft);
 
   const create = useSubmit(async () => {
     if (!selected) return;
     // Built from the field descriptors rather than the raw values so a
     // property's declared type survives (`attributeValue`).
-    const attributes: Record<string, unknown> = {};
-    for (const entry of fields) {
-      // Optional properties are omitted rather than sent empty: an empty
-      // string fails format validation (`email`) instead of reading as absent.
-      const value = values[entry.key]?.trim() ?? "";
-      if (value === "") continue;
-      attributes[entry.key] = attributeValue(entry, value);
+    const attributes = draftValue(root, form.draft, "create") as Record<string, unknown>;
+    try {
+      await api.createUser({ schema: selected.id, attributes }, { project_id: projectId });
+    } catch (cause) {
+      form.applyServerError(cause);
+      throw cause;
     }
-    await api.createUser({ schema: selected.id, attributes }, { project_id: projectId });
     await onCreated();
     onClose();
   }, "Could not create the user.");
@@ -143,10 +147,6 @@ function AddUserForm({
   const selectSchema = useCallback(
     (next: string) => {
       setSchemaId(next);
-      // Values are keyed by property name and schemas do not share a namespace,
-      // so a leftover value could be written to a property the new schema never
-      // declared. Reset rather than merge.
-      setValues({});
       setLoadError(undefined);
       clearError();
     },
@@ -157,12 +157,13 @@ function AddUserForm({
     <FormSheetForm
       title="Add user"
       submitLabel="Add user"
-      canSubmit={Boolean(selected) && !missingRequired}
+      canSubmit={Boolean(selected) && unwritable.length === 0}
       pending={create.pending}
-      error={create.error ?? loadError}
+      error={create.error ?? loadError ?? unwritableMessage(unwritable, "add this user")}
+      noValidate
       onSubmit={() => {
         setLoadError(undefined);
-        void create.run();
+        if (form.attemptSubmit()) void create.run();
       }}
       onClose={onClose}
     >
@@ -179,14 +180,14 @@ function AddUserForm({
           />
         </Field>
         <Separator />
-        {fields.map((entry) => (
-          <SchemaInput
-            key={entry.key}
-            field={entry}
-            value={values[entry.key] ?? ""}
-            onChange={(value) => setValues((current) => ({ ...current, [entry.key]: value }))}
-          />
-        ))}
+        <SchemaFields
+          root={root}
+          draft={form.draft}
+          onChange={form.setDraft}
+          form={form.controls}
+          layout={SHEET_LAYOUT}
+          disabled={create.pending}
+        />
       </div>
       {/* Projects block — out of the MVP for two independent reasons, both of
             which must clear before it returns.
@@ -207,37 +208,5 @@ function AddUserForm({
       {/* <Separator />
         <ProjectAccess projects={projects} rows={access} onChange={setAccess} /> */}
     </FormSheetForm>
-  );
-}
-
-function SchemaInput({
-  field,
-  value,
-  onChange,
-}: {
-  field: SchemaField;
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  const id = useId();
-
-  return (
-    <Field>
-      <div className={LABEL_ROW}>
-        <FieldLabel htmlFor={id}>{field.label}</FieldLabel>
-        {/* A sibling of the label, not part of it, so the accessible name stays
-            the field name; requiredness itself reaches AT via `required`. */}
-        {!field.required && <FieldOptionalIndicator />}
-      </div>
-      <Input
-        id={id}
-        name={field.key}
-        {...inputAttributes(field)}
-        required={field.required}
-        placeholder={field.placeholder}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-      />
-    </Field>
   );
 }

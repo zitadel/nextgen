@@ -16,6 +16,9 @@
 
 ## Decisions
 
+### D25 · User forms are built from the whole schema — 2026-11-03 · [standing]
+Add user and the edit card draw one control per property of the user's schema: an object as an inline group, an array as one row per item with add and remove, an enum as a Select, a boolean as a Switch. A nullable property behaves as its type, and empty means absent. A property no control can write shows its stored value read-only and points to the CLI or API; when one is required, Add user says so and blocks. Otherwise Submit stays enabled and clicking it reveals the errors, so a form is never silently stuck. A schema's `default` prefills on create only. Free strings are sent as typed; only format-typed inputs, numbers and the identifier are trimmed. Profile stays as D16 has it.
+
 ### D24 · Projects is the home, drawn without the sidebar — 2026-10-26 · [standing]
 The sidebar is one project's screens, so Projects leaves it: the logo and the project switcher's "All projects" open it, and it draws no sidebar, only a bar with the logo, search and the account menu. It is a project-free page, so the list sits in a centred column. A project is created from the app it connects, so the page hands over the CLI's `setup` command in a card beside the list instead of a New project button and drawer, and below the list it explains how a project lives: set up, build locally, deploy, add environments (each a project of its own), operate in the console. On the way to a screen (`?next=`, D22) the guide is left out. Supersedes D21's New project drawer and the sidebar row of D22.
 → Design review of the home bar, the setup card and the lifecycle guide.

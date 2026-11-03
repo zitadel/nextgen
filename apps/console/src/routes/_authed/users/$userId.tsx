@@ -1,6 +1,6 @@
 import { Link, createFileRoute, useRouter } from "@tanstack/react-router";
 import { GitCommitHorizontal, User } from "lucide-react";
-import { Fragment, type ReactNode, useEffect, useId, useMemo, useState } from "react";
+import { Fragment, type ReactNode, useMemo, useState } from "react";
 
 import { api } from "@/api/zitadel";
 import { DeleteUserDialog } from "@/components/delete-user-dialog";
@@ -8,17 +8,16 @@ import { MetaRule, MetaValue } from "@/components/detail-meta";
 import { DETAIL_BODY, DETAIL_CARD, DetailHeader, DetailSection } from "@/components/detail-page";
 import { FormError } from "@/components/form-error";
 import { Page } from "@/components/layout";
+import { SchemaFields, type SchemaFieldsLayout } from "@/components/schema-fields";
 import { StatusBadge } from "@/components/status-badge";
 import { FIELD_LABEL_TYPOGRAPHY, SECTION_HEADING } from "@/components/typography";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Field, FieldContent, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
-import { FieldOptionalIndicator } from "@/components/ui/field-optional-indicator";
+import { FieldGroup } from "@/components/ui/field";
 import { Separator } from "@/components/ui/separator";
-import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useSchemaForm } from "@/hooks/use-schema-form";
 import { useSubmit } from "@/hooks/use-submit";
 import { formatDate, formatDateTime } from "@/lib/date";
 import {
@@ -29,16 +28,15 @@ import {
 } from "@/lib/idp";
 import { passwordState } from "@/lib/sign-in-methods";
 import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
-import { displayValue, field } from "@/lib/record";
+import { field } from "@/lib/record";
+import { type UserSchema, schemaDisplayName, schemaFields } from "@/lib/schema";
 import {
-  type SchemaField,
-  type UserSchema,
-  attributeValue,
-  inputAttributes,
-  schemaDisplayName,
-  schemaFields,
-  schemaProperties,
-} from "@/lib/schema";
+  attributesPatch,
+  draftFromAttributes,
+  formRoot,
+  unwritableMessage,
+  unwritableRequired,
+} from "@/lib/schema-form";
 import { userAttributes, userIdentity, userIdentitySecondary, userMetadata } from "@/lib/user";
 
 /**
@@ -116,9 +114,15 @@ const PANEL_RULE = "mx-6 w-auto data-[orientation=horizontal]:w-auto";
 const ROW = "flex items-center justify-between gap-4 py-1";
 const ROW_LABEL = "text-muted-foreground min-w-0 truncate text-sm font-medium";
 const ROW_VALUE = "text-foreground shrink-0 text-sm";
-// `schemaProperties` type labels a text or number input or a switch can write;
-// "—" is an untyped property, which accepts a string.
-const WRITABLE_TYPES = new Set(["String", "Number", "Integer", "Boolean", "—"]);
+// The profile's fields sit in the design's label column on a wide row.
+const PROFILE_LAYOUT: SchemaFieldsLayout = {
+  orientation: "responsive",
+  // On a wide row the column is the control's 36px, so a one-line label centres
+  // on it while an error under the control leaves it in place.
+  labelRow: `flex items-center gap-2 @md/field-group:min-h-9 ${LABEL_COLUMN}`,
+  label: FIELD_LABEL,
+  control: INPUT_WIDTH,
+};
 
 function UserDetail() {
   const { user, schema, passkeys, identityLinks, idps, passwordSetAt } = Route.useLoaderData();
@@ -168,6 +172,8 @@ function UserDetail() {
           className="flex flex-col gap-6"
         >
           <ProfileCard
+            // The route reuses this for the next user: a save's error stays with its own.
+            key={userId}
             userId={userId}
             schema={schema}
             schemaId={field(user, "schema")}
@@ -320,62 +326,22 @@ function ProfileCard({
   attributes: Record<string, unknown>;
   onSaved: () => Promise<void>;
 }) {
-  const fields = useMemo(() => (schema ? schemaFields(schema) : []), [schema]);
-  // A text input writes a string, or through `number` a number, and a switch
-  // a boolean, so only a property of exactly one of those types (or none) is
-  // editable. Anything else (an array, a union such as `["boolean", "null"]`)
-  // stays read-only rather than storing `"true"` where the schema wants
-  // `true`. So does a boolean stored as something else (`"yes"` from before a
-  // type change): the switch would show it as off, and a toggle overwrite it.
-  const readOnlyKeys = useMemo(
-    () =>
-      new Set([
-        ...(schema ? schemaProperties(schema) : [])
-          .filter((property) => !WRITABLE_TYPES.has(property.type))
-          .map((property) => property.key),
-        ...fields
-          .filter(
-            (entry) =>
-              entry.inputType === "boolean" &&
-              attributes[entry.key] != null &&
-              typeof attributes[entry.key] !== "boolean",
-          )
-          .map((entry) => entry.key),
-      ]),
-    [schema, fields, attributes],
-  );
-  const stored = useMemo(
-    () =>
-      Object.fromEntries(
-        fields.map((entry) => [
-          entry.key,
-          // The switch shows an absent boolean as off, so off again is no change.
-          displayValue(attributes, entry.key) ??
-            (entry.inputType === "boolean" && attributes[entry.key] == null ? "false" : ""),
-        ]),
-      ),
-    [fields, attributes],
-  );
-  const [values, setValues] = useState(stored);
-  // An input that cannot read what it shows (a partly cleared date reports
-  // `""` with `validity.badInput`); saving would delete the stored value.
-  const [unreadable, setUnreadable] = useState<Record<string, boolean>>({});
+  const root = useMemo(() => formRoot(schema ? schemaFields(schema) : []), [schema]);
+  const stored = useMemo(() => draftFromAttributes(root, attributes), [root, attributes]);
+  const form = useSchemaForm(root, stored, "edit");
+  const patch = attributesPatch(root, stored, form.draft);
   const save = useSubmit(async () => {
-    await api.patchUserByID(userId, { attributes: patchOf(fields, stored, values) });
+    try {
+      await api.patchUserByID(userId, { attributes: patch });
+    } catch (cause) {
+      form.applyServerError(cause);
+      throw cause;
+    }
     await onSaved();
   }, "Could not save the user.");
-  const { clearError } = save;
-
-  useEffect(() => {
-    setValues(stored);
-    setUnreadable({});
-    clearError();
-  }, [stored, clearError]);
-
-  const dirty = fields.some((entry) => values[entry.key] !== stored[entry.key]);
-  const missing = fields.filter(
-    (entry) => entry.required && !readOnlyKeys.has(entry.key) && !values[entry.key]?.trim(),
-  );
+  const dirty = Object.keys(patch).length > 0;
+  // The server refuses any save while one is missing, and a save here can't add it.
+  const unwritable = unwritableMessage(unwritableRequired(root, form.draft), "set it");
   const name = schema && schemaId ? schemaDisplayName(schema, schemaId) : undefined;
 
   return (
@@ -417,7 +383,7 @@ function ProfileCard({
         )}
       </div>
       <Separator className={PANEL_RULE} />
-      {fields.length === 0 ? (
+      {root.fields.length === 0 ? (
         <p className="text-muted-foreground px-6 pt-4 pb-5 text-sm">
           {schema
             ? "This schema defines no attributes that can be shown."
@@ -426,31 +392,25 @@ function ProfileCard({
       ) : (
         <form
           className="flex flex-col gap-4 px-6 pt-4 pb-5"
+          noValidate
           onSubmit={(event) => {
             event.preventDefault();
-            void save.run();
+            if (form.attemptSubmit()) void save.run();
           }}
         >
           <FieldGroup className="gap-4">
-            {fields.map((entry) => (
-              <ProfileField
-                key={entry.key}
-                entry={entry}
-                value={values[entry.key] ?? ""}
-                readOnly={readOnlyKeys.has(entry.key)}
-                // The reload after a save resets the draft, so an edit made
-                // meanwhile would be lost.
-                disabled={save.pending}
-                missing={missing.includes(entry)}
-                // Marked, since it is the only reason on screen why Save is off.
-                unreadable={unreadable[entry.key] ?? false}
-                onBadInput={(badInput) =>
-                  setUnreadable((current) => ({ ...current, [entry.key]: badInput }))
-                }
-                onChange={(value) => setValues((current) => ({ ...current, [entry.key]: value }))}
-              />
-            ))}
+            <SchemaFields
+              root={root}
+              draft={form.draft}
+              onChange={form.setDraft}
+              form={form.controls}
+              layout={PROFILE_LAYOUT}
+              // The reload after a save resets the draft, so an edit made
+              // meanwhile would be lost.
+              disabled={save.pending}
+            />
           </FieldGroup>
+          <FormError message={unwritable} />
           <FormError message={save.error} />
           <div className="flex justify-end">
             {/* Secondary, small: the resting Save is the secondary fill, which
@@ -461,7 +421,7 @@ function ProfileCard({
               variant="secondary"
               size="sm"
               className="gap-1 px-2.5 text-xs max-sm:w-full"
-              disabled={!dirty || missing.length > 0 || Object.values(unreadable).some(Boolean)}
+              disabled={!dirty}
               loading={save.pending}
             >
               Save
@@ -470,106 +430,5 @@ function ProfileCard({
         </form>
       )}
     </Card>
-  );
-}
-
-/**
- * The attributes a save changes, and only those. A cleared field is sent as
- * `null` rather than `""`, which would fail a `format` such as `email`.
- */
-function patchOf(
-  fields: SchemaField[],
-  stored: Record<string, string>,
-  values: Record<string, string>,
-): Record<string, unknown> {
-  const patch: Record<string, unknown> = {};
-  for (const entry of fields) {
-    if (values[entry.key] === stored[entry.key]) continue;
-    const value = values[entry.key]?.trim() ?? "";
-    patch[entry.key] = value === "" ? null : attributeValue(entry, value);
-  }
-  return patch;
-}
-
-/** One attribute of the profile, as a switch for a boolean. */
-function ProfileField({
-  entry,
-  value,
-  readOnly,
-  disabled,
-  missing,
-  unreadable,
-  onBadInput,
-  onChange,
-}: {
-  entry: SchemaField;
-  value: string;
-  readOnly: boolean;
-  disabled: boolean;
-  /** A required value the draft has emptied. */
-  missing: boolean;
-  unreadable: boolean;
-  /**
-   * Whether the input shows something its `value` cannot express. Read on
-   * every native `input` event: `onChange` skips one that leaves the value
-   * as it was, such as the last step of clearing a partial date.
-   */
-  onBadInput: (badInput: boolean) => void;
-  onChange: (value: string) => void;
-}) {
-  const id = useId();
-  const errorId = `${id}-error`;
-
-  return (
-    <Field orientation="responsive">
-      {/* As in the add-user sheet: the marker is a sibling of the label, not
-          part of it, so the accessible name stays the field name. On a wide
-          row the column is the control's 36px, so a one-line label centres
-          on it while an error under the control leaves it in place. */}
-      <div className={`flex items-center gap-2 @md/field-group:min-h-9 ${LABEL_COLUMN}`}>
-        <FieldLabel htmlFor={id} className={FIELD_LABEL}>
-          {entry.label}
-        </FieldLabel>
-        {!entry.required && <FieldOptionalIndicator />}
-      </div>
-      <FieldContent>
-        {entry.inputType === "boolean" ? (
-          <div className="flex items-center gap-2 @md/field-group:min-h-9">
-            {/* A switch cannot be read-only, so a locked value disables it. */}
-            <Switch
-              id={id}
-              checked={value === "true"}
-              onCheckedChange={(checked) => onChange(String(checked))}
-              required={entry.required}
-              disabled={disabled || readOnly}
-            />
-            {/* The switch reports its own state, so Yes/No is for the eye. A
-                locked value shows as stored instead, which the switch cannot
-                report. */}
-            <span className="text-foreground text-sm font-medium" aria-hidden={!readOnly}>
-              {readOnly ? value : value === "true" ? "Yes" : "No"}
-            </span>
-          </div>
-        ) : (
-          <Input
-            id={id}
-            name={entry.key}
-            {...inputAttributes(entry)}
-            value={value}
-            readOnly={readOnly}
-            disabled={disabled}
-            required={entry.required}
-            placeholder={entry.placeholder}
-            aria-invalid={missing || unreadable || undefined}
-            // `aria-invalid` says the field is wrong; this says why.
-            aria-describedby={missing ? errorId : undefined}
-            className={INPUT_WIDTH}
-            onChange={(event) => onChange(event.target.value)}
-            onInput={(event) => onBadInput(event.currentTarget.validity.badInput)}
-          />
-        )}
-        {missing && <FieldError id={errorId}>This field is required.</FieldError>}
-      </FieldContent>
-    </Field>
   );
 }

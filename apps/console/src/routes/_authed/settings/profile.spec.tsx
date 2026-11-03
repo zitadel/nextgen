@@ -238,6 +238,40 @@ describe("settings profile, generated from the schema", () => {
     expect(profile?.style.getPropertyValue("--zl-avatar-base")).toBe(vars["--zl-avatar-base"]);
   });
 
+  it("keeps what a text input cannot round-trip read-only, whatever the forms can write", async () => {
+    // Add user and the user detail edit these through their own controls; the
+    // Profile stays a row of text inputs (D16).
+    server.use(
+      schema({
+        "x-identifier": "username",
+        required: ["username"],
+        properties: {
+          username: { type: "string" },
+          active: { type: ["boolean", "null"] },
+          plan: { type: "string", enum: ["free", "paid"] },
+          tags: { type: "array", items: { type: "string" } },
+          address: { type: "object", properties: { city: { type: "string" } } },
+        },
+      }),
+      http.get(ME_URL, () =>
+        HttpResponse.json(
+          me({ attributes: { username: "maya", tags: ["a"], address: { city: "Bern" } } }),
+        ),
+      ),
+    );
+    await renderAt("/settings/profile");
+
+    expect(await screen.findByLabelText("Username")).toBeDisabled();
+    expect(screen.getByLabelText("Active")).toBeDisabled();
+    expect(screen.getByLabelText("Tags")).toBeDisabled();
+    // An enum stays the text input it was here.
+    expect(screen.getByLabelText("Plan")).toBeEnabled();
+    expect(screen.queryByRole("switch")).not.toBeInTheDocument();
+    // An object still has no row.
+    expect(screen.queryByLabelText("City")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Address")).not.toBeInTheDocument();
+  });
+
   it("shows a boolean read-only, and saves a name beside a required one", async () => {
     let patched: unknown;
     server.use(

@@ -27,7 +27,13 @@ import { useSubmit } from "@/hooks/use-submit";
 import { fetchAllIdps, fetchMyIdentityLinks } from "@/lib/idp";
 import { fetchMyPasskeys, fetchMyPasswordSetAt, passwordState } from "@/lib/sign-in-methods";
 import { displayValue, field } from "@/lib/record";
-import { type SchemaField, attributeValue, inputAttributes, schemaFields } from "@/lib/schema";
+import {
+  type SchemaField,
+  type ValueField,
+  attributeValue,
+  inputAttributes,
+  schemaFlatFields,
+} from "@/lib/schema";
 import { readOwnUserSchema } from "@/lib/user-schema";
 import { userAttributes } from "@/lib/user";
 
@@ -85,10 +91,32 @@ const METHOD_HEAD = "px-6 pt-5 text-sm font-medium text-foreground";
  * record's own `identifier_property` / `identifier` (ADR 058), so nothing
  * here names a property the schema might rename.
  */
-function identifierFallback(user: Record<string, unknown>): SchemaField[] {
+function identifierFallback(user: Record<string, unknown>): ValueField[] {
   const key = field(user, "identifier_property");
   if (!key) return [];
-  return [{ key, label: "Identifier", required: true, inputType: "text" }];
+  return [textRow(key, "Identifier", true)];
+}
+
+function textRow(key: string, label: string, required: boolean): ValueField {
+  return {
+    kind: "value",
+    key,
+    label,
+    required,
+    inputType: "text",
+    integer: false,
+    nullable: false,
+    trim: true,
+    rules: {},
+  };
+}
+
+/**
+ * A row per property (D16). One no text input can round-trip stays a row: the
+ * editable check below reads the property's own `type`, so it is never editable.
+ */
+function profileRow(entry: SchemaField): ValueField {
+  return entry.kind === "value" ? entry : textRow(entry.key, entry.label, entry.required);
 }
 
 function ProfileScreen() {
@@ -101,18 +129,18 @@ function ProfileScreen() {
 
   // The identifier first — it is who the person is — then the rest in the
   // schema's own (alphabetical) order.
-  const all = schema ? schemaFields(schema) : identifierFallback(record);
+  const all = schema ? schemaFlatFields(schema).map(profileRow) : identifierFallback(record);
   // Editable: anything but the identifier that a text input can round-trip.
   // Another type (a boolean) shows its value read-only rather than as text it
   // could never be saved back from. Without a schema there are no types, so
   // nothing is editable.
   const types = (schema?.properties ?? {}) as Record<string, { type?: unknown }>;
-  const isEditable = (entry: SchemaField) =>
+  const isEditable = (entry: ValueField) =>
     entry.key !== identifier && EDITABLE_TYPES.has(String(types[entry.key]?.type));
   const fixed = all.filter((entry) => !isEditable(entry));
   const editable = all.filter(isEditable);
 
-  const saved = (entry: SchemaField) =>
+  const saved = (entry: ValueField) =>
     (displayValue(attributes, entry.key) ?? "") ||
     // Unread schema: the record's resolved identifier stands in for the attribute.
     (!schema && entry.key === identifier ? (field(record, "identifier") ?? "") : "");
@@ -188,7 +216,7 @@ function ProfileScreen() {
 }
 
 /** The editable rows and Save, starting from the saved values. */
-function ProfileForm({ fields, saved }: { fields: SchemaField[]; saved: Record<string, string> }) {
+function ProfileForm({ fields, saved }: { fields: ValueField[]; saved: Record<string, string> }) {
   const router = useRouter();
   const [values, setValues] = useState(saved);
   const changed = fields.filter((entry) => (values[entry.key] ?? "").trim() !== saved[entry.key]);
@@ -250,7 +278,7 @@ function ProfileRow({
   onChange,
   onEnter,
 }: {
-  field: SchemaField;
+  field: ValueField;
   value: string;
   readOnly?: boolean;
   onChange?: (value: string) => void;
