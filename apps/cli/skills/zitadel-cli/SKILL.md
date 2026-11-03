@@ -258,8 +258,11 @@ Each invocation prints one JSON object:
 - `deploy` and `deploy --dry-run` read the project's users and add a warning
   to `warnings` when the config would lock existing users out: users of a
   schema who lack its `x-identifier` property while a step on the login path
-  collects it, or users with an SSO link whose schema no flow uses any more. It only warns, and it is skipped
-  silently when the users cannot be read.
+  collects it, or users with an SSO link whose schema no flow uses any more. It only warns and never fails the
+  deploy. When it could not finish (a request failed, the SSO part was skipped,
+  or the read limit was reached), `warnings` carries a note saying so, such as
+  "Could not finish checking existing users"; that note means the check was
+  incomplete, not that users are locked out.
 - `preview` is `deploy` for a pull-request build: it deploys the release to the
   build's preview URLs (from the platform, or `--origin`) for `--ttl` and emits
   `data.previews` plus `data.release_env` (the `NEXT_PUBLIC_ZITADEL_RELEASE`

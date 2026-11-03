@@ -23,6 +23,8 @@ function ctx(options: {
   requested?: number[];
   failNotEquals?: boolean;
   endlessEmptyPages?: boolean;
+  failFor?: string;
+  listed?: number[];
 }): StepContext {
   return {
     cwd: "/unused",
@@ -36,6 +38,9 @@ function ctx(options: {
           throw new Error("forbidden");
         }
         if (options.failNotEquals && body.filter.some((f) => f.operation === "not_equals")) {
+          throw new Error("boom");
+        }
+        if (options.failFor && body.filter.some((f) => f.value === options.failFor)) {
           throw new Error("boom");
         }
         if (options.endlessEmptyPages) {
@@ -62,6 +67,7 @@ function ctx(options: {
       }),
       listSchemas: {
         all: async () => {
+          options.listed?.push(1);
           if (options.failListSchemas) {
             throw new Error("forbidden");
           }
@@ -447,10 +453,10 @@ describe("lockoutStep", () => {
       }),
     );
 
-    expect(takeReportedWarnings()[0]).toContain("Checked only the first users");
+    expect(takeReportedWarnings()[0]).toContain("Checked only some of the users of");
   });
 
-  it("finds linked users anywhere in the users it read", async () => {
+  it("says so when it only looked up the links of the first stranded users", async () => {
     const stranded = Array.from({ length: 250 }, (_, index) => user(`s-${index}`, "human-user"));
     await lockoutStep.run(
       ctx({
@@ -461,7 +467,21 @@ describe("lockoutStep", () => {
       }),
     );
 
-    expect(takeReportedWarnings()[0]).toContain('1 existing user of "human-user" has an SSO link');
+    expect(takeReportedWarnings()[0]).toContain("Checked only some of the users of");
+  });
+
+  it("counts linked users among the first stranded ones", async () => {
+    const stranded = Array.from({ length: 250 }, (_, index) => user(`s-${index}`, "human-user"));
+    await lockoutStep.run(
+      ctx({
+        schemas: [{ objectType: "employee" }],
+        flows: [flow("employee")],
+        users: stranded,
+        links: { "s-0": 1 },
+      }),
+    );
+
+    expect(takeReportedWarnings()[0]).toContain("at least 1 existing user");
   });
 
   it("reports an exact count when the read ends exactly at the limit", async () => {
@@ -475,6 +495,67 @@ describe("lockoutStep", () => {
     );
 
     expect(takeReportedWarnings()[0]).toContain('500 of 500 existing users of "human-user"');
+  });
+
+  it("keeps one schema's warning when another schema's read fails", async () => {
+    await lockoutStep.run(
+      ctx({
+        schemas: [
+          { objectType: "human-user", "x-identifier": "email" },
+          { objectType: "employee", "x-identifier": "email" },
+        ],
+        flows: [flow("human-user"), flow("employee")],
+        users: [user("u1", "human-user", {}), user("e1", "employee", {})],
+        failFor: "employee",
+      }),
+    );
+
+    const warnings = takeReportedWarnings();
+    expect(warnings[0]).toContain('of "human-user"');
+    expect(warnings.at(-1)).toContain("Could not finish checking existing users");
+  });
+
+  it("does not list the schemas when every flow names an object type and nobody is linked", async () => {
+    const listed: number[] = [];
+    await lockoutStep.run(
+      ctx({
+        schemas: [{ objectType: "human-user", "x-identifier": "email" }],
+        flows: [flow("human-user")],
+        users: [user("u1", "human-user", { email: "a@example.com" })],
+        listed,
+      }),
+    );
+
+    expect(listed).toHaveLength(0);
+  });
+
+  it("lists the schemas once when both resolving a flow and naming a user need them", async () => {
+    const listed: number[] = [];
+    await lockoutStep.run(
+      ctx({
+        schemas: [{ objectType: "employee" }],
+        flows: [flow(EMPLOYEE)],
+        users: [user("u1", "human-user")],
+        links: { u1: 1 },
+        listed,
+      }),
+    );
+
+    expect(listed).toHaveLength(1);
+    expect(takeReportedWarnings()[0]).toContain('of "human-user" has an SSO link');
+  });
+
+  it("says the schemas could not be read, not that a flow's schema is undefined", async () => {
+    await lockoutStep.run(
+      ctx({
+        schemas: [{ objectType: "employee" }],
+        flows: [flow(EMPLOYEE)],
+        users: [],
+        failListSchemas: true,
+      }),
+    );
+
+    expect(takeReportedWarnings()[0]).toContain("the project's schemas could not be read");
   });
 
   it("never fails the deploy when users cannot be read", async () => {

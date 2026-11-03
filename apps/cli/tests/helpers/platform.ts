@@ -4,13 +4,14 @@ import {
   setupPlatformHandlers,
   snapshotPlatformStore,
 } from "@zitadel/api-mock/platform";
+import { getDefaultHumanUserSchema } from "@zitadel/config/defaults";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll } from "vitest";
 
 /** What the platform was asked to publish, for a surface the mock does not keep. */
-/** The object type of the schema the scaffolded login flow serves. */
-const SERVED_OBJECT_TYPE = "human-user";
+/** The object type of the schema the scaffolded login flow serves, read from the scaffold's own default. */
+const SERVED_OBJECT_TYPE = String(getDefaultHumanUserSchema().objectType);
 
 export interface Captured<T> {
   readonly all: T[];
