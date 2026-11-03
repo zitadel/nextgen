@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { readNearestRuntimeMetadata } from "../../lib/local-server/runtime";
 import { LocalServer } from "../../lib/local-server/server";
-import { startedServer } from "../local-server/port";
+import { startedServer } from "../local-server/started";
 import {
   LOG_LEVELS,
   type LogLine,
@@ -30,15 +30,6 @@ const TAIL: Refused<number> = {
     hint: "Use a positive integer.",
   },
 };
-
-/**
- * A flag that holds how many lines to show, {@link DEFAULT_TAIL} of them when
- * it is not given.
- */
-export const tailFlag = Flags.custom<number>({
-  default: DEFAULT_TAIL,
-  parse: reads(TAIL),
-});
 
 /**
  * How following the lines into the envelope is refused: following writes lines
@@ -74,7 +65,10 @@ export default class Logs extends BaseCommand {
       description: "Show only lines at this level or above.",
       options: LOG_LEVELS,
     })(),
-    tail: tailFlag({
+    tail: Flags.custom<number>({
+      parse: reads(TAIL),
+    })({
+      default: DEFAULT_TAIL,
       description: "Number of lines to show, counting only those --level shows.",
     }),
   };

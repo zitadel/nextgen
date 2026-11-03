@@ -1,5 +1,5 @@
 import { LocalServer } from "../../../lib/local-server/server";
-import { readPort } from "../../local-server/port";
+import { readPort } from "../index";
 import type { PromptContext, SetupAnswers, SetupPrompt } from "./types";
 
 /**

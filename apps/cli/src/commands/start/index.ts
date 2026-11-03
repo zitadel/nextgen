@@ -1,9 +1,11 @@
 import { Flags } from "@oclif/core";
+import { z } from "zod";
 
 import { serverLogAction } from "../../lib/journey-guidance";
 import { ensureLocalAdmin } from "../../lib/local-server/admin-credential";
 import { EMPTY_SUMMARY, loadProjectEnv } from "../../lib/local-server/env-vars";
-import { portFlag, startedServer } from "../local-server/port";
+import { startedServer } from "../local-server/started";
+import { type Refused, reads, whole } from "../../lib/oclif/flags";
 import {
   DEFAULT_LOCAL_SERVER_PORT,
   PLATFORM_PROJECT_ID,
@@ -37,13 +39,34 @@ const IMAGE_NEEDS_DOCKER_REFUSAL: Refusal = {
   hint: "Use `zitadel start --runtime docker --image <tag>`, or omit --image for the npm binary runtime.",
 };
 
+const MIN_PORT = 1;
+const MAX_PORT = 65_535;
+
+/**
+ * A TCP port, refusing what is not a whole number from 1 to 65535, which is no
+ * port a server can listen on.
+ */
+const PORT: Refused<number> = {
+  schema: whole.pipe(z.number().min(MIN_PORT).max(MAX_PORT)),
+  refusal: {
+    message: "{value} is not a TCP port",
+    hint: "Use a TCP port from {min} to {max}.",
+  },
+  values: {
+    min: MIN_PORT,
+    max: MAX_PORT,
+  },
+};
+
 export default class Start extends BaseCommand {
   static override description = "Start a local Zitadel server.";
   static override group = CommandGroups.gettingStarted;
   static override groupOrder = 2;
   static override flags = {
     image: nonBlankString({ description: "Container image to run." }),
-    port: portFlag({
+    port: Flags.custom<number>({
+      parse: reads(PORT),
+    })({
       description:
         "Local HTTP port. By default this directory keeps the port it had, or takes the first free one from 8080.",
     }),

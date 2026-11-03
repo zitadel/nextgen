@@ -22,7 +22,7 @@ const LIMIT_MIN = 1;
 const LIMIT_MAX = 100;
 
 /** The page size `--limit` asks for, as the server bounds it. */
-const LIMIT_FLAG: Refused<number> = {
+const LIMIT: Refused<number> = {
   schema: whole.pipe(z.number().min(LIMIT_MIN).max(LIMIT_MAX)),
   refusal: {
     message: "{value} is not a valid {input}",
@@ -56,7 +56,7 @@ export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
     origin: Flags.string({ description: "Only deployments that targeted this origin." }),
     live: Flags.boolean({ description: "What each target serves now, not the full history." }),
     limit: Flags.custom<number>({
-      parse: reads(LIMIT_FLAG),
+      parse: reads(LIMIT),
     })({
       min: LIMIT_MIN,
       max: LIMIT_MAX,

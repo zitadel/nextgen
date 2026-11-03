@@ -158,13 +158,12 @@ import {
 } from "../../lib/suggestion";
 import { asStepsShown, type StepsShown } from "../../lib/oclif/next-steps";
 import { Destructive } from "../../lib/oclif/destructive";
-import { portFlag } from "../local-server/port";
 import semver from "semver";
 import { type Refusal, refusalError } from "../../lib/oclif/refusal";
 import type { GlobalOptions } from "../../lib/oclif/types";
 import { type ResolvedServer, resolveServer } from "../../lib/server";
 import { PAGE_LAYOUT_HINT } from "../../lib/branding/designs";
-import { filled, type Refused, reads } from "../../lib/oclif/flags";
+import { filled, type Refused, reads, whole } from "../../lib/oclif/flags";
 
 /**
  * {@link recoverySelector} plus `--server local`, for the recovery after a
@@ -1007,6 +1006,42 @@ function recoverySelector(cwd: string | undefined): EnvironmentSelector {
  * — each entry is a small class) and {@link PickFrameworkPrompt} (the
  * empty-directory framework choice, before the main wizard).
  */
+const MIN_PORT = 1;
+const MAX_PORT = 65_535;
+
+/**
+ * A TCP port, refusing what is not a whole number from 1 to 65535, which is no
+ * port a server can listen on.
+ */
+const PORT: Refused<number> = {
+  schema: whole.pipe(z.number().min(MIN_PORT).max(MAX_PORT)),
+  refusal: {
+    message: "{value} is not a TCP port",
+    hint: "Use a TCP port from {min} to {max}.",
+  },
+  values: {
+    min: MIN_PORT,
+    max: MAX_PORT,
+  },
+};
+
+/**
+ * The port a value names, for the dev-port prompt, so a port typed at the
+ * prompt and one passed as `--dev-port` are held to the same rule.
+ */
+export function readPort(value: string): Parsed<number> {
+  const parsed = PORT.schema.safeParse(value);
+  return parsed.success
+    ? {
+        ok: true,
+        value: parsed.data,
+      }
+    : {
+        ok: false,
+        problem: "Must be a port number",
+      };
+}
+
 export default class Setup extends Destructive(BaseCommand) {
   static override description =
     "Create a Zitadel project and scaffold local auth. An interactive setup ends with a note about the Zitadel agent skills, shown once per machine; set NO_SKILLS_PROMPT=1 to hide it.";
@@ -1027,7 +1062,9 @@ export default class Setup extends Destructive(BaseCommand) {
       description: RENDERER_FLAG_DESCRIPTION,
       options: [...AVAILABLE_RENDERER_IDS],
     }),
-    "dev-port": portFlag({
+    "dev-port": Flags.custom<number>({
+      parse: reads(PORT),
+    })({
       description:
         "Dev-server port; also the issuer origin registered with Zitadel. Defaults to the detected port. Use distinct ports to run several scaffolded apps side by side. In an app already set up, moves it to this port: the dev script, ZITADEL_ISSUER and the allowed origin.",
     }),

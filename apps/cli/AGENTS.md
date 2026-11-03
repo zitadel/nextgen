@@ -51,15 +51,18 @@
   that disagree as an `if`, a precondition the project or server decides as an
   async function returning what it found. There is no framework for either, and
   none is wanted.
-- Keep it all in the command's own file, above the class: refusal consts, then
-  validators, then the flag definitions. No `flags/`, `args/` or `rules/`
-  directory, and no helper module beside a command.
-- Duplicate a few lines into two commands rather than add a file; share only
-  what a whole topic needs, in that topic's own directory.
+- Keep it all in the command's own file: a `const NAME: Refused<T>` above the
+  class, named for the flag and nothing else, then the flag declared inline in
+  `static flags` as `Flags.custom<T>({ parse: reads(NAME) })({ … })`.
+- Never share a flag. Three commands take `--port`; each declares its own,
+  because a shared flag module is a file to find before a flag can be read.
+  Duplicate it, and share only what a whole topic needs.
+- No `flags/`, `args/` or `rules/` directory, and no helper module beside a
+  command.
 - Write every refusal once, as a `Refusal` template with `{name}` placeholders
   (`src/lib/oclif/refusal.ts`), never a `ZitadelError` built by hand. Thread
-  `this.suggest(...)` in where one names a follow-up: `refusalError` throws
-  without a suggester, which costs the refusal its code.
+  `this.suggest(...)` in where one names a follow-up: a refusal raised without
+  a suggester goes without its follow-ups.
 - Declare a flag or argument by its CLI spelling and read it as code reads it
   (`"client-id"` is read `flags.clientId`); see `src/lib/oclif/names.ts`.
 - Keep the CLI spelling in three places only: the definition key, oclif's own

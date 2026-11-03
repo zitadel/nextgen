@@ -10,7 +10,7 @@ import { filled, type Refused, taken } from "../../lib/oclif/flags";
  * The preview URL to remove. It refuses a blank value, and drops a trailing
  * slash that names the same origin but, sent as typed, would match nothing.
  */
-const URL_ARG: Refused<string> = {
+const URL: Refused<string> = {
   schema: filled.transform((url) => {
     return url.replace(/\/+$/, "");
   }),
@@ -36,7 +36,7 @@ export default class PreviewRm extends Destructive(PreviewCommand) {
   ];
   static override args = {
     url: Args.custom<string>({
-      parse: taken(URL_ARG),
+      parse: taken(URL),
     })({
       required: true,
       description: "The preview URL to remove.",

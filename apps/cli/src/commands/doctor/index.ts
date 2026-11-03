@@ -1,6 +1,7 @@
 import { dirname, join } from "node:path";
 import { existsSync } from "node:fs";
 import { Flags } from "@oclif/core";
+import { z } from "zod";
 import consola from "consola";
 
 import { createZitadelClient } from "../../lib/api-client";
@@ -28,7 +29,8 @@ import {
   type RuntimeMetadata,
 } from "../../lib/local-server/runtime";
 import { LocalServer } from "../../lib/local-server/server";
-import { startedServer } from "../local-server/port";
+import { startedServer } from "../local-server/started";
+import { type Refused, reads, whole } from "../../lib/oclif/flags";
 import {
   type Admitted,
   BaseCommand,
@@ -36,7 +38,6 @@ import {
   type JsonEnvelope,
   nonBlankString,
 } from "../../lib/oclif";
-import { portFlag } from "../local-server/port";
 import { Destructive } from "../../lib/oclif/destructive";
 import { isRefusal } from "../../lib/consent";
 import { reportWarning } from "../../lib/warnings";
@@ -89,6 +90,25 @@ const LOCAL_RUNTIME_CHECK_NAMES = new Set([
  * level and skipped, not propagated — the post-fix re-verify still reports
  * whatever remains broken.
  */
+const MIN_PORT = 1;
+const MAX_PORT = 65_535;
+
+/**
+ * A TCP port, refusing what is not a whole number from 1 to 65535, which is no
+ * port a server can listen on.
+ */
+const PORT: Refused<number> = {
+  schema: whole.pipe(z.number().min(MIN_PORT).max(MAX_PORT)),
+  refusal: {
+    message: "{value} is not a TCP port",
+    hint: "Use a TCP port from {min} to {max}.",
+  },
+  values: {
+    min: MIN_PORT,
+    max: MAX_PORT,
+  },
+};
+
 /** What doctor is about, worked out once however many times it is asked for. */
 type Checking = Readonly<{
   cwd: string;
@@ -109,7 +129,9 @@ export default class Doctor extends Destructive(BaseCommand) {
       dependsOn: ["fix"],
     }),
     image: nonBlankString({ description: "Container image to check." }),
-    port: portFlag({
+    port: Flags.custom<number>({
+      parse: reads(PORT),
+    })({
       description: "Local HTTP port to check. Defaults to the port this directory's server uses.",
     }),
     runtime: Flags.option({

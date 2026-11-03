@@ -1,7 +1,7 @@
 import type { Config } from "@oclif/core";
 import { describe, expect } from "vitest";
 
-import Logs, { tailFlag } from "../../../../src/commands/logs";
+import Logs from "../../../../src/commands/logs";
 import { it } from "../../../helpers/fixtures";
 import { parseFlag } from "../../../helpers/inputs";
 
@@ -22,11 +22,11 @@ describe("--tail", () => {
     ["5000", 5000],
     [" 42 ", 42],
   ])("reads %j as %i lines", async (input, lines) => {
-    await expect(parseFlag(tailFlag({}), input, "tail")).resolves.toBe(lines);
+    await expect(parseFlag(Logs.flags.tail, input, "tail")).resolves.toBe(lines);
   });
 
   it.each(["0", "-1", "1.5", "all", "", "1e3"])("refuses %j", async (input) => {
-    await expect(parseFlag(tailFlag({}), input, "tail")).rejects.toMatchObject({
+    await expect(parseFlag(Logs.flags.tail, input, "tail")).rejects.toMatchObject({
       code: "E_VALIDATION",
       message: `${input.trim()} is not a valid tail`,
       hint: "Use a positive integer.",
@@ -34,7 +34,7 @@ describe("--tail", () => {
   });
 
   it("shows 200 lines when it is not given", () => {
-    expect(tailFlag({}).default).toBe(200);
+    expect(Logs.flags.tail.default).toBe(200);
   });
 
   it("refuses a count that is not a number of lines before the server is read", async () => {

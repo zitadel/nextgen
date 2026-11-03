@@ -6,7 +6,7 @@ import {
   readRuntimeMetadata,
 } from "../lib/local-server/runtime";
 import { LocalServer } from "../lib/local-server/server";
-import { startedServer } from "./local-server/port";
+import { startedServer } from "./local-server/started";
 import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
 import { Destructive } from "../lib/oclif/destructive";
 
