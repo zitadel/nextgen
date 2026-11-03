@@ -936,6 +936,33 @@ describe("warn/password-without-identifier", () => {
     expect(errors(issues)).toEqual([]);
     expect(warnings(issues).map((i) => i.step)).toEqual(["password"]);
   });
+
+  it("does not warn for a password step reached only through a user_already_exists collision", () => {
+    const def = {
+      name: "login",
+      status: "active",
+      user_schema: "sch_x",
+      purposes: { login: "start" },
+      steps: [
+        {
+          name: "start",
+          fields: [],
+          actions: [{ name: "go", kind: "navigate", primary: true }],
+          transitions: { go: { target: "done" }, user_already_exists: { target: "password" } },
+        },
+        {
+          name: "password",
+          fields: ["x-auth-methods#password"],
+          actions: [{ name: "submit", kind: "submit", primary: true }],
+          transitions: { submit: { target: "done" } },
+        },
+        { name: "done", complete: "show" },
+      ],
+    };
+    const relaxed = structuredClone(schema);
+    delete relaxed.required;
+    expect(warnings(validateFlowDefinition(def, relaxed))).toEqual([]);
+  });
 });
 
 // ── drift audit against the Go source ────────────────────────────────────────

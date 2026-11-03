@@ -25,6 +25,20 @@ export interface PlatformMock {
   rejectsSchemaUploads(): void;
 
   /**
+   * Refuses every release build as a server does a bundle whose schema names a
+   * property it does not have: `rel.invalid`, with the reason under
+   * `details.resources`.
+   */
+  rejectsASchema(): void;
+
+  /**
+   * Refuses every release build as a server does a bundle whose flow fails
+   * against its schema: `rel.invalid`, with the reason under the resource's
+   * own `details`.
+   */
+  rejectsAFlow(): void;
+
+  /**
    * Answers as a server that is reachable but is not a Zitadel platform API,
    * which is what a mistyped or wrong `--server` points at: every route 404s
    * with a body that is not a platform error envelope.
@@ -97,6 +111,17 @@ export function usePlatformMock(): PlatformMock {
     resetPlatformStore();
   });
 
+  const refuseReleases = (resources: readonly Record<string, unknown>[]) => {
+    server.use(
+      http.post("*/releases/build", () =>
+        HttpResponse.json(
+          { code: "rel.invalid", message: "release: invalid", details: { resources } },
+          { status: 400 },
+        ),
+      ),
+    );
+  };
+
   return {
     rejectsSchemaUploads() {
       server.use(
@@ -104,6 +129,31 @@ export function usePlatformMock(): PlatformMock {
           HttpResponse.json({ code: "internal", message: "boom" }, { status: 500 }),
         ),
       );
+    },
+
+    rejectsASchema() {
+      refuseReleases([
+        {
+          kind: "schema",
+          handle: "human-user",
+          code: "sch.invalid_request",
+          message: 'schema designation invalid: "x-display" names unknown property "nickname"',
+        },
+      ]);
+    },
+
+    rejectsAFlow() {
+      refuseReleases([
+        {
+          kind: "flow",
+          handle: "default-login",
+          code: "flowdef.invalid",
+          message: "flow definition: invalid",
+          details: {
+            details: 'step "register-password": on_success create_user requires "identifier"',
+          },
+        },
+      ]);
     },
 
     isNotZitadel() {

@@ -572,3 +572,11 @@ On implementation: the CLI's
 [`SKILL.md`](../../apps/cli/skills/zitadel-cli/SKILL.md), the SDK and
 components READMEs, the API spec's `hint.login_name` description, and the
 [compose quick start](../quick-start/docker-compose.md).
+
+## Amendment (2026-10-31): §10, no project default target
+
+There is no project default target: a caller with no `Origin` is served the
+project's newest primary deployment
+([ADR 085](085-which-release-serves-a-request.md)). The rest of §10 stands: the
+code carries the deployment for an authorization code grant, and a refresh and
+userinfo resolve the newest deployment to the token's issuer.
