@@ -5,7 +5,7 @@ import consola from "consola";
 
 import { createZitadelClient } from "../../lib/api-client";
 import { claimAction, claimCommand, claimWindowClosedAction } from "../../lib/claim-state";
-import { type Environment, resolveEnvironment } from "../../lib/environment";
+import { resolveEnvironment } from "../../lib/environment";
 import { ZitadelError, errorMessage } from "../../lib/errors";
 import { serverLogAction } from "../../lib/journey-guidance";
 import {
@@ -152,6 +152,7 @@ export default class Doctor extends Destructive(BaseCommand) {
       orca: createOrca(),
       cliVersion: this.meta.cliVersion,
       dryRun,
+      signal: this.signal,
       consent: (gate) => this.consent(gate),
     };
 
@@ -190,6 +191,7 @@ export default class Doctor extends Destructive(BaseCommand) {
       envName: typeof flags.env === "string" ? flags.env : undefined,
       envFile: typeof flags["env-file"] === "string" ? flags["env-file"] : undefined,
       serverFlag: typeof flags.server === "string" ? flags.server : undefined,
+      signal: this.signal,
     });
     const checks = [...runtimeChecks, ...projectChecks, ...environmentChecks];
     const failed = checks.filter((check) => check.status === "fail");
@@ -551,28 +553,31 @@ async function runEnvironmentChecks(input: {
   envName?: string;
   envFile?: string;
   serverFlag?: string;
+  signal: AbortSignal;
 }): Promise<CheckOutcome[]> {
   if (input.envName === undefined && input.envFile === undefined) {
     return [];
   }
-  let environment: Environment;
-  try {
-    environment = await resolveEnvironment({
-      cwd: input.cwd,
-      env: input.env,
-      envName: input.envName,
-      envFile: input.envFile,
-      serverFlag: input.serverFlag,
-    });
-  } catch (error) {
+  const resolved = await resolveEnvironment({
+    cwd: input.cwd,
+    env: input.env,
+    envName: input.envName,
+    envFile: input.envFile,
+    serverFlag: input.serverFlag,
+  }).then(
+    (environment) => ({ environment }),
+    (error: unknown) => ({ failure: error }),
+  );
+  if ("failure" in resolved) {
     return [
       {
         name: "environment",
         status: "fail",
-        message: errorMessage(error),
+        message: errorMessage(resolved.failure),
       },
     ];
   }
+  const { environment } = resolved;
   const name = environment.name.value;
   return [
     await check(`environment`, `Resolved ${name} environment connects`, async () => {
@@ -589,7 +594,11 @@ async function runEnvironmentChecks(input: {
           `ZITADEL_PROJECT_SECRET must resolve to verify project ${projectId} on ${server}`,
         );
       }
-      const project = await createZitadelClient({ baseUrl: server, token }).getProject(projectId);
+      const project = await createZitadelClient({
+        baseUrl: server,
+        token,
+        signal: input.signal,
+      }).getProject(projectId);
       if (project.id !== projectId) {
         throw new Error(`${server} returned project ${project.id}, not the resolved ${projectId}`);
       }

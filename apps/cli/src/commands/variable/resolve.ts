@@ -2,11 +2,10 @@ import { Flags } from "@oclif/core";
 import type { ZitadelClient } from "../../lib/api-client";
 
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../../lib/oclif";
-import { Tabulatable } from "../../lib/oclif/tabulatable";
-import { listData } from "../../lib/oclif/envelope";
+import { plainFlag, Tabulatable } from "../../lib/oclif/tabulatable";
 import { DEPLOY_ARGS, originMatchesPattern } from "../../lib/release";
 import { ZitadelError } from "../../lib/errors";
-import { shellArg } from "../../lib/shell";
+import { Cmd } from "../../lib/cmd";
 import { toVariableRows, variableCells } from "../../lib/variables";
 
 /** The columns `resolve` renders, in order. */
@@ -33,10 +32,7 @@ export default class VariableResolve extends Tabulatable(EnvironmentCommand) {
   ];
   static override flags = {
     origin: Flags.string({ description: "The origin whose live deployment to read." }),
-    plain: Flags.boolean({
-      description:
-        "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
-    }),
+    plain: plainFlag,
   };
 
   async run(): Promise<JsonEnvelope> {
@@ -71,7 +67,7 @@ export default class VariableResolve extends Tabulatable(EnvironmentCommand) {
         {
           hint: `Live origins: ${origins.join(", ")}.`,
           nextCommands: origins.map((o) =>
-            this.suggest(`variable resolve --origin ${shellArg(o)}`),
+            this.suggest(`variable resolve --origin ${Cmd.quote(o)}`),
           ),
         },
       );
@@ -87,27 +83,30 @@ export default class VariableResolve extends Tabulatable(EnvironmentCommand) {
     const servedOrigins = live.targets.map((target) => target.origin).sort();
     const where = servedOrigins.join(", ");
 
-    const rows = toVariableRows(
+    const items = toVariableRows(
       await client.getDeploymentVariables(live.id, { project_id: projectId }),
     );
-    this.recordTelemetry({ variable_count: rows.length });
+    this.recordTelemetry({ variable_count: items.length });
 
-    // The resource commands' list rendering: a pipe (or `--plain`) gets one
-    // tab-separated record per line, with no header; a terminal gets a table.
-    const cells = variableCells(rows);
-    const plain = this.isPlain(flags.plain);
-    return this.emit({
-      status: "ok",
-      data: { deployment_id: live.id, origins: servedOrigins, ...listData(rows) },
-      pretty: plain
-        ? this.tabulateRows(COLUMNS, cells)
-        : rows.length === 0
-          ? `${live.id} froze no variables for ${where}.`
-          : [
-              await this.tabulate(COLUMNS, cells),
-              "",
-              `${rows.length} ${rows.length === 1 ? "variable" : "variables"} frozen by ${live.id} for ${where}`,
-            ].join("\n"),
+    const rows = variableCells(items);
+    const columns = COLUMNS;
+    const empty = `${live.id} froze no variables for ${where}.`;
+    const footer = [`Frozen by ${live.id} for ${where}`];
+    const page = null;
+    const extra = {
+      deployment_id: live.id,
+      origins: servedOrigins,
+    };
+
+    return this.emitList(flags, {
+      columns,
+      rows,
+      items,
+      singular: "variable",
+      empty,
+      footer,
+      page,
+      extra,
     });
   }
 

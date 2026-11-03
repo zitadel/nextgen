@@ -126,8 +126,10 @@ nothing; `data.skills` and `data.directories` say what it added where.
   environment), but that is the user's environment choice, not a flag to attach
   to every call.
 - **Flag conventions.** Flags follow what a model already expects from curl, ssh
-  and wget: `--help`/`-h`, `--version`, `-v`/`--verbose`, kebab-case long flags,
-  both `--flag value` and `--flag=value`, and `--no-telemetry`-style negation.
+  and wget: `--help`/`-h` (also `zitadel api help`), `--version`, `-v`/`--verbose`,
+  kebab-case long flags, both `--flag value` and `--flag=value`, and
+  `--no-telemetry`-style negation. `-h` anywhere before `--` asks for help, even
+  as a flag's value.
   Two deliberate deviations worth knowing: `-n` is `--non-interactive` (not
   `--dry-run`, which is long-only), and machine output is `--json` (not
   `--output json`). `api` takes `-X` for the method, as curl does, and `-F` for
@@ -197,7 +199,7 @@ npx @zitadel/cli@latest --help               # every command family, grouped by 
 npx @zitadel/cli@latest commands             # flat list of all commands
 npx @zitadel/cli@latest <command> --help     # a command's flags, which are required, and examples
 npx @zitadel/cli@latest resources --json     # the resource surface in one call (see below); contacts no server
-npx @zitadel/cli@latest api ls --json        # every API operation, its parameters, body and paging; contacts no server
+npx @zitadel/cli@latest api ls --json        # every API operation, its parameters, body and paging; contacts no server (`--plain` for tab-separated rows)
 ```
 
 `--help` groups the commands by what you are doing: getting started, local
@@ -246,6 +248,15 @@ Each invocation prints one JSON object:
   (the origins it went live on) and `data.resources` (how many it pinned). A
   re-run on unchanged config returns the same digest. Use it to confirm what
   went live.
+- When the server refuses a release, `deploy` fails with `E_VALIDATION` and
+  the `hint` lists each refused resource as `<kind> <handle>: <reason>`, such
+  as `schema human-user: …` or `flow default-login: …`. Read the hint, not
+  only `message` (`release: invalid`); the same entries are in
+  `details.body.details.resources`.
+- `deploy` warns that a password step cannot tell which user to challenge only
+  when no identifier step comes before it. A step reached through a
+  `user_already_exists` collision, such as `sso-conflict`, is exempt: the
+  collision names the user.
 - `preview` is `deploy` for a pull-request build: it deploys the release to the
   build's preview URLs (from the platform, or `--origin`) for `--ttl` and emits
   `data.previews` plus `data.release_env` (the `NEXT_PUBLIC_ZITADEL_RELEASE`
@@ -506,6 +517,9 @@ local admin's team and ends `data.next_commands` with `console`; when it finds
 no local admin for that server on the way up, it says so in the envelope's
 `warnings` and the project stays unattached, so the local console does not
 list it.
+
+`reset` asks before it deletes the local server's database, which cannot be undone, and keeps
+`.zitadel/local/admin.json`.
 
 For a project set up against a hosted server, `doctor` checks no local
 runtime, unless a local server was started in its directory or a parent, or

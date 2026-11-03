@@ -6,12 +6,19 @@ import { describe, expect } from "vitest";
 import { it } from "../../../../../../helpers/fixtures";
 
 import { ZitadelError } from "../../../../../../../src/lib/errors";
-import { scaffold } from "../../../../../../../src/lib/orca/patchers/rule/file-writer/index";
+import { FileWriter } from "../../../../../../../src/lib/orca/patchers/rule/file-writer/index";
 import type { ScaffoldPlan } from "../../../../../../../src/lib/orca/patchers/rule/file-writer/types";
 import { rejectionOf } from "../../../../../../helpers/thrown-value";
 
 function plan(...ops: ScaffoldPlan["ops"]): ScaffoldPlan {
   return { ops, summary: [] };
+}
+
+function scaffold(
+  scaffoldPlan: ScaffoldPlan,
+  options: { cwd: string; dryRun: boolean; force: boolean },
+) {
+  return new FileWriter(options).scaffold(scaffoldPlan);
 }
 
 async function exists(path: string): Promise<boolean> {

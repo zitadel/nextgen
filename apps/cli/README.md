@@ -292,7 +292,7 @@ List the operations of the Zitadel API that `zitadel api` calls.
 ```
 USAGE
   $ zitadel api ls [FILTER] [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--tag <value>]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--tag <value>] [--plain]
 
 ARGUMENTS
   [FILTER]  Only operations whose id, path, summary or tag contains this text.
@@ -307,6 +307,8 @@ FLAGS
                          NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
+      --plain            Tab-separated rows with no header, for piping. Implied
+                         when stdout is not a terminal.
       --tag=<value>      Only the operations of this part of the API (Users,
                          Teams, …).
       --[no-]telemetry   Send anonymous usage analytics. Disable with
@@ -1357,7 +1359,7 @@ USAGE
   $ zitadel events list [--json] [-c <value>] [-s <value>] [-n]
     [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
     <value>] [--limit <value>] [-a | --page-token <value>] [--fields <value>]
-    [--plain] [--filter <value>...] [--sort <value>]
+    [--filter <value>...] [--sort <value>] [--plain]
 
 FLAGS
   -a, --all
@@ -1493,7 +1495,7 @@ USAGE
   $ zitadel flow-definitions list [--json] [-c <value>] [-s <value>] [-n]
     [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
     <value>] [--limit <value>] [-a | --page-token <value>] [--fields <value>]
-    [--plain] [--filter <value>...]
+    [--filter <value>...] [--plain]
 
 FLAGS
   -a, --all                 Fetch every page instead of one.
@@ -1716,7 +1718,7 @@ USAGE
   $ zitadel grants list [--json] [-c <value>] [-s <value>] [-n]
     [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
     <value>] [--limit <value>] [-a | --page-token <value>] [--fields <value>]
-    [--plain] [--filter <value>...] [--sort <value>]
+    [--filter <value>...] [--sort <value>] [--plain]
 
 FLAGS
   -a, --all
@@ -2009,7 +2011,7 @@ USAGE
   $ zitadel idps list [--json] [-c <value>] [-s <value>] [-n]
     [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
     <value>] [--limit <value>] [-a | --page-token <value>] [--fields <value>]
-    [--plain] [--filter <value>...] [--sort <value>]
+    [--filter <value>...] [--sort <value>] [--plain]
 
 FLAGS
   -a, --all
@@ -2325,7 +2327,7 @@ USAGE
   $ zitadel policies list [--json] [-c <value>] [-s <value>] [-n]
     [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
     <value>] [--limit <value>] [-a | --page-token <value>] [--fields <value>]
-    [--plain] [--filter <value>...]
+    [--filter <value>...] [--plain]
 
 FLAGS
   -a, --all                 Fetch every page instead of one.
@@ -2633,7 +2635,7 @@ USAGE
   $ zitadel projects list [--json] [-c <value>] [-s <value>] [-n]
     [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
     <value>] [--limit <value>] [-a | --page-token <value>] [--fields <value>]
-    [--plain] [--filter <value>...] [--sort <value>]
+    [--filter <value>...] [--sort <value>] [--plain]
 
 FLAGS
   -a, --all                 Fetch every page instead of one.
@@ -3129,7 +3131,7 @@ USAGE
   $ zitadel schemas list [--json] [-c <value>] [-s <value>] [-n]
     [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
     <value>] [--limit <value>] [-a | --page-token <value>] [--fields <value>]
-    [--plain] [--filter <value>...]
+    [--filter <value>...] [--plain]
 
 FLAGS
   -a, --all                 Fetch every page instead of one.
@@ -3250,7 +3252,7 @@ USAGE
   $ zitadel sessions list [--json] [-c <value>] [-s <value>] [-n]
     [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
     <value>] [--limit <value>] [-a | --page-token <value>] [--fields <value>]
-    [--plain] [--filter <value>...] [--sort <value>]
+    [--filter <value>...] [--sort <value>] [--plain]
 
 FLAGS
   -a, --all
@@ -3800,7 +3802,7 @@ USAGE
   $ zitadel teams list [--json] [-c <value>] [-s <value>] [-n]
     [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
     <value>] [--limit <value>] [-a | --page-token <value>] [--fields <value>]
-    [--plain] [--filter <value>...] [--sort <value>]
+    [--filter <value>...] [--sort <value>] [--plain]
 
 FLAGS
   -a, --all
@@ -4136,7 +4138,7 @@ USAGE
   $ zitadel users list [--json] [-c <value>] [-s <value>] [-n]
     [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
     <value>] [--limit <value>] [-a | --page-token <value>] [--fields <value>]
-    [--plain] [--filter <value>...] [--sort <value>]
+    [--filter <value>...] [--sort <value>] [--plain]
 
 FLAGS
   -a, --all

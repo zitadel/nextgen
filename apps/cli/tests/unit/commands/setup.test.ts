@@ -37,6 +37,8 @@ import { asTerminal } from "../../helpers/terminal";
 import { moveDevPort } from "../../../src/commands/setup/move-dev-port";
 import { createOrca } from "../../../src/lib/orca";
 
+const signal = new AbortController().signal;
+
 const { server, dirs: tempDirs } = usePlatformServer();
 const held: Server[] = [];
 
@@ -1377,6 +1379,7 @@ describe("setup --dev-port on an app already set up", () => {
       orca: createOrca(),
       cliVersion: "0.0.0",
       dryRun: false,
+      signal,
       consent: () => Promise.reject(new Error("a bug in the caller")),
     });
 

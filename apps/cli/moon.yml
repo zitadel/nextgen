@@ -63,7 +63,7 @@ tasks:
       - "/apps/server/bin/**/*"
       # The spec files whose `x-zitadel-cli` names the api-coverage test checks
       # against the commands.
-      - "/api/openapi/endpoints/**/methods.yaml"
+      - "/apps/api/api/openapi/endpoints/**/methods.yaml"
       # The product analytics catalog the catalog test checks telemetry against.
       - "/docs/product-analytics-events.yaml"
       # The cloud's rewrite the CLI's Mixpanel endpoint has to match.
