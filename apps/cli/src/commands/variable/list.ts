@@ -1,8 +1,7 @@
 import { Flags } from "@oclif/core";
 
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../../lib/oclif";
-import { Tabulatable } from "../../lib/oclif/tabulatable";
-import { listData } from "../../lib/oclif/envelope";
+import { plainFlag, Tabulatable } from "../../lib/oclif/tabulatable";
 import {
   toInventoryRows,
   toVariableRows,
@@ -12,9 +11,9 @@ import {
   variableReadScope,
 } from "../../lib/variables";
 
-/** The columns `list` renders, in order; the inventory adds the preview kind. */
-const COLUMNS = ["name", "value"] as const;
-const INVENTORY_COLUMNS = ["name", "value", "preview"] as const;
+/** The columns `list` renders, in order; `--preview` leaves out the preview column. */
+const COLUMNS = ["name", "value", "preview"] as const;
+const PREVIEW_COLUMNS = ["name", "value"] as const;
 
 /**
  * `zitadel variable list` — show the variables entered on the project.
@@ -38,10 +37,7 @@ export default class VariableList extends Tabulatable(EnvironmentCommand) {
       default: false,
       description: "List the preview values instead of the primary ones.",
     }),
-    plain: Flags.boolean({
-      description:
-        "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
-    }),
+    plain: plainFlag,
   };
 
   async run(): Promise<JsonEnvelope> {
@@ -57,22 +53,13 @@ export default class VariableList extends Tabulatable(EnvironmentCommand) {
       : toInventoryRows(await client.getVariables({ project_id: projectId }));
     this.recordTelemetry({ variable_count: rows.length });
 
-    // The resource commands' list rendering: a pipe (or `--plain`) gets one
-    // tab-separated record per line, with no header and nothing at all when
-    // empty, so `cut`, `awk` and `wc -l` work on it; a terminal gets a table.
     const cells = flags.preview ? variableCells(rows) : variableInventoryCells(rows);
-    const plain = this.isPlain(flags.plain);
-    const empty = flags.preview
-      ? "No preview values on the project."
-      : "No variables on the project.";
-    return this.emit({
-      status: "ok",
-      data: listData(rows),
-      pretty: await this.tabulateList(flags.preview ? COLUMNS : INVENTORY_COLUMNS, cells as never, {
-        plain,
-        singular: "variable",
-        empty,
-      }),
+    return this.emitList(flags, {
+      columns: flags.preview ? PREVIEW_COLUMNS : COLUMNS,
+      rows: cells,
+      items: rows,
+      singular: "variable",
+      empty: flags.preview ? "No preview values on the project." : "No variables on the project.",
     });
   }
 }

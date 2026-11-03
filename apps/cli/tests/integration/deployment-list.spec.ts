@@ -61,6 +61,44 @@ describe("deployment list", () => {
         expect(result).toSuggest("deployment list --limit 1 --page-token");
       });
 
+      it("keeps the environment when suggesting the next page", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        await app.deployData();
+
+        const result = await app.run([
+          "deployment",
+          "list",
+          "--env",
+          "development",
+          "--limit",
+          "1",
+          "--json",
+        ]);
+
+        expect(result).toSuggest("--env development");
+      });
+
+      it("repeats the origin when suggesting the next page", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        await app.deployData();
+
+        const result = await app.run([
+          "deployment",
+          "list",
+          "--origin",
+          "http://localhost:3000",
+          "--limit",
+          "1",
+          "--json",
+        ]);
+
+        expect(result).toSuggest(
+          "deployment list --origin http://localhost:3000 --limit 1 --page-token",
+        );
+      });
+
       it("drains the history with --all", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin();
@@ -82,6 +120,27 @@ describe("deployment list", () => {
         const result = await app.run(["deployment", "list"]);
 
         expect(result).toPrint(deployed.release_id ?? "");
+      });
+    });
+
+    describe("--plain", () => {
+      it("prints each deployment as a tab-separated record", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        const deployed = await app.deployData();
+
+        const result = await app.run(["deployment", "list", "--plain"]);
+
+        expect(result).toPrintPlainRow(/.+/, deployed.release_id ?? "", /.*/, /.+/, /.+/);
+      });
+
+      it("prints nothing before anything is deployed", async () => {
+        const app = await anUndeployedEnvironment();
+
+        const result = await app.run(["deployment", "list", "--env", "staging", "--plain"]);
+
+        expect(result).toSucceed();
+        expect(result).toPrintPlainRows();
       });
     });
   });

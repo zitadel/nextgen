@@ -19,6 +19,38 @@ beforeEach(() => {
   vi.mocked(makeTable).mockClear();
 });
 
+const onATerminal = async <T>(run: () => Promise<T>): Promise<T> => {
+  const isTTY = Object.getOwnPropertyDescriptor(process.stdout, "isTTY");
+  try {
+    Object.defineProperty(process.stdout, "isTTY", { value: true, configurable: true });
+    return await run();
+  } finally {
+    if (isTTY) Object.defineProperty(process.stdout, "isTTY", isTTY);
+    else delete (process.stdout as unknown as Record<string, unknown>).isTTY;
+  }
+};
+
+const piped = async <T>(run: () => Promise<T>): Promise<T> => {
+  const isTTY = Object.getOwnPropertyDescriptor(process.stdout, "isTTY");
+  try {
+    Object.defineProperty(process.stdout, "isTTY", { value: false, configurable: true });
+    return await run();
+  } finally {
+    if (isTTY) Object.defineProperty(process.stdout, "isTTY", isTTY);
+    else delete (process.stdout as unknown as Record<string, unknown>).isTTY;
+  }
+};
+
+/** What a list prints for a person or a pipe, for the given flags and view. */
+const printed = async (
+  flags: { plain: boolean | undefined },
+  view: Parameters<ReturnType<typeof draw>["drawList"]>[1],
+  argv: string[] = [],
+): Promise<string> => {
+  const result = await draw(argv).drawList(flags, view);
+  return result.status === "ok" ? (result.pretty ?? "") : "";
+};
+
 describe("tabulate", () => {
   it("aligns columns, heads them by the path's last segment, and resolves nested paths", async () => {
     const table = await draw().draw(
@@ -110,59 +142,174 @@ describe("tabulate", () => {
   });
 });
 
-describe("tabulateList", () => {
-  const options = { plain: false, singular: "thing", empty: "No things." };
+describe("a list for a person", () => {
+  const view = { columns: ["id"], rows: [{ id: "a" }], singular: "thing", empty: "No things." };
 
-  it("draws the table, a blank line, a count and the footer for a person", async () => {
-    const list = await draw().drawList(["id"], [{ id: "a" }], { ...options, footer: ["More."] });
+  it("draws the table, a blank line, a count and the footer", async () => {
+    const list = await onATerminal(() => printed({ plain: false }, { ...view, footer: ["More."] }));
 
     expect(list).toBe("  id\n ────\n  a\n\n1 thing\nMore.");
   });
 
   it("says so when the list is empty", async () => {
-    expect(await draw().drawList(["id"], [], options)).toBe("No things.");
+    expect(await onATerminal(() => printed({ plain: false }, { ...view, rows: [] }))).toBe(
+      "No things.",
+    );
   });
 
-  it("gives a script tab-separated rows and nothing for an empty list", async () => {
-    expect(await draw().drawList(["id"], [{ id: "a" }], { ...options, plain: true })).toBe("a");
-    expect(await draw().drawList(["id"], [], { ...options, plain: true })).toBe("");
+  it("pluralises the count, with the plural when one is given", async () => {
+    const rows = [{ id: "a" }, { id: "b" }];
+
+    expect(await onATerminal(() => printed({ plain: false }, { ...view, rows }))).toContain(
+      "2 things",
+    );
+    expect(
+      await onATerminal(() => printed({ plain: false }, { ...view, rows, plural: "people" })),
+    ).toContain("2 people");
   });
 
   it("draws nothing under --json", async () => {
-    expect(await draw(["--json"]).drawList(["id"], [{ id: "a" }], options)).toBe("");
+    const list = await onATerminal(() => printed({ plain: false }, view, ["--json"]));
+
+    expect(list).toBe("");
     expect(makeTable).not.toHaveBeenCalled();
   });
 });
 
-describe("tabulateRows", () => {
-  it("emits one tab-separated record per line, with no header", () => {
-    const rows = draw().drawRows(
-      ["id", "metadata.status"],
-      [
-        { id: "user_1", metadata: { status: "active" } },
-        { id: "user_22", metadata: { status: "suspended" } },
-      ],
+describe("a list for a script", () => {
+  const view = { columns: ["id"], rows: [{ id: "a" }], singular: "thing", empty: "No things." };
+
+  it("is plain for the --plain flag, and when there is no terminal", async () => {
+    expect(await onATerminal(() => printed({ plain: true }, view))).toBe("a");
+    expect(await piped(() => printed({ plain: false }, view))).toBe("a");
+    expect(await piped(() => printed({ plain: undefined }, view))).toBe("a");
+  });
+
+  it("is a table for a terminal that did not ask for plain", async () => {
+    expect(await onATerminal(() => printed({ plain: undefined }, view))).toContain("──");
+  });
+
+  it("prints nothing for an empty list", async () => {
+    expect(await printed({ plain: true }, { ...view, rows: [] })).toBe("");
+  });
+
+  it("emits one tab-separated record per line, with no header", async () => {
+    const rows = await printed(
+      { plain: true },
+      {
+        ...view,
+        columns: ["id", "metadata.status"],
+        rows: [
+          { id: "user_1", metadata: { status: "active" } },
+          { id: "user_22", metadata: { status: "suspended" } },
+        ],
+      },
     );
+
     expect(rows).toBe("user_1\tactive\nuser_22\tsuspended");
   });
 
-  it("keeps empty cells as empty fields so column positions hold", () => {
-    expect(draw().drawRows(["id", "gone", "n"], [{ id: "a", n: 3 }])).toBe("a\t\t3");
+  it("keeps empty cells as empty fields so column positions hold", async () => {
+    const rows = await printed(
+      { plain: true },
+      { ...view, columns: ["id", "gone", "n"], rows: [{ id: "a", n: 3 }] },
+    );
+
+    expect(rows).toBe("a\t\t3");
   });
 
-  it("escapes tabs and newlines inside a value", () => {
-    expect(draw().drawRows(["note"], [{ note: "a\tb\nc" }])).toBe("a\\tb\\nc");
+  it("escapes tabs and newlines inside a value", async () => {
+    const rows = await printed(
+      { plain: true },
+      { ...view, columns: ["note"], rows: [{ note: "a\tb\nc" }] },
+    );
+
+    expect(rows).toBe("a\\tb\\nc");
   });
 
-  it("escapes control characters so a value cannot drive the terminal", () => {
-    const rows = draw().drawRows(["id"], [{ id: "a\u001b[2Jb" }]);
+  it("escapes control characters so a value cannot drive the terminal", async () => {
+    const rows = await printed(
+      { plain: true },
+      { ...view, columns: ["id"], rows: [{ id: "a\u001b[2Jb" }] },
+    );
 
     expect(rows).not.toContain("\u001b");
     expect(rows).toBe("a\\x1b[2Jb");
   });
+});
 
-  it("renders nothing for an empty list", () => {
-    expect(draw().drawRows(["id"], [])).toBe("");
+describe("emitList", () => {
+  const view = { columns: ["id"], rows: [{ id: "a" }], singular: "thing", empty: "No things." };
+
+  it("builds the canonical list data from the rows", async () => {
+    const result = await draw().drawList({ plain: true }, view);
+
+    expect(result).toMatchObject({
+      data: { items: [{ id: "a" }], count: 1, next_page_token: null },
+    });
+  });
+
+  it("carries other items in the data when the drawn rows are a view of them", async () => {
+    const result = await draw().drawList(
+      { plain: true },
+      { ...view, items: [{ id: "a", more: 1 }] },
+    );
+
+    expect(result).toMatchObject({ data: { items: [{ id: "a", more: 1 }] } });
+  });
+
+  it("adds extra fields beside items, count and next_page_token", async () => {
+    const result = await draw().drawList({ plain: true }, { ...view, extra: { resolved: "x" } });
+
+    expect(result).toMatchObject({ data: { count: 1, resolved: "x" } });
+  });
+
+  it("lets a list with a fixed shape supply its own data", async () => {
+    const result = await draw().drawList({ plain: true }, { ...view, data: { operations: [] } });
+
+    expect(result).toMatchObject({ data: { operations: [] } });
+  });
+
+  it("gives a pipe tab-separated rows, and sends the next steps beside them", async () => {
+    const result = await draw().drawList({ plain: true }, view);
+
+    expect(result).toMatchObject({ pretty: "a", machineReadable: true });
+  });
+
+  it("keeps the next steps with the table for a person", async () => {
+    const result = await onATerminal(() => draw().drawList({ plain: false }, view));
+
+    expect(result).toMatchObject({ machineReadable: false });
+  });
+
+  it("reports the next page's cursor, its command and a footer that names it", async () => {
+    const result = await draw().drawList(
+      { plain: false },
+      { ...view, page: { token: "p2", command: "thing list", flags: ["--limit 1"] } },
+    );
+
+    expect(result).toMatchObject({
+      data: { next_page_token: "p2" },
+      next: { commands: [expect.stringContaining("thing list --limit 1 --page-token p2 --json")] },
+    });
+  });
+
+  it("names the next page in the footer of a person's list", async () => {
+    const result = await onATerminal(() =>
+      draw().drawList({ plain: false }, { ...view, page: { token: "p2", command: "thing list" } }),
+    );
+
+    expect(result).toMatchObject({
+      pretty: expect.stringContaining("More available: --page-token p2 (or --all)"),
+    });
+  });
+
+  it("joins a cursor that starts with a dash to its option, so it stays one option", async () => {
+    const result = await onATerminal(() =>
+      draw().drawList({ plain: false }, { ...view, page: { token: "-p2", command: "thing list" } }),
+    );
+
+    expect(result).toMatchObject({ pretty: expect.stringContaining("--page-token=-p2") });
   });
 });
 
@@ -203,24 +350,21 @@ describe("tabulateDetail", () => {
   });
 });
 
-describe("isPlain", () => {
-  it("is true for the --plain flag, and when there is no terminal", () => {
-    const isTTY = Object.getOwnPropertyDescriptor(process.stdout, "isTTY");
-    try {
-      Object.defineProperty(process.stdout, "isTTY", { value: true, configurable: true });
-      expect(draw().plain(true)).toBe(true);
-      expect(draw().plain(false)).toBe(false);
-      expect(draw().plain()).toBe(false);
-      Object.defineProperty(process.stdout, "isTTY", { value: false, configurable: true });
-      expect(draw().plain(false)).toBe(true);
-    } finally {
-      if (isTTY) Object.defineProperty(process.stdout, "isTTY", isTTY);
-      else delete (process.stdout as unknown as Record<string, unknown>).isTTY;
-    }
-  });
-});
-
 describe("Tabulatable", () => {
+  it("is the only definition of --plain, so every list's help reads the same", async () => {
+    const root = fileURLToPath(new URL("../../../../src", import.meta.url));
+    const defining: string[] = [];
+
+    for (const file of await readdir(root, { recursive: true })) {
+      if (!file.endsWith(".ts") || file === join("lib", "oclif", "tabulatable.ts")) continue;
+      if (/\bplain: Flags\./.test(await readFile(join(root, file), "utf8"))) {
+        defining.push(file);
+      }
+    }
+
+    expect(defining).toEqual([]);
+  });
+
   it("is the only code that imports the table library, so no command can bypass the --json skip", async () => {
     const root = fileURLToPath(new URL("../../../../src", import.meta.url));
     const importing: string[] = [];

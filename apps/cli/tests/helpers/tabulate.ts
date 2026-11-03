@@ -19,20 +19,12 @@ class Drawing extends Tabulatable(BaseCommand) {
 
   draw: Tabulate = (columns, items) => this.tabulate(columns, items);
 
-  drawList(...args: Parameters<Drawing["tabulateList"]>) {
-    return this.tabulateList(...args);
-  }
-
-  drawRows(...args: Parameters<Drawing["tabulateRows"]>) {
-    return this.tabulateRows(...args);
+  drawList(...args: Parameters<Drawing["listResult"]>) {
+    return this.listResult(...args);
   }
 
   drawDetail(...args: Parameters<Drawing["tabulateDetail"]>) {
     return this.tabulateDetail(...args);
-  }
-
-  plain(flag?: boolean) {
-    return this.isPlain(flag);
   }
 }
 

@@ -7,6 +7,7 @@ import { sanitizeResponse } from "../../../api-client";
 import { nonBlankString } from "../../flags";
 
 import type { CommandResult, GlobalOptions } from "../../types";
+import { plainFlag } from "../../tabulatable";
 import { collectPages } from "../paging";
 import { wireOf } from "../wire";
 import { type ParsedFilter, parseFilter, parseSort } from "../query";
@@ -54,10 +55,6 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
         description:
           "Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the resource's own columns; `--json` is unaffected.",
       }),
-      plain: Flags.boolean({
-        description:
-          "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
-      }),
     };
     const filters = spec.filters ?? [];
     const sorts = spec.sorts ?? [];
@@ -97,7 +94,13 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
             ]
           : []),
       ],
-      flags: { ...(paged ? paging : {}), ...presentation, ...specific, ...options.flags },
+      flags: {
+        ...(paged ? paging : {}),
+        ...presentation,
+        ...specific,
+        ...options.flags,
+        plain: plainFlag,
+      },
       args: {},
     };
   }
@@ -205,48 +208,23 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
     });
     progress?.stop(`Fetched ${items.length} ${items.length === 1 ? resource.singular : topic}`);
 
-    // A terminal gets the aligned table with its header and footer; a pipe (or
-    // `--plain`) gets one tab-separated record per line, which `cut` and `awk`
-    // can split and nothing else has to parse around.
-    const plain = this.isPlain(flags.plain === true);
     const columns = early ?? chosenColumns(flags.fields, resource.columns, items);
-    // A page token is only valid alongside the sorting and filters that issued
-    // it, so the suggested next page repeats the whole invocation rather than
-    // handing back a bare token. `--all` already drained everything, so it
-    // suggests nothing.
-    const nextCommands =
-      next && !all
-        ? [
-            this.suggest(
-              [
-                `${topic} list`,
-                ...repeatedFlags(flags),
-                shellOption("--page-token", next),
-                "--json",
-              ].join(" "),
-            ),
-          ]
-        : [];
-    return {
-      status: "ok",
-      data: {
-        items,
-        count: items.length,
-        [wire.nextPageToken]: next,
+    return this.listResult(
+      { plain: flags.plain === true },
+      {
+        columns,
+        rows: items,
+        singular: resource.singular,
+        plural: topic,
+        empty: `No ${topic} found.`,
+        page: { token: next, command: `${topic} list`, flags: repeatedFlags(flags) },
+        data: {
+          items,
+          count: items.length,
+          [wire.nextPageToken]: next,
+        },
       },
-      ...(nextCommands.length > 0 ? { next: { commands: nextCommands } } : {}),
-      machineReadable: plain,
-      pretty: plain
-        ? this.tabulateRows(columns, items)
-        : items.length === 0
-          ? `No ${topic} found.`
-          : [
-              await this.tabulate(columns, items),
-              "",
-              `${items.length} ${items.length === 1 ? resource.singular : topic}`,
-              ...(next ? [`More available: ${shellOption("--page-token", next)} (or --all)`] : []),
-            ].join("\n"),
-    };
+    );
   }
 }
 

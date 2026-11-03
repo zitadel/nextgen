@@ -1,10 +1,8 @@
 import { Flags } from "@oclif/core";
 
 import { CommandGroups, type JsonEnvelope, nonBlankString, PreviewCommand } from "../../lib/oclif";
-import { Tabulatable } from "../../lib/oclif/tabulatable";
+import { plainFlag, Tabulatable } from "../../lib/oclif/tabulatable";
 import { collectPages } from "../../lib/oclif/crud/paging";
-import { listData } from "../../lib/oclif/envelope";
-import { shellArg } from "../../lib/shell";
 
 /** The columns `list` renders, in order. */
 const COLUMNS = ["url", "expires", "created"] as const;
@@ -40,10 +38,7 @@ export default class PreviewList extends Tabulatable(PreviewCommand) {
       description: "Fetch every page instead of one.",
       exclusive: ["page-token"],
     }),
-    plain: Flags.boolean({
-      description:
-        "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
-    }),
+    plain: plainFlag,
   };
 
   async run(): Promise<JsonEnvelope> {
@@ -72,33 +67,17 @@ export default class PreviewList extends Tabulatable(PreviewCommand) {
       created: preview.created_at,
     }));
 
-    // A page token is only valid alongside the flags that issued it, so the
-    // suggested next page repeats the whole invocation rather than a bare
-    // token. `--all` already drained everything, so it suggests nothing.
-    const nextCommand =
-      next && flags.all !== true
-        ? this.suggest(
-            [
-              "preview list",
-              ...(flags.limit === undefined ? [] : [`--limit ${flags.limit}`]),
-              `--page-token ${shellArg(next)}`,
-              "--json",
-            ].join(" "),
-          )
-        : undefined;
-
-    const plain = this.isPlain(flags.plain);
-    return this.emit({
-      status: "ok",
-      data: listData(previews, { nextPageToken: next }),
-      ...(nextCommand === undefined ? {} : { next: { commands: [nextCommand] } }),
-      machineReadable: plain,
-      pretty: await this.tabulateList(COLUMNS, rows, {
-        plain,
-        singular: "preview",
-        empty: "No live previews.",
-        footer: next ? [`More available: --page-token ${shellArg(next)} (or --all)`] : [],
-      }),
+    return this.emitList(flags, {
+      columns: COLUMNS,
+      rows,
+      items: previews,
+      singular: "preview",
+      empty: "No live previews.",
+      page: {
+        token: next,
+        command: "preview list",
+        flags: flags.limit === undefined ? [] : [`--limit ${flags.limit}`],
+      },
     });
   }
 }

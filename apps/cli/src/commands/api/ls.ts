@@ -2,7 +2,10 @@ import { Args, Flags } from "@oclif/core";
 
 import { type ApiOperation, findOperations, uncallable } from "../../lib/api/operations";
 import { BaseCommand, CommandGroups, type JsonEnvelope } from "../../lib/oclif";
-import { Tabulatable } from "../../lib/oclif/tabulatable";
+import { plainFlag, Tabulatable } from "../../lib/oclif/tabulatable";
+
+/** The columns `ls` renders, in order. */
+const COLUMNS = ["id", "method", "path", "summary"] as const;
 
 /** One operation as `api ls` lists it. */
 const entryOf = (operation: ApiOperation) => ({
@@ -43,6 +46,7 @@ export default class ApiLs extends Tabulatable(BaseCommand) {
     tag: Flags.string({
       description: "Only the operations of this part of the API (Users, Teams, …).",
     }),
+    plain: plainFlag,
   };
 
   async run(): Promise<JsonEnvelope> {
@@ -50,17 +54,16 @@ export default class ApiLs extends Tabulatable(BaseCommand) {
     await this.toMeta(flags, { resolveServer: false });
     const operations = findOperations({ filter: args.filter, tag: flags.tag }).map(entryOf);
 
-    const columns = ["id", "method", "path", "summary"];
-    return this.emit({
-      status: "ok",
-      data: { operations, count: operations.length },
-      pretty: process.stdout.isTTY
-        ? [
-            await this.tabulate(columns, operations),
-            "",
-            `${operations.length} operations. Call one with \`${this.config.bin} api <id>\`; --json has each one's parameters.`,
-          ].join("\n")
-        : this.tabulateRows(columns, operations),
+    return this.emitList(flags, {
+      columns: COLUMNS,
+      rows: operations,
+      singular: "operation",
+      empty: `No operations match. \`${this.config.bin} api ls\` lists every one.`,
+      footer: [`Call one with \`${this.config.bin} api <id>\`; --json has each one's parameters.`],
+      data: {
+        operations,
+        count: operations.length,
+      },
     });
   }
 }

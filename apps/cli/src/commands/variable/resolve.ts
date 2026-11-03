@@ -2,8 +2,7 @@ import { Flags } from "@oclif/core";
 import type { ZitadelClient } from "../../lib/api-client";
 
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../../lib/oclif";
-import { Tabulatable } from "../../lib/oclif/tabulatable";
-import { listData } from "../../lib/oclif/envelope";
+import { plainFlag, Tabulatable } from "../../lib/oclif/tabulatable";
 import { DEPLOY_ARGS, originMatchesPattern } from "../../lib/release";
 import { ZitadelError } from "../../lib/errors";
 import { shellArg } from "../../lib/shell";
@@ -33,10 +32,7 @@ export default class VariableResolve extends Tabulatable(EnvironmentCommand) {
   ];
   static override flags = {
     origin: Flags.string({ description: "The origin whose live deployment to read." }),
-    plain: Flags.boolean({
-      description:
-        "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
-    }),
+    plain: plainFlag,
   };
 
   async run(): Promise<JsonEnvelope> {
@@ -92,22 +88,17 @@ export default class VariableResolve extends Tabulatable(EnvironmentCommand) {
     );
     this.recordTelemetry({ variable_count: rows.length });
 
-    // The resource commands' list rendering: a pipe (or `--plain`) gets one
-    // tab-separated record per line, with no header; a terminal gets a table.
-    const cells = variableCells(rows);
-    const plain = this.isPlain(flags.plain);
-    return this.emit({
-      status: "ok",
-      data: { deployment_id: live.id, origins: servedOrigins, ...listData(rows) },
-      pretty: plain
-        ? this.tabulateRows(COLUMNS, cells)
-        : rows.length === 0
-          ? `${live.id} froze no variables for ${where}.`
-          : [
-              await this.tabulate(COLUMNS, cells),
-              "",
-              `${rows.length} ${rows.length === 1 ? "variable" : "variables"} frozen by ${live.id} for ${where}`,
-            ].join("\n"),
+    return this.emitList(flags, {
+      columns: COLUMNS,
+      rows: variableCells(rows),
+      items: rows,
+      singular: "variable",
+      empty: `${live.id} froze no variables for ${where}.`,
+      footer: [`Frozen by ${live.id} for ${where}`],
+      extra: {
+        deployment_id: live.id,
+        origins: servedOrigins,
+      },
     });
   }
 

@@ -129,6 +129,11 @@ export abstract class EnvironmentCommand extends BaseCommand {
     return projectCommand(args, this.environmentSelector(), this.meta.cliVersion);
   }
 
+  /** A follow-up the framework suggests, such as a list's next page, aimed at this project. */
+  protected override suggestFollowUp(args: string): SuggestedCommand {
+    return this.suggest(args);
+  }
+
   /**
    * The run again through {@link suggest}, which puts its selector back on.
    * A run that resolved no environment (an `auth-method` edit) has none to

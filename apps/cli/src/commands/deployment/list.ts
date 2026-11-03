@@ -6,10 +6,9 @@ import {
   type JsonEnvelope,
   nonBlankString,
 } from "../../lib/oclif";
-import { Tabulatable } from "../../lib/oclif/tabulatable";
+import { plainFlag, Tabulatable } from "../../lib/oclif/tabulatable";
 import { collectPages } from "../../lib/oclif/crud/paging";
-import { listData } from "../../lib/oclif/envelope";
-import { shellArg } from "../../lib/shell";
+import { shellOption } from "../../lib/shell";
 
 /** The columns `list` renders, in order. */
 const COLUMNS = ["id", "release_id", "reason", "origins", "deployed_at"] as const;
@@ -48,10 +47,7 @@ export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
       description: "Fetch every page instead of one.",
       exclusive: ["page-token"],
     }),
-    plain: Flags.boolean({
-      description:
-        "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
-    }),
+    plain: plainFlag,
   };
 
   async run(): Promise<JsonEnvelope> {
@@ -83,38 +79,21 @@ export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
       deployed_at: deployment.deployed_at,
     }));
 
-    // A page token is only valid alongside the flags that issued it, so the
-    // suggested next page repeats the whole invocation rather than a bare
-    // token. `--all` already drained everything, so it suggests nothing.
-    const nextCommand =
-      next && flags.all !== true
-        ? this.suggest(
-            [
-              "deployment list",
-              ...(flags.origin === undefined ? [] : [`--origin ${shellArg(flags.origin)}`]),
-              ...(flags.live ? ["--live"] : []),
-              ...(flags.limit === undefined ? [] : [`--limit ${flags.limit}`]),
-              // `next` is an opaque server cursor: quote it so whitespace or shell
-              // metacharacters in a copied command cannot execute as server-controlled
-              // text or break the suggestion.
-              `--page-token ${shellArg(next)}`,
-              "--json",
-            ].join(" "),
-          )
-        : undefined;
-
-    const plain = this.isPlain(flags.plain);
-    return this.emit({
-      status: "ok",
-      data: listData(deployments, { nextPageToken: next }),
-      ...(nextCommand === undefined ? {} : { next: { commands: [nextCommand] } }),
-      machineReadable: plain,
-      pretty: await this.tabulateList(COLUMNS, rows, {
-        plain,
-        singular: "deployment",
-        empty: "No deployments yet.",
-        footer: next ? [`More available: --page-token ${shellArg(next)} (or --all)`] : [],
-      }),
+    return this.emitList(flags, {
+      columns: COLUMNS,
+      rows,
+      items: deployments,
+      singular: "deployment",
+      empty: "No deployments yet.",
+      page: {
+        token: next,
+        command: "deployment list",
+        flags: [
+          ...(flags.origin === undefined ? [] : [shellOption("--origin", flags.origin)]),
+          ...(flags.live ? ["--live"] : []),
+          ...(flags.limit === undefined ? [] : [`--limit ${flags.limit}`]),
+        ],
+      },
     });
   }
 }
