@@ -65,8 +65,6 @@ export type ListView = {
   columns: readonly string[];
   /** What is drawn: one record per row. */
   rows: readonly unknown[];
-  /** What `--json` carries: the records the rows were made from. */
-  items: readonly unknown[];
   singular: string;
   plural?: string;
   /** Said to a person when there is nothing to list; a pipe gets nothing. */
@@ -75,6 +73,8 @@ export type ListView = {
   footer: readonly string[];
 } & (
   | {
+      /** What `--json` carries: the records the rows were made from. */
+      items: readonly unknown[];
       page: ListPage | null;
       extra: ListExtra;
       data?: never;
@@ -82,6 +82,7 @@ export type ListView = {
   | {
       /** The whole `--json` data, for a shape fixed before the canonical one. */
       data: unknown;
+      items?: never;
       page: null;
       extra: Record<string, never>;
     }
@@ -198,36 +199,44 @@ export function Tabulatable<TBase extends CommandClass<BaseCommand>>(Base: TBase
       const token = view.page?.token || null;
       const more =
         token === null ? [] : [`More available: ${Cmd.option("--page-token", token)} (or --all)`];
-      const nextCommand =
-        view.page === null || token === null
+      // A paged list asks for its follow-up command whether or not there is a
+      // next page, so a command that cannot suggest one fails on its first run
+      // and not on the first result that spans two pages.
+      const followUp =
+        view.page === null
           ? undefined
           : this.suggestFollowUp(
               [
                 view.page.command,
                 ...view.page.flags,
-                Cmd.option("--page-token", token),
+                Cmd.option("--page-token", token ?? ""),
                 "--json",
               ].join(" "),
             );
+      const nextCommand = token === null ? undefined : followUp;
       return {
         status: "ok",
-        data: view.data !== undefined ? view.data : this.listData(view, token),
+        data: view.items === undefined ? view.data : this.canonicalData(view, token),
         ...(nextCommand === undefined ? {} : { next: { commands: [nextCommand] } }),
         machineReadable: plain,
         pretty: await this.renderList(plain, view, more),
       };
     }
 
-    /** The canonical `--json` data of a list: `items`, `count` and its cursor. */
-    private listData(view: ListView, token: string | null): Record<string, unknown> {
-      const { next_page_token: cursor, ...canonical } = listData(view.items, {
+    /** The canonical `--json` data of a list: `items`, `count`, its cursor and its extra fields. */
+    private canonicalData(
+      view: ListView & { items: readonly unknown[] },
+      token: string | null,
+    ): Record<string, unknown> {
+      const canonical = listData(view.items, {
         nextPageToken: token,
+        cursorKey: view.page?.cursorKey,
       });
-      return {
-        ...canonical,
-        [view.page?.cursorKey ?? "next_page_token"]: cursor,
-        ...view.extra,
-      };
+      const replaced = Object.keys(view.extra).filter((key) => key in canonical);
+      if (replaced.length > 0) {
+        throw new Error(`a list's extra fields may not replace ${replaced.join(", ")}`);
+      }
+      return { ...canonical, ...view.extra };
     }
 
     /**

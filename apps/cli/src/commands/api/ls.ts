@@ -70,7 +70,6 @@ export default class ApiLs extends Tabulatable(BaseCommand) {
     return this.emitList(flags, {
       columns,
       rows,
-      items,
       singular: "operation",
       empty,
       footer,

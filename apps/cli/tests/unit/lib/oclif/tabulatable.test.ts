@@ -277,7 +277,19 @@ describe("emitList", () => {
   });
 
   it("lets a list with a fixed shape supply its own data", async () => {
-    const result = await draw().drawList({ plain: true }, { ...view, data: { operations: [] } });
+    const result = await draw().drawList(
+      { plain: true },
+      {
+        columns: view.columns,
+        rows: view.rows,
+        singular: view.singular,
+        empty: view.empty,
+        footer: [],
+        page: null,
+        extra: {},
+        data: { operations: [] },
+      },
+    );
 
     expect(result).toMatchObject({ data: { operations: [] } });
   });
@@ -292,15 +304,23 @@ describe("emitList", () => {
     expect(result).not.toMatchObject({ data: { next_page_token: expect.anything() } });
   });
 
-  it("does not compile an extra field that would replace a canonical one", () => {
-    const replacing = () =>
-      draw().drawList(
-        { plain: true },
-        // @ts-expect-error `count` belongs to the list itself
-        { ...view, extra: { count: 99 } },
-      );
+  it("does not let an extra field replace a canonical one", async () => {
+    const replacing = draw().drawList(
+      { plain: true },
+      // @ts-expect-error `count` belongs to the list itself
+      { ...view, extra: { count: 99 } },
+    );
 
-    expect(replacing).toBeTypeOf("function");
+    await expect(replacing).rejects.toThrow("may not replace count");
+  });
+
+  it("refuses a paged list from a command that cannot suggest a follow-up, even on its last page", async () => {
+    const list = anUnscopedTabulatingCommand().drawList(
+      { plain: true },
+      { ...view, page: { token: null, command: "thing list", flags: [] } },
+    );
+
+    await expect(list).rejects.toThrow("override suggestFollowUp");
   });
 
   it("refuses to suggest a follow-up from a command that has none to suggest", async () => {

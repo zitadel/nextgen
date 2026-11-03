@@ -5,6 +5,8 @@ import { anUndeployedEnvironment, aSetUpApp, SETUP_ORIGIN } from "../helpers/pro
 
 const platform = usePlatformMock();
 
+const DEFAULT_ENVIRONMENT = "development";
+
 describe("deployment list", () => {
   describe("against an invalid server", () => {
     describe("that is not a zitadel api", () => {
@@ -70,13 +72,13 @@ describe("deployment list", () => {
           "deployment",
           "list",
           "--env",
-          "development",
+          DEFAULT_ENVIRONMENT,
           "--limit",
           "1",
           "--json",
         ]);
 
-        expect(result).toSuggest("--env development");
+        expect(result).toSuggest(`--env ${DEFAULT_ENVIRONMENT}`);
       });
 
       it("repeats the origin when suggesting the next page", async () => {

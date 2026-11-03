@@ -47,18 +47,31 @@ function describeResult(result: CliResult): string {
 /** One cell of a tab-separated row: its exact text, or a pattern for a value that varies. */
 type Cell = string | RegExp;
 
-const plainRowsOf = (received: CliResult): string[][] =>
-  received.stdout
+const plainRowsOf = (received: CliResult): string[][] => {
+  if (received.stdout === "") {
+    return [];
+  }
+  return received.stdout
+    .replace(/\n$/, "")
     .split("\n")
-    .filter((line) => line !== "")
     .map((line) => line.split("\t"));
+};
 
-const sameRow = (row: string[] | undefined, cells: Cell[]): boolean =>
-  row !== undefined &&
-  row.length === cells.length &&
-  cells.every((cell, at) =>
-    typeof cell === "string" ? row[at] === cell : cell.test(row[at] ?? ""),
-  );
+const sameCell = (found: string | undefined, cell: Cell): boolean => {
+  if (typeof cell === "string") {
+    return found === cell;
+  }
+  return new RegExp(cell.source, cell.flags.replace("g", "")).test(found ?? "");
+};
+
+const sameRow = (row: string[] | undefined, cells: Cell[]): boolean => {
+  if (row === undefined || row.length !== cells.length) {
+    return false;
+  }
+  return cells.every((cell, at) => {
+    return sameCell(row[at], cell);
+  });
+};
 
 expect.extend({
   toSucceed(received: CliResult) {

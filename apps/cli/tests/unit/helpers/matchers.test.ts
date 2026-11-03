@@ -20,8 +20,15 @@ describe("toPrintRow", () => {
 });
 
 describe("toPrintPlainRows", () => {
-  it("matches exactly these tab-separated records, whatever blank lines surround them", () => {
+  it("matches exactly these tab-separated records, apart from the final line terminator", () => {
     expect(printed("a\tb\nc\td\n")).toPrintPlainRows(["a", "b"], ["c", "d"]);
+    expect(printed("a\tb\nc\td")).toPrintPlainRows(["a", "b"], ["c", "d"]);
+  });
+
+  it("does not match blank records, before, between or after the rows", () => {
+    expect(printed("\n")).not.toPrintPlainRows();
+    expect(printed("a\tb\n\nc\td\n")).not.toPrintPlainRows(["a", "b"], ["c", "d"]);
+    expect(printed("a\tb\n\n")).not.toPrintPlainRows(["a", "b"]);
   });
 
   it("matches nothing for empty output", () => {

@@ -22,29 +22,12 @@ class Unscoped extends Tabulatable(BaseCommand) {
   }
 }
 
-class Drawing extends Tabulatable(BaseCommand) {
-  public static override readonly id: string = "test:tabulate";
-
-  constructor(argv: string[] = []) {
-    super(argv, {
-      version: "1.2.3",
-      runHook: async () => ({ successes: [], failures: [] }),
-    } as unknown as Config);
-  }
-
-  async run() {
-    return this.emit({ status: "ok", data: {} });
-  }
-
+class Drawing extends Unscoped {
   protected override suggestFollowUp(args: string) {
     return this.suggestUnscoped(args);
   }
 
   draw: Tabulate = (columns, items) => this.tabulate(columns, items);
-
-  drawList(...args: Parameters<Drawing["listResult"]>) {
-    return this.listResult(...args);
-  }
 
   drawDetail(...args: Parameters<Drawing["tabulateDetail"]>) {
     return this.tabulateDetail(...args);

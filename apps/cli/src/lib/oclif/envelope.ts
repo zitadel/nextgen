@@ -14,19 +14,19 @@
  * across all of them. A single-page endpoint passes `nextPageToken: null` (the
  * default); a paginated one passes the server cursor (or `null` once drained).
  */
-export function listData<T>(
+export function listData<T, K extends string = "next_page_token">(
   items: readonly T[],
-  opts: { nextPageToken?: string | null } = {},
+  opts: { nextPageToken?: string | null; cursorKey?: K } = {},
 ): {
   items: readonly T[];
   count: number;
-  next_page_token: string | null;
-} {
+} & Record<K, string | null> {
+  const cursorKey: string = opts.cursorKey ?? "next_page_token";
   return {
     items,
     count: items.length,
-    next_page_token: opts.nextPageToken ?? null,
-  };
+    [cursorKey]: opts.nextPageToken ?? null,
+  } as { items: readonly T[]; count: number } & Record<K, string | null>;
 }
 
 /**
