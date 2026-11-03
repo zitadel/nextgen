@@ -13,7 +13,7 @@ afterEach(() => setProxyPath(""));
 // behind.
 test("API_PREFIX is the spec's server URL", () => {
   const spec = readFileSync(
-    new URL("../../../../api/openapi/openapi-spec.yaml", import.meta.url),
+    new URL("../../../../apps/api/api/openapi/openapi-spec.yaml", import.meta.url),
     "utf8",
   );
 

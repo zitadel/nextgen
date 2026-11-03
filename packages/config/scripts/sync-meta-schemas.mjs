@@ -26,7 +26,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const packageRoot = fileURLToPath(new URL("..", import.meta.url));
-const sourceDir = join(packageRoot, "../..", "api/openapi/endpoints/schemas");
+const sourceDir = join(packageRoot, "../..", "apps/api/api/openapi/endpoints/schemas");
 const targetDir = join(packageRoot, "meta-schemas");
 
 /**
