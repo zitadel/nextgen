@@ -32,7 +32,7 @@ describe("the operation zitadel api is pointed at", () => {
   });
 
   it("refuses one the CLI cannot call, saying why", async () => {
-    const refused = (await chosen("startSession")) as { unmet?: { reason?: string } };
+    const refused = (await chosen("getMyUser")) as { unmet?: { reason?: string } };
 
     expect(refused.unmet?.reason).toEqual(expect.any(String));
   });

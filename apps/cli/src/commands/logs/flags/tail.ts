@@ -17,8 +17,11 @@ const TAIL_REFUSAL: Refusal = {
  * them, and zero lines is a run that would print nothing.
  */
 function readTail(input: string): number {
+  // Digits alone are not enough, and nor is the number alone: `1e3` is not a
+  // count a person typed, while enough digits overflow to `Infinity`, which
+  // Docker is handed verbatim and the binary backend reads as the whole log.
   const value = Number(input);
-  if (/^\d+$/.test(input.trim()) && value >= 1) {
+  if (/^\d+$/.test(input.trim()) && Number.isSafeInteger(value) && value >= 1) {
     return value;
   }
   throw refusalError(TAIL_REFUSAL, {

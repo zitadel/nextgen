@@ -12,7 +12,7 @@ describe("--sso-display-name", () => {
 
   it("refuses one the provider could not have", async () => {
     await expect(
-      parseFlag(ssoDisplayNameFlag({}), "x".repeat(201), "sso-display-name"),
+      parseFlag(ssoDisplayNameFlag({}), "x".repeat(257), "sso-display-name"),
     ).rejects.toMatchObject({
       code: "E_VALIDATION",
       hint: "Fix --sso-display-name and run the command again.",

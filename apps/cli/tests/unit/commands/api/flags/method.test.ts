@@ -19,7 +19,7 @@ describe("-X", () => {
     async (value) => {
       await expect(parseFlag(methodFlag({}), value, "method")).rejects.toMatchObject({
         code: "E_VALIDATION",
-        message: `${value} is not one of ${METHODS}`,
+        message: `-X ${value} is not one of ${METHODS}`,
       });
     },
   );

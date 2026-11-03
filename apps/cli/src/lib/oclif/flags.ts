@@ -78,6 +78,7 @@ function parseInteger(input: string, flag: IntegerRules & { name: string }): num
   // them overflow to `Infinity`, and past 2^53 they round to a neighbour, so
   // the number itself is what must be whole and exact.
   const inside =
+    /^-?\d+$/.test(input.trim()) &&
     Number.isSafeInteger(value) &&
     (flag.min === undefined || value >= flag.min) &&
     (flag.max === undefined || value <= flag.max);

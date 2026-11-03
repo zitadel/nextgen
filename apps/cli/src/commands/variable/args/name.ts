@@ -6,7 +6,7 @@ import { VARIABLE_NAME_MAX, variableNameProblem } from "../../../lib/variables";
 
 /** What a name holding anything but letters, digits and underscores is refused for. */
 const VARIABLE_NAME_INVALID_REFUSAL: Refusal = {
-  message: 'Invalid variable name "{value}".',
+  message: "Invalid variable name {value}.",
   hint: "A variable name contains only letters, digits and underscores.",
 };
 
@@ -30,7 +30,9 @@ function readVariableName(input: string, label = "name"): string {
   throw refusalError(
     problem === "too-long" ? VARIABLE_NAME_TOO_LONG_REFUSAL : VARIABLE_NAME_INVALID_REFUSAL,
     {
-      value,
+      // Quoted and escaped: a name is refused before anything reads it, and a
+      // newline or escape sequence in it would otherwise reach the terminal.
+      value: JSON.stringify(value),
       length: value.length,
       max: VARIABLE_NAME_MAX,
     },
