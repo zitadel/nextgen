@@ -14713,6 +14713,7 @@ func (*BuildReleaseCreated) buildReleaseRes() {}
 type BuildReleaseErrorResponse struct {
 	Type                     BuildReleaseErrorResponseType // switch on this field
 	AppClientIDTaken         AppClientIDTaken
+	AppCredentialTaken       AppCredentialTaken
 	AppDeclared              AppDeclared
 	AppFieldImmutable        AppFieldImmutable
 	AppIdentifierTaken       AppIdentifierTaken
@@ -14748,6 +14749,7 @@ type BuildReleaseErrorResponseType string
 // Possible values for BuildReleaseErrorResponseType.
 const (
 	AppClientIDTakenBuildReleaseErrorResponse         BuildReleaseErrorResponseType = "app.client_id_taken"
+	AppCredentialTakenBuildReleaseErrorResponse       BuildReleaseErrorResponseType = "app.credential_taken"
 	AppDeclaredBuildReleaseErrorResponse              BuildReleaseErrorResponseType = "app.declared"
 	AppFieldImmutableBuildReleaseErrorResponse        BuildReleaseErrorResponseType = "app.field_immutable"
 	AppIdentifierTakenBuildReleaseErrorResponse       BuildReleaseErrorResponseType = "app.identifier_taken"
@@ -14780,6 +14782,11 @@ const (
 // IsAppClientIDTaken reports whether BuildReleaseErrorResponse is AppClientIDTaken.
 func (s BuildReleaseErrorResponse) IsAppClientIDTaken() bool {
 	return s.Type == AppClientIDTakenBuildReleaseErrorResponse
+}
+
+// IsAppCredentialTaken reports whether BuildReleaseErrorResponse is AppCredentialTaken.
+func (s BuildReleaseErrorResponse) IsAppCredentialTaken() bool {
+	return s.Type == AppCredentialTakenBuildReleaseErrorResponse
 }
 
 // IsAppDeclared reports whether BuildReleaseErrorResponse is AppDeclared.
@@ -14935,6 +14942,27 @@ func (s BuildReleaseErrorResponse) GetAppClientIDTaken() (v AppClientIDTaken, ok
 func NewAppClientIDTakenBuildReleaseErrorResponse(v AppClientIDTaken) BuildReleaseErrorResponse {
 	var s BuildReleaseErrorResponse
 	s.SetAppClientIDTaken(v)
+	return s
+}
+
+// SetAppCredentialTaken sets BuildReleaseErrorResponse to AppCredentialTaken.
+func (s *BuildReleaseErrorResponse) SetAppCredentialTaken(v AppCredentialTaken) {
+	s.Type = AppCredentialTakenBuildReleaseErrorResponse
+	s.AppCredentialTaken = v
+}
+
+// GetAppCredentialTaken returns AppCredentialTaken and true boolean if BuildReleaseErrorResponse is AppCredentialTaken.
+func (s BuildReleaseErrorResponse) GetAppCredentialTaken() (v AppCredentialTaken, ok bool) {
+	if !s.IsAppCredentialTaken() {
+		return v, false
+	}
+	return s.AppCredentialTaken, true
+}
+
+// NewAppCredentialTakenBuildReleaseErrorResponse returns new BuildReleaseErrorResponse from AppCredentialTaken.
+func NewAppCredentialTakenBuildReleaseErrorResponse(v AppCredentialTaken) BuildReleaseErrorResponse {
+	var s BuildReleaseErrorResponse
+	s.SetAppCredentialTaken(v)
 	return s
 }
 
@@ -18987,6 +19015,7 @@ func (*CreateAppCreated) createAppRes() {}
 type CreateAppErrorResponse struct {
 	Type                CreateAppErrorResponseType // switch on this field
 	AppClientIDTaken    AppClientIDTaken
+	AppCredentialTaken  AppCredentialTaken
 	AppDeclared         AppDeclared
 	AppFieldImmutable   AppFieldImmutable
 	AppIdentifierTaken  AppIdentifierTaken
@@ -19008,6 +19037,7 @@ type CreateAppErrorResponseType string
 // Possible values for CreateAppErrorResponseType.
 const (
 	AppClientIDTakenCreateAppErrorResponse    CreateAppErrorResponseType = "app.client_id_taken"
+	AppCredentialTakenCreateAppErrorResponse  CreateAppErrorResponseType = "app.credential_taken"
 	AppDeclaredCreateAppErrorResponse         CreateAppErrorResponseType = "app.declared"
 	AppFieldImmutableCreateAppErrorResponse   CreateAppErrorResponseType = "app.field_immutable"
 	AppIdentifierTakenCreateAppErrorResponse  CreateAppErrorResponseType = "app.identifier_taken"
@@ -19026,6 +19056,11 @@ const (
 // IsAppClientIDTaken reports whether CreateAppErrorResponse is AppClientIDTaken.
 func (s CreateAppErrorResponse) IsAppClientIDTaken() bool {
 	return s.Type == AppClientIDTakenCreateAppErrorResponse
+}
+
+// IsAppCredentialTaken reports whether CreateAppErrorResponse is AppCredentialTaken.
+func (s CreateAppErrorResponse) IsAppCredentialTaken() bool {
+	return s.Type == AppCredentialTakenCreateAppErrorResponse
 }
 
 // IsAppDeclared reports whether CreateAppErrorResponse is AppDeclared.
@@ -19109,6 +19144,27 @@ func (s CreateAppErrorResponse) GetAppClientIDTaken() (v AppClientIDTaken, ok bo
 func NewAppClientIDTakenCreateAppErrorResponse(v AppClientIDTaken) CreateAppErrorResponse {
 	var s CreateAppErrorResponse
 	s.SetAppClientIDTaken(v)
+	return s
+}
+
+// SetAppCredentialTaken sets CreateAppErrorResponse to AppCredentialTaken.
+func (s *CreateAppErrorResponse) SetAppCredentialTaken(v AppCredentialTaken) {
+	s.Type = AppCredentialTakenCreateAppErrorResponse
+	s.AppCredentialTaken = v
+}
+
+// GetAppCredentialTaken returns AppCredentialTaken and true boolean if CreateAppErrorResponse is AppCredentialTaken.
+func (s CreateAppErrorResponse) GetAppCredentialTaken() (v AppCredentialTaken, ok bool) {
+	if !s.IsAppCredentialTaken() {
+		return v, false
+	}
+	return s.AppCredentialTaken, true
+}
+
+// NewAppCredentialTakenCreateAppErrorResponse returns new CreateAppErrorResponse from AppCredentialTaken.
+func NewAppCredentialTakenCreateAppErrorResponse(v AppCredentialTaken) CreateAppErrorResponse {
+	var s CreateAppErrorResponse
+	s.SetAppCredentialTaken(v)
 	return s
 }
 

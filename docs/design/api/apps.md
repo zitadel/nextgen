@@ -151,6 +151,15 @@ Credentials are a resource of their own, with their own writer
   adds the new one and revokes the old one later, so the client, its
   `client_id` and its history stay. A client holds at most 20, and one may
   expire.
+- **Credentials belong to the client's row**, which outlives revisions. A
+  client a newer revision removes keeps them, listed and revocable, since a
+  deployment that pins an older revision still accepts them; only a client
+  the newest revision has takes a new one.
+- **A kid names one key of a client**, whether in `jwks` at any revision a
+  deployment may serve or written through the API, so an assertion's kid
+  picks one: a write that gives a kid to another key is refused
+  (`app.credential_taken`). The same key may sit in both, so it moves
+  between the file and the API without a gap.
 - **A registered app's new confidential client gets a secret** with the write
   that creates it, named `initial` and shown once, unless it brings keys.
 - **A client's authentication methods are a set**, the ones its credentials
@@ -279,7 +288,7 @@ The authorization server finds clients and APIs through one interface,
 - `VerifyClientSecret(at, app, client, secret)` checks every secret the
   client holds: a declared file's frozen variable and the credentials written
   through the API. `ClientKeys(at, app, client)` returns its public keys, from
-  `jwks` and the API, for a `private_key_jwt` assertion.
+  `jwks` and the API, each once, for a `private_key_jwt` assertion.
 - **Built-in apps** are the third source the POC found: apps the server
   declares, read-only and versioned with the binary, such as the platform
   project's `zitadel`. The directory serves them first.

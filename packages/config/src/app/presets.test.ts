@@ -50,6 +50,12 @@ describe("app presets", () => {
     expect(web?.secret).toBe("${{ SHOP_WEB_CLIENT_SECRET }}");
   });
 
+  it("names a valid variable for a slug that starts with a digit", () => {
+    expect(appClientSecretVariable("123shop", "web")).toBe("_123SHOP_WEB_CLIENT_SECRET");
+    const { document } = composeAppDocument("web", { ...input, slug: "123shop" });
+    expect(check(document), JSON.stringify(check.errors)).toBe(true);
+  });
+
   it("opens an MCP server to registered clients through its API only", () => {
     const { document } = composeAppDocument("mcp-server", input);
     expect(document.apis?.[0]).toMatchObject({ third_party: true });

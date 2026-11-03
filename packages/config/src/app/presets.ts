@@ -66,10 +66,13 @@ const LOOPBACK_REDIRECTS = [
 
 /**
  * The variable a declared confidential client's secret is read from:
- * `SHOP_WEB_CLIENT_SECRET` for client `web` of app `shop`.
+ * `SHOP_WEB_CLIENT_SECRET` for client `web` of app `shop`. A slug may start
+ * with a digit and a variable name may not, so `123shop` names
+ * `_123SHOP_WEB_CLIENT_SECRET`.
  */
 export function appClientSecretVariable(appSlug: string, clientSlug: string): string {
-  return `${appSlug}_${clientSlug}_CLIENT_SECRET`.toUpperCase().replace(/[^A-Z0-9_]/g, "_");
+  const name = `${appSlug}_${clientSlug}_CLIENT_SECRET`.toUpperCase().replace(/[^A-Z0-9_]/g, "_");
+  return /^[0-9]/.test(name) ? `_${name}` : name;
 }
 
 const secretRef = (appSlug: string, clientSlug: string): string =>

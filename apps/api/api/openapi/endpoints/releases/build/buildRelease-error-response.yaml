@@ -5,6 +5,7 @@ content:
     schema:
       oneOf:
         - $ref: '../../../components/schemas/errors/app-client_id_taken.yaml'
+        - $ref: '../../../components/schemas/errors/app-credential_taken.yaml'
         - $ref: '../../../components/schemas/errors/app-declared.yaml'
         - $ref: '../../../components/schemas/errors/app-field_immutable.yaml'
         - $ref: '../../../components/schemas/errors/app-identifier_taken.yaml'
@@ -36,6 +37,7 @@ content:
         propertyName: code
         mapping:
           app.client_id_taken: '../../../components/schemas/errors/app-client_id_taken.yaml'
+          app.credential_taken: '../../../components/schemas/errors/app-credential_taken.yaml'
           app.declared: '../../../components/schemas/errors/app-declared.yaml'
           app.field_immutable: '../../../components/schemas/errors/app-field_immutable.yaml'
           app.identifier_taken: '../../../components/schemas/errors/app-identifier_taken.yaml'
@@ -69,6 +71,11 @@ content:
         value:
           code: app.client_id_taken
           message: 'app: another client in the project holds the client_id'
+      app.credential_taken:
+        summary: app.credential_taken
+        value:
+          code: app.credential_taken
+          message: 'app: another credential of the client has the name or the key id'
       app.declared:
         summary: app.declared
         value:

@@ -239,6 +239,38 @@ func TestAppService_RegisteredApp(t *testing.T) {
 		assert.JSONEq(t, string(key), string(keys[1]))
 	})
 
+	t.Run("a kid names one key of a client, in the document or through the API", func(t *testing.T) {
+		const fileKey = `{"kty":"OKP","crv":"Ed25519","kid":"file-1","x":"11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo"}`
+		const apiKey = `{"kty":"OKP","crv":"Ed25519","kid":"api-1","x":"3p7bfXt9wbTTW2HC7OQ1Nz-DQ8hbeGdNrfx-FG-IK08"}`
+		keyring := func(keys ...string) []byte {
+			return []byte(`{"slug":"keyring","name":"Keyring","clients":[{"slug":"runner","type":"confidential",
+				"grant_types":["client_credentials"],"jwks":{"keys":[` + strings.Join(keys, ",") + `]}}]}`)
+		}
+		app, err := f.apps.CreateOrRevise(f.ctx, f.projectID, keyring(fileKey))
+		require.NoError(t, err)
+		add := func(name, key string) error {
+			_, err := f.apps.AddClientCredential(f.ctx, service.AddAppClientCredentialInput{
+				ProjectID: f.projectID, AppID: app.App.ID, ClientSlug: "runner", Name: name, PublicKey: []byte(key),
+			})
+			return err
+		}
+		require.NoError(t, add("api", apiKey))
+
+		_, err = f.apps.CreateOrRevise(f.ctx, f.projectID, keyring(fileKey, strings.Replace(fileKey, `"file-1"`, `"api-1"`, 1)))
+		require.ErrorIs(t, err, domain.ErrAppCredentialTaken(nil), "another key under the kid of the client's API key")
+
+		// The same key in both places is one key, so it moves between the
+		// document and the API without a gap.
+		_, err = f.apps.CreateOrRevise(f.ctx, f.projectID, keyring(fileKey, apiKey))
+		require.NoError(t, err)
+		require.NoError(t, add("file", fileKey))
+		resolved, runner, err := f.directory.Client(f.ctx, f.at(), clientIDs(app.AppView)["runner"])
+		require.NoError(t, err)
+		keys, err := f.directory.ClientKeys(f.ctx, f.at(), resolved, runner)
+		require.NoError(t, err)
+		assert.Len(t, keys, 2, "each key once")
+	})
+
 	t.Run("an import in the generated form must pass its checksum", func(t *testing.T) {
 		_, err := f.apps.AddClientCredential(f.ctx, service.AddAppClientCredentialInput{
 			ProjectID: f.projectID, AppID: created.App.ID, ClientSlug: "web", Name: "fake", Secret: "zcs_not-generated",
@@ -363,6 +395,61 @@ func TestAppService_DeclaredApp(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, f.directory.VerifyClientSecret(f.ctx, f.at(), app, deploy, added.Secret),
 			"the release revised the app, and the credential stays")
+	})
+
+	t.Run("a client a newer revision removed keeps its credentials revocable", func(t *testing.T) {
+		const jobs = `{"slug":"jobs","name":"Jobs","clients":[
+			{"slug":"runner","type":"confidential","grant_types":["client_credentials"]},
+			{"slug":"backup","type":"confidential","grant_types":["client_credentials"]}]}`
+		old := service.AppLookup{ProjectID: f.projectID, DeploymentID: f.deploy(t, f.build(t, jobs), "https://old.jobs.example.com")}
+		appID := mustAppID(t, f, "jobs")
+		added, err := f.apps.AddClientCredential(f.ctx, service.AddAppClientCredentialInput{
+			ProjectID: f.projectID, AppID: appID, ClientSlug: "backup", Name: "nightly",
+		})
+		require.NoError(t, err)
+		f.build(t, `{"slug":"jobs","name":"Jobs","clients":[{"slug":"runner","type":"confidential","grant_types":["client_credentials"]}]}`)
+
+		app, backup, err := f.directory.Client(f.ctx, old, added.ClientID)
+		require.NoError(t, err, "the old release still lists backup")
+		require.NoError(t, f.directory.VerifyClientSecret(f.ctx, old, app, backup, added.Secret))
+		listed, err := f.apps.ListClientCredentials(f.ctx, f.projectID, appID, "backup")
+		require.NoError(t, err)
+		require.Len(t, listed.Credentials, 1)
+		_, err = f.apps.AddClientCredential(f.ctx, service.AddAppClientCredentialInput{
+			ProjectID: f.projectID, AppID: appID, ClientSlug: "backup", Name: "another",
+		})
+		require.ErrorIs(t, err, domain.ErrAppClientNotFound(), "a client the newest revision removed takes no new one")
+
+		require.NoError(t, f.apps.RevokeClientCredential(f.ctx, f.projectID, appID, "backup", added.Credential.ID))
+		require.ErrorIs(t, f.directory.VerifyClientSecret(f.ctx, old, app, backup, added.Secret), domain.ErrAppClientSecretInvalid(),
+			"the old deployment no longer accepts it")
+	})
+
+	t.Run("a kid names one key across the revisions deployments pin", func(t *testing.T) {
+		const key = `{"kty":"OKP","crv":"Ed25519","kid":"k1","x":"11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo"}`
+		const other = `{"kty":"OKP","crv":"Ed25519","kid":"k1","x":"3p7bfXt9wbTTW2HC7OQ1Nz-DQ8hbeGdNrfx-FG-IK08"}`
+		signer := func(jwks string) string {
+			return `{"slug":"signer","name":"Signer","clients":[{"slug":"runner","type":"confidential","grant_types":["client_credentials"]` + jwks + `}]}`
+		}
+		f.deploy(t, f.build(t, signer(`,"jwks":{"keys":[`+key+`]}`)), "https://old.signer.example.com")
+		f.build(t, signer(""))
+		appID := mustAppID(t, f, "signer")
+		add := func(name, key string) error {
+			_, err := f.apps.AddClientCredential(f.ctx, service.AddAppClientCredentialInput{
+				ProjectID: f.projectID, AppID: appID, ClientSlug: "runner", Name: name, PublicKey: []byte(key),
+			})
+			return err
+		}
+		require.ErrorIs(t, add("other", other), domain.ErrAppCredentialTaken(nil), "the old deployment still serves k1 from the file")
+		require.NoError(t, add("moved", key), "the same key, moved from the file")
+
+		_, err := f.releases.Build(f.ctx, service.BuildReleaseInput{ProjectID: f.projectID, Apps: []service.BuildApp{
+			{Index: 0, Document: []byte(signer(`,"jwks":{"keys":[` + other + `]}`))},
+		}})
+		var bundleErr *service.BundleValidationError
+		require.ErrorAs(t, err, &bundleErr, "a release may not give k1 to another key either")
+		require.Len(t, bundleErr.Resources, 1)
+		assert.Equal(t, "signer", bundleErr.Resources[0].Handle)
 	})
 }
 

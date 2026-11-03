@@ -475,6 +475,7 @@ func appRefusal(err domain.Error) bool {
 		domain.ErrAppFieldImmutable(nil),
 		domain.ErrAppClientIDTaken(nil),
 		domain.ErrAppIdentifierTaken(nil),
+		domain.ErrAppCredentialTaken(nil),
 	} {
 		if err.Code == refusal.Code {
 			return true

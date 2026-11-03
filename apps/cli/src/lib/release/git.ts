@@ -11,6 +11,7 @@ const CONFIG_PATHS = [
   ".zitadel/flows/",
   ".zitadel/branding/",
   ".zitadel/idps/",
+  ".zitadel/apps/",
 ];
 
 /** The current commit, or null when there is no repo or no commit yet. */

@@ -202,6 +202,9 @@ func (s *appService) write(ctx context.Context, stmts AllStatements, projectID s
 	if err != nil {
 		return nil, err
 	}
+	if err := checkDocumentKeys(ctx, stmts, current, doc); err != nil {
+		return nil, err
+	}
 	if reuse {
 		match, err := matchingAppRevision(ctx, stmts, current, document)
 		if err != nil {
@@ -649,9 +652,18 @@ func (s *appService) AddClientCredential(ctx context.Context, input AddAppClient
 	}
 	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		stmts := tx.Statements()
-		entity, client, row, err := lockedClient(ctx, stmts, input.ProjectID, input.AppID, input.ClientSlug)
+		entity, row, err := lockedClient(ctx, stmts, input.ProjectID, input.AppID, input.ClientSlug)
 		if err != nil {
 			return err
+		}
+		doc, err := domain.ParseAppDocument(entity.Document)
+		if err != nil {
+			return domain.ErrInternal(err).WithMessage("stored app document does not parse")
+		}
+		// A client the newest revision removed takes no new credential.
+		client, ok := doc.Client(input.ClientSlug)
+		if !ok {
+			return domain.ErrAppClientNotFound()
 		}
 		if client.Type != domain.ClientTypeConfidential {
 			return domain.ErrAppInvalid(nil).WithMessage("app: a public client holds no credential: it proves itself with PKCE")
@@ -664,9 +676,16 @@ func (s *appService) AddClientCredential(ctx context.Context, input AddAppClient
 			return domain.ErrAppInvalid(nil).WithMessage(fmt.Sprintf("app: a client holds at most %d credentials; revoke one first", maxClientCredentials))
 		}
 		if credential.Kind == domain.CredentialKindKey {
-			if slices.ContainsFunc(stored, func(c *domain.AppClientCredential) bool { return c.KeyID == credential.KeyID }) ||
-				slices.Contains(documentKeyIDs(client), credential.KeyID) {
+			if slices.ContainsFunc(stored, func(c *domain.AppClientCredential) bool { return c.KeyID == credential.KeyID }) {
 				return domain.ErrAppCredentialTaken(map[string]string{"field": "public_key/kid"})
+			}
+			clash, err := documentKeyClash(ctx, stmts, entity, client, credential.KeyID, credential.PublicKey)
+			if err != nil {
+				return err
+			}
+			if clash {
+				return domain.ErrAppCredentialTaken(map[string]string{"field": "public_key/kid"}).
+					WithMessage(fmt.Sprintf("app: kid %q names another key in the client's jwks, at the newest revision or one a deployment may serve", credential.KeyID))
 			}
 		}
 		credential.ClientRowID = row.ID
@@ -690,7 +709,7 @@ func (s *appService) ListClientCredentials(ctx context.Context, projectID, appID
 	defer end(&err)
 
 	stmts := s.v2Pool.Statements()
-	_, _, row, err := appClient(ctx, stmts, projectID, appID, clientSlug)
+	_, row, err := appClient(ctx, stmts, projectID, appID, clientSlug)
 	if err != nil {
 		return nil, err
 	}
@@ -707,7 +726,7 @@ func (s *appService) RevokeClientCredential(ctx context.Context, projectID, appI
 
 	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		stmts := tx.Statements()
-		entity, _, row, err := lockedClient(ctx, stmts, projectID, appID, clientSlug)
+		entity, row, err := lockedClient(ctx, stmts, projectID, appID, clientSlug)
 		if err != nil {
 			return err
 		}
@@ -730,58 +749,128 @@ func (s *appService) RevokeClientCredential(ctx context.Context, projectID, appI
 	return nil
 }
 
-// appClient reads the app id names at its newest revision, the client slug
-// names in it, and the row holding the client's id.
-func appClient(ctx context.Context, stmts AllStatements, projectID, appID, slug string) (*domain.App, domain.AppClient, *domain.AppClientID, error) {
+// appClient reads the app id names at its newest revision and the row of the
+// client slug names. Credentials hang off that row, which outlives revisions:
+// a client a newer revision removed keeps it, and a deployment that pins an
+// older revision still accepts the client's credentials, so they stay listed
+// and revocable.
+func appClient(ctx context.Context, stmts AllStatements, projectID, appID, slug string) (*domain.App, *domain.AppClientID, error) {
 	entity, err := stmts.GetApp(ctx, appBy(projectID, domain.AppFieldID, appID))
 	if err != nil {
-		return nil, domain.AppClient{}, nil, mapAppReadError(err)
-	}
-	doc, err := domain.ParseAppDocument(entity.Document)
-	if err != nil {
-		return nil, domain.AppClient{}, nil, domain.ErrInternal(err).WithMessage("stored app document does not parse")
-	}
-	client, ok := doc.Client(slug)
-	if !ok {
-		return nil, domain.AppClient{}, nil, domain.ErrAppClientNotFound()
+		return nil, nil, mapAppReadError(err)
 	}
 	rows, err := stmts.ListAppClientIDs(ctx, projectID, entity.ID)
 	if err != nil {
-		return nil, domain.AppClient{}, nil, err
+		return nil, nil, err
 	}
 	i := slices.IndexFunc(rows, func(row *domain.AppClientID) bool { return row.Slug == slug })
 	if i < 0 {
-		return nil, domain.AppClient{}, nil, domain.ErrAppClientNotFound()
+		return nil, nil, domain.ErrAppClientNotFound()
 	}
-	return entity, client, rows[i], nil
+	return entity, rows[i], nil
 }
 
 // lockedClient is appClient under the app's lock, so credential writes to one
-// app serialize and a kid or the count is checked against what is stored.
-func lockedClient(ctx context.Context, stmts AllStatements, projectID, appID, slug string) (*domain.App, domain.AppClient, *domain.AppClientID, error) {
+// app serialize with each other and with its revisions, and a kid or the count
+// is checked against what is stored.
+func lockedClient(ctx context.Context, stmts AllStatements, projectID, appID, slug string) (*domain.App, *domain.AppClientID, error) {
 	if err := stmts.LockApp(ctx, projectID, appID); err != nil {
-		return nil, domain.AppClient{}, nil, mapAppReadError(err)
+		return nil, nil, mapAppReadError(err)
 	}
 	return appClient(ctx, stmts, projectID, appID, slug)
 }
 
-// documentKeyIDs returns the kids of the keys in the client's document.
-func documentKeyIDs(client domain.AppClient) []string {
+// documentKeys returns the keys in the client's document by kid. A set's
+// only key may have none, and is left out.
+func documentKeys(client domain.AppClient) map[string]json.RawMessage {
 	var set struct {
-		Keys []struct {
-			Kid string `json:"kid"`
-		} `json:"keys"`
+		Keys []json.RawMessage `json:"keys"`
 	}
 	if len(client.JWKS) == 0 || json.Unmarshal(client.JWKS, &set) != nil {
 		return nil
 	}
-	kids := make([]string, 0, len(set.Keys))
-	for _, key := range set.Keys {
-		if key.Kid != "" {
-			kids = append(kids, key.Kid)
+	keys := make(map[string]json.RawMessage, len(set.Keys))
+	for _, raw := range set.Keys {
+		var key struct {
+			Kid string `json:"kid"`
+		}
+		if json.Unmarshal(raw, &key) == nil && key.Kid != "" {
+			keys[key.Kid] = raw
 		}
 	}
-	return kids
+	return keys
+}
+
+// documentKeyClash reports whether kid names a key other than key in the
+// client's document: at the newest revision and, for a declared app, at every
+// revision, since a deployment serves the one its release pins. A kid names
+// one key of a client wherever it sits, so an assertion's kid picks one; the
+// same key in the file and through the API is one key, which lets it move
+// between them without a gap.
+func documentKeyClash(ctx context.Context, stmts AllStatements, entity *domain.App, client domain.AppClient, kid string, key json.RawMessage) (bool, error) {
+	clashes := func(client domain.AppClient) bool {
+		other, ok := documentKeys(client)[kid]
+		return ok && !domain.SamePublicKey(other, key)
+	}
+	if clashes(client) {
+		return true, nil
+	}
+	if entity.Source != domain.AppSourceDeclared {
+		// A registered app serves its newest revision only.
+		return false, nil
+	}
+	page := database.Page[domain.AppField]{Limit: maxListLimit, OrderBy: appstore.RevisionsNewestFirst()}
+	for {
+		result, err := stmts.ListAppRevisions(WithAuthzListUnrestricted(ctx), entity.ProjectID, entity.ID, page)
+		if err != nil {
+			return false, err
+		}
+		for _, revision := range result.Items {
+			doc, err := domain.ParseAppDocument(revision.Document)
+			if err != nil {
+				return false, domain.ErrInternal(err).WithMessage("stored app document does not parse")
+			}
+			if old, ok := doc.Client(client.Slug); ok && clashes(old) {
+				return true, nil
+			}
+		}
+		if len(result.NextCursor) == 0 {
+			return false, nil
+		}
+		page.Cursor = result.NextCursor
+	}
+}
+
+// checkDocumentKeys refuses a revision whose document gives a client a key
+// under the kid of another key the client holds through the API: the
+// reciprocal of documentKeyClash, which keeps those keys from taking a kid
+// the document has.
+func checkDocumentKeys(ctx context.Context, stmts AllStatements, entity *domain.App, doc domain.AppDocument) error {
+	if !slices.ContainsFunc(doc.Clients, func(client domain.AppClient) bool { return len(client.JWKS) > 0 }) {
+		return nil
+	}
+	rows, err := stmts.ListAppClientIDs(ctx, entity.ProjectID, entity.ID)
+	if err != nil {
+		return err
+	}
+	for i, client := range doc.Clients {
+		keys := documentKeys(client)
+		j := slices.IndexFunc(rows, func(row *domain.AppClientID) bool { return row.Slug == client.Slug })
+		if len(keys) == 0 || j < 0 {
+			continue
+		}
+		stored, err := stmts.ListAppClientCredentials(ctx, entity.ProjectID, rows[j].ID)
+		if err != nil {
+			return err
+		}
+		for _, credential := range stored {
+			if key, ok := keys[credential.KeyID]; ok && credential.Kind == domain.CredentialKindKey && !domain.SamePublicKey(key, credential.PublicKey) {
+				return domain.ErrAppCredentialTaken(map[string]string{"field": fmt.Sprintf("/clients/%d/jwks", i)}).
+					WithMessage(fmt.Sprintf("app: kid %q in jwks names another key, which the client holds through the API", credential.KeyID))
+			}
+		}
+	}
+	return nil
 }
 
 // clientSecretPrefix marks a secret the server generated, so a scanner can

@@ -45,7 +45,8 @@ type AppDirectory interface {
 	VerifyClientSecret(ctx context.Context, at AppLookup, app *domain.ResolvedApp, client domain.AppClient, secret string) error
 	// ClientKeys returns the public keys a confidential client signs its
 	// private_key_jwt assertions with, as JWKs: the ones in its document and
-	// the ones written through the API, expired ones left out. The
+	// the ones written through the API, expired ones left out and a key in
+	// both listed once. A kid names one key of a client, so the
 	// authorization server picks one by the assertion's kid.
 	ClientKeys(ctx context.Context, at AppLookup, app *domain.ResolvedApp, client domain.AppClient) ([]json.RawMessage, error)
 	// ClientRegistration finds a client that registered itself through
@@ -196,8 +197,11 @@ func (d *appDirectory) ClientKeys(ctx context.Context, at AppLookup, app *domain
 	if err != nil {
 		return nil, err
 	}
+	// A write never lets a kid name two keys of a client, so a stored key
+	// under a kid the document has is that same key, listed once.
+	inDocument := documentKeys(client)
 	for _, credential := range stored {
-		if credential.Kind == domain.CredentialKindKey {
+		if _, listed := inDocument[credential.KeyID]; credential.Kind == domain.CredentialKindKey && !listed {
 			keys = append(keys, credential.PublicKey)
 		}
 	}

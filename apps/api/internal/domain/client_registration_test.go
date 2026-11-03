@@ -170,6 +170,22 @@ func TestPublicJWKKeyID(t *testing.T) {
 	}
 }
 
+func TestSamePublicKey(t *testing.T) {
+	t.Parallel()
+
+	key := []byte(`{"kty":"OKP","crv":"Ed25519","kid":"ci-1","x":"11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo"}`)
+	assert.True(t, domain.SamePublicKey(key, []byte(`{"use":"sig","x":"11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo","kty":"OKP","crv":"Ed25519","kid":"ci-1"}`)),
+		"the members that make the key, in any order and beside others")
+	for name, other := range map[string]string{
+		"another x":   `{"kty":"OKP","crv":"Ed25519","kid":"ci-1","x":"3p7bfXt9wbTTW2HC7OQ1Nz-DQ8hbeGdNrfx-FG-IK08"}`,
+		"another crv": `{"kty":"OKP","crv":"X25519","kid":"ci-1","x":"11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo"}`,
+		"another kty": `{"kty":"EC","crv":"Ed25519","kid":"ci-1","x":"11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo"}`,
+		"not a key":   `"ci-1"`,
+	} {
+		assert.False(t, domain.SamePublicKey(key, []byte(other)), name)
+	}
+}
+
 func TestAppDocumentValidate_RefusesMintedClientIDForms(t *testing.T) {
 	t.Parallel()
 

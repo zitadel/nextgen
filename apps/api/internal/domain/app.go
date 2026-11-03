@@ -119,7 +119,9 @@ func ErrAppCredentialNotFound() Error {
 }
 
 // ErrAppCredentialTaken refuses a credential whose name, or whose key's kid,
-// another credential of the client has. details names the field.
+// another credential of the client has, and a key in jwks or written through
+// the API under the kid of another key the client holds. details names the
+// field.
 func ErrAppCredentialTaken(details any) Error {
 	return newError(PrefixApp.ErrorCodePrefix("credential_taken"), "app: another credential of the client has the name or the key id", details, nil)
 }
@@ -747,6 +749,33 @@ func PublicJWKKeyID(raw json.RawMessage) (string, error) {
 		return "", fmt.Errorf("kty must be RSA, EC or OKP")
 	}
 	return kid, nil
+}
+
+// SamePublicKey reports whether two JWKs hold the same public key: the same
+// kty and the same members that make the key, the ones its RFC 7638
+// thumbprint covers. Members such as alg or use do not make another key.
+func SamePublicKey(a, b json.RawMessage) bool {
+	var ka, kb map[string]any
+	if json.Unmarshal(a, &ka) != nil || json.Unmarshal(b, &kb) != nil || ka["kty"] != kb["kty"] {
+		return false
+	}
+	var members []string
+	switch ka["kty"] {
+	case "RSA":
+		members = []string{"n", "e"}
+	case "EC":
+		members = []string{"crv", "x", "y"}
+	case "OKP":
+		members = []string{"crv", "x"}
+	default:
+		return false
+	}
+	for _, name := range members {
+		if v, _ := ka[name].(string); v == "" || kb[name] != v {
+			return false
+		}
+	}
+	return true
 }
 
 // checkAPIIdentifier accepts an https URL, an http URL on a loopback host, or

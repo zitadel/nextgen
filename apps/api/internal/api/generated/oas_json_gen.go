@@ -23701,6 +23701,22 @@ func (s BuildReleaseErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case AppCredentialTakenBuildReleaseErrorResponse:
+		e.FieldStart("code")
+		e.Str("app.credential_taken")
+		{
+			s := s.AppCredentialTaken
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case AppDeclaredBuildReleaseErrorResponse:
 		e.FieldStart("code")
 		e.Str("app.declared")
@@ -24162,6 +24178,9 @@ func (s *BuildReleaseErrorResponse) Decode(d *jx.Decoder) error {
 				case "app.client_id_taken":
 					s.Type = AppClientIDTakenBuildReleaseErrorResponse
 					found = true
+				case "app.credential_taken":
+					s.Type = AppCredentialTakenBuildReleaseErrorResponse
+					found = true
 				case "app.declared":
 					s.Type = AppDeclaredBuildReleaseErrorResponse
 					found = true
@@ -24259,6 +24278,10 @@ func (s *BuildReleaseErrorResponse) Decode(d *jx.Decoder) error {
 	switch s.Type {
 	case AppClientIDTakenBuildReleaseErrorResponse:
 		if err := s.AppClientIDTaken.Decode(d); err != nil {
+			return err
+		}
+	case AppCredentialTakenBuildReleaseErrorResponse:
+		if err := s.AppCredentialTaken.Decode(d); err != nil {
 			return err
 		}
 	case AppDeclaredBuildReleaseErrorResponse:
@@ -30261,6 +30284,22 @@ func (s CreateAppErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case AppCredentialTakenCreateAppErrorResponse:
+		e.FieldStart("code")
+		e.Str("app.credential_taken")
+		{
+			s := s.AppCredentialTaken
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case AppDeclaredCreateAppErrorResponse:
 		e.FieldStart("code")
 		e.Str("app.declared")
@@ -30498,6 +30537,9 @@ func (s *CreateAppErrorResponse) Decode(d *jx.Decoder) error {
 				case "app.client_id_taken":
 					s.Type = AppClientIDTakenCreateAppErrorResponse
 					found = true
+				case "app.credential_taken":
+					s.Type = AppCredentialTakenCreateAppErrorResponse
+					found = true
 				case "app.declared":
 					s.Type = AppDeclaredCreateAppErrorResponse
 					found = true
@@ -30553,6 +30595,10 @@ func (s *CreateAppErrorResponse) Decode(d *jx.Decoder) error {
 	switch s.Type {
 	case AppClientIDTakenCreateAppErrorResponse:
 		if err := s.AppClientIDTaken.Decode(d); err != nil {
+			return err
+		}
+	case AppCredentialTakenCreateAppErrorResponse:
+		if err := s.AppCredentialTaken.Decode(d); err != nil {
 			return err
 		}
 	case AppDeclaredCreateAppErrorResponse:
