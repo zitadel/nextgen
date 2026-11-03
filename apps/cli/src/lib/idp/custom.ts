@@ -83,6 +83,10 @@ export const SETUP_FLAG_NAMES: CustomFlagNames = flagNamesOf(SETUP_FLAG_KEYS);
  * and reads `displayName`. The rule is `src/lib/oclif/names.ts`, repeated here
  * because this library knows nothing of the command layer.
  */
+type AsRead<Key extends string> = Key extends `${infer Head}-${infer Tail}`
+  ? `${Head}${Capitalize<AsRead<Tail>>}`
+  : Key;
+
 const asRead = (key: string): string => {
   return key.replace(/[-_](.)/g, (_separator, letter: string) => {
     return letter.toUpperCase();
@@ -94,7 +98,7 @@ const asRead = (key: string): string => {
  * keys, so the flags a command parsed must carry them.
  */
 export function customFlagValues<K extends FlagKeys>(
-  flags: { readonly [P in K["slug" | "displayName" | "issuer" | "scopes"]]?: string },
+  flags: { readonly [P in AsRead<K["slug" | "displayName" | "issuer" | "scopes"]>]?: string },
   keys: K,
 ): CustomFlagValues {
   const read = (key: string) =>
