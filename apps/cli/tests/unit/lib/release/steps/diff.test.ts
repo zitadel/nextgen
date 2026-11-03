@@ -177,6 +177,26 @@ describe("diffStep", () => {
     expect(learned.schemasOrFlowsChanged).toBe(false);
   });
 
+  it("records nothing when the primary origins serve different releases", async ({ dir: cwd }) => {
+    const sha = await liveCommit(cwd);
+    const learned: StepContext["learned"] = {};
+
+    await diffStep.run(
+      ctx(
+        cwd,
+        [
+          { targets: [PRIMARY], sha, release: "rel_2" },
+          { targets: [SECOND_PRIMARY], sha, release: "rel_1" },
+        ],
+        false,
+        {},
+        learned,
+      ),
+    );
+
+    expect(learned.schemasOrFlowsChanged).toBeUndefined();
+  });
+
   it("records nothing when there is no diff to read", async ({ dir: cwd }) => {
     const learned: StepContext["learned"] = {};
 

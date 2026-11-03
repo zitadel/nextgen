@@ -61,7 +61,9 @@ export const lockoutStep: Step = {
   async run(ctx: StepContext): Promise<undefined> {
     // Branding, policies and connections cannot lock anyone out. Without a
     // diff to say so, the check runs.
-    if (ctx.learned?.schemasOrFlowsChanged === false) {
+    // A flow whose schema the release does not carry runs on the server's
+    // newest revision, which a clean diff says nothing about.
+    if (ctx.learned?.schemasOrFlowsChanged === false && !resolvesOnServer(ctx)) {
       return undefined;
     }
     try {
@@ -77,6 +79,17 @@ export const lockoutStep: Step = {
     return undefined;
   },
 };
+
+function resolvesOnServer(ctx: StepContext): boolean {
+  const carried = new Set<unknown>();
+  for (const schema of ctx.bundle.schemas) {
+    carried.add(schema.objectType);
+    carried.add(schema.$id);
+  }
+  return ctx.bundle.flow_definitions.some(
+    (flow) => typeof flow.user_schema === "string" && !carried.has(flow.user_schema),
+  );
+}
 
 async function lockoutWarnings(ctx: StepContext): Promise<string[]> {
   // Names are only needed for flows that name a schema by id and for the SSO
@@ -258,7 +271,7 @@ async function unservedWarnings(
   // per user, so only the first few are asked, and the SSO count says so.
   const stranded = read.users;
   const linkChecked = stranded.slice(0, LINK_CHECKS);
-  const linksPartial = stranded.length > LINK_CHECKS;
+  const linksPartial = stranded.length > LINK_CHECKS || read.truncated;
   // Its own boundary: a link read that fails (a user deleted since the query)
   // must not discard the other warnings.
   let failed = false;
@@ -278,6 +291,7 @@ async function unservedWarnings(
   });
   // Revisions of one schema share an object type, so they are one count.
   const found = new Map<string | symbol, { users: number; linked: number }>();
+  const linksUnsure = linksPartial || failed;
   const nameOf = stranded.length > 0 ? await names() : undefined;
   stranded.forEach((user, index) => {
     const name = nameOf?.byId.get(user.schema)?.objectType ?? UNNAMED;
@@ -290,7 +304,7 @@ async function unservedWarnings(
     const label = typeof name === "string" ? quote(name) : "schemas whose names could not be read";
     const sso =
       linked > 0
-        ? ` (${count(linked, linksPartial)} of them ${linked === 1 ? "has" : "have"} an SSO link)`
+        ? ` (${count(linked, linksUnsure)} of them ${linked === 1 ? "has" : "have"} an SSO link)`
         : "";
     return `${count(users, read.truncated)} existing ${plural(users, "user")} of ${label} ${users === 1 ? "is" : "are"} on a schema no flow in this release uses${sso}, so they cannot sign in with a password or SSO. Users cannot move between schemas, so keep or restore a flow on ${label}.`;
   });
@@ -331,7 +345,8 @@ function loginPathFields(flow: Record<string, unknown>): Set<string> {
     }
     const transitions = (step.transitions ?? {}) as Record<string, Record<string, unknown>>;
     for (const [outcome, transition] of Object.entries(transitions)) {
-      const sameFlow = transition.flow === undefined && transition.purpose === undefined;
+      // The wire allows null for an absent flow or purpose.
+      const sameFlow = transition.flow == null && transition.purpose == null;
       const signsUp = outcome === "user_not_found" || outcome === "sso_user_not_found";
       if (sameFlow && !signsUp && typeof transition.target === "string") {
         queue.push(transition.target);

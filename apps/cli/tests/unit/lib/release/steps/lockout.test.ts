@@ -233,6 +233,57 @@ describe("lockoutStep", () => {
     expect(takeReportedWarnings()[0]).toContain('has no "email"');
   });
 
+  it("treats a null purpose and flow on a transition as absent", async () => {
+    const preset = passkeyFirstFlow("human-user");
+    const nullable = {
+      ...preset,
+      steps: preset.steps.map((step, index) =>
+        index === 0
+          ? {
+              ...step,
+              transitions: { email_fallback: { target: "identifier", purpose: null, flow: null } },
+            }
+          : step,
+      ),
+    };
+    await lockoutStep.run(
+      ctx({
+        schemas: [{ objectType: "human-user", "x-identifier": "email" }],
+        flows: [nullable],
+        users: [user("u1", "human-user", {})],
+      }),
+    );
+
+    expect(takeReportedWarnings()[0]).toContain('has no "email"');
+  });
+
+  it("still checks when a clean diff leaves a flow's schema to the server", async () => {
+    await lockoutStep.run(
+      ctx({
+        schemas: [],
+        flows: [flow("employee")],
+        users: [user("u1", "human-user")],
+        learned: { schemasOrFlowsChanged: false },
+      }),
+    );
+
+    expect(takeReportedWarnings()).toHaveLength(1);
+  });
+
+  it("qualifies the SSO count when the user read was cut short", async () => {
+    const stranded = Array.from({ length: 1200 }, (_, index) => user(`s-${index}`, "human-user"));
+    await lockoutStep.run(
+      ctx({
+        schemas: [{ objectType: "employee" }],
+        flows: [flow("employee")],
+        users: stranded,
+        links: { "s-0": 1 },
+      }),
+    );
+
+    expect(takeReportedWarnings()[0]).toContain("(at least 1 of them has an SSO link)");
+  });
+
   it("does not follow a purpose change off the login path", async () => {
     await lockoutStep.run(
       ctx({
