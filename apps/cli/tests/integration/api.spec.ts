@@ -46,6 +46,22 @@ describe("api", () => {
 
       expect(result).toPrint("Call any operation of the Zitadel API");
     });
+
+    it("prints the usage for help in any case, whatever follows", async () => {
+      const app = await aSetUpApp();
+
+      const result = await app.apiRendered("Help", "getVariable");
+
+      expect(result).toPrint("Call any operation of the Zitadel API");
+    });
+
+    it("answers help with an empty envelope under --json", async () => {
+      const app = await aSetUpApp();
+
+      const result = await app.api("help");
+
+      expect(app.envelopeOf(result).data).toBeNull();
+    });
   });
 
   describe("against a valid server", () => {

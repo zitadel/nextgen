@@ -170,6 +170,12 @@ describe("the cli", () => {
         expect(result).toFailWith("E_VALIDATION");
       });
 
+      it("accepts -h as the short form of --help", async () => {
+        const result = await runCliForTest(["resources", "-h"]);
+
+        expect(result).toPrint("USAGE");
+      });
+
       it("accepts --no-color", async () => {
         const result = await runCliForTest(["resources", "--no-color", "--json"]);
 

@@ -87,14 +87,17 @@ export default class Api extends Destructive(BaseCommand) {
 
   async run(): Promise<JsonEnvelope> {
     const { args, argv, flags } = await this.parse(Api);
-    const meta = await this.toMeta(flags);
-
-    // `help` is no operation, so `zitadel api help` shows this command's help
-    // as `--help` does.
+    // No operation is called help, so the word asks for this command's help as
+    // --help does. It comes before the server is resolved, which help never
+    // needs, and under --json the envelope stays the only thing on stdout.
     if (args.operation?.toLowerCase() === "help") {
-      await this.config.runCommand("help", [this.id ?? "api"]);
+      if (!this.jsonEnabled()) {
+        await this.config.runCommand("help", [Api.id]);
+      }
       return this.emit({ status: "ok", data: null, pretty: "" });
     }
+
+    const meta = await this.toMeta(flags);
 
     const ref = args.operation ?? (await this.chooseOperation());
     const target = resolveTarget(ref, flags.method);
