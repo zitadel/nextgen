@@ -80,7 +80,7 @@ public-plane.
 | Plane | Principal | Credential | Operations (today) |
 |---|---|---|---|
 | **Public** (browser) | The human / their session | Publishable key (+ session cookie for me-ops) | flow ops, `exchangeHandoff` (see below), me-ops, OIDC authorize/jwks/well-known, health probes |
-| **App** (deployment) | The running server-side app | Project secret | auth_attempts, challenges, `createHandoff`, `createSession`, `exchangeHandoff`, introspection |
+| **App** (deployment) | The running server-side app | Project secret | auth_attempts, challenges, `createHandoff`, `createSession`, `exchangeHandoff`, introspection; proposed bot-evidence exchange (ADR 019) |
 | **Operator** (CLI/CI/console) | The operator or automation | Project secret today; PATs/service users with the specced resource scopes later (token lifecycle ADR, PR #450) | schemas, flow definitions, project patch/query, users, teams, releases/deployments (ADR 035) |
 
 App and operator planes share the project secret today; they are named
@@ -249,10 +249,15 @@ publishable-key wiring only.
   paths no longer have an operator-capable bearer attached by infrastructure;
   this no longer depends on per-operation scope enforcement (#207), which
   remains required for the app and operator planes.
-- **ADR 019 interaction:** the secret-authenticated edge bot-verdict header is
-  an app-plane channel. SPA deployments without edge compute fall back to the
-  in-flow captcha gate and server-side signals; SSR deployments keep the
-  authenticated verdict channel.
+- **ADR 019 interaction (amended 2026-11-02):** customer bot evidence uses an
+  explicit authenticated app-plane exchange, `POST /api/v1/bot_protection/evidence`.
+  It returns an opaque action-bound receipt for the public flow submission.
+  Backend code verifies the incoming request's signal before calling that endpoint;
+  no project credential is injected into ordinary flow traffic, and no blind
+  credentialed public relay is exposed. `X-Zitadel-Bot-Evidence` carries only the
+  returned receipt. Unsigned verdict headers and browser claims have no authority.
+  Static SPA deployments can use the built-in worker or a configured challenge
+  provider without adding a secret-holding proxy. See ADR 019 for replay/scope rules.
 - **#310 is partially reverted in spirit:** proxies now restrict the project
   secret to `POST /sessions/exchange`; once the publishable-key path lands,
   proxied SPA traffic stops carrying it entirely. SSR middlewares keep the

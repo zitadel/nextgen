@@ -1,0 +1,21 @@
+{
+  "parameters": {
+    "algorithm": "PBKDF2/SHA-256",
+    "nonce": "798e8f97eb7c6c46a18626250437ef67",
+    "salt": "1ca468e95c5dd570b7d8047d8f663c80",
+    "cost": 5000,
+    "keyLength": 32,
+    "keyPrefix": "4829b78a43767a311e9b8880d1ade0ae",
+    "keySignature": "bfbfdea187ec6b0eb64e7ec8003c806dea27bcbb4c562a0ed7966d71e8964221",
+    "data": {
+      "attempt_id": "attempt_fixture",
+      "generation": 1,
+      "operation": "user.create",
+      "project_id": "project_fixture",
+      "requirement_id": "requirement_fixture"
+    },
+    "expiresAt": 1793746198
+  },
+  "counter": 309,
+  "derived_key": "4829b78a43767a311e9b8880d1ade0aefef52ef7186be4f3895050545e0bce0a"
+}

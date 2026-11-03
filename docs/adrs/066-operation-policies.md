@@ -373,8 +373,9 @@ every rule so a missing marker never means "disclose".
 - `deny`: at least one rule failed; the operation is rejected with the violated rules
 
 A third outcome, `require` (the operation is not yet permissible, these
-requirements are unmet, used to inject a step mid-flow), is not needed by any MVP
-operation. It returns as a per-rule field when the first assurance consumer lands.
+requirements are unmet, used to inject a step mid-flow), is not needed by the
+shipped password-setting consumer. Add it as a per-rule field with the first
+bot-admission or assurance consumer; it is not implemented by today's decision.
 
 Rules stay boolean predicates. What can grow is what a failed rule causes
 (`deny` today; `require`, `warn` or `audit` later) and named outputs of other
@@ -479,7 +480,7 @@ Each rule is then one boolean expression, and CEL is the fit for exactly that:
 | Latency | in-process, microseconds | in-process, microseconds; or a sidecar round-trip | native call (best) |
 | Second language in the product | none: OpenFGA conditions are already CEL, so a widened FGA profile ([ADR 032](032-permission-catalogs.md)) reuses it (best) | Rego alongside CEL | none |
 | Extensibility | developer-authored rules later, append-only, same evaluator | developer replaces the program | server release per change |
-| Tooling | no `opa test` equivalent: covered by a release-side test file and a server-side dry-run (see [Authoring](../design/policies/4-authoring.md#testing-not-built-yet)) | `opa test`, `opa fmt`, Regal, coverage (best) | Go tests |
+| Tooling | no `opa test` equivalent: covered by a release-side test file and a server-side dry-run (see [Authoring](../design/policies/4-authoring.md#testing)) | `opa test`, `opa fmt`, Regal, coverage (best) | Go tests |
 | Precedent | Kubernetes embedded CEL for in-tree policy and kept OPA as an external webhook; Google IAM Conditions, Firebase Rules, OpenFGA, SpiceDB, Envoy RBAC | CNCF-graduated, Gatekeeper, Conftest | n/a |
 
 The evaluator is [cel-go](https://github.com/cel-expr/cel-go), the same
@@ -685,6 +686,76 @@ than the link.
 ### Password specifics
 
 - [NIST SP 800-63B-4 password verifier requirements](https://pages.nist.gov/800-63-4/sp800-63b.html#passwordver): the at-least-64 maximum the domain cap meets, code-point counting after NFC, and the prohibition on composition rules. Its 15-character single-factor minimum is a value a project configures, not a server default.
+
+## Bot-admission consumer (amendment 2026-11-02)
+
+[ADR 019](019-captcha-gate-and-bot-signals.md) defines the evidence contract and
+selects ZITADEL-owned precomputed PBKDF2 with four immutable work profiles.
+It does not add arbitrary provider configuration to
+policy settings. A separate revisioned `bot_protection` resource holds provider
+connections, secret references, trusted backend sources and explicit fallbacks;
+the policy and that resource resolve from the same pinned deployment.
+
+The planned `user.create` / `auth.check` consumers introduce `require`, private
+rules whose thresholds are not disclosed in constraints, and audit mode. A
+boolean `require_bot_evidence` can accept only configured evidence types; an
+explicit `require_bot_challenge` cannot be waived by a backend verdict. Go builds
+a normalized trusted context; CEL neither fetches vendor signals nor verifies
+proofs. Server-derived self-service/provisioning context prevents an input field
+from becoming a bypass. The current boolean/integer setting types remain enough
+for the initial policies; provider objects and source lists belong to configuration.
+
+No policy instance still means no project policy. ADR 078's independent guards
+remain the baseline, and a policy cannot waive a hard refusal. Enforcement and
+one-use consumption live in the operation service, before expensive work, not
+only in a flow renderer. CAPTCHA evidence never counts as an authentication
+factor. Adaptive cost bands remain uncalibrated pending the real-device and
+integration measurements recorded with ADR 019.
+
+### Progressive PoW output
+
+The bot consumer also adds a named integer output, `pow_level`. The server feeds
+it a trusted prospective attempt ordinal from scoped/windowed security events and
+active execution reservations. A ZITADEL-defined CEL expression computes a level
+from project settings such as a PoW-free allowance and attempts per level. Go
+maps that level to a finite, calibrated work-profile table in the configured
+algorithm family and combines it with baseline guards; a hard denial always wins. The
+[worked design](../design/flowengine/bot-protection-plan.md#progressive-work-allocation-through-cel)
+shows ten PoW-free checks followed by doubling every five, with a ceiling and
+decay. These are examples, not shipped defaults or measured production bands.
+[ADR 019](019-captcha-gate-and-bot-signals.md#selected-construction-and-immutable-profiles)
+fixes four PBKDF2 profiles with 512/1,024/2,048/4,096 maximum trials and unchanged
+per-trial cost. Go saturates a valid requested level at the enabled ceiling,
+then enforces all guard floors; configuration cannot lower a guard requirement.
+Level zero skips only PoW, and still requires atomic execution admission.
+
+This is a template/decision extension, not a boolean rule with a different
+interpretation. An output declares its type, bounded result handling and setting
+dependencies, and may read multiple settings. Existing boolean rules retain
+one-setting/one-rule semantics. All dependencies must be supplied to activate an
+output; partial settings fail configuration validation, all omitted means off.
+Validate types, expression length, static/runtime evaluation cost, dependencies
+and compatibility just as for rules. Extend the existing rule-only usage checks
+to recognize output dependencies without allowing unused settings. Templates
+remain ZITADEL-defined; arbitrary project-authored CEL is not introduced here.
+
+CEL performs no counting, I/O, state mutation, cryptography or algorithm
+selection. Counts and curve settings are undisclosed policy data; the issued
+puzzle necessarily exposes its actual work parameters. Curve configuration may
+only tighten deployment guards. Unavailable context/evaluation fails the protected
+operation; it never grants the free band. Separate account/factor, principal and
+project budgets prevent a new flow ID from restarting the allowance.
+
+Strict free allowances need atomic admission reservations **before** expensive
+work, including when no PoW is required. Recounting only after a password hash
+cannot stop a concurrent burst from doing that work for free. ADR 078 owns the
+accounting; ADR 019 owns proof binding and single-use consumption. Work profiles
+and server memory/concurrency caps remain independent of CEL. Doubling a bounded
+search range can raise client work without doubling the server KDF's memory cost.
+The bot-protection resource selects the algorithm (PBKDF2 initially); CEL never
+chooses it. A later family supplies its own qualified level table and guard floors.
+Equal numeric levels in different families do not make their proofs interchangeable;
+ADR 019 defines exact profile binding and algorithm-change lifecycle.
 
 ## Alternatives rejected
 

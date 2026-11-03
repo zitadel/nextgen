@@ -1,0 +1,41 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": [
+    "//"
+  ],
+  "tasks": {
+    "matched": {
+      "cache": false,
+      "passThroughEnv": [
+        "POW_BENCH_NODE_MODULES",
+        "POW_BENCH_SAMPLES",
+        "POW_BENCH_BROWSERS",
+        "GOCACHE",
+        "GOMODCACHE",
+        "PLAYWRIGHT_BROWSERS_PATH"
+      ]
+    },
+    "run": {
+      "cache": false,
+      "passThroughEnv": [
+        "POW_BENCH_NODE_MODULES",
+        "GOCACHE",
+        "GOMODCACHE",
+        "PLAYWRIGHT_BROWSERS_PATH",
+        "POW_BENCH_SAMPLES",
+        "POW_BENCH_BROWSERS"
+      ]
+    },
+    "test": {
+      "cache": false,
+      "passThroughEnv": [
+        "POW_BENCH_NODE_MODULES",
+        "GOCACHE",
+        "GOMODCACHE",
+        "PLAYWRIGHT_BROWSERS_PATH",
+        "POW_BENCH_SAMPLES",
+        "POW_BENCH_BROWSERS"
+      ]
+    }
+  }
+}

@@ -27,7 +27,7 @@
 | Server | Enforces no limit. Eight operations declare `429` (`createProject`, `completeClaim`, `getClaimStatus`, `getClaimWindow`, `createGrant`, `createTeam`, `queryProjects`, `queryTeams`) and the API reference lists them as rate-limited; no handler returns it ([#1266](https://github.com/zitadel/nextgen/issues/1266)). |
 | Failed proofs | `recordProofFailure` stores the failure and emits a failed `auth.check` event; nothing reads either. [#1434](https://github.com/zitadel/nextgen/pull/1434) (open) adds a per-user password backoff that counts those events. |
 | Policies | The ADR 066 engine ([#1878](https://github.com/zitadel/nextgen/pull/1878) to [#2279](https://github.com/zitadel/nextgen/pull/2279)) guards `auth.factor.password.set` only. A policy has no server default: a project without an instance has no policy. |
-| Challenges | ADR 019's contract (built-in Altcha, a project's own captcha provider, `X-Zitadel-Risk-Signal`) is not wired: the runtime step carries no gates and the state machine refuses `gate_proofs` as unsupported. |
+| Challenges | ADR 019's contract (internal library-backed PoW, customer providers and scoped backend receipts) is not wired: the runtime step carries no gates and the state machine refuses `gate_proofs` as unsupported. |
 | Client address | `clientIP` believes the left-most `X-Forwarded-For` hop from any peer ([#802](https://github.com/zitadel/nextgen/issues/802)). |
 
 ### What the hosted cloud changes
@@ -215,36 +215,70 @@ What a guard does not count:
   template's bounds later, so no API that sets them ever has to be withdrawn,
   which #1356 made the condition for shipping #1434.
 
-### 5. Layer 4: one challenge contract, several signals
+#### Progressive work allocation (amendment 2026-11-02)
 
-> **Proposed amendment (2026-10-29), [ADR 084](084-hosted-cloud-business-systems.md) §5.**
-> The hosted cloud's own sign-in takes the option this section leaves open:
-> its console routes the sign-in widget's calls through a JavaScript function
-> (`apps/cloud-functions`), which runs `checkBotId()` on the two flow writes,
-> as a customer app on Vercel would. Until ADR 019's runtime reads the risk
-> signal, that function refuses a bad verdict, a block on the cloud's edge
-> where this section allows only a signal; ADR 084 keeps the choice open.
+An operation policy may request a PoW-free allowance followed by capped
+exponential work. ADR 066 adds a typed `pow_level` CEL output over trusted Go
+context. A finite operator profile table turns a level into work; policies cannot
+lower a guard floor or override a hard refusal. Ten free checks and doubling
+every five are an illustrative curve, not new server defaults. Scope, counted
+event, window/decay and successful-check handling are defined per operation;
+creating another flow must not reset them. The
+[worked plan](../design/flowengine/bot-protection-plan.md#progressive-work-allocation-through-cel)
+spells out the boundaries and test obligations.
 
-- ADR 019 stands. Its built-in Altcha proof-of-work is the default everywhere
-  and the whole answer for a self-hoster: no third-party account, no data
-  leaving the deployment, an HMAC check to verify. It is also how a guard
-  prices guesses: the difficulty grows with the guard's count, so a guesser
-  pays in CPU and the server holds nothing open. Any client can solve it, a
-  script included; it prices a guess, it does not prove a human.
-- A project that already uses Turnstile, hCaptcha or reCAPTCHA brings its own
-  keys (ADR 019).
-- Edge verdicts are signals, never blocks. A customer app on Vercel calls
-  `checkBotId()` in its SSR middleware and forwards the verdict as
-  `X-Zitadel-Risk-Signal`, which the server trusts only with the origin-scoped
-  secret (ADR 019 §2; ADR 036 keeps that channel for SSR deployments). A
-  Cloudflare bot score travels in the same header. A `clean` verdict can waive
-  a challenge and a `suspicious` one can require it. Deep Analysis is billed to
-  the customer's own Vercel account.
-- The hosted cloud's own login UI uses Altcha, as a self-hosted one does.
-  BotID there would need a JavaScript function in front of the Go service; it
-  stays an option, so the cloud keeps behaving like a self-hosted server.
-- The whole layer waits on ADR 019's runtime: gates on the runtime step,
-  `gate_proofs` verified through `auth_attempts`, and `<zl-captcha>`.
+For exact free allowances, extend the §3 lock/count/recount design with atomic
+execution reservations before expensive work. Count prior failed checks plus
+active reservations, never a failure and its retired reservation twice. Reserve
+PoW-free slots too; otherwise a concurrent burst all receives the cheapest band.
+Pending unsolved puzzles are not execution reservations and do not add password
+failures. At proof submission, re-evaluate the price, reserve execution and
+consume sufficient evidence atomically. Below-price proof gets a fresh bounded
+requirement; hard refusal wins regardless of proof.
+
+This explicitly adds bounded in-flight admission state to §3's event-based
+history, with crash leases/fencing and cleanup; it is not a cumulative counter
+or a write for every rejected request. Implementation must prove these properties
+across replicas/dialects before advertising an exact free allowance. Success may
+clear an account/factor streak but not project-wide abuse history. Budget issuance
+and identity churn independently so abandoned puzzles cannot buy cheap resets.
+
+### 5. Layer 4: one admission contract, several evidence sources
+
+Amended 2026-11-02 after the [matched stage 1 benchmark](../design/flowengine/pow-matched-benchmark-2026-11-02.md).
+[ADR 019](019-captcha-gate-and-bot-signals.md) is the protocol authority.
+
+- ZITADEL owns the internal admission service. The selected v1 protocol is ZITADEL-owned
+  precomputed PBKDF2 by default, with fixed per-trial cost and four bounded search ranges.
+  Matched tests against ALTCHA and Argon2id support this choice; ALTCHA is a
+  research dependency, and Argon2id is a candidate for a later registered family.
+  Algorithm selection belongs to bot configuration within operator limits; CEL
+  chooses a level within that family. Profiles from different families are not
+  interchangeable proof of work. No ALTCHA server or external account is needed.
+  Issuance and verification run inside ZITADEL; a browser worker or native client
+  solves it.
+  PoW prices an attempt, including an agent's attempt, and never proves humanity.
+- Verification is inexpensive, but precomputation makes new challenge issuance
+  costlier than a SHA target puzzle. Reuse pending challenges, reserve bounded
+  issuance capacity, limit refresh/new attempts and outstanding requirements,
+  and consume proofs once per protected operation. These are release prerequisites.
+  The v1 profile meanings stay fixed. Production level ceilings and adaptive
+  activation need real-device/load results. The benchmark is not a capacity test.
+- A project can bring provider keys or register a trusted backend. Backend
+  evidence uses ADR 019's explicit app-plane exchange, producing an action-bound
+  receipt carried by `X-Zitadel-Bot-Evidence`. Do not trust unsigned verdict
+  dictionaries or inject a project secret into arbitrary public proxy traffic.
+  A clean verdict can satisfy only requirements configured to accept it; a hard
+  guard refusal always wins. A verified crawler is not permission to sign up.
+- The hosted cloud uses BotID in the JavaScript cloud function (ADR 084), with
+  built-in PoW as a permitted fallback. Its current temporary `403` is replaced
+  when shared admission is implemented. Suspicious verdicts must still allow
+  rendering a challenge and submitting a valid solution through that proxy.
+  Direct API traffic is protected by the same operation service.
+- Runtime gates and `gate_proofs`, `<zl-captcha>`, auth-attempt delegation and the
+  persistent admission service are still required work. CAPTCHA uses separate
+  requirement state, not the existing factor-success path. Its success cannot
+  complete an auth attempt or increase session assurance.
 
 ### 6. The client's address
 
@@ -308,7 +342,7 @@ What a guard does not count:
    declarations no guard answers removed.
 4. #802's trusted proxies, so the address the server records and the
    allow-list reads is the client's.
-5. ADR 019's runtime with Altcha; the guards gain their challenge step, and
+5. ADR 019's runtime with the constrained internal PoW profile; the guards gain their challenge step, and
    the spraying job a switch to turn on.
 6. The self-hosting docs' reference edge configurations.
 7. The `auth.check` policy template, after ADR 066's undisclosed rules,

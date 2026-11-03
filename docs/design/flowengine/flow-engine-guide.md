@@ -450,7 +450,7 @@ The planned contract declares a keyed gate on a step:
   "name": "profile",
   "fields": ["email", "given_name", "family_name"],
   "gates": {
-    "captcha": { "kind": "captcha", "provider": "altcha" }
+    "captcha": { "kind": "captcha", "provider": "zitadel_pow" }
   },
   "actions": [
     {"name": "submit", "kind": "submit", "primary": true}

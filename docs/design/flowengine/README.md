@@ -34,9 +34,13 @@ This directory holds its design and architecture docs.
 | [Flow Engine — Developer Guide](flow-engine-guide.md) | In Review | Progressive walkthrough of building flows: steps, pivots, completion, sessions, error handling. |
 | [Session API](session-api.md) | Preliminary | Factor accumulation primitive. Assurance-level model is directional, not final. |
 | [User Schema Integration](user-schema.md) | Preliminary | How the flow engine and policy engine consume user schema annotations. |
-| [Bot Detection](bot-detection.md) | Preliminary | Composable captcha, fingerprinting, and risk evaluation. Depends on policy engine. |
+| [Bot Detection](bot-detection.md) | Proposed | Internal PoW, customer providers and backend evidence; shared operation admission, separate from authentication factors. |
 | [Template Security](template-security.md) | In Review | XSS attack vectors, trust boundaries, and defense-in-depth for LiquidJS + innerHTML rendering. |
 | **Research / Proposals** | | |
+| [Internal Bot Protection Plan](bot-protection-plan.md) | Stage 1 desktop complete | Selected own PBKDF2 protocol, customer evidence/providers, progressive CEL work allocation and staged cloud integration. |
+| [Bot Protection Implementation](bot-protection-implementation.md) | Planned | Ordered PRs for default PBKDF2, future algorithm selection, Passwap assessment and release gates. |
+| [PoW Benchmark](pow-benchmark-2026-11-02.md) | Measured 2026-11-02 | Original SHA-256 versus embedded ALTCHA comparison; preserved observations and limits. |
+| [Matched PoW Benchmark](pow-matched-benchmark-2026-11-02.md) | Measured 2026-11-02 | Own PBKDF2/Argon2id versus ALTCHA on identical puzzles, four cost levels, issuer memory and the v1 decision. |
 | [External Auth Factors](flow-engine-external-auth-factors.md) | Research | Generic extensibility for third-party MFA providers (Duo, Futurae, …). Not a design decision. |
 | [Capability Handshake](capability-handshake.md) | Research | Client/SDK ↔ server SemVer negotiation. Not implemented. |
 | **Tooling** | | |
@@ -125,8 +129,8 @@ graph TD
 
 5. **User schemas drive forms.** Registration fields, validation rules, and progressive profiling steps come from JSON Schema definitions — not hardcoded templates. When a schema adds a new field, every flow that references it picks it up automatically.
 
-6. **Flow state lives in the browser.** The flow engine stores its orchestration state (current step, collected data, history) in an encrypted HttpOnly cookie. The server is stateless between requests. Only factor verifications and user mutations touch the database. This means multiple flows can run on the same session over time (login, then step-up, then profiling) without accumulating server-side state.
+6. **Flow state lives in the browser.** The flow engine stores its orchestration state (current step, collected data, history) in an encrypted HttpOnly cookie. The server is stateless between requests. Security admission also keeps bounded requirements and execution reservations in shared storage (ADR 019); flow cookies do not prevent proof replay. This means multiple flows can run on the same session over time (login, then step-up, then profiling) without accumulating server-side state.
 
 7. **Assurance is graduated, not binary.** A session never says "I am sufficient." It says "I am at this assurance level." Whether that level is enough depends on who is asking. The same session might satisfy one application's requirements but not another's. This follows OIDC ACR (Authentication Context Class Reference) and NIST AAL (Authenticator Assurance Levels).
 
-8. **Bot detection is composable.** Captcha, device fingerprinting, behavioral signals, and rate limiting are independent inputs to a risk evaluator. Altcha (self-hosted proof-of-work) ships as the default with zero external dependencies. Admins can configure third-party providers (reCAPTCHA, hCaptcha, Turnstile) when needed.
+8. **Bot detection is composable.** ADR 019 selects ZITADEL-owned PBKDF2 work as the turnkey option, alongside customer providers and authenticated backend evidence. Runtime integration is planned; it is not shipped. Guards and operation policies decide which evidence is required, and fingerprints or behavioral telemetry are not prerequisites.

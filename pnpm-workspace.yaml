@@ -8,6 +8,10 @@ packages:
   - "tools/*"
 
 catalog:
+  "@noble/hashes": ^2.4.0
+  altcha-lib: ^2.8.0
+  esbuild: ^0.28.1
+  hash-wasm: ^4.12.0
   "@arethetypeswrong/cli": ^0.18.5
   "@angular/platform-server": ^22.2.3
   # Babel 7 for the Nuxt projects: Nuxt's sub-packages have optional peers on

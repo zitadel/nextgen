@@ -159,12 +159,29 @@
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       "inputs": ["$TURBO_ROOT$/scripts/go-lint.mjs", "$TURBO_ROOT$/biome.json", "$TURBO_ROOT$/biome-plugins/*.grit"]
     },
+    "check-pow-vectors": {
+      "inputs": [
+        "$TURBO_ROOT$/docs/design/flowengine/testdata/generate-pow-v1-vectors.mjs",
+        "$TURBO_ROOT$/docs/design/flowengine/testdata/pow-v1-vectors.json"
+      ]
+    },
+    "test-pow": {
+      "cache": false,
+      "dependsOn": ["check-pow-vectors"],
+      "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
+      "inputs": [
+        "$TURBO_ROOT$/internal/crypto/pow/**",
+        "$TURBO_ROOT$/docs/design/flowengine/testdata/**",
+        "$TURBO_ROOT$/go.mod",
+        "$TURBO_ROOT$/go.sum"
+      ]
+    },
     // The test binary embeds the console's dist. Listed directly and not only
     // through vet: turbo hashes every dependency's result, but the direct edge
     // keeps the intent visible, as in moon.yml.
     "test": {
       "cache": false,
-      "dependsOn": ["go-sources", "go-tests", "openapi", "format", "vet", "lint", "@zitadel/console#build"],
+      "dependsOn": ["go-sources", "go-tests", "openapi", "format", "vet", "lint", "check-pow-vectors", "@zitadel/console#build"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"]
     },
     // The database lanes talk to a database whose state no hash sees, so

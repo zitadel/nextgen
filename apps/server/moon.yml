@@ -204,6 +204,29 @@ tasks:
       cache: false
       runFromWorkspaceRoot: true
 
+  check-pow-vectors:
+    command: "node docs/design/flowengine/testdata/generate-pow-v1-vectors.mjs --check"
+    inputs:
+      - "/docs/design/flowengine/testdata/generate-pow-v1-vectors.mjs"
+      - "/docs/design/flowengine/testdata/pow-v1-vectors.json"
+    options:
+      runFromWorkspaceRoot: true
+
+  # The pure protocol package has no generated API, database or embedded UI
+  # dependency. A focused race/fuzz entry point keeps its feedback loop bounded.
+  test-pow:
+    command: "go test -race -timeout 60s ./internal/crypto/pow"
+    deps:
+      - "check-pow-vectors"
+    inputs:
+      - "/internal/crypto/pow/**"
+      - "/docs/design/flowengine/testdata/**"
+      - "/go.mod"
+      - "/go.sum"
+    options:
+      cache: false
+      runFromWorkspaceRoot: true
+
   test:
     command: "go"
     args:
@@ -217,6 +240,7 @@ tasks:
       - "format"
       - "vet"
       - "lint"
+      - "check-pow-vectors"
       # The test binary embeds the console's dist (//go:embed all:dist). Listed here
       # and not only reached through vet: vet has no outputs, so moon would not
       # propagate these builds through it for affected-task selection.

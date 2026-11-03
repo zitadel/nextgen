@@ -479,7 +479,13 @@ levels are currently satisfied." The consumer decides if that set is enough.
 | `otp_email` | `{ "code": "..." }` | Prior `user` factor + challenge | Possession factor → AAL2 (restricted by NIST) |
 | `idp` | `{ "intent_id": "...", "token": "..." }` | Prior `user` factor | Depends on IdP's own assurance level |
 | `recovery_code` | `{ "code": "..." }` | Prior `user` factor | Single-use, not counted toward assurance |
-| `captcha` | `{ "provider": "altcha", "salt": "...", "number": ... }` or `{ "provider": "recaptcha", "token": "..." }` | Challenge (from auth_attempt) | Bot detection signal, not an authentication factor |
+
+
+CAPTCHA is planned operation admission, not a factor. Auth-attempt endpoints
+may delegate its ceremony to the separate service in
+[ADR 019](../../adrs/019-captcha-gate-and-bot-signals.md). Built-in proof carries
+`protocol`, `challenge_id` and `derived_key`; it never adds assurance or completes
+an authentication attempt. Customer-provider proofs use the configured adapter.
 
 ## Shipped Storage Model
 

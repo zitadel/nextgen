@@ -48,8 +48,8 @@
   only; platform operators are human sessions (ADR 075).
 - A team has a name and no metadata. Its active members are all equal: there
   are no team roles.
-- No Stripe, HubSpot, queue or workflow code exists. ADR 078 §5 keeps the
-  cloud's login on Altcha and names BotID "an option" that needs a JavaScript
+- No Stripe, HubSpot, queue or workflow code exists. ADR 078 §5 originally kept the
+  cloud's login on Altcha and named BotID "an option" that needed a JavaScript
   function in front of the Go service.
 
 ### What the cloud needs, in this order
@@ -248,9 +248,14 @@ website's catch-all.
 - **A bad verdict** (`isBot` and not a verified bot) is refused with `403
   auth.bot_suspected` for now, because the server does not read a risk signal
   yet. That is a block, and ADR 078 §5 says verdicts are signals, never
-  blocks. Once ADR 019's runtime reads `X-Zitadel-Risk-Signal`, the function
-  forwards the verdict in it, under the origin-scoped secret, and stops
-  refusing (decided 2026-10-29).
+  blocks. Amended 2026-11-02: once ADR 019's admission service is available,
+  the function exchanges its verdict server-to-server for a scoped receipt,
+  forwards `X-Zitadel-Bot-Evidence`, and stops this temporary refusal. It never
+  injects the project secret into ordinary public flow requests. Suspicious
+  traffic can receive and solve the internal PoW fallback through the same hop;
+  a verified bot does not automatically get signup permission. Test direct API
+  bypass and both prefixed and legacy paths before production activation.
+  The original temporary-block decision was made 2026-10-29.
 - Basic checks only, which are free. Deep Analysis (US$1 per 1,000 checks on
   Pro) is a switch for an attack.
 - The verdict cannot be enforced anywhere else. `checkBotId()` needs a

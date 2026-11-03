@@ -1,4 +1,4 @@
-# ADR 021: Ordered Arrays for Step Fields, Actions, and Gates
+# ADR 021: Ordered Step Fields and Actions; Named Gates
 
 > **Status:** Accepted — 2026-06-05 (status updated 2026-08-11; originally Draft)
 > **Date:** 2026-06-05
@@ -6,16 +6,21 @@
 >
 > **Amendment (2026-08-11):** the ordered-array shape shipped for `fields` and
 > `actions` in both `flow-step.yaml` and `flow-definition-step.yaml`. `gates`
-> shipped as a map keyed by gate type — the array form was not adopted for
+> shipped as a map keyed by gate name — the array form was not adopted for
 > gates. `transitions` remains a dictionary as decided below.
 
 ## Decision
 
-The runtime step payload ([`flow-step.yaml`][flowstep]) and the definition step payload
-([`flow-definition-step.yaml`][flowdefstep]) serialize `fields`, `actions`, and `gates`
-as **ordered arrays of `{name, ...}` objects**, not as dictionaries keyed by name.
-`transitions` stays a dictionary — it is a pure outcome→target lookup with no
-rendering-order semantics.
+The runtime step payload ([`flow-step.yaml`][flowstep]) serializes `fields` and
+`actions` as ordered arrays of `{name, ...}` objects. The definition step
+([`flow-definition-step.yaml`][flowdefstep]) uses an ordered array for actions
+and retains `fields` as an ordered list of field names.
+
+**Amendment (2026-11-02):** reconcile the original decision with the shipped
+schema: `gates` is a dictionary keyed by gate **name**, such as `bot_check`;
+`captcha` is the gate's kind, not its key. `gate_proofs` uses those same names
+(ADR 019). Gate order does not convey admission semantics; all required gates
+must be satisfied. `transitions` also stays a dictionary, an outcome→target lookup.
 
 The default Liquid template needs two views of the same data: ordered iteration
 (`{% for f in fields %}`) to render the form, and lookup by name
@@ -43,7 +48,7 @@ arrays.
 
 ### Before / after
 
-Runtime step response — `step.fields`, `step.actions`, `step.gates`:
+Runtime step response — `step.fields` and `step.actions`:
 
 ```jsonc
 // Before — dicts keyed by name; JSON key order is non-deterministic.
@@ -73,7 +78,7 @@ Runtime step response — `step.fields`, `step.actions`, `step.gates`:
 }
 ```
 
-Flow definition step — same change on `actions` and `gates` (`fields` is already `[]string`,
+Flow definition step — same change on `actions` (`fields` is already `[]string`,
 `transitions` stays a dict):
 
 ```yaml
@@ -145,7 +150,7 @@ between renders: Go's `map` iteration is non-deterministic, and the ogen-generat
 marshaller ranges the map directly without sorting
 (`api/generated/oas_json_gen.go:8979`). The flow definition is authored with intended order,
 but the resolver and the wire shape drop it on the way out. Same shape, same problem, on
-`actions` and `gates`.
+`actions`. Gates remain name-keyed lookups.
 
 Three alternatives were considered:
 
@@ -174,7 +179,7 @@ of scope; no backwards-compatibility shims since there are no external consumers
 
 ## Future work
 
-If a future external consumer needs O(1) lookup on fields/actions/gates, they build a
+If a future external consumer needs O(1) lookup on fields/actions, they build a
 client-side index from the array — the wire shape stays array-only. The render-context
 `*_by_name` augmentation can be lifted into a shared helper if other templates want the
 same dual view.
