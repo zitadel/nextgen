@@ -26,6 +26,10 @@ func (allowAll) HandleOAuth2(ctx context.Context, _ oasapi.OperationName, _ oasa
 	return ctx, nil
 }
 
+func (allowAll) HandlePat(ctx context.Context, _ oasapi.OperationName, _ oasapi.Pat) (context.Context, error) {
+	return ctx, nil
+}
+
 // The request instruments that serve the API are the generated server's, so
 // this runs the generated server: one request per user id, which is what a
 // benchmark over many users did to the old `http.target` attribute. The

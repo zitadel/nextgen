@@ -3,6 +3,8 @@ package api
 import (
 	"context"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
@@ -11,9 +13,12 @@ import (
 	"github.com/ogen-go/ogen/ogenerrors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
+	"gopkg.in/yaml.v3"
+
 	api "github.com/zitadel/nextgen/internal/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
-	"gopkg.in/yaml.v3"
+	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
 )
 
 // fakeBearers verifies one token, as the platform's authorization server would.
@@ -149,4 +154,45 @@ func TestUserBearerRefusals(t *testing.T) {
 		_, err = requireSelf(ctx, api.NewOptProjectID(api.ProjectID("proj_other")))
 		assert.ErrorIs(t, err, domain.ErrSessionProjectMismatch())
 	})
+}
+
+// Through the real router, where ogen runs every bearer scheme an operation
+// lists against the one Authorization header: a person's token reaches an
+// operator operation and is refused on the app plane, and the project secret
+// reaches both. The handler is unimplemented, so a request that passed
+// security fails there instead, with anything but a 401.
+func TestBearerSchemesThroughTheRouter(t *testing.T) {
+	const secret = "a.five.part.secret.jwe"
+	tokens := servicemocks.NewMockTokenService(gomock.NewController(t))
+	tokens.EXPECT().IntrospectToken(gomock.Any(), secret).Return(&domain.Token{
+		ProjectID: "proj_1",
+		Type:      domain.TokenTypeProjectToken,
+		Scope:     []string{"project.write", "project.read"},
+	}, nil).AnyTimes()
+	security := NewSecurityHandler(tokens).WithPlatformProject(domain.PlatformProjectID).WithUserBearers(fakeBearers{})
+	server, err := api.NewServer(api.UnimplementedHandler{}, security, api.WithErrorHandler(OgenErrorHandler))
+	require.NoError(t, err)
+
+	for _, tc := range []struct {
+		name, path, token string
+		passes            bool
+	}{
+		{"a person's token on an operator operation", "/deployments?project_id=proj_1", testBearer, true},
+		{"a person's token on the app plane", "/auth_attempts/att_1", testBearer, false},
+		{"the secret on an operator operation", "/deployments?project_id=proj_1", secret, true},
+		{"the secret on the app plane", "/auth_attempts/att_1", secret, true},
+		{"a token neither scheme knows", "/deployments?project_id=proj_1", "other.jwt.token", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, tc.path, nil)
+			req.Header.Set("Authorization", "Bearer "+tc.token)
+			rec := httptest.NewRecorder()
+			server.ServeHTTP(rec, req)
+			if tc.passes {
+				assert.NotEqual(t, http.StatusUnauthorized, rec.Code, rec.Body.String())
+			} else {
+				assert.Equal(t, http.StatusUnauthorized, rec.Code, rec.Body.String())
+			}
+		})
+	}
 }
