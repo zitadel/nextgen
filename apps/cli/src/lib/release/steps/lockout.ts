@@ -230,7 +230,9 @@ async function ssoWarnings(
   const read = await readUsers(
     ctx,
     [
-      ...served.map((value) => ({ field: "schema_object_type", operation: "not_equals", value })),
+      ...served.map(
+        (value): UserFilter => ({ field: "schema_object_type", operation: "not_equals", value }),
+      ),
       ACTIVE,
     ],
     share,
