@@ -352,6 +352,12 @@ export default class Claim extends EnvironmentCommand {
   ): Promise<{ team_id: string; claimed_at: string; dashboard_url: string }> {
     return pRetry(
       async (attempt) => {
+        const isExpired = Date.now() >= deadline;
+
+        if (isExpired) {
+          throw new NotFinished(attempt - 1);
+        }
+
         try {
           const status = await client.getClaimStatus(projectId, { challenge_id: challengeId });
           if (status.status === "completed") {

@@ -43,6 +43,71 @@ function shellWords(command: string): string[] {
   );
 }
 
+/** What a command's words hold after its name: how many arguments, and the first thing wrong with them. */
+type Walk = Readonly<{ positional: number; problem?: string }>;
+
+/** The flag a word names, and whether the word carries its own value (`--name=value`). */
+function flagFor(
+  token: string,
+  flags: readonly FlagReference[],
+): Readonly<{ flag?: FlagReference; isInline: boolean }> {
+  const isLong = token.startsWith("--");
+  const spelled = isLong ? (token.slice(2).split("=")[0] as string) : token.slice(1);
+  const isInline = isLong && token.includes("=");
+  const named =
+    flags.find(({ name }) => {
+      return name === spelled;
+    }) ??
+    flags.find(({ name, allowNo }) => {
+      return allowNo && `no-${name}` === spelled;
+    });
+  const flag = isLong
+    ? named
+    : flags.find(({ char }) => {
+        return char === spelled;
+      });
+
+  return { flag, isInline };
+}
+
+/**
+ * Reads a command's words in order: an option takes the word after it, `--`
+ * makes every word after it an argument, and a template's `...` stands for the
+ * rest, which it does not spell.
+ */
+function walk(
+  reference: CommandReference,
+  flags: readonly FlagReference[],
+  tokens: readonly string[],
+  seen: ReadonlySet<string> = new Set(),
+  positional = 0,
+): Walk {
+  const [token, ...rest] = tokens;
+
+  if (token === undefined || token === "...") {
+    return { positional };
+  }
+  if (token === "--") {
+    return { positional: positional + rest.length };
+  }
+  if (!token.startsWith("-") || token === "-") {
+    return walk(reference, flags, rest, seen, positional + 1);
+  }
+
+  const { flag, isInline } = flagFor(token, flags);
+
+  if (flag === undefined) {
+    return { positional, problem: `${reference.id} takes no ${token}` };
+  }
+  if (!flag.multiple && seen.has(flag.name)) {
+    return { positional, problem: `${reference.id} takes --${flag.name} once` };
+  }
+
+  const remaining = flag.type === "option" && !isInline ? rest.slice(1) : rest;
+
+  return walk(reference, flags, remaining, new Set([...seen, flag.name]), positional);
+}
+
 /**
  * Why `command` would not run as the CLI reads it, or `undefined` when it
  * would: it names a command, every flag is one that command takes, a flag
@@ -68,45 +133,16 @@ function problemWith(command: string): string | undefined {
     return `names no command: ${rest.slice(0, 2).join(" ")}`;
   }
   const flags = [...reference.flags, ...REFERENCE.globalFlags];
-  const seen = new Map<string, number>();
-  // Walks the tokens by hand: an option takes the token after it, which the walk then skips.
-  let positional = 0;
   const tokens = rest.slice(reference.id.split(" ").length);
-  for (let at = 0; at < tokens.length; at++) {
-    const token = tokens[at] as string;
-    // A template's `...` stands for the rest, which it does not spell.
-    if (token === "...") {
-      break;
-    }
-    if (token === "--") {
-      positional += tokens.length - at - 1;
-      break;
-    }
-    if (!token.startsWith("-") || token === "-") {
-      positional++;
-      continue;
-    }
-    const [spelled, inline] = token.startsWith("--")
-      ? [token.slice(2).split("=")[0] as string, token.includes("=")]
-      : [token.slice(1), false];
-    const flag = token.startsWith("--")
-      ? (flags.find(({ name }) => name === spelled) ??
-        flags.find(({ name, allowNo }) => allowNo && `no-${name}` === spelled))
-      : flags.find(({ char }) => char === spelled);
-    if (flag === undefined) {
-      return `${reference.id} takes no ${token}`;
-    }
-    seen.set(flag.name, (seen.get(flag.name) ?? 0) + 1);
-    if (!flag.multiple && (seen.get(flag.name) ?? 0) > 1) {
-      return `${reference.id} takes --${flag.name} once`;
-    }
-    if (flag.type === "option" && !inline) {
-      at++;
-    }
+  const walked = walk(reference, flags, tokens);
+
+  if (walked.problem !== undefined) {
+    return walked.problem;
   }
-  if (!reference.variadic && positional > reference.args.length) {
-    return `${reference.id} takes ${reference.args.length} argument(s), not ${positional}`;
+  if (!reference.variadic && walked.positional > reference.args.length) {
+    return `${reference.id} takes ${reference.args.length} argument(s), not ${walked.positional}`;
   }
+
   return undefined;
 }
 
