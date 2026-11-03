@@ -52,14 +52,16 @@ export function readPort(value: string): Parsed<number> {
  * A command that reports which server it was about needs that before the run's
  * context is built, so its first event names the right server, and again while
  * it works. Reading it twice would ask the filesystem twice for the same
- * answer, so the first read is kept.
+ * answer, so each directory's first read is kept — keyed by directory, since
+ * one asked about is not evidence about another.
  */
 export function startedServer<T>(read: (cwd: string) => Promise<T | undefined>) {
-  let found: Promise<T | undefined> | undefined;
+  const found = new Map<string, Promise<T | undefined>>();
   return {
     of: (cwd: string): Promise<T | undefined> => {
-      found ??= read(cwd);
-      return found;
+      const reading = found.get(cwd) ?? read(cwd);
+      found.set(cwd, reading);
+      return reading;
     },
   };
 }

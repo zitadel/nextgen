@@ -25,3 +25,11 @@ describe("byName", () => {
     });
   });
 });
+
+describe("byName against two names that read the same", () => {
+  it("refuses them, rather than leave one of them unreadable", () => {
+    expect(() => {
+      byName({ "page-token": "a", pageToken: "b" });
+    }).toThrow("read as pageToken");
+  });
+});

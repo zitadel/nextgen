@@ -26,9 +26,15 @@ export function named(name: string): string {
 
 /** `values` keyed as {@link Named} spells each of its names. */
 export function byName<Values extends object>(values: Values): ByName<Values> {
-  return Object.fromEntries(
-    Object.entries(values).map(([name, value]) => {
-      return [named(name), value];
-    }),
-  ) as ByName<Values>;
+  const read: Record<string, unknown> = {};
+  for (const [name, value] of Object.entries(values)) {
+    const key = named(name);
+    // Two names that read the same would leave one of them unreadable, and a
+    // flag nothing can read is a flag that silently does nothing.
+    if (Object.hasOwn(read, key)) {
+      throw new Error(`Two names are both read as ${key}; one of them must be renamed`);
+    }
+    read[key] = value;
+  }
+  return read as ByName<Values>;
 }

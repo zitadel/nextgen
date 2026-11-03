@@ -6,7 +6,6 @@ import {
   readRuntimeMetadata,
 } from "../lib/local-server/runtime";
 import { LocalServer } from "../lib/local-server/server";
-import { resolveCwd } from "../lib/paths";
 import { startedServer } from "./local-server/port";
 import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
 
@@ -26,8 +25,7 @@ export default class Stop extends BaseCommand {
 
   private readonly started = startedServer(readRuntimeMetadata);
 
-  protected override async sourceOf(flags: Record<string, unknown>): Promise<string> {
-    const cwd = resolveCwd(typeof flags.cwd === "string" ? flags.cwd : undefined);
+  protected override async sourceOf(_flags: unknown, cwd: string): Promise<string> {
     return (await this.started.of(cwd))?.server_url ?? DEFAULT_LOCAL_SERVER_URL;
   }
 

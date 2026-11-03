@@ -28,7 +28,6 @@ import {
   type RuntimeMetadata,
 } from "../../lib/local-server/runtime";
 import { LocalServer } from "../../lib/local-server/server";
-import { resolveCwd } from "../../lib/paths";
 import {
   type Admitted,
   BaseCommand,
@@ -119,31 +118,38 @@ export default class Doctor extends Destructive(BaseCommand) {
     resolveServer: false,
   };
 
-  protected override async sourceOf(flags: Record<string, unknown>): Promise<string> {
-    const asked = flags as Admitted<typeof Doctor>["flags"];
-    const cwd = resolveCwd(typeof flags.cwd === "string" ? flags.cwd : undefined);
-    const hosted = await this.hostedServerWithoutLocalRuntime(asked, cwd);
-    return hosted ?? localServerUrl(await this.portOf(asked, cwd));
-  }
-
   /**
-   * The port doctor checks: the one asked for, else the one this directory
-   * records, else the default. An unreadable record only costs the hint; the
-   * read `execute` makes reports it.
+   * What doctor is about, worked out once: the port it checks and the hosted
+   * server of a project that runs no local one. It is resolved before the
+   * context is built, so the run's first event names the same server as its
+   * last, and `execute` reads what was found rather than asking again.
    */
-  private async portOf(
-    flags: Admitted<typeof Doctor>["flags"],
-    cwd: string = this.cwd,
-  ): Promise<number> {
+  private checking:
+    | Readonly<{
+        port: number;
+        hostedServer: string | undefined;
+      }>
+    | undefined;
+
+  protected override async sourceOf(flags: Record<string, unknown>, cwd: string): Promise<string> {
+    const asked = flags as Admitted<typeof Doctor>["flags"];
+    // An unreadable record only costs the port hint; the read `execute` makes
+    // reports it.
     const hint = await readNearestRuntimeMetadata(cwd).catch(() => {
       return undefined;
     });
-    return flags.port ?? hint?.runtime.port ?? DEFAULT_LOCAL_SERVER_PORT;
+    this.checking = {
+      port: asked.port ?? hint?.runtime.port ?? DEFAULT_LOCAL_SERVER_PORT,
+      hostedServer: await this.hostedServerWithoutLocalRuntime(asked, cwd),
+    };
+    return this.checking.hostedServer ?? localServerUrl(this.checking.port);
   }
 
   protected async execute({ flags }: Admitted<typeof Doctor>): Promise<JsonEnvelope> {
-    const port = await this.portOf(flags);
-    const hostedServer = await this.hostedServerWithoutLocalRuntime(flags);
+    const { port, hostedServer } = this.checking ?? {
+      port: flags.port ?? DEFAULT_LOCAL_SERVER_PORT,
+      hostedServer: undefined,
+    };
     const nearest = await readNearestRuntimeMetadata(this.cwd);
     const existingRuntime = nearest?.runtime;
     const parentRuntimeDir =

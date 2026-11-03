@@ -3,7 +3,6 @@ import { z } from "zod";
 
 import { readNearestRuntimeMetadata } from "../../lib/local-server/runtime";
 import { LocalServer } from "../../lib/local-server/server";
-import { resolveCwd } from "../../lib/paths";
 import { startedServer } from "../local-server/port";
 import {
   LOG_LEVELS,
@@ -86,11 +85,8 @@ export default class Logs extends BaseCommand {
 
   private readonly started = startedServer(readNearestRuntimeMetadata);
 
-  protected override async sourceOf(flags: Record<string, unknown>): Promise<string | undefined> {
-    const found = await this.started.of(
-      resolveCwd(typeof flags.cwd === "string" ? flags.cwd : undefined),
-    );
-    return found?.runtime.server_url;
+  protected override async sourceOf(_flags: unknown, cwd: string): Promise<string | undefined> {
+    return (await this.started.of(cwd))?.runtime.server_url;
   }
 
   protected async execute({ flags }: Admitted<typeof Logs>): Promise<JsonEnvelope> {

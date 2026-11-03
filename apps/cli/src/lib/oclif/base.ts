@@ -255,10 +255,14 @@ export abstract class BaseCommand extends Interruptible(Command) {
    * The server this run is about, where the command knows it before any work:
    * the one a local runtime's record names, say. It is resolved before the
    * context is built, so every event this run reports — the first one included
-   * — classifies the same invocation the same way. A command that learns its
-   * server later sets `this.meta.source` when it does.
+   * — classifies the same invocation the same way. `cwd` is the directory the
+   * run addresses, resolved already, because `this.cwd` is not set this early.
+   * A command that learns its server later sets `this.meta.source` when it does.
    */
-  protected async sourceOf(_flags: Record<string, unknown>): Promise<string | undefined> {
+  protected async sourceOf(
+    _flags: Record<string, unknown>,
+    _cwd: string,
+  ): Promise<string | undefined> {
     return undefined;
   }
 
@@ -274,7 +278,10 @@ export abstract class BaseCommand extends Interruptible(Command) {
       throw asRaised(error);
     });
     const flags = byName(parsed.flags);
-    const source = await this.sourceOf(flags);
+    const source = await this.sourceOf(
+      flags,
+      resolveCwd(typeof flags.cwd === "string" ? flags.cwd : undefined),
+    );
     await this.toMeta(flags, {
       ...this.command.meta,
       ...(source === undefined ? {} : { source }),
@@ -627,19 +634,14 @@ export abstract class BaseCommand extends Interruptible(Command) {
 /**
  * oclif rewrites the message of an error a flag's `parse` threw, prefixing the
  * flag and appending its own help line. A refusal reads the same wherever it
- * was raised, so the message it was given is put back.
+ * was raised, so the message it was given is put back — read from the error
+ * itself rather than matched out of oclif's wording, which is not ours.
  */
-const PARSE_PREFIX = /^Parsing --\S+ \n\t([\s\S]*)\nSee more help with --help$/;
-
 function asRaised(error: unknown): unknown {
-  if (!(error instanceof ZitadelError)) {
+  if (!(error instanceof ZitadelError) || error.message === error.raised) {
     return error;
   }
-  const raised = PARSE_PREFIX.exec(error.message)?.[1];
-  if (raised === undefined) {
-    return error;
-  }
-  return new ZitadelError(error.code, raised, {
+  return new ZitadelError(error.code, error.raised, {
     hint: error.hint,
     nextCommands: error.nextCommands,
     details: error.details,

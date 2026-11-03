@@ -25,7 +25,11 @@ const LIMIT_FLAG: Refused<number> = {
   schema: whole.pipe(z.number().min(LIMIT_MIN).max(LIMIT_MAX)),
   refusal: {
     message: "{value} is not a valid {input}",
-    hint: "Use a whole number from 1 to 100.",
+    hint: "Use a whole number from {min} to {max}.",
+  },
+  values: {
+    min: LIMIT_MIN,
+    max: LIMIT_MAX,
   },
 };
 

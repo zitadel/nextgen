@@ -115,7 +115,10 @@ export const nonBlankArg = Args.custom<string>({
 /** The server a command is about: `local`, or an http(s) URL, as it was typed. */
 export const serverFlag = Flags.custom<string>({
   parse: reads({
-    schema: z.union([z.literal("local"), z.url({ protocol: /^https?$/ })]),
+    schema: z
+      .string()
+      .trim()
+      .pipe(z.union([z.literal("local"), z.url({ protocol: /^https?$/ })])),
     refusal: {
       message: 'Invalid server "{value}"',
       hint: "Use `local`, or a URL like https://acme.zitadel.cloud.",

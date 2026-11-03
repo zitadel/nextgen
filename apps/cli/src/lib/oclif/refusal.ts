@@ -4,8 +4,7 @@ import type { SuggestedCommand } from "../suggestion";
 /**
  * How a command refuses, written once as text. Every placeholder is written
  * `{name}` and filled from the values the refusal is raised with: a flag, an
- * argument, or whatever the check that raised it hands over. A refusal with
- * a placeholder that has no value is a defect in the command, so it throws.
+ * argument, or whatever the check that raised it hands over.
  */
 export type Refusal = Readonly<{
   code?: ZitadelErrorCode;
@@ -20,18 +19,27 @@ export type Placeholders = Readonly<Record<string, unknown>>;
 
 const PLACEHOLDER = /\{([\w-]+)\}/g;
 
-/** `template` with each `{name}` replaced by the value `values` holds for it. */
+/**
+ * `template` with each `{name}` replaced by the value `values` holds for it.
+ *
+ * A placeholder with no value is left as it was written. It is a defect in the
+ * refusal, but the person is being refused something, and a thrown error here
+ * would lose the code that says why and answer with an unexplained failure
+ * instead; the wording reads oddly and the refusal still lands.
+ */
 export function interpolate(template: string, values: Placeholders): string {
-  return template.replace(PLACEHOLDER, (_placeholder, name: string) => {
+  return template.replace(PLACEHOLDER, (placeholder, name: string) => {
     const value = values[name];
-    if (value === undefined) {
-      throw new Error(`The placeholder {${name}} in "${template}" has no value`);
-    }
-    return String(value);
+    return value === undefined ? placeholder : String(value);
   });
 }
 
 const WHOLE_PLACEHOLDER = /^\{([\w-]+)\}$/;
+
+function isPlain(value: object): boolean {
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+}
 
 /**
  * `details` with each string filled in. A string that is only a placeholder
@@ -48,7 +56,9 @@ function fill(details: unknown, values: Placeholders): unknown {
   if (Array.isArray(details)) {
     return details.map((one) => fill(one, values));
   }
-  if (typeof details === "object" && details !== null) {
+  // Only a plain object is rebuilt: anything else — a Date, a Map, a class —
+  // would come apart into its entries and lose what it held.
+  if (typeof details === "object" && details !== null && isPlain(details)) {
     return Object.fromEntries(
       Object.entries(details).map(([key, one]) => [key, fill(one, values)]),
     );
@@ -67,16 +77,18 @@ export function refusalError(
   values: Placeholders,
   suggest?: (command: string) => SuggestedCommand,
 ): ZitadelError {
-  if (refusal.next !== undefined && suggest === undefined) {
-    throw new Error(
-      `The refusal "${refusal.message}" names next commands but nothing to suggest them with`,
-    );
-  }
+  // A refusal raised where no run exists, such as while a flag parses, has
+  // nothing to build a suggestion with. It goes without its follow-ups rather
+  // than throwing, which would cost the refusal the code that says why.
+  const suggested =
+    suggest === undefined
+      ? undefined
+      : refusal.next?.map((command) => {
+          return suggest(interpolate(command, values));
+        });
   return new ZitadelError(refusal.code ?? "E_VALIDATION", interpolate(refusal.message, values), {
     hint: refusal.hint === undefined ? undefined : interpolate(refusal.hint, values),
-    nextCommands: refusal.next?.map(
-      (command) => suggest?.(interpolate(command, values)) as SuggestedCommand,
-    ),
+    nextCommands: suggested,
     details: fill(refusal.details, values),
   });
 }

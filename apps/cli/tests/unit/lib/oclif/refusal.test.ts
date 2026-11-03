@@ -18,8 +18,11 @@ describe("interpolate", () => {
     expect(interpolate("{a}{a}", { a: "x" })).toBe("xx");
   });
 
-  it("refuses a placeholder that has no value", () => {
-    expect(() => interpolate("{missing}", {})).toThrow("The placeholder {missing}");
+  it("leaves a placeholder that has no value as it was written", () => {
+    // A refusal with a placeholder nothing fills is a defect in its wording,
+    // but the person is still being refused: throwing here would cost the
+    // error the code that says why.
+    expect(interpolate("from {min} to {max}", { min: 1 })).toBe("from 1 to {max}");
   });
 });
 
@@ -94,10 +97,11 @@ describe("refusalError without a way to suggest", () => {
     expect(refusalError({ message: "No" }, {}).message).toBe("No");
   });
 
-  it("refuses to raise one that names a next command", () => {
-    expect(() => refusalError({ message: "No", next: ["start"] }, {})).toThrow(
-      "names next commands",
-    );
+  it("raises one that names a next command without its follow-ups", () => {
+    const error = refusalError({ code: "E_CONFLICT", message: "No", next: ["start"] }, {});
+
+    expect(error.code).toBe("E_CONFLICT");
+    expect(error.nextCommands).toBeUndefined();
   });
 });
 
@@ -121,5 +125,15 @@ describe("refusalError details", () => {
       missing: ["a", "b"],
       note: "see column",
     });
+  });
+});
+
+describe("refusalError's details", () => {
+  it("keeps a value that is not plain data as it is", () => {
+    const at = new Date("2026-01-01T00:00:00.000Z");
+
+    const error = refusalError({ message: "No", details: { at } }, {});
+
+    expect(error.details).toEqual({ at });
   });
 });

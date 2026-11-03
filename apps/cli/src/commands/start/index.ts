@@ -17,7 +17,6 @@ import {
   type RuntimeMetadata,
 } from "../../lib/local-server/runtime";
 import { LocalServer } from "../../lib/local-server/server";
-import { resolveCwd } from "../../lib/paths";
 import {
   type Admitted,
   BaseCommand,
@@ -60,17 +59,16 @@ export default class Start extends BaseCommand {
 
   private readonly recorded = startedServer(peekRuntimeMetadata);
 
-  protected override async sourceOf(flags: Record<string, unknown>): Promise<string> {
-    return localServerUrl(await this.portOf(flags));
+  protected override async sourceOf(flags: Record<string, unknown>, cwd: string): Promise<string> {
+    return localServerUrl(await this.portOf(flags, cwd));
   }
 
   /**
    * Where the server will be, as far as is known before one is chosen: the
    * port asked for, else the one this directory already has.
    */
-  private async portOf(flags: Record<string, unknown>): Promise<number> {
+  private async portOf(flags: Record<string, unknown>, cwd = this.cwd): Promise<number> {
     const asked = typeof flags.port === "number" ? flags.port : undefined;
-    const cwd = resolveCwd(typeof flags.cwd === "string" ? flags.cwd : undefined);
     return asked ?? (await this.recorded.of(cwd))?.port ?? DEFAULT_LOCAL_SERVER_PORT;
   }
 
