@@ -15,7 +15,8 @@ reclassified until it is one.
   `src/**` and names the rule, beside the module that owns it:
   `layering.test.ts` for what `lib/oclif` may import, `names-declared.test.ts`
   for a flag's two spellings, `refusal-wording.test.ts` for a placeholder
-  nothing fills. Prefer a GritQL rule in `biome-plugins/` where the pattern is
+  nothing fills, `flags-declared.test.ts` for a `Refused` a command's class
+  names anywhere but the `reads` its flag applies it with. Prefer a GritQL rule in `biome-plugins/` where the pattern is
   syntactic, and keep each rule in one of the two, never both.
 - Unit tests own all detail: wording, key order, classification, renderer
   output, validation messages, id prefixes, envelope fields. A spec never
