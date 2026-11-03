@@ -137,12 +137,13 @@ function CloudPlans({ catalog }: { catalog: Catalog }) {
         includes={`All ${free.label} features, plus:`}
         features={[
           "Conditional policies and delegated administration",
-          `${short(pro.limits.requests_per_month_per_account)} requests a month, then extra requests`,
+          `${short(pro.limits.requests_per_month_per_account)} API requests a month, then extra API requests`,
+          "Custom lockout, captcha, session and rate-limit settings",
           "Managed email and SMS",
           "Remove the Zitadel mark",
           `${pro.event_retention_days} days of audit events`,
           ...(pro.sla
-            ? [`${pro.sla.target_percent}% availability ${pro.sla.credits ? "SLA" : "target"}`]
+            ? [`${pro.sla.target_percent}% uptime ${pro.sla.credits ? "SLA" : "target"}`]
             : []),
           capitalize(proSupport),
         ]}

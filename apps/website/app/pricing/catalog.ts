@@ -91,6 +91,8 @@ export type Meter = {
   id: string;
   label: string;
   kind: "users" | "activity" | "gauge";
+  /** One counted unit, singular: user, token, check. */
+  unit?: string;
   /** What one count is. */
   counts: string;
   /** What counts once a month for an enterprise integration. */
@@ -201,8 +203,8 @@ export function meterPrice(meter: Meter): string[] {
   if (!price) return ["Never billed"];
   switch (price.model) {
     case "per_unit": {
-      const per = meter.kind === "users" ? "per user" : "per unit";
-      const lines = [price.display ?? `${dollars(price.unit_amount)} ${per}`];
+      const per = meter.unit ?? (meter.kind === "users" ? "user" : "unit");
+      const lines = [price.display ?? `${dollars(price.unit_amount)} per ${per}`];
       const most = mostPer(meter);
       if (most !== undefined) {
         lines.push(`At most ${dollars(most)} per ${meter.counted_per?.key} a month`);

@@ -127,8 +127,13 @@ describe("free security and account-wide packages", () => {
       expect(words(row.cells.pro), row.label).toBe("Included Planned");
     }
     const intelligence = shield.find((row) => row.source === "threat_intel_users")!;
-    expect(words(intelligence.cells.free)).toBe("10K / month included");
-    expect(words(intelligence.cells.pro)).toBe("10K / month included Then $0.003 per user");
+    expect(words(intelligence.cells.free)).toBe("10K users / month included");
+    expect(words(intelligence.cells.pro)).toBe("10K users / month included Then $0.003 per user");
+  });
+
+  it("names what every priced meter counts, so no cell shows a bare number", () => {
+    for (const meter of catalog.meters.filter((entry) => entry.price !== null))
+      expect(meter.unit, meter.id).toMatch(/^[a-z]+$/);
   });
 
   it("groups rows by what they are, never by who uses them", () => {
@@ -148,7 +153,7 @@ describe("free security and account-wide packages", () => {
   });
 
   it("reserves branding removal for paid plans", () => {
-    const row = rows.find((entry) => entry.label === "Hide the Zitadel mark")!;
+    const row = rows.find((entry) => entry.label === "Hide the Zitadel mark on your login")!;
     expect(row.cells.free.kind).toBe("no");
     expect(row.cells.pro.kind).toBe("yes");
     expect(row.cells.enterprise.kind).toBe("yes");
@@ -174,7 +179,7 @@ describe("free security and account-wide packages", () => {
   });
 
   it("does not advertise Pro's availability target as a contractual SLA", () => {
-    const row = rows.find((entry) => entry.label === "Availability commitment")!;
+    const row = rows.find((entry) => entry.label === "Uptime commitment")!;
     expect(words(row.cells.pro)).toBe("99.9% target No service credits");
     expect(words(row.cells.enterprise)).toBe("99.95% SLA With service credits");
     expect(words(rows.find((entry) => entry.source === "sla_9995")!.cells.enterprise)).toBe(

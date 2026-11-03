@@ -60,7 +60,10 @@ function subgroup(title: string, rows: Row[]): Row[] {
 export function meterCell(meter: Meter, plan: PlanId): Cell {
   if (meter.plans && !meter.plans.includes(plan)) return NO;
   if (plan === "enterprise") return CUSTOM;
-  const included = meter.allowance ? `${short(meter.allowance)} / month included` : undefined;
+  const units = meter.unit ? ` ${meter.unit}s` : "";
+  const included = meter.allowance
+    ? `${short(meter.allowance)}${units} / month included`
+    : undefined;
   if (plan === "free") return included ? text(included) : NO;
   const [price = "", ...more] = meterPrice(meter);
   return included ? text(included, [`Then ${price}`, ...more]) : text(price, more);
@@ -148,14 +151,14 @@ export function compareGroups(catalog: Catalog): Group[] {
           cells: each((plan) => text(regionList(plans[plan].regions.selection))),
         },
         {
-          label: requests.label,
+          label: `Included ${requests.label}`,
           source: requests.id,
           cells: {
-            free: text(`${free.limits.requests_per_second_per_project} RPS per project`, [
-              `${short(free.limits.requests_per_month_per_account)} / month per account`,
+            free: text(`${free.limits.requests_per_second_per_project} per second per project`, [
+              `${short(free.limits.requests_per_month_per_account)} a month per account`,
             ]),
-            pro: text(`${pro.limits.requests_per_second_per_project} RPS per project`, [
-              `${short(pro.limits.requests_per_month_per_account)} / month per account`,
+            pro: text(`${pro.limits.requests_per_second_per_project} per second per project`, [
+              `${short(pro.limits.requests_per_month_per_account)} a month per account`,
             ]),
             enterprise: CUSTOM,
           },
@@ -164,11 +167,11 @@ export function compareGroups(catalog: Catalog): Group[] {
         meterRow("email_messages"),
         meterRow("sms_messages"),
         {
-          label: "Dev inbox and your own email provider",
+          label: "Dev inbox for testing, or your own email provider",
           cells: each((plan) => (plans[plan].delivery_modes.includes("own_provider") ? YES : NO)),
         },
         {
-          label: "Hide the Zitadel mark",
+          label: "Hide the Zitadel mark on your login",
           cells: each((plan) => (plans[plan].attribution_mark === "hideable" ? YES : NO)),
         },
         lineRow("dedicated_infrastructure"),
@@ -203,7 +206,7 @@ export function compareGroups(catalog: Catalog): Group[] {
       title: "Audit & logs",
       rows: [
         {
-          label: "Audit events kept",
+          label: "Audit log retention",
           cells: each((plan) => text(`${plans[plan].event_retention_days} days`)),
         },
         ...packageRows("compliance"),
@@ -225,7 +228,7 @@ export function compareGroups(catalog: Catalog): Group[] {
         lineRow("tam_hours"),
         lineRow("private_slack"),
         {
-          label: "Availability commitment",
+          label: "Uptime commitment",
           cells: each((plan) => {
             const sla = plans[plan].sla;
             if (!sla) return NO;
@@ -235,7 +238,7 @@ export function compareGroups(catalog: Catalog): Group[] {
           }),
         },
         lineRow("sla_9995"),
-        lineRow("sla_9999", "99.99% SLA upgrade"),
+        lineRow("sla_9999", "99.99% uptime SLA"),
         lineRow("addendum"),
       ],
     },
