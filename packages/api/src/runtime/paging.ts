@@ -1,10 +1,13 @@
+/** Fetches the page a cursor names; `undefined` asks for the first page. */
+export type FetchPage<P> = (token: string | undefined) => Promise<P>;
+
 /**
- * Fetches the page a cursor names.
+ * {@link FetchPage}, also told which page of the walk it is.
  *
  * @param token - The cursor of the page to fetch, or `undefined` for the first page.
  * @param number - How many pages have been asked for, counting this one, from 1.
  */
-export type FetchPage<P> = (token: string | undefined, number: number) => Promise<P>;
+export type FetchNumberedPage<P> = (token: string | undefined, number: number) => Promise<P>;
 
 /**
  * How to read one page of a list.
@@ -112,7 +115,7 @@ export class Paging<P, T = unknown> {
    * @param fetchPage - Fetches the page a cursor names, and is told which page
    * of the walk it is.
    */
-  async *walk(fetchPage: FetchPage<P>): AsyncGenerator<P, void, undefined> {
+  async *walk(fetchPage: FetchNumberedPage<P>): AsyncGenerator<P, void, undefined> {
     let token: string | undefined;
     for (let number = 1; ; number += 1) {
       const page = await fetchPage(token, number);
@@ -174,4 +177,50 @@ export class Paging<P, T = unknown> {
     }
     return list;
   }
+}
+
+/**
+ * The cursor to the page after `page`, or `undefined` on the last one.
+ *
+ * @deprecated Use {@link Paging.next}.
+ * @param page - A page of the list.
+ * @param field - The name of the field holding the cursor.
+ */
+export function nextToken(page: unknown, field = "next_page_token"): string | undefined {
+  return Paging.byField("", field).next(page);
+}
+
+/**
+ * The array `field` names on a page.
+ *
+ * @deprecated Use {@link Paging.items} on {@link Paging.byField}.
+ * @param page - A page of the list.
+ * @param field - The name of the field holding the list.
+ * @throws TypeError when the page has no such list.
+ */
+export function itemsOf(page: unknown, field: string): readonly unknown[] {
+  return Paging.byField(field).items(page);
+}
+
+/**
+ * Every page, fetched only when the loop asks for the next one.
+ *
+ * @deprecated Use {@link Paging.walk}.
+ * @param fetchPage - Fetches the page a cursor names.
+ * @param options - `next` reads a page's cursor, {@link nextToken} by default.
+ */
+export function pages<P>(
+  fetchPage: FetchPage<P>,
+  { next = nextToken }: { next?: (page: P) => string | undefined } = {},
+): AsyncGenerator<P, void, undefined> {
+  const paging = new Paging<P>({
+    items: () => {
+      return [];
+    },
+    next,
+  });
+
+  return paging.walk((token) => {
+    return fetchPage(token);
+  });
 }
