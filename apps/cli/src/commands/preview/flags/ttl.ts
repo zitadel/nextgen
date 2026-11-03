@@ -3,7 +3,7 @@ import { Flags } from "@oclif/core";
 import { type Refusal, refusalError } from "../../../lib/oclif/refusal";
 import { parseTtl, type Ttl } from "../../../lib/ttl";
 
-export const TTL_OUT_OF_RANGE_REFUSAL: Refusal = {
+const TTL_OUT_OF_RANGE_REFUSAL: Refusal = {
   message: "{value} is outside the allowed range",
   hint: "A preview lives between 60s and 365d.",
 };
@@ -16,7 +16,7 @@ const MAXIMUM_MS = 365 * 24 * 60 * 60 * 1000;
  * that is not a duration and one outside the server's fixed limits of a minute
  * and 365 days.
  */
-export function readTtl(input: string): Ttl {
+function readTtl(input: string): Ttl {
   const ttl = parseTtl(input);
   if (ttl.ms < MINIMUM_MS || ttl.ms > MAXIMUM_MS) {
     throw refusalError(TTL_OUT_OF_RANGE_REFUSAL, {

@@ -74,8 +74,11 @@ function integerHint(rules: IntegerRules): string {
 
 function parseInteger(input: string, flag: IntegerRules & { name: string }): number {
   const value = Number(input);
+  // A run of digits says nothing about what `Number` made of it: enough of
+  // them overflow to `Infinity`, and past 2^53 they round to a neighbour, so
+  // the number itself is what must be whole and exact.
   const inside =
-    /^-?\d+$/.test(input.trim()) &&
+    Number.isSafeInteger(value) &&
     (flag.min === undefined || value >= flag.min) &&
     (flag.max === undefined || value <= flag.max);
   if (inside) {
@@ -106,20 +109,6 @@ function parseInteger(input: string, flag: IntegerRules & { name: string }): num
  */
 export const integerFlag = Flags.custom<number, IntegerRules>({
   parse: async (input, _command, flag) => parseInteger(input, flag),
-});
-
-const PORT_RULES: IntegerRules = {
-  min: 1,
-  max: 65_535,
-  refusal: {
-    message: "{value} is not a TCP port",
-    hint: "Use a TCP port from {min} to {max}.",
-  },
-};
-
-/** An integer flag that holds a TCP port. */
-export const portFlag = Flags.custom<number>({
-  parse: async (input, _command, flag) => parseInteger(input, { ...PORT_RULES, name: flag.name }),
 });
 
 /**

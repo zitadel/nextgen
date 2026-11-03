@@ -14,7 +14,7 @@ export {
 } from "./environment-command";
 export { CREDENTIALS, type CredentialKind } from "./credentials";
 export { CommandGroups, type CommandGroup } from "./groups";
-export { integerFlag, nonBlankArg, nonBlankString, portFlag } from "./flags";
+export { integerFlag, nonBlankArg, nonBlankString } from "./flags";
 export type {
   CommandResult,
   ConnectOptions,

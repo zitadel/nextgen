@@ -1,38 +1,35 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  messageFlag,
-  MESSAGE_TOO_LONG_REFUSAL,
-  readMessage,
-} from "../../../../../src/commands/release/flags/message";
-import { interpolate } from "../../../../../src/lib/oclif/refusal";
+import { messageFlag } from "../../../../../src/commands/release/flags/message";
+import { parseFlag } from "../../../../helpers/inputs";
 
-describe("readMessage", () => {
-  it("trims a message", () => {
-    expect(readMessage("  add company  ")).toBe("add company");
+const message = () => {
+  return messageFlag("A message.");
+};
+
+describe("-m", () => {
+  it("trims a message", async () => {
+    await expect(parseFlag(message(), "  add company  ", "message")).resolves.toBe("add company");
   });
 
-  it("refuses a blank message", () => {
-    expect(() => readMessage("   ")).toThrow("the value is empty");
+  it("refuses a blank message", async () => {
+    await expect(parseFlag(message(), "   ", "message")).rejects.toMatchObject({
+      code: "E_VALIDATION",
+      message: "the value is empty",
+    });
   });
 
-  it("refuses a message longer than the server records, naming the limit", () => {
-    expect(() => readMessage("x".repeat(1025))).toThrow(
-      interpolate(MESSAGE_TOO_LONG_REFUSAL.message, { limit: 1024 }),
+  it("refuses a message longer than the server records, naming the limit", async () => {
+    await expect(parseFlag(message(), "x".repeat(1025), "message")).rejects.toMatchObject({
+      code: "E_VALIDATION",
+      message: "the message is longer than 1024 characters",
+      hint: "Pass a shorter summary with -m.",
+    });
+  });
+
+  it("counts code points, not UTF-16 units", async () => {
+    await expect(parseFlag(message(), "\u{1F600}".repeat(1024), "message")).resolves.toHaveLength(
+      2048,
     );
-  });
-
-  it("counts code points, not UTF-16 units", () => {
-    expect(readMessage("😀".repeat(1024))).toHaveLength(2048);
-  });
-});
-
-describe("messageFlag", () => {
-  it("is wired to the validator", async () => {
-    const defined = messageFlag("A message.") as unknown as {
-      parse: (input: string, context: never, flag: unknown) => Promise<unknown>;
-    };
-
-    expect(await defined.parse(" hi ", {} as never, { name: "message" })).toBe("hi");
   });
 });

@@ -4,7 +4,7 @@ import type { Parsed } from "@zitadel/config/idp";
 import { interpolate, type Refusal, refusalError } from "../../../../lib/oclif/refusal";
 
 /** What an app URL is refused for: it must be an http(s) URL. */
-export const APP_URL_REFUSAL: Refusal = {
+const APP_URL_REFUSAL: Refusal = {
   message: 'Invalid app URL "{value}"',
   hint: "Use a URL like https://app.acme.com.",
 };

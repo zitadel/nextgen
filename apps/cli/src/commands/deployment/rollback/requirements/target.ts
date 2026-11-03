@@ -2,7 +2,7 @@ import { requirement } from "../../../../lib/oclif/requirements";
 import type { History } from "./history";
 
 /** The deployment a rollback re-applies, and the one it expects to be live. */
-export type Target = Readonly<{
+type Target = Readonly<{
   id: string;
   expectedDeploymentId: string | undefined;
 }>;
@@ -14,7 +14,7 @@ export type Target = Readonly<{
  * than become the expected one. With no deployment before the latest there is
  * nothing to roll back to, which is a refusal.
  */
-export function targetFrom(given: string | undefined, history: History): Target | undefined {
+function targetFrom(given: string | undefined, history: History): Target | undefined {
   if (given !== undefined) {
     return {
       id: given,

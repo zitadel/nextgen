@@ -1,21 +1,35 @@
 import { describe, expect, it } from "vitest";
 
-import { previewUrlsFrom } from "../../../../../src/commands/preview/requirements/urls";
+import { previewUrls } from "../../../../../src/commands/preview/requirements/urls";
+import { requirementContext } from "../../../../helpers/requirement-context";
 
-const NOTHING = () => ({ urls: [], variablesLookedFor: ["VERCEL_URL", "DEPLOY_URL"] });
+function urls(origin: readonly string[], env: NodeJS.ProcessEnv = {}) {
+  return previewUrls.resolve(
+    requirementContext({
+      flags: {
+        origin,
+      },
+      meta: {
+        env,
+      },
+    }),
+  );
+}
 
-describe("previewUrlsFrom", () => {
-  it("sends a URL given twice once", () => {
-    expect(previewUrlsFrom(["https://a.app", "https://a.app"], NOTHING)).toEqual(["https://a.app"]);
+describe("the preview URLs a run deploys to", () => {
+  it("sends a URL given twice once", async () => {
+    await expect(urls(["https://a.app", "https://a.app"])).resolves.toEqual(["https://a.app"]);
   });
 
-  it("falls back to the URLs the platform names", () => {
-    expect(
-      previewUrlsFrom([], () => ({ urls: ["https://b.app"], variablesLookedFor: [] })),
-    ).toEqual(["https://b.app"]);
+  it("falls back to the URL the platform's own build names", async () => {
+    await expect(urls([], { VERCEL_URL: "b.app" })).resolves.toEqual(["https://b.app"]);
   });
 
-  it("names the variables it looked for when there are none", () => {
-    expect(previewUrlsFrom([], NOTHING)).toEqual({ variables: "VERCEL_URL, DEPLOY_URL" });
+  it("names the variables it looked for when there are none", async () => {
+    await expect(urls([])).resolves.toMatchObject({
+      unmet: {
+        variables: expect.stringContaining("VERCEL_URL"),
+      },
+    });
   });
 });

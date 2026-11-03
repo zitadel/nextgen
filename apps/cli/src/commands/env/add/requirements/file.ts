@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { requirement, unmet } from "../../../../lib/oclif/requirements";
 
 /** The file an environment is written to, and its path in the project. */
-export type EnvironmentFile = {
+type EnvironmentFile = {
   readonly file: string;
   readonly path: string;
 };

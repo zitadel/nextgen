@@ -13,10 +13,7 @@ export type ProjectSecret = Readonly<{
  * project at hand fills a `project_id` left out. With the operation still to be
  * chosen, a missing project only narrows what can be chosen.
  */
-export async function projectSecretFor(
-  chosen: Chosen,
-  cwd: string,
-): Promise<ZitadelSecret | undefined> {
+async function projectSecretFor(chosen: Chosen, cwd: string): Promise<ZitadelSecret | undefined> {
   if (chosen.target?.operation.auth === "secret") {
     return readZitadelSecret(cwd);
   }

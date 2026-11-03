@@ -3,7 +3,7 @@ import type { Refusal } from "../../../lib/oclif/refusal";
 import { requirement, unmet } from "../../../lib/oclif/requirements";
 import type { Payload } from "./payload";
 
-export const FORCE_REQUIRED_REFUSAL: Refusal = {
+const FORCE_REQUIRED_REFUSAL: Refusal = {
   message: "Cannot call {operation} without --force in non-interactive mode",
   hint: "Run the same command again, with its --field values or the pipe into --input, and add --force.",
 };
@@ -15,7 +15,7 @@ export const FORCE_REQUIRED_REFUSAL: Refusal = {
  * alone would not have, so the refusal cannot suggest one and says what to do.
  * A dry run calls nothing, so it asks nothing.
  */
-export function needsForce(
+function needsForce(
   request: ApiRequest | undefined,
   run: { dryRun: boolean; nonInteractive: boolean; force: boolean },
 ): boolean {

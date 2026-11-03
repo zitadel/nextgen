@@ -4,7 +4,7 @@ import { refuseBlank } from "../../../lib/oclif/flags";
 import { type Refusal, refusalError } from "../../../lib/oclif/refusal";
 import { MESSAGE_MAX_LENGTH, messageTooLong } from "../../../lib/release";
 
-export const MESSAGE_TOO_LONG_REFUSAL: Refusal = {
+const MESSAGE_TOO_LONG_REFUSAL: Refusal = {
   message: "the message is longer than {limit} characters",
   hint: "Pass a shorter summary with -m.",
   details: {
@@ -18,7 +18,7 @@ export const MESSAGE_TOO_LONG_REFUSAL: Refusal = {
  * which the server would reject after the bundle was built. It returns the
  * message trimmed.
  */
-export function readMessage(input: string): string {
+function readMessage(input: string): string {
   const value = refuseBlank(input, "--message", "the value is empty");
   if (messageTooLong(value)) {
     throw refusalError(MESSAGE_TOO_LONG_REFUSAL, {
@@ -33,6 +33,8 @@ export function messageFlag(description: string) {
   return Flags.custom<string>({
     char: "m",
     description,
-    parse: async (input) => readMessage(input),
+    parse: async (input) => {
+      return readMessage(input);
+    },
   })();
 }

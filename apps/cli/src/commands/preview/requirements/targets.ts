@@ -4,7 +4,7 @@ import type { ZitadelClient } from "../../../lib/api-client";
 import { requirement, unmet } from "../../../lib/oclif/requirements";
 
 /** The URLs among `urls` that are primary origins, which a preview must never reach. */
-export function productionUrls(urls: readonly string[], primaries: readonly string[]): string[] {
+function productionUrls(urls: readonly string[], primaries: readonly string[]): string[] {
   return urls.filter((url) => primaries.includes(url));
 }
 
@@ -14,7 +14,7 @@ export function productionUrls(urls: readonly string[], primaries: readonly stri
  * to. A 401 is a token the server does not accept at all, which fails here
  * rather than after the whole bundle is built.
  */
-export async function primaryOrigins(client: ZitadelClient, projectId: string): Promise<string[]> {
+async function primaryOrigins(client: ZitadelClient, projectId: string): Promise<string[]> {
   try {
     const project = await client.getProject(projectId);
     return project.origins

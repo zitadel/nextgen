@@ -2,7 +2,7 @@ import { Config } from "@oclif/core";
 import { describe, expect, it } from "vitest";
 
 import { BaseCommand } from "../../../../src/lib/oclif/base";
-import { integerFlag, portFlag } from "../../../../src/lib/oclif/flags";
+import { integerFlag } from "../../../../src/lib/oclif/flags";
 import type { JsonEnvelope } from "../../../../src/lib/oclif/types";
 import { cliPackageRoot } from "../../../helpers/oclif-build";
 
@@ -91,7 +91,14 @@ class Numbers extends BaseCommand {
   };
 
   static override flags = {
-    port: portFlag(),
+    port: integerFlag({
+      min: 1,
+      max: 65_535,
+      refusal: {
+        message: "{value} is not a TCP port",
+        hint: "Use a TCP port from {min} to {max}.",
+      },
+    }),
     tail: integerFlag({
       min: 1,
     }),
@@ -124,7 +131,7 @@ async function parse(...argv: string[]): Promise<Record<string, unknown>> {
   return command.received;
 }
 
-describe("a port flag", () => {
+describe("an integer flag bounded as a TCP port", () => {
   it("passes a port through as a number", async () => {
     expect((await parse("--port", "8080")).port).toBe(8080);
   });
@@ -162,5 +169,22 @@ describe("an integer flag", () => {
 
   it("accepts a value on its bounds", async () => {
     expect((await parse("--level", "5")).level).toBe(5);
+  });
+});
+
+describe("a number flag against what Number makes of a long digit run", () => {
+  it.each([
+    ["9".repeat(309), "overflows to Infinity"],
+    ["9007199254740993", "rounds past the safe range"],
+  ])("refuses %j, which %s", async (value) => {
+    await expect(parse("--tail", value)).rejects.toMatchObject({
+      code: "E_VALIDATION",
+    });
+  });
+
+  it("refuses the same value for a bounded flag", async () => {
+    await expect(parse("--port", "9".repeat(309))).rejects.toMatchObject({
+      code: "E_VALIDATION",
+    });
   });
 });

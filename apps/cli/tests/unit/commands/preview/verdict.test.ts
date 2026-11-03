@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  previewVerdict,
-  runsInCi,
-} from "../../../../../src/commands/preview/requirements/previewable";
+import { previewVerdict, runsInCi } from "../../../../src/commands/preview/verdict";
 
 const READY = {
   environment: "preview",

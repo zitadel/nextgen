@@ -4,13 +4,13 @@ import { isEnvironmentName } from "../../../../lib/environment";
 import { type Refusal, refusalError } from "../../../../lib/oclif/refusal";
 
 /** What an environment name is refused for: it must be usable in a `.env.<name>.local` file name. */
-export const ENVIRONMENT_NAME_REFUSAL: Refusal = {
+const ENVIRONMENT_NAME_REFUSAL: Refusal = {
   message: '"{value}" is not a usable environment name',
   hint: 'Use letters, digits, dot, dash and underscore, and no "..", e.g. production.',
 };
 
 /** The environment name `input` holds, or the refusal for why it cannot name a file. */
-export function readEnvironmentName(input: string): string {
+function readEnvironmentName(input: string): string {
   if (!isEnvironmentName(input)) {
     throw refusalError(ENVIRONMENT_NAME_REFUSAL, {
       value: input,

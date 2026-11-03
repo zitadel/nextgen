@@ -2,7 +2,7 @@ import { resolveTarget, type Target, uncallable } from "../../../lib/api/operati
 import type { Refusal } from "../../../lib/oclif/refusal";
 import { requirement, unmet } from "../../../lib/oclif/requirements";
 
-export const UNCALLABLE_REFUSAL: Refusal = {
+const UNCALLABLE_REFUSAL: Refusal = {
   message: "{reason}",
   hint: "Call it from the app it belongs to, through the SDK; `zitadel api ls` marks what the CLI can call.",
 };
@@ -18,7 +18,7 @@ export type Chosen = Readonly<{
  * and one the CLI cannot call, because only an end user's session cookie
  * authenticates it. With no operation named, a person is asked to choose one.
  */
-export function chosenOperation(
+function chosenOperation(
   ref: string | undefined,
   method: string | undefined,
 ): Chosen | { reason: string } {

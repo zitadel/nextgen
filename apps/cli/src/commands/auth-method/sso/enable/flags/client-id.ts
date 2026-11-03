@@ -7,7 +7,7 @@ import { refuseBlank } from "../../../../../lib/oclif/flags";
  * The client id a value holds, trimmed as the one a prompt would have accepted.
  * Refuses a blank value, naming `flag`, and one the provider cannot have issued.
  */
-export function readClientId(input: string, flag: string): ClientId {
+function readClientId(input: string, flag: string): ClientId {
   return validated(parseClientId(refuseBlank(input, flag, `${flag} was given an empty value`)));
 }
 

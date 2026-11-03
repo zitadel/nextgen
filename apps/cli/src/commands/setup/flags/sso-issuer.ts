@@ -4,7 +4,7 @@ import { parseIssuer } from "@zitadel/config/idp";
 import { refuseBlank } from "../../../lib/oclif/flags";
 import { type Refusal, refusalError } from "../../../lib/oclif/refusal";
 
-export const SSO_ISSUER_REFUSAL: Refusal = {
+const SSO_ISSUER_REFUSAL: Refusal = {
   message: "--sso-issuer: {problem}",
   hint: "Fix --sso-issuer and run the command again.",
   details: {
@@ -16,7 +16,7 @@ export const SSO_ISSUER_REFUSAL: Refusal = {
  * Reads the issuer of a custom connection, refusing one the server would refuse
  * on apply, and keeps it as typed.
  */
-export function readSsoIssuer(input: string): string {
+function readSsoIssuer(input: string): string {
   const trimmed = refuseBlank(input, "--sso-issuer", "the value is empty");
   const parsed = parseIssuer(trimmed);
   if (!parsed.ok) {

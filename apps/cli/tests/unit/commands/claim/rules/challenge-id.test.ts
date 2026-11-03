@@ -1,24 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  challengeIdRule,
-  isChallengeId,
-} from "../../../../../src/commands/claim/rules/challenge-id";
+import { challengeIdRule } from "../../../../../src/commands/claim/rules/challenge-id";
 
-describe("isChallengeId", () => {
-  it("accepts the shape the claim contract gives a challenge_id", () => {
-    expect(isChallengeId("ch_01J0Z9KX7Y0Q2Y7JX5M9K2YF3C")).toBe(true);
-  });
-
-  it.each(["challenge", "", "ch_"])("refuses %j", (value) => {
-    expect(isChallengeId(value)).toBe(false);
-  });
-});
-
-describe("challengeIdRule", () => {
+describe("--challenge-id", () => {
   const broken = (challengeId: unknown) => {
     return challengeIdRule.broken({ flags: { challengeId }, args: {}, argv: [] });
   };
+
+  it.each(["challenge", "", "ch_"])("refuses %j, which is not a challenge id", (value) => {
+    expect(broken(value)).toBe(true);
+  });
 
   it("lets an id in the contract's shape and an absent one through", () => {
     expect(broken("ch_01J0Z9KX7Y0Q2Y7JX5M9K2YF3C")).toBe(false);

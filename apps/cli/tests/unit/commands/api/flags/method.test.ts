@@ -1,38 +1,26 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  HTTP_METHODS,
-  readMethod,
-  methodFlag,
-  METHOD_NOT_SENT_REFUSAL,
-} from "../../../../../src/commands/api/flags/method";
-import { interpolate } from "../../../../../src/lib/oclif/refusal";
+import { methodFlag } from "../../../../../src/commands/api/flags/method";
+import { parseFlag } from "../../../../helpers/inputs";
 
-describe("readMethod", () => {
-  it.each(HTTP_METHODS)("accepts %s", (method) => {
-    expect(readMethod(method)).toBe(method);
+const METHODS = "GET, POST, PUT, PATCH, DELETE";
+
+describe("-X", () => {
+  it.each(["GET", "POST", "PUT", "PATCH", "DELETE"])("sends %s", async (method) => {
+    await expect(parseFlag(methodFlag({}), method, "method")).resolves.toBe(method);
   });
 
-  it("takes any case, as curl does", () => {
-    expect(readMethod("delete")).toBe("DELETE");
+  it("takes any case, as curl does", async () => {
+    await expect(parseFlag(methodFlag({}), "delete", "method")).resolves.toBe("DELETE");
   });
 
-  it.each(["trace", "OPTIONS", ""])("refuses %j, naming it and the methods that exist", (value) => {
-    expect(() => readMethod(value)).toThrow(
-      interpolate(METHOD_NOT_SENT_REFUSAL.message, {
-        value,
-        methods: "GET, POST, PUT, PATCH, DELETE",
-      }),
-    );
-  });
-});
-
-describe("methodFlag", () => {
-  it("is wired to the validator", async () => {
-    const defined = methodFlag({ name: "method" } as never) as unknown as {
-      parse: (input: string, context: never, flag: unknown) => Promise<unknown>;
-    };
-
-    expect(await defined.parse("patch", {} as never, { name: "method" })).toBe("PATCH");
-  });
+  it.each(["trace", "OPTIONS", ""])(
+    "refuses %j, naming it and the methods that exist",
+    async (value) => {
+      await expect(parseFlag(methodFlag({}), value, "method")).rejects.toMatchObject({
+        code: "E_VALIDATION",
+        message: `${value} is not one of ${METHODS}`,
+      });
+    },
+  );
 });

@@ -3,7 +3,7 @@ import { Args } from "@oclif/core";
 import { type Refusal, refusalError } from "../../../lib/oclif/refusal";
 
 /** What a pull target names, or that it names nothing pull understands. */
-export type PullTarget =
+type PullTarget =
   | { readonly kind: "latest" }
   | { readonly kind: "release"; readonly id: string }
   | { readonly kind: "deployment"; readonly id: string }
@@ -12,7 +12,7 @@ export type PullTarget =
 /** A pull target that names something pull can read. */
 export type ReadablePullTarget = Exclude<PullTarget, { readonly kind: "invalid" }>;
 
-export const TARGET_REFUSAL: Refusal = {
+const TARGET_REFUSAL: Refusal = {
   message: 'Don\'t know how to pull "{value}".',
   hint: "Pass 'latest', a release id (rel_…), or a deployment id (dep_…).",
 };
@@ -21,7 +21,7 @@ export const TARGET_REFUSAL: Refusal = {
  * Classify a pull target: `latest` (the live release), a release id (`rel_…`),
  * a deployment id (`dep_…`), or something pull does not understand.
  */
-export function classifyTarget(target: string): PullTarget {
+function classifyTarget(target: string): PullTarget {
   if (target === "latest") {
     return { kind: "latest" };
   }
@@ -40,7 +40,7 @@ export const LATEST_TARGET: ReadablePullTarget = {
 };
 
 /** Reads what to pull, refusing a target that is not `latest`, `rel_…` or `dep_…`. */
-export function readTarget(input: string): ReadablePullTarget {
+function readTarget(input: string): ReadablePullTarget {
   const target = classifyTarget(input);
   if (target.kind === "invalid") {
     throw refusalError(TARGET_REFUSAL, {

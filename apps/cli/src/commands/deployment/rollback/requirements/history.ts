@@ -17,7 +17,7 @@ export type History = Readonly<{
  * deployment needs none of it, and reads nothing. Nothing deployed is a
  * refusal, since there is nothing to undo.
  */
-export async function primaryHistory(
+async function primaryHistory(
   given: string | undefined,
   load: () => Promise<readonly Deployment[]>,
 ): Promise<History | undefined> {

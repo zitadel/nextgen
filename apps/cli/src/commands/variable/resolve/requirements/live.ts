@@ -6,7 +6,7 @@ import { DEPLOY_ARGS, originMatchesPattern } from "../../../../lib/release";
 import type { SuggestedCommand } from "../../../../lib/suggestion";
 
 /** A deployment that is live on the target now. */
-export type LiveDeployment = Awaited<ReturnType<ZitadelClient["listDeployments"]["all"]>>[number];
+type LiveDeployment = Awaited<ReturnType<ZitadelClient["listDeployments"]["all"]>>[number];
 
 /**
  * The miss for an origin nothing is deployed to, with the fix that reaches

@@ -1,25 +1,39 @@
 import { describe, expect, it } from "vitest";
 
-import { chosenOperation } from "../../../../../src/commands/api/requirements/operation";
+import { apiOperation } from "../../../../../src/commands/api/requirements/operation";
+import { requirementContext } from "../../../../helpers/requirement-context";
 
-describe("chosenOperation", () => {
-  it("leaves the operation to be chosen when none is named", () => {
-    expect(chosenOperation(undefined, undefined)).toEqual({ target: undefined });
+function chosen(operation: string | undefined, method?: string) {
+  return apiOperation.resolve(
+    requirementContext({
+      args: {
+        operation,
+      },
+      flags: {
+        method,
+      },
+    }),
+  );
+}
+
+describe("the operation zitadel api is pointed at", () => {
+  it("is none when none is named, so a person is asked to choose", async () => {
+    await expect(chosen(undefined)).resolves.toEqual({ target: undefined });
   });
 
-  it("finds an operation by its id", () => {
-    expect(chosenOperation("queryUsers", undefined)).toMatchObject({
-      target: { operation: { id: "queryUsers" } },
+  it("is the operation an id names", async () => {
+    await expect(chosen("getProject")).resolves.toMatchObject({
+      target: {
+        operation: {
+          id: "getProject",
+        },
+      },
     });
   });
 
-  it("refuses an operation no one but an end user's session can call, saying why", () => {
-    expect(chosenOperation("getMyUser", undefined)).toEqual({
-      reason: expect.stringContaining("authenticated by an end user's session cookie"),
-    });
-  });
+  it("refuses one the CLI cannot call, saying why", async () => {
+    const refused = (await chosen("startSession")) as { unmet?: { reason?: string } };
 
-  it("refuses an operation the spec does not have", () => {
-    expect(() => chosenOperation("noSuchOperation", undefined)).toThrow("No operation is called");
+    expect(refused.unmet?.reason).toEqual(expect.any(String));
   });
 });

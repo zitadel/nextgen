@@ -6,7 +6,7 @@ import { requirement, unmet } from "../../../lib/oclif/requirements";
  * unique targets require, else the ones the platform's own build variables
  * name, else none, which is a refusal.
  */
-export function previewUrlsFrom(
+function previewUrlsFrom(
   requested: readonly string[],
   detected: () => { urls: readonly string[]; variablesLookedFor: readonly string[] },
 ): readonly string[] | { variables: string } {

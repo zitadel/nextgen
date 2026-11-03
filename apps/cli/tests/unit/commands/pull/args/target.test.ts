@@ -1,49 +1,26 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  classifyTarget,
-  LATEST_TARGET,
-  readTarget,
-  TARGET_REFUSAL,
-  targetArg,
-} from "../../../../../src/commands/pull/args/target";
+import { LATEST_TARGET, targetArg } from "../../../../../src/commands/pull/args/target";
+import { parseArg } from "../../../../helpers/inputs";
 
-describe("classifyTarget", () => {
+describe("the pull target argument", () => {
   it.each([
     ["latest", { kind: "latest" }],
     ["rel_01ABC", { kind: "release", id: "rel_01ABC" }],
     ["dep_01ABC", { kind: "deployment", id: "dep_01ABC" }],
-    ["sch_01ABC", { kind: "invalid" }],
-    ["human-user", { kind: "invalid" }],
-  ])("reads %s", (input, expected) => {
-    expect(classifyTarget(input)).toEqual(expected);
-  });
-});
-
-describe("readTarget", () => {
-  it("hands over a classified target", () => {
-    expect(readTarget("dep_01ABC")).toEqual({ kind: "deployment", id: "dep_01ABC" });
+  ])("hands over %s classified", async (input, expected) => {
+    await expect(parseArg(targetArg({}), input, "target")).resolves.toEqual(expected);
   });
 
-  it("refuses a target pull cannot read, naming it", () => {
-    expect(() => readTarget("sch_01ABC")).toThrow(
-      expect.objectContaining({
+  it.each(["sch_01ABC", "human-user"])(
+    "refuses %s, which pull cannot read, naming it",
+    async (input) => {
+      await expect(parseArg(targetArg({}), input, "target")).rejects.toMatchObject({
         code: "E_VALIDATION",
-        message: TARGET_REFUSAL.message.replace("{value}", "sch_01ABC"),
-      }),
-    );
-  });
-});
-
-describe("targetArg", () => {
-  it("is wired to readTarget", async () => {
-    const arg = targetArg();
-
-    await expect(arg.parse("rel_01ABC", {} as never, arg)).resolves.toEqual({
-      kind: "release",
-      id: "rel_01ABC",
-    });
-  });
+        message: `Don't know how to pull "${input}".`,
+      });
+    },
+  );
 
   it("defaults to the live release", () => {
     expect(LATEST_TARGET).toEqual({ kind: "latest" });

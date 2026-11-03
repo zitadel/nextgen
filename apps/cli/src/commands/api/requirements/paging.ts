@@ -3,13 +3,13 @@ import type { Refusal } from "../../../lib/oclif/refusal";
 import { requirement, unmet } from "../../../lib/oclif/requirements";
 import type { Chosen } from "./operation";
 
-export const NOTHING_TO_PAGE_REFUSAL: Refusal = {
+const NOTHING_TO_PAGE_REFUSAL: Refusal = {
   message: "{operation} does not page, so --paginate has nothing to follow",
   hint: "Leave out --paginate.",
 };
 
 /** Whether `--paginate` has a cursor to follow on the operation, when one is named. */
-export function pagesOperation(target: Target | undefined, paginate: boolean): boolean {
+function pagesOperation(target: Target | undefined, paginate: boolean): boolean {
   return !paginate || target === undefined || target.operation.paging !== null;
 }
 

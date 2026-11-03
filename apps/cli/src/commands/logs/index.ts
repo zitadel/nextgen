@@ -9,7 +9,7 @@ import {
 } from "../../lib/local-server/server-log";
 import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "../../lib/oclif";
 import { localRuntimeStarted } from "../local-server/requirements/local-runtime-started";
-import { DEFAULT_TAIL, tailFlag } from "./flags/tail";
+import { tailFlag } from "./flags/tail";
 import { followIsNotJsonRule } from "./rules/follow-is-not-json";
 
 export default class Logs extends BaseCommand {
@@ -31,7 +31,6 @@ export default class Logs extends BaseCommand {
     })(),
     tail: tailFlag({
       description: "Number of lines to show, counting only those --level shows.",
-      default: DEFAULT_TAIL,
     }),
   };
 

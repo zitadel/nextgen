@@ -5,7 +5,7 @@ import { type Refusal, refusalError } from "../../../lib/oclif/refusal";
 
 const MESSAGE_MAX_LENGTH = 1024;
 
-export const MESSAGE_REFUSAL: Refusal = {
+const MESSAGE_REFUSAL: Refusal = {
   message: "the message is longer than {limit} characters",
   hint: "Pass a shorter summary with -m.",
   details: {
@@ -14,7 +14,7 @@ export const MESSAGE_REFUSAL: Refusal = {
 };
 
 /** Reads `-m/--message`, refusing a blank one or one longer than the server records. */
-export function readMessage(input: string): string {
+function readMessage(input: string): string {
   const value = refuseBlank(input, "--message", "the value is empty");
   if (Array.from(value).length > MESSAGE_MAX_LENGTH) {
     throw refusalError(MESSAGE_REFUSAL, {

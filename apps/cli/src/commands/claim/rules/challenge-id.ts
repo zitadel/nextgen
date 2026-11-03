@@ -3,7 +3,7 @@ import { getClaimStatusQueryChallengeIdRegExp } from "@zitadel/api/generated/end
 import { type Rule, refuses } from "../../../lib/oclif/rules";
 
 /** Whether `value` has the shape the claim contract gives a `challenge_id`. */
-export function isChallengeId(value: string): boolean {
+function isChallengeId(value: string): boolean {
   return getClaimStatusQueryChallengeIdRegExp.test(value);
 }
 

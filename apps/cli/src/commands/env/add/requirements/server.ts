@@ -2,7 +2,7 @@ import { requirement } from "../../../../lib/oclif/requirements";
 import { resolveServer } from "../../../../lib/server";
 
 /** The server `--server` named, or none when it was not given. */
-export type GivenServer = {
+type GivenServer = {
   readonly value: string | undefined;
 };
 

@@ -1,47 +1,29 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  ssoDisplayNameFlag,
-  readSsoDisplayName,
-} from "../../../../../src/commands/setup/flags/sso-display-name";
+import { ssoDisplayNameFlag } from "../../../../../src/commands/setup/flags/sso-display-name";
+import { parseFlag } from "../../../../helpers/inputs";
 
-describe("readSsoDisplayName", () => {
-  it("reads 'Acme SSO' as typed", () => {
-    expect(readSsoDisplayName("Acme SSO")).toBe("Acme SSO");
-  });
-
-  it("refuses 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'", () => {
-    expect(() =>
-      readSsoDisplayName(
-        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-      ),
-    ).toThrow(
-      expect.objectContaining({
-        code: "E_VALIDATION",
-        hint: "Fix --sso-display-name and run the command again.",
-      }),
+describe("--sso-display-name", () => {
+  it("reads a value the provider could have issued", async () => {
+    await expect(parseFlag(ssoDisplayNameFlag({}), "Acme SSO", "sso-display-name")).resolves.toBe(
+      "Acme SSO",
     );
   });
 
-  it("refuses a blank value", () => {
-    expect(() => readSsoDisplayName("  ")).toThrow(
-      expect.objectContaining({ code: "E_VALIDATION" }),
-    );
-  });
-});
-
-describe("ssoDisplayNameFlag", () => {
-  it("is wired to readSsoDisplayName", async () => {
-    const flag = ssoDisplayNameFlag({});
-
+  it("refuses one the provider could not have", async () => {
     await expect(
-      flag.parse(
-        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-        {} as never,
-        flag as never,
-      ),
+      parseFlag(ssoDisplayNameFlag({}), "x".repeat(201), "sso-display-name"),
     ).rejects.toMatchObject({
       code: "E_VALIDATION",
+      hint: "Fix --sso-display-name and run the command again.",
     });
+  });
+
+  it("refuses a blank value", async () => {
+    await expect(parseFlag(ssoDisplayNameFlag({}), "  ", "sso-display-name")).rejects.toMatchObject(
+      {
+        code: "E_VALIDATION",
+      },
+    );
   });
 });

@@ -3,7 +3,7 @@ import { Flags } from "@oclif/core";
 import { refuseBlank } from "../../../lib/oclif/flags";
 import { type Refusal, refusalError } from "../../../lib/oclif/refusal";
 
-export const ORIGIN_IS_PRIMARY_REFUSAL: Refusal = {
+const ORIGIN_IS_PRIMARY_REFUSAL: Refusal = {
   message: "A preview cannot target the primary origins",
   hint: "Pass the preview URLs with --origin; production is deployed by `zitadel deploy`, after merge.",
 };
@@ -14,7 +14,7 @@ export const ORIGIN_IS_PRIMARY_REFUSAL: Refusal = {
  * and `primary`, the deployment keyword for every primary origin, which a
  * preview build must never reach with its narrower credential.
  */
-export function readOrigin(input: string, label: string): string {
+function readOrigin(input: string, label: string): string {
   const url = refuseBlank(input, label, "the value is empty").replace(/\/+$/, "");
   if (url === "primary") {
     throw refusalError(ORIGIN_IS_PRIMARY_REFUSAL, {});

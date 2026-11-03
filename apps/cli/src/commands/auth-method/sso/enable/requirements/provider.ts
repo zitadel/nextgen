@@ -19,7 +19,7 @@ import { requirement } from "../../../../../lib/oclif/requirements";
  * but later: here the ones they did give are only checked. A script, a dry run
  * or `--non-interactive` is held to the flags and told which are missing.
  */
-export type SsoProvider = {
+type SsoProvider = {
   readonly selection: ProviderSelection | undefined;
   readonly values: CustomFlagValues;
 };

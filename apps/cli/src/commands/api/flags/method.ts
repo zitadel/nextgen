@@ -3,9 +3,9 @@ import { Flags } from "@oclif/core";
 import { type Refusal, refusalError } from "../../../lib/oclif/refusal";
 
 /** The HTTP methods `zitadel api` sends. */
-export const HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"] as const;
+const HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"] as const;
 
-export const METHOD_NOT_SENT_REFUSAL: Refusal = {
+const METHOD_NOT_SENT_REFUSAL: Refusal = {
   message: "-X {value} is not one of {methods}",
 };
 
@@ -14,7 +14,7 @@ export const METHOD_NOT_SENT_REFUSAL: Refusal = {
  * would refuse `-X delete`. It refuses a method the CLI does not send, and
  * returns the others in upper case.
  */
-export function readMethod(input: string): string {
+function readMethod(input: string): string {
   const method = input.toUpperCase();
   if (!(HTTP_METHODS as readonly string[]).includes(method)) {
     throw refusalError(METHOD_NOT_SENT_REFUSAL, {
