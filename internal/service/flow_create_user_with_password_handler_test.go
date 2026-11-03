@@ -57,7 +57,7 @@ func newPasswordHandlerFixture(t *testing.T, gate ...service.PasswordGate) *pass
 	stmts.EXPECT().ListJSONSchemas(gomock.Any(), gomock.Any(), gomock.Any()).
 		Return(&database.ListResult[*domain.JSONSchema]{}, nil).AnyTimes()
 	userService := service.NewUserService(svcPool, schemaStore, service.FixedProjectHasherResolver{Hasher: hasher}, passwords, service.StatementsUserRefResolver{Pool: svcPool}, domain.BuiltinSchemaBases{})
-	handler := service.NewFlowCreateUserHandler(service.FixedProjectHasherResolver{Hasher: hasher}, passwords, userService, schemaStore, v2Pool)
+	handler := service.NewFlowCreateUserHandler(service.FixedProjectHasherResolver{Hasher: hasher}, passwords, userService, schemaStore, v2Pool, stubSignupProtection{})
 
 	return &passwordHandlerFixture{
 		handler:     handler,
@@ -237,4 +237,15 @@ func TestFlowCreateUserWithPassword_MissingPasswordIsIntegrityError(t *testing.T
 		},
 	})
 	require.ErrorIs(t, err, domain.ErrFlowIntegrity())
+}
+
+func TestFlowCreateUserWithPassword_ProofBeforeUserOrPasswordWork(t *testing.T) {
+	for _, refusal := range []error{domain.ErrFlowProofInvalid(), domain.ErrFlowRateLimited()} {
+		// Nil mutation dependencies deliberately prove that a refused proof never
+		// reaches ID allocation, password hashing, schema lookup or user writes.
+		handler := service.NewFlowCreateUserHandler(nil, nil, nil, nil, nil, stubSignupProtection{err: refusal})
+		state := &domain.FlowState{ProjectID: "proj_1", FlowProgress: domain.FlowProgress{CollectedData: domain.CollectedFlowData{AuthMethods: domain.CollectedAuthMethodData{Password: "secret"}}}}
+		_, err := handler.Handle(t.Context(), domain.FlowOnSuccessInput{ProjectID: state.ProjectID, State: state})
+		require.ErrorIs(t, err, refusal)
+	}
 }

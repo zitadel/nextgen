@@ -14464,6 +14464,7 @@ type CreateFlowErrorResponse struct {
 	FlowdefPurposeMismatch FlowdefPurposeMismatch
 	FlowIntegrity          FlowIntegrity
 	FlowInvalidPurpose     FlowInvalidPurpose
+	FlowRateLimited        FlowRateLimited
 	Internal               Internal
 	TknInvalid             TknInvalid
 	TknInvalidTknid        TknInvalidTknid
@@ -14493,6 +14494,7 @@ const (
 	FlowdefPurposeMismatchCreateFlowErrorResponse CreateFlowErrorResponseType = "flowdef.purpose_mismatch"
 	FlowIntegrityCreateFlowErrorResponse          CreateFlowErrorResponseType = "flow.integrity"
 	FlowInvalidPurposeCreateFlowErrorResponse     CreateFlowErrorResponseType = "flow.invalid_purpose"
+	FlowRateLimitedCreateFlowErrorResponse        CreateFlowErrorResponseType = "flow.rate_limited"
 	InternalCreateFlowErrorResponse               CreateFlowErrorResponseType = "internal"
 	TknInvalidCreateFlowErrorResponse             CreateFlowErrorResponseType = "tkn.invalid"
 	TknInvalidTknidCreateFlowErrorResponse        CreateFlowErrorResponseType = "tkn.invalid_tknid"
@@ -14551,6 +14553,11 @@ func (s CreateFlowErrorResponse) IsFlowIntegrity() bool {
 // IsFlowInvalidPurpose reports whether CreateFlowErrorResponse is FlowInvalidPurpose.
 func (s CreateFlowErrorResponse) IsFlowInvalidPurpose() bool {
 	return s.Type == FlowInvalidPurposeCreateFlowErrorResponse
+}
+
+// IsFlowRateLimited reports whether CreateFlowErrorResponse is FlowRateLimited.
+func (s CreateFlowErrorResponse) IsFlowRateLimited() bool {
+	return s.Type == FlowRateLimitedCreateFlowErrorResponse
 }
 
 // IsInternal reports whether CreateFlowErrorResponse is Internal.
@@ -14802,6 +14809,27 @@ func (s CreateFlowErrorResponse) GetFlowInvalidPurpose() (v FlowInvalidPurpose, 
 func NewFlowInvalidPurposeCreateFlowErrorResponse(v FlowInvalidPurpose) CreateFlowErrorResponse {
 	var s CreateFlowErrorResponse
 	s.SetFlowInvalidPurpose(v)
+	return s
+}
+
+// SetFlowRateLimited sets CreateFlowErrorResponse to FlowRateLimited.
+func (s *CreateFlowErrorResponse) SetFlowRateLimited(v FlowRateLimited) {
+	s.Type = FlowRateLimitedCreateFlowErrorResponse
+	s.FlowRateLimited = v
+}
+
+// GetFlowRateLimited returns FlowRateLimited and true boolean if CreateFlowErrorResponse is FlowRateLimited.
+func (s CreateFlowErrorResponse) GetFlowRateLimited() (v FlowRateLimited, ok bool) {
+	if !s.IsFlowRateLimited() {
+		return v, false
+	}
+	return s.FlowRateLimited, true
+}
+
+// NewFlowRateLimitedCreateFlowErrorResponse returns new CreateFlowErrorResponse from FlowRateLimited.
+func NewFlowRateLimitedCreateFlowErrorResponse(v FlowRateLimited) CreateFlowErrorResponse {
+	var s CreateFlowErrorResponse
+	s.SetFlowRateLimited(v)
 	return s
 }
 
@@ -23006,51 +23034,53 @@ func (s *EvaluatePolicyResponseViolations) init() EvaluatePolicyResponseViolatio
 // Ref: #
 // Event represents sum type.
 type Event struct {
-	Type                            EventType // switch on this field
-	AuthAttemptCreatedEvent         AuthAttemptCreatedEvent
-	AuthAttemptHandedOffEvent       AuthAttemptHandedOffEvent
-	AuthCheckFailedEvent            AuthCheckFailedEvent
-	AuthCheckSucceededEvent         AuthCheckSucceededEvent
-	AuthFactorPasskeyEnrolledEvent  AuthFactorPasskeyEnrolledEvent
-	AuthFactorPasswordSetEvent      AuthFactorPasswordSetEvent
-	AuthSSOAuthorizationFailedEvent AuthSSOAuthorizationFailedEvent
-	AuthSSOExchangeFailedEvent      AuthSSOExchangeFailedEvent
-	AuthSSOExchangeSucceededEvent   AuthSSOExchangeSucceededEvent
-	AuthTokenIssuedEvent            AuthTokenIssuedEvent
-	AuthTokenRevokedEvent           AuthTokenRevokedEvent
-	AuthzGrantedEvent               AuthzGrantedEvent
-	AuthzRevokedEvent               AuthzRevokedEvent
-	BrandingCreatedEvent            BrandingCreatedEvent
-	DeploymentCreatedEvent          DeploymentCreatedEvent
-	FlowdefCreatedEvent             FlowdefCreatedEvent
-	FlowdefDeletedEvent             FlowdefDeletedEvent
-	FlowdefUpdatedEvent             FlowdefUpdatedEvent
-	IdpCreatedEvent                 IdpCreatedEvent
-	IdpIdentityLinkCreatedEvent     IdpIdentityLinkCreatedEvent
-	IdpUpdatedEvent                 IdpUpdatedEvent
-	OriginAddedEvent                OriginAddedEvent
-	OriginRemovedEvent              OriginRemovedEvent
-	PolicyCreatedEvent              PolicyCreatedEvent
-	PolicyUpdatedEvent              PolicyUpdatedEvent
-	PreviewRemovedEvent             PreviewRemovedEvent
-	ProjectCreatedEvent             ProjectCreatedEvent
-	ProjectDeletedEvent             ProjectDeletedEvent
-	ProjectUpdatedEvent             ProjectUpdatedEvent
-	ReleaseCreatedEvent             ReleaseCreatedEvent
-	ReleaseRevokedEvent             ReleaseRevokedEvent
-	RequestAPIEvent                 RequestAPIEvent
-	SchemaCreatedEvent              SchemaCreatedEvent
-	SessionDeletedEvent             SessionDeletedEvent
-	SessionEstablishedEvent         SessionEstablishedEvent
-	TeamCreatedEvent                TeamCreatedEvent
-	TeamDeactivatedEvent            TeamDeactivatedEvent
-	TeamUpdatedEvent                TeamUpdatedEvent
-	UserCreateFailedEvent           UserCreateFailedEvent
-	UserCreatedEvent                UserCreatedEvent
-	UserDeletedEvent                UserDeletedEvent
-	UserUpdatedEvent                UserUpdatedEvent
-	VariableRemovedEvent            VariableRemovedEvent
-	VariableSetEvent                VariableSetEvent
+	Type                             EventType // switch on this field
+	AuthAttemptCreatedEvent          AuthAttemptCreatedEvent
+	AuthAttemptHandedOffEvent        AuthAttemptHandedOffEvent
+	AuthCheckFailedEvent             AuthCheckFailedEvent
+	AuthCheckSucceededEvent          AuthCheckSucceededEvent
+	AuthFactorPasskeyEnrolledEvent   AuthFactorPasskeyEnrolledEvent
+	AuthFactorPasswordSetEvent       AuthFactorPasswordSetEvent
+	AuthSSOAuthorizationFailedEvent  AuthSSOAuthorizationFailedEvent
+	AuthSSOExchangeFailedEvent       AuthSSOExchangeFailedEvent
+	AuthSSOExchangeSucceededEvent    AuthSSOExchangeSucceededEvent
+	AuthTokenIssuedEvent             AuthTokenIssuedEvent
+	AuthTokenRevokedEvent            AuthTokenRevokedEvent
+	AuthzGrantedEvent                AuthzGrantedEvent
+	AuthzRevokedEvent                AuthzRevokedEvent
+	BrandingCreatedEvent             BrandingCreatedEvent
+	DeploymentCreatedEvent           DeploymentCreatedEvent
+	FlowSignupChallengeConsumedEvent FlowSignupChallengeConsumedEvent
+	FlowSignupChallengeIssuedEvent   FlowSignupChallengeIssuedEvent
+	FlowdefCreatedEvent              FlowdefCreatedEvent
+	FlowdefDeletedEvent              FlowdefDeletedEvent
+	FlowdefUpdatedEvent              FlowdefUpdatedEvent
+	IdpCreatedEvent                  IdpCreatedEvent
+	IdpIdentityLinkCreatedEvent      IdpIdentityLinkCreatedEvent
+	IdpUpdatedEvent                  IdpUpdatedEvent
+	OriginAddedEvent                 OriginAddedEvent
+	OriginRemovedEvent               OriginRemovedEvent
+	PolicyCreatedEvent               PolicyCreatedEvent
+	PolicyUpdatedEvent               PolicyUpdatedEvent
+	PreviewRemovedEvent              PreviewRemovedEvent
+	ProjectCreatedEvent              ProjectCreatedEvent
+	ProjectDeletedEvent              ProjectDeletedEvent
+	ProjectUpdatedEvent              ProjectUpdatedEvent
+	ReleaseCreatedEvent              ReleaseCreatedEvent
+	ReleaseRevokedEvent              ReleaseRevokedEvent
+	RequestAPIEvent                  RequestAPIEvent
+	SchemaCreatedEvent               SchemaCreatedEvent
+	SessionDeletedEvent              SessionDeletedEvent
+	SessionEstablishedEvent          SessionEstablishedEvent
+	TeamCreatedEvent                 TeamCreatedEvent
+	TeamDeactivatedEvent             TeamDeactivatedEvent
+	TeamUpdatedEvent                 TeamUpdatedEvent
+	UserCreateFailedEvent            UserCreateFailedEvent
+	UserCreatedEvent                 UserCreatedEvent
+	UserDeletedEvent                 UserDeletedEvent
+	UserUpdatedEvent                 UserUpdatedEvent
+	VariableRemovedEvent             VariableRemovedEvent
+	VariableSetEvent                 VariableSetEvent
 }
 
 // EventType is oneOf type of Event.
@@ -23058,50 +23088,52 @@ type EventType string
 
 // Possible values for EventType.
 const (
-	AuthAttemptCreatedEventEvent         EventType = "auth.attempt.created"
-	AuthAttemptHandedOffEventEvent       EventType = "auth.attempt.handed_off"
-	AuthCheckFailedEventEvent            EventType = "auth.check.failed"
-	AuthCheckSucceededEventEvent         EventType = "auth.check.succeeded"
-	AuthFactorPasskeyEnrolledEventEvent  EventType = "auth.factor.passkey.enrolled"
-	AuthFactorPasswordSetEventEvent      EventType = "auth.factor.password.set"
-	AuthSSOAuthorizationFailedEventEvent EventType = "auth.sso.authorization.failed"
-	AuthSSOExchangeFailedEventEvent      EventType = "auth.sso.exchange.failed"
-	AuthSSOExchangeSucceededEventEvent   EventType = "auth.sso.exchange.succeeded"
-	AuthTokenIssuedEventEvent            EventType = "auth.token.issued"
-	AuthTokenRevokedEventEvent           EventType = "auth.token.revoked"
-	AuthzGrantedEventEvent               EventType = "authz.granted"
-	AuthzRevokedEventEvent               EventType = "authz.revoked"
-	BrandingCreatedEventEvent            EventType = "branding.created"
-	DeploymentCreatedEventEvent          EventType = "deployment.created"
-	FlowdefCreatedEventEvent             EventType = "flowdef.created"
-	FlowdefDeletedEventEvent             EventType = "flowdef.deleted"
-	FlowdefUpdatedEventEvent             EventType = "flowdef.updated"
-	IdpCreatedEventEvent                 EventType = "idp.created"
-	IdpIdentityLinkCreatedEventEvent     EventType = "idp.identity_link.created"
-	IdpUpdatedEventEvent                 EventType = "idp.updated"
-	OriginAddedEventEvent                EventType = "origin.added"
-	OriginRemovedEventEvent              EventType = "origin.removed"
-	PolicyCreatedEventEvent              EventType = "policy.created"
-	PolicyUpdatedEventEvent              EventType = "policy.updated"
-	PreviewRemovedEventEvent             EventType = "preview.removed"
-	ProjectCreatedEventEvent             EventType = "project.created"
-	ProjectDeletedEventEvent             EventType = "project.deleted"
-	ProjectUpdatedEventEvent             EventType = "project.updated"
-	ReleaseCreatedEventEvent             EventType = "release.created"
-	ReleaseRevokedEventEvent             EventType = "release.revoked"
-	RequestAPIEventEvent                 EventType = "request.api"
-	SchemaCreatedEventEvent              EventType = "schema.created"
-	SessionDeletedEventEvent             EventType = "session.deleted"
-	SessionEstablishedEventEvent         EventType = "session.established"
-	TeamCreatedEventEvent                EventType = "team.created"
-	TeamDeactivatedEventEvent            EventType = "team.deactivated"
-	TeamUpdatedEventEvent                EventType = "team.updated"
-	UserCreateFailedEventEvent           EventType = "user.create.failed"
-	UserCreatedEventEvent                EventType = "user.created"
-	UserDeletedEventEvent                EventType = "user.deleted"
-	UserUpdatedEventEvent                EventType = "user.updated"
-	VariableRemovedEventEvent            EventType = "variable.removed"
-	VariableSetEventEvent                EventType = "variable.set"
+	AuthAttemptCreatedEventEvent          EventType = "auth.attempt.created"
+	AuthAttemptHandedOffEventEvent        EventType = "auth.attempt.handed_off"
+	AuthCheckFailedEventEvent             EventType = "auth.check.failed"
+	AuthCheckSucceededEventEvent          EventType = "auth.check.succeeded"
+	AuthFactorPasskeyEnrolledEventEvent   EventType = "auth.factor.passkey.enrolled"
+	AuthFactorPasswordSetEventEvent       EventType = "auth.factor.password.set"
+	AuthSSOAuthorizationFailedEventEvent  EventType = "auth.sso.authorization.failed"
+	AuthSSOExchangeFailedEventEvent       EventType = "auth.sso.exchange.failed"
+	AuthSSOExchangeSucceededEventEvent    EventType = "auth.sso.exchange.succeeded"
+	AuthTokenIssuedEventEvent             EventType = "auth.token.issued"
+	AuthTokenRevokedEventEvent            EventType = "auth.token.revoked"
+	AuthzGrantedEventEvent                EventType = "authz.granted"
+	AuthzRevokedEventEvent                EventType = "authz.revoked"
+	BrandingCreatedEventEvent             EventType = "branding.created"
+	DeploymentCreatedEventEvent           EventType = "deployment.created"
+	FlowSignupChallengeConsumedEventEvent EventType = "flow.signup_challenge.consumed"
+	FlowSignupChallengeIssuedEventEvent   EventType = "flow.signup_challenge.issued"
+	FlowdefCreatedEventEvent              EventType = "flowdef.created"
+	FlowdefDeletedEventEvent              EventType = "flowdef.deleted"
+	FlowdefUpdatedEventEvent              EventType = "flowdef.updated"
+	IdpCreatedEventEvent                  EventType = "idp.created"
+	IdpIdentityLinkCreatedEventEvent      EventType = "idp.identity_link.created"
+	IdpUpdatedEventEvent                  EventType = "idp.updated"
+	OriginAddedEventEvent                 EventType = "origin.added"
+	OriginRemovedEventEvent               EventType = "origin.removed"
+	PolicyCreatedEventEvent               EventType = "policy.created"
+	PolicyUpdatedEventEvent               EventType = "policy.updated"
+	PreviewRemovedEventEvent              EventType = "preview.removed"
+	ProjectCreatedEventEvent              EventType = "project.created"
+	ProjectDeletedEventEvent              EventType = "project.deleted"
+	ProjectUpdatedEventEvent              EventType = "project.updated"
+	ReleaseCreatedEventEvent              EventType = "release.created"
+	ReleaseRevokedEventEvent              EventType = "release.revoked"
+	RequestAPIEventEvent                  EventType = "request.api"
+	SchemaCreatedEventEvent               EventType = "schema.created"
+	SessionDeletedEventEvent              EventType = "session.deleted"
+	SessionEstablishedEventEvent          EventType = "session.established"
+	TeamCreatedEventEvent                 EventType = "team.created"
+	TeamDeactivatedEventEvent             EventType = "team.deactivated"
+	TeamUpdatedEventEvent                 EventType = "team.updated"
+	UserCreateFailedEventEvent            EventType = "user.create.failed"
+	UserCreatedEventEvent                 EventType = "user.created"
+	UserDeletedEventEvent                 EventType = "user.deleted"
+	UserUpdatedEventEvent                 EventType = "user.updated"
+	VariableRemovedEventEvent             EventType = "variable.removed"
+	VariableSetEventEvent                 EventType = "variable.set"
 )
 
 // IsAuthAttemptCreatedEvent reports whether Event is AuthAttemptCreatedEvent.
@@ -23154,6 +23186,16 @@ func (s Event) IsBrandingCreatedEvent() bool { return s.Type == BrandingCreatedE
 
 // IsDeploymentCreatedEvent reports whether Event is DeploymentCreatedEvent.
 func (s Event) IsDeploymentCreatedEvent() bool { return s.Type == DeploymentCreatedEventEvent }
+
+// IsFlowSignupChallengeConsumedEvent reports whether Event is FlowSignupChallengeConsumedEvent.
+func (s Event) IsFlowSignupChallengeConsumedEvent() bool {
+	return s.Type == FlowSignupChallengeConsumedEventEvent
+}
+
+// IsFlowSignupChallengeIssuedEvent reports whether Event is FlowSignupChallengeIssuedEvent.
+func (s Event) IsFlowSignupChallengeIssuedEvent() bool {
+	return s.Type == FlowSignupChallengeIssuedEventEvent
+}
 
 // IsFlowdefCreatedEvent reports whether Event is FlowdefCreatedEvent.
 func (s Event) IsFlowdefCreatedEvent() bool { return s.Type == FlowdefCreatedEventEvent }
@@ -23556,6 +23598,48 @@ func (s Event) GetDeploymentCreatedEvent() (v DeploymentCreatedEvent, ok bool) {
 func NewDeploymentCreatedEventEvent(v DeploymentCreatedEvent) Event {
 	var s Event
 	s.SetDeploymentCreatedEvent(v)
+	return s
+}
+
+// SetFlowSignupChallengeConsumedEvent sets Event to FlowSignupChallengeConsumedEvent.
+func (s *Event) SetFlowSignupChallengeConsumedEvent(v FlowSignupChallengeConsumedEvent) {
+	s.Type = FlowSignupChallengeConsumedEventEvent
+	s.FlowSignupChallengeConsumedEvent = v
+}
+
+// GetFlowSignupChallengeConsumedEvent returns FlowSignupChallengeConsumedEvent and true boolean if Event is FlowSignupChallengeConsumedEvent.
+func (s Event) GetFlowSignupChallengeConsumedEvent() (v FlowSignupChallengeConsumedEvent, ok bool) {
+	if !s.IsFlowSignupChallengeConsumedEvent() {
+		return v, false
+	}
+	return s.FlowSignupChallengeConsumedEvent, true
+}
+
+// NewFlowSignupChallengeConsumedEventEvent returns new Event from FlowSignupChallengeConsumedEvent.
+func NewFlowSignupChallengeConsumedEventEvent(v FlowSignupChallengeConsumedEvent) Event {
+	var s Event
+	s.SetFlowSignupChallengeConsumedEvent(v)
+	return s
+}
+
+// SetFlowSignupChallengeIssuedEvent sets Event to FlowSignupChallengeIssuedEvent.
+func (s *Event) SetFlowSignupChallengeIssuedEvent(v FlowSignupChallengeIssuedEvent) {
+	s.Type = FlowSignupChallengeIssuedEventEvent
+	s.FlowSignupChallengeIssuedEvent = v
+}
+
+// GetFlowSignupChallengeIssuedEvent returns FlowSignupChallengeIssuedEvent and true boolean if Event is FlowSignupChallengeIssuedEvent.
+func (s Event) GetFlowSignupChallengeIssuedEvent() (v FlowSignupChallengeIssuedEvent, ok bool) {
+	if !s.IsFlowSignupChallengeIssuedEvent() {
+		return v, false
+	}
+	return s.FlowSignupChallengeIssuedEvent, true
+}
+
+// NewFlowSignupChallengeIssuedEventEvent returns new Event from FlowSignupChallengeIssuedEvent.
+func NewFlowSignupChallengeIssuedEventEvent(v FlowSignupChallengeIssuedEvent) Event {
+	var s Event
+	s.SetFlowSignupChallengeIssuedEvent(v)
 	return s
 }
 
@@ -27697,6 +27781,112 @@ func (s *FlowNotFoundDetails) init() FlowNotFoundDetails {
 	return m
 }
 
+// Merged schema.
+// Ref: #
+type FlowProofInvalid struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptFlowProofInvalidDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *FlowProofInvalid) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *FlowProofInvalid) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *FlowProofInvalid) GetDetails() OptFlowProofInvalidDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *FlowProofInvalid) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *FlowProofInvalid) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *FlowProofInvalid) SetDetails(val OptFlowProofInvalidDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type FlowProofInvalidDetails map[string]jx.Raw
+
+func (s *FlowProofInvalidDetails) init() FlowProofInvalidDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type FlowRateLimited struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptFlowRateLimitedDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *FlowRateLimited) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *FlowRateLimited) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *FlowRateLimited) GetDetails() OptFlowRateLimitedDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *FlowRateLimited) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *FlowRateLimited) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *FlowRateLimited) SetDetails(val OptFlowRateLimitedDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type FlowRateLimitedDetails map[string]jx.Raw
+
+func (s *FlowRateLimitedDetails) init() FlowRateLimitedDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
 // Ref: #
 type FlowResponse struct {
 	// Flow handle. Use this as the path parameter for subsequent
@@ -27893,6 +28083,964 @@ func (s *FlowRestartRequiredDetails) init() FlowRestartRequiredDetails {
 		*s = m
 	}
 	return m
+}
+
+// FlowSignupChallengeConsumed2XX is 2XX pattern response for FlowSignupChallengeConsumed operation.
+type FlowSignupChallengeConsumed2XX struct {
+	StatusCode int
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *FlowSignupChallengeConsumed2XX) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *FlowSignupChallengeConsumed2XX) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+func (*FlowSignupChallengeConsumed2XX) flowSignupChallengeConsumedRes() {}
+
+// FlowSignupChallengeConsumedDef is default response for FlowSignupChallengeConsumed operation.
+type FlowSignupChallengeConsumedDef struct {
+	StatusCode int
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *FlowSignupChallengeConsumedDef) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *FlowSignupChallengeConsumedDef) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+func (*FlowSignupChallengeConsumedDef) flowSignupChallengeConsumedRes() {}
+
+// Merged schema.
+// Ref: #
+type FlowSignupChallengeConsumedEvent struct {
+	// Managed event id (`evt_<opaque>`).
+	ID        string    `json:"id"`
+	ProjectID ProjectID `json:"project_id"`
+	// Emit-time team scope, when the actor operated under a team.
+	TeamID OptNilString `json:"team_id"`
+	// Merged property.
+	EventType string `json:"event_type"`
+	// Wide-event category.
+	Category FlowSignupChallengeConsumedEventCategory `json:"category"`
+	// When the action happened (server/storage clock, dialect-owned).
+	OccurredAt time.Time `json:"occurred_at"`
+	// When the row was inserted (server/storage clock, dialect-owned).
+	CreatedAt time.Time `json:"created_at"`
+	// Who triggered the event.
+	ActorID OptNilString `json:"actor_id"`
+	// Actor kind.
+	ActorType OptNilFlowSignupChallengeConsumedEventActorType `json:"actor_type"`
+	// Resource type affected.
+	EntityType OptNilString `json:"entity_type"`
+	// Resource id affected.
+	EntityID OptNilString `json:"entity_id"`
+	// Application or agent that produced the event.
+	ClientID string `json:"client_id"`
+	// Token id present at emit time, when any.
+	TokenID OptString `json:"token_id"`
+	// Delegation kind (omit when unset).
+	DelegationType OptFlowSignupChallengeConsumedEventDelegationType `json:"delegation_type"`
+	DelegationID   OptString                                         `json:"delegation_id"`
+	Grantor        OptString                                         `json:"grantor"`
+	// Device fingerprint correlation id.
+	Fingerprint OptString `json:"fingerprint"`
+	// HTTP request correlation id.
+	RequestID OptNilString `json:"request_id"`
+	// Session correlation id.
+	SessionID OptNilString `json:"session_id"`
+	// Login flow correlation id.
+	FlowID   OptNilString      `json:"flow_id"`
+	Metadata OptEventMetadata  `json:"metadata"`
+	Payload  EmptyEventPayload `json:"payload"`
+}
+
+// GetID returns the value of ID.
+func (s *FlowSignupChallengeConsumedEvent) GetID() string {
+	return s.ID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *FlowSignupChallengeConsumedEvent) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetTeamID returns the value of TeamID.
+func (s *FlowSignupChallengeConsumedEvent) GetTeamID() OptNilString {
+	return s.TeamID
+}
+
+// GetEventType returns the value of EventType.
+func (s *FlowSignupChallengeConsumedEvent) GetEventType() string {
+	return s.EventType
+}
+
+// GetCategory returns the value of Category.
+func (s *FlowSignupChallengeConsumedEvent) GetCategory() FlowSignupChallengeConsumedEventCategory {
+	return s.Category
+}
+
+// GetOccurredAt returns the value of OccurredAt.
+func (s *FlowSignupChallengeConsumedEvent) GetOccurredAt() time.Time {
+	return s.OccurredAt
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *FlowSignupChallengeConsumedEvent) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetActorID returns the value of ActorID.
+func (s *FlowSignupChallengeConsumedEvent) GetActorID() OptNilString {
+	return s.ActorID
+}
+
+// GetActorType returns the value of ActorType.
+func (s *FlowSignupChallengeConsumedEvent) GetActorType() OptNilFlowSignupChallengeConsumedEventActorType {
+	return s.ActorType
+}
+
+// GetEntityType returns the value of EntityType.
+func (s *FlowSignupChallengeConsumedEvent) GetEntityType() OptNilString {
+	return s.EntityType
+}
+
+// GetEntityID returns the value of EntityID.
+func (s *FlowSignupChallengeConsumedEvent) GetEntityID() OptNilString {
+	return s.EntityID
+}
+
+// GetClientID returns the value of ClientID.
+func (s *FlowSignupChallengeConsumedEvent) GetClientID() string {
+	return s.ClientID
+}
+
+// GetTokenID returns the value of TokenID.
+func (s *FlowSignupChallengeConsumedEvent) GetTokenID() OptString {
+	return s.TokenID
+}
+
+// GetDelegationType returns the value of DelegationType.
+func (s *FlowSignupChallengeConsumedEvent) GetDelegationType() OptFlowSignupChallengeConsumedEventDelegationType {
+	return s.DelegationType
+}
+
+// GetDelegationID returns the value of DelegationID.
+func (s *FlowSignupChallengeConsumedEvent) GetDelegationID() OptString {
+	return s.DelegationID
+}
+
+// GetGrantor returns the value of Grantor.
+func (s *FlowSignupChallengeConsumedEvent) GetGrantor() OptString {
+	return s.Grantor
+}
+
+// GetFingerprint returns the value of Fingerprint.
+func (s *FlowSignupChallengeConsumedEvent) GetFingerprint() OptString {
+	return s.Fingerprint
+}
+
+// GetRequestID returns the value of RequestID.
+func (s *FlowSignupChallengeConsumedEvent) GetRequestID() OptNilString {
+	return s.RequestID
+}
+
+// GetSessionID returns the value of SessionID.
+func (s *FlowSignupChallengeConsumedEvent) GetSessionID() OptNilString {
+	return s.SessionID
+}
+
+// GetFlowID returns the value of FlowID.
+func (s *FlowSignupChallengeConsumedEvent) GetFlowID() OptNilString {
+	return s.FlowID
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *FlowSignupChallengeConsumedEvent) GetMetadata() OptEventMetadata {
+	return s.Metadata
+}
+
+// GetPayload returns the value of Payload.
+func (s *FlowSignupChallengeConsumedEvent) GetPayload() EmptyEventPayload {
+	return s.Payload
+}
+
+// SetID sets the value of ID.
+func (s *FlowSignupChallengeConsumedEvent) SetID(val string) {
+	s.ID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *FlowSignupChallengeConsumedEvent) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *FlowSignupChallengeConsumedEvent) SetTeamID(val OptNilString) {
+	s.TeamID = val
+}
+
+// SetEventType sets the value of EventType.
+func (s *FlowSignupChallengeConsumedEvent) SetEventType(val string) {
+	s.EventType = val
+}
+
+// SetCategory sets the value of Category.
+func (s *FlowSignupChallengeConsumedEvent) SetCategory(val FlowSignupChallengeConsumedEventCategory) {
+	s.Category = val
+}
+
+// SetOccurredAt sets the value of OccurredAt.
+func (s *FlowSignupChallengeConsumedEvent) SetOccurredAt(val time.Time) {
+	s.OccurredAt = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *FlowSignupChallengeConsumedEvent) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetActorID sets the value of ActorID.
+func (s *FlowSignupChallengeConsumedEvent) SetActorID(val OptNilString) {
+	s.ActorID = val
+}
+
+// SetActorType sets the value of ActorType.
+func (s *FlowSignupChallengeConsumedEvent) SetActorType(val OptNilFlowSignupChallengeConsumedEventActorType) {
+	s.ActorType = val
+}
+
+// SetEntityType sets the value of EntityType.
+func (s *FlowSignupChallengeConsumedEvent) SetEntityType(val OptNilString) {
+	s.EntityType = val
+}
+
+// SetEntityID sets the value of EntityID.
+func (s *FlowSignupChallengeConsumedEvent) SetEntityID(val OptNilString) {
+	s.EntityID = val
+}
+
+// SetClientID sets the value of ClientID.
+func (s *FlowSignupChallengeConsumedEvent) SetClientID(val string) {
+	s.ClientID = val
+}
+
+// SetTokenID sets the value of TokenID.
+func (s *FlowSignupChallengeConsumedEvent) SetTokenID(val OptString) {
+	s.TokenID = val
+}
+
+// SetDelegationType sets the value of DelegationType.
+func (s *FlowSignupChallengeConsumedEvent) SetDelegationType(val OptFlowSignupChallengeConsumedEventDelegationType) {
+	s.DelegationType = val
+}
+
+// SetDelegationID sets the value of DelegationID.
+func (s *FlowSignupChallengeConsumedEvent) SetDelegationID(val OptString) {
+	s.DelegationID = val
+}
+
+// SetGrantor sets the value of Grantor.
+func (s *FlowSignupChallengeConsumedEvent) SetGrantor(val OptString) {
+	s.Grantor = val
+}
+
+// SetFingerprint sets the value of Fingerprint.
+func (s *FlowSignupChallengeConsumedEvent) SetFingerprint(val OptString) {
+	s.Fingerprint = val
+}
+
+// SetRequestID sets the value of RequestID.
+func (s *FlowSignupChallengeConsumedEvent) SetRequestID(val OptNilString) {
+	s.RequestID = val
+}
+
+// SetSessionID sets the value of SessionID.
+func (s *FlowSignupChallengeConsumedEvent) SetSessionID(val OptNilString) {
+	s.SessionID = val
+}
+
+// SetFlowID sets the value of FlowID.
+func (s *FlowSignupChallengeConsumedEvent) SetFlowID(val OptNilString) {
+	s.FlowID = val
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *FlowSignupChallengeConsumedEvent) SetMetadata(val OptEventMetadata) {
+	s.Metadata = val
+}
+
+// SetPayload sets the value of Payload.
+func (s *FlowSignupChallengeConsumedEvent) SetPayload(val EmptyEventPayload) {
+	s.Payload = val
+}
+
+type FlowSignupChallengeConsumedEventActorType string
+
+const (
+	FlowSignupChallengeConsumedEventActorTypeHuman   FlowSignupChallengeConsumedEventActorType = "human"
+	FlowSignupChallengeConsumedEventActorTypeService FlowSignupChallengeConsumedEventActorType = "service"
+	FlowSignupChallengeConsumedEventActorTypeSystem  FlowSignupChallengeConsumedEventActorType = "system"
+	FlowSignupChallengeConsumedEventActorTypeAgent   FlowSignupChallengeConsumedEventActorType = "agent"
+)
+
+// AllValues returns all FlowSignupChallengeConsumedEventActorType values.
+func (FlowSignupChallengeConsumedEventActorType) AllValues() []FlowSignupChallengeConsumedEventActorType {
+	return []FlowSignupChallengeConsumedEventActorType{
+		FlowSignupChallengeConsumedEventActorTypeHuman,
+		FlowSignupChallengeConsumedEventActorTypeService,
+		FlowSignupChallengeConsumedEventActorTypeSystem,
+		FlowSignupChallengeConsumedEventActorTypeAgent,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s FlowSignupChallengeConsumedEventActorType) MarshalText() ([]byte, error) {
+	switch s {
+	case FlowSignupChallengeConsumedEventActorTypeHuman:
+		return []byte(s), nil
+	case FlowSignupChallengeConsumedEventActorTypeService:
+		return []byte(s), nil
+	case FlowSignupChallengeConsumedEventActorTypeSystem:
+		return []byte(s), nil
+	case FlowSignupChallengeConsumedEventActorTypeAgent:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *FlowSignupChallengeConsumedEventActorType) UnmarshalText(data []byte) error {
+	switch FlowSignupChallengeConsumedEventActorType(data) {
+	case FlowSignupChallengeConsumedEventActorTypeHuman:
+		*s = FlowSignupChallengeConsumedEventActorTypeHuman
+		return nil
+	case FlowSignupChallengeConsumedEventActorTypeService:
+		*s = FlowSignupChallengeConsumedEventActorTypeService
+		return nil
+	case FlowSignupChallengeConsumedEventActorTypeSystem:
+		*s = FlowSignupChallengeConsumedEventActorTypeSystem
+		return nil
+	case FlowSignupChallengeConsumedEventActorTypeAgent:
+		*s = FlowSignupChallengeConsumedEventActorTypeAgent
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Wide-event category.
+type FlowSignupChallengeConsumedEventCategory string
+
+const (
+	FlowSignupChallengeConsumedEventCategoryRequest FlowSignupChallengeConsumedEventCategory = "request"
+	FlowSignupChallengeConsumedEventCategoryAuth    FlowSignupChallengeConsumedEventCategory = "auth"
+	FlowSignupChallengeConsumedEventCategorySession FlowSignupChallengeConsumedEventCategory = "session"
+	FlowSignupChallengeConsumedEventCategoryAdmin   FlowSignupChallengeConsumedEventCategory = "admin"
+	FlowSignupChallengeConsumedEventCategoryEntity  FlowSignupChallengeConsumedEventCategory = "entity"
+	FlowSignupChallengeConsumedEventCategorySignal  FlowSignupChallengeConsumedEventCategory = "signal"
+)
+
+// AllValues returns all FlowSignupChallengeConsumedEventCategory values.
+func (FlowSignupChallengeConsumedEventCategory) AllValues() []FlowSignupChallengeConsumedEventCategory {
+	return []FlowSignupChallengeConsumedEventCategory{
+		FlowSignupChallengeConsumedEventCategoryRequest,
+		FlowSignupChallengeConsumedEventCategoryAuth,
+		FlowSignupChallengeConsumedEventCategorySession,
+		FlowSignupChallengeConsumedEventCategoryAdmin,
+		FlowSignupChallengeConsumedEventCategoryEntity,
+		FlowSignupChallengeConsumedEventCategorySignal,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s FlowSignupChallengeConsumedEventCategory) MarshalText() ([]byte, error) {
+	switch s {
+	case FlowSignupChallengeConsumedEventCategoryRequest:
+		return []byte(s), nil
+	case FlowSignupChallengeConsumedEventCategoryAuth:
+		return []byte(s), nil
+	case FlowSignupChallengeConsumedEventCategorySession:
+		return []byte(s), nil
+	case FlowSignupChallengeConsumedEventCategoryAdmin:
+		return []byte(s), nil
+	case FlowSignupChallengeConsumedEventCategoryEntity:
+		return []byte(s), nil
+	case FlowSignupChallengeConsumedEventCategorySignal:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *FlowSignupChallengeConsumedEventCategory) UnmarshalText(data []byte) error {
+	switch FlowSignupChallengeConsumedEventCategory(data) {
+	case FlowSignupChallengeConsumedEventCategoryRequest:
+		*s = FlowSignupChallengeConsumedEventCategoryRequest
+		return nil
+	case FlowSignupChallengeConsumedEventCategoryAuth:
+		*s = FlowSignupChallengeConsumedEventCategoryAuth
+		return nil
+	case FlowSignupChallengeConsumedEventCategorySession:
+		*s = FlowSignupChallengeConsumedEventCategorySession
+		return nil
+	case FlowSignupChallengeConsumedEventCategoryAdmin:
+		*s = FlowSignupChallengeConsumedEventCategoryAdmin
+		return nil
+	case FlowSignupChallengeConsumedEventCategoryEntity:
+		*s = FlowSignupChallengeConsumedEventCategoryEntity
+		return nil
+	case FlowSignupChallengeConsumedEventCategorySignal:
+		*s = FlowSignupChallengeConsumedEventCategorySignal
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Delegation kind (omit when unset).
+type FlowSignupChallengeConsumedEventDelegationType string
+
+const (
+	FlowSignupChallengeConsumedEventDelegationTypeDirect    FlowSignupChallengeConsumedEventDelegationType = "direct"
+	FlowSignupChallengeConsumedEventDelegationTypeDelegated FlowSignupChallengeConsumedEventDelegationType = "delegated"
+	FlowSignupChallengeConsumedEventDelegationTypePatShared FlowSignupChallengeConsumedEventDelegationType = "pat_shared"
+	FlowSignupChallengeConsumedEventDelegationTypeExchanged FlowSignupChallengeConsumedEventDelegationType = "exchanged"
+)
+
+// AllValues returns all FlowSignupChallengeConsumedEventDelegationType values.
+func (FlowSignupChallengeConsumedEventDelegationType) AllValues() []FlowSignupChallengeConsumedEventDelegationType {
+	return []FlowSignupChallengeConsumedEventDelegationType{
+		FlowSignupChallengeConsumedEventDelegationTypeDirect,
+		FlowSignupChallengeConsumedEventDelegationTypeDelegated,
+		FlowSignupChallengeConsumedEventDelegationTypePatShared,
+		FlowSignupChallengeConsumedEventDelegationTypeExchanged,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s FlowSignupChallengeConsumedEventDelegationType) MarshalText() ([]byte, error) {
+	switch s {
+	case FlowSignupChallengeConsumedEventDelegationTypeDirect:
+		return []byte(s), nil
+	case FlowSignupChallengeConsumedEventDelegationTypeDelegated:
+		return []byte(s), nil
+	case FlowSignupChallengeConsumedEventDelegationTypePatShared:
+		return []byte(s), nil
+	case FlowSignupChallengeConsumedEventDelegationTypeExchanged:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *FlowSignupChallengeConsumedEventDelegationType) UnmarshalText(data []byte) error {
+	switch FlowSignupChallengeConsumedEventDelegationType(data) {
+	case FlowSignupChallengeConsumedEventDelegationTypeDirect:
+		*s = FlowSignupChallengeConsumedEventDelegationTypeDirect
+		return nil
+	case FlowSignupChallengeConsumedEventDelegationTypeDelegated:
+		*s = FlowSignupChallengeConsumedEventDelegationTypeDelegated
+		return nil
+	case FlowSignupChallengeConsumedEventDelegationTypePatShared:
+		*s = FlowSignupChallengeConsumedEventDelegationTypePatShared
+		return nil
+	case FlowSignupChallengeConsumedEventDelegationTypeExchanged:
+		*s = FlowSignupChallengeConsumedEventDelegationTypeExchanged
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// FlowSignupChallengeIssued2XX is 2XX pattern response for FlowSignupChallengeIssued operation.
+type FlowSignupChallengeIssued2XX struct {
+	StatusCode int
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *FlowSignupChallengeIssued2XX) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *FlowSignupChallengeIssued2XX) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+func (*FlowSignupChallengeIssued2XX) flowSignupChallengeIssuedRes() {}
+
+// FlowSignupChallengeIssuedDef is default response for FlowSignupChallengeIssued operation.
+type FlowSignupChallengeIssuedDef struct {
+	StatusCode int
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *FlowSignupChallengeIssuedDef) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *FlowSignupChallengeIssuedDef) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+func (*FlowSignupChallengeIssuedDef) flowSignupChallengeIssuedRes() {}
+
+// Merged schema.
+// Ref: #
+type FlowSignupChallengeIssuedEvent struct {
+	// Managed event id (`evt_<opaque>`).
+	ID        string    `json:"id"`
+	ProjectID ProjectID `json:"project_id"`
+	// Emit-time team scope, when the actor operated under a team.
+	TeamID OptNilString `json:"team_id"`
+	// Merged property.
+	EventType string `json:"event_type"`
+	// Wide-event category.
+	Category FlowSignupChallengeIssuedEventCategory `json:"category"`
+	// When the action happened (server/storage clock, dialect-owned).
+	OccurredAt time.Time `json:"occurred_at"`
+	// When the row was inserted (server/storage clock, dialect-owned).
+	CreatedAt time.Time `json:"created_at"`
+	// Who triggered the event.
+	ActorID OptNilString `json:"actor_id"`
+	// Actor kind.
+	ActorType OptNilFlowSignupChallengeIssuedEventActorType `json:"actor_type"`
+	// Resource type affected.
+	EntityType OptNilString `json:"entity_type"`
+	// Resource id affected.
+	EntityID OptNilString `json:"entity_id"`
+	// Application or agent that produced the event.
+	ClientID string `json:"client_id"`
+	// Token id present at emit time, when any.
+	TokenID OptString `json:"token_id"`
+	// Delegation kind (omit when unset).
+	DelegationType OptFlowSignupChallengeIssuedEventDelegationType `json:"delegation_type"`
+	DelegationID   OptString                                       `json:"delegation_id"`
+	Grantor        OptString                                       `json:"grantor"`
+	// Device fingerprint correlation id.
+	Fingerprint OptString `json:"fingerprint"`
+	// HTTP request correlation id.
+	RequestID OptNilString `json:"request_id"`
+	// Session correlation id.
+	SessionID OptNilString `json:"session_id"`
+	// Login flow correlation id.
+	FlowID   OptNilString      `json:"flow_id"`
+	Metadata OptEventMetadata  `json:"metadata"`
+	Payload  EmptyEventPayload `json:"payload"`
+}
+
+// GetID returns the value of ID.
+func (s *FlowSignupChallengeIssuedEvent) GetID() string {
+	return s.ID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *FlowSignupChallengeIssuedEvent) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetTeamID returns the value of TeamID.
+func (s *FlowSignupChallengeIssuedEvent) GetTeamID() OptNilString {
+	return s.TeamID
+}
+
+// GetEventType returns the value of EventType.
+func (s *FlowSignupChallengeIssuedEvent) GetEventType() string {
+	return s.EventType
+}
+
+// GetCategory returns the value of Category.
+func (s *FlowSignupChallengeIssuedEvent) GetCategory() FlowSignupChallengeIssuedEventCategory {
+	return s.Category
+}
+
+// GetOccurredAt returns the value of OccurredAt.
+func (s *FlowSignupChallengeIssuedEvent) GetOccurredAt() time.Time {
+	return s.OccurredAt
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *FlowSignupChallengeIssuedEvent) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetActorID returns the value of ActorID.
+func (s *FlowSignupChallengeIssuedEvent) GetActorID() OptNilString {
+	return s.ActorID
+}
+
+// GetActorType returns the value of ActorType.
+func (s *FlowSignupChallengeIssuedEvent) GetActorType() OptNilFlowSignupChallengeIssuedEventActorType {
+	return s.ActorType
+}
+
+// GetEntityType returns the value of EntityType.
+func (s *FlowSignupChallengeIssuedEvent) GetEntityType() OptNilString {
+	return s.EntityType
+}
+
+// GetEntityID returns the value of EntityID.
+func (s *FlowSignupChallengeIssuedEvent) GetEntityID() OptNilString {
+	return s.EntityID
+}
+
+// GetClientID returns the value of ClientID.
+func (s *FlowSignupChallengeIssuedEvent) GetClientID() string {
+	return s.ClientID
+}
+
+// GetTokenID returns the value of TokenID.
+func (s *FlowSignupChallengeIssuedEvent) GetTokenID() OptString {
+	return s.TokenID
+}
+
+// GetDelegationType returns the value of DelegationType.
+func (s *FlowSignupChallengeIssuedEvent) GetDelegationType() OptFlowSignupChallengeIssuedEventDelegationType {
+	return s.DelegationType
+}
+
+// GetDelegationID returns the value of DelegationID.
+func (s *FlowSignupChallengeIssuedEvent) GetDelegationID() OptString {
+	return s.DelegationID
+}
+
+// GetGrantor returns the value of Grantor.
+func (s *FlowSignupChallengeIssuedEvent) GetGrantor() OptString {
+	return s.Grantor
+}
+
+// GetFingerprint returns the value of Fingerprint.
+func (s *FlowSignupChallengeIssuedEvent) GetFingerprint() OptString {
+	return s.Fingerprint
+}
+
+// GetRequestID returns the value of RequestID.
+func (s *FlowSignupChallengeIssuedEvent) GetRequestID() OptNilString {
+	return s.RequestID
+}
+
+// GetSessionID returns the value of SessionID.
+func (s *FlowSignupChallengeIssuedEvent) GetSessionID() OptNilString {
+	return s.SessionID
+}
+
+// GetFlowID returns the value of FlowID.
+func (s *FlowSignupChallengeIssuedEvent) GetFlowID() OptNilString {
+	return s.FlowID
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *FlowSignupChallengeIssuedEvent) GetMetadata() OptEventMetadata {
+	return s.Metadata
+}
+
+// GetPayload returns the value of Payload.
+func (s *FlowSignupChallengeIssuedEvent) GetPayload() EmptyEventPayload {
+	return s.Payload
+}
+
+// SetID sets the value of ID.
+func (s *FlowSignupChallengeIssuedEvent) SetID(val string) {
+	s.ID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *FlowSignupChallengeIssuedEvent) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *FlowSignupChallengeIssuedEvent) SetTeamID(val OptNilString) {
+	s.TeamID = val
+}
+
+// SetEventType sets the value of EventType.
+func (s *FlowSignupChallengeIssuedEvent) SetEventType(val string) {
+	s.EventType = val
+}
+
+// SetCategory sets the value of Category.
+func (s *FlowSignupChallengeIssuedEvent) SetCategory(val FlowSignupChallengeIssuedEventCategory) {
+	s.Category = val
+}
+
+// SetOccurredAt sets the value of OccurredAt.
+func (s *FlowSignupChallengeIssuedEvent) SetOccurredAt(val time.Time) {
+	s.OccurredAt = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *FlowSignupChallengeIssuedEvent) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetActorID sets the value of ActorID.
+func (s *FlowSignupChallengeIssuedEvent) SetActorID(val OptNilString) {
+	s.ActorID = val
+}
+
+// SetActorType sets the value of ActorType.
+func (s *FlowSignupChallengeIssuedEvent) SetActorType(val OptNilFlowSignupChallengeIssuedEventActorType) {
+	s.ActorType = val
+}
+
+// SetEntityType sets the value of EntityType.
+func (s *FlowSignupChallengeIssuedEvent) SetEntityType(val OptNilString) {
+	s.EntityType = val
+}
+
+// SetEntityID sets the value of EntityID.
+func (s *FlowSignupChallengeIssuedEvent) SetEntityID(val OptNilString) {
+	s.EntityID = val
+}
+
+// SetClientID sets the value of ClientID.
+func (s *FlowSignupChallengeIssuedEvent) SetClientID(val string) {
+	s.ClientID = val
+}
+
+// SetTokenID sets the value of TokenID.
+func (s *FlowSignupChallengeIssuedEvent) SetTokenID(val OptString) {
+	s.TokenID = val
+}
+
+// SetDelegationType sets the value of DelegationType.
+func (s *FlowSignupChallengeIssuedEvent) SetDelegationType(val OptFlowSignupChallengeIssuedEventDelegationType) {
+	s.DelegationType = val
+}
+
+// SetDelegationID sets the value of DelegationID.
+func (s *FlowSignupChallengeIssuedEvent) SetDelegationID(val OptString) {
+	s.DelegationID = val
+}
+
+// SetGrantor sets the value of Grantor.
+func (s *FlowSignupChallengeIssuedEvent) SetGrantor(val OptString) {
+	s.Grantor = val
+}
+
+// SetFingerprint sets the value of Fingerprint.
+func (s *FlowSignupChallengeIssuedEvent) SetFingerprint(val OptString) {
+	s.Fingerprint = val
+}
+
+// SetRequestID sets the value of RequestID.
+func (s *FlowSignupChallengeIssuedEvent) SetRequestID(val OptNilString) {
+	s.RequestID = val
+}
+
+// SetSessionID sets the value of SessionID.
+func (s *FlowSignupChallengeIssuedEvent) SetSessionID(val OptNilString) {
+	s.SessionID = val
+}
+
+// SetFlowID sets the value of FlowID.
+func (s *FlowSignupChallengeIssuedEvent) SetFlowID(val OptNilString) {
+	s.FlowID = val
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *FlowSignupChallengeIssuedEvent) SetMetadata(val OptEventMetadata) {
+	s.Metadata = val
+}
+
+// SetPayload sets the value of Payload.
+func (s *FlowSignupChallengeIssuedEvent) SetPayload(val EmptyEventPayload) {
+	s.Payload = val
+}
+
+type FlowSignupChallengeIssuedEventActorType string
+
+const (
+	FlowSignupChallengeIssuedEventActorTypeHuman   FlowSignupChallengeIssuedEventActorType = "human"
+	FlowSignupChallengeIssuedEventActorTypeService FlowSignupChallengeIssuedEventActorType = "service"
+	FlowSignupChallengeIssuedEventActorTypeSystem  FlowSignupChallengeIssuedEventActorType = "system"
+	FlowSignupChallengeIssuedEventActorTypeAgent   FlowSignupChallengeIssuedEventActorType = "agent"
+)
+
+// AllValues returns all FlowSignupChallengeIssuedEventActorType values.
+func (FlowSignupChallengeIssuedEventActorType) AllValues() []FlowSignupChallengeIssuedEventActorType {
+	return []FlowSignupChallengeIssuedEventActorType{
+		FlowSignupChallengeIssuedEventActorTypeHuman,
+		FlowSignupChallengeIssuedEventActorTypeService,
+		FlowSignupChallengeIssuedEventActorTypeSystem,
+		FlowSignupChallengeIssuedEventActorTypeAgent,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s FlowSignupChallengeIssuedEventActorType) MarshalText() ([]byte, error) {
+	switch s {
+	case FlowSignupChallengeIssuedEventActorTypeHuman:
+		return []byte(s), nil
+	case FlowSignupChallengeIssuedEventActorTypeService:
+		return []byte(s), nil
+	case FlowSignupChallengeIssuedEventActorTypeSystem:
+		return []byte(s), nil
+	case FlowSignupChallengeIssuedEventActorTypeAgent:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *FlowSignupChallengeIssuedEventActorType) UnmarshalText(data []byte) error {
+	switch FlowSignupChallengeIssuedEventActorType(data) {
+	case FlowSignupChallengeIssuedEventActorTypeHuman:
+		*s = FlowSignupChallengeIssuedEventActorTypeHuman
+		return nil
+	case FlowSignupChallengeIssuedEventActorTypeService:
+		*s = FlowSignupChallengeIssuedEventActorTypeService
+		return nil
+	case FlowSignupChallengeIssuedEventActorTypeSystem:
+		*s = FlowSignupChallengeIssuedEventActorTypeSystem
+		return nil
+	case FlowSignupChallengeIssuedEventActorTypeAgent:
+		*s = FlowSignupChallengeIssuedEventActorTypeAgent
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Wide-event category.
+type FlowSignupChallengeIssuedEventCategory string
+
+const (
+	FlowSignupChallengeIssuedEventCategoryRequest FlowSignupChallengeIssuedEventCategory = "request"
+	FlowSignupChallengeIssuedEventCategoryAuth    FlowSignupChallengeIssuedEventCategory = "auth"
+	FlowSignupChallengeIssuedEventCategorySession FlowSignupChallengeIssuedEventCategory = "session"
+	FlowSignupChallengeIssuedEventCategoryAdmin   FlowSignupChallengeIssuedEventCategory = "admin"
+	FlowSignupChallengeIssuedEventCategoryEntity  FlowSignupChallengeIssuedEventCategory = "entity"
+	FlowSignupChallengeIssuedEventCategorySignal  FlowSignupChallengeIssuedEventCategory = "signal"
+)
+
+// AllValues returns all FlowSignupChallengeIssuedEventCategory values.
+func (FlowSignupChallengeIssuedEventCategory) AllValues() []FlowSignupChallengeIssuedEventCategory {
+	return []FlowSignupChallengeIssuedEventCategory{
+		FlowSignupChallengeIssuedEventCategoryRequest,
+		FlowSignupChallengeIssuedEventCategoryAuth,
+		FlowSignupChallengeIssuedEventCategorySession,
+		FlowSignupChallengeIssuedEventCategoryAdmin,
+		FlowSignupChallengeIssuedEventCategoryEntity,
+		FlowSignupChallengeIssuedEventCategorySignal,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s FlowSignupChallengeIssuedEventCategory) MarshalText() ([]byte, error) {
+	switch s {
+	case FlowSignupChallengeIssuedEventCategoryRequest:
+		return []byte(s), nil
+	case FlowSignupChallengeIssuedEventCategoryAuth:
+		return []byte(s), nil
+	case FlowSignupChallengeIssuedEventCategorySession:
+		return []byte(s), nil
+	case FlowSignupChallengeIssuedEventCategoryAdmin:
+		return []byte(s), nil
+	case FlowSignupChallengeIssuedEventCategoryEntity:
+		return []byte(s), nil
+	case FlowSignupChallengeIssuedEventCategorySignal:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *FlowSignupChallengeIssuedEventCategory) UnmarshalText(data []byte) error {
+	switch FlowSignupChallengeIssuedEventCategory(data) {
+	case FlowSignupChallengeIssuedEventCategoryRequest:
+		*s = FlowSignupChallengeIssuedEventCategoryRequest
+		return nil
+	case FlowSignupChallengeIssuedEventCategoryAuth:
+		*s = FlowSignupChallengeIssuedEventCategoryAuth
+		return nil
+	case FlowSignupChallengeIssuedEventCategorySession:
+		*s = FlowSignupChallengeIssuedEventCategorySession
+		return nil
+	case FlowSignupChallengeIssuedEventCategoryAdmin:
+		*s = FlowSignupChallengeIssuedEventCategoryAdmin
+		return nil
+	case FlowSignupChallengeIssuedEventCategoryEntity:
+		*s = FlowSignupChallengeIssuedEventCategoryEntity
+		return nil
+	case FlowSignupChallengeIssuedEventCategorySignal:
+		*s = FlowSignupChallengeIssuedEventCategorySignal
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Delegation kind (omit when unset).
+type FlowSignupChallengeIssuedEventDelegationType string
+
+const (
+	FlowSignupChallengeIssuedEventDelegationTypeDirect    FlowSignupChallengeIssuedEventDelegationType = "direct"
+	FlowSignupChallengeIssuedEventDelegationTypeDelegated FlowSignupChallengeIssuedEventDelegationType = "delegated"
+	FlowSignupChallengeIssuedEventDelegationTypePatShared FlowSignupChallengeIssuedEventDelegationType = "pat_shared"
+	FlowSignupChallengeIssuedEventDelegationTypeExchanged FlowSignupChallengeIssuedEventDelegationType = "exchanged"
+)
+
+// AllValues returns all FlowSignupChallengeIssuedEventDelegationType values.
+func (FlowSignupChallengeIssuedEventDelegationType) AllValues() []FlowSignupChallengeIssuedEventDelegationType {
+	return []FlowSignupChallengeIssuedEventDelegationType{
+		FlowSignupChallengeIssuedEventDelegationTypeDirect,
+		FlowSignupChallengeIssuedEventDelegationTypeDelegated,
+		FlowSignupChallengeIssuedEventDelegationTypePatShared,
+		FlowSignupChallengeIssuedEventDelegationTypeExchanged,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s FlowSignupChallengeIssuedEventDelegationType) MarshalText() ([]byte, error) {
+	switch s {
+	case FlowSignupChallengeIssuedEventDelegationTypeDirect:
+		return []byte(s), nil
+	case FlowSignupChallengeIssuedEventDelegationTypeDelegated:
+		return []byte(s), nil
+	case FlowSignupChallengeIssuedEventDelegationTypePatShared:
+		return []byte(s), nil
+	case FlowSignupChallengeIssuedEventDelegationTypeExchanged:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *FlowSignupChallengeIssuedEventDelegationType) UnmarshalText(data []byte) error {
+	switch FlowSignupChallengeIssuedEventDelegationType(data) {
+	case FlowSignupChallengeIssuedEventDelegationTypeDirect:
+		*s = FlowSignupChallengeIssuedEventDelegationTypeDirect
+		return nil
+	case FlowSignupChallengeIssuedEventDelegationTypeDelegated:
+		*s = FlowSignupChallengeIssuedEventDelegationTypeDelegated
+		return nil
+	case FlowSignupChallengeIssuedEventDelegationTypePatShared:
+		*s = FlowSignupChallengeIssuedEventDelegationTypePatShared
+		return nil
+	case FlowSignupChallengeIssuedEventDelegationTypeExchanged:
+		*s = FlowSignupChallengeIssuedEventDelegationTypeExchanged
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
 }
 
 // A step contains ordered capability arrays: what to collect (fields),
@@ -28564,7 +29712,8 @@ type FlowSubmitRequest struct {
 	// User input values. Keys match field names from the step's `fields` dictionary.
 	Fields OptFlowSubmitRequestFields `json:"fields"`
 	// Solutions for security gates. Keys match gate names from the step's `gates` dictionary.
-	// The orchestrator collects these from `<zl-captcha>` component events.
+	// For password signup, the orchestrator solves the built-in challenge with
+	// Web Crypto and submits its JSON proof under `signup_pow`.
 	GateProofs OptFlowSubmitRequestGateProofs `json:"gate_proofs"`
 	// Response to a pending challenge on the step. Required when the step has a
 	// `challenge` property (e.g., after submitting a passkey action).
@@ -28724,7 +29873,8 @@ func (s *FlowSubmitRequestFields) init() FlowSubmitRequestFields {
 }
 
 // Solutions for security gates. Keys match gate names from the step's `gates` dictionary.
-// The orchestrator collects these from `<zl-captcha>` component events.
+// For password signup, the orchestrator solves the built-in challenge with
+// Web Crypto and submits its JSON proof under `signup_pow`.
 type FlowSubmitRequestGateProofs map[string]string
 
 func (s *FlowSubmitRequestGateProofs) init() FlowSubmitRequestGateProofs {
@@ -30756,12 +31906,12 @@ type Gate struct {
 	// ceremonies (e.g. passkey) are modelled as credential auth_attempts via
 	// `x-credential` on a field, not as gates.
 	Kind GateKind `json:"kind"`
-	// Provider identifier within the gate kind — e.g. `altcha`, `turnstile`,
-	// `hcaptcha`. The engine looks up an implementation in its provider
-	// registry.
-	Provider string `json:"provider"`
-	// Provider-specific configuration consumed by the implementation when
-	// issuing the per-render challenge. Opaque to the engine.
+	// Implementation identifier. `zitadel_pow` protects password signup with
+	// the built-in proof-of-work solver. External providers are not supported.
+	Provider  string          `json:"provider"`
+	Challenge OptPowChallenge `json:"challenge"`
+	// Reserved provider-specific configuration. The built-in signup gate uses
+	// `challenge` and does not accept caller-selected cost parameters.
 	Config OptGateConfig `json:"config"`
 }
 
@@ -30773,6 +31923,11 @@ func (s *Gate) GetKind() GateKind {
 // GetProvider returns the value of Provider.
 func (s *Gate) GetProvider() string {
 	return s.Provider
+}
+
+// GetChallenge returns the value of Challenge.
+func (s *Gate) GetChallenge() OptPowChallenge {
+	return s.Challenge
 }
 
 // GetConfig returns the value of Config.
@@ -30790,13 +31945,18 @@ func (s *Gate) SetProvider(val string) {
 	s.Provider = val
 }
 
+// SetChallenge sets the value of Challenge.
+func (s *Gate) SetChallenge(val OptPowChallenge) {
+	s.Challenge = val
+}
+
 // SetConfig sets the value of Config.
 func (s *Gate) SetConfig(val OptGateConfig) {
 	s.Config = val
 }
 
-// Provider-specific configuration consumed by the implementation when
-// issuing the per-render challenge. Opaque to the engine.
+// Reserved provider-specific configuration. The built-in signup gate uses
+// `challenge` and does not accept caller-selected cost parameters.
 type GateConfig map[string]jx.Raw
 
 func (s *GateConfig) init() GateConfig {
@@ -32935,6 +34095,7 @@ type GetFlowStepErrorResponse struct {
 	FlowIntegrity               FlowIntegrity
 	FlowInvalidAction           FlowInvalidAction
 	FlowNotFound                FlowNotFound
+	FlowRateLimited             FlowRateLimited
 	FlowRestartRequired         FlowRestartRequired
 	FlowUnsupported             FlowUnsupported
 	IdpNotFound                 IdpNotFound
@@ -32980,6 +34141,7 @@ const (
 	FlowIntegrityGetFlowStepErrorResponse               GetFlowStepErrorResponseType = "flow.integrity"
 	FlowInvalidActionGetFlowStepErrorResponse           GetFlowStepErrorResponseType = "flow.invalid_action"
 	FlowNotFoundGetFlowStepErrorResponse                GetFlowStepErrorResponseType = "flow.not_found"
+	FlowRateLimitedGetFlowStepErrorResponse             GetFlowStepErrorResponseType = "flow.rate_limited"
 	FlowRestartRequiredGetFlowStepErrorResponse         GetFlowStepErrorResponseType = "flow.restart_required"
 	FlowUnsupportedGetFlowStepErrorResponse             GetFlowStepErrorResponseType = "flow.unsupported"
 	IdpNotFoundGetFlowStepErrorResponse                 GetFlowStepErrorResponseType = "idp.not_found"
@@ -33078,6 +34240,11 @@ func (s GetFlowStepErrorResponse) IsFlowInvalidAction() bool {
 // IsFlowNotFound reports whether GetFlowStepErrorResponse is FlowNotFound.
 func (s GetFlowStepErrorResponse) IsFlowNotFound() bool {
 	return s.Type == FlowNotFoundGetFlowStepErrorResponse
+}
+
+// IsFlowRateLimited reports whether GetFlowStepErrorResponse is FlowRateLimited.
+func (s GetFlowStepErrorResponse) IsFlowRateLimited() bool {
+	return s.Type == FlowRateLimitedGetFlowStepErrorResponse
 }
 
 // IsFlowRestartRequired reports whether GetFlowStepErrorResponse is FlowRestartRequired.
@@ -33507,6 +34674,27 @@ func (s GetFlowStepErrorResponse) GetFlowNotFound() (v FlowNotFound, ok bool) {
 func NewFlowNotFoundGetFlowStepErrorResponse(v FlowNotFound) GetFlowStepErrorResponse {
 	var s GetFlowStepErrorResponse
 	s.SetFlowNotFound(v)
+	return s
+}
+
+// SetFlowRateLimited sets GetFlowStepErrorResponse to FlowRateLimited.
+func (s *GetFlowStepErrorResponse) SetFlowRateLimited(v FlowRateLimited) {
+	s.Type = FlowRateLimitedGetFlowStepErrorResponse
+	s.FlowRateLimited = v
+}
+
+// GetFlowRateLimited returns FlowRateLimited and true boolean if GetFlowStepErrorResponse is FlowRateLimited.
+func (s GetFlowStepErrorResponse) GetFlowRateLimited() (v FlowRateLimited, ok bool) {
+	if !s.IsFlowRateLimited() {
+		return v, false
+	}
+	return s.FlowRateLimited, true
+}
+
+// NewFlowRateLimitedGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from FlowRateLimited.
+func NewFlowRateLimitedGetFlowStepErrorResponse(v FlowRateLimited) GetFlowStepErrorResponse {
+	var s GetFlowStepErrorResponse
+	s.SetFlowRateLimited(v)
 	return s
 }
 
@@ -53050,6 +54238,98 @@ func (o OptFlowNotFoundDetails) Or(d FlowNotFoundDetails) FlowNotFoundDetails {
 	return d
 }
 
+// NewOptFlowProofInvalidDetails returns new OptFlowProofInvalidDetails with value set to v.
+func NewOptFlowProofInvalidDetails(v FlowProofInvalidDetails) OptFlowProofInvalidDetails {
+	return OptFlowProofInvalidDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptFlowProofInvalidDetails is optional FlowProofInvalidDetails.
+type OptFlowProofInvalidDetails struct {
+	Value FlowProofInvalidDetails
+	Set   bool
+}
+
+// IsSet returns true if OptFlowProofInvalidDetails was set.
+func (o OptFlowProofInvalidDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptFlowProofInvalidDetails) Reset() {
+	var v FlowProofInvalidDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptFlowProofInvalidDetails) SetTo(v FlowProofInvalidDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptFlowProofInvalidDetails) Get() (v FlowProofInvalidDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptFlowProofInvalidDetails) Or(d FlowProofInvalidDetails) FlowProofInvalidDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptFlowRateLimitedDetails returns new OptFlowRateLimitedDetails with value set to v.
+func NewOptFlowRateLimitedDetails(v FlowRateLimitedDetails) OptFlowRateLimitedDetails {
+	return OptFlowRateLimitedDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptFlowRateLimitedDetails is optional FlowRateLimitedDetails.
+type OptFlowRateLimitedDetails struct {
+	Value FlowRateLimitedDetails
+	Set   bool
+}
+
+// IsSet returns true if OptFlowRateLimitedDetails was set.
+func (o OptFlowRateLimitedDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptFlowRateLimitedDetails) Reset() {
+	var v FlowRateLimitedDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptFlowRateLimitedDetails) SetTo(v FlowRateLimitedDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptFlowRateLimitedDetails) Get() (v FlowRateLimitedDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptFlowRateLimitedDetails) Or(d FlowRateLimitedDetails) FlowRateLimitedDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptFlowRestartRequiredDetails returns new OptFlowRestartRequiredDetails with value set to v.
 func NewOptFlowRestartRequiredDetails(v FlowRestartRequiredDetails) OptFlowRestartRequiredDetails {
 	return OptFlowRestartRequiredDetails{
@@ -53090,6 +54370,98 @@ func (o OptFlowRestartRequiredDetails) Get() (v FlowRestartRequiredDetails, ok b
 
 // Or returns value if set, or given parameter if does not.
 func (o OptFlowRestartRequiredDetails) Or(d FlowRestartRequiredDetails) FlowRestartRequiredDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptFlowSignupChallengeConsumedEventDelegationType returns new OptFlowSignupChallengeConsumedEventDelegationType with value set to v.
+func NewOptFlowSignupChallengeConsumedEventDelegationType(v FlowSignupChallengeConsumedEventDelegationType) OptFlowSignupChallengeConsumedEventDelegationType {
+	return OptFlowSignupChallengeConsumedEventDelegationType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptFlowSignupChallengeConsumedEventDelegationType is optional FlowSignupChallengeConsumedEventDelegationType.
+type OptFlowSignupChallengeConsumedEventDelegationType struct {
+	Value FlowSignupChallengeConsumedEventDelegationType
+	Set   bool
+}
+
+// IsSet returns true if OptFlowSignupChallengeConsumedEventDelegationType was set.
+func (o OptFlowSignupChallengeConsumedEventDelegationType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptFlowSignupChallengeConsumedEventDelegationType) Reset() {
+	var v FlowSignupChallengeConsumedEventDelegationType
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptFlowSignupChallengeConsumedEventDelegationType) SetTo(v FlowSignupChallengeConsumedEventDelegationType) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptFlowSignupChallengeConsumedEventDelegationType) Get() (v FlowSignupChallengeConsumedEventDelegationType, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptFlowSignupChallengeConsumedEventDelegationType) Or(d FlowSignupChallengeConsumedEventDelegationType) FlowSignupChallengeConsumedEventDelegationType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptFlowSignupChallengeIssuedEventDelegationType returns new OptFlowSignupChallengeIssuedEventDelegationType with value set to v.
+func NewOptFlowSignupChallengeIssuedEventDelegationType(v FlowSignupChallengeIssuedEventDelegationType) OptFlowSignupChallengeIssuedEventDelegationType {
+	return OptFlowSignupChallengeIssuedEventDelegationType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptFlowSignupChallengeIssuedEventDelegationType is optional FlowSignupChallengeIssuedEventDelegationType.
+type OptFlowSignupChallengeIssuedEventDelegationType struct {
+	Value FlowSignupChallengeIssuedEventDelegationType
+	Set   bool
+}
+
+// IsSet returns true if OptFlowSignupChallengeIssuedEventDelegationType was set.
+func (o OptFlowSignupChallengeIssuedEventDelegationType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptFlowSignupChallengeIssuedEventDelegationType) Reset() {
+	var v FlowSignupChallengeIssuedEventDelegationType
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptFlowSignupChallengeIssuedEventDelegationType) SetTo(v FlowSignupChallengeIssuedEventDelegationType) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptFlowSignupChallengeIssuedEventDelegationType) Get() (v FlowSignupChallengeIssuedEventDelegationType, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptFlowSignupChallengeIssuedEventDelegationType) Or(d FlowSignupChallengeIssuedEventDelegationType) FlowSignupChallengeIssuedEventDelegationType {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -57116,6 +58488,132 @@ func (o OptNilFlowDefinitionStepTransitionsItemPurpose) Or(d FlowDefinitionStepT
 	return d
 }
 
+// NewOptNilFlowSignupChallengeConsumedEventActorType returns new OptNilFlowSignupChallengeConsumedEventActorType with value set to v.
+func NewOptNilFlowSignupChallengeConsumedEventActorType(v FlowSignupChallengeConsumedEventActorType) OptNilFlowSignupChallengeConsumedEventActorType {
+	return OptNilFlowSignupChallengeConsumedEventActorType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilFlowSignupChallengeConsumedEventActorType is optional nullable FlowSignupChallengeConsumedEventActorType.
+type OptNilFlowSignupChallengeConsumedEventActorType struct {
+	Value FlowSignupChallengeConsumedEventActorType
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilFlowSignupChallengeConsumedEventActorType was set.
+func (o OptNilFlowSignupChallengeConsumedEventActorType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilFlowSignupChallengeConsumedEventActorType) Reset() {
+	var v FlowSignupChallengeConsumedEventActorType
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilFlowSignupChallengeConsumedEventActorType) SetTo(v FlowSignupChallengeConsumedEventActorType) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilFlowSignupChallengeConsumedEventActorType) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilFlowSignupChallengeConsumedEventActorType) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v FlowSignupChallengeConsumedEventActorType
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilFlowSignupChallengeConsumedEventActorType) Get() (v FlowSignupChallengeConsumedEventActorType, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilFlowSignupChallengeConsumedEventActorType) Or(d FlowSignupChallengeConsumedEventActorType) FlowSignupChallengeConsumedEventActorType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptNilFlowSignupChallengeIssuedEventActorType returns new OptNilFlowSignupChallengeIssuedEventActorType with value set to v.
+func NewOptNilFlowSignupChallengeIssuedEventActorType(v FlowSignupChallengeIssuedEventActorType) OptNilFlowSignupChallengeIssuedEventActorType {
+	return OptNilFlowSignupChallengeIssuedEventActorType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilFlowSignupChallengeIssuedEventActorType is optional nullable FlowSignupChallengeIssuedEventActorType.
+type OptNilFlowSignupChallengeIssuedEventActorType struct {
+	Value FlowSignupChallengeIssuedEventActorType
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilFlowSignupChallengeIssuedEventActorType was set.
+func (o OptNilFlowSignupChallengeIssuedEventActorType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilFlowSignupChallengeIssuedEventActorType) Reset() {
+	var v FlowSignupChallengeIssuedEventActorType
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilFlowSignupChallengeIssuedEventActorType) SetTo(v FlowSignupChallengeIssuedEventActorType) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilFlowSignupChallengeIssuedEventActorType) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilFlowSignupChallengeIssuedEventActorType) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v FlowSignupChallengeIssuedEventActorType
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilFlowSignupChallengeIssuedEventActorType) Get() (v FlowSignupChallengeIssuedEventActorType, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilFlowSignupChallengeIssuedEventActorType) Or(d FlowSignupChallengeIssuedEventActorType) FlowSignupChallengeIssuedEventActorType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptNilFlowdefCreatedEventActorType returns new OptNilFlowdefCreatedEventActorType with value set to v.
 func NewOptNilFlowdefCreatedEventActorType(v FlowdefCreatedEventActorType) OptNilFlowdefCreatedEventActorType {
 	return OptNilFlowdefCreatedEventActorType{
@@ -60642,6 +62140,52 @@ func (o OptPolicyUpdatedEventDelegationType) Get() (v PolicyUpdatedEventDelegati
 
 // Or returns value if set, or given parameter if does not.
 func (o OptPolicyUpdatedEventDelegationType) Or(d PolicyUpdatedEventDelegationType) PolicyUpdatedEventDelegationType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptPowChallenge returns new OptPowChallenge with value set to v.
+func NewOptPowChallenge(v PowChallenge) OptPowChallenge {
+	return OptPowChallenge{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptPowChallenge is optional PowChallenge.
+type OptPowChallenge struct {
+	Value PowChallenge
+	Set   bool
+}
+
+// IsSet returns true if OptPowChallenge was set.
+func (o OptPowChallenge) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptPowChallenge) Reset() {
+	var v PowChallenge
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptPowChallenge) SetTo(v PowChallenge) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptPowChallenge) Get() (v PowChallenge, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptPowChallenge) Or(d PowChallenge) PowChallenge {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -71093,6 +72637,94 @@ func (s *PolicyUpdatedEventDelegationType) UnmarshalText(data []byte) error {
 	default:
 		return errors.Errorf("invalid value: %q", data)
 	}
+}
+
+// A short-lived, single-use signup challenge scoped to this project and flow.
+// For pbkdf2_sha256_5000_l1, try counters 0 through 511, deriving 32 bytes with
+// PBKDF2-HMAC-SHA256 (5000 iterations), password nonce || uint32_be(counter),
+// and the supplied salt. Match the first 16 derived bytes to key_prefix.
+// Submit gate_proofs.signup_pow as a JSON string containing protocol,
+// challenge_id and derived_key (the full 32 bytes in lowercase hex).
+// The proof is spent before password hashing, even if user creation fails.
+// Ref: #
+type PowChallenge struct {
+	Protocol    string    `json:"protocol"`
+	ChallengeID string    `json:"challenge_id"`
+	ProfileID   string    `json:"profile_id"`
+	Salt        string    `json:"salt"`
+	Nonce       string    `json:"nonce"`
+	KeyPrefix   string    `json:"key_prefix"`
+	ExpiresAt   time.Time `json:"expires_at"`
+}
+
+// GetProtocol returns the value of Protocol.
+func (s *PowChallenge) GetProtocol() string {
+	return s.Protocol
+}
+
+// GetChallengeID returns the value of ChallengeID.
+func (s *PowChallenge) GetChallengeID() string {
+	return s.ChallengeID
+}
+
+// GetProfileID returns the value of ProfileID.
+func (s *PowChallenge) GetProfileID() string {
+	return s.ProfileID
+}
+
+// GetSalt returns the value of Salt.
+func (s *PowChallenge) GetSalt() string {
+	return s.Salt
+}
+
+// GetNonce returns the value of Nonce.
+func (s *PowChallenge) GetNonce() string {
+	return s.Nonce
+}
+
+// GetKeyPrefix returns the value of KeyPrefix.
+func (s *PowChallenge) GetKeyPrefix() string {
+	return s.KeyPrefix
+}
+
+// GetExpiresAt returns the value of ExpiresAt.
+func (s *PowChallenge) GetExpiresAt() time.Time {
+	return s.ExpiresAt
+}
+
+// SetProtocol sets the value of Protocol.
+func (s *PowChallenge) SetProtocol(val string) {
+	s.Protocol = val
+}
+
+// SetChallengeID sets the value of ChallengeID.
+func (s *PowChallenge) SetChallengeID(val string) {
+	s.ChallengeID = val
+}
+
+// SetProfileID sets the value of ProfileID.
+func (s *PowChallenge) SetProfileID(val string) {
+	s.ProfileID = val
+}
+
+// SetSalt sets the value of Salt.
+func (s *PowChallenge) SetSalt(val string) {
+	s.Salt = val
+}
+
+// SetNonce sets the value of Nonce.
+func (s *PowChallenge) SetNonce(val string) {
+	s.Nonce = val
+}
+
+// SetKeyPrefix sets the value of KeyPrefix.
+func (s *PowChallenge) SetKeyPrefix(val string) {
+	s.KeyPrefix = val
+}
+
+// SetExpiresAt sets the value of ExpiresAt.
+func (s *PowChallenge) SetExpiresAt(val time.Time) {
+	s.ExpiresAt = val
 }
 
 // A preview URL that is live: an origin matching one of the project's
@@ -86328,6 +87960,8 @@ type SubmitFlowStepErrorResponse struct {
 	FlowIntegrity               FlowIntegrity
 	FlowInvalidAction           FlowInvalidAction
 	FlowNotFound                FlowNotFound
+	FlowProofInvalid            FlowProofInvalid
+	FlowRateLimited             FlowRateLimited
 	FlowRestartRequired         FlowRestartRequired
 	FlowUnsupported             FlowUnsupported
 	IdpEndpointCleartext        IdpEndpointCleartext
@@ -86375,6 +88009,8 @@ const (
 	FlowIntegritySubmitFlowStepErrorResponse               SubmitFlowStepErrorResponseType = "flow.integrity"
 	FlowInvalidActionSubmitFlowStepErrorResponse           SubmitFlowStepErrorResponseType = "flow.invalid_action"
 	FlowNotFoundSubmitFlowStepErrorResponse                SubmitFlowStepErrorResponseType = "flow.not_found"
+	FlowProofInvalidSubmitFlowStepErrorResponse            SubmitFlowStepErrorResponseType = "flow.proof_invalid"
+	FlowRateLimitedSubmitFlowStepErrorResponse             SubmitFlowStepErrorResponseType = "flow.rate_limited"
 	FlowRestartRequiredSubmitFlowStepErrorResponse         SubmitFlowStepErrorResponseType = "flow.restart_required"
 	FlowUnsupportedSubmitFlowStepErrorResponse             SubmitFlowStepErrorResponseType = "flow.unsupported"
 	IdpEndpointCleartextSubmitFlowStepErrorResponse        SubmitFlowStepErrorResponseType = "idp.endpoint_cleartext"
@@ -86479,6 +88115,16 @@ func (s SubmitFlowStepErrorResponse) IsFlowInvalidAction() bool {
 // IsFlowNotFound reports whether SubmitFlowStepErrorResponse is FlowNotFound.
 func (s SubmitFlowStepErrorResponse) IsFlowNotFound() bool {
 	return s.Type == FlowNotFoundSubmitFlowStepErrorResponse
+}
+
+// IsFlowProofInvalid reports whether SubmitFlowStepErrorResponse is FlowProofInvalid.
+func (s SubmitFlowStepErrorResponse) IsFlowProofInvalid() bool {
+	return s.Type == FlowProofInvalidSubmitFlowStepErrorResponse
+}
+
+// IsFlowRateLimited reports whether SubmitFlowStepErrorResponse is FlowRateLimited.
+func (s SubmitFlowStepErrorResponse) IsFlowRateLimited() bool {
+	return s.Type == FlowRateLimitedSubmitFlowStepErrorResponse
 }
 
 // IsFlowRestartRequired reports whether SubmitFlowStepErrorResponse is FlowRestartRequired.
@@ -86934,6 +88580,48 @@ func (s SubmitFlowStepErrorResponse) GetFlowNotFound() (v FlowNotFound, ok bool)
 func NewFlowNotFoundSubmitFlowStepErrorResponse(v FlowNotFound) SubmitFlowStepErrorResponse {
 	var s SubmitFlowStepErrorResponse
 	s.SetFlowNotFound(v)
+	return s
+}
+
+// SetFlowProofInvalid sets SubmitFlowStepErrorResponse to FlowProofInvalid.
+func (s *SubmitFlowStepErrorResponse) SetFlowProofInvalid(v FlowProofInvalid) {
+	s.Type = FlowProofInvalidSubmitFlowStepErrorResponse
+	s.FlowProofInvalid = v
+}
+
+// GetFlowProofInvalid returns FlowProofInvalid and true boolean if SubmitFlowStepErrorResponse is FlowProofInvalid.
+func (s SubmitFlowStepErrorResponse) GetFlowProofInvalid() (v FlowProofInvalid, ok bool) {
+	if !s.IsFlowProofInvalid() {
+		return v, false
+	}
+	return s.FlowProofInvalid, true
+}
+
+// NewFlowProofInvalidSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from FlowProofInvalid.
+func NewFlowProofInvalidSubmitFlowStepErrorResponse(v FlowProofInvalid) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetFlowProofInvalid(v)
+	return s
+}
+
+// SetFlowRateLimited sets SubmitFlowStepErrorResponse to FlowRateLimited.
+func (s *SubmitFlowStepErrorResponse) SetFlowRateLimited(v FlowRateLimited) {
+	s.Type = FlowRateLimitedSubmitFlowStepErrorResponse
+	s.FlowRateLimited = v
+}
+
+// GetFlowRateLimited returns FlowRateLimited and true boolean if SubmitFlowStepErrorResponse is FlowRateLimited.
+func (s SubmitFlowStepErrorResponse) GetFlowRateLimited() (v FlowRateLimited, ok bool) {
+	if !s.IsFlowRateLimited() {
+		return v, false
+	}
+	return s.FlowRateLimited, true
+}
+
+// NewFlowRateLimitedSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from FlowRateLimited.
+func NewFlowRateLimitedSubmitFlowStepErrorResponse(v FlowRateLimited) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetFlowRateLimited(v)
 	return s
 }
 

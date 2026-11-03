@@ -1,5 +1,8 @@
 ---
+"@zitadel/server": minor
+"@zitadel/components": minor
 ---
 
-Adds an experimental internal PBKDF2 PoW core, reference vectors and tests.
-No shipped API or login behavior changes.
+Protect Flow API password signup with built-in PBKDF2 proof of work, a browser
+solver, single-use proofs and fixed per-project rate limits. Custom/headless
+signup clients must solve `step.gates.signup_pow` and submit `gate_proofs.signup_pow`.

@@ -23,8 +23,9 @@ const (
 )
 
 // Binding comes from the caller's trusted state, never from the submitted proof.
-// The operation instance must pin the protected input/target privately; changing
-// that input requires a new operation instance. Do not put passwords here.
+// The operation instance identifies the protected scope (for example a flow
+// allowed one signup attempt). The caller must consume it atomically before
+// performing the operation. Do not put passwords here.
 // ExpiresAt is integer Unix seconds, with no client-controlled clock allowance.
 type Binding struct {
 	ProfileID           string `json:"profile_id"`

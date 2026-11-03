@@ -1,3 +1,4 @@
+import { webcrypto } from "node:crypto";
 import {
   applyBranding,
   clearBranding,
@@ -49,6 +50,11 @@ let testProject = configureZitadel({
 });
 
 beforeAll(() => {
+  // jsdom has no SubtleCrypto; use Node's native implementation.
+  Object.defineProperty(globalThis.crypto, "subtle", {
+    configurable: true,
+    value: webcrypto.subtle,
+  });
   server.listen({ onUnhandledRequest: "error" });
 });
 
@@ -1798,6 +1804,41 @@ describe("<zitadel-login> against the typed Flow API", () => {
       );
       await waitFor(() => element.shadowRoot?.querySelector('zl-field[type="password"]'));
     }
+
+    it("keeps signup input after a solver failure and submits a fresh proof on retry", async () => {
+      const element = await mount(host);
+      await navigateToRegisterPassword(element);
+      type(element, PASSWORD_FIELD, "hunter2secure");
+      const derive = vi.spyOn(globalThis.crypto.subtle, "deriveBits");
+      derive.mockRejectedValueOnce(new Error("Temporary signup check failure"));
+      try {
+        submit(element);
+        await waitFor(() =>
+          element.shadowRoot?.textContent?.includes("Temporary signup check failure") ? true : null,
+        );
+        expect(
+          element.shadowRoot?.querySelector(`zl-field[name="${PASSWORD_FIELD}"]`),
+        ).not.toBeNull();
+        submit(element);
+        await waitFor(() =>
+          mock
+            .getCaptured()
+            .find((r) => r.kind === "submitFlowStep" && r.body.gate_proofs?.signup_pow),
+        );
+        const request = mock
+          .getCaptured()
+          .find((r) => r.kind === "submitFlowStep" && r.body.gate_proofs?.signup_pow);
+        expect(request).toMatchObject({
+          kind: "submitFlowStep",
+          body: {
+            fields: { [PASSWORD_FIELD]: "hunter2secure" },
+            gate_proofs: { signup_pow: expect.any(String) },
+          },
+        });
+      } finally {
+        derive.mockRestore();
+      }
+    });
 
     it("renders no generic control for the kind: back action, only the account's change link", async () => {
       const element = await mount(host);

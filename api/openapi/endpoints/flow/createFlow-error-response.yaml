@@ -13,6 +13,7 @@ content:
         - $ref: '../../components/schemas/errors/flowdef-purpose_mismatch.yaml'
         - $ref: '../../components/schemas/errors/flow-integrity.yaml'
         - $ref: '../../components/schemas/errors/flow-invalid_purpose.yaml'
+        - $ref: '../../components/schemas/errors/flow-rate_limited.yaml'
         - $ref: '../../components/schemas/errors/internal.yaml'
         - $ref: '../../components/schemas/errors/tkn-invalid.yaml'
         - $ref: '../../components/schemas/errors/tkn-invalid_tknid.yaml'
@@ -38,6 +39,7 @@ content:
           flowdef.purpose_mismatch: '../../components/schemas/errors/flowdef-purpose_mismatch.yaml'
           flow.integrity: '../../components/schemas/errors/flow-integrity.yaml'
           flow.invalid_purpose: '../../components/schemas/errors/flow-invalid_purpose.yaml'
+          flow.rate_limited: '../../components/schemas/errors/flow-rate_limited.yaml'
           internal: '../../components/schemas/errors/internal.yaml'
           tkn.invalid: '../../components/schemas/errors/tkn-invalid.yaml'
           tkn.invalid_tknid: '../../components/schemas/errors/tkn-invalid_tknid.yaml'
@@ -97,6 +99,11 @@ content:
         value:
           code: flow.invalid_purpose
           message: 'unknown or unsupported flow purpose'
+      flow.rate_limited:
+        summary: flow.rate_limited
+        value:
+          code: flow.rate_limited
+          message: 'signup request limit reached; retry after one minute'
       internal:
         summary: internal
         value:

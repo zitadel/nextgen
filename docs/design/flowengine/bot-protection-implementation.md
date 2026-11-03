@@ -1,69 +1,86 @@
-# PBKDF2 proof-of-work POC
+# Minimal signup proof of work
 
-> **Status:** Experimental core only. No endpoint, flow gate or admission policy is enabled.
+> **Status:** Implemented for the Flow API's password `create_user` mutation.
+> The protocol identifier remains provisional: `zitadel_pow_poc_v1`.
 
-This experiment checks whether ZITADEL can issue a bounded PBKDF2 puzzle and
-verify its solution cheaply with HMACs. It uses Go's standard library and
-WebCrypto, with no new runtime dependencies. Passwap remains untouched.
+The default signup renders `step.gates.signup_pow` on its password step. The
+server injects this gate by the step's `on_success: create_user`, independent of
+its name, purpose or template. Editing the template cannot remove enforcement.
+There is no new endpoint, provider registry, policy or configuration surface.
 
-The implementation is [internal/crypto/pow](../../../internal/crypto/pow/doc.go).
-Its protocol identifier is `zitadel_pow_poc_v1`; both the protocol and profiles
-are provisional. This does not finalize the proposed flow contract in
-[ADR 019](../../adrs/019-captcha-gate-and-bot-signals.md).
+## Request path
 
-## Small, fixed experiment
+1. Rendering the signup step reuses its live challenge or issues one with a
+   five-minute lifetime. The browser receives only the public puzzle.
+2. On submit, `<zitadel-login>` refreshes the step and solves the puzzle through
+   native asynchronous Web Crypto. The existing loading state covers this work.
+   It submits the full proof as the JSON string `gate_proofs.signup_pow`.
+3. The shared signup handler verifies and atomically consumes the proof before
+   allocating a user ID, hashing the password or running user mutations.
+4. Only one concurrent submission can consume it. A failed mutation still spends
+   the proof. Re-rendering or retrying obtains another challenge. Field/identifier
+   validation failures before verification leave the pending challenge usable.
 
-The default algorithm is `pbkdf2_sha256`. Each trial uses 5,000 iterations,
-a 16-byte salt, and a 32-byte output. The input is a 16-byte nonce followed by a
-four-byte big-endian counter. Issuance samples the hidden counter uniformly and
-performs one KDF; the client searches for the published first 16 output bytes.
+A proof authorizes one signup attempt within one project and flow. It does not
+prove humanity, authenticate a user, or bind a password chosen after issuance.
+It is never an authentication factor. Replaying an older flow cookie does not
+restore a spent challenge. Missing, malformed, expired and spent proofs return
+`403 flow.proof_invalid`; the client can refresh and retry.
 
-| Level | Maximum trials |
-| --- | --- |
-| 1 | 512 |
-| 2 | 1,024 |
-| 3 | 2,048 |
-| 4 | 4,096 |
+## Fixed initial costs and limits
 
-Level zero means the caller issues no puzzle. The algorithm/profile boundary
-allows a future implementation to add a supported algorithm; unknown algorithms,
-levels and client-supplied KDF parameters are rejected. There is no provider or
-profile-retirement framework in this POC.
+PBKDF2-HMAC-SHA256 is the default and only enabled algorithm. Signup uses
+`pbkdf2_sha256_5000_l1`: 5,000 iterations per trial and at most 512 trials. Each
+trial derives 32 bytes from `nonce || uint32_be(counter)` with a 16-byte salt.
+The client matches the published first 16 bytes and sends the entire derived key.
+The server issues with one KDF and verifies with HMACs, without running a KDF.
 
-## Correctness boundaries
+The crypto core retains profiles for 512, 1,024, 2,048 and 4,096 trials. The live
+signup path and browser solver enable level one only. Unknown profiles fail
+closed; adding an algorithm later requires a new supported profile and solver.
+No client-selected iteration or memory parameters are accepted.
 
-The caller supplies the project, operation, operation-instance ID, challenge ID,
-profile and expiry. The operation instance must privately pin the protected
-input; changing that input needs a new instance. Resource IDs come from storage.
-Passwords and other protected inputs are never part of the challenge.
+Each project has a fixed one-minute budget of **60 new challenges** and **120
+proof submissions**, committed before cryptographic work. Exhaustion returns
+`429 flow.rate_limited`. Refreshing an existing live challenge is free. Budgets
+are shared across replicas and cannot be reset by creating another flow or
+spoofing a forwarded IP header. They are deliberately conservative project-wide
+caps; one noisy client can exhaust the project's budget. Per-client fairness,
+configurable limits and increasing cost are deferred. Normal ingress request
+limits remain necessary; this gate does not rate-limit all Flow API requests.
 
-Two independent 256-bit keys authenticate the exact stored context/full solution
-and the stored challenge body, using distinct HMAC domains. The client receives
-only the protocol, challenge/profile IDs, salt, nonce, key prefix and expiry. Its
-proof contains the protocol, challenge ID and full derived key. Verification
-checks the expected binding, expiry, prefix and MACs without running a KDF.
+## Persistence and secrets
 
-Proofs are limited to 2 KiB, stored bodies to 4 KiB and validity to five minutes.
-Strict parsing rejects unknown or duplicate fields, case aliases, nulls, trailing
-data and malformed hex. Reference vectors cover all levels, counter framing and
-Go/WebCrypto agreement; negative tests and fuzzing cover hostile inputs.
+SQLite, PostgreSQL and Spanner store pending challenges and counters. Project
+locks serialize budget updates and issuance; compare-and-delete consumes a proof
+once. Issuance and consumption emit audit events in their transactions. Expired
+rows are cleaned up when that project issues a challenge; inactive projects keep
+only their last bounded batch until the next issuance or project deletion. Each
+project has one counter row. There is no new background worker.
 
-## Next validation
+Each challenge has independent random 256-bit HMAC keys. The server encrypts the
+keys and stored challenge with the existing project secret crypter; the JWE key
+ID supports reads after key rotation. Cookie/password keys are not used as PoW
+MAC keys. Salt, nonce and counter randomness is puzzle material; resource IDs
+come from the storage dialect. PBKDF2, randomness and key-service calls stay
+outside retryable database transactions.
 
-A successful proof currently remains reusable: this package has no admission
-store. Before public use, demonstrate one protected operation through a browser,
-with bounded issuance, atomic one-use consumption and independent rate limits.
-Then exercise ten free attempts followed by increasing cost, including concurrent
-requests. Those are follow-up experiments, not implemented behavior.
+The browser solver has a 512-trial bound and a 30-second/expiry deadline. It
+cancels when the component disconnects, uses no third-party script, WASM or
+worker bundle, and requires Web Crypto on a secure origin. Existing back and SSO
+actions do not solve signup puzzles. Headless clients must implement the same
+challenge/proof exchange; old clients without a solver receive a proof refusal.
 
-Production key lifecycle, release/configuration integration, CEL accounting,
-customer providers and Cloud BotID remain outside this change. PoW demonstrates
-work, not humanity; desktop results alone do not establish attacker economics or
-acceptable mobile cost.
+## Scope and verification
 
-## Run
+CEL, ten free attempts followed by increasing costs, external providers, Cloud
+BotID, algorithm configuration, and protection for SSO/passkey signup are deferred.
+Passwap remains the password-hashing library; it is not needed for these fixed
+protocol KDF parameters. There is no ALTCHA library or hosted service dependency.
+Mobile calibration and attacker economics remain unvalidated.
 
-`moon run server:test-pow` checks the independent WebCrypto vectors and runs the
-Go race suite. The normal server tests also include the core and vector check.
-See [the fixture instructions](testdata/README.md) for bounded fuzzing and vector
-regeneration. All fixture keys and identifiers are public synthetic data.
+`moon run server:test-pow` checks the Go core and independent Web Crypto vectors.
+Portable storage tests cover atomic replay rejection, project/flow isolation,
+expiry and shared quotas. HTTP tests cover signup refusal, acceptance and cookie
+replay. Component tests exercise the signup exchange; Chromium tests check the
+solver against the same [public MIT vectors](testdata/README.md).

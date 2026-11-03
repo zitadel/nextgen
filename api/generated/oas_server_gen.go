@@ -1158,6 +1158,11 @@ type Handler interface {
 	// The response sets an updated encrypted `HttpOnly` cookie (`_zflow`)
 	// with the new flow state. The server is stateless — all orchestration
 	// state is carried in this cookie between requests.
+	// Password signup (`create_user`) additionally requires a single-use
+	// `gate_proofs.signup_pow` solution for `step.gates.signup_pow`. Pending
+	// challenges and rate counters are stored on the server. Invalid or spent
+	// proofs return `403 flow.proof_invalid`; exhausted project budgets return
+	// `429 flow.rate_limited`. Refresh the current step before retrying a proof.
 	// **Important:** The `id` in the response may differ from the `id` used in
 	// the request. This happens when a flow pivots (pushes a new flow onto the
 	// stack) or when a stacked flow completes (auto-pops to the parent flow).

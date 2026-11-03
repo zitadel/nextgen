@@ -4,9 +4,34 @@
 > **Date:** 2026-05-26
 > **Context:** Flow engine gates, bot detection, captcha providers, edge/platform risk signals
 
-> **Experiment:** The [internal PBKDF2 POC](../design/flowengine/bot-protection-implementation.md)
-> evaluates a ZITADEL-owned alternative to the proposed ALTCHA library integration.
-> Its protocol is provisional and no flow enforcement is enabled.
+> **Implemented slice (2026-11-03):** Password signup uses ZITADEL-owned PBKDF2
+> proof of work, a native browser solver, database-backed single-use proofs and
+> fixed project rate limits. See the [implementation](../design/flowengine/bot-protection-implementation.md).
+> The broader provider/CEL/signal design below remains proposed.
+
+## Minimal signup decision
+
+The turnkey implementation is internal PBKDF2, with no ALTCHA server or library.
+This supersedes the proposed built-in ALTCHA choice below. The runtime injects
+`gates.signup_pow` with `kind: captcha`, `provider: zitadel_pow` and a typed public
+`challenge`. The existing `gate_proofs` submission channel carries its solution.
+Enforcement lives in the shared `create_user` handler before password hashing;
+proofs are not authentication factors and do not go through `auth_attempts`.
+
+A proof permits one password signup attempt scoped to its project and flow.
+Storage atomically consumes it, including when the subsequent mutation fails.
+Pending challenges are reused across renders and expire after five minutes.
+The only active profile is PBKDF2-SHA256, 5,000 iterations and up to 512 trials.
+Database budgets allow 60 issuances and 120 proof submissions per project per
+minute across replicas. These conservative fixed limits require no CEL, client
+IP trust, new endpoint or policy configuration. They do not cover other signup
+methods or replace ingress rate limits.
+
+The browser uses native asynchronous Web Crypto, with bounded trials, expiry,
+a deadline and disconnect cancellation. Future algorithms require versioned
+supported profiles; arbitrary client cost parameters remain forbidden. Customer
+providers, Cloud BotID, adaptive cost and CEL remain follow-up design work. A
+customer's own provider is still a product goal, not an implemented capability.
 
 ## Decision
 

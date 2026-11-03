@@ -1,0 +1,29 @@
+-- +goose Up
+-- +goose StatementBegin
+CREATE TABLE signup_challenges (
+    project_id TEXT NOT NULL,
+    flow_id TEXT NOT NULL,
+    id TEXT NOT NULL,
+    expires_at INTEGER NOT NULL,
+    payload TEXT NOT NULL,
+    CONSTRAINT fk_signup_challenges_project FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE,
+    PRIMARY KEY (project_id, flow_id)
+);
+-- +goose StatementEnd
+-- +goose StatementBegin
+CREATE TABLE signup_limits (
+    project_id TEXT NOT NULL,
+    window_start INTEGER NOT NULL,
+    issued INTEGER NOT NULL,
+    verified INTEGER NOT NULL,
+    CONSTRAINT fk_signup_limits_project FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE,
+    PRIMARY KEY (project_id)
+);
+-- +goose StatementEnd
+-- +goose Down
+-- +goose StatementBegin
+DROP TABLE signup_limits;
+-- +goose StatementEnd
+-- +goose StatementBegin
+DROP TABLE signup_challenges;
+-- +goose StatementEnd

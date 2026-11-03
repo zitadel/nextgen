@@ -35,6 +35,7 @@ import { stampExportparts } from "./exportparts.js";
 import { createLiquidEngine, localiseFlowErrorKeys } from "./liquid.js";
 import { isHidden, localeFor, type Locale } from "./locales/index.js";
 import { patchMandatoryGates } from "./mandatory-gates.js";
+import { solveSignupPow } from "./signup-pow.js";
 import { resolveApi } from "./resolve-api.js";
 import { returnPathFromLocation } from "./return-path.js";
 import { createSanitiser } from "./sanitiser.js";
@@ -449,6 +450,7 @@ export class ZitadelLogin extends ZitadelSurface {
   }
 
   override disconnectedCallback(): void {
+    this.signupSolve?.abort();
     super.disconnectedCallback();
     if (typeof window !== "undefined") {
       window.removeEventListener("popstate", this.handlePopState);
@@ -909,6 +911,7 @@ export class ZitadelLogin extends ZitadelSurface {
   }
 
   private async applyResponse(wire: CreateFlow201): Promise<void> {
+    this.signupSolve?.abort();
     this.restarting = false;
     // A fresh response carries fresh (or no) errors — un-dismiss.
     this.stepErrorDismissed = false;
@@ -1548,6 +1551,8 @@ export class ZitadelLogin extends ZitadelSurface {
     target?.focus();
   }
 
+  private signupSolve?: AbortController;
+
   private async submit(
     action: string | null,
     challengeResponse?: SubmitFlowStepBodyChallengeResponse,
@@ -1577,13 +1582,51 @@ export class ZitadelLogin extends ZitadelSurface {
           : {}),
       };
       const { api } = resolveApi(this.project, this.projectAttrs, "<zitadel-login>");
+      const submitting =
+        this.response.step.actions.find((a) => a.name === body.action)?.kind === "submit";
+      if (submitting && this.response.step.gates.signup_pow) {
+        const controller = new AbortController();
+        this.signupSolve = controller;
+        // Refresh before solving: a previous attempt may have spent its proof,
+        // or the person may have left the password form open past its expiry.
+        // Keep the entered fields; GET only refreshes the server-owned gate.
+        const fresh = await getCurrentStep(api, id);
+        controller.signal.throwIfAborted();
+        if (fresh.step.name !== this.response.step.name) {
+          void this.applyResponse(fresh);
+          return;
+        }
+        const gate = fresh.step.gates.signup_pow;
+        if (gate?.provider !== "zitadel_pow" || gate.kind !== "captcha" || !gate.challenge) {
+          throw new Error("Signup check is unavailable. Refresh and try again.");
+        }
+        body.gate_proofs = { signup_pow: await solveSignupPow(gate.challenge, controller.signal) };
+      }
       const wire = await apiSubmitStep(api, id, body);
       void this.applyResponse(wire);
       emit(this, "zitadel-flow-step", { step: wire.step });
     } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
       if (await this.restartIfRequired(error)) return;
+      if (this.signupSolve && this.response) {
+        const message =
+          error instanceof ApiError
+            ? apiErrorMessage(error)
+            : error instanceof Error
+              ? error.message
+              : "Signup check failed. Please try again.";
+        // Keep the form and its values available for a retry. The next submit
+        // refreshes the challenge instead of reusing a possibly spent proof.
+        await this.applyResponse({
+          ...this.response,
+          step: { ...this.response.step, error: message },
+        });
+        emit(this, "zitadel-flow-error", { message });
+        return;
+      }
       this.handleTransportError(error);
     } finally {
+      this.signupSolve = undefined;
       this.pendingAction = null;
       this.loading = false;
     }

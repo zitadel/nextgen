@@ -1,3 +1,4 @@
+import { signupProof } from "./fixtures/signup-pow.js";
 import { configureZitadel } from "@zitadel/api/config";
 import {
   createFlow,
@@ -319,6 +320,7 @@ describe("setupMockHandlers", () => {
     const done = await submitFlowStep(id, {
       session_token: password.session_token,
       action: "submit",
+      gate_proofs: { signup_pow: signupProof(password.session_token) },
       fields: { [PASSWORD_FIELD]: "correct-horse-battery-staple" },
     });
     expect(done.step.name).toBe("done");
@@ -426,6 +428,7 @@ describe("setupMockHandlers", () => {
     const done = await submitFlowStep(passwordStep.id, {
       session_token: passwordStep.session_token,
       action: "submit",
+      gate_proofs: { signup_pow: signupProof(passwordStep.session_token) },
       fields: { [PASSWORD_FIELD]: "hunter2" },
     });
     expect(done.step.name).toBe("done");

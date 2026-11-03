@@ -27,7 +27,8 @@ properties:
     type: object
     description: |
       Solutions for security gates. Keys match gate names from the step's `gates` dictionary.
-      The orchestrator collects these from `<zl-captcha>` component events.
+      For password signup, the orchestrator solves the built-in challenge with
+      Web Crypto and submits its JSON proof under `signup_pow`.
     additionalProperties:
       type: string
   challenge_response:

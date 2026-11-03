@@ -87,7 +87,8 @@ func TestPostCreateUserPasskeyUpsell(t *testing.T) {
 
 	// register-password → passkey-upsell (create_user fires here)
 	pwResp, err := client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{
-		Action: "submit",
+		GateProofs: signupProofs(t, regOK.Response.Step),
+		Action:     "submit",
 		Fields: api.NewOptFlowSubmitRequestFields(api.FlowSubmitRequestFields{
 			"x-auth-methods#password": jx.Raw(`"` + newPass + `"`),
 		}),
@@ -220,7 +221,8 @@ func TestPostCreateUserPasskeyUpsell_SkipsToDone(t *testing.T) {
 	zflow = mustExtractZflow(t, regOK.SetCookie)
 
 	pwResp, err := client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{
-		Action: "submit",
+		GateProofs: signupProofs(t, regOK.Response.Step),
+		Action:     "submit",
 		Fields: api.NewOptFlowSubmitRequestFields(api.FlowSubmitRequestFields{
 			"x-auth-methods#password": jx.Raw(`"` + newPass + `"`),
 		}),

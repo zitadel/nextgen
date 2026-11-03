@@ -1,3 +1,4 @@
+import { validSignupProof } from "./fixtures/signup-pow.js";
 /**
  * MSW handler factory for the mock Flow API.
  *
@@ -510,6 +511,16 @@ export function setupMockHandlers(
         iss,
       };
 
+      if (
+        before === "register-password" &&
+        body.action === "submit" &&
+        !validSignupProof(body.gate_proofs?.signup_pow, snapshot.context.sessionToken)
+      ) {
+        return HttpResponse.json(
+          { code: "flow.proof_invalid", message: "signup proof is missing or invalid" },
+          { status: 403 },
+        );
+      }
       const outcome = accountOutcome(before, body.action, email);
 
       // With account routing the collision is the switch to sign-in, as the

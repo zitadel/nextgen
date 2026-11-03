@@ -20,6 +20,8 @@ content:
         - $ref: '../../../components/schemas/errors/flow-integrity.yaml'
         - $ref: '../../../components/schemas/errors/flow-invalid_action.yaml'
         - $ref: '../../../components/schemas/errors/flow-not_found.yaml'
+        - $ref: '../../../components/schemas/errors/flow-proof_invalid.yaml'
+        - $ref: '../../../components/schemas/errors/flow-rate_limited.yaml'
         - $ref: '../../../components/schemas/errors/flow-restart_required.yaml'
         - $ref: '../../../components/schemas/errors/flow-unsupported.yaml'
         - $ref: '../../../components/schemas/errors/idp-endpoint_cleartext.yaml'
@@ -63,6 +65,8 @@ content:
           flow.integrity: '../../../components/schemas/errors/flow-integrity.yaml'
           flow.invalid_action: '../../../components/schemas/errors/flow-invalid_action.yaml'
           flow.not_found: '../../../components/schemas/errors/flow-not_found.yaml'
+          flow.proof_invalid: '../../../components/schemas/errors/flow-proof_invalid.yaml'
+          flow.rate_limited: '../../../components/schemas/errors/flow-rate_limited.yaml'
           flow.restart_required: '../../../components/schemas/errors/flow-restart_required.yaml'
           flow.unsupported: '../../../components/schemas/errors/flow-unsupported.yaml'
           idp.endpoint_cleartext: '../../../components/schemas/errors/idp-endpoint_cleartext.yaml'
@@ -168,6 +172,16 @@ content:
         value:
           code: flow.not_found
           message: 'flow not found'
+      flow.proof_invalid:
+        summary: flow.proof_invalid
+        value:
+          code: flow.proof_invalid
+          message: 'signup proof is missing, invalid, expired or already used; refresh the step'
+      flow.rate_limited:
+        summary: flow.rate_limited
+        value:
+          code: flow.rate_limited
+          message: 'signup request limit reached; retry after one minute'
       flow.restart_required:
         summary: flow.restart_required
         value:

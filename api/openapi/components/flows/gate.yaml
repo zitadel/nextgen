@@ -17,15 +17,16 @@ properties:
   provider:
     type: string
     description: |
-      Provider identifier within the gate kind — e.g. `altcha`, `turnstile`,
-      `hcaptcha`. The engine looks up an implementation in its provider
-      registry.
-    example: altcha
+      Implementation identifier. `zitadel_pow` protects password signup with
+      the built-in proof-of-work solver. External providers are not supported.
+    example: zitadel_pow
+  challenge:
+    $ref: pow-challenge.yaml
   config:
     type: object
     description: |
-      Provider-specific configuration consumed by the implementation when
-      issuing the per-render challenge. Opaque to the engine.
+      Reserved provider-specific configuration. The built-in signup gate uses
+      `challenge` and does not accept caller-selected cost parameters.
     additionalProperties: true
     example:
       site_key: "0x4AAAAAAA-example-site-key"

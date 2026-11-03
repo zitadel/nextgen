@@ -53,10 +53,12 @@ var payloadByEventType = map[string]string{
 	"session.established": "session-established-payload.yaml",
 	"session.deleted":     "session-deleted-payload.yaml",
 
-	"auth.attempt.created":    "empty-event-payload.yaml",
-	"auth.attempt.handed_off": "empty-event-payload.yaml",
-	"auth.check.failed":       "auth-check-payload.yaml",
-	"auth.check.succeeded":    "auth-check-payload.yaml",
+	"flow.signup_challenge.issued":   "empty-event-payload.yaml",
+	"flow.signup_challenge.consumed": "empty-event-payload.yaml",
+	"auth.attempt.created":           "empty-event-payload.yaml",
+	"auth.attempt.handed_off":        "empty-event-payload.yaml",
+	"auth.check.failed":              "auth-check-payload.yaml",
+	"auth.check.succeeded":           "auth-check-payload.yaml",
 
 	"auth.sso.authorization.failed": "auth-check-payload.yaml",
 	"auth.sso.exchange.succeeded":   "auth-check-payload.yaml",
@@ -149,8 +151,10 @@ var webhookByEventType = map[string]webhookDoc{
 	"session.established": {description: "A session was established, by a sign-in or by exchanging a session."},
 	"session.deleted":     {description: "A session was revoked."},
 
-	"auth.attempt.created":    {description: "An authentication attempt started."},
-	"auth.attempt.handed_off": {description: "An authentication attempt was handed off to a session."},
+	"flow.signup_challenge.issued":   {description: "A password signup proof-of-work challenge was issued."},
+	"flow.signup_challenge.consumed": {description: "A signup proof was spent before attempting user creation."},
+	"auth.attempt.created":           {description: "An authentication attempt started."},
+	"auth.attempt.handed_off":        {description: "An authentication attempt was handed off to a session."},
 	"auth.check.failed": {description: "A check in an authentication attempt failed, such as a wrong " +
 		"password."},
 	"auth.check.succeeded": {description: "A check in an authentication attempt succeeded. Also sent when " +

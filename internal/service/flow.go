@@ -78,8 +78,10 @@ func NewFlowService(
 	v2Pool *DB,
 	stateMachine domain.FlowStateMachine,
 	builtinBases domain.BuiltinSchemaBases,
+	protection SignupProtection,
 ) FlowService {
 	return &flowService{
+		protection:   protection,
 		v2Pool:       v2Pool,
 		stateMachine: stateMachine,
 		builtinBases: builtinBases,
@@ -87,6 +89,7 @@ func NewFlowService(
 }
 
 type flowService struct {
+	protection   SignupProtection
 	v2Pool       *DB
 	stateMachine domain.FlowStateMachine
 	// builtinBases resolves a definition's user schema given as a built-in
@@ -355,6 +358,9 @@ func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (res doma
 		}
 	}
 
+	if err := s.attachSignupChallenge(ctx, req.Definition, &result); err != nil {
+		return domain.FlowStepResult{}, err
+	}
 	return domain.FlowStepResult{State: result.State, Step: result.Step}, nil
 }
 
@@ -396,6 +402,9 @@ func (s *flowService) Submit(ctx context.Context, req SubmitFlowRequest) (res do
 	if err != nil {
 		return domain.FlowStepResult{}, err
 	}
+	if err := s.attachSignupChallenge(ctx, def, &result); err != nil {
+		return domain.FlowStepResult{}, err
+	}
 	return domain.FlowStepResult{
 		State:                 result.State,
 		Step:                  result.Step,
@@ -419,6 +428,9 @@ func (s *flowService) GetStep(ctx context.Context, req GetFlowStepRequest) (res 
 	}
 	result, err := s.stateMachine.Render(ctx, def, req.State)
 	if err != nil {
+		return domain.FlowStepResult{}, err
+	}
+	if err := s.attachSignupChallenge(ctx, def, &result); err != nil {
 		return domain.FlowStepResult{}, err
 	}
 	return domain.FlowStepResult{
@@ -452,4 +464,24 @@ func pickNewestFlowRevision(defs []*domain.FlowDefinition) *domain.FlowDefinitio
 		}
 	}
 	return winner
+}
+
+// Runtime enforcement does not depend on template markup or client-selected purpose.
+func (s *flowService) attachSignupChallenge(ctx context.Context, def *domain.FlowDefinition, result *domain.FlowStepResult) error {
+	if result.Step == nil || result.State == nil {
+		return nil
+	}
+	step, ok := def.FindStep(result.Step.Name)
+	if !ok || step.OnSuccess == nil || *step.OnSuccess != domain.FlowOnSuccessCreateUser {
+		return nil
+	}
+	if s.protection == nil {
+		return domain.ErrFlowIntegrity()
+	}
+	challenge, err := s.protection.Challenge(ctx, result.State)
+	if err != nil {
+		return err
+	}
+	result.Step.SignupChallenge = challenge
+	return nil
 }

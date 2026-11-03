@@ -10,7 +10,7 @@ key, proof and parameter MAC.
 
 `generate-pow-v1-vectors.mjs` independently derives these values with WebCrypto.
 The Go protocol tests compare issuance byte for byte and verify the proofs.
-Future browser/native solvers should consume this same fixture, rather than
+The Chromium solver tests consume this same fixture; future solvers should too, rather than
 copying the AGPL server or research implementation into a client package.
 
 Run `moon run server:test-pow` for vectors and the Go race suite. Its default Go
