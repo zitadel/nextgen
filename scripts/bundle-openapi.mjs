@@ -133,8 +133,8 @@ async function writeErrorCatalog() {
 }
 
 if (isDirectRun(import.meta.url)) {
+  const api = process.argv.includes("--api");
   const docs = process.argv.includes("--docs");
-  const api = process.argv.includes("--api") || !docs;
   try {
     await bundleOpenAPI({ api, docs });
   } catch (error) {

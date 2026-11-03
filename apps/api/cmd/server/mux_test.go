@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -11,7 +10,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	openapibundled "github.com/zitadel/nextgen/api/openapi/bundled"
 	"github.com/zitadel/nextgen/internal/api"
 	oasapi "github.com/zitadel/nextgen/internal/api/generated"
 	"github.com/zitadel/nextgen/internal/audit"
@@ -235,35 +233,6 @@ func TestBuildHTTPMuxServesRuntimeDocumentWithTheConsoleOff(t *testing.T) {
 
 	// With the console off, its prefix is not a mount at all.
 	assert.Equal(t, "root", get(t, mux, "/ui/console/").Header().Get("X-Test-Handler"))
-}
-
-// The OpenAPI document this binary embeds is a mux mount beside the ogen API,
-// so a client can read the contract that deployment speaks without auth.
-func TestBuildHTTPMuxServesTheOpenAPIDocument(t *testing.T) {
-	mux := newTestMux(t, uiConfig(false))
-
-	rec := get(t, mux, openapibundled.Path)
-	require.Equal(t, http.StatusOK, rec.Code)
-	assert.Empty(t, rec.Header().Get("X-Test-Handler"), "openapi document must not fall through to the API")
-	assert.Contains(t, rec.Header().Get("Content-Type"), "application/json")
-	assert.Equal(t, "*", rec.Header().Get("Access-Control-Allow-Origin"))
-
-	var doc struct {
-		OpenAPI string `json:"openapi"`
-		Info    struct {
-			Title string `json:"title"`
-		} `json:"info"`
-	}
-	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &doc))
-	assert.True(t, strings.HasPrefix(doc.OpenAPI, "3.1."), "openapi version: %s", doc.OpenAPI)
-	assert.Equal(t, "Zitadel NextGen", doc.Info.Title)
-
-	head := serve(t, mux, http.MethodHead, openapibundled.Path)
-	require.Equal(t, http.StatusOK, head.Code)
-	assert.Empty(t, head.Body.String())
-
-	post := serve(t, mux, http.MethodPost, openapibundled.Path)
-	assert.Equal(t, http.StatusMethodNotAllowed, post.Code)
 }
 
 // The event retention trigger is a mount only when a scheduler outside the

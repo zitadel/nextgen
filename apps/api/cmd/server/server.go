@@ -30,7 +30,6 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
 
-	openapibundled "github.com/zitadel/nextgen/api/openapi/bundled"
 	"github.com/zitadel/nextgen/internal/api"
 	oasapi "github.com/zitadel/nextgen/internal/api/generated"
 	"github.com/zitadel/nextgen/internal/api/middleware"
@@ -1012,11 +1011,9 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiS
 		middleware.WithLogging,
 		api.WithRecover,
 	))
-	// The OpenAPI document this binary was built from. Exact path, ahead of
-	// the API catch-all; outside the ogen chain so discovery needs no auth.
-	mux.Handle(openapibundled.Path, openapibundled.Handler())
-	// The API under /api/v1, the probes at the root, and the root alias for
-	// every other path until 1.0.0 (ADR 077).
+	// The API under /api/v1 (including the embedded OpenAPI document), the
+	// probes at the root, and the root alias for every other path until
+	// 1.0.0 (ADR 077).
 	api.MountAPI(mux, chain, apiServers)
 	return securityheaders.Middleware(mux), nil
 }

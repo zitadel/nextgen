@@ -10,6 +10,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/zitadel/nextgen/api/client"
+	openapibundled "github.com/zitadel/nextgen/api/openapi/bundled"
 	api "github.com/zitadel/nextgen/internal/api/generated"
 )
 
@@ -69,11 +70,15 @@ func NewServers(h api.Handler, sec api.SecurityHandler, opts ...api.ServerOption
 
 // MountAPI mounts servers on mux, each behind chain. The API answers under
 // client.PathPrefix, and at the bare prefix too, so that a request for it
-// gets the API's not-found answer rather than the mux's redirect. The probes
-// answer at their root paths, and the root alias takes every other path:
-// mounts registered on mux for paths of their own, the console's and the IdP
-// callbacks', win over it.
+// gets the API's not-found answer rather than the mux's redirect. The OpenAPI
+// document this binary embeds answers at openapibundled.Path with no chain
+// (discovery before auth). The probes answer at their root paths, and the
+// root alias takes every other path: mounts registered on mux for paths of
+// their own, the console's and the IdP callbacks', win over it.
 func MountAPI(mux *http.ServeMux, chain func(http.Handler) http.Handler, servers Servers) {
+	// Exact path ahead of the prefix catch-all; outside chain so tools need
+	// no CSRF or session cookie.
+	mux.Handle(openapibundled.Path, openapibundled.Handler())
 	prefixed := chain(servers.API)
 	mux.Handle(client.PathPrefix+"/", prefixed)
 	mux.Handle(client.PathPrefix, prefixed)

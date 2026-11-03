@@ -55,7 +55,7 @@ func (h *Harness) EnsureTestServer(t testing.TB) *httptest.Server {
 		)))
 		// The same paths as the production mux (buildHTTPMux), not its
 		// middleware chain: the callback on both its spellings, then the API's
-		// mounts, under the prefix, the probes and the root alias.
+		// mounts (prefix, OpenAPI document, probes and root alias).
 		mux := http.NewServeMux()
 		mux.Handle(api.IDPCallbackPattern, callback)
 		mux.Handle(api.IDPCallbackUpstreamPattern, callback)

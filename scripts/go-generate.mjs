@@ -126,14 +126,9 @@ export async function goGenerate({ log = console.log } = {}) {
   }
 
   await runPhase(rest, MOCKGEN_PHASE, log);
-}
 
-/**
- * Everything `server:generate` / `server:check-generate` must produce: Go
- * generate directives, then the OpenAPI JSON the binary embeds.
- */
-export async function serverGenerate({ log = console.log } = {}) {
-  await goGenerate({ log });
+  // After Go generate: error schemas and error-response YAML must exist before
+  // Redocly bundles the contract the binary embeds.
   await bundleOpenAPI({ api: true, log });
 }
 
@@ -241,7 +236,7 @@ export function findGeneratePackages(root = ROOT) {
 
 if (isDirectRun(import.meta.url)) {
   try {
-    await serverGenerate();
+    await goGenerate();
   } catch (error) {
     // runCapture folds the generator's own stdout/stderr into the message; a
     // Node stack trace on top of it only buries the line that explains the

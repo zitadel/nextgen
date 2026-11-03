@@ -16,6 +16,7 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 
+	openapibundled "github.com/zitadel/nextgen/api/openapi/bundled"
 	api "github.com/zitadel/nextgen/internal/api/generated"
 	"github.com/zitadel/nextgen/internal/instrumentation/zotel"
 )
@@ -115,6 +116,36 @@ func TestMountAPIServesThePrefixAndTheRootAlias(t *testing.T) {
 			assert.Empty(t, rec.Header().Values("Link"), name)
 		}
 	}
+}
+
+// The OpenAPI document this binary embeds is a MountAPI mount outside the
+// ogen chain, so a client can read the contract that deployment speaks
+// without auth.
+func TestMountAPIServesTheOpenAPIDocument(t *testing.T) {
+	t.Parallel()
+	m := newMountedAPI(t)
+
+	rec := m.serve(httptest.NewRequest(http.MethodGet, openapibundled.Path, nil))
+	require.Equal(t, http.StatusOK, rec.Code)
+	assert.Contains(t, rec.Header().Get("Content-Type"), "application/json")
+	assert.Equal(t, "*", rec.Header().Get("Access-Control-Allow-Origin"))
+
+	var doc struct {
+		OpenAPI string `json:"openapi"`
+		Info    struct {
+			Title string `json:"title"`
+		} `json:"info"`
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &doc))
+	assert.True(t, strings.HasPrefix(doc.OpenAPI, "3.1."), "openapi version: %s", doc.OpenAPI)
+	assert.Equal(t, "Zitadel NextGen", doc.Info.Title)
+
+	head := m.serve(httptest.NewRequest(http.MethodHead, openapibundled.Path, nil))
+	require.Equal(t, http.StatusOK, head.Code)
+	assert.Empty(t, head.Body.String())
+
+	post := m.serve(httptest.NewRequest(http.MethodPost, openapibundled.Path, nil))
+	assert.Equal(t, http.StatusMethodNotAllowed, post.Code)
 }
 
 // RFC 9745: the date as a structured-field date, the link with the relation
