@@ -848,6 +848,62 @@ describe("lockoutStep", () => {
     expect(takeReportedWarnings()[0]).toContain('has no "email"');
   });
 
+  it("lets the bundle's schema drop the designation even if a listed revision still has one", async () => {
+    await lockoutStep.run(
+      ctx({
+        schemas: [{ objectType: "employee" }],
+        flows: [flow("sch_old", "email")],
+        users: [user("e1", "employee", {})],
+        listing: [
+          {
+            id: "sch_old",
+            schema: { objectType: "employee", "x-identifier": "email" },
+            metadata: { created_at: "2026-01-01T00:00:00Z" },
+          },
+        ],
+      }),
+    );
+
+    expect(takeReportedWarnings()).toEqual([]);
+  });
+
+  it("does not warn about linked users when the release carries no flow definitions", async () => {
+    await lockoutStep.run(
+      ctx({
+        schemas: [{ objectType: "employee" }],
+        flows: [],
+        users: [user("u1", "human-user")],
+        links: { u1: 1 },
+      }),
+    );
+
+    expect(takeReportedWarnings()).toEqual([]);
+  });
+
+  it.each([
+    ["older first", ["sch_a", "sch_b"]],
+    ["newer first", ["sch_b", "sch_a"]],
+  ])(
+    "picks the same revision for equal timestamps whatever the listing order (%s)",
+    async (_, order) => {
+      const revisions: Record<string, string> = { sch_a: "email", sch_b: "username" };
+      await lockoutStep.run(
+        ctx({
+          schemas: [],
+          flows: [flow("employee", "username")],
+          users: [user("e1", "employee", { email: "a@example.com" })],
+          listing: order.map((id) => ({
+            id,
+            schema: { objectType: "employee", "x-identifier": revisions[id] },
+            metadata: { created_at: "2026-01-01T00:00:00Z" },
+          })),
+        }),
+      );
+
+      expect(takeReportedWarnings()[0]).toContain('has no "username"');
+    },
+  );
+
   it("never fails the deploy when users cannot be read", async () => {
     await expect(
       lockoutStep.run(

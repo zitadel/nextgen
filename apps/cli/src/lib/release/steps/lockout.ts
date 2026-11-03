@@ -82,6 +82,9 @@ async function lockoutWarnings(ctx: StepContext): Promise<string[]> {
     return listed;
   };
   const { flows, unresolved, unreadable } = await servedFlows(ctx, names);
+  // A release with no flow definitions leaves the project's flows as they are,
+  // so it strands no one (unlike one whose flows are all drafts).
+  const noFlows = ctx.bundle.flow_definitions.length === 0;
   // Every scan gets its own share of the cap up front, so none can starve
   // another and the total stays within it.
   const scanned = new Set(
@@ -92,7 +95,7 @@ async function lockoutWarnings(ctx: StepContext): Promise<string[]> {
   const settled = await Promise.allSettled([
     lookupWarnings(ctx, flows, share),
     // With a flow whose schema is unknown, "a schema no flow serves" cannot be told.
-    unresolved || unreadable ? nothing() : ssoWarnings(ctx, flows, names, share),
+    unresolved || unreadable || noFlows ? nothing() : ssoWarnings(ctx, flows, names, share),
   ]);
   const scans = settled.flatMap((outcome) =>
     outcome.status === "fulfilled" ? [outcome.value] : [],
@@ -165,10 +168,13 @@ async function servedFlows(
       continue;
     }
     // Only the schema's designated identifier performs a lookup, and only when
-    // a step on the login path collects it.
-    // The release pins the newest revision, so a revision id only names the
-    // object type; the identifier is the bundle's, or the newest listed one.
-    const identifier = designated.get(schema) ?? listing?.byObjectType.get(schema)?.identifier;
+    // a step on the login path collects it. The release pins the newest
+    // revision, so a revision id only names the object type: the bundle's own
+    // schema decides the identifier (and may have none), and the newest listed
+    // revision decides it only for a schema this release does not carry.
+    const identifier = objectTypes.has(schema)
+      ? designated.get(schema)
+      : listing?.byObjectType.get(schema)?.identifier;
     const looksUp = identifier !== undefined && loginPathFields(flow).has(identifier);
     flows.push({ schema, ...(looksUp ? { identifier } : {}) });
   }
@@ -365,7 +371,7 @@ function carries(user: QueriedUser, path: string): boolean {
 /** The project's schemas, by revision id and by object type. */
 async function objectTypes(ctx: StepContext): Promise<Listing> {
   const byId = new Map<string, SchemaInfo>();
-  const newest = new Map<string, { createdAt: string; info: SchemaInfo }>();
+  const newest = new Map<string, { createdAt: string; id: string; info: SchemaInfo }>();
   const listed = await ctx.client.listSchemas.all({ project_id: ctx.projectId });
   for (const entry of listed) {
     const document = entry.schema as { objectType?: unknown; "x-identifier"?: unknown } | undefined;
@@ -380,8 +386,13 @@ async function objectTypes(ctx: StepContext): Promise<Listing> {
     byId.set(entry.id, info);
     const createdAt = String(entry.metadata?.created_at ?? "");
     const seen = newest.get(info.objectType);
-    if (seen === undefined || createdAt >= seen.createdAt) {
-      newest.set(info.objectType, { createdAt, info });
+    // Equal or missing timestamps fall back to the id, so the pick never
+    // depends on the order the server lists the revisions in.
+    const later =
+      seen !== undefined &&
+      (createdAt > seen.createdAt || (createdAt === seen.createdAt && entry.id > seen.id));
+    if (seen === undefined || later) {
+      newest.set(info.objectType, { createdAt, id: entry.id, info });
     }
   }
   return {
