@@ -77,11 +77,11 @@ func NewRuntimeResolver(v2Pool *DB, releases ReleaseService, ownOrigins ...strin
 }
 
 // Resolve walks the three layers: the gate refuses an origin no pattern
-// admits, the target is the newest deployment to that exact origin, and the
-// release is that deployment's release unless it is revoked. A request with
-// no origin is served the newest primary deployment. So is one the project does
-// not list but admits anyway (empty allowlist, loopback or a console origin) with
-// nothing deployed to its origin.
+// admits, the target is the deployment the live view says that origin serves,
+// and the release is that deployment's release unless it is revoked. A request
+// with no origin is served the newest primary deployment. So is one the project
+// does not list but admits anyway (empty allowlist, loopback or a console
+// origin) with nothing serving its origin.
 func (r *RuntimeResolver) Resolve(ctx context.Context, projectID, origin string) (*RuntimeResolution, error) {
 	logger := getLoggingContext(ctx, "runtime").With(
 		slog.String("project_id", projectID),
@@ -175,28 +175,16 @@ func (r *RuntimeResolver) finish(ctx context.Context, project *domain.Project, o
 	}, nil
 }
 
-// deploymentOf is the deployment an admitted origin serves, nil for none: the
-// newest primary deployment when it names the origin, or for a live preview
-// URL the one the live view shows. An older deployment that named the origin
-// never answers.
+// deploymentOf is the deployment an admitted origin serves, nil for none, as
+// the live view picks it: a listed primary origin runs the newest primary
+// deployment when that names it, a preview URL its live preview deployment.
 func (r *RuntimeResolver) deploymentOf(ctx context.Context, projectID string, matched *matchedOrigin) (*domain.Deployment, error) {
-	stmts := r.v2Pool.Statements()
-	if !matched.preview {
-		dep, err := newestPrimary(ctx, stmts, projectID)
-		if err != nil {
-			return nil, domain.ErrInternal(err).WithMessage("failed to read the newest primary deployment")
-		}
-		if dep == nil || !slices.Contains(dep.Origins(), matched.origin) {
-			return nil, nil
-		}
-		return dep, nil
-	}
-	dep, err := stmts.GetLiveDeployment(ctx, projectID, matched.origin, r.now())
+	dep, err := r.v2Pool.Statements().GetLiveDeployment(ctx, projectID, matched.origin, r.now())
 	if err != nil {
 		if isNoRowFound(err) {
 			return nil, nil
 		}
-		return nil, domain.ErrInternal(err).WithMessage("failed to read the preview's deployment")
+		return nil, domain.ErrInternal(err).WithMessage("failed to read the origin's deployment")
 	}
 	return dep, nil
 }

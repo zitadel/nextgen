@@ -74,8 +74,8 @@ func TestRuntimeResolver_Resolve(t *testing.T) {
 				{Pattern: origin, Kind: domain.OriginKindPrimary},
 			},
 		}, nil)
-		statements.EXPECT().ListDeployments(gomock.Any(), gomock.Any()).
-			Return(&database.ListResult[*domain.Deployment]{}, nil)
+		statements.EXPECT().GetLiveDeployment(gomock.Any(), projectID, ownOrigin, gomock.Any()).
+			Return(nil, &database.NoRowFoundError{})
 		statements.EXPECT().ListDeployments(gomock.Any(), gomock.Any()).
 			Return(&database.ListResult[*domain.Deployment]{Items: []*domain.Deployment{{
 				ID: "dep_primary", ProjectID: projectID, ReleaseID: "rel_primary",
@@ -155,8 +155,8 @@ func TestRuntimeResolver_Resolve(t *testing.T) {
 		statements.EXPECT().GetProjectByID(gomock.Any(), projectID).Return(&domain.Project{
 			ID: projectID,
 		}, nil)
-		statements.EXPECT().ListDeployments(gomock.Any(), gomock.Any()).
-			Return(&database.ListResult[*domain.Deployment]{}, nil)
+		statements.EXPECT().GetLiveDeployment(gomock.Any(), projectID, origin, gomock.Any()).
+			Return(nil, &database.NoRowFoundError{})
 		statements.EXPECT().ListDeployments(gomock.Any(), gomock.Any()).
 			Return(&database.ListResult[*domain.Deployment]{}, nil)
 
@@ -174,8 +174,8 @@ func TestRuntimeResolver_Resolve(t *testing.T) {
 				{Pattern: origin, Kind: domain.OriginKindPrimary},
 			},
 		}, nil)
-		statements.EXPECT().ListDeployments(gomock.Any(), gomock.Any()).
-			Return(&database.ListResult[*domain.Deployment]{}, nil)
+		statements.EXPECT().GetLiveDeployment(gomock.Any(), projectID, loopback, gomock.Any()).
+			Return(nil, &database.NoRowFoundError{})
 		statements.EXPECT().ListDeployments(gomock.Any(), gomock.Any()).
 			Return(&database.ListResult[*domain.Deployment]{}, nil)
 
@@ -192,8 +192,8 @@ func TestRuntimeResolver_Resolve(t *testing.T) {
 				{Pattern: origin, Kind: domain.OriginKindPrimary},
 			},
 		}, nil)
-		statements.EXPECT().ListDeployments(gomock.Any(), gomock.Any()).
-			Return(&database.ListResult[*domain.Deployment]{}, nil)
+		statements.EXPECT().GetLiveDeployment(gomock.Any(), projectID, ownOrigin, gomock.Any()).
+			Return(nil, &database.NoRowFoundError{})
 		statements.EXPECT().ListDeployments(gomock.Any(), gomock.Any()).
 			Return(&database.ListResult[*domain.Deployment]{}, nil)
 
@@ -215,8 +215,8 @@ func TestRuntimeResolver_Resolve(t *testing.T) {
 			ID:      projectID,
 			Origins: []domain.Origin{{Pattern: origin, Kind: domain.OriginKindPrimary}},
 		}, nil)
-		statements.EXPECT().ListDeployments(gomock.Any(), gomock.Any()).
-			Return(&database.ListResult[*domain.Deployment]{}, nil)
+		statements.EXPECT().GetLiveDeployment(gomock.Any(), projectID, other, gomock.Any()).
+			Return(nil, &database.NoRowFoundError{})
 		statements.EXPECT().ListDeployments(gomock.Any(), gomock.Any()).
 			Return(&database.ListResult[*domain.Deployment]{}, nil)
 
@@ -235,11 +235,11 @@ func TestRuntimeResolver_Resolve(t *testing.T) {
 				{Pattern: ownOrigin, Kind: domain.OriginKindPrimary},
 			},
 		}, nil)
-		statements.EXPECT().ListDeployments(gomock.Any(), gomock.Any()).
-			Return(&database.ListResult[*domain.Deployment]{Items: []*domain.Deployment{{
+		statements.EXPECT().GetLiveDeployment(gomock.Any(), projectID, ownOrigin, gomock.Any()).
+			Return(&domain.Deployment{
 				ID: "dep_1", ProjectID: projectID, ReleaseID: "rel_1",
 				Targets: []domain.DeploymentTarget{{Origin: ownOrigin}},
-			}}}, nil)
+			}, nil)
 		releases.EXPECT().Get(gomock.Any(), projectID, "rel_1").Return(&domain.Release{
 			ID: "rel_1", ProjectID: projectID,
 		}, nil)
@@ -259,8 +259,8 @@ func TestRuntimeResolver_Resolve(t *testing.T) {
 				{Pattern: ownOrigin, Kind: domain.OriginKindPrimary},
 			},
 		}, nil)
-		statements.EXPECT().ListDeployments(gomock.Any(), gomock.Any()).
-			Return(&database.ListResult[*domain.Deployment]{}, nil)
+		statements.EXPECT().GetLiveDeployment(gomock.Any(), projectID, ownOrigin, gomock.Any()).
+			Return(nil, &database.NoRowFoundError{})
 
 		_, err := resolver.Resolve(t.Context(), projectID, ownOrigin)
 		require.Error(t, err)
@@ -305,8 +305,8 @@ func TestRuntimeResolver_Resolve(t *testing.T) {
 		}, nil)
 		statements.EXPECT().GetPreview(gomock.Any(), projectID, ownOrigin).
 			Return(nil, &database.NoRowFoundError{})
-		statements.EXPECT().ListDeployments(gomock.Any(), gomock.Any()).
-			Return(&database.ListResult[*domain.Deployment]{}, nil)
+		statements.EXPECT().GetLiveDeployment(gomock.Any(), projectID, ownOrigin, gomock.Any()).
+			Return(nil, &database.NoRowFoundError{})
 		statements.EXPECT().ListDeployments(gomock.Any(), gomock.Any()).
 			Return(&database.ListResult[*domain.Deployment]{}, nil)
 
@@ -323,8 +323,8 @@ func TestRuntimeResolver_Resolve(t *testing.T) {
 				{Pattern: origin, Kind: domain.OriginKindPrimary},
 			},
 		}, nil)
-		statements.EXPECT().ListDeployments(gomock.Any(), gomock.Any()).
-			Return(&database.ListResult[*domain.Deployment]{}, nil)
+		statements.EXPECT().GetLiveDeployment(gomock.Any(), projectID, origin, gomock.Any()).
+			Return(nil, &database.NoRowFoundError{})
 
 		_, err := resolver.Resolve(t.Context(), projectID, origin)
 		require.Error(t, err)
@@ -339,11 +339,11 @@ func TestRuntimeResolver_Resolve(t *testing.T) {
 				{Pattern: origin, Kind: domain.OriginKindPrimary},
 			},
 		}, nil)
-		statements.EXPECT().ListDeployments(gomock.Any(), gomock.Any()).
-			Return(&database.ListResult[*domain.Deployment]{Items: []*domain.Deployment{{
+		statements.EXPECT().GetLiveDeployment(gomock.Any(), projectID, origin, gomock.Any()).
+			Return(&domain.Deployment{
 				ID: "dep_1", ProjectID: projectID, ReleaseID: "rel_1",
 				Targets: []domain.DeploymentTarget{{Origin: origin}},
-			}}}, nil)
+			}, nil)
 		releases.EXPECT().Get(gomock.Any(), projectID, "rel_1").Return(&domain.Release{
 			ID: "rel_1", ProjectID: projectID, ContentHash: "sha256:abc",
 		}, nil)
@@ -397,11 +397,11 @@ func TestRuntimeResolver_Resolve(t *testing.T) {
 				{Pattern: origin, Kind: domain.OriginKindPrimary},
 			},
 		}, nil)
-		statements.EXPECT().ListDeployments(gomock.Any(), gomock.Any()).
-			Return(&database.ListResult[*domain.Deployment]{Items: []*domain.Deployment{{
+		statements.EXPECT().GetLiveDeployment(gomock.Any(), projectID, origin, gomock.Any()).
+			Return(&domain.Deployment{
 				ID: "dep_1", ProjectID: projectID, ReleaseID: "rel_1",
 				Targets: []domain.DeploymentTarget{{Origin: origin}},
-			}}}, nil)
+			}, nil)
 		releases.EXPECT().Get(gomock.Any(), projectID, "rel_1").Return(&domain.Release{
 			ID: "rel_1", ProjectID: projectID, RevokedAt: &revokedAt,
 		}, nil)
