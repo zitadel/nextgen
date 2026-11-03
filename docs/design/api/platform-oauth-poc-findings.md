@@ -14,7 +14,8 @@
 | Piece | Where | Shape |
 | --- | --- | --- |
 | The `zitadel` app | `apps/api/internal/oauth/app.go` | Declared in the server binary: client `cli` (public, first-party, loopback on any port), API `platform` (`aud` = `<base>/api/v1`, the base the API answers under), API `mcp` (`aud` = `<base>/mcp`), and registration through client ID metadata documents (CIMD) and RFC 7591 |
-| Authorization server | `apps/api/internal/oauth` | Issuer `<base>`, the domain the console shares with the server, with its endpoints under `/oauth/proj_platform`. RFC 8414 and RFC 9728 metadata, JWKS, authorize, consent, token, revoke and register; zitadel/oidc's `op.Server` answers token, revoke and JWKS |
+| Authorization server | `apps/api/internal/oauth` | Issuer `<base>`, the domain the console shares with the server, with its endpoints under `/oauth/proj_platform`. RFC 8414 and RFC 9728 metadata, JWKS, authorize, token, revoke and register; zitadel/oidc's `op.Server` answers token, revoke and JWKS |
+| Login handoff | `apps/api/internal/oauth/authorize.go`, `apps/api/internal/domain/flow_authorization.go`, `<zitadel-login>` | Authorize sends the browser to the console's `/login?auth_request=<handle>` (ADR 081 §8). The widget sends the handle on `POST /flow`, the flow signs the user in, shows the reserved `consent` step when the client needs it (§11), and ends in a redirect to the client with the code (§9) |
 | Tokens | `apps/api/internal/oauth/token.go` | JWT access tokens (`typ: at+jwt`, EdDSA) signed with the platform project's existing token signing key, one `aud` each (RFC 8707). Codes and refresh tokens are sealed JWEs whose single-use records sit in `tokens` |
 | Consents | `apps/api/internal/service/consent.go`, table `consents` | One per user, client and API, with the scopes agreed to. A third party is asked again only for a new scope or on `prompt=consent`; a first-party client is never asked, but gets one too. Codes and refresh tokens are `tokens` rows naming it as `oidc_session_id`, so revoking it ends them. It lasts `platform.oauth.consent_lifetime` (90 days) at most, and the refresh token's lifetime unused. `GET /users/me/consents` and `DELETE /users/me/consents/{consent_id}` list and revoke them |
 | User bearer | `apps/api/internal/api/security.go` | The API takes a platform access token where a console session may act, as the same principal and grants (ADR 053 §5) |
@@ -80,9 +81,10 @@ Postgres and Spanner were not run.
   `client_id` can be the sealed registration (about 500 characters). The
   "DCR needs a table" assumption only holds for listing or revoking clients
   one by one.
-- **The login is reusable as it is.** `authorize` sends the browser to the
-  console's `/login?next=…`, and the mux routes `<console>/oauth/continue` to
-  the authorization server. The console needed no change.
+- **The login was reusable as it was.** The POC sent the browser to the
+  console's `/login?next=…` and routed `<console>/oauth/continue` back to the
+  authorization server, with no console change. The handoff below replaced
+  that route.
 
 ## What was missing
 
@@ -90,8 +92,8 @@ Postgres and Spanner were not run.
   and §6 puts the browser endpoints under an app's `/__nextgen` proxy. The
   platform project's login is the console, on the server's origin, so its
   issuer has to be there. §5 now carves it out (see below).
-- **Login handoff.** ADR 081 §8's `auth_request` through `<zitadel-login>` is
-  not built. The `next` route is fragile:
+- **Login handoff.** ADR 081 §8's `auth_request` through `<zitadel-login>`
+  was not built (it is now, below). The `next` route was fragile:
   - it ties the server to the console's mount path, and does not route on the
     hosted cloud, whose console is a separate service;
   - per the console's login route, a browser that already has a session but
@@ -219,6 +221,35 @@ went to `attacker.example`.
   stored. `--credential project|login` forces one, the envelope names the
   one used, and nothing falls back to the other after a failure.
 
+## The login handoff (built 2026-11-03)
+
+ADR 081 §8–§11 for the platform project, whose login app is the console:
+
+- **The handle.** Authorize checks the request, seals it into an opaque
+  handle and sends the browser to `<console>/login?auth_request=<handle>`.
+  A cookie per request, `__Host-_zauthz_<id>`, holds a nonce whose hash is
+  in the handle, so the handle opens nothing in another browser, and a
+  second request in the same browser leaves the first one alone. The flow
+  clears the cookie when it ends.
+- **No `auth_requests` table.** The flow keeps the request in its sealed
+  `_zflow` cookie, as it keeps all its state. The worst case (a 512-byte
+  `state`, the longest authorize takes, and long client and redirect URLs)
+  seals to about 3.3 KB of the cookie's 4 KiB; a test holds it there. A
+  table is needed once requests must be revoked or counted, such as by a
+  revoked release (§10).
+- **How a flow answers.** It ends in a redirect to the client whatever its
+  definition's terminal step says, and keeps its handoff, so the console
+  keeps the session (§9). The `consent` step comes after the sign-in, for a
+  third-party client or on `prompt=consent`. A live session answers at once,
+  under the consent step when needed and without a handoff. `prompt=login`
+  signs in again, and `prompt=none` shows no step. A failure the user has not
+  seen goes back only to a first-party client or a loopback URI, or the flow
+  refuses with `flow.auth_request_invalid`.
+- **Reserved names.** The validator and the meta-schema refuse a definition
+  step named `consent` or `account_choice`.
+- **The console** keeps `auth_request` in the URL and renders the widget on
+  `/login` even with a live session, so the flow can answer.
+
 ## Follow-ups
 
 1. Register clients through #2452's stored registrations instead of sealed
@@ -229,11 +260,19 @@ went to `attacker.example`.
    scopes are its ceiling", which on Zitadel's own API means checks that
    intersect a principal's roles with the token's scopes. No issue tracks it
    yet.
-4. Build ADR 081 §8's `auth_request` handoff to replace the `next` route,
-   with the consent step in `<zitadel-login>`.
+4. One flow cookie name per flow (ADR 081 §8.3): two authorization requests
+   in one browser's tabs still share `_zflow`, so the second flow ends the
+   first.
 5. `deploy` with a user bearer.
 6. Index `tokens (project_id, oidc_session_id)` before consents see real
    traffic: revoking one, or a replay, scans every token of the project. On
    Postgres, build the index `CONCURRENTLY` in a migration of its own.
 7. Delete a client's consents in batches: one transaction for all of them
    can pass Spanner's 80,000 mutations per commit.
+8. The rest of ADR 081 §8.5 and §11: `login_hint`, `prompt=create`,
+   `max_age`, `acr_values`, and account choice.
+9. Decide whether signing out of the console ends the CLI's sign-in. §9
+   binds the code to the session; the consents, and so the CLI's refresh
+   tokens, outlive it.
+10. An end-to-end lane that signs the CLI in through the console. The
+    pieces are tested at their own layers, and the whole by hand.
