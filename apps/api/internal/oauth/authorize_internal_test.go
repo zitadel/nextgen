@@ -1,9 +1,11 @@
 package oauth
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -73,4 +75,48 @@ func TestAuthorizeRedirectsToTheCheckedURI(t *testing.T) {
 		"state":             {"s1"},
 		"iss":               {"https://zitadel.example.com"},
 	}, location.Query())
+}
+
+// A registered client's redirect URI is whatever its registration said, so a
+// failure goes there only once the user has seen the app: before that, the
+// error page answers (RFC 9700 §4.11.2). A loopback URI is the user's own
+// machine, and gets the failure as before.
+func TestAuthorizeSendsNoFailureUnaskedToARegisteredClient(t *testing.T) {
+	redirects := []string{"https://app.example/callback", "http://127.0.0.1/callback"}
+	var documentURL string
+	documents := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"client_id":     documentURL,
+			"client_name":   "Agent",
+			"redirect_uris": redirects,
+		})
+	}))
+	t.Cleanup(documents.Close)
+	documentURL = documents.URL + "/metadata.json"
+	s, err := New(Deps{
+		Config:     Config{Enabled: true, ClientIDMetadataDocuments: true},
+		PublicBase: "https://zitadel.example.com",
+		ProjectID:  domain.PlatformProjectID,
+		Fetch:      documents.Client(),
+	})
+	require.NoError(t, err)
+
+	for redirect, redirected := range map[string]bool{redirects[0]: false, redirects[1]: true} {
+		t.Run(redirect, func(t *testing.T) {
+			w := authorizeRaw(t, s, url.Values{
+				"client_id":     {documentURL},
+				"response_type": {"token"},
+				"redirect_uri":  {redirect},
+			}.Encode())
+
+			if !redirected {
+				assert.Equal(t, http.StatusBadRequest, w.Code)
+				assert.Empty(t, w.Header().Get("Location"))
+				return
+			}
+			assert.Equal(t, http.StatusSeeOther, w.Code)
+			assert.True(t, strings.HasPrefix(w.Header().Get("Location"), redirect+"?"), w.Header().Get("Location"))
+		})
+	}
 }

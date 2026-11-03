@@ -69,10 +69,11 @@ func (s *Server) authorize(w http.ResponseWriter, r *http.Request) {
 		invalidAuthorizationRequest(w, r)
 		return
 	}
-	// From here on every failure goes back to the client.
+	// From here on a failure goes back to the client, where it may go before
+	// the user has signed in and seen the app.
 	state := q.Get("state")
 	fail := func(code, description string) {
-		s.redirectError(w, r, redirectURI, state, code, description)
+		s.failUnasked(w, r, client, redirectURI, state, code, description)
 	}
 	if q.Get("response_type") != "code" {
 		fail(errUnsupportedResponseType, "Only response_type=code is supported.")
@@ -140,7 +141,7 @@ func (s *Server) proceed(w http.ResponseWriter, r *http.Request, client Client, 
 	}
 	if user == "" {
 		if noLogin {
-			s.redirectError(w, r, redirectURI, req.State, errLoginRequired, "Sign-in did not complete.")
+			s.failUnasked(w, r, client, redirectURI, req.State, errLoginRequired, "Sign-in did not complete.")
 			return
 		}
 		sealed, err := s.seal(ctx, kindRequest, req, requestTTL)
@@ -153,13 +154,26 @@ func (s *Server) proceed(w http.ResponseWriter, r *http.Request, client Client, 
 	}
 	if !client.FirstParty {
 		if r.URL.Query().Get("prompt") == "none" {
-			s.redirectError(w, r, redirectURI, req.State, errConsentRequired, "This app needs your consent.")
+			s.failUnasked(w, r, client, redirectURI, req.State, errConsentRequired, "This app needs your consent.")
 			return
 		}
 		s.showConsent(w, r, client, req, user)
 		return
 	}
 	s.issueCode(w, r, req, user)
+}
+
+// failUnasked answers a failure the user has not seen the app's consent for.
+// It goes back to a first-party client, or to a loopback URI, the user's own
+// machine. A registered client's other URIs are whatever its registration
+// said, so sending the browser there unasked would make this server a
+// redirector for phishing (RFC 9700 §4.11.2): the error page answers instead.
+func (s *Server) failUnasked(w http.ResponseWriter, r *http.Request, client Client, redirectURI *url.URL, state, code, description string) {
+	if !client.FirstParty && !isLoopback(redirectURI.Hostname()) {
+		invalidAuthorizationRequest(w, r)
+		return
+	}
+	s.redirectError(w, r, redirectURI, state, code, description)
 }
 
 // loginURL is the console's login page, which returns to the continue path
