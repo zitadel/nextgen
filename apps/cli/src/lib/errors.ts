@@ -76,9 +76,18 @@ export class ZitadelError extends Error {
   readonly nextCommands?: readonly SuggestedCommand[];
   readonly details?: unknown;
 
+  /**
+   * The message this was raised with. `message` is not always it: oclif
+   * rewrites the message of an error a flag's `parse` threw, prefixing the
+   * flag and appending its own help line, so the words a refusal chose are
+   * kept here for whoever reports it.
+   */
+  readonly raised: string;
+
   constructor(code: ZitadelErrorCode, message: string, opts: ZitadelErrorOptions = {}) {
     super(message);
     this.name = "ZitadelError";
+    this.raised = message;
     this.code = code;
     this.hint = opts.hint;
     this.nextCommands = opts.nextCommands;

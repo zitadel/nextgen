@@ -5,7 +5,7 @@ import { resolveTarget } from "../../../../src/lib/api/operations";
 import { buildRequest } from "../../../../src/lib/api/request";
 
 const requestFor = (ref: string, fields: string[] = []) =>
-  buildRequest({ target: resolveTarget(ref), pathValues: {}, fields, projectId: "proj_1" });
+  buildRequest({ target: resolveTarget(ref), fields, projectId: "proj_1" });
 
 describe("curlOf", () => {
   it("reads the project secret from the environment, never writing it out", () => {
