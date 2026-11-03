@@ -39,12 +39,32 @@ export function shortRevisionId(id: string): string {
 /**
  * A revision's id on one line, at most the menu's width: a minted one in the
  * design's short form (`shortRevisionId`), any other cut in the middle.
+ * `readWhole` gives a screen reader the whole id behind the short form, where
+ * nothing else names it; an option keeps its visible text as its name, which
+ * its title and typeahead text carry the whole id beside.
  */
-function RevisionId({ id, title, className }: { id: string; title?: string; className?: string }) {
+function RevisionId({
+  id,
+  title,
+  readWhole = false,
+  className,
+}: {
+  id: string;
+  title?: string;
+  readWhole?: boolean;
+  className?: string;
+}) {
   const short = shortRevisionId(id);
   // The short form is as short as the design draws it, so it never gives way.
   const fixed = short !== id && "shrink-0";
-  return <IdText id={short} title={title} className={cn("max-w-81", fixed, className)} />;
+  return (
+    <IdText
+      id={short}
+      label={readWhole ? id : short}
+      title={title}
+      className={cn("max-w-81", fixed, className)}
+    />
+  );
 }
 
 /**
@@ -53,17 +73,19 @@ function RevisionId({ id, title, className }: { id: string; title?: string; clas
  */
 export function RevisionValue({
   revisions,
+  latestId,
   id,
   className,
 }: {
   revisions: SchemaRevision[];
+  latestId?: string;
   id: string;
   className?: string;
 }) {
   return (
     <>
-      <RevisionId id={id} title={id} className={className} />
-      <RevisionBadges revisions={revisions} id={id} />
+      <RevisionId id={id} title={id} readWhole className={className} />
+      <RevisionBadges revisions={revisions} latestId={latestId} id={id} />
     </>
   );
 }
@@ -71,11 +93,21 @@ export function RevisionValue({
 /**
  * `Latest` marks the newest revision and `In use` one some user is still on;
  * a revision can carry both. Filled and outlined, so they stay apart when
- * they sit side by side. `revisions` is the history, newest first; an id it
- * does not list carries neither.
+ * they sit side by side. `latestId` is the newest revision as the latest-of-type
+ * read names it, not the history's first entry: the history leaves out a
+ * revision the viewer may not read. Unknown, nothing is marked `Latest`.
+ * `revisions` is the history, which says what is in use.
  */
-export function RevisionBadges({ revisions, id }: { revisions: SchemaRevision[]; id: string }) {
-  const latest = revisions[0]?.id === id;
+export function RevisionBadges({
+  revisions,
+  latestId,
+  id,
+}: {
+  revisions: SchemaRevision[];
+  latestId?: string;
+  id: string;
+}) {
+  const latest = latestId !== undefined && latestId === id;
   const revision = revisions.find((entry) => entry.id === id);
   return (
     <>
@@ -100,14 +132,21 @@ export function RevisionBadges({ revisions, id }: { revisions: SchemaRevision[];
 
 /**
  * The menu's options, newest first: the id on the first line with the check
- * mark beside it, the creation time and badges under it. Each option's value
- * is the revision's id.
+ * mark beside it, the creation time and badges under it. Each option's value,
+ * and what typing finds it by, is the revision's whole id.
  */
-export function RevisionItems({ revisions }: { revisions: SchemaRevision[] }) {
+export function RevisionItems({
+  revisions,
+  latestId,
+}: {
+  revisions: SchemaRevision[];
+  latestId?: string;
+}) {
   return revisions.map((revision) => (
     <SelectItem
       key={revision.id}
       value={revision.id}
+      textValue={revision.id}
       title={revision.id}
       // The design's rhythm: the id on a 32px row, the meta line 6px under
       // it, 5px below, and 4px between options. The check mark sits on the
@@ -123,7 +162,7 @@ export function RevisionItems({ revisions }: { revisions: SchemaRevision[] }) {
           <span className="text-muted-foreground in-data-highlighted:text-accent-foreground text-xs">
             {formatDateTime(revision.createdAt)}
           </span>
-          <RevisionBadges revisions={revisions} id={revision.id} />
+          <RevisionBadges revisions={revisions} latestId={latestId} id={revision.id} />
         </span>
       </span>
     </SelectItem>

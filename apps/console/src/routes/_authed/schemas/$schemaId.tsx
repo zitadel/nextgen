@@ -22,6 +22,7 @@ import { field } from "@/lib/record";
 import {
   type SchemaRevision,
   type UserSchema,
+  fetchLatestSchemaId,
   fetchSchemaRevisions,
   schemaAuthMethods,
   schemaDisplayName,
@@ -42,11 +43,16 @@ export const Route = createFileRoute("/_authed/schemas/$schemaId")({
     // nothing, and has no history to list. The history is chrome: a failed
     // read leaves the schema on screen without a picker. `inUse` marks the
     // revisions some user is still on, as the Users filter does.
+    // `Latest` comes from the latest-of-type read: the history leaves out a
+    // revision the viewer may not read, so its first entry may not be it.
     const objectType = field(schema, "objectType");
-    const revisions = objectType
-      ? await fetchSchemaRevisions(projectId, objectType, { inUse: true }).catch(() => [])
-      : [];
-    return { schema, createdAt: body.metadata.created_at, revisions };
+    const [revisions, latestId] = objectType
+      ? await Promise.all([
+          fetchSchemaRevisions(projectId, objectType, { inUse: true }).catch(() => []),
+          fetchLatestSchemaId(projectId, objectType).catch(() => undefined),
+        ])
+      : [[], undefined];
+    return { schema, createdAt: body.metadata.created_at, revisions, latestId };
   },
   component: SchemaDetail,
 });
@@ -64,14 +70,16 @@ export const Route = createFileRoute("/_authed/schemas/$schemaId")({
  * carries the revision picker as its action.
  */
 function SchemaDetail() {
-  const { schema, createdAt, revisions } = Route.useLoaderData();
+  const { schema, createdAt, revisions, latestId } = Route.useLoaderData();
   const { schemaId } = Route.useParams();
   const name = schemaDisplayName(schema, schemaId);
   const methods = schemaAuthMethods(schema);
   // A document the history leaves out (stored without `kind`) has no place
   // in the picker.
   const listed = revisions.some((revision) => revision.id === schemaId);
-  const picker = listed && <RevisionSelect revisions={revisions} current={schemaId} />;
+  const picker = listed && (
+    <RevisionSelect revisions={revisions} latestId={latestId} current={schemaId} />
+  );
 
   return (
     <Page>
@@ -145,7 +153,15 @@ function SchemaDetail() {
  * Picking one opens that revision's own page, since each is a schema of its
  * own; the project scope rides along in the search.
  */
-function RevisionSelect({ revisions, current }: { revisions: SchemaRevision[]; current: string }) {
+function RevisionSelect({
+  revisions,
+  latestId,
+  current,
+}: {
+  revisions: SchemaRevision[];
+  latestId?: string;
+  current: string;
+}) {
   const navigate = useNavigate({ from: Route.fullPath });
   return (
     <Select
@@ -159,11 +175,16 @@ function RevisionSelect({ revisions, current }: { revisions: SchemaRevision[]; c
           <span className="text-muted-foreground">Revision</span>
           {/* 12px, as the design draws it on this card: at 14px the id is cut
               short on a phone, where the trigger takes the card's width. */}
-          <RevisionValue revisions={revisions} id={current} className="text-xs" />
+          <RevisionValue
+            revisions={revisions}
+            latestId={latestId}
+            id={current}
+            className="text-xs"
+          />
         </SelectValue>
       </SelectTrigger>
       <SelectContent position="popper" sideOffset={4} align="end" className={REVISION_MENU}>
-        <RevisionItems revisions={revisions} />
+        <RevisionItems revisions={revisions} latestId={latestId} />
       </SelectContent>
     </Select>
   );

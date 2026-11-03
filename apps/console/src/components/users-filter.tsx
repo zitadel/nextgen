@@ -68,7 +68,13 @@ export function UsersFilter({
           search.revision === OLDER_REVISIONS ? (
             <span className="truncate">Older revisions</span>
           ) : (
-            search.revision && <RevisionValue revisions={revisions} id={search.revision} />
+            search.revision && (
+              <RevisionValue
+                revisions={revisions}
+                latestId={chosen?.latestId}
+                id={search.revision}
+              />
+            )
           )
         }
         disabled={!search.schema || (revisions.length === 0 && !search.revision)}
@@ -81,7 +87,7 @@ export function UsersFilter({
             <SelectSeparator />
           </>
         )}
-        <RevisionItems revisions={revisions} />
+        <RevisionItems revisions={revisions} latestId={chosen?.latestId} />
       </FilterSelect>
     </>
   );

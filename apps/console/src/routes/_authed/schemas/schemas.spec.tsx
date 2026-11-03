@@ -395,9 +395,14 @@ describe("user schema detail", () => {
     const router = await renderAt("/schemas/sch_business");
     await screen.findByRole("heading", { name: "Business" });
 
-    expect(lists.at(-1)?.get("object_type")).toBe("human-user");
-    expect(lists.at(-1)?.get("revisions")).toBe("all");
-    expect(lists.at(-1)?.get("expand")).toBe("in_use");
+    // The history, with what is in use, and the latest of the type, which
+    // names `Latest`.
+    const history = lists.find((params) => params.get("revisions") === "all");
+    expect(history?.get("object_type")).toBe("human-user");
+    expect(history?.get("expand")).toBe("in_use");
+    const latest = lists.find((params) => params.get("revisions") === "latest");
+    expect(latest?.get("object_type")).toBe("human-user");
+    expect(latest?.get("limit")).toBe("1");
     const picker = screen.getByRole("combobox", { name: "Schema revision" });
     expect(picker).toHaveTextContent("Revisionsch_business");
     expect(picker).not.toHaveTextContent("Latest");
@@ -484,7 +489,7 @@ describe("user schema detail", () => {
         projects.push(new URL(request.url).searchParams.get("project_id"));
         return HttpResponse.json(envelope("sch_business", BUSINESS));
       }),
-      // The history read is scoped the same way.
+      // The history and latest reads are scoped the same way.
       http.get(SCHEMAS_URL, ({ request }) => {
         projects.push(new URL(request.url).searchParams.get("project_id"));
         return HttpResponse.json({ schemas: [envelope("sch_business", BUSINESS)] });
@@ -493,7 +498,7 @@ describe("user schema detail", () => {
     await renderAt("/schemas/sch_business", "proj_other");
 
     expect(await screen.findByRole("heading", { name: "Business" })).toBeInTheDocument();
-    expect(projects).toEqual(["proj_other", "proj_other"]);
+    expect(projects).toEqual(["proj_other", "proj_other", "proj_other"]);
   });
 
   it("elides the middle of a deep path, keeping the last two levels", async () => {

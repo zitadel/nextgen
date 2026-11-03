@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { Select, SelectContent } from "@/components/ui/select";
 import { formatDateTime } from "@/lib/date";
 
-import { RevisionBadges, RevisionItems, shortRevisionId } from "./revision-select";
+import { RevisionBadges, RevisionItems, RevisionValue, shortRevisionId } from "./revision-select";
 
 const NEWEST = { id: "sch_01M62294FC71CAD2XY0TZNP02S", createdAt: "2026-08-01T09:30:00Z" };
 const MIDDLE = {
@@ -45,14 +45,31 @@ describe("shortRevisionId", () => {
 describe("RevisionBadges", () => {
   it("marks the newest revision Latest and one some user is on In use, together when both hold", () => {
     const { rerender } = render(
-      <RevisionBadges revisions={[{ ...NEWEST, inUse: true }, OLDEST]} id={NEWEST.id} />,
+      <RevisionBadges
+        revisions={[{ ...NEWEST, inUse: true }, OLDEST]}
+        latestId={NEWEST.id}
+        id={NEWEST.id}
+      />,
     );
     expect(screen.getByText("Latest")).toBeInTheDocument();
     expect(screen.getByText("In use")).toBeInTheDocument();
 
-    rerender(<RevisionBadges revisions={[NEWEST, MIDDLE, OLDEST]} id={OLDEST.id} />);
+    rerender(
+      <RevisionBadges revisions={[NEWEST, MIDDLE, OLDEST]} latestId={NEWEST.id} id={OLDEST.id} />,
+    );
     expect(screen.queryByText("Latest")).not.toBeInTheDocument();
     expect(screen.queryByText("In use")).not.toBeInTheDocument();
+  });
+
+  it("marks Latest only the id the latest read names, not the history's first entry", () => {
+    // The history leaves out a revision the viewer may not read.
+    const { rerender } = render(
+      <RevisionBadges revisions={[MIDDLE, OLDEST]} latestId={NEWEST.id} id={MIDDLE.id} />,
+    );
+    expect(screen.queryByText("Latest")).not.toBeInTheDocument();
+
+    rerender(<RevisionBadges revisions={[NEWEST, OLDEST]} id={NEWEST.id} />);
+    expect(screen.queryByText("Latest")).not.toBeInTheDocument();
   });
 
   it("marks nothing on an id the history does not list", () => {
@@ -62,12 +79,21 @@ describe("RevisionBadges", () => {
   });
 });
 
+describe("RevisionValue", () => {
+  it("draws the short id and reads the whole one", () => {
+    render(<RevisionValue revisions={[NEWEST]} latestId={NEWEST.id} id={NEWEST.id} />);
+    expect(screen.getByText(NEWEST.id)).toHaveClass("sr-only");
+    expect(screen.getByText("sch_…ZNP02S")).toHaveAttribute("aria-hidden", "true");
+    expect(screen.getByText("Latest")).toBeInTheDocument();
+  });
+});
+
 describe("RevisionItems", () => {
   it("shows each revision by its short id, creation time and badges, keeping the full id in its title", () => {
     render(
       <Select open value={MIDDLE.id}>
         <SelectContent>
-          <RevisionItems revisions={[NEWEST, MIDDLE, OLDEST]} />
+          <RevisionItems revisions={[NEWEST, MIDDLE, OLDEST]} latestId={NEWEST.id} />
         </SelectContent>
       </Select>,
     );

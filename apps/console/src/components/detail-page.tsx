@@ -184,7 +184,7 @@ export function DetailTitle({
     <header className="flex flex-col gap-2 px-2">
       <h1 className={cn(DETAIL_TITLE, "wrap-anywhere")}>{title}</h1>
       <div className="text-muted-foreground flex flex-col gap-1 text-xs leading-4 sm:flex-row sm:items-center">
-        <span className="flex flex-wrap items-center gap-x-1">
+        <span className="flex min-w-0 flex-wrap items-center gap-x-1">
           <span className="whitespace-nowrap">{idLabel}</span>
           <span className="flex min-w-0 items-center gap-1">
             {/* One line, cut in the middle: a URI id must not widen the page. */}
@@ -195,7 +195,7 @@ export function DetailTitle({
         {createdAt && (
           <>
             <span aria-hidden className="bg-border mx-4.5 hidden h-4 w-px shrink-0 sm:block" />
-            <span className="flex items-center gap-1">
+            <span className="flex shrink-0 items-center gap-1">
               <span>Created</span>
               <span>{formatDate(createdAt)}</span>
             </span>
