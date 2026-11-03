@@ -104,9 +104,9 @@ func ErrReleaseNotDeployed(details any) Error {
 	return newError(PrefixRelease.ErrorCodePrefix("not_deployed"), "nothing is deployed to this origin", details, nil)
 }
 
-// ErrReleaseNoDefault reports that the project has no primary deployment.
-// Callers with no origin, and the console host when the project does not list
-// it, are served the newest one.
+// ErrReleaseNoDefault reports that a request with no origin, or from a console
+// host the project does not list, found no primary deployment to serve it. A
+// request from a listed origin with nothing deployed gets ErrReleaseNotDeployed.
 func ErrReleaseNoDefault() Error {
 	return newError(PrefixRelease.ErrorCodePrefix("no_default"), "the project has no primary deployment", nil, nil)
 }
