@@ -80,13 +80,15 @@ func (s *GrantService) Create(ctx context.Context, input CreateGrantInput) (_ *G
 	if err := validateCreateGrant(input); err != nil {
 		return nil, err
 	}
-	// With a platform project every grantable principal is homed there, so
-	// the refusal depends on the project alone and runs before any lookup: it
-	// tells the caller nothing about the principal. Without one, nothing can
-	// be claimed, so nothing is refused.
-	if s.platformProjectID != "" {
-		if err := requireClaimedForForeign(ctx, s.v2Pool.Statements(), input.ProjectID, s.platformProjectID); err != nil {
+	// An unclaimed project has no owner who may share it (ADR 053 §2, ADR 054 §4 amendments).
+	// The platform project granting on itself and servers without a platform project are unaffected.
+	if s.platformProjectID != "" && input.ProjectID != s.platformProjectID {
+		claimed, err := projectIsClaimed(ctx, s.v2Pool.Statements(), input.ProjectID)
+		if err != nil {
 			return nil, err
+		}
+		if !claimed {
+			return nil, domain.ErrGrantProjectUnclaimed()
 		}
 	}
 	if input.Identifier != "" {
@@ -323,24 +325,6 @@ func (s *GrantService) resolveByID(ctx context.Context, stmts AllStatements, pri
 		return "", "", err
 	}
 	return principalType, id, nil
-}
-
-// requireClaimedForForeign refuses a grant to a principal homed outside the
-// granting project while that project has no owning team: an unclaimed
-// project has no owner who may share it (ADR 053 §2, ADR 054 §4 amendments).
-// The platform project granting its own principals is unaffected.
-func requireClaimedForForeign(ctx context.Context, stmts AllStatements, grantProjectID, principalHome string) error {
-	if principalHome == grantProjectID {
-		return nil
-	}
-	claimed, err := projectIsClaimed(ctx, stmts, grantProjectID)
-	if err != nil {
-		return err
-	}
-	if !claimed {
-		return domain.ErrGrantProjectUnclaimed()
-	}
-	return nil
 }
 
 // resolveUserByIdentifier resolves a grant's identifier locator. Only active

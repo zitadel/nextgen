@@ -502,7 +502,8 @@ func cleanupPlatformUserAndTeam(t *testing.T, userID string) {
 		ctx := context.Background()
 		stmts := harness.EnsureServiceDB(t).Statements()
 		if membership, err := stmts.GetEarliestTeamMembership(ctx, platformID, userID); err == nil {
-			_, _ = stmts.DeactivateTeam(ctx, platformID, membership.TeamID)
+			_, err = stmts.DeactivateTeam(ctx, platformID, membership.TeamID)
+			assert.NoError(t, err)
 		}
 		_ = stmts.DeleteUserByID(ctx, platformID, userID)
 	})
@@ -541,6 +542,10 @@ func TestGrantQuery(t *testing.T) {
 		Name:      helpers.TeamName(),
 	})
 	require.NoError(t, err)
+	t.Cleanup(func() {
+		_, err := stmts.DeactivateTeam(context.Background(), platform.ID, owningTeam.ID)
+		assert.NoError(t, err)
+	})
 	owning := domain.NewClaimTeamAssignment(project.ID, owningTeam.ID)
 	require.NoError(t, stmts.CreateAuthzAssignment(t.Context(), owning))
 

@@ -96,7 +96,7 @@ func (h *Handler) requirePrincipalRead(ctx context.Context, homeProjectID string
 		return nil
 	}
 	if domain.IsServerFault(err) {
-		return domain.ErrInternal(err).WithMessage("expanding a grant principal failed")
+		return err
 	}
 	return domain.ErrUserPermissionDenied().WithParent(err).
 		WithMessage("expanding a grant principal requires read access to its home project")

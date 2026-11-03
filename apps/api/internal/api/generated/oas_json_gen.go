@@ -56128,6 +56128,22 @@ func (s GetGrantErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case UserNotFoundGetGrantErrorResponse:
+		e.FieldStart("code")
+		e.Str("user.not_found")
+		{
+			s := s.UserNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case UserPermissionDeniedGetGrantErrorResponse:
 		e.FieldStart("code")
 		e.Str("user.permission_denied")
@@ -56191,6 +56207,9 @@ func (s *GetGrantErrorResponse) Decode(d *jx.Decoder) error {
 				case "unavailable":
 					s.Type = UnavailableGetGrantErrorResponse
 					found = true
+				case "user.not_found":
+					s.Type = UserNotFoundGetGrantErrorResponse
+					found = true
 				case "user.permission_denied":
 					s.Type = UserPermissionDeniedGetGrantErrorResponse
 					found = true
@@ -56234,6 +56253,10 @@ func (s *GetGrantErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case UnavailableGetGrantErrorResponse:
 		if err := s.Unavailable.Decode(d); err != nil {
+			return err
+		}
+	case UserNotFoundGetGrantErrorResponse:
+		if err := s.UserNotFound.Decode(d); err != nil {
 			return err
 		}
 	case UserPermissionDeniedGetGrantErrorResponse:
@@ -105148,6 +105171,22 @@ func (s QueryGrantsErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case UserNotFoundQueryGrantsErrorResponse:
+		e.FieldStart("code")
+		e.Str("user.not_found")
+		{
+			s := s.UserNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case UserPermissionDeniedQueryGrantsErrorResponse:
 		e.FieldStart("code")
 		e.Str("user.permission_denied")
@@ -105217,6 +105256,9 @@ func (s *QueryGrantsErrorResponse) Decode(d *jx.Decoder) error {
 				case "unavailable":
 					s.Type = UnavailableQueryGrantsErrorResponse
 					found = true
+				case "user.not_found":
+					s.Type = UserNotFoundQueryGrantsErrorResponse
+					found = true
 				case "user.permission_denied":
 					s.Type = UserPermissionDeniedQueryGrantsErrorResponse
 					found = true
@@ -105268,6 +105310,10 @@ func (s *QueryGrantsErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case UnavailableQueryGrantsErrorResponse:
 		if err := s.Unavailable.Decode(d); err != nil {
+			return err
+		}
+	case UserNotFoundQueryGrantsErrorResponse:
+		if err := s.UserNotFound.Decode(d); err != nil {
 			return err
 		}
 	case UserPermissionDeniedQueryGrantsErrorResponse:
