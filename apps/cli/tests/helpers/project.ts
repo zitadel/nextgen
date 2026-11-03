@@ -1216,6 +1216,17 @@ export class ScaffoldedApp {
     return this.editDocument(FLOW_FILE, edit);
   }
 
+  /** Edits the step a visitor lands on to log in, as the developer owning the flow would. */
+  editLoginEntryStep(edit: (step: FlowDocument["steps"][number]) => void): Promise<void> {
+    return this.editLoginFlow((flow) => {
+      const step = flow.steps.find((candidate) => candidate.name === flow.purposes.login);
+      if (step === undefined) {
+        throw new Error("the login flow has no login entry step");
+      }
+      edit(step);
+    });
+  }
+
   editPackageJson(edit: (pkg: PackageJson) => void): Promise<void> {
     return this.editDocument("package.json", edit);
   }

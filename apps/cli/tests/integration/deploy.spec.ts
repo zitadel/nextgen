@@ -115,14 +115,7 @@ describe("deploy", () => {
       it("names the schema the server refused, and why", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin();
-        platform.rejectsReleases([
-          {
-            kind: "schema",
-            handle: "human-user",
-            code: "sch.invalid_request",
-            message: 'schema designation invalid: "x-display" names unknown property "nickname"',
-          },
-        ]);
+        platform.rejectsASchema();
 
         const result = await app.deploy();
 
@@ -135,17 +128,7 @@ describe("deploy", () => {
       it("names the flow the server refused, and why", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin();
-        platform.rejectsReleases([
-          {
-            kind: "flow",
-            handle: "default-login",
-            code: "flowdef.invalid",
-            message: "flow definition: invalid",
-            details: {
-              details: 'step "register-password": on_success create_user requires "identifier"',
-            },
-          },
-        ]);
+        platform.rejectsAFlow();
 
         const result = await app.deploy();
 
@@ -167,12 +150,8 @@ describe("deploy", () => {
       it("warns when the login path reaches a password step with no identifier before it", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin();
-        await app.editLoginFlow((flow) => {
-          const entry = flow.steps.find((step) => step.name === flow.purposes.login);
-          if (entry === undefined) {
-            throw new Error("the login flow has no login entry step");
-          }
-          entry.fields = [];
+        await app.editLoginEntryStep((step) => {
+          step.fields = [];
         });
 
         const result = await app.deployDryRun();

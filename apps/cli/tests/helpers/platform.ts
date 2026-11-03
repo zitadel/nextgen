@@ -25,11 +25,18 @@ export interface PlatformMock {
   rejectsSchemaUploads(): void;
 
   /**
-   * Refuses every release build as a server does a bundle with invalid
-   * resources: `rel.invalid`, with the reason for each resource under
+   * Refuses every release build as a server does a bundle whose schema names a
+   * property it does not have: `rel.invalid`, with the reason under
    * `details.resources`.
    */
-  rejectsReleases(resources: readonly Record<string, unknown>[]): void;
+  rejectsASchema(): void;
+
+  /**
+   * Refuses every release build as a server does a bundle whose flow fails
+   * against its schema: `rel.invalid`, with the reason under the resource's
+   * own `details`.
+   */
+  rejectsAFlow(): void;
 
   /**
    * Answers as a server that is reachable but is not a Zitadel platform API,
@@ -104,6 +111,17 @@ export function usePlatformMock(): PlatformMock {
     resetPlatformStore();
   });
 
+  const refuseReleases = (resources: readonly Record<string, unknown>[]) => {
+    server.use(
+      http.post("*/releases/build", () =>
+        HttpResponse.json(
+          { code: "rel.invalid", message: "release: invalid", details: { resources } },
+          { status: 400 },
+        ),
+      ),
+    );
+  };
+
   return {
     rejectsSchemaUploads() {
       server.use(
@@ -113,15 +131,29 @@ export function usePlatformMock(): PlatformMock {
       );
     },
 
-    rejectsReleases(resources) {
-      server.use(
-        http.post("*/releases/build", () =>
-          HttpResponse.json(
-            { code: "rel.invalid", message: "release: invalid", details: { resources } },
-            { status: 400 },
-          ),
-        ),
-      );
+    rejectsASchema() {
+      refuseReleases([
+        {
+          kind: "schema",
+          handle: "human-user",
+          code: "sch.invalid_request",
+          message: 'schema designation invalid: "x-display" names unknown property "nickname"',
+        },
+      ]);
+    },
+
+    rejectsAFlow() {
+      refuseReleases([
+        {
+          kind: "flow",
+          handle: "default-login",
+          code: "flowdef.invalid",
+          message: "flow definition: invalid",
+          details: {
+            details: 'step "register-password": on_success create_user requires "identifier"',
+          },
+        },
+      ]);
     },
 
     isNotZitadel() {
