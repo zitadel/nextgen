@@ -127,8 +127,7 @@ export default class BrandingEject extends Promptable(BaseCommand) {
     }
     // The checks above refused one that is not a design, so a value that got
     // here is either a design or absent, and absent is asked for.
-    const requested = flags.design;
-    const design = requested ?? (await this.promptDesign(this.nonInteractive));
+    const design = flags.design ?? (await this.promptDesign(this.nonInteractive));
     this.recordTelemetry({ design, force: this.force });
     const { branding, template } = getDefaultBrandingConfig(design);
 

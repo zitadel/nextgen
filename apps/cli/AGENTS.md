@@ -54,6 +54,10 @@
 - Keep it all in the command's own file: a `const NAME: Refused<T>` above the
   class, named for the flag and nothing else, then the flag declared inline in
   `static flags` as `Flags.custom<T>({ parse: reads(NAME) })({ … })`.
+- Never hold a flag in a const to use it once: the declaration belongs at the
+  one place the command declares its flags. Only a flag every command takes
+  (`serverFlag`, `plainFlag`, the environment flags) has a const, because it
+  has no single site.
 - Never share a flag. Three commands take `--port`; each declares its own,
   because a shared flag module is a file to find before a flag can be read.
   Duplicate it, and share only what a whole topic needs.

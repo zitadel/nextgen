@@ -267,8 +267,6 @@ export default class Doctor extends Destructive(BaseCommand) {
     // `doctor` is not an EnvironmentCommand but honours --env/--env-file/--server
     // to check a chosen environment, so a suggested rerun of a failed check has
     // to carry that same selection or it would check the default project.
-    const cwdFlag = flags.cwd;
-    const serverFlag = flags.server;
     const selector = environmentSelectorSuffix({
       cwd: flags.cwd,
       envFile: flags.envFile,
@@ -287,8 +285,8 @@ export default class Doctor extends Destructive(BaseCommand) {
     // A `zitadel.json` that does not parse is the config check's to report,
     // not a reason for doctor itself to fail before it reports anything.
     const projectServer = hasConfig
-      ? await readZitadelConfig(this.cwd).then(readProjectServer, () => serverFlag)
-      : serverFlag;
+      ? await readZitadelConfig(this.cwd).then(readProjectServer, () => flags.server)
+      : flags.server;
     // A bare claim resolves as this shell does, so it is offered unpinned only
     // when that resolution lands on the very project the check read.
     const bareResolves =
@@ -302,12 +300,12 @@ export default class Doctor extends Destructive(BaseCommand) {
       Promise.resolve(projectId),
     ))
       ? environmentSelectorSuffix({
-          cwd: cwdFlag,
-          envFile: projectEnvFile(cwdFlag, ".env.development.local"),
+          cwd: flags.cwd,
+          envFile: projectEnvFile(flags.cwd, ".env.development.local"),
           server: projectServer,
         })
       : bareResolves
-        ? environmentSelectorSuffix({ cwd: cwdFlag, server: projectServer })
+        ? environmentSelectorSuffix({ cwd: flags.cwd, server: projectServer })
         : undefined;
     const warningAdvice = advisoryForWarnings(warnings, this.cliVersion, claimSelector, selector);
     // A server that is running is one a sign-in or a request can fail
@@ -355,7 +353,7 @@ export default class Doctor extends Destructive(BaseCommand) {
         this.cliVersion,
         selector,
         parentRuntimeDir,
-        cwdFlag,
+        flags.cwd,
       );
       // A check that failed with a typed CLI error advertises its own
       // category (e.g. the framework floor's E_UNSUPPORTED_PROJECT_SHAPE) —

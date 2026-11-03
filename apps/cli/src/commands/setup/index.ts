@@ -896,57 +896,6 @@ function settingFlag(flag: string, parse: (value: string) => Parsed<unknown>) {
   });
 }
 
-/** A flag that holds the client id of the application registered with the provider. */
-export const clientIdFlag = Flags.custom<ClientId>({
-  parse: readsFilled({
-    schema: made(parseClientId),
-    refusal: {
-      message: "--sso-client-id: {problem}",
-      hint: "Fix --sso-client-id and run the command again.",
-      details: {
-        argument: "--sso-client-id",
-      },
-    },
-  }),
-});
-
-/**
- * A flag that holds the shortest password the policy accepts, read with the
- * prompt's own parser so the two cannot disagree.
- */
-export const passwordMinLengthFlag = Flags.custom<PasswordMinLength>({
-  parse: readsFilled(
-    {
-      schema: made(parsePasswordMinLength),
-      refusal: {
-        message: "{problem}",
-        hint: "Pass a whole number for {input}, or 0 for none.",
-        details: {
-          argument: "{input}",
-        },
-      },
-    },
-    {
-      message: "{input} was given an empty value",
-      hint: "Pass a value for {input}, or omit it entirely.",
-    },
-  ),
-});
-
-/** A flag that holds the connection slug of a custom connection. */
-export const ssoSlugFlag = settingFlag("--sso-slug", (value) => {
-  return parseConnectionSlug(value, RESERVED_SLUGS);
-});
-
-/** A flag that holds the display name of a custom connection. */
-export const ssoDisplayNameFlag = settingFlag("--sso-display-name", parseDisplayName);
-
-/** A flag that holds the issuer of a custom connection. */
-export const ssoIssuerFlag = settingFlag("--sso-issuer", parseIssuer);
-
-/** A flag that holds the scopes of a custom connection. */
-export const ssoScopesFlag = settingFlag("--sso-scopes", parseScopes);
-
 /**
  * The frameworks `--framework` accepts, derived from Orca's registry so the
  * flag can't drift from what the CLI can actually scaffold. `createOrca` is
@@ -1091,7 +1040,24 @@ export default class Setup extends Destructive(BaseCommand) {
     // hidden so scripts and agents still passing it get a targeted error
     // pointing at `branding eject` instead of oclif's unknown-flag error.
     design: nonBlankString({ hidden: true }),
-    "password-min-length": passwordMinLengthFlag({
+    "password-min-length": Flags.custom<PasswordMinLength>({
+      parse: readsFilled(
+        {
+          schema: made(parsePasswordMinLength),
+          refusal: {
+            message: "{problem}",
+            hint: "Pass a whole number for {input}, or 0 for none.",
+            details: {
+              argument: "{input}",
+            },
+          },
+        },
+        {
+          message: "{input} was given an empty value",
+          hint: "Pass a value for {input}, or omit it entirely.",
+        },
+      ),
+    })({
       description:
         "Minimum password length for the project's password policy, for example 12; 0 sets none. Without it, setup sets 15, the NIST minimum for password-only sign-in; change it in .zitadel/policies/ later.",
     }),
@@ -1100,20 +1066,42 @@ export default class Setup extends Destructive(BaseCommand) {
         "Social sign-in provider to enable while scaffolding, e.g. google. Skips the wizard's provider question; needs --sso-client-id, and the OAuth application must already be registered with the provider. Pipe the client secret in on stdin; never pass it as a flag.",
       options: [...IDP_PROVIDERS, CUSTOM_PROVIDER],
     }),
-    "sso-client-id": clientIdFlag({
+    "sso-client-id": Flags.custom<ClientId>({
+      parse: readsFilled({
+        schema: made(parseClientId),
+        refusal: {
+          message: "--sso-client-id: {problem}",
+          hint: "Fix --sso-client-id and run the command again.",
+          details: {
+            argument: "--sso-client-id",
+          },
+        },
+      }),
+    })({
       description: "Client id of the OAuth application registered with the --sso provider.",
     }),
-    [SETUP_FLAG_KEYS.slug]: ssoSlugFlag({
+    [SETUP_FLAG_KEYS.slug]: settingFlag("--sso-slug", (value) => {
+      return parseConnectionSlug(value, RESERVED_SLUGS);
+    })({
       description: "With --sso custom: the name of the connection. Schemas and flows refer to it.",
     }),
-    [SETUP_FLAG_KEYS.displayName]: ssoDisplayNameFlag({
+    [SETUP_FLAG_KEYS.displayName]: settingFlag(
+      "--sso-display-name",
+      parseDisplayName,
+    )({
       description: "With --sso custom: the name shown on the sign-in button.",
     }),
-    [SETUP_FLAG_KEYS.issuer]: ssoIssuerFlag({
+    [SETUP_FLAG_KEYS.issuer]: settingFlag(
+      "--sso-issuer",
+      parseIssuer,
+    )({
       description:
         "With --sso custom: the provider's issuer URL. Its endpoints come from OIDC discovery.",
     }),
-    [SETUP_FLAG_KEYS.scopes]: ssoScopesFlag({
+    [SETUP_FLAG_KEYS.scopes]: settingFlag(
+      "--sso-scopes",
+      parseScopes,
+    )({
       description:
         "With --sso custom: the scopes to request, separated by spaces or commas. Must include openid. Default: openid profile email.",
     }),

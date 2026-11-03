@@ -124,11 +124,6 @@ const CLIENT_ID: Refused<ClientId> = {
   },
 };
 
-/** `--client-id`, refused before the command runs by {@link CLIENT_ID}. */
-const clientIdFlag = Flags.custom<ClientId>({
-  parse: reads(CLIENT_ID),
-});
-
 /**
  * How a run that names no provider is refused. `--provider` is not oclif's
  * `required` so that its own refusal, which carries no hint, never answers
@@ -270,7 +265,9 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       description:
         "Scopes the custom connection requests, separated by spaces or commas. Must include openid. Default: openid profile email.",
     }),
-    "client-id": clientIdFlag({
+    "client-id": Flags.custom<ClientId>({
+      parse: reads(CLIENT_ID),
+    })({
       description: "Client id of the application registered with the provider.",
     }),
   };

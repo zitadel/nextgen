@@ -123,3 +123,9 @@ export const parseSort = (
   }
   return { field, direction };
 };
+
+/** A `--filter` entry, read, with the text it was typed as. */
+export type TypedFilter = ParsedFilter & Readonly<{ raw: string }>;
+
+/** A `--sort` entry, read, with the text it was typed as. */
+export type TypedSort = Readonly<{ raw: string; field: string; direction: string }>;

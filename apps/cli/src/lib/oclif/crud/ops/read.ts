@@ -1,6 +1,7 @@
-import { chosenColumns } from "../columns";
-import { fieldsFlag } from "../inputs";
-import { fieldPaths } from "../paths";
+import { Flags } from "@oclif/core";
+
+import { chosenColumns, readColumns } from "../columns";
+import { type FieldPaths, fieldPaths } from "../paths";
 import { idArg, idName, idValue } from "../shared";
 import type { GetSpec } from "../types";
 import type { CommandResult } from "../../types";
@@ -38,7 +39,14 @@ export class GetOperation<Ctx> extends ResourceCommand<Ctx, GetSpec<Ctx>, ReadIn
         `<%= config.bin %> ${topic} get <${idName(resource)}> --json`,
       ],
       flags: {
-        fields: fieldsFlag({
+        fields: Flags.custom<
+          readonly string[],
+          Readonly<{ fallback: readonly string[]; shape?: FieldPaths }>
+        >({
+          parse: async (input, _command, flag) => {
+            return readColumns(input, flag.fallback, flag.shape);
+          },
+        })({
           description:
             "Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is unaffected.",
           fallback: resource.detail ?? resource.columns,

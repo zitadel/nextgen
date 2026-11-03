@@ -20,16 +20,7 @@ import {
 import { expectedPublicCliCommand, parseJson, runCliForTest } from "../../../helpers/run-cli";
 import { parseFlag } from "../../../helpers/inputs";
 import { unscopedCommand } from "../../../../src/lib/suggestion";
-import {
-  clientIdFlag,
-  passwordMinLengthFlag,
-  ssoDisplayNameFlag,
-  ssoIssuerFlag,
-  ssoScopesFlag,
-  refuseUnusableFlags,
-  type SetupFlagsToCheck,
-  ssoSlugFlag,
-} from "../../../../src/commands/setup";
+import Setup, { refuseUnusableFlags, type SetupFlagsToCheck } from "../../../../src/commands/setup";
 
 /**
  * Unit-level guardrails for the `setup` command. The happy path
@@ -1324,24 +1315,26 @@ function binaryRuntimeFor(cwd: string, serverUrl: string, serverVersion: string)
 
 describe("--sso-client-id", () => {
   it("reads a client id trimmed", async () => {
-    await expect(parseFlag(clientIdFlag({}), "  abc123  ", "sso-client-id")).resolves.toBe(
-      "abc123",
-    );
+    await expect(
+      parseFlag(Setup.flags["sso-client-id"], "  abc123  ", "sso-client-id"),
+    ).resolves.toBe("abc123");
   });
 
   it("refuses a blank value", async () => {
-    await expect(parseFlag(clientIdFlag({}), "  ", "sso-client-id")).rejects.toMatchObject({
+    await expect(
+      parseFlag(Setup.flags["sso-client-id"], "  ", "sso-client-id"),
+    ).rejects.toMatchObject({
       code: "E_VALIDATION",
     });
   });
 });
 
 async function parse(input: string) {
-  const flag = passwordMinLengthFlag({});
+  const flag = Setup.flags["password-min-length"];
   return flag.parse(input, {} as never, flag as never);
 }
 
-describe("passwordMinLengthFlag", () => {
+describe("password-min-length", () => {
   it("reads a whole number", async () => {
     await expect(parse("12")).resolves.toBe(12);
   });
@@ -1364,18 +1357,22 @@ describe("passwordMinLengthFlag", () => {
 
 describe("--sso-slug", () => {
   it("reads a value the provider could have issued", async () => {
-    await expect(parseFlag(ssoSlugFlag({}), "acme-sso", "sso-slug")).resolves.toBe("acme-sso");
+    await expect(parseFlag(Setup.flags["sso-slug"], "acme-sso", "sso-slug")).resolves.toBe(
+      "acme-sso",
+    );
   });
 
   it("refuses one the provider could not have", async () => {
-    await expect(parseFlag(ssoSlugFlag({}), "Not A Slug!", "sso-slug")).rejects.toMatchObject({
+    await expect(
+      parseFlag(Setup.flags["sso-slug"], "Not A Slug!", "sso-slug"),
+    ).rejects.toMatchObject({
       code: "E_VALIDATION",
       hint: "Fix --sso-slug and run the command again.",
     });
   });
 
   it("refuses a blank value, saying to pass one rather than to fix it", async () => {
-    await expect(parseFlag(ssoSlugFlag({}), "  ", "sso-slug")).rejects.toMatchObject({
+    await expect(parseFlag(Setup.flags["sso-slug"], "  ", "sso-slug")).rejects.toMatchObject({
       code: "E_VALIDATION",
       message: "the value is empty",
       hint: "Pass a value for --sso-slug, or omit it entirely.",
@@ -1385,14 +1382,14 @@ describe("--sso-slug", () => {
 
 describe("--sso-display-name", () => {
   it("reads a value the provider could have issued", async () => {
-    await expect(parseFlag(ssoDisplayNameFlag({}), "Acme SSO", "sso-display-name")).resolves.toBe(
-      "Acme SSO",
-    );
+    await expect(
+      parseFlag(Setup.flags["sso-display-name"], "Acme SSO", "sso-display-name"),
+    ).resolves.toBe("Acme SSO");
   });
 
   it("refuses one the provider could not have", async () => {
     await expect(
-      parseFlag(ssoDisplayNameFlag({}), "x".repeat(257), "sso-display-name"),
+      parseFlag(Setup.flags["sso-display-name"], "x".repeat(257), "sso-display-name"),
     ).rejects.toMatchObject({
       code: "E_VALIDATION",
       hint: "Fix --sso-display-name and run the command again.",
@@ -1400,30 +1397,32 @@ describe("--sso-display-name", () => {
   });
 
   it("refuses a blank value", async () => {
-    await expect(parseFlag(ssoDisplayNameFlag({}), "  ", "sso-display-name")).rejects.toMatchObject(
-      {
-        code: "E_VALIDATION",
-      },
-    );
+    await expect(
+      parseFlag(Setup.flags["sso-display-name"], "  ", "sso-display-name"),
+    ).rejects.toMatchObject({
+      code: "E_VALIDATION",
+    });
   });
 });
 
 describe("--sso-issuer", () => {
   it("reads a value the provider could have issued", async () => {
     await expect(
-      parseFlag(ssoIssuerFlag({}), "https://sso.acme.example", "sso-issuer"),
+      parseFlag(Setup.flags["sso-issuer"], "https://sso.acme.example", "sso-issuer"),
     ).resolves.toBe("https://sso.acme.example");
   });
 
   it("refuses one the provider could not have", async () => {
-    await expect(parseFlag(ssoIssuerFlag({}), "not a url", "sso-issuer")).rejects.toMatchObject({
+    await expect(
+      parseFlag(Setup.flags["sso-issuer"], "not a url", "sso-issuer"),
+    ).rejects.toMatchObject({
       code: "E_VALIDATION",
       hint: "Fix --sso-issuer and run the command again.",
     });
   });
 
   it("refuses a blank value", async () => {
-    await expect(parseFlag(ssoIssuerFlag({}), "  ", "sso-issuer")).rejects.toMatchObject({
+    await expect(parseFlag(Setup.flags["sso-issuer"], "  ", "sso-issuer")).rejects.toMatchObject({
       code: "E_VALIDATION",
     });
   });
@@ -1431,20 +1430,22 @@ describe("--sso-issuer", () => {
 
 describe("--sso-scopes", () => {
   it("reads a value the provider could have issued", async () => {
-    await expect(parseFlag(ssoScopesFlag({}), "openid profile", "sso-scopes")).resolves.toBe(
-      "openid profile",
-    );
+    await expect(
+      parseFlag(Setup.flags["sso-scopes"], "openid profile", "sso-scopes"),
+    ).resolves.toBe("openid profile");
   });
 
   it("refuses one the provider could not have", async () => {
-    await expect(parseFlag(ssoScopesFlag({}), "   ,  ", "sso-scopes")).rejects.toMatchObject({
+    await expect(
+      parseFlag(Setup.flags["sso-scopes"], "   ,  ", "sso-scopes"),
+    ).rejects.toMatchObject({
       code: "E_VALIDATION",
       hint: "Fix --sso-scopes and run the command again.",
     });
   });
 
   it("refuses a blank value", async () => {
-    await expect(parseFlag(ssoScopesFlag({}), "  ", "sso-scopes")).rejects.toMatchObject({
+    await expect(parseFlag(Setup.flags["sso-scopes"], "  ", "sso-scopes")).rejects.toMatchObject({
       code: "E_VALIDATION",
     });
   });

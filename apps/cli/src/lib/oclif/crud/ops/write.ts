@@ -1,3 +1,6 @@
+import { Flags } from "@oclif/core";
+
+import { type Assignment, readAssignment } from "../assign";
 import { nonBlankString } from "../../flags";
 import { named } from "../../names";
 
@@ -12,7 +15,6 @@ import {
   fieldExample,
   flagsAloneMayBeIncomplete,
 } from "../fields";
-import { setFlag } from "../inputs";
 import { article, dryRunResult, idArg, idName } from "../shared";
 import type {
   CreateSpec,
@@ -50,7 +52,14 @@ const rawBodyFlags = (document: ZodLike | undefined, fields: readonly BodyField[
       exclusive: ["data"],
       helpGroup: "RAW BODY",
     }),
-    set: setFlag({
+    set: Flags.custom<
+      Assignment,
+      Readonly<{ document: ZodLike | undefined; fields: readonly BodyField[] }>
+    >({
+      parse: async (input, _command, flag) => {
+        return readAssignment(input, flag.document, flag.fields);
+      },
+    })({
       description:
         'Set one field by its dot path: path=value, or path:=json for JSON. Repeatable; applied after the field flags, in order. A key that contains a dot is set through its parent: --set \'parent:={"a.b":"x"}\'.',
       multiple: true,

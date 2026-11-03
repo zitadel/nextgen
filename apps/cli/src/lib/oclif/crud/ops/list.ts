@@ -10,13 +10,18 @@ import { nonBlankString, type Refused, reads, whole } from "../../flags";
 import type { CommandResult } from "../../types";
 import { plainFlag } from "../../tabulatable";
 import { wireOf } from "../wire";
-import { fieldsFlag, filterFlag, sortFlag, type TypedFilter, type TypedSort } from "../inputs";
-import type { ParsedFilter } from "../query";
+import {
+  type ParsedFilter,
+  parseFilter,
+  parseSort,
+  type TypedFilter,
+  type TypedSort,
+} from "../query";
 import { parseOrThrow } from "../shared";
-import { chosenColumns } from "../columns";
+import { chosenColumns, readColumns } from "../columns";
 import { Cmd } from "../../../cmd";
-import { fieldPaths } from "../paths";
-import type { Json, ListSpec } from "../types";
+import { type FieldPaths, fieldPaths } from "../paths";
+import type { FilterField, Json, ListSpec } from "../types";
 import {
   type OperationDefinition,
   type OperationInput,
@@ -58,10 +63,6 @@ const LIMIT: Refused<number> = {
   },
 };
 
-const limitFlag = Flags.custom<number>({
-  parse: reads(LIMIT),
-});
-
 export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>, ListInput> {
   static describe<Ctx>({
     topic,
@@ -71,7 +72,9 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>, List
   }: OperationDefinition<Ctx, ListSpec<Ctx>>): OperationStatics {
     const paged = spec.paged !== false;
     const pagingFlags = {
-      limit: limitFlag({
+      limit: Flags.custom<number>({
+        parse: reads(LIMIT),
+      })({
         description: "Page size (server default 20, max 100).",
         min: LIMIT_MIN,
         max: LIMIT_MAX,
@@ -86,7 +89,14 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>, List
       }),
     };
     const presentation = {
-      fields: fieldsFlag({
+      fields: Flags.custom<
+        readonly string[],
+        Readonly<{ fallback: readonly string[]; shape?: FieldPaths }>
+      >({
+        parse: async (input, _command, flag) => {
+          return readColumns(input, flag.fallback, flag.shape);
+        },
+      })({
         description:
           "Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the resource's own columns; `--json` is unaffected.",
         fallback: resource.columns,
@@ -101,7 +111,17 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>, List
     const specific = {
       ...(filters.length > 0
         ? {
-            filter: filterFlag({
+            filter: Flags.custom<
+              TypedFilter,
+              Readonly<{ filters: readonly FilterField[]; operations: readonly string[] }>
+            >({
+              parse: async (input, _command, flag) => {
+                return {
+                  raw: input,
+                  ...parseFilter(input, flag.filters, flag.operations),
+                };
+              },
+            })({
               multiple: true,
               filters,
               operations: options.operations,
@@ -116,7 +136,14 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>, List
         : {}),
       ...(sorts.length > 0
         ? {
-            sort: sortFlag({
+            sort: Flags.custom<TypedSort, Readonly<{ sorts: readonly string[] }>>({
+              parse: async (input, _command, flag) => {
+                return {
+                  raw: input,
+                  ...parseSort(input, flag.sorts),
+                };
+              },
+            })({
               sorts,
               description: `Sort as field:direction (asc|desc). Fields: ${sorts.join(", ")}.`,
             }),
