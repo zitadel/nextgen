@@ -118,7 +118,12 @@ properties are ([#1283](https://github.com/zitadel/nextgen/issues/1283)
 scenario 6). The model allows them, so they can ship later.
 
 A public client, such as a SPA or a mobile app, is never a principal: it only
-acts for the user who signed in.
+acts for the user who signed in. Every client states its `type`, public or
+confidential ([RFC 6749 §2.1](https://www.rfc-editor.org/rfc/rfc6749#section-2.1)),
+and its preset fills it. Zitadel never infers it from credentials, which are
+written on their own and can arrive after the client
+([One call](#one-call)), and it refuses a credential, client credentials or
+token exchange on a public client.
 
 That covers machines without machine users:
 
@@ -178,8 +183,9 @@ needs, with the mappings between them:
 
 The mappings say:
 
-- how upstream claims, attributes and SCIM resources become user properties,
-  and when a user is created on first sign-in;
+- how each config's claims, SAML attributes or SCIM attributes become user
+  properties, since each protocol names them its own way, and when a user is
+  created on first sign-in;
 - where each config finds the shared subject, so a user that SCIM created
   signs in through OIDC without a linking step;
 - which client a workload or an external agent becomes, by the claims in its
@@ -227,10 +233,10 @@ token, which breaks when that person leaves.
 - Whoever may manage the owner manages its PATs: creates, lists, rotates and
   revokes them. The creator is kept for audit only.
 - The project's and a team's secrets, `sk_proj` and `sk_team`
-  ([`security.go`](../../../internal/api/security.go)), become PATs that the
-  project and the team own: one token kind with an owner type, one hash, one
-  verify path, and a prefix per owner type, so secret scanners tell the kinds
-  apart.
+  ([`security.go`](../../../apps/api/internal/api/security.go)), become PATs
+  that the project and the team own: one token kind with an owner type, one
+  hash, one verify path, and a prefix per owner type, so secret scanners tell
+  the kinds apart.
 
 **A client's scopes are its ceiling.** A CLI is a public client that asks for
 scopes for the user who signed in, and a PAT is capped by its owner's rights
@@ -266,8 +272,8 @@ provisioning and open registration:
   "clients": [
     { "slug": "web", "protocol": "oidc", "type": "confidential", "redirect_uris": ["https://shop.example.com/callback"] },
     { "slug": "ios", "protocol": "oidc", "type": "public", "redirect_uris": ["com.example.shop:/callback"] },
-    { "slug": "deploy", "protocol": "oauth", "grant_types": ["client_credentials"] },
-    { "slug": "assistant", "protocol": "oauth", "grant_types": ["client_credentials", "token_exchange"] }
+    { "slug": "deploy", "protocol": "oauth", "type": "confidential", "grant_types": ["client_credentials"] },
+    { "slug": "assistant", "protocol": "oauth", "type": "confidential", "grant_types": ["client_credentials", "urn:ietf:params:oauth:grant-type:token-exchange"] }
   ],
   "apis": [
     { "slug": "orders", "identifier": "https://api.shop.example.com", "scopes": ["orders.read", "orders.write"] },
@@ -280,9 +286,11 @@ provisioning and open registration:
 ```
 
 `grant_types` keeps RFC 7591's name, since here a grant is what gives a
-principal roles. Those rights are not fields of the document: grants that ship
-beside it let `deploy` release and let `assistant` read the catalog and
-delegate for the shop's customers ([Principals](#principals)).
+principal roles, and its values, so token exchange is
+[RFC 8693 §2.1](https://www.rfc-editor.org/rfc/rfc8693#section-2.1)'s URN.
+Those rights are not fields of the document: grants that ship beside it let
+`deploy` release and let `assistant` read the catalog and delegate for the
+shop's customers ([Principals](#principals)).
 
 A customer's Entra, which Acme's admin sets up in the product, signing users
 in and provisioning them under one subject:
@@ -292,23 +300,29 @@ in and provisioning them under one subject:
   "team": "acme",
   "slug": "entra",
   "domains": ["acme.com"],
-  "oidc": [{ "slug": "sign-in", "issuer": "https://login.microsoftonline.com/<tenant>/v2.0", "client_id": "<id>", "client_secret": "<write-only>" }],
+  "oidc": [{ "slug": "sign-in", "issuer": "https://login.microsoftonline.com/<tenant-id>/v2.0", "client_id": "<client-id>", "client_secret": "<client-secret>" }],
   "scim": [{ "slug": "sync" }],
   "mappings": {
     "subject": { "sign-in": "oid", "sync": "externalId" },
-    "user": { "email": "email", "givenName": "given_name", "familyName": "family_name" }
+    "user": {
+      "sign-in": { "email": "email", "givenName": "given_name", "familyName": "family_name" },
+      "sync": { "email": "emails[primary eq true].value", "givenName": "name.givenName", "familyName": "name.familyName" }
+    }
   }
 }
 ```
 
 The developer's rules decided what it may hold, and the Entra preset filled
-its mappings.
+its mappings, one per config, since OIDC's `given_name` is SCIM's
+`name.givenName`. The `<…>` values are Acme's own, which its admin enters in
+the setup screen, and the API stores the secret without ever returning it.
 
 GitHub Actions, deploying as the shop's `deploy` client without a secret:
 
 ```json
 {
   "name": "GitHub Actions",
+  "slug": "github-actions",
   "oidc_wif": [{ "slug": "actions", "issuer": "https://token.actions.githubusercontent.com", "audience": "https://auth.shop.example.com" }],
   "mappings": {
     "clients": [{ "when": { "repository": "acme/shop", "ref": "refs/heads/main" }, "client": "shop/deploy" }]
@@ -321,8 +335,9 @@ GitHub Actions, deploying as the shop's `deploy` client without a secret:
 Each app and each connection is one document, and one call writes it:
 
 - **An app with every config it holds** is the body of `POST /apps`, which
-  creates the app or revises it by slug
-  ([ADR 082 §3](../../adrs/082-oauth-and-oidc-server.md#3-apps)). No
+  creates the app or revises it by slug, as `POST /idps` does for a
+  connection ([ADR 082 §3](../../adrs/082-oauth-and-oidc-server.md#3-apps)),
+  so a writer never reads first to choose between create and update. No
   container comes first, as v4's project did, and a client, an API or a SAML
   config is a field of the document, not a call of its own. Only clients that
   register themselves arrive on their own.
@@ -366,9 +381,10 @@ zitadel app create repricer --preset service --role catalog.write
   of [ADR 082 §3](../../adrs/082-oauth-and-oidc-server.md#3-apps) become the
   presets: web, SPA or native, and service. Refresh tokens, token exchange,
   and client credentials for a web app's backend tasks are opt-in on top, as
-  in v4, and `--file` takes a whole document instead. The presets ship
-  beside the JSON Schemas, so the console offers the same ones and an agent
-  can start from them.
+  in v4, and `--file` takes a whole document instead. A client keeps the
+  fields, never the preset, so registered, declared and imported clients
+  share one shape. The presets ship beside the JSON Schemas, so the console
+  offers the same ones and an agent can start from them.
 - Where the developer can't tell which preset fits, the CLI and the console
   ask questions the developer can answer: do users sign in, where do they
   come back, does it work without a user. Without answers, as with `--json`
@@ -506,41 +522,26 @@ consents stay per user, client and scope.
 
 1. **Names.** App or Application; Connection or Provider; what to call the
    configs, and a PAT that a client or a team owns.
-2. **Rights on the app.** Answered: rights stay per client, and a grant to a
-   whole app would at most be a console shortcut ([Principals](#principals)).
-3. **Delegation and impersonation policy.** Partly answered: they are roles,
-   held directly or through a team, over a user, a schema's users or a
-   team's users ([Principals](#principals)). Still open: whether the switch
-   that allows impersonation sits on the project or the app, when a user's
-   consent is needed, and which actions besides claiming a project only a
-   person may take.
-4. **Registration.** Answered: a client registers at the project and joins
-   the app whose API its first authorization request names ([Apps](#apps)).
-5. **Self-service rules.** Where they live: on the user schema, which already
+2. **Delegation and impersonation policy.** Whether the switch that allows
+   impersonation sits on the project or the app, when a user's consent is
+   needed, and which actions besides claiming a project only a person may
+   take.
+3. **Self-service rules.** Where they live: on the user schema, which already
    says how a kind of person signs in; as an operation policy on a team's
    connection writes, a template Zitadel defines and the release fills in
    ([ADR 066](../../adrs/066-operation-policies.md)); or in a file of their
    own. And whether a team may use a declared connection too, such as one
    Okta for several teams.
-6. **Identity links.** Whether a link keys on the connection or on one of its
+4. **Identity links.** Whether a link keys on the connection or on one of its
    configs, when a connection holds two OIDC configs for different issuers.
-7. **Where sign-in offers connections.** Today a user schema lists its
+5. **Where sign-in offers connections.** Today a user schema lists its
    connections (`x-auth-methods.sso.providers`); with several configs per
    connection, the list may name configs, or the app may choose. A team's
    connection is data no schema can list, so sign-in finds it by verified
    domain.
-8. **Agents that must be users.** Narrowed: an agent on a team is a client in
-   it ([Principals](#principals)). Still open: APIs that accept only user
-   tokens, and Entra's agent paired one to one with a user account, which a
-   connection could map to a user.
-9. **Presets.** Answered: ADR 082 §3's kinds, with opt-ins on top
-   ([One call](#one-call)). A client stores the OAuth fields its preset
-   filled, never the preset, so registered, declared and imported clients
-   share one shape. The console lists apps by what they hold (a client that
-   acts as itself or delegates, an API, a registered third party), and
-   nothing in the model treats an agent differently from a service account,
-   since `act` and a non-user principal already mark what only a person may
-   do.
+6. **Agents that must be users.** APIs that accept only user tokens, and
+   Entra's agent paired one to one with a user account, which a connection
+   could map to a user.
 
 ## Prior art
 
