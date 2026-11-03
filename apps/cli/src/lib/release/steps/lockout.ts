@@ -16,8 +16,9 @@ type UserFilter = { field: string; operation: string; value: string };
  * deploy that passes validation can still lock people out, because the flow
  * and the schema are judged without the users they will meet:
  *
- * - a schema whose `x-identifier` names a property that users of that schema
- *   do not carry sends them to registration when they type their old identifier;
+ * - a login flow that looks users up by a field the existing users of its
+ *   schema do not carry sends them to registration when they type their old
+ *   identifier;
  * - a flow moved to another schema cannot continue an SSO sign-in whose linked
  *   user is on the old schema.
  *
@@ -59,23 +60,36 @@ async function lockoutWarnings(ctx: StepContext): Promise<string[]> {
     schemas.has(ref) ? ref : (byId.get(ref) ?? names.get(ref) ?? ref);
   const flows = ctx.bundle.flow_definitions.flatMap((flow) =>
     typeof flow.name === "string" && typeof flow.user_schema === "string"
-      ? [{ name: flow.name, schema: resolve(flow.user_schema) }]
+      ? [{ name: flow.name, schema: resolve(flow.user_schema), identifiers: loginFields(flow) }]
       : [],
   );
   const warnings: string[] = [];
 
-  // Case 1: the schema's identifier is a property its users lack.
-  for (const objectType of new Set(flows.map((flow) => flow.schema))) {
-    const identifier = schemas.get(objectType)?.["x-identifier"];
-    if (typeof identifier !== "string" || identifier === "") continue;
+  // Case 1: a field the login flow looks users up by that its users lack.
+  const lookups = new Map<string, Set<string>>();
+  for (const flow of flows) {
+    const known = lookups.get(flow.schema) ?? new Set<string>();
+    for (const identifier of flow.identifiers) {
+      known.add(identifier);
+    }
+    lookups.set(flow.schema, known);
+  }
+  for (const [objectType, identifiers] of lookups) {
+    if (identifiers.size === 0) {
+      continue;
+    }
     const { users, truncated } = await readUsers(ctx, [
       { field: "schema_object_type", operation: "equals", value: objectType },
     ]);
-    const missing = users.filter((user) => !carries(user, identifier));
-    if (missing.length === 0) continue;
-    warnings.push(
-      `${count(missing.length, truncated)} of ${count(users.length, truncated)} existing ${plural(users.length, "user")} of ${quote(objectType)} ${missing.length === 1 ? "has" : "have"} no ${quote(identifier)}, the identifier the schema now signs in with, so they cannot sign in with a password. Move each to the new revision and set it in one update: zitadel users update <user_id> --schema <revision_id> --set attributes.${identifier}=<value>`,
-    );
+    for (const identifier of identifiers) {
+      const missing = users.filter((user) => !carries(user, identifier));
+      if (missing.length === 0) {
+        continue;
+      }
+      warnings.push(
+        `${count(missing.length, truncated)} of ${count(users.length, truncated)} existing ${plural(users.length, "user")} of ${quote(objectType)} ${missing.length === 1 ? "has" : "have"} no ${quote(identifier)}, the field the login flow looks users up by, so they cannot sign in with a password. Move each to the new revision and set it in one update: zitadel users update <user_id> --schema <revision_id> --set attributes.${identifier}=<value>`,
+      );
+    }
   }
 
   // Case 2: users on a schema no flow serves any more, with a provider linked.
@@ -110,6 +124,21 @@ async function lockoutWarnings(ctx: StepContext): Promise<string[]> {
     );
   }
   return warnings;
+}
+
+/**
+ * The fields a flow's login step collects: what a visitor types to be found,
+ * and the only places the engine looks for it. Authentication-method fields
+ * (`x-auth-methods#password`) are not lookups.
+ */
+function loginFields(flow: Record<string, unknown>): string[] {
+  const purposes = flow.purposes as Record<string, unknown> | undefined;
+  const steps = Array.isArray(flow.steps) ? (flow.steps as Array<Record<string, unknown>>) : [];
+  const entry = steps.find((step) => step.name === purposes?.login);
+  const fields = Array.isArray(entry?.fields) ? (entry.fields as unknown[]) : [];
+  return fields.filter(
+    (field): field is string => typeof field === "string" && !field.startsWith("x-auth-methods#"),
+  );
 }
 
 /** Run `task` over `items`, a few at a time, keeping the results in order. */
