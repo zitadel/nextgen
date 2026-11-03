@@ -60,20 +60,16 @@ describe("zitadel api help", () => {
   it("is no operation, in any case and whatever follows", async () => {
     const envelope = await api("Help", "getVariable");
 
-    expect(envelope).toMatchObject({ status: "ok", data: null });
+    expect(envelope).toMatchObject({ status: "ok", data: {} });
   });
 
-  it("needs no server it can resolve", async () => {
-    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
-    const config = await Config.load({ root: cliPackageRoot });
-    const cwd = await makeProject({ linked: true });
+  it("opens no telemetry and resolves no server", async () => {
+    const toMeta = vi.spyOn(Api.prototype as unknown as { toMeta: () => unknown }, "toMeta");
 
-    const envelope = await Api.run(
-      ["help", "--cwd", cwd, "--no-telemetry", "--server", "local"],
-      config,
-    );
+    await api("help");
 
-    expect(envelope).toMatchObject({ status: "ok" });
+    expect(toMeta).not.toHaveBeenCalled();
+    toMeta.mockRestore();
   });
 });
 

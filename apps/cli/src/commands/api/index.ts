@@ -94,15 +94,15 @@ export default class Api extends Destructive(BaseCommand) {
       // Only the command's name is needed for the envelope: `toMeta` would also
       // open telemetry and the first-run notice, which `--help` does not.
       this.meta = { ...this.meta, command: this.id ?? this.meta.command };
-      if (this.jsonEnabled()) {
-        return this.emit({
-          status: "ok",
-          data: {},
-          next: { commands: [this.suggestUnscoped("api ls")] },
-        });
+      if (!this.jsonEnabled()) {
+        await this.config.runCommand("help", [Api.id]);
       }
-      await this.config.runCommand("help", [Api.id]);
-      return this.emit({ status: "ok", data: null, pretty: "" });
+      return this.emit({
+        status: "ok",
+        data: {},
+        pretty: "",
+        next: { commands: [this.suggestUnscoped("api ls")] },
+      });
     }
 
     const meta = await this.toMeta(flags);
