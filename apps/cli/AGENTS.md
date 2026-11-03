@@ -77,6 +77,12 @@
   (`src/lib/oclif/refusal.ts`), never a `ZitadelError` built by hand. Thread
   `this.suggest(...)` in where one names a follow-up: a refusal raised without
   a suggester goes without its follow-ups.
+  - A refusal raised while a flag parses names its follow-ups too, unscoped —
+    the environment comes from the flags, so there is none to repeat yet. A
+    flag whose own `parse` refuses in more than one way passes
+    `suggesterOf(command)` (`src/lib/oclif/flags.ts`), as `--design` does.
+  - A `next` entry that is only a placeholder takes its value as it is, so a
+    check that found two steps hands over both.
 - Declare a flag or argument by its CLI spelling and read it as code reads it
   (`"client-id"` is read `flags.clientId`); see `src/lib/oclif/names.ts`.
 - Keep the CLI spelling in three places only: the definition key, oclif's own
