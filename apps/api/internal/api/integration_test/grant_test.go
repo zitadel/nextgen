@@ -1132,7 +1132,8 @@ func TestGrantAnonymousProjectCannotReadPlatformUser(t *testing.T) {
 	})
 	require.NoError(t, err)
 	t.Cleanup(func() {
-		_, _ = harness.EnsureServiceDB(t).Statements().DeactivateTeam(context.Background(), platform.ID, team.ID)
+		_, err := harness.EnsureServiceDB(t).Statements().DeactivateTeam(context.Background(), platform.ID, team.ID)
+		assert.NoError(t, err)
 	})
 
 	createParams := api.CreateGrantParams{ProjectID: api.ProjectID(project.ID)}

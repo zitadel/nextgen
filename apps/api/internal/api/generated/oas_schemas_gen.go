@@ -34234,7 +34234,6 @@ type GetGrantErrorResponse struct {
 	NotImplemented        NotImplemented
 	ReqInvalid            ReqInvalid
 	Unavailable           Unavailable
-	UserNotFound          UserNotFound
 	UserPermissionDenied  UserPermissionDenied
 }
 
@@ -34250,7 +34249,6 @@ const (
 	NotImplementedGetGrantErrorResponse        GetGrantErrorResponseType = "not_implemented"
 	ReqInvalidGetGrantErrorResponse            GetGrantErrorResponseType = "req.invalid"
 	UnavailableGetGrantErrorResponse           GetGrantErrorResponseType = "unavailable"
-	UserNotFoundGetGrantErrorResponse          GetGrantErrorResponseType = "user.not_found"
 	UserPermissionDeniedGetGrantErrorResponse  GetGrantErrorResponseType = "user.permission_denied"
 )
 
@@ -34283,11 +34281,6 @@ func (s GetGrantErrorResponse) IsReqInvalid() bool { return s.Type == ReqInvalid
 // IsUnavailable reports whether GetGrantErrorResponse is Unavailable.
 func (s GetGrantErrorResponse) IsUnavailable() bool {
 	return s.Type == UnavailableGetGrantErrorResponse
-}
-
-// IsUserNotFound reports whether GetGrantErrorResponse is UserNotFound.
-func (s GetGrantErrorResponse) IsUserNotFound() bool {
-	return s.Type == UserNotFoundGetGrantErrorResponse
 }
 
 // IsUserPermissionDenied reports whether GetGrantErrorResponse is UserPermissionDenied.
@@ -34439,27 +34432,6 @@ func (s GetGrantErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
 func NewUnavailableGetGrantErrorResponse(v Unavailable) GetGrantErrorResponse {
 	var s GetGrantErrorResponse
 	s.SetUnavailable(v)
-	return s
-}
-
-// SetUserNotFound sets GetGrantErrorResponse to UserNotFound.
-func (s *GetGrantErrorResponse) SetUserNotFound(v UserNotFound) {
-	s.Type = UserNotFoundGetGrantErrorResponse
-	s.UserNotFound = v
-}
-
-// GetUserNotFound returns UserNotFound and true boolean if GetGrantErrorResponse is UserNotFound.
-func (s GetGrantErrorResponse) GetUserNotFound() (v UserNotFound, ok bool) {
-	if !s.IsUserNotFound() {
-		return v, false
-	}
-	return s.UserNotFound, true
-}
-
-// NewUserNotFoundGetGrantErrorResponse returns new GetGrantErrorResponse from UserNotFound.
-func NewUserNotFoundGetGrantErrorResponse(v UserNotFound) GetGrantErrorResponse {
-	var s GetGrantErrorResponse
-	s.SetUserNotFound(v)
 	return s
 }
 
@@ -74998,7 +74970,6 @@ type QueryGrantsErrorResponse struct {
 	NotImplemented        NotImplemented
 	ReqInvalid            ReqInvalid
 	Unavailable           Unavailable
-	UserNotFound          UserNotFound
 	UserPermissionDenied  UserPermissionDenied
 }
 
@@ -75016,7 +74987,6 @@ const (
 	NotImplementedQueryGrantsErrorResponse        QueryGrantsErrorResponseType = "not_implemented"
 	ReqInvalidQueryGrantsErrorResponse            QueryGrantsErrorResponseType = "req.invalid"
 	UnavailableQueryGrantsErrorResponse           QueryGrantsErrorResponseType = "unavailable"
-	UserNotFoundQueryGrantsErrorResponse          QueryGrantsErrorResponseType = "user.not_found"
 	UserPermissionDeniedQueryGrantsErrorResponse  QueryGrantsErrorResponseType = "user.permission_denied"
 )
 
@@ -75063,11 +75033,6 @@ func (s QueryGrantsErrorResponse) IsReqInvalid() bool {
 // IsUnavailable reports whether QueryGrantsErrorResponse is Unavailable.
 func (s QueryGrantsErrorResponse) IsUnavailable() bool {
 	return s.Type == UnavailableQueryGrantsErrorResponse
-}
-
-// IsUserNotFound reports whether QueryGrantsErrorResponse is UserNotFound.
-func (s QueryGrantsErrorResponse) IsUserNotFound() bool {
-	return s.Type == UserNotFoundQueryGrantsErrorResponse
 }
 
 // IsUserPermissionDenied reports whether QueryGrantsErrorResponse is UserPermissionDenied.
@@ -75261,27 +75226,6 @@ func (s QueryGrantsErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
 func NewUnavailableQueryGrantsErrorResponse(v Unavailable) QueryGrantsErrorResponse {
 	var s QueryGrantsErrorResponse
 	s.SetUnavailable(v)
-	return s
-}
-
-// SetUserNotFound sets QueryGrantsErrorResponse to UserNotFound.
-func (s *QueryGrantsErrorResponse) SetUserNotFound(v UserNotFound) {
-	s.Type = UserNotFoundQueryGrantsErrorResponse
-	s.UserNotFound = v
-}
-
-// GetUserNotFound returns UserNotFound and true boolean if QueryGrantsErrorResponse is UserNotFound.
-func (s QueryGrantsErrorResponse) GetUserNotFound() (v UserNotFound, ok bool) {
-	if !s.IsUserNotFound() {
-		return v, false
-	}
-	return s.UserNotFound, true
-}
-
-// NewUserNotFoundQueryGrantsErrorResponse returns new QueryGrantsErrorResponse from UserNotFound.
-func NewUserNotFoundQueryGrantsErrorResponse(v UserNotFound) QueryGrantsErrorResponse {
-	var s QueryGrantsErrorResponse
-	s.SetUserNotFound(v)
 	return s
 }
 
