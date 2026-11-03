@@ -7533,6 +7533,45 @@
     },
     {
       "kind": "javascript-module",
+      "path": "src/orchestrator/signup-pow.ts",
+      "declarations": [
+        {
+          "kind": "function",
+          "name": "solveSignupPow",
+          "return": {
+            "type": {
+              "text": "Promise<string>"
+            }
+          },
+          "parameters": [
+            {
+              "name": "challenge",
+              "type": {
+                "text": "Challenge"
+              }
+            },
+            {
+              "name": "signal",
+              "type": {
+                "text": "AbortSignal"
+              }
+            }
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "solveSignupPow",
+          "declaration": {
+            "name": "solveSignupPow",
+            "module": "src/orchestrator/signup-pow.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
       "path": "src/orchestrator/surface.ts",
       "declarations": [
         {
@@ -8926,6 +8965,14 @@
                 }
               ],
               "description": "On the initial paint, only a field earns focus: script-moved focus with\nno prior interaction matches `:focus-visible`, so autofocusing a button\non a field-less step (passkey-first) paints a ring that reads as a\npre-selected state. Step swaps keep button focus — there the browser\nderives the modality from the user's actual input."
+            },
+            {
+              "kind": "field",
+              "name": "signupSolve",
+              "type": {
+                "text": "AbortController | undefined"
+              },
+              "privacy": "private"
             },
             {
               "kind": "method",
