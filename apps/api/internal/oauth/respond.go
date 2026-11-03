@@ -76,6 +76,12 @@ func invalidClient(description string) error {
 // redirectError sends the browser back to a validated redirect URI with an
 // error, the state and the issuer (RFC 9207).
 func (s *Server) redirectError(w http.ResponseWriter, r *http.Request, redirectURI *url.URL, state, code, description string) {
+	http.Redirect(w, r, s.errorRedirectURL(redirectURI, state, code, description), http.StatusSeeOther)
+}
+
+// errorRedirectURL is a validated redirect URI with an error, the state and
+// the issuer (RFC 9207).
+func (s *Server) errorRedirectURL(redirectURI *url.URL, state, code, description string) string {
 	target := *redirectURI
 	q := target.Query()
 	q.Set("error", code)
@@ -87,7 +93,7 @@ func (s *Server) redirectError(w http.ResponseWriter, r *http.Request, redirectU
 	}
 	q.Set("iss", s.issuer)
 	target.RawQuery = q.Encode()
-	http.Redirect(w, r, target.String(), http.StatusSeeOther)
+	return target.String()
 }
 
 // invalidAuthorizationRequest is the page for a request that cannot be sent

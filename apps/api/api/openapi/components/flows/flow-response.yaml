@@ -21,10 +21,20 @@ properties:
     description: |
       Resolved branding inherited from the app → team → project hierarchy.
       Determined at flow creation based on audience context. Does not change between steps.
+  client:
+    $ref: flow-client.yaml
+    description: |
+      The client the flow signs the user in to. Present on every response of
+      a flow that carries an authorization request (`auth_request_id`).
   redirect_uri:
     type: string
     format: uri
-    description: Present when `step.complete` is `redirect`.
+    description: |
+      Present when `step.complete` is `redirect`. For a flow that carries an
+      authorization request, it is the client's redirect URI with the
+      answer: `code`, `state` and `iss`, or an `error` (RFC 9207). Exchange
+      `handoff_token` first when it is present, so the user stays signed in
+      here too (ADR 081 §9).
   handoff_token:
     type: string
     description: |

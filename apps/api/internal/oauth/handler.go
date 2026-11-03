@@ -28,7 +28,6 @@ func (s *Server) Routes() []Route {
 		{"GET " + ns + "/.well-known/oauth-authorization-server", metadata},
 		{"OPTIONS " + ns + "/.well-known/oauth-authorization-server", metadata},
 		{"GET " + ns + "/authorize", http.HandlerFunc(s.authorize)},
-		{"POST " + ns + "/consent", http.HandlerFunc(s.consent)},
 		{"GET " + ns + "/jwks", back},
 		{"OPTIONS " + ns + "/jwks", back},
 		{"POST " + ns + "/token", back},
@@ -37,7 +36,6 @@ func (s *Server) Routes() []Route {
 		{"OPTIONS " + ns + "/revoke", back},
 		{"POST " + ns + "/register", cors(http.HandlerFunc(s.serveRegister))},
 		{"OPTIONS " + ns + "/register", cors(http.HandlerFunc(s.serveRegister))},
-		{"GET " + s.consolePath + continuePath, http.HandlerFunc(s.resume)},
 		// RFC 9728 §3.1: each API's metadata with the API's path inserted.
 		{"GET " + s.resourceMetadataPath(PlatformAPISlug), cors(s.serveResourceMetadata(PlatformAPISlug))},
 		{"OPTIONS " + s.resourceMetadataPath(PlatformAPISlug), cors(s.serveResourceMetadata(PlatformAPISlug))},

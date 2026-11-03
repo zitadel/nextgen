@@ -119,6 +119,8 @@ type testServer struct {
 	crypter  crypto.Crypter
 	fake     *fakeFlowSvc
 	projects *mocks.MockProjectService
+	handler  *api.Handler
+	tokens   *mocks.MockTokenService
 }
 
 // newTestServer serves the handler bare. Secure on a cookie follows the
@@ -178,7 +180,7 @@ func newTestServerKeys(t *testing.T, openErr, sealErr error, middleware ...func(
 	}
 	srv := httptest.NewServer(h)
 	t.Cleanup(srv.Close)
-	return &testServer{srv: srv, crypter: crypter, fake: fake, projects: projects}
+	return &testServer{srv: srv, crypter: crypter, fake: fake, projects: projects, handler: handler, tokens: tokenService}
 }
 
 // sealCookie matches what the handler emits, so tests can skip CreateFlow.

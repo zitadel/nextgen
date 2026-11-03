@@ -63,10 +63,22 @@ type FlowState struct {
 	// parent's next step. Empty for non-stacked flows.
 	PivotStack []FlowProgress
 
-	// AuthRequestID, when set, identifies the OIDC authorization request
-	// this flow is fulfilling. Nil for flows started outside an OIDC
-	// context (e.g. standalone registration or recovery).
-	AuthRequestID *string
+	// AuthRequest is the authorization request this flow answers, when the
+	// page started it with one (ADR 081 §8). Such a flow ends in a redirect to
+	// the client, whatever its definition's terminal step says. Nil for flows
+	// started outside an OIDC context (e.g. standalone registration or
+	// recovery).
+	AuthRequest *FlowAuthRequest `json:",omitempty"`
+
+	// SessionUser is set when the flow's user is the one the browser's live
+	// session names, not one this flow's checks proved: the flow answers its
+	// authorization request without a sign-in, and ends without a handoff,
+	// since the browser keeps the session it has.
+	SessionUser bool `json:",omitempty"`
+
+	// AwaitingConsent is set while the engine shows the consent step. The
+	// flow rests on its definition's terminal step (CurrentStep) meanwhile.
+	AwaitingConsent bool `json:",omitempty"`
 
 	// RedirectURI is the terminal redirect destination for `complete:
 	// redirect` flows (typically the OIDC callback). Nil for `complete:

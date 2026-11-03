@@ -1,0 +1,39 @@
+type: object
+required: [api, scopes]
+description: |
+  What the client asks the user to let it do, on the engine's reserved
+  `consent` step (ADR 081 §11). The client is the response's `client`. The
+  step offers two actions: `accept`, which records the consent and returns
+  the user to the client signed in, and `deny`, which returns them with
+  `access_denied`.
+properties:
+  api:
+    type: object
+    required: [identifier, name]
+    description: The API the client asks to call as the user.
+    properties:
+      identifier:
+        type: string
+        format: uri
+        description: The API's identifier, the `aud` of the tokens the client gets.
+        example: https://zitadel.example.com/api/v1
+      name:
+        type: string
+        description: The API's name.
+        example: Zitadel API
+  scopes:
+    type: array
+    description: The scopes the client asks for, in the order it asked.
+    items:
+      type: object
+      required: [name, text_key]
+      properties:
+        name:
+          type: string
+          example: offline_access
+        text_key:
+          type: string
+          description: |
+            Localisation key of the scope's consent line, `scope.<name>`. A
+            client without the key shows the scope's name.
+          example: scope.offline_access

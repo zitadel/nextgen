@@ -28,10 +28,15 @@ type FlowService interface {
 }
 
 type StartFlowRequest struct {
-	Definition    *domain.FlowDefinition
-	Purpose       domain.FlowDefinitionPurpose
-	RedirectURI   *string
-	AuthRequestID *string
+	Definition  *domain.FlowDefinition
+	Purpose     domain.FlowDefinitionPurpose
+	RedirectURI *string
+	// AuthRequest is the authorization request the flow answers, already
+	// checked against the browser it is bound to (ADR 081 §8).
+	AuthRequest *domain.FlowAuthRequest
+	// SessionUserID is the user the browser's live session names, read only
+	// with AuthRequest.
+	SessionUserID string
 	SessionID     *string
 	UserAgent     *domain.UserAgent
 }
@@ -335,10 +340,9 @@ func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (res doma
 		Purpose:       req.Purpose,
 		Session:       domain.FlowSessionRef{ID: sessionID},
 		RedirectURI:   req.RedirectURI,
+		AuthRequest:   req.AuthRequest,
+		SessionUserID: req.SessionUserID,
 		UserSchemaURL: userSchema.URL,
-	}
-	if req.AuthRequestID != nil {
-		in.AuthRequest = &domain.FlowAuthRequestRef{ID: *req.AuthRequestID}
 	}
 
 	result, err := s.stateMachine.Start(ctx, in)

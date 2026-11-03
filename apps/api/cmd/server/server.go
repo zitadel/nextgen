@@ -475,7 +475,6 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 			ConsolePath: cfg.Server.ConsolePath,
 			ProjectID:   cfg.Platform.ResolvedProjectID(),
 			Keys:        keyService,
-			Sessions:    tokenService,
 			Users:       userService,
 			Consents:    consentService,
 			Fetch:       egressClient,
@@ -484,34 +483,41 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 			return err
 		}
 		securityHandler = securityHandler.WithUserBearers(userBearers{authServer})
+		// The console's login flow answers the server's authorization
+		// requests (ADR 081 §8).
+		stateMachine.WithAuthorizer(authServer)
 		slog.Info("platform oauth: serving the authorization server", slog.String("issuer", authServer.Issuer()))
 	}
 
+	handler := api.NewHandler(
+		flowService,
+		authAttemptSvc,
+		sessionService,
+		projectService,
+		userService,
+		schemaService,
+		flowDefinitionSvc,
+		teamService,
+		brandingService,
+		releaseService,
+		deploymentService,
+		idpConnectionService,
+		eventService,
+		tokenService,
+		keyService,
+		claimService,
+		grantService,
+		variableService,
+		serviceDBPool,
+		// Resolved, not the raw pin: in bootstrap mode project_id is empty
+		// and an empty handler pin rejects every claim/complete session.
+		cfg.Platform.ResolvedProjectID(),
+	).WithPersonalTeamEnsurer(personalTeams).WithBuiltinSchemaBases(builtinBases).WithRuntimeResolver(runtimeResolver).WithPolicyService(policyService).WithConsentService(consentService).WithReadinessCheck(pool)
+	if authServer != nil {
+		handler = handler.WithAuthRequests(authServer)
+	}
 	apiServers, err := api.NewServers(
-		api.NewHandler(
-			flowService,
-			authAttemptSvc,
-			sessionService,
-			projectService,
-			userService,
-			schemaService,
-			flowDefinitionSvc,
-			teamService,
-			brandingService,
-			releaseService,
-			deploymentService,
-			idpConnectionService,
-			eventService,
-			tokenService,
-			keyService,
-			claimService,
-			grantService,
-			variableService,
-			serviceDBPool,
-			// Resolved, not the raw pin: in bootstrap mode project_id is empty
-			// and an empty handler pin rejects every claim/complete session.
-			cfg.Platform.ResolvedProjectID(),
-		).WithPersonalTeamEnsurer(personalTeams).WithBuiltinSchemaBases(builtinBases).WithRuntimeResolver(runtimeResolver).WithPolicyService(policyService).WithConsentService(consentService).WithReadinessCheck(pool),
+		handler,
 		// The same platform project the handler resolves: sessions homed there
 		// can reach the platform operator path (ADR 075).
 		securityHandler,
@@ -1015,6 +1021,7 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiS
 			api.WithRecover,
 			api.WithRequestHostMiddleware,
 			api.WithLoopbackSessionCookie,
+			api.WithRequestCookies,
 			middleware.WithUserAgentMiddleware,
 			api.WithSessionStateNoStore,
 			api.WithCSRFRequest,

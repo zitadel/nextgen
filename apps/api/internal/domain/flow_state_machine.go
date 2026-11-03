@@ -147,10 +147,14 @@ type FlowStateMachine interface {
 // FlowStartInput carries everything the state machine needs to
 // bootstrap a new flow.
 type FlowStartInput struct {
-	Definition    *FlowDefinition
-	Purpose       FlowDefinitionPurpose
-	Session       FlowSessionRef
-	AuthRequest   *FlowAuthRequestRef
+	Definition  *FlowDefinition
+	Purpose     FlowDefinitionPurpose
+	Session     FlowSessionRef
+	AuthRequest *FlowAuthRequest
+	// SessionUserID is the user the browser's live session names, read only
+	// with AuthRequest: such a flow answers the request for that user without
+	// a sign-in, unless the request says prompt=login.
+	SessionUserID string
 	RedirectURI   *string
 	UserSchemaURL string
 }
@@ -249,6 +253,8 @@ type FlowStep struct {
 	// satisfy before re-submitting (e.g. a passkey assertion). Nil unless
 	// the engine just issued one.
 	Challenge *FlowStepChallenge
+	// Consent is set only on the engine's consent step.
+	Consent *FlowStepConsent
 }
 
 // FlowStepIdentifier mirrors the OpenAPI `flow-step.identifier`: the
@@ -336,13 +342,6 @@ type FlowSessionRef struct {
 	Version int64
 }
 
-// FlowAuthRequestRef ties a flow to the OIDC authorization request it
-// is fulfilling.
-type FlowAuthRequestRef struct {
-	ID           string
-	RequestedACR *string
-}
-
 // FlowStateMachineRuntime is the production [FlowStateMachine].
 type FlowStateMachineRuntime struct {
 	schemas       SchemaResolver
@@ -354,7 +353,15 @@ type FlowStateMachineRuntime struct {
 	ssoIdentities FlowSSOIdentityService
 	ssoRedirects  FlowSSORedirectIssuer
 	passwords     FlowPasswordPolicy
+	authorizer    FlowAuthorizer
 	now           func() time.Time
+}
+
+// WithAuthorizer wires the authorization server that flows answering an
+// authorization request report to. Without one, no flow carries a request.
+func (r *FlowStateMachineRuntime) WithAuthorizer(authorizer FlowAuthorizer) *FlowStateMachineRuntime {
+	r.authorizer = authorizer
+	return r
 }
 
 // NewFlowStateMachine wires the runtime. The now hook is injectable so
@@ -414,8 +421,11 @@ func (r *FlowStateMachineRuntime) Start(ctx context.Context, in FlowStartInput) 
 		SessionVersion: in.Session.Version,
 	}
 	if in.AuthRequest != nil {
-		state.AuthRequestID = &in.AuthRequest.ID
-		state.RequestedACR = in.AuthRequest.RequestedACR
+		if r.authorizer == nil {
+			return FlowStepResult{}, ErrFlowAuthRequestInvalid()
+		}
+		req := *in.AuthRequest
+		state.AuthRequest = &req
 	}
 	if in.RedirectURI != nil {
 		uri := *in.RedirectURI
@@ -436,11 +446,44 @@ func (r *FlowStateMachineRuntime) Start(ctx context.Context, in FlowStartInput) 
 	}
 	state.AuthAttemptID = attemptID
 
+	if state.AuthRequest != nil {
+		if result, answered, err := r.startAuthorization(ctx, in.Definition, state, in.SessionUserID); answered || err != nil {
+			return result, err
+		}
+	}
+
 	step, err := r.renderStep(ctx, in.Definition, state)
 	if err != nil {
 		return FlowStepResult{}, err
 	}
 	return FlowStepResult{State: state, Step: step}, nil
+}
+
+// startAuthorization answers an authorization request that needs no sign-in
+// (ADR 081 §8): the browser's live session names the user, unless the request
+// says prompt=login, and prompt=none answers at once either way. The flow then
+// rests on its terminal step, under the consent step if the user must consent.
+// It reports false when the flow goes on to sign the user in.
+func (r *FlowStateMachineRuntime) startAuthorization(ctx context.Context, def *FlowDefinition, state *FlowState, sessionUserID string) (FlowStepResult, bool, error) {
+	req := state.AuthRequest
+	signedIn := sessionUserID != "" && !req.ForceLogin
+	if !signedIn && !req.NoInteraction {
+		return FlowStepResult{}, false, nil
+	}
+	end, err := terminalStep(def)
+	if err != nil {
+		return FlowStepResult{}, true, err
+	}
+	state.CurrentStep = end.Name
+	pc := &processCtx{ctx: ctx, def: def, state: state, currentStep: end}
+	if !signedIn {
+		result, err := r.answerAuthorization(pc, FlowAuthLoginRequired)
+		return result, true, err
+	}
+	state.CollectedData.UserID = sessionUserID
+	state.SessionUser = true
+	result, err := r.concludeAuthorization(pc)
+	return result, true, err
 }
 
 // Render re-emits the current step without advancing. It refreshes IssuedAt
@@ -449,6 +492,9 @@ func (r *FlowStateMachineRuntime) Start(ctx context.Context, in FlowStartInput) 
 func (r *FlowStateMachineRuntime) Render(ctx context.Context, def *FlowDefinition, state *FlowState) (FlowStepResult, error) {
 	if def == nil || state == nil {
 		return FlowStepResult{}, fmt.Errorf("%w: render without definition or state", ErrFlowIntegrity())
+	}
+	if state.AwaitingConsent {
+		return FlowStepResult{State: state, Step: consentStep(state)}, nil
 	}
 	if result, reseal, err := r.resolveSSOIdentity(ctx, def, state); err != nil || result.Step != nil {
 		result.Reseal = reseal
@@ -1104,6 +1150,9 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, def *FlowDefiniti
 	}
 
 	pc := &processCtx{ctx: ctx, def: def, state: state, currentStep: currentStep, in: in}
+	if state.AwaitingConsent {
+		return r.processConsent(pc)
+	}
 	// An external sign-in collects nothing on the step, so it skips the
 	// input pipeline like back and navigate do.
 	if in.Action == FlowActionSSO || in.SSOProvider != nil {
@@ -1397,6 +1446,9 @@ func (r *FlowStateMachineRuntime) routeOutcome(pc *processCtx, resolved FlowReso
 	}
 
 	if nextStep.Complete != nil {
+		if pc.state.AuthRequest != nil {
+			return r.concludeAuthorization(pc)
+		}
 		return r.terminate(pc, nextStep)
 	}
 
@@ -2338,12 +2390,18 @@ func (r *FlowStateMachineRuntime) processBack(pc *processCtx) (FlowStepResult, e
 // mints the handoff. Clears BackStack — no back past a
 // point-of-no-return.
 func (r *FlowStateMachineRuntime) terminate(pc *processCtx, step *FlowDefinitionStep) (FlowStepResult, error) {
+	return r.terminateAs(pc, *step.Complete)
+}
+
+// terminateAs is terminate with the completion kind the caller decides: a
+// flow that answers an authorization request ends in a redirect whatever its
+// definition's terminal step says (ADR 081 §9).
+func (r *FlowStateMachineRuntime) terminateAs(pc *processCtx, kind FlowStepComplete) (FlowStepResult, error) {
 	pc.state.ClearBackStack()
 	rendered, err := r.renderStep(pc.ctx, pc.def, pc.state)
 	if err != nil {
 		return FlowStepResult{}, err
 	}
-	kind := *step.Complete
 	rendered.Complete = &kind
 	if kind == FlowStepCompleteRedirect && pc.state.RedirectURI != nil {
 		uri := *pc.state.RedirectURI
@@ -2356,7 +2414,9 @@ func (r *FlowStateMachineRuntime) terminate(pc *processCtx, step *FlowDefinition
 	// requires a verified credential-class factor), but a no-account terminal
 	// has nothing to hand off and must return the step cleanly rather than
 	// surface ErrAuthAttemptNotCompleted.
-	if pc.state.CollectedData.UserID == "" {
+	// A user the browser's live session named has proved nothing in this
+	// flow, so there is nothing to hand off: the browser keeps its session.
+	if pc.state.CollectedData.UserID == "" || pc.state.SessionUser {
 		return FlowStepResult{State: pc.state, Step: rendered}, nil
 	}
 

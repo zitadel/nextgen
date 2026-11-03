@@ -4,7 +4,8 @@ additionalProperties: false
 description: |
   An action the engine offers on a runtime step. Every declared action of the
   definition's step appears here, plus the engine-injected `back` whenever
-  returning to the previous step is possible.
+  returning to the previous step is possible. The engine's `consent` step
+  offers `accept` (`submit`, primary) and `deny` (`navigate`).
 properties:
   name:
     type: string

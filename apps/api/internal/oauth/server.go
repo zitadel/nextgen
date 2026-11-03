@@ -22,12 +22,6 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 )
 
-// Sessions reads the browser session a sign-in left: the console's
-// __nextgen_session cookie (service.TokenService).
-type Sessions interface {
-	IntrospectToken(ctx context.Context, token string) (*domain.Token, error)
-}
-
 // Users reads a signed-in user's own record (service.UserService).
 type Users interface {
 	GetMyUser(ctx context.Context, input service.GetMyUserInput) (*domain.User, error)
@@ -39,13 +33,12 @@ type Deps struct {
 	// PublicBase is the deployment's public base, `server.public_base`: the
 	// issuer and the API identifiers hang off it.
 	PublicBase string
-	// ConsolePath is where the console is mounted, whose login page signs
-	// the developer in (`server.console_path`).
+	// ConsolePath is where the console is mounted, whose login page answers
+	// the requests (`server.console_path`).
 	ConsolePath string
 	// ProjectID is the platform project, the issuer's project.
 	ProjectID string
 	Keys      service.KeyService
-	Sessions  Sessions
 	Users     Users
 	Consents  service.ConsentService
 	// Fetch is the hardened egress client client ID metadata documents are
@@ -63,7 +56,6 @@ type Server struct {
 	issuer      string
 	consolePath string
 	keys        service.KeyService
-	sessions    Sessions
 	users       Users
 	consents    service.ConsentService
 	documents   *documentCache
@@ -97,7 +89,6 @@ func New(deps Deps) (*Server, error) {
 		publicBase:  base,
 		consolePath: strings.TrimRight(deps.ConsolePath, "/"),
 		keys:        deps.Keys,
-		sessions:    deps.Sessions,
 		users:       deps.Users,
 		consents:    deps.Consents,
 		documents:   newDocumentCache(deps.Fetch, now),

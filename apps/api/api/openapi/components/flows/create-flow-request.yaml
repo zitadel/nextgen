@@ -41,7 +41,18 @@ properties:
     $ref: ../schemas/session-proof-token.yaml
   auth_request_id:
     type: string
-    description: OIDC/SAML auth request ID (links flow to protocol request).
+    description: |
+      The authorization request this flow answers: the `auth_request`
+      parameter of the login page's URL, where the authorization endpoint
+      sent the browser (ADR 081 §8). Send it on every `POST /flow` the page
+      makes for that request, restarts included. The endpoint bound it to
+      the browser with a cookie, so it answers only in the browser that
+      made the request; anywhere else, or once the request expired, the
+      call fails with `flow.auth_request_invalid`. Cannot be combined with
+      `redirect_uri`: the flow ends in a redirect to the client.
+
+      With a live session in the browser, the response may already be the
+      `consent` step or a terminal `redirect`.
   redirect_uri:
     type: string
     format: uri

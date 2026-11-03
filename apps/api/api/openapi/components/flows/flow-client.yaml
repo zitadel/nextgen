@@ -1,0 +1,39 @@
+type: object
+required: [id, name, redirect_host, party]
+description: |
+  The client the flow signs the user in to, when the flow carries an
+  authorization request (`auth_request_id`). Every response of such a flow
+  carries it, so the page can say what the user is signing in to (ADR 081
+  §8).
+properties:
+  id:
+    type: string
+    description: |
+      The client's `client_id`: a client the project declares, a registered
+      one, or the URL of a client ID metadata document.
+    example: cli
+  name:
+    type: string
+    description: |
+      The client's name. A third-party client names itself, so show its name
+      beside `redirect_host`, which the server checked.
+    example: Zitadel CLI
+  logo_uri:
+    type: string
+    format: uri
+    description: The client's logo, when it names one.
+  redirect_host:
+    type: string
+    description: |
+      The host, and the port when it has one, the browser returns to when the
+      flow ends: where the client receives the answer.
+    example: 127.0.0.1:53124
+  party:
+    type: string
+    enum: [first_party, third_party]
+    description: |
+      - `first_party`: the project's own client. The flow asks for consent
+        only when the request asks for it (`prompt=consent`).
+      - `third_party`: a client that registered itself, or that the project
+        lets in. The flow asks the user before the client gets a scope the
+        user has not agreed to.

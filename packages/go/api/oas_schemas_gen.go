@@ -15632,11 +15632,16 @@ func (s *CreateFlowDefinitionRequest) SetFlowDefinition(val FlowDefinition) {
 // CreateFlowErrorResponse represents sum type.
 type CreateFlowErrorResponse struct {
 	Type                   CreateFlowErrorResponseType // switch on this field
+	AttAlreadyHandedOff    AttAlreadyHandedOff
 	AttInvalidRequest      AttInvalidRequest
+	AttInvalidState        AttInvalidState
+	AttNotCompleted        AttNotCompleted
+	ConsentNotFound        ConsentNotFound
 	EncKeyDecryptFailed    EncKeyDecryptFailed
 	EncKeyEncryptFailed    EncKeyEncryptFailed
 	EncKeyNotFound         EncKeyNotFound
 	EvtInvalid             EvtInvalid
+	FlowAuthRequestInvalid FlowAuthRequestInvalid
 	FlowdefNotFound        FlowdefNotFound
 	FlowdefPurposeMismatch FlowdefPurposeMismatch
 	FlowIntegrity          FlowIntegrity
@@ -15652,6 +15657,7 @@ type CreateFlowErrorResponse struct {
 	RelNotFound            RelNotFound
 	RelRevoked             RelRevoked
 	ReqInvalid             ReqInvalid
+	SessTokenInvalid       SessTokenInvalid
 	EncKeyUnknownAlg       EncKeyUnknownAlg
 	Unavailable            Unavailable
 }
@@ -15661,11 +15667,16 @@ type CreateFlowErrorResponseType string
 
 // Possible values for CreateFlowErrorResponseType.
 const (
+	AttAlreadyHandedOffCreateFlowErrorResponse    CreateFlowErrorResponseType = "att.already_handed_off"
 	AttInvalidRequestCreateFlowErrorResponse      CreateFlowErrorResponseType = "att.invalid_request"
+	AttInvalidStateCreateFlowErrorResponse        CreateFlowErrorResponseType = "att.invalid_state"
+	AttNotCompletedCreateFlowErrorResponse        CreateFlowErrorResponseType = "att.not_completed"
+	ConsentNotFoundCreateFlowErrorResponse        CreateFlowErrorResponseType = "consent.not_found"
 	EncKeyDecryptFailedCreateFlowErrorResponse    CreateFlowErrorResponseType = "enc_key.decrypt_failed"
 	EncKeyEncryptFailedCreateFlowErrorResponse    CreateFlowErrorResponseType = "enc_key.encrypt_failed"
 	EncKeyNotFoundCreateFlowErrorResponse         CreateFlowErrorResponseType = "enc_key.not_found"
 	EvtInvalidCreateFlowErrorResponse             CreateFlowErrorResponseType = "evt.invalid"
+	FlowAuthRequestInvalidCreateFlowErrorResponse CreateFlowErrorResponseType = "flow.auth_request_invalid"
 	FlowdefNotFoundCreateFlowErrorResponse        CreateFlowErrorResponseType = "flowdef.not_found"
 	FlowdefPurposeMismatchCreateFlowErrorResponse CreateFlowErrorResponseType = "flowdef.purpose_mismatch"
 	FlowIntegrityCreateFlowErrorResponse          CreateFlowErrorResponseType = "flow.integrity"
@@ -15681,13 +15692,34 @@ const (
 	RelNotFoundCreateFlowErrorResponse            CreateFlowErrorResponseType = "rel.not_found"
 	RelRevokedCreateFlowErrorResponse             CreateFlowErrorResponseType = "rel.revoked"
 	ReqInvalidCreateFlowErrorResponse             CreateFlowErrorResponseType = "req.invalid"
+	SessTokenInvalidCreateFlowErrorResponse       CreateFlowErrorResponseType = "sess.token_invalid"
 	EncKeyUnknownAlgCreateFlowErrorResponse       CreateFlowErrorResponseType = "enc_key.unknown_alg"
 	UnavailableCreateFlowErrorResponse            CreateFlowErrorResponseType = "unavailable"
 )
 
+// IsAttAlreadyHandedOff reports whether CreateFlowErrorResponse is AttAlreadyHandedOff.
+func (s CreateFlowErrorResponse) IsAttAlreadyHandedOff() bool {
+	return s.Type == AttAlreadyHandedOffCreateFlowErrorResponse
+}
+
 // IsAttInvalidRequest reports whether CreateFlowErrorResponse is AttInvalidRequest.
 func (s CreateFlowErrorResponse) IsAttInvalidRequest() bool {
 	return s.Type == AttInvalidRequestCreateFlowErrorResponse
+}
+
+// IsAttInvalidState reports whether CreateFlowErrorResponse is AttInvalidState.
+func (s CreateFlowErrorResponse) IsAttInvalidState() bool {
+	return s.Type == AttInvalidStateCreateFlowErrorResponse
+}
+
+// IsAttNotCompleted reports whether CreateFlowErrorResponse is AttNotCompleted.
+func (s CreateFlowErrorResponse) IsAttNotCompleted() bool {
+	return s.Type == AttNotCompletedCreateFlowErrorResponse
+}
+
+// IsConsentNotFound reports whether CreateFlowErrorResponse is ConsentNotFound.
+func (s CreateFlowErrorResponse) IsConsentNotFound() bool {
+	return s.Type == ConsentNotFoundCreateFlowErrorResponse
 }
 
 // IsEncKeyDecryptFailed reports whether CreateFlowErrorResponse is EncKeyDecryptFailed.
@@ -15708,6 +15740,11 @@ func (s CreateFlowErrorResponse) IsEncKeyNotFound() bool {
 // IsEvtInvalid reports whether CreateFlowErrorResponse is EvtInvalid.
 func (s CreateFlowErrorResponse) IsEvtInvalid() bool {
 	return s.Type == EvtInvalidCreateFlowErrorResponse
+}
+
+// IsFlowAuthRequestInvalid reports whether CreateFlowErrorResponse is FlowAuthRequestInvalid.
+func (s CreateFlowErrorResponse) IsFlowAuthRequestInvalid() bool {
+	return s.Type == FlowAuthRequestInvalidCreateFlowErrorResponse
 }
 
 // IsFlowdefNotFound reports whether CreateFlowErrorResponse is FlowdefNotFound.
@@ -15783,6 +15820,11 @@ func (s CreateFlowErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidCreateFlowErrorResponse
 }
 
+// IsSessTokenInvalid reports whether CreateFlowErrorResponse is SessTokenInvalid.
+func (s CreateFlowErrorResponse) IsSessTokenInvalid() bool {
+	return s.Type == SessTokenInvalidCreateFlowErrorResponse
+}
+
 // IsEncKeyUnknownAlg reports whether CreateFlowErrorResponse is EncKeyUnknownAlg.
 func (s CreateFlowErrorResponse) IsEncKeyUnknownAlg() bool {
 	return s.Type == EncKeyUnknownAlgCreateFlowErrorResponse
@@ -15791,6 +15833,27 @@ func (s CreateFlowErrorResponse) IsEncKeyUnknownAlg() bool {
 // IsUnavailable reports whether CreateFlowErrorResponse is Unavailable.
 func (s CreateFlowErrorResponse) IsUnavailable() bool {
 	return s.Type == UnavailableCreateFlowErrorResponse
+}
+
+// SetAttAlreadyHandedOff sets CreateFlowErrorResponse to AttAlreadyHandedOff.
+func (s *CreateFlowErrorResponse) SetAttAlreadyHandedOff(v AttAlreadyHandedOff) {
+	s.Type = AttAlreadyHandedOffCreateFlowErrorResponse
+	s.AttAlreadyHandedOff = v
+}
+
+// GetAttAlreadyHandedOff returns AttAlreadyHandedOff and true boolean if CreateFlowErrorResponse is AttAlreadyHandedOff.
+func (s CreateFlowErrorResponse) GetAttAlreadyHandedOff() (v AttAlreadyHandedOff, ok bool) {
+	if !s.IsAttAlreadyHandedOff() {
+		return v, false
+	}
+	return s.AttAlreadyHandedOff, true
+}
+
+// NewAttAlreadyHandedOffCreateFlowErrorResponse returns new CreateFlowErrorResponse from AttAlreadyHandedOff.
+func NewAttAlreadyHandedOffCreateFlowErrorResponse(v AttAlreadyHandedOff) CreateFlowErrorResponse {
+	var s CreateFlowErrorResponse
+	s.SetAttAlreadyHandedOff(v)
+	return s
 }
 
 // SetAttInvalidRequest sets CreateFlowErrorResponse to AttInvalidRequest.
@@ -15811,6 +15874,69 @@ func (s CreateFlowErrorResponse) GetAttInvalidRequest() (v AttInvalidRequest, ok
 func NewAttInvalidRequestCreateFlowErrorResponse(v AttInvalidRequest) CreateFlowErrorResponse {
 	var s CreateFlowErrorResponse
 	s.SetAttInvalidRequest(v)
+	return s
+}
+
+// SetAttInvalidState sets CreateFlowErrorResponse to AttInvalidState.
+func (s *CreateFlowErrorResponse) SetAttInvalidState(v AttInvalidState) {
+	s.Type = AttInvalidStateCreateFlowErrorResponse
+	s.AttInvalidState = v
+}
+
+// GetAttInvalidState returns AttInvalidState and true boolean if CreateFlowErrorResponse is AttInvalidState.
+func (s CreateFlowErrorResponse) GetAttInvalidState() (v AttInvalidState, ok bool) {
+	if !s.IsAttInvalidState() {
+		return v, false
+	}
+	return s.AttInvalidState, true
+}
+
+// NewAttInvalidStateCreateFlowErrorResponse returns new CreateFlowErrorResponse from AttInvalidState.
+func NewAttInvalidStateCreateFlowErrorResponse(v AttInvalidState) CreateFlowErrorResponse {
+	var s CreateFlowErrorResponse
+	s.SetAttInvalidState(v)
+	return s
+}
+
+// SetAttNotCompleted sets CreateFlowErrorResponse to AttNotCompleted.
+func (s *CreateFlowErrorResponse) SetAttNotCompleted(v AttNotCompleted) {
+	s.Type = AttNotCompletedCreateFlowErrorResponse
+	s.AttNotCompleted = v
+}
+
+// GetAttNotCompleted returns AttNotCompleted and true boolean if CreateFlowErrorResponse is AttNotCompleted.
+func (s CreateFlowErrorResponse) GetAttNotCompleted() (v AttNotCompleted, ok bool) {
+	if !s.IsAttNotCompleted() {
+		return v, false
+	}
+	return s.AttNotCompleted, true
+}
+
+// NewAttNotCompletedCreateFlowErrorResponse returns new CreateFlowErrorResponse from AttNotCompleted.
+func NewAttNotCompletedCreateFlowErrorResponse(v AttNotCompleted) CreateFlowErrorResponse {
+	var s CreateFlowErrorResponse
+	s.SetAttNotCompleted(v)
+	return s
+}
+
+// SetConsentNotFound sets CreateFlowErrorResponse to ConsentNotFound.
+func (s *CreateFlowErrorResponse) SetConsentNotFound(v ConsentNotFound) {
+	s.Type = ConsentNotFoundCreateFlowErrorResponse
+	s.ConsentNotFound = v
+}
+
+// GetConsentNotFound returns ConsentNotFound and true boolean if CreateFlowErrorResponse is ConsentNotFound.
+func (s CreateFlowErrorResponse) GetConsentNotFound() (v ConsentNotFound, ok bool) {
+	if !s.IsConsentNotFound() {
+		return v, false
+	}
+	return s.ConsentNotFound, true
+}
+
+// NewConsentNotFoundCreateFlowErrorResponse returns new CreateFlowErrorResponse from ConsentNotFound.
+func NewConsentNotFoundCreateFlowErrorResponse(v ConsentNotFound) CreateFlowErrorResponse {
+	var s CreateFlowErrorResponse
+	s.SetConsentNotFound(v)
 	return s
 }
 
@@ -15895,6 +16021,27 @@ func (s CreateFlowErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
 func NewEvtInvalidCreateFlowErrorResponse(v EvtInvalid) CreateFlowErrorResponse {
 	var s CreateFlowErrorResponse
 	s.SetEvtInvalid(v)
+	return s
+}
+
+// SetFlowAuthRequestInvalid sets CreateFlowErrorResponse to FlowAuthRequestInvalid.
+func (s *CreateFlowErrorResponse) SetFlowAuthRequestInvalid(v FlowAuthRequestInvalid) {
+	s.Type = FlowAuthRequestInvalidCreateFlowErrorResponse
+	s.FlowAuthRequestInvalid = v
+}
+
+// GetFlowAuthRequestInvalid returns FlowAuthRequestInvalid and true boolean if CreateFlowErrorResponse is FlowAuthRequestInvalid.
+func (s CreateFlowErrorResponse) GetFlowAuthRequestInvalid() (v FlowAuthRequestInvalid, ok bool) {
+	if !s.IsFlowAuthRequestInvalid() {
+		return v, false
+	}
+	return s.FlowAuthRequestInvalid, true
+}
+
+// NewFlowAuthRequestInvalidCreateFlowErrorResponse returns new CreateFlowErrorResponse from FlowAuthRequestInvalid.
+func NewFlowAuthRequestInvalidCreateFlowErrorResponse(v FlowAuthRequestInvalid) CreateFlowErrorResponse {
+	var s CreateFlowErrorResponse
+	s.SetFlowAuthRequestInvalid(v)
 	return s
 }
 
@@ -16213,6 +16360,27 @@ func NewReqInvalidCreateFlowErrorResponse(v ReqInvalid) CreateFlowErrorResponse 
 	return s
 }
 
+// SetSessTokenInvalid sets CreateFlowErrorResponse to SessTokenInvalid.
+func (s *CreateFlowErrorResponse) SetSessTokenInvalid(v SessTokenInvalid) {
+	s.Type = SessTokenInvalidCreateFlowErrorResponse
+	s.SessTokenInvalid = v
+}
+
+// GetSessTokenInvalid returns SessTokenInvalid and true boolean if CreateFlowErrorResponse is SessTokenInvalid.
+func (s CreateFlowErrorResponse) GetSessTokenInvalid() (v SessTokenInvalid, ok bool) {
+	if !s.IsSessTokenInvalid() {
+		return v, false
+	}
+	return s.SessTokenInvalid, true
+}
+
+// NewSessTokenInvalidCreateFlowErrorResponse returns new CreateFlowErrorResponse from SessTokenInvalid.
+func NewSessTokenInvalidCreateFlowErrorResponse(v SessTokenInvalid) CreateFlowErrorResponse {
+	var s CreateFlowErrorResponse
+	s.SetSessTokenInvalid(v)
+	return s
+}
+
 // SetEncKeyUnknownAlg sets CreateFlowErrorResponse to EncKeyUnknownAlg.
 func (s *CreateFlowErrorResponse) SetEncKeyUnknownAlg(v EncKeyUnknownAlg) {
 	s.Type = EncKeyUnknownAlgCreateFlowErrorResponse
@@ -16308,7 +16476,16 @@ type CreateFlowRequest struct {
 	// Requires `session_token`.
 	SessionID    OptString            `json:"session_id"`
 	SessionToken OptSessionProofToken `json:"session_token"`
-	// OIDC/SAML auth request ID (links flow to protocol request).
+	// The authorization request this flow answers: the `auth_request`
+	// parameter of the login page's URL, where the authorization endpoint
+	// sent the browser (ADR 081 §8). Send it on every `POST /flow` the page
+	// makes for that request, restarts included. The endpoint bound it to
+	// the browser with a cookie, so it answers only in the browser that
+	// made the request; anywhere else, or once the request expired, the
+	// call fails with `flow.auth_request_invalid`. Cannot be combined with
+	// `redirect_uri`: the flow ends in a redirect to the client.
+	// With a live session in the browser, the response may already be the
+	// `consent` step or a terminal `redirect`.
 	AuthRequestID OptString   `json:"auth_request_id"`
 	RedirectURI   OptURI      `json:"redirect_uri"`
 	Hint          OptFlowHint `json:"hint"`
@@ -27715,6 +27892,180 @@ func (s *FlowAudience) SetAppIds(val []string) {
 
 // Merged schema.
 // Ref: #
+type FlowAuthRequestInvalid struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptFlowAuthRequestInvalidDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *FlowAuthRequestInvalid) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *FlowAuthRequestInvalid) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *FlowAuthRequestInvalid) GetDetails() OptFlowAuthRequestInvalidDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *FlowAuthRequestInvalid) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *FlowAuthRequestInvalid) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *FlowAuthRequestInvalid) SetDetails(val OptFlowAuthRequestInvalidDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type FlowAuthRequestInvalidDetails map[string]jx.Raw
+
+func (s *FlowAuthRequestInvalidDetails) init() FlowAuthRequestInvalidDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// The client the flow signs the user in to, when the flow carries an
+// authorization request (`auth_request_id`). Every response of such a flow
+// carries it, so the page can say what the user is signing in to (ADR 081
+// §8).
+// Ref: #
+type FlowClient struct {
+	// The client's `client_id`: a client the project declares, a registered
+	// one, or the URL of a client ID metadata document.
+	ID string `json:"id"`
+	// The client's name. A third-party client names itself, so show its name
+	// beside `redirect_host`, which the server checked.
+	Name string `json:"name"`
+	// The client's logo, when it names one.
+	LogoURI OptURI `json:"logo_uri"`
+	// The host, and the port when it has one, the browser returns to when the
+	// flow ends: where the client receives the answer.
+	RedirectHost string `json:"redirect_host"`
+	// - `first_party`: the project's own client. The flow asks for consent
+	// only when the request asks for it (`prompt=consent`).
+	// - `third_party`: a client that registered itself, or that the project
+	// lets in. The flow asks the user before the client gets a scope the
+	// user has not agreed to.
+	Party FlowClientParty `json:"party"`
+}
+
+// GetID returns the value of ID.
+func (s *FlowClient) GetID() string {
+	return s.ID
+}
+
+// GetName returns the value of Name.
+func (s *FlowClient) GetName() string {
+	return s.Name
+}
+
+// GetLogoURI returns the value of LogoURI.
+func (s *FlowClient) GetLogoURI() OptURI {
+	return s.LogoURI
+}
+
+// GetRedirectHost returns the value of RedirectHost.
+func (s *FlowClient) GetRedirectHost() string {
+	return s.RedirectHost
+}
+
+// GetParty returns the value of Party.
+func (s *FlowClient) GetParty() FlowClientParty {
+	return s.Party
+}
+
+// SetID sets the value of ID.
+func (s *FlowClient) SetID(val string) {
+	s.ID = val
+}
+
+// SetName sets the value of Name.
+func (s *FlowClient) SetName(val string) {
+	s.Name = val
+}
+
+// SetLogoURI sets the value of LogoURI.
+func (s *FlowClient) SetLogoURI(val OptURI) {
+	s.LogoURI = val
+}
+
+// SetRedirectHost sets the value of RedirectHost.
+func (s *FlowClient) SetRedirectHost(val string) {
+	s.RedirectHost = val
+}
+
+// SetParty sets the value of Party.
+func (s *FlowClient) SetParty(val FlowClientParty) {
+	s.Party = val
+}
+
+// - `first_party`: the project's own client. The flow asks for consent
+// only when the request asks for it (`prompt=consent`).
+// - `third_party`: a client that registered itself, or that the project
+// lets in. The flow asks the user before the client gets a scope the
+// user has not agreed to.
+type FlowClientParty string
+
+const (
+	FlowClientPartyFirstParty FlowClientParty = "first_party"
+	FlowClientPartyThirdParty FlowClientParty = "third_party"
+)
+
+// AllValues returns all FlowClientParty values.
+func (FlowClientParty) AllValues() []FlowClientParty {
+	return []FlowClientParty{
+		FlowClientPartyFirstParty,
+		FlowClientPartyThirdParty,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s FlowClientParty) MarshalText() ([]byte, error) {
+	switch s {
+	case FlowClientPartyFirstParty:
+		return []byte(s), nil
+	case FlowClientPartyThirdParty:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *FlowClientParty) UnmarshalText(data []byte) error {
+	switch FlowClientParty(data) {
+	case FlowClientPartyFirstParty:
+		*s = FlowClientPartyFirstParty
+		return nil
+	case FlowClientPartyThirdParty:
+		*s = FlowClientPartyThirdParty
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Merged schema.
+// Ref: #
 type FlowCompleted struct {
 	// Merged property.
 	Code string `json:"code"`
@@ -27764,6 +28115,94 @@ func (s *FlowCompletedDetails) init() FlowCompletedDetails {
 		*s = m
 	}
 	return m
+}
+
+// What the client asks the user to let it do, on the engine's reserved
+// `consent` step (ADR 081 §11). The client is the response's `client`. The
+// step offers two actions: `accept`, which records the consent and returns
+// the user to the client signed in, and `deny`, which returns them with
+// `access_denied`.
+// Ref: #
+type FlowConsent struct {
+	// The API the client asks to call as the user.
+	API FlowConsentAPI `json:"api"`
+	// The scopes the client asks for, in the order it asked.
+	Scopes []FlowConsentScopesItem `json:"scopes"`
+}
+
+// GetAPI returns the value of API.
+func (s *FlowConsent) GetAPI() FlowConsentAPI {
+	return s.API
+}
+
+// GetScopes returns the value of Scopes.
+func (s *FlowConsent) GetScopes() []FlowConsentScopesItem {
+	return s.Scopes
+}
+
+// SetAPI sets the value of API.
+func (s *FlowConsent) SetAPI(val FlowConsentAPI) {
+	s.API = val
+}
+
+// SetScopes sets the value of Scopes.
+func (s *FlowConsent) SetScopes(val []FlowConsentScopesItem) {
+	s.Scopes = val
+}
+
+// The API the client asks to call as the user.
+type FlowConsentAPI struct {
+	// The API's identifier, the `aud` of the tokens the client gets.
+	Identifier url.URL `json:"identifier"`
+	// The API's name.
+	Name string `json:"name"`
+}
+
+// GetIdentifier returns the value of Identifier.
+func (s *FlowConsentAPI) GetIdentifier() url.URL {
+	return s.Identifier
+}
+
+// GetName returns the value of Name.
+func (s *FlowConsentAPI) GetName() string {
+	return s.Name
+}
+
+// SetIdentifier sets the value of Identifier.
+func (s *FlowConsentAPI) SetIdentifier(val url.URL) {
+	s.Identifier = val
+}
+
+// SetName sets the value of Name.
+func (s *FlowConsentAPI) SetName(val string) {
+	s.Name = val
+}
+
+type FlowConsentScopesItem struct {
+	Name string `json:"name"`
+	// Localisation key of the scope's consent line, `scope.<name>`. A
+	// client without the key shows the scope's name.
+	TextKey string `json:"text_key"`
+}
+
+// GetName returns the value of Name.
+func (s *FlowConsentScopesItem) GetName() string {
+	return s.Name
+}
+
+// GetTextKey returns the value of TextKey.
+func (s *FlowConsentScopesItem) GetTextKey() string {
+	return s.TextKey
+}
+
+// SetName sets the value of Name.
+func (s *FlowConsentScopesItem) SetName(val string) {
+	s.Name = val
+}
+
+// SetTextKey sets the value of TextKey.
+func (s *FlowConsentScopesItem) SetTextKey(val string) {
+	s.TextKey = val
 }
 
 // Merged schema.
@@ -28221,7 +28660,8 @@ func (s *FlowDefinitionStatus) UnmarshalText(data []byte) error {
 // Ref: #
 type FlowDefinitionStep struct {
 	// Unique step identifier within this flow. Used as transition targets
-	// and returned in the API response as `step.name`.
+	// and returned in the API response as `step.name`. `consent` and
+	// `account_choice` are reserved for the steps the engine inserts.
 	Name string `json:"name"`
 	// Schema property names to collect from the user. Each entry references
 	// a property in the flow's user schema. The engine resolves field type,
@@ -28942,7 +29382,14 @@ type FlowResponse struct {
 	// Resolved branding inherited from the app → team → project hierarchy.
 	// Determined at flow creation based on audience context. Does not change between steps.
 	Branding OptBranding `json:"branding"`
-	// Present when `step.complete` is `redirect`.
+	// The client the flow signs the user in to. Present on every response of
+	// a flow that carries an authorization request (`auth_request_id`).
+	Client OptFlowClient `json:"client"`
+	// Present when `step.complete` is `redirect`. For a flow that carries an
+	// authorization request, it is the client's redirect URI with the
+	// answer: `code`, `state` and `iss`, or an `error` (RFC 9207). Exchange
+	// `handoff_token` first when it is present, so the user stays signed in
+	// here too (ADR 081 §9).
 	RedirectURI OptURI `json:"redirect_uri"`
 	// Short-lived, audience-bound token produced on flow completion.
 	// Exchange it for a session via `POST /sessions/exchange`.
@@ -28976,6 +29423,11 @@ func (s *FlowResponse) GetStep() FlowStep {
 // GetBranding returns the value of Branding.
 func (s *FlowResponse) GetBranding() OptBranding {
 	return s.Branding
+}
+
+// GetClient returns the value of Client.
+func (s *FlowResponse) GetClient() OptFlowClient {
+	return s.Client
 }
 
 // GetRedirectURI returns the value of RedirectURI.
@@ -29016,6 +29468,11 @@ func (s *FlowResponse) SetStep(val FlowStep) {
 // SetBranding sets the value of Branding.
 func (s *FlowResponse) SetBranding(val OptBranding) {
 	s.Branding = val
+}
+
+// SetClient sets the value of Client.
+func (s *FlowResponse) SetClient(val OptFlowClient) {
+	s.Client = val
 }
 
 // SetRedirectURI sets the value of RedirectURI.
@@ -29132,7 +29589,10 @@ func (s *FlowRestartRequiredDetails) init() FlowRestartRequiredDetails {
 // and builds name-keyed indexes locally for lookup.
 // Ref: #
 type FlowStep struct {
-	// Step name from the flow definition.
+	// Step name from the flow definition, or `consent`, the step the engine
+	// inserts when a flow that carries an authorization request needs the
+	// user's consent (see `consent`). A definition cannot name a step
+	// `consent` or `account_choice`.
 	Name  string       `json:"name"`
 	Texts OptStepTexts `json:"texts"`
 	// What the flow does on this step. A login moves between `login` and
@@ -29162,11 +29622,17 @@ type FlowStep struct {
 	// `error.outcome_unhandled` for any other outcome.
 	Error OptNilString `json:"error"`
 	// Present only on terminal steps. Tells the frontend what to do:
-	// - redirect: navigate to redirect_uri immediately (OIDC/SAML done)
+	// - redirect: navigate to redirect_uri (OIDC/SAML done). A flow that
+	// carries an authorization request always ends in `redirect`,
+	// whatever its definition's terminal step says; exchange the
+	// response's `handoff_token` first when it has one.
 	// - show: render the step as a success screen (e.g., registration confirmed).
 	Complete OptFlowStepComplete `json:"complete"`
 	// URL to navigate to (e.g., SSO provider redirect).
 	RedirectURL OptURI `json:"redirect_url"`
+	// Present only on the `consent` step: the API and the scopes the
+	// response's `client` asks the user to let it use.
+	Consent OptFlowConsent `json:"consent"`
 	// Ordered list of input fields to collect. Field metadata (type, validation)
 	// is resolved by the engine from the flow's user schema. The LiquidJS
 	// template iterates this array; for keyed lookup it builds a name-indexed
@@ -29254,6 +29720,11 @@ func (s *FlowStep) GetRedirectURL() OptURI {
 	return s.RedirectURL
 }
 
+// GetConsent returns the value of Consent.
+func (s *FlowStep) GetConsent() OptFlowConsent {
+	return s.Consent
+}
+
 // GetFields returns the value of Fields.
 func (s *FlowStep) GetFields() []Field {
 	return s.Fields
@@ -29319,6 +29790,11 @@ func (s *FlowStep) SetRedirectURL(val OptURI) {
 	s.RedirectURL = val
 }
 
+// SetConsent sets the value of Consent.
+func (s *FlowStep) SetConsent(val OptFlowConsent) {
+	s.Consent = val
+}
+
 // SetFields sets the value of Fields.
 func (s *FlowStep) SetFields(val []Field) {
 	s.Fields = val
@@ -29351,7 +29827,8 @@ func (s *FlowStep) SetChallenge(val OptFlowStepChallenge) {
 
 // An action the engine offers on a runtime step. Every declared action of the
 // definition's step appears here, plus the engine-injected `back` whenever
-// returning to the previous step is possible.
+// returning to the previous step is possible. The engine's `consent` step
+// offers `accept` (`submit`, primary) and `deny` (`navigate`).
 // Ref: #
 type FlowStepAction struct {
 	// Action identifier. Sent back in the submit request as `action`.
@@ -29588,7 +30065,10 @@ func (s *FlowStepChallengeOptions) init() FlowStepChallengeOptions {
 }
 
 // Present only on terminal steps. Tells the frontend what to do:
-// - redirect: navigate to redirect_uri immediately (OIDC/SAML done)
+// - redirect: navigate to redirect_uri (OIDC/SAML done). A flow that
+// carries an authorization request always ends in `redirect`,
+// whatever its definition's terminal step says; exchange the
+// response's `handoff_token` first when it has one.
 // - show: render the step as a success screen (e.g., registration confirmed).
 type FlowStepComplete string
 
@@ -34156,10 +34636,12 @@ type GetFlowStepErrorResponse struct {
 	AttInvalidState             AttInvalidState
 	AttNotCompleted             AttNotCompleted
 	AttNotFound                 AttNotFound
+	ConsentNotFound             ConsentNotFound
 	EncKeyDecryptFailed         EncKeyDecryptFailed
 	EncKeyEncryptFailed         EncKeyEncryptFailed
 	EncKeyNotFound              EncKeyNotFound
 	EvtInvalid                  EvtInvalid
+	FlowAuthRequestInvalid      FlowAuthRequestInvalid
 	FlowCompleted               FlowCompleted
 	FlowCookieExpired           FlowCookieExpired
 	FlowCookieInvalid           FlowCookieInvalid
@@ -34175,6 +34657,7 @@ type GetFlowStepErrorResponse struct {
 	IdpScopesMissingOpenid      IdpScopesMissingOpenid
 	Internal                    Internal
 	TknInvalid                  TknInvalid
+	TknInvalidTknid             TknInvalidTknid
 	NotImplemented              NotImplemented
 	ProjLastOwner               ProjLastOwner
 	RelNotFound                 RelNotFound
@@ -34201,10 +34684,12 @@ const (
 	AttInvalidStateGetFlowStepErrorResponse             GetFlowStepErrorResponseType = "att.invalid_state"
 	AttNotCompletedGetFlowStepErrorResponse             GetFlowStepErrorResponseType = "att.not_completed"
 	AttNotFoundGetFlowStepErrorResponse                 GetFlowStepErrorResponseType = "att.not_found"
+	ConsentNotFoundGetFlowStepErrorResponse             GetFlowStepErrorResponseType = "consent.not_found"
 	EncKeyDecryptFailedGetFlowStepErrorResponse         GetFlowStepErrorResponseType = "enc_key.decrypt_failed"
 	EncKeyEncryptFailedGetFlowStepErrorResponse         GetFlowStepErrorResponseType = "enc_key.encrypt_failed"
 	EncKeyNotFoundGetFlowStepErrorResponse              GetFlowStepErrorResponseType = "enc_key.not_found"
 	EvtInvalidGetFlowStepErrorResponse                  GetFlowStepErrorResponseType = "evt.invalid"
+	FlowAuthRequestInvalidGetFlowStepErrorResponse      GetFlowStepErrorResponseType = "flow.auth_request_invalid"
 	FlowCompletedGetFlowStepErrorResponse               GetFlowStepErrorResponseType = "flow.completed"
 	FlowCookieExpiredGetFlowStepErrorResponse           GetFlowStepErrorResponseType = "flow.cookie_expired"
 	FlowCookieInvalidGetFlowStepErrorResponse           GetFlowStepErrorResponseType = "flow.cookie_invalid"
@@ -34220,6 +34705,7 @@ const (
 	IdpScopesMissingOpenidGetFlowStepErrorResponse      GetFlowStepErrorResponseType = "idp.scopes_missing_openid"
 	InternalGetFlowStepErrorResponse                    GetFlowStepErrorResponseType = "internal"
 	TknInvalidGetFlowStepErrorResponse                  GetFlowStepErrorResponseType = "tkn.invalid"
+	TknInvalidTknidGetFlowStepErrorResponse             GetFlowStepErrorResponseType = "tkn.invalid_tknid"
 	NotImplementedGetFlowStepErrorResponse              GetFlowStepErrorResponseType = "not_implemented"
 	ProjLastOwnerGetFlowStepErrorResponse               GetFlowStepErrorResponseType = "proj.last_owner"
 	RelNotFoundGetFlowStepErrorResponse                 GetFlowStepErrorResponseType = "rel.not_found"
@@ -34261,6 +34747,11 @@ func (s GetFlowStepErrorResponse) IsAttNotFound() bool {
 	return s.Type == AttNotFoundGetFlowStepErrorResponse
 }
 
+// IsConsentNotFound reports whether GetFlowStepErrorResponse is ConsentNotFound.
+func (s GetFlowStepErrorResponse) IsConsentNotFound() bool {
+	return s.Type == ConsentNotFoundGetFlowStepErrorResponse
+}
+
 // IsEncKeyDecryptFailed reports whether GetFlowStepErrorResponse is EncKeyDecryptFailed.
 func (s GetFlowStepErrorResponse) IsEncKeyDecryptFailed() bool {
 	return s.Type == EncKeyDecryptFailedGetFlowStepErrorResponse
@@ -34279,6 +34770,11 @@ func (s GetFlowStepErrorResponse) IsEncKeyNotFound() bool {
 // IsEvtInvalid reports whether GetFlowStepErrorResponse is EvtInvalid.
 func (s GetFlowStepErrorResponse) IsEvtInvalid() bool {
 	return s.Type == EvtInvalidGetFlowStepErrorResponse
+}
+
+// IsFlowAuthRequestInvalid reports whether GetFlowStepErrorResponse is FlowAuthRequestInvalid.
+func (s GetFlowStepErrorResponse) IsFlowAuthRequestInvalid() bool {
+	return s.Type == FlowAuthRequestInvalidGetFlowStepErrorResponse
 }
 
 // IsFlowCompleted reports whether GetFlowStepErrorResponse is FlowCompleted.
@@ -34354,6 +34850,11 @@ func (s GetFlowStepErrorResponse) IsInternal() bool {
 // IsTknInvalid reports whether GetFlowStepErrorResponse is TknInvalid.
 func (s GetFlowStepErrorResponse) IsTknInvalid() bool {
 	return s.Type == TknInvalidGetFlowStepErrorResponse
+}
+
+// IsTknInvalidTknid reports whether GetFlowStepErrorResponse is TknInvalidTknid.
+func (s GetFlowStepErrorResponse) IsTknInvalidTknid() bool {
+	return s.Type == TknInvalidTknidGetFlowStepErrorResponse
 }
 
 // IsNotImplemented reports whether GetFlowStepErrorResponse is NotImplemented.
@@ -34531,6 +35032,27 @@ func NewAttNotFoundGetFlowStepErrorResponse(v AttNotFound) GetFlowStepErrorRespo
 	return s
 }
 
+// SetConsentNotFound sets GetFlowStepErrorResponse to ConsentNotFound.
+func (s *GetFlowStepErrorResponse) SetConsentNotFound(v ConsentNotFound) {
+	s.Type = ConsentNotFoundGetFlowStepErrorResponse
+	s.ConsentNotFound = v
+}
+
+// GetConsentNotFound returns ConsentNotFound and true boolean if GetFlowStepErrorResponse is ConsentNotFound.
+func (s GetFlowStepErrorResponse) GetConsentNotFound() (v ConsentNotFound, ok bool) {
+	if !s.IsConsentNotFound() {
+		return v, false
+	}
+	return s.ConsentNotFound, true
+}
+
+// NewConsentNotFoundGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from ConsentNotFound.
+func NewConsentNotFoundGetFlowStepErrorResponse(v ConsentNotFound) GetFlowStepErrorResponse {
+	var s GetFlowStepErrorResponse
+	s.SetConsentNotFound(v)
+	return s
+}
+
 // SetEncKeyDecryptFailed sets GetFlowStepErrorResponse to EncKeyDecryptFailed.
 func (s *GetFlowStepErrorResponse) SetEncKeyDecryptFailed(v EncKeyDecryptFailed) {
 	s.Type = EncKeyDecryptFailedGetFlowStepErrorResponse
@@ -34612,6 +35134,27 @@ func (s GetFlowStepErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
 func NewEvtInvalidGetFlowStepErrorResponse(v EvtInvalid) GetFlowStepErrorResponse {
 	var s GetFlowStepErrorResponse
 	s.SetEvtInvalid(v)
+	return s
+}
+
+// SetFlowAuthRequestInvalid sets GetFlowStepErrorResponse to FlowAuthRequestInvalid.
+func (s *GetFlowStepErrorResponse) SetFlowAuthRequestInvalid(v FlowAuthRequestInvalid) {
+	s.Type = FlowAuthRequestInvalidGetFlowStepErrorResponse
+	s.FlowAuthRequestInvalid = v
+}
+
+// GetFlowAuthRequestInvalid returns FlowAuthRequestInvalid and true boolean if GetFlowStepErrorResponse is FlowAuthRequestInvalid.
+func (s GetFlowStepErrorResponse) GetFlowAuthRequestInvalid() (v FlowAuthRequestInvalid, ok bool) {
+	if !s.IsFlowAuthRequestInvalid() {
+		return v, false
+	}
+	return s.FlowAuthRequestInvalid, true
+}
+
+// NewFlowAuthRequestInvalidGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from FlowAuthRequestInvalid.
+func NewFlowAuthRequestInvalidGetFlowStepErrorResponse(v FlowAuthRequestInvalid) GetFlowStepErrorResponse {
+	var s GetFlowStepErrorResponse
+	s.SetFlowAuthRequestInvalid(v)
 	return s
 }
 
@@ -34927,6 +35470,27 @@ func (s GetFlowStepErrorResponse) GetTknInvalid() (v TknInvalid, ok bool) {
 func NewTknInvalidGetFlowStepErrorResponse(v TknInvalid) GetFlowStepErrorResponse {
 	var s GetFlowStepErrorResponse
 	s.SetTknInvalid(v)
+	return s
+}
+
+// SetTknInvalidTknid sets GetFlowStepErrorResponse to TknInvalidTknid.
+func (s *GetFlowStepErrorResponse) SetTknInvalidTknid(v TknInvalidTknid) {
+	s.Type = TknInvalidTknidGetFlowStepErrorResponse
+	s.TknInvalidTknid = v
+}
+
+// GetTknInvalidTknid returns TknInvalidTknid and true boolean if GetFlowStepErrorResponse is TknInvalidTknid.
+func (s GetFlowStepErrorResponse) GetTknInvalidTknid() (v TknInvalidTknid, ok bool) {
+	if !s.IsTknInvalidTknid() {
+		return v, false
+	}
+	return s.TknInvalidTknid, true
+}
+
+// NewTknInvalidTknidGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from TknInvalidTknid.
+func NewTknInvalidTknidGetFlowStepErrorResponse(v TknInvalidTknid) GetFlowStepErrorResponse {
+	var s GetFlowStepErrorResponse
+	s.SetTknInvalidTknid(v)
 	return s
 }
 
@@ -54133,6 +54697,98 @@ func (o OptFlowAudience) Or(d FlowAudience) FlowAudience {
 	return d
 }
 
+// NewOptFlowAuthRequestInvalidDetails returns new OptFlowAuthRequestInvalidDetails with value set to v.
+func NewOptFlowAuthRequestInvalidDetails(v FlowAuthRequestInvalidDetails) OptFlowAuthRequestInvalidDetails {
+	return OptFlowAuthRequestInvalidDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptFlowAuthRequestInvalidDetails is optional FlowAuthRequestInvalidDetails.
+type OptFlowAuthRequestInvalidDetails struct {
+	Value FlowAuthRequestInvalidDetails
+	Set   bool
+}
+
+// IsSet returns true if OptFlowAuthRequestInvalidDetails was set.
+func (o OptFlowAuthRequestInvalidDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptFlowAuthRequestInvalidDetails) Reset() {
+	var v FlowAuthRequestInvalidDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptFlowAuthRequestInvalidDetails) SetTo(v FlowAuthRequestInvalidDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptFlowAuthRequestInvalidDetails) Get() (v FlowAuthRequestInvalidDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptFlowAuthRequestInvalidDetails) Or(d FlowAuthRequestInvalidDetails) FlowAuthRequestInvalidDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptFlowClient returns new OptFlowClient with value set to v.
+func NewOptFlowClient(v FlowClient) OptFlowClient {
+	return OptFlowClient{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptFlowClient is optional FlowClient.
+type OptFlowClient struct {
+	Value FlowClient
+	Set   bool
+}
+
+// IsSet returns true if OptFlowClient was set.
+func (o OptFlowClient) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptFlowClient) Reset() {
+	var v FlowClient
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptFlowClient) SetTo(v FlowClient) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptFlowClient) Get() (v FlowClient, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptFlowClient) Or(d FlowClient) FlowClient {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptFlowCompletedDetails returns new OptFlowCompletedDetails with value set to v.
 func NewOptFlowCompletedDetails(v FlowCompletedDetails) OptFlowCompletedDetails {
 	return OptFlowCompletedDetails{
@@ -54173,6 +54829,52 @@ func (o OptFlowCompletedDetails) Get() (v FlowCompletedDetails, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptFlowCompletedDetails) Or(d FlowCompletedDetails) FlowCompletedDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptFlowConsent returns new OptFlowConsent with value set to v.
+func NewOptFlowConsent(v FlowConsent) OptFlowConsent {
+	return OptFlowConsent{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptFlowConsent is optional FlowConsent.
+type OptFlowConsent struct {
+	Value FlowConsent
+	Set   bool
+}
+
+// IsSet returns true if OptFlowConsent was set.
+func (o OptFlowConsent) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptFlowConsent) Reset() {
+	var v FlowConsent
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptFlowConsent) SetTo(v FlowConsent) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptFlowConsent) Get() (v FlowConsent, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptFlowConsent) Or(d FlowConsent) FlowConsent {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -65255,6 +65957,52 @@ func (o OptSessTokenCreationFailedDetails) Get() (v SessTokenCreationFailedDetai
 
 // Or returns value if set, or given parameter if does not.
 func (o OptSessTokenCreationFailedDetails) Or(d SessTokenCreationFailedDetails) SessTokenCreationFailedDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptSessTokenInvalidDetails returns new OptSessTokenInvalidDetails with value set to v.
+func NewOptSessTokenInvalidDetails(v SessTokenInvalidDetails) OptSessTokenInvalidDetails {
+	return OptSessTokenInvalidDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptSessTokenInvalidDetails is optional SessTokenInvalidDetails.
+type OptSessTokenInvalidDetails struct {
+	Value SessTokenInvalidDetails
+	Set   bool
+}
+
+// IsSet returns true if OptSessTokenInvalidDetails was set.
+func (o OptSessTokenInvalidDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptSessTokenInvalidDetails) Reset() {
+	var v SessTokenInvalidDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptSessTokenInvalidDetails) SetTo(v SessTokenInvalidDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptSessTokenInvalidDetails) Get() (v SessTokenInvalidDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptSessTokenInvalidDetails) Or(d SessTokenInvalidDetails) SessTokenInvalidDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -86226,6 +86974,59 @@ func (s *SessTokenCreationFailedDetails) init() SessTokenCreationFailedDetails {
 	return m
 }
 
+// Merged schema.
+// Ref: #
+type SessTokenInvalid struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptSessTokenInvalidDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *SessTokenInvalid) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *SessTokenInvalid) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *SessTokenInvalid) GetDetails() OptSessTokenInvalidDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *SessTokenInvalid) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *SessTokenInvalid) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *SessTokenInvalid) SetDetails(val OptSessTokenInvalidDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type SessTokenInvalidDetails map[string]jx.Raw
+
+func (s *SessTokenInvalidDetails) init() SessTokenInvalidDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
 type SessionCookie struct {
 	APIKey string
 	Roles  []string
@@ -88379,10 +89180,12 @@ type SubmitFlowStepErrorResponse struct {
 	AttNotFound                 AttNotFound
 	AttProofRejected            AttProofRejected
 	AttStaleChallenge           AttStaleChallenge
+	ConsentNotFound             ConsentNotFound
 	EncKeyDecryptFailed         EncKeyDecryptFailed
 	EncKeyEncryptFailed         EncKeyEncryptFailed
 	EncKeyNotFound              EncKeyNotFound
 	EvtInvalid                  EvtInvalid
+	FlowAuthRequestInvalid      FlowAuthRequestInvalid
 	FlowCookieExpired           FlowCookieExpired
 	FlowCookieInvalid           FlowCookieInvalid
 	FlowIntegrity               FlowIntegrity
@@ -88396,6 +89199,7 @@ type SubmitFlowStepErrorResponse struct {
 	IdpScopesMissingOpenid      IdpScopesMissingOpenid
 	Internal                    Internal
 	TknInvalid                  TknInvalid
+	TknInvalidTknid             TknInvalidTknid
 	NotImplemented              NotImplemented
 	ProjLastOwner               ProjLastOwner
 	ProjOriginNotAllowed        ProjOriginNotAllowed
@@ -88426,10 +89230,12 @@ const (
 	AttNotFoundSubmitFlowStepErrorResponse                 SubmitFlowStepErrorResponseType = "att.not_found"
 	AttProofRejectedSubmitFlowStepErrorResponse            SubmitFlowStepErrorResponseType = "att.proof_rejected"
 	AttStaleChallengeSubmitFlowStepErrorResponse           SubmitFlowStepErrorResponseType = "att.stale_challenge"
+	ConsentNotFoundSubmitFlowStepErrorResponse             SubmitFlowStepErrorResponseType = "consent.not_found"
 	EncKeyDecryptFailedSubmitFlowStepErrorResponse         SubmitFlowStepErrorResponseType = "enc_key.decrypt_failed"
 	EncKeyEncryptFailedSubmitFlowStepErrorResponse         SubmitFlowStepErrorResponseType = "enc_key.encrypt_failed"
 	EncKeyNotFoundSubmitFlowStepErrorResponse              SubmitFlowStepErrorResponseType = "enc_key.not_found"
 	EvtInvalidSubmitFlowStepErrorResponse                  SubmitFlowStepErrorResponseType = "evt.invalid"
+	FlowAuthRequestInvalidSubmitFlowStepErrorResponse      SubmitFlowStepErrorResponseType = "flow.auth_request_invalid"
 	FlowCookieExpiredSubmitFlowStepErrorResponse           SubmitFlowStepErrorResponseType = "flow.cookie_expired"
 	FlowCookieInvalidSubmitFlowStepErrorResponse           SubmitFlowStepErrorResponseType = "flow.cookie_invalid"
 	FlowIntegritySubmitFlowStepErrorResponse               SubmitFlowStepErrorResponseType = "flow.integrity"
@@ -88443,6 +89249,7 @@ const (
 	IdpScopesMissingOpenidSubmitFlowStepErrorResponse      SubmitFlowStepErrorResponseType = "idp.scopes_missing_openid"
 	InternalSubmitFlowStepErrorResponse                    SubmitFlowStepErrorResponseType = "internal"
 	TknInvalidSubmitFlowStepErrorResponse                  SubmitFlowStepErrorResponseType = "tkn.invalid"
+	TknInvalidTknidSubmitFlowStepErrorResponse             SubmitFlowStepErrorResponseType = "tkn.invalid_tknid"
 	NotImplementedSubmitFlowStepErrorResponse              SubmitFlowStepErrorResponseType = "not_implemented"
 	ProjLastOwnerSubmitFlowStepErrorResponse               SubmitFlowStepErrorResponseType = "proj.last_owner"
 	ProjOriginNotAllowedSubmitFlowStepErrorResponse        SubmitFlowStepErrorResponseType = "proj.origin_not_allowed"
@@ -88496,6 +89303,11 @@ func (s SubmitFlowStepErrorResponse) IsAttStaleChallenge() bool {
 	return s.Type == AttStaleChallengeSubmitFlowStepErrorResponse
 }
 
+// IsConsentNotFound reports whether SubmitFlowStepErrorResponse is ConsentNotFound.
+func (s SubmitFlowStepErrorResponse) IsConsentNotFound() bool {
+	return s.Type == ConsentNotFoundSubmitFlowStepErrorResponse
+}
+
 // IsEncKeyDecryptFailed reports whether SubmitFlowStepErrorResponse is EncKeyDecryptFailed.
 func (s SubmitFlowStepErrorResponse) IsEncKeyDecryptFailed() bool {
 	return s.Type == EncKeyDecryptFailedSubmitFlowStepErrorResponse
@@ -88514,6 +89326,11 @@ func (s SubmitFlowStepErrorResponse) IsEncKeyNotFound() bool {
 // IsEvtInvalid reports whether SubmitFlowStepErrorResponse is EvtInvalid.
 func (s SubmitFlowStepErrorResponse) IsEvtInvalid() bool {
 	return s.Type == EvtInvalidSubmitFlowStepErrorResponse
+}
+
+// IsFlowAuthRequestInvalid reports whether SubmitFlowStepErrorResponse is FlowAuthRequestInvalid.
+func (s SubmitFlowStepErrorResponse) IsFlowAuthRequestInvalid() bool {
+	return s.Type == FlowAuthRequestInvalidSubmitFlowStepErrorResponse
 }
 
 // IsFlowCookieExpired reports whether SubmitFlowStepErrorResponse is FlowCookieExpired.
@@ -88579,6 +89396,11 @@ func (s SubmitFlowStepErrorResponse) IsInternal() bool {
 // IsTknInvalid reports whether SubmitFlowStepErrorResponse is TknInvalid.
 func (s SubmitFlowStepErrorResponse) IsTknInvalid() bool {
 	return s.Type == TknInvalidSubmitFlowStepErrorResponse
+}
+
+// IsTknInvalidTknid reports whether SubmitFlowStepErrorResponse is TknInvalidTknid.
+func (s SubmitFlowStepErrorResponse) IsTknInvalidTknid() bool {
+	return s.Type == TknInvalidTknidSubmitFlowStepErrorResponse
 }
 
 // IsNotImplemented reports whether SubmitFlowStepErrorResponse is NotImplemented.
@@ -88808,6 +89630,27 @@ func NewAttStaleChallengeSubmitFlowStepErrorResponse(v AttStaleChallenge) Submit
 	return s
 }
 
+// SetConsentNotFound sets SubmitFlowStepErrorResponse to ConsentNotFound.
+func (s *SubmitFlowStepErrorResponse) SetConsentNotFound(v ConsentNotFound) {
+	s.Type = ConsentNotFoundSubmitFlowStepErrorResponse
+	s.ConsentNotFound = v
+}
+
+// GetConsentNotFound returns ConsentNotFound and true boolean if SubmitFlowStepErrorResponse is ConsentNotFound.
+func (s SubmitFlowStepErrorResponse) GetConsentNotFound() (v ConsentNotFound, ok bool) {
+	if !s.IsConsentNotFound() {
+		return v, false
+	}
+	return s.ConsentNotFound, true
+}
+
+// NewConsentNotFoundSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from ConsentNotFound.
+func NewConsentNotFoundSubmitFlowStepErrorResponse(v ConsentNotFound) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetConsentNotFound(v)
+	return s
+}
+
 // SetEncKeyDecryptFailed sets SubmitFlowStepErrorResponse to EncKeyDecryptFailed.
 func (s *SubmitFlowStepErrorResponse) SetEncKeyDecryptFailed(v EncKeyDecryptFailed) {
 	s.Type = EncKeyDecryptFailedSubmitFlowStepErrorResponse
@@ -88889,6 +89732,27 @@ func (s SubmitFlowStepErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
 func NewEvtInvalidSubmitFlowStepErrorResponse(v EvtInvalid) SubmitFlowStepErrorResponse {
 	var s SubmitFlowStepErrorResponse
 	s.SetEvtInvalid(v)
+	return s
+}
+
+// SetFlowAuthRequestInvalid sets SubmitFlowStepErrorResponse to FlowAuthRequestInvalid.
+func (s *SubmitFlowStepErrorResponse) SetFlowAuthRequestInvalid(v FlowAuthRequestInvalid) {
+	s.Type = FlowAuthRequestInvalidSubmitFlowStepErrorResponse
+	s.FlowAuthRequestInvalid = v
+}
+
+// GetFlowAuthRequestInvalid returns FlowAuthRequestInvalid and true boolean if SubmitFlowStepErrorResponse is FlowAuthRequestInvalid.
+func (s SubmitFlowStepErrorResponse) GetFlowAuthRequestInvalid() (v FlowAuthRequestInvalid, ok bool) {
+	if !s.IsFlowAuthRequestInvalid() {
+		return v, false
+	}
+	return s.FlowAuthRequestInvalid, true
+}
+
+// NewFlowAuthRequestInvalidSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from FlowAuthRequestInvalid.
+func NewFlowAuthRequestInvalidSubmitFlowStepErrorResponse(v FlowAuthRequestInvalid) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetFlowAuthRequestInvalid(v)
 	return s
 }
 
@@ -89162,6 +90026,27 @@ func (s SubmitFlowStepErrorResponse) GetTknInvalid() (v TknInvalid, ok bool) {
 func NewTknInvalidSubmitFlowStepErrorResponse(v TknInvalid) SubmitFlowStepErrorResponse {
 	var s SubmitFlowStepErrorResponse
 	s.SetTknInvalid(v)
+	return s
+}
+
+// SetTknInvalidTknid sets SubmitFlowStepErrorResponse to TknInvalidTknid.
+func (s *SubmitFlowStepErrorResponse) SetTknInvalidTknid(v TknInvalidTknid) {
+	s.Type = TknInvalidTknidSubmitFlowStepErrorResponse
+	s.TknInvalidTknid = v
+}
+
+// GetTknInvalidTknid returns TknInvalidTknid and true boolean if SubmitFlowStepErrorResponse is TknInvalidTknid.
+func (s SubmitFlowStepErrorResponse) GetTknInvalidTknid() (v TknInvalidTknid, ok bool) {
+	if !s.IsTknInvalidTknid() {
+		return v, false
+	}
+	return s.TknInvalidTknid, true
+}
+
+// NewTknInvalidTknidSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from TknInvalidTknid.
+func NewTknInvalidTknidSubmitFlowStepErrorResponse(v TknInvalidTknid) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetTknInvalidTknid(v)
 	return s
 }
 

@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -320,29 +319,158 @@ func TestRevokingOneTokenKeepsTheOtherSignIns(t *testing.T) {
 	assert.Equal(t, http.StatusOK, status, body)
 }
 
-// signedIn stands in for the token service: the cookie it knows is the
-// developer's session.
-type signedIn struct{}
-
-const testSessionCookie = "session-cookie"
-
-func (signedIn) IntrospectToken(_ context.Context, token string) (*domain.Token, error) {
-	if token != testSessionCookie {
-		return nil, domain.ErrInvalidToken()
-	}
-	sessionID := "sess_developer"
-	return &domain.Token{
-		ProjectID: domain.PlatformProjectID,
-		UserID:    testUserID,
-		Type:      domain.TokenTypeSessionToken,
-		SessionID: &sessionID,
-	}, nil
+// handOff follows authorize to the login page: the handle in the page's URL,
+// and the cookie that binds the request to the browser.
+func handOff(t *testing.T, w *httptest.ResponseRecorder) (string, *http.Cookie) {
+	t.Helper()
+	require.Equal(t, http.StatusSeeOther, w.Code, w.Body.String())
+	location, err := url.Parse(w.Header().Get("Location"))
+	require.NoError(t, err)
+	cookies := w.Result().Cookies()
+	require.Len(t, cookies, 1)
+	return location.Query().Get("auth_request"), cookies[0]
 }
 
-var (
-	consentRequestField = regexp.MustCompile(`name="request" value="([^"]+)"`)
-	consentCSRFField    = regexp.MustCompile(`name="csrf" value="([^"]+)"`)
-)
+// browser is a cookie jar holding these cookies.
+func browser(cookies ...*http.Cookie) func(string) (string, bool) {
+	return func(name string) (string, bool) {
+		for _, c := range cookies {
+			if c.Name == name {
+				return c.Value, true
+			}
+		}
+		return "", false
+	}
+}
+
+// authorizeCLI is the CLI's authorization request, with extra parameters.
+func authorizeCLI(s *Server, extra ...string) *httptest.ResponseRecorder {
+	platform, _ := s.app.api(PlatformAPISlug)
+	q := url.Values{
+		"client_id":             {CLIClientID},
+		"response_type":         {"code"},
+		"redirect_uri":          {testRedirect},
+		"code_challenge":        {rfcChallenge},
+		"code_challenge_method": {"S256"},
+		"resource":              {platform.Identifier},
+		"state":                 {"cli-state"},
+	}
+	for i := 0; i < len(extra); i += 2 {
+		q.Set(extra[i], extra[i+1])
+	}
+	return serve(s, httptest.NewRequest(http.MethodGet, s.namespace()+"/authorize?"+q.Encode(), nil))
+}
+
+// Authorize hands the request to the console's login page, sealed into the
+// page's URL and bound to the browser by a cookie of its own (ADR 081 §8).
+// The page's flow opens it with both, and its answer is the client's code.
+func TestAuthorizeHandsTheRequestToTheLogin(t *testing.T) {
+	s := newTestServer(t, func(d *Deps) { d.ConsolePath = "/console" })
+	w := authorizeCLI(s, "scope", "openid offline_access")
+	location, err := url.Parse(w.Header().Get("Location"))
+	require.NoError(t, err)
+	assert.Equal(t, testPublicBase+"/console/login", location.Scheme+"://"+location.Host+location.Path)
+	handle, binding := handOff(t, w)
+	assert.True(t, strings.HasPrefix(binding.Name, "__Host-_zauthz_"), binding.Name)
+	assert.True(t, binding.HttpOnly && binding.Secure)
+	assert.Equal(t, http.SameSiteLaxMode, binding.SameSite)
+	assert.Equal(t, "/", binding.Path)
+
+	req, err := s.ResolveAuthRequest(t.Context(), s.projectID, handle, browser(binding))
+	require.NoError(t, err)
+	platform, _ := s.app.api(PlatformAPISlug)
+	assert.Equal(t, domain.FlowClient{ID: CLIClientID, Name: "Zitadel CLI", RedirectHost: "127.0.0.1:51234", FirstParty: true}, req.Client)
+	assert.Equal(t, domain.FlowAPI{Identifier: platform.Identifier, Name: "Zitadel API"}, req.API)
+	assert.Equal(t, []string{"openid", "offline_access"}, req.Scope)
+	assert.Equal(t, binding.Name, req.BindingCookie, "the flow clears the cookie it was opened with")
+
+	needs, err := s.NeedsConsent(t.Context(), s.projectID, req, testUserID)
+	require.NoError(t, err)
+	assert.False(t, needs, "a first-party client is not asked")
+	target, err := s.Answer(t.Context(), s.projectID, req, testUserID, domain.FlowAuthAllow)
+	require.NoError(t, err)
+	answer, err := url.Parse(target)
+	require.NoError(t, err)
+	assert.Equal(t, "cli-state", answer.Query().Get("state"))
+	assert.Equal(t, testPublicBase, answer.Query().Get("iss"))
+	status, body := postToken(t, s, exchange(answer.Query().Get("code"), rfcVerifier))
+	assert.Equal(t, http.StatusOK, status, body)
+
+	_, err = s.consents.Find(t.Context(), s.projectID, testUserID, CLIClientID, platform.Identifier)
+	assert.NoError(t, err, "the CLI's consent is kept, though it was not asked")
+}
+
+// A handle opens its request only in the browser that holds the request's own
+// binding cookie, and only for the server's project: a link someone else
+// starts, or a second request in the same browser, opens nothing.
+func TestAnAuthorizationRequestOpensOnlyInItsBrowser(t *testing.T) {
+	s := newTestServer(t)
+	first, firstBinding := handOff(t, authorizeCLI(s))
+	second, secondBinding := handOff(t, authorizeCLI(s))
+	assert.NotEqual(t, firstBinding.Name, secondBinding.Name, "each request has a cookie of its own")
+
+	both := browser(firstBinding, secondBinding)
+	for name, open := range map[string]func() error{
+		"no cookie": func() error {
+			_, err := s.ResolveAuthRequest(t.Context(), s.projectID, first, browser())
+			return err
+		},
+		"the other request's cookie": func() error {
+			_, err := s.ResolveAuthRequest(t.Context(), s.projectID, first, browser(&http.Cookie{Name: firstBinding.Name, Value: secondBinding.Value}))
+			return err
+		},
+		"another project": func() error {
+			_, err := s.ResolveAuthRequest(t.Context(), "proj_other", first, both)
+			return err
+		},
+		"not a handle": func() error {
+			_, err := s.ResolveAuthRequest(t.Context(), s.projectID, first[:len(first)-4]+"AAAA", both)
+			return err
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			assert.ErrorIs(t, open(), domain.ErrFlowAuthRequestInvalid())
+		})
+	}
+	for _, handle := range []string{first, second} {
+		_, err := s.ResolveAuthRequest(t.Context(), s.projectID, handle, both)
+		assert.NoError(t, err, "both requests stay open in their browser")
+	}
+}
+
+// A user who refuses the consent goes back to the client with access_denied;
+// a failure the user has not seen goes back only where failUnasked lets it.
+func TestAnAuthorizationRequestsOtherAnswers(t *testing.T) {
+	s := newTestServer(t)
+	handle, binding := handOff(t, authorizeCLI(s))
+	req, err := s.ResolveAuthRequest(t.Context(), s.projectID, handle, browser(binding))
+	require.NoError(t, err)
+
+	target, err := s.Answer(t.Context(), s.projectID, req, testUserID, domain.FlowAuthDeny)
+	require.NoError(t, err)
+	denied, err := url.Parse(target)
+	require.NoError(t, err)
+	assert.Equal(t, errAccessDenied, denied.Query().Get("error"))
+	assert.Equal(t, "cli-state", denied.Query().Get("state"))
+	assert.Equal(t, testPublicBase, denied.Query().Get("iss"))
+	platform, _ := s.app.api(PlatformAPISlug)
+	_, err = s.consents.Find(t.Context(), s.projectID, testUserID, CLIClientID, platform.Identifier)
+	assert.ErrorIs(t, err, domain.ErrConsentNotFound(), "a refusal keeps no consent")
+
+	target, err = s.Answer(t.Context(), s.projectID, req, "", domain.FlowAuthLoginRequired)
+	require.NoError(t, err)
+	assert.Contains(t, target, "error="+errLoginRequired, "the CLI's loopback URI gets the failure")
+
+	thirdParty := *req
+	thirdParty.Client.FirstParty = false
+	record := map[string]any{}
+	require.NoError(t, json.Unmarshal(req.Record, &record))
+	record["redirect_uri"] = "https://app.example/callback"
+	thirdParty.Record, err = json.Marshal(record)
+	require.NoError(t, err)
+	_, err = s.Answer(t.Context(), s.projectID, &thirdParty, "", domain.FlowAuthConsentRequired)
+	assert.ErrorIs(t, err, domain.ErrFlowAuthRequestInvalid(), "a registered client's own URI gets no failure the user has not seen")
+}
 
 // A third-party client is asked for consent once: an authorization asking
 // for nothing more goes straight to a code, until it asks for a scope the
@@ -361,11 +489,11 @@ func TestAThirdPartyIsAskedForConsentOnce(t *testing.T) {
 	documentURL = documents.URL + "/metadata.json"
 	s := newTestServer(t, func(d *Deps) {
 		d.Config.ClientIDMetadataDocuments = true
-		d.Sessions = signedIn{}
 		d.Fetch = documents.Client()
 	})
 	mcp, _ := s.app.api(MCPAPISlug)
-	authorize := func(scope string, extra ...string) *httptest.ResponseRecorder {
+	open := func(scope string, extra ...string) *domain.FlowAuthRequest {
+		t.Helper()
 		q := url.Values{
 			"client_id":             {documentURL},
 			"response_type":         {"code"},
@@ -378,34 +506,98 @@ func TestAThirdPartyIsAskedForConsentOnce(t *testing.T) {
 		for i := 0; i < len(extra); i += 2 {
 			q.Set(extra[i], extra[i+1])
 		}
-		r := httptest.NewRequest(http.MethodGet, s.namespace()+"/authorize?"+q.Encode(), nil)
-		r.AddCookie(&http.Cookie{Name: sessionCookieName, Value: testSessionCookie})
-		return serve(s, r)
+		handle, binding := handOff(t, serve(s, httptest.NewRequest(http.MethodGet, s.namespace()+"/authorize?"+q.Encode(), nil)))
+		req, err := s.ResolveAuthRequest(t.Context(), s.projectID, handle, browser(binding))
+		require.NoError(t, err)
+		return req
 	}
-	isConsentStep := func(w *httptest.ResponseRecorder) bool {
-		return w.Code == http.StatusOK && consentRequestField.MatchString(w.Body.String())
-	}
-	isCode := func(w *httptest.ResponseRecorder) bool {
-		location, err := url.Parse(w.Header().Get("Location"))
-		return w.Code == http.StatusSeeOther && err == nil && location.Query().Get("code") != ""
+	asks := func(req *domain.FlowAuthRequest) bool {
+		t.Helper()
+		needs, err := s.NeedsConsent(t.Context(), s.projectID, req, testUserID)
+		require.NoError(t, err)
+		return needs
 	}
 
-	first := authorize("openid")
-	require.True(t, isConsentStep(first), "a first authorization asks: %d %s", first.Code, first.Header().Get("Location"))
-	form := url.Values{
-		"request":  {consentRequestField.FindStringSubmatch(first.Body.String())[1]},
-		"csrf":     {consentCSRFField.FindStringSubmatch(first.Body.String())[1]},
-		"decision": {"allow"},
-	}
-	allow := httptest.NewRequest(http.MethodPost, s.namespace()+"/consent", strings.NewReader(form.Encode()))
-	allow.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	allow.AddCookie(&http.Cookie{Name: sessionCookieName, Value: testSessionCookie})
-	allowed := serve(s, allow)
-	require.True(t, isCode(allowed), "allowing issues a code: %d %s", allowed.Code, allowed.Body.String())
+	first := open("openid")
+	assert.Equal(t, domain.FlowClient{ID: documentURL, Name: "Agent", RedirectHost: "127.0.0.1:51234"}, first.Client)
+	require.True(t, asks(first), "a first authorization asks")
+	target, err := s.Answer(t.Context(), s.projectID, first, testUserID, domain.FlowAuthAllow)
+	require.NoError(t, err)
+	assert.Contains(t, target, "code=", "allowing issues a code")
 
-	assert.True(t, isCode(authorize("openid")), "the same scopes need no consent again")
-	assert.True(t, isConsentStep(authorize("openid offline_access")), "a scope the user did not agree to asks again")
-	assert.True(t, isConsentStep(authorize("openid", "prompt", "consent")), "prompt=consent asks again")
+	assert.False(t, asks(open("openid")), "the same scopes need no consent again")
+	assert.True(t, asks(open("openid offline_access")), "a scope the user did not agree to asks again")
+	assert.True(t, asks(open("openid", "prompt", "consent")), "prompt=consent asks again")
+}
+
+// The request rides in the login flow's sealed cookie, which a browser drops
+// past 4 KiB: a flow resting on the consent step, with the longest state
+// authorize takes and a long client ID metadata document URL, still fits.
+func TestAFlowWithAnAuthorizationRequestFitsItsCookie(t *testing.T) {
+	long := strings.Repeat("x", 160)
+	redirect := "https://app.example/" + long + "/callback"
+	var documentURL string
+	documents := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"client_id":     documentURL,
+			"client_name":   strings.Repeat("Agent ", 10),
+			"redirect_uris": []string{redirect},
+		})
+	}))
+	t.Cleanup(documents.Close)
+	documentURL = documents.URL + "/" + long + "/metadata.json"
+	s := newTestServer(t, func(d *Deps) {
+		d.Config.ClientIDMetadataDocuments = true
+		d.Fetch = documents.Client()
+	})
+	mcp, _ := s.app.api(MCPAPISlug)
+	q := url.Values{
+		"client_id":             {documentURL},
+		"response_type":         {"code"},
+		"redirect_uri":          {redirect},
+		"code_challenge":        {rfcChallenge},
+		"code_challenge_method": {"S256"},
+		"resource":              {mcp.Identifier},
+		"scope":                 {strings.Join(builtinScopes, " ")},
+		"state":                 {strings.Repeat("s", maxStateLength)},
+	}
+	handle, binding := handOff(t, serve(s, httptest.NewRequest(http.MethodGet, s.namespace()+"/authorize?"+q.Encode(), nil)))
+	req, err := s.ResolveAuthRequest(t.Context(), s.projectID, handle, browser(binding))
+	require.NoError(t, err)
+
+	issued := time.Now()
+	state := domain.FlowState{
+		ID:            "flow_01JC2XAMPLE0000000000000000",
+		ProjectID:     s.projectID,
+		UserSchemaURL: schemas.DefaultHumanUserSchemaURL(testSchemaBase),
+		DeploymentID:  "dep_01JC2XAMPLE0000000000000000",
+		ReleaseID:     "rel_01JC2XAMPLE0000000000000000",
+		FlowProgress: domain.FlowProgress{
+			DefinitionID:   "fdef_01JC2XAMPLE000000000000000",
+			Purpose:        domain.FlowDefinitionPurposeLogin,
+			CurrentPurpose: domain.FlowDefinitionPurposeLogin,
+			CurrentStep:    "done",
+			History:        []string{"identifier", "password"},
+			CollectedData: domain.CollectedFlowData{
+				UserData: map[string]any{"email": "a.developer.with.a.long.name@example.com"},
+				UserID:   testUserID,
+			},
+		},
+		IssuedAt:        issued,
+		SessionID:       "sess_01JC2XAMPLE0000000000000000",
+		AuthAttemptID:   "aa_01JC2XAMPLE00000000000000000",
+		AuthRequest:     req,
+		AwaitingConsent: true,
+	}
+	payload, err := json.Marshal(state)
+	require.NoError(t, err)
+	crypter, err := s.keys.GetProjectCrypter(t.Context(), s.projectID, domain.EncryptionKeyPurposeCookie)
+	require.NoError(t, err)
+	sealed, err := crypter.Encrypt(string(payload))
+	require.NoError(t, err)
+	t.Logf("the flow cookie with its request: %d bytes", len(sealed))
+	assert.Less(t, len("_zflow=")+len(sealed), 4096)
 }
 
 // Consenting again to more scopes widens the consent the user has, and the
