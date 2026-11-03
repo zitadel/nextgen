@@ -17,7 +17,7 @@ import type { EvaluatePolicy200, EvaluatePolicyBody } from "@zitadel/api/generat
 import { policyTestFileSchema } from "@zitadel/config/schemas";
 import type { z } from "zod";
 
-import type { ZitadelClient } from "../api-client";
+import type { PolicyService, ReleaseService } from "../backend";
 import { readJsonDirEntries } from "../json-dir";
 import {
   isPolicyTestFile,
@@ -149,17 +149,15 @@ export type ReleasePolicies = {
  * the test, but both mean its sign-ins do not use these policies.
  */
 export async function policiesFromRelease(
-  client: ZitadelClient,
-  projectId: string,
+  releases: ReleaseService,
+  service: PolicyService,
   releaseId: string,
 ): Promise<ReleasePolicies> {
-  const release = await client.getReleaseById(releaseId, { project_id: projectId });
+  const release = await releases.get(releaseId);
   const pinned = release.pointers.filter((pointer) => pointer.kind === "policy");
   const revisions = await Promise.all(
     pinned.map(async (pointer): Promise<[string, PolicyUnderTest]> => {
-      const revision = await client.getPolicyRevision(pointer.revision_id, {
-        project_id: projectId,
-      });
+      const revision = await service.revision(pointer.revision_id);
       return [
         pointer.handle,
         { config: revision.config, source: { revision_id: pointer.revision_id } },
@@ -238,8 +236,7 @@ async function mapBounded<T, R>(
  * results in file and case order.
  */
 export async function runPolicyTests(
-  client: ZitadelClient,
-  projectId: string,
+  service: PolicyService,
   suites: readonly PolicyTestSuite[],
   policies: ReadonlyMap<string, PolicyUnderTest>,
 ): Promise<PolicySuiteResult[]> {
@@ -250,15 +247,12 @@ export async function runPolicyTests(
     runs,
     EVALUATE_CONCURRENCY,
     async ({ suite, operation, testCase }) => {
-      const actual = await client.evaluatePolicy(
-        {
-          operation,
-          config: policies.get(operation)?.config ?? {},
-          input: testCase.input,
-          ...(testCase.facts === undefined ? {} : { facts: testCase.facts }),
-        },
-        { project_id: projectId },
-      );
+      const actual = await service.evaluate({
+        operation,
+        config: policies.get(operation)?.config ?? {},
+        input: testCase.input,
+        ...(testCase.facts === undefined ? {} : { facts: testCase.facts }),
+      });
       const result: PolicyCaseResult = {
         name: testCase.name,
         passed: caseHolds(testCase.expect, actual),

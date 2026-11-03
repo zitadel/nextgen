@@ -1,3 +1,4 @@
+import { PolicyService, ReleaseService } from "../../lib/backend";
 import { Args } from "@oclif/core";
 
 import { ZitadelError } from "../../lib/errors";
@@ -68,10 +69,11 @@ export default class PoliciesTest extends EnvironmentCommand {
     }
 
     const { client, projectId } = await this.connect();
+    const service = new PolicyService(client, projectId);
     const fromRelease =
       flags.release === undefined
         ? undefined
-        : await policiesFromRelease(client, projectId, flags.release);
+        : await policiesFromRelease(new ReleaseService(client, projectId), service, flags.release);
     if (fromRelease?.revoked) {
       reportWarning(`Release ${flags.release} is revoked, so no origin serves its policies.`);
     }
@@ -90,7 +92,7 @@ export default class PoliciesTest extends EnvironmentCommand {
     }
     const policies = source.policies;
 
-    const results = await runPolicyTests(client, projectId, suites, policies);
+    const results = await runPolicyTests(service, suites, policies);
     const cases = results.flatMap((result) => result.cases);
     const failed = cases.filter((testCase) => !testCase.passed).length;
     this.recordTelemetry({

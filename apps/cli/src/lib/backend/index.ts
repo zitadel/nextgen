@@ -24,6 +24,8 @@ export {
 } from "./project-service";
 export { PreviewService, type PreviewPageQuery } from "./preview-service";
 export { VariableService, type VariableKinds, type VariableWrite } from "./variable-service";
+export { BrandingService } from "./branding-service";
+export { PolicyService, type PolicyEvaluation, type PolicyQuery } from "./policy-service";
 export { OriginService, type OriginKind, type ProjectOriginEntry } from "./origin-service";
 export { worktreeIsDirty, headSha } from "./git";
 export { deployMessage, MESSAGE_MAX_LENGTH, messageTooLong } from "./message";

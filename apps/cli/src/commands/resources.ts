@@ -57,6 +57,7 @@ import { isVariableReference } from "@zitadel/config/idp";
 import type { ZitadelClient } from "../lib/api-client";
 import { CommandGroups } from "../lib/oclif/groups";
 import { pagedFunctions } from "../lib/api-client";
+import { BrandingService, PolicyService } from "../lib/backend";
 import { ZitadelError } from "../lib/errors";
 import {
   buildResourceCommands,
@@ -740,11 +741,11 @@ export const RESOURCES = {
       // the paging flags are not generated for it.
       paged: false,
       item: ListBrandingResponse.element,
-      call: ({ client, projectId }) => client.listBranding({ project_id: projectId }),
+      call: ({ client, projectId }) => new BrandingService(client, projectId).list(),
       items: (page) => page,
     }),
     get: get({
-      call: ({ client }, id) => client.getBrandingById(id),
+      call: ({ client, projectId }, id) => new BrandingService(client, projectId).get(id),
       response: GetBrandingByIdResponse,
     }),
   }),
@@ -769,7 +770,7 @@ export const RESOURCES = {
       item: ListPoliciesResponse.shape.policies.element,
       filters: [{ field: "operation", operations: ["equals"] }],
       call: ({ client, projectId }: Platform, params: Query<"listPolicies">) =>
-        client.listPolicies({ ...params, project_id: projectId }),
+        new PolicyService(client, projectId).list(params),
       items: pagedFunctions.listPolicies.items,
       next: pagedFunctions.listPolicies.next,
     }),
@@ -781,7 +782,7 @@ export const RESOURCES = {
       // refused as a malformed query rather than reported as not found.
       call: async ({ client, projectId }, ref) => {
         if (ref.startsWith("pol_")) {
-          return client.getPolicy(ref, { project_id: projectId });
+          return new PolicyService(client, projectId).get(ref);
         }
         const notFound = () =>
           new ZitadelError("E_NOT_FOUND", `No policy for "${ref}"`, {
@@ -791,8 +792,7 @@ export const RESOURCES = {
         if (operation === undefined) {
           throw notFound();
         }
-        const page = await client.listPolicies({ project_id: projectId, operation, limit: 1 });
-        const current = page.policies[0];
+        const current = await new PolicyService(client, projectId).ofOperation(operation);
         if (!current) {
           throw notFound();
         }

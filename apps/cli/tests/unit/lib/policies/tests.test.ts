@@ -1,3 +1,4 @@
+import { PolicyService } from "../../../../src/lib/backend";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
@@ -264,8 +265,7 @@ describe("runPolicyTests", () => {
     });
 
     const results = await runPolicyTests(
-      client,
-      "proj_1",
+      new PolicyService(client, "proj_1"),
       [suite("one.test.json", passwords.slice(0, 3)), suite("two.test.json", passwords.slice(3))],
       new Map(),
     );
