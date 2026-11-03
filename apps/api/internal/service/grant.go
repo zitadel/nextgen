@@ -184,7 +184,9 @@ func mapGrantWriteError(err error) error {
 	return domain.ErrInternal(err).WithMessage("failed to create grant")
 }
 
-func (s *GrantService) Get(ctx context.Context, projectID, id string, includePrincipal bool) (_ *Grant, err error) {
+// Get returns one managed grant. includePrincipal is expand=principal, which
+// principalRead must allow for the principal's home project.
+func (s *GrantService) Get(ctx context.Context, projectID, id string, includePrincipal bool, principalRead PrincipalReadCheck) (_ *Grant, err error) {
 	ctx, end := startSpan(ctx, "GrantService.Get")
 	defer end(&err)
 
@@ -198,7 +200,7 @@ func (s *GrantService) Get(ctx context.Context, projectID, id string, includePri
 	if asgn.RevokedAt != nil || !isManagedGrant(asgn) {
 		return nil, domain.ErrGrantNotFound()
 	}
-	grants, err := s.hydrate(ctx, includePrincipal, asgn)
+	grants, err := s.hydrate(ctx, includePrincipal, principalRead, asgn)
 	if err != nil {
 		return nil, err
 	}
@@ -475,6 +477,11 @@ type TeamRef struct {
 	Name   string
 }
 
+// PrincipalReadCheck decides whether the caller may read the profile of the
+// principals homed in homeProjectID (expand=principal). A non-nil error
+// refuses the whole request and is returned as is.
+type PrincipalReadCheck func(ctx context.Context, homeProjectID string) error
+
 // ListGrantsRequest is the input for listing the grants of a project.
 type ListGrantsRequest struct {
 	ProjectID        string
@@ -493,7 +500,9 @@ type ListGrantsResponse struct {
 
 // List returns unrevoked managed grants of a project, ordered and paginated
 // with an opaque cursor. Principal refs are hydrated in one batch per page.
-func (s *GrantService) List(ctx context.Context, req ListGrantsRequest) (_ *ListGrantsResponse, err error) {
+// req.IncludePrincipal is expand=principal, which principalRead must allow for
+// every principal home on the page.
+func (s *GrantService) List(ctx context.Context, req ListGrantsRequest, principalRead PrincipalReadCheck) (_ *ListGrantsResponse, err error) {
 	ctx, end := startSpan(ctx, "GrantService.List")
 	defer end(&err)
 
@@ -536,7 +545,7 @@ func (s *GrantService) List(ctx context.Context, req ListGrantsRequest) (_ *List
 		return nil, mapListError(err, "failed to list grants")
 	}
 
-	grants, err := s.hydrate(ctx, req.IncludePrincipal, result.Items...)
+	grants, err := s.hydrate(ctx, req.IncludePrincipal, principalRead, result.Items...)
 	if err != nil {
 		return nil, err
 	}
@@ -557,7 +566,10 @@ func idOnlyGrant(asgn *domain.AuthzAssignment) *Grant {
 	return g
 }
 
-func (s *GrantService) hydrate(ctx context.Context, includePrincipal bool, asgns ...*domain.AuthzAssignment) ([]*Grant, error) {
+// hydrate attaches each grant's label (user ref, team name) and, with
+// includePrincipal, the principal's profile. The profile is loaded only after
+// principalRead allowed every home on the page, one call per home.
+func (s *GrantService) hydrate(ctx context.Context, includePrincipal bool, principalRead PrincipalReadCheck, asgns ...*domain.AuthzAssignment) ([]*Grant, error) {
 	out := make([]*Grant, 0, len(asgns))
 	for _, a := range asgns {
 		g := &Grant{Assignment: a}
@@ -566,13 +578,23 @@ func (s *GrantService) hydrate(ctx context.Context, includePrincipal bool, asgns
 		}
 		out = append(out, g)
 	}
-	if len(out) == 0 {
-		return out, nil
-	}
 
+	// No early return for an empty page: with a pinned platform project the
+	// home is known without rows, so a caller who may not expand is refused
+	// on an empty page as well.
 	homes, err := s.grantsByPrincipalHome(ctx, out)
 	if err != nil {
 		return nil, err
+	}
+	if includePrincipal {
+		if principalRead == nil {
+			return nil, domain.ErrInternal(errors.New("grant principal expand without a read check"))
+		}
+		for home := range homes {
+			if err := principalRead(ctx, home); err != nil {
+				return nil, err
+			}
+		}
 	}
 
 	users := map[string]*domain.User{}

@@ -56089,22 +56089,6 @@ func (s GetGrantErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case TeamPermissionDeniedGetGrantErrorResponse:
-		e.FieldStart("code")
-		e.Str("team.permission_denied")
-		{
-			s := s.TeamPermissionDenied
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
 	case UnavailableGetGrantErrorResponse:
 		e.FieldStart("code")
 		e.Str("unavailable")
@@ -56181,9 +56165,6 @@ func (s *GetGrantErrorResponse) Decode(d *jx.Decoder) error {
 				case "req.invalid":
 					s.Type = ReqInvalidGetGrantErrorResponse
 					found = true
-				case "team.permission_denied":
-					s.Type = TeamPermissionDeniedGetGrantErrorResponse
-					found = true
 				case "unavailable":
 					s.Type = UnavailableGetGrantErrorResponse
 					found = true
@@ -56226,10 +56207,6 @@ func (s *GetGrantErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case ReqInvalidGetGrantErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
-			return err
-		}
-	case TeamPermissionDeniedGetGrantErrorResponse:
-		if err := s.TeamPermissionDenied.Decode(d); err != nil {
 			return err
 		}
 	case UnavailableGetGrantErrorResponse:
@@ -104910,22 +104887,6 @@ func (s QueryGrantsErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case TeamPermissionDeniedQueryGrantsErrorResponse:
-		e.FieldStart("code")
-		e.Str("team.permission_denied")
-		{
-			s := s.TeamPermissionDenied
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
 	case UnavailableQueryGrantsErrorResponse:
 		e.FieldStart("code")
 		e.Str("unavailable")
@@ -105008,9 +104969,6 @@ func (s *QueryGrantsErrorResponse) Decode(d *jx.Decoder) error {
 				case "req.invalid":
 					s.Type = ReqInvalidQueryGrantsErrorResponse
 					found = true
-				case "team.permission_denied":
-					s.Type = TeamPermissionDeniedQueryGrantsErrorResponse
-					found = true
 				case "unavailable":
 					s.Type = UnavailableQueryGrantsErrorResponse
 					found = true
@@ -105061,10 +105019,6 @@ func (s *QueryGrantsErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case ReqInvalidQueryGrantsErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
-			return err
-		}
-	case TeamPermissionDeniedQueryGrantsErrorResponse:
-		if err := s.TeamPermissionDenied.Decode(d); err != nil {
 			return err
 		}
 	case UnavailableQueryGrantsErrorResponse:

@@ -34205,7 +34205,6 @@ type GetGrantErrorResponse struct {
 	Internal              Internal
 	NotImplemented        NotImplemented
 	ReqInvalid            ReqInvalid
-	TeamPermissionDenied  TeamPermissionDenied
 	Unavailable           Unavailable
 	UserPermissionDenied  UserPermissionDenied
 }
@@ -34221,7 +34220,6 @@ const (
 	InternalGetGrantErrorResponse              GetGrantErrorResponseType = "internal"
 	NotImplementedGetGrantErrorResponse        GetGrantErrorResponseType = "not_implemented"
 	ReqInvalidGetGrantErrorResponse            GetGrantErrorResponseType = "req.invalid"
-	TeamPermissionDeniedGetGrantErrorResponse  GetGrantErrorResponseType = "team.permission_denied"
 	UnavailableGetGrantErrorResponse           GetGrantErrorResponseType = "unavailable"
 	UserPermissionDeniedGetGrantErrorResponse  GetGrantErrorResponseType = "user.permission_denied"
 )
@@ -34251,11 +34249,6 @@ func (s GetGrantErrorResponse) IsNotImplemented() bool {
 
 // IsReqInvalid reports whether GetGrantErrorResponse is ReqInvalid.
 func (s GetGrantErrorResponse) IsReqInvalid() bool { return s.Type == ReqInvalidGetGrantErrorResponse }
-
-// IsTeamPermissionDenied reports whether GetGrantErrorResponse is TeamPermissionDenied.
-func (s GetGrantErrorResponse) IsTeamPermissionDenied() bool {
-	return s.Type == TeamPermissionDeniedGetGrantErrorResponse
-}
 
 // IsUnavailable reports whether GetGrantErrorResponse is Unavailable.
 func (s GetGrantErrorResponse) IsUnavailable() bool {
@@ -34390,27 +34383,6 @@ func (s GetGrantErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 func NewReqInvalidGetGrantErrorResponse(v ReqInvalid) GetGrantErrorResponse {
 	var s GetGrantErrorResponse
 	s.SetReqInvalid(v)
-	return s
-}
-
-// SetTeamPermissionDenied sets GetGrantErrorResponse to TeamPermissionDenied.
-func (s *GetGrantErrorResponse) SetTeamPermissionDenied(v TeamPermissionDenied) {
-	s.Type = TeamPermissionDeniedGetGrantErrorResponse
-	s.TeamPermissionDenied = v
-}
-
-// GetTeamPermissionDenied returns TeamPermissionDenied and true boolean if GetGrantErrorResponse is TeamPermissionDenied.
-func (s GetGrantErrorResponse) GetTeamPermissionDenied() (v TeamPermissionDenied, ok bool) {
-	if !s.IsTeamPermissionDenied() {
-		return v, false
-	}
-	return s.TeamPermissionDenied, true
-}
-
-// NewTeamPermissionDeniedGetGrantErrorResponse returns new GetGrantErrorResponse from TeamPermissionDenied.
-func NewTeamPermissionDeniedGetGrantErrorResponse(v TeamPermissionDenied) GetGrantErrorResponse {
-	var s GetGrantErrorResponse
-	s.SetTeamPermissionDenied(v)
 	return s
 }
 
@@ -39205,11 +39177,14 @@ func (s *GrantAlreadyExistsDetails) init() GrantAlreadyExistsDetails {
 // `status`, `created_at`, and `updated_at` on `team`. The id (`user_id` /
 // `team_id`) is always present. If the user or team cannot be loaded, the
 // object stays id-only — the same shape as not expanding.
-// Expanding requires `user.read` and `team.read` in addition to
-// `project.read` for project secrets. Both are checked once for the whole
-// request. If the caller lacks either, the request is `403`, and the extras
-// are not omitted silently. A user-bound console session that already passed
-// the project check may expand without those scopes.
+// Expanding requires read access to the principal's home project (the
+// platform project when the server has one), decided as for reading that
+// project's users, once per home project. A project secret of another
+// project never has it, and a session has it only with a grant on that
+// project. A caller without it gets 403 `user.permission_denied`; extras
+// are never omitted silently. Without `expand`, every caller who may read
+// the grants sees `user_id`, `identifier` and `display`, or the team's
+// `name`.
 // Ref: #
 type GrantExpand string
 
@@ -74867,7 +74842,6 @@ type QueryGrantsErrorResponse struct {
 	Internal              Internal
 	NotImplemented        NotImplemented
 	ReqInvalid            ReqInvalid
-	TeamPermissionDenied  TeamPermissionDenied
 	Unavailable           Unavailable
 	UserPermissionDenied  UserPermissionDenied
 }
@@ -74885,7 +74859,6 @@ const (
 	InternalQueryGrantsErrorResponse              QueryGrantsErrorResponseType = "internal"
 	NotImplementedQueryGrantsErrorResponse        QueryGrantsErrorResponseType = "not_implemented"
 	ReqInvalidQueryGrantsErrorResponse            QueryGrantsErrorResponseType = "req.invalid"
-	TeamPermissionDeniedQueryGrantsErrorResponse  QueryGrantsErrorResponseType = "team.permission_denied"
 	UnavailableQueryGrantsErrorResponse           QueryGrantsErrorResponseType = "unavailable"
 	UserPermissionDeniedQueryGrantsErrorResponse  QueryGrantsErrorResponseType = "user.permission_denied"
 )
@@ -74928,11 +74901,6 @@ func (s QueryGrantsErrorResponse) IsNotImplemented() bool {
 // IsReqInvalid reports whether QueryGrantsErrorResponse is ReqInvalid.
 func (s QueryGrantsErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidQueryGrantsErrorResponse
-}
-
-// IsTeamPermissionDenied reports whether QueryGrantsErrorResponse is TeamPermissionDenied.
-func (s QueryGrantsErrorResponse) IsTeamPermissionDenied() bool {
-	return s.Type == TeamPermissionDeniedQueryGrantsErrorResponse
 }
 
 // IsUnavailable reports whether QueryGrantsErrorResponse is Unavailable.
@@ -75110,27 +75078,6 @@ func (s QueryGrantsErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 func NewReqInvalidQueryGrantsErrorResponse(v ReqInvalid) QueryGrantsErrorResponse {
 	var s QueryGrantsErrorResponse
 	s.SetReqInvalid(v)
-	return s
-}
-
-// SetTeamPermissionDenied sets QueryGrantsErrorResponse to TeamPermissionDenied.
-func (s *QueryGrantsErrorResponse) SetTeamPermissionDenied(v TeamPermissionDenied) {
-	s.Type = TeamPermissionDeniedQueryGrantsErrorResponse
-	s.TeamPermissionDenied = v
-}
-
-// GetTeamPermissionDenied returns TeamPermissionDenied and true boolean if QueryGrantsErrorResponse is TeamPermissionDenied.
-func (s QueryGrantsErrorResponse) GetTeamPermissionDenied() (v TeamPermissionDenied, ok bool) {
-	if !s.IsTeamPermissionDenied() {
-		return v, false
-	}
-	return s.TeamPermissionDenied, true
-}
-
-// NewTeamPermissionDeniedQueryGrantsErrorResponse returns new QueryGrantsErrorResponse from TeamPermissionDenied.
-func NewTeamPermissionDeniedQueryGrantsErrorResponse(v TeamPermissionDenied) QueryGrantsErrorResponse {
-	var s QueryGrantsErrorResponse
-	s.SetTeamPermissionDenied(v)
 	return s
 }
 
