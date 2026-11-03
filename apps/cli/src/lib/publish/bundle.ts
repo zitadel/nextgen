@@ -1,33 +1,13 @@
 import { join } from "node:path";
 
 import { BRANDING_DIR, toBrandingWireBody } from "../branding";
+import type { ConfigurationBundle } from "../backend";
 import { ZitadelError } from "../errors";
 import { FLOWS_DIR } from "../flows";
 import { IDPS_DIR } from "../idp";
 import { readJsonDir, readJsonDirEntries } from "../json-dir";
 import { isPolicyTestFile, POLICIES_DIR } from "../policies";
 import { SCHEMAS_DIR } from "../user-schema";
-
-/**
- * The resources of `.zitadel/` as `POST /releases/build` takes them, grouped by
- * kind: the schemas, flow definitions, identity-provider connections and
- * operation policies as authored, and the branding descriptor with its `$file`
- * template inlined. The
- * editor-only `$schema` affordance is stripped from each so it never reaches
- * the wire.
- *
- * Connections ride the bundle like every other kind, so the server creates or
- * revises them inside the same transaction as the release: a build that fails
- * leaves none of them behind, and a release that is never deployed writes none.
- */
-export type ConfigurationBundle = {
-  schemas: Record<string, unknown>[];
-  flow_definitions: Record<string, unknown>[];
-  idps: Record<string, unknown>[];
-  /** Absent when `.zitadel/policies/` holds none, so a server without the kind takes the bundle. */
-  policies?: Record<string, unknown>[];
-  branding?: Record<string, unknown>;
-};
 
 /** A built bundle and the number of resources it carries across every kind. */
 export type BuiltBundle = {

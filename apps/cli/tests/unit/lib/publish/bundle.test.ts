@@ -5,7 +5,7 @@ import { describe, expect } from "vitest";
 
 import { it } from "../../../helpers/fixtures";
 
-import { buildBundle } from "../../../../src/lib/backend/bundle";
+import { buildBundle } from "../../../../src/lib/publish/bundle";
 
 async function project(dir: string, files: Record<string, unknown>): Promise<string> {
   for (const [relPath, content] of Object.entries(files)) {

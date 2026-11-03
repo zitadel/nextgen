@@ -4,8 +4,12 @@
  * backend is a service bound to one project — {@link ReleaseService},
  * {@link DeploymentService}, {@link OriginService}. `deploy` and `preview` are thin compositions of these.
  */
-export { buildBundle, type BuiltBundle, type ConfigurationBundle } from "./bundle";
-export { ReleaseService, type Release, type ReleaseSource } from "./release-service";
+export {
+  ReleaseService,
+  type ConfigurationBundle,
+  type Release,
+  type ReleaseSource,
+} from "./release-service";
 export {
   DeploymentService,
   type DeployInput,
@@ -46,11 +50,6 @@ export {
   type OriginRemoval,
   type ProjectOriginEntry,
 } from "./origin-service";
-export { worktreeIsDirty, headSha } from "./git";
-export { deployMessage, MESSAGE_MAX_LENGTH, messageTooLong } from "./message";
-export { runSteps, type PipelineMode, type Step, type StepContext } from "./pipeline";
-export { validateStep } from "./steps/validate";
-export { diffStep } from "./steps/diff";
 
 /**
  * The arguments of a suggested publish. A non-interactive `deploy` with no

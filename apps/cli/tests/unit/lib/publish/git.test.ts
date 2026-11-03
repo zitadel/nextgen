@@ -11,7 +11,7 @@ import {
   diffConfigAgainst,
   diffConfigFilesAgainst,
   worktreeIsDirty,
-} from "../../../../src/lib/backend/git";
+} from "../../../../src/lib/publish/git";
 
 const run = promisify(execFile);
 

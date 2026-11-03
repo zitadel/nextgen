@@ -6,18 +6,18 @@ import {
   EnvironmentCommand,
   type JsonEnvelope,
 } from "../../lib/oclif";
+import { ReleaseService } from "../../lib/backend";
 import {
   buildBundle,
-  ReleaseService,
   headSha,
   runSteps,
   type StepContext,
   validateStep,
   worktreeIsDirty,
-} from "../../lib/backend";
+} from "../../lib/publish";
 
 import { reads, type Refused } from "../../lib/oclif/flags";
-import { MESSAGE_MAX_LENGTH, messageTooLong } from "../../lib/backend";
+import { MESSAGE_MAX_LENGTH, messageTooLong } from "../../lib/publish";
 
 /**
  * What `-m/--message` records. It refuses a blank message, which would record

@@ -11,7 +11,7 @@ import {
 import { DeploymentService } from "../../lib/backend";
 
 import { reads, type Refused } from "../../lib/oclif/flags";
-import { MESSAGE_MAX_LENGTH, messageTooLong } from "../../lib/backend";
+import { MESSAGE_MAX_LENGTH, messageTooLong } from "../../lib/publish";
 
 /**
  * What `-m/--message` records. It refuses a blank message, which would record

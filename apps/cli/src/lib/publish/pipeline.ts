@@ -1,7 +1,7 @@
 import type { ZitadelClient } from "../api-client";
 
 import type { SuggestedCommand } from "../suggestion";
-import type { ConfigurationBundle } from "./bundle";
+import type { ConfigurationBundle } from "../backend";
 
 /** Which publish a step runs for. `preview` lands with the preview command. */
 export type PipelineMode = "deploy" | "preview";

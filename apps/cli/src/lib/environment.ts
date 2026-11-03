@@ -3,17 +3,15 @@ import { join, resolve } from "node:path";
 import { parseEnv } from "node:util";
 
 import type { ZitadelClient } from "./api-client";
+import { DeploymentService, type EnvironmentFiles, ReleaseService } from "./backend";
 import {
   buildBundle,
-  DeploymentService,
-  type EnvironmentFiles,
   headSha,
-  ReleaseService,
   runSteps,
   type StepContext,
   validateStep,
   worktreeIsDirty,
-} from "./backend";
+} from "./publish";
 import { ZitadelError } from "./errors";
 import { readIfExists } from "./fs";
 import { input } from "./input";

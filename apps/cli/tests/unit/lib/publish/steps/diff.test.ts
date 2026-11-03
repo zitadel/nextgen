@@ -7,8 +7,8 @@ import { beforeEach, describe, expect, vi } from "vitest";
 
 import { it } from "../../../../helpers/fixtures";
 
-import type { StepContext } from "../../../../../src/lib/backend/pipeline";
-import { diffStep } from "../../../../../src/lib/backend/steps/diff";
+import type { StepContext } from "../../../../../src/lib/publish/pipeline";
+import { diffStep } from "../../../../../src/lib/publish/steps/diff";
 import type { SuggestedCommand } from "../../../../../src/lib/suggestion";
 
 const run = promisify(execFile);

@@ -14,7 +14,8 @@ import {
 } from "../../../lib/oclif";
 import { Tabulatable } from "../../../lib/oclif/tabulatable";
 import { reads, type Refused } from "../../../lib/oclif/flags";
-import { MESSAGE_MAX_LENGTH, messageTooLong, DeploymentService } from "../../../lib/backend";
+import { DeploymentService } from "../../../lib/backend";
+import { MESSAGE_MAX_LENGTH, messageTooLong } from "../../../lib/publish";
 import { type Refusal, refusalError } from "../../../lib/oclif/refusal";
 import { toZitadelError } from "../../../lib/errors";
 import type { SuggestedCommand } from "../../../lib/suggestion";

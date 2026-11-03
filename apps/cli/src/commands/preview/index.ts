@@ -10,11 +10,9 @@ import {
   PREVIEW_CREDENTIAL,
   PreviewCommand,
 } from "../../lib/oclif";
+import { DeploymentService, OriginService, ReleaseService } from "../../lib/backend";
 import {
   buildBundle,
-  DeploymentService,
-  OriginService,
-  ReleaseService,
   deployMessage,
   headSha,
   runSteps,
@@ -23,7 +21,7 @@ import {
   type StepContext,
   validateStep,
   worktreeIsDirty,
-} from "../../lib/backend";
+} from "../../lib/publish";
 import { ApiError } from "@zitadel/api/runtime/fetch";
 
 import type { ZitadelClient } from "../../lib/api-client";

@@ -7,7 +7,7 @@ import { it } from "../../../../helpers/fixtures";
 import {
   brandingAssetWarnings,
   resolvePublicAddresses,
-} from "../../../../../src/lib/backend/steps/asset-probe";
+} from "../../../../../src/lib/publish/steps/asset-probe";
 import { userAgentInterceptor } from "../../../../../src/lib/user-agent";
 
 const { lookupMock } = vi.hoisted(() => ({ lookupMock: vi.fn() }));

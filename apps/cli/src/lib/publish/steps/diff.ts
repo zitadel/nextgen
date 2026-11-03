@@ -2,7 +2,7 @@ import { brandingReferencePaths } from "../../branding";
 import type { DiffedFile } from "../../git";
 import { diffConfigAgainst, diffConfigFilesAgainst } from "../git";
 import type { Step, StepContext, StepReport } from "../pipeline";
-import { DeploymentService } from "../deployment-service";
+import { DeploymentService } from "../../backend";
 
 /**
  * The diff as `--json` reports it, in `data.diff`: what the terminal shows,

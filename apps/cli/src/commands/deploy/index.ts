@@ -5,19 +5,16 @@ import {
   EnvironmentCommand,
   type JsonEnvelope,
 } from "../../lib/oclif";
+import { DEPLOY_ARGS, DeploymentService, OriginService, ReleaseService } from "../../lib/backend";
 import {
   buildBundle,
-  DEPLOY_ARGS,
-  DeploymentService,
-  OriginService,
-  ReleaseService,
   diffStep,
   headSha,
   runSteps,
   type StepContext,
   validateStep,
   worktreeIsDirty,
-} from "../../lib/backend";
+} from "../../lib/publish";
 import { ApiError } from "@zitadel/api/runtime/fetch";
 import { Flags } from "@oclif/core";
 import { z } from "zod";
@@ -28,7 +25,7 @@ import { reads, type Refused } from "../../lib/oclif/flags";
 import { type Refusal, refusalError } from "../../lib/oclif/refusal";
 import { issuerHeldAsPreview, originOf, type ProjectOrigin } from "../../lib/origins";
 import { readZitadelSecret } from "../../lib/project";
-import { deployMessage, MESSAGE_MAX_LENGTH, messageTooLong } from "../../lib/backend";
+import { deployMessage, MESSAGE_MAX_LENGTH, messageTooLong } from "../../lib/publish";
 import type { SuggestedCommand } from "../../lib/suggestion";
 import { reportWarning } from "../../lib/warnings";
 
