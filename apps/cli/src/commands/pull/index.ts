@@ -16,7 +16,7 @@ import {
   EnvironmentCommand,
   type JsonEnvelope,
 } from "../../lib/oclif";
-import { DEPLOY_ARGS, DeploymentService } from "../../lib/backend";
+import { DEPLOY_ARGS, DeploymentService, ReleaseService } from "../../lib/backend";
 import { writeBackResource } from "../../lib/sync";
 import { SCHEMAS_DIR } from "../../lib/user-schema";
 import { type Refused, taken } from "../../lib/oclif/flags";
@@ -164,7 +164,7 @@ export default class Pull extends EnvironmentCommand {
     const { client, projectId } = await this.connect();
 
     const releaseId = await this.resolveReleaseId(client, projectId, args.target);
-    const release = await client.getReleaseById(releaseId, { project_id: projectId });
+    const release = await new ReleaseService(client, projectId).get(releaseId);
 
     const pulled: { kind: string; handle: string; path: string }[] = [];
     const skipped: { kind: string; handle: string }[] = [];
@@ -222,15 +222,10 @@ export default class Pull extends EnvironmentCommand {
       return target.id;
     }
     if (target.kind === "deployment") {
-      const deployment = await client.getDeploymentById(target.id, {
-        project_id: projectId,
-      });
+      const deployment = await new DeploymentService(client, projectId).get(target.id);
       return deployment.release_id;
     }
-    const deployments = await client.listDeployments.all({
-      project_id: projectId,
-      live: true,
-    });
+    const deployments = await new DeploymentService(client, projectId).live();
     const deployment = deployments.find(DeploymentService.servesPrimary);
     if (deployment === undefined) {
       throw new ZitadelError("E_NOT_FOUND", "Nothing is deployed to a primary origin yet.", {

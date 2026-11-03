@@ -219,6 +219,7 @@ const STANDALONE: Readonly<Record<string, readonly string[]>> = {
 const PIPELINE_SOURCES: readonly string[] = [
   "lib/backend/release-service.ts",
   "lib/backend/deployment-service.ts",
+  "lib/backend/origin-service.ts",
   "lib/backend/steps/diff.ts",
   "lib/backend/steps/idp-checks.ts",
 ];
@@ -275,16 +276,21 @@ const standaloneCommandOperations = async (): Promise<ReadonlyMap<string, Readon
       PIPELINE_SOURCES.map((file) => callsIn(join(import.meta.dirname, "../../../src", file))),
     )
   ).flat();
-  const originService = await callsIn(
-    join(import.meta.dirname, "../../../src/lib/backend/origin-service.ts"),
-  );
+  const serviceCalls = async (file: string): Promise<string[]> =>
+    callsIn(join(import.meta.dirname, "../../../src/lib/backend", file));
+  /** The services a group of commands reaches the API through, instead of calling it themselves. */
+  const SERVICES: Readonly<Record<string, readonly string[]>> = {
+    origin: ["origin-service.ts"],
+    variables: ["variable-service.ts", "deployment-service.ts", "origin-service.ts"],
+    previews: ["preview-service.ts", "origin-service.ts"],
+  };
   return new Map(
     await Promise.all(
       Object.entries(STANDALONE).flatMap(([group, commands]) =>
         commands.map(async (command): Promise<[string, ReadonlySet<string>]> => {
           const own = await callsInCommand(command);
           const viaPipeline = group === "releases" || group === "deployments" ? pipeline : [];
-          const viaService = group === "origin" ? originService : [];
+          const viaService = (await Promise.all((SERVICES[group] ?? []).map(serviceCalls))).flat();
           return [command.replaceAll("/", " "), new Set([...own, ...viaPipeline, ...viaService])];
         }),
       ),

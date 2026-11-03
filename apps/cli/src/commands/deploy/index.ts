@@ -9,6 +9,7 @@ import {
   buildBundle,
   DEPLOY_ARGS,
   DeploymentService,
+  OriginService,
   ReleaseService,
   diffStep,
   headSha,
@@ -224,10 +225,7 @@ export default class Deploy extends EnvironmentCommand {
     // preview, which never targets a primary, is never it. It guards the
     // create against another deploy that raced in since we inspected: the
     // server refuses with 409 rather than overwriting that deploy unseen (#538).
-    const deployments = await client.listDeployments.all({
-      project_id: projectId,
-      live: true,
-    });
+    const deployments = await new DeploymentService(client, projectId).live();
     const observed = deployments.find((deployment) => {
       return deployment.targets.some((entry) => {
         return landing.includes(entry.origin);
@@ -267,10 +265,7 @@ export default class Deploy extends EnvironmentCommand {
           );
         }
         // The deployment that raced in on a primary origin, not a live preview.
-        const deployments = await client.listDeployments.all({
-          project_id: projectId,
-          live: true,
-        });
+        const deployments = await new DeploymentService(client, projectId).live();
         const current = deployments.find(DeploymentService.servesPrimary);
         throw new ZitadelError(
           "E_CONFLICT",
@@ -313,15 +308,8 @@ export default class Deploy extends EnvironmentCommand {
     projectId: string,
     environment: Connection["environment"],
   ): Promise<string[]> {
-    const project = await client.getProject(projectId);
-    const origins = project.origins ?? [];
-    const landing = origins
-      .filter((entry) => {
-        return entry.kind === "primary";
-      })
-      .map((entry) => {
-        return entry.pattern;
-      });
+    const origins = await new OriginService(client, projectId).list();
+    const landing = OriginService.primaryPatterns(origins);
     if (landing.length > 0) {
       return landing;
     }

@@ -1,3 +1,4 @@
+import { ProjectService, VariableService } from "../../lib/backend";
 import { access, readFile, rm, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { intro, note, outro } from "@clack/prompts";
@@ -2362,7 +2363,7 @@ function ssoCredentialPublisher(
   }
   const client = createZitadelClient({ baseUrl: server, token: project.project_secret, signal });
   return async (name, value, { secret }) => {
-    await client.updateVariables({ [name]: { value, secret } }, { project_id: project.id });
+    await new VariableService(client, project.id).set(name, { value, secret });
   };
 }
 
@@ -2379,7 +2380,7 @@ async function createProjectWithLocalHint(
     // the requests the dev proxy forwards from it, and a deploy goes to the
     // project's primary origins. A preview pattern is for the URLs a
     // pull-request build deploys to, which this is not.
-    return await client.createProject({
+    return await new ProjectService(client).create({
       name: projectName,
       origins: [{ pattern: issuer, kind: "primary" }],
       seed_defaults: false,

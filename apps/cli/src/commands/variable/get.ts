@@ -9,6 +9,7 @@ import {
 } from "../../lib/oclif";
 import { variableNameArg } from "./name";
 import { Tabulatable } from "../../lib/oclif/tabulatable";
+import { VariableService } from "../../lib/backend";
 import { toVariableRow, variableCells, variableReadScope } from "../../lib/variables";
 
 /**
@@ -43,7 +44,7 @@ export default class VariableGet extends Tabulatable(EnvironmentCommand) {
 
     // The single-name endpoint answers in the same two forms the collection
     // does, so the row projection is shared rather than duplicated.
-    const value = (await client.getVariable(args.name, scope))[scope.kind];
+    const value = await new VariableService(client, projectId).get(args.name, scope.kind);
     if (value === undefined) {
       throw new ZitadelError("E_NOT_FOUND", `Variable ${args.name} has no ${scope.kind} value.`, {
         hint: flags.preview

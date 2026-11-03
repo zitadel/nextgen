@@ -15,7 +15,7 @@ import {
 import { toZitadelError } from "../../../lib/errors";
 import { writeManagedEnvFile } from "../../../lib/fs-safe";
 import { isObject } from "../../../lib/json";
-import { DEPLOY_ARGS } from "../../../lib/backend";
+import { DEPLOY_ARGS, ProjectService } from "../../../lib/backend";
 import { reportWarning } from "../../../lib/warnings";
 import {
   type Admitted,
@@ -239,7 +239,9 @@ export default class EnvAdd extends Promptable(BaseCommand) {
 
     const project =
       flags.project === undefined
-        ? await createZitadelClient({ baseUrl: server, signal: this.signal }).createProject({
+        ? await new ProjectService(
+            createZitadelClient({ baseUrl: server, signal: this.signal }),
+          ).create({
             name: `${basename(cwd)}-${args.name}`,
             ...(issuer === undefined
               ? {}

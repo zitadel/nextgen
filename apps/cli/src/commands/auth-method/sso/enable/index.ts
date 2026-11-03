@@ -1,3 +1,4 @@
+import { VariableService } from "../../../../lib/backend";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
@@ -701,7 +702,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       return undefined;
     }
     return async (name, value, { secret }) => {
-      await client.updateVariables({ [name]: { value, secret } }, { project_id: projectId });
+      await new VariableService(client, projectId).set(name, { value, secret });
     };
   }
 

@@ -21,9 +21,8 @@ import {
   type VariableType,
   type VariableValue,
   type VariableKind,
-  variableReadScope,
-  variableScope,
 } from "../../../lib/variables";
+import { VariableService } from "../../../lib/backend";
 import { type Refusal, refusalError } from "../../../lib/oclif/refusal";
 import { inShell, type SuggestedCommand } from "../../../lib/suggestion";
 import { Promptable } from "../../../lib/oclif/promptable";
@@ -116,12 +115,12 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
     }
 
     const { client, projectId } = await this.connect();
+    const variables = new VariableService(client, projectId);
     if (flags.preview && !flags.secret) {
       await refusePreviewOfSecret(client, projectId, args.name, (command) => {
         return this.suggest(command);
       });
     }
-    const scope = variableScope(projectId, flags.preview);
     // The kinds this write sets, as the platform's rule gives them: the preview
     // kind alone under `--preview`, otherwise both for a plain value and the
     // primary kind for a secret.
@@ -166,17 +165,17 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
     // value is held (ADR 062 §7), never the value itself. The kind this write
     // did not touch is read in a separate call: the platform never merges the
     // two kinds in one answer.
-    const written = (
-      await client.updateVariables({ [args.name]: { value, secret: flags.secret } }, scope)
-    )[args.name];
+    const written = await variables.set(
+      args.name,
+      { value, secret: flags.secret },
+      flags.preview ? "preview" : undefined,
+    );
     this.recordTelemetry({ is_secret: flags.secret });
     const stateOfKind = async (kind: VariableKind): Promise<KindState> =>
       stateOf(
         written?.[kind] !== undefined
           ? written[kind]
-          : (await client.getVariables(variableReadScope(projectId, kind === "preview")))[
-              args.name
-            ]?.[kind],
+          : (await variables.ofKind(kind))[args.name]?.[kind],
       );
     const primary = await stateOfKind("primary");
     const previewState = await stateOfKind("preview");
@@ -267,8 +266,8 @@ export async function refusePreviewOfSecret(
   name: string,
   suggest: (command: string) => SuggestedCommand,
 ): Promise<void> {
-  const held = await client
-    .getVariables({ project_id: projectId, kind: "primary" })
+  const held = await new VariableService(client, projectId)
+    .ofKind("primary")
     .then((body) => {
       return body[name]?.primary;
     })

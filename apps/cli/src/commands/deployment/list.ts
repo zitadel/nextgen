@@ -1,3 +1,4 @@
+import { DeploymentService } from "../../lib/backend";
 import { Paging } from "@zitadel/api/runtime/paging";
 import { Flags } from "@oclif/core";
 import { z } from "zod";
@@ -77,7 +78,6 @@ export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
     const { client, projectId } = await this.connect();
 
     const params = {
-      project_id: projectId,
       origin: flags.origin,
       live: flags.live,
       limit: flags.limit,
@@ -86,9 +86,12 @@ export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
     // One page unless `--all`, as every list does; the walk starts at
     // `--page-token`, and a drain leaves no next page to report.
     const paging = new Paging(pagedFunctions.listDeployments);
-    const { items, next } = await paging.collect(client.listDeployments.pages(params), {
-      all: flags.all === true,
-    });
+    const { items, next } = await paging.collect(
+      new DeploymentService(client, projectId).pages(params),
+      {
+        all: flags.all === true,
+      },
+    );
 
     // Flatten each deployment's targets to one `origins` cell for the table.
     const rows = items.map((deployment) => ({

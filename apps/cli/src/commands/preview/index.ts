@@ -13,6 +13,7 @@ import {
 import {
   buildBundle,
   DeploymentService,
+  OriginService,
   ReleaseService,
   deployMessage,
   headSha,
@@ -182,14 +183,7 @@ export function readPreviewUrls(
  */
 async function primaryOrigins(client: ZitadelClient, projectId: string): Promise<string[]> {
   try {
-    const project = await client.getProject(projectId);
-    return project.origins
-      .filter((entry) => {
-        return entry.kind === "primary";
-      })
-      .map((entry) => {
-        return entry.pattern;
-      });
+    return await new OriginService(client, projectId).primary();
   } catch (error) {
     if (error instanceof ApiError && error.status === 403) {
       return [];

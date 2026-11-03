@@ -15,6 +15,7 @@ import {
   variableInventoryCells,
   variableReadScope,
 } from "../../lib/variables";
+import { VariableService } from "../../lib/backend";
 
 /** The columns `list` renders, in order; `--preview` leaves out the preview column. */
 const COLUMNS = ["name", "value", "preview"] as const;
@@ -51,9 +52,10 @@ export default class VariableList extends Tabulatable(EnvironmentCommand) {
 
     // The inventory reads both kinds, which a read without a kind answers in
     // one request; `--preview` reads that kind alone.
+    const variables = new VariableService(client, projectId);
     const items = flags.preview
-      ? toVariableRows(valuesOfKind(await client.getVariables(scope), scope.kind))
-      : toInventoryRows(await client.getVariables({ project_id: projectId }));
+      ? toVariableRows(valuesOfKind(await variables.ofKind(scope.kind), scope.kind))
+      : toInventoryRows(await variables.inventory());
     this.recordTelemetry({ variable_count: items.length });
 
     const rows = flags.preview ? variableCells(items) : variableInventoryCells(items);

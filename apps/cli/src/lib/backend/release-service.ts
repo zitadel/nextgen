@@ -55,6 +55,11 @@ export class ReleaseService {
     return this.client.buildRelease(body, { project_id: this.projectId });
   }
 
+  /** Read one release, with the revisions it points at. */
+  async get(releaseId: string) {
+    return this.client.getReleaseById(releaseId, { project_id: this.projectId });
+  }
+
   /** Revoke a release so its content is never served again. Idempotent. */
   async revoke(consent: Consent, releaseId: string): Promise<Release> {
     return consent.unlock(this.client).revokeRelease(releaseId, { project_id: this.projectId });

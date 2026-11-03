@@ -1,3 +1,4 @@
+import { OriginService } from "../../../lib/backend";
 import { createZitadelClient, type ZitadelClient } from "../../../lib/api-client";
 import { issuerHeldAsPreview, recordedOrigins } from "../../../lib/origins";
 import {
@@ -83,13 +84,12 @@ export class IssuerOriginCheck implements SanityCheck {
     if (consent === undefined) {
       return;
     }
-    await consent.unlock(client).removeOrigin(secret.project_id, { pattern });
+    const origins = new OriginService(client, secret.project_id);
+    await origins.remove(consent, pattern);
     try {
-      await client.addOrigin(secret.project_id, { pattern, kind: "primary" });
+      await origins.add(pattern, "primary");
     } catch (error) {
-      await client
-        .addOrigin(secret.project_id, { pattern, kind: "preview" })
-        .catch(() => undefined);
+      await origins.add(pattern, "preview").catch(() => undefined);
       throw error;
     }
     await writeZitadelSecret(ctx.cwd, {

@@ -176,7 +176,7 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
     const history = await readPrimaryHistory(
       args.deploymentId,
       async () => {
-        return client.listDeployments.all({ project_id: projectId });
+        return new DeploymentService(client, projectId).list();
       },
       suggest,
     );
@@ -208,7 +208,7 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
         // cannot stand in for.
         prepare: async () =>
           target.expectedDeploymentId ??
-          (await client.listDeployments.all({ project_id: projectId, live: true })).find(
+          (await new DeploymentService(client, projectId).live()).find(
             DeploymentService.servesPrimary,
           )?.id,
         apply: async (consent, guard) => {

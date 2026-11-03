@@ -38,6 +38,16 @@ export class OriginService {
     return project.origins ?? [];
   }
 
+  /** The patterns a deploy lands on: the project's primary origins. */
+  async primary(): Promise<string[]> {
+    return OriginService.primaryPatterns(await this.list());
+  }
+
+  /** The patterns of the primary origins among `origins`. */
+  static primaryPatterns(origins: readonly ProjectOriginEntry[]): string[] {
+    return origins.filter((entry) => entry.kind === "primary").map((entry) => entry.pattern);
+  }
+
   /** Add one pattern and return what the server stored. */
   async add(pattern: string, kind: OriginKind): Promise<ProjectOriginEntry> {
     return this.client.addOrigin(this.projectId, { pattern, kind });

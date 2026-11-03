@@ -1,3 +1,4 @@
+import { OriginService } from "../../lib/backend";
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 
@@ -66,7 +67,7 @@ export async function moveDevPort(opts: {
   });
   if (!dryRun) {
     try {
-      await client.addOrigin(secret.project_id, { pattern: issuer, kind: "primary" });
+      await new OriginService(client, secret.project_id).add(issuer, "primary");
     } catch (error) {
       const normalized = toZitadelError(error);
       throw new ZitadelError(normalized.code, `Could not allow ${issuer} for this project`, {

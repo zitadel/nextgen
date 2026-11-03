@@ -1,3 +1,4 @@
+import { PreviewService } from "../../lib/backend";
 import { Args, Flags } from "@oclif/core";
 
 import { type Admitted, CommandGroups, type JsonEnvelope, PreviewCommand } from "../../lib/oclif";
@@ -67,7 +68,7 @@ export default class PreviewRm extends Destructive(PreviewCommand) {
           // would otherwise read as a removal. Checked before asking, so
           // nobody confirms removing what is not there.
           if (
-            !(await connection.client.listPreviews.all(connection.projectId)).some(
+            !(await new PreviewService(connection.client, connection.projectId).list()).some(
               (preview) => preview.origin === args.url,
             )
           ) {
@@ -81,7 +82,7 @@ export default class PreviewRm extends Destructive(PreviewCommand) {
           return connection;
         },
         apply: async (consent, { client, projectId }) => {
-          await consent.unlock(client).removePreview(projectId, { origin: args.url });
+          await new PreviewService(client, projectId).remove(consent, args.url);
           return {
             status: "ok",
             data: deletedData({ url: args.url }),

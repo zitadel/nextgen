@@ -1,3 +1,4 @@
+import { DeploymentService, VariableService } from "../../lib/backend";
 import {
   type Admitted,
   CommandGroups,
@@ -24,12 +25,13 @@ export default class DeploymentGet extends Tabulatable(EnvironmentCommand) {
   protected async execute({ args }: Admitted<typeof DeploymentGet>): Promise<JsonEnvelope> {
     const { client, projectId } = await this.connect();
 
-    const scope = { project_id: projectId };
     // `--json` carries the record alone, so only a person's view reads the
     // frozen set.
     const [deployment, variables] = await Promise.all([
-      client.getDeploymentById(args.deploymentId, scope),
-      this.isJson ? undefined : client.getDeploymentVariables(args.deploymentId, scope),
+      new DeploymentService(client, projectId).get(args.deploymentId),
+      this.isJson
+        ? undefined
+        : new VariableService(client, projectId).ofDeployment(args.deploymentId),
     ]);
 
     const origins = deployment.targets.map((target) => target.origin);

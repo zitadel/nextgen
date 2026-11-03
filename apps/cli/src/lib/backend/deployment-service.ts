@@ -55,6 +55,13 @@ export type RollbackOptions = {
   expectedDeploymentId?: string;
 };
 
+/** What narrows a list of deployments. */
+export type DeploymentQuery = Readonly<{ origin?: string; live?: boolean }>;
+
+/** What narrows and pages a list of deployments. */
+export type DeploymentPageQuery = DeploymentQuery &
+  Readonly<{ limit?: number; page_token?: string }>;
+
 /** The deployments of one project. */
 export class DeploymentService {
   private readonly client: ZitadelClient;
@@ -73,6 +80,26 @@ export class DeploymentService {
    */
   static servesPrimary(deployment: Pick<ListDeployments200DeploymentsItem, "targets">): boolean {
     return deployment.targets.some((target) => target.expires_at == null);
+  }
+
+  /** Read one deployment. */
+  async get(deploymentId: string) {
+    return this.client.getDeploymentById(deploymentId, { project_id: this.projectId });
+  }
+
+  /** Every deployment, across all pages, optionally narrowed to the live ones or one origin. */
+  async list(query: DeploymentQuery = {}) {
+    return this.client.listDeployments.all({ project_id: this.projectId, ...query });
+  }
+
+  /** The deployments serving traffic now, optionally for one origin. */
+  async live(origin?: string) {
+    return this.list({ live: true, origin });
+  }
+
+  /** The pages of deployments, for a caller that pages through them. */
+  pages(query: DeploymentPageQuery = {}) {
+    return this.client.listDeployments.pages({ project_id: this.projectId, ...query });
   }
 
   /**

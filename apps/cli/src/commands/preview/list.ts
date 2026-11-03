@@ -1,3 +1,4 @@
+import { PreviewService } from "../../lib/backend";
 import { Paging } from "@zitadel/api/runtime/paging";
 import { Flags } from "@oclif/core";
 import { z } from "zod";
@@ -79,9 +80,12 @@ export default class PreviewList extends Tabulatable(PreviewCommand) {
     // One page unless `--all`, as every list does; the walk starts at
     // `--page-token`, and a drain leaves no next page to report.
     const paging = new Paging(pagedFunctions.listPreviews);
-    const { items, next } = await paging.collect(client.listPreviews.pages(projectId, params), {
-      all: flags.all === true,
-    });
+    const { items, next } = await paging.collect(
+      new PreviewService(client, projectId).pages(params),
+      {
+        all: flags.all === true,
+      },
+    );
 
     const rows = items.map((preview) => ({
       url: preview.origin,

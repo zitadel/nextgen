@@ -1,7 +1,12 @@
 import type { ZitadelClient } from "../../../lib/api-client";
 import { Cmd } from "../../../lib/cmd";
 import { ZitadelError } from "../../../lib/errors";
-import { DEPLOY_ARGS, OriginService } from "../../../lib/backend";
+import {
+  DEPLOY_ARGS,
+  DeploymentService,
+  OriginService,
+  VariableService,
+} from "../../../lib/backend";
 import type { SuggestedCommand } from "../../../lib/suggestion";
 
 import {
@@ -35,8 +40,7 @@ async function nothingDeployed(
       nextCommands: [suggest(DEPLOY_ARGS)],
     });
   }
-  const project = await client.getProject(projectId);
-  const origins = project.origins;
+  const origins = await new OriginService(client, projectId).list();
   if (origins.some((entry) => entry.kind === "primary" && entry.pattern === origin)) {
     return new ZitadelError("E_NOT_FOUND", `Nothing is deployed to ${origin}.`, {
       hint: `Deploy to it first with \`${suggest(DEPLOY_ARGS)}\`, then resolve its variables.`,
@@ -72,11 +76,7 @@ export async function liveDeployment(
   origin: string | undefined,
   suggest: (command: string) => SuggestedCommand,
 ): Promise<LiveDeployment> {
-  const deployments = await client.listDeployments.all({
-    project_id: projectId,
-    live: true,
-    origin,
-  });
+  const deployments = await new DeploymentService(client, projectId).live(origin);
   if (origin === undefined && deployments.length > 1) {
     const origins = [
       ...new Set(deployments.flatMap((deployment) => deployment.targets.map((t) => t.origin))),
@@ -139,7 +139,7 @@ export default class VariableResolve extends Tabulatable(EnvironmentCommand) {
     const where = servedOrigins.join(", ");
 
     const items = toVariableRows(
-      await client.getDeploymentVariables(live.id, { project_id: projectId }),
+      await new VariableService(client, projectId).ofDeployment(live.id),
     );
     this.recordTelemetry({ variable_count: items.length });
 
