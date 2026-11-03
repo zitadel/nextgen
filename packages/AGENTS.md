@@ -66,7 +66,7 @@ change needs a changeset, and the whole train versions together.
 
 The generated TypeScript client: orval output under `src/generated/`.
 Regenerate it, never hand-edit it; the source is
-[`api/openapi/`](../api/openapi/AGENTS.md). The runtime helpers in
+[`apps/api/api/openapi/`](../apps/api/api/openapi/AGENTS.md). The runtime helpers in
 `src/runtime/` (`configureZitadel()` from `@zitadel/api/config`, proxy-path
 handling) are hand-written and the primary consumer surface.
 
