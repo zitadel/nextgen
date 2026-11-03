@@ -54,11 +54,4 @@ export class VariableService {
     const written = await this.client.updateVariables({ [name]: write }, scope);
     return written[name] ?? {};
   }
-
-  /** The variables a live deployment froze at the time it was made. */
-  async ofDeployment(
-    deploymentId: string,
-  ): Promise<Awaited<ReturnType<ZitadelClient["getDeploymentVariables"]>>> {
-    return this.client.getDeploymentVariables(deploymentId, { project_id: this.projectId });
-  }
 }

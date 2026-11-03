@@ -1,4 +1,4 @@
-import { DeploymentService, VariableService } from "../../lib/backend";
+import { DeploymentService } from "../../lib/backend";
 import {
   type Admitted,
   CommandGroups,
@@ -7,7 +7,7 @@ import {
   nonBlankArg,
 } from "../../lib/oclif";
 import { Tabulatable } from "../../lib/oclif/tabulatable";
-import { frozenVariables, toVariableRows } from "../../lib/variables";
+import { frozenVariables } from "../../lib/variables";
 
 /**
  * `zitadel deployment get <deployment_id>` — read one deployment record: the
@@ -26,13 +26,7 @@ export default class DeploymentGet extends Tabulatable(EnvironmentCommand) {
     const { client, projectId } = await this.connect();
 
     const deploymentService = new DeploymentService(client, projectId);
-    const variableService = new VariableService(client, projectId);
-    // `--json` carries the record alone, so only a person's view reads the
-    // frozen set.
-    const [deployment, variables] = await Promise.all([
-      deploymentService.get(args.deploymentId),
-      this.isJson ? undefined : variableService.ofDeployment(args.deploymentId),
-    ]);
+    const { deployment, variables } = await deploymentService.get(args.deploymentId);
 
     const origins = deployment.targets.map((target) => target.origin);
     return this.emit({
@@ -44,14 +38,8 @@ export default class DeploymentGet extends Tabulatable(EnvironmentCommand) {
         `  reason    ${deployment.metadata.reason ?? "deploy"}`,
         `  deployed  ${deployment.deployed_at}`,
         `  origins   ${origins.join(", ")}`,
-        ...(variables === undefined
-          ? []
-          : [
-              "",
-              await frozenVariables(toVariableRows(variables), (columns, items) =>
-                this.tabulate(columns, items),
-              ),
-            ]),
+        "",
+        await frozenVariables(variables, (columns, items) => this.tabulate(columns, items)),
       ].join("\n"),
     });
   }

@@ -6,8 +6,11 @@ import type {
   RollbackDeployment201,
 } from "@zitadel/api/generated/model";
 
-import type { ZitadelClient } from "../api-client";
+import { Paging } from "@zitadel/api/runtime/paging";
+
+import { pagedFunctions, type ZitadelClient } from "../api-client";
 import type { Consent } from "../consent";
+import { toVariableRows, type VariableRow } from "../variables";
 
 /**
  * A deployment, as create returns it: 200 when every target already served it,
@@ -55,12 +58,31 @@ export type RollbackOptions = {
   expectedDeploymentId?: string;
 };
 
+/** A deployment as the server records it. */
+export type DeploymentRecord = Awaited<ReturnType<ZitadelClient["getDeploymentById"]>>;
+
+/**
+ * A deployment with everything that belongs to it: the record, and the
+ * variables it froze when it was made.
+ */
+export type DeploymentDetail = Readonly<{
+  deployment: DeploymentRecord;
+  variables: readonly VariableRow[];
+}>;
+
+/** One page of the deployment history, or every page when it was asked to drain. */
+export type DeploymentHistory = Readonly<{
+  items: readonly ListDeployments200DeploymentsItem[];
+  /** The cursor to the next page, or null when none remains. */
+  next: string | null;
+}>;
+
 /** What narrows a list of deployments. */
 export type DeploymentQuery = Readonly<{ origin?: string; live?: boolean }>;
 
 /** What narrows and pages a list of deployments. */
 export type DeploymentPageQuery = DeploymentQuery &
-  Readonly<{ limit?: number; page_token?: string }>;
+  Readonly<{ limit?: number; page_token?: string; all?: boolean }>;
 
 /**
  * The deployments of one project: making a release live, undoing that, and
@@ -91,9 +113,31 @@ export class DeploymentService {
     return deployment.targets.some((target) => target.expires_at == null);
   }
 
-  /** Read one deployment. */
-  async get(deploymentId: string) {
+  /**
+   * Read one deployment with everything that belongs to it.
+   *
+   * @param deploymentId - The deployment to read.
+   * @returns The record and the variables it froze, as rows ready to show.
+   */
+  async get(deploymentId: string): Promise<DeploymentDetail> {
+    const [deployment, variables] = await Promise.all([
+      this.record(deploymentId),
+      this.frozenVariables(deploymentId),
+    ]);
+    return Object.freeze({ deployment, variables });
+  }
+
+  /** Read the deployment record alone, for a caller that needs nothing it froze. */
+  async record(deploymentId: string): Promise<DeploymentRecord> {
     return this.client.getDeploymentById(deploymentId, { project_id: this.projectId });
+  }
+
+  /** The variables a deployment froze when it was made. A secret is named, never disclosed. */
+  async frozenVariables(deploymentId: string): Promise<readonly VariableRow[]> {
+    const frozen = await this.client.getDeploymentVariables(deploymentId, {
+      project_id: this.projectId,
+    });
+    return toVariableRows(frozen);
   }
 
   /** Every deployment, across all pages, optionally narrowed to the live ones or one origin. */
@@ -106,9 +150,19 @@ export class DeploymentService {
     return this.list({ live: true, origin });
   }
 
-  /** The pages of deployments, for a caller that pages through them. */
-  pages(query: DeploymentPageQuery = {}) {
-    return this.client.listDeployments.pages({ project_id: this.projectId, ...query });
+  /**
+   * The deployment history, newest first.
+   *
+   * @param query - The filters, the page size, the cursor to continue from, and
+   * `all` to drain every page instead of reading one.
+   * @returns The items read, and the cursor to the next page when one remains.
+   */
+  async page(query: DeploymentPageQuery = {}): Promise<DeploymentHistory> {
+    const { all, ...filter } = query;
+    const paging = new Paging(pagedFunctions.listDeployments);
+    const pages = this.client.listDeployments.pages({ project_id: this.projectId, ...filter });
+    const { items, next } = await paging.collect(pages, { all: all === true });
+    return Object.freeze({ items, next });
   }
 
   /**

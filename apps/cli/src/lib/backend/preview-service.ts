@@ -1,8 +1,17 @@
-import type { ZitadelClient } from "../api-client";
+import { Paging } from "@zitadel/api/runtime/paging";
+
+import { pagedFunctions, type ZitadelClient } from "../api-client";
 import type { Consent } from "../consent";
 
 /** What {@link PreviewService.pages} takes beyond the project. */
-export type PreviewPageQuery = Readonly<{ limit?: number; page_token?: string }>;
+export type PreviewPageQuery = Readonly<{ limit?: number; page_token?: string; all?: boolean }>;
+
+/** One page of live previews, or every page when it was asked to drain. */
+export type PreviewList = Readonly<{
+  items: readonly Awaited<ReturnType<ZitadelClient["listPreviews"]>>["previews"][number][];
+  /** The cursor to the next page, or null when none remains. */
+  next: string | null;
+}>;
 
 /**
  * The live previews of one project: the pull-request deployments that expire on
@@ -25,9 +34,18 @@ export class PreviewService {
     return this.client.listPreviews.all(this.projectId);
   }
 
-  /** The pages of live previews, for a caller that pages through them. */
-  pages(query: PreviewPageQuery) {
-    return this.client.listPreviews.pages(this.projectId, query);
+  /**
+   * The live previews, a page at a time.
+   *
+   * @param query - The page size, the cursor to continue from, and `all` to drain every page.
+   * @returns The items read, and the cursor to the next page when one remains.
+   */
+  async page(query: PreviewPageQuery = {}): Promise<PreviewList> {
+    const { all, ...filter } = query;
+    const paging = new Paging(pagedFunctions.listPreviews);
+    const pages = this.client.listPreviews.pages(this.projectId, filter);
+    const { items, next } = await paging.collect(pages, { all: all === true });
+    return Object.freeze({ items, next });
   }
 
   /** Stop serving one preview origin. */
