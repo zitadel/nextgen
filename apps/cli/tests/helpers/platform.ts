@@ -9,6 +9,9 @@ import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll } from "vitest";
 
 /** What the platform was asked to publish, for a surface the mock does not keep. */
+/** The object type of the schema the scaffolded login flow serves. */
+const SERVED_OBJECT_TYPE = "human-user";
+
 export interface Captured<T> {
   readonly all: T[];
   readonly count: number;
@@ -127,10 +130,18 @@ export function usePlatformMock(): PlatformMock {
     server.use(
       http.post("*/users/query", async ({ request }) => {
         const { filter = [] } = (await request.json()) as {
-          filter?: Array<{ operation: string }>;
+          filter?: Array<{ operation: string; value: string }>;
         };
-        const excluding = filter.some((entry) => entry.operation === "not_equals");
-        return HttpResponse.json({ users: excluding ? elsewhere : matching });
+        const equals = filter.find((entry) => entry.operation === "equals");
+        if (equals !== undefined) {
+          return HttpResponse.json({ users: equals.value === SERVED_OBJECT_TYPE ? matching : [] });
+        }
+        const excluded = filter
+          .filter((entry) => entry.operation === "not_equals")
+          .map((entry) => entry.value);
+        return HttpResponse.json({
+          users: excluded.includes(SERVED_OBJECT_TYPE) ? elsewhere : [],
+        });
       }),
     );
   };

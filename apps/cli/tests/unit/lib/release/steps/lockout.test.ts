@@ -21,6 +21,8 @@ function ctx(options: {
   failQuery?: boolean;
   failListSchemas?: boolean;
   requested?: number[];
+  failNotEquals?: boolean;
+  endlessEmptyPages?: boolean;
 }): StepContext {
   return {
     cwd: "/unused",
@@ -32,6 +34,12 @@ function ctx(options: {
       }) => {
         if (options.failQuery) {
           throw new Error("forbidden");
+        }
+        if (options.failNotEquals && body.filter.some((f) => f.operation === "not_equals")) {
+          throw new Error("boom");
+        }
+        if (options.endlessEmptyPages) {
+          return { users: [], next_page_token: "again" };
         }
         const equals = body.filter.find((f) => f.operation === "equals")?.value;
         const excluded = body.filter
@@ -360,6 +368,98 @@ describe("lockoutStep", () => {
     );
 
     expect(takeReportedWarnings()[0]).toContain('has no "username"');
+  });
+
+  it("does not follow a not-found outcome into a sign-up step", async () => {
+    await lockoutStep.run(
+      ctx({
+        schemas: [{ objectType: "human-user", "x-identifier": "email" }],
+        flows: [
+          {
+            name: "default-login",
+            status: "active",
+            user_schema: "human-user",
+            purposes: { login: "start" },
+            steps: [
+              {
+                name: "start",
+                fields: [],
+                transitions: { sso_user_not_found: { target: "register-sso" } },
+              },
+              { name: "register-sso", fields: ["email"] },
+            ],
+          },
+        ],
+        users: [user("u1", "human-user", {})],
+      }),
+    );
+
+    expect(takeReportedWarnings()).toEqual([]);
+  });
+
+  it("gives every schema its own share of the scan limit", async () => {
+    const lots = Array.from({ length: 1200 }, (_, index) =>
+      user(`a-${index}`, "human-user", { email: "a@example.com" }),
+    );
+    await lockoutStep.run(
+      ctx({
+        schemas: [
+          { objectType: "human-user", "x-identifier": "email" },
+          { objectType: "employee", "x-identifier": "email" },
+        ],
+        flows: [flow("human-user"), flow("employee")],
+        users: [
+          ...lots,
+          user("e1", "employee", {}),
+          user("e2", "employee", {}),
+          user("e3", "employee", {}),
+        ],
+      }),
+    );
+
+    expect(takeReportedWarnings()[0]).toContain(
+      '3 of 3 existing users of "employee" have no "email"',
+    );
+  });
+
+  it("keeps one scan's warning when the other scan fails", async () => {
+    await lockoutStep.run(
+      ctx({
+        schemas: [{ objectType: "human-user", "x-identifier": "email" }],
+        flows: [flow("human-user")],
+        users: [user("u1", "human-user", {})],
+        failNotEquals: true,
+      }),
+    );
+
+    expect(takeReportedWarnings()[0]).toContain('has no "email"');
+  });
+
+  it("stops asking when a page is empty but still offers another", async () => {
+    await lockoutStep.run(
+      ctx({
+        schemas: [{ objectType: "human-user", "x-identifier": "email" }],
+        flows: [flow("human-user")],
+        users: [],
+        endlessEmptyPages: true,
+      }),
+    );
+
+    expect(takeReportedWarnings()).toEqual([]);
+  });
+
+  it("looks up the identity links of only the first stranded users", async () => {
+    const stranded = Array.from({ length: 250 }, (_, index) => user(`s-${index}`, "human-user"));
+    await lockoutStep.run(
+      ctx({
+        schemas: [{ objectType: "employee" }],
+        flows: [flow("employee")],
+        users: stranded,
+        links: Object.fromEntries(stranded.map((entry) => [entry.id, 1])),
+      }),
+    );
+
+    expect(takeReportedWarnings()[0]).toContain("at least 200 existing users");
   });
 
   it("never fails the deploy when users cannot be read", async () => {

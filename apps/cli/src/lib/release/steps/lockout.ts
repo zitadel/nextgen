@@ -3,18 +3,18 @@ import { mapBounded } from "../../map-bounded";
 import { reportWarning } from "../../warnings";
 import type { Step, StepContext } from "../pipeline";
 
-/** Users read per page, and the most the whole check reads, across every scan. */
+/** Users read per page, and the most the whole check reads, shared out across its scans. */
 const PAGE_SIZE = 100;
 const SCAN_CAP = 1000;
+/** The most stranded users whose identity links are looked up. */
+const LINK_CHECKS = 200;
 /** Identity-link reads in flight at once. */
 const CONCURRENCY = 10;
 
 type QueriedUser = Awaited<ReturnType<ZitadelClient["queryUsers"]>>["users"][number];
 type QueryUsersBody = Parameters<ZitadelClient["queryUsers"]>[0];
 type UserFilter = NonNullable<QueryUsersBody["filter"]>[number];
-type Flow = { schema: string; identifiers: string[] };
-/** How many users the whole check may still read. */
-type Budget = { remaining: number };
+type Flow = { schema: string; identifier?: string };
 
 /**
  * Warn when this deploy leaves users who exist today unable to sign in. A
@@ -52,13 +52,16 @@ async function lockoutWarnings(ctx: StepContext): Promise<string[]> {
   // lookups below do not depend on it, so a failed read costs the names.
   const names = await objectTypes(ctx).catch(() => new Map<string, string>());
   const { flows, unresolved } = servedFlows(ctx, names);
-  const budget: Budget = { remaining: SCAN_CAP };
-  const [lookups, sso] = await Promise.all([
-    lookupWarnings(ctx, flows, budget),
+  // Every scan gets its own share of the cap up front, so none can starve
+  // another and the total stays within it.
+  const share = Math.floor(SCAN_CAP / (new Set(flows.map((flow) => flow.schema)).size + 1));
+  // One scan failing must not discard what the other found.
+  const settled = await Promise.allSettled([
+    lookupWarnings(ctx, flows, share),
     // With a flow whose schema is unknown, "a schema no flow serves" cannot be told.
-    unresolved ? [] : ssoWarnings(ctx, flows, names, budget),
+    unresolved ? [] : ssoWarnings(ctx, flows, names, share),
   ]);
-  return [...lookups, ...sso];
+  return settled.flatMap((outcome) => (outcome.status === "fulfilled" ? outcome.value : []));
 }
 
 /**
@@ -101,7 +104,7 @@ function servedFlows(
     // a step on the login path collects it.
     const identifier = designated.get(schema);
     const looksUp = identifier !== undefined && loginPathFields(flow).has(identifier);
-    flows.push({ schema, identifiers: looksUp ? [identifier] : [] });
+    flows.push({ schema, ...(looksUp ? { identifier } : {}) });
   }
   return { flows, unresolved };
 }
@@ -110,35 +113,29 @@ function servedFlows(
 async function lookupWarnings(
   ctx: StepContext,
   flows: readonly Flow[],
-  budget: Budget,
+  share: number,
 ): Promise<string[]> {
-  const lookups = new Map<string, Set<string>>();
+  // The designated identifier belongs to the schema, so there is one per schema.
+  const lookups = new Map<string, string>();
   for (const flow of flows) {
-    const known = lookups.get(flow.schema) ?? new Set<string>();
-    for (const identifier of flow.identifiers) {
-      known.add(identifier);
+    if (flow.identifier !== undefined) {
+      lookups.set(flow.schema, flow.identifier);
     }
-    lookups.set(flow.schema, known);
   }
   const warnings: string[] = [];
-  for (const [objectType, identifiers] of lookups) {
-    if (identifiers.size === 0) {
-      continue;
-    }
+  for (const [objectType, identifier] of lookups) {
     const { users, truncated } = await readUsers(
       ctx,
       [{ field: "schema_object_type", operation: "equals", value: objectType }],
-      budget,
+      share,
     );
-    for (const identifier of identifiers) {
-      const missing = users.filter((user) => !carries(user, identifier));
-      if (missing.length === 0) {
-        continue;
-      }
-      warnings.push(
-        `${count(missing.length, truncated)} of ${count(users.length, truncated)} existing ${plural(users.length, "user")} of ${quote(objectType)} ${missing.length === 1 ? "has" : "have"} no ${quote(identifier)}, the field the login flow looks users up by, so they cannot sign in with a password. Move each to the new revision and set it in one update: zitadel users update <user_id> --schema <revision_id> --set attributes.${identifier}=<value>`,
-      );
+    const missing = users.filter((user) => !carries(user, identifier));
+    if (missing.length === 0) {
+      continue;
     }
+    warnings.push(
+      `${count(missing.length, truncated)} of ${count(users.length, truncated)} existing ${plural(users.length, "user")} of ${quote(objectType)} ${missing.length === 1 ? "has" : "have"} no ${quote(identifier)}, the field the login flow looks users up by, so typing it offers them registration instead of signing them in. Set it on each user: zitadel users update <user_id> --set attributes.${identifier}=<value> (add --schema <revision_id> to move a user to a newer revision of the schema)`,
+    );
   }
   return warnings;
 }
@@ -148,17 +145,20 @@ async function ssoWarnings(
   ctx: StepContext,
   flows: readonly Flow[],
   names: ReadonlyMap<string, string>,
-  budget: Budget,
+  share: number,
 ): Promise<string[]> {
   const served = [...new Set(flows.map((flow) => flow.schema))];
   if (served.length === 0) {
     return [];
   }
-  const { users: stranded, truncated } = await readUsers(
+  const read = await readUsers(
     ctx,
     served.map((value) => ({ field: "schema_object_type", operation: "not_equals", value })),
-    budget,
+    share,
   );
+  // One request per user, so only the first few are asked.
+  const stranded = read.users.slice(0, LINK_CHECKS);
+  const truncated = read.truncated || read.users.length > LINK_CHECKS;
   // Its own boundary: a link read that fails (a user deleted since the query)
   // must not discard the other warnings.
   const hasLink = await mapBounded(stranded, CONCURRENCY, async (user) => {
@@ -199,6 +199,13 @@ function loginPathFields(flow: Record<string, unknown>): Set<string> {
   const byName = new Map(steps.map((step) => [step.name, step]));
   const fields = new Set<string>();
   const seen = new Set<unknown>();
+  // Another purpose's entry step is where a switch lands, and a missing account
+  // continues as a sign-up: neither is part of logging in.
+  const otherEntries = new Set(
+    Object.entries(purposes ?? {})
+      .filter(([purpose]) => purpose !== "login")
+      .map(([, entry]) => entry),
+  );
   const queue: unknown[] = [purposes?.login];
   for (let head = 0; head < queue.length; head += 1) {
     const name = queue[head];
@@ -213,9 +220,15 @@ function loginPathFields(flow: Record<string, unknown>): Set<string> {
       }
     }
     const transitions = (step.transitions ?? {}) as Record<string, Record<string, unknown>>;
-    for (const transition of Object.values(transitions)) {
+    for (const [outcome, transition] of Object.entries(transitions)) {
       const sameFlow = transition.flow === undefined && transition.purpose === undefined;
-      if (sameFlow && typeof transition.target === "string") {
+      const signsUp = outcome === "user_not_found" || outcome === "sso_user_not_found";
+      if (
+        sameFlow &&
+        !signsUp &&
+        typeof transition.target === "string" &&
+        !otherEntries.has(transition.target)
+      ) {
         queue.push(transition.target);
       }
     }
@@ -226,36 +239,40 @@ function loginPathFields(flow: Record<string, unknown>): Set<string> {
 async function readUsers(
   ctx: StepContext,
   filter: UserFilter[],
-  budget: Budget,
+  max: number,
 ): Promise<{ users: QueriedUser[]; truncated: boolean }> {
   const users: QueriedUser[] = [];
   let pageToken: string | undefined;
-  if (budget.remaining <= 0) {
-    return { users, truncated: true };
-  }
-  do {
-    const limit = Math.min(PAGE_SIZE, budget.remaining);
+  let received = 1;
+  while (received > 0 && users.length < max) {
     const page = await ctx.client.queryUsers(
       {
-        limit,
+        limit: Math.min(PAGE_SIZE, max - users.length),
         filter,
         ...(pageToken === undefined ? {} : { page_token: pageToken }),
       },
       { project_id: ctx.projectId },
     );
     users.push(...page.users);
-    budget.remaining -= page.users.length;
+    received = page.users.length;
     pageToken = page.next_page_token ?? undefined;
-  } while (pageToken !== undefined && budget.remaining > 0);
-  return { users, truncated: pageToken !== undefined };
+    if (pageToken === undefined) {
+      return { users, truncated: false };
+    }
+  }
+  return { users, truncated: true };
 }
 
 /** Whether the user holds a value at the (dotted) attribute path. */
 function carries(user: QueriedUser, path: string): boolean {
   let node: unknown = user.attributes;
   for (const key of path.split(".")) {
-    if (typeof node !== "object" || node === null) return false;
-    if (!Object.hasOwn(node, key)) return false;
+    if (typeof node !== "object" || node === null) {
+      return false;
+    }
+    if (!Object.hasOwn(node, key)) {
+      return false;
+    }
     node = (node as Record<string, unknown>)[key];
   }
   return node !== undefined && node !== null && node !== "";
@@ -267,11 +284,14 @@ async function objectTypes(ctx: StepContext): Promise<Map<string, string>> {
   const listed = await ctx.client.listSchemas.all({ project_id: ctx.projectId });
   for (const entry of listed) {
     const objectType = (entry.schema as { objectType?: unknown } | undefined)?.objectType;
-    if (typeof objectType === "string") names.set(entry.id, objectType);
+    if (typeof objectType === "string") {
+      names.set(entry.id, objectType);
+    }
   }
   return names;
 }
 
 const quote = (value: string) => `"${value}"`;
-const plural = (n: number, noun: string) => (n === 1 ? noun : `${noun}s`);
+const plural = (n: number, noun: string) =>
+  new Intl.PluralRules("en").select(n) === "one" ? noun : `${noun}s`;
 const count = (n: number, truncated: boolean) => (truncated ? `at least ${n}` : `${n}`);
