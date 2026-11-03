@@ -9,8 +9,9 @@ export const links = {
   chooseVersion: "/choose-version",
   github: "https://github.com/zitadel/nextgen",
   issues: "https://github.com/zitadel/nextgen/issues",
-  // The nextgen channel on Zitadel's Discord, for questions.
-  discord: "https://discord.com/channels/927474939156643850/1528728902896320672",
+  // The invite to Zitadel's Discord, which has the nextgen channel: a link to
+  // the channel itself assumes the reader has already joined.
+  discord: "https://zitadel.com/chat",
   releases: "https://github.com/zitadel/nextgen/releases",
   changelogFeed: "/changelog/feed.xml",
   zitadel: "https://zitadel.com",

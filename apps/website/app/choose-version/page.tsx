@@ -133,10 +133,11 @@ export default function ChooseVersionPage() {
               <div>
                 <dt className="font-semibold text-text-primary">Cloud or self-hosted.</dt>
                 <dd>
-                  Zitadel Cloud runs the next version, but it does not have full backup and recovery
-                  yet, runs in fewer regions, and has no account management, billing or pricing yet.
-                  As with Zitadel today: for full control over your data, backups and region, host
-                  it yourself.
+                  The next version&apos;s cloud runs at preview.zitadel.com, apart from Zitadel
+                  v4&apos;s on zitadel.com. It does not have full backup and recovery yet, runs in
+                  fewer regions, and has no account management, billing or pricing yet. As with
+                  Zitadel today: for full control over your data, backups and region, host it
+                  yourself.
                 </dd>
               </div>
             </dl>
@@ -175,7 +176,7 @@ export default function ChooseVersionPage() {
                         Feature
                       </th>
                       <th scope="col" className="py-2 pr-3 font-normal">
-                        Preview
+                        Next version
                       </th>
                       <th scope="col" className="py-2 font-normal">
                         Zitadel v4

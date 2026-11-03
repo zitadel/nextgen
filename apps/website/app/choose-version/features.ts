@@ -3,7 +3,7 @@
 // when one of them changes what ships, change its row here.
 
 // The day the rows last changed, shown on the page: change it with them.
-export const UPDATED = "2026-10-28";
+export const UPDATED = "2026-11-03";
 
 // The guide above the tables: when to start with the next version, when
 // with v4. Keep it in step with the rows.
@@ -18,6 +18,7 @@ export const CHOOSE = {
   v4: [
     "You need authenticator apps, one-time codes or security keys.",
     "You need SAML, LDAP or SCIM.",
+    "Your app needs its own roles.",
     "Other apps sign in through Zitadel as an OpenID Connect provider.",
     "You need a hosted login today.",
     "You go live now and need an SLA, uptime, and backup and recovery.",
@@ -36,7 +37,7 @@ export const STATUS_LABELS: Record<Status, string> = {
 
 // The legend, in this order: what each status means for the preview.
 export const STATUS_DESCRIPTIONS: [Status, string][] = [
-  ["available", "Ships in the preview today."],
+  ["available", "Ships in the next version today."],
   ["next", "In implementation, or planned for the near future."],
   ["roadmap", "Planned for the next version, to match v4 or beyond it; not scheduled yet."],
   ["partial", "Covers part of the feature; the note says which."],
@@ -262,7 +263,7 @@ export const AREAS: Area[] = [
       },
       {
         name: "Session lifetime",
-        preview: { status: "partial", note: "Server-wide, when you host it yourself" },
+        preview: { status: "partial", note: "Per sign-in, up to the server's maximum" },
         v4: { status: "available" },
       },
       {
@@ -283,7 +284,7 @@ export const AREAS: Area[] = [
     features: [
       {
         name: "Login inside your app",
-        preview: { status: "available", note: "Components for 14 frameworks." },
+        preview: { status: "available", note: "Components for 12 frameworks." },
         v4: { status: "partial", note: "Build it on the Session API" },
       },
       {
@@ -344,7 +345,7 @@ export const AREAS: Area[] = [
       },
       {
         name: "Events to a webhook",
-        preview: { status: "partial", note: "One sink per deployment" },
+        preview: { status: "partial", note: "Server configuration, when you host it yourself" },
         v4: { status: "available", note: "Actions" },
       },
       {
