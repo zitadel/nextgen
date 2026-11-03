@@ -1,6 +1,6 @@
 import { spinner } from "@clack/prompts";
 import { Flags } from "@oclif/core";
-import { pages } from "@zitadel/api/runtime/paging";
+import { Paging } from "@zitadel/api/runtime/paging";
 
 import { sanitizeResponse } from "../../../api-client";
 
@@ -8,7 +8,6 @@ import { nonBlankString } from "../../flags";
 
 import type { CommandResult, GlobalOptions } from "../../types";
 import { plainFlag } from "../../tabulatable";
-import { collectPages } from "../paging";
 import { wireOf } from "../wire";
 import { type ParsedFilter, parseFilter, parseSort } from "../query";
 import { parseOrThrow } from "../shared";
@@ -35,7 +34,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
     options,
   }: OperationDefinition<Ctx, ListSpec<Ctx>>): OperationStatics {
     const paged = spec.paged !== false;
-    const paging = {
+    const pagingFlags = {
       limit: Flags.integer({
         description: "Page size (server default 20, max 100).",
         min: 1,
@@ -95,7 +94,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
           : []),
       ],
       flags: {
-        ...(paged ? paging : {}),
+        ...(paged ? pagingFlags : {}),
         ...presentation,
         ...specific,
         ...options.flags,
@@ -121,7 +120,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
     // An unpaged endpoint has no cursor flags to read and would reject the
     // parameters anyway, so nothing is sent and one request is the whole list.
     const paged = spec.paged !== false;
-    const paging = (token?: string): Json =>
+    const pageFields = (token?: string): Json =>
       paged
         ? {
             ...(typeof flags.limit === "number" && { [wire.limit]: flags.limit }),
@@ -156,7 +155,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
             parseOrThrow(
               spec.body,
               wire.query({
-                paging: paging(token),
+                paging: pageFields(token),
                 sorting,
                 filters: parsed.map(({ field, operation, value }) => ({
                   field: field.field,
@@ -169,7 +168,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
             ),
           )
         : spec.call(ctx, {
-            ...paging(token),
+            ...pageFields(token),
             ...queryParams(parsed),
             ...(sorting && spec.sortParam ? { [spec.sortParam]: sorting.direction } : {}),
           });
@@ -183,30 +182,30 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
     // `--json` has already silenced everything.
     const progress = all && process.stdout.isTTY && !this.jsonEnabled() ? spinner() : undefined;
     progress?.start(`Fetching ${topic}`);
-    // Counted across the fetches: `pages` hands the callback no page number.
-    let fetched = 0;
     // The walk begins at the page --page-token names, if any.
     const first = typeof flags["page-token"] === "string" ? flags["page-token"] : undefined;
+    const paging = new Paging({
+      items: (response) => {
+        return sanitizeResponse(spec.items(response));
+      },
+      next: (response) => {
+        return spec.next?.(response);
+      },
+    });
+    const walk = paging.walk(async (token, number) => {
+      const page = await request(token ?? first);
+      progress?.message(`Fetching ${topic} — page ${number}`);
+      return page;
+    });
     // The spinner owns the cursor and a SIGINT handler until it is stopped, so a
     // page that fails mid-drain has to stop it too; otherwise the error prints
     // under a live spinner and the handler outlives the command.
-    const walk = pages(
-      async (token) => {
-        const page = await request(token ?? first);
-        fetched += 1;
-        progress?.message(`Fetching ${topic} — page ${fetched}`);
-        return page;
-      },
-      { next: (response) => spec.next?.(response) || undefined },
-    );
-    const { items, next } = await collectPages(walk, {
-      items: (response) => sanitizeResponse(spec.items(response)),
-      all,
-      next: (response) => sanitizeResponse(spec.next?.(response)),
-    }).catch((error: unknown) => {
+    const collected = await paging.collect(walk, { all }).catch((error: unknown) => {
       progress?.stop(`Fetching ${topic} failed`);
       throw error;
     });
+    const { items } = collected;
+    const next = sanitizeResponse(collected.next);
     progress?.stop(`Fetched ${items.length} ${items.length === 1 ? resource.singular : topic}`);
 
     const rows = items;

@@ -1,3 +1,4 @@
+import { Paging } from "@zitadel/api/runtime/paging";
 import { Flags } from "@oclif/core";
 
 import {
@@ -7,7 +8,7 @@ import {
   nonBlankString,
 } from "../../lib/oclif";
 import { plainFlag, Tabulatable } from "../../lib/oclif/tabulatable";
-import { collectPages } from "../../lib/oclif/crud/paging";
+import { pagedFunctions } from "../../lib/api-client";
 import { Cmd } from "../../lib/cmd";
 
 /** The columns `list` renders, in order. */
@@ -64,10 +65,9 @@ export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
     };
     // One page unless `--all`, as every list does; the walk starts at
     // `--page-token`, and a drain leaves no next page to report.
-    const { items, next } = await collectPages(client.listDeployments.pages(params), {
-      items: (page) => page.deployments,
+    const paging = new Paging(pagedFunctions.listDeployments);
+    const { items, next } = await paging.collect(client.listDeployments.pages(params), {
       all: flags.all === true,
-      next: (page) => page.next_page_token,
     });
 
     // Flatten each deployment's targets to one `origins` cell for the table.
