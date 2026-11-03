@@ -16,29 +16,43 @@ import { describe, expect, it } from "vitest";
  */
 const commandsDir = join(import.meta.dirname, "../../../../src/commands/variable");
 
+/** What a command's own directory holds beside its body, and never a command. */
+const INPUTS = new Set(["flags", "args", "rules", "requirements", "prompts"]);
+
+/**
+ * Every `variable` command's body: the file itself, or the `index.ts` of the
+ * directory a command with its own flags, rules or requirements becomes.
+ */
+async function commandBodies(): Promise<Map<string, string>> {
+  const entries = await readdir(commandsDir, { withFileTypes: true });
+  const bodies = new Map<string, string>();
+  for (const entry of entries) {
+    if (entry.isDirectory()) {
+      if (!INPUTS.has(entry.name)) {
+        bodies.set(`${entry.name}.ts`, join(commandsDir, entry.name, "index.ts"));
+      }
+      continue;
+    }
+    if (entry.name.endsWith(".ts")) {
+      bodies.set(entry.name, join(commandsDir, entry.name));
+    }
+  }
+  return bodies;
+}
+
 /** The dimension names each command passes to `recordTelemetry`. */
 async function recordedDimensions(): Promise<Map<string, string[]>> {
-  // A command with flags, rules or requirements of its own is a directory, so
-  // its body is the `index.ts` inside it.
   const entries = await Promise.all(
-    (await readdir(commandsDir, { withFileTypes: true }))
-      .filter((entry) => {
-        return entry.isDirectory() || entry.name.endsWith(".ts");
-      })
-      .map((entry) => {
-        return entry.isDirectory() ? `${entry.name}.ts` : entry.name;
-      })
-      .map(async (file) => {
-        const body = file.replace(/\.ts$/, "");
-        const source = await readFile(join(commandsDir, file), "utf8").catch(() => {
-          return readFile(join(commandsDir, body, "index.ts"), "utf8");
+    [...(await commandBodies())].map(async ([command, body]) => {
+      const source = await readFile(body, "utf8");
+      const calls = [...source.matchAll(/recordTelemetry\(\{([^}]*)\}/gs)];
+      const keys = calls.flatMap((call) => {
+        return [...(call[1] ?? "").matchAll(/(\w+)\s*:/g)].map((key) => {
+          return key[1] as string;
         });
-        const calls = [...source.matchAll(/recordTelemetry\(\{([^}]*)\}/gs)];
-        const keys = calls.flatMap((call) =>
-          [...(call[1] ?? "").matchAll(/(\w+)\s*:/g)].map((key) => key[1] as string),
-        );
-        return [file, keys] as const;
-      }),
+      });
+      return [command, keys] as const;
+    }),
   );
   return new Map(entries);
 }

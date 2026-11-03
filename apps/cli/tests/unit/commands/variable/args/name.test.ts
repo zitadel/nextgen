@@ -11,18 +11,28 @@ describe("readVariableName", () => {
     expect(readVariableName(name)).toBe(name);
   });
 
-  it.each(["GOOGLE-CLIENT", "a.b", "has space", ""])(
-    "refuses %j as invalid, quoting it",
-    (name) => {
-      expect(() => readVariableName(name)).toThrow(
-        expect.objectContaining({
-          code: "E_VALIDATION",
-          message: `Invalid variable name "${name}".`,
-          hint: VARIABLE_NAME_INVALID_REFUSAL.hint,
-        }),
-      );
-    },
-  );
+  it.each(["GOOGLE-CLIENT", "a.b", "has space"])("refuses %j as invalid, quoting it", (name) => {
+    expect(() => readVariableName(name)).toThrow(
+      expect.objectContaining({
+        code: "E_VALIDATION",
+        message: `Invalid variable name "${name}".`,
+        hint: VARIABLE_NAME_INVALID_REFUSAL.hint,
+      }),
+    );
+  });
+
+  it("refuses an empty name, naming the argument it was given for", () => {
+    expect(() => readVariableName("")).toThrow(
+      expect.objectContaining({
+        code: "E_VALIDATION",
+        message: "name was given an empty value",
+      }),
+    );
+  });
+
+  it("trims a padded name, as the prompt would have", () => {
+    expect(readVariableName("  FOO  ")).toBe("FOO");
+  });
 
   it("refuses a name past the schema's limit, saying how long it is", () => {
     expect(() => readVariableName("A".repeat(256))).toThrow(
