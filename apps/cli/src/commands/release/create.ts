@@ -1,6 +1,11 @@
 import { Flags } from "@oclif/core";
 
-import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../../lib/oclif";
+import {
+  type Admitted,
+  CommandGroups,
+  EnvironmentCommand,
+  type JsonEnvelope,
+} from "../../lib/oclif";
 import {
   buildBundle,
   createReleaseFromBundle,
@@ -35,9 +40,7 @@ export default class ReleaseCreate extends EnvironmentCommand {
     }),
   };
 
-  async run(): Promise<JsonEnvelope> {
-    const { flags } = await this.parse(ReleaseCreate);
-    await this.toMeta(flags);
+  protected async execute({ flags }: Admitted<typeof ReleaseCreate>): Promise<JsonEnvelope> {
     const { cwd, env, dryRun, isTTY } = this.meta;
     const json = this.jsonEnabled();
 

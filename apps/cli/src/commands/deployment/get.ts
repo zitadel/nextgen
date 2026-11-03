@@ -1,4 +1,10 @@
-import { CommandGroups, EnvironmentCommand, type JsonEnvelope, nonBlankArg } from "../../lib/oclif";
+import {
+  type Admitted,
+  CommandGroups,
+  EnvironmentCommand,
+  type JsonEnvelope,
+  nonBlankArg,
+} from "../../lib/oclif";
 import { Tabulatable } from "../../lib/oclif/tabulatable";
 import { frozenVariables, toVariableRows } from "../../lib/variables";
 
@@ -15,9 +21,7 @@ export default class DeploymentGet extends Tabulatable(EnvironmentCommand) {
     deployment_id: nonBlankArg({ required: true, description: "The deployment to read." }),
   };
 
-  async run(): Promise<JsonEnvelope> {
-    const { args, flags } = await this.parse(DeploymentGet);
-    await this.toMeta(flags);
+  protected async execute({ args }: Admitted<typeof DeploymentGet>): Promise<JsonEnvelope> {
     const { client, projectId } = await this.connect();
 
     const scope = { project_id: projectId };

@@ -15,15 +15,15 @@ import {
   usableSignInMethods,
 } from "../auth-methods";
 import { ZitadelError } from "../errors";
-import { type FlowFile, readSchemaFiles, type SchemaFile, selectSchema } from "../idp";
+import type { SchemaFile } from "../idp";
 import { stableStringify } from "../json";
 import { optionArgs } from "../public-cli";
-import { flowsForSchema } from "../schema-flows";
 import { reportWarning } from "../warnings";
 import { EnvironmentCommand } from "./environment-command";
 import { environmentFlags } from "./environment-flags";
 import { portableSuggestions, type SuggestedCommand } from "../suggestion";
 import { nonBlankString } from "./flags";
+import { type SchemaTarget, schemaTarget } from "./requires/schema";
 import type { JsonEnvelope } from "./types";
 import { Destructive } from "./destructive";
 import { Consent } from "../consent";
@@ -37,16 +37,6 @@ export type Permit = Consent | "not-the-last-method" | "dry-run";
 
 /** The message `deploy` needs, which only the caller can write. */
 const DEPLOY_MESSAGE = "<what changed>";
-
-/** What every `auth-method` command reads before changing anything. */
-type Target = {
-  readonly cwd: string;
-  /** `--cwd` for a follow-up command, or none when the run had none. */
-  readonly cwdArgs: string[];
-  readonly schema: SchemaFile;
-  /** The login flows that run against the schema, whatever their status. */
-  readonly flows: FlowFile[];
-};
 
 /**
  * What the `auth-method` commands share (ADR 070): finding the schema and its
@@ -74,41 +64,14 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
     }),
   };
 
-  /**
-   * Set up the invocation, then read the schema and the flows that run
-   * against it, refusing a schema whose methods live elsewhere.
-   *
-   * @param flags - The parsed flags.
-   * @param options.resolveServer - Whether the command talks to a server.
-   *   Off by default: a stopped local runtime must not block staging a change
-   *   for a later `deploy`.
-   * @param options.preflight - Checks of the flags that must answer before the
-   *   schema is read, with what they read handed back as `preflight`. It must
-   *   not ask a question, use the network or write anything: ask in the
-   *   command's own `run`, after `connect()`.
-   */
-  protected async target<T = undefined>(
-    flags: { schema?: string; cwd?: string },
-    options: { resolveServer?: boolean; preflight?: (cwd: string) => Promise<T> } = {},
-  ): Promise<Target & { readonly preflight: T }> {
-    await this.toMeta(flags, {
-      resolveServer: options.resolveServer ?? false,
-      // Only a command that talks to a server has an environment to resolve.
-      environment: options.resolveServer === true,
-    });
-    const { cwd } = this.meta;
-    const preflight = (await options.preflight?.(cwd)) as T;
-    const schema = selectSchema(await readSchemaFiles(cwd), flags.schema);
-    refuseExternalSchema(schema);
-    return {
-      cwd,
-      // A follow-up run from where the user stands must reach the same Project.
-      cwdArgs: flags.cwd === undefined ? [] : optionArgs("--cwd", cwd),
-      schema,
-      flows: await flowsForSchema(cwd, schema),
-      preflight,
-    };
-  }
+  static override meta = {
+    resolveServer: false,
+    environment: false,
+  };
+
+  static override requires = {
+    target: schemaTarget,
+  };
 
   /**
    * The last-method guard (ADR 070 §3). Returns what lets {@link writeSchema}
@@ -226,7 +189,7 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
    * argument lists (its `next_args`).
    *
    * @param changed - Whether a file changed, which `deploy` then publishes.
-   * @param cwdArgs - `--cwd` for `deploy`, from {@link target}.
+   * @param cwdArgs - `--cwd` for `deploy`, from the run's target.
    * @param leading - Commands that come first, such as publishing a credential
    *   that did not reach the project.
    */
@@ -258,11 +221,11 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
    * edited, so a change one of them would reject is refused instead.
    */
   protected async toggle(
-    flags: { schema?: string; cwd?: string },
+    target: SchemaTarget,
     method: ToggleableMethod,
     enabled: boolean,
   ): Promise<JsonEnvelope> {
-    const { cwd, cwdArgs, schema, flows } = await this.target(flags);
+    const { cwd, cwdArgs, schema, flows } = target;
     const { dryRun } = this.meta;
     const verb = enabled ? "enable" : "disable";
 
@@ -352,23 +315,6 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
         : `Nothing to ${verb} for ${schema.name}`,
     });
   }
-}
-
-/**
- * A schema that points at an external URL holds no sign-in methods of its own:
- * they live in the schema the server fetches, so editing the pointer would
- * change nothing.
- */
-function refuseExternalSchema(schema: SchemaFile): void {
-  if (schema.body.kind !== "schema-url") {
-    return;
-  }
-  throw new ZitadelError("E_VALIDATION", `${schema.path} points at an external schema`, {
-    hint:
-      "Its sign-in methods live in the schema at its url, which the server fetches. " +
-      "Edit x-auth-methods there instead.",
-    details: { file: schema.path, url: schema.body.url },
-  });
 }
 
 /** The server refuses password on a schema without an identifier. */

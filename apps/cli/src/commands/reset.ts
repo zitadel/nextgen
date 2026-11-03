@@ -1,13 +1,9 @@
 import { Flags } from "@oclif/core";
 
-import {
-  DEFAULT_LOCAL_SERVER_URL,
-  localContainerName,
-  readRuntimeMetadata,
-} from "../lib/local-server/runtime";
+import { localContainerName } from "../lib/local-server/runtime";
 import { LocalServer } from "../lib/local-server/server";
-import { BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
-import { resolveCwd } from "../lib/paths";
+import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
+import { recordedRuntime } from "../lib/oclif/requires/local-runtime";
 import { Destructive } from "../lib/oclif/destructive";
 
 export default class Reset extends Destructive(BaseCommand) {
@@ -22,14 +18,16 @@ export default class Reset extends Destructive(BaseCommand) {
     }),
   };
 
-  async run(): Promise<JsonEnvelope> {
-    const { flags } = await this.parse(Reset);
-    const cwd = resolveCwd(typeof flags.cwd === "string" ? flags.cwd : undefined);
-    const runtime = await readRuntimeMetadata(cwd);
-    await this.toMeta(flags, {
-      resolveServer: false,
-      source: runtime?.server_url ?? DEFAULT_LOCAL_SERVER_URL,
-    });
+  static override meta = {
+    resolveServer: false,
+  };
+
+  static override requires = {
+    recorded: recordedRuntime,
+  };
+
+  protected async execute({ recorded }: Admitted<typeof Reset>): Promise<JsonEnvelope> {
+    const { runtime } = recorded;
 
     const containerName =
       runtime?.backend === "docker" ? runtime.container_name : localContainerName(this.meta.cwd);

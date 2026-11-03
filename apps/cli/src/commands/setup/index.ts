@@ -29,7 +29,6 @@ import semver from "semver";
 import { createZitadelClient } from "../../lib/api-client";
 import { isDevelopmentBuild } from "../../lib/build-channel";
 import { renderBoxActions, wrapForBox } from "../../lib/box";
-import { setupDesignRemovedError } from "../../lib/branding/designs";
 import {
   claimAction,
   claimBoxAction,
@@ -45,7 +44,6 @@ import {
   customExample,
   customFlagValues,
   flagText,
-  givenCustomFlags,
   loopbackIssuerWarning,
   publishClientId,
   type PublishState,
@@ -61,7 +59,21 @@ import {
   type SecretPublisher,
 } from "../../lib/idp";
 import { brandingGuidanceAction, exploreAllCommands } from "../../lib/journey-guidance";
-import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../../lib/oclif";
+import {
+  type Admitted,
+  BaseCommand,
+  CommandGroups,
+  type JsonEnvelope,
+  type MetaOptions,
+  needs,
+  nonBlankString,
+  portFlag,
+  type Rule,
+} from "../../lib/oclif";
+import type { GlobalOptions } from "../../lib/oclif/types";
+import { removedSetupDesignRule } from "../../lib/oclif/inputs/branding";
+import { passwordMinLengthFlag } from "../../lib/oclif/inputs/password-policy";
+import { requirement } from "../../lib/oclif/requirements";
 import { environmentSelectorSuffix, projectEnvFile } from "../../lib/oclif/environment-flags";
 import { serverKind } from "../../lib/oclif/server-kind";
 import { findLocalAdminFor } from "../../lib/local-server/admin-credential";
@@ -91,11 +103,7 @@ import {
 import type { PatchContext } from "../../lib/orca/patchers/types";
 import type { Asker } from "../../lib/input";
 import { hasZitadelConfig, hasZitadelSecret } from "../../lib/project";
-import {
-  PASSWORD_POLICY_PATH,
-  type PasswordMinLength,
-  parsePasswordMinLength,
-} from "../../lib/policies";
+import { PASSWORD_POLICY_PATH, type PasswordMinLength } from "../../lib/policies";
 import { derivePosture } from "../../lib/orca/patchers/posture";
 import { writeScaffoldManifest } from "../../lib/scaffold-manifest";
 import {
@@ -205,6 +213,89 @@ function localRecoverySelector(cwd: string | undefined): EnvironmentSelector {
   });
 }
 
+type SetupFlags = Parameters<typeof retryOptionsFromFlags>[0];
+
+function retryOptionsOf(flags: Record<string, unknown>): SetupRetryOptions {
+  return retryOptionsFromFlags(flags as SetupFlags);
+}
+
+const CUSTOM_FLAGS = [
+  SETUP_FLAG_NAMES.slug,
+  SETUP_FLAG_NAMES.displayName,
+  SETUP_FLAG_NAMES.issuer,
+  SETUP_FLAG_NAMES.scopes,
+];
+
+const SETUP_RULES: readonly Rule[] = [
+  removedSetupDesignRule,
+  needs("sso-client-id", "sso", {
+    message: "--sso-client-id needs --sso",
+    hint: "Name the provider with --sso, e.g. --sso google.",
+  }),
+  ...CUSTOM_FLAGS.map((name) => {
+    return needs(name.slice(2), "sso", {
+      message: `${name} needs --sso ${CUSTOM_PROVIDER}`,
+      hint: `Name the provider with --sso ${CUSTOM_PROVIDER}.`,
+    });
+  }),
+];
+
+function checkSsoFlags(flags: Record<string, unknown>, json: boolean): void {
+  const setupFlags = flags as SetupFlags;
+  const customValues = customFlagValues(setupFlags, SETUP_FLAG_KEYS);
+  const settingsGiven =
+    customValues.slug !== undefined &&
+    customValues.displayName !== undefined &&
+    customValues.issuer !== undefined;
+  const scripted = Boolean(flags["non-interactive"] || json || !process.stdin.isTTY);
+  if (setupFlags.sso === CUSTOM_PROVIDER) {
+    checkGivenCustomFlags(customValues, SETUP_FLAG_NAMES);
+  }
+  if (
+    setupFlags.sso !== undefined &&
+    (setupFlags.sso !== CUSTOM_PROVIDER || settingsGiven || scripted)
+  ) {
+    selectionFromFlags(setupFlags.sso, customValues, SETUP_FLAG_NAMES, SSO_CUSTOM_EXAMPLE);
+  }
+}
+
+const setupDirectory = requirement({
+  resolve: async ({ meta }) => {
+    await assertDirectoryOrMissing(meta.cwd);
+    return meta.cwd;
+  },
+});
+
+const setupProject = requirement({
+  refusal: {
+    code: "E_CONFLICT",
+    message: ".zitadel/secret exists without zitadel.json",
+    hint: "Move the secret aside or restore zitadel.json before running setup.",
+  },
+  resolve: async ({ meta }) => {
+    const configured = await hasZitadelConfig(meta.cwd);
+    if (!configured && (await hasZitadelSecret(meta.cwd))) {
+      return undefined;
+    }
+    return {
+      configured,
+    };
+  },
+});
+
+const setupReadiness = requirement({
+  resolve: async ({ flags, meta }) => {
+    if (await hasZitadelConfig(meta.cwd)) {
+      return true as const;
+    }
+    if (flags.git !== false) {
+      await assertCleanWorktree(meta.cwd);
+    }
+    await assertLocalServerVersion(meta.cwd, meta.source, retryOptionsOf(flags), meta.cliVersion);
+    return true as const;
+  },
+});
+
 /** `zitadel setup` — create a project and scaffold local auth.
  *
  * Detects the framework (or, for an empty directory, picks the one to
@@ -238,7 +329,7 @@ export default class Setup extends Destructive(BaseCommand) {
       description: RENDERER_FLAG_DESCRIPTION,
       options: [...AVAILABLE_RENDERER_IDS],
     }),
-    "dev-port": Flags.integer({
+    "dev-port": portFlag({
       description:
         "Dev-server port; also the issuer origin registered with Zitadel. Defaults to the detected port. Use distinct ports to run several scaffolded apps side by side. In an app already set up, moves it to this port: the dev script, ZITADEL_ISSUER and the allowed origin.",
     }),
@@ -265,7 +356,7 @@ export default class Setup extends Destructive(BaseCommand) {
     // hidden so scripts and agents still passing it get a targeted error
     // pointing at `branding eject` instead of oclif's unknown-flag error.
     design: nonBlankString({ hidden: true }),
-    "password-min-length": nonBlankString({
+    "password-min-length": passwordMinLengthFlag({
       description:
         "Minimum password length for the project's password policy, for example 12; 0 sets none. Without it, setup sets 15, the NIST minimum for password-only sign-in; change it in .zitadel/policies/ later.",
     }),
@@ -293,71 +384,36 @@ export default class Setup extends Destructive(BaseCommand) {
     }),
   };
 
-  async run(): Promise<JsonEnvelope> {
-    const { flags } = await this.parse(Setup);
-    // Before toMeta and before anything touches the server or the disk.
-    if (flags.design !== undefined) {
-      throw setupDesignRemovedError(this.config.version);
-    }
-    // The command line's own mistakes come before anything that can fail for
-    // another reason, so a slug the server would refuse is named even when the
-    // server is down. A custom connection whose settings the wizard will ask for
-    // is checked once they are all there.
-    const customValues = customFlagValues(flags, SETUP_FLAG_KEYS);
-    const settingsGiven =
-      customValues.slug !== undefined &&
-      customValues.displayName !== undefined &&
-      customValues.issuer !== undefined;
-    // A run with no terminal, or asked for JSON, has nobody to ask for what is
-    // missing, so it is held to the full description.
-    const scripted = Boolean(
-      flags["non-interactive"] || this.jsonEnabled() || !process.stdin.isTTY,
-    );
-    if (flags.sso === CUSTOM_PROVIDER) {
-      checkGivenCustomFlags(customValues, SETUP_FLAG_NAMES);
-    }
-    if (flags.sso !== undefined && (flags.sso !== CUSTOM_PROVIDER || settingsGiven || scripted)) {
-      selectionFromFlags(flags.sso, customValues, SETUP_FLAG_NAMES, SSO_CUSTOM_EXAMPLE);
-    }
-    try {
-      await this.toMeta(flags);
-    } catch (error) {
-      throw localSetupHint(error, retryOptionsFromFlags(flags), this.config.version);
-    }
-    const { cwd, nonInteractive, dryRun, force } = this.meta;
-    // A `--cwd` that does not exist yet is the new app's directory, created
-    // with the app; one that is a file is a mistake to name before any read.
-    await assertDirectoryOrMissing(cwd);
+  static override rules = SETUP_RULES;
 
-    if (await hasZitadelConfig(cwd)) {
+  static override requires = {
+    directory: setupDirectory,
+    target: setupProject,
+    readiness: setupReadiness,
+  };
+
+  protected override async toMeta(
+    flags: Record<string, unknown>,
+    options: MetaOptions = {},
+  ): Promise<GlobalOptions> {
+    checkSsoFlags(flags, this.jsonEnabled());
+    try {
+      return await super.toMeta(flags, options);
+    } catch (error) {
+      throw localSetupHint(error, retryOptionsOf(flags), this.config.version);
+    }
+  }
+
+  protected async execute({ flags, target }: Admitted<typeof Setup>): Promise<JsonEnvelope> {
+    const { cwd, nonInteractive, dryRun, force } = this.meta;
+    if (target.configured) {
       // An app already set up has nothing left to scaffold, but an explicit
       // --dev-port is how it moves to another port.
       if (flags["dev-port"] !== undefined) {
-        return this.moveToDevPort(cwd, flags.cwd, assertDevPort(flags["dev-port"]), dryRun);
+        return this.moveToDevPort(cwd, flags.cwd, flags["dev-port"], dryRun);
       }
       return this.emit({ status: "skipped", reason: "already-initialized" });
     }
-    if (await hasZitadelSecret(cwd)) {
-      throw new ZitadelError("E_CONFLICT", ".zitadel/secret exists without zitadel.json", {
-        hint: "Move the secret aside or restore zitadel.json before running setup.",
-      });
-    }
-    // Before anything is written: setup commits what it writes, and it can
-    // only tell its own files from the developer's when the tree starts clean.
-    // A dirty repository is refused here, where nothing has happened yet.
-    // A dry run too: the check only reads, and previewing success on a
-    // repository the real run would refuse is a worse lie than refusing early.
-    if (flags.git !== false) {
-      await assertCleanWorktree(cwd);
-    }
-    // Before anything is detected, created or written: a server another CLI
-    // release left running fails setup halfway, after the project exists.
-    await assertLocalServerVersion(
-      cwd,
-      this.meta.source,
-      retryOptionsFromFlags(flags),
-      this.config.version,
-    );
 
     // Resolved before anything is detected, created or written: an
     // inconsistent set of --sso flags is a mistake in the command line, and
@@ -429,15 +485,9 @@ export default class Setup extends Destructive(BaseCommand) {
       preset: flags.preset ?? DEFAULT_SETUP_PRESET,
       use_case: flags["use-case"] ?? DEFAULT_SETUP_USE_CASE,
       sso: flags.sso ?? "none",
-      // Read from the raw flag: it is parsed below, so a bad value fails after
-      // this step is recorded, like the other flags'. 0 sets none, and no
-      // flag the recommended minimum.
-      password_policy: setsMinLength(flags["password-min-length"]) ? "set" : "empty",
+      password_policy: flags["password-min-length"] === null ? "empty" : "set",
       step: "framework_resolved",
     });
-    // Read once: a bad value is refused here, before anything is created.
-    const passwordMinLengthFlag = passwordMinLengthFromFlag(flags["password-min-length"]);
-
     // An explicit --dev-port overrides the detected port for the whole run, so
     // the issuer and the registered origin track the requested port (and several
     // apps can be scaffolded on distinct ports). The config edits set the
@@ -445,7 +495,7 @@ export default class Setup extends Destructive(BaseCommand) {
     // different port in vite.config.*/angular.json keeps it — pass --dev-port to
     // match that pin (or remove it) if the origin check rejects requests.
     if (flags["dev-port"] !== undefined) {
-      app = { ...app, devPort: assertDevPort(flags["dev-port"]) };
+      app = { ...app, devPort: flags["dev-port"] };
     }
 
     const defaultAnswers: SetupAnswers = {
@@ -454,7 +504,7 @@ export default class Setup extends Destructive(BaseCommand) {
       preset: (flags.preset as SetupPreset | undefined) ?? DEFAULT_SETUP_PRESET,
       useCase: (flags["use-case"] as SetupUseCase | undefined) ?? DEFAULT_SETUP_USE_CASE,
       sso: ssoFromCommandLine === undefined ? [] : [ssoFromCommandLine],
-      passwordMinLength: passwordMinLengthFlag,
+      passwordMinLength: flags["password-min-length"],
     };
 
     const asks = !nonInteractive && !dryRun;
@@ -1525,17 +1575,6 @@ export async function ssoFromFlags(
 ): Promise<SsoDraft | undefined> {
   const customValues = customFlagValues(flags, SETUP_FLAG_KEYS);
   if (flags.sso === undefined) {
-    if (flags["sso-client-id"] !== undefined) {
-      throw new ZitadelError("E_VALIDATION", "--sso-client-id needs --sso", {
-        hint: "Name the provider with --sso, e.g. --sso google.",
-      });
-    }
-    const given = givenCustomFlags(customValues, SETUP_FLAG_NAMES);
-    if (given.length > 0) {
-      throw new ZitadelError("E_VALIDATION", `${given.join(", ")} needs --sso ${CUSTOM_PROVIDER}`, {
-        hint: `Name the provider with --sso ${CUSTOM_PROVIDER}.`,
-      });
-    }
     return undefined;
   }
   // Described before the credentials are asked for, and before a Project is
@@ -1711,18 +1750,6 @@ const isKnownSsoName = (name: string): boolean =>
  * resolves answers. `--non-interactive` is echoed only when explicitly passed
  * — TTY/JSON-inferred non-interactivity re-infers itself on the retry.
  */
-/**
- * The `--password-min-length` a retry carries: the value it means, or nothing
- * for one the parser refuses, which a retry would only be refused for again.
- */
-function retryMinLength(value: string | undefined): PasswordMinLength | undefined {
-  if (value === undefined) {
-    return undefined;
-  }
-  const parsed = parsePasswordMinLength(value);
-  return parsed.ok ? parsed.value : undefined;
-}
-
 export function retryOptionsFromFlags(flags: {
   cwd?: string;
   framework?: string;
@@ -1731,7 +1758,7 @@ export function retryOptionsFromFlags(flags: {
   renderer?: string;
   "dev-port"?: number;
   "non-interactive"?: boolean;
-  "password-min-length"?: string;
+  "password-min-length"?: PasswordMinLength;
   sso?: string;
   "sso-client-id"?: string;
   "sso-slug"?: string;
@@ -1779,7 +1806,7 @@ export function retryOptionsFromFlags(flags: {
     renderer: flags.renderer,
     devPort: flags["dev-port"],
     nonInteractive: Boolean(flags["non-interactive"]),
-    passwordMinLength: retryMinLength(flags["password-min-length"]),
+    passwordMinLength: flags["password-min-length"],
     // The provider survives on its own. A suggested retry carries `--sso`
     // without `--sso-client-id` -- the id is never put in command text -- so
     // requiring both here would drop the provider from the next suggestion if
@@ -1905,17 +1932,6 @@ async function createProjectWithLocalHint(
       },
     });
   }
-}
-
-/** `--dev-port`, refused unless it is a TCP port. */
-function assertDevPort(devPort: number): number {
-  if (!Number.isInteger(devPort) || devPort < 1 || devPort > 65535) {
-    throw new ZitadelError(
-      "E_VALIDATION",
-      `--dev-port must be an integer in 1..65535, got ${devPort}`,
-    );
-  }
-  return devPort;
 }
 
 function defaultProjectName(cwd: string, framework: string): string {
@@ -2056,34 +2072,6 @@ export function portInUseWarning(
   return free === undefined
     ? `Port ${port} and the ports after it are already in use. If that is not this app's dev server, run setup with --dev-port and a free port.`
     : `Port ${port} is already in use. If that is not this app's dev server, run setup with a free port: ${suggest(`setup --dev-port ${free}`)}`;
-}
-
-/**
- * Whether `--password-min-length` leaves a minimum in the policy: a value, or
- * no flag, which means the recommended one; not none, or a value the parser
- * refuses (setup fails on that just after).
- */
-function setsMinLength(value: string | undefined): boolean {
-  if (value === undefined) {
-    return true;
-  }
-  const parsed = parsePasswordMinLength(value);
-  return parsed.ok && typeof parsed.value === "number";
-}
-
-/**
- * `--password-min-length`, read with the prompt's parser so the two cannot
- * disagree. Refused before anything is created.
- */
-function passwordMinLengthFromFlag(value: string | undefined): PasswordMinLength | undefined {
-  if (value === undefined) {
-    return undefined;
-  }
-  const parsed = parsePasswordMinLength(value);
-  if (!parsed.ok) {
-    throw new ZitadelError("E_VALIDATION", `--password-min-length: ${parsed.problem}`);
-  }
-  return parsed.value;
 }
 
 /**

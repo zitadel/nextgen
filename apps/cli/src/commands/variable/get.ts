@@ -1,14 +1,15 @@
 import { Flags } from "@oclif/core";
 
 import { ZitadelError } from "../../lib/errors";
-import { CommandGroups, EnvironmentCommand, type JsonEnvelope, nonBlankArg } from "../../lib/oclif";
-import { Tabulatable } from "../../lib/oclif/tabulatable";
 import {
-  assertVariableName,
-  toVariableRow,
-  variableCells,
-  variableReadScope,
-} from "../../lib/variables";
+  type Admitted,
+  CommandGroups,
+  EnvironmentCommand,
+  type JsonEnvelope,
+} from "../../lib/oclif";
+import { variableNameArg } from "../../lib/oclif/inputs/variables";
+import { Tabulatable } from "../../lib/oclif/tabulatable";
+import { toVariableRow, variableCells, variableReadScope } from "../../lib/variables";
 
 /**
  * `zitadel variable get NAME` — read one variable by name from the project.
@@ -27,7 +28,7 @@ export default class VariableGet extends Tabulatable(EnvironmentCommand) {
     "<%= config.bin %> variable get GOOGLE_CLIENT_ID --json",
   ];
   static override args = {
-    name: nonBlankArg({ required: true, description: "Variable name to read." }),
+    name: variableNameArg({ required: true, description: "Variable name to read." }),
   };
   static override flags = {
     preview: Flags.boolean({
@@ -36,12 +37,8 @@ export default class VariableGet extends Tabulatable(EnvironmentCommand) {
     }),
   };
 
-  async run(): Promise<JsonEnvelope> {
-    const { args, flags } = await this.parse(VariableGet);
-    await this.toMeta(flags);
+  protected async execute({ args, flags }: Admitted<typeof VariableGet>): Promise<JsonEnvelope> {
     const name = args.name;
-
-    assertVariableName(name);
     const { client, projectId } = await this.connect();
     const scope = variableReadScope(projectId, flags.preview);
 

@@ -1,7 +1,12 @@
 import { Flags } from "@oclif/core";
 
 import { readBoundEnvironments } from "../../lib/environment";
-import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../../lib/oclif";
+import {
+  type Admitted,
+  CommandGroups,
+  EnvironmentCommand,
+  type JsonEnvelope,
+} from "../../lib/oclif";
 import { Tabulatable } from "../../lib/oclif/tabulatable";
 import { listData } from "../../lib/oclif/envelope";
 
@@ -25,9 +30,8 @@ export default class EnvList extends Tabulatable(EnvironmentCommand) {
     }),
   };
 
-  async run(): Promise<JsonEnvelope> {
-    const { flags } = await this.parse(EnvList);
-    const { cwd, env } = await this.toMeta(flags);
+  protected async execute({ flags }: Admitted<typeof EnvList>): Promise<JsonEnvelope> {
+    const { cwd, env } = this.meta;
     const { name, values } = this.environment;
 
     const bound = await readBoundEnvironments(cwd);

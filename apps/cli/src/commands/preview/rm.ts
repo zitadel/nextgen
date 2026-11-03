@@ -1,6 +1,7 @@
 import { Flags } from "@oclif/core";
 
-import { CommandGroups, type JsonEnvelope, nonBlankArg, PreviewCommand } from "../../lib/oclif";
+import { type Admitted, CommandGroups, type JsonEnvelope, PreviewCommand } from "../../lib/oclif";
+import { previewUrlArg } from "../../lib/oclif/inputs/preview";
 import { dryRunResult } from "../../lib/oclif/crud/shared";
 import { deletedData } from "../../lib/oclif/envelope";
 import { Destructive, Settled } from "../../lib/oclif/destructive";
@@ -20,7 +21,7 @@ export default class PreviewRm extends Destructive(PreviewCommand) {
     "<%= config.bin %> preview rm https://acme-git-sso-acmeinc.vercel.app --force",
   ];
   static override args = {
-    url: nonBlankArg({ required: true, description: "The preview URL to remove." }),
+    url: previewUrlArg({ required: true, description: "The preview URL to remove." }),
   };
   static override flags = {
     // `--force` is per command, not global: here it permits a removal.
@@ -31,12 +32,8 @@ export default class PreviewRm extends Destructive(PreviewCommand) {
     }),
   };
 
-  async run(): Promise<JsonEnvelope> {
-    const { args, flags } = await this.parse(PreviewRm);
-    await this.toMeta(flags);
-    // An origin has no path, so a trailing slash is the same URL; sent as
-    // typed it would remove nothing and still answer 204.
-    const url = args.url.replace(/\/+$/, "");
+  protected async execute({ args }: Admitted<typeof PreviewRm>): Promise<JsonEnvelope> {
+    const url = args.url;
 
     return this.emit(
       await this.confirmed({

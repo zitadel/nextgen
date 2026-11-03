@@ -12,11 +12,16 @@ import {
 } from "../../lib/api/operations";
 import { buildRequest, pathValuesOf, readInput, urlOf } from "../../lib/api/request";
 import { ZitadelError } from "../../lib/errors";
-import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../../lib/oclif";
+import {
+  type Admitted,
+  BaseCommand,
+  CommandGroups,
+  type JsonEnvelope,
+  nonBlankString,
+} from "../../lib/oclif";
+import { httpMethodFlag } from "../../lib/oclif/inputs/api";
 import { readZitadelSecret } from "../../lib/project";
 import { Destructive } from "../../lib/oclif/destructive";
-
-const METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"] as const;
 
 /**
  * `zitadel api` — call any operation of the Zitadel API with the server and
@@ -51,18 +56,9 @@ export default class Api extends Destructive(BaseCommand) {
     }),
   };
   static override flags = {
-    method: Flags.string({
+    method: httpMethodFlag({
       char: "X",
       description: "The HTTP method, to choose among a path's operations.",
-      helpValue: METHODS.join("|"),
-      // In any case, as curl takes it: oclif's `options` would refuse `-X delete`.
-      parse: async (input) => {
-        const method = input.toUpperCase();
-        if (!(METHODS as readonly string[]).includes(method)) {
-          throw new ZitadelError("E_VALIDATION", `-X ${input} is not one of ${METHODS.join(", ")}`);
-        }
-        return method;
-      },
     }),
     field: Flags.string({
       char: "F",
@@ -85,9 +81,9 @@ export default class Api extends Destructive(BaseCommand) {
     }),
   };
 
-  async run(): Promise<JsonEnvelope> {
-    const { args, argv, flags } = await this.parse(Api);
-    const meta = await this.toMeta(flags);
+  protected async execute({ args, flags }: Admitted<typeof Api>): Promise<JsonEnvelope> {
+    const meta = this.meta;
+    const { argv } = await this.parse(Api);
 
     const ref = args.operation ?? (await this.chooseOperation());
     const target = resolveTarget(ref, flags.method);

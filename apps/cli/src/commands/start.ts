@@ -1,25 +1,29 @@
 import { Flags } from "@oclif/core";
 
-import { ZitadelError } from "../lib/errors";
 import { serverLogAction } from "../lib/journey-guidance";
 import { ensureLocalAdmin } from "../lib/local-server/admin-credential";
 import { EMPTY_SUMMARY, loadProjectEnv } from "../lib/local-server/env-vars";
+import { localPort } from "../lib/oclif/requires/local-server";
 import {
-  DEFAULT_LOCAL_SERVER_PORT,
   PLATFORM_PROJECT_ID,
   defaultLocalServerImageForCliVersion,
   ensureLocalState,
   localContainerName,
   localServerUrl,
-  peekRuntimeMetadata,
-  type RuntimeBackend,
   resolveRuntimeBackend,
   type RuntimeMetadata,
 } from "../lib/local-server/runtime";
 import { LocalServer } from "../lib/local-server/server";
-import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../lib/oclif";
+import {
+  type Admitted,
+  BaseCommand,
+  CommandGroups,
+  type JsonEnvelope,
+  nonBlankString,
+  portFlag,
+  refuses,
+} from "../lib/oclif";
 import type { NextSteps } from "../lib/oclif/next-steps";
-import { resolveCwd } from "../lib/paths";
 import type { SuggestedCommand } from "../lib/suggestion";
 
 export default class Start extends BaseCommand {
@@ -28,7 +32,7 @@ export default class Start extends BaseCommand {
   static override groupOrder = 2;
   static override flags = {
     image: nonBlankString({ description: "Container image to run." }),
-    port: Flags.integer({
+    port: portFlag({
       description:
         "Local HTTP port. By default this directory keeps the port it had, or takes the first free one from 8080.",
     }),
@@ -38,25 +42,29 @@ export default class Start extends BaseCommand {
     }),
   };
 
-  async run(): Promise<JsonEnvelope> {
-    const { flags } = await this.parse(Start);
-    const requestedPort = flags.port;
-    // Where the server will be, as far as is known before one is chosen: the
-    // port asked for, else the one this directory already has.
-    const recorded = await peekRuntimeMetadata(
-      resolveCwd(typeof flags.cwd === "string" ? flags.cwd : undefined),
-    );
-    const port = requestedPort ?? recorded?.port ?? DEFAULT_LOCAL_SERVER_PORT;
-    const serverUrl = localServerUrl(port);
-    await this.toMeta(flags, { resolveServer: false, source: serverUrl });
+  static override meta = {
+    resolveServer: false,
+  };
 
-    validatePort(port);
+  static override rules = [
+    refuses((view) => view.flags.runtime === "binary" && view.flags.image !== undefined, {
+      message: "--image requires --runtime docker",
+      hint: "Use `zitadel start --runtime docker --image <tag>`, or omit --image for the npm binary runtime.",
+    }),
+  ];
+
+  static override requires = {
+    port: localPort,
+  };
+
+  protected async execute({ flags, port }: Admitted<typeof Start>): Promise<JsonEnvelope> {
+    const requestedPort = flags.port;
+    const serverUrl = localServerUrl(port);
     const runtimeBackend = resolveRuntimeBackend({
       image: flags.image,
       runtime: flags.runtime,
       envImage: this.meta.env.ZITADEL_LOCAL_IMAGE,
     });
-    assertRuntimeFlags(runtimeBackend, flags.image);
     this.recordTelemetry({ runtime: runtimeBackend });
     const image =
       flags.image ??
@@ -185,20 +193,4 @@ function readyNext(
     ],
     commands: [setupCommand],
   };
-}
-
-function validatePort(port: number): void {
-  if (!Number.isInteger(port) || port < 1 || port > 65_535) {
-    throw new ZitadelError("E_VALIDATION", `Invalid port ${String(port)}`, {
-      hint: "Use a TCP port between 1 and 65535.",
-    });
-  }
-}
-
-function assertRuntimeFlags(runtime: RuntimeBackend, image: string | undefined): void {
-  if (runtime === "binary" && image) {
-    throw new ZitadelError("E_VALIDATION", "--image requires --runtime docker", {
-      hint: "Use `zitadel start --runtime docker --image <tag>`, or omit --image for the npm binary runtime.",
-    });
-  }
 }

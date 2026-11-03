@@ -1,3 +1,4 @@
+import { getClaimStatusQueryChallengeIdRegExp } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import type { BoxAction } from "./box";
 import { serverKind } from "./oclif/server-kind";
 import type { ZitadelSecret } from "./project";
@@ -200,4 +201,9 @@ export function claimWindowClosedAction(cliVersion: string, selector: Environmen
     `longer be claimed. ${publicCliCommand("setup", cliVersion)} in a fresh directory ` +
     "gets you a new project you can claim."
   );
+}
+
+/** Whether `value` has the shape the claim contract gives a `challenge_id`. */
+export function isChallengeId(value: string): boolean {
+  return getClaimStatusQueryChallengeIdRegExp.test(value);
 }

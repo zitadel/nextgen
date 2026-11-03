@@ -1,7 +1,13 @@
 import { Paging } from "@zitadel/api/runtime/paging";
 import { Flags } from "@oclif/core";
 
-import { CommandGroups, type JsonEnvelope, nonBlankString, PreviewCommand } from "../../lib/oclif";
+import {
+  type Admitted,
+  CommandGroups,
+  type JsonEnvelope,
+  nonBlankString,
+  PreviewCommand,
+} from "../../lib/oclif";
 import { Tabulatable } from "../../lib/oclif/tabulatable";
 import { listData } from "../../lib/oclif/envelope";
 import { pagedFunctions } from "../../lib/api-client";
@@ -47,9 +53,7 @@ export default class PreviewList extends Tabulatable(PreviewCommand) {
     }),
   };
 
-  async run(): Promise<JsonEnvelope> {
-    const { flags } = await this.parse(PreviewList);
-    await this.toMeta(flags);
+  protected async execute({ flags }: Admitted<typeof PreviewList>): Promise<JsonEnvelope> {
     const { client, projectId } = await this.connect();
 
     const params = {

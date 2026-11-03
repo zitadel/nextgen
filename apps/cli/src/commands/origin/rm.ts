@@ -1,6 +1,12 @@
 import { Flags } from "@oclif/core";
 
-import { CommandGroups, EnvironmentCommand, type JsonEnvelope, nonBlankArg } from "../../lib/oclif";
+import {
+  type Admitted,
+  CommandGroups,
+  EnvironmentCommand,
+  type JsonEnvelope,
+  nonBlankArg,
+} from "../../lib/oclif";
 import { dryRunResult } from "../../lib/oclif/crud/shared";
 import { deletedData } from "../../lib/oclif/envelope";
 import { reportWarning } from "../../lib/warnings";
@@ -32,9 +38,7 @@ export default class OriginRm extends Destructive(EnvironmentCommand) {
     }),
   };
 
-  async run(): Promise<JsonEnvelope> {
-    const { args, flags } = await this.parse(OriginRm);
-    await this.toMeta(flags);
+  protected async execute({ args }: Admitted<typeof OriginRm>): Promise<JsonEnvelope> {
     const pattern = args.pattern;
 
     return this.emit(

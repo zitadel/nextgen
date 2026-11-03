@@ -1,7 +1,7 @@
 import { Args, Flags } from "@oclif/core";
 
 import { type ApiOperation, findOperations, uncallable } from "../../lib/api/operations";
-import { BaseCommand, CommandGroups, type JsonEnvelope } from "../../lib/oclif";
+import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "../../lib/oclif";
 import { Tabulatable } from "../../lib/oclif/tabulatable";
 
 /** One operation as `api ls` lists it. */
@@ -45,9 +45,11 @@ export default class ApiLs extends Tabulatable(BaseCommand) {
     }),
   };
 
-  async run(): Promise<JsonEnvelope> {
-    const { args, flags } = await this.parse(ApiLs);
-    await this.toMeta(flags, { resolveServer: false });
+  static override meta = {
+    resolveServer: false,
+  };
+
+  protected async execute({ args, flags }: Admitted<typeof ApiLs>): Promise<JsonEnvelope> {
     const operations = findOperations({ filter: args.filter, tag: flags.tag }).map(entryOf);
 
     const columns = ["id", "method", "path", "summary"];

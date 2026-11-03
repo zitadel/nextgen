@@ -293,6 +293,14 @@ const helpGroupOf = (field: BodyField): string => {
   return `${(field.path[0] ?? "").replaceAll("_", " ").toUpperCase()} FIELD`;
 };
 
+/** A repeatable record flag: each entry is read as a `key=value` pair of the field. */
+const recordFlag = Flags.custom<readonly [string, unknown], Readonly<{ field: BodyField }>>({
+  parse: async (input, _command, flag) => {
+    const { field } = flag;
+    return parsePair(input, field.flag ?? field.name, unwrap(field.node)?.def?.valueType);
+  },
+});
+
 /** The oclif flag for one field. */
 const flagFor = (field: BodyField): Interfaces.FlagInput[string] => {
   // oclif orders help groups by their first flag alphabetically, so the
@@ -322,7 +330,7 @@ const flagFor = (field: BodyField): Interfaces.FlagInput[string] => {
     case "number":
       return numberFlag(common);
     case "record":
-      return Flags.string({ ...common, multiple: true });
+      return recordFlag({ ...common, multiple: true, field });
     case "list":
       return field.item === "integer"
         ? Flags.integer({ ...common, multiple: true })
@@ -351,17 +359,13 @@ export const bodyFromFlags = (fields: readonly BodyField[], flags: Json): Json |
     if (value === undefined || field.flag === undefined) {
       return body;
     }
-    return setAt(body ?? {}, field.path, field.kind === "record" ? recordOf(field, value) : value);
+    return setAt(body ?? {}, field.path, field.kind === "record" ? recordOf(value) : value);
   }, undefined);
 };
 
 /** The object a repeatable record flag's entries make. */
-const recordOf = (field: BodyField, value: unknown): Json => {
-  const values = unwrap(field.node)?.def?.valueType;
-  const entries = (Array.isArray(value) ? value : [value]).map((entry) =>
-    parsePair(String(entry), field.flag ?? field.name, values),
-  );
-  return Object.fromEntries(entries);
+const recordOf = (value: unknown): Json => {
+  return Object.fromEntries(Array.isArray(value) ? value : [value]);
 };
 
 /**

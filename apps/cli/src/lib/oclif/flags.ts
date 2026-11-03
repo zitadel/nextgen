@@ -1,6 +1,7 @@
 import { Args, Flags } from "@oclif/core";
 
 import { ZitadelError } from "../errors";
+import { interpolate, type Refusal } from "./refusal";
 
 /**
  * Refuse a value that is present but holds nothing.
@@ -47,4 +48,74 @@ export const nonBlankArg = Args.custom<string>({
   // An argument's failure carries no such prefix, so this one names itself.
   parse: async (input, _command, arg) =>
     refuseBlank(input, arg.name, `${arg.name} was given an empty value`),
+});
+
+/** The whole numbers an integer flag accepts, and how it refuses the rest. */
+export type IntegerRules = Readonly<{
+  min?: number;
+  max?: number;
+  refusal?: Refusal;
+}>;
+
+function integerHint(rules: IntegerRules): string {
+  if (rules.min !== undefined && rules.max !== undefined) {
+    return "Use a whole number from {min} to {max}.";
+  }
+  if (rules.min !== undefined) {
+    return "Use a whole number of {min} or more.";
+  }
+  if (rules.max !== undefined) {
+    return "Use a whole number of {max} or less.";
+  }
+  return "Use a whole number.";
+}
+
+function parseInteger(input: string, flag: IntegerRules & { name: string }): number {
+  const value = Number(input);
+  const inside =
+    /^-?\d+$/.test(input.trim()) &&
+    (flag.min === undefined || value >= flag.min) &&
+    (flag.max === undefined || value <= flag.max);
+  if (inside) {
+    return value;
+  }
+  const refusal = flag.refusal ?? {
+    message: "{value} is not a valid {flag}",
+    hint: integerHint(flag),
+  };
+  const values = {
+    value: input,
+    flag: `--${flag.name}`,
+    ...(flag.min === undefined ? {} : { min: flag.min }),
+    ...(flag.max === undefined ? {} : { max: flag.max }),
+  };
+  throw new ZitadelError("E_VALIDATION", interpolate(refusal.message, values), {
+    hint: refusal.hint === undefined ? undefined : interpolate(refusal.hint, values),
+    details: {
+      argument: values.flag,
+    },
+  });
+}
+
+/**
+ * An integer flag that refuses what is not a whole number within `min` and
+ * `max`, with `refusal` or the default wording. The refusal's placeholders are
+ * `{value}` as typed, `{flag}`, `{min}` and `{max}`.
+ */
+export const integerFlag = Flags.custom<number, IntegerRules>({
+  parse: async (input, _command, flag) => parseInteger(input, flag),
+});
+
+const PORT_RULES: IntegerRules = {
+  min: 1,
+  max: 65_535,
+  refusal: {
+    message: "{value} is not a TCP port",
+    hint: "Use a TCP port from {min} to {max}.",
+  },
+};
+
+/** An integer flag that holds a TCP port. */
+export const portFlag = Flags.custom<number>({
+  parse: async (input, _command, flag) => parseInteger(input, { ...PORT_RULES, name: flag.name }),
 });

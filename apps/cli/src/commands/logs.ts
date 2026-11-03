@@ -1,11 +1,16 @@
 import { Flags } from "@oclif/core";
 
-import { ZitadelError } from "../lib/errors";
-import { DEFAULT_LOCAL_SERVER_URL, readNearestRuntimeMetadata } from "../lib/local-server/runtime";
+import { localRuntimeStarted } from "../lib/oclif/requires/local-server";
 import { LocalServer } from "../lib/local-server/server";
 import { LOG_LEVELS, type LogLine, logText, renderLogLine } from "../lib/local-server/server-log";
-import { BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
-import { resolveCwd } from "../lib/paths";
+import {
+  type Admitted,
+  BaseCommand,
+  CommandGroups,
+  excludes,
+  integerFlag,
+  type JsonEnvelope,
+} from "../lib/oclif";
 
 export default class Logs extends BaseCommand {
   static override description =
@@ -24,47 +29,38 @@ export default class Logs extends BaseCommand {
       description: "Show only lines at this level or above.",
       options: [...LOG_LEVELS],
     }),
-    tail: Flags.integer({
+    tail: integerFlag({
       description: "Number of lines to show, counting only those --level shows.",
       default: 200,
+      min: 1,
+      refusal: {
+        message: "{value} is not a valid tail",
+        hint: "Use a positive integer.",
+      },
     }),
   };
 
-  async run(): Promise<JsonEnvelope> {
-    const { flags } = await this.parse(Logs);
-    // The server this directory uses: the one `zitadel start` ran in here or
-    // in the nearest parent, as `doctor` and `console` find it.
-    const nearest = await readNearestRuntimeMetadata(
-      resolveCwd(typeof flags.cwd === "string" ? flags.cwd : undefined),
-    );
-    await this.toMeta(flags, {
-      resolveServer: false,
-      source: nearest?.runtime.server_url ?? DEFAULT_LOCAL_SERVER_URL,
-    });
+  static override meta = {
+    resolveServer: false,
+  };
 
-    if (!nearest) {
-      throw new ZitadelError("E_VALIDATION", "Local Zitadel runtime has not been started", {
-        hint: "Run `zitadel start` first.",
-        nextCommands: [this.suggestUnscoped("start")],
-      });
-    }
+  static override rules = [
+    excludes("follow", "json", {
+      message: "Cannot stream logs with --json",
+      hint: "Run without --json, or omit --follow.",
+    }),
+  ];
 
-    const tail = flags.tail ?? 200;
-    if (!Number.isInteger(tail) || tail < 1) {
-      throw new ZitadelError("E_VALIDATION", `Invalid tail value ${String(tail)}`, {
-        hint: "Use a positive integer.",
-      });
-    }
+  static override requires = {
+    started: localRuntimeStarted,
+  };
 
+  protected async execute({ flags, started }: Admitted<typeof Logs>): Promise<JsonEnvelope> {
+    const { tail } = flags;
     const level = LOG_LEVELS.find((name) => name === flags.level);
     const color = colorsLines(flags.color, this.meta.env, Boolean(process.stdout.isTTY));
-    const server = LocalServer.at(nearest.dir, { cliVersion: this.meta.cliVersion });
+    const server = LocalServer.at(started.dir, { cliVersion: this.meta.cliVersion });
     if (flags.follow) {
-      if (this.jsonEnabled()) {
-        throw new ZitadelError("E_VALIDATION", "Cannot stream logs with --json", {
-          hint: "Run without --json, or omit --follow.",
-        });
-      }
       await server.followLogs({
         tail,
         level,

@@ -1,13 +1,9 @@
 import { Flags } from "@oclif/core";
 
-import {
-  DEFAULT_LOCAL_SERVER_URL,
-  localContainerName,
-  readRuntimeMetadata,
-} from "../lib/local-server/runtime";
+import { localContainerName } from "../lib/local-server/runtime";
 import { LocalServer } from "../lib/local-server/server";
-import { BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
-import { resolveCwd } from "../lib/paths";
+import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
+import { recordedRuntime } from "../lib/oclif/requires/local-runtime";
 
 export default class Stop extends BaseCommand {
   static override description = "Stop the local Zitadel server.";
@@ -19,14 +15,16 @@ export default class Stop extends BaseCommand {
     }),
   };
 
-  async run(): Promise<JsonEnvelope> {
-    const { flags } = await this.parse(Stop);
-    const cwd = resolveCwd(typeof flags.cwd === "string" ? flags.cwd : undefined);
-    const runtime = await readRuntimeMetadata(cwd);
-    await this.toMeta(flags, {
-      resolveServer: false,
-      source: runtime?.server_url ?? DEFAULT_LOCAL_SERVER_URL,
-    });
+  static override meta = {
+    resolveServer: false,
+  };
+
+  static override requires = {
+    recorded: recordedRuntime,
+  };
+
+  protected async execute({ flags, recorded }: Admitted<typeof Stop>): Promise<JsonEnvelope> {
+    const { runtime } = recorded;
 
     if (flags.all) {
       return this.stopAllManagedRuntimes();

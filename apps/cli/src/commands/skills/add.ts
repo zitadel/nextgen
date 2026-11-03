@@ -19,11 +19,11 @@ export default class SkillsAdd extends BaseCommand {
     "<%= config.bin %> <%= command.id %> --cwd my-app",
   ];
 
-  async run(): Promise<JsonEnvelope> {
-    const { flags } = await this.parse(SkillsAdd);
-    // The skills are in the package: nothing to ask a server.
-    await this.toMeta(flags, { resolveServer: false });
+  static override meta = {
+    resolveServer: false,
+  };
 
+  protected async execute(): Promise<JsonEnvelope> {
     const skills = await bundledSkills(this.config.root);
     const dirs = await skillDirs(this.meta.cwd);
     if (!this.meta.dryRun) {

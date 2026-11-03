@@ -2,6 +2,7 @@ import { Paging } from "@zitadel/api/runtime/paging";
 import { Flags } from "@oclif/core";
 
 import {
+  type Admitted,
   CommandGroups,
   EnvironmentCommand,
   type JsonEnvelope,
@@ -55,9 +56,7 @@ export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
     }),
   };
 
-  async run(): Promise<JsonEnvelope> {
-    const { flags } = await this.parse(DeploymentList);
-    await this.toMeta(flags);
+  protected async execute({ flags }: Admitted<typeof DeploymentList>): Promise<JsonEnvelope> {
     const { client, projectId } = await this.connect();
 
     const params = {

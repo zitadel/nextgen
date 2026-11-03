@@ -1,11 +1,18 @@
 import { Args, Flags } from "@oclif/core";
 import { ApiError } from "@zitadel/api/runtime/fetch";
 
-import { CommandGroups, EnvironmentCommand, type JsonEnvelope, nonBlankArg } from "../../lib/oclif";
+import {
+  type Admitted,
+  CommandGroups,
+  EnvironmentCommand,
+  excludes,
+  type JsonEnvelope,
+  refuses,
+} from "../../lib/oclif";
+import { variableNameArg } from "../../lib/oclif/inputs/variables";
 import { dryRunResult } from "../../lib/oclif/crud/shared";
 import { ZitadelError } from "../../lib/errors";
 import {
-  assertVariableName,
   parseVariableValue,
   toVariableRow,
   VARIABLE_TYPES,
@@ -46,12 +53,12 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
     "<%= config.bin %> variable set API_URL https://preview.acme.com --preview",
   ];
   static override args = {
-    name: nonBlankArg({
+    name: variableNameArg({
       required: true,
       description: "Variable name (letters, digits and underscores).",
     }),
     // A plain value may be given here; an empty string is a value the scalar
-    // schema accepts, so this is not `nonBlankArg`. A secret refuses it below.
+    // schema accepts, so this is not `nonBlankArg`. A secret refuses it.
     // `ignoreStdin` keeps oclif from folding piped input into this arg — a
     // secret and a scripted plain value both arrive on stdin, which this command
     // reads itself through `input`.
@@ -77,29 +84,33 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
     }),
   };
 
-  async run(): Promise<JsonEnvelope> {
-    const { args, flags } = await this.parse(VariableSet);
-    await this.toMeta(flags);
+  static override rules = [
+    refuses((view) => view.flags.secret === true && view.flags.as !== "string", {
+      message: "A secret is stored as a string.",
+      hint: "Drop --as, or drop --secret for a non-credential number or boolean.",
+    }),
+    excludes("secret", "value", {
+      message: "A secret value is not given on the command line.",
+      hint: "Drop the value and pipe it in, or let the prompt ask for it.",
+    }),
+    refuses(
+      (view) => {
+        const { value } = view.args;
+        return (
+          typeof value === "string" && !parseVariableValue(value, view.flags.as as VariableType).ok
+        );
+      },
+      {
+        message: '"{value}" is not a valid {as} value.',
+        hint: "A boolean variable is exactly `true` or `false`, and a number is a JSON number such as 5, -1.5 or 1e3. Pass --as string to keep it as text.",
+      },
+    ),
+  ];
+
+  protected async execute({ args, flags }: Admitted<typeof VariableSet>): Promise<JsonEnvelope> {
     const { dryRun } = this.meta;
     const name = args.name;
     const type = flags.as as VariableType;
-
-    assertVariableName(name);
-    // A credential is a string: a numeric-looking key stored as a number could
-    // lose digits, and one stored as a boolean is meaningless. Refused before
-    // anything is asked for, so no secret is typed only to be turned away.
-    if (flags.secret && type !== "string") {
-      throw new ZitadelError("E_VALIDATION", "A secret is stored as a string.", {
-        hint: "Drop --as, or drop --secret for a non-credential number or boolean.",
-      });
-    }
-    // A secret never comes from the command line: it would land in shell history
-    // and a process listing. It is prompted for or piped instead.
-    if (flags.secret && args.value !== undefined) {
-      throw new ZitadelError("E_VALIDATION", "A secret value is not given on the command line.", {
-        hint: "Drop the value and pipe it in, or let the prompt ask for it.",
-      });
-    }
 
     const { client, projectId } = await this.connect();
     const scope = variableScope(projectId, flags.preview);
@@ -143,12 +154,6 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
     }
 
     if (dryRun) {
-      // A value given on the command line is checked as the real run checks
-      // it, so a preview never reports a write the run would refuse.
-      const given = args.value === undefined ? undefined : parseVariableValue(args.value, type);
-      if (given !== undefined && !given.ok) {
-        throw new ZitadelError("E_VALIDATION", given.problem);
-      }
       // The resource commands' dry-run contract, plus what this write would
       // store. Never the value: it may be a credential.
       const preview = dryRunResult("set", "variable", name);

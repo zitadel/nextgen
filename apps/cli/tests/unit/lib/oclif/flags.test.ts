@@ -1,4 +1,10 @@
+import { Config } from "@oclif/core";
 import { describe, expect, it } from "vitest";
+
+import { BaseCommand } from "../../../../src/lib/oclif/base";
+import { integerFlag, portFlag } from "../../../../src/lib/oclif/flags";
+import type { JsonEnvelope } from "../../../../src/lib/oclif/types";
+import { cliPackageRoot } from "../../../helpers/oclif-build";
 
 import { parseJson, runCliForTest } from "../../../helpers/run-cli";
 
@@ -76,5 +82,85 @@ describe("an argument that must not be blank", () => {
 
     const json = parseJson(result.stdout) as { message: string };
     expect(json.message).not.toMatch(/empty value|Invalid variable name/);
+  });
+});
+
+class Numbers extends BaseCommand {
+  static override meta = {
+    resolveServer: false,
+  };
+
+  static override flags = {
+    port: portFlag(),
+    tail: integerFlag({
+      min: 1,
+    }),
+    level: integerFlag({
+      min: 1,
+      max: 5,
+      refusal: {
+        message: "{value} is not a level",
+        hint: "Pick {min} to {max} for {flag}.",
+      },
+    }),
+  };
+
+  public received: Record<string, unknown> = {};
+
+  protected async execute(input: { flags: Record<string, unknown> }): Promise<JsonEnvelope> {
+    this.received = input.flags;
+    return this.emit({
+      status: "ok",
+      data: {},
+    });
+  }
+}
+
+const config = await Config.load(cliPackageRoot);
+
+async function parse(...argv: string[]): Promise<Record<string, unknown>> {
+  const command = new Numbers(["--no-telemetry", ...argv], config);
+  await command.run();
+  return command.received;
+}
+
+describe("a port flag", () => {
+  it("passes a port through as a number", async () => {
+    expect((await parse("--port", "8080")).port).toBe(8080);
+  });
+
+  it.each(["0", "65536", "-1", "80.5", "http", ""])("refuses %j", async (value) => {
+    await expect(parse("--port", value)).rejects.toMatchObject({
+      code: "E_VALIDATION",
+      message: expect.stringContaining(`${value} is not a TCP port`),
+      hint: "Use a TCP port from 1 to 65535.",
+    });
+  });
+});
+
+describe("an integer flag", () => {
+  it("refuses a value under its minimum, with the default wording", async () => {
+    await expect(parse("--tail", "0")).rejects.toMatchObject({
+      code: "E_VALIDATION",
+      message: expect.stringContaining("0 is not a valid --tail"),
+      hint: "Use a whole number of 1 or more.",
+    });
+  });
+
+  it("refuses what is not a whole number", async () => {
+    await expect(parse("--tail", "1.5")).rejects.toMatchObject({
+      code: "E_VALIDATION",
+    });
+  });
+
+  it("words its refusal as it is told, filling the placeholders", async () => {
+    await expect(parse("--level", "9")).rejects.toMatchObject({
+      message: expect.stringContaining("9 is not a level"),
+      hint: "Pick 1 to 5 for --level.",
+    });
+  });
+
+  it("accepts a value on its bounds", async () => {
+    expect((await parse("--level", "5")).level).toBe(5);
   });
 });

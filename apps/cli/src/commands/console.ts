@@ -2,13 +2,11 @@ import { Flags } from "@oclif/core";
 import consola from "consola";
 
 import { openInBrowser } from "../lib/browser";
-import { ZitadelError } from "../lib/errors";
-import { findLocalAdminDir, readLocalAdmin } from "../lib/local-server/admin-credential";
 import { consoleSignInUrl } from "../lib/local-server/sign-in";
-import { DEFAULT_LOCAL_SERVER_URL, readRuntimeMetadata } from "../lib/local-server/runtime";
+import { DEFAULT_LOCAL_SERVER_URL } from "../lib/local-server/runtime";
 import { LocalServer } from "../lib/local-server/server";
-import { BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
-import { resolveCwd } from "../lib/paths";
+import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
+import { localAdmin } from "../lib/oclif/requires/local-admin";
 
 /**
  * `zitadel console` — open the local console signed in as the local
@@ -32,25 +30,17 @@ export default class Console extends BaseCommand {
     }),
   };
 
-  async run(): Promise<JsonEnvelope> {
-    const { flags } = await this.parse(Console);
-    const cwd = resolveCwd(typeof flags.cwd === "string" ? flags.cwd : undefined);
-    // `start` may have run in a parent of the app directory; its runtime
-    // metadata sits beside the admin it created.
-    const localDir = (await findLocalAdminDir(cwd)) ?? cwd;
-    const runtime = await readRuntimeMetadata(localDir);
-    await this.toMeta(flags, {
-      resolveServer: false,
-      source: runtime?.server_url ?? DEFAULT_LOCAL_SERVER_URL,
-    });
+  static override meta = {
+    resolveServer: false,
+    source: DEFAULT_LOCAL_SERVER_URL,
+  };
 
-    const admin = await readLocalAdmin(localDir);
-    if (!admin) {
-      throw new ZitadelError("E_VALIDATION", "No local admin in this directory or its parents", {
-        hint: "Run this from the directory `zitadel start` ran in, or one inside it. If the server was never started, run `zitadel start` first; it creates the local admin the console signs in as.",
-        nextCommands: [this.suggestUnscoped("start")],
-      });
-    }
+  static override requires = {
+    local: localAdmin,
+  };
+
+  protected async execute({ flags, local }: Admitted<typeof Console>): Promise<JsonEnvelope> {
+    const { admin, dir: localDir } = local;
 
     // A link is minted by running the real login flow, which burns a one-time
     // handoff token on the server — a mutation, so a dry run only reports who

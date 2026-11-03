@@ -15,11 +15,18 @@ import {
 import { BRANDING_FILE_SCHEMA_REF, META_SCHEMA_DIR } from "@zitadel/config/meta-schemas";
 
 import { BRANDING_DIR } from "../../lib/branding";
-import { BRANDING_DESIGN_INFO, resolveBrandingDesign } from "../../lib/branding/designs";
+import { BRANDING_DESIGN_INFO } from "../../lib/branding/designs";
 import { isErrno, ZitadelError } from "../../lib/errors";
 import { stableStringify } from "../../lib/json";
-import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../../lib/oclif";
-import { hasZitadelConfig } from "../../lib/project";
+import {
+  type Admitted,
+  BaseCommand,
+  CommandGroups,
+  type JsonEnvelope,
+  nonBlankString,
+} from "../../lib/oclif";
+import { brandingDesignRules, requestedBrandingDesign } from "../../lib/oclif/inputs/branding";
+import { zitadelProject } from "../../lib/oclif/requires/zitadel-project";
 import { metaSchemaState, projectMetaSchemas } from "../../lib/meta-schemas";
 import { normalizePublicCliProse } from "../../lib/public-cli";
 import { DEPLOY_ARGS } from "../../lib/release";
@@ -44,30 +51,28 @@ export default class BrandingEject extends Promptable(BaseCommand) {
   static override flags = {
     force: Flags.boolean({ char: "f", description: "Overwrite an existing branding file." }),
     // No oclif `options`: the retired designs (#1039) must reach
-    // resolveBrandingDesign to get their targeted error instead of oclif's
+    // brandingDesignRules to get their targeted error instead of oclif's
     // generic "expected one of".
     design: nonBlankString({
       description: `Design to start from: ${BRANDING_DESIGNS.join(" or ")} (default: ${DEFAULT_BRANDING_DESIGN}).`,
     }),
   };
 
-  async run(): Promise<JsonEnvelope> {
-    const { flags } = await this.parse(BrandingEject);
-    await this.toMeta(flags, { resolveServer: false });
+  static override meta = {
+    resolveServer: false,
+  };
+
+  static override rules = brandingDesignRules;
+
+  static override requires = {
+    requested: requestedBrandingDesign,
+    project: zitadelProject,
+  };
+
+  protected async execute({ requested }: Admitted<typeof BrandingEject>): Promise<JsonEnvelope> {
     const { cwd, force, nonInteractive } = this.meta;
-    const flagDesign =
-      flags.design === undefined
-        ? undefined
-        : resolveBrandingDesign(flags.design, this.meta.cliVersion);
 
-    if (!(await hasZitadelConfig(cwd))) {
-      throw new ZitadelError("E_VALIDATION", "This directory is not a Zitadel project", {
-        hint: "Run setup first; branding files live under .zitadel/.",
-        nextCommands: [this.suggestUnscoped("setup")],
-      });
-    }
-
-    const design = flagDesign ?? (await this.promptDesign(nonInteractive));
+    const design = requested.design ?? (await this.promptDesign(nonInteractive));
     this.recordTelemetry({ design, force });
     const { branding, template } = getDefaultBrandingConfig(design);
 

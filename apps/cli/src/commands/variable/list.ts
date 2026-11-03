@@ -1,6 +1,11 @@
 import { Flags } from "@oclif/core";
 
-import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../../lib/oclif";
+import {
+  type Admitted,
+  CommandGroups,
+  EnvironmentCommand,
+  type JsonEnvelope,
+} from "../../lib/oclif";
 import { Tabulatable } from "../../lib/oclif/tabulatable";
 import { listData } from "../../lib/oclif/envelope";
 import {
@@ -44,9 +49,7 @@ export default class VariableList extends Tabulatable(EnvironmentCommand) {
     }),
   };
 
-  async run(): Promise<JsonEnvelope> {
-    const { flags } = await this.parse(VariableList);
-    await this.toMeta(flags);
+  protected async execute({ flags }: Admitted<typeof VariableList>): Promise<JsonEnvelope> {
     const { client, projectId } = await this.connect();
     const scope = variableReadScope(projectId, flags.preview);
 

@@ -1,14 +1,15 @@
 import { mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
-import { Args } from "@oclif/core";
 import type { GetReleaseById200PointersItemKind } from "@zitadel/api/generated/model";
 
 import type { ZitadelClient } from "../lib/api-client";
 import { ZitadelError } from "../lib/errors";
 import { FLOWS_DIR } from "../lib/flows";
 import { readJsonDirEntries } from "../lib/json-dir";
-import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../lib/oclif";
+import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../lib/oclif";
+import { pullTargetArg } from "../lib/oclif/inputs/pull-target";
+import { classifyTarget } from "../lib/pull-target";
 import { DEPLOY_ARGS, servesPrimary } from "../lib/release";
 import { writeBackResource } from "../lib/sync";
 import { SCHEMAS_DIR } from "../lib/user-schema";
@@ -58,32 +59,6 @@ export const RECONSTRUCTABLE: Readonly<Record<ReconstructableKind, Reconstructab
   },
 };
 
-/** What a pull target names, or that it names nothing pull understands. */
-export type PullTarget =
-  | { readonly kind: "latest" }
-  | { readonly kind: "release"; readonly id: string }
-  | { readonly kind: "deployment"; readonly id: string }
-  | { readonly kind: "invalid" };
-
-/**
- * Classify a pull target: `latest` (the live release), a release id (`rel_…`),
- * a deployment id (`dep_…`), or something pull does not understand. Kept pure
- * and separate from the lookups it drives so the shape is settled before any
- * server call.
- */
-export function classifyTarget(target: string): PullTarget {
-  if (target === "latest") {
-    return { kind: "latest" };
-  }
-  if (target.startsWith("rel_")) {
-    return { kind: "release", id: target };
-  }
-  if (target.startsWith("dep_")) {
-    return { kind: "deployment", id: target };
-  }
-  return { kind: "invalid" };
-}
-
 /**
  * The file a handle already lives in under `dir`, or `<dir>/<handle>.json` when
  * none does. Setup writes a schema to `default-human-user.json` though its
@@ -128,7 +103,7 @@ export default class Pull extends EnvironmentCommand {
     "<%= config.bin %> pull dep_01KX5N7C9D2E7F0N9WD3P2E4YM6",
   ];
   static override args = {
-    target: Args.string({
+    target: pullTargetArg({
       required: false,
       default: "latest",
       description:
@@ -136,9 +111,7 @@ export default class Pull extends EnvironmentCommand {
     }),
   };
 
-  async run(): Promise<JsonEnvelope> {
-    const { args, flags } = await this.parse(Pull);
-    await this.toMeta(flags);
+  protected async execute({ args }: Admitted<typeof Pull>): Promise<JsonEnvelope> {
     const { cwd, dryRun } = this.meta;
     const { client, projectId } = await this.connect();
 
@@ -207,22 +180,17 @@ export default class Pull extends EnvironmentCommand {
       });
       return deployment.release_id;
     }
-    if (classified.kind === "latest") {
-      const deployments = await client.listDeployments.all({
-        project_id: projectId,
-        live: true,
-      });
-      const deployment = deployments.find(servesPrimary);
-      if (deployment === undefined) {
-        throw new ZitadelError("E_NOT_FOUND", "Nothing is deployed to a primary origin yet.", {
-          hint: `Deploy first with \`zitadel ${DEPLOY_ARGS}${this.environmentSelector()}\`, then pull.`,
-        });
-      }
-      return deployment.release_id;
-    }
-    throw new ZitadelError("E_VALIDATION", `Don't know how to pull "${target}".`, {
-      hint: "Pass 'latest', a release id (rel_…), or a deployment id (dep_…).",
+    const deployments = await client.listDeployments.all({
+      project_id: projectId,
+      live: true,
     });
+    const deployment = deployments.find(servesPrimary);
+    if (deployment === undefined) {
+      throw new ZitadelError("E_NOT_FOUND", "Nothing is deployed to a primary origin yet.", {
+        hint: `Deploy first with \`zitadel ${DEPLOY_ARGS}${this.environmentSelector()}\`, then pull.`,
+      });
+    }
+    return deployment.release_id;
   }
 }
 

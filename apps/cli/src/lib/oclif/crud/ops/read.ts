@@ -1,6 +1,5 @@
-import { nonBlankString } from "../../flags";
-
 import { chosenColumns } from "../columns";
+import { fieldsFlag } from "../inputs";
 import { fieldPaths } from "../paths";
 import { idArg, idName, idValue } from "../shared";
 import type { GetSpec } from "../types";
@@ -21,6 +20,7 @@ export class GetOperation<Ctx> extends ResourceCommand<Ctx, GetSpec<Ctx>> {
   static describe<Ctx>({
     topic,
     resource,
+    spec,
     options,
   }: OperationDefinition<Ctx, GetSpec<Ctx>>): OperationStatics {
     return {
@@ -31,9 +31,11 @@ export class GetOperation<Ctx> extends ResourceCommand<Ctx, GetSpec<Ctx>> {
         `<%= config.bin %> ${topic} get <${idName(resource)}> --json`,
       ],
       flags: {
-        fields: nonBlankString({
+        fields: fieldsFlag({
           description:
             "Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is unaffected.",
+          fallback: resource.detail ?? resource.columns,
+          shape: fieldPaths(spec.response),
         }),
         ...options.flags,
       },
@@ -41,18 +43,16 @@ export class GetOperation<Ctx> extends ResourceCommand<Ctx, GetSpec<Ctx>> {
     };
   }
 
-  protected override async execute({ flags, args }: OperationInput): Promise<CommandResult> {
+  protected override async operate({ flags, args }: OperationInput): Promise<CommandResult> {
     const { resource, spec } = this.definition;
-    // Same as `list`: a schema decides `--fields` before the request is made.
     const shape = fieldPaths(spec.response);
-    const early = shape
-      ? chosenColumns(flags.fields, resource.detail ?? resource.columns, [], shape)
-      : undefined;
     const item = await spec.call(await this.context(), idValue(resource, args));
-    // Validated before the output branch, so the same arguments are valid (or
-    // not) whether the result goes to a terminal or a pipe.
-    const fields =
-      early ?? chosenColumns(flags.fields, resource.detail ?? resource.columns, [item]);
+    const fields = chosenColumns(
+      flags.fields as readonly string[] | undefined,
+      resource.detail ?? resource.columns,
+      [item],
+      shape,
+    );
     if (!process.stdout.isTTY) {
       return { status: "ok", data: item, pretty: JSON.stringify(item, null, 2) };
     }

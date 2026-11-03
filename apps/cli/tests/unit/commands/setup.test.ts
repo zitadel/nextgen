@@ -1089,20 +1089,16 @@ describe("a retry after a failure before the wizard", () => {
   });
 
   it("carries the minimum password length, and an explicit none as 0", () => {
-    expect(setupRetryFlags(retryOptionsFromFlags({ "password-min-length": "12" }))).toContain(
+    expect(setupRetryFlags(retryOptionsFromFlags({ "password-min-length": 12 }))).toContain(
       "--password-min-length 12",
     );
-    expect(setupRetryFlags(retryOptionsFromFlags({ "password-min-length": "0" }))).toContain(
+    expect(setupRetryFlags(retryOptionsFromFlags({ "password-min-length": null }))).toContain(
       "--password-min-length 0",
     );
     // The recommended one too: without the flag, a policy file --force keeps
     // keeps its own minimum.
-    expect(setupRetryFlags(retryOptionsFromFlags({ "password-min-length": "15" }))).toContain(
+    expect(setupRetryFlags(retryOptionsFromFlags({ "password-min-length": 15 }))).toContain(
       "--password-min-length 15",
-    );
-    // A refused value would only be refused again.
-    expect(setupRetryFlags(retryOptionsFromFlags({ "password-min-length": "65" }))).not.toContain(
-      "--password-min-length",
     );
   });
 

@@ -19,16 +19,14 @@ import {
   type Parsed,
   parseScopes,
   type ProviderName,
-  type ProviderSelection,
   providerOf,
   RESERVED_SLUGS,
   selectionName,
-  validated,
 } from "@zitadel/config/idp";
 
 import type { ZitadelClient } from "../../../lib/api-client";
 import { loopbackReach } from "../../../lib/local-server/runtime";
-import { refuseBrokenFlows, refuseUneditable } from "../../../lib/auth-methods";
+import { refuseBrokenFlows } from "../../../lib/auth-methods";
 import { isDevelopmentBuild } from "../../../lib/build-channel";
 import { ZitadelError } from "../../../lib/errors";
 import { stableStringify } from "../../../lib/json";
@@ -38,7 +36,6 @@ import {
   askConnectionEndpoints,
   callbackUriFor,
   checkCustomSlug,
-  checkGivenCustomFlags,
   CONNECTION_SCHEMA_REF,
   enabledMethods,
   type ConnectionFile,
@@ -47,7 +44,6 @@ import {
   credentialVariablesOf,
   type CustomFlagValues,
   customExample,
-  customFlagValues,
   ENABLE_FLAG_KEYS,
   ENABLE_FLAG_NAMES,
   loopbackIssuerWarning,
@@ -60,7 +56,6 @@ import {
   republishArgs,
   selectionFromFlags,
   type StoredVariables,
-  ssoEditRefusal,
   type SsoResult,
   type SsoSkipped,
   reportSecretOutcome,
@@ -71,11 +66,17 @@ import {
   type SecretPublisher,
 } from "../../../lib/idp";
 import {
+  type Admitted,
   AuthMethodCommand,
+  atLeastOne,
   CommandGroups,
   type JsonEnvelope,
   nonBlankString,
 } from "../../../lib/oclif";
+import { clientIdFlag } from "../../../lib/oclif/inputs/idp";
+import { developmentIssuer } from "../../../lib/oclif/requires/environment";
+import { ssoFlows, ssoProvider } from "../../../lib/oclif/requires/idp";
+import { schemaTarget } from "../../../lib/oclif/requires/schema";
 import { environmentFlags } from "../../../lib/oclif/environment-flags";
 import { inShell, type SuggestedCommand } from "../../../lib/suggestion";
 import { reportWarning } from "../../../lib/warnings";
@@ -127,36 +128,39 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       description:
         "Scopes the custom connection requests, separated by spaces or commas. Must include openid. Default: openid profile email.",
     }),
-    "client-id": nonBlankString({
+    "client-id": clientIdFlag({
       description: "Client id of the application registered with the provider.",
     }),
   };
 
-  async run(): Promise<JsonEnvelope> {
-    const { flags } = await this.parse(AuthMethodSsoEnable);
-    const {
-      cwd,
-      schema,
-      flows: candidates,
-      preflight: project,
-    } = await this.target(flags, {
-      // The credentials are published to the project, so the environment is
-      // resolved, unlike for the other auth-method commands.
-      resolveServer: true,
-      preflight: () =>
-        readProject(
-          flags,
-          this.environment.values.ZITADEL_ISSUER?.value,
-          !this.meta.nonInteractive && !this.meta.dryRun,
-        ),
-    });
-    const { issuer } = project;
+  static override meta = {
+    resolveServer: true,
+    environment: true,
+  };
+
+  static override rules = [
+    atLeastOne([ENABLE_FLAG_KEYS.provider], {
+      message: "Name the provider to enable",
+      hint: `Pass --provider, e.g. --provider ${IDP_PROVIDERS[0]}.`,
+    }),
+  ];
+
+  static override requires = {
+    project: ssoProvider,
+    issuer: developmentIssuer,
+    target: schemaTarget,
+    flows: ssoFlows,
+  };
+
+  protected async execute({
+    flags,
+    project,
+    issuer,
+    target,
+    flows,
+  }: Admitted<typeof AuthMethodSsoEnable>): Promise<JsonEnvelope> {
+    const { cwd, schema } = target;
     const connections = await readConnectionFiles(cwd);
-    // Before dry-run and before the first question, including the ones
-    // `connect()` asks: a Project whose flows all name another schema, or whose
-    // schema or flow was edited by hand where the editors write, must fail
-    // identically whether or not anything was asked.
-    const flows = targetFlows(schema, candidates);
     // Resolved before anything else is asked for: being turned away after
     // typing a secret would mean typing it again.
     const { client, projectId, server } = await this.connect({ quiet: true });
@@ -209,13 +213,11 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
           )
         : undefined;
 
-    // `nonBlankString` has already refused a blank one.
-    const clientIdFlag =
-      flags["client-id"] === undefined ? undefined : validated(parseClientId(flags["client-id"]));
+    const givenClientId = flags["client-id"];
     const plan = planConnection({
       selection,
       files: connections,
-      clientId: clientIdFlag,
+      clientId: givenClientId,
       scopesGiven: flags[ENABLE_FLAG_KEYS.scopes] !== undefined,
       slugFlag: ENABLE_FLAG_NAMES.slug,
     });
@@ -308,7 +310,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       // silently ignored. Nothing is prompted for: an unattended rerun should
       // not start asking for credentials the project already has.
       const publish = this.publisher(client, projectId);
-      if (clientIdFlag !== undefined) {
+      if (givenClientId !== undefined) {
         if (idVariable === undefined) {
           reportWarning(
             `${plan.file.path} holds its client id directly, so nothing was published. ` +
@@ -317,7 +319,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         } else {
           clientIdState = await publishClientId({
             name: idVariable,
-            value: clientIdFlag,
+            value: givenClientId,
             publish,
           });
         }
@@ -671,70 +673,6 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
 }
 
 /**
- * What the run needs from the flags before the schema is read. `selection` is
- * undefined for a custom provider whose settings a person will be asked for
- * once everything that can fail has passed; `values` are the settings the
- * flags gave.
- */
-type ProjectContext = {
-  readonly selection: ProviderSelection | undefined;
-  readonly values: CustomFlagValues;
-  readonly issuer: string;
-};
-
-/**
- * This command's `preflight`: quick checks of the flags, and nothing else.
- *
- * It runs inside `AuthMethodCommand.target`, before the schema is read, so it
- * must neither ask a question nor use the network or write anything: anything that
- * fails later would otherwise fail after the person had answered. Questions
- * for a custom provider's settings are asked in `run`, after the Project is
- * connected.
- *
- * The provider and a custom connection's settings are checked first, before
- * the Project's issuer: a name or issuer the server would refuse on deploy is
- * refused here, at once, under its flag.
- *
- * @param flags - `--provider`, which is named rather than prompted for, and
- *   the custom connection's settings.
- * @param issuer - The origin the app serves from, from the environment.
- * @param interactive - Whether a person is there to be asked for settings left
- *   out. A dry run never asks, so it is held to the flags like a script is.
- */
-async function readProject(
-  flags: { readonly [K in (typeof ENABLE_FLAG_KEYS)[keyof typeof ENABLE_FLAG_KEYS]]?: string },
-  issuer: string | undefined,
-  interactive: boolean,
-): Promise<ProjectContext> {
-  const provider = flags[ENABLE_FLAG_KEYS.provider];
-  if (provider === undefined) {
-    // Named rather than prompted for: the catalog holds one provider today,
-    // and a question offering a single answer is a keystroke, not a choice.
-    throw new ZitadelError("E_VALIDATION", "Name the provider to enable", {
-      hint: `Pass --provider, e.g. --provider ${IDP_PROVIDERS[0]}.`,
-    });
-  }
-  const values = customFlagValues(flags, ENABLE_FLAG_KEYS);
-  // A person at a terminal is asked for the settings they left out, but later:
-  // here the settings they did give are only checked, so nobody is asked before
-  // being turned away. A script, a dry run or --non-interactive is held to the
-  // flags and told which are missing.
-  const askLater = provider === CUSTOM_PROVIDER && interactive && !hasAllCustomSettings(values);
-  if (askLater) {
-    checkGivenCustomFlags(values, ENABLE_FLAG_NAMES);
-  }
-  const selection: ProviderSelection | undefined = askLater
-    ? undefined
-    : selectionFromFlags(provider, values, ENABLE_FLAG_NAMES, customExample(ENABLE_FLAG_NAMES));
-  if (issuer === undefined) {
-    throw new ZitadelError("E_VALIDATION", "This Project has no development issuer", {
-      hint: "Run `zitadel setup` first, or set ZITADEL_ISSUER to the origin your app serves from.",
-    });
-  }
-  return { selection, values, issuer };
-}
-
-/**
  * What the file of an existing custom connection holds, checked as a typed
  * answer is, or a refusal that names the file and the setting: a stored value
  * that cannot be used would otherwise surface as an error about a flag the
@@ -782,44 +720,6 @@ function usableStoredSettings(
     displayName: usable("a display name", stored.displayName, given.displayName, parseDisplayName),
     issuer: usable("an issuer", stored.issuer, given.issuer, parseIssuer),
   };
-}
-
-/** Whether a custom connection's name, button text and issuer were all given. */
-function hasAllCustomSettings(values: CustomFlagValues): boolean {
-  return (
-    values.slug !== undefined && values.displayName !== undefined && values.issuer !== undefined
-  );
-}
-
-/**
- * The flows this provider must be added to, or a refusal.
- *
- * Called before the connection is written and before either credential is
- * published, because no flow means no button however well everything else
- * went: `deploy` succeeds and the sign-in screen simply never offers the
- * provider. Failing afterwards would leave a connection file and two
- * published variables behind for a provider that cannot be shown.
- *
- * @param schema - The schema the provider is enabled for.
- * @param flows - The flows that run against it.
- */
-function targetFlows(schema: SchemaFile, flows: FlowFile[]): FlowFile[] {
-  if (flows.length === 0) {
-    throw new ZitadelError("E_NOT_FOUND", `No login flow runs against ${schema.name}`, {
-      hint:
-        "The provider is offered by a flow, and none of the files under .zitadel/flows/ " +
-        "names this schema. Check that the flow's user_schema names the schema's objectType.",
-      details: { schema: schema.path },
-    });
-  }
-  // The editors read a region they cannot recognise as absent and write the
-  // generated one over it. Refuse here, before anything is written or
-  // published, rather than discard whatever a developer put there.
-  refuseUneditable(schema.path, ssoEditRefusal(schema.body, "schema"));
-  for (const flow of flows) {
-    refuseUneditable(flow.path, ssoEditRefusal(flow.body, "flow"));
-  }
-  return flows;
 }
 
 /** The schema and flow edits a run will make, before anything is written. */

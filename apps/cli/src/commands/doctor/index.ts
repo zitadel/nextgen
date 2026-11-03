@@ -15,11 +15,9 @@ import {
 import type { LocalServers, ManagedRuntimeProcess } from "../../lib/local-server/processes";
 import {
   DEFAULT_LOCAL_SERVER_PORT,
-  LOCAL_RUNTIME_FILE,
   assertLocalStateWritable,
   checkLocalServerHealth,
   defaultLocalServerImageForCliVersion,
-  findUpward,
   localServerUrl,
   readNearestRuntimeMetadata,
   type RuntimeBackend,
@@ -27,7 +25,15 @@ import {
   type RuntimeMetadata,
 } from "../../lib/local-server/runtime";
 import { LocalServer } from "../../lib/local-server/server";
-import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../../lib/oclif";
+import {
+  type Admitted,
+  BaseCommand,
+  CommandGroups,
+  type JsonEnvelope,
+  nonBlankString,
+  portFlag,
+} from "../../lib/oclif";
+import { doctorTarget } from "../../lib/oclif/requires/doctor-target";
 import { Destructive } from "../../lib/oclif/destructive";
 import { isRefusal } from "../../lib/consent";
 import { reportWarning } from "../../lib/warnings";
@@ -37,7 +43,6 @@ import {
   projectEnvFile,
 } from "../../lib/oclif/environment-flags";
 import { createOrca } from "../../lib/orca";
-import { resolveCwd } from "../../lib/paths";
 import {
   hasZitadelConfig,
   hasZitadelSecret,
@@ -46,7 +51,6 @@ import {
   readZitadelSecret,
 } from "../../lib/project";
 import { listenersForPort } from "../../lib/prober/ports";
-import { isLoopbackUrl } from "../../lib/server";
 import { SANITY_CHECKS, type CheckContext, type CheckOutcome } from "./checks";
 import {
   type EnvironmentSelector,
@@ -94,7 +98,7 @@ export default class Doctor extends Destructive(BaseCommand) {
       dependsOn: ["fix"],
     }),
     image: nonBlankString({ description: "Container image to check." }),
-    port: Flags.integer({
+    port: portFlag({
       description: "Local HTTP port to check. Defaults to the port this directory's server uses.",
     }),
     runtime: Flags.string({
@@ -107,19 +111,16 @@ export default class Doctor extends Destructive(BaseCommand) {
     ...environmentFlags,
   };
 
-  async run(): Promise<JsonEnvelope> {
-    const { flags } = await this.parse(Doctor);
-    // The local server this directory uses: the one `zitadel start` ran here,
-    // or in the nearest parent, as setup and `console` find it. An unreadable
-    // record only costs the port hint; the read below reports it.
-    const startDir = resolveCwd(typeof flags.cwd === "string" ? flags.cwd : undefined);
-    const hint = await readNearestRuntimeMetadata(startDir).catch(() => undefined);
-    const port = flags.port ?? hint?.runtime.port ?? DEFAULT_LOCAL_SERVER_PORT;
-    const hostedServer = await hostedServerWithoutLocalRuntime(startDir, flags);
-    await this.toMeta(flags, {
-      resolveServer: false,
-      source: hostedServer ?? localServerUrl(port),
-    });
+  static override meta = {
+    resolveServer: false,
+  };
+
+  static override requires = {
+    target: doctorTarget,
+  };
+
+  protected async execute({ flags, target }: Admitted<typeof Doctor>): Promise<JsonEnvelope> {
+    const { port, hostedServer } = target;
     const { cwd, dryRun } = this.meta;
     const nearest = await readNearestRuntimeMetadata(cwd);
     const existingRuntime = nearest?.runtime;
@@ -605,28 +606,6 @@ async function runEnvironmentChecks(input: {
       return `${server} is reachable and project ${projectId} matches`;
     }),
   ];
-}
-
-/**
- * The server of a project set up against a hosted server, for which doctor
- * checks no local runtime: no local server runs for it, so the runtime says
- * nothing about it, and a port another app holds would fail it. `undefined`
- * (check the runtime) before setup, for a project on a local server or with a
- * `zitadel.json` that does not parse, where a server was started in the
- * directory or a parent, and when a flag asks about the runtime.
- */
-async function hostedServerWithoutLocalRuntime(
-  cwd: string,
-  flags: { port?: number; runtime?: string; image?: string },
-): Promise<string | undefined> {
-  if (flags.port !== undefined || flags.runtime !== undefined || flags.image !== undefined) {
-    return undefined;
-  }
-  if ((await findUpward(cwd, LOCAL_RUNTIME_FILE)) !== undefined || !(await hasZitadelConfig(cwd))) {
-    return undefined;
-  }
-  const server = await readZitadelConfig(cwd).then(readProjectServer, () => undefined);
-  return server === undefined || isLoopbackUrl(server) ? undefined : server;
 }
 
 /**

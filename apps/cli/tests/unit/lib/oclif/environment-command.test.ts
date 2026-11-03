@@ -16,7 +16,11 @@ vi.mock("@clack/prompts", async () => (await import("../../../helpers/clack")).c
 
 /** Connects with the project secret, the default credential. */
 class ProjectProbe extends EnvironmentCommand {
-  async run() {
+  protected async execute(): Promise<never> {
+    throw new Error("unused");
+  }
+
+  override async run() {
     const { flags } = await this.parse(ProjectProbe);
     await this.toMeta(flags);
     return { connection: await this.connect(), telemetry: this.telemetryProps };
@@ -27,7 +31,11 @@ class ProjectProbe extends EnvironmentCommand {
 class PreviewProbe extends EnvironmentCommand {
   static override credential = "preview" as const;
 
-  async run() {
+  protected async execute(): Promise<never> {
+    throw new Error("unused");
+  }
+
+  override async run() {
     const { flags } = await this.parse(PreviewProbe);
     await this.toMeta(flags);
     return { connection: await this.connect(), telemetry: this.telemetryProps };
@@ -36,7 +44,11 @@ class PreviewProbe extends EnvironmentCommand {
 
 /** A real preview command's base, connecting as `preview list` does. */
 class PreviewCommandProbe extends PreviewCommand {
-  async run() {
+  protected async execute(): Promise<never> {
+    throw new Error("unused");
+  }
+
+  override async run() {
     const { flags } = await this.parse(PreviewCommandProbe);
     await this.toMeta(flags);
     return { connection: await this.connect() };
@@ -45,7 +57,11 @@ class PreviewCommandProbe extends PreviewCommand {
 
 /** Exposes the selector suffix the base class derives from the resolution. */
 class SelectorProbe extends EnvironmentCommand {
-  async run() {
+  protected async execute(): Promise<never> {
+    throw new Error("unused");
+  }
+
+  override async run() {
     const { flags } = await this.parse(SelectorProbe);
     await this.toMeta(flags);
     return { selector: this.environmentSelector() };

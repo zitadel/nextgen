@@ -1,6 +1,6 @@
 import { Flags } from "@oclif/core";
 
-import { BaseCommand, type JsonEnvelope } from "../lib/oclif";
+import { type Admitted, BaseCommand, type JsonEnvelope } from "../lib/oclif";
 import { Tabulatable } from "../lib/oclif/tabulatable";
 import { describeRegistry } from "../lib/oclif/crud";
 import { listData } from "../lib/oclif/envelope";
@@ -36,10 +36,11 @@ export default class ResourcesList extends Tabulatable(BaseCommand) {
     }),
   };
 
-  async run(): Promise<JsonEnvelope> {
-    const { flags } = await this.parse(ResourcesList);
-    // No server call, so no server resolution: the answer is the same offline.
-    await this.toMeta(flags, { resolveServer: false });
+  static override meta = {
+    resolveServer: false,
+  };
+
+  protected async execute({ flags }: Admitted<typeof ResourcesList>): Promise<JsonEnvelope> {
     const resources = describeRegistry(RESOURCES);
 
     const rows = resources.map((resource) => ({

@@ -1,6 +1,12 @@
 import { Flags } from "@oclif/core";
 
-import { CommandGroups, EnvironmentCommand, type JsonEnvelope, nonBlankArg } from "../../lib/oclif";
+import {
+  type Admitted,
+  CommandGroups,
+  EnvironmentCommand,
+  type JsonEnvelope,
+  nonBlankArg,
+} from "../../lib/oclif";
 import { mutatedData } from "../../lib/oclif/envelope";
 import { revokeRelease } from "../../lib/release";
 import { Destructive } from "../../lib/oclif/destructive";
@@ -30,9 +36,7 @@ export default class ReleaseRevoke extends Destructive(EnvironmentCommand) {
     }),
   };
 
-  async run(): Promise<JsonEnvelope> {
-    const { args, flags } = await this.parse(ReleaseRevoke);
-    await this.toMeta(flags);
+  protected async execute({ args }: Admitted<typeof ReleaseRevoke>): Promise<JsonEnvelope> {
     const releaseId = args.release_id;
 
     return this.emit(

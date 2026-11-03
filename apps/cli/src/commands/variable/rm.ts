@@ -1,9 +1,15 @@
 import { Flags } from "@oclif/core";
 
-import { CommandGroups, EnvironmentCommand, type JsonEnvelope, nonBlankArg } from "../../lib/oclif";
+import {
+  type Admitted,
+  CommandGroups,
+  EnvironmentCommand,
+  type JsonEnvelope,
+} from "../../lib/oclif";
+import { variableNameArg } from "../../lib/oclif/inputs/variables";
 import { dryRunResult } from "../../lib/oclif/crud/shared";
 import { deletedData } from "../../lib/oclif/envelope";
-import { assertVariableName, variableScope } from "../../lib/variables";
+import { variableScope } from "../../lib/variables";
 import { Destructive } from "../../lib/oclif/destructive";
 
 /**
@@ -21,7 +27,7 @@ export default class VariableRm extends Destructive(EnvironmentCommand) {
     "<%= config.bin %> variable rm GOOGLE_CLIENT_ID --force",
   ];
   static override args = {
-    name: nonBlankArg({ required: true, description: "Variable name to remove." }),
+    name: variableNameArg({ required: true, description: "Variable name to remove." }),
   };
   static override flags = {
     preview: Flags.boolean({
@@ -36,13 +42,8 @@ export default class VariableRm extends Destructive(EnvironmentCommand) {
     }),
   };
 
-  async run(): Promise<JsonEnvelope> {
-    const { args, flags } = await this.parse(VariableRm);
-    await this.toMeta(flags);
+  protected async execute({ args, flags }: Admitted<typeof VariableRm>): Promise<JsonEnvelope> {
     const name = args.name;
-
-    assertVariableName(name);
-
     const kinds = flags.preview ? ["preview"] : ["primary", "preview"];
 
     return this.emit(

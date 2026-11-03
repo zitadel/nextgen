@@ -1,7 +1,12 @@
 import { Flags } from "@oclif/core";
 import type { ZitadelClient } from "../../lib/api-client";
 
-import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../../lib/oclif";
+import {
+  type Admitted,
+  CommandGroups,
+  EnvironmentCommand,
+  type JsonEnvelope,
+} from "../../lib/oclif";
 import { Tabulatable } from "../../lib/oclif/tabulatable";
 import { listData } from "../../lib/oclif/envelope";
 import { DEPLOY_ARGS, originMatchesPattern } from "../../lib/release";
@@ -39,9 +44,7 @@ export default class VariableResolve extends Tabulatable(EnvironmentCommand) {
     }),
   };
 
-  async run(): Promise<JsonEnvelope> {
-    const { flags } = await this.parse(VariableResolve);
-    await this.toMeta(flags);
+  protected async execute({ flags }: Admitted<typeof VariableResolve>): Promise<JsonEnvelope> {
     const { client, projectId } = await this.connect();
     const origin = flags.origin;
 

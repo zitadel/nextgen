@@ -3,6 +3,7 @@ import type { ZitadelClient } from "../../lib/api-client";
 import { ApiError } from "@zitadel/api/runtime/fetch";
 
 import {
+  type Admitted,
   CommandGroups,
   CREDENTIALS,
   type JsonEnvelope,
@@ -23,7 +24,6 @@ import {
   worktreeIsDirty,
 } from "../../lib/release";
 import { detectPreviewUrls } from "../../lib/preview";
-import { parseTtl } from "../../lib/ttl";
 import { ZitadelError } from "../../lib/errors";
 import { reportWarning } from "../../lib/warnings";
 import { ciProvider } from "../../lib/telemetry/dimensions/ci-provider";
@@ -72,9 +72,7 @@ export default class Preview extends PreviewCommand {
     }),
   };
 
-  async run(): Promise<JsonEnvelope> {
-    const { flags } = await this.parse(Preview);
-    await this.toMeta(flags);
+  protected async execute({ flags }: Admitted<typeof Preview>): Promise<JsonEnvelope> {
     const { cwd, env, isTTY, dryRun } = this.meta;
     const json = this.jsonEnabled();
     const color = !json && isTTY && flags.color !== false && !process.env.NO_COLOR;
@@ -84,32 +82,11 @@ export default class Preview extends PreviewCommand {
     // `zitadel deploy` after merge. The environment gates this, not `--origin`:
     // an explicit origin only selects which targets to preview, it never
     // authorizes a preview deploy into an environment that must not take writes.
-    // An origin has no path, so a trailing slash is the same URL: dropped
-    // here as detection drops it, so one preview is one spelling — and a URL
-    // given twice is sent once, as the request's unique targets require.
-    const requested = [...new Set((flags.origin ?? []).map((url) => url.replace(/\/+$/, "")))];
-    // `primary` is the deployment keyword for every primary origin. A preview
-    // build carries the preview credential and must never be able to reach
-    // production with it, so the keyword is refused outright.
-    if (requested.includes("primary")) {
-      throw new ZitadelError("E_VALIDATION", "A preview cannot target the primary origins", {
-        hint: "Pass the preview URLs with --origin; production is deployed by `zitadel deploy`, after merge.",
-      });
-    }
-
+    // A URL given twice is sent once, as the request's unique targets require.
+    const requested = [...new Set(flags.origin ?? [])];
     // `--ttl` is optional: omitted, nothing is sent and the server applies the
     // project's default, rather than the CLI pinning a lifetime of its own.
-    // Checked before anything that can skip the run, so a bad value fails every
-    // build rather than only the trusted ones that reach the deploy.
-    const ttl = flags.ttl === undefined ? undefined : parseTtl(flags.ttl);
-    // A preview lives a minute at least and 365 days at most — the server's
-    // fixed limit (preview-ttl.yaml), applied here rather than in the generic
-    // TTL parser so a bad value fails before a release is built.
-    if (ttl !== undefined && (ttl.ms < 60 * 1000 || ttl.ms > 365 * 24 * 60 * 60 * 1000)) {
-      throw new ZitadelError("E_VALIDATION", `${flags.ttl} is outside the allowed range`, {
-        hint: "A preview lives between 60s and 365d.",
-      });
-    }
+    const { ttl } = flags;
 
     const envName = this.environment.name.value;
     if (envName !== "preview" && envName !== "development") {

@@ -1,10 +1,10 @@
-import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../lib/oclif";
+import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../lib/oclif";
+import { deployReason } from "../lib/oclif/requires/deploy-message";
 import {
   buildBundle,
   createDeployment,
   DEPLOY_ARGS,
   createReleaseFromBundle,
-  deployMessage,
   diffStep,
   headSha,
   messageFlag,
@@ -51,23 +51,15 @@ export default class Deploy extends EnvironmentCommand {
     ),
   };
 
-  async run(): Promise<JsonEnvelope> {
-    const { flags } = await this.parse(Deploy);
-    await this.toMeta(flags);
-    const { cwd, env, dryRun, isTTY, nonInteractive } = this.meta;
+  static override requires = {
+    reason: deployReason,
+  };
+
+  protected async execute({ flags, reason }: Admitted<typeof Deploy>): Promise<JsonEnvelope> {
+    const { cwd, env, dryRun, isTTY } = this.meta;
     const json = this.jsonEnabled();
     const color = !json && isTTY && flags.color !== false && !process.env.NO_COLOR;
-
-    // A deploy records why it happened. Interactively the reason can be left
-    // off, but a non-interactive caller (CI) with no message to fall back on
-    // must name one, refused before anything is built. A dry run records
-    // nothing, so it neither resolves nor needs one.
-    const message = dryRun ? undefined : await deployMessage(flags.message, cwd, env);
-    if (nonInteractive && !dryRun && message === undefined) {
-      throw new ZitadelError("E_VALIDATION", "A deploy needs a message in non-interactive mode", {
-        hint: "Pass -m/--message with a short summary of what this release changes, or deploy from a clean git commit.",
-      });
-    }
+    const { message } = reason;
 
     const { client, projectId } = await this.connect();
 

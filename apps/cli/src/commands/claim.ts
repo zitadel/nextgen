@@ -1,5 +1,4 @@
 import { Flags } from "@oclif/core";
-import { getClaimStatusQueryChallengeIdRegExp } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import { ApiError } from "@zitadel/api/runtime/fetch";
 import consola from "consola";
 import pRetry, { AbortError } from "p-retry";
@@ -7,11 +6,12 @@ import pRetry, { AbortError } from "p-retry";
 import type { ZitadelClient } from "../lib/api-client";
 import { wrapForBox } from "../lib/box";
 import { openInBrowser } from "../lib/browser";
-import { CLAIM_WINDOW_DAYS, isAttached } from "../lib/claim-state";
+import { CLAIM_WINDOW_DAYS, isAttached, isChallengeId } from "../lib/claim-state";
 import { requireValue } from "../lib/environment";
 import { ZitadelError } from "../lib/errors";
 import { isObject } from "../lib/json";
-import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../lib/oclif";
+import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../lib/oclif";
+import { challengeIdRules } from "../lib/oclif/inputs/claim";
 import { hasZitadelSecret, readZitadelSecret, writeZitadelSecret } from "../lib/project";
 import { isLoopbackUrl } from "../lib/server";
 import { reportWarning } from "../lib/warnings";
@@ -124,20 +124,11 @@ export default class Claim extends EnvironmentCommand {
     }),
   };
 
-  async run(): Promise<JsonEnvelope> {
-    const { flags } = await this.parse(Claim);
-    await this.toMeta(flags);
+  static override rules = challengeIdRules;
+
+  protected async execute({ flags }: Admitted<typeof Claim>): Promise<JsonEnvelope> {
     const { cwd, dryRun, nonInteractive } = this.meta;
     const challengeId = flags["challenge-id"];
-    // The id goes back to the platform and into this run's suggestions, so it
-    // has to be the contract's shape before anything is asked or sent.
-    if (challengeId !== undefined && !isChallengeId(challengeId)) {
-      throw new ZitadelError(
-        "E_VALIDATION",
-        "--challenge-id takes the challenge_id a `claim --no-wait` run returned, which starts with ch_.",
-        { nextCommands: [this.suggest("claim --no-wait")] },
-      );
-    }
     // Where a fresh link comes from when this one dies: a run that is part of
     // the two-step flow suggests the step that hands the link back, so
     // following the suggestion never blocks with the link out of sight.
@@ -506,11 +497,6 @@ function isClaimWindowExpired(error: unknown): boolean {
     isObject(error.body) &&
     error.body.code === "proj.claim_window_expired"
   );
-}
-
-/** Whether `value` has the shape the claim contract gives a `challenge_id`. */
-function isChallengeId(value: string): boolean {
-  return getClaimStatusQueryChallengeIdRegExp.test(value);
 }
 
 /** A `404 claim_challenge.not_found` from `claim/status`. */

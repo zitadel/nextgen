@@ -19,11 +19,14 @@ import {
 } from "../lib/local-server/runtime";
 import { LocalServer } from "../lib/local-server/server";
 import {
+  type Admitted,
   type Connection,
   CommandGroups,
   EnvironmentCommand,
   type JsonEnvelope,
+  type MetaOptions,
 } from "../lib/oclif";
+import type { GlobalOptions } from "../lib/oclif/types";
 import { resolveCwd } from "../lib/paths";
 import { Cmd } from "../lib/cmd";
 import {
@@ -53,18 +56,23 @@ export default class Status extends EnvironmentCommand {
   static override group = CommandGroups.gettingStarted;
   static override groupOrder = 3;
 
-  async run(): Promise<JsonEnvelope> {
-    const { flags } = await this.parse(Status);
-    const cwd = resolveCwd(typeof flags.cwd === "string" ? flags.cwd : undefined);
-    const runtime = await readRuntimeMetadata(cwd);
-    if (flags.server === "local") {
-      await this.toMeta(flags, {
-        resolveServer: false,
-        source: runtime?.server_url ?? DEFAULT_LOCAL_SERVER_URL,
-      });
-    } else {
-      await this.toMeta(flags);
+  protected override async toMeta(
+    flags: Record<string, unknown>,
+    options: MetaOptions = {},
+  ): Promise<GlobalOptions> {
+    if (flags.server !== "local") {
+      return super.toMeta(flags, options);
     }
+    const runtime = await readRuntimeMetadata(
+      resolveCwd(typeof flags.cwd === "string" ? flags.cwd : undefined),
+    );
+    return super.toMeta(flags, {
+      resolveServer: false,
+      source: runtime?.server_url ?? DEFAULT_LOCAL_SERVER_URL,
+    });
+  }
+
+  protected async execute({ flags }: Admitted<typeof Status>): Promise<JsonEnvelope> {
     const server = await LocalServer.at(this.meta.cwd, {
       cliVersion: this.meta.cliVersion,
     }).status();

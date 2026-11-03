@@ -41,6 +41,19 @@
 
 ## Command code
 
+- A command does its work in `execute(input: Admitted<typeof Command>)`, never
+  `run`: `BaseCommand.run` parses, resolves the run's context (`static meta`),
+  checks `static rules`, finds `static requires`, and only then calls
+  `execute`, so `execute` validates nothing it was handed.
+- Refuse a bad value with a typed flag or argument (`portFlag`, `integerFlag`,
+  `nonBlankString`, the wrappers in `src/lib/oclif/inputs/`), a bad
+  combination with a rule (`excludes`, `needs`, `atLeastOne`, `refuses` in
+  `src/lib/oclif/rules.ts`), and a missing precondition with a requirement
+  (`src/lib/oclif/requires/`). Write each refusal once, as a `Refusal`
+  template with `{name}` placeholders.
+- Keep `lib/oclif` the only layer that knows oclif: a domain lib stays plain
+  functions and parsers and never imports it, and the typed flags and
+  requirements that wrap one live in `lib/oclif/inputs` and `lib/oclif/requires`.
 - Report a warning through `reportWarning` (`src/lib/warnings.ts`) or a
   result's `warnings`, never `consola.warn`: `--json` silences consola. A unit
   test fails on any other `consola.warn`.

@@ -2,16 +2,13 @@ import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { Flags } from "@oclif/core";
-import { IDP_PROVIDERS } from "@zitadel/config/idp";
 import { consola } from "consola";
 
 import {
-  listedProviders,
   refuseBrokenFlows,
   refuseUneditable,
   usableSignInMethods,
 } from "../../../lib/auth-methods";
-import { ZitadelError } from "../../../lib/errors";
 import {
   removeSsoFromFlow,
   removeSsoFromSchema,
@@ -19,7 +16,9 @@ import {
   ssoProvidersRefusal,
 } from "../../../lib/idp";
 import { stableStringify } from "../../../lib/json";
+import { providerToRemove } from "../../../lib/oclif/requires/idp";
 import {
+  type Admitted,
   AuthMethodCommand,
   CommandGroups,
   type JsonEnvelope,
@@ -59,19 +58,18 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
     }),
   };
 
-  async run(): Promise<JsonEnvelope> {
-    const { flags } = await this.parse(AuthMethodSsoDisable);
-    const { cwd, cwdArgs, schema, flows } = await this.target(flags);
+  static override requires = {
+    ...AuthMethodCommand.requires,
+    provider: providerToRemove,
+  };
+
+  protected async execute({
+    target,
+    provider,
+  }: Admitted<typeof AuthMethodSsoDisable>): Promise<JsonEnvelope> {
+    const { cwd, cwdArgs, schema, flows } = target;
     const { dryRun } = this.meta;
 
-    const provider = flags.provider;
-    if (provider === undefined) {
-      // Every provider the schema lists, well-formed or not: any of them is
-      // one the developer may want to remove.
-      throw new ZitadelError("E_VALIDATION", "Name the provider to remove", {
-        hint: `Pass --provider, e.g. --provider ${IDP_PROVIDERS[0]}. ${schema.name} offers: ${listedProviders(schema.body).join(", ") || "none"}.`,
-      });
-    }
     // The same shapes `auth-method sso enable` refuses: a region that is not
     // what these editors write is someone's, and is not overwritten.
     refuseUneditable(schema.path, ssoEditRefusal(schema.body, "schema"));

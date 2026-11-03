@@ -1,6 +1,11 @@
 import { Flags } from "@oclif/core";
 
-import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../../lib/oclif";
+import {
+  type Admitted,
+  CommandGroups,
+  EnvironmentCommand,
+  type JsonEnvelope,
+} from "../../lib/oclif";
 import { createDeployment } from "../../lib/release";
 
 /**
@@ -22,10 +27,7 @@ export default class DeploymentCreate extends EnvironmentCommand {
     message: Flags.string({ char: "m", description: "A short summary of why this deploys." }),
   };
 
-  async run(): Promise<JsonEnvelope> {
-    const { flags } = await this.parse(DeploymentCreate);
-    await this.toMeta(flags);
-
+  protected async execute({ flags }: Admitted<typeof DeploymentCreate>): Promise<JsonEnvelope> {
     const targets = ["primary"];
 
     // A dry run makes no request, so it answers before the connection — the

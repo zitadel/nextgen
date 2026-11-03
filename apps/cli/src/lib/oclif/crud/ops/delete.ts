@@ -1,7 +1,7 @@
 import { Flags } from "@oclif/core";
 
 import { deletedData, mutatedData } from "../../envelope";
-import type { CommandResult, GlobalOptions } from "../../types";
+import type { CommandResult } from "../../types";
 import { article, capitalize, dryRunResult, idArg, idValue } from "../shared";
 
 /** Past tense reported beside the id, per verb. */
@@ -47,10 +47,7 @@ export class DeleteOperation<Ctx> extends ResourceCommand<Ctx, DeleteSpec<Ctx>> 
     };
   }
 
-  protected override async execute(
-    { args }: OperationInput,
-    _meta: GlobalOptions,
-  ): Promise<CommandResult> {
+  protected override async operate({ args }: OperationInput): Promise<CommandResult> {
     const { topic, resource, spec } = this.definition;
     const verb = spec.verb ?? "delete";
     const past = spec.outcome ?? PAST[verb] ?? "deleted";

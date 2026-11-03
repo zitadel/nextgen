@@ -1,7 +1,13 @@
 import { Flags } from "@oclif/core";
 import type { GetReleaseById200PointersItem } from "@zitadel/api/generated/model";
 
-import { CommandGroups, EnvironmentCommand, type JsonEnvelope, nonBlankArg } from "../../lib/oclif";
+import {
+  type Admitted,
+  CommandGroups,
+  EnvironmentCommand,
+  type JsonEnvelope,
+  nonBlankArg,
+} from "../../lib/oclif";
 import { Tabulatable } from "../../lib/oclif/tabulatable";
 import { messageFlag, rollbackDeployment, servesPrimary } from "../../lib/release";
 import { toZitadelError, ZitadelError } from "../../lib/errors";
@@ -40,10 +46,10 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
     message: messageFlag("A short summary of why this rolls back."),
   };
 
-  async run(): Promise<JsonEnvelope> {
-    const { args, flags } = await this.parse(DeploymentRollback);
-    await this.toMeta(flags);
-
+  protected async execute({
+    args,
+    flags,
+  }: Admitted<typeof DeploymentRollback>): Promise<JsonEnvelope> {
     const { client, projectId } = await this.connect();
 
     // Bare: undo the latest deployment by re-applying what its targets served

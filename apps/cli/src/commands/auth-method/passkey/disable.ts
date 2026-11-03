@@ -1,6 +1,11 @@
 import { Flags } from "@oclif/core";
 
-import { AuthMethodCommand, CommandGroups, type JsonEnvelope } from "../../../lib/oclif";
+import {
+  type Admitted,
+  AuthMethodCommand,
+  CommandGroups,
+  type JsonEnvelope,
+} from "../../../lib/oclif";
 
 /** `auth-method passkey disable` (ADR 070). */
 export default class AuthMethodPasskeyDisable extends AuthMethodCommand {
@@ -21,8 +26,9 @@ export default class AuthMethodPasskeyDisable extends AuthMethodCommand {
     }),
   };
 
-  async run(): Promise<JsonEnvelope> {
-    const { flags } = await this.parse(AuthMethodPasskeyDisable);
-    return this.toggle(flags, "passkey", false);
+  protected async execute({
+    target,
+  }: Admitted<typeof AuthMethodPasskeyDisable>): Promise<JsonEnvelope> {
+    return this.toggle(target, "passkey", false);
   }
 }

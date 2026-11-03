@@ -1,4 +1,9 @@
-import { AuthMethodCommand, CommandGroups, type JsonEnvelope } from "../../../lib/oclif";
+import {
+  type Admitted,
+  AuthMethodCommand,
+  CommandGroups,
+  type JsonEnvelope,
+} from "../../../lib/oclif";
 
 /** `auth-method password enable` (ADR 070). */
 export default class AuthMethodPasswordEnable extends AuthMethodCommand {
@@ -9,8 +14,9 @@ export default class AuthMethodPasswordEnable extends AuthMethodCommand {
     "<%= config.bin %> auth-method password enable --schema customers",
   ];
 
-  async run(): Promise<JsonEnvelope> {
-    const { flags } = await this.parse(AuthMethodPasswordEnable);
-    return this.toggle(flags, "password", true);
+  protected async execute({
+    target,
+  }: Admitted<typeof AuthMethodPasswordEnable>): Promise<JsonEnvelope> {
+    return this.toggle(target, "password", true);
   }
 }

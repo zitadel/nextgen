@@ -2,6 +2,7 @@ import { posix } from "node:path";
 
 import { Cmd } from "../cmd";
 import { nonBlankString } from "./flags";
+import { previewOriginFlag, previewTtlFlag } from "./inputs/preview";
 import { asEnvironmentSelector, type EnvironmentSelector } from "../suggestion";
 
 /**
@@ -45,12 +46,12 @@ export const ENVIRONMENT_SELECTOR_OPTIONS: readonly string[] = [
  * credential but take neither, stay free of them.
  */
 export const previewFlags = {
-  origin: nonBlankString({
+  origin: previewOriginFlag({
     description:
       "A preview URL to deploy to, instead of detecting them from the platform build. Repeatable.",
     multiple: true,
   }),
-  ttl: nonBlankString({
+  ttl: previewTtlFlag({
     description:
       "How long each preview stays live, e.g. 7d, 12h or 90m. Between 60s and 365d. Omitted, the project's default applies.",
   }),

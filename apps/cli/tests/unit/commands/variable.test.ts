@@ -868,6 +868,27 @@ describe("variable set --as", () => {
     expect(json.message).toMatch(/Expected a number.*JSON number/);
   });
 
+  it("refuses a given value its --as cannot parse, naming the value and the type, before any request", async () => {
+    const cwd = await makeProject();
+    const bodies = capture();
+
+    const res = await runCliForTest([
+      "variable",
+      "set",
+      "SESSION_TTL",
+      "abc",
+      "--as",
+      "number",
+      ...base(cwd),
+    ]);
+
+    const json = parseJson(res.stdout) as { code: string; message: string; hint: string };
+    expect(json.code).toBe("E_VALIDATION");
+    expect(json.message).toBe('"abc" is not a valid number value.');
+    expect(json.hint).toContain("JSON number");
+    expect(bodies).toEqual([]);
+  });
+
   it("refuses a typed secret before reading the value", async () => {
     const cwd = await makeProject();
     const bodies = capture();

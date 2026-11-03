@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 
-import { Command, Flags } from "@oclif/core";
+import { Command, Flags, type Interfaces } from "@oclif/core";
 
+import { placeholdersOf, type Rule, type RuleView } from "./rules";
 import { nonBlankString } from "./flags";
 import { Interruptible } from "./interruptible";
 import consola from "consola";
@@ -28,8 +29,12 @@ import {
 } from "./command-telemetry";
 import type { CommandGroup } from "./groups";
 import { type NextSteps, nextStepsData, renderNextSteps } from "./next-steps";
+import { refusalError } from "./refusal";
+import { type Ended, isEnded, isUnmet, type Requirements, type Resolved } from "./requirements";
 import type {
   CommandResult,
+  ConnectOptions,
+  Connection,
   ErrorEnvelope,
   EnvelopeMeta,
   FlagVariable,
@@ -71,6 +76,25 @@ export const FLAG_VARIABLES: readonly FlagVariable[] = [
   DO_NOT_TRACK,
   ZITADEL_TELEMETRY,
 ];
+
+/** How a command resolves the context it runs in; see {@link BaseCommand.meta}. */
+export type MetaOptions = {
+  resolveServer?: boolean;
+  source?: string;
+  environment?: boolean;
+};
+
+/**
+ * What {@link BaseCommand.execute} receives once a command has been admitted:
+ * its parsed flags, arguments and positional words, and what each of its requirements found,
+ * under the name it is declared with.
+ */
+export type Admitted<C extends typeof BaseCommand> = Readonly<{
+  flags: Interfaces.InferredFlags<C["flags"] & C["baseFlags"]>;
+  args: Interfaces.InferredArgs<C["args"]>;
+  argv: readonly string[];
+}> &
+  Resolved<C["requires"]>;
 
 /**
  * Base class for every oclif command. Owns the global flags, builds the
@@ -133,6 +157,15 @@ export abstract class BaseCommand extends Interruptible(Command) {
     }),
   };
 
+  /** How the run's context is resolved; see {@link toMeta}. */
+  static meta: MetaOptions = {};
+
+  /** Rules between this command's flags and arguments, checked right after they parse. */
+  static rules: readonly Rule[] = [];
+
+  /** What this command needs from outside its flags, found before it runs. */
+  static requires: Requirements = {};
+
   /** Resolved context for the current invocation; set by {@link toMeta}. */
   protected meta: GlobalOptions = this.fallbackMeta();
 
@@ -165,6 +198,106 @@ export abstract class BaseCommand extends Interruptible(Command) {
    * {@link catch} after an early failure.
    */
   private readonly telemetryStartedAt = Date.now();
+
+  /**
+   * The one lifecycle every command shares: parse the flags, resolve the
+   * context, check the command's rules, find what it requires, and only
+   * then hand the work to {@link execute}. Nothing in `execute` needs to check
+   * anything it was given.
+   */
+  async run(): Promise<JsonEnvelope> {
+    const admitted = await this.admit();
+    if (isEnded(admitted)) {
+      return this.emit(admitted.ended);
+    }
+    return this.execute(admitted);
+  }
+
+  /** The command's work, which receives only flags, arguments and findings that passed. */
+  protected abstract execute(input: Admitted<typeof BaseCommand>): Promise<JsonEnvelope>;
+
+  protected connectionForRequirement(_options: ConnectOptions): Promise<Connection> {
+    return Promise.reject(new Error(`${this.id ?? "This command"} has no project to connect to`));
+  }
+
+  private get command(): typeof BaseCommand {
+    return this.ctor as typeof BaseCommand;
+  }
+
+  private async admit(): Promise<Admitted<typeof BaseCommand> | Ended> {
+    const { flags, args, argv } = await this.parse(this.command);
+    await this.toMeta(flags, this.command.meta);
+    const view = {
+      flags: {
+        ...flags,
+        json: this.jsonEnabled(),
+      },
+      args,
+    };
+    this.refuseBrokenRules(view);
+    const resolved = await this.resolveRequirements(view);
+    if (isEnded(resolved)) {
+      return resolved;
+    }
+    return {
+      flags,
+      args,
+      argv: argv.map(String),
+      ...resolved,
+    } as Admitted<typeof BaseCommand>;
+  }
+
+  private refuseBrokenRules(view: RuleView): void {
+    for (const rule of this.command.rules) {
+      const outcome = rule.broken(view);
+      if (outcome) {
+        throw refusalError(
+          rule.refusal,
+          {
+            ...placeholdersOf(view),
+            ...(outcome === true ? {} : outcome),
+          },
+          (next) => this.suggestUnscoped(next),
+        );
+      }
+    }
+  }
+
+  private async resolveRequirements(view: RuleView): Promise<Record<string, unknown> | Ended> {
+    const resolved: Record<string, unknown> = {};
+    for (const [name, requirement] of Object.entries(this.command.requires)) {
+      const found = await requirement.resolve({
+        ...view,
+        meta: this.meta,
+        connect: (options = {}) => this.connectionForRequirement(options),
+        resolved,
+      });
+      if (found === undefined || isUnmet(found)) {
+        throw refusalError(
+          requirement.refusal ?? {
+            message: `${name} could not be found`,
+          },
+          {
+            ...placeholdersOf(view),
+            cwd: this.meta.cwd,
+            ...(found === undefined ? {} : found.unmet),
+          },
+          (next) => this.suggestUnscoped(next),
+        );
+      }
+      if (isEnded(found)) {
+        return found;
+      }
+      resolved[name] = found;
+      if (requirement.source !== undefined) {
+        this.meta = {
+          ...this.meta,
+          source: requirement.source(found),
+        };
+      }
+    }
+    return resolved;
+  }
 
   /**
    * oclif runs this before `run`. The user agent goes in here, ahead of flag
@@ -231,7 +364,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
    */
   protected async toMeta(
     flags: Record<string, unknown>,
-    options: { resolveServer?: boolean; source?: string } = {},
+    options: MetaOptions = {},
   ): Promise<GlobalOptions> {
     const cwd = resolveCwd(typeof flags.cwd === "string" ? flags.cwd : undefined);
     this.typedCwd = typeof flags.cwd === "string" ? flags.cwd : undefined;

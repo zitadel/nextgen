@@ -6,18 +6,18 @@ import { consola } from "consola";
 
 import { createZitadelClient } from "../../lib/api-client";
 import { toZitadelError, ZitadelError } from "../../lib/errors";
-import { isEnvironmentName } from "../../lib/environment";
 import { writeManagedEnvFile } from "../../lib/fs-safe";
 import { isObject } from "../../lib/json";
 import { DEPLOY_ARGS, deployInitialRelease, type InitialDeployment } from "../../lib/release";
 import { reportWarning } from "../../lib/warnings";
 import {
+  type Admitted,
   BaseCommand,
   CommandGroups,
   type JsonEnvelope,
-  nonBlankArg,
   nonBlankString,
 } from "../../lib/oclif";
+import { appUrlFlag, environmentNameArg, parseAppUrl } from "../../lib/oclif/inputs/environment";
 import { PUBLIC_PROJECT_ID_VARIABLE } from "../../lib/orca/patchers/rule/public-project-id";
 import { readZitadelConfig } from "../../lib/project";
 import { DEFAULT_SERVER, parseServer, resolveServer } from "../../lib/server";
@@ -51,32 +51,30 @@ export default class EnvAdd extends Promptable(BaseCommand) {
     "<%= config.bin %> env add staging --server https://api.zitadel.cloud --project proj_01K9AA9M3K7E2QX8VB4T",
   ];
   static override args = {
-    name: nonBlankArg({ required: true, description: "The environment name, e.g. production." }),
+    name: environmentNameArg({
+      required: true,
+      description: "The environment name, e.g. production.",
+    }),
   };
   static override flags = {
     project: nonBlankString({
       description:
         "Bind this existing project instead of creating one. Its secrets come from ZITADEL_PROJECT_SECRET and ZITADEL_PREVIEW_TOKEN in the process environment.",
     }),
-    "app-url": nonBlankString({
+    "app-url": appUrlFlag({
       description:
         "The URL this environment's app is served from. It becomes ZITADEL_ISSUER and is registered with a new project.",
     }),
     force: Flags.boolean({ description: "Overwrite an existing .env.<name>.local." }),
   };
 
-  async run(): Promise<JsonEnvelope> {
-    const { args, flags } = await this.parse(EnvAdd);
-    // The server is chosen here, not resolved: the environment being added has
-    // no file yet to say where its project lives.
-    await this.toMeta(flags, { resolveServer: false });
+  static override meta = {
+    resolveServer: false,
+  };
+
+  protected async execute({ args, flags }: Admitted<typeof EnvAdd>): Promise<JsonEnvelope> {
     const { cwd, env, nonInteractive, dryRun, serverFlag } = this.meta;
     const name = args.name;
-    if (!isEnvironmentName(name)) {
-      throw new ZitadelError("E_VALIDATION", `"${name}" is not a usable environment name`, {
-        hint: 'Use letters, digits, dot, dash and underscore, and no "..", e.g. production.',
-      });
-    }
     const file = `.env.${name}.local`;
     const path = join(cwd, file);
 
@@ -133,16 +131,8 @@ export default class EnvAdd extends Promptable(BaseCommand) {
             message: "What URL is your app served from? You can leave this empty to skip it.",
             flag: "--app-url",
             placeholder: "https://app.acme.com",
-            parse: (answer: string) => ({ ok: true, value: answer.trim() || undefined }) as const,
+            parse: parseAppUrl,
           }));
-    if (
-      appUrl !== undefined &&
-      !(URL.canParse(appUrl) && /^https?:$/.test(new URL(appUrl).protocol))
-    ) {
-      throw new ZitadelError("E_VALIDATION", `Invalid app URL "${appUrl}"`, {
-        hint: "Use a URL like https://app.acme.com.",
-      });
-    }
     const issuer = appUrl === undefined ? undefined : new URL(appUrl).origin;
 
     if (dryRun) {

@@ -3,7 +3,13 @@ import { readFile, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { pathExists } from "../lib/fs";
-import { BaseCommand, type CommandResult, CommandGroups, type JsonEnvelope } from "../lib/oclif";
+import {
+  type Admitted,
+  BaseCommand,
+  type CommandResult,
+  CommandGroups,
+  type JsonEnvelope,
+} from "../lib/oclif";
 import { createOrca } from "../lib/orca";
 import { AGENTS_HEADER, removeGuidanceSection } from "../lib/orca/patchers/rule/guidance";
 import type { EjectActions } from "../lib/orca/patchers/types";
@@ -245,9 +251,11 @@ export default class Eject extends Destructive(BaseCommand) {
     }),
   };
 
-  async run(): Promise<JsonEnvelope> {
-    const { flags } = await this.parse(Eject);
-    await this.toMeta(flags, { resolveServer: false });
+  static override meta = {
+    resolveServer: false,
+  };
+
+  protected async execute({ flags }: Admitted<typeof Eject>): Promise<JsonEnvelope> {
     const { cwd } = this.meta;
     const dir = typeof flags.cwd === "string" ? flags.cwd : undefined;
 

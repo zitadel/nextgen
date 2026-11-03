@@ -1,7 +1,12 @@
 import { Args, Flags } from "@oclif/core";
 
 import { ZitadelError } from "../../lib/errors";
-import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../../lib/oclif";
+import {
+  type Admitted,
+  CommandGroups,
+  EnvironmentCommand,
+  type JsonEnvelope,
+} from "../../lib/oclif";
 import { POLICIES_DIR } from "../../lib/policies";
 import {
   policiesFromFiles,
@@ -44,9 +49,7 @@ export default class PoliciesTest extends EnvironmentCommand {
     }),
   };
 
-  async run(): Promise<JsonEnvelope> {
-    const { args, flags } = await this.parse(PoliciesTest);
-    await this.toMeta(flags);
+  protected async execute({ args, flags }: Admitted<typeof PoliciesTest>): Promise<JsonEnvelope> {
     const { cwd } = this.meta;
 
     const operations = args.operation === undefined ? [] : [args.operation];

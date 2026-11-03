@@ -4,11 +4,12 @@ import { Paging } from "@zitadel/api/runtime/paging";
 
 import { sanitizeResponse } from "../../../api-client";
 
-import { nonBlankString } from "../../flags";
+import { integerFlag, nonBlankString } from "../../flags";
 
-import type { CommandResult, GlobalOptions } from "../../types";
+import type { CommandResult } from "../../types";
 import { wireOf } from "../wire";
-import { type ParsedFilter, parseFilter, parseSort } from "../query";
+import { fieldsFlag, filterFlag, sortFlag, type TypedFilter, type TypedSort } from "../inputs";
+import type { ParsedFilter } from "../query";
 import { parseOrThrow } from "../shared";
 import { chosenColumns } from "../columns";
 import { Cmd } from "../../../cmd";
@@ -29,15 +30,20 @@ import {
 export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
   static describe<Ctx>({
     topic,
+    resource,
     spec,
     options,
   }: OperationDefinition<Ctx, ListSpec<Ctx>>): OperationStatics {
     const paged = spec.paged !== false;
     const pagingFlags = {
-      limit: Flags.integer({
+      limit: integerFlag({
         description: "Page size (server default 20, max 100).",
         min: 1,
         max: 100,
+        refusal: {
+          message: "{value} is not a valid page size",
+          hint: "Use a whole number from {min} to {max}.",
+        },
       }),
       "page-token": nonBlankString({
         description: "Continue from a previous page's next_page_token.",
@@ -49,9 +55,11 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
       }),
     };
     const presentation = {
-      fields: nonBlankString({
+      fields: fieldsFlag({
         description:
           "Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the resource's own columns; `--json` is unaffected.",
+        fallback: resource.columns,
+        shape: fieldPaths(spec.item),
       }),
       plain: Flags.boolean({
         description:
@@ -66,8 +74,10 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
     const specific = {
       ...(filters.length > 0
         ? {
-            filter: nonBlankString({
+            filter: filterFlag({
               multiple: true,
+              filters,
+              operations: options.operations,
               description: `Filter as field=operation:value (operation defaults to equals). Fields: ${filters
                 .map(
                   (field) =>
@@ -79,7 +89,8 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
         : {}),
       ...(sorts.length > 0
         ? {
-            sort: nonBlankString({
+            sort: sortFlag({
+              sorts,
               description: `Sort as field:direction (asc|desc). Fields: ${sorts.join(", ")}.`,
             }),
           }
@@ -101,16 +112,10 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
     };
   }
 
-  protected override async execute(
-    { flags }: OperationInput,
-    _meta: GlobalOptions,
-  ): Promise<CommandResult> {
+  protected override async operate({ flags }: OperationInput): Promise<CommandResult> {
     const { topic, resource, spec, options } = this.definition;
     const wire = wireOf(options.wire);
-    // With a schema in hand the columns are known before any request, so a
-    // typo fails without contacting the server at all.
     const shape = fieldPaths(spec.item);
-    const early = shape ? chosenColumns(flags.fields, resource.columns, [], shape) : undefined;
     // Every list's pages arrive as the server sent them, so the walk below
     // sends each cursor back unchanged and escapes only what the list answers.
     const ctx = await this.context({ verbatim: true });
@@ -125,12 +130,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
           }
         : {};
 
-    // One request per page. Filters are parsed and checked against each
-    // field's own declaration first, so an operation the endpoint does not
-    // offer fails locally with what that field accepts.
-    const given = (Array.isArray(flags.filter) ? flags.filter : []).map((raw) =>
-      parseFilter(String(raw), spec.filters ?? [], options.operations),
-    );
+    const given = (flags.filter ?? []) as readonly TypedFilter[];
     // A field that declares a default contributes it only when the caller did
     // not name that field, so naming it always wins.
     const defaults = (spec.filters ?? []).flatMap((field) =>
@@ -139,8 +139,11 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
         : [],
     );
     const parsed = [...given, ...defaults];
-    const sorting =
-      typeof flags.sort === "string" ? parseSort(flags.sort, spec.sorts ?? []) : undefined;
+    const sort = flags.sort as TypedSort | undefined;
+    const sorting = sort && {
+      field: sort.field,
+      direction: sort.direction,
+    };
 
     // Transport is the only thing that differs: a structured query endpoint
     // takes a validated body, a GET list takes flat parameters. The caller
@@ -209,7 +212,12 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
     // `--plain`) gets one tab-separated record per line, which `cut` and `awk`
     // can split and nothing else has to parse around.
     const plain = this.isPlain(flags.plain === true);
-    const columns = early ?? chosenColumns(flags.fields, resource.columns, items);
+    const columns = chosenColumns(
+      flags.fields as readonly string[] | undefined,
+      resource.columns,
+      items,
+      shape,
+    );
     // A page token is only valid alongside the sorting and filters that issued
     // it, so the suggested next page repeats the whole invocation rather than
     // handing back a bare token. `--all` already drained everything, so it
@@ -257,9 +265,9 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
  */
 const repeatedFlags = (flags: Json): readonly string[] => {
   const limit = typeof flags.limit === "number" ? [`--limit ${flags.limit}`] : [];
-  const sort = typeof flags.sort === "string" ? [Cmd.option("--sort", flags.sort)] : [];
-  const filters = (Array.isArray(flags.filter) ? flags.filter : []).map((filter) =>
-    Cmd.option("--filter", String(filter)),
+  const sort = flags.sort ? [Cmd.option("--sort", (flags.sort as TypedSort).raw)] : [];
+  const filters = ((flags.filter ?? []) as readonly TypedFilter[]).map((filter) =>
+    Cmd.option("--filter", filter.raw),
   );
   return [...limit, ...sort, ...filters];
 };
