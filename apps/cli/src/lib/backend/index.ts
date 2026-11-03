@@ -7,37 +7,21 @@
  * depends on the API client, the consent a destructive call needs, and the
  * error type, and on nothing else under `lib/`.
  */
-export {
-  ReleaseService,
-  type ConfigurationBundle,
-  type Release,
-  type ReleaseSource,
-} from "./release-service";
+export { BrandingService, type BrandingRevision, type BrandingSummary } from "./branding-service";
 export {
   DeploymentService,
   type DeployInput,
   type Deployment,
+  type DeploymentDetail,
+  type DeploymentHistory,
   type DeploymentPageQuery,
   type DeploymentQuery,
+  type DeploymentRecord,
+  type DeploymentSummary,
   type DeployTargets,
   type RollbackOptions,
   type RolledBackDeployment,
 } from "./deployment-service";
-export {
-  ProjectService,
-  type CreatedProject,
-  type CreateProjectInput,
-  type Project,
-} from "./project-service";
-export { PreviewService, type PreviewPageQuery } from "./preview-service";
-export {
-  Variable,
-  VariableService,
-  type VariableState,
-  type VariableWrite,
-} from "./variable-service";
-export { BrandingService } from "./branding-service";
-export { PolicyService, type PolicyEvaluation, type PolicyQuery } from "./policy-service";
 export {
   EnvironmentService,
   type BindRequest,
@@ -53,3 +37,40 @@ export {
   type OriginRemoval,
   type ProjectOriginEntry,
 } from "./origin-service";
+export {
+  PolicyService,
+  type PolicyDecision,
+  type PolicyEvaluation,
+  type PolicyPage,
+  type PolicyQuery,
+  type PolicyRecord,
+  type PolicyRevision,
+  type PolicySummary,
+} from "./policy-service";
+export {
+  PreviewService,
+  type LivePreview,
+  type PreviewList,
+  type PreviewPageQuery,
+} from "./preview-service";
+export {
+  ProjectService,
+  type CreatedProject,
+  type CreateProjectInput,
+  type Project,
+} from "./project-service";
+export {
+  ReleaseService,
+  type ConfigurationBundle,
+  type Release,
+  type ReleaseRecord,
+  type ReleaseSource,
+} from "./release-service";
+export {
+  Variable,
+  VariableService,
+  type VariableKind,
+  type VariableState,
+  type VariableValue,
+  type VariableWrite,
+} from "./variable-service";

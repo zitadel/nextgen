@@ -11,18 +11,7 @@ export type VariableKind = "primary" | "preview";
 /** One value on the wire: a bare scalar, or `{"secret": true}` for a secret. */
 export type VariableValue = NonNullable<GetVariable200["primary"]>;
 
-/** The values of one kind in a read, keyed by name. */
-export function valuesOfKind(
-  body: GetVariables200,
-  kind: VariableKind,
-): Record<string, VariableValue> {
-  return Object.fromEntries(
-    Object.entries(body).flatMap(([name, byKind]) =>
-      byKind[kind] === undefined ? [] : [[name, byKind[kind]]],
-    ),
-  );
-}
-
+/** The scalar a plain variable holds. */
 type Scalar = string | number | boolean;
 
 /** What one kind of a name holds: a value, or the fact that a secret is held. */
@@ -31,7 +20,7 @@ type Held = Readonly<{ secret: boolean; value?: Scalar }>;
 /** A value to write: a secret is stored but never read back. */
 export type VariableWrite = Readonly<{ value: Scalar; secret: boolean }>;
 
-/** What a name holds in each kind, as a write or a read leaves it. */
+/** What a name holds in each kind, as a write leaves it. */
 export type VariableState = Readonly<Record<VariableKind, Variable | undefined>>;
 
 /** Stands in for a secret's value, which the platform never discloses. */
@@ -49,6 +38,24 @@ const NAME_PATTERN = /^\w+$/;
 
 /** Longest name the same schema accepts. */
 const NAME_MAX_LENGTH = 255;
+
+/**
+ * The values of one kind in a read, keyed by name.
+ *
+ * @param body - What a read answered.
+ * @param kind - The kind to keep.
+ * @returns The names that hold a value of that kind, with the value.
+ */
+export function valuesOfKind(
+  body: GetVariables200,
+  kind: VariableKind,
+): Readonly<Record<string, VariableValue>> {
+  return Object.fromEntries(
+    Object.entries(body).flatMap(([name, byKind]) =>
+      byKind[kind] === undefined ? [] : [[name, byKind[kind]]],
+    ),
+  );
+}
 
 function heldOf(wire: VariableValue): Held {
   return typeof wire === "object" && wire !== null
@@ -98,13 +105,24 @@ export class Variable {
     Object.freeze(this);
   }
 
-  /** One name with the value it holds in a single kind. */
+  /**
+   * One name with the value it holds in a single kind.
+   *
+   * @param name - The variable's name.
+   * @param wire - The value as the platform reports it.
+   * @returns The variable.
+   */
   static of(name: string, wire: VariableValue): Variable {
     return new Variable(name, heldOf(wire), undefined);
   }
 
-  /** The values of one kind as variables, sorted by name so output is stable between runs. */
-  static fromValues(values: Record<string, VariableValue>): Variable[] {
+  /**
+   * The values of one kind as variables.
+   *
+   * @param values - The values, keyed by name.
+   * @returns The variables, sorted by name so output is stable between runs.
+   */
+  static fromValues(values: Readonly<Record<string, VariableValue>>): readonly Variable[] {
     return Object.entries(values)
       .map(([name, wire]) => Variable.of(name, wire))
       .sort((a, b) => a.name.localeCompare(b.name));
@@ -112,10 +130,13 @@ export class Variable {
 
   /**
    * Every name on the project with the primary value it holds and the preview
-   * value beside it, sorted by name. A name is listed when either kind holds a
-   * value, so a preview-only name does not disappear (#1617).
+   * value beside it. A name is listed when either kind holds a value, so a
+   * preview-only name does not disappear (#1617).
+   *
+   * @param body - What a read without a kind answered.
+   * @returns The variables, sorted by name.
    */
-  static inventory(body: GetVariables200): Variable[] {
+  static inventory(body: GetVariables200): readonly Variable[] {
     return Object.entries(body)
       .map(([name, byKind]) => {
         const primary = byKind.primary === undefined ? undefined : heldOf(byKind.primary);
@@ -125,14 +146,18 @@ export class Variable {
       .sort((a, b) => a.name.localeCompare(b.name));
   }
 
-  /** The cells of a table with one value column. Every value is escaped for the terminal. */
+  /**
+   * The cells of a table with one value column. Every value is escaped for the
+   * terminal, and a secret prints a marker.
+   */
   cell(): { name: string; value: string } {
     return { name: this.name, value: this.secret ? SECRET_MARKER : render(this.value) };
   }
 
   /**
-   * {@link Variable.cell} plus the preview column. A kind the name holds nothing
-   * for prints `-`, because an empty cell would read as an empty value.
+   * The cells of a table with a preview column beside the value. A kind the
+   * name holds nothing for prints `-`, because an empty cell would read as an
+   * empty value.
    */
   inventoryCell(): { name: string; value: string; preview: string } {
     const show = (held: Held | undefined): string => {
@@ -151,6 +176,7 @@ export class Variable {
     };
   }
 
+  /** The plain record the JSON output carries. */
   toJSON(): Record<string, unknown> {
     return {
       name: this.name,
@@ -187,6 +213,7 @@ export class VariableService {
    * Refuse a name the platform would refuse, quoting it so a newline or an
    * escape sequence in it cannot reach the terminal.
    *
+   * @param name - The name to check.
    * @throws ZitadelError `E_VALIDATION` naming what is wrong with the name.
    */
   static assertName(name: string): void {
@@ -204,35 +231,52 @@ export class VariableService {
     }
   }
 
-  /** The kinds a write sets: the platform's rule for where a plain value and a secret go. */
-  static kindsWritten(secret: boolean, kind?: "preview"): VariableKind[] {
+  /**
+   * The kinds a write sets: the platform's rule for where a plain value and a
+   * secret go.
+   *
+   * @param secret - Whether the value is a secret.
+   * @param kind - `preview` to write the preview kind alone.
+   * @returns The kinds the write sets.
+   */
+  static kindsWritten(secret: boolean, kind?: "preview"): readonly VariableKind[] {
     if (kind === "preview") {
       return ["preview"];
     }
     return secret ? ["primary"] : ["primary", "preview"];
   }
 
-  /** The kinds a removal clears: the preview value alone, or both. */
-  static kindsRemoved(kind?: "preview"): VariableKind[] {
+  /**
+   * The kinds a removal clears: the preview value alone, or both.
+   *
+   * @param kind - `preview` to remove the preview kind alone.
+   * @returns The kinds the removal clears.
+   */
+  static kindsRemoved(kind?: "preview"): readonly VariableKind[] {
     return kind === "preview" ? ["preview"] : ["primary", "preview"];
   }
 
   /**
-   * The variables of the project. Without a kind, every name with its primary
-   * value and the preview value beside it; with one, only the names that hold a
-   * value of that kind.
+   * List the variables of the project.
+   *
+   * @param kind - Without a kind, every name with its primary value and the
+   * preview value beside it; with one, only the names that hold a value of it.
+   * @returns The variables, sorted by name.
    */
   async list(kind?: VariableKind): Promise<readonly Variable[]> {
     if (kind === undefined) {
       return Variable.inventory(await this.client.getVariables({ project_id: this.projectId }));
     }
-    const held = await this.read(kind);
-    return Variable.fromValues(valuesOfKind(held, kind));
+    return Variable.fromValues(valuesOfKind(await this.read(kind), kind));
   }
 
   /**
    * Read one variable in the given kind.
    *
+   * @param name - The variable to read.
+   * @param kind - The kind to read it in.
+   * @returns The variable. A secret is found but not disclosed.
+   * @throws ZitadelError `E_VALIDATION` for a name the platform would refuse.
    * @throws ZitadelError `E_NOT_FOUND` when the name holds no value of that kind.
    */
   async get(name: string, kind: VariableKind): Promise<Variable> {
@@ -254,9 +298,13 @@ export class VariableService {
    * Set one name. Without a kind a plain value is stored for both kinds and a
    * secret for the primary kind only; `preview` writes the preview kind alone.
    *
+   * @param name - The variable to set.
+   * @param write - The value, and whether it is a secret.
+   * @param kind - `preview` to write the preview kind alone.
    * @returns What the name holds in each kind afterwards. The write answers with
    * the kinds it touched, and the kind it did not touch is read separately,
    * because the platform never merges the two kinds in one answer.
+   * @throws ZitadelError `E_VALIDATION` for a name the platform would refuse.
    */
   async set(name: string, write: VariableWrite, kind?: "preview"): Promise<VariableState> {
     VariableService.assertName(name);
@@ -273,9 +321,13 @@ export class VariableService {
   /**
    * Remove one name: its preview value alone, or both kinds.
    *
+   * @param consent - The proof the caller was allowed to do something irreversible.
+   * @param name - The variable to remove.
+   * @param kind - `preview` to remove the preview kind alone.
    * @returns The kinds cleared.
+   * @throws ZitadelError `E_VALIDATION` for a name the platform would refuse.
    */
-  async remove(consent: Consent, name: string, kind?: "preview"): Promise<VariableKind[]> {
+  async remove(consent: Consent, name: string, kind?: "preview"): Promise<readonly VariableKind[]> {
     VariableService.assertName(name);
     const scope =
       kind === undefined ? { project_id: this.projectId } : { project_id: this.projectId, kind };
@@ -284,26 +336,9 @@ export class VariableService {
   }
 
   /**
-   * Whether the name's primary value is a secret. A token that may not read the
-   * primary values leaves the answer to whoever can, so it reads as no; any other
-   * failure leaves it unknown and is thrown, because acting on an unknown is the
-   * one outcome a caller asking this exists to prevent.
-   */
-  async holdsSecret(name: string): Promise<boolean> {
-    try {
-      const held = (await this.read("primary"))[name]?.primary;
-      return typeof held === "object" && held !== null;
-    } catch (error) {
-      if (error instanceof ApiError && error.status === 403) {
-        return false;
-      }
-      throw error;
-    }
-  }
-
-  /**
-   * Which names hold a value in the given kind, and whether each is a secret.
+   * Find which names hold a value in the given kind, and whether each is a secret.
    *
+   * @param kind - The kind to read.
    * @returns The names mapped to whether they are secret, or undefined when a
    * token that may not read the preview values asked for them, which leaves the
    * check to whoever can.
@@ -320,6 +355,27 @@ export class VariableService {
     } catch (error) {
       if (kind === "preview" && error instanceof ApiError && error.status === 403) {
         return undefined;
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Whether the name's primary value is a secret. A token that may not read the
+   * primary values leaves the answer to whoever can, so it reads as no; any other
+   * failure leaves it unknown and is thrown, because acting on an unknown is the
+   * one outcome a caller asking this exists to prevent.
+   *
+   * @param name - The variable to check.
+   * @returns True when the primary value is a secret.
+   */
+  async holdsSecret(name: string): Promise<boolean> {
+    try {
+      const held = (await this.read("primary"))[name]?.primary;
+      return typeof held === "object" && held !== null;
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 403) {
+        return false;
       }
       throw error;
     }

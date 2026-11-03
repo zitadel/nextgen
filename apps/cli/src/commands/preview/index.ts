@@ -175,7 +175,10 @@ export function readPreviewUrls(
  * to. A 401 is a token the server does not accept at all, which fails here
  * rather than after the whole bundle is built.
  */
-async function primaryOrigins(client: ZitadelClient, projectId: string): Promise<string[]> {
+async function primaryOrigins(
+  client: ZitadelClient,
+  projectId: string,
+): Promise<readonly string[]> {
   const originService = new OriginService(client, projectId);
   try {
     return await originService.primary();

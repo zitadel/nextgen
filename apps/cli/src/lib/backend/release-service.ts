@@ -13,22 +13,28 @@ import { ZitadelError } from "../errors";
  * The resources of `.zitadel/` as `POST /releases/build` takes them, grouped by
  * kind: the schemas, flow definitions, identity-provider connections and
  * operation policies as authored, and the branding descriptor with its `$file`
- * template inlined. The
- * editor-only `$schema` affordance is stripped from each so it never reaches
- * the wire.
+ * template inlined. The editor-only `$schema` affordance is stripped from each
+ * so it never reaches the wire.
  *
  * Connections ride the bundle like every other kind, so the server creates or
  * revises them inside the same transaction as the release: a build that fails
  * leaves none of them behind, and a release that is never deployed writes none.
  */
-export type ConfigurationBundle = {
-  schemas: Record<string, unknown>[];
-  flow_definitions: Record<string, unknown>[];
-  idps: Record<string, unknown>[];
+export type ConfigurationBundle = Readonly<{
+  schemas: readonly Record<string, unknown>[];
+  flow_definitions: readonly Record<string, unknown>[];
+  idps: readonly Record<string, unknown>[];
   /** Absent when `.zitadel/policies/` holds none, so a server without the kind takes the bundle. */
-  policies?: Record<string, unknown>[];
-  branding?: Record<string, unknown>;
-};
+  policies?: readonly Record<string, unknown>[];
+  branding?: Readonly<Record<string, unknown>>;
+}>;
+
+/** Metadata recorded alongside a release, mirroring the source commit. */
+export type ReleaseSource = Readonly<{
+  message?: string;
+  gitSha: string | null;
+  gitDirty: boolean;
+}>;
 
 /**
  * A release, as build returns it: 200 when the bundle matched a release that
@@ -36,19 +42,18 @@ export type ConfigurationBundle = {
  */
 export type Release = BuildRelease200 | BuildRelease201;
 
-/** Metadata recorded alongside a release, mirroring the source commit. */
-export type ReleaseSource = {
-  message?: string;
-  gitSha: string | null;
-  gitDirty: boolean;
-};
+/** A release with the revisions it points at, as a read returns it. */
+export type ReleaseRecord = Awaited<ReturnType<ZitadelClient["getReleaseById"]>>;
 
 /**
- * The releases of one project: building one from a configuration bundle, reading
- * it back, and revoking it.
+ * The releases of one project: reading one, building one from a configuration
+ * bundle, and revoking it.
  *
  * @remarks
- * A Service Layer (Fowler, Patterns of Enterprise Application Architecture) over the generated API client, which plays the Gateway: a command says what should happen and never which endpoint serves it. Bound to one project at construction, so a call carries only what is specific to it.
+ * A Service Layer (Fowler, PoEAA) over the generated API client, which plays
+ * the Gateway: a command says what should happen and never which endpoint
+ * serves it. Bound to one project at construction, so a call carries only what
+ * is specific to it.
  */
 export class ReleaseService {
   private readonly client: ZitadelClient;
@@ -57,6 +62,16 @@ export class ReleaseService {
   constructor(client: ZitadelClient, projectId: string) {
     this.client = client;
     this.projectId = projectId;
+  }
+
+  /**
+   * Read one release.
+   *
+   * @param releaseId - The release to read.
+   * @returns The release, with the revisions it points at.
+   */
+  async get(releaseId: string): Promise<ReleaseRecord> {
+    return this.client.getReleaseById(releaseId, { project_id: this.projectId });
   }
 
   /**
@@ -81,11 +96,7 @@ export class ReleaseService {
       ...(source.gitSha === null ? {} : { git_sha: source.gitSha }),
       git_dirty: source.gitDirty,
     };
-    // The bundle is read from disk as loose JSON. `validate` has already held
-    // each file to the API's rules, naming it; this narrows the body to the
-    // API's type before it is sent, and sends it as read: the check fills in no
-    // defaults.
-    assertBuildReleaseBody(body);
+    ReleaseService.assertBuildBody(body);
     const release = await this.client.buildRelease(body, { project_id: this.projectId });
     if (release.revoked_at) {
       throw new ZitadelError(
@@ -100,26 +111,29 @@ export class ReleaseService {
     return release;
   }
 
-  /** Read one release, with the revisions it points at. */
-  async get(releaseId: string) {
-    return this.client.getReleaseById(releaseId, { project_id: this.projectId });
-  }
-
   /**
    * Revoke a release so its content is never served again. Idempotent.
    *
    * @param consent - The proof the caller was allowed to do something irreversible.
    * @param releaseId - The release to revoke.
+   * @returns The release, now revoked.
    */
   async revoke(consent: Consent, releaseId: string): Promise<Release> {
     return consent.unlock(this.client).revokeRelease(releaseId, { project_id: this.projectId });
   }
-}
 
-/** Refuses a body `POST /releases/build` does not take, naming each field it refuses. */
-function assertBuildReleaseBody(body: unknown): asserts body is BuildReleaseBody {
-  const checked = BuildReleaseBodySchema.safeParse(body);
-  if (!checked.success) {
+  /**
+   * Narrow a body to the API's type before it is sent. The bundle is read from
+   * disk as loose JSON and `validate` has already held each file to the API's
+   * rules, naming it; this sends the body as read and fills in no defaults.
+   *
+   * @throws ZitadelError `E_VALIDATION` naming each field the API does not take.
+   */
+  private static assertBuildBody(body: unknown): asserts body is BuildReleaseBody {
+    const checked = BuildReleaseBodySchema.safeParse(body);
+    if (checked.success) {
+      return;
+    }
     const issues = checked.error.issues;
     const noun = issues.length === 1 ? "issue" : "issues";
     throw new ZitadelError(

@@ -296,7 +296,7 @@ export default class Deploy extends EnvironmentCommand {
     client: Connection["client"],
     projectId: string,
     environment: Connection["environment"],
-  ): Promise<string[]> {
+  ): Promise<readonly string[]> {
     const originService = new OriginService(client, projectId);
     const origins = await originService.list();
     const landing = OriginService.primaryPatterns(origins);

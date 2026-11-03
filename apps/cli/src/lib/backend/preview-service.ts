@@ -3,12 +3,20 @@ import { Paging } from "@zitadel/api/runtime/paging";
 import { pagedFunctions, type ZitadelClient } from "../api-client";
 import type { Consent } from "../consent";
 
-/** What {@link PreviewService.pages} takes beyond the project. */
-export type PreviewPageQuery = Readonly<{ limit?: number; page_token?: string; all?: boolean }>;
+/** A live preview, as the list of them returns it. */
+export type LivePreview = Awaited<ReturnType<ZitadelClient["listPreviews"]["all"]>>[number];
+
+/** What pages a list of previews. */
+export type PreviewPageQuery = Readonly<{
+  limit?: number;
+  page_token?: string;
+  /** Drain every page instead of reading one. */
+  all?: boolean;
+}>;
 
 /** One page of live previews, or every page when it was asked to drain. */
 export type PreviewList = Readonly<{
-  items: readonly Awaited<ReturnType<ZitadelClient["listPreviews"]>>["previews"][number][];
+  items: readonly LivePreview[];
   /** The cursor to the next page, or null when none remains. */
   next: string | null;
 }>;
@@ -18,7 +26,10 @@ export type PreviewList = Readonly<{
  * their own.
  *
  * @remarks
- * A Service Layer (Fowler, Patterns of Enterprise Application Architecture) over the generated API client, which plays the Gateway: a command says what should happen and never which endpoint serves it. Bound to one project at construction, so a call carries only what is specific to it.
+ * A Service Layer (Fowler, PoEAA) over the generated API client, which plays
+ * the Gateway: a command says what should happen and never which endpoint
+ * serves it. Bound to one project at construction, so a call carries only what
+ * is specific to it.
  */
 export class PreviewService {
   private readonly client: ZitadelClient;
@@ -29,13 +40,17 @@ export class PreviewService {
     this.projectId = projectId;
   }
 
-  /** Every live preview, across all pages. */
-  async list() {
+  /**
+   * List every live preview, across all pages.
+   *
+   * @returns The previews that are still being served.
+   */
+  async list(): Promise<readonly LivePreview[]> {
     return this.client.listPreviews.all(this.projectId);
   }
 
   /**
-   * The live previews, a page at a time.
+   * List the live previews a page at a time.
    *
    * @param query - The page size, the cursor to continue from, and `all` to drain every page.
    * @returns The items read, and the cursor to the next page when one remains.
@@ -48,7 +63,12 @@ export class PreviewService {
     return Object.freeze({ items, next });
   }
 
-  /** Stop serving one preview origin. */
+  /**
+   * Stop serving one preview origin.
+   *
+   * @param consent - The proof the caller was allowed to do something irreversible.
+   * @param origin - The preview origin to stop serving.
+   */
   async remove(consent: Consent, origin: string): Promise<void> {
     await consent.unlock(this.client).removePreview(this.projectId, { origin });
   }
