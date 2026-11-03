@@ -55,7 +55,7 @@ import { Table, TableBody, TableCell, TableHeader } from "@/components/ui/table"
 import { useLoadMore } from "@/hooks/use-load-more";
 import { useScrollEdges } from "@/hooks/use-scroll-edges";
 import { requireProjectScope, useRequiredProjectScope } from "@/lib/project-scope";
-import { fetchAllSchemas, fetchSchemaRevisions } from "@/lib/schema";
+import { fetchAllSchemas, fetchLatestSchemaId, fetchSchemaRevisions } from "@/lib/schema";
 import type { UserSchema } from "@/lib/schema";
 import type { UserTeam } from "@/lib/user";
 import {
@@ -114,11 +114,15 @@ export const Route = createFileRoute("/_authed/users/")({
     const readingRevisions = deps.schema
       ? fetchSchemaRevisions(projectId, deps.schema, { inUse: true }).catch(() => [])
       : Promise.resolve([]);
-    // `older` compares with the newest revision, so its users wait for the
-    // history. Unreadable, the URL would claim a filter the list cannot
-    // apply, so it drops back to the schema alone.
-    const older = deps.revision === OLDER_REVISIONS;
-    const latestId = older ? (await readingRevisions)[0]?.id : undefined;
+    // `older` compares with the newest revision, so its users wait for it.
+    // It is read as the latest of the type, not taken from the history,
+    // which leaves out a revision the viewer may not read. Unreadable, the
+    // URL would claim a filter the list cannot apply, so it drops back to the
+    // schema alone.
+    const older = deps.revision === OLDER_REVISIONS ? deps.schema : undefined;
+    const latestId = older
+      ? await fetchLatestSchemaId(projectId, older).catch(() => undefined)
+      : undefined;
     if (older && !latestId) {
       throw redirect({ to: "/users", search: (prev) => ({ ...prev, revision: undefined }) });
     }

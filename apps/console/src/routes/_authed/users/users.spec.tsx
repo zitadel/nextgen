@@ -1445,6 +1445,41 @@ describe("users screen", () => {
     );
   });
 
+  it("compares `older` with the latest of the type, not the first of a history it cannot all read", async () => {
+    // A grant that hides the newest revision leaves it out of the history;
+    // the latest-of-type read still names it.
+    const business = { ...BUSINESS_SCHEMA.schema, objectType: "business" };
+    const newest = {
+      id: "sch_business_3",
+      schema: business,
+      metadata: { created_at: "2026-09-01T00:00:00Z" },
+    };
+    const visible = [
+      { id: "sch_business_2", schema: business, metadata: { created_at: "2026-08-01T00:00:00Z" } },
+      { id: "sch_business", schema: business, metadata: { created_at: "2026-07-01T00:00:00Z" } },
+    ];
+    server.use(
+      http.get(SCHEMAS_URL, ({ request }) =>
+        HttpResponse.json({
+          schemas:
+            new URL(request.url).searchParams.get("revisions") === "all" ? visible : [newest],
+        }),
+      ),
+    );
+    const bodies = recordQueries(() => HttpResponse.json({ users: [] }));
+    await renderUsers(`${scopedPath("/users")}&schema=business&revision=older`);
+
+    await screen.findByRole("table");
+    expect(bodies.at(-1)).toEqual(
+      expect.objectContaining({
+        filter: [
+          { field: "schema_object_type", operation: "equals", value: "business" },
+          { field: "schema", operation: "not_equals", value: "sch_business_3" },
+        ],
+      }),
+    );
+  });
+
   it("drops `older` back to the schema when its history cannot be read", async () => {
     // With no newest revision to compare with, the URL would claim a filter
     // the list does not apply.
