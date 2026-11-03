@@ -16,7 +16,9 @@ describe("ReleaseService.create", () => {
     const { buildRelease, client } = aClient();
     const bundle = { schemas: [getDefaultHumanUserSchemaBody()], flow_definitions: [], idps: [] };
 
-    await new ReleaseService(client, "proj_1").create(bundle, source);
+    const releaseService = new ReleaseService(client, "proj_1");
+
+    await releaseService.create(bundle, source);
 
     expect(buildRelease).toHaveBeenCalledWith(
       { bundle, git_dirty: false },
@@ -28,12 +30,27 @@ describe("ReleaseService.create", () => {
     const { buildRelease, client } = aClient();
     const bundle = { schemas: [{ kind: "user-schema" }], flow_definitions: [], idps: [] };
 
-    await expect(new ReleaseService(client, "proj_1").create(bundle, source)).rejects.toMatchObject(
-      {
-        code: "E_VALIDATION",
-        message: expect.stringMatching(/nothing was sent[\s\S]*bundle\.schemas\.0/),
-      },
-    );
+    const releaseService = new ReleaseService(client, "proj_1");
+
+    await expect(releaseService.create(bundle, source)).rejects.toMatchObject({
+      code: "E_VALIDATION",
+      message: expect.stringMatching(/nothing was sent[\s\S]*bundle\.schemas\.0/),
+    });
     expect(buildRelease).not.toHaveBeenCalled();
+  });
+
+  it("refuses content that builds back to a revoked release, naming it", async () => {
+    const buildRelease = vi.fn(async () => ({
+      id: "rel_1",
+      content_hash: "sha256:abc",
+      revoked_at: "2026-01-01T00:00:00Z",
+    }));
+    const releaseService = new ReleaseService({ buildRelease } as never, "proj_1");
+    const bundle = { schemas: [getDefaultHumanUserSchemaBody()], flow_definitions: [], idps: [] };
+
+    await expect(releaseService.create(bundle, source)).rejects.toMatchObject({
+      code: "E_CONFLICT",
+      message: expect.stringContaining("rel_1"),
+    });
   });
 });

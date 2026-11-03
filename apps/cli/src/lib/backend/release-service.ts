@@ -50,6 +50,9 @@ export class ReleaseService {
    * @param source - The commit the bundle was built from.
    * @returns The release, new or the one that already carried the bundle.
    * @throws ZitadelError `E_VALIDATION` naming each field the API does not take, before anything is sent.
+   * @throws ZitadelError `E_CONFLICT` when the content matches a release that was revoked. The server
+   * dedupes on content, so the same tree always builds back to that release, and a revoked release
+   * can never be served.
    */
   async create(bundle: ConfigurationBundle, source: ReleaseSource): Promise<Release> {
     const body = {
@@ -63,7 +66,18 @@ export class ReleaseService {
     // API's type before it is sent, and sends it as read: the check fills in no
     // defaults.
     assertBuildReleaseBody(body);
-    return this.client.buildRelease(body, { project_id: this.projectId });
+    const release = await this.client.buildRelease(body, { project_id: this.projectId });
+    if (release.revoked_at) {
+      throw new ZitadelError(
+        "E_CONFLICT",
+        `This content was already released as ${release.id}, which is revoked`,
+        {
+          hint: "A revoked release can never be served again. Change the configuration so it builds a new release.",
+          details: { release_id: release.id, content_hash: release.content_hash },
+        },
+      );
+    }
+    return release;
   }
 
   /** Read one release, with the revisions it points at. */

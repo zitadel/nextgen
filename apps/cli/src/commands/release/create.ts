@@ -15,7 +15,6 @@ import {
   validateStep,
   worktreeIsDirty,
 } from "../../lib/backend";
-import { ZitadelError } from "../../lib/errors";
 
 import { reads, type Refused } from "../../lib/oclif/flags";
 import { MESSAGE_MAX_LENGTH, messageTooLong } from "../../lib/backend";
@@ -102,18 +101,6 @@ export default class ReleaseCreate extends EnvironmentCommand {
       gitSha: await headSha(this.cwd),
       gitDirty: await worktreeIsDirty(this.cwd),
     });
-    // Building dedupes on content, revoked releases included: the same tree
-    // answers with the revoked release, which can never be deployed.
-    if (release.revoked_at) {
-      throw new ZitadelError(
-        "E_CONFLICT",
-        `This content was already released as ${release.id}, which is revoked`,
-        {
-          hint: "A revoked release can never be served again. Change the configuration so it builds a new release.",
-          details: { release_id: release.id, content_hash: release.content_hash },
-        },
-      );
-    }
 
     return this.emit({
       status: "ok",
