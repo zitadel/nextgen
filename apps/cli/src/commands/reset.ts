@@ -22,7 +22,7 @@ export default class Reset extends Destructive(BaseCommand) {
     force: Flags.boolean({
       char: "f",
       description:
-        "Delete the local Zitadel server's data without the confirmation prompt. Required when non-interactive.",
+        "Delete the local runtime and its data without the confirmation prompt. Required when non-interactive.",
     }),
   };
 
@@ -47,12 +47,11 @@ export default class Reset extends Destructive(BaseCommand) {
 
     const dataDir = localRuntimePaths(this.meta.cwd).dataDir;
     const adminFile = join(this.meta.cwd, LOCAL_ADMIN_FILE);
-    const scope = { deletes: dataDir, keeps: adminFile };
 
     return this.emit(
       await this.confirmed({
         verb: "reset",
-        name: `delete the local Zitadel server's data in "${dataDir}"`,
+        name: "delete the local runtime and its data",
         message: [
           `Permanently delete the local Zitadel server's data in ${dataDir}?`,
           "",
@@ -63,18 +62,14 @@ export default class Reset extends Destructive(BaseCommand) {
         ].join("\n"),
         preview: () => ({
           status: "ok",
-          data: {
-            title: "Local Zitadel server runtime reset plan.",
-            runtime: described,
-            scope,
-          },
+          data: { title: "Local Zitadel server runtime reset plan.", runtime: described },
           next: { commands: [this.suggestUnscoped("reset --force")] },
         }),
         apply: async (consent) => {
           await LocalServer.at(this.meta.cwd, { cliVersion: this.meta.cliVersion }).reset(consent);
           return {
             status: "ok",
-            data: { title: "Local Zitadel server runtime reset.", runtime: described, scope },
+            data: { title: "Local Zitadel server runtime reset.", runtime: described },
           };
         },
       }),

@@ -519,7 +519,7 @@ no local admin for that server on the way up, it says so in the envelope's
 list it.
 
 `reset` asks before it deletes the local server's database, which cannot be undone, and keeps
-`.zitadel/local/admin.json`; `--dry-run --json` returns the same scope in `data.scope`.
+`.zitadel/local/admin.json`.
 
 For a project set up against a hosted server, `doctor` checks no local
 runtime, unless a local server was started in its directory or a parent, or
