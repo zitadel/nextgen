@@ -764,12 +764,12 @@ describe("LiquidJS engine", () => {
       );
     });
 
-    it("shows only the error while the field has one", () => {
+    it("keeps the help text beside an error, for the field to show once the error clears", () => {
       const result = renderRegisterPassword(fullLocale, [
         { field: "x-auth-methods#password", message: "Password must be at least 15 characters." },
       ]);
       expect(result).toContain('error="Password must be at least 15 characters."');
-      expect(result).not.toContain('slot="help"');
+      expect(result).toContain('slot="help"');
     });
 
     it("shows the field's own help text instead, when the locale has one", () => {

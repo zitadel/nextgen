@@ -8763,7 +8763,7 @@
                   "text": "string[]"
                 }
               },
-              "description": "The validation error keys the current step's captured values earn, in the\nserver's own dialect: `error.<field>_required` for an empty required\nfield, `_min_length` / `_max_length` for a value outside the field's\ndeclared bounds. Reads each atom's live `formValue` (the getter reflects\nthe native control, so autofill that skipped `input` events is still\nseen), so this is browser-independent and does not rely on native\nconstraint validation. The server checks the same rules again."
+              "description": "The validation error keys the current step's captured values earn, in the\nserver's own dialect: `error.<field>_required` for an empty required\nfield, `_min_length` / `_max_length` for a value outside the field's\ndeclared bounds. Reads the live values through captureFieldValues,\nso autofill that skipped `input` events is both judged and kept when the\nerror rebuilds the step. The server checks the same rules again."
             },
             {
               "kind": "method",
@@ -8782,7 +8782,18 @@
                   }
                 }
               ],
-              "description": "Surface client-side field errors (keys from fieldRuleErrors,\n\"; \"-joined), so they flow through the same localisation and\ninline/banner routing as a real backend rejection — no native browser\nbubble. Idempotent: re-running with the same keys (both submit entry\npoints fire on one click) is a no-op."
+              "description": "Surface client-side field errors (keys from fieldRuleErrors,\n\"; \"-joined), so they flow through the same localisation and\ninline/banner routing as a real backend rejection — no native browser\nbubble. The same keys again are a no-op while their error still shows;\nonce the user edited it away they show it again, through\nerrorRevision."
+            },
+            {
+              "kind": "method",
+              "name": "captureFieldValues",
+              "privacy": "private",
+              "return": {
+                "type": {
+                  "text": "Map<string, string>"
+                }
+              },
+              "description": "Read every rendered field atom's live `formValue` (the getter reflects the\nnative control, so autofill that skipped `input` events is still seen)\nand fold the values into `formValues`, which a step rebuild restores.\nTag-agnostic: every form-participating atom is read the same way."
             },
             {
               "kind": "method",
@@ -8804,6 +8815,16 @@
               "privacy": "private",
               "default": "false",
               "description": "True once the user retired the current step error by editing a field or\ndismissing the alert. Deliberately NON-reactive: consulting reactive\nstate in `renderStep` would change its output string on the first\npost-dismiss keystroke, and `unsafeHTML` would rebuild the whole step\nsubtree — wiping typed values (`hydrateStepAfterRender` only re-applies\nthem on response changes) and reconnecting atoms. Reset on every new\nresponse; consulted only by the `loading` re-render, which rebuilds\nanyway."
+            },
+            {
+              "kind": "field",
+              "name": "errorRevision",
+              "type": {
+                "text": "number"
+              },
+              "privacy": "private",
+              "default": "0",
+              "description": "Bumped when a client-side check shows an error again that the user had\nedited away. The step markup carries it, so `unsafeHTML`, which keeps a\nsubtree whose markup is unchanged, rebuilds the step and the alert and\ninline error that clearStaleErrors removed come back."
             },
             {
               "kind": "field",

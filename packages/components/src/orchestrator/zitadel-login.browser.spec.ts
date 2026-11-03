@@ -587,7 +587,56 @@ describe("<zitadel-login> form + focus (chromium)", () => {
       return el?.getAttribute("error") ? el : null;
     });
     expect(field?.getAttribute("error")).toContain("15");
-    expect(field?.querySelector('[slot="help"]')).toBeNull();
+  });
+
+  /** The password field's inline error, as the visitor sees it. */
+  const passwordError = (root: ShadowRoot): string => {
+    const field = root.querySelector('zl-field[name="x-auth-methods#password"]') as
+      | (HTMLElement & { error?: string })
+      | null;
+    return field?.error ?? "";
+  };
+
+  it("shows the error again when an edited password is still too short", async () => {
+    const { root } = await submitPassword("short123");
+    await waitFor(() => passwordError(root) || null);
+    // Editing retires the error; a still-short value must bring it back on
+    // the next submit rather than block it without a word.
+    await fillNativeField(root, "x-auth-methods#password", "short1234");
+    expect(passwordError(root)).toBe("");
+    const submit = root.querySelector('zl-button[action="submit"]') as HTMLElement;
+    submit.shadowRoot?.querySelector("button")?.click();
+    expect(await waitFor(() => passwordError(root) || null)).toContain("15");
+    expect(stub.calls.length).toBe(1);
+  });
+
+  it("keeps an autofilled password when its length error rebuilds the step", async () => {
+    stub.restore();
+    stub = installFlowFetchStub([registerPasswordStep, passkeyUpsellStep]);
+    const element = document.createElement("zitadel-login") as ZitadelLogin;
+    element.purpose = "register";
+    element.project = testProject;
+    host.appendChild(element);
+    const root = await waitFor(() =>
+      element.shadowRoot?.querySelector('zl-field[name="x-auth-methods#password"]')
+        ? element.shadowRoot
+        : null,
+    );
+    await waitFor(() => (element.getAttribute("aria-busy") === "false" ? element : null));
+    // Autofill writes the native input without an `input` event.
+    await setNativeFieldValue(root, "x-auth-methods#password", "autofill1");
+    const submit = root.querySelector('zl-button[action="submit"]') as HTMLElement & {
+      updateComplete: Promise<unknown>;
+    };
+    await submit.updateComplete;
+    submit.shadowRoot?.querySelector("button")?.click();
+    await waitFor(() => passwordError(root) || null);
+    const field = root.querySelector('zl-field[name="x-auth-methods#password"]') as HTMLElement & {
+      formValue: string;
+      updateComplete: Promise<unknown>;
+    };
+    await field.updateComplete;
+    expect(field.formValue).toBe("autofill1");
   });
 
   it("blocks a password longer than its maximum", async () => {
@@ -605,6 +654,13 @@ describe("<zitadel-login> form + focus (chromium)", () => {
     // units, which `String#length` would let through.
     const { calls } = await submitPassword(`${"a".repeat(13)}\u{1F511}`);
     expect(calls).toBe(1);
+  });
+
+  it("measures a password after NFC normalization, as the server does", async () => {
+    // 63 letters and "e" + a combining acute: 65 code points as typed, 64
+    // once NFC composes the accent, so the 64-character maximum lets it by.
+    const { calls } = await submitPassword(`${"a".repeat(63)}e\u0301`);
+    expect(calls).toBe(2);
   });
 
   it("submits a password within its bounds", async () => {

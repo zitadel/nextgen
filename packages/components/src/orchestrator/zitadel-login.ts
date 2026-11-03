@@ -664,7 +664,7 @@ export class ZitadelLogin extends ZitadelSurface {
       novalidate
       aria-busy=${this.loading ? "true" : "false"}
     >
-      ${this.renderPairedIdentifier()}${unsafeHTML(rendered)}
+      ${this.renderPairedIdentifier()}${unsafeHTML(`${rendered}<!--${this.errorRevision}-->`)}
     </form>`;
   }
 
@@ -1223,17 +1223,12 @@ export class ZitadelLogin extends ZitadelSurface {
    * The validation error keys the current step's captured values earn, in the
    * server's own dialect: `error.<field>_required` for an empty required
    * field, `_min_length` / `_max_length` for a value outside the field's
-   * declared bounds. Reads each atom's live `formValue` (the getter reflects
-   * the native control, so autofill that skipped `input` events is still
-   * seen), so this is browser-independent and does not rely on native
-   * constraint validation. The server checks the same rules again.
+   * declared bounds. Reads the live values through {@link captureFieldValues},
+   * so autofill that skipped `input` events is both judged and kept when the
+   * error rebuilds the step. The server checks the same rules again.
    */
   private fieldRuleErrors(): string[] {
-    const values = new Map<string, string>();
-    for (const atom of this.fieldAtoms()) {
-      const name = atom.getAttribute("name");
-      if (name) values.set(name, atom.formValue);
-    }
+    const values = this.captureFieldValues();
     return this.response
       ? fieldRuleErrorKeys(this.response.step, (name) => values.get(name) ?? "")
       : [];
@@ -1243,18 +1238,38 @@ export class ZitadelLogin extends ZitadelSurface {
    * Surface client-side field errors (keys from {@link fieldRuleErrors},
    * "; "-joined), so they flow through the same localisation and
    * inline/banner routing as a real backend rejection — no native browser
-   * bubble. Idempotent: re-running with the same keys (both submit entry
-   * points fire on one click) is a no-op.
+   * bubble. The same keys again are a no-op while their error still shows;
+   * once the user edited it away they show it again, through
+   * {@link errorRevision}.
    */
   private reportFieldErrors(keys: readonly string[]): void {
     if (!this.response) return;
     const errorKey = keys.join("; ");
-    if (this.response.step.error === errorKey) return;
+    if (this.response.step.error === errorKey && !this.stepErrorDismissed) return;
     this.stepErrorDismissed = false;
+    this.errorRevision += 1;
     this.response = {
       ...this.response,
       step: { ...this.response.step, error: errorKey },
     };
+  }
+
+  /**
+   * Read every rendered field atom's live `formValue` (the getter reflects the
+   * native control, so autofill that skipped `input` events is still seen)
+   * and fold the values into `formValues`, which a step rebuild restores.
+   * Tag-agnostic: every form-participating atom is read the same way.
+   */
+  private captureFieldValues(): Map<string, string> {
+    const current = new Map<string, string>();
+    for (const atom of this.fieldAtoms()) {
+      const name = atom.getAttribute("name");
+      if (name) current.set(name, atom.formValue);
+    }
+    if (current.size > 0) {
+      this.formValues = { ...this.formValues, ...Object.fromEntries(current) };
+    }
+    return current;
   }
 
   /**
@@ -1267,14 +1282,7 @@ export class ZitadelLogin extends ZitadelSurface {
    * cross-step identity (the signed-in greeting) and post-error restoration.
    */
   private collectSubmitFields(): SubmitFlowStepBodyFields {
-    const current = new Map<string, string>();
-    for (const atom of this.fieldAtoms()) {
-      const name = atom.getAttribute("name");
-      if (name) current.set(name, atom.formValue);
-    }
-    if (current.size > 0) {
-      this.formValues = { ...this.formValues, ...Object.fromEntries(current) };
-    }
+    const current = this.captureFieldValues();
     const fields: SubmitFlowStepBodyFields = {};
     for (const f of this.response?.step.fields ?? []) {
       const value = current.get(f.name) ?? "";
@@ -1313,6 +1321,14 @@ export class ZitadelLogin extends ZitadelSurface {
    * anyway.
    */
   private stepErrorDismissed = false;
+
+  /**
+   * Bumped when a client-side check shows an error again that the user had
+   * edited away. The step markup carries it, so `unsafeHTML`, which keeps a
+   * subtree whose markup is unchanged, rebuilds the step and the alert and
+   * inline error that {@link clearStaleErrors} removed come back.
+   */
+  private errorRevision = 0;
 
   private handleAtomInput = (event: CustomEvent<ZlFieldInputDetail>): void => {
     if (!event.detail) return;
@@ -1751,7 +1767,10 @@ function fieldRuleErrorKeys(step: CreateFlow201Step, valueFor: (name: string) =>
   return (step.fields ?? []).flatMap((field) => {
     const value = valueFor(field.name);
     if (value === "") return required.has(field.name) ? [`error.${field.name}_required`] : [];
-    const length = Array.from(value).length;
+    // A password is measured after NFC normalization, as the server and
+    // its password policy measure it.
+    const measured = field.type === "password" ? value.normalize("NFC") : value;
+    const length = Array.from(measured).length;
     const { min_length: min, max_length: max } = field.validation ?? {};
     if (min !== undefined && min > 0 && length < min) return [`error.${field.name}_min_length`];
     if (max !== undefined && max > 0 && length > max) return [`error.${field.name}_max_length`];
