@@ -5,6 +5,11 @@ get:
     Returns the current capability step without advancing the state machine.
     Useful for page reloads or re-rendering after a network error.
 
+    For a password-signup step, prepares `step.gates.signup_pow.challenge`.
+    Reuses challenges with more than a minute remaining; otherwise issues a
+    new one. If this render resolves parked SSO state, it first returns the
+    updated cookie; fetch the step again to obtain its puzzle.
+
     Reuses the deployment sealed into `_zflow` at `createFlow`; it does not
     re-resolve from `Origin`. If that release was revoked since the attempt
     started, the response is `409` with `rel.revoked`.

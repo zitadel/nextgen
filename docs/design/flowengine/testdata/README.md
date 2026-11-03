@@ -5,8 +5,9 @@ All keys, IDs, salts, nonces and solutions are **public test data**.
 
 `pow-v1-vectors.json` contains one vector for each experimental PBKDF2 profile, including
 counter zero, counters above 255 and the maximum level-four counter. It records
-the exact context/body bytes, both server keys, the public projection, the derived
-key, proof and parameter MAC.
+the exact context/body bytes, the server solution key, the public projection, the derived
+key and proof. The verifier body contains the solution MAC; authenticated
+storage supplies parameter integrity.
 
 `generate-pow-v1-vectors.mjs` independently derives these values with WebCrypto.
 The Go protocol tests compare issuance byte for byte and verify the proofs.

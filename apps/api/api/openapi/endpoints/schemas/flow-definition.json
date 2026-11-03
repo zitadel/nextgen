@@ -638,12 +638,7 @@
         "config": {
           "type": "object",
           "description": "Reserved provider-specific configuration. The built-in signup gate uses\nserver-issued runtime parameters and accepts no caller-selected costs.\n",
-          "additionalProperties": true,
-          "examples": [
-            {
-              "site_key": "0x4AAAAAAA-example-site-key"
-            }
-          ]
+          "additionalProperties": true
         }
       }
     }

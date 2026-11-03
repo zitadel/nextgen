@@ -959,6 +959,13 @@ func TestFlowService_SignupIssuanceCannotDiscardTransition(t *testing.T) {
 	require.NoError(t, err)
 	require.Same(t, state, submitted.State)
 	require.True(t, submitted.Step.SignupRequired)
+	// A GET that advances parked SSO state must also preserve its new cookie.
+	sm.renderResult.Reseal = true
+	svc = service.NewFlowService(stubGetFlowDefinition(t, def), sm, domain.BuiltinSchemaBases{}, protection)
+	rendered, err := svc.GetStep(t.Context(), service.GetFlowStepRequest{State: state})
+	require.NoError(t, err)
+	require.True(t, rendered.Reseal)
+	sm.renderResult.Reseal = false
 	// Issuance is a separate retryable read, after the advanced cookie is returned.
 	svc = service.NewFlowService(stubGetFlowDefinition(t, def), sm, domain.BuiltinSchemaBases{}, protection)
 	_, err = svc.GetStep(t.Context(), service.GetFlowStepRequest{State: state})

@@ -26,5 +26,3 @@ properties:
       Reserved provider-specific configuration. The built-in signup gate uses
       server-issued runtime parameters and accepts no caller-selected costs.
     additionalProperties: true
-    example:
-      site_key: "0x4AAAAAAA-example-site-key"

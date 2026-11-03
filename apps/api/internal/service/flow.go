@@ -427,7 +427,9 @@ func (s *flowService) GetStep(ctx context.Context, req GetFlowStepRequest) (res 
 		return domain.FlowStepResult{}, err
 	}
 	attachSignupGate(def, &result)
-	if result.Step != nil && result.Step.SignupRequired {
+	// A render may resolve parked SSO state. Return its updated cookie before
+	// attempting issuance, just as Start and Submit do.
+	if result.Step != nil && result.Step.SignupRequired && !result.Reseal {
 		if s.protection == nil {
 			return domain.FlowStepResult{}, domain.ErrFlowIntegrity()
 		}

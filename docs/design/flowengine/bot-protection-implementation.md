@@ -87,8 +87,8 @@ Portable storage tests cover atomic replay rejection, project/flow isolation,
 expiry and flow-isolated quotas. HTTP tests cover signup refusal, acceptance, live-attempt proof replay and completed-cookie rejection. Component tests exercise the signup exchange; Chromium tests check the
 solver against the same [public MIT vectors](testdata/README.md).
 
-Start and Submit always preserve a successful state transition even if challenge
-issuance is unavailable: they announce the gate without issuing. The browser's
+Start, Submit and GETs that resolve parked SSO state preserve a successful transition even if challenge
+issuance is unavailable: they announce the gate without issuing. The next GET prepares the puzzle. The browser's
 pre-submit GET can fail independently and be retried. Solver failures and proof
 or rate refusals preserve the form; terminal flow errors and server faults use
 the existing error screen. A solved proof is reused while its challenge remains

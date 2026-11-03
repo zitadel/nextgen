@@ -28,5 +28,3 @@ properties:
       Reserved provider-specific configuration. The built-in signup gate uses
       `challenge` and does not accept caller-selected cost parameters.
     additionalProperties: true
-    example:
-      site_key: "0x4AAAAAAA-example-site-key"
