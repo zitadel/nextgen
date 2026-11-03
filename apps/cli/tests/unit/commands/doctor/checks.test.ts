@@ -1527,6 +1527,23 @@ function setBearer(proxyReq) {
     expect((await check.run(ctxFor(cwd))).status).toBe("pass");
     expect(await readFile(join(cwd, "app/page.tsx"), "utf8")).toContain(MANAGED_MARKER);
   });
+
+  it("records the route layouts a repair adds to a fresh scaffold from an older setup", async () => {
+    // An older setup wrote no route layouts, so its manifest has none.
+    const cwd = await makeProject();
+    await writeScaffoldState(cwd, {
+      files: { "app/page.tsx": { hash: "0".repeat(64), class: "presentation" } },
+      scaffolded_framework: true,
+    });
+    const check = new ManagedFilesCheck();
+
+    await check.fix(ctxFor(cwd));
+
+    expect(await readFile(join(cwd, "app/login/layout.tsx"), "utf8")).toContain(MANAGED_MARKER);
+    expect((await readScaffoldState(cwd)).files).toHaveProperty("app/login/layout.tsx");
+    await rm(join(cwd, "app/login/layout.tsx"));
+    expect((await check.run(ctxFor(cwd))).message).toContain("app/login/layout.tsx");
+  });
 });
 
 describe("ManagedFilesCheck on a Nuxt app from an older setup", () => {
