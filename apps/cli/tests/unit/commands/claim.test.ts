@@ -21,7 +21,7 @@ import {
 } from "../../../src/lib/local-server/runtime";
 import Claim from "../../../src/commands/claim";
 import { usePlatformServer } from "../../helpers/platform-project";
-import { parseJson, runCliForTest } from "../../helpers/run-cli";
+import { parseJson, pressCtrlC, runCliForTest } from "../../helpers/run-cli";
 import { asTerminal } from "../../helpers/terminal";
 
 vi.mock("@clack/prompts", async () => (await import("../../helpers/clack")).clackDouble());
@@ -345,6 +345,55 @@ describe("claim", () => {
     expect(json.status).toBe("error");
     expect(json.code).toBe("E_VALIDATION");
     expect(json.message).toContain("Stopped waiting");
+    expect((await readSecret(cwd)).team_id).toBeUndefined();
+  });
+
+  it("never asks for the status of a link that has already expired", async () => {
+    const { cwd } = await makeProject();
+    const statusChecks = vi.fn(() =>
+      HttpResponse.json({
+        status: "completed",
+        team_id: "team-late",
+        claimed_at: "2026-03-03T00:00:00.000Z",
+        dashboard_url: "https://example.test/teams/team-late",
+      }),
+    );
+    server.use(
+      http.post("*/projects/:project_id/claim/init", () =>
+        HttpResponse.json(
+          {
+            claim_url: "https://example.test/claim/ch_expired",
+            challenge_id: "ch_expired",
+            expires_at: new Date(Date.now() - 1_000).toISOString(),
+          },
+          { status: 201 },
+        ),
+      ),
+      http.get("*/projects/:project_id/claim/status", statusChecks),
+    );
+
+    const res = await claim(cwd);
+
+    expect(statusChecks).not.toHaveBeenCalled();
+    expect(res.exitCode).toBe(3);
+    expect((parseJson(res.stdout) as { message: string }).message).toContain("Stopped waiting");
+    expect((await readSecret(cwd)).team_id).toBeUndefined();
+  });
+
+  it("stops at once when interrupted while it waits to ask again", async () => {
+    vi.spyOn(process, "exit").mockImplementation((() => undefined) as never);
+    const { cwd } = await makeProject();
+    const statusChecks = vi.fn(() => new HttpResponse(null, { status: 429 }));
+    server.use(http.get("*/projects/:project_id/claim/status", statusChecks));
+
+    const running = claim(cwd);
+    await vi.waitFor(() => expect(statusChecks).toHaveBeenCalledOnce());
+    pressCtrlC();
+    const res = await running;
+
+    expect(res.exitCode).toBe(130);
+    expect((parseJson(res.stdout) as { code: string }).code).toBe("E_CANCELLED");
+    expect(statusChecks).toHaveBeenCalledOnce();
     expect((await readSecret(cwd)).team_id).toBeUndefined();
   });
 
