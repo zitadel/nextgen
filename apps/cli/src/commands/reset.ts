@@ -3,8 +3,8 @@ import { Flags } from "@oclif/core";
 import { LOCAL_ADMIN_FILE } from "../lib/local-server/admin-credential";
 import {
   DEFAULT_LOCAL_SERVER_URL,
-  LOCAL_DATA_DIR,
   localContainerName,
+  localRuntimePaths,
   readRuntimeMetadata,
 } from "../lib/local-server/runtime";
 import { LocalServer } from "../lib/local-server/server";
@@ -43,20 +43,27 @@ export default class Reset extends Destructive(BaseCommand) {
       data_deleted: true,
     };
 
+    const dataDir = localRuntimePaths(this.meta.cwd).dataDir;
+    const scope = { deletes: dataDir, keeps: LOCAL_ADMIN_FILE, irreversible: true };
+
     return this.emit(
       await this.confirmed({
         verb: "reset",
-        name: "delete the local runtime and its data",
+        name: `delete the local Zitadel server's data in ${dataDir}`,
         message: [
-          `Permanently delete the local Zitadel server's data in ${LOCAL_DATA_DIR}?`,
+          `Permanently delete the local Zitadel server's data in ${dataDir}?`,
           "",
-          "This stops the server and deletes its database: every organization, user, application and setting you created. It cannot be undone.",
+          "This stops and removes the local server if one is running, forgets it, and deletes its database: every organization, user, application and setting you created. It cannot be undone.",
           `Kept: ${LOCAL_ADMIN_FILE}, the local admin sign-in, and everything else in your project.`,
-          "Run `zitadel start` afterwards to set up a fresh server.",
+          `Run \`${this.suggestUnscoped("start")}\` afterwards to set up a fresh server.`,
         ].join("\n"),
         preview: () => ({
           status: "ok",
-          data: { title: "Local Zitadel server runtime reset plan.", runtime: described },
+          data: {
+            title: "Local Zitadel server runtime reset plan.",
+            runtime: described,
+            scope,
+          },
           next: { commands: [this.suggestUnscoped("reset --force")] },
         }),
         apply: async (consent) => {

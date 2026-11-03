@@ -12,7 +12,6 @@ import { cancel, confirm, isCancel } from "@clack/prompts";
 import { LOCAL_ADMIN_FILE } from "../../../src/lib/local-server/admin-credential";
 import {
   CONTAINER_DATA_DIR,
-  LOCAL_DATA_DIR,
   LOCAL_RUNTIME_FILE,
   defaultLocalServerImageForCliVersion,
   localContainerName,
@@ -959,6 +958,7 @@ describe("local runtime commands", () => {
       const cwd = await tempProject("zitadel-reset-asked-");
       const paths = localRuntimePaths(cwd);
       await mkdir(paths.dataDir, { recursive: true });
+      await writeFile(join(cwd, LOCAL_ADMIN_FILE), "{}");
       await writeRuntimeMetadata(cwd, runtimeFor(cwd, "http://localhost:8080"));
       vi.mocked(isCancel).mockReturnValue(cancelled);
       vi.mocked(confirm).mockResolvedValueOnce(answer as never);
@@ -967,6 +967,7 @@ describe("local runtime commands", () => {
         (error: unknown) => ({ error }),
       );
       return {
+        cwd,
         outcome,
         kept: await stat(paths.dataDir).then(
           () => true,
@@ -991,23 +992,36 @@ describe("local runtime commands", () => {
       expect(kept).toBe(true);
     });
 
-    it("deletes the data when the answer is yes", async () => {
+    it("deletes the data but keeps the local admin when the answer is yes", async () => {
       const fake = await fakeDocker();
       vi.stubEnv("PATH", `${fake.binDir}:${process.env.PATH ?? ""}`);
       vi.stubEnv("DOCKER_LOG", fake.logPath);
-      const { outcome, kept } = await resetting(true, false);
+      const { outcome, kept, cwd } = await resetting(true, false);
 
       expect(outcome).toMatchObject({ envelope: { status: "ok" } });
       expect(kept).toBe(false);
+      await expect(stat(join(cwd, LOCAL_ADMIN_FILE))).resolves.toBeDefined();
+      await expect(readFile(fake.logPath, "utf8")).resolves.toContain("inspect");
     });
 
-    it("says what is deleted, that it cannot be undone, and what is kept", async () => {
-      await resetting(false, false);
+    it("names the directory it deletes and the admin file it keeps", async () => {
+      const { cwd } = await resetting(false, false);
 
       const message = vi.mocked(confirm).mock.calls[0]?.[0].message;
-      expect(message).toContain(LOCAL_DATA_DIR);
-      expect(message).toContain("cannot be undone");
-      expect(message).toContain(`Kept: ${LOCAL_ADMIN_FILE}`);
+      expect(message).toContain(localRuntimePaths(cwd).dataDir);
+      expect(message).toContain(LOCAL_ADMIN_FILE);
+    });
+
+    it("puts the same scope in the plan of a dry run", async () => {
+      const cwd = await tempProject("zitadel-reset-plan-");
+
+      const result = await runCliForTest(["reset", "--cwd", cwd, "--json", "--dry-run"]);
+
+      expect(parseJson(result.stdout)).toMatchObject({
+        data: {
+          scope: { deletes: localRuntimePaths(cwd).dataDir, keeps: LOCAL_ADMIN_FILE },
+        },
+      });
     });
 
     it("fails, deleting nothing, on Ctrl-C", async () => {

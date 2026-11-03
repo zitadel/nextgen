@@ -511,14 +511,15 @@ local server is healthy once its `/readyz` answers, which takes its database
 answering too: `start` waits for that, and the commands that read a server
 treat one whose database does not answer as unhealthy. `stop`,
 `reset` and `status` read only the working directory's
-`.zitadel/local/`, so run them where `start` ran. `reset` asks first and says what it
-deletes: the server's database in `.zitadel/local/nextgen-data`, which cannot be undone; it keeps
-`.zitadel/local/admin.json` and the rest of the project, and `start` sets up a fresh server. On a local
+`.zitadel/local/`, so run them where `start` ran. On a local
 server that hosts the platform project, `setup` attaches the project to the
 local admin's team and ends `data.next_commands` with `console`; when it finds
 no local admin for that server on the way up, it says so in the envelope's
 `warnings` and the project stays unattached, so the local console does not
 list it.
+
+`reset` asks before it deletes the local server's database, which cannot be undone, and keeps
+`.zitadel/local/admin.json`; `--dry-run --json` returns the same scope in `data.scope`.
 
 For a project set up against a hosted server, `doctor` checks no local
 runtime, unless a local server was started in its directory or a parent, or
