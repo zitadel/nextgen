@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { itemsOf, nextToken, Paging, pages } from "./paging";
+import { Paging } from "./paging";
 
 type Page = { rows: string[]; next_page_token?: string | null };
 
@@ -206,61 +206,5 @@ describe("Paging#collect", () => {
     const collected = await byRows.collect(byRows.walk(one), { all: true });
 
     expect(collected.items).toHaveLength(200_000);
-  });
-});
-
-describe("the deprecated functions", () => {
-  it("nextToken reads the default cursor field", () => {
-    expect(nextToken({ next_page_token: "t1" })).toBe("t1");
-  });
-
-  it("nextToken reads the cursor field it is told to", () => {
-    expect(nextToken({ next_cursor: "c2" }, "next_cursor")).toBe("c2");
-  });
-
-  it("nextToken reads an empty cursor as none", () => {
-    expect(nextToken({ next_page_token: "" })).toBeUndefined();
-  });
-
-  it("itemsOf reads the list the field names", () => {
-    expect(itemsOf({ users: ["a"] }, "users")).toEqual(["a"]);
-  });
-
-  it("itemsOf refuses a page without the list", () => {
-    expect(() => itemsOf({}, "users")).toThrow(
-      new TypeError('Unexpected list response: missing "users" array'),
-    );
-  });
-
-  it("pages follows next_page_token by default, asking with the cursor alone", async () => {
-    const fetch = vi.fn(async (token: string | undefined): Promise<Page> => {
-      return token === undefined ? { rows: ["a"], next_page_token: "t1" } : { rows: ["b"] };
-    });
-
-    const { items } = await byRows.collect(pages(fetch), { all: true });
-
-    expect(items).toEqual(["a", "b"]);
-    expect(fetch.mock.calls).toEqual([[undefined], ["t1"]]);
-  });
-
-  it("pages follows the cursor its next reads", async () => {
-    const seen: Array<string | undefined> = [];
-    const walk = pages(
-      async (token) => {
-        seen.push(token);
-        return token === undefined ? { cursor: "c1" } : {};
-      },
-      {
-        next: (page: { cursor?: string }) => {
-          return page.cursor;
-        },
-      },
-    );
-
-    for await (const _ of walk) {
-      expect(seen.length).toBeGreaterThan(0);
-    }
-
-    expect(seen).toEqual([undefined, "c1"]);
   });
 });
