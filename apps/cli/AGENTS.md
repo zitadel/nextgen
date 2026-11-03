@@ -58,9 +58,14 @@
   one place the command declares its flags. Only a flag every command takes
   (`serverFlag`, `plainFlag`, the environment flags) has a const, because it
   has no single site.
-- Never share a flag. Three commands take `--port`; each declares its own,
-  because a shared flag module is a file to find before a flag can be read.
-  Duplicate it, and share only what a whole topic needs.
+- Never share one across topics: `start`, `setup` and `doctor` each declare
+  `--port`. Within a topic, share it where duplicating would copy real logic —
+  `variable/name.ts` holds one argument three variable commands take.
+- Name a `Refused` for its flag (`PORT`, `TTL`) and a `Refusal` for what it
+  refuses, ending `_REFUSAL`, so the two read apart. A `Refused`'s wording must
+  stand on its own: `read` fills `{value}`, `{input}` and `{problem}`, and
+  anything else comes from its `values`, which a unit test checks
+  (`tests/unit/lib/oclif/refusal-wording.test.ts`).
 - No `flags/`, `args/` or `rules/` directory, and no helper module beside a
   command.
 - Write every refusal once, as a `Refusal` template with `{name}` placeholders

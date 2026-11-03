@@ -299,7 +299,10 @@ export abstract class BaseCommand extends Interruptible(Command) {
   }
 
   private async admit(): Promise<Admitted<typeof BaseCommand>> {
-    const parsed = await this.parseOnce();
+    const parsed: Interfaces.ParserOutput<
+      Interfaces.InferredFlags<(typeof BaseCommand)["flags"] & (typeof BaseCommand)["baseFlags"]>,
+      Interfaces.InferredArgs<(typeof BaseCommand)["args"]>
+    > = await this.parseOnce();
     const flags = byName(parsed.flags);
     const source = await this.sourceOf(
       flags,
@@ -316,7 +319,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
       flags,
       args: byName(parsed.args),
       argv: parsed.argv.map(String),
-    } as unknown as Admitted<typeof BaseCommand>;
+    } as Admitted<typeof BaseCommand>;
   }
 
   /**
