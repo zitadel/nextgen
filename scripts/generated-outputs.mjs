@@ -3,7 +3,7 @@
  *
  * These globs mirror the `outputs` of the `server:generate` Moon task — keep
  * the two in sync. They are deliberately file-precise rather than
- * directory-wide: `internal/domain` holds hand-written code alongside its
+ * directory-wide: `apps/api/internal/domain` holds hand-written code alongside its
  * generated `*_enumer.go`, so a directory-level pattern here would be a
  * destructive mistake waiting to happen.
  */
@@ -14,21 +14,24 @@ import { fileURLToPath } from "node:url";
 export const ROOT = fileURLToPath(new URL("..", import.meta.url));
 
 export const GENERATED_GLOBS = [
-  "api/generated/**/*.go",
-  "api/openapi/components/schemas/errors/**/*.yaml",
-  "api/openapi/endpoints/**/*-error-response.yaml",
+  "apps/api/internal/api/generated/**/*.go",
+  "apps/api/api/openapi/components/schemas/errors/**/*.yaml",
+  "apps/api/api/openapi/endpoints/**/*-error-response.yaml",
   // gen_event_schemas: the Event union, a schema per event type, and a
   // webhook per event type. The payloads and event-base.yaml beside them are
   // hand-written.
-  "api/openapi/endpoints/events/event.yaml",
-  "api/openapi/endpoints/events/types/*.yaml",
-  "api/openapi/endpoints/events/webhooks/*.yaml",
+  "apps/api/api/openapi/endpoints/events/event.yaml",
+  "apps/api/api/openapi/endpoints/events/types/*.yaml",
+  "apps/api/api/openapi/endpoints/events/webhooks/*.yaml",
   // JSON meta-schemas, generated from the OpenAPI YAML next to them by
   // scripts/generate-meta-schemas.ts. Single-segment `*` on purpose: the
   // `examples/` subdirectory holds hand-written documents.
-  "api/openapi/endpoints/schemas/*.json",
-  "internal/**/*_enumer.go",
-  "internal/**/*.mock.go",
+  "apps/api/api/openapi/endpoints/schemas/*.json",
+  "apps/api/internal/**/*_enumer.go",
+  "apps/api/internal/**/*.mock.go",
+  // The public Go client (go.zitadel.com/zitadel/v5/api), ogen output of
+  // apps/api/api/.ogen-client.yaml, beside the package's hand-written files.
+  "packages/go/api/*_gen.go",
 ];
 
 /**
@@ -47,7 +50,7 @@ const HEADER_BYTES = 512;
 
 export function hasGeneratedMarker(absPath) {
   // Read from a descriptor rather than whole-file: the marker is always in the
-  // header, and api/generated alone is megabytes of ogen output to slurp for a
+  // header, and the ogen output alone is megabytes to slurp for a
   // line that cannot be below the first few. A multi-byte rune split at the
   // boundary decodes to a replacement char, which the marker never contains.
   const fd = openSync(absPath, "r");
@@ -84,7 +87,7 @@ function globToRegExp(pattern) {
 /** Every file under a repo-relative directory, itself repo-relative. */
 function filesUnder(dir) {
   const absolute = join(ROOT, dir);
-  // api/generated is gone on a pruned tree, and internal/** always exists.
+  // The ogen output is gone on a pruned tree, and internal/** always exists.
   if (!existsSync(absolute)) {
     return [];
   }

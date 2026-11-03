@@ -1,11 +1,6 @@
-import { builders, generateCode } from "magicast";
+import { builders } from "magicast";
 
-import {
-  ensureArrayItem,
-  ensureEditableObject,
-  parseConfigModule,
-  resolveDefaultExportObject,
-} from "../utils/magicast";
+import { ConfigModule } from "../utils/config-module";
 
 const NUXT_MODULE = "@zitadel/sdk-nuxt/module";
 
@@ -24,12 +19,18 @@ const NUXT_MODULE = "@zitadel/sdk-nuxt/module";
 export function nuxtConfigEdit(): (source: string | undefined) => string {
   return (source) => {
     const label = "the Nuxt config (nuxt.config.*)";
-    const mod = parseConfigModule(source, label);
-    const config = resolveDefaultExportObject(mod, label);
+    const file = ConfigModule.open(source, label);
+    const config = file.exportedObject();
 
-    const addsModule = ensureArrayItem(config, "modules", NUXT_MODULE);
+    config.modules ??= [];
+    const modules = file.arrayAt(config, "modules");
+    const addsModule = !modules.includes(NUXT_MODULE);
+    if (addsModule) {
+      modules.push(NUXT_MODULE);
+    }
 
-    const nextgen = ensureEditableObject(config, "nextgen");
+    config.nextgen ??= {};
+    const nextgen = file.objectAt(config, "nextgen");
     const addsLoginPath = nextgen.loginPath === undefined;
     if (addsLoginPath) {
       nextgen.loginPath = "/login";
@@ -42,8 +43,10 @@ export function nuxtConfigEdit(): (source: string | undefined) => string {
     // Tell Vue's template compiler the `zitadel-*` Lit elements are custom
     // elements, not Vue components, so it renders them as native elements
     // instead of logging "Failed to resolve component" and mis-binding props.
-    const vue = ensureEditableObject(config, "vue");
-    const compilerOptions = ensureEditableObject(vue, "compilerOptions");
+    config.vue ??= {};
+    const vue = file.objectAt(config, "vue");
+    vue.compilerOptions ??= {};
+    const compilerOptions = file.objectAt(vue, "compilerOptions");
     const addsCustomElement = compilerOptions.isCustomElement === undefined;
     if (addsCustomElement) {
       compilerOptions.isCustomElement = builders.raw(`(tag) => tag.startsWith("zitadel-")`);
@@ -52,10 +55,6 @@ export function nuxtConfigEdit(): (source: string | undefined) => string {
 
     // Nothing was missing — return the source untouched so the file-writer skips
     // it instead of letting magicast reformat an already-patched config.
-    if (!changed && source !== undefined) {
-      return source;
-    }
-    const code = generateCode(mod).code;
-    return code.endsWith("\n") ? code : `${code}\n`;
+    return file.render(changed);
   };
 }

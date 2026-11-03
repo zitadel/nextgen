@@ -47,14 +47,17 @@ export async function discoverManagedRuntimeProcesses(opts?: {
     return { supported: false, processes: [], error: "process sweep is not available on Windows" };
   }
 
-  let rows: ReadonlyArray<ProcessRow>;
-  try {
-    rows = parsePsRows(await runPs(["axo", "pid=,ppid=,command="], opts?.timeoutMs ?? 1000));
-  } catch (error) {
-    return { supported: false, processes: [], error: errorMessage(error) };
+  const listed = await runPs(["axo", "pid=,ppid=,command="], opts?.timeoutMs ?? 1000)
+    .then(parsePsRows)
+    .then(
+      (rows) => ({ rows }),
+      (error: unknown) => ({ error: errorMessage(error) }),
+    );
+  if ("error" in listed) {
+    return { supported: false, processes: [], error: listed.error };
   }
 
-  const candidates = rows.filter((row) => isRuntimeCandidate(row.command));
+  const candidates = listed.rows.filter((row) => isRuntimeCandidate(row.command));
   const hydrated = await Promise.all(
     candidates.map(async (row) => ({
       ...row,

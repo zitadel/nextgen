@@ -288,6 +288,8 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     // per-schema, and they are idempotent. Enabling the provider for a second
     // user type, and finishing a run interrupted after the connection file was
     // written, both arrive here.
+    // Both are set inside whichever branch runs below, between statements that
+    // print and prompt, so neither can be built as one expression.
     let secret: SecretOutcome | undefined;
     let clientIdState: PublishState | undefined;
 

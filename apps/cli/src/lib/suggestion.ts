@@ -1,5 +1,5 @@
+import { Cmd } from "./cmd";
 import { isPortableShellWord, newestCliCommand, publicCliCommand } from "./public-cli";
-import { shellOption } from "./shell";
 
 declare const suggestedCommand: unique symbol;
 
@@ -89,7 +89,7 @@ export function shellCommand(command: string): SuggestedCommand {
 
 /** `upgrade` on the CLI's dist-tag, so the newest release does the upgrading. */
 export function upgradeCommand(cliVersion: string, typedCwd?: string): SuggestedCommand {
-  const args = typedCwd === undefined ? "upgrade" : `upgrade ${shellOption("--cwd", typedCwd)}`;
+  const args = typedCwd === undefined ? "upgrade" : `upgrade ${Cmd.option("--cwd", typedCwd)}`;
   return newestCliCommand(args, cliVersion) as SuggestedCommand;
 }
 

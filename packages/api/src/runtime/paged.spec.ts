@@ -63,6 +63,17 @@ describe("paged", () => {
     expect(await paged(endpoint(), rows, asIs).all("user_1")).toEqual(["a", "b"]);
   });
 
+  it("collects a page too large to pass as call arguments", async () => {
+    const large = Array.from({ length: 200_000 }, (_, index) => String(index));
+    const call = vi.fn(async () => {
+      return { rows: large };
+    });
+
+    const collected = await paged(call, rows, asIs).all();
+
+    expect(collected).toHaveLength(200_000);
+  });
+
   it("reads the cursor before its response hook sees the page", async () => {
     const reshape = {
       ...asIs,

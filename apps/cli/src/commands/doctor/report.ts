@@ -1,8 +1,8 @@
 import wrapAnsi from "wrap-ansi";
 
 import { type NextSteps, renderNextSteps } from "../../lib/oclif/next-steps";
+import { Cmd } from "../../lib/cmd";
 import { publicCliCommand } from "../../lib/public-cli";
-import { shellOption } from "../../lib/shell";
 import { arrow, command, dim, mark, statusColor, strong } from "../../lib/style";
 import type { CheckOutcome } from "./checks";
 
@@ -156,7 +156,7 @@ function skipReason(
     return {
       reason: "no zitadel.json in this directory",
       command: publicCliCommand(
-        input.typedCwd === undefined ? "setup" : `setup ${shellOption("--cwd", input.typedCwd)}`,
+        input.typedCwd === undefined ? "setup" : `setup ${Cmd.option("--cwd", input.typedCwd)}`,
         input.cliVersion,
       ),
     };

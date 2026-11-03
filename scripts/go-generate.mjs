@@ -28,9 +28,9 @@
  * Within a package `go generate` keeps directives in file order, which is what
  * keeps api's own chain (error schemas -> openapi errors -> ogen) intact.
  *
- * That chain closes a cycle on a pruned tree — the analysis needs the client
+ * That chain closes a cycle on a pruned tree — the analysis needs the stubs
  * ogen writes at the end of it — which `api/cmd/gen_openapi_errors` breaks from
- * the inside, by generating a bootstrap client for itself. Nothing about it is
+ * the inside, by generating a bootstrap pass of them for itself. Nothing about it is
  * this runner's business; bare `go generate ./...` gets the same treatment.
  *
  * Today the mockgen race would be benign — enumer writes via a same-directory
@@ -46,8 +46,10 @@ import { fileURLToPath } from "node:url";
 
 import { isDirectRun, run, runCapture } from "./dev-process.mjs";
 import { mapAll } from "./map-all.mjs";
+import { serverModuleRoot } from "./server-build.mjs";
 
-const ROOT = fileURLToPath(new URL("..", import.meta.url));
+// The Go module; every directive the server generates lives below it.
+const ROOT = serverModuleRoot(fileURLToPath(new URL("..", import.meta.url)));
 
 // Never hold Go sources, and walking them dwarfs the rest of discovery.
 // `.claude` holds agent worktrees, `.go` a local module cache and `vendor` a
@@ -190,8 +192,8 @@ async function runPhase(dirs, phase, log) {
 }
 
 /**
- * Every directory holding a `//go:generate` directive, repo-relative, mapped to
- * the directives it holds.
+ * Every directory holding a `//go:generate` directive, module-relative, mapped
+ * to the directives it holds.
  *
  * Each is generated with `go generate .` rather than `./...`, so a directory
  * whose subdirectories also hold directives (`internal/instrumentation` over

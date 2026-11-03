@@ -99,11 +99,8 @@ async function fetchDistTag(distTag: string, registry: string): Promise<string |
 }
 
 function cacheFile(env: NodeJS.ProcessEnv): string | undefined {
-  try {
-    return join(telemetryConfigDir(env), "update-check.json");
-  } catch {
-    return undefined;
-  }
+  const dir = telemetryConfigDir(env);
+  return dir === undefined ? undefined : join(dir, "update-check.json");
 }
 
 /** The answer kept for this dist-tag on this registry; another registry's says nothing about it. */
