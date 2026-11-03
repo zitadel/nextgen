@@ -374,7 +374,7 @@ function carries(user: QueriedUser, path: string): boolean {
 /** The project's schemas, by revision id and by object type. */
 async function objectTypes(ctx: StepContext): Promise<Listing> {
   const byId = new Map<string, SchemaInfo>();
-  const newest = new Map<string, { createdAt: string; id: string; info: SchemaInfo }>();
+  const newest = new Map<string, SchemaInfo>();
   const listed = await ctx.client.listSchemas.all({ project_id: ctx.projectId });
   for (const entry of listed) {
     const document = entry.schema as { objectType?: unknown; "x-identifier"?: unknown } | undefined;
@@ -387,21 +387,14 @@ async function objectTypes(ctx: StepContext): Promise<Listing> {
       ...(typeof identifier === "string" && identifier !== "" ? { identifier } : {}),
     };
     byId.set(entry.id, info);
-    const createdAt = String(entry.metadata?.created_at ?? "");
-    const seen = newest.get(info.objectType);
-    // Equal or missing timestamps fall back to the id, so the pick never
-    // depends on the order the server lists the revisions in.
-    const later =
-      seen !== undefined &&
-      (createdAt > seen.createdAt || (createdAt === seen.createdAt && entry.id > seen.id));
-    if (seen === undefined || later) {
-      newest.set(info.objectType, { createdAt, id: entry.id, info });
+    // The API lists schemas newest first, so the first revision of an object
+    // type is its newest. Timestamps are not compared: their fractional digits
+    // vary in length, so they do not sort as text.
+    if (!newest.has(info.objectType)) {
+      newest.set(info.objectType, info);
     }
   }
-  return {
-    byId,
-    byObjectType: new Map([...newest].map(([objectType, { info }]) => [objectType, info])),
-  };
+  return { byId, byObjectType: newest };
 }
 
 const quote = (value: string) => `"${value}"`;
