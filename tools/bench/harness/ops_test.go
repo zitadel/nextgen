@@ -6,14 +6,13 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/zitadel/nextgen/api/client"
-	api "github.com/zitadel/nextgen/api/generated"
+	api "go.zitadel.com/zitadel/v5/api"
 )
 
 func newClient(t *testing.T, srv *httptest.Server) *api.Client {
 	t.Helper()
 	//egress:allow test client against an httptest server
-	c, err := client.New(srv.URL, NewCredentials("secret"), api.WithClient(http.DefaultClient))
+	c, err := api.New(srv.URL, NewCredentials("secret"), api.WithClient(http.DefaultClient))
 	if err != nil {
 		t.Fatal(err)
 	}

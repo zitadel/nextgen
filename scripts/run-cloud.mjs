@@ -8,7 +8,8 @@
  * --local-config), so what it needs lives there, in fields a deployment does
  * not use:
  *
- * - server: `entrypoint` names apps/cloud/launcher. Vercel's Go builder builds
+ * - server: `root` is the Go module, apps/api, and `entrypoint` names its
+ *   cmd/cloud-launcher package. Vercel's Go builder builds
  *   it in dev and starts it on $PORT; a deployment's build runs
  *   @zitadel/cloud's `deploy` instead, which compiles the same package
  *   through turbo. The launcher, without

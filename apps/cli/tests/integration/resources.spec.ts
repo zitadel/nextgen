@@ -175,5 +175,15 @@ describe("resources", () => {
         }
       });
     });
+
+    describe("--plain", () => {
+      it("prints each topic as a tab-separated record", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run(["resources", "--plain"]);
+
+        expect(result).toPrintPlainRow("users", /.+/, /.*/);
+      });
+    });
   });
 });

@@ -9,7 +9,7 @@ import { AGENTS_HEADER, removeGuidanceSection } from "../lib/orca/patchers/rule/
 import type { EjectActions } from "../lib/orca/patchers/types";
 import { MANAGED_MARKER } from "../lib/paths";
 import { readRendererId, readZitadelConfig } from "../lib/project";
-import { shellArg } from "../lib/shell";
+import { Cmd } from "../lib/cmd";
 import { shellCommand, type SuggestedCommand } from "../lib/suggestion";
 import { Destructive } from "../lib/oclif/destructive";
 import { Consent } from "../lib/consent";
@@ -61,7 +61,7 @@ function assembleNextCommands(
   dir: string | undefined,
 ): ReadonlyArray<SuggestedCommand> {
   const inDir = (command: string) =>
-    shellCommand(dir === undefined ? command : `cd ${shellArg(dir)} && ${command}`);
+    shellCommand(dir === undefined ? command : `cd ${Cmd.quote(dir)} && ${command}`);
   const commands: SuggestedCommand[] = [];
   if (backedUp.length > 0) {
     // Name only the backups eject actually created (each `backedUp` entry is

@@ -6,6 +6,8 @@ import { it } from "../../../helpers/fixtures";
 import type { LocalAdmin } from "../../../../src/lib/local-server/admin-credential";
 import { claimProjectAsAdmin } from "../../../../src/lib/local-server/claim-as-admin";
 
+const signal = new AbortController().signal;
+
 const SERVER = "http://local-admin.invalid:8080";
 const PROJECT = "proj_local";
 
@@ -83,6 +85,7 @@ const claim = () =>
     projectId: PROJECT,
     projectSecret: "sk_project",
     admin,
+    signal,
   });
 
 describe("claiming a project as the local admin", () => {

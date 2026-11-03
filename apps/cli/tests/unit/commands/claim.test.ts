@@ -8,7 +8,7 @@ import {
   expireClaimWindow,
   snapshotPlatformStore,
 } from "@zitadel/api-mock/platform";
-import { http, passthrough } from "msw";
+import { HttpResponse, http, passthrough } from "msw";
 import { text } from "@clack/prompts";
 import { beforeEach, describe, expect, vi } from "vitest";
 
@@ -21,7 +21,7 @@ import {
 } from "../../../src/lib/local-server/runtime";
 import Claim from "../../../src/commands/claim";
 import { usePlatformServer } from "../../helpers/platform-project";
-import { parseJson, runCliForTest } from "../../helpers/run-cli";
+import { parseJson, pressCtrlC, runCliForTest } from "../../helpers/run-cli";
 import { asTerminal } from "../../helpers/terminal";
 
 vi.mock("@clack/prompts", async () => (await import("../../helpers/clack")).clackDouble());
@@ -320,6 +320,21 @@ describe("claim", () => {
     expect(secret.team_id).toBeUndefined();
   });
 
+  it("keeps waiting after the platform rate-limits a status check", async () => {
+    const { cwd, project } = await makeProject();
+    const rateLimited = vi.fn(() => new HttpResponse(null, { status: 429 }));
+    server.use(http.get("*/projects/:project_id/claim/status", rateLimited, { once: true }));
+
+    const [res] = await Promise.all([
+      claim(cwd),
+      onChallengeMinted((challengeId) => completeClaimChallenge(challengeId, project.id)),
+    ]);
+
+    expect(rateLimited).toHaveBeenCalledOnce();
+    expect(res.exitCode).toBe(0);
+    expect((await readSecret(cwd)).team_id).toMatch(/^team-/);
+  });
+
   it("stops waiting at --timeout and leaves the secret untouched", async () => {
     const { cwd } = await makeProject();
 
@@ -331,6 +346,86 @@ describe("claim", () => {
     expect(json.code).toBe("E_VALIDATION");
     expect(json.message).toContain("Stopped waiting");
     expect((await readSecret(cwd)).team_id).toBeUndefined();
+  });
+
+  it("never asks for the status of a link that has already expired", async () => {
+    const { cwd } = await makeProject();
+    const statusChecks = vi.fn(() =>
+      HttpResponse.json({
+        status: "completed",
+        team_id: "team-late",
+        claimed_at: "2026-03-03T00:00:00.000Z",
+        dashboard_url: "https://example.test/teams/team-late",
+      }),
+    );
+    server.use(
+      http.post("*/projects/:project_id/claim/init", () =>
+        HttpResponse.json(
+          {
+            claim_url: "https://example.test/claim/ch_expired",
+            challenge_id: "ch_expired",
+            expires_at: new Date(Date.now() - 1_000).toISOString(),
+          },
+          { status: 201 },
+        ),
+      ),
+      http.get("*/projects/:project_id/claim/status", statusChecks),
+    );
+
+    const res = await claim(cwd);
+
+    expect(statusChecks).not.toHaveBeenCalled();
+    expect(res.exitCode).toBe(3);
+    expect((parseJson(res.stdout) as { message: string }).message).toContain("Stopped waiting");
+    expect((await readSecret(cwd)).team_id).toBeUndefined();
+  });
+
+  it("stops at once when interrupted while it waits to ask again", async () => {
+    vi.spyOn(process, "exit").mockImplementation((() => undefined) as never);
+    const { cwd } = await makeProject();
+    const statusChecks = vi.fn(() => new HttpResponse(null, { status: 429 }));
+    server.use(http.get("*/projects/:project_id/claim/status", statusChecks));
+
+    const running = claim(cwd);
+    await vi.waitFor(() => expect(statusChecks).toHaveBeenCalledOnce());
+    pressCtrlC();
+    const res = await running;
+
+    expect(res.exitCode).toBe(130);
+    expect((parseJson(res.stdout) as { code: string }).code).toBe("E_CANCELLED");
+    expect(statusChecks).toHaveBeenCalledOnce();
+    expect((await readSecret(cwd)).team_id).toBeUndefined();
+  });
+
+  it("waits longer between each status check that is answered with 429, up to five seconds", async () => {
+    vi.spyOn(process, "exit").mockImplementation((() => undefined) as never);
+    const { cwd } = await makeProject();
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    const askedAt: number[] = [];
+    server.use(
+      http.get("*/projects/:project_id/claim/status", () => {
+        askedAt.push(Date.now());
+        return new HttpResponse(null, { status: 429 });
+      }),
+    );
+
+    const running = claim(cwd, ["--timeout", "60"]);
+    while (askedAt.length < 7) {
+      await new Promise<void>((resolve) => {
+        setImmediate(resolve);
+      });
+      if (vi.getTimerCount() > 0) {
+        await vi.advanceTimersToNextTimerAsync();
+      }
+    }
+    vi.useRealTimers();
+    pressCtrlC();
+    await running;
+
+    const gaps = askedAt.slice(1).map((at, index) => {
+      return at - (askedAt[index] as number);
+    });
+    expect(gaps).toEqual([1000, 1500, 2250, 3375, 5000, 5000]);
   });
 
   it("mutates neither the platform nor the secret under --dry-run", async () => {

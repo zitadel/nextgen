@@ -1,18 +1,18 @@
 import { spinner } from "@clack/prompts";
 import { Flags } from "@oclif/core";
-import { pages } from "@zitadel/api/runtime/paging";
+import { Paging } from "@zitadel/api/runtime/paging";
 
 import { sanitizeResponse } from "../../../api-client";
 
 import { nonBlankString } from "../../flags";
 
 import type { CommandResult, GlobalOptions } from "../../types";
-import { collectPages } from "../paging";
+import { plainFlag } from "../../tabulatable";
 import { wireOf } from "../wire";
 import { type ParsedFilter, parseFilter, parseSort } from "../query";
 import { parseOrThrow } from "../shared";
 import { chosenColumns } from "../columns";
-import { shellOption } from "../../../shell";
+import { Cmd } from "../../../cmd";
 import { fieldPaths } from "../paths";
 import type { Json, ListSpec } from "../types";
 import {
@@ -34,7 +34,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
     options,
   }: OperationDefinition<Ctx, ListSpec<Ctx>>): OperationStatics {
     const paged = spec.paged !== false;
-    const paging = {
+    const pagingFlags = {
       limit: Flags.integer({
         description: "Page size (server default 20, max 100).",
         min: 1,
@@ -53,10 +53,6 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
       fields: nonBlankString({
         description:
           "Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the resource's own columns; `--json` is unaffected.",
-      }),
-      plain: Flags.boolean({
-        description:
-          "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
       }),
     };
     const filters = spec.filters ?? [];
@@ -97,7 +93,13 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
             ]
           : []),
       ],
-      flags: { ...(paged ? paging : {}), ...presentation, ...specific, ...options.flags },
+      flags: {
+        ...(paged ? pagingFlags : {}),
+        ...presentation,
+        ...specific,
+        ...options.flags,
+        plain: plainFlag,
+      },
       args: {},
     };
   }
@@ -118,7 +120,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
     // An unpaged endpoint has no cursor flags to read and would reject the
     // parameters anyway, so nothing is sent and one request is the whole list.
     const paged = spec.paged !== false;
-    const paging = (token?: string): Json =>
+    const pageFields = (token?: string): Json =>
       paged
         ? {
             ...(typeof flags.limit === "number" && { [wire.limit]: flags.limit }),
@@ -153,7 +155,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
             parseOrThrow(
               spec.body,
               wire.query({
-                paging: paging(token),
+                paging: pageFields(token),
                 sorting,
                 filters: parsed.map(({ field, operation, value }) => ({
                   field: field.field,
@@ -166,7 +168,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
             ),
           )
         : spec.call(ctx, {
-            ...paging(token),
+            ...pageFields(token),
             ...queryParams(parsed),
             ...(sorting && spec.sortParam ? { [spec.sortParam]: sorting.direction } : {}),
           });
@@ -180,73 +182,58 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
     // `--json` has already silenced everything.
     const progress = all && process.stdout.isTTY && !this.jsonEnabled() ? spinner() : undefined;
     progress?.start(`Fetching ${topic}`);
-    let fetched = 0;
     // The walk begins at the page --page-token names, if any.
     const first = typeof flags["page-token"] === "string" ? flags["page-token"] : undefined;
+    const paging = new Paging({
+      items: (response) => {
+        return sanitizeResponse(spec.items(response));
+      },
+      next: (response) => {
+        return spec.next?.(response);
+      },
+    });
+    const walk = paging.walk(async (token, number) => {
+      const page = await request(token ?? first);
+      progress?.message(`Fetching ${topic} — page ${number}`);
+      return page;
+    });
     // The spinner owns the cursor and a SIGINT handler until it is stopped, so a
     // page that fails mid-drain has to stop it too; otherwise the error prints
     // under a live spinner and the handler outlives the command.
-    const walk = pages(
-      async (token) => {
-        const page = await request(token ?? first);
-        fetched += 1;
-        progress?.message(`Fetching ${topic} — page ${fetched}`);
-        return page;
-      },
-      { next: (response) => spec.next?.(response) || undefined },
-    );
-    const { items, next } = await collectPages(walk, {
-      items: (response) => sanitizeResponse(spec.items(response)),
-      all,
-      next: (response) => sanitizeResponse(spec.next?.(response)),
-    }).catch((error: unknown) => {
+    const collected = await paging.collect(walk, { all }).catch((error: unknown) => {
       progress?.stop(`Fetching ${topic} failed`);
       throw error;
     });
+    const { items } = collected;
+    const next = sanitizeResponse(collected.next);
     progress?.stop(`Fetched ${items.length} ${items.length === 1 ? resource.singular : topic}`);
 
-    // A terminal gets the aligned table with its header and footer; a pipe (or
-    // `--plain`) gets one tab-separated record per line, which `cut` and `awk`
-    // can split and nothing else has to parse around.
-    const plain = this.isPlain(flags.plain === true);
+    const rows = items;
     const columns = early ?? chosenColumns(flags.fields, resource.columns, items);
-    // A page token is only valid alongside the sorting and filters that issued
-    // it, so the suggested next page repeats the whole invocation rather than
-    // handing back a bare token. `--all` already drained everything, so it
-    // suggests nothing.
-    const nextCommands =
-      next && !all
-        ? [
-            this.suggest(
-              [
-                `${topic} list`,
-                ...repeatedFlags(flags),
-                shellOption("--page-token", next),
-                "--json",
-              ].join(" "),
-            ),
-          ]
-        : [];
-    return {
-      status: "ok",
-      data: {
-        items,
-        count: items.length,
-        [wire.nextPageToken]: next,
-      },
-      ...(nextCommands.length > 0 ? { next: { commands: nextCommands } } : {}),
-      machineReadable: plain,
-      pretty: plain
-        ? this.tabulateRows(columns, items)
-        : items.length === 0
-          ? `No ${topic} found.`
-          : [
-              await this.tabulate(columns, items),
-              "",
-              `${items.length} ${items.length === 1 ? resource.singular : topic}`,
-              ...(next ? [`More available: ${shellOption("--page-token", next)} (or --all)`] : []),
-            ].join("\n"),
+    const empty = `No ${topic} found.`;
+    const footer: string[] = [];
+    const page = {
+      token: next,
+      command: `${topic} list`,
+      flags: repeatedFlags(flags),
+      cursorKey: wire.nextPageToken,
     };
+    const extra = {};
+
+    return this.listResult(
+      { plain: flags.plain === true },
+      {
+        columns,
+        rows,
+        items,
+        singular: resource.singular,
+        plural: topic,
+        empty,
+        footer,
+        page,
+        extra,
+      },
+    );
   }
 }
 
@@ -257,9 +244,9 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
  */
 const repeatedFlags = (flags: Json): readonly string[] => {
   const limit = typeof flags.limit === "number" ? [`--limit ${flags.limit}`] : [];
-  const sort = typeof flags.sort === "string" ? [shellOption("--sort", flags.sort)] : [];
+  const sort = typeof flags.sort === "string" ? [Cmd.option("--sort", flags.sort)] : [];
   const filters = (Array.isArray(flags.filter) ? flags.filter : []).map((filter) =>
-    shellOption("--filter", String(filter)),
+    Cmd.option("--filter", String(filter)),
   );
   return [...limit, ...sort, ...filters];
 };

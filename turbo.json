@@ -301,7 +301,7 @@
         "scripts/server-build.mjs",
         "scripts/render-builtin-schemas.mjs",
         "scripts/render-builtin-schemas.test.mjs",
-        "api/openapi/endpoints/schemas/*.json",
+        "apps/api/api/openapi/endpoints/schemas/*.json",
         // The built-in schemas' renderer matches the server's default
         // namespace.
         "packages/config/src/builtin-schema-base.ts",
@@ -362,7 +362,7 @@
     },
     "//#doctor": {
       "cache": false,
-      "inputs": ["scripts/doctor.mjs", "scripts/dev-process.mjs"]
+      "inputs": ["scripts/doctor.mjs", "scripts/server-build.mjs", "scripts/dev-process.mjs"]
     },
     // `workspace:cli` is not a turbo task: it is interactive, which turbo only
     // supports inside its terminal UI. Run `pnpm run cli -- ...` directly.
