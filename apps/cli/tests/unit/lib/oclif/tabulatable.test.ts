@@ -61,19 +61,21 @@ describe("tabulate", () => {
    * streams. What the run decided is the thing worth pinning.
    */
   const headerStyle = async (argv: string[]): Promise<unknown> => {
+    // Every variable the run reads to decide colour, so the answer is the
+    // argv's and not the runner's: CI sets `NO_COLOR`, and a terminal sets
+    // `TERM`, each of which would otherwise decide this on its own.
+    vi.stubEnv("NO_COLOR", "");
+    vi.stubEnv("TERM", "xterm");
+    vi.stubEnv("FORCE_COLOR", "1");
     await aTableDrawnByARun(argv);
     return vi.mocked(makeTable).mock.calls.at(-1)?.[0]?.headerOptions;
   };
 
   it("asks for an unstyled header where the run's output is not coloured", async () => {
-    vi.stubEnv("FORCE_COLOR", "1");
-
     expect(await headerStyle(["--no-color"])).toEqual({ bold: false, color: undefined });
   });
 
   it("asks for a coloured header where the run's output is coloured", async () => {
-    vi.stubEnv("FORCE_COLOR", "1");
-
     expect(await headerStyle(["--color"])).toEqual({ bold: true, color: "blue" });
   });
 
