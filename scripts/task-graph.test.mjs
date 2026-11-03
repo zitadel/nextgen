@@ -139,14 +139,16 @@ beforeAll(() => {
   delete workspace.remote;
   write(".moon/workspace.yml", stringify(workspace));
   for (const file of [
-    "internal/build/info.go",
-    "internal/build/info_test.go",
+    "apps/api/internal/build/info.go",
+    "apps/api/internal/build/info_test.go",
     "tools/bench/main.go",
     "tools/oidc-mock/main.go",
+    "packages/go/api/client.go",
+    "packages/go/api/client_test.go",
   ]) {
     write(file, "package main\n");
   }
-  write("internal/build/testdata/fixture.txt", "test fixture\n");
+  write("apps/api/internal/build/testdata/fixture.txt", "test fixture\n");
   for (const file of ["vitest.shared.mjs", "vitest.shared.d.mts"]) {
     write(
       `packages/vitest-config/${file}`,
@@ -229,7 +231,7 @@ describe.sequential("task graph cache and ordering contracts", () => {
       for (const [from, to] of graph.graph.edges) {
         if (ids.has(from) && ids.has(to)) waitsFor.get(ids.get(from)).push(ids.get(to));
       }
-      // Every Go task on the root module resolves the console's embed.
+      // Every Go task on the server module resolves the console's embed.
       const goReaders = [...waitsFor.keys()].filter((id) =>
         /^server:(?!openapi$|format$)/.test(id),
       );
@@ -275,7 +277,10 @@ describe.sequential("task graph cache and ordering contracts", () => {
   });
 
   test("Go tests and independent modules do not invalidate production binaries", () => {
-    for (const file of ["internal/build/info_test.go", "internal/build/testdata/fixture.txt"]) {
+    for (const file of [
+      "apps/api/internal/build/info_test.go",
+      "apps/api/internal/build/testdata/fixture.txt",
+    ]) {
       changed(file, "// changed test input\n", () => {
         const next = dry();
         for (const project of ["server", "bench", "cloud"]) {
@@ -295,6 +300,32 @@ describe.sequential("task graph cache and ordering contracts", () => {
         expect(affected.has("server:test")).toBe(true);
       });
     }
+    // The client module's tests are its own: the server compiles only its
+    // non-test files, through the replace directive.
+    changed("packages/go/api/client_test.go", "package main\n// changed test\n", () => {
+      const next = dry();
+      for (const task of [
+        "@zitadel/server#check-generate",
+        "@zitadel/server#build",
+        "@zitadel/bench#build",
+        "@zitadel/cloud#build",
+      ]) {
+        expect(next.get(task).hash, task).toBe(baseline.get(task).hash);
+      }
+      expect(next.get("@zitadel/go#test").hash).not.toBe(baseline.get("@zitadel/go#test").hash);
+      const affected = moonAffected();
+      expect(affected.has("server:build")).toBe(false);
+      expect(affected.has("bench:build")).toBe(false);
+      expect(affected.has("go:test")).toBe(true);
+    });
+    changed("packages/go/api/client.go", "package main\n// changed client\n", () => {
+      const next = dry();
+      for (const project of ["server", "bench", "cloud"]) {
+        expect(next.get(`@zitadel/${project}#build`).hash, project).not.toBe(
+          baseline.get(`@zitadel/${project}#build`).hash,
+        );
+      }
+    });
     changed("tools/oidc-mock/main.go", "package main\n// changed mock\n", () => {
       const next = dry();
       for (const project of ["server", "bench", "cloud"]) {

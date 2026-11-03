@@ -109,5 +109,25 @@ describe("variable list", () => {
         expect(result).toPrint("FOO");
       });
     });
+
+    describe("--plain", () => {
+      it("prints each variable as a tab-separated record", async () => {
+        const app = await aSetUpApp();
+        expect(await app.setVariable("FOO", "bar")).toSucceed();
+
+        const result = await app.run(["variable", "list", "--plain"]);
+
+        expect(result).toPrintPlainRows(["FOO", "bar", /.*/]);
+      });
+
+      it("prints nothing when no variable is entered", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run(["variable", "list", "--plain"]);
+
+        expect(result).toSucceed();
+        expect(result).toPrintPlainRows();
+      });
+    });
   });
 });

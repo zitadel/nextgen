@@ -422,8 +422,6 @@ function withoutServerDefaults(step: Step): Step {
   return copy;
 }
 
-let shippedPasswordForms: string[] | undefined;
-
 /**
  * The password steps the shipped flows carry, one per preset, in the form
  * {@link withoutSsoRoutes} reduces any password step to. A step that reduces to
@@ -431,12 +429,11 @@ let shippedPasswordForms: string[] | undefined;
  * The shipped steps carry no provider routes, so the terminal does not matter.
  */
 function shippedPasswordSteps(): string[] {
-  shippedPasswordForms ??= SETUP_PRESETS.flatMap((preset) => {
+  return SETUP_PRESETS.flatMap((preset) => {
     const flow = getDefaultLoginFlow({ preset }) as unknown as Json;
     const step = stepNamed(flow, PASSWORD_STEP);
     return step === undefined ? [] : [stableStringify(withoutSsoRoutes(step, "done"))];
   });
-  return shippedPasswordForms;
 }
 
 /**
@@ -518,8 +515,7 @@ const LEGACY_OUTCOMES: ReadonlyArray<readonly [string, string]> = [
  * refused: the new keys may declare neither, and dropping them would change the
  * author's routing.
  */
-function migrateLegacyOutcomes(document: Json): boolean {
-  let changed = false;
+function migrateLegacyOutcomes(document: Json): void {
   for (const step of steps(document)) {
     if (!isObject(step.transitions)) {
       continue;
@@ -561,10 +557,8 @@ function migrateLegacyOutcomes(document: Json): boolean {
         transitions[next] = transition;
       }
       delete transitions[old];
-      changed = true;
     }
   }
-  return changed;
 }
 
 /**
@@ -619,23 +613,19 @@ export function applySsoToFlow(
   // Before any rewrite, so a refused flow is never half edited.
   refuseOutcomeActionCollision(document);
   const skipped: SsoSkipped[] = [];
-  let changed = false;
+  const before = stableStringify(document);
   // `ssoEditRefusal` has already refused a flow with no terminal to route to,
   // so the caller never reaches here without one.
   const terminal = terminalStep(document) ?? "done";
   // First, so a step the previous CLI wrote matches today's template below.
-  if (migrateLegacyOutcomes(document)) {
-    changed = true;
-  }
+  migrateLegacyOutcomes(document);
 
   for (const name of providerSteps(document)) {
     const step = stepNamed(document, name);
     if (step === undefined) {
       continue;
     }
-    if (addProvider(step, slug)) {
-      changed = true;
-    }
+    addProvider(step, slug);
     const transitions = isObject(step.transitions) ? { ...step.transitions } : {};
     for (const [outcome, target] of Object.entries(providerOutcomes(terminal))) {
       const current = transitions[outcome];
@@ -647,7 +637,6 @@ export function applySsoToFlow(
         continue;
       }
       transitions[outcome] = { target };
-      changed = true;
     }
     step.transitions = transitions;
   }
@@ -681,8 +670,8 @@ export function applySsoToFlow(
           : [];
       });
       for (const provider of new Set([...offered, slug])) {
-        if (typeof provider === "string" && addProvider(password, provider)) {
-          changed = true;
+        if (typeof provider === "string") {
+          addProvider(password, provider);
         }
       }
       const transitions = isObject(password.transitions) ? { ...password.transitions } : {};
@@ -694,7 +683,6 @@ export function applySsoToFlow(
         const current = transitions[outcome];
         if (!isObject(current) || current.target !== target) {
           transitions[outcome] = { target };
-          changed = true;
         }
       }
       password.transitions = transitions;
@@ -712,13 +700,10 @@ export function applySsoToFlow(
     if (!isObject(current) || current.target !== SSO_CONFLICT) {
       transitions.user_already_exists = { target: SSO_CONFLICT };
       registerPassword.transitions = transitions;
-      changed = true;
     }
   }
 
   const list = steps(document);
-  const terminalIndex = list.findIndex((step) => step.name === terminal);
-  const insertAt = terminalIndex === -1 ? list.length : terminalIndex;
   // Each step with every form the generator may have written it in before. The
   // conflict step follows the methods enabled, so one written when passkey was
   // off is still the generator's own output once passkey is on. `register-sso`
@@ -734,14 +719,13 @@ export function applySsoToFlow(
       ),
     },
   ];
-  let offset = 0;
   for (const { step, earlier } of wanted) {
     const name = step.name as string;
     const existing = stepNamed(document, name);
     if (existing === undefined) {
-      list.splice(insertAt + offset, 0, step);
-      offset += 1;
-      changed = true;
+      // Before the terminal step, after any step already added here.
+      const terminalIndex = list.findIndex((candidate) => candidate.name === terminal);
+      list.splice(terminalIndex === -1 ? list.length : terminalIndex, 0, step);
       continue;
     }
     // The conflict step carries a provider list of its own, so a second
@@ -758,8 +742,8 @@ export function applySsoToFlow(
     // report promises it did not do.
     const candidate = merged === undefined ? existing : { ...existing, sso_providers: merged };
     if (matches(candidate, expected)) {
-      if (merged !== undefined && addProvider(existing, slug)) {
-        changed = true;
+      if (merged !== undefined) {
+        addProvider(existing, slug);
       }
     } else if (
       merged !== undefined &&
@@ -768,13 +752,13 @@ export function applySsoToFlow(
       // What the generator wrote for other methods: bring it up to today's, in
       // the place it already has, keeping the providers it lists.
       list[list.indexOf(existing)] = expected;
-      changed = true;
     } else {
       skipped.push({ step: name, region: `steps.${name}`, reason: "hand-edited" });
     }
   }
   document.steps = list;
 
+  const changed = stableStringify(document) !== before;
   return changed || skipped.length > 0
     ? { document, changed, skipped }
     : { document: flow, changed: false, skipped };
@@ -811,7 +795,7 @@ export function removeSsoFromSchema(schema: object, slug: string): SsoResult<obj
  */
 export function removeSsoFromFlow(flow: object, slug: string): SsoResult<object> {
   const document = clone(flow) as Json;
-  let changed = false;
+  const before = stableStringify(document);
   for (const step of steps(document)) {
     if (!Array.isArray(step.sso_providers) || !step.sso_providers.includes(slug)) {
       continue;
@@ -822,8 +806,8 @@ export function removeSsoFromFlow(flow: object, slug: string): SsoResult<object>
     } else {
       step.sso_providers = providers;
     }
-    changed = true;
   }
+  const changed = stableStringify(document) !== before;
   return changed
     ? { document, changed, skipped: [] }
     : { document: flow, changed: false, skipped: [] };

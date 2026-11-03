@@ -50,7 +50,7 @@
     "ufo": "catalog:"
   },
   "peerDependencies": {
-    "h3": ">=1",
+    "h3": "^1.15.0",
     "nuxt": ">=4"
   },
   "devDependencies": {

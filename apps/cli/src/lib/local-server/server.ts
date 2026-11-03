@@ -398,15 +398,13 @@ export class LocalServer {
    */
   async status(): Promise<ServerStatus> {
     const runtime = await readRuntimeMetadata(this.cwd);
-    let container: Awaited<ReturnType<typeof DockerLauncher.inspect>> | undefined;
-    let dockerError: string | undefined;
-    if (runtime?.backend === "docker") {
-      try {
-        container = await DockerLauncher.inspect(runtime.container_name);
-      } catch (error) {
-        dockerError = errorMessage(error);
-      }
-    }
+    const { container, dockerError } =
+      runtime?.backend === "docker"
+        ? await DockerLauncher.inspect(runtime.container_name).then(
+            (inspected) => ({ container: inspected, dockerError: undefined }),
+            (error: unknown) => ({ container: undefined, dockerError: errorMessage(error) }),
+          )
+        : { container: undefined, dockerError: undefined };
     const healthy = runtime ? await checkLocalServerHealth(runtime.server_url) : false;
     const running =
       runtime?.backend === "binary" ? await BinaryLauncher.isRecordRunning(runtime) : false;

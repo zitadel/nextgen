@@ -72,7 +72,7 @@
         "!LICENSE",
         "!src/**/README.md",
         "$TURBO_ROOT$/apps/server/bin/**",
-        "$TURBO_ROOT$/api/openapi/endpoints/**/methods.yaml",
+        "$TURBO_ROOT$/apps/api/api/openapi/endpoints/**/methods.yaml",
         "$TURBO_ROOT$/docs/product-analytics-events.yaml",
         "$TURBO_ROOT$/vercel.json",
         "$TURBO_ROOT$/scripts/**/*.mjs",
