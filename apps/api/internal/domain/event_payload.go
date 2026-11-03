@@ -91,6 +91,20 @@ type AuthTokenIssuedPayload struct {
 
 type AuthTokenRevokedPayload struct{}
 
+// ConsentGivenPayload is what a user consented to: the client, the API and
+// the scopes the consent now covers.
+type ConsentGivenPayload struct {
+	ClientID string   `json:"client_id"`
+	Resource string   `json:"resource"`
+	Scopes   []string `json:"scopes,omitempty"`
+}
+
+// ConsentRevokedPayload names the client and the API whose consent ended.
+type ConsentRevokedPayload struct {
+	ClientID string `json:"client_id"`
+	Resource string `json:"resource"`
+}
+
 type SessionEstablishedPayload struct {
 	UserID string `json:"user_id,omitempty"`
 }

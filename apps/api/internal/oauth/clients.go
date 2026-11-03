@@ -19,10 +19,18 @@ import (
 // sealed. An authorization request for it never redirects (ADR 081 §8).
 var errUnknownClient = errors.New("oauth: unknown client")
 
+// maxClientIDLength bounds a client_id: a consent's unique key holds it, and
+// an index entry has a size limit (about 2.7 KB on Postgres). An app's own
+// ids are short; this bounds metadata document URLs and sealed registrations.
+const maxClientIDLength = 1024
+
 // resolveClient finds the client a client_id names.
 func (s *Server) resolveClient(ctx context.Context, clientID string) (Client, error) {
 	if client, ok := s.app.client(clientID); ok {
 		return client, nil
+	}
+	if len(clientID) > maxClientIDLength {
+		return Client{}, errUnknownClient
 	}
 	if strings.HasPrefix(clientID, "https://") {
 		if !s.app.Registration.ClientIDMetadataDocuments {
@@ -51,7 +59,7 @@ func (s *Server) resolveClient(ctx context.Context, clientID string) (Client, er
 // registration is what a dynamically registered client's client_id seals: no
 // table holds it, so the client_id is the registration (RFC 7591 lets the
 // server choose the id). Revoking one client means rotating the key; a
-// user's consent and refresh tokens are revoked per grant.
+// user's consent and its refresh tokens are revoked per consent.
 type registration struct {
 	ClientName   string   `json:"client_name,omitempty"`
 	RedirectURIs []string `json:"redirect_uris"`

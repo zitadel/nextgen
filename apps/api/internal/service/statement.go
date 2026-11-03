@@ -40,6 +40,7 @@ type AllStatements interface {
 	TeamStatements
 	TeamMembershipStatements
 	TokenStatements
+	ConsentStatements
 	SessionStatements
 	AuthAttemptStatements
 	UserStatements
@@ -404,6 +405,31 @@ type TokenStatements interface {
 // 	Statementer[SessionStatements]
 // 	Transactioner[SessionStatements]
 // }
+
+// ConsentStatements keep users' consents to OAuth clients (ADR 082 §8), one
+// per user, client and resource.
+type ConsentStatements interface {
+	Statements
+	// CreateConsent inserts a consent. The dialect mints its id and writes it
+	// back with the stored created_at and updated_at. A second consent of the
+	// same user to the same client for the same resource is a UniqueError.
+	CreateConsent(ctx context.Context, consent *domain.Consent) error
+	// GetConsent returns the consent the filter names, live or not; a
+	// NoRowFoundError when none matches.
+	GetConsent(ctx context.Context, filter database.Filter[domain.ConsentField]) (*domain.Consent, error)
+	ListConsents(ctx context.Context, filter *database.ListOptions[domain.ConsentField]) (*database.ListResult[*domain.Consent], error)
+	// UpdateConsent writes a later consent, or a use, to a consent and moves
+	// its updated_at; a NoRowFoundError when the consent is gone.
+	UpdateConsent(ctx context.Context, projectID, consentID string, update domain.ConsentUpdate) error
+	// DeleteConsent deletes a consent and every token issued under it, the
+	// tokens whose oidc_session_id is the consent's id. It wraps the writes in
+	// withTransaction. A missing consent is a NoRowFoundError.
+	DeleteConsent(ctx context.Context, projectID, consentID string) error
+	// DeleteConsentsByClient deletes a client's consents in a project and the
+	// tokens issued under them, for a client that is deleted. It wraps the
+	// writes in withTransaction; a client without consents is no error.
+	DeleteConsentsByClient(ctx context.Context, projectID, clientID string) error
+}
 
 type SessionStatements interface {
 	Statements

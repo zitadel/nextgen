@@ -1,0 +1,18 @@
+title: ConsentGivenPayload
+type: object
+description: Payload for `consent.given` events.
+required:
+  - client_id
+  - resource
+properties:
+  client_id:
+    type: string
+    description: The client the user consented to.
+  resource:
+    type: string
+    description: The API the consent is for.
+  scopes:
+    type: array
+    description: The scopes the consent covers now.
+    items:
+      type: string

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/zitadel/nextgen/api/client"
+	"github.com/zitadel/nextgen/internal/service"
 )
 
 // Config holds what an operator may set on the platform project's
@@ -25,11 +26,23 @@ type Config struct {
 	ClientIDMetadataDocuments bool `mapstructure:"client_id_metadata_documents"`
 	// DynamicRegistration serves RFC 7591 registration (ADR 082 §9).
 	DynamicRegistration bool `mapstructure:"dynamic_registration"`
+	// ConsentLifetime is how long a user's consent to a client lasts, however
+	// often it is used (ADR 072's absolute lifetime).
+	ConsentLifetime time.Duration `mapstructure:"consent_lifetime"`
+}
+
+// ConsentLifetimes bound a consent: its own lifetime, and the refresh token's
+// as its idle timeout, since a consent unused for longer has no token left
+// to use it with.
+func (c Config) ConsentLifetimes() service.ConsentLifetimes {
+	c = c.withDefaults()
+	return service.ConsentLifetimes{Lifetime: c.ConsentLifetime, IdleTimeout: c.RefreshTokenTTL}
 }
 
 const (
 	defaultAccessTokenTTL  = 5 * time.Minute
 	defaultRefreshTokenTTL = 14 * 24 * time.Hour
+	defaultConsentLifetime = 90 * 24 * time.Hour
 	codeTTL                = time.Minute
 	requestTTL             = 10 * time.Minute
 )
@@ -40,6 +53,9 @@ func (c Config) withDefaults() Config {
 	}
 	if c.RefreshTokenTTL <= 0 {
 		c.RefreshTokenTTL = defaultRefreshTokenTTL
+	}
+	if c.ConsentLifetime <= 0 {
+		c.ConsentLifetime = defaultConsentLifetime
 	}
 	return c
 }

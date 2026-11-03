@@ -151,6 +151,8 @@ func errorResponse(err error) *api.ErrorDetailsStatusCode {
 	case strings.HasPrefix(e.Code, domain.PrefixClaimChallenge.ErrorCodePrefix("")),
 		strings.HasPrefix(e.Code, domain.PrefixClaim.ErrorCodePrefix("")):
 		return claimErrorResponse(e)
+	case e.Code == domain.ErrConsentNotFound().Code:
+		return errorResponseWithStatusCode(http.StatusNotFound, e)
 	case e.Code == domain.ErrRequestInvalid().Code:
 		return errorResponseWithStatusCode(http.StatusBadRequest, e)
 	case e.Code == domain.ErrRequestNotFound().Code:

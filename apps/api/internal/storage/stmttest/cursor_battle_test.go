@@ -86,6 +86,7 @@ func TestCursorBattle_DrainAllListIncarnations(t *testing.T) {
 		t.Run("idp_connections", func(t *testing.T) { battleIDPConnections(t, d) })
 		t.Run("idp_connection_revisions", func(t *testing.T) { battleIDPConnectionRevisions(t, d) })
 		t.Run("idp_identity_links", func(t *testing.T) { battleIDPIdentityLinks(t, d) })
+		t.Run("consents", func(t *testing.T) { battleConsents(t, d) })
 		t.Run("flow_definitions", func(t *testing.T) { battleFlowDefinitions(t, d) })
 		t.Run("json_schemas", func(t *testing.T) { battleJSONSchemas(t, d) })
 		t.Run("json_schemas_latest", func(t *testing.T) { battleJSONSchemasLatest(t, d) })
@@ -902,6 +903,48 @@ func battleIDPIdentityLinks(t *testing.T, d dialect) {
 			Filter: filter, Pagination: page,
 		})
 	}, func(link *domain.IDPIdentityLink) string { return link.ID }, 2)
+}
+
+// battleConsents drains one user's consents by created_at then id, the order
+// the consent service lists them in (newest first, so the DESC drain is its
+// walk). Another user's consent to the same client is seeded too, so the exact
+// drain also pins that the user filter keeps it out.
+func battleConsents(t *testing.T, d dialect) {
+	t.Helper()
+	f := newConsentFixture(t, d.stmts)
+	consents := make([]*domain.Consent, 0, 5)
+	for i := range 5 {
+		consent := f.consent(f.userID, "https://client-"+string(rune('a'+i))+".example.com/metadata.json", testConsentResource)
+		require.NoError(t, d.stmts.CreateConsent(t.Context(), consent))
+		consents = append(consents, consent)
+	}
+	require.NoError(t, d.stmts.CreateConsent(t.Context(), f.consent(f.otherUserID, "https://client-a.example.com/metadata.json", testConsentResource)))
+
+	// Consents created in the same instant tie on created_at, so the expected
+	// order comes from the stored values rather than the insert order.
+	slices.SortFunc(consents, func(a, b *domain.Consent) int {
+		return cmp.Or(a.CreatedAt.Compare(b.CreatedAt), strings.Compare(a.ID, b.ID))
+	})
+	want := make([]string, len(consents))
+	for i, consent := range consents {
+		want[i] = consent.ID
+	}
+	filter := database.And(
+		database.Equal(database.Col(domain.ConsentFieldProjectID), f.projectID),
+		database.Equal(database.Col(domain.ConsentFieldUserID), f.userID),
+	)
+	orderAsc := database.OrderBy[domain.ConsentField]{
+		Columns: []database.Column[domain.ConsentField]{
+			database.Col(domain.ConsentFieldCreatedAt),
+			database.Col(domain.ConsentFieldID),
+		},
+		Direction: database.OrderAsc,
+	}
+	drainIncarnation(t, want, orderAsc, func(page database.Page[domain.ConsentField]) (*database.ListResult[*domain.Consent], error) {
+		return d.stmts.ListConsents(t.Context(), &database.ListOptions[domain.ConsentField]{
+			Filter: filter, Pagination: page,
+		})
+	}, func(consent *domain.Consent) string { return consent.ID }, 2)
 }
 
 // battlePolicies drains a project's policies in the service's order, first

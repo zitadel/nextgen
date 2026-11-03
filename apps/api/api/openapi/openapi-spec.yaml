@@ -144,6 +144,10 @@ paths:
     $ref: endpoints/users/by_id/teams/methods.yaml
   /users/me:
     $ref: endpoints/users/me/methods.yaml
+  /users/me/consents:
+    $ref: endpoints/users/me/consents/methods.yaml
+  /users/me/consents/{consent_id}:
+    $ref: endpoints/users/me/consents/by_id/methods.yaml
   /users/me/identity_links:
     $ref: endpoints/users/me/identity_links/methods.yaml
   /users/me/passkeys:
@@ -308,6 +312,10 @@ webhooks:
     $ref: endpoints/events/webhooks/authz-revoked.yaml
   branding.created:
     $ref: endpoints/events/webhooks/branding-created.yaml
+  consent.given:
+    $ref: endpoints/events/webhooks/consent-given.yaml
+  consent.revoked:
+    $ref: endpoints/events/webhooks/consent-revoked.yaml
   deployment.created:
     $ref: endpoints/events/webhooks/deployment-created.yaml
   flowdef.created:

@@ -16,6 +16,7 @@ import (
 	generated "github.com/zitadel/nextgen/internal/api/generated"
 	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
+	"github.com/zitadel/nextgen/internal/oauth"
 	"github.com/zitadel/nextgen/internal/service"
 	"go.opentelemetry.io/otel"
 )
@@ -146,7 +147,7 @@ func (h *Harness) EnsureHandler(t testing.TB) *api.Handler {
 			service.NewVariableService(db, h.EnsureKeyService(t)),
 			db,
 			platform.ID,
-		).WithBuiltinSchemaBases(BuiltinSchemaBases()).WithRuntimeResolver(service.NewRuntimeResolver(db, releaseService, ConsoleOrigin)).WithPolicyService(h.EnsurePolicyService(t))
+		).WithBuiltinSchemaBases(BuiltinSchemaBases()).WithRuntimeResolver(service.NewRuntimeResolver(db, releaseService, ConsoleOrigin)).WithPolicyService(h.EnsurePolicyService(t)).WithConsentService(service.NewConsentService(db, oauth.Config{}.ConsentLifetimes()))
 	}
 	return h.handler.value
 }

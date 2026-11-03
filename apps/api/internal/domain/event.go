@@ -57,6 +57,9 @@ const (
 	EventTypeSessionEstablished EventType = "session.established"
 	EventTypeSessionDeleted     EventType = "session.deleted"
 
+	EventTypeConsentGiven   EventType = "consent.given"
+	EventTypeConsentRevoked EventType = "consent.revoked"
+
 	EventTypeAuthAttemptCreated   EventType = "auth.attempt.created"
 	EventTypeAuthAttemptHandedOff EventType = "auth.attempt.handed_off"
 	EventTypeAuthCheckFailed      EventType = "auth.check.failed"

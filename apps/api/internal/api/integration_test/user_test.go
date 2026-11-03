@@ -1434,6 +1434,11 @@ func TestMyUser_HoldsTheSessionToTheNamedProject(t *testing.T) {
 	require.IsType(t, &api.SessProjectMismatch{}, passwordState, helpers.MustMarshal(t, passwordState))
 	assert.Equal(t, "sess.project_mismatch", passwordState.(*api.SessProjectMismatch).Code)
 
+	consents, err := client.ListMyConsents(t.Context(), api.ListMyConsentsParams{ProjectID: other})
+	require.NoError(t, err)
+	require.IsType(t, &api.SessProjectMismatch{}, consents, helpers.MustMarshal(t, consents))
+	assert.Equal(t, "sess.project_mismatch", consents.(*api.SessProjectMismatch).Code)
+
 	read, err = client.GetMyUser(t.Context(), api.GetMyUserParams{ProjectID: own})
 	require.NoError(t, err)
 	require.IsType(t, &api.User{}, read, helpers.MustMarshal(t, read))
@@ -1465,6 +1470,16 @@ func TestMyUser_HoldsTheSessionToTheNamedProject(t *testing.T) {
 	links, err = client.ListMyIdentityLinks(t.Context(), api.ListMyIdentityLinksParams{ProjectID: own})
 	require.NoError(t, err)
 	require.IsType(t, &api.ListUserIdentityLinksResponseHeaders{}, links, helpers.MustMarshal(t, links))
+
+	// A user who connected no app has no consents, and none to revoke.
+	consents, err = client.ListMyConsents(t.Context(), api.ListMyConsentsParams{ProjectID: own})
+	require.NoError(t, err)
+	require.IsType(t, &api.ListMyConsentsResponseHeaders{}, consents, helpers.MustMarshal(t, consents))
+	assert.Empty(t, consents.(*api.ListMyConsentsResponseHeaders).Response.Consents)
+	revoked, err := client.RevokeMyConsent(t.Context(), api.RevokeMyConsentParams{ConsentID: "consent_01J0Z9KX7Y0Q2Y7JX5M9K2YF3C", ProjectID: own})
+	require.NoError(t, err)
+	require.IsType(t, &api.ErrorDetails{}, revoked, helpers.MustMarshal(t, revoked))
+	assert.Equal(t, "consent.not_found", string(revoked.(*api.ErrorDetails).Code))
 
 	// The session was made with a password, so its state carries when it was set.
 	passwordState, err = client.GetMyPasswordState(t.Context(), api.GetMyPasswordStateParams{ProjectID: own})

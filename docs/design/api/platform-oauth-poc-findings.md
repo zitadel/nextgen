@@ -16,6 +16,7 @@
 | The `zitadel` app | `apps/api/internal/oauth/app.go` | Declared in the server binary: client `cli` (public, first-party, loopback on any port), API `platform` (`aud` = `<base>/api/v1`, the base the API answers under), API `mcp` (`aud` = `<base>/mcp`), and registration through client ID metadata documents (CIMD) and RFC 7591 |
 | Authorization server | `apps/api/internal/oauth` | Issuer `<base>`, the domain the console shares with the server, with its endpoints under `/oauth/proj_platform`. RFC 8414 and RFC 9728 metadata, JWKS, authorize, consent, token, revoke and register; zitadel/oidc's `op.Server` answers token, revoke and JWKS |
 | Tokens | `apps/api/internal/oauth/token.go` | JWT access tokens (`typ: at+jwt`, EdDSA) signed with the platform project's existing token signing key, one `aud` each (RFC 8707). Codes and refresh tokens are sealed JWEs whose single-use records sit in `tokens` |
+| Consents | `apps/api/internal/service/consent.go`, table `consents` | One per user, client and API, with the scopes agreed to. A third party is asked again only for a new scope or on `prompt=consent`; a first-party client is never asked, but gets one too. Codes and refresh tokens are `tokens` rows naming it as `oidc_session_id`, so revoking it ends them. It lasts `platform.oauth.consent_lifetime` (90 days) at most, and the refresh token's lifetime unused. `GET /users/me/consents` and `DELETE /users/me/consents/{consent_id}` list and revoke them |
 | User bearer | `apps/api/internal/api/security.go` | The API takes a platform access token where a console session may act, as the same principal and grants (ADR 053 §5) |
 | `/mcp` | `apps/api/internal/oauth/mcp.go` | A Streamable HTTP stub: JSON responses, no stream, and a `whoami` tool |
 | CLI | `apps/cli/src/lib/login`, `login`, `whoami`, `logout` | Discovery, PKCE (S256), loopback redirect, and a `0600` token store in the user config directory. `deployment list` falls back to the login |
@@ -95,11 +96,9 @@ Postgres and Spanner were not run.
     hosted cloud, whose console is a separate service;
   - per the console's login route, a browser that already has a session but
     lands on `/login` redirects inside the SPA and never reaches the server.
-- **Consents and connected apps.** Without storage, consent is asked every
-  time, and nothing lists "the apps you connected". That needs consent
-  records (user, client, API, scopes) behind the consent step and ADR 082
-  §8's me endpoints. Each authorization's id rides in `oidc_session_id` for
-  now.
+- **Consents and connected apps.** Without storage, consent was asked every
+  time, and nothing listed "the apps you connected". Consents are stored now
+  (see the table).
 - **Where a user bearer may go.** Operations that only a project secret calls
   read `ScopeContext.ProjectID` as the target. So the bearer is limited to
   the operations a session may call (`userBoundSessionOperations`), and
@@ -222,15 +221,19 @@ went to `attacker.example`.
 
 ## Follow-ups
 
-1. Store consents as decided above: connected apps and per-client
-   revocation.
-2. Register clients through #2452's stored registrations instead of sealed
-   ids.
-3. Add a PAT scheme beside `oauth2`, with the operations each reaches
+1. Register clients through #2452's stored registrations instead of sealed
+   ids, and implement its `ClientRegistrationConsents` on the consents.
+2. Add a PAT scheme beside `oauth2`, with the operations each reaches
    declared in the spec.
-4. Before third parties reach the platform API: the model's "a client's
+3. Before third parties reach the platform API: the model's "a client's
    scopes are its ceiling", which on Zitadel's own API means checks that
    intersect a principal's roles with the token's scopes. No issue tracks it
    yet.
-5. Build ADR 081 §8's `auth_request` handoff to replace the `next` route.
-6. `deploy` with a user bearer.
+4. Build ADR 081 §8's `auth_request` handoff to replace the `next` route,
+   with the consent step in `<zitadel-login>`.
+5. `deploy` with a user bearer.
+6. Index `tokens (project_id, oidc_session_id)` before consents see real
+   traffic: revoking one, or a replay, scans every token of the project. On
+   Postgres, build the index `CONCURRENTLY` in a migration of its own.
+7. Delete a client's consents in batches: one transaction for all of them
+   can pass Spanner's 80,000 mutations per commit.

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 
 	"github.com/zitadel/nextgen/internal/domain"
@@ -36,6 +37,9 @@ type authorizationRequest struct {
 	CodeChallenge string   `json:"code_challenge"`
 	Resource      string   `json:"resource"`
 	Scope         []string `json:"scope,omitempty"`
+	// AskConsent is prompt=consent: the consent step comes even when the user
+	// consented to every scope already (ADR 082 §8).
+	AskConsent bool `json:"ask_consent,omitempty"`
 }
 
 // authorize serves GET /oauth/{project}/authorize: it checks the request,
@@ -99,6 +103,7 @@ func (s *Server) authorize(w http.ResponseWriter, r *http.Request) {
 		CodeChallenge: q.Get("code_challenge"),
 		Resource:      api.Identifier,
 		Scope:         grantedScopes(api, strings.Fields(q.Get("scope"))),
+		AskConsent:    slices.Contains(strings.Fields(q.Get("prompt")), "consent"),
 	}
 	s.proceed(w, r, client, req, q.Get("prompt") == "none")
 }
@@ -129,8 +134,10 @@ func (s *Server) resume(w http.ResponseWriter, r *http.Request) {
 	s.proceed(w, r, client, req, true)
 }
 
-// proceed takes a validated request on: to the login without a session, to
-// consent for a third-party client, else straight to a code.
+// proceed takes a validated request on: to the login without a session; for a
+// third-party client, to the consent step unless the user's consent covers
+// every scope it asks for (ADR 082 §8); else straight to a code under the
+// user's consent.
 func (s *Server) proceed(w http.ResponseWriter, r *http.Request, client Client, req authorizationRequest, noLogin bool) {
 	ctx := r.Context()
 	redirectURI, _ := url.Parse(req.RedirectURI)
@@ -153,14 +160,23 @@ func (s *Server) proceed(w http.ResponseWriter, r *http.Request, client Client, 
 		return
 	}
 	if !client.FirstParty {
-		if r.URL.Query().Get("prompt") == "none" {
-			s.failUnasked(w, r, client, redirectURI, req.State, errConsentRequired, "This app needs your consent.")
+		consented, err := s.consents.Find(ctx, s.projectID, user, client.ID, req.Resource)
+		if err != nil && !errors.Is(err, domain.ErrConsentNotFound()) {
+			authorizationServerFault(w, r, err)
 			return
 		}
-		s.showConsent(w, r, client, req, user)
-		return
+		if consented == nil || !consented.Covers(req.Scope) || req.AskConsent {
+			if r.URL.Query().Get("prompt") == "none" {
+				s.failUnasked(w, r, client, redirectURI, req.State, errConsentRequired, "This app needs your consent.")
+				return
+			}
+			s.showConsent(w, r, client, req, user)
+			return
+		}
 	}
-	s.issueCode(w, r, req, user)
+	// A first-party client asks nothing, but its consent is kept all the
+	// same: the user sees it among the apps they connected, and revokes it.
+	s.consentAndIssueCode(w, r, client, req, user)
 }
 
 // failUnasked answers a failure the user has not seen the app's consent for.
@@ -276,12 +292,21 @@ func (s *Server) consent(w http.ResponseWriter, r *http.Request) {
 		s.redirectError(w, r, redirectURI, req.State, errAccessDenied, "You did not allow the app.")
 		return
 	}
-	s.issueCode(w, r, req, user)
+	client, err := s.resolveClient(ctx, req.ClientID)
+	if err != nil {
+		if errors.Is(err, errUnknownClient) {
+			invalidAuthorizationRequest(w, r)
+			return
+		}
+		authorizationServerFault(w, r, err)
+		return
+	}
+	s.consentAndIssueCode(w, r, client, req, user)
 }
 
 // codePayload is what an authorization code seals.
 type codePayload struct {
-	GrantID       string   `json:"grant_id"`
+	ConsentID     string   `json:"consent_id"`
 	TokenID       string   `json:"token_id"`
 	ClientID      string   `json:"client_id"`
 	RedirectURI   string   `json:"redirect_uri"`
@@ -291,10 +316,24 @@ type codePayload struct {
 	UserID        string   `json:"user_id"`
 }
 
-// issueCode starts a grant and sends the browser to the client with its code,
-// the state and the issuer (RFC 9207).
-func (s *Server) issueCode(w http.ResponseWriter, r *http.Request, req authorizationRequest, user string) {
-	code, err := s.newCode(r.Context(), req, user)
+// consentAndIssueCode records the user's consent to what the request asks,
+// which renews a consent that covered it already, and sends the browser to
+// the client with a code issued under it, the state and the issuer
+// (RFC 9207).
+func (s *Server) consentAndIssueCode(w http.ResponseWriter, r *http.Request, client Client, req authorizationRequest, user string) {
+	consent, err := s.consents.Give(r.Context(), service.GiveConsentInput{
+		ProjectID:  s.projectID,
+		UserID:     user,
+		ClientID:   client.ID,
+		ClientName: client.Name,
+		Resource:   req.Resource,
+		Scope:      req.Scope,
+	})
+	if err != nil {
+		authorizationServerFault(w, r, err)
+		return
+	}
+	code, err := s.newCode(r.Context(), req, user, consent.ID)
 	if err != nil {
 		authorizationServerFault(w, r, err)
 		return
@@ -310,14 +349,10 @@ func (s *Server) issueCode(w http.ResponseWriter, r *http.Request, req authoriza
 	http.Redirect(w, r, target.String(), http.StatusSeeOther)
 }
 
-func (s *Server) newCode(ctx context.Context, req authorizationRequest, user string) (string, error) {
-	grantID, err := s.grants.NewGrantID(ctx)
-	if err != nil {
-		return "", domain.ErrInternal(err).WithMessage("failed to mint grant id")
-	}
-	tokenID, err := s.grants.Issue(ctx, service.OAuthGrantToken{
+func (s *Server) newCode(ctx context.Context, req authorizationRequest, user, consentID string) (string, error) {
+	tokenID, err := s.consents.IssueToken(ctx, service.ConsentToken{
 		ProjectID: s.projectID,
-		GrantID:   grantID,
+		ConsentID: consentID,
 		UserID:    user,
 		Scope:     req.Scope,
 		ExpiresAt: s.now().Add(codeTTL),
@@ -326,7 +361,7 @@ func (s *Server) newCode(ctx context.Context, req authorizationRequest, user str
 		return "", err
 	}
 	return s.seal(ctx, kindCode, codePayload{
-		GrantID:       grantID,
+		ConsentID:     consentID,
 		TokenID:       tokenID,
 		ClientID:      req.ClientID,
 		RedirectURI:   req.RedirectURI,

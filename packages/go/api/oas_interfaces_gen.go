@@ -73,6 +73,14 @@ type CompleteClaimRes interface {
 	completeClaimRes()
 }
 
+type ConsentGivenRes interface {
+	consentGivenRes()
+}
+
+type ConsentRevokedRes interface {
+	consentRevokedRes()
+}
+
 type CreateAuthAttemptRes interface {
 	createAuthAttemptRes()
 }
@@ -333,6 +341,10 @@ type ListIdpRevisionsRes interface {
 	listIdpRevisionsRes()
 }
 
+type ListMyConsentsRes interface {
+	listMyConsentsRes()
+}
+
 type ListMyIdentityLinksRes interface {
 	listMyIdentityLinksRes()
 }
@@ -475,6 +487,10 @@ type RemovePreviewRes interface {
 
 type RequestApiRes interface {
 	requestApiRes()
+}
+
+type RevokeMyConsentRes interface {
+	revokeMyConsentRes()
 }
 
 type RevokeMySessionRes interface {

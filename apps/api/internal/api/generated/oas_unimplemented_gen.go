@@ -991,6 +991,20 @@ func (UnimplementedHandler) ListIdpRevisions(ctx context.Context, params ListIdp
 	return r, ht.ErrNotImplemented
 }
 
+// ListMyConsents implements listMyConsents operation.
+//
+// The apps the signed-in user let act for them, newest first, paginated with
+// a cursor: one consent per client and API, with the scopes the user agreed
+// to and when the consent ends (ADR 082 §8). A consent that ended is not
+// listed.
+// With `project_id`, the consents are listed only when the session belongs to
+// that project.
+//
+// GET /users/me/consents
+func (UnimplementedHandler) ListMyConsents(ctx context.Context, params ListMyConsentsParams) (r ListMyConsentsRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // ListMyIdentityLinks implements listMyIdentityLinks operation.
 //
 // The identity provider accounts a sign-in linked to the signed-in user,
@@ -1343,6 +1357,19 @@ func (UnimplementedHandler) RemoveOrigin(ctx context.Context, req *RemoveOriginR
 //
 // POST /projects/{project_id}/previews/remove
 func (UnimplementedHandler) RemovePreview(ctx context.Context, req *RemovePreviewRequest, params RemovePreviewParams) (r RemovePreviewRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// RevokeMyConsent implements revokeMyConsent operation.
+//
+// Revokes one of the signed-in user's consents, and with it every token the
+// client holds under it: its sign-ins end, and its next authorization asks
+// for consent again (ADR 082 §8).
+// With `project_id`, the consent is revoked only when the session belongs to
+// that project.
+//
+// DELETE /users/me/consents/{consent_id}
+func (UnimplementedHandler) RevokeMyConsent(ctx context.Context, params RevokeMyConsentParams) (r RevokeMyConsentRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

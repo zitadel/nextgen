@@ -18,14 +18,14 @@ import (
 )
 
 // refreshPayload is what a refresh token seals. Its record, TokenID, is what
-// rotation consumes.
+// rotation consumes, under the consent ConsentID names.
 type refreshPayload struct {
-	GrantID  string   `json:"grant_id"`
-	TokenID  string   `json:"token_id"`
-	ClientID string   `json:"client_id"`
-	Resource string   `json:"resource"`
-	Scope    []string `json:"scope,omitempty"`
-	UserID   string   `json:"user_id"`
+	ConsentID string   `json:"consent_id"`
+	TokenID   string   `json:"token_id"`
+	ClientID  string   `json:"client_id"`
+	Resource  string   `json:"resource"`
+	Scope     []string `json:"scope,omitempty"`
+	UserID    string   `json:"user_id"`
 }
 
 type tokenResponse struct {
@@ -123,33 +123,33 @@ func (b backChannel) CodeExchange(ctx context.Context, r *op.ClientRequest[oidc.
 	case resource != "" && resource != code.Resource:
 		return nil, oidc.ErrInvalidTarget().WithDescription("The code was issued for another resource.")
 	}
-	if err := s.grants.Redeem(ctx, s.projectID, code.TokenID); err != nil {
-		if !errors.Is(err, service.ErrOAuthGrantTokenSpent) {
+	if err := s.consents.RedeemCode(ctx, s.projectID, code.TokenID); err != nil {
+		if !errors.Is(err, service.ErrConsentTokenSpent) {
 			return nil, serverFault(ctx, err)
 		}
-		// A code presented twice may have leaked: whatever it issued goes
-		// too (RFC 6749 §4.1.2).
-		if err := s.grants.Revoke(ctx, s.projectID, code.GrantID); err != nil {
+		// A code presented twice may have leaked: whatever was issued under
+		// its consent goes too (RFC 6749 §4.1.2).
+		if err := s.consents.RevokeTokens(ctx, s.projectID, code.ConsentID); err != nil {
 			return nil, serverFault(ctx, err)
 		}
 		return nil, oidc.ErrInvalidGrant().WithDescription("The code was already used.")
 	}
 	return s.issueTokens(ctx, client, refreshPayload{
-		GrantID:  code.GrantID,
-		ClientID: code.ClientID,
-		Resource: code.Resource,
-		Scope:    code.Scope,
-		UserID:   code.UserID,
+		ConsentID: code.ConsentID,
+		ClientID:  code.ClientID,
+		Resource:  code.Resource,
+		Scope:     code.Scope,
+		UserID:    code.UserID,
 	}, "")
 }
 
 // RefreshToken rotates a refresh token (RFC 6749 §6): the next one replaces
-// it, and presenting it again revokes the grant (ADR 037).
+// it, and presenting it again revokes every token of its consent (ADR 037).
 func (b backChannel) RefreshToken(ctx context.Context, r *op.ClientRequest[oidc.RefreshTokenRequest]) (*op.Response, error) {
 	s := b.s
 	client := clientOf(r.Client)
-	var grant refreshPayload
-	if err := s.unseal(ctx, kindRefresh, r.Data.RefreshToken, &grant); err != nil {
+	var issued refreshPayload
+	if err := s.unseal(ctx, kindRefresh, r.Data.RefreshToken, &issued); err != nil {
 		if errors.Is(err, errSealed) {
 			return nil, oidc.ErrInvalidGrant().WithDescription("The refresh token is not valid or expired.")
 		}
@@ -157,40 +157,41 @@ func (b backChannel) RefreshToken(ctx context.Context, r *op.ClientRequest[oidc.
 	}
 	resource := r.Form.Get("resource")
 	switch {
-	case client.ID != grant.ClientID:
+	case client.ID != issued.ClientID:
 		return nil, oidc.ErrInvalidGrant().WithDescription("The refresh token was issued to another client.")
-	case resource != "" && resource != grant.Resource:
+	case resource != "" && resource != issued.Resource:
 		return nil, oidc.ErrInvalidTarget().WithDescription("The refresh token was issued for another resource.")
 	}
 	// A refresh may narrow the scope, never widen it (RFC 6749 §6). The
 	// library's own split keeps empty entries, so the raw value is read.
 	if requested := strings.Fields(r.Form.Get("scope")); len(requested) > 0 {
 		for _, scope := range requested {
-			if !slices.Contains(grant.Scope, scope) {
+			if !slices.Contains(issued.Scope, scope) {
 				return nil, oidc.ErrInvalidScope().WithDescription("A refresh cannot add the scope %s.", scope)
 			}
 		}
-		grant.Scope = requested
+		issued.Scope = requested
 	}
-	return s.issueTokens(ctx, client, grant, grant.TokenID)
+	return s.issueTokens(ctx, client, issued, issued.TokenID)
 }
 
-// Revocation serves RFC 7009. A refresh token ends its grant. An access
-// token cannot be revoked: nothing stores it, and it expires in minutes
-// (ADR 037). Either way the answer is 200, so a caller learns nothing about a
-// token it sends.
+// Revocation serves RFC 7009. A refresh token ends, and with it the rotations
+// that would have followed it; the user's consent and the client's other
+// sign-ins stay. An access token cannot be revoked: nothing stores it, and it
+// expires in minutes (ADR 037). Either way the answer is 200, so a caller
+// learns nothing about a token it sends.
 func (b backChannel) Revocation(ctx context.Context, r *op.ClientRequest[oidc.RevocationRequest]) (*op.Response, error) {
 	s := b.s
-	var grant refreshPayload
-	if err := s.unseal(ctx, kindRefresh, r.Data.Token, &grant); err != nil {
+	var issued refreshPayload
+	if err := s.unseal(ctx, kindRefresh, r.Data.Token, &issued); err != nil {
 		if !errors.Is(err, errSealed) {
 			return nil, serverFault(ctx, err)
 		}
 		return op.NewResponse(nil), nil
 	}
 	// RFC 7009 §2.1: a client revokes only its own tokens.
-	if grant.ClientID == r.Client.GetID() {
-		if err := s.grants.Revoke(ctx, s.projectID, grant.GrantID); err != nil {
+	if issued.ClientID == r.Client.GetID() {
+		if err := s.consents.RevokeToken(ctx, s.projectID, issued.TokenID); err != nil {
 			return nil, serverFault(ctx, err)
 		}
 	}
@@ -206,34 +207,35 @@ func (b backChannel) Keys(ctx context.Context, _ *op.Request[struct{}]) (*op.Res
 	return op.NewResponse(keys), nil
 }
 
-// issueTokens mints the access token for the grant's API and, for a
+// issueTokens mints the access token for the consent's API and, for a
 // first-party client or a third party that was granted offline_access, the
 // next refresh token: written fresh after a code, rotated from rotateFrom
 // after a refresh.
-func (s *Server) issueTokens(ctx context.Context, client Client, grant refreshPayload, rotateFrom string) (*op.Response, error) {
-	api, ok := s.app.apiByIdentifier(grant.Resource)
+func (s *Server) issueTokens(ctx context.Context, client Client, issued refreshPayload, rotateFrom string) (*op.Response, error) {
+	api, ok := s.app.apiByIdentifier(issued.Resource)
 	if !ok {
-		// The API left the app since the grant began: the grant cannot widen
+		// The API left the app since the consent began: it cannot widen
 		// to another (ADR 081 §10).
 		return nil, oidc.ErrInvalidTarget().WithDescription("The resource is no longer served.")
 	}
-	// A user gone from the project ends the grant at its next use.
-	if _, err := s.users.GetMyUser(ctx, service.GetMyUserInput{Self: s.selfOf(grant.UserID)}); err != nil {
+	// A user gone from the project ends the consent's tokens at their next
+	// use.
+	if _, err := s.users.GetMyUser(ctx, service.GetMyUserInput{Self: s.selfOf(issued.UserID)}); err != nil {
 		if !errors.Is(err, domain.ErrUserNotFound()) {
 			return nil, serverFault(ctx, err)
 		}
-		if err := s.grants.Revoke(ctx, s.projectID, grant.GrantID); err != nil {
+		if err := s.consents.RevokeTokens(ctx, s.projectID, issued.ConsentID); err != nil {
 			return nil, serverFault(ctx, err)
 		}
 		return nil, oidc.ErrInvalidGrant().WithDescription("The user no longer exists.")
 	}
 	var refreshToken string
-	if client.FirstParty || slices.Contains(grant.Scope, "offline_access") {
-		next := service.OAuthGrantToken{
+	if client.FirstParty || slices.Contains(issued.Scope, "offline_access") {
+		next := service.ConsentToken{
 			ProjectID: s.projectID,
-			GrantID:   grant.GrantID,
-			UserID:    grant.UserID,
-			Scope:     grant.Scope,
+			ConsentID: issued.ConsentID,
+			UserID:    issued.UserID,
+			Scope:     issued.Scope,
 			ExpiresAt: s.now().Add(s.cfg.RefreshTokenTTL),
 		}
 		var (
@@ -241,25 +243,28 @@ func (s *Server) issueTokens(ctx context.Context, client Client, grant refreshPa
 			err     error
 		)
 		if rotateFrom == "" {
-			tokenID, err = s.grants.Issue(ctx, next)
+			tokenID, err = s.consents.IssueToken(ctx, next)
 		} else {
-			tokenID, err = s.grants.Rotate(ctx, s.projectID, rotateFrom, next)
+			tokenID, err = s.consents.Rotate(ctx, s.projectID, rotateFrom, next)
 		}
-		if errors.Is(err, service.ErrOAuthGrantTokenSpent) {
-			return nil, oidc.ErrInvalidGrant().WithDescription("The refresh token was already used; the grant is revoked.")
+		if errors.Is(err, service.ErrConsentTokenSpent) {
+			return nil, oidc.ErrInvalidGrant().WithDescription("The refresh token was already used; every token of its consent is revoked.")
+		}
+		if errors.Is(err, domain.ErrConsentNotFound()) {
+			return nil, oidc.ErrInvalidGrant().WithDescription("The consent this token was issued under ended.")
 		}
 		if err != nil {
 			return nil, serverFault(ctx, err)
 		}
-		grant.TokenID = tokenID
-		if refreshToken, err = s.seal(ctx, kindRefresh, grant, s.cfg.RefreshTokenTTL); err != nil {
+		issued.TokenID = tokenID
+		if refreshToken, err = s.seal(ctx, kindRefresh, issued, s.cfg.RefreshTokenTTL); err != nil {
 			return nil, serverFault(ctx, err)
 		}
 	} else if rotateFrom != "" {
 		// A third party without offline_access never got a refresh token.
 		return nil, oidc.ErrInvalidGrant().WithDescription("The refresh token is not valid.")
 	}
-	access, expires, err := s.mintAccessToken(ctx, grant.UserID, client.ID, api, grant.Scope)
+	access, expires, err := s.mintAccessToken(ctx, issued.UserID, client.ID, api, issued.Scope)
 	if err != nil {
 		return nil, serverFault(ctx, err)
 	}
@@ -268,7 +273,7 @@ func (s *Server) issueTokens(ctx context.Context, client Client, grant refreshPa
 		TokenType:    "Bearer",
 		ExpiresIn:    int64(expires.Sub(s.now()).Round(time.Second) / time.Second),
 		RefreshToken: refreshToken,
-		Scope:        strings.Join(grant.Scope, " "),
+		Scope:        strings.Join(issued.Scope, " "),
 	})
 	// RFC 6749 §5.1.
 	resp.Header.Set("Cache-Control", "no-store")
@@ -342,6 +347,10 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 		writeServerFault(w, r, err)
 		return
 	}
+	if len(clientID) > maxClientIDLength {
+		writeError(w, http.StatusBadRequest, errInvalidClientMetadata, "The registration is too large: name fewer or shorter redirect URIs, or a shorter client_name.")
+		return
+	}
 	writeJSON(w, http.StatusCreated, map[string]any{
 		"client_id":                  clientID,
 		"client_id_issued_at":        issued,
@@ -353,7 +362,7 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// selfOf is the user a grant names, as the user service reads its own user.
+// selfOf is the user a token names, as the user service reads its own user.
 func (s *Server) selfOf(userID string) domain.Self {
 	self, _ := domain.SelfFromAccessToken(s.projectID, userID, s.now().Add(time.Minute), s.now())
 	return self

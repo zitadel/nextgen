@@ -554,6 +554,28 @@ type ListIdpRevisionsParams struct {
 	PageToken OptPageToken `json:",omitempty,omitzero"`
 }
 
+// ListMyConsentsParams is parameters of listMyConsents operation.
+type ListMyConsentsParams struct {
+	// Maximum number of items to return.
+	Limit OptLimit `json:",omitempty,omitzero"`
+	// Token for fetching the next page of results.
+	// Obtain this value from `next_page_token` in the previous response.
+	// Omit to start from the beginning.
+	// Its format is opaque and may change between releases.
+	PageToken OptPageToken `json:",omitempty,omitzero"`
+	// The project the caller signs its users in to. The cookie's session is used
+	// only when it belongs to this project; a session of any other project answers
+	// `403` with `sess.project_mismatch`.
+	// A session belongs to one project, while a browser sends its cookie to every
+	// app on the same host. An app passes its own project, so that a session of
+	// another project never reads or acts as one of its users, and signing out of
+	// the app never ends it. The SDKs pass it when they read the session or sign
+	// out.
+	// `sess.project_mismatch` does not mean the session is invalid: it is live in
+	// its own project, so keep its cookie.
+	ProjectID OptProjectID `json:",omitempty,omitzero"`
+}
+
 // ListMyIdentityLinksParams is parameters of listMyIdentityLinks operation.
 type ListMyIdentityLinksParams struct {
 	// Maximum number of items to return.
@@ -873,6 +895,23 @@ type RemoveOriginParams struct {
 type RemovePreviewParams struct {
 	// The unique identifier of the project.
 	ProjectID ProjectID
+}
+
+// RevokeMyConsentParams is parameters of revokeMyConsent operation.
+type RevokeMyConsentParams struct {
+	// The unique identifier of the consent.
+	ConsentID ConsentID
+	// The project the caller signs its users in to. The cookie's session is used
+	// only when it belongs to this project; a session of any other project answers
+	// `403` with `sess.project_mismatch`.
+	// A session belongs to one project, while a browser sends its cookie to every
+	// app on the same host. An app passes its own project, so that a session of
+	// another project never reads or acts as one of its users, and signing out of
+	// the app never ends it. The SDKs pass it when they read the session or sign
+	// out.
+	// `sess.project_mismatch` does not mean the session is invalid: it is live in
+	// its own project, so keep its cookie.
+	ProjectID OptProjectID `json:",omitempty,omitzero"`
 }
 
 // RevokeMySessionParams is parameters of revokeMySession operation.

@@ -47,7 +47,7 @@ type Deps struct {
 	Keys      service.KeyService
 	Sessions  Sessions
 	Users     Users
-	Grants    service.OAuthGrantService
+	Consents  service.ConsentService
 	// Fetch is the hardened egress client client ID metadata documents are
 	// fetched with.
 	Fetch *http.Client
@@ -65,7 +65,7 @@ type Server struct {
 	keys        service.KeyService
 	sessions    Sessions
 	users       Users
-	grants      service.OAuthGrantService
+	consents    service.ConsentService
 	documents   *documentCache
 	backChannel http.Handler
 	now         func() time.Time
@@ -99,7 +99,7 @@ func New(deps Deps) (*Server, error) {
 		keys:        deps.Keys,
 		sessions:    deps.Sessions,
 		users:       deps.Users,
-		grants:      deps.Grants,
+		consents:    deps.Consents,
 		documents:   newDocumentCache(deps.Fetch, now),
 		now:         now,
 	}

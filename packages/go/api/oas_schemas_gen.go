@@ -6763,10 +6763,12 @@ func (s *AuthUnauthorized) SetDetails(val OptAuthUnauthorizedDetails) {
 func (*AuthUnauthorized) completeClaimRes()       {}
 func (*AuthUnauthorized) getMyPasswordStateRes()  {}
 func (*AuthUnauthorized) getMyUserSchemaRes()     {}
+func (*AuthUnauthorized) listMyConsentsRes()      {}
 func (*AuthUnauthorized) listMyIdentityLinksRes() {}
 func (*AuthUnauthorized) listMyPasskeysRes()      {}
 func (*AuthUnauthorized) listMyProjectsRes()      {}
 func (*AuthUnauthorized) listMyTeamsRes()         {}
+func (*AuthUnauthorized) revokeMyConsentRes()     {}
 func (*AuthUnauthorized) revokeMySessionRes()     {}
 
 // Additional error-specific context.
@@ -12578,6 +12580,1181 @@ func NewSchemaURLConfigurationBundleSchemasItem(v SchemaURL) ConfigurationBundle
 	var s ConfigurationBundleSchemasItem
 	s.SetSchemaURL(v)
 	return s
+}
+
+// ConsentGiven2XX is 2XX pattern response for ConsentGiven operation.
+type ConsentGiven2XX struct {
+	StatusCode int
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *ConsentGiven2XX) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *ConsentGiven2XX) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+func (*ConsentGiven2XX) consentGivenRes() {}
+
+// ConsentGivenDef is default response for ConsentGiven operation.
+type ConsentGivenDef struct {
+	StatusCode int
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *ConsentGivenDef) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *ConsentGivenDef) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+func (*ConsentGivenDef) consentGivenRes() {}
+
+// Merged schema.
+// Ref: #
+type ConsentGivenEvent struct {
+	// Managed event id (`evt_<opaque>`).
+	ID        string    `json:"id"`
+	ProjectID ProjectID `json:"project_id"`
+	// Emit-time team scope, when the actor operated under a team.
+	TeamID OptNilString `json:"team_id"`
+	// Merged property.
+	EventType string `json:"event_type"`
+	// Wide-event category.
+	Category ConsentGivenEventCategory `json:"category"`
+	// When the action happened (server/storage clock, dialect-owned).
+	OccurredAt time.Time `json:"occurred_at"`
+	// When the row was inserted (server/storage clock, dialect-owned).
+	CreatedAt time.Time `json:"created_at"`
+	// Who triggered the event.
+	ActorID OptNilString `json:"actor_id"`
+	// Actor kind.
+	ActorType OptNilConsentGivenEventActorType `json:"actor_type"`
+	// Resource type affected.
+	EntityType OptNilString `json:"entity_type"`
+	// Resource id affected.
+	EntityID OptNilString `json:"entity_id"`
+	// Application or agent that produced the event.
+	ClientID string `json:"client_id"`
+	// Token id present at emit time, when any.
+	TokenID OptString `json:"token_id"`
+	// Delegation kind (omit when unset).
+	DelegationType OptConsentGivenEventDelegationType `json:"delegation_type"`
+	DelegationID   OptString                          `json:"delegation_id"`
+	Grantor        OptString                          `json:"grantor"`
+	// Device fingerprint correlation id.
+	Fingerprint OptString `json:"fingerprint"`
+	// HTTP request correlation id.
+	RequestID OptNilString `json:"request_id"`
+	// Session correlation id.
+	SessionID OptNilString `json:"session_id"`
+	// Login flow correlation id.
+	FlowID   OptNilString        `json:"flow_id"`
+	Metadata OptEventMetadata    `json:"metadata"`
+	Payload  ConsentGivenPayload `json:"payload"`
+}
+
+// GetID returns the value of ID.
+func (s *ConsentGivenEvent) GetID() string {
+	return s.ID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *ConsentGivenEvent) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetTeamID returns the value of TeamID.
+func (s *ConsentGivenEvent) GetTeamID() OptNilString {
+	return s.TeamID
+}
+
+// GetEventType returns the value of EventType.
+func (s *ConsentGivenEvent) GetEventType() string {
+	return s.EventType
+}
+
+// GetCategory returns the value of Category.
+func (s *ConsentGivenEvent) GetCategory() ConsentGivenEventCategory {
+	return s.Category
+}
+
+// GetOccurredAt returns the value of OccurredAt.
+func (s *ConsentGivenEvent) GetOccurredAt() time.Time {
+	return s.OccurredAt
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *ConsentGivenEvent) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetActorID returns the value of ActorID.
+func (s *ConsentGivenEvent) GetActorID() OptNilString {
+	return s.ActorID
+}
+
+// GetActorType returns the value of ActorType.
+func (s *ConsentGivenEvent) GetActorType() OptNilConsentGivenEventActorType {
+	return s.ActorType
+}
+
+// GetEntityType returns the value of EntityType.
+func (s *ConsentGivenEvent) GetEntityType() OptNilString {
+	return s.EntityType
+}
+
+// GetEntityID returns the value of EntityID.
+func (s *ConsentGivenEvent) GetEntityID() OptNilString {
+	return s.EntityID
+}
+
+// GetClientID returns the value of ClientID.
+func (s *ConsentGivenEvent) GetClientID() string {
+	return s.ClientID
+}
+
+// GetTokenID returns the value of TokenID.
+func (s *ConsentGivenEvent) GetTokenID() OptString {
+	return s.TokenID
+}
+
+// GetDelegationType returns the value of DelegationType.
+func (s *ConsentGivenEvent) GetDelegationType() OptConsentGivenEventDelegationType {
+	return s.DelegationType
+}
+
+// GetDelegationID returns the value of DelegationID.
+func (s *ConsentGivenEvent) GetDelegationID() OptString {
+	return s.DelegationID
+}
+
+// GetGrantor returns the value of Grantor.
+func (s *ConsentGivenEvent) GetGrantor() OptString {
+	return s.Grantor
+}
+
+// GetFingerprint returns the value of Fingerprint.
+func (s *ConsentGivenEvent) GetFingerprint() OptString {
+	return s.Fingerprint
+}
+
+// GetRequestID returns the value of RequestID.
+func (s *ConsentGivenEvent) GetRequestID() OptNilString {
+	return s.RequestID
+}
+
+// GetSessionID returns the value of SessionID.
+func (s *ConsentGivenEvent) GetSessionID() OptNilString {
+	return s.SessionID
+}
+
+// GetFlowID returns the value of FlowID.
+func (s *ConsentGivenEvent) GetFlowID() OptNilString {
+	return s.FlowID
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *ConsentGivenEvent) GetMetadata() OptEventMetadata {
+	return s.Metadata
+}
+
+// GetPayload returns the value of Payload.
+func (s *ConsentGivenEvent) GetPayload() ConsentGivenPayload {
+	return s.Payload
+}
+
+// SetID sets the value of ID.
+func (s *ConsentGivenEvent) SetID(val string) {
+	s.ID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *ConsentGivenEvent) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *ConsentGivenEvent) SetTeamID(val OptNilString) {
+	s.TeamID = val
+}
+
+// SetEventType sets the value of EventType.
+func (s *ConsentGivenEvent) SetEventType(val string) {
+	s.EventType = val
+}
+
+// SetCategory sets the value of Category.
+func (s *ConsentGivenEvent) SetCategory(val ConsentGivenEventCategory) {
+	s.Category = val
+}
+
+// SetOccurredAt sets the value of OccurredAt.
+func (s *ConsentGivenEvent) SetOccurredAt(val time.Time) {
+	s.OccurredAt = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *ConsentGivenEvent) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetActorID sets the value of ActorID.
+func (s *ConsentGivenEvent) SetActorID(val OptNilString) {
+	s.ActorID = val
+}
+
+// SetActorType sets the value of ActorType.
+func (s *ConsentGivenEvent) SetActorType(val OptNilConsentGivenEventActorType) {
+	s.ActorType = val
+}
+
+// SetEntityType sets the value of EntityType.
+func (s *ConsentGivenEvent) SetEntityType(val OptNilString) {
+	s.EntityType = val
+}
+
+// SetEntityID sets the value of EntityID.
+func (s *ConsentGivenEvent) SetEntityID(val OptNilString) {
+	s.EntityID = val
+}
+
+// SetClientID sets the value of ClientID.
+func (s *ConsentGivenEvent) SetClientID(val string) {
+	s.ClientID = val
+}
+
+// SetTokenID sets the value of TokenID.
+func (s *ConsentGivenEvent) SetTokenID(val OptString) {
+	s.TokenID = val
+}
+
+// SetDelegationType sets the value of DelegationType.
+func (s *ConsentGivenEvent) SetDelegationType(val OptConsentGivenEventDelegationType) {
+	s.DelegationType = val
+}
+
+// SetDelegationID sets the value of DelegationID.
+func (s *ConsentGivenEvent) SetDelegationID(val OptString) {
+	s.DelegationID = val
+}
+
+// SetGrantor sets the value of Grantor.
+func (s *ConsentGivenEvent) SetGrantor(val OptString) {
+	s.Grantor = val
+}
+
+// SetFingerprint sets the value of Fingerprint.
+func (s *ConsentGivenEvent) SetFingerprint(val OptString) {
+	s.Fingerprint = val
+}
+
+// SetRequestID sets the value of RequestID.
+func (s *ConsentGivenEvent) SetRequestID(val OptNilString) {
+	s.RequestID = val
+}
+
+// SetSessionID sets the value of SessionID.
+func (s *ConsentGivenEvent) SetSessionID(val OptNilString) {
+	s.SessionID = val
+}
+
+// SetFlowID sets the value of FlowID.
+func (s *ConsentGivenEvent) SetFlowID(val OptNilString) {
+	s.FlowID = val
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *ConsentGivenEvent) SetMetadata(val OptEventMetadata) {
+	s.Metadata = val
+}
+
+// SetPayload sets the value of Payload.
+func (s *ConsentGivenEvent) SetPayload(val ConsentGivenPayload) {
+	s.Payload = val
+}
+
+type ConsentGivenEventActorType string
+
+const (
+	ConsentGivenEventActorTypeHuman   ConsentGivenEventActorType = "human"
+	ConsentGivenEventActorTypeService ConsentGivenEventActorType = "service"
+	ConsentGivenEventActorTypeSystem  ConsentGivenEventActorType = "system"
+	ConsentGivenEventActorTypeAgent   ConsentGivenEventActorType = "agent"
+)
+
+// AllValues returns all ConsentGivenEventActorType values.
+func (ConsentGivenEventActorType) AllValues() []ConsentGivenEventActorType {
+	return []ConsentGivenEventActorType{
+		ConsentGivenEventActorTypeHuman,
+		ConsentGivenEventActorTypeService,
+		ConsentGivenEventActorTypeSystem,
+		ConsentGivenEventActorTypeAgent,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ConsentGivenEventActorType) MarshalText() ([]byte, error) {
+	switch s {
+	case ConsentGivenEventActorTypeHuman:
+		return []byte(s), nil
+	case ConsentGivenEventActorTypeService:
+		return []byte(s), nil
+	case ConsentGivenEventActorTypeSystem:
+		return []byte(s), nil
+	case ConsentGivenEventActorTypeAgent:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ConsentGivenEventActorType) UnmarshalText(data []byte) error {
+	switch ConsentGivenEventActorType(data) {
+	case ConsentGivenEventActorTypeHuman:
+		*s = ConsentGivenEventActorTypeHuman
+		return nil
+	case ConsentGivenEventActorTypeService:
+		*s = ConsentGivenEventActorTypeService
+		return nil
+	case ConsentGivenEventActorTypeSystem:
+		*s = ConsentGivenEventActorTypeSystem
+		return nil
+	case ConsentGivenEventActorTypeAgent:
+		*s = ConsentGivenEventActorTypeAgent
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Wide-event category.
+type ConsentGivenEventCategory string
+
+const (
+	ConsentGivenEventCategoryRequest ConsentGivenEventCategory = "request"
+	ConsentGivenEventCategoryAuth    ConsentGivenEventCategory = "auth"
+	ConsentGivenEventCategorySession ConsentGivenEventCategory = "session"
+	ConsentGivenEventCategoryAdmin   ConsentGivenEventCategory = "admin"
+	ConsentGivenEventCategoryEntity  ConsentGivenEventCategory = "entity"
+	ConsentGivenEventCategorySignal  ConsentGivenEventCategory = "signal"
+)
+
+// AllValues returns all ConsentGivenEventCategory values.
+func (ConsentGivenEventCategory) AllValues() []ConsentGivenEventCategory {
+	return []ConsentGivenEventCategory{
+		ConsentGivenEventCategoryRequest,
+		ConsentGivenEventCategoryAuth,
+		ConsentGivenEventCategorySession,
+		ConsentGivenEventCategoryAdmin,
+		ConsentGivenEventCategoryEntity,
+		ConsentGivenEventCategorySignal,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ConsentGivenEventCategory) MarshalText() ([]byte, error) {
+	switch s {
+	case ConsentGivenEventCategoryRequest:
+		return []byte(s), nil
+	case ConsentGivenEventCategoryAuth:
+		return []byte(s), nil
+	case ConsentGivenEventCategorySession:
+		return []byte(s), nil
+	case ConsentGivenEventCategoryAdmin:
+		return []byte(s), nil
+	case ConsentGivenEventCategoryEntity:
+		return []byte(s), nil
+	case ConsentGivenEventCategorySignal:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ConsentGivenEventCategory) UnmarshalText(data []byte) error {
+	switch ConsentGivenEventCategory(data) {
+	case ConsentGivenEventCategoryRequest:
+		*s = ConsentGivenEventCategoryRequest
+		return nil
+	case ConsentGivenEventCategoryAuth:
+		*s = ConsentGivenEventCategoryAuth
+		return nil
+	case ConsentGivenEventCategorySession:
+		*s = ConsentGivenEventCategorySession
+		return nil
+	case ConsentGivenEventCategoryAdmin:
+		*s = ConsentGivenEventCategoryAdmin
+		return nil
+	case ConsentGivenEventCategoryEntity:
+		*s = ConsentGivenEventCategoryEntity
+		return nil
+	case ConsentGivenEventCategorySignal:
+		*s = ConsentGivenEventCategorySignal
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Delegation kind (omit when unset).
+type ConsentGivenEventDelegationType string
+
+const (
+	ConsentGivenEventDelegationTypeDirect    ConsentGivenEventDelegationType = "direct"
+	ConsentGivenEventDelegationTypeDelegated ConsentGivenEventDelegationType = "delegated"
+	ConsentGivenEventDelegationTypePatShared ConsentGivenEventDelegationType = "pat_shared"
+	ConsentGivenEventDelegationTypeExchanged ConsentGivenEventDelegationType = "exchanged"
+)
+
+// AllValues returns all ConsentGivenEventDelegationType values.
+func (ConsentGivenEventDelegationType) AllValues() []ConsentGivenEventDelegationType {
+	return []ConsentGivenEventDelegationType{
+		ConsentGivenEventDelegationTypeDirect,
+		ConsentGivenEventDelegationTypeDelegated,
+		ConsentGivenEventDelegationTypePatShared,
+		ConsentGivenEventDelegationTypeExchanged,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ConsentGivenEventDelegationType) MarshalText() ([]byte, error) {
+	switch s {
+	case ConsentGivenEventDelegationTypeDirect:
+		return []byte(s), nil
+	case ConsentGivenEventDelegationTypeDelegated:
+		return []byte(s), nil
+	case ConsentGivenEventDelegationTypePatShared:
+		return []byte(s), nil
+	case ConsentGivenEventDelegationTypeExchanged:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ConsentGivenEventDelegationType) UnmarshalText(data []byte) error {
+	switch ConsentGivenEventDelegationType(data) {
+	case ConsentGivenEventDelegationTypeDirect:
+		*s = ConsentGivenEventDelegationTypeDirect
+		return nil
+	case ConsentGivenEventDelegationTypeDelegated:
+		*s = ConsentGivenEventDelegationTypeDelegated
+		return nil
+	case ConsentGivenEventDelegationTypePatShared:
+		*s = ConsentGivenEventDelegationTypePatShared
+		return nil
+	case ConsentGivenEventDelegationTypeExchanged:
+		*s = ConsentGivenEventDelegationTypeExchanged
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Payload for `consent.given` events.
+// Ref: #
+type ConsentGivenPayload struct {
+	// The client the user consented to.
+	ClientID string `json:"client_id"`
+	// The API the consent is for.
+	Resource string `json:"resource"`
+	// The scopes the consent covers now.
+	Scopes []string `json:"scopes"`
+}
+
+// GetClientID returns the value of ClientID.
+func (s *ConsentGivenPayload) GetClientID() string {
+	return s.ClientID
+}
+
+// GetResource returns the value of Resource.
+func (s *ConsentGivenPayload) GetResource() string {
+	return s.Resource
+}
+
+// GetScopes returns the value of Scopes.
+func (s *ConsentGivenPayload) GetScopes() []string {
+	return s.Scopes
+}
+
+// SetClientID sets the value of ClientID.
+func (s *ConsentGivenPayload) SetClientID(val string) {
+	s.ClientID = val
+}
+
+// SetResource sets the value of Resource.
+func (s *ConsentGivenPayload) SetResource(val string) {
+	s.Resource = val
+}
+
+// SetScopes sets the value of Scopes.
+func (s *ConsentGivenPayload) SetScopes(val []string) {
+	s.Scopes = val
+}
+
+type ConsentID string
+
+// Merged schema.
+// Ref: #
+type ConsentNotFound struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptConsentNotFoundDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *ConsentNotFound) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *ConsentNotFound) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *ConsentNotFound) GetDetails() OptConsentNotFoundDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *ConsentNotFound) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *ConsentNotFound) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *ConsentNotFound) SetDetails(val OptConsentNotFoundDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type ConsentNotFoundDetails map[string]jx.Raw
+
+func (s *ConsentNotFoundDetails) init() ConsentNotFoundDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// That the user let a client use some of an API's scopes (ADR 082 §8). There is
+// one consent per client and API, and the tokens issued under it end with it.
+// Ref: #
+type ConsentResponse struct {
+	ID ConsentID `json:"id"`
+	// The client's id: an app client's, a registration's, or the URL of the
+	// client's metadata document.
+	ClientID string `json:"client_id"`
+	// The name the client went by when the user consented. A registered
+	// client's name is its own claim.
+	ClientName string `json:"client_name"`
+	// The API the consent is for, the `aud` of the tokens issued under it.
+	Resource url.URL `json:"resource"`
+	// The scopes the user agreed to.
+	Scopes []string `json:"scopes"`
+	// When the user consented.
+	CreatedAt time.Time `json:"created_at"`
+	// When the consent ends unless the client uses it again. Each use moves it,
+	// never past the consent's lifetime.
+	ExpiresAt time.Time `json:"expires_at"`
+}
+
+// GetID returns the value of ID.
+func (s *ConsentResponse) GetID() ConsentID {
+	return s.ID
+}
+
+// GetClientID returns the value of ClientID.
+func (s *ConsentResponse) GetClientID() string {
+	return s.ClientID
+}
+
+// GetClientName returns the value of ClientName.
+func (s *ConsentResponse) GetClientName() string {
+	return s.ClientName
+}
+
+// GetResource returns the value of Resource.
+func (s *ConsentResponse) GetResource() url.URL {
+	return s.Resource
+}
+
+// GetScopes returns the value of Scopes.
+func (s *ConsentResponse) GetScopes() []string {
+	return s.Scopes
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *ConsentResponse) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetExpiresAt returns the value of ExpiresAt.
+func (s *ConsentResponse) GetExpiresAt() time.Time {
+	return s.ExpiresAt
+}
+
+// SetID sets the value of ID.
+func (s *ConsentResponse) SetID(val ConsentID) {
+	s.ID = val
+}
+
+// SetClientID sets the value of ClientID.
+func (s *ConsentResponse) SetClientID(val string) {
+	s.ClientID = val
+}
+
+// SetClientName sets the value of ClientName.
+func (s *ConsentResponse) SetClientName(val string) {
+	s.ClientName = val
+}
+
+// SetResource sets the value of Resource.
+func (s *ConsentResponse) SetResource(val url.URL) {
+	s.Resource = val
+}
+
+// SetScopes sets the value of Scopes.
+func (s *ConsentResponse) SetScopes(val []string) {
+	s.Scopes = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *ConsentResponse) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetExpiresAt sets the value of ExpiresAt.
+func (s *ConsentResponse) SetExpiresAt(val time.Time) {
+	s.ExpiresAt = val
+}
+
+// ConsentRevoked2XX is 2XX pattern response for ConsentRevoked operation.
+type ConsentRevoked2XX struct {
+	StatusCode int
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *ConsentRevoked2XX) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *ConsentRevoked2XX) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+func (*ConsentRevoked2XX) consentRevokedRes() {}
+
+// ConsentRevokedDef is default response for ConsentRevoked operation.
+type ConsentRevokedDef struct {
+	StatusCode int
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *ConsentRevokedDef) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *ConsentRevokedDef) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+func (*ConsentRevokedDef) consentRevokedRes() {}
+
+// Merged schema.
+// Ref: #
+type ConsentRevokedEvent struct {
+	// Managed event id (`evt_<opaque>`).
+	ID        string    `json:"id"`
+	ProjectID ProjectID `json:"project_id"`
+	// Emit-time team scope, when the actor operated under a team.
+	TeamID OptNilString `json:"team_id"`
+	// Merged property.
+	EventType string `json:"event_type"`
+	// Wide-event category.
+	Category ConsentRevokedEventCategory `json:"category"`
+	// When the action happened (server/storage clock, dialect-owned).
+	OccurredAt time.Time `json:"occurred_at"`
+	// When the row was inserted (server/storage clock, dialect-owned).
+	CreatedAt time.Time `json:"created_at"`
+	// Who triggered the event.
+	ActorID OptNilString `json:"actor_id"`
+	// Actor kind.
+	ActorType OptNilConsentRevokedEventActorType `json:"actor_type"`
+	// Resource type affected.
+	EntityType OptNilString `json:"entity_type"`
+	// Resource id affected.
+	EntityID OptNilString `json:"entity_id"`
+	// Application or agent that produced the event.
+	ClientID string `json:"client_id"`
+	// Token id present at emit time, when any.
+	TokenID OptString `json:"token_id"`
+	// Delegation kind (omit when unset).
+	DelegationType OptConsentRevokedEventDelegationType `json:"delegation_type"`
+	DelegationID   OptString                            `json:"delegation_id"`
+	Grantor        OptString                            `json:"grantor"`
+	// Device fingerprint correlation id.
+	Fingerprint OptString `json:"fingerprint"`
+	// HTTP request correlation id.
+	RequestID OptNilString `json:"request_id"`
+	// Session correlation id.
+	SessionID OptNilString `json:"session_id"`
+	// Login flow correlation id.
+	FlowID   OptNilString          `json:"flow_id"`
+	Metadata OptEventMetadata      `json:"metadata"`
+	Payload  ConsentRevokedPayload `json:"payload"`
+}
+
+// GetID returns the value of ID.
+func (s *ConsentRevokedEvent) GetID() string {
+	return s.ID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *ConsentRevokedEvent) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetTeamID returns the value of TeamID.
+func (s *ConsentRevokedEvent) GetTeamID() OptNilString {
+	return s.TeamID
+}
+
+// GetEventType returns the value of EventType.
+func (s *ConsentRevokedEvent) GetEventType() string {
+	return s.EventType
+}
+
+// GetCategory returns the value of Category.
+func (s *ConsentRevokedEvent) GetCategory() ConsentRevokedEventCategory {
+	return s.Category
+}
+
+// GetOccurredAt returns the value of OccurredAt.
+func (s *ConsentRevokedEvent) GetOccurredAt() time.Time {
+	return s.OccurredAt
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *ConsentRevokedEvent) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetActorID returns the value of ActorID.
+func (s *ConsentRevokedEvent) GetActorID() OptNilString {
+	return s.ActorID
+}
+
+// GetActorType returns the value of ActorType.
+func (s *ConsentRevokedEvent) GetActorType() OptNilConsentRevokedEventActorType {
+	return s.ActorType
+}
+
+// GetEntityType returns the value of EntityType.
+func (s *ConsentRevokedEvent) GetEntityType() OptNilString {
+	return s.EntityType
+}
+
+// GetEntityID returns the value of EntityID.
+func (s *ConsentRevokedEvent) GetEntityID() OptNilString {
+	return s.EntityID
+}
+
+// GetClientID returns the value of ClientID.
+func (s *ConsentRevokedEvent) GetClientID() string {
+	return s.ClientID
+}
+
+// GetTokenID returns the value of TokenID.
+func (s *ConsentRevokedEvent) GetTokenID() OptString {
+	return s.TokenID
+}
+
+// GetDelegationType returns the value of DelegationType.
+func (s *ConsentRevokedEvent) GetDelegationType() OptConsentRevokedEventDelegationType {
+	return s.DelegationType
+}
+
+// GetDelegationID returns the value of DelegationID.
+func (s *ConsentRevokedEvent) GetDelegationID() OptString {
+	return s.DelegationID
+}
+
+// GetGrantor returns the value of Grantor.
+func (s *ConsentRevokedEvent) GetGrantor() OptString {
+	return s.Grantor
+}
+
+// GetFingerprint returns the value of Fingerprint.
+func (s *ConsentRevokedEvent) GetFingerprint() OptString {
+	return s.Fingerprint
+}
+
+// GetRequestID returns the value of RequestID.
+func (s *ConsentRevokedEvent) GetRequestID() OptNilString {
+	return s.RequestID
+}
+
+// GetSessionID returns the value of SessionID.
+func (s *ConsentRevokedEvent) GetSessionID() OptNilString {
+	return s.SessionID
+}
+
+// GetFlowID returns the value of FlowID.
+func (s *ConsentRevokedEvent) GetFlowID() OptNilString {
+	return s.FlowID
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *ConsentRevokedEvent) GetMetadata() OptEventMetadata {
+	return s.Metadata
+}
+
+// GetPayload returns the value of Payload.
+func (s *ConsentRevokedEvent) GetPayload() ConsentRevokedPayload {
+	return s.Payload
+}
+
+// SetID sets the value of ID.
+func (s *ConsentRevokedEvent) SetID(val string) {
+	s.ID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *ConsentRevokedEvent) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *ConsentRevokedEvent) SetTeamID(val OptNilString) {
+	s.TeamID = val
+}
+
+// SetEventType sets the value of EventType.
+func (s *ConsentRevokedEvent) SetEventType(val string) {
+	s.EventType = val
+}
+
+// SetCategory sets the value of Category.
+func (s *ConsentRevokedEvent) SetCategory(val ConsentRevokedEventCategory) {
+	s.Category = val
+}
+
+// SetOccurredAt sets the value of OccurredAt.
+func (s *ConsentRevokedEvent) SetOccurredAt(val time.Time) {
+	s.OccurredAt = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *ConsentRevokedEvent) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetActorID sets the value of ActorID.
+func (s *ConsentRevokedEvent) SetActorID(val OptNilString) {
+	s.ActorID = val
+}
+
+// SetActorType sets the value of ActorType.
+func (s *ConsentRevokedEvent) SetActorType(val OptNilConsentRevokedEventActorType) {
+	s.ActorType = val
+}
+
+// SetEntityType sets the value of EntityType.
+func (s *ConsentRevokedEvent) SetEntityType(val OptNilString) {
+	s.EntityType = val
+}
+
+// SetEntityID sets the value of EntityID.
+func (s *ConsentRevokedEvent) SetEntityID(val OptNilString) {
+	s.EntityID = val
+}
+
+// SetClientID sets the value of ClientID.
+func (s *ConsentRevokedEvent) SetClientID(val string) {
+	s.ClientID = val
+}
+
+// SetTokenID sets the value of TokenID.
+func (s *ConsentRevokedEvent) SetTokenID(val OptString) {
+	s.TokenID = val
+}
+
+// SetDelegationType sets the value of DelegationType.
+func (s *ConsentRevokedEvent) SetDelegationType(val OptConsentRevokedEventDelegationType) {
+	s.DelegationType = val
+}
+
+// SetDelegationID sets the value of DelegationID.
+func (s *ConsentRevokedEvent) SetDelegationID(val OptString) {
+	s.DelegationID = val
+}
+
+// SetGrantor sets the value of Grantor.
+func (s *ConsentRevokedEvent) SetGrantor(val OptString) {
+	s.Grantor = val
+}
+
+// SetFingerprint sets the value of Fingerprint.
+func (s *ConsentRevokedEvent) SetFingerprint(val OptString) {
+	s.Fingerprint = val
+}
+
+// SetRequestID sets the value of RequestID.
+func (s *ConsentRevokedEvent) SetRequestID(val OptNilString) {
+	s.RequestID = val
+}
+
+// SetSessionID sets the value of SessionID.
+func (s *ConsentRevokedEvent) SetSessionID(val OptNilString) {
+	s.SessionID = val
+}
+
+// SetFlowID sets the value of FlowID.
+func (s *ConsentRevokedEvent) SetFlowID(val OptNilString) {
+	s.FlowID = val
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *ConsentRevokedEvent) SetMetadata(val OptEventMetadata) {
+	s.Metadata = val
+}
+
+// SetPayload sets the value of Payload.
+func (s *ConsentRevokedEvent) SetPayload(val ConsentRevokedPayload) {
+	s.Payload = val
+}
+
+type ConsentRevokedEventActorType string
+
+const (
+	ConsentRevokedEventActorTypeHuman   ConsentRevokedEventActorType = "human"
+	ConsentRevokedEventActorTypeService ConsentRevokedEventActorType = "service"
+	ConsentRevokedEventActorTypeSystem  ConsentRevokedEventActorType = "system"
+	ConsentRevokedEventActorTypeAgent   ConsentRevokedEventActorType = "agent"
+)
+
+// AllValues returns all ConsentRevokedEventActorType values.
+func (ConsentRevokedEventActorType) AllValues() []ConsentRevokedEventActorType {
+	return []ConsentRevokedEventActorType{
+		ConsentRevokedEventActorTypeHuman,
+		ConsentRevokedEventActorTypeService,
+		ConsentRevokedEventActorTypeSystem,
+		ConsentRevokedEventActorTypeAgent,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ConsentRevokedEventActorType) MarshalText() ([]byte, error) {
+	switch s {
+	case ConsentRevokedEventActorTypeHuman:
+		return []byte(s), nil
+	case ConsentRevokedEventActorTypeService:
+		return []byte(s), nil
+	case ConsentRevokedEventActorTypeSystem:
+		return []byte(s), nil
+	case ConsentRevokedEventActorTypeAgent:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ConsentRevokedEventActorType) UnmarshalText(data []byte) error {
+	switch ConsentRevokedEventActorType(data) {
+	case ConsentRevokedEventActorTypeHuman:
+		*s = ConsentRevokedEventActorTypeHuman
+		return nil
+	case ConsentRevokedEventActorTypeService:
+		*s = ConsentRevokedEventActorTypeService
+		return nil
+	case ConsentRevokedEventActorTypeSystem:
+		*s = ConsentRevokedEventActorTypeSystem
+		return nil
+	case ConsentRevokedEventActorTypeAgent:
+		*s = ConsentRevokedEventActorTypeAgent
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Wide-event category.
+type ConsentRevokedEventCategory string
+
+const (
+	ConsentRevokedEventCategoryRequest ConsentRevokedEventCategory = "request"
+	ConsentRevokedEventCategoryAuth    ConsentRevokedEventCategory = "auth"
+	ConsentRevokedEventCategorySession ConsentRevokedEventCategory = "session"
+	ConsentRevokedEventCategoryAdmin   ConsentRevokedEventCategory = "admin"
+	ConsentRevokedEventCategoryEntity  ConsentRevokedEventCategory = "entity"
+	ConsentRevokedEventCategorySignal  ConsentRevokedEventCategory = "signal"
+)
+
+// AllValues returns all ConsentRevokedEventCategory values.
+func (ConsentRevokedEventCategory) AllValues() []ConsentRevokedEventCategory {
+	return []ConsentRevokedEventCategory{
+		ConsentRevokedEventCategoryRequest,
+		ConsentRevokedEventCategoryAuth,
+		ConsentRevokedEventCategorySession,
+		ConsentRevokedEventCategoryAdmin,
+		ConsentRevokedEventCategoryEntity,
+		ConsentRevokedEventCategorySignal,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ConsentRevokedEventCategory) MarshalText() ([]byte, error) {
+	switch s {
+	case ConsentRevokedEventCategoryRequest:
+		return []byte(s), nil
+	case ConsentRevokedEventCategoryAuth:
+		return []byte(s), nil
+	case ConsentRevokedEventCategorySession:
+		return []byte(s), nil
+	case ConsentRevokedEventCategoryAdmin:
+		return []byte(s), nil
+	case ConsentRevokedEventCategoryEntity:
+		return []byte(s), nil
+	case ConsentRevokedEventCategorySignal:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ConsentRevokedEventCategory) UnmarshalText(data []byte) error {
+	switch ConsentRevokedEventCategory(data) {
+	case ConsentRevokedEventCategoryRequest:
+		*s = ConsentRevokedEventCategoryRequest
+		return nil
+	case ConsentRevokedEventCategoryAuth:
+		*s = ConsentRevokedEventCategoryAuth
+		return nil
+	case ConsentRevokedEventCategorySession:
+		*s = ConsentRevokedEventCategorySession
+		return nil
+	case ConsentRevokedEventCategoryAdmin:
+		*s = ConsentRevokedEventCategoryAdmin
+		return nil
+	case ConsentRevokedEventCategoryEntity:
+		*s = ConsentRevokedEventCategoryEntity
+		return nil
+	case ConsentRevokedEventCategorySignal:
+		*s = ConsentRevokedEventCategorySignal
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Delegation kind (omit when unset).
+type ConsentRevokedEventDelegationType string
+
+const (
+	ConsentRevokedEventDelegationTypeDirect    ConsentRevokedEventDelegationType = "direct"
+	ConsentRevokedEventDelegationTypeDelegated ConsentRevokedEventDelegationType = "delegated"
+	ConsentRevokedEventDelegationTypePatShared ConsentRevokedEventDelegationType = "pat_shared"
+	ConsentRevokedEventDelegationTypeExchanged ConsentRevokedEventDelegationType = "exchanged"
+)
+
+// AllValues returns all ConsentRevokedEventDelegationType values.
+func (ConsentRevokedEventDelegationType) AllValues() []ConsentRevokedEventDelegationType {
+	return []ConsentRevokedEventDelegationType{
+		ConsentRevokedEventDelegationTypeDirect,
+		ConsentRevokedEventDelegationTypeDelegated,
+		ConsentRevokedEventDelegationTypePatShared,
+		ConsentRevokedEventDelegationTypeExchanged,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ConsentRevokedEventDelegationType) MarshalText() ([]byte, error) {
+	switch s {
+	case ConsentRevokedEventDelegationTypeDirect:
+		return []byte(s), nil
+	case ConsentRevokedEventDelegationTypeDelegated:
+		return []byte(s), nil
+	case ConsentRevokedEventDelegationTypePatShared:
+		return []byte(s), nil
+	case ConsentRevokedEventDelegationTypeExchanged:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ConsentRevokedEventDelegationType) UnmarshalText(data []byte) error {
+	switch ConsentRevokedEventDelegationType(data) {
+	case ConsentRevokedEventDelegationTypeDirect:
+		*s = ConsentRevokedEventDelegationTypeDirect
+		return nil
+	case ConsentRevokedEventDelegationTypeDelegated:
+		*s = ConsentRevokedEventDelegationTypeDelegated
+		return nil
+	case ConsentRevokedEventDelegationTypePatShared:
+		*s = ConsentRevokedEventDelegationTypePatShared
+		return nil
+	case ConsentRevokedEventDelegationTypeExchanged:
+		*s = ConsentRevokedEventDelegationTypeExchanged
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Payload for `consent.revoked` events.
+// Ref: #
+type ConsentRevokedPayload struct {
+	// The client whose consent ended.
+	ClientID string `json:"client_id"`
+	// The API the consent was for.
+	Resource string `json:"resource"`
+}
+
+// GetClientID returns the value of ClientID.
+func (s *ConsentRevokedPayload) GetClientID() string {
+	return s.ClientID
+}
+
+// GetResource returns the value of Resource.
+func (s *ConsentRevokedPayload) GetResource() string {
+	return s.Resource
+}
+
+// SetClientID sets the value of ClientID.
+func (s *ConsentRevokedPayload) SetClientID(val string) {
+	s.ClientID = val
+}
+
+// SetResource sets the value of Resource.
+func (s *ConsentRevokedPayload) SetResource(val string) {
+	s.Resource = val
 }
 
 // CreateAuthAttemptErrorResponse represents sum type.
@@ -22550,9 +23727,11 @@ func (*ErrorDetails) getBrandingByIdRes()      {}
 func (*ErrorDetails) getMyUserRes()            {}
 func (*ErrorDetails) initClaimRes()            {}
 func (*ErrorDetails) listFlowDefinitionsRes()  {}
+func (*ErrorDetails) listMyConsentsRes()       {}
 func (*ErrorDetails) listMyIdentityLinksRes()  {}
 func (*ErrorDetails) listMyPasskeysRes()       {}
 func (*ErrorDetails) listMyTeamsRes()          {}
+func (*ErrorDetails) revokeMyConsentRes()      {}
 func (*ErrorDetails) revokeMySessionRes()      {}
 func (*ErrorDetails) rollbackDeploymentRes()   {}
 func (*ErrorDetails) submitFlowStepRes()       {}
@@ -23021,6 +24200,8 @@ type Event struct {
 	AuthzGrantedEvent               AuthzGrantedEvent
 	AuthzRevokedEvent               AuthzRevokedEvent
 	BrandingCreatedEvent            BrandingCreatedEvent
+	ConsentGivenEvent               ConsentGivenEvent
+	ConsentRevokedEvent             ConsentRevokedEvent
 	DeploymentCreatedEvent          DeploymentCreatedEvent
 	FlowdefCreatedEvent             FlowdefCreatedEvent
 	FlowdefDeletedEvent             FlowdefDeletedEvent
@@ -23072,6 +24253,8 @@ const (
 	AuthzGrantedEventEvent               EventType = "authz.granted"
 	AuthzRevokedEventEvent               EventType = "authz.revoked"
 	BrandingCreatedEventEvent            EventType = "branding.created"
+	ConsentGivenEventEvent               EventType = "consent.given"
+	ConsentRevokedEventEvent             EventType = "consent.revoked"
 	DeploymentCreatedEventEvent          EventType = "deployment.created"
 	FlowdefCreatedEventEvent             EventType = "flowdef.created"
 	FlowdefDeletedEventEvent             EventType = "flowdef.deleted"
@@ -23151,6 +24334,12 @@ func (s Event) IsAuthzRevokedEvent() bool { return s.Type == AuthzRevokedEventEv
 
 // IsBrandingCreatedEvent reports whether Event is BrandingCreatedEvent.
 func (s Event) IsBrandingCreatedEvent() bool { return s.Type == BrandingCreatedEventEvent }
+
+// IsConsentGivenEvent reports whether Event is ConsentGivenEvent.
+func (s Event) IsConsentGivenEvent() bool { return s.Type == ConsentGivenEventEvent }
+
+// IsConsentRevokedEvent reports whether Event is ConsentRevokedEvent.
+func (s Event) IsConsentRevokedEvent() bool { return s.Type == ConsentRevokedEventEvent }
 
 // IsDeploymentCreatedEvent reports whether Event is DeploymentCreatedEvent.
 func (s Event) IsDeploymentCreatedEvent() bool { return s.Type == DeploymentCreatedEventEvent }
@@ -23535,6 +24724,48 @@ func (s Event) GetBrandingCreatedEvent() (v BrandingCreatedEvent, ok bool) {
 func NewBrandingCreatedEventEvent(v BrandingCreatedEvent) Event {
 	var s Event
 	s.SetBrandingCreatedEvent(v)
+	return s
+}
+
+// SetConsentGivenEvent sets Event to ConsentGivenEvent.
+func (s *Event) SetConsentGivenEvent(v ConsentGivenEvent) {
+	s.Type = ConsentGivenEventEvent
+	s.ConsentGivenEvent = v
+}
+
+// GetConsentGivenEvent returns ConsentGivenEvent and true boolean if Event is ConsentGivenEvent.
+func (s Event) GetConsentGivenEvent() (v ConsentGivenEvent, ok bool) {
+	if !s.IsConsentGivenEvent() {
+		return v, false
+	}
+	return s.ConsentGivenEvent, true
+}
+
+// NewConsentGivenEventEvent returns new Event from ConsentGivenEvent.
+func NewConsentGivenEventEvent(v ConsentGivenEvent) Event {
+	var s Event
+	s.SetConsentGivenEvent(v)
+	return s
+}
+
+// SetConsentRevokedEvent sets Event to ConsentRevokedEvent.
+func (s *Event) SetConsentRevokedEvent(v ConsentRevokedEvent) {
+	s.Type = ConsentRevokedEventEvent
+	s.ConsentRevokedEvent = v
+}
+
+// GetConsentRevokedEvent returns ConsentRevokedEvent and true boolean if Event is ConsentRevokedEvent.
+func (s Event) GetConsentRevokedEvent() (v ConsentRevokedEvent, ok bool) {
+	if !s.IsConsentRevokedEvent() {
+		return v, false
+	}
+	return s.ConsentRevokedEvent, true
+}
+
+// NewConsentRevokedEventEvent returns new Event from ConsentRevokedEvent.
+func NewConsentRevokedEventEvent(v ConsentRevokedEvent) Event {
+	var s Event
+	s.SetConsentRevokedEvent(v)
 	return s
 }
 
@@ -44963,6 +46194,272 @@ type ListIdpRevisionsUnauthorized ErrorDetails
 
 func (*ListIdpRevisionsUnauthorized) listIdpRevisionsRes() {}
 
+// ListMyConsentsErrorResponse represents sum type.
+type ListMyConsentsErrorResponse struct {
+	Type                ListMyConsentsErrorResponseType // switch on this field
+	AuthUnauthorized    AuthUnauthorized
+	Internal            Internal
+	NotImplemented      NotImplemented
+	ReqInvalid          ReqInvalid
+	SessProjectMismatch SessProjectMismatch
+	Unavailable         Unavailable
+}
+
+// ListMyConsentsErrorResponseType is oneOf type of ListMyConsentsErrorResponse.
+type ListMyConsentsErrorResponseType string
+
+// Possible values for ListMyConsentsErrorResponseType.
+const (
+	AuthUnauthorizedListMyConsentsErrorResponse    ListMyConsentsErrorResponseType = "auth.unauthorized"
+	InternalListMyConsentsErrorResponse            ListMyConsentsErrorResponseType = "internal"
+	NotImplementedListMyConsentsErrorResponse      ListMyConsentsErrorResponseType = "not_implemented"
+	ReqInvalidListMyConsentsErrorResponse          ListMyConsentsErrorResponseType = "req.invalid"
+	SessProjectMismatchListMyConsentsErrorResponse ListMyConsentsErrorResponseType = "sess.project_mismatch"
+	UnavailableListMyConsentsErrorResponse         ListMyConsentsErrorResponseType = "unavailable"
+)
+
+// IsAuthUnauthorized reports whether ListMyConsentsErrorResponse is AuthUnauthorized.
+func (s ListMyConsentsErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedListMyConsentsErrorResponse
+}
+
+// IsInternal reports whether ListMyConsentsErrorResponse is Internal.
+func (s ListMyConsentsErrorResponse) IsInternal() bool {
+	return s.Type == InternalListMyConsentsErrorResponse
+}
+
+// IsNotImplemented reports whether ListMyConsentsErrorResponse is NotImplemented.
+func (s ListMyConsentsErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedListMyConsentsErrorResponse
+}
+
+// IsReqInvalid reports whether ListMyConsentsErrorResponse is ReqInvalid.
+func (s ListMyConsentsErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidListMyConsentsErrorResponse
+}
+
+// IsSessProjectMismatch reports whether ListMyConsentsErrorResponse is SessProjectMismatch.
+func (s ListMyConsentsErrorResponse) IsSessProjectMismatch() bool {
+	return s.Type == SessProjectMismatchListMyConsentsErrorResponse
+}
+
+// IsUnavailable reports whether ListMyConsentsErrorResponse is Unavailable.
+func (s ListMyConsentsErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableListMyConsentsErrorResponse
+}
+
+// SetAuthUnauthorized sets ListMyConsentsErrorResponse to AuthUnauthorized.
+func (s *ListMyConsentsErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedListMyConsentsErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if ListMyConsentsErrorResponse is AuthUnauthorized.
+func (s ListMyConsentsErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedListMyConsentsErrorResponse returns new ListMyConsentsErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedListMyConsentsErrorResponse(v AuthUnauthorized) ListMyConsentsErrorResponse {
+	var s ListMyConsentsErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets ListMyConsentsErrorResponse to Internal.
+func (s *ListMyConsentsErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalListMyConsentsErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if ListMyConsentsErrorResponse is Internal.
+func (s ListMyConsentsErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalListMyConsentsErrorResponse returns new ListMyConsentsErrorResponse from Internal.
+func NewInternalListMyConsentsErrorResponse(v Internal) ListMyConsentsErrorResponse {
+	var s ListMyConsentsErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets ListMyConsentsErrorResponse to NotImplemented.
+func (s *ListMyConsentsErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedListMyConsentsErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if ListMyConsentsErrorResponse is NotImplemented.
+func (s ListMyConsentsErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedListMyConsentsErrorResponse returns new ListMyConsentsErrorResponse from NotImplemented.
+func NewNotImplementedListMyConsentsErrorResponse(v NotImplemented) ListMyConsentsErrorResponse {
+	var s ListMyConsentsErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
+// SetReqInvalid sets ListMyConsentsErrorResponse to ReqInvalid.
+func (s *ListMyConsentsErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidListMyConsentsErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if ListMyConsentsErrorResponse is ReqInvalid.
+func (s ListMyConsentsErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidListMyConsentsErrorResponse returns new ListMyConsentsErrorResponse from ReqInvalid.
+func NewReqInvalidListMyConsentsErrorResponse(v ReqInvalid) ListMyConsentsErrorResponse {
+	var s ListMyConsentsErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetSessProjectMismatch sets ListMyConsentsErrorResponse to SessProjectMismatch.
+func (s *ListMyConsentsErrorResponse) SetSessProjectMismatch(v SessProjectMismatch) {
+	s.Type = SessProjectMismatchListMyConsentsErrorResponse
+	s.SessProjectMismatch = v
+}
+
+// GetSessProjectMismatch returns SessProjectMismatch and true boolean if ListMyConsentsErrorResponse is SessProjectMismatch.
+func (s ListMyConsentsErrorResponse) GetSessProjectMismatch() (v SessProjectMismatch, ok bool) {
+	if !s.IsSessProjectMismatch() {
+		return v, false
+	}
+	return s.SessProjectMismatch, true
+}
+
+// NewSessProjectMismatchListMyConsentsErrorResponse returns new ListMyConsentsErrorResponse from SessProjectMismatch.
+func NewSessProjectMismatchListMyConsentsErrorResponse(v SessProjectMismatch) ListMyConsentsErrorResponse {
+	var s ListMyConsentsErrorResponse
+	s.SetSessProjectMismatch(v)
+	return s
+}
+
+// SetUnavailable sets ListMyConsentsErrorResponse to Unavailable.
+func (s *ListMyConsentsErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableListMyConsentsErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if ListMyConsentsErrorResponse is Unavailable.
+func (s ListMyConsentsErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableListMyConsentsErrorResponse returns new ListMyConsentsErrorResponse from Unavailable.
+func NewUnavailableListMyConsentsErrorResponse(v Unavailable) ListMyConsentsErrorResponse {
+	var s ListMyConsentsErrorResponse
+	s.SetUnavailable(v)
+	return s
+}
+
+// ListMyConsentsErrorResponseStatusCode wraps ListMyConsentsErrorResponse with StatusCode.
+type ListMyConsentsErrorResponseStatusCode struct {
+	StatusCode int
+	Response   ListMyConsentsErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *ListMyConsentsErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *ListMyConsentsErrorResponseStatusCode) GetResponse() ListMyConsentsErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *ListMyConsentsErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *ListMyConsentsErrorResponseStatusCode) SetResponse(val ListMyConsentsErrorResponse) {
+	s.Response = val
+}
+
+func (*ListMyConsentsErrorResponseStatusCode) listMyConsentsRes() {}
+
+// Paginated list of the user's consents, newest first.
+// Ref: #
+type ListMyConsentsResponse struct {
+	Consents []ConsentResponse `json:"consents"`
+	// Token to pass as `page_token` in the next request to fetch the following page.
+	// Present when the page was full. A following request may return an empty page
+	// and no token, which ends the listing.
+	NextPageToken OptNilPageToken `json:"next_page_token"`
+}
+
+// GetConsents returns the value of Consents.
+func (s *ListMyConsentsResponse) GetConsents() []ConsentResponse {
+	return s.Consents
+}
+
+// GetNextPageToken returns the value of NextPageToken.
+func (s *ListMyConsentsResponse) GetNextPageToken() OptNilPageToken {
+	return s.NextPageToken
+}
+
+// SetConsents sets the value of Consents.
+func (s *ListMyConsentsResponse) SetConsents(val []ConsentResponse) {
+	s.Consents = val
+}
+
+// SetNextPageToken sets the value of NextPageToken.
+func (s *ListMyConsentsResponse) SetNextPageToken(val OptNilPageToken) {
+	s.NextPageToken = val
+}
+
+// ListMyConsentsResponseHeaders wraps ListMyConsentsResponse with response headers.
+type ListMyConsentsResponseHeaders struct {
+	CacheControl OptString
+	Response     ListMyConsentsResponse
+}
+
+// GetCacheControl returns the value of CacheControl.
+func (s *ListMyConsentsResponseHeaders) GetCacheControl() OptString {
+	return s.CacheControl
+}
+
+// GetResponse returns the value of Response.
+func (s *ListMyConsentsResponseHeaders) GetResponse() ListMyConsentsResponse {
+	return s.Response
+}
+
+// SetCacheControl sets the value of CacheControl.
+func (s *ListMyConsentsResponseHeaders) SetCacheControl(val OptString) {
+	s.CacheControl = val
+}
+
+// SetResponse sets the value of Response.
+func (s *ListMyConsentsResponseHeaders) SetResponse(val ListMyConsentsResponse) {
+	s.Response = val
+}
+
+func (*ListMyConsentsResponseHeaders) listMyConsentsRes() {}
+
 // ListMyIdentityLinksErrorResponse represents sum type.
 type ListMyIdentityLinksErrorResponse struct {
 	Type                ListMyIdentityLinksErrorResponseType // switch on this field
@@ -51164,6 +52661,144 @@ func (o OptCompletedFactorPayload) Or(d CompletedFactorPayload) CompletedFactorP
 	return d
 }
 
+// NewOptConsentGivenEventDelegationType returns new OptConsentGivenEventDelegationType with value set to v.
+func NewOptConsentGivenEventDelegationType(v ConsentGivenEventDelegationType) OptConsentGivenEventDelegationType {
+	return OptConsentGivenEventDelegationType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptConsentGivenEventDelegationType is optional ConsentGivenEventDelegationType.
+type OptConsentGivenEventDelegationType struct {
+	Value ConsentGivenEventDelegationType
+	Set   bool
+}
+
+// IsSet returns true if OptConsentGivenEventDelegationType was set.
+func (o OptConsentGivenEventDelegationType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptConsentGivenEventDelegationType) Reset() {
+	var v ConsentGivenEventDelegationType
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptConsentGivenEventDelegationType) SetTo(v ConsentGivenEventDelegationType) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptConsentGivenEventDelegationType) Get() (v ConsentGivenEventDelegationType, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptConsentGivenEventDelegationType) Or(d ConsentGivenEventDelegationType) ConsentGivenEventDelegationType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptConsentNotFoundDetails returns new OptConsentNotFoundDetails with value set to v.
+func NewOptConsentNotFoundDetails(v ConsentNotFoundDetails) OptConsentNotFoundDetails {
+	return OptConsentNotFoundDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptConsentNotFoundDetails is optional ConsentNotFoundDetails.
+type OptConsentNotFoundDetails struct {
+	Value ConsentNotFoundDetails
+	Set   bool
+}
+
+// IsSet returns true if OptConsentNotFoundDetails was set.
+func (o OptConsentNotFoundDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptConsentNotFoundDetails) Reset() {
+	var v ConsentNotFoundDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptConsentNotFoundDetails) SetTo(v ConsentNotFoundDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptConsentNotFoundDetails) Get() (v ConsentNotFoundDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptConsentNotFoundDetails) Or(d ConsentNotFoundDetails) ConsentNotFoundDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptConsentRevokedEventDelegationType returns new OptConsentRevokedEventDelegationType with value set to v.
+func NewOptConsentRevokedEventDelegationType(v ConsentRevokedEventDelegationType) OptConsentRevokedEventDelegationType {
+	return OptConsentRevokedEventDelegationType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptConsentRevokedEventDelegationType is optional ConsentRevokedEventDelegationType.
+type OptConsentRevokedEventDelegationType struct {
+	Value ConsentRevokedEventDelegationType
+	Set   bool
+}
+
+// IsSet returns true if OptConsentRevokedEventDelegationType was set.
+func (o OptConsentRevokedEventDelegationType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptConsentRevokedEventDelegationType) Reset() {
+	var v ConsentRevokedEventDelegationType
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptConsentRevokedEventDelegationType) SetTo(v ConsentRevokedEventDelegationType) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptConsentRevokedEventDelegationType) Get() (v ConsentRevokedEventDelegationType, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptConsentRevokedEventDelegationType) Or(d ConsentRevokedEventDelegationType) ConsentRevokedEventDelegationType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptCreateSessionRequestUserAgent returns new OptCreateSessionRequestUserAgent with value set to v.
 func NewOptCreateSessionRequestUserAgent(v CreateSessionRequestUserAgent) OptCreateSessionRequestUserAgent {
 	return OptCreateSessionRequestUserAgent{
@@ -56732,6 +58367,132 @@ func (o OptNilBrandingCreatedEventActorType) Get() (v BrandingCreatedEventActorT
 
 // Or returns value if set, or given parameter if does not.
 func (o OptNilBrandingCreatedEventActorType) Or(d BrandingCreatedEventActorType) BrandingCreatedEventActorType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptNilConsentGivenEventActorType returns new OptNilConsentGivenEventActorType with value set to v.
+func NewOptNilConsentGivenEventActorType(v ConsentGivenEventActorType) OptNilConsentGivenEventActorType {
+	return OptNilConsentGivenEventActorType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilConsentGivenEventActorType is optional nullable ConsentGivenEventActorType.
+type OptNilConsentGivenEventActorType struct {
+	Value ConsentGivenEventActorType
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilConsentGivenEventActorType was set.
+func (o OptNilConsentGivenEventActorType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilConsentGivenEventActorType) Reset() {
+	var v ConsentGivenEventActorType
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilConsentGivenEventActorType) SetTo(v ConsentGivenEventActorType) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilConsentGivenEventActorType) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilConsentGivenEventActorType) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v ConsentGivenEventActorType
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilConsentGivenEventActorType) Get() (v ConsentGivenEventActorType, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilConsentGivenEventActorType) Or(d ConsentGivenEventActorType) ConsentGivenEventActorType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptNilConsentRevokedEventActorType returns new OptNilConsentRevokedEventActorType with value set to v.
+func NewOptNilConsentRevokedEventActorType(v ConsentRevokedEventActorType) OptNilConsentRevokedEventActorType {
+	return OptNilConsentRevokedEventActorType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilConsentRevokedEventActorType is optional nullable ConsentRevokedEventActorType.
+type OptNilConsentRevokedEventActorType struct {
+	Value ConsentRevokedEventActorType
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilConsentRevokedEventActorType was set.
+func (o OptNilConsentRevokedEventActorType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilConsentRevokedEventActorType) Reset() {
+	var v ConsentRevokedEventActorType
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilConsentRevokedEventActorType) SetTo(v ConsentRevokedEventActorType) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilConsentRevokedEventActorType) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilConsentRevokedEventActorType) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v ConsentRevokedEventActorType
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilConsentRevokedEventActorType) Get() (v ConsentRevokedEventActorType, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilConsentRevokedEventActorType) Or(d ConsentRevokedEventActorType) ConsentRevokedEventActorType {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -80734,6 +82495,303 @@ func (s *RequestApiDef) SetStatusCode(val int) {
 
 func (*RequestApiDef) requestApiRes() {}
 
+// RevokeMyConsentErrorResponse represents sum type.
+type RevokeMyConsentErrorResponse struct {
+	Type                RevokeMyConsentErrorResponseType // switch on this field
+	AuthCsrfInvalid     AuthCsrfInvalid
+	AuthUnauthorized    AuthUnauthorized
+	ConsentNotFound     ConsentNotFound
+	EvtInvalid          EvtInvalid
+	Internal            Internal
+	NotImplemented      NotImplemented
+	ReqInvalid          ReqInvalid
+	SessProjectMismatch SessProjectMismatch
+	Unavailable         Unavailable
+}
+
+// RevokeMyConsentErrorResponseType is oneOf type of RevokeMyConsentErrorResponse.
+type RevokeMyConsentErrorResponseType string
+
+// Possible values for RevokeMyConsentErrorResponseType.
+const (
+	AuthCsrfInvalidRevokeMyConsentErrorResponse     RevokeMyConsentErrorResponseType = "auth.csrf_invalid"
+	AuthUnauthorizedRevokeMyConsentErrorResponse    RevokeMyConsentErrorResponseType = "auth.unauthorized"
+	ConsentNotFoundRevokeMyConsentErrorResponse     RevokeMyConsentErrorResponseType = "consent.not_found"
+	EvtInvalidRevokeMyConsentErrorResponse          RevokeMyConsentErrorResponseType = "evt.invalid"
+	InternalRevokeMyConsentErrorResponse            RevokeMyConsentErrorResponseType = "internal"
+	NotImplementedRevokeMyConsentErrorResponse      RevokeMyConsentErrorResponseType = "not_implemented"
+	ReqInvalidRevokeMyConsentErrorResponse          RevokeMyConsentErrorResponseType = "req.invalid"
+	SessProjectMismatchRevokeMyConsentErrorResponse RevokeMyConsentErrorResponseType = "sess.project_mismatch"
+	UnavailableRevokeMyConsentErrorResponse         RevokeMyConsentErrorResponseType = "unavailable"
+)
+
+// IsAuthCsrfInvalid reports whether RevokeMyConsentErrorResponse is AuthCsrfInvalid.
+func (s RevokeMyConsentErrorResponse) IsAuthCsrfInvalid() bool {
+	return s.Type == AuthCsrfInvalidRevokeMyConsentErrorResponse
+}
+
+// IsAuthUnauthorized reports whether RevokeMyConsentErrorResponse is AuthUnauthorized.
+func (s RevokeMyConsentErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedRevokeMyConsentErrorResponse
+}
+
+// IsConsentNotFound reports whether RevokeMyConsentErrorResponse is ConsentNotFound.
+func (s RevokeMyConsentErrorResponse) IsConsentNotFound() bool {
+	return s.Type == ConsentNotFoundRevokeMyConsentErrorResponse
+}
+
+// IsEvtInvalid reports whether RevokeMyConsentErrorResponse is EvtInvalid.
+func (s RevokeMyConsentErrorResponse) IsEvtInvalid() bool {
+	return s.Type == EvtInvalidRevokeMyConsentErrorResponse
+}
+
+// IsInternal reports whether RevokeMyConsentErrorResponse is Internal.
+func (s RevokeMyConsentErrorResponse) IsInternal() bool {
+	return s.Type == InternalRevokeMyConsentErrorResponse
+}
+
+// IsNotImplemented reports whether RevokeMyConsentErrorResponse is NotImplemented.
+func (s RevokeMyConsentErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedRevokeMyConsentErrorResponse
+}
+
+// IsReqInvalid reports whether RevokeMyConsentErrorResponse is ReqInvalid.
+func (s RevokeMyConsentErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidRevokeMyConsentErrorResponse
+}
+
+// IsSessProjectMismatch reports whether RevokeMyConsentErrorResponse is SessProjectMismatch.
+func (s RevokeMyConsentErrorResponse) IsSessProjectMismatch() bool {
+	return s.Type == SessProjectMismatchRevokeMyConsentErrorResponse
+}
+
+// IsUnavailable reports whether RevokeMyConsentErrorResponse is Unavailable.
+func (s RevokeMyConsentErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableRevokeMyConsentErrorResponse
+}
+
+// SetAuthCsrfInvalid sets RevokeMyConsentErrorResponse to AuthCsrfInvalid.
+func (s *RevokeMyConsentErrorResponse) SetAuthCsrfInvalid(v AuthCsrfInvalid) {
+	s.Type = AuthCsrfInvalidRevokeMyConsentErrorResponse
+	s.AuthCsrfInvalid = v
+}
+
+// GetAuthCsrfInvalid returns AuthCsrfInvalid and true boolean if RevokeMyConsentErrorResponse is AuthCsrfInvalid.
+func (s RevokeMyConsentErrorResponse) GetAuthCsrfInvalid() (v AuthCsrfInvalid, ok bool) {
+	if !s.IsAuthCsrfInvalid() {
+		return v, false
+	}
+	return s.AuthCsrfInvalid, true
+}
+
+// NewAuthCsrfInvalidRevokeMyConsentErrorResponse returns new RevokeMyConsentErrorResponse from AuthCsrfInvalid.
+func NewAuthCsrfInvalidRevokeMyConsentErrorResponse(v AuthCsrfInvalid) RevokeMyConsentErrorResponse {
+	var s RevokeMyConsentErrorResponse
+	s.SetAuthCsrfInvalid(v)
+	return s
+}
+
+// SetAuthUnauthorized sets RevokeMyConsentErrorResponse to AuthUnauthorized.
+func (s *RevokeMyConsentErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedRevokeMyConsentErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if RevokeMyConsentErrorResponse is AuthUnauthorized.
+func (s RevokeMyConsentErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedRevokeMyConsentErrorResponse returns new RevokeMyConsentErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedRevokeMyConsentErrorResponse(v AuthUnauthorized) RevokeMyConsentErrorResponse {
+	var s RevokeMyConsentErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetConsentNotFound sets RevokeMyConsentErrorResponse to ConsentNotFound.
+func (s *RevokeMyConsentErrorResponse) SetConsentNotFound(v ConsentNotFound) {
+	s.Type = ConsentNotFoundRevokeMyConsentErrorResponse
+	s.ConsentNotFound = v
+}
+
+// GetConsentNotFound returns ConsentNotFound and true boolean if RevokeMyConsentErrorResponse is ConsentNotFound.
+func (s RevokeMyConsentErrorResponse) GetConsentNotFound() (v ConsentNotFound, ok bool) {
+	if !s.IsConsentNotFound() {
+		return v, false
+	}
+	return s.ConsentNotFound, true
+}
+
+// NewConsentNotFoundRevokeMyConsentErrorResponse returns new RevokeMyConsentErrorResponse from ConsentNotFound.
+func NewConsentNotFoundRevokeMyConsentErrorResponse(v ConsentNotFound) RevokeMyConsentErrorResponse {
+	var s RevokeMyConsentErrorResponse
+	s.SetConsentNotFound(v)
+	return s
+}
+
+// SetEvtInvalid sets RevokeMyConsentErrorResponse to EvtInvalid.
+func (s *RevokeMyConsentErrorResponse) SetEvtInvalid(v EvtInvalid) {
+	s.Type = EvtInvalidRevokeMyConsentErrorResponse
+	s.EvtInvalid = v
+}
+
+// GetEvtInvalid returns EvtInvalid and true boolean if RevokeMyConsentErrorResponse is EvtInvalid.
+func (s RevokeMyConsentErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
+	if !s.IsEvtInvalid() {
+		return v, false
+	}
+	return s.EvtInvalid, true
+}
+
+// NewEvtInvalidRevokeMyConsentErrorResponse returns new RevokeMyConsentErrorResponse from EvtInvalid.
+func NewEvtInvalidRevokeMyConsentErrorResponse(v EvtInvalid) RevokeMyConsentErrorResponse {
+	var s RevokeMyConsentErrorResponse
+	s.SetEvtInvalid(v)
+	return s
+}
+
+// SetInternal sets RevokeMyConsentErrorResponse to Internal.
+func (s *RevokeMyConsentErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalRevokeMyConsentErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if RevokeMyConsentErrorResponse is Internal.
+func (s RevokeMyConsentErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalRevokeMyConsentErrorResponse returns new RevokeMyConsentErrorResponse from Internal.
+func NewInternalRevokeMyConsentErrorResponse(v Internal) RevokeMyConsentErrorResponse {
+	var s RevokeMyConsentErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets RevokeMyConsentErrorResponse to NotImplemented.
+func (s *RevokeMyConsentErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedRevokeMyConsentErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if RevokeMyConsentErrorResponse is NotImplemented.
+func (s RevokeMyConsentErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedRevokeMyConsentErrorResponse returns new RevokeMyConsentErrorResponse from NotImplemented.
+func NewNotImplementedRevokeMyConsentErrorResponse(v NotImplemented) RevokeMyConsentErrorResponse {
+	var s RevokeMyConsentErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
+// SetReqInvalid sets RevokeMyConsentErrorResponse to ReqInvalid.
+func (s *RevokeMyConsentErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidRevokeMyConsentErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if RevokeMyConsentErrorResponse is ReqInvalid.
+func (s RevokeMyConsentErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidRevokeMyConsentErrorResponse returns new RevokeMyConsentErrorResponse from ReqInvalid.
+func NewReqInvalidRevokeMyConsentErrorResponse(v ReqInvalid) RevokeMyConsentErrorResponse {
+	var s RevokeMyConsentErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetSessProjectMismatch sets RevokeMyConsentErrorResponse to SessProjectMismatch.
+func (s *RevokeMyConsentErrorResponse) SetSessProjectMismatch(v SessProjectMismatch) {
+	s.Type = SessProjectMismatchRevokeMyConsentErrorResponse
+	s.SessProjectMismatch = v
+}
+
+// GetSessProjectMismatch returns SessProjectMismatch and true boolean if RevokeMyConsentErrorResponse is SessProjectMismatch.
+func (s RevokeMyConsentErrorResponse) GetSessProjectMismatch() (v SessProjectMismatch, ok bool) {
+	if !s.IsSessProjectMismatch() {
+		return v, false
+	}
+	return s.SessProjectMismatch, true
+}
+
+// NewSessProjectMismatchRevokeMyConsentErrorResponse returns new RevokeMyConsentErrorResponse from SessProjectMismatch.
+func NewSessProjectMismatchRevokeMyConsentErrorResponse(v SessProjectMismatch) RevokeMyConsentErrorResponse {
+	var s RevokeMyConsentErrorResponse
+	s.SetSessProjectMismatch(v)
+	return s
+}
+
+// SetUnavailable sets RevokeMyConsentErrorResponse to Unavailable.
+func (s *RevokeMyConsentErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableRevokeMyConsentErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if RevokeMyConsentErrorResponse is Unavailable.
+func (s RevokeMyConsentErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableRevokeMyConsentErrorResponse returns new RevokeMyConsentErrorResponse from Unavailable.
+func NewUnavailableRevokeMyConsentErrorResponse(v Unavailable) RevokeMyConsentErrorResponse {
+	var s RevokeMyConsentErrorResponse
+	s.SetUnavailable(v)
+	return s
+}
+
+// RevokeMyConsentErrorResponseStatusCode wraps RevokeMyConsentErrorResponse with StatusCode.
+type RevokeMyConsentErrorResponseStatusCode struct {
+	StatusCode int
+	Response   RevokeMyConsentErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *RevokeMyConsentErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *RevokeMyConsentErrorResponseStatusCode) GetResponse() RevokeMyConsentErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *RevokeMyConsentErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *RevokeMyConsentErrorResponseStatusCode) SetResponse(val RevokeMyConsentErrorResponse) {
+	s.Response = val
+}
+
+func (*RevokeMyConsentErrorResponseStatusCode) revokeMyConsentRes() {}
+
+// RevokeMyConsentNoContent is response for RevokeMyConsent operation.
+type RevokeMyConsentNoContent struct{}
+
+func (*RevokeMyConsentNoContent) revokeMyConsentRes() {}
+
 // RevokeMySessionErrorResponse represents sum type.
 type RevokeMySessionErrorResponse struct {
 	Type                RevokeMySessionErrorResponseType // switch on this field
@@ -84067,10 +86125,12 @@ func (s *SessProjectMismatch) SetDetails(val OptSessProjectMismatchDetails) {
 func (*SessProjectMismatch) getMyPasswordStateRes()  {}
 func (*SessProjectMismatch) getMyUserRes()           {}
 func (*SessProjectMismatch) getMyUserSchemaRes()     {}
+func (*SessProjectMismatch) listMyConsentsRes()      {}
 func (*SessProjectMismatch) listMyIdentityLinksRes() {}
 func (*SessProjectMismatch) listMyPasskeysRes()      {}
 func (*SessProjectMismatch) listMyProjectsRes()      {}
 func (*SessProjectMismatch) listMyTeamsRes()         {}
+func (*SessProjectMismatch) revokeMyConsentRes()     {}
 
 // Additional error-specific context.
 type SessProjectMismatchDetails map[string]jx.Raw

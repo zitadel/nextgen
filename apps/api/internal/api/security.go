@@ -242,6 +242,8 @@ var sessionCookieOperations = map[api.OperationName]bool{
 	api.ListMyPasskeysOperation:        true,
 	api.ListMyIdentityLinksOperation:   true,
 	api.GetMyPasswordStateOperation:    true,
+	api.ListMyConsentsOperation:        true,
+	api.RevokeMyConsentOperation:       true,
 }
 
 // userBoundSessionOperations require a session with UserID. Anonymous
@@ -262,6 +264,8 @@ var userBoundSessionOperations = map[api.OperationName]bool{
 	api.ListMyPasskeysOperation:      true,
 	api.ListMyIdentityLinksOperation: true,
 	api.GetMyPasswordStateOperation:  true,
+	api.ListMyConsentsOperation:      true,
+	api.RevokeMyConsentOperation:     true,
 	api.GetProjectOperation:          true,
 	api.PatchProjectOperation:        true,
 	api.ListProjectAdminsOperation:   true,

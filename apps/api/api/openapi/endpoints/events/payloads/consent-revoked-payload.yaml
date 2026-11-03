@@ -1,0 +1,13 @@
+title: ConsentRevokedPayload
+type: object
+description: Payload for `consent.revoked` events.
+required:
+  - client_id
+  - resource
+properties:
+  client_id:
+    type: string
+    description: The client whose consent ended.
+  resource:
+    type: string
+    description: The API the consent was for.

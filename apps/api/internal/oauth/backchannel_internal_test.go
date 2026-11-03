@@ -131,3 +131,19 @@ func TestTokenEndpointRefusesWhatNoPublicClientSends(t *testing.T) {
 		})
 	}
 }
+
+// A client_id is bounded: a consent's unique key holds it. A longer one names
+// no client, so the token endpoint refuses it before anything is stored.
+func TestTokenEndpointRefusesAnOverlongClientID(t *testing.T) {
+	form := url.Values{
+		"grant_type":    {"refresh_token"},
+		"client_id":     {"https://agent.example/" + strings.Repeat("a", maxClientIDLength)},
+		"refresh_token": {"token"},
+	}
+	w := post(newPlainServer(t), "/token", form)
+
+	assert.Equal(t, http.StatusUnauthorized, w.Code, w.Body.String())
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &body))
+	assert.Equal(t, "invalid_client", body["error"])
+}

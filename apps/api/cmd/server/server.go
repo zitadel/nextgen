@@ -465,6 +465,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	// The platform project's authorization server (a proof of concept of
 	// ADR 082): the CLI and MCP clients sign a developer in, and the API
 	// takes the token as a user bearer (ADR 053 §5).
+	consentService := service.NewConsentService(serviceDBPool, cfg.Platform.OAuth.ConsentLifetimes())
 	var authServer *oauth.Server
 	securityHandler := api.NewSecurityHandler(tokenService).WithPlatformProject(cfg.Platform.ResolvedProjectID())
 	if cfg.Platform.OAuth.Enabled {
@@ -476,7 +477,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 			Keys:        keyService,
 			Sessions:    tokenService,
 			Users:       userService,
-			Grants:      service.NewOAuthGrantService(serviceDBPool),
+			Consents:    consentService,
 			Fetch:       egressClient,
 		})
 		if err != nil {
@@ -510,7 +511,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 			// Resolved, not the raw pin: in bootstrap mode project_id is empty
 			// and an empty handler pin rejects every claim/complete session.
 			cfg.Platform.ResolvedProjectID(),
-		).WithPersonalTeamEnsurer(personalTeams).WithBuiltinSchemaBases(builtinBases).WithRuntimeResolver(runtimeResolver).WithPolicyService(policyService).WithReadinessCheck(pool),
+		).WithPersonalTeamEnsurer(personalTeams).WithBuiltinSchemaBases(builtinBases).WithRuntimeResolver(runtimeResolver).WithPolicyService(policyService).WithConsentService(consentService).WithReadinessCheck(pool),
 		// The same platform project the handler resolves: sessions homed there
 		// can reach the platform operator path (ADR 075).
 		securityHandler,
@@ -805,12 +806,14 @@ func readConfig(configPath string, overrides ...configOverride) (Config, error) 
 	// Empty: nobody is a platform operator (ADR 075).
 	v.SetDefault("platform.operators", []string{})
 	// Off: no authorization server, and the API takes no user bearer. Zero
-	// lifetimes take oauth's defaults (ADR 037: minutes, two weeks).
+	// lifetimes take oauth's defaults (ADR 037: minutes, two weeks; a consent
+	// 90 days).
 	v.SetDefault("platform.oauth.enabled", false)
 	v.SetDefault("platform.oauth.access_token_ttl", 0)
 	v.SetDefault("platform.oauth.refresh_token_ttl", 0)
 	v.SetDefault("platform.oauth.client_id_metadata_documents", false)
 	v.SetDefault("platform.oauth.dynamic_registration", false)
+	v.SetDefault("platform.oauth.consent_lifetime", 0)
 	v.SetDefault("events.retention.window", 30*24*time.Hour)
 	v.SetDefault("events.retention.interval", time.Hour)
 	v.SetDefault("events.retention.enabled", true)
