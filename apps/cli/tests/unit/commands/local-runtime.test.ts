@@ -976,6 +976,7 @@ describe("local runtime commands", () => {
     };
 
     afterEach(() => {
+      vi.unstubAllEnvs();
       vi.mocked(confirm).mockReset();
       vi.mocked(isCancel).mockReset();
       vi.mocked(isCancel).mockReturnValue(false);
@@ -991,6 +992,9 @@ describe("local runtime commands", () => {
     });
 
     it("deletes the data when the answer is yes", async () => {
+      const fake = await fakeDocker();
+      vi.stubEnv("PATH", `${fake.binDir}:${process.env.PATH ?? ""}`);
+      vi.stubEnv("DOCKER_LOG", fake.logPath);
       const { outcome, kept } = await resetting(true, false);
 
       expect(outcome).toMatchObject({ envelope: { status: "ok" } });
@@ -1000,7 +1004,7 @@ describe("local runtime commands", () => {
     it("says what is deleted, that it cannot be undone, and what is kept", async () => {
       await resetting(false, false);
 
-      const { message } = vi.mocked(confirm).mock.calls[0][0];
+      const message = vi.mocked(confirm).mock.calls[0]?.[0].message;
       expect(message).toContain(LOCAL_DATA_DIR);
       expect(message).toContain("cannot be undone");
       expect(message).toContain(`Kept: ${LOCAL_ADMIN_FILE}`);
