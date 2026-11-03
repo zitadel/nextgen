@@ -8,7 +8,7 @@ CREATE TABLE signup_challenges (
     expires_at INT64 NOT NULL,
     payload STRING(MAX) NOT NULL,
     CONSTRAINT fk_signup_challenges_project FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE
-) PRIMARY KEY (project_id, flow_id);
+) PRIMARY KEY (project_id, flow_id)
 -- +goose StatementEnd
 -- +goose StatementBegin
 CREATE TABLE signup_limits (
@@ -17,12 +17,12 @@ CREATE TABLE signup_limits (
     issued INT64 NOT NULL,
     verified INT64 NOT NULL,
     CONSTRAINT fk_signup_limits_project FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE
-) PRIMARY KEY (project_id);
+) PRIMARY KEY (project_id)
 -- +goose StatementEnd
 -- +goose Down
 -- +goose StatementBegin
-DROP TABLE signup_limits;
+DROP TABLE signup_limits
 -- +goose StatementEnd
 -- +goose StatementBegin
-DROP TABLE signup_challenges;
+DROP TABLE signup_challenges
 -- +goose StatementEnd
