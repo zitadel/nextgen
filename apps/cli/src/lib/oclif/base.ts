@@ -2,12 +2,13 @@ import { randomUUID } from "node:crypto";
 
 import { Command, Flags, type Interfaces } from "@oclif/core";
 
+import { byName, type ByName } from "./names";
 import { placeholdersOf, type Rule, type RuleView } from "./rules";
-import { nonBlankString } from "./flags";
+import { nonBlankString, serverFlag } from "./flags";
 import { Interruptible } from "./interruptible";
 import consola from "consola";
 
-import { toZitadelError, type ZitadelError } from "../errors";
+import { toZitadelError, ZitadelError } from "../errors";
 import { isObject } from "../json";
 import { type LocalServers, PsLocalServers } from "../local-server/processes";
 import { resolveCwd } from "../paths";
@@ -86,12 +87,13 @@ export type MetaOptions = {
 
 /**
  * What {@link BaseCommand.execute} receives once a command has been admitted:
- * its parsed flags, arguments and positional words, and what each of its requirements found,
- * under the name it is declared with.
+ * its parsed flags, arguments and positional words, and what each of its
+ * requirements found, under the name it is declared with. A flag or argument is
+ * read as code reads it (`flags.clientId` for `--client-id`); see `./names`.
  */
 export type Admitted<C extends typeof BaseCommand> = Readonly<{
-  flags: Interfaces.InferredFlags<C["flags"] & C["baseFlags"]>;
-  args: Interfaces.InferredArgs<C["args"]>;
+  flags: ByName<Interfaces.InferredFlags<C["flags"] & C["baseFlags"]>>;
+  args: ByName<Interfaces.InferredArgs<C["args"]>>;
   argv: readonly string[];
 }> &
   Resolved<C["requires"]>;
@@ -129,7 +131,10 @@ export abstract class BaseCommand extends Interruptible(Command) {
    */
   static override baseFlags = {
     cwd: nonBlankString({ char: "c", description: "Project directory to operate on." }),
-    server: nonBlankString({ char: "s", description: "Override the resolved server URL." }),
+    server: serverFlag({
+      char: "s",
+      description: "Override the resolved server URL.",
+    }),
     "non-interactive": Flags.boolean({
       char: "n",
       description: "Disable prompts. Required when scripting or running as an agent.",
@@ -160,7 +165,10 @@ export abstract class BaseCommand extends Interruptible(Command) {
   /** How the run's context is resolved; see {@link toMeta}. */
   static meta: MetaOptions = {};
 
-  /** Rules between this command's flags and arguments, checked right after they parse. */
+  /**
+   * Rules between this command's flags and arguments, checked right after they
+   * parse. A command's rules follow those of every class it extends.
+   */
   static rules: readonly Rule[] = [];
 
   /** What this command needs from outside its flags, found before it runs. */
@@ -168,6 +176,55 @@ export abstract class BaseCommand extends Interruptible(Command) {
 
   /** Resolved context for the current invocation; set by {@link toMeta}. */
   protected meta: GlobalOptions = this.fallbackMeta();
+
+  /** The project directory this run is about: `--cwd`, else where it was run. */
+  protected get cwd(): string {
+    return this.meta.cwd;
+  }
+
+  /** The process environment, read through the run so a test can stand it in. */
+  protected get env(): NodeJS.ProcessEnv {
+    return this.meta.env;
+  }
+
+  /** Whether this run previews its work instead of doing it (`--dry-run`). */
+  protected get dryRun(): boolean {
+    return this.meta.dryRun;
+  }
+
+  /** Whether this run may not ask a question (`--non-interactive`, `--json`, no terminal). */
+  protected get nonInteractive(): boolean {
+    return this.meta.nonInteractive;
+  }
+
+  /** Whether this run was told to go ahead regardless (`--force`). */
+  protected get force(): boolean {
+    return this.meta.force;
+  }
+
+  /** Whether a person is at the terminal, on both ends of the run. */
+  protected get isTTY(): boolean {
+    return this.meta.isTTY;
+  }
+
+  /** Whether this run answers in the JSON envelope (`--json`). */
+  protected get isJson(): boolean {
+    return this.meta.json;
+  }
+
+  /**
+   * Whether this run's human output is coloured: the one decision every
+   * command shares, honouring `--color`/`--no-color`, `NO_COLOR`,
+   * `FORCE_COLOR` and a dumb terminal. A JSON run is never coloured.
+   */
+  protected get isColored(): boolean {
+    return this.meta.colored;
+  }
+
+  /** The release of the CLI that is running. */
+  protected get cliVersion(): string {
+    return this.meta.cliVersion;
+  }
 
   /**
    * Anonymous usage analytics for this invocation, created once in
@@ -216,6 +273,10 @@ export abstract class BaseCommand extends Interruptible(Command) {
   /** The command's work, which receives only flags, arguments and findings that passed. */
   protected abstract execute(input: Admitted<typeof BaseCommand>): Promise<JsonEnvelope>;
 
+  protected suggestRefusal(command: string): SuggestedCommand {
+    return this.suggestUnscoped(command);
+  }
+
   protected connectionForRequirement(_options: ConnectOptions): Promise<Connection> {
     return Promise.reject(new Error(`${this.id ?? "This command"} has no project to connect to`));
   }
@@ -225,7 +286,11 @@ export abstract class BaseCommand extends Interruptible(Command) {
   }
 
   private async admit(): Promise<Admitted<typeof BaseCommand> | Ended> {
-    const { flags, args, argv } = await this.parse(this.command);
+    const parsed = await this.parse(this.command).catch((error: unknown) => {
+      throw asRaised(error);
+    });
+    const flags = byName(parsed.flags);
+    const args = byName(parsed.args);
     await this.toMeta(flags, this.command.meta);
     const view = {
       flags: {
@@ -233,6 +298,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
         json: this.jsonEnabled(),
       },
       args,
+      argv: parsed.argv.map(String),
     };
     this.refuseBrokenRules(view);
     const resolved = await this.resolveRequirements(view);
@@ -242,13 +308,27 @@ export abstract class BaseCommand extends Interruptible(Command) {
     return {
       flags,
       args,
-      argv: argv.map(String),
+      argv: view.argv,
       ...resolved,
     } as Admitted<typeof BaseCommand>;
   }
 
+  private everyRule(): Rule[] {
+    const rules: Rule[] = [];
+    for (
+      let current: object | null = this.command;
+      current !== null && current !== Function.prototype;
+      current = Object.getPrototypeOf(current)
+    ) {
+      if (Object.hasOwn(current, "rules")) {
+        rules.unshift(...(current as typeof BaseCommand).rules);
+      }
+    }
+    return rules;
+  }
+
   private refuseBrokenRules(view: RuleView): void {
-    for (const rule of this.command.rules) {
+    for (const rule of this.everyRule()) {
       const outcome = rule.broken(view);
       if (outcome) {
         throw refusalError(
@@ -257,7 +337,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
             ...placeholdersOf(view),
             ...(outcome === true ? {} : outcome),
           },
-          (next) => this.suggestUnscoped(next),
+          (next) => this.suggestRefusal(next),
         );
       }
     }
@@ -270,6 +350,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
         ...view,
         meta: this.meta,
         connect: (options = {}) => this.connectionForRequirement(options),
+        suggest: (next) => this.suggestRefusal(next),
         resolved,
       });
       if (found === undefined || isUnmet(found)) {
@@ -282,7 +363,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
             cwd: this.meta.cwd,
             ...(found === undefined ? {} : found.unmet),
           },
-          (next) => this.suggestUnscoped(next),
+          (next) => this.suggestRefusal(next),
         );
       }
       if (isEnded(found)) {
@@ -371,12 +452,14 @@ export abstract class BaseCommand extends Interruptible(Command) {
    * `source` is `--server` or the cloud default, which is `setup`'s rule; a
    * command that takes its server from the environment extends
    * `EnvironmentCommand`, and one that never talks to a server passes
-   * `resolveServer: false`.
+   * `resolveServer: false`. The flags are read as code reads them, whether
+   * they arrive from {@link admit} or straight from `parse`.
    */
   protected async toMeta(
-    flags: Record<string, unknown>,
+    given: Record<string, unknown>,
     options: MetaOptions = {},
   ): Promise<GlobalOptions> {
+    const flags = byName(given);
     const cwd = resolveCwd(typeof flags.cwd === "string" ? flags.cwd : undefined);
     this.typedCwd = typeof flags.cwd === "string" ? flags.cwd : undefined;
     const serverFlag = typeof flags.server === "string" ? flags.server : undefined;
@@ -399,6 +482,9 @@ export abstract class BaseCommand extends Interruptible(Command) {
     // parsed `color` flag. The flag's value is the source of truth here so that
     // a programmatic `run()` (tests) honours it without the entry-point shim.
     const useColor = flags.color !== false && !process.env[NO_COLOR.name];
+    const colored =
+      useColor &&
+      (Boolean(process.env[FORCE_COLOR.name]) || (isTTY && process.env.TERM !== "dumb"));
     // Drop the right-aligned timestamp the FancyReporter adds by default.
     // Timestamps add no value in a one-off CLI run, wrap awkwardly on long
     // lines (e.g. created-schema URL), and clutter the visual rhythm of the
@@ -411,8 +497,8 @@ export abstract class BaseCommand extends Interruptible(Command) {
     };
     this.meta = {
       cwd,
-      nonInteractive: Boolean(flags["non-interactive"]) || !isTTY || json,
-      dryRun: Boolean(flags["dry-run"]),
+      nonInteractive: Boolean(flags.nonInteractive) || !isTTY || json,
+      dryRun: Boolean(flags.dryRun),
       force: Boolean(flags.force),
       command: this.id ?? "(default)",
       cliVersion: this.config.version,
@@ -422,6 +508,8 @@ export abstract class BaseCommand extends Interruptible(Command) {
       debug,
       env: process.env,
       isTTY,
+      colored: !json && colored,
+      json,
     };
     this.openTelemetry(typeof flags.telemetry === "boolean" ? flags.telemetry : undefined);
     return this.meta;
@@ -624,8 +712,32 @@ export abstract class BaseCommand extends Interruptible(Command) {
       debug: false,
       env: process.env,
       isTTY: Boolean(process.stdout.isTTY && process.stdin.isTTY),
+      colored: false,
+      json: false,
     };
   }
+}
+
+/**
+ * oclif rewrites the message of an error a flag's `parse` threw, prefixing the
+ * flag and appending its own help line. A refusal reads the same wherever it
+ * was raised, so the message it was given is put back.
+ */
+const PARSE_PREFIX = /^Parsing --\S+ \n\t([\s\S]*)\nSee more help with --help$/;
+
+function asRaised(error: unknown): unknown {
+  if (!(error instanceof ZitadelError)) {
+    return error;
+  }
+  const raised = PARSE_PREFIX.exec(error.message)?.[1];
+  if (raised === undefined) {
+    return error;
+  }
+  return new ZitadelError(error.code, raised, {
+    hint: error.hint,
+    nextCommands: error.nextCommands,
+    details: error.details,
+  });
 }
 
 /** Rewrites each suggested `zitadel …` command to the public form the reader can run. */

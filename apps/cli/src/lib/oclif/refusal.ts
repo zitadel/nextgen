@@ -31,6 +31,31 @@ export function interpolate(template: string, values: Placeholders): string {
   });
 }
 
+const WHOLE_PLACEHOLDER = /^\{([\w-]+)\}$/;
+
+/**
+ * `details` with each string filled in. A string that is only a placeholder
+ * takes the value as it is, so a list stays a list in the error's details.
+ */
+function fill(details: unknown, values: Placeholders): unknown {
+  if (typeof details === "string") {
+    const whole = WHOLE_PLACEHOLDER.exec(details);
+    if (whole?.[1] !== undefined && values[whole[1]] !== undefined) {
+      return values[whole[1]];
+    }
+    return interpolate(details, values);
+  }
+  if (Array.isArray(details)) {
+    return details.map((one) => fill(one, values));
+  }
+  if (typeof details === "object" && details !== null) {
+    return Object.fromEntries(
+      Object.entries(details).map(([key, one]) => [key, fill(one, values)]),
+    );
+  }
+  return details;
+}
+
 /**
  * The error a {@link Refusal} describes, `E_VALIDATION` unless it names a code.
  * `suggest` turns each of its `next` commands into the suggestion the run's own
@@ -52,6 +77,6 @@ export function refusalError(
     nextCommands: refusal.next?.map(
       (command) => suggest?.(interpolate(command, values)) as SuggestedCommand,
     ),
-    details: refusal.details,
+    details: fill(refusal.details, values),
   });
 }

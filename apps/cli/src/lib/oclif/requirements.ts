@@ -1,16 +1,19 @@
 import type { RuleView } from "./rules";
 import type { Placeholders, Refusal } from "./refusal";
+import type { SuggestedCommand } from "../suggestion";
 import type { CommandResult, ConnectOptions, Connection, GlobalOptions } from "./types";
 
 /**
  * What a requirement reads to find what it needs. `connect` opens the project
  * connection of a project command, the one `execute` later shares; any other
- * command has none and it throws.
+ * command has none and it throws. `suggest` builds a command to suggest the
+ * way a refusal's own `next` does, with the project selector when there is one.
  */
 export type RequirementContext = Readonly<
   RuleView & {
     meta: GlobalOptions;
     connect: (options?: ConnectOptions) => Promise<Connection>;
+    suggest: (command: string) => SuggestedCommand;
     resolved: Readonly<Record<string, unknown>>;
   }
 >;

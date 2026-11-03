@@ -28,8 +28,8 @@ export default class DeploymentGet extends Tabulatable(EnvironmentCommand) {
     // `--json` carries the record alone, so only a person's view reads the
     // frozen set.
     const [deployment, variables] = await Promise.all([
-      client.getDeploymentById(args.deployment_id, scope),
-      this.jsonEnabled() ? undefined : client.getDeploymentVariables(args.deployment_id, scope),
+      client.getDeploymentById(args.deploymentId, scope),
+      this.isJson ? undefined : client.getDeploymentVariables(args.deploymentId, scope),
     ]);
 
     const origins = deployment.targets.map((target) => target.origin);

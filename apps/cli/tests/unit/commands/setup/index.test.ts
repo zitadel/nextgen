@@ -364,6 +364,8 @@ describe("setup command pre-flight", () => {
       "local",
       "--sso",
       "google",
+      "--sso-client-id",
+      "abc",
       "--json",
     ]);
 

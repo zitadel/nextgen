@@ -1,6 +1,6 @@
 import { Flags } from "@oclif/core";
 
-import { parseColumns } from "./columns";
+import { readColumns } from "./columns";
 import { readAssignment } from "./assign";
 import type { Assignment } from "./assign";
 import type { BodyField } from "./fields";
@@ -46,7 +46,9 @@ export const fieldsFlag = Flags.custom<
   readonly string[],
   Readonly<{ fallback: readonly string[]; shape?: FieldPaths }>
 >({
-  parse: async (input, _command, flag) => parseColumns(input, flag.fallback, flag.shape),
+  parse: async (input, _command, flag) => {
+    return readColumns(input, flag.fallback, flag.shape);
+  },
 });
 
 /** `--set`: one field of the body by its path, read against the body's schema. */
@@ -54,5 +56,7 @@ export const setFlag = Flags.custom<
   Assignment,
   Readonly<{ document: ZodLike | undefined; fields: readonly BodyField[] }>
 >({
-  parse: async (input, _command, flag) => readAssignment(input, flag.document, flag.fields),
+  parse: async (input, _command, flag) => {
+    return readAssignment(input, flag.document, flag.fields);
+  },
 });

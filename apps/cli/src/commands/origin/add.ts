@@ -31,29 +31,30 @@ export default class OriginAdd extends EnvironmentCommand {
     "<%= config.bin %> origin add 'https://*-acme.vercel.app' --kind preview",
   ];
   static override args = {
-    pattern: nonBlankArg({ required: true, description: "The origin pattern to add." }),
+    pattern: nonBlankArg({
+      required: true,
+      description: "The origin pattern to add.",
+    }),
   };
   static override flags = {
-    kind: Flags.string({
+    kind: Flags.option({
       description: "What the pattern is for.",
-      options: [...ORIGIN_KINDS],
+      options: ORIGIN_KINDS,
       required: true,
-    }),
+    })(),
   };
 
   protected async execute({ args, flags }: Admitted<typeof OriginAdd>): Promise<JsonEnvelope> {
-    const kind = flags.kind as (typeof ORIGIN_KINDS)[number];
-
     // A dry run makes no request, so it answers before the connection — the
     // order the resource commands' `create` uses, which keeps
     // `--dry-run --non-interactive` usable.
-    if (this.meta.dryRun) {
-      return this.emit(dryRunResult("add", "origin", args.pattern, { kind }));
+    if (this.dryRun) {
+      return this.emit(dryRunResult("add", "origin", args.pattern, { kind: flags.kind }));
     }
 
     const { client, projectId } = await this.connect();
 
-    const added = await client.addOrigin(projectId, { pattern: args.pattern, kind });
+    const added = await client.addOrigin(projectId, { pattern: args.pattern, kind: flags.kind });
 
     return this.emit({
       status: "ok",

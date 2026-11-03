@@ -10,8 +10,8 @@ import {
   type Target,
   uncallable,
 } from "../../lib/api/operations";
-import { buildRequest, pathValuesOf, readInput, urlOf } from "../../lib/api/request";
-import { ZitadelError } from "../../lib/errors";
+import { type PathValues, urlOf, withPathValues } from "../../lib/api/request";
+import type { ZitadelSecret } from "../../lib/project";
 import {
   type Admitted,
   BaseCommand,
@@ -19,8 +19,13 @@ import {
   type JsonEnvelope,
   nonBlankString,
 } from "../../lib/oclif";
-import { httpMethodFlag } from "../../lib/oclif/inputs/api";
-import { readZitadelSecret } from "../../lib/project";
+import { methodFlag } from "./flags/method";
+import { apiForce } from "./requirements/force";
+import { apiOperation } from "./requirements/operation";
+import { apiPaging } from "./requirements/paging";
+import { apiPath, pathValuesFromWords } from "./requirements/path";
+import { apiPayload, requestOf } from "./requirements/payload";
+import { apiSecret } from "./requirements/secret";
 import { Destructive } from "../../lib/oclif/destructive";
 
 /**
@@ -56,7 +61,7 @@ export default class Api extends Destructive(BaseCommand) {
     }),
   };
   static override flags = {
-    method: httpMethodFlag({
+    method: methodFlag({
       char: "X",
       description: "The HTTP method, to choose among a path's operations.",
     }),
@@ -81,64 +86,57 @@ export default class Api extends Destructive(BaseCommand) {
     }),
   };
 
-  protected async execute({ args, flags }: Admitted<typeof Api>): Promise<JsonEnvelope> {
-    const meta = this.meta;
-    const { argv } = await this.parse(Api);
+  static override requires = {
+    operation: apiOperation,
+    paging: apiPaging,
+    secret: apiSecret,
+    path: apiPath,
+    payload: apiPayload,
+    force: apiForce,
+  };
 
-    const ref = args.operation ?? (await this.chooseOperation());
-    const target = resolveTarget(ref, flags.method);
+  protected async execute({
+    argv,
+    args,
+    flags,
+    operation: chosen,
+    secret: { secret },
+    path,
+    payload,
+  }: Admitted<typeof Api>): Promise<JsonEnvelope> {
+    // Only a prompted operation is resolved here: a requirement cannot ask, so
+    // the one the command line named brought its path values and request with it.
+    const prompted = chosen.target === undefined;
+    const target =
+      chosen.target ?? resolveTarget(await this.chooseOperation(flags.paginate, secret));
     const { operation } = target;
-    const refusal = uncallable(operation);
-    if (refusal) {
-      throw new ZitadelError("E_VALIDATION", refusal, {
-        hint: "Call it from the app it belongs to, through the SDK; `zitadel api ls` marks what the CLI can call.",
-      });
-    }
-    if (flags.paginate && operation.paging === null) {
-      throw new ZitadelError(
-        "E_VALIDATION",
-        `${operation.id} does not page, so --paginate has nothing to follow`,
-        {
-          hint: "Leave out --paginate.",
-        },
-      );
-    }
     this.recordTelemetry({ operation: operation.id, is_paginated: flags.paginate });
 
-    // An operation that needs no credential runs anywhere; one that does
-    // needs the project `zitadel setup` wrote. Either way a project at hand
-    // fills a `project_id` left out.
-    const secret =
-      operation.auth === "secret"
-        ? await readZitadelSecret(meta.cwd)
-        : await readZitadelSecret(meta.cwd).catch(() => undefined);
-    const positionals = (argv as string[]).slice(args.operation === undefined ? 0 : 1);
-    const pathValues = await this.pathValues(target, positionals, secret?.project_id);
-    const request = buildRequest({
-      target,
-      pathValues,
-      fields: flags.field ?? [],
-      input: await readInput(flags.input),
-      projectId: secret?.project_id,
-    });
+    const given = prompted
+      ? pathValuesFromWords(target, argv, args.operation !== undefined, secret?.project_id)
+      : path;
+    const request = withPathValues(
+      payload.request ?? (await requestOf(target, flags, secret?.project_id)),
+      await this.pathValues(target, given),
+    );
 
-    if (meta.dryRun) {
+    if (this.dryRun) {
       return this.emit({
         status: "ok",
         data: {
           operation: operation.id,
           method: operation.method,
-          url: urlOf(meta.source, request),
+          url: urlOf(this.meta.source, request),
           ...(request.body === undefined ? {} : { body: request.body }),
         },
-        pretty: curlOf(meta.source, request),
+        pretty: curlOf(this.meta.source, request),
       });
     }
 
     // As the resource commands do: say which server is called, on a terminal
     // only, so a pipe receives the response alone.
     if (process.stdout.isTTY) {
-      consola.info(`${operation.method} ${urlOf(meta.source, request)}`);
+      consola.info(`${operation.method} ${urlOf(this.meta.source, request)}`);
     }
     const destructive = request.operation.destructive;
     const consent = destructive
@@ -146,25 +144,12 @@ export default class Api extends Destructive(BaseCommand) {
           verb: "call",
           name: `call ${operation.id}`,
           message: [
-            `Would you like to call ${operation.id} at ${urlOf(meta.source, request)}?`,
+            `Would you like to call ${operation.id} at ${urlOf(this.meta.source, request)}?`,
             ...(operation.summary === "" ? [] : [`${operation.summary}.`]),
           ].join(" "),
           // A body is not repeated in a suggestion: it can hold a secret, or
           // have come from a pipe a rerun of the command alone would not have.
-          ...(request.body === undefined
-            ? {}
-            : {
-                retry: undefined,
-                refuse: () => {
-                  throw new ZitadelError(
-                    "E_VALIDATION",
-                    `Cannot call ${operation.id} without --force in non-interactive mode`,
-                    {
-                      hint: "Run the same command again, with its --field values or the pipe into --input, and add --force.",
-                    },
-                  );
-                },
-              }),
+          ...(request.body === undefined ? {} : { retry: undefined }),
         })
       : undefined;
     if (destructive && consent === undefined) {
@@ -172,8 +157,8 @@ export default class Api extends Destructive(BaseCommand) {
     }
     const token = operation.auth === "secret" ? secret?.project_secret : undefined;
     const response = flags.paginate
-      ? await sendAll(meta.source, token, request, this.signal)
-      : await send(meta.source, token, request, this.signal, consent);
+      ? await sendAll(this.meta.source, token, request, this.signal)
+      : await send(this.meta.source, token, request, this.signal, consent);
     return this.emit({
       status: "ok",
       data: response.body ?? null,
@@ -189,8 +174,16 @@ export default class Api extends Destructive(BaseCommand) {
   }
 
   /** Choose an operation the CLI can call: its part of the API, then the operation. */
-  private async chooseOperation(): Promise<string> {
-    const callable = OPERATIONS.filter((operation) => uncallable(operation) === undefined);
+  private async chooseOperation(
+    paginate: boolean,
+    secret: ZitadelSecret | undefined,
+  ): Promise<string> {
+    const callable = OPERATIONS.filter(
+      (operation) =>
+        uncallable(operation) === undefined &&
+        (!paginate || operation.paging !== null) &&
+        (operation.auth !== "secret" || secret !== undefined),
+    );
     const retry = this.suggestUnscoped("api ls --json");
     const tag = await this.input({
       kind: "select",
@@ -220,10 +213,8 @@ export default class Api extends Destructive(BaseCommand) {
   /** Every path parameter's value, asking for the ones the command line left out. */
   private async pathValues(
     target: Target,
-    positionals: readonly string[],
-    projectId: string | undefined,
+    { values, missing }: PathValues,
   ): Promise<Readonly<Record<string, string>>> {
-    const { values, missing } = pathValuesOf(target, positionals, projectId);
     const filled: Record<string, string> = { ...values };
     for (const name of missing) {
       filled[name] = await this.input({

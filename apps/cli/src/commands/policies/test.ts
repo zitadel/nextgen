@@ -50,10 +50,8 @@ export default class PoliciesTest extends EnvironmentCommand {
   };
 
   protected async execute({ args, flags }: Admitted<typeof PoliciesTest>): Promise<JsonEnvelope> {
-    const { cwd } = this.meta;
-
     const operations = args.operation === undefined ? [] : [args.operation];
-    const { suites, issues } = await readPolicyTests(cwd, operations);
+    const { suites, issues } = await readPolicyTests(this.cwd, operations);
     if (issues.length > 0) {
       throw new ZitadelError("E_VALIDATION", "The policy test files are not valid", {
         details: { issues },
@@ -82,7 +80,7 @@ export default class PoliciesTest extends EnvironmentCommand {
         `Release ${flags.release} pins no flow, so sign-ins served it use the newest policy revisions, not the ones tested here.`,
       );
     }
-    const source = fromRelease ?? (await policiesFromFiles(cwd, operations));
+    const source = fromRelease ?? (await policiesFromFiles(this.cwd, operations));
     if ("issues" in source && source.issues.length > 0) {
       throw new ZitadelError("E_VALIDATION", "The policy files are not valid", {
         details: { issues: source.issues },

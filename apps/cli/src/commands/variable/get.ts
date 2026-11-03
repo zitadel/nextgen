@@ -7,7 +7,7 @@ import {
   EnvironmentCommand,
   type JsonEnvelope,
 } from "../../lib/oclif";
-import { variableNameArg } from "../../lib/oclif/inputs/variables";
+import { variableNameArg } from "./args/name";
 import { Tabulatable } from "../../lib/oclif/tabulatable";
 import { toVariableRow, variableCells, variableReadScope } from "../../lib/variables";
 
@@ -38,21 +38,20 @@ export default class VariableGet extends Tabulatable(EnvironmentCommand) {
   };
 
   protected async execute({ args, flags }: Admitted<typeof VariableGet>): Promise<JsonEnvelope> {
-    const name = args.name;
     const { client, projectId } = await this.connect();
     const scope = variableReadScope(projectId, flags.preview);
 
     // The single-name endpoint answers in the same two forms the collection
     // does, so the row projection is shared rather than duplicated.
-    const value = (await client.getVariable(name, scope))[scope.kind];
+    const value = (await client.getVariable(args.name, scope))[scope.kind];
     if (value === undefined) {
-      throw new ZitadelError("E_NOT_FOUND", `Variable ${name} has no ${scope.kind} value.`, {
+      throw new ZitadelError("E_NOT_FOUND", `Variable ${args.name} has no ${scope.kind} value.`, {
         hint: flags.preview
           ? "A name has a preview value only once one is set with `--preview`."
           : "Set one with `variable set`.",
       });
     }
-    const row = toVariableRow(name, value);
+    const row = toVariableRow(args.name, value);
     this.recordTelemetry({ is_secret: row.secret });
 
     const data = row;
@@ -67,7 +66,7 @@ export default class VariableGet extends Tabulatable(EnvironmentCommand) {
     return this.emit({
       status: "ok",
       data,
-      pretty: this.tabulateDetail(name, ["value"], {
+      pretty: this.tabulateDetail(args.name, ["value"], {
         // The detail view drops an empty field, which would hide a value that
         // is legitimately the empty string.
         value: cell?.value === "" ? '""' : cell?.value,

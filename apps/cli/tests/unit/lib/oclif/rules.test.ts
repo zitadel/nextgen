@@ -16,6 +16,7 @@ function view(flags: Record<string, unknown>, args: Record<string, unknown> = {}
   return {
     flags,
     args,
+    argv: [],
   };
 }
 

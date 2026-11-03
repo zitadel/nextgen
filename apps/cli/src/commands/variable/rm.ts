@@ -6,7 +6,7 @@ import {
   EnvironmentCommand,
   type JsonEnvelope,
 } from "../../lib/oclif";
-import { variableNameArg } from "../../lib/oclif/inputs/variables";
+import { variableNameArg } from "./args/name";
 import { dryRunResult } from "../../lib/oclif/crud/shared";
 import { deletedData } from "../../lib/oclif/envelope";
 import { variableScope } from "../../lib/variables";
@@ -43,16 +43,15 @@ export default class VariableRm extends Destructive(EnvironmentCommand) {
   };
 
   protected async execute({ args, flags }: Admitted<typeof VariableRm>): Promise<JsonEnvelope> {
-    const name = args.name;
     const kinds = flags.preview ? ["preview"] : ["primary", "preview"];
 
     return this.emit(
       await this.confirmed({
         verb: "remove",
-        name: `remove ${name} from the project`,
-        message: `Remove ${name} from the project?`,
+        name: `remove ${args.name} from the project`,
+        message: `Remove ${args.name} from the project?`,
         preview: () => {
-          const preview = dryRunResult("remove", "variable", name);
+          const preview = dryRunResult("remove", "variable", args.name);
           return {
             ...preview,
             data: { ...(preview.data as object), kinds },
@@ -63,11 +62,11 @@ export default class VariableRm extends Destructive(EnvironmentCommand) {
         apply: async (consent, { client, projectId }) => {
           await consent
             .unlock(client)
-            .deleteVariable(name, variableScope(projectId, flags.preview));
+            .deleteVariable(args.name, variableScope(projectId, flags.preview));
           return {
             status: "ok",
-            data: { ...deletedData({ name }), kinds },
-            pretty: `Removed ${name} from the project${flags.preview ? " (preview)" : ""}`,
+            data: { ...deletedData({ name: args.name }), kinds },
+            pretty: `Removed ${args.name} from the project${flags.preview ? " (preview)" : ""}`,
           };
         },
       }),

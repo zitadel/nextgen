@@ -1,8 +1,11 @@
 import { posix } from "node:path";
 
+import { Flags } from "@oclif/core";
+
 import { Cmd } from "../cmd";
+import { isEnvironmentName } from "../environment";
 import { nonBlankString } from "./flags";
-import { previewOriginFlag, previewTtlFlag } from "./inputs/preview";
+import { refusalError } from "./refusal";
 import { asEnvironmentSelector, type EnvironmentSelector } from "../suggestion";
 
 /**
@@ -11,8 +14,25 @@ import { asEnvironmentSelector, type EnvironmentSelector } from "../suggestion";
  * Kept as a bag of their own so a test can check them against every other bag
  * for a clashing name or short form.
  */
+const environmentNameFlag = Flags.custom<string>({
+  parse: async (input) => {
+    if (!isEnvironmentName(input)) {
+      throw refusalError(
+        {
+          message: '"{value}" is not a usable environment name',
+          hint: 'Use letters, digits, dot, dash and underscore, and no "..", and not `local` or a name ending in `.local`.',
+        },
+        {
+          value: input,
+        },
+      );
+    }
+    return input;
+  },
+});
+
 export const environmentFlags = {
-  env: nonBlankString({
+  env: environmentNameFlag({
     char: "e",
     description:
       "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
@@ -38,24 +58,6 @@ export const ENVIRONMENT_SELECTOR_OPTIONS: readonly string[] = [
   "--cwd",
   "-c",
 ];
-
-/**
- * The flags the `preview` command adds on top of the environment ones: which
- * preview URLs to deploy to and for how long. Kept as a bag so `preview` can
- * spread them while `preview list` and `preview rm`, which share the preview
- * credential but take neither, stay free of them.
- */
-export const previewFlags = {
-  origin: previewOriginFlag({
-    description:
-      "A preview URL to deploy to, instead of detecting them from the platform build. Repeatable.",
-    multiple: true,
-  }),
-  ttl: previewTtlFlag({
-    description:
-      "How long each preview stays live, e.g. 7d, 12h or 90m. Between 60s and 365d. Omitted, the project's default applies.",
-  }),
-};
 
 /**
  * The `--env`/`--env-file`/`--server` suffix — a leading-space string, or empty

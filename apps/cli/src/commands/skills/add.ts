@@ -25,11 +25,11 @@ export default class SkillsAdd extends BaseCommand {
 
   protected async execute(): Promise<JsonEnvelope> {
     const skills = await bundledSkills(this.config.root);
-    const dirs = await skillDirs(this.meta.cwd);
-    if (!this.meta.dryRun) {
+    const dirs = await skillDirs(this.cwd);
+    if (!this.dryRun) {
       await addSkills({
         packageRoot: this.config.root,
-        projectDir: this.meta.cwd,
+        projectDir: this.cwd,
         skills,
         dirs,
       });
@@ -38,13 +38,13 @@ export default class SkillsAdd extends BaseCommand {
     return this.emit({
       status: "ok",
       data: {
-        title: this.meta.dryRun ? "Zitadel agent skills to add." : "Zitadel agent skills added.",
+        title: this.dryRun ? "Zitadel agent skills to add." : "Zitadel agent skills added.",
         skills,
         directories: dirs,
-        ...(this.meta.dryRun ? { dry_run: true } : {}),
+        ...(this.dryRun ? { dry_run: true } : {}),
       },
       pretty: [
-        `${this.meta.dryRun ? "Would add" : "Added"} the ${skills.length} Zitadel agent skills of CLI ${this.meta.cliVersion} to:`,
+        `${this.dryRun ? "Would add" : "Added"} the ${skills.length} Zitadel agent skills of CLI ${this.cliVersion} to:`,
         ...dirs.map((dir) => `  ${dir}${dir === CLAUDE_SKILLS_DIR ? "  (Claude Code)" : ""}`),
         "Run this again after updating the CLI to keep them in step with it.",
       ].join("\n"),

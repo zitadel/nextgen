@@ -4,6 +4,7 @@ import { Flags } from "@oclif/core";
 import {
   type Admitted,
   CommandGroups,
+  integerFlag,
   EnvironmentCommand,
   type JsonEnvelope,
   nonBlankString,
@@ -36,7 +37,7 @@ export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
   static override flags = {
     origin: Flags.string({ description: "Only deployments that targeted this origin." }),
     live: Flags.boolean({ description: "What each target serves now, not the full history." }),
-    limit: Flags.integer({
+    limit: integerFlag({
       description: "Page size (server default 20, max 100).",
       min: 1,
       max: 100,
@@ -60,7 +61,7 @@ export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
       origin: flags.origin,
       live: flags.live,
       limit: flags.limit,
-      page_token: flags["page-token"],
+      page_token: flags.pageToken,
     };
     // One page unless `--all`, as every list does; the walk starts at
     // `--page-token`, and a drain leaves no next page to report.

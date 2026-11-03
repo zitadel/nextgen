@@ -1,12 +1,15 @@
 import type { Placeholders, Refusal } from "./refusal";
 
 /**
- * What a rule reads: the parsed flags and arguments. `json` is among the
- * flags, and is set whenever this run answers in the JSON envelope.
+ * What a rule reads: the parsed flags and arguments, read as code reads them
+ * (`flags.clientId` for `--client-id`), and `argv`, the positional words a
+ * non-strict command takes. `json` is among the flags, and is set whenever
+ * this run answers in the JSON envelope.
  */
 export type RuleView = Readonly<{
   flags: Readonly<Record<string, unknown>>;
   args: Readonly<Record<string, unknown>>;
+  argv: readonly string[];
 }>;
 
 /**
@@ -75,8 +78,14 @@ export function atLeastOne(flags: readonly string[], refusal: Refusal): Rule {
   };
 }
 
-/** Any other rule, as a predicate that is true when the rule is broken. */
-export function refuses(broken: (view: RuleView) => boolean, refusal: Refusal): Rule {
+/**
+ * Any other rule, as a predicate that is true when the rule is broken, or
+ * answers with the values its refusal needs.
+ */
+export function refuses(
+  broken: (view: RuleView) => boolean | Placeholders,
+  refusal: Refusal,
+): Rule {
   return {
     refusal,
     broken,

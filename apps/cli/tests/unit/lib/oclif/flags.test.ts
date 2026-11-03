@@ -132,7 +132,7 @@ describe("a port flag", () => {
   it.each(["0", "65536", "-1", "80.5", "http", ""])("refuses %j", async (value) => {
     await expect(parse("--port", value)).rejects.toMatchObject({
       code: "E_VALIDATION",
-      message: expect.stringContaining(`${value} is not a TCP port`),
+      message: `${value} is not a TCP port`,
       hint: "Use a TCP port from 1 to 65535.",
     });
   });
@@ -142,7 +142,7 @@ describe("an integer flag", () => {
   it("refuses a value under its minimum, with the default wording", async () => {
     await expect(parse("--tail", "0")).rejects.toMatchObject({
       code: "E_VALIDATION",
-      message: expect.stringContaining("0 is not a valid --tail"),
+      message: "0 is not a valid --tail",
       hint: "Use a whole number of 1 or more.",
     });
   });
@@ -155,7 +155,7 @@ describe("an integer flag", () => {
 
   it("words its refusal as it is told, filling the placeholders", async () => {
     await expect(parse("--level", "9")).rejects.toMatchObject({
-      message: expect.stringContaining("9 is not a level"),
+      message: "9 is not a level",
       hint: "Pick 1 to 5 for --level.",
     });
   });

@@ -1,6 +1,4 @@
 import { Flags } from "@oclif/core";
-import type { ZitadelClient } from "../../lib/api-client";
-import { ApiError } from "@zitadel/api/runtime/fetch";
 
 import {
   type Admitted,
@@ -9,7 +7,6 @@ import {
   type JsonEnvelope,
   PREVIEW_CREDENTIAL,
   PreviewCommand,
-  previewFlags,
 } from "../../lib/oclif";
 import {
   buildBundle,
@@ -17,17 +14,17 @@ import {
   createReleaseFromBundle,
   deployMessage,
   headSha,
-  messageFlag,
   runSteps,
   type StepContext,
   validateStep,
   worktreeIsDirty,
 } from "../../lib/release";
-import { detectPreviewUrls } from "../../lib/preview";
-import { ZitadelError } from "../../lib/errors";
-import { reportWarning } from "../../lib/warnings";
-import { ciProvider } from "../../lib/telemetry/dimensions/ci-provider";
-import { envEnabled } from "../../lib/telemetry/dimensions/env-flag";
+import { originFlag } from "./flags/origin";
+import { messageFlag } from "./flags/message";
+import { ttlFlag } from "./flags/ttl";
+import { previewable } from "./requirements/previewable";
+import { previewTargets } from "./requirements/targets";
+import { previewUrls } from "./requirements/urls";
 
 /**
  * `zitadel preview` — publish `.zitadel/` to a pull-request build's preview URLs.
@@ -61,112 +58,45 @@ export default class Preview extends PreviewCommand {
     "<%= config.bin %> preview -m 'add phone_number to human-user'",
   ];
   static override flags = {
-    ...previewFlags,
+    origin: originFlag({
+      description:
+        "A preview URL to deploy to, instead of detecting them from the platform build. Repeatable.",
+      multiple: true,
+    }),
+    ttl: ttlFlag({
+      description:
+        "How long the preview stays live, such as 7d, 12h or 90m. Between 60s and 365d. Defaults to the project's own lifetime.",
+    }),
     message: messageFlag(
       "A short summary of what this release changes. Defaults to the pull request's title or the current commit's subject.",
     ),
-    // Preview-only: `preview list` and `preview rm` share the credential but
-    // have no deploy to make strict, so this lives here, not in `previewFlags`.
     strict: Flags.boolean({
       description: `Fail instead of warning when no preview credential (${CREDENTIALS[PREVIEW_CREDENTIAL]}) is set.`,
     }),
   };
 
-  protected async execute({ flags }: Admitted<typeof Preview>): Promise<JsonEnvelope> {
-    const { cwd, env, isTTY, dryRun } = this.meta;
-    const json = this.jsonEnabled();
-    const color = !json && isTTY && flags.color !== false && !process.env.NO_COLOR;
+  static override requires = {
+    environment: previewable,
+    urls: previewUrls,
+    targets: previewTargets,
+  };
 
-    // Only a preview or development build has anything to preview: a production
-    // (or any other non-preview) build serves the deployed release, published by
-    // `zitadel deploy` after merge. The environment gates this, not `--origin`:
-    // an explicit origin only selects which targets to preview, it never
-    // authorizes a preview deploy into an environment that must not take writes.
-    // A URL given twice is sent once, as the request's unique targets require.
-    const requested = [...new Set(flags.origin ?? [])];
-    // `--ttl` is optional: omitted, nothing is sent and the server applies the
-    // project's default, rather than the CLI pinning a lifetime of its own.
-    const { ttl } = flags;
-
-    const envName = this.environment.name.value;
-    if (envName !== "preview" && envName !== "development") {
-      return this.emit({
-        status: "skipped",
-        reason: "nothing-to-preview",
-        pretty: "nothing to preview — production is deployed by `zitadel deploy`, after merge",
-      });
-    }
-    // `development` by default is a developer's machine. In a CI build it is
-    // only a platform the resolver cannot read (anything but Vercel and
-    // Netlify), which may be a production build, so it must say it is a
-    // preview build rather than be taken for one.
-    if (this.environment.name.source === "default" && runsInCi(env)) {
-      reportWarning(
-        "This CI build names no environment, so the preview is skipped. Set ZITADEL_ENV=preview in the pull-request build that should deploy one.",
-      );
-      return this.emit({
-        status: "skipped",
-        reason: "nothing-to-preview",
-        pretty: "nothing to preview — set ZITADEL_ENV=preview in the pull-request build",
-      });
-    }
-
-    // A fork pull-request build cannot read a secret — one is never exposed to
-    // a fork — so a missing credential is not a build failure: the preview is
-    // skipped and the build carries on (#1312). `--strict` is for a trusted
-    // build that expects it, where a missing one is a misconfiguration worth
-    // failing on. The other credential is never a stand-in, so its presence
-    // does not satisfy this.
-    const credential = CREDENTIALS[PREVIEW_CREDENTIAL];
-    if (this.environment.values[credential] === undefined) {
-      if (flags.strict) {
-        throw new ZitadelError("E_VALIDATION", `${credential} is not set`, {
-          hint: `Set ${credential} for this build, or drop --strict to skip the preview when it is absent.`,
-        });
-      }
-      reportWarning(
-        `No preview credential (${credential}) is set, so the preview is skipped; a fork pull-request build cannot read it. Pass --strict to fail instead.`,
-      );
-      return this.emit({
-        status: "skipped",
-        reason: "no-preview-credential",
-        pretty: `no preview credential (${credential}) — preview skipped`,
-      });
-    }
-
-    // Preview URLs come from `--origin`, else from the platform build variables.
-    const detected = requested.length === 0 ? detectPreviewUrls(env) : undefined;
-    if (detected !== undefined && detected.urls.length === 0) {
-      throw new ZitadelError("E_VALIDATION", "No preview URLs to deploy to", {
-        hint: `Pass --origin, or run inside a pull-request build that sets one of: ${detected.variablesLookedFor.join(", ")}.`,
-      });
-    }
-    const urls = detected === undefined ? requested : [...detected.urls];
-
+  protected async execute({
+    flags,
+    targets: urls,
+  }: Admitted<typeof Preview>): Promise<JsonEnvelope> {
     const { client, projectId } = await this.connect();
 
-    // An exact primary origin is production as surely as the `primary`
-    // keyword is, so it is refused too. The server is the authority on what
-    // the preview token may reach; this catches the mistake before anything
-    // is built, whenever the token can read the project's origins.
-    const primaries = await primaryOrigins(client, projectId);
-    const production = urls.filter((url) => primaries.includes(url));
-    if (production.length > 0) {
-      throw new ZitadelError("E_VALIDATION", `${production.join(", ")} is a primary origin`, {
-        hint: "Pass the preview URLs with --origin; production is deployed by `zitadel deploy`, after merge.",
-      });
-    }
-
-    const { bundle, brandingSources, idpFiles, policyFiles } = await buildBundle(cwd);
+    const { bundle, brandingSources, idpFiles, policyFiles } = await buildBundle(this.cwd);
     const ctx: StepContext = {
-      cwd,
+      cwd: this.cwd,
       client,
       projectId,
-      env,
+      env: this.env,
       mode: "preview",
-      dryRun,
-      json,
-      color,
+      dryRun: this.dryRun,
+      json: this.isJson,
+      color: this.isColored,
       bundle,
       brandingSources,
       idpFiles,
@@ -182,7 +112,7 @@ export default class Preview extends PreviewCommand {
     // A dry run validates and resolves the targets but writes nothing — no
     // release, no deployment, no preview registration — so a pull-request build
     // can check its `.zitadel/` without publishing, as `deploy --dry-run` does.
-    if (dryRun) {
+    if (this.dryRun) {
       return this.emit({
         status: "ok",
         data: {
@@ -198,19 +128,19 @@ export default class Preview extends PreviewCommand {
 
     // The release keeps the message of whichever run built it first, usually
     // this one, so the deploy after merge reuses it rather than adding its own.
-    const message = await deployMessage(flags.message, cwd, env);
+    const message = await deployMessage(flags.message, this.cwd, this.env);
     const release = await createReleaseFromBundle(client, projectId, bundle, {
       message,
-      gitSha: await headSha(cwd),
-      gitDirty: await worktreeIsDirty(cwd),
+      gitSha: await headSha(this.cwd),
+      gitDirty: await worktreeIsDirty(this.cwd),
     });
     const deployment = await createDeployment(client, projectId, {
       releaseId: release.id,
-      targets: urls,
+      targets: [...urls],
       message,
       // The wire takes an ISO-8601 duration; `--ttl` keeps the `7d`/`12h`
       // spelling a person writes (create-deployment-request.yaml).
-      ...(ttl === undefined ? {} : { ttl: ttl.iso }),
+      ...(flags.ttl === undefined ? {} : { ttl: flags.ttl.iso }),
     });
 
     const previews = deployment.targets.map((target) => ({
@@ -237,37 +167,4 @@ export default class Preview extends PreviewCommand {
       ].join("\n"),
     });
   }
-}
-
-/**
- * The project's primary origins, or none when the preview token may not read
- * the project (403): the server then decides alone what the token can deploy
- * to. A 401 is a token the server does not accept at all, which fails here
- * rather than after the whole bundle is built.
- */
-async function primaryOrigins(client: ZitadelClient, projectId: string): Promise<string[]> {
-  try {
-    const project = await client.getProject(projectId);
-    const origins = project.origins;
-    return origins.filter((entry) => entry.kind === "primary").map((entry) => entry.pattern);
-  } catch (error) {
-    if (error instanceof ApiError && error.status === 403) {
-      return [];
-    }
-    throw error;
-  }
-}
-
-/**
- * Whether this runs in a CI build: the providers the CLI already recognises
- * (`CI`, or a provider's own marker such as Jenkins' `JENKINS_URL`), plus the
- * builds that set neither: Cloudflare Pages, Azure Pipelines and AWS CodeBuild.
- */
-function runsInCi(env: NodeJS.ProcessEnv): boolean {
-  return (
-    ciProvider.value(env) !== undefined ||
-    env.CF_PAGES === "1" ||
-    envEnabled(env.TF_BUILD) ||
-    envEnabled(env.CODEBUILD_BUILD_ID)
-  );
 }

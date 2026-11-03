@@ -7,6 +7,7 @@ import {
   type JsonEnvelope,
 } from "../../lib/oclif";
 import { createDeployment } from "../../lib/release";
+import { messageFlag } from "./flags/message";
 
 /**
  * `zitadel deployment create --release <id>` — make an existing release live.
@@ -24,7 +25,7 @@ export default class DeploymentCreate extends EnvironmentCommand {
   ];
   static override flags = {
     release: Flags.string({ description: "The release id to deploy.", required: true }),
-    message: Flags.string({ char: "m", description: "A short summary of why this deploys." }),
+    message: messageFlag("A short summary of why this deploys."),
   };
 
   protected async execute({ flags }: Admitted<typeof DeploymentCreate>): Promise<JsonEnvelope> {
@@ -34,7 +35,7 @@ export default class DeploymentCreate extends EnvironmentCommand {
     // order `origin add`/`deploy` use, which keeps the no-mutation promise
     // literal: deploying an existing release writes a deployment record, and a
     // dry run must write none.
-    if (this.meta.dryRun) {
+    if (this.dryRun) {
       return this.emit({
         status: "ok",
         data: { dry_run: true, release_id: flags.release, targets },

@@ -15,8 +15,13 @@ import {
   fieldExample,
   flagsAloneMayBeIncomplete,
 } from "../../../../../src/lib/oclif/crud";
+import { named } from "../../../../../src/lib/oclif/names";
 
 type Described = Parameters<typeof describeBody>;
+
+/** Flags as a command reads them, which is what the body is built from. */
+const asRead = (flags: Record<string, unknown>): Record<string, unknown> =>
+  Object.fromEntries(Object.entries(flags).map(([name, value]) => [named(name), value]));
 
 const byName = (...args: Described) =>
   Object.fromEntries(describeBody(...args).map((field) => [field.name, field]));
@@ -244,26 +249,32 @@ describe("bodyFromFlags", () => {
         );
       }
     }
-    return bodyFromFlags(fields, parsed);
+    return bodyFromFlags(fields, asRead(parsed));
   };
 
   it("collects scalar and enum flags under their wire names", () => {
     expect(
-      bodyFromFlags(grantFields, {
-        relation: "viewer",
-        "expires-at": "2030-01-01T00:00:00Z",
-      }),
+      bodyFromFlags(
+        grantFields,
+        asRead({
+          relation: "viewer",
+          "expires-at": "2030-01-01T00:00:00Z",
+        }),
+      ),
     ).toEqual({ relation: "viewer", expires_at: "2030-01-01T00:00:00Z" });
   });
 
   it("nests a nested field's value at its path", () => {
     expect(
-      bodyFromFlags(describeBody(CreateIdpBody, { root: "idp" }), {
-        slug: "acme",
-        "oidc-issuer": "https://sso.acme.example",
-        "oidc-scopes": ["openid", "email"],
-        "oidc-pkce-enabled": false,
-      }),
+      bodyFromFlags(
+        describeBody(CreateIdpBody, { root: "idp" }),
+        asRead({
+          slug: "acme",
+          "oidc-issuer": "https://sso.acme.example",
+          "oidc-scopes": ["openid", "email"],
+          "oidc-pkce-enabled": false,
+        }),
+      ),
     ).toEqual({
       slug: "acme",
       oidc: {

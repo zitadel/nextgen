@@ -4,6 +4,7 @@ import { Flags } from "@oclif/core";
 import {
   type Admitted,
   CommandGroups,
+  integerFlag,
   type JsonEnvelope,
   nonBlankString,
   PreviewCommand,
@@ -32,7 +33,7 @@ export default class PreviewList extends Tabulatable(PreviewCommand) {
     "<%= config.bin %> preview list --plain",
   ];
   static override flags = {
-    limit: Flags.integer({
+    limit: integerFlag({
       description: "Page size (server default 20, max 100).",
       min: 1,
       max: 100,
@@ -53,7 +54,7 @@ export default class PreviewList extends Tabulatable(PreviewCommand) {
 
     const params = {
       limit: flags.limit,
-      page_token: flags["page-token"],
+      page_token: flags.pageToken,
     };
     // One page unless `--all`, as every list does; the walk starts at
     // `--page-token`, and a drain leaves no next page to report.

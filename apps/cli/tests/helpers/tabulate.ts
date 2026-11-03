@@ -13,7 +13,7 @@ class Unscoped extends Tabulatable(BaseCommand) {
     } as unknown as Config);
   }
 
-  async run() {
+  protected async execute() {
     return this.emit({ status: "ok", data: {} });
   }
 

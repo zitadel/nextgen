@@ -13,10 +13,8 @@ export {
   PreviewCommand,
 } from "./environment-command";
 export { CREDENTIALS, type CredentialKind } from "./credentials";
-export { AuthMethodCommand, type Permit } from "./auth-method-command";
 export { CommandGroups, type CommandGroup } from "./groups";
 export { integerFlag, nonBlankArg, nonBlankString, portFlag } from "./flags";
-export { previewFlags } from "./environment-flags";
 export type {
   CommandResult,
   ConnectOptions,

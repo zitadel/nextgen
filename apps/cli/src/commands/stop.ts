@@ -3,7 +3,7 @@ import { Flags } from "@oclif/core";
 import { localContainerName } from "../lib/local-server/runtime";
 import { LocalServer } from "../lib/local-server/server";
 import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
-import { recordedRuntime } from "../lib/oclif/requires/local-runtime";
+import { recordedRuntime } from "./local-server/requirements/recorded-runtime";
 
 export default class Stop extends BaseCommand {
   static override description = "Stop the local Zitadel server.";
@@ -31,8 +31,8 @@ export default class Stop extends BaseCommand {
     }
 
     const containerName =
-      runtime?.backend === "docker" ? runtime.container_name : localContainerName(this.meta.cwd);
-    if (this.meta.dryRun) {
+      runtime?.backend === "docker" ? runtime.container_name : localContainerName(this.cwd);
+    if (this.dryRun) {
       return this.emit({
         status: "ok",
         data: {
@@ -50,8 +50,8 @@ export default class Stop extends BaseCommand {
       });
     }
 
-    const { stopped, outcome } = await LocalServer.at(this.meta.cwd, {
-      cliVersion: this.meta.cliVersion,
+    const { stopped, outcome } = await LocalServer.at(this.cwd, {
+      cliVersion: this.cliVersion,
     }).stop();
 
     return this.emit({

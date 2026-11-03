@@ -25,10 +25,9 @@ export default class EnvList extends Tabulatable(EnvironmentCommand) {
   };
 
   protected async execute({ flags }: Admitted<typeof EnvList>): Promise<JsonEnvelope> {
-    const { cwd, env } = this.meta;
     const { name, values } = this.environment;
 
-    const bound = await readBoundEnvironments(cwd);
+    const bound = await readBoundEnvironments(this.cwd);
     const items = [
       ...bound.map((entry) => ({
         name: entry.name,
@@ -36,13 +35,13 @@ export default class EnvList extends Tabulatable(EnvironmentCommand) {
         server: entry.values.ZITADEL_URL ?? "",
         project_id: entry.values.ZITADEL_PROJECT_ID ?? "",
       })),
-      ...(env.ZITADEL_PROJECT_ID
+      ...(this.env.ZITADEL_PROJECT_ID
         ? [
             {
               name: name.value,
               source: "process environment",
-              server: env.ZITADEL_URL ?? "",
-              project_id: env.ZITADEL_PROJECT_ID,
+              server: this.env.ZITADEL_URL ?? "",
+              project_id: this.env.ZITADEL_PROJECT_ID,
             },
           ]
         : []),

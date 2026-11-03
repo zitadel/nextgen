@@ -18,16 +18,27 @@ const commandsDir = join(import.meta.dirname, "../../../../src/commands/variable
 
 /** The dimension names each command passes to `recordTelemetry`. */
 async function recordedDimensions(): Promise<Map<string, string[]>> {
-  const files = (await readdir(commandsDir)).filter((name) => name.endsWith(".ts"));
+  // A command with flags, rules or requirements of its own is a directory, so
+  // its body is the `index.ts` inside it.
   const entries = await Promise.all(
-    files.map(async (file) => {
-      const source = await readFile(join(commandsDir, file), "utf8");
-      const calls = [...source.matchAll(/recordTelemetry\(\{([^}]*)\}/gs)];
-      const keys = calls.flatMap((call) =>
-        [...(call[1] ?? "").matchAll(/(\w+)\s*:/g)].map((key) => key[1] as string),
-      );
-      return [file, keys] as const;
-    }),
+    (await readdir(commandsDir, { withFileTypes: true }))
+      .filter((entry) => {
+        return entry.isDirectory() || entry.name.endsWith(".ts");
+      })
+      .map((entry) => {
+        return entry.isDirectory() ? `${entry.name}.ts` : entry.name;
+      })
+      .map(async (file) => {
+        const body = file.replace(/\.ts$/, "");
+        const source = await readFile(join(commandsDir, file), "utf8").catch(() => {
+          return readFile(join(commandsDir, body, "index.ts"), "utf8");
+        });
+        const calls = [...source.matchAll(/recordTelemetry\(\{([^}]*)\}/gs)];
+        const keys = calls.flatMap((call) =>
+          [...(call[1] ?? "").matchAll(/(\w+)\s*:/g)].map((key) => key[1] as string),
+        );
+        return [file, keys] as const;
+      }),
   );
   return new Map(entries);
 }

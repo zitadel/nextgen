@@ -4,6 +4,8 @@ import { createZitadelClient } from "../api-client";
 import { type Environment, requireValueInteractive, resolveEnvironment } from "../environment";
 import { resolveCwd } from "../paths";
 import { BaseCommand, type MetaOptions } from "./base";
+import { byName } from "./names";
+import { excludes, type Rule } from "./rules";
 import { CREDENTIALS, type CredentialKind } from "./credentials";
 import {
   ENVIRONMENT_SELECTOR_OPTIONS,
@@ -30,6 +32,13 @@ import { Cmd } from "../cmd";
 export abstract class EnvironmentCommand extends BaseCommand {
   static override baseFlags = { ...BaseCommand.baseFlags, ...environmentFlags };
 
+  static override rules: readonly Rule[] = [
+    excludes("env", "env-file", {
+      message: "--env and --env-file cannot be used together",
+      hint: "--env picks the .env.<name>.local files; --env-file names one file outright.",
+    }),
+  ];
+
   static credential: CredentialKind = "project";
 
   private readonly connections = new Map<string, Promise<Connection>>();
@@ -50,25 +59,26 @@ export abstract class EnvironmentCommand extends BaseCommand {
    * local runtime metadata `status --server local` reads).
    */
   protected override async toMeta(
-    flags: Record<string, unknown>,
+    given: Record<string, unknown>,
     options: MetaOptions = {},
   ): Promise<GlobalOptions> {
+    const flags = byName(given);
     const text = (value: unknown): string | undefined =>
       typeof value === "string" ? value : undefined;
     this.cwdFlag = text(flags.cwd);
     // A command that only edits files in the project directory resolves none:
     // a stray ZITADEL_ENV must not stop it, and it names no server or project.
     if (options.environment === false) {
-      return super.toMeta(flags, { resolveServer: options.resolveServer, source: options.source });
+      return super.toMeta(given, { resolveServer: options.resolveServer, source: options.source });
     }
     this.environment = await resolveEnvironment({
       cwd: resolveCwd(text(flags.cwd)),
       env: process.env,
       serverFlag: options.source ?? text(flags.server),
       envName: text(flags.env),
-      envFile: text(flags["env-file"]),
+      envFile: text(flags.envFile),
     });
-    return super.toMeta(flags, {
+    return super.toMeta(given, {
       resolveServer: false,
       source: this.environment.values.ZITADEL_URL?.value ?? "",
     });
@@ -170,6 +180,13 @@ export abstract class EnvironmentCommand extends BaseCommand {
     const open = this.connections.get(key) ?? this.openConnection(options);
     this.connections.set(key, open);
     return open;
+  }
+
+  protected override suggestRefusal(command: string): SuggestedCommand {
+    if ((this.environment as Environment | undefined) === undefined) {
+      return super.suggestRefusal(command);
+    }
+    return this.suggest(command);
   }
 
   protected override connectionForRequirement(options: ConnectOptions): Promise<Connection> {

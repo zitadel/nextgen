@@ -11,12 +11,19 @@ import {
   ResourceCommand,
 } from "./command";
 
+type ReadInput = OperationInput<
+  Readonly<{
+    fields?: readonly string[];
+  }>,
+  Record<string, string>
+>;
+
 /**
  * `<topic> get <id>`. A terminal gets the record laid out field by field,
  * headed by whatever identifies it; a pipe (and `--json`) gets the object
  * itself, because a script wants the record rather than a view of it.
  */
-export class GetOperation<Ctx> extends ResourceCommand<Ctx, GetSpec<Ctx>> {
+export class GetOperation<Ctx> extends ResourceCommand<Ctx, GetSpec<Ctx>, ReadInput> {
   static describe<Ctx>({
     topic,
     resource,
@@ -43,21 +50,16 @@ export class GetOperation<Ctx> extends ResourceCommand<Ctx, GetSpec<Ctx>> {
     };
   }
 
-  protected override async operate({ flags, args }: OperationInput): Promise<CommandResult> {
+  protected override async operate({ flags, args }: ReadInput): Promise<CommandResult> {
     const { resource, spec } = this.definition;
     const shape = fieldPaths(spec.response);
     const item = await spec.call(await this.context(), idValue(resource, args));
-    const fields = chosenColumns(
-      flags.fields as readonly string[] | undefined,
-      resource.detail ?? resource.columns,
-      [item],
-      shape,
-    );
+    const fields = chosenColumns(flags.fields, resource.detail ?? resource.columns, [item], shape);
     if (!process.stdout.isTTY) {
       return { status: "ok", data: item, pretty: JSON.stringify(item, null, 2) };
     }
     const sections =
-      flags.fields === undefined && !this.jsonEnabled()
+      flags.fields === undefined && !this.isJson
         ? ((await spec.sections?.(item, (columns, rows) => this.tabulate(columns, rows))) ?? [])
         : [];
     return {

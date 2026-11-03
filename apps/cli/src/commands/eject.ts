@@ -256,7 +256,6 @@ export default class Eject extends Destructive(BaseCommand) {
   };
 
   protected async execute({ flags }: Admitted<typeof Eject>): Promise<JsonEnvelope> {
-    const { cwd } = this.meta;
     const dir = typeof flags.cwd === "string" ? flags.cwd : undefined;
 
     return this.emit(
@@ -264,8 +263,8 @@ export default class Eject extends Destructive(BaseCommand) {
         verb: "eject",
         name: "remove the managed files and local state",
         message: "Remove the managed files and local Zitadel state?",
-        preview: async () => ejected(cwd, await ejectProject(cwd, "plan"), dir),
-        apply: async (consent) => ejected(cwd, await ejectProject(cwd, consent), dir),
+        preview: async () => ejected(this.cwd, await ejectProject(this.cwd, "plan"), dir),
+        apply: async (consent) => ejected(this.cwd, await ejectProject(this.cwd, consent), dir),
       }),
     );
   }

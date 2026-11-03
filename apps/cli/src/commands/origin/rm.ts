@@ -27,7 +27,10 @@ export default class OriginRm extends Destructive(EnvironmentCommand) {
     "<%= config.bin %> origin rm https://app.acme.com --force",
   ];
   static override args = {
-    pattern: nonBlankArg({ required: true, description: "The origin pattern to remove." }),
+    pattern: nonBlankArg({
+      required: true,
+      description: "The origin pattern to remove.",
+    }),
   };
   static override flags = {
     // `--force` is per command, not global: here it permits a removal.
@@ -39,20 +42,18 @@ export default class OriginRm extends Destructive(EnvironmentCommand) {
   };
 
   protected async execute({ args }: Admitted<typeof OriginRm>): Promise<JsonEnvelope> {
-    const pattern = args.pattern;
-
     return this.emit(
       await this.confirmed({
         verb: "remove",
-        name: `remove ${pattern} from the project`,
-        message: `Remove ${pattern} from the project?`,
+        name: `remove ${args.pattern} from the project`,
+        message: `Remove ${args.pattern} from the project?`,
         preview: () => {
-          const result = dryRunResult("remove", "origin", pattern);
+          const result = dryRunResult("remove", "origin", args.pattern);
           return { ...result, pretty: `${result.pretty} from the project` };
         },
         prepare: () => this.connect(),
         apply: async (consent, { client, projectId }) => {
-          await consent.unlock(client).removeOrigin(projectId, { pattern });
+          await consent.unlock(client).removeOrigin(projectId, { pattern: args.pattern });
           // An empty list admits every origin, so removing the last pattern opens the
           // project up rather than closing it: said aloud, since it is the opposite
           // of what removing one pattern otherwise does.
@@ -62,7 +63,7 @@ export default class OriginRm extends Destructive(EnvironmentCommand) {
             (project) => project.origins,
             (error: unknown) => {
               reportWarning(
-                `${pattern} was removed, but the project's remaining origins could not be read: ${errorMessage(error)}`,
+                `${args.pattern} was removed, but the project's remaining origins could not be read: ${errorMessage(error)}`,
               );
               return undefined;
             },
@@ -72,17 +73,17 @@ export default class OriginRm extends Destructive(EnvironmentCommand) {
               // Named in the text, not as a next command: the URL is the developer's
               // to fill in, and a `<url>` placeholder is a shell redirection. The
               // selector keeps it on the environment that was just opened up.
-              `${pattern} was the project's last origin, so the project now admits every origin. Add the ones it should admit with \`zitadel origin add <url> --kind primary${this.environmentSelector()}\`.`,
+              `${args.pattern} was the project's last origin, so the project now admits every origin. Add the ones it should admit with \`zitadel origin add <url> --kind primary${this.environmentSelector()}\`.`,
             );
           }
 
           return {
             status: "ok",
-            data: deletedData({ pattern }),
+            data: deletedData({ pattern: args.pattern }),
             pretty:
               remaining?.length === 0
-                ? `Removed ${pattern}; the project has no origins left and admits every origin`
-                : `Removed ${pattern} from the project's origins`,
+                ? `Removed ${args.pattern}; the project has no origins left and admits every origin`
+                : `Removed ${args.pattern} from the project's origins`,
           };
         },
       }),

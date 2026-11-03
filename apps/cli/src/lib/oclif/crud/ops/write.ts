@@ -1,7 +1,8 @@
 import { nonBlankString } from "../../flags";
+import { named } from "../../names";
 
 import { refuses } from "../../rules";
-import { resourceBody } from "../../requires/crud";
+import { resourceBody } from "../resource-body";
 import type { CommandResult } from "../../types";
 import {
   type BodyField,
@@ -127,29 +128,33 @@ const describeWrite = <
 };
 
 const givesBody = (flags: Json, fields: readonly BodyField[]): boolean => {
-  const set = flags.set;
   return (
     flags.data !== undefined ||
     flags.file !== undefined ||
-    (Array.isArray(set) && set.length > 0) ||
-    fields.some((field) => field.flag !== undefined && flags[field.flag] !== undefined)
+    (Array.isArray(flags.set) && flags.set.length > 0) ||
+    fields.some((field) => field.flag !== undefined && flags[named(field.flag)] !== undefined)
   );
 };
+
+type WriteInput = OperationInput<
+  Json,
+  Record<string, string>,
+  Readonly<{
+    body: Json;
+  }>
+>;
 
 abstract class WriteOperation<
   Ctx,
   Spec extends WriteShape & { readonly schema: CreateSpec<Ctx>["schema"] },
-> extends ResourceCommand<Ctx, Spec> {
+> extends ResourceCommand<Ctx, Spec, WriteInput> {
   protected abstract verb: "create" | "update";
 
-  protected override async operate({
-    args,
-    body,
-  }: OperationInput & Readonly<{ body: Json }>): Promise<CommandResult> {
+  protected override async operate({ args, body }: WriteInput): Promise<CommandResult> {
     const { topic, resource, spec, options } = this.definition;
-    const idKey = idName(resource);
+    const idKey = named(idName(resource));
     const id = typeof args[idKey] === "string" ? (args[idKey] as string) : undefined;
-    if (this.meta.dryRun) {
+    if (this.dryRun) {
       return dryRunResult(this.verb, topic, id, body, {
         schema: spec.schema as ZodLike,
         references: options.references,

@@ -81,6 +81,10 @@ export type GlobalOptions = {
   debug: boolean;
   env: NodeJS.ProcessEnv;
   isTTY: boolean;
+  /** Whether human output is coloured; the one decision, see `./base`. */
+  colored: boolean;
+  /** Whether the run answers in the JSON envelope. */
+  json: boolean;
 };
 
 /**

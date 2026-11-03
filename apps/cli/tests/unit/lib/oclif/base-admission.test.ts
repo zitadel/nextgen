@@ -140,9 +140,14 @@ describe("what a rule and a requirement can work out for their refusal", () => {
       };
 
       static override rules = [
-        refuses(() => ({ problem: "it is wrong" }), {
-          message: "Not valid: {problem}",
-        }),
+        refuses(
+          () => {
+            return { problem: "it is wrong" };
+          },
+          {
+            message: "Not valid: {problem}",
+          },
+        ),
       ];
 
       protected async execute(): Promise<JsonEnvelope> {

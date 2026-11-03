@@ -31,9 +31,9 @@ import {
   CommandGroups,
   type JsonEnvelope,
   nonBlankString,
-  portFlag,
 } from "../../lib/oclif";
-import { doctorTarget } from "../../lib/oclif/requires/doctor-target";
+import { portFlag } from "../local-server/flags/port";
+import { target } from "./requirements/target";
 import { Destructive } from "../../lib/oclif/destructive";
 import { isRefusal } from "../../lib/consent";
 import { reportWarning } from "../../lib/warnings";
@@ -116,29 +116,29 @@ export default class Doctor extends Destructive(BaseCommand) {
   };
 
   static override requires = {
-    target: doctorTarget,
+    target: target,
   };
 
   protected async execute({ flags, target }: Admitted<typeof Doctor>): Promise<JsonEnvelope> {
     const { port, hostedServer } = target;
-    const { cwd, dryRun } = this.meta;
-    const nearest = await readNearestRuntimeMetadata(cwd);
+    const nearest = await readNearestRuntimeMetadata(this.cwd);
     const existingRuntime = nearest?.runtime;
-    const parentRuntimeDir = nearest !== undefined && nearest.dir !== cwd ? nearest.dir : undefined;
+    const parentRuntimeDir =
+      nearest !== undefined && nearest.dir !== this.cwd ? nearest.dir : undefined;
     const runtimeBackend = resolveRuntimeBackend({
       runtime: flags.runtime,
       image: flags.image,
-      envImage: this.meta.env.ZITADEL_LOCAL_IMAGE,
+      envImage: this.env.ZITADEL_LOCAL_IMAGE,
       existingRuntime,
     });
     const image =
       flags.image ??
-      this.meta.env.ZITADEL_LOCAL_IMAGE ??
-      defaultLocalServerImageForCliVersion(this.meta.cliVersion);
+      this.env.ZITADEL_LOCAL_IMAGE ??
+      defaultLocalServerImageForCliVersion(this.cliVersion);
     const runtimeChecks =
       hostedServer === undefined
         ? await runLocalRuntimeChecks(
-            nearest?.dir ?? cwd,
+            nearest?.dir ?? this.cwd,
             existingRuntime,
             runtimeBackend,
             image,
@@ -147,12 +147,12 @@ export default class Doctor extends Destructive(BaseCommand) {
             parentRuntimeDir,
           )
         : [];
-    const hasConfig = await hasZitadelConfig(cwd);
+    const hasConfig = await hasZitadelConfig(this.cwd);
     const ctx: CheckContext = {
-      cwd,
+      cwd: this.cwd,
       orca: createOrca(),
-      cliVersion: this.meta.cliVersion,
-      dryRun,
+      cliVersion: this.cliVersion,
+      dryRun: this.dryRun,
       signal: this.signal,
       consent: (gate) => this.consent(gate),
     };
@@ -187,11 +187,11 @@ export default class Doctor extends Destructive(BaseCommand) {
       ? await Promise.all(SANITY_CHECKS.map((check) => check.run(ctx)))
       : [];
     const environmentChecks = await runEnvironmentChecks({
-      cwd,
-      env: this.meta.env,
-      envName: typeof flags.env === "string" ? flags.env : undefined,
-      envFile: typeof flags["env-file"] === "string" ? flags["env-file"] : undefined,
-      serverFlag: typeof flags.server === "string" ? flags.server : undefined,
+      cwd: this.cwd,
+      env: this.env,
+      envName: flags.env,
+      envFile: flags.envFile,
+      serverFlag: flags.server,
       signal: this.signal,
     });
     const checks = [...runtimeChecks, ...projectChecks, ...environmentChecks];
@@ -200,13 +200,13 @@ export default class Doctor extends Destructive(BaseCommand) {
     // `doctor` is not an EnvironmentCommand but honours --env/--env-file/--server
     // to check a chosen environment, so a suggested rerun of a failed check has
     // to carry that same selection or it would check the default project.
-    const cwdFlag = typeof flags.cwd === "string" ? flags.cwd : undefined;
-    const serverFlag = typeof flags.server === "string" ? flags.server : undefined;
+    const cwdFlag = flags.cwd;
+    const serverFlag = flags.server;
     const selector = environmentSelectorSuffix({
-      cwd: cwdFlag,
-      envFile: typeof flags["env-file"] === "string" ? flags["env-file"] : undefined,
-      envName: typeof flags.env === "string" ? flags.env : undefined,
-      server: typeof flags.server === "string" ? flags.server : undefined,
+      cwd: flags.cwd,
+      envFile: flags.envFile,
+      envName: flags.env,
+      server: flags.server,
     });
     // The claim check reads the local `.zitadel/secret`, which is setup's
     // project, so a claim is suggested only pinned to the file setup wrote for
@@ -216,22 +216,22 @@ export default class Doctor extends Destructive(BaseCommand) {
     // names that very project nothing a command can carry selects it, so the
     // advice says so instead. The server is the project's own, from
     // `zitadel.json` where the claim check read it, not this run's `--server`.
-    const projectId = await secretProjectId(cwd);
+    const projectId = await secretProjectId(this.cwd);
     // A `zitadel.json` that does not parse is the config check's to report,
     // not a reason for doctor itself to fail before it reports anything.
     const projectServer = hasConfig
-      ? await readZitadelConfig(cwd).then(readProjectServer, () => serverFlag)
+      ? await readZitadelConfig(this.cwd).then(readProjectServer, () => serverFlag)
       : serverFlag;
     // A bare claim resolves as this shell does, so it is offered unpinned only
     // when that resolution lands on the very project the check read.
     const bareResolves =
       projectId !== undefined &&
-      (await resolveEnvironment({ cwd, env: this.meta.env }).then(
+      (await resolveEnvironment({ cwd: this.cwd, env: this.env }).then(
         (environment) => environment.values.ZITADEL_PROJECT_ID?.value === projectId,
         () => false,
       ));
     const claimSelector = (await namesProject(
-      join(cwd, ".env.development.local"),
+      join(this.cwd, ".env.development.local"),
       Promise.resolve(projectId),
     ))
       ? environmentSelectorSuffix({
@@ -242,12 +242,7 @@ export default class Doctor extends Destructive(BaseCommand) {
       : bareResolves
         ? environmentSelectorSuffix({ cwd: cwdFlag, server: projectServer })
         : undefined;
-    const warningAdvice = advisoryForWarnings(
-      warnings,
-      this.meta.cliVersion,
-      claimSelector,
-      selector,
-    );
+    const warningAdvice = advisoryForWarnings(warnings, this.cliVersion, claimSelector, selector);
     // A server that is running is one a sign-in or a request can fail
     // against, and its log is where the reason is.
     const serving =
@@ -255,7 +250,7 @@ export default class Doctor extends Destructive(BaseCommand) {
       runtimeChecks.find((check) => check.name === "runtime")?.status === "pass";
     const nextActions = [
       ...(warningAdvice?.nextActions ?? []),
-      ...(serving ? [serverLogAction(this.meta.cliVersion)] : []),
+      ...(serving ? [serverLogAction(this.cliVersion)] : []),
     ];
     this.recordTelemetry({
       runtime: runtimeBackend,
@@ -290,7 +285,7 @@ export default class Doctor extends Destructive(BaseCommand) {
         failed,
         image,
         port,
-        this.meta.cliVersion,
+        this.cliVersion,
         selector,
         parentRuntimeDir,
         cwdFlag,

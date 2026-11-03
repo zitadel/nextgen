@@ -1,7 +1,8 @@
 import { Args, Flags } from "@oclif/core";
 
 import { ZitadelError } from "../errors";
-import { interpolate, type Refusal } from "./refusal";
+import { parseServer } from "../server";
+import { interpolate, type Refusal, refusalError } from "./refusal";
 
 /**
  * Refuse a value that is present but holds nothing.
@@ -16,7 +17,9 @@ import { interpolate, type Refusal } from "./refusal";
  *
  * Refusing during parse rather than in each command puts it at the same point
  * oclif's own refusal lands, so both spellings of a missing value fail the same
- * way, and the value that reaches `run` is already trimmed.
+ * way, and the value that reaches the command is already trimmed. The refusal
+ * names what was empty itself: `BaseCommand` puts back the message a flag's
+ * `parse` raised, so a refusal reads the same wherever it came from.
  */
 export function refuseBlank(input: string, label: string, message: string): string {
   const value = input.trim();
@@ -37,17 +40,16 @@ export function refuseBlank(input: string, label: string, message: string): stri
  * plain `Flags.string`.
  */
 export const nonBlankString = Flags.custom<string>({
-  // oclif prefixes a flag's parse failure with "Parsing --<name>", so the
-  // message must not name it again.
-  parse: async (input, _command, flag) =>
-    refuseBlank(input, `--${flag.name}`, "the value is empty"),
+  parse: async (input, _command, flag) => {
+    return refuseBlank(input, `--${flag.name}`, `--${flag.name} was given an empty value`);
+  },
 });
 
 /** A positional argument whose value must not be blank. See {@link refuseBlank}. */
 export const nonBlankArg = Args.custom<string>({
-  // An argument's failure carries no such prefix, so this one names itself.
-  parse: async (input, _command, arg) =>
-    refuseBlank(input, arg.name, `${arg.name} was given an empty value`),
+  parse: async (input, _command, arg) => {
+    return refuseBlank(input, arg.name, `${arg.name} was given an empty value`);
+  },
 });
 
 /** The whole numbers an integer flag accepts, and how it refuses the rest. */
@@ -118,4 +120,29 @@ const PORT_RULES: IntegerRules = {
 /** An integer flag that holds a TCP port. */
 export const portFlag = Flags.custom<number>({
   parse: async (input, _command, flag) => parseInteger(input, { ...PORT_RULES, name: flag.name }),
+});
+
+/**
+ * The flag that names the server a command is about: `local`, or an http(s)
+ * URL. It keeps what was typed, since a suggested retry repeats it.
+ */
+export const serverFlag = Flags.custom<string>({
+  parse: async (input) => {
+    if (input === "local") {
+      return input;
+    }
+    const parsed = parseServer(input);
+    if (!parsed.ok) {
+      throw refusalError(
+        {
+          message: "{problem}",
+          hint: "Use `local`, or a URL like https://acme.zitadel.cloud.",
+        },
+        {
+          problem: parsed.problem,
+        },
+      );
+    }
+    return input;
+  },
 });

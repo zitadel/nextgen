@@ -25,8 +25,10 @@ import {
   type JsonEnvelope,
   nonBlankString,
 } from "../../lib/oclif";
-import { brandingDesignRules, requestedBrandingDesign } from "../../lib/oclif/inputs/branding";
-import { zitadelProject } from "../../lib/oclif/requires/zitadel-project";
+import { design } from "./requirements/design";
+import { project } from "./requirements/project";
+import { retiredDesignRule } from "./rules/retired-design";
+import { unknownDesignRule } from "./rules/unknown-design";
 import { metaSchemaState, projectMetaSchemas } from "../../lib/meta-schemas";
 import { normalizePublicCliProse } from "../../lib/public-cli";
 import { DEPLOY_ARGS } from "../../lib/release";
@@ -62,23 +64,21 @@ export default class BrandingEject extends Promptable(BaseCommand) {
     resolveServer: false,
   };
 
-  static override rules = brandingDesignRules;
+  static override rules = [retiredDesignRule, unknownDesignRule];
 
   static override requires = {
-    requested: requestedBrandingDesign,
-    project: zitadelProject,
+    requested: design,
+    project: project,
   };
 
   protected async execute({ requested }: Admitted<typeof BrandingEject>): Promise<JsonEnvelope> {
-    const { cwd, force, nonInteractive } = this.meta;
-
-    const design = requested.design ?? (await this.promptDesign(nonInteractive));
-    this.recordTelemetry({ design, force });
+    const design = requested.design ?? (await this.promptDesign(this.nonInteractive));
+    this.recordTelemetry({ design, force: this.force });
     const { branding, template } = getDefaultBrandingConfig(design);
 
     const filesWritten: string[] = [];
     const write = async (relPath: string, content: string, overwrite: boolean): Promise<void> => {
-      const dest = join(cwd, relPath);
+      const dest = join(this.cwd, relPath);
       await mkdir(dirname(dest), { recursive: true });
       try {
         await writeFile(dest, content, overwrite ? undefined : { flag: "wx" });
@@ -96,25 +96,25 @@ export default class BrandingEject extends Promptable(BaseCommand) {
     await write(
       DEFAULT_BRANDING_CONFIG_PATH,
       `${stableStringify({ $schema: BRANDING_FILE_SCHEMA_REF, ...branding })}\n`,
-      force,
+      this.force,
     );
-    await write(DEFAULT_BRANDING_TEMPLATE_PATH, template, force);
+    await write(DEFAULT_BRANDING_TEMPLATE_PATH, template, this.force);
 
     // Never overwrite a hand-edited README.
     await write(
       join(BRANDING_DIR, "README.md"),
-      normalizePublicCliProse(brandingReadmeContent(), this.meta.cliVersion),
+      normalizePublicCliProse(brandingReadmeContent(), this.cliVersion),
       false,
     ).catch(swallowConflict);
     // The descriptor's `$schema` must resolve to the dialect it was written
     // in, so the CLI-owned meta-schema is written when missing or outdated,
     // as `doctor --fix` does; one that cannot be read, or sits behind a
     // symlink, is doctor's to report.
-    const brandingMeta = projectMetaSchemas(this.meta.cliVersion).find(
+    const brandingMeta = projectMetaSchemas(this.cliVersion).find(
       (file) => file.path === `${META_SCHEMA_DIR}/branding.json`,
     );
     if (brandingMeta) {
-      const state = await metaSchemaState(cwd, brandingMeta).catch(() => "current" as const);
+      const state = await metaSchemaState(this.cwd, brandingMeta).catch(() => "current" as const);
       if (state === "missing" || state === "outdated") {
         await write(brandingMeta.path, brandingMeta.contents, true);
       }

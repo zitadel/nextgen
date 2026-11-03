@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { chosenColumns, parseColumns } from "../../../../../src/lib/oclif/crud/columns";
+import { chosenColumns, readColumns } from "../../../../../src/lib/oclif/crud/columns";
 import { fieldPaths } from "../../../../../src/lib/oclif/crud/paths";
 
-describe("parseColumns", () => {
+describe("readColumns", () => {
   it("drops blanks between commas", () => {
-    expect(parseColumns("id,, name", ["id"])).toEqual(["id", "name"]);
+    expect(readColumns("id,, name", ["id"])).toEqual(["id", "name"]);
   });
 });
 

@@ -8,19 +8,21 @@ import { plainFlag, Tabulatable } from "../../lib/oclif/tabulatable";
 const COLUMNS = ["id", "method", "path", "summary"] as const;
 
 /** One operation as `api ls` lists it. */
-const entryOf = (operation: ApiOperation) => ({
-  id: operation.id,
-  method: operation.method,
-  path: operation.path,
-  summary: operation.summary,
-  tag: operation.tag,
-  auth: operation.auth,
-  callable: uncallable(operation) === undefined,
-  parameters: operation.parameters,
-  body: operation.body,
-  paging: operation.paging,
-  command: operation.cli,
-});
+function entryOf(operation: ApiOperation) {
+  return {
+    id: operation.id,
+    method: operation.method,
+    path: operation.path,
+    summary: operation.summary,
+    tag: operation.tag,
+    auth: operation.auth,
+    callable: uncallable(operation) === undefined,
+    parameters: operation.parameters,
+    body: operation.body,
+    paging: operation.paging,
+    command: operation.cli,
+  };
+}
 
 /**
  * `zitadel api ls` — the operations `zitadel api` can call, from the spec the

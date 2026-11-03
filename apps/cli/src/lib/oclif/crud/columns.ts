@@ -1,4 +1,4 @@
-import { ZitadelError } from "../../errors";
+import { refusalError } from "../refusal";
 import { allows, type FieldPaths, observedPaths, suggestable } from "./paths";
 
 function refuseMissing(chosen: readonly string[], paths: FieldPaths): void {
@@ -7,15 +7,21 @@ function refuseMissing(chosen: readonly string[], paths: FieldPaths): void {
     return;
   }
   const available = suggestable(paths);
-  throw new ZitadelError(
-    "E_VALIDATION",
-    `No such ${missing.length === 1 ? "column" : "columns"}: ${missing.join(", ")}`,
+  throw refusalError(
     {
-      hint: `Available: ${available.join(", ")}.`,
+      message: "No such {noun}: {missing}",
+      hint: "Available: {available}.",
       details: {
-        missing,
-        available,
+        missing: "{missingList}",
+        available: "{availableList}",
       },
+    },
+    {
+      noun: missing.length === 1 ? "column" : "columns",
+      missing: missing.join(", "),
+      available: available.join(", "),
+      missingList: missing,
+      availableList: available,
     },
   );
 }
@@ -26,7 +32,7 @@ function refuseMissing(chosen: readonly string[], paths: FieldPaths): void {
  * known: the verdict then comes from the shape, so it does not change with
  * how many records a page happened to return.
  */
-export const parseColumns = (
+export const readColumns = (
   raw: string,
   fallback: readonly string[],
   shape?: FieldPaths,
@@ -36,9 +42,15 @@ export const parseColumns = (
     .map((field) => field.trim())
     .filter(Boolean);
   if (chosen.length === 0) {
-    throw new ZitadelError("E_VALIDATION", "At least one column is needed", {
-      hint: `Comma-separated dot-paths, e.g. --fields ${fallback.join(",")}.`,
-    });
+    throw refusalError(
+      {
+        message: "At least one column is needed",
+        hint: "Comma-separated dot-paths, e.g. --fields {example}.",
+      },
+      {
+        example: fallback.join(","),
+      },
+    );
   }
   if (shape) {
     refuseMissing(chosen, shape);

@@ -23,12 +23,24 @@ import {
   ResourceCommand,
 } from "./command";
 
+type ListFlags = Readonly<{
+  limit?: number;
+  pageToken?: string;
+  all?: boolean;
+  fields?: readonly string[];
+  filter?: readonly TypedFilter[];
+  sort?: TypedSort;
+  plain?: boolean;
+}>;
+
+type ListInput = OperationInput<ListFlags, Json>;
+
 /**
  * `<topic> list`: one page by default, `--all` to drain, `--filter` / `--sort`
  * for query-backed lists or one flag per parameter for GET-backed ones.
  * Emits `{ items, count, next_page_token }` and a column table for humans.
  */
-export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
+export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>, ListInput> {
   static describe<Ctx>({
     topic,
     resource,
@@ -115,7 +127,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
     };
   }
 
-  protected override async operate({ flags }: OperationInput): Promise<CommandResult> {
+  protected override async operate({ flags }: ListInput): Promise<CommandResult> {
     const { topic, resource, spec, options } = this.definition;
     const wire = wireOf(options.wire);
     const shape = fieldPaths(spec.item);
@@ -128,12 +140,12 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
     const pageFields = (token?: string): Json =>
       paged
         ? {
-            ...(typeof flags.limit === "number" && { [wire.limit]: flags.limit }),
+            ...(flags.limit !== undefined && { [wire.limit]: flags.limit }),
             ...(token && { [wire.pageToken]: token }),
           }
         : {};
 
-    const given = (flags.filter ?? []) as readonly TypedFilter[];
+    const given = flags.filter ?? [];
     // A field that declares a default contributes it only when the caller did
     // not name that field, so naming it always wins.
     const defaults = (spec.filters ?? []).flatMap((field) =>
@@ -142,10 +154,9 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
         : [],
     );
     const parsed = [...given, ...defaults];
-    const sort = flags.sort as TypedSort | undefined;
-    const sorting = sort && {
-      field: sort.field,
-      direction: sort.direction,
+    const sorting = flags.sort && {
+      field: flags.sort.field,
+      direction: flags.sort.direction,
     };
 
     // Transport is the only thing that differs: a structured query endpoint
@@ -178,15 +189,13 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
 
     // A resource that drains by default does so only when the caller named no
     // page: asking for one with --limit or --page-token is asking for one.
-    const asked = flags.limit !== undefined || flags["page-token"] !== undefined;
+    const asked = flags.limit !== undefined || flags.pageToken !== undefined;
     const all = paged && (flags.all === true || (spec.drains === true && !asked));
     // `--all` is one request per page, so a wide drain would otherwise sit
     // silent. The spinner is terminal-only: no animation reaches a pipe, and
     // `--json` has already silenced everything.
-    const progress = all && process.stdout.isTTY && !this.jsonEnabled() ? spinner() : undefined;
+    const progress = all && this.isTTY && !this.isJson ? spinner() : undefined;
     progress?.start(`Fetching ${topic}`);
-    // The walk begins at the page --page-token names, if any.
-    const first = typeof flags["page-token"] === "string" ? flags["page-token"] : undefined;
     const paging = new Paging({
       items: (response) => {
         return sanitizeResponse(spec.items(response));
@@ -196,7 +205,8 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
       },
     });
     const walk = paging.walk(async (token, number) => {
-      const page = await request(token ?? first);
+      // The walk begins at the page --page-token names, if any.
+      const page = await request(token ?? flags.pageToken);
       progress?.message(`Fetching ${topic} — page ${number}`);
       return page;
     });
@@ -212,12 +222,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
     progress?.stop(`Fetched ${items.length} ${items.length === 1 ? resource.singular : topic}`);
 
     const rows = items;
-    const columns = chosenColumns(
-      flags.fields as readonly string[] | undefined,
-      resource.columns,
-      items,
-      shape,
-    );
+    const columns = chosenColumns(flags.fields, resource.columns, items, shape);
     const empty = `No ${topic} found.`;
     const footer: string[] = [];
     const page = {
@@ -250,12 +255,10 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
  * sorting and filters that produced it, and the page size is part of what the
  * caller asked for. Values are re-emitted exactly as they were typed.
  */
-const repeatedFlags = (flags: Json): readonly string[] => {
-  const limit = typeof flags.limit === "number" ? [`--limit ${flags.limit}`] : [];
-  const sort = flags.sort ? [Cmd.option("--sort", (flags.sort as TypedSort).raw)] : [];
-  const filters = ((flags.filter ?? []) as readonly TypedFilter[]).map((filter) =>
-    Cmd.option("--filter", filter.raw),
-  );
+const repeatedFlags = (flags: ListFlags): readonly string[] => {
+  const limit = flags.limit === undefined ? [] : [`--limit ${flags.limit}`];
+  const sort = flags.sort ? [Cmd.option("--sort", flags.sort.raw)] : [];
+  const filters = (flags.filter ?? []).map((filter) => Cmd.option("--filter", filter.raw));
   return [...limit, ...sort, ...filters];
 };
 

@@ -41,19 +41,37 @@
 
 ## Command code
 
-- A command does its work in `execute(input: Admitted<typeof Command>)`, never
-  `run`: `BaseCommand.run` parses, resolves the run's context (`static meta`),
-  checks `static rules`, finds `static requires`, and only then calls
-  `execute`, so `execute` validates nothing it was handed.
-- Refuse a bad value with a typed flag or argument (`portFlag`, `integerFlag`,
-  `nonBlankString`, the wrappers in `src/lib/oclif/inputs/`), a bad
-  combination with a rule (`excludes`, `needs`, `atLeastOne`, `refuses` in
-  `src/lib/oclif/rules.ts`), and a missing precondition with a requirement
-  (`src/lib/oclif/requires/`). Write each refusal once, as a `Refusal`
-  template with `{name}` placeholders.
-- Keep `lib/oclif` the only layer that knows oclif: a domain lib stays plain
-  functions and parsers and never imports it, and the typed flags and
-  requirements that wrap one live in `lib/oclif/inputs` and `lib/oclif/requires`.
+- A command does its work in `execute`, never `run`: `BaseCommand.run`
+  (`src/lib/oclif/base.ts`) parses, resolves `static meta`, checks
+  `static rules`, resolves `static requires`, and only then calls it.
+- Validate nothing in `execute`: every flag, argument and precondition is
+  settled before it runs, so it reads only values it can trust.
+- Refuse one bad value in a typed flag or argument, a bad combination in a rule
+  (`src/lib/oclif/rules.ts`), a missing precondition in a requirement
+  (`src/lib/oclif/requirements.ts`).
+- A requirement hands what it found to `execute`, so nothing is resolved twice,
+  and it may end the run with a result instead.
+- Write every refusal once, as a `Refusal` template with `{name}` placeholders
+  (`src/lib/oclif/refusal.ts`), never a `ZitadelError` built in a command.
+- Declare a flag or argument by its CLI spelling and read it as code reads it
+  (`"client-id"` is read `flags.clientId`); see `src/lib/oclif/names.ts`.
+- Keep the CLI spelling in three places only: the definition key, oclif's own
+  cross-references (`char`, `aliases`, `exclusive`, `dependsOn`,
+  `relationships`) and the flag as a refusal's message names it. A rule's name
+  and a refusal's placeholders take the code spelling.
+- Keep a command's own inputs beside it, one named export per file:
+  `src/commands/<name>/{flags,args,rules,requirements}/*.ts`.
+- Write no classes there: a flag or argument is a pure validator function plus a
+  `Flags.custom`/`Args.custom` whose `parse` only calls it, and a rule or
+  requirement is a plain function.
+- Let that validator throw `refusalError` with a module-level `Refusal`, or
+  return `Parsed<T>` where a prompt's `parse` reuses it.
+- Share an input only within its own topic's directory; duplicate it rather
+  than import another command's.
+- Keep `src/lib/oclif` generic: no product concept and no domain-lib import. A
+  unit test fails on a leak (`tests/unit/lib/oclif/layering.test.ts`).
+- A domain lib under `src/lib` stays plain functions and parsers, and never
+  imports `lib/oclif`.
 - Report a warning through `reportWarning` (`src/lib/warnings.ts`) or a
   result's `warnings`, never `consola.warn`: `--json` silences consola. A unit
   test fails on any other `consola.warn`.

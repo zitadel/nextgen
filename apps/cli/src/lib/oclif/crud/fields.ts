@@ -1,6 +1,7 @@
 import { Flags, type Interfaces } from "@oclif/core";
 
 import { ZitadelError } from "../../errors";
+import { named } from "../names";
 import { decimalValue, jsonValue, refuseProtoKey, setAt, typedValue } from "./document";
 import type { Json, Schema } from "./types";
 import {
@@ -330,7 +331,11 @@ const flagFor = (field: BodyField): Interfaces.FlagInput[string] => {
     case "number":
       return numberFlag(common);
     case "record":
-      return recordFlag({ ...common, multiple: true, field });
+      return recordFlag({
+        ...common,
+        multiple: true,
+        field,
+      });
     case "list":
       return field.item === "integer"
         ? Flags.integer({ ...common, multiple: true })
@@ -355,7 +360,7 @@ export const bodyFieldFlags = (fields: readonly BodyField[]): Interfaces.FlagInp
  */
 export const bodyFromFlags = (fields: readonly BodyField[], flags: Json): Json | undefined => {
   return fields.reduce<Json | undefined>((body, field) => {
-    const value = field.flag === undefined ? undefined : flags[field.flag];
+    const value = field.flag === undefined ? undefined : flags[named(field.flag)];
     if (value === undefined || field.flag === undefined) {
       return body;
     }

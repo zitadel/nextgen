@@ -1,11 +1,10 @@
-import { Flags } from "@oclif/core";
-
 import {
   type Admitted,
   CommandGroups,
   EnvironmentCommand,
   type JsonEnvelope,
 } from "../../lib/oclif";
+import { messageFlag } from "./flags/message";
 import {
   buildBundle,
   createReleaseFromBundle,
@@ -34,29 +33,24 @@ export default class ReleaseCreate extends EnvironmentCommand {
     "<%= config.bin %> release create -m 'add phone_number to human-user'",
   ];
   static override flags = {
-    message: Flags.string({
-      char: "m",
-      description: "A short summary of what this release changes.",
-    }),
+    message: messageFlag("A short summary of what this release changes."),
   };
 
   protected async execute({ flags }: Admitted<typeof ReleaseCreate>): Promise<JsonEnvelope> {
-    const { cwd, env, dryRun, isTTY } = this.meta;
-    const json = this.jsonEnabled();
-
     const { client, projectId } = await this.connect();
-    const { bundle, resourceCount, brandingSources, idpFiles, policyFiles } =
-      await buildBundle(cwd);
+    const { bundle, resourceCount, brandingSources, idpFiles, policyFiles } = await buildBundle(
+      this.cwd,
+    );
 
     const ctx: StepContext = {
-      cwd,
+      cwd: this.cwd,
       client,
       projectId,
-      env,
+      env: this.env,
       mode: "deploy",
-      dryRun,
-      json,
-      color: !json && isTTY && flags.color !== false && !process.env.NO_COLOR,
+      dryRun: this.dryRun,
+      json: this.isJson,
+      color: this.isColored,
       bundle,
       brandingSources,
       idpFiles,
@@ -71,7 +65,7 @@ export default class ReleaseCreate extends EnvironmentCommand {
     // `release create` carries the same no-mutation promise every command does
     // under `--dry-run`: validate the bundle the same way, then stop before the
     // release is posted so nothing is written server-side.
-    if (dryRun) {
+    if (this.dryRun) {
       return this.emit({
         status: "ok",
         data: { dry_run: true, resources: resourceCount },
@@ -81,8 +75,8 @@ export default class ReleaseCreate extends EnvironmentCommand {
 
     const release = await createReleaseFromBundle(client, projectId, bundle, {
       message: flags.message,
-      gitSha: await headSha(cwd),
-      gitDirty: await worktreeIsDirty(cwd),
+      gitSha: await headSha(this.cwd),
+      gitDirty: await worktreeIsDirty(this.cwd),
     });
     // Building dedupes on content, revoked releases included: the same tree
     // answers with the revoked release, which can never be deployed.

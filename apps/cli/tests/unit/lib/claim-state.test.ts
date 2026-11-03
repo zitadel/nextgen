@@ -7,7 +7,6 @@ import {
   claimWindowClosedAction,
   claimWindowDeadline,
   isAttached,
-  isChallengeId,
 } from "../../../src/lib/claim-state";
 import { environmentSelectorSuffix } from "../../../src/lib/oclif/environment-flags";
 
@@ -165,16 +164,5 @@ describe("claim window deadline", () => {
     const now = Date.parse("2026-09-04T10:00:00.000Z");
     expect(claimWindowDeadline(undefined, now).toISOString()).toBe("2026-09-18T10:00:00.000Z");
     expect(claimWindowDeadline("not-a-date", now).toISOString()).toBe("2026-09-18T10:00:00.000Z");
-  });
-});
-
-describe("isChallengeId", () => {
-  it("accepts the shape the claim contract gives a challenge_id", () => {
-    expect(isChallengeId("ch_01J0Z9KX7Y0Q2Y7JX5M9K2YF3C")).toBe(true);
-  });
-
-  it("refuses anything else", () => {
-    expect(isChallengeId("challenge")).toBe(false);
-    expect(isChallengeId("")).toBe(false);
   });
 });

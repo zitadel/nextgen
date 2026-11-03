@@ -100,3 +100,26 @@ describe("refusalError without a way to suggest", () => {
     );
   });
 });
+
+describe("refusalError details", () => {
+  it("keeps a list a list when a detail is only a placeholder", () => {
+    const error = refusalError(
+      {
+        message: "No {noun}",
+        details: {
+          missing: "{names}",
+          note: "see {noun}",
+        },
+      },
+      {
+        noun: "column",
+        names: ["a", "b"],
+      },
+    );
+
+    expect(error.details).toEqual({
+      missing: ["a", "b"],
+      note: "see column",
+    });
+  });
+});

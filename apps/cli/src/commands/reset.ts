@@ -3,7 +3,7 @@ import { Flags } from "@oclif/core";
 import { localContainerName } from "../lib/local-server/runtime";
 import { LocalServer } from "../lib/local-server/server";
 import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
-import { recordedRuntime } from "../lib/oclif/requires/local-runtime";
+import { recordedRuntime } from "./local-server/requirements/recorded-runtime";
 import { Destructive } from "../lib/oclif/destructive";
 
 export default class Reset extends Destructive(BaseCommand) {
@@ -30,7 +30,7 @@ export default class Reset extends Destructive(BaseCommand) {
     const { runtime } = recorded;
 
     const containerName =
-      runtime?.backend === "docker" ? runtime.container_name : localContainerName(this.meta.cwd);
+      runtime?.backend === "docker" ? runtime.container_name : localContainerName(this.cwd);
     const described = {
       backend: runtime?.backend ?? "missing",
       ...(runtime?.backend === "binary"
@@ -50,7 +50,7 @@ export default class Reset extends Destructive(BaseCommand) {
           next: { commands: [this.suggestUnscoped("reset --force")] },
         }),
         apply: async (consent) => {
-          await LocalServer.at(this.meta.cwd, { cliVersion: this.meta.cliVersion }).reset(consent);
+          await LocalServer.at(this.cwd, { cliVersion: this.cliVersion }).reset(consent);
           return {
             status: "ok",
             data: { title: "Local Zitadel server runtime reset.", runtime: described },

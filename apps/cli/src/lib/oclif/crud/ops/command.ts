@@ -29,11 +29,19 @@ export type OperationStatics = Readonly<{
 }>;
 
 /**
- * Parsed flags and args, untyped, and what the operation's requirements
- * found under the names it declared them with: operations narrow what they read.
+ * What an operation receives: its parsed flags and args, as each operation
+ * types them, and what its requirements found under the names it declared
+ * them with.
  */
-export type OperationInput = Readonly<{ flags: Json; args: Json }> &
-  Readonly<Record<string, unknown>>;
+export type OperationInput<
+  Flags extends object = Json,
+  Args extends object = Json,
+  Found extends object = Record<never, never>,
+> = Readonly<{
+  flags: Readonly<Flags>;
+  args: Readonly<Args>;
+}> &
+  Readonly<Found>;
 
 /**
  * The static shape every operation class has: the {@link ResourceCommand}
@@ -52,7 +60,11 @@ export type OperationClass<Ctx, Spec> = typeof ResourceCommand<Ctx, Spec> & {
  * definition is bound onto a subclass by {@link bindOperation}; the operation
  * classes themselves are never registered with oclif directly.
  */
-export class ResourceCommand<Ctx, Spec> extends Tabulatable(Destructive(EnvironmentCommand)) {
+export class ResourceCommand<
+  Ctx,
+  Spec,
+  Input extends OperationInput = OperationInput,
+> extends Tabulatable(Destructive(EnvironmentCommand)) {
   protected get definition(): OperationDefinition<Ctx, Spec> {
     const definition = definitionOf(this.constructor as typeof Command);
     if (!definition) {
@@ -65,7 +77,7 @@ export class ResourceCommand<Ctx, Spec> extends Tabulatable(Destructive(Environm
   }
 
   protected override async execute(input: Admitted<typeof BaseCommand>): Promise<JsonEnvelope> {
-    return this.emit(await this.operate(input as OperationInput));
+    return this.emit(await this.operate(input as unknown as Input));
   }
 
   /**
@@ -82,7 +94,7 @@ export class ResourceCommand<Ctx, Spec> extends Tabulatable(Destructive(Environm
    * implementation exists only so {@link bindOperation} can subclass through
    * the generic static type, which TypeScript cannot do for an abstract member.
    */
-  protected operate(_input: OperationInput): Promise<CommandResult> {
+  protected operate(_input: Input): Promise<CommandResult> {
     return Promise.reject(
       new ZitadelError("E_NOT_IMPLEMENTED", `${this.id ?? "operation"} has no operate`),
     );
@@ -103,8 +115,8 @@ export const bindOperation = <Ctx, Spec>(
     static override examples = [...statics.examples];
     static override flags = statics.flags;
     static override args = statics.args;
-    static override rules = statics.rules ?? [];
-    static override requires = statics.requires ?? {};
+    static override rules: readonly Rule[] = statics.rules ?? [];
+    static override requires: Requirements = statics.requires ?? {};
     static override group = definition.resource.group;
     static override groupOrder = definition.resource.groupOrder;
   };

@@ -1,7 +1,7 @@
 import { Flags } from "@oclif/core";
 
 import { type Admitted, CommandGroups, type JsonEnvelope, PreviewCommand } from "../../lib/oclif";
-import { previewUrlArg } from "../../lib/oclif/inputs/preview";
+import { urlArg } from "./args/url";
 import { dryRunResult } from "../../lib/oclif/crud/shared";
 import { deletedData } from "../../lib/oclif/envelope";
 import { Destructive, Settled } from "../../lib/oclif/destructive";
@@ -21,7 +21,7 @@ export default class PreviewRm extends Destructive(PreviewCommand) {
     "<%= config.bin %> preview rm https://acme-git-sso-acmeinc.vercel.app --force",
   ];
   static override args = {
-    url: previewUrlArg({ required: true, description: "The preview URL to remove." }),
+    url: urlArg({ required: true, description: "The preview URL to remove." }),
   };
   static override flags = {
     // `--force` is per command, not global: here it permits a removal.
@@ -33,15 +33,13 @@ export default class PreviewRm extends Destructive(PreviewCommand) {
   };
 
   protected async execute({ args }: Admitted<typeof PreviewRm>): Promise<JsonEnvelope> {
-    const url = args.url;
-
     return this.emit(
       await this.confirmed({
         verb: "remove",
-        name: `remove ${url} from the project`,
-        message: `Remove ${url} from the project?`,
+        name: `remove ${args.url} from the project`,
+        message: `Remove ${args.url} from the project?`,
         preview: () => {
-          const result = dryRunResult("remove", "preview", url);
+          const result = dryRunResult("remove", "preview", args.url);
           return { ...result, pretty: `${result.pretty} from the project` };
         },
         prepare: async () => {
@@ -51,21 +49,25 @@ export default class PreviewRm extends Destructive(PreviewCommand) {
           // nobody confirms removing what is not there.
           if (
             !(await connection.client.listPreviews.all(connection.projectId)).some(
-              (preview) => preview.origin === url,
+              (preview) => preview.origin === args.url,
             )
           ) {
             return new Settled({
               status: "skipped",
               reason: "not-live",
-              pretty: `${url} is not a live preview of the project; nothing was removed`,
+              pretty: `${args.url} is not a live preview of the project; nothing was removed`,
               next: { commands: [this.suggest("preview list")] },
             });
           }
           return connection;
         },
         apply: async (consent, { client, projectId }) => {
-          await consent.unlock(client).removePreview(projectId, { origin: url });
-          return { status: "ok", data: deletedData({ url }), pretty: `Stopped serving ${url}` };
+          await consent.unlock(client).removePreview(projectId, { origin: args.url });
+          return {
+            status: "ok",
+            data: deletedData({ url: args.url }),
+            pretty: `Stopped serving ${args.url}`,
+          };
         },
       }),
     );

@@ -6,7 +6,7 @@ import { consoleSignInUrl } from "../lib/local-server/sign-in";
 import { DEFAULT_LOCAL_SERVER_URL } from "../lib/local-server/runtime";
 import { LocalServer } from "../lib/local-server/server";
 import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
-import { localAdmin } from "../lib/oclif/requires/local-admin";
+import { localAdmin } from "./local-server/requirements/local-admin";
 
 /**
  * `zitadel console` — open the local console signed in as the local
@@ -45,7 +45,7 @@ export default class Console extends BaseCommand {
     // A link is minted by running the real login flow, which burns a one-time
     // handoff token on the server — a mutation, so a dry run only reports who
     // it would sign in as.
-    if (this.meta.dryRun) {
+    if (this.dryRun) {
       consola.info(`Would mint a console sign-in link for ${admin.email}.`);
       return this.emit({
         status: "ok",
@@ -62,7 +62,7 @@ export default class Console extends BaseCommand {
 
     consola.log(`Signed in to the local console as ${admin.email}:`);
     consola.log(signInUrl);
-    const skipLaunch = flags["no-open"] || this.meta.nonInteractive;
+    const skipLaunch = flags.noOpen || this.nonInteractive;
     const opened = skipLaunch ? false : (await openInBrowser(signInUrl)).opened;
     if (!opened) {
       consola.info("Open the link above. It works once; run this command again for a new one.");
