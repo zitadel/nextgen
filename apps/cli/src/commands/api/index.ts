@@ -95,6 +95,35 @@ export default class Api extends Destructive(BaseCommand) {
     force: apiForce,
   };
 
+  /**
+   * No operation is called help, so the word asks for this command's help as
+   * `--help` does. It answers before the run is admitted, because help needs
+   * neither a resolved server nor an operation, and the operation this command
+   * requires would refuse `help` as a name it does not know.
+   */
+  override async run(): Promise<JsonEnvelope> {
+    const { args } = await this.parse(Api);
+    if (args.operation?.toLowerCase() !== "help") {
+      return super.run();
+    }
+    // Only the command's name is needed for the envelope: `toMeta` would also
+    // open telemetry and the first-run notice, which `--help` does not.
+    this.meta = {
+      ...this.meta,
+      command: this.id ?? this.meta.command,
+    };
+    if (!this.jsonEnabled()) {
+      await this.config.runCommand("help", [Api.id]);
+    }
+    return this.emit({
+      status: "ok",
+      data: {},
+      pretty: "",
+      // Under --json the usage is not printed, so the envelope points on.
+      next: this.jsonEnabled() ? { commands: [this.suggestUnscoped("api ls")] } : undefined,
+    });
+  }
+
   protected async execute({
     argv,
     args,
