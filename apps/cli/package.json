@@ -40,6 +40,9 @@
     "hooks": {
       "finally": "./dist/lib/oclif/hooks/version-notice"
     },
+    "additionalHelpFlags": [
+      "-h"
+    ],
     "topicSeparator": " ",
     "plugins": [
       "@oclif/plugin-help",

@@ -139,8 +139,10 @@ nothing; `data.skills` and `data.directories` say what it added where.
   environment), but that is the user's environment choice, not a flag to attach
   to every call.
 - **Flag conventions.** Flags follow what a model already expects from curl, ssh
-  and wget: `--help`/`-h`, `--version`, `-v`/`--verbose`, kebab-case long flags,
-  both `--flag value` and `--flag=value`, and `--no-telemetry`-style negation.
+  and wget: `--help`/`-h` (also `zitadel api help`), `--version`, `-v`/`--verbose`,
+  kebab-case long flags, both `--flag value` and `--flag=value`, and
+  `--no-telemetry`-style negation. `-h` anywhere before `--` asks for help, even
+  as a flag's value.
   Two deliberate deviations worth knowing: `-n` is `--non-interactive` (not
   `--dry-run`, which is long-only), and machine output is `--json` (not
   `--output json`). `api` takes `-X` for the method, as curl does, and `-F` for

@@ -77,7 +77,7 @@ Diagnostics and utilities
   which             Show which plugin a command is in
 
 Flags
-  --help      Show help for command
+  -h, --help  Show help for command
   --version   Show zitadel version
 
 Examples
