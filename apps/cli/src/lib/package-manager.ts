@@ -5,7 +5,7 @@ import { execa } from "execa";
 import { pathExists } from "./fs";
 import { readPackageJson } from "./npm";
 import { optionArgs } from "./public-cli";
-import { shellOption } from "./shell";
+import { Cmd } from "./cmd";
 
 export type PackageManager = "npm" | "pnpm" | "yarn" | "bun";
 
@@ -103,7 +103,7 @@ export function inDirectory(
   return {
     command: packageCommand.command,
     args: [...optionArgs(flag, dir), ...packageCommand.args],
-    display: [packageCommand.command, shellOption(flag, dir), ...packageCommand.args].join(" "),
+    display: [packageCommand.command, Cmd.option(flag, dir), ...packageCommand.args].join(" "),
   };
 }
 

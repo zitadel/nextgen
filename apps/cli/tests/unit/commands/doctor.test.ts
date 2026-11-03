@@ -279,7 +279,9 @@ describe("doctor command", () => {
     );
   });
 
-  it("suggests the claim on the project's own server, not the one doctor was pointed at", async () => {
+  it("suggests the claim on the project's own server, not the one doctor was pointed at", async ({
+    port,
+  }) => {
     const cwd = await makeHealthyProject();
     await writeDetachedSecret(cwd);
     const fake = await fakeDocker();
@@ -291,7 +293,7 @@ describe("doctor command", () => {
         cwd,
         "--json",
         "--port",
-        String(nextPort()),
+        String(port),
         "--server",
         "https://self.example",
       ],
@@ -598,9 +600,9 @@ console.log(["p4242", "cnode", "n127.0.0.1:" + process.env.LSOF_FIXTURE_PORT].jo
     });
   });
 
-  it("checks the local runtime of a project set up against a local server", async () => {
+  it("checks the local runtime of a project set up against a local server", async ({ port }) => {
     const cwd = await makeHealthyProject();
-    await setProjectServer(cwd, `http://localhost:${String(nextPort())}`);
+    await setProjectServer(cwd, `http://localhost:${String(port)}`);
 
     const res = await doctorWithoutPort(cwd);
 

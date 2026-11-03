@@ -1,5 +1,5 @@
 import { Consent, type Gate } from "../consent";
-import { shellArg } from "../shell";
+import { Cmd } from "../cmd";
 import { inShell } from "../suggestion";
 import type { BaseCommand } from "./base";
 import { Promptable } from "./promptable";
@@ -128,9 +128,7 @@ export function Destructive<TBase extends CommandClass<BaseCommand>>(Base: TBase
         "--force",
         ...flags,
       ]);
-      const retry = delimited
-        ? inShell(command, { after: ` -- ${positional.map(shellArg).join(" ")}` })
-        : command;
+      const retry = delimited ? inShell(command, { after: ` -- ${Cmd.of(positional)}` }) : command;
       return Consent.request("retry" in gate ? gate : { ...gate, retry }, {
         interactive: !this.meta.nonInteractive,
         force: this.meta.force,

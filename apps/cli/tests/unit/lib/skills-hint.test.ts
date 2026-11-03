@@ -7,9 +7,14 @@ import { it } from "../../helpers/fixtures";
 
 const rosie = vi.hoisted(() => ({ agents: vi.fn() }));
 const log = vi.hoisted(() => vi.fn());
+const homedir = vi.hoisted(() => vi.fn<() => string>());
 
 vi.mock("rosie-skills", () => rosie);
 vi.mock("consola", () => ({ default: { log } }));
+vi.mock("node:os", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:os")>();
+  return { ...actual, homedir };
+});
 
 import { showSkillsHint } from "../../../src/lib/skills-hint";
 
@@ -94,6 +99,16 @@ describe("showSkillsHint", () => {
     await Promise.all([first, second]);
 
     expect(log).toHaveBeenCalledTimes(1);
+  });
+
+  it("stays silent when the home directory cannot be determined", async () => {
+    homedir.mockImplementation(() => {
+      throw new Error("no home directory");
+    });
+
+    await showSkillsHint({ env: {}, interactive: true, cliVersion });
+
+    expect(log).not.toHaveBeenCalled();
   });
 
   it("never throws into the command", async ({ dir }) => {

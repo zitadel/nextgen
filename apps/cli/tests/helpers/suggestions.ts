@@ -27,33 +27,85 @@ const REFERENCE = JSON.parse(
 /** The CLI as a suggestion runs it: `npx @zitadel/cli@<version>` or `zitadel`. */
 const RUNNER = /^(?:@zitadel\/cli(?:@\S+)?|zitadel)$/;
 
+/** One shell word: unquoted characters, escapes and quoted runs, up to the next blank. */
+const SHELL_WORD = /(?:[^\s'"\\]|\\[\s\S]|'[^']*'|"(?:\\[\s\S]|[^"\\])*")+/g;
+/** A quoted run or an escape inside a word, which the shell replaces with its text. */
+const SHELL_QUOTING = /'([^']*)'|"((?:\\[\s\S]|[^"\\])*)"|\\([\s\S])/g;
+
 /** The words a POSIX shell splits a command into, and the operators between them. */
 function shellWords(command: string): string[] {
-  const words: string[] = [];
-  let word: string | undefined;
-  for (let at = 0; at < command.length; at++) {
-    const char = command[at] as string;
-    if (char === "'") {
-      const end = command.indexOf("'", at + 1);
-      word = (word ?? "") + command.slice(at + 1, end);
-      at = end;
-    } else if (char === '"') {
-      let text = "";
-      for (at++; at < command.length && command[at] !== '"'; at++) {
-        text += command[at] === "\\" ? (command[++at] ?? "") : command[at];
-      }
-      word = (word ?? "") + text;
-    } else if (char === "\\") {
-      word = (word ?? "") + (command[++at] ?? "");
-    } else if (/\s/.test(char)) {
-      if (word !== undefined) words.push(word);
-      word = undefined;
-    } else {
-      word = (word ?? "") + char;
-    }
+  return (command.match(SHELL_WORD) ?? []).map((word) =>
+    word.replaceAll(
+      SHELL_QUOTING,
+      (_, single?: string, double?: string, escaped?: string) =>
+        single ?? double?.replaceAll(/\\([\s\S])/g, "$1") ?? escaped ?? "",
+    ),
+  );
+}
+
+/** What a command's words hold after its name: how many arguments, and the first thing wrong with them. */
+type Walk = Readonly<{ positional: number; problem?: string }>;
+
+/** The flag a word names, and whether the word carries its own value (`--name=value`). */
+function flagFor(
+  token: string,
+  flags: readonly FlagReference[],
+): Readonly<{ flag?: FlagReference; isInline: boolean }> {
+  const isLong = token.startsWith("--");
+  const spelled = isLong ? (token.slice(2).split("=")[0] as string) : token.slice(1);
+  const isInline = isLong && token.includes("=");
+  const named =
+    flags.find(({ name }) => {
+      return name === spelled;
+    }) ??
+    flags.find(({ name, allowNo }) => {
+      return allowNo && `no-${name}` === spelled;
+    });
+  const flag = isLong
+    ? named
+    : flags.find(({ char }) => {
+        return char === spelled;
+      });
+
+  return { flag, isInline };
+}
+
+/**
+ * Reads a command's words in order: an option takes the word after it, `--`
+ * makes every word after it an argument, and a template's `...` stands for the
+ * rest, which it does not spell.
+ */
+function walk(
+  reference: CommandReference,
+  flags: readonly FlagReference[],
+  tokens: readonly string[],
+  seen: ReadonlySet<string> = new Set(),
+  positional = 0,
+): Walk {
+  const [token, ...rest] = tokens;
+
+  if (token === undefined || token === "...") {
+    return { positional };
   }
-  if (word !== undefined) words.push(word);
-  return words;
+  if (token === "--") {
+    return { positional: positional + rest.length };
+  }
+  if (!token.startsWith("-") || token === "-") {
+    return walk(reference, flags, rest, seen, positional + 1);
+  }
+
+  const { flag, isInline } = flagFor(token, flags);
+
+  if (flag === undefined) {
+    return { positional, problem: `${reference.id} takes no ${token}` };
+  }
+  if (!flag.multiple && seen.has(flag.name)) {
+    return { positional, problem: `${reference.id} takes --${flag.name} once` };
+  }
+
+  const remaining = flag.type === "option" && !isInline ? rest.slice(1) : rest;
+
+  return walk(reference, flags, remaining, new Set([...seen, flag.name]), positional);
 }
 
 /**
@@ -81,44 +133,16 @@ function problemWith(command: string): string | undefined {
     return `names no command: ${rest.slice(0, 2).join(" ")}`;
   }
   const flags = [...reference.flags, ...REFERENCE.globalFlags];
-  const seen = new Map<string, number>();
-  let positional = 0;
   const tokens = rest.slice(reference.id.split(" ").length);
-  for (let at = 0; at < tokens.length; at++) {
-    const token = tokens[at] as string;
-    // A template's `...` stands for the rest, which it does not spell.
-    if (token === "...") {
-      break;
-    }
-    if (token === "--") {
-      positional += tokens.length - at - 1;
-      break;
-    }
-    if (!token.startsWith("-") || token === "-") {
-      positional++;
-      continue;
-    }
-    const [spelled, inline] = token.startsWith("--")
-      ? [token.slice(2).split("=")[0] as string, token.includes("=")]
-      : [token.slice(1), false];
-    const flag = token.startsWith("--")
-      ? (flags.find(({ name }) => name === spelled) ??
-        flags.find(({ name, allowNo }) => allowNo && `no-${name}` === spelled))
-      : flags.find(({ char }) => char === spelled);
-    if (flag === undefined) {
-      return `${reference.id} takes no ${token}`;
-    }
-    seen.set(flag.name, (seen.get(flag.name) ?? 0) + 1);
-    if (!flag.multiple && (seen.get(flag.name) ?? 0) > 1) {
-      return `${reference.id} takes --${flag.name} once`;
-    }
-    if (flag.type === "option" && !inline) {
-      at++;
-    }
+  const walked = walk(reference, flags, tokens);
+
+  if (walked.problem !== undefined) {
+    return walked.problem;
   }
-  if (!reference.variadic && positional > reference.args.length) {
-    return `${reference.id} takes ${reference.args.length} argument(s), not ${positional}`;
+  if (!reference.variadic && walked.positional > reference.args.length) {
+    return `${reference.id} takes ${reference.args.length} argument(s), not ${walked.positional}`;
   }
+
   return undefined;
 }
 
