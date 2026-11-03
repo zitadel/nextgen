@@ -1,6 +1,8 @@
 import "../internal/lit-dev-mode.js";
 
+export { ZlAccount, zlAccountManifest } from "./zl-account.js";
 export { ZlAlert, zlAlertManifest } from "./zl-alert.js";
+export { ZlAvatar, zlAvatarManifest } from "./zl-avatar.js";
 export type { ZlSubmitDetail } from "./events.js";
 export { ZlButton, zlButtonManifest } from "./zl-button.js";
 export { ZlCard, zlCardManifest } from "./zl-card.js";

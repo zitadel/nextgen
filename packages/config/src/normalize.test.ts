@@ -20,7 +20,7 @@ import {
  */
 function metaSchema(name: string): Record<string, unknown> {
   return JSON.parse(
-    readFileSync(join(__dirname, "../../../api/openapi/endpoints/schemas", name), "utf8"),
+    readFileSync(join(__dirname, "../../../apps/api/api/openapi/endpoints/schemas", name), "utf8"),
   ) as Record<string, unknown>;
 }
 
@@ -310,7 +310,7 @@ describe("normalizeSchemaBody", () => {
     // changed and the normalizer must follow.
     const metaSchema = JSON.parse(
       readFileSync(
-        join(__dirname, "../../../api/openapi/endpoints/schemas/user-property.json"),
+        join(__dirname, "../../../apps/api/api/openapi/endpoints/schemas/user-property.json"),
         "utf8",
       ),
     ) as { properties: Record<string, { default?: unknown }> };

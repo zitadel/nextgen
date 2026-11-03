@@ -114,9 +114,8 @@ Notes:
 The `layout` field has two values, `centered` (the default) and `split`. One template ships with the component package, `default.liquid`: a card centred in the page shell with fields stacked and the primary action full-width. It does not read `layout`. `split` describes revisions published from the split designs below.
 
 The `layout` enum stays this small on purpose. This file is the **widget
-template** (advanced structure inside the widget, shared later by embedded
-and Zitadel-served login). Zitadel-served **page chrome** is unset;
-`page.liquid` is only a later proposal — see
+template** (advanced structure inside the widget); **page chrome** is the
+customer's application — see
 [`customization-strategy.md`](customization-strategy.md#what-the-shipped-designs-really-are)
 and [ADR 057](../../adrs/057-login-customization-categories.md).
 `zitadel branding eject --design` offers two widget-structure starting
@@ -129,8 +128,8 @@ points; setup never writes either
 | `minimal`     | `centered`          | Chrome stripped to heading, fields, and actions.                        |
 
 The retired page-layout designs (`split`, `split-right`, `hero`) are no
-longer ejectable: they were page chrome around the same card, and embedder
-page looks live in the application (Zitadel-served page chrome is unset).
+longer ejectable: they were page chrome around the same card, and page
+looks live in the application.
 Revisions already published from them keep rendering; their last shipped
 templates are kept as fixtures in
 `packages/components/src/orchestrator/__fixtures__/legacy-designs/` and

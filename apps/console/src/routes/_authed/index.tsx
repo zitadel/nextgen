@@ -18,10 +18,16 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
  * a team, which reads as "nothing happened".
  * Point this at the overview when the figures behind it exist, restoring the
  * mock parked below and replacing its dummy constants with loader data.
+ *
+ * Users acts on the selected project. The `_authed` guard has given `/` the
+ * default one by the time this runs, so with none selected there are several
+ * projects to choose from (or none), and `/` lands on Projects itself: by way
+ * of Users it would arrive as a detour, `Continue to Users` (D22), which is
+ * not what anybody arriving at the console asked for.
  */
 export const Route = createFileRoute("/_authed/")({
-  beforeLoad: () => {
-    throw redirect({ to: "/users" });
+  beforeLoad: ({ search }) => {
+    throw redirect({ to: search.project ? "/users" : "/projects" });
   },
 });
 

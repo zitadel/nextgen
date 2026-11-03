@@ -30,6 +30,7 @@ type CheckChangesetsStatusModule = {
   }) => Promise<{
     ok: boolean;
     errors: Array<{ code: string; message: string }>;
+    warnings: Array<{ code: string; message: string }>;
     analysis: {
       versionOnly: boolean;
       changedPackages: Array<{ name: string; files: string[] }>;
@@ -165,6 +166,67 @@ Improve local start behavior.
 
     expect(report.ok).toBe(true);
     expect(report.nextAction).toContain("Changesets are present");
+  });
+
+  it("passes when a fix edits a pending changeset instead of adding one", async () => {
+    const { checkChangesetsStatus } = await loadModule();
+    const report = await checkChangesetsStatus({
+      entries: [
+        { status: "M", file: "apps/cli/src/commands/start.ts" },
+        { status: "M", file: ".changeset/cli-start.md" },
+      ],
+      config: validConfig(),
+      changesetSources: {
+        ".changeset/cli-start.md": cliChangeset("Improve local start behavior."),
+      },
+      changesetStatus: {
+        releases: [{ name: "@zitadel/cli", type: "minor", changesets: ["cli-start"] }],
+      },
+    });
+
+    expect(report.ok).toBe(true);
+    expect(report.nextAction).toContain("Changesets are present");
+  });
+
+  it("warns, without failing, about a summary over 60 words", async () => {
+    const { checkChangesetsStatus } = await loadModule();
+    const report = await checkChangesetsStatus({
+      pending: true,
+      entries: [{ status: "A", file: ".changeset/cli-start.md" }],
+      config: validConfig(),
+      changesetSources: { ".changeset/cli-start.md": cliChangeset(words(61)) },
+      changesetStatus: {},
+    });
+
+    expect(report.ok).toBe(true);
+    expect(report.warnings).toEqual([
+      expect.objectContaining({
+        code: "long-summary",
+        message: expect.stringContaining(".changeset/cli-start.md runs 61 words"),
+      }),
+    ]);
+  });
+
+  it("leaves the Breaking paragraph and upgrade steps out of the summary's length", async () => {
+    const { checkChangesetsStatus } = await loadModule();
+    const report = await checkChangesetsStatus({
+      pending: true,
+      entries: [{ status: "A", file: ".changeset/cli-start.md" }],
+      config: validConfig(),
+      changesetSources: {
+        ".changeset/cli-start.md": cliChangeset(
+          [
+            words(60),
+            `**Breaking:** ${words(80)}`,
+            `**Upgrading a project set up with 0.1.0:** ${words(40)}`,
+            `1. ${words(30)}\n2. ${words(30)}`,
+          ].join("\n\n"),
+        ),
+      },
+      changesetStatus: {},
+    });
+
+    expect(report.warnings).toEqual([]);
   });
 
   it("passes when an empty changeset covers non-shipping publishable path changes", async () => {
@@ -558,6 +620,14 @@ const MAJOR_SERVER_CHANGESET = `---
 
 Remove the endpoint.
 `;
+
+function cliChangeset(summary: string): string {
+  return `---\n"@zitadel/cli": minor\n---\n\n${summary}\n`;
+}
+
+function words(count: number): string {
+  return Array.from({ length: count }, (_, index) => `word${index}`).join(" ");
+}
 
 function validConfig(): { fixed: string[][] } {
   return {

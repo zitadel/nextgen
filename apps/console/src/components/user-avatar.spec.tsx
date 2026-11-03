@@ -1,32 +1,22 @@
 import { render } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { UserAvatar, avatarVars } from "./user-avatar";
-
-const avatarGradient = (seed: string) => JSON.stringify(avatarVars(seed));
-
-describe("avatarVars", () => {
-  it("gives a seed the same gradient every time", () => {
-    expect(avatarGradient("user_1")).toBe(avatarGradient("user_1"));
-  });
-
-  it("draws two different design-system starts", () => {
-    for (const seed of ["user_1", "user_2", "a", "", "01JZXYZ"]) {
-      const starts = avatarGradient(seed).match(/--zl-gradient-[a-z]+-start/g);
-      expect(starts).toHaveLength(2);
-      expect(starts?.[0]).not.toBe(starts?.[1]);
-    }
-  });
-
-  it("tells people apart", () => {
-    const gradients = new Set(
-      Array.from({ length: 50 }, (_, index) => avatarGradient(`user_${index}`)),
-    );
-    expect(gradients.size).toBeGreaterThan(45);
-  });
-});
+import { ProjectMark } from "./project-mark";
+import { UserAvatar } from "./user-avatar";
 
 describe("UserAvatar", () => {
+  it("opts into the shared motion, which a project's mark leaves off", () => {
+    const { container } = render(
+      <>
+        <UserAvatar seed="user_1" />
+        <ProjectMark projectId="proj_1" />
+      </>,
+    );
+    const [person, project] = container.querySelectorAll(".zl-avatar");
+    expect(person?.classList.contains("zl-avatar-moving")).toBe(true);
+    expect(project?.classList.contains("zl-avatar-moving")).toBe(false);
+  });
+
   it("eases up to speed on hover, and coasts back to rest", () => {
     vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame", "performance"] });
     // jsdom runs no CSS animations, so stand in for the gradient's.

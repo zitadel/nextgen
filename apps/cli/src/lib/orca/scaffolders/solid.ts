@@ -2,7 +2,7 @@ import { rm } from "node:fs/promises";
 import { join } from "node:path";
 
 import { AbstractCLIScaffolder } from "./cli";
-import { CREATE_VITE_NODE_ENGINES } from "./node-engines";
+import { CREATE_VITE_NODE_ENGINES, CREATE_VITE_VERSION } from "./node-engines";
 
 /**
  * Scaffolds a new Vite + Solid (TypeScript) single-page app with `create-vite`,
@@ -14,9 +14,14 @@ export class SolidScaffolder extends AbstractCLIScaffolder {
   readonly displayName = "Solid (Vite)";
   readonly supportedFrameworks: ReadonlyArray<string> = ["solid"];
   readonly nodeEngines = CREATE_VITE_NODE_ENGINES;
+  override readonly pinnedPackages: ReadonlyArray<string> = [CREATE_VITE_NODE_ENGINES.spec];
 
   protected async create(cwd: string, _framework: string): Promise<void> {
-    this.runCommand("npm", ["create", "vite@latest", ".", "--", "--template", "solid-ts"], cwd);
+    this.runCommand(
+      "npm",
+      ["create", `vite@${CREATE_VITE_VERSION}`, ".", "--", "--template", "solid-ts"],
+      cwd,
+    );
     await rm(join(cwd, "src/App.tsx"), { force: true });
     await rm(join(cwd, "src/App.css"), { force: true });
   }

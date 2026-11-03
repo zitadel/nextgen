@@ -5,7 +5,7 @@ import { writeOperations } from "./scripts/operations.ts";
 export default defineConfig({
   zitadel: {
     input: {
-      target: "../../api/openapi/openapi-spec.yaml",
+      target: "../../apps/api/api/openapi/openapi-spec.yaml",
       // `api/openapi/` is split one file per endpoint (see api/openapi/AGENTS.md),
       // so the spec is almost entirely `$ref`s into sibling files. orval 8.37
       // stopped following external `$ref`s unless allow-listed — a fetch guard
@@ -25,9 +25,10 @@ export default defineConfig({
       // `//` on a redirect and 404s. orval only encodes the parameters —
       // not the `baseUrl` below — from 8.37.0 (orval-labs/orval#4179).
       urlEncodeParameters: true,
+      // The proxy path or server URL, then the API prefix (ADR 077).
       baseUrl: {
-        runtime: "getProxyPath()",
-        imports: [{ name: "getProxyPath", importPath: "../../runtime/base-url" }],
+        runtime: "getApiBaseUrl()",
+        imports: [{ name: "getApiBaseUrl", importPath: "../../runtime/base-url" }],
       },
       override: {
         fetch: {
@@ -52,7 +53,7 @@ export default defineConfig({
   },
   zitadelZod: {
     input: {
-      target: "../../api/openapi/openapi-spec.yaml",
+      target: "../../apps/api/api/openapi/openapi-spec.yaml",
       // See the note on the `zitadel` input above.
       parserOptions: { externalRefs: { allow: ["*"] } },
     },

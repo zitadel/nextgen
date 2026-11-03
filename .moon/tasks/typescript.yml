@@ -22,11 +22,8 @@ implicitInputs:
   # config change would leave every project's lint task cache-hit (and
   # unselected by `moon ci`), running stale rules.
   - "/biome.json"
-  # Spread into every project's vitest config's `test` block. Without these a
-  # change to the shared base would leave every project's test task cache-hit
-  # (and unselected by `moon ci`), running stale config.
-  - "/vitest.shared.mjs"
-  - "/vitest.shared.d.mts"
+  # The GritQL rules biome.json loads as plugins: rules too.
+  - "/biome-plugins/*.grit"
 
 tasks:
   # Single standardized linter + formatter for every TypeScript project: Biome
@@ -49,6 +46,10 @@ tasks:
   # opts out with `workspace.inheritedTasks.exclude`.
   typecheck:
     command: "corepack pnpm run typecheck"
+    inputs:
+      - "**/*"
+      - "/packages/vitest-config/vitest.shared.mjs"
+      - "/packages/vitest-config/vitest.shared.d.mts"
 
   build:
     command: "corepack pnpm run build"
@@ -57,3 +58,7 @@ tasks:
 
   test:
     command: "corepack pnpm run test:all"
+    inputs:
+      - "**/*"
+      - "/packages/vitest-config/vitest.shared.mjs"
+      - "/packages/vitest-config/vitest.shared.d.mts"

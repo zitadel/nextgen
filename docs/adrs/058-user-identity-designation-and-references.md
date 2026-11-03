@@ -16,6 +16,14 @@
 > envelope gains derived, read-only identity fields (`identifier`,
 > `identifier_property`, `display`, §3a). Builds on
 > [ADR 048](048-wide-events-internal-audit-primitive.md) (audit events).
+>
+> **Note (2026-10-24):** most of this is built: `x-identifier` and
+> `x-display`, user refs with batch resolution (#1090), sessions returning
+> resolved refs (#1085), the derived identity on user responses and console
+> surfaces (#1092), and case-insensitive uniqueness (#970). Not built: the
+> per-property `x-unique: {compare: "exact"}` opt-out (§4a), and §5's check
+> that identifier values stay unique across designations, with its conflict
+> scan on redesignation.
 
 ## Decision
 

@@ -31,7 +31,7 @@ const socialLoginFlow = readFileSync(
 );
 
 const schemasDir = join(repoRoot, "docs/design/idp/schemas");
-const metaSchemaDir = join(repoRoot, "api/openapi/endpoints/schemas");
+const metaSchemaDir = join(repoRoot, "apps/api/api/openapi/endpoints/schemas");
 const loadJson = (dir: string, name: string) =>
   JSON.parse(readFileSync(join(dir, name), "utf8")) as Record<string, unknown>;
 const connectionSchema = loadJson(metaSchemaDir, "idp-connection.json");
@@ -686,7 +686,10 @@ describe("dialect dependency (x-verify removed in #901)", () => {
 
   it("the dialect's x-* vocabulary matches the note in area 1", () => {
     const dialect = JSON.parse(
-      readFileSync(join(repoRoot, "api/openapi/endpoints/schemas/user-property.json"), "utf8"),
+      readFileSync(
+        join(repoRoot, "apps/api/api/openapi/endpoints/schemas/user-property.json"),
+        "utf8",
+      ),
     ) as { properties: Record<string, unknown> };
     const annotations = Object.keys(dialect.properties)
       .filter((k) => k.startsWith("x-"))

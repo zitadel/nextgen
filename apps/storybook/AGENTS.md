@@ -5,9 +5,8 @@ instance hosting `@zitadel/components`' atoms and orchestrators, the
 orchestrators driven by `@zitadel/api-mock`. Console UI iterates on the console
 dev server instead (ADR 055). Commands and coverage: [`README.md`](README.md).
 
-The static build (`dist/`) is the hosted cloud's `storybook` service at
-`/storybook/`: production from `main`, a preview on every branch. Vercel builds
-it with `turbo run build` (repo-root [`vercel.json`](../../vercel.json)).
+It is the team's tool, never deployed: customers see the components in the
+docs' live examples ([`apps/docs/AGENTS.md`](../docs/AGENTS.md#live-examples)).
 
 ## Hard rules
 
@@ -24,8 +23,7 @@ it with `turbo run build` (repo-root [`vercel.json`](../../vercel.json)).
   (`parameters.msw`), and they are tagged `no-test` to keep the network out of
   the test run.
 - The build is relocatable: address files relative to the page or Vite's
-  base, never from `/`. The MSW worker follows the base; scoped to `/`, it
-  would intercept the console's and login UI's requests.
+  base, never from `/`. The MSW worker follows the base.
 
 ## Orchestrator stories
 

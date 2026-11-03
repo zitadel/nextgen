@@ -69,6 +69,7 @@
     "@types/node": "catalog:",
     "@vitest/browser": "catalog:",
     "@vitest/browser-playwright": "catalog:",
+    "@zitadel/vitest-config": "workspace:*",
     "msw": "catalog:",
     "playwright": "catalog:",
     "tsdown": "catalog:",

@@ -11,7 +11,7 @@
  * leaves out as the server's default rather than as a change.
  *
  * Normalized bodies are for COMPARISON; uploads send the file as written,
- * and `apply` never writes a server body back into the file. Comparing
+ * and `deploy` never writes a server body back into the file. Comparing
  * without the defaults is sound because the server applies them itself: it
  * decodes a schema into ogen's typed `UserSchema`, which sets `x-audit:
  * false` on every property that omits it, and stores the re-encoded body

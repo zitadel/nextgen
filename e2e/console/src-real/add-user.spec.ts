@@ -230,7 +230,7 @@ test("closes from the header without creating anything", async ({ page, zitadel,
 //
 //   const request = page.waitForRequest(
 //     (candidate) =>
-//       candidate.method() === "POST" && new URL(candidate.url()).pathname.endsWith("/api/users"),
+//       candidate.method() === "POST" && new URL(candidate.url()).pathname.endsWith("/api/v1/users"),
 //   );
 //
 //   await drawer.getByRole("combobox", { name: "Select project" }).click();

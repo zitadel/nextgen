@@ -1,69 +1,83 @@
 {
   "$schema": "https://turborepo.dev/schema.json",
   "extends": ["//"],
-  // The k6 benchmark harness (ADR 067): a nested Go module whose tasks run in
-  // this directory. The root module is a dependency through the replace
-  // directive, and the root packages bench imports compile in the JSON
-  // meta-schemas and the config defaults through //go:embed.
+  // The k6 benchmark harness (ADR 067): the Go module turbo finds through
+  // go.work as the package `bench`. The server module, the Go client, the
+  // config defaults and the design tokens are dependencies through replace
+  // directives; the root's `go-sources` reaches their sources through the
+  // module graph. The tasks are moon's (moon.yml) as commands; turbo's
+  // built-in `dev` (go run ./cmd/k6) is dropped.
   "tasks": {
     // Tracked Go files only, as the server project checks them.
     "format": {
-      "inputs": ["**/*.go"]
+      "cache": false,
+      "command": ["node", "../../scripts/go-format-check.mjs"],
+      "inputs": ["**/*.go", "$TURBO_ROOT$/scripts/go-format-check.mjs", "$TURBO_ROOT$/scripts/dev-process.mjs"]
     },
-    // Compiles the root module's generated Go (api/generated, the enumer and
-    // mock files) through the replace directive, which the server's
+    // Compiles the server module's generated output (the JSON meta-schemas its
+    // api/openapi/endpoints/schemas package embeds, the enumer and mock files) through the replace directive, which the server's
     // generation rewrites mid-graph; the edge keeps vet behind it, as the
-    // server's own vet is. build and test are ordered through vet.
+    // server's own vet is. Test waits through vet; build waits directly on
+    // generation so a test-only change does not select a production build.
     "vet": {
-      "dependsOn": ["@zitadel/server#check-generate"],
-      "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
-      "inputs": [
-        "$TURBO_DEFAULT$",
-        "$TURBO_ROOT$/**/*.go",
-        "$TURBO_ROOT$/go.mod",
-        "$TURBO_ROOT$/go.sum",
-        "$TURBO_ROOT$/api/openapi/endpoints/schemas/*.json",
-        "$TURBO_ROOT$/packages/config/defaults/**"
-      ]
+      "cache": false,
+      "dependsOn": ["go-sources", "@zitadel/server#check-generate"],
+      "command": ["go", "vet", "./..."],
+      "inputs": ["$TURBO_DEFAULT$"],
+      "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"]
     },
     // The JavaScript k6 scenarios go through Biome like the server launcher.
     "lint": {
-      "inputs": ["scripts/**/*.js", "$TURBO_ROOT$/biome.json"]
+      "command": ["pnpm", "exec", "biome", "check", "scripts", "--no-errors-on-unmatched"],
+      "inputs": ["scripts/**/*.js", "$TURBO_ROOT$/biome.json", "$TURBO_ROOT$/biome-plugins/*.grit"]
     },
+    "dev": { "extends": false },
+    // `build` and `test` are turbo's built-in Go tasks with moon's commands,
+    // and turbo adds every file of this module and of the modules it
+    // requires to their inputs, tests included. The negations take the
+    // tests back out: the server's would select the harness for a test-only
+    // change.
     "build": {
-      "dependsOn": ["vet"],
+      "cache": false,
+      "dependsOn": ["go-sources", "@zitadel/server#check-generate"],
+      "command": ["go", "build", "-o", "dist/k6", "./cmd/k6"],
+      "inputs": ["$TURBO_EXTENDS$", "!$TURBO_ROOT$/**/*_test.go", "!$TURBO_ROOT$/**/testdata/**"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
-      "inputs": [
-        "$TURBO_DEFAULT$",
-        "$TURBO_ROOT$/**/*.go",
-        "$TURBO_ROOT$/go.mod",
-        "$TURBO_ROOT$/go.sum",
-        "$TURBO_ROOT$/api/openapi/endpoints/schemas/*.json",
-        "$TURBO_ROOT$/packages/config/defaults/**"
-      ],
       "outputs": ["dist/k6"]
     },
     "test": {
-      "dependsOn": ["format", "vet"],
-      "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
+      "cache": false,
+      "dependsOn": ["go-sources", "format", "vet"],
+      "command": ["go", "test", "-timeout", "5m", "./..."],
       "inputs": [
         "$TURBO_DEFAULT$",
-        "$TURBO_ROOT$/**/*.go",
-        "$TURBO_ROOT$/go.mod",
-        "$TURBO_ROOT$/go.sum",
-        "$TURBO_ROOT$/api/openapi/endpoints/schemas/*.json",
-        "$TURBO_ROOT$/packages/config/defaults/**"
-      ]
+        "!$TURBO_ROOT$/apps/**/*_test.go",
+        "!$TURBO_ROOT$/apps/**/testdata/**",
+        "!$TURBO_ROOT$/packages/**/*_test.go",
+        "!$TURBO_ROOT$/packages/**/testdata/**"
+      ],
+      "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"]
     },
     // Measure a server that is already running (locally `pnpm run server`):
-    //   turbo run sweep --filter=@zitadel/bench -- --vus 5 --duration 10s
+    //   turbo run sweep --filter=bench -- --vus 5 --duration 10s
     "sweep": {
       "cache": false,
-      "dependsOn": ["build"]
+      "dependsOn": ["build"],
+      "command": [
+        "dist/k6",
+        "x",
+        "nextgen",
+        "sweep",
+        "--base",
+        "http://localhost:8080",
+        "--fixtures",
+        "fixtures/local.json"
+      ]
     },
     "summarize": {
       "cache": false,
-      "dependsOn": ["build"]
+      "dependsOn": ["build"],
+      "command": ["dist/k6", "x", "nextgen", "summarize"]
     }
   }
 }

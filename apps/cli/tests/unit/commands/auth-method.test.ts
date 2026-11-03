@@ -120,7 +120,7 @@ describe("auth-method password and passkey", () => {
       });
     });
 
-    it("lists plan and apply as the next commands after a change", async () => {
+    it("lists a dry run and a deploy as the next commands after a change", async () => {
       const cwd = await makeProject();
 
       const { envelope } = await run(cwd, "passkey", "disable");
@@ -128,7 +128,7 @@ describe("auth-method password and passkey", () => {
       const next = envelope.data?.next_commands as string[];
       expect(
         next.map((command) => command.replace(/^.*?@\S+ /, "").replace(/--cwd \S+/, "--cwd <cwd>")),
-      ).toEqual(["plan --cwd <cwd>", "apply --cwd <cwd>"]);
+      ).toEqual(["deploy --dry-run --cwd <cwd>", "deploy -m '<what changed>' --cwd <cwd>"]);
     });
 
     it("hands over the follow-ups as argument lists when the path needs quoting", async () => {
@@ -141,8 +141,8 @@ describe("auth-method password and passkey", () => {
 
       expect(envelope.data?.next_commands).toEqual([]);
       expect(envelope.data?.next_args).toEqual([
-        ["plan", "--cwd", expect.stringContaining("my project")],
-        ["apply", "--cwd", expect.stringContaining("my project")],
+        ["deploy", "--dry-run", "--cwd", expect.stringContaining("my project")],
+        ["deploy", "-m", "<what changed>", "--cwd", expect.stringContaining("my project")],
       ]);
     });
 

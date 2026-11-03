@@ -51,7 +51,17 @@ describe("api ls", () => {
 
         const result = await app.apiOperationsRendered("--tag", "System");
 
-        expect(result).toPrint("getHealth\tGET\t/healthz");
+        expect(result).toPrint("getLive\tGET\t/livez");
+      });
+    });
+
+    describe("--plain", () => {
+      it("prints each operation as a tab-separated record", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.apiOperationsRendered("--tag", "System", "--plain");
+
+        expect(result).toPrintPlainRow("getLive", "GET", "/livez", /.+/);
       });
     });
   });

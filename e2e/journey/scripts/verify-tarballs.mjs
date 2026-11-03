@@ -3,6 +3,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
+// @boundaries-ignore root scripts/ belongs to the workspace root, which no package can depend on
 import { APP_RELEASE_PACKAGES, PUBLIC_PACKAGE_DIRS } from "../../../scripts/release-manifest.mjs";
 import { packageName, readManifest } from "./lib.mjs";
 
@@ -40,10 +41,14 @@ const manifests = new Map();
 const serverPlatformPackagePattern = /^@zitadel\/server-(?:darwin|linux|win32)-/;
 // The CLI ships its agent contract as an installable Agent Skill (ADR 004).
 // Shipping the complete skill — its entry file and every reference it links —
-// is core product behavior, so the tarball must carry all of them.
+// is core product behavior, so the tarball must carry all of them. So must the
+// bundle `zitadel skills add` installs from dist/skills, which its build fills.
 const cliSkillFiles = [
   "skills/zitadel-cli/SKILL.md",
   "skills/zitadel-cli/references/driving-login-ui.md",
+  "dist/skills/zitadel/SKILL.md",
+  "dist/skills/zitadel-cli/SKILL.md",
+  "dist/skills/zitadel-cli/references/driving-login-ui.md",
 ];
 
 const tarballs = (await readdir(tarballsDir)).filter((file) => file.endsWith(".tgz")).sort();

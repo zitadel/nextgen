@@ -1,0 +1,240 @@
+post:
+  operationId: buildRelease
+  x-zitadel-cli: deploy
+  summary: Build a release from files
+  description: |
+    Builds a release from the resources of `.zitadel/` as authored on disk,
+    grouped by kind, in one transaction: a failure anywhere leaves no
+    revision and no release. The caller records nothing.
+
+    If the project already holds a release with the same content, the same
+    `content_hash`, the request answers `200` with that release and
+    allocates nothing, however long ago it was built. Otherwise every resource is compared against the
+    project's newest revision of the same handle: unchanged content reuses
+    that revision, changed content allocates a new one, and the request
+    answers `201` with the new release. A policy whose config matches only an
+    older revision allocates a new one too, so a request that resolves no
+    release, which reads the newest revision, applies it as well. Metadata is excluded from the
+    comparison, so the same content under a different `message` is the same
+    release.
+
+    A structurally malformed request is refused while decoding with
+    `req.invalid`, naming the offending fields. A well-formed bundle is then
+    checked resource by resource, as each kind's create endpoint checks it,
+    and every failure is reported at once: the request answers `400` with
+    `rel.invalid`, and `details.resources` lists each resource that failed.
+    A handle that resolves neither in the bundle nor in the project answers
+    `rel.unresolved_reference`, naming the pointer and the handle.
+
+    Building writes revisions, so besides `release.write` it needs the write
+    scope of every kind the bundle carries a resource of: `schema.write`,
+    `flow_definition.write`, `branding.write`, `idp.write` and
+    `policy.write`, as the per-kind create endpoints do. A missing scope answers `403` with `rel.permission_denied`,
+    naming the kind. An empty kind needs no scope.
+
+    Building a release does not deploy it. A release is not tied to an
+    origin, and the same release can later be deployed to any number of
+    origins unchanged.
+  tags:
+    - Releases
+  parameters:
+    - $ref: ../../../components/parameters/project-id.yaml
+  security:
+    - oauth2:
+        - release.write
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: build-release-request.yaml
+        examples:
+          bundle:
+            summary: Built from the files on disk
+            description: |
+              The CLI's form: the schemas, flow definitions and branding as
+              authored, the flow naming its schema by `objectType`. The
+              schema's `metaSchema` is the one the server publishes at
+              `/user-schema.json`. The server reuses whichever revisions
+              already match and allocates the rest.
+            value:
+              bundle:
+                schemas:
+                  - $schema: https://json-schema.org/draft/2020-12/schema
+                    kind: user-schema
+                    metaSchema: https://auth.acme.com/user-schema.json
+                    objectType: human-user
+                    x-auth-methods:
+                      password:
+                        enabled: true
+                    x-identifier: email
+                    properties:
+                      email:
+                        type: string
+                        format: email
+                        x-unique: project
+                      phone_number:
+                        type: string
+                flow_definitions:
+                  - name: default-login
+                    status: active
+                    user_schema: human-user
+                    purposes:
+                      login: identify
+                    steps:
+                      - name: identify
+                        fields: [email]
+                        actions:
+                          - name: submit
+                            kind: submit
+                            primary: true
+                        transitions:
+                          submit: { target: authenticate }
+                      - name: authenticate
+                        fields: ['x-auth-methods#password']
+                        actions:
+                          - name: submit
+                            kind: submit
+                            primary: true
+                        transitions:
+                          submit: { target: done }
+                      - name: done
+                        complete: redirect
+                idps:
+                  - slug: google
+                    protocol: oidc
+                    template: google
+                    display_name: Google
+                    subject_claim: sub
+                    claim_mapping:
+                      email: email
+                    oidc:
+                      issuer: https://accounts.google.com
+                      client_id: '${{ GOOGLE_CLIENT_ID }}'
+                      client_secret: '${{ GOOGLE_CLIENT_SECRET }}'
+                      scopes:
+                        - openid
+                        - email
+                policies:
+                  - operation: auth.factor.password.set
+                    config:
+                      min_length: 12
+                branding:
+                  layout: centered
+                  liquid_template: '<main>{{ step.name }}</main>'
+              message: add phone_number to human-user
+              git_sha: 4a5b6c7d8e9f0a1b2c3d4e5f60718293a4b5c6d7
+              git_dirty: false
+  responses:
+    '200':
+      description: |
+        The project already held a release with this content, built earlier,
+        and it was returned unchanged. No new release and no new revision was
+        created.
+      content:
+        application/json:
+          schema:
+            $ref: ../release.yaml
+          examples:
+            reused:
+              summary: The same files were built again under a new message
+              description: |
+                The content matched an existing release, so that release is
+                returned — note the message it was originally created with,
+                not the one just submitted.
+              value:
+                id: rel_01KX3RG8A7F0N9WD3P2E4YM5C1
+                project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
+                content_hash: sha256:9f2c1a7b4e83d05f6c2b19ae7d430f821c6b5de90a4f73829f2c1a7b4e83d05f
+                metadata:
+                  message: add phone_number to human-user
+                  git_sha: 4a5b6c7d8e9f0a1b2c3d4e5f60718293a4b5c6d7
+                  git_dirty: false
+                  created_at: '2026-07-14T09:11:00Z'
+                  created_by: user_01KWH3B72K7M7F0N9WD3P2E4YM
+                  created_by_type: human
+                revoked_at: null
+                pointers:
+                  - kind: schema
+                    handle: human-user
+                    revision_id: sch_01KWHF18816ZQE7F0N9WD3P2E4
+                  - kind: flow_definition
+                    handle: default-login
+                    revision_id: flowdef_01KWHG09JXA7F0N9WD3P2E4YM5
+                  - kind: branding
+                    handle: default
+                    revision_id: brnd_01KWH1P4MYS7F0N9WD3P2E4YM5
+    '201':
+      description: The release was built.
+      content:
+        application/json:
+          schema:
+            $ref: ../release.yaml
+          examples:
+            builtFromBundle:
+              summary: Built from a bundle
+              description: |
+                Each pointer carries the handle the server read from the
+                resource — `objectType` for a schema, `name` for a flow
+                definition, `default` for branding and `slug` for an IDP
+                connection — and the revision it reused or allocated for it.
+              value:
+                id: rel_01KX3RG8A7F0N9WD3P2E4YM5C1
+                project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
+                content_hash: sha256:9f2c1a7b4e83d05f6c2b19ae7d430f821c6b5de90a4f73829f2c1a7b4e83d05f
+                metadata:
+                  message: add phone_number to human-user
+                  git_sha: 4a5b6c7d8e9f0a1b2c3d4e5f60718293a4b5c6d7
+                  git_dirty: false
+                  created_at: '2026-07-14T09:11:00Z'
+                  created_by: user_01KWH3B72K7M7F0N9WD3P2E4YM
+                  created_by_type: human
+                revoked_at: null
+                pointers:
+                  - kind: schema
+                    handle: human-user
+                    revision_id: sch_01KWHF18816ZQE7F0N9WD3P2E4
+                  - kind: flow_definition
+                    handle: default-login
+                    revision_id: flowdef_01KWHG09JXA7F0N9WD3P2E4YM5
+                  - kind: branding
+                    handle: default
+                    revision_id: brnd_01KWH1P4MYS7F0N9WD3P2E4YM5
+                  - kind: idp
+                    handle: google
+                    revision_id: idprev_01KWHF2XY6RN7F0N9WD3P2E4YM
+    '400':
+      description: |
+        The bundle cannot build a release. A bundle whose resources fail
+        validation answers `rel.invalid` with every failing resource in
+        `details.resources`.
+      content:
+        application/json:
+          schema:
+            $ref: build-release-bad-request.yaml
+          examples:
+            invalidBundle:
+              summary: Two bundle resources fail validation
+              description: |
+                Each entry names the resource by kind, position and handle,
+                and carries the error its own create endpoint would have
+                answered, details included.
+              value:
+                code: rel.invalid
+                message: 'release: invalid'
+                details:
+                  resources:
+                    - kind: schema
+                      index: 0
+                      handle: human-user
+                      code: sch.invalid_request
+                      message: 'schema designation invalid: "x-identifier" property "email" must carry "x-unique" "project", has "none"'
+                    - kind: flow_definition
+                      index: 1
+                      handle: b2b-login
+                      code: flowdef.invalid
+                      message: 'flow definition: invalid'
+                      details:
+                        details: no purposes defined
+    default:
+      $ref: buildRelease-error-response.yaml

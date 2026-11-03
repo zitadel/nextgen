@@ -3,6 +3,7 @@ import type { ComponentProps, MouseEvent, ReactNode } from "react";
 
 import { FormError } from "@/components/form-error";
 import { Button } from "@/components/ui/button";
+import { CopyButton } from "@/components/ui/copy-button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,9 +32,10 @@ import { PAGE_TITLE, PAGE_TITLE_ROW } from "./typography";
  * | Head label    | display face, 12/16, 0.72px tracking, `foreground`  |
  * | Row icon      | 16px, stroke 1.5, `muted-foreground`, 10px to label |
  *
- * Column widths stay with each screen: Teams is a fixed 248px grid, Projects
- * thirds, and the Users table is schema-driven (its ID column takes the slack),
- * so it has no fixed grid to share.
+ * Column widths stay with each screen: Teams is a fixed 248px grid, while the
+ * Users and Projects tables let their ID column take the slack
+ * (`ResourceIdCell`); Users takes the properties a viewer pins, so it has no
+ * fixed grid to share.
  */
 
 /**
@@ -57,14 +59,33 @@ export const RESOURCE_TITLE = PAGE_TITLE;
 
 /**
  * The title row of a list screen: the heading with, where the screen has one,
- * its primary action beside it at every width (D19). 36px tall with or without
- * the button (`PAGE_TITLE_ROW`).
+ * its primary action beside it at every width (D19), and any filter beside
+ * that. 36px tall (`PAGE_TITLE_ROW`), except on a phone with a filter, where
+ * the filter takes a second row under the title.
  */
-export function ResourceTitle({ children, action }: { children: ReactNode; action?: ReactNode }) {
+export function ResourceTitle({
+  children,
+  action,
+  filter,
+}: {
+  children: ReactNode;
+  action?: ReactNode;
+  /**
+   * Controls that narrow the list, beside the action and 8px from it. On a
+   * phone they drop to their own row under the title while the action keeps
+   * the title row (D19).
+   */
+  filter?: ReactNode;
+}) {
   return (
-    <div className={cn(RESOURCE_HEADER, PAGE_TITLE_ROW)}>
+    <div className={cn(RESOURCE_HEADER, PAGE_TITLE_ROW, "flex-wrap gap-x-2 gap-y-4")}>
       <h1 className={RESOURCE_TITLE}>{children}</h1>
-      {action}
+      {filter && (
+        <div className="order-3 flex basis-full items-center gap-2 sm:order-2 sm:ml-auto sm:basis-auto">
+          {filter}
+        </div>
+      )}
+      <div className="order-2 ml-auto sm:order-3 sm:ml-0">{action}</div>
     </div>
   );
 }
@@ -73,11 +94,72 @@ export function ResourceTitle({ children, action }: { children: ReactNode; actio
 export const RESOURCE_TABLE_WRAP =
   "border-sidebar-border bg-card overflow-x-auto rounded-md border";
 
+/**
+ * The card of a table whose leading and trailing columns stay put while the
+ * rest scrolls under them. It is the `scroll` group the sticky cells read
+ * `data-scroll-start` / `data-scroll-end` from (`useScrollEdges`).
+ */
+export const RESOURCE_TABLE_SCROLL = "group/scroll";
+
+/**
+ * The leading column, pinned to the card's left edge from 640px. Its 1px
+ * divider shows only while a column is scrolled under it.
+ *
+ * Below 640px it scrolls with the rest: a phone's card is about 300px wide,
+ * and a pinned identity column (up to 280px) beside the pinned menu would
+ * leave no room for any column between them.
+ */
+export const RESOURCE_STICKY_START =
+  "sm:sticky sm:left-0 sm:z-10 bg-card sm:group-data-[scroll-start]/scroll:shadow-[inset_-1px_0_0_var(--color-border)]";
+
+/**
+ * The trailing column (the row menu), pinned to the card's right edge so the
+ * menu is reachable at any width. Its divider shows while columns run on
+ * under it.
+ */
+export const RESOURCE_STICKY_END =
+  "sticky right-0 z-10 bg-card group-data-[scroll-end]/scroll:shadow-[inset_1px_0_0_var(--color-border)]";
+
+/**
+ * A body cell of a sticky column. It must be opaque, or the scrolled cells
+ * show through it, so the row's translucent hover and open-menu fills
+ * (`ResourceRow`, `TableRow`) are mixed onto the card colour here rather than
+ * layered over it. The row needs the `group` class. It fades with the row's
+ * own `transition-colors`, or it would snap while the rest of the row fades.
+ */
+export const RESOURCE_STICKY_BODY =
+  "transition-colors bg-card group-hover:bg-[color-mix(in_oklab,var(--color-muted)_40%,var(--color-card))] group-has-aria-expanded:bg-[color-mix(in_oklab,var(--color-muted)_50%,var(--color-card))]";
+
 /** One body cell: 56px tall, inset 24px. */
 export const RESOURCE_CELL = "h-14 px-6 py-2";
 
 /** A body cell holding secondary text. */
 export const RESOURCE_CELL_MUTED = "text-muted-foreground h-14 truncate px-6 py-2 text-sm";
+
+// The row's copy button rests hidden and shows on the row's hover or its own
+// focus, so a keyboard reaches it; where there is no hover it always shows.
+// The row needs the `group` class for the hover.
+const ROW_COPY =
+  "shrink-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100";
+
+/**
+ * A row's ID cell. It takes whatever width the other columns leave
+ * (`w-full max-w-0`) and truncates inside it, so a table of a few short
+ * columns fits a 1024px window without scrolling. The tooltip keeps the whole
+ * id, and the copy button copies it however much of it shows.
+ */
+export function ResourceIdCell({ id, name }: { id: string; name: string }) {
+  return (
+    <TableCell className={`${RESOURCE_CELL} w-full max-w-0 min-w-40`}>
+      <span className="flex items-center gap-1">
+        <span className="text-foreground min-w-0 truncate text-sm" title={id}>
+          {id}
+        </span>
+        <CopyButton value={id} label={`Copy the ID of ${name}`} className={ROW_COPY} />
+      </span>
+    </TableCell>
+  );
+}
 
 /** A row's leading glyph — the design draws Lucide at stroke 1.5, not the default 2. */
 export const RESOURCE_ROW_ICON = "text-muted-foreground size-4 shrink-0";
@@ -176,6 +258,7 @@ export function ResourceEmptyRow({ colSpan, children }: { colSpan: number; child
 export function RowMenu({
   name,
   icon: Icon = Ellipsis,
+  size = "icon",
   className,
   contentClassName = "w-40",
   children,
@@ -183,6 +266,8 @@ export function RowMenu({
   /** The row's name, for the trigger's accessible name. */
   name: string;
   icon?: LucideIcon;
+  /** `icon-xs`: the 24px trigger a detail card's rows draw. */
+  size?: "icon" | "icon-xs";
   className?: string;
   contentClassName?: string;
   children: ReactNode;
@@ -192,7 +277,7 @@ export function RowMenu({
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
-          size="icon"
+          size={size}
           aria-label={`Actions for ${name}`}
           className={className}
         >

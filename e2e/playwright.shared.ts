@@ -18,7 +18,7 @@ export const workspaceRoot = join(import.meta.dirname, "..");
 
 /**
  * Fail-fast timeouts, so a wedged or unresponsive server ends a lane with a
- * clear error instead of hanging it. A stale server answering `/healthz` can
+ * clear error instead of hanging it. A stale server answering `/readyz` can
  * let readiness pass against the wrong instance; these caps turn that into a
  * quick failure. Spread `e2eTimeouts` at the top level of `defineConfig` and
  * `e2eActionTimeouts` into `use`.
@@ -53,7 +53,7 @@ export const chromiumProjects: PlaywrightTestConfig["projects"] = [
  * `withZitadel`'s `zitadel` options for the lanes that boot a real instance:
  * the source-built server binary, which `moon run server:build` writes (the
  * moon tasks set ZITADEL_SERVER_BINARY to the same path). That build embeds
- * the console and login-ui dists, so a lane tests the working tree's UI.
+ * the console's dist, so a lane tests the working tree's console.
  */
 export const inRepoZitadel = {
   serverBinary:

@@ -27,7 +27,7 @@ import { useTheme } from "@/theme";
  * signs in or registers against the **platform project** — the console's own
  * identity project (ADR 0004), not the project being claimed — and the page
  * spends the challenge via `claim/complete`, authenticated by the
- * `__nextgen_session` cookie. The CLI meanwhile polls `claim/status`, so
+ * session cookie. The CLI meanwhile polls `claim/status`, so
  * success here is what unblocks the terminal.
  *
  * A top-level route outside `_authed` on purpose: an unauthenticated visitor

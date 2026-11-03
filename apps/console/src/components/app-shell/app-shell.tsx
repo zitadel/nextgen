@@ -1,4 +1,4 @@
-import { Link, useMatchRoute } from "@tanstack/react-router";
+import { Link, useMatch, useMatchRoute } from "@tanstack/react-router";
 import { ArrowLeft } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -22,7 +22,7 @@ import { ZitadelLogo } from "./icons";
 import { SearchDialog, SearchTrigger, useSearchShortcut } from "./search";
 import { useNavItems } from "./use-nav-items";
 import type { NavView } from "@/nav";
-import { SETTINGS_PATH, type ShellUser, UserMenuItem } from "./user-menu";
+import { SETTINGS_PATH, type ShellUser, UserMenuButton, UserMenuItem } from "./user-menu";
 
 /**
  * Console shell built on shadcn's `Sidebar` block. `collapsible="icon"` gives
@@ -32,6 +32,10 @@ import { SETTINGS_PATH, type ShellUser, UserMenuItem } from "./user-menu";
  * sits at the top of the content column in the portal view, and is absent from
  * the Settings view, which the design draws without one. Colours come from `@zitadel/design-tokens` via the shadcn utility names;
  * the sidebar surface uses `background` per the design (see `ui/sidebar.tsx`).
+ *
+ * Projects is the console's home and draws no sidebar (`HomeShell`): the
+ * sidebar is the selected project's screens, and the home is above every
+ * project rather than inside one.
  */
 export function AppShell({
   children,
@@ -46,13 +50,25 @@ export function AppShell({
 }) {
   const matchRoute = useMatchRoute();
   const inSettings = !!matchRoute({ to: SETTINGS_PATH, fuzzy: true });
+  const atHome = !!useMatch({ from: HOME_ROUTE, shouldThrow: false });
   // The palette is the shell's, not the bar's: ⌘K opens it in the Settings
   // view too, which draws no bar.
   const [searchOpen, setSearchOpen] = useSearchShortcut();
 
+  const searchDialog = <SearchDialog open={searchOpen} onOpenChange={setSearchOpen} />;
+
+  if (atHome) {
+    return (
+      <HomeShell user={user} onSignOut={onSignOut} onSearch={() => setSearchOpen(true)}>
+        {searchDialog}
+        {children}
+      </HomeShell>
+    );
+  }
+
   return (
     <SidebarProvider defaultOpen={readSidebarOpen()}>
-      <SearchDialog open={searchOpen} onOpenChange={setSearchOpen} />
+      {searchDialog}
       <AppSidebar user={user} onSignOut={onSignOut} />
       {/* `min-w-0` because the inset is a flex item, and a flex item's default
           `min-width: auto` makes it grow to fit its widest content instead of
@@ -63,10 +79,53 @@ export function AppShell({
         {/* No context bar in the Settings view: the settings design draws none,
             and the switcher it carries is a *project* control that says nothing
             about an account screen. */}
-        {!inSettings && <ContextBar onSearch={() => setSearchOpen(true)} />}
+        {!inSettings && <ContextBar onSearch={() => setSearchOpen(true)} userId={user?.userId} />}
         {children}
       </SidebarInset>
     </SidebarProvider>
+  );
+}
+
+/** The console's home: Projects, the one screen drawn without the sidebar. */
+const HOME_ROUTE = "/_authed/projects/";
+
+/**
+ * The home's chrome: one 56px bar, ruled underneath like the portal's, with
+ * the logo on the left and search and the account on the right. No project
+ * switcher, since the page is that list at full size (D21), and no sidebar,
+ * since its screens are a project's and none is open here.
+ */
+function HomeShell({
+  children,
+  user,
+  onSignOut,
+  onSearch,
+}: {
+  children: ReactNode;
+  user?: ShellUser;
+  onSignOut?: () => void;
+  onSearch: () => void;
+}) {
+  return (
+    <div className="flex min-h-svh w-full flex-col bg-background">
+      <header className={`${TOP_BAR} px-4`}>
+        <HomeLink className="text-foreground" />
+        <div className="flex min-w-0 items-center gap-3">
+          <BarSearch onSearch={onSearch} />
+          <UserMenuButton user={user} onSignOut={onSignOut} />
+        </div>
+      </header>
+      <main className="min-w-0 flex-1">{children}</main>
+    </div>
+  );
+}
+
+/** Home is Projects, the list of every project, from any screen. */
+function HomeLink({ className }: { className: string }) {
+  return (
+    <Link to="/projects" aria-label="Home" className={`inline-flex items-center ${className}`}>
+      <ZitadelLogo className="h-[21px] w-auto" />
+    </Link>
   );
 }
 
@@ -133,17 +192,11 @@ function AppSidebar({ user, onSignOut }: { user?: ShellUser; onSignOut?: () => v
   );
 }
 
-/** Logo lockup and the collapse toggle; the toggle alone in the rail. */
+/** Logo lockup, linking home, and the collapse toggle; the toggle alone in the rail. */
 function BrandHeader() {
   return (
     <SidebarHeader className={BRAND_HEADER}>
-      <Link
-        to="/"
-        aria-label="Home"
-        className="inline-flex items-center text-sidebar-foreground group-data-[collapsible=icon]:hidden"
-      >
-        <ZitadelLogo className="h-[21px] w-auto" />
-      </Link>
+      <HomeLink className="text-sidebar-foreground group-data-[collapsible=icon]:hidden" />
       <SidebarTrigger className={HEADER_BUTTON} />
     </SidebarHeader>
   );
@@ -183,8 +236,9 @@ function SettingsHeader() {
  * Console ADR 0001). Portal is the project's screens; Settings holds the
  * person's profile alone while accounts are not surfaced (Console ADR 0005
  * §3). A row stays marked on the screens beneath it, so a resource's detail
- * keeps its list marked. Design-only entries (`DESIGN_ONLY_NAV`, empty today)
- * render disabled.
+ * keeps its list marked. Projects is not a row: it is the home, behind the
+ * logo and the project switcher's `All projects`. Design-only entries
+ * (`DESIGN_ONLY_NAV`, empty today) render disabled.
  *
  * Rows keep their height and a 2px gap in both sidebar states, so collapsing
  * moves nothing vertically.
@@ -234,15 +288,28 @@ function NavList({ view, label }: { view: NavView; label: string }) {
  * sidebar's brand header. The collapse toggle lives in the sidebar and the
  * theme in the account menu, so the bar carries neither.
  */
-function ContextBar({ onSearch }: { onSearch: () => void }) {
+function ContextBar({ onSearch, userId }: { onSearch: () => void; userId?: string }) {
   return (
-    <div className="sticky top-0 z-10 flex h-14 shrink-0 items-center justify-between gap-4 border-b border-border bg-background px-2 md:px-4">
-      <ContextSwitcher />
-      {/* Hidden on phones, as in the proposal: ⌘K still opens it, and the bar
-          needs the width for the switchers. */}
-      <div className="hidden w-75 justify-end sm:flex">
-        <SearchTrigger onOpen={onSearch} />
-      </div>
+    <div className={`${TOP_BAR} px-2 md:px-4`}>
+      {/* The signed-in person, whose recent projects the switcher keeps. */}
+      <ContextSwitcher userId={userId} />
+      <BarSearch onSearch={onSearch} />
+    </div>
+  );
+}
+
+/** The top bar both shells draw: 56px, ruled underneath, level with the sidebar's brand header. */
+const TOP_BAR =
+  "sticky top-0 z-10 flex h-14 shrink-0 items-center justify-between gap-4 border-b border-border bg-background";
+
+/**
+ * The bar's search. Hidden on phones, as in the proposal: ⌘K still opens it,
+ * and the bar needs the width for the switchers.
+ */
+function BarSearch({ onSearch }: { onSearch: () => void }) {
+  return (
+    <div className="hidden w-75 justify-end sm:flex">
+      <SearchTrigger onOpen={onSearch} />
     </div>
   );
 }

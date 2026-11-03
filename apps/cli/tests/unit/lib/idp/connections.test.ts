@@ -11,10 +11,14 @@ import { clientId, displayName, googleSelection, issuer, slug } from "../../../h
 import {
   type ConnectionFile,
   IDPS_DIR,
+  checkCustomSlug,
   credentialVariablesOf,
   planConnection,
   readConnectionFiles,
+  refuseChangedIssuer,
+  storedCustomSettings,
 } from "../../../../src/lib/idp";
+import { thrownBy } from "../../../helpers/thrown-value";
 
 const googleBody = (over: Record<string, unknown> = {}) => ({
   slug: "google",
@@ -93,6 +97,79 @@ describe("credentialVariablesOf", () => {
       clientId: "ACME_CLIENT_ID",
       clientSecret: "ACME_CLIENT_SECRET",
     });
+  });
+});
+
+const acmeFile = file("acme-sso.json", {
+  slug: "acme-sso",
+  display_name: "Acme SSO",
+  oidc: { issuer: "https://sso.acme.example", scopes: ["openid", "email"] },
+});
+
+describe("checkCustomSlug", () => {
+  const check = (files: readonly ConnectionFile[], given = "acme-sso") =>
+    checkCustomSlug(files, slug(given), "--slug");
+
+  it("returns the single file that declares the slug", () => {
+    expect(check([acmeFile])).toBe(acmeFile);
+  });
+
+  it("returns nothing for a slug that is free", () => {
+    expect(check([acmeFile], "other-sso")).toBeUndefined();
+  });
+
+  it("refuses two files that declare the same slug", () => {
+    const twin = file("acme-sso-copy.json", acmeFile.body);
+
+    expect(() => check([acmeFile, twin])).toThrow(/More than one connection is named acme-sso/);
+  });
+
+  it("refuses a slug whose file name holds another connection", () => {
+    const squatter = file("acme-sso.json", { slug: "something-else" });
+
+    expect(() => check([squatter])).toThrow(/already exists and is not the acme-sso connection/);
+  });
+});
+
+describe("storedCustomSettings", () => {
+  it("reads the display name and issuer as the file holds them, and not the scopes", () => {
+    expect(storedCustomSettings(acmeFile)).toEqual({
+      displayName: "Acme SSO",
+      issuer: "https://sso.acme.example",
+    });
+  });
+
+  it("reads only what the file has", () => {
+    expect(storedCustomSettings(file("acme-sso.json", { slug: "acme-sso" }))).toEqual({});
+    expect(
+      storedCustomSettings(file("acme-sso.json", { slug: "acme-sso", oidc: { issuer: 3 } })),
+    ).toEqual({});
+  });
+});
+
+describe("refuseChangedIssuer", () => {
+  const refuse = (given: string) =>
+    refuseChangedIssuer(acmeFile, slug("acme-sso"), given, "--slug");
+
+  it("accepts the issuer the connection was written with", () => {
+    expect(() => refuse("https://sso.acme.example")).not.toThrow();
+  });
+
+  it("refuses another issuer, even one that differs by a trailing slash", () => {
+    expect(() => refuse("https://sso.acme.example/")).toThrow(
+      /connects to https:\/\/sso.acme.example, not https:\/\/sso.acme.example\//,
+    );
+  });
+
+  it("refuses a file that has no issuer at all", () => {
+    expect(() =>
+      refuseChangedIssuer(
+        file("acme-sso.json", { slug: "acme-sso" }),
+        slug("acme-sso"),
+        "https://a.example",
+        "--slug",
+      ),
+    ).toThrow(/is not an OIDC connection to https:\/\/a.example/);
   });
 });
 
@@ -260,12 +337,12 @@ describe("planConnection", () => {
       slug: "google",
       oidc: { issuer: "http://localhost:9100", client_id: "a", client_secret: "b" },
     });
-    let hint = "";
-    try {
-      planConnection({ slugFlag: "--sso-slug", selection: googleSelection, files: [local] });
-    } catch (error) {
-      hint = (error as ZitadelError).hint ?? "";
-    }
+    const hint =
+      (
+        thrownBy(() =>
+          planConnection({ slugFlag: "--sso-slug", selection: googleSelection, files: [local] }),
+        ) as ZitadelError | undefined
+      )?.hint ?? "";
 
     expect(hint).toContain("in the schemas and flows that name it");
   });
@@ -275,12 +352,12 @@ describe("planConnection", () => {
       slug: "google",
       oidc: { issuer: "http://localhost:9100", client_id: "a", client_secret: "b" },
     });
-    let hint = "";
-    try {
-      planConnection({ slugFlag: "--slug", selection: googleSelection, files: [local] });
-    } catch (error) {
-      hint = (error as ZitadelError).hint ?? "";
-    }
+    const hint =
+      (
+        thrownBy(() =>
+          planConnection({ slugFlag: "--slug", selection: googleSelection, files: [local] }),
+        ) as ZitadelError | undefined
+      )?.hint ?? "";
 
     expect(hint).not.toContain("--slug");
   });
@@ -290,12 +367,12 @@ describe("planConnection", () => {
       slug: "google",
       oidc: { issuer: "http://localhost:9100", client_id: "a", client_secret: "b" },
     });
-    let hint = "";
-    try {
-      planConnection({ slugFlag: "--slug", selection: googleSelection, files: [local] });
-    } catch (error) {
-      hint = (error as ZitadelError).hint ?? "";
-    }
+    const hint =
+      (
+        thrownBy(() =>
+          planConnection({ slugFlag: "--slug", selection: googleSelection, files: [local] }),
+        ) as ZitadelError | undefined
+      )?.hint ?? "";
 
     expect(hint).not.toContain("give it the slug google");
   });
@@ -600,12 +677,12 @@ describe("planConnection for a custom connection", () => {
   it("names the slug flag of the command it is planning for in the hint", () => {
     const existing = file("acme-sso.json", acmeBody());
     const input = { ...acme, issuer: issuer("https://sso.other.example") };
-    let hint = "";
-    try {
-      planConnection({ slugFlag: "--sso-slug", selection: custom(input), files: [existing] });
-    } catch (error) {
-      hint = (error as ZitadelError).hint ?? "";
-    }
+    const hint =
+      (
+        thrownBy(() =>
+          planConnection({ slugFlag: "--sso-slug", selection: custom(input), files: [existing] }),
+        ) as ZitadelError | undefined
+      )?.hint ?? "";
 
     expect(hint).toContain("--sso-slug");
   });
@@ -636,12 +713,12 @@ describe("planConnection for a custom connection", () => {
   });
   it("names the slug flag of the command in the hint about a file that holds the name", () => {
     const occupied = file("acme-sso.json", acmeBody({ slug: "something-else" }));
-    let hint = "";
-    try {
-      planConnection({ slugFlag: "--sso-slug", selection: custom(acme), files: [occupied] });
-    } catch (error) {
-      hint = (error as ZitadelError).hint ?? "";
-    }
+    const hint =
+      (
+        thrownBy(() =>
+          planConnection({ slugFlag: "--sso-slug", selection: custom(acme), files: [occupied] }),
+        ) as ZitadelError | undefined
+      )?.hint ?? "";
 
     expect(hint).toContain("--sso-slug");
   });

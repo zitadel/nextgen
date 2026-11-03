@@ -6,8 +6,11 @@
     "typecheck": {
       "dependsOn": ["@zitadel/api-mock#build", "build"]
     },
+    // src/browser-commands.d.ts declares the Vitest browser commands, which
+    // the library build never reads.
     "build": {
-      "dependsOn": ["@zitadel/components#build", "@zitadel/sdk-core#build"]
+      "dependsOn": ["@zitadel/components#build", "@zitadel/sdk-core#build"],
+      "inputs": ["$TURBO_EXTENDS$", "!src/browser-commands.d.ts"]
     },
     "build-release": {
       "dependsOn": ["@zitadel/components#build-release", "@zitadel/sdk-core#build-release"]
@@ -16,7 +19,8 @@
     // Lit components need a real DOM); api-mock serves the Flow API to the
     // specs. The script retries a failed suite (#1490).
     "test": {
-      "dependsOn": ["@zitadel/api-mock#build", "install-browsers", "build"]
+      "dependsOn": ["@zitadel/api-mock#build", "install-browsers", "build"],
+      "inputs": ["$TURBO_EXTENDS$", "$TURBO_ROOT$/scripts/task-guard.mjs"]
     }
   }
 }

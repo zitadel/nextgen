@@ -5,15 +5,35 @@
 > [`v4.19.5`](https://github.com/zitadel/zitadel/tree/v4.19.5). The `v4:` paths
 > below are relative to that tag.
 
+PR #2250 retains the aggregate JSON reducers in
+[`stage`](../../../apps/api/internal/migratev4/stage). Position ordering detects
+changed aggregates; each aggregate is folded in **sequence order**, not position
+order, so historical position inversions do not lose its state. Planning
+recomputes derived users from the complete snapshot, including organization
+domain changes without a user event.
+
+The current importer requires stopped source and target writers for every
+apply and verification, even when the source has the gap-free setup marker.
+Its source/option binding includes a digest of the database endpoint and
+instance creation event; reconnect also checks the saved event cursor still
+exists. A pending apply freezes the staged snapshot until recovery completes.
+Verification folds a fresh source snapshot independently of the durable stage.
+These offline safeguards do not establish mixed-version writer safety or
+deployed-runtime readiness; the live-reader requirements below remain future
+work, as summarized in the [implementation status](README.md#implementation-status-in-pr-2250).
+
 ## 1. Versions and capability
 
-The source must guarantee that no event slips past the reader.
+The source must guarantee that no event slips past the reader. The first
+supported/tested fixture is v4.19.5. The table describes reader capabilities,
+not a promise that every listed minor's reducers have been validated. Add a
+version to the supported matrix only with its payload and lifecycle fixtures.
 
 | v4 | Position stamped | Late-commit guard | Migrator |
 |---|---|---|---|
 | 4.0 – 4.1 | Transaction start | `pg_stat_activity` filter on the pusher's `application_name` | Refuse; upgrade first |
 | 4.2 – 4.17 | Transaction start (`NOW()`) | Advisory-lock barrier. A writer whose transaction began before the reader's but locked after it can still be missed | Only with v4 stopped |
-| 4.18+ | `clock_timestamp()` at insert, after the writer's lock | Advisory-lock barrier, gap-free | Continuous sync (`--follow`) |
+| 4.18+ | `clock_timestamp()` at insert, after the writer's lock | Advisory-lock barrier, gap-free | Eligible for `--follow` after M4 and writer-version validation |
 
 - **Detect capability, not version numbers.**
   - Setup steps are recorded as events: `aggregate_type = 'system'`,
@@ -23,6 +43,15 @@ The source must guarantee that no event slips past the reader.
   - The barrier needs v4 ≥ 4.2. Writers take the lock in
     [`v4:internal/eventstore/v3/push.go`](https://github.com/zitadel/zitadel/blob/v4.19.5/internal/eventstore/v3/push.go),
     and no setup step marks that version.
+  - A setup marker proves schema migration, not the behavior of every running
+    writer. Record the deployed writer versions/digests and the operator's
+    evidence that old replicas, jobs and external writers have been retired.
+    Missing evidence or a mixed upgrade blocks follow; an immutable source
+    snapshot can still be assessed using a tested offline adapter.
+  - Bind the source's stable database identity and instance to the ledger.
+    Reconnect checks also confirm that the last consumed event still exists
+    with the same identity/payload; rollback to an older database or an event
+    rewrite stops ingestion for reassessment. Never treat a DSN as identity.
 - **Older data.** A database upgraded from the old `events` table may hold
   `in_tx_order` as BIGINT and a leftover `eventstore.events_old`. Read the
   column type and ignore that table.
@@ -80,6 +109,14 @@ LIMIT $10;
 
 This is v4's own projection query (`prepareEventTypeScans`).
 
+For a verification generation, first capture a cutoff H behind this barrier
+and persist it with the cursor. Subsequent pages keep the same cutoff: replace
+the `now()` upper bound with that saved decimal cutoff (no later than each
+page's transaction start). Drain every selected event-type scan through H
+before declaring ingestion complete. Retain both the cutoff and last event
+tuple, because a quiet interval can contain no final event to serve as H.
+Final H is captured only after every source writer is stopped or fenced.
+
 - **Same transaction.** Do not split the lock and the select into separate
   statements outside a transaction. `now()` must be no later than the lock.
 - **Not REPEATABLE READ.** Its snapshot would be taken at the lock statement,
@@ -87,17 +124,12 @@ This is v4's own projection query (`prepareEventTypeScans`).
 - **Primary only.** Advisory locks do not replicate.
 - **Brief write pause.** The exclusive lock briefly holds up new writers of
   that instance. v4's projections do the same constantly.
-- **Pairs with idempotent apply.** Keep the cursor beside the stage. Skip
-  events at or below the stored per-aggregate `sequence`.
-- **Detect with position, fold by sequence.** The POC uses this query only to
-  learn which aggregates changed. It then reads each one's events after its
-  staged sequence on the primary key (`instance_id, aggregate_type,
-  aggregate_id, sequence`), in sequence order
-  ([events.go](../../../internal/migratev4/v4/events.go)).
-  - One aggregate's sequences become visible in order: a push that reads the
-    newest sequence waits for the transaction holding it.
-  - So the fold is right even where positions disagree with sequences, which
-    old data written before 4.18 can contain.
+- **Pairs with idempotent apply.** Commit the cursor, per-aggregate replay
+  checkpoints, stage changes and dependency invalidations together. A sequence
+  deduplicates source events only; a separate stage revision drives apply.
+  Reduce every effect of an event before recording its aggregate checkpoint.
+- **Precision.** Preserve DECIMAL positions and BIGINT orders/sequences
+  losslessly in Go, SQL and reports; serialize them as decimal strings in JSON.
 - **Instances.** List them from `instance.added` minus `instance.removed`, both
   on `aggregate_type = 'instance'`. A partial index (`active_instances_events`)
   covers that.
@@ -124,8 +156,11 @@ This is v4's own projection query (`prepareEventTypeScans`).
 
 ## 4. Events the reducers consume
 
-Each reducer keeps the newest `sequence` it applied per aggregate. Source
-files are under `v4:internal/repository/`.
+Each reducer keeps the newest source `sequence` it applied per aggregate.
+Source files are under `v4:internal/repository/`. After reducing an event,
+advance the stage revisions of its direct and dependent rows in the same
+ledger transaction ([pipeline](README.md#pipeline)). Org/instance sequences
+must never be compared with user sequences.
 
 ### Instance (`aggregate_type = 'instance'`, id = owner = instance id)
 
@@ -134,10 +169,9 @@ files are under `v4:internal/repository/`.
 | `instance.added`, `instance.changed` {`name`} | Name |
 | `instance.removed` | Instance removed. Stop and report |
 | `instance.default.org.set` {`orgId`} | Default org (the newest wins) |
-| `instance.iam.project.set` {`iamProjectId`} | Zitadel's own project (the console's), left out of `assess`'s project count |
 | `instance.domain.added` {`domain`, `generated`}, `.primary.set`, `.removed`; `instance.trusted_domains.added`/`.removed` | Origin candidates for the report |
 | `instance.policy.domain.added`/`.changed` {`userLoginMustBeDomain`, …} | Instance default for login names (default false) |
-| `instance.policy.login.added`/`.changed` {`allowUsernamePassword`, `allowRegister`, `allowExternalIdp`, `forceMFA`, `disableLoginWithEmail`, `disableLoginWithPhone`, …} | `assess` flags, such as forced MFA |
+| `instance.policy.login.added`/`.changed` {`allowUsernamePassword`, `allowRegister`, `allowExternalIdp`, `forceMFA`, `disableLoginWithEmail`, `disableLoginWithPhone`, …} | Effective-policy inputs; invalidate inheriting orgs/users and reassess safety gates |
 | `instance.policy.login.idpprovider.added`/`.removed`/`.cascade.removed` {`idpConfigId`} | IdPs offered at sign-in |
 
 ### Organization (`aggregate_type = 'org'`, id = owner = org id)
@@ -145,11 +179,18 @@ files are under `v4:internal/repository/`.
 | Event | Stage effect |
 |---|---|
 | `org.added`, `org.changed` {`name`} | Name |
-| `org.deactivated`, `org.reactivated` | State |
+| `org.deactivated`, `org.reactivated` | State; invalidate all owned users, preserving each user's own lock/inactive state |
 | `org.removed` | Removed. **v4 writes no user events for it**: mark the org's users, IdPs and links removed |
-| `org.domain.added`, `.verified`, `.primary.set`, `.removed` {`domain`} | Verified domains and the primary domain. Creating an org pushes added, verified and primary.set for its generated domain |
-| `org.policy.domain.added`/`.changed`/`.removed` | Org override of `userLoginMustBeDomain` |
-| `org.policy.login.*` and `org.policy.login.idpprovider.*` | Counted (org login policies are out of scope) |
+| `org.domain.added`, `.verified`, `.primary.set`, `.removed` {`domain`} | Verified/primary domains; invalidate derived user login names even without user events. Creating an org pushes added, verified and primary.set |
+| `org.policy.domain.added`/`.changed`/`.removed` | Org override of `userLoginMustBeDomain`; removal restores inheritance and invalidates dependents |
+| `org.policy.login.*` and `org.policy.login.idpprovider.*` | Reduce overrides, removals and allowed providers for effective eligibility; importing team-scoped flows remains out of scope |
+
+Policy assessment must include default/override precedence, MFA and enrolled
+factors, password/registration/IdP permissions, verification requirements and
+lifetimes/lockout rules used by the source. Reuse the pinned v4 semantics in
+independent fixtures. Unknown authentication-affecting events or fields are
+inconclusive and block readiness, rather than disappearing into an inventory
+count. See [safety gates](README.md#safety-gates).
 
 ### Human user (`aggregate_type = 'user'`, owner = org id)
 
@@ -185,7 +226,9 @@ Files: `user/human*.go`, `user/user.go`, `user/human_external_idp.go`.
   - `user.removed` gives deleted;
   - treat the owning org's removal, or the instance's, as deleted.
 - **Owner.** `user.human.added` sets its owner explicitly, so a re-created id
-  may sit under another org. Take the owner from the newest create event.
+  may sit under another org. Take the owner from the newest create event and
+  record its sequence as the incarnation. Reset credentials and links; old
+  target identity links must not survive an id reused for a new account.
 
 ### Machine user
 
@@ -236,6 +279,14 @@ It ignores deactivate and reactivate. The migrator follows the projection,
 because that is what v4's login used
 ([`v4:internal/query/projection/idp_template.go`](https://github.com/zitadel/zitadel/blob/v4.19.5/internal/query/projection/idp_template.go)).
 
+Keep `isCreationAllowed` and `isAutoCreation` separate. v4's external login
+checks `IsAutoCreation` before automatic registration; allowing a user to
+choose creation is not the same behavior
+([`external_provider_handler.go`](https://github.com/zitadel/zitadel/blob/v4.19.5/internal/api/ui/login/external_provider_handler.go)).
+The [target mapping](README.md#oidc-idp--idp-connection) defines all four flag
+combinations. IdP removal invalidates links and the offered flow, while an
+issuer/type change requires reassessment of the trust relationship.
+
 ### Login names
 
 [`v4:internal/query/projection/login_name_query.sql`](https://github.com/zitadel/zitadel/blob/v4.19.5/internal/query/projection/login_name_query.sql)
@@ -269,7 +320,9 @@ defines login names, together with setup steps 58 and 72.
   `std-base64(IV(16) || AES-256-CFB(key, plaintext))`.
   - Look the key up by the value's own `KeyID`, not by config.
   - There is no MAC. A wrong key returns garbage, and bad base64 returns an
-    empty string without an error. Validate every result.
+    empty string without an error. Reject malformed inputs and implausible
+    results, but do not call printable plaintext proof of a correct key.
+    Verify a provider exchange before making the migrated connection ready.
 - **Which key encrypts what:**
 
   | Value | Key |
@@ -292,15 +345,9 @@ defines login names, together with setup steps 58 and 72.
 
 ## 6. What `assess` counts but does not migrate
 
-- **Live objects.** Projects, user grants, actions and user schemas are folded
-  per aggregate from their add and remove events. The exact type lists are in
-  each package's `eventstore.go`.
-- **Settings.** These are counted as changes someone made:
-  - Setup writes its defaults with an empty `creator`: 72
-    `instance.customtext.set`, the default label, lockout and password
-    policies, the first members, and feature flags.
-  - API writes carry the acting user's id. `creator <> ''` therefore separates
-    customizations from a fresh instance's defaults.
+These categories are counted as live objects by folding add and remove
+events per object id. The exact type lists are in each package's
+`eventstore.go`.
 
 | Category | Aggregate, event-type prefix |
 |---|---|
@@ -312,7 +359,7 @@ defines login names, together with setup steps 58 and 72.
 | Actions v2 | `execution`: `execution.set`, `execution.v2.set`, `execution.removed`; `target`: `target.*` |
 | SMTP, SMS, email providers | `instance`: `instance.smtp.config.*`, `instance.sms.config*` |
 | Branding, texts | `*.policy.label.*`, `*.customtext.*`, mail and login texts |
-| Policies | `*.policy.password.complexity.*`, `.age.*`, `.lockout.*`, `.notification.*`, `.privacy.*`, the login policy's MFA and lifetimes |
+| Policies | `*.policy.password.complexity.*`, `.age.*`, `.lockout.*`, `.notification.*`, `.privacy.*`; authentication requirements are also reduced for safety assessment, not merely counted |
 | Keys | `web_key`: `web_key.*`; `key_pair` |
 | Feature flags, limits, quotas, restrictions | `feature`, `limits`, `quota`, `restrictions` |
 | User schemas (v4 beta) | `user_schema`: `user_schema.*`; `schemauser` |
@@ -323,8 +370,36 @@ defines login names, together with setup steps 58 and 72.
 The tables are versioned, and the names below are those of v4.19.5. Each
 advances on its own; its cursor is in `projections.current_states`
 (`projection_name` = table name, then `position` and `filter_offset`, which
-holds `in_tx_order`). Read them in one REPEATABLE READ snapshot and compare
-counts only.
+holds `in_tx_order`). Read rows and their cursor metadata in one REPEATABLE
+READ snapshot, separately from the barrier reader's READ COMMITTED transaction.
+That snapshot prevents torn reads within a projection; it does not make every
+projection reflect the same event cut.
+
+- Record each projection's relevant event coverage at H. It must have processed
+  all of its relevant events through H and none beyond the compared cut. A
+  projection with no relevant event near H need not have a numerically equal
+  cursor. Compare coverage using the pinned adapter's event filters and sort
+  semantics, not only a raw position equality test.
+- During live follow, a lagging or ahead-of-cut projection yields
+  `inconclusive`. Retry against an aligned cut or a frozen source; never label
+  lag a mismatch or certify a stale projection because its count happens to fit.
+- For final verification, fence all writers, drain projections, then snapshot
+  rows and coverage at H. Stopping the entire v4 process before draining also
+  stops its projectors. If that happened, either keep cutover blocked or run
+  an independent verifier on an isolated copy of the stopped database: use the
+  pinned v4 projection/write-model code against events only through H, then
+  compare its outputs. This verifier is a separate v4-side test/verification
+  tool, not an import of v4 internal packages into nextgen and not another
+  invocation of the migrator's reducers. Its implementation is part of M1.
+- Compare canonical fields and entity sets, including organization/user state,
+  profile/verification flags, preferred login names, IdP settings and exact
+  external-subject → user links. Retain documented filters for removed owners
+  and dangling links so intentional source-projection leftovers are explained.
+  Counts are diagnostics; swapped links or changed fields must fail even when
+  all counts match.
+- Projections contain no password hash. A pinned v4 write-model replay provides
+  an independent credential-state comparison; synthetic fixtures additionally
+  prove password sign-in and rehash without exposing credentials in reports.
 
 | Table | What it holds |
 |---|---|

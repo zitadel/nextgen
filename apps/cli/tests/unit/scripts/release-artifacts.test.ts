@@ -215,12 +215,14 @@ describe("release artifact helpers", () => {
       await writeFile(join(dir, platform.goos === "windows" ? "nextgen.exe" : "nextgen"), "binary");
     }
 
-    let running = 0;
-    let mostRunning = 0;
-    let everyoneStarted: () => void = () => undefined;
-    const allStarted = new Promise<void>((resolve) => {
-      everyoneStarted = resolve;
-    });
+    const running = new Set<string>();
+    const runningCounts: number[] = [];
+    const startedListeners: Array<() => void> = [];
+    const allStarted = new Promise<void>((resolve) => startedListeners.push(resolve));
+    const everyoneStarted = () =>
+      startedListeners.forEach((resolve) => {
+        resolve();
+      });
     const { archives, checksumPath } = await createArchives({
       repoRoot,
       outDir,
@@ -231,18 +233,18 @@ describe("release artifact helpers", () => {
         if (!archivePath) {
           throw new Error(`no archive path in: ${args.join(" ")}`);
         }
-        running += 1;
-        mostRunning = Math.max(mostRunning, running);
-        if (running === SERVER_PLATFORMS.length) {
+        running.add(archivePath);
+        runningCounts.push(running.size);
+        if (running.size === SERVER_PLATFORMS.length) {
           everyoneStarted();
         }
         await allStarted;
         await writeFile(archivePath, `archive ${basename(archivePath)}`);
-        running -= 1;
+        running.delete(archivePath);
       },
     });
 
-    expect(mostRunning).toBe(SERVER_PLATFORMS.length);
+    expect(Math.max(...runningCounts)).toBe(SERVER_PLATFORMS.length);
     const names = SERVER_PLATFORMS.map(
       (platform) =>
         `nextgen_0.1.0-alpha.6_${platform.goos}_${platform.goarch}.${

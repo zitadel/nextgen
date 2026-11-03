@@ -35,6 +35,15 @@ export function Page({
 const PAGE = "px-4 pt-4 pb-8 lg:pt-5";
 const PAGE_FILL = "lg:flex lg:h-[calc(100svh-3.5rem)] lg:flex-col";
 
+/**
+ * The home's column (Projects): the full width of a page without a sidebar
+ * reads as a stretched table, so it is capped and centred like a settings
+ * column, wider.
+ */
+export function HomeColumn({ children }: { children: ReactNode }) {
+  return <div className="mx-auto w-full max-w-6xl">{children}</div>;
+}
+
 /** The fixed column every settings screen renders in, centred in the main area. */
 export function SettingsColumn({ children }: { children: ReactNode }) {
   return <div className="mx-auto w-full max-w-(--zl-container-settings)">{children}</div>;

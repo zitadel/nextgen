@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process";
+import { execaSync } from "execa";
 import { rm } from "node:fs/promises";
 import { join } from "node:path";
 
@@ -11,15 +11,13 @@ import {
   scaffoldingCalls,
 } from "../../../../helpers/node-engines";
 
-vi.mock("node:child_process", () => ({ spawnSync: vi.fn() }));
+vi.mock("execa", () => ({ execaSync: vi.fn() }));
 vi.mock("node:fs/promises", () => ({ rm: vi.fn() }));
-const mockSpawn = vi.mocked(spawnSync);
+const mockSpawn = vi.mocked(execaSync);
 const mockRm = vi.mocked(rm);
 
-function spawnOk(): ReturnType<typeof spawnSync> {
-  return { status: 0, stderr: "", stdout: "", pid: 1, output: [], signal: null } as ReturnType<
-    typeof spawnSync
-  >;
+function spawnOk(): ReturnType<typeof execaSync> {
+  return { exitCode: 0, failed: false, stderr: "", stdout: "" } as ReturnType<typeof execaSync>;
 }
 
 beforeEach(() => {
@@ -36,7 +34,7 @@ describe("SvelteScaffolder", () => {
 
     const [command, args, opts] = scaffoldingCalls()[0] ?? [];
     expect(command).toBe("npm");
-    expect(args).toEqual(["create", "vite@latest", ".", "--", "--template", "svelte-ts"]);
+    expect(args).toEqual(["create", "vite@9.3.1", ".", "--", "--template", "svelte-ts"]);
     expect(opts).toMatchObject({ cwd: "/tmp/proj" });
     expect(mockRm).toHaveBeenCalledWith(join("/tmp/proj", "src/App.svelte"), { force: true });
     expect(mockRm).toHaveBeenCalledWith(join("/tmp/proj", "src/lib/Counter.svelte"), {
@@ -48,7 +46,7 @@ describe("SvelteScaffolder", () => {
     make: (node, platform) => new SvelteScaffolder(node, platform),
     framework: "svelte",
     label: "create-vite",
-    spec: "create-vite@latest",
+    spec: "create-vite@9.3.1",
     fallback: "^20.19.0 || >=22.12.0",
     enforcement: "warn",
     supported: ["24.15.0", "20.19.0", "22.12.0"],

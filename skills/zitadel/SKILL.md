@@ -15,10 +15,12 @@ description: >-
 # Zitadel
 
 This is the entry point for Zitadel work. The full set of Zitadel skills
-installs together with `npx skills add zitadel/nextgen --full-depth`; this
-router then points you at the right one for the task. If a skill named below is
-not actually installed, the set was added without `--full-depth` — install it
-that way to get the CLI and per-framework skills alongside this router.
+installs together, with `npx @zitadel/cli@latest skills add` in the project
+(the set of that CLI version) or `npx skills add zitadel/nextgen --full-depth`;
+this router then points you at the right one for the task. If a skill named
+below is not actually installed, the set was added without `--full-depth` —
+run the CLI's `skills add` to get the CLI and per-framework skills alongside
+this router.
 
 ## Route by what you are doing
 

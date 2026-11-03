@@ -10,7 +10,7 @@ async function reviseUserSchema(app: ScaffoldedApp): Promise<void> {
   await app.editUserSchema((schema) => {
     schema.properties.company = { type: "string" };
   });
-  expect(await app.apply()).toSucceed();
+  expect(await app.publish()).toSucceed();
 }
 
 describe("api", () => {
@@ -34,6 +34,35 @@ describe("api", () => {
         const result = await app.api("getVariables");
 
         expect(result).toFailWith("E_NETWORK");
+      });
+    });
+  });
+
+  describe("asking for help", () => {
+    it.each([["-h"], ["help"]])("prints the usage for %s", async (ask) => {
+      const app = await aSetUpApp();
+
+      const result = await app.apiRendered(ask);
+
+      expect(result).toPrint("Call any operation of the Zitadel API");
+    });
+
+    it("ends with the usage, as --help does", async () => {
+      const app = await aSetUpApp();
+
+      const result = await app.apiRendered("help");
+
+      expect(result.stdout).not.toMatch(/npx @zitadel\/cli@\S+ api ls/);
+    });
+
+    it("points to api ls under --json", async () => {
+      const app = await aSetUpApp();
+
+      const result = await app.api("help");
+
+      expect(app.envelopeOf(result)).toMatchObject({
+        command: "api",
+        data: { next_commands: [expect.stringMatching(/ api ls$/)] },
       });
     });
   });
@@ -78,9 +107,13 @@ describe("api", () => {
         const app = await aSetUpApp();
         await reviseUserSchema(app);
 
+        const all = await app.api("listSchemas", "-F", "limit=100");
+        const total = app.envelopeOf<{ schemas: unknown[] }>(all).data.schemas.length;
+
         const result = await app.api("listSchemas", "-F", "limit=1", "--paginate");
 
-        expect(app.envelopeOf<{ schemas: unknown[] }>(result).data.schemas).toHaveLength(2);
+        expect(total).toBeGreaterThan(1);
+        expect(app.envelopeOf<{ schemas: unknown[] }>(result).data.schemas).toHaveLength(total);
       });
 
       it("fails as the server refuses", async () => {
@@ -89,6 +122,78 @@ describe("api", () => {
         const result = await app.api("getVariable", "NOT_THERE");
 
         expect(result).toFailWith("E_NOT_FOUND");
+      });
+
+      describe("without --force when no one can be asked", () => {
+        it("is refused", async () => {
+          const app = await aSetUpApp();
+          expect(await app.setVariable("FOO", "bar")).toSucceed();
+
+          const result = await app.api("deleteVariable", "FOO");
+
+          expect(result).toFailWith("E_VALIDATION");
+        });
+
+        it("says to pass --force", async () => {
+          const app = await aSetUpApp();
+          expect(await app.setVariable("FOO", "bar")).toSucceed();
+
+          const result = await app.api("deleteVariable", "FOO");
+
+          expect(result).toHintAt("--force");
+        });
+
+        it("suggests running it again with --force", async () => {
+          const app = await aSetUpApp();
+          expect(await app.setVariable("FOO", "bar")).toSucceed();
+
+          const result = await app.api("deleteVariable", "FOO");
+
+          expect(result).toSuggestExactly(app.againAsRun("api deleteVariable FOO --force"));
+        });
+
+        it("deletes nothing", async () => {
+          const app = await aSetUpApp();
+          expect(await app.setVariable("FOO", "bar")).toSucceed();
+
+          await app.api("deleteVariable", "FOO");
+
+          expect(await app.projectVariables()).not.toEqual([]);
+        });
+      });
+
+      it("runs an operation that deletes with --force", async () => {
+        const app = await aSetUpApp();
+        expect(await app.setVariable("FOO", "bar")).toSucceed();
+
+        await app.api("deleteVariable", "FOO", "--force");
+
+        expect(await app.projectVariables()).toEqual([]);
+      });
+
+      it("does not repeat a refused request's body in its suggestion", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.api("removePreview", "-F", "origin=https://pr-1.example.com");
+
+        expect(result).not.toSuggest("pr-1.example.com");
+      });
+
+      it("says to run a refused request with a body again with --force", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.api("removePreview", "-F", "origin=https://pr-1.example.com");
+
+        expect(result).toHintAt("Run the same command again");
+      });
+
+      it("sends a merge patch with a null without asking, as before", async () => {
+        const app = await aSetUpApp();
+        expect(await app.setVariable("FOO", "bar")).toSucceed();
+
+        await app.api("updateVariables", "-F", "FOO:=null");
+
+        expect(await app.projectVariables()).toEqual([]);
       });
 
       it("refuses an operation only an end user's session authenticates", async () => {

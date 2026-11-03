@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "noEmit": true,
+    "types": ["node", "vite/client"],
+    // The console's components (`@zitadel/console/addon/ui`) import each
+    // other as `@/…`; the add-on itself never does (AGENTS.md).
+    "paths": { "@/*": ["../console/src/*"] }
+  },
+  "include": ["*.config.ts", "vite.ts", "src/**/*.ts", "src/**/*.tsx"]
+}

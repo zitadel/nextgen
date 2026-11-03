@@ -8,6 +8,7 @@ import {
   installDependenciesForSetup,
   type SetupInstallInput,
 } from "../../../../src/commands/setup/install";
+import { environmentSelectorSuffix } from "../../../../src/lib/oclif/environment-flags";
 import type { runPackageCommand } from "../../../../src/lib/package-manager";
 
 const dirs: string[] = [];
@@ -32,13 +33,15 @@ function input(overrides: Partial<SetupInstallInput> = {}): SetupInstallInput {
     env: {},
     issuer: "http://localhost:3000",
     json: true,
+    selector: environmentSelectorSuffix({ envFile: ".env.development.local" }),
     scaffoldedFramework: false,
     skipInstall: false,
     ...overrides,
   };
 }
 
-const planCommand = "npx @zitadel/cli@1.2.3 plan";
+const selector = " --env-file .env.development.local";
+const planCommand = `npx @zitadel/cli@1.2.3 deploy --dry-run${selector}`;
 
 describe("setup dependency installation", () => {
   it("installs when setup added a dependency", async () => {
@@ -59,7 +62,7 @@ describe("setup dependency installation", () => {
       command: "npm install",
     });
     expect(result.nextActions.join("\n")).toContain(
-      "Start your project: npm run dev (then open http://localhost:3000/login)",
+      "Start your project: npm run dev (then open http://localhost:3000/register)",
     );
     expect(result.nextActions.join("\n")).not.toContain(
       "Start your project: npm run dev (then open http://localhost:3000)",
@@ -69,7 +72,7 @@ describe("setup dependency installation", () => {
     expect(result.nextActions.join("\n")).toContain(".zitadel/schemas/");
     expect(result.nextActions.join("\n")).toContain(".zitadel/flows/");
     expect(result.nextActions.join("\n")).toContain(
-      `See your changes before they go live: ${planCommand} to preview, then npx @zitadel/cli@1.2.3 apply to publish.`,
+      `See your changes before they go live: ${planCommand} to preview, then npx @zitadel/cli@1.2.3 deploy -m '<what changed>'${selector} to publish.`,
     );
     expect(result.nextCommands).toEqual(["npm run dev", planCommand]);
   });
@@ -86,7 +89,7 @@ describe("setup dependency installation", () => {
       text:
         "Once login works, this shows your next steps (customizing is covered in " +
         "your README's Zitadel section):",
-      command: "npx @zitadel/cli@1.2.3 status",
+      command: `npx @zitadel/cli@1.2.3 status${selector}`,
     });
     const boxText = result.boxActions
       .map((action) => [action.text, action.command].filter(Boolean).join(" "))
@@ -146,6 +149,29 @@ describe("setup dependency installation", () => {
     expect(run).not.toHaveBeenCalled();
     expect(result.install).toMatchObject({ status: "skipped", reason: "dry-run" });
     expect(result.nextCommands).toEqual(["npm install", "npm run dev", planCommand]);
+  });
+
+  it("runs the suggested install and dev commands in the --cwd directory", async () => {
+    const cwd = await tempProject();
+    const run = vi.fn<typeof runPackageCommand>(async () => undefined);
+
+    const result = await installDependenciesForSetup(
+      input({ cwd, cwdFlag: "shop", run, skipInstall: true }),
+    );
+
+    expect(result.nextCommands.slice(0, 2)).toEqual([
+      "npm --prefix shop install",
+      "npm --prefix shop run dev",
+    ]);
+  });
+
+  it("runs the install itself in the project directory, as typed nowhere", async () => {
+    const cwd = await tempProject();
+    const run = vi.fn<typeof runPackageCommand>(async () => undefined);
+
+    await installDependenciesForSetup(input({ cwd, cwdFlag: "shop", run }));
+
+    expect(run.mock.calls[0]?.[0].display).toBe("npm install");
   });
 
   it("does not install when no dependency changed", async () => {

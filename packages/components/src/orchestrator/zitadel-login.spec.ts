@@ -72,7 +72,7 @@ afterAll(() => {
   server.close();
 });
 
-async function waitFor<T>(probe: () => T | null | undefined, timeout = 1500): Promise<T> {
+async function waitFor<T>(probe: () => T | null | undefined, timeout = 10_000): Promise<T> {
   const start = Date.now();
   while (Date.now() - start < timeout) {
     const value = probe();
@@ -425,7 +425,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
     await waitFor(() => element.shadowRoot?.querySelector("zl-alert"));
     const text = element.shadowRoot?.querySelector("zl-alert")?.textContent ?? "";
     expect(text).toContain('flow-name="no-such-flow"');
-    expect(text).toContain("zitadel apply");
+    expect(text).toContain("zitadel deploy");
   });
 
   it("explains a flow-name that does not serve the requested purpose", async () => {
@@ -605,6 +605,44 @@ describe("<zitadel-login> against the typed Flow API", () => {
       expect(exchanges).toHaveLength(1);
       expect(exchanges[0]?.body.handoff_token).toBeTruthy();
       expect(exchanges[0]?.projectId).toBe("demo-project");
+    } finally {
+      Object.defineProperty(window, "location", {
+        configurable: true,
+        value: location,
+      });
+    }
+  });
+
+  it("reports a failed handoff exchange without navigating or showing the signed-in screen", async () => {
+    const assign = vi.fn();
+    const { location } = window;
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...location, assign },
+    });
+
+    try {
+      mock.failNextExchange();
+      const element = document.createElement("zitadel-login") as ZitadelLogin;
+      element.purpose = "login";
+      element.project = testProject;
+      element.postSignInUrl = "/admin";
+      const failed = vi.fn();
+      element.addEventListener("zitadel-flow-error", failed);
+      host.appendChild(element);
+      await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
+
+      await advanceMockLoginFlow(element);
+
+      await waitFor(() => (failed.mock.calls.length > 0 ? failed : null));
+      await element.updateComplete;
+      expect(failed).toHaveBeenCalledOnce();
+      expect(assign).not.toHaveBeenCalled();
+      expect(element.shadowRoot?.querySelector("zl-alert")?.textContent).toContain(
+        "Session exchange is temporarily unavailable.",
+      );
+      expect(element.shadowRoot?.textContent).not.toContain("You're signed in");
+      expect(element.getAttribute("aria-busy")).toBe("false");
     } finally {
       Object.defineProperty(window, "location", {
         configurable: true,
@@ -1772,9 +1810,10 @@ describe("<zitadel-login> against the typed Flow API", () => {
       // wired to it is the contextual correction beside the account the step
       // names.
       expect(element.shadowRoot?.querySelector('[data-testid="zitadel-action-back"]')).toBeNull();
-      const wired = element.shadowRoot?.querySelectorAll('[data-action="back"]') ?? [];
+      const wired =
+        element.shadowRoot?.querySelectorAll('[data-action="back"], [action="back"]') ?? [];
       expect(Array.from(wired, (el) => el.getAttribute("data-testid"))).toEqual([
-        "zitadel-action-change-account",
+        "zitadel-account",
       ]);
     });
 

@@ -7,31 +7,51 @@ import {
   useParams,
 } from "@tanstack/react-router";
 import { Box, Boxes, Check, ChevronsUpDown, type LucideIcon, Plus, Slash } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { AddTeamSheet } from "@/components/add-team-sheet";
+import { ProjectMark } from "@/components/project-mark";
+import {
+  Combobox,
+  ComboboxAnchor,
+  ComboboxContent,
+  type ComboboxGroup,
+  type ComboboxOption,
+} from "@/components/ui/combobox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
-import { api } from "@/api/zitadel";
 import { queryActiveTeams } from "@/lib/teams";
 import { useAsync } from "@/hooks/use-async";
 import {
+  byName,
+  type ProjectRef,
+  type SelectedProject,
   useMyProjects,
   useProjectScope,
+  useProjectSearch,
+  useSelectedProject,
   useSelectProjectTarget,
   withoutTrailingSlash,
 } from "@/lib/project-scope";
+import {
+  RECENT_PROJECT_LIMIT,
+  readRecentProjects,
+  useRememberRecentProject,
+} from "@/lib/recent-projects";
 
 /**
  * The top bar's context: the project switcher, then — on a team's page — a
- * slash and the team switcher, as the design's navbar draws them. Built on
- * shadcn `Popover`.
+ * slash and the team switcher, as the design's navbar draws them.
  *
- * The project popover has no footer: the sidebar's first entry is the
- * Projects overview. The team popover's footer adds a team, opening the Add
- * team drawer and then the new team.
+ * The project switcher is the design system's searchable picker (`Combobox`):
+ * it opens on a search field, matched on the server across every project the
+ * person can act on, above the selected project and the ones they opened
+ * recently, and, while all their projects fit on one page, every other one by
+ * name. Its footer opens Projects. The team switcher is a `Popover` over the
+ * project's active teams; its footer adds a team, opening the Add team drawer
+ * and then the new team.
  */
 
 /**
@@ -43,39 +63,53 @@ const NO_PROJECTS = "No projects";
 /** What the project pill says while projects exist but none is selected. */
 const NO_SELECTION = "Select a project";
 
+/** The project list's search field, label and placeholder alike. */
+const FIND_PROJECT = "Find a project";
+
+/** What the project list says when a search finds nothing. */
+const NO_MATCHES = "No matching projects";
+
+/** What it says while the search for what was typed is on its way. */
+const SEARCHING = "Searching…";
+
+/** What it says with nothing to open on: too many projects to list, none recent. */
+const TYPE_TO_FIND = "Type to find a project";
+
+/** What it says while the first page loads. */
+const LOADING = "Loading projects…";
+
+/** How many projects a search lists: as many as the first page. */
+const PROJECT_RESULTS = 20;
+
 interface SwitcherOption {
   id: string;
   label: string;
-  /** Where following the row goes — for a project, the same screen re-scoped to it (`?project=`). */
+  /** Where following the row goes — for a team, its page. */
   link: Pick<LinkProps, "to" | "params" | "search">;
 }
 
-export function ContextSwitcher() {
-  const projects = useProjects();
+export function ContextSwitcher({ userId }: { userId?: string }) {
   // The pill shows the selected project (`?project=`, `src/lib/project-scope.ts`),
   // never `getConsoleProjectId()`: that is the project the console signs into —
   // the platform project on a platform deployment — which is not what anybody
-  // means here unless it was selected.
+  // means here unless it was selected. Never named from a search's matches,
+  // which come and go as the person types; by its id until its name is read.
+  // Read here, once, for the pill and for the person's recent projects: a
+  // project selected anywhere — the switcher, Projects, search, a link — is the
+  // one they opened last.
+  const current = useSelectedProject();
+  useRememberRecentProject(userId, current);
   const selected = useProjectScope();
-  const current = useSelectedOption(selected, projects);
   const teamId = useParams({ strict: false, select: (params) => params.teamId });
-  // The Projects list is where a project is chosen, and it marks the selected
-  // one, so the pill would only repeat it: no switcher there.
+  // Projects is the switcher's list with room to read it, and has its own
+  // search, so a pill there would only offer a second way to find a project,
+  // naming one above the list of all of them (D21). That list marks the
+  // selected project instead.
   const onProjects = useMatch({ from: "/_authed/projects/", shouldThrow: false });
 
   return (
     <nav aria-label="Context" className="flex min-w-0 items-center gap-2">
-      {!onProjects && (
-        <Switcher
-          icon={Boxes}
-          heading="Projects"
-          label={current?.label}
-          currentId={current?.id}
-          options={projects}
-          emptyLabel={projects?.length === 0 ? NO_PROJECTS : NO_SELECTION}
-          ariaLabel="Switch project"
-        />
-      )}
+      {!onProjects && <ProjectSwitcher userId={userId} current={current} />}
       {/* The team switcher joins the bar once a team is open — the team is the
           context then, and following another team from the list switches it.
           Teams are not a standing selection the way projects are: no screen
@@ -89,6 +123,144 @@ export function ContextSwitcher() {
       )}
     </nav>
   );
+}
+
+/**
+ * The project pill and its list. Choosing a project is a navigation, as a link
+ * would be: the selection lives in the URL. Past the first page the list opens
+ * on no more than the selected and recent projects, since that page is only the
+ * oldest ones; the search reaches the rest.
+ */
+function ProjectSwitcher({
+  userId,
+  current,
+}: {
+  userId: string | undefined;
+  /** The selected project, named once it is read. */
+  current: SelectedProject | undefined;
+}) {
+  // The first page says whether there are more projects than it shows, and so
+  // whether the list can open on all of them.
+  const mine = useMyProjects();
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const found = useProjectSearch(query, PROJECT_RESULTS);
+  const navigate = useNavigate();
+  const scopeTo = useScopeTarget();
+  const selected = useProjectScope();
+  // Read as the list opens, so it holds what was opened since it last did.
+  const recents = useMemo(() => (open ? readRecentProjects(userId) : []), [open, userId]);
+
+  const changeOpen = (next: boolean) => {
+    setOpen(next);
+    // A search starts over each time the list opens.
+    if (!next) setQuery("");
+  };
+
+  const term = query.trim().toLowerCase();
+  let groups: ComboboxGroup[] = [];
+  let emptyLabel = LOADING;
+  if (term) {
+    // Re-filtered against the live query: until the next debounced read lands,
+    // the last one's answer can name projects the typing has already ruled out.
+    const matches = (found?.projects ?? []).filter((project) =>
+      project.name.toLowerCase().includes(term),
+    );
+    groups = [{ options: byName(matches).map(toOption) }];
+    emptyLabel = found?.term.toLowerCase() === term ? NO_MATCHES : SEARCHING;
+  } else if (mine) {
+    const named = current?.name === undefined ? undefined : { ...current, name: current.name };
+    const { recent, rest } = openingList(mine, named, recents);
+    groups = [
+      { heading: "Recent", options: recent.map(toOption) },
+      { heading: "Projects", options: rest.map(toOption) },
+    ];
+    emptyLabel = mine.projects.length === 0 && !mine.more ? NO_PROJECTS : TYPE_TO_FIND;
+  }
+
+  const label = current && (current.name ?? current.id);
+
+  return (
+    <Combobox open={open} onOpenChange={changeOpen}>
+      <ComboboxAnchor asChild>
+        <button type="button" aria-label="Switch project" className={TRIGGER}>
+          {selected ? (
+            <ProjectMark projectId={selected} className="size-4" />
+          ) : (
+            <Boxes size={16} className="shrink-0 text-foreground" aria-hidden />
+          )}
+          {mine === undefined ? (
+            <Skeleton className="h-4 w-24" />
+          ) : label === undefined ? (
+            <span className="min-w-0 truncate text-muted-foreground">
+              {mine.projects.length === 0 ? NO_PROJECTS : NO_SELECTION}
+            </span>
+          ) : (
+            <span className="min-w-0 truncate leading-5 text-foreground">{label}</span>
+          )}
+          <ChevronsUpDown size={16} className="shrink-0 text-muted-foreground" aria-hidden />
+        </button>
+      </ComboboxAnchor>
+      <ComboboxContent
+        groups={groups}
+        selected={selected ? [selected] : []}
+        searchPlaceholder={FIND_PROJECT}
+        emptyLabel={emptyLabel}
+        search={{ query, onQueryChange: setQuery }}
+        footer={{
+          label: "All projects",
+          icon: <Boxes aria-hidden />,
+          onSelect: () => void navigate({ to: "/projects" }),
+        }}
+        label="Projects"
+        // Wider than the pill: a row carries a name and its host or id.
+        className="w-72"
+        onSelect={(projectId) => void navigate(scopeTo(projectId))}
+        onClose={() => changeOpen(false)}
+      />
+    </Combobox>
+  );
+}
+
+/**
+ * A project as the list shows it: its mark, its name, and beneath it what
+ * tells it from another of the same name — its site's host, or else its id.
+ */
+function toOption(project: ProjectRef): ComboboxOption {
+  return {
+    value: project.id,
+    label: project.name,
+    description: project.host ?? project.id,
+    icon: <ProjectMark projectId={project.id} />,
+  };
+}
+
+/**
+ * What the list opens on before anything is typed: the selected project, then
+ * the recent ones, then, while the first page holds all of the person's
+ * projects, the rest by name. A recent project that full list lacks is gone,
+ * or no longer theirs; past one page that cannot be told, so recent ones stand
+ * as they were kept.
+ */
+function openingList(
+  mine: { projects: ProjectRef[]; more: boolean },
+  current: ProjectRef | undefined,
+  recents: ProjectRef[],
+): { recent: ProjectRef[]; rest: ProjectRef[] } {
+  const listed = new Map(mine.projects.map((project) => [project.id, project]));
+  const recent: ProjectRef[] = [];
+  for (const project of current ? [current, ...recents] : recents) {
+    if (recent.length === RECENT_PROJECT_LIMIT) break;
+    if (recent.some((shown) => shown.id === project.id)) continue;
+    // The list's copy carries the name as it is now.
+    const fresh = listed.get(project.id);
+    if (fresh) recent.push(fresh);
+    else if (mine.more || project === current) recent.push(project);
+  }
+  const rest = mine.more
+    ? []
+    : byName(mine.projects.filter((project) => !recent.some((shown) => shown.id === project.id)));
+  return { recent, rest };
 }
 
 /**
@@ -140,13 +312,6 @@ function TeamSwitcher({ projectId, teamId }: { projectId: string; teamId: string
 /** One page of the team switcher's list. */
 const TEAM_PAGE = 25;
 
-/** The project pill's options: the person's projects (`useMyProjects`), each a link re-scoping to it. */
-function useProjects(): SwitcherOption[] | undefined {
-  const projects = useMyProjects();
-  const scopeTo = useScopeTarget();
-  return projects?.map(({ id, name }) => ({ id, label: name, link: scopeTo(id) }));
-}
-
 /**
  * Where selecting a project goes. A project-scoped list stays where it is and
  * re-reads under the new project, keeping its own filters (Teams' tab and
@@ -155,7 +320,7 @@ function useProjects(): SwitcherOption[] | undefined {
  * Projects row would (`useSelectProjectTarget`): the screen `?next=` names, or
  * the console's landing for that project.
  */
-function useScopeTarget(): (projectId: string) => NonNullable<SwitcherOption["link"]> {
+function useScopeTarget(): (projectId: string) => SwitcherOption["link"] {
   const leaf = useMatches({ select: (matches) => matches[matches.length - 1] });
   const selectTarget = useSelectProjectTarget();
   const stays = leaf?.staticData.scope === "project" && leaf.staticData.nav !== undefined;
@@ -166,33 +331,6 @@ function useScopeTarget(): (projectId: string) => NonNullable<SwitcherOption["li
           search: (prev: Record<string, unknown>) => ({ ...prev, project: projectId }),
         }
       : selectTarget(projectId);
-}
-
-/**
- * The option the pill shows. A selected project missing from the list — one
- * named by a shared link's `?project=` rather than chosen here — is named by
- * `GET /projects/{id}`, and by its id until that read answers or if it is
- * refused.
- */
-function useSelectedOption(
-  selected: string | undefined,
-  projects: SwitcherOption[] | undefined,
-): Pick<SwitcherOption, "id" | "label"> | undefined {
-  const listed = selected ? projects?.find((project) => project.id === selected) : undefined;
-  const missing = selected !== undefined && projects !== undefined && listed === undefined;
-  // Tagged with the id it answers for: a re-read keeps the last answer until
-  // the next lands, and that must not name another project.
-  const read = useAsync(
-    missing && selected
-      ? () => api.getProject(selected).then((project) => ({ id: selected, name: project.name }))
-      : null,
-    undefined,
-    [missing, selected],
-  );
-
-  if (listed) return listed;
-  if (!missing) return undefined;
-  return { id: selected, label: read?.id === selected ? read.name : selected };
 }
 
 function Switcher({
@@ -207,7 +345,7 @@ function Switcher({
   current = false,
 }: {
   icon: LucideIcon;
-  /** The list's caption, as the design's menu label draws it (`PROJECTS`). */
+  /** The list's caption, as the design's menu label draws it (`TEAMS`). */
   heading: string;
   /** `undefined` while loading, and when there are no options to name. */
   label: string | undefined;
@@ -265,25 +403,22 @@ function Switcher({
           {rows.length === 0 ? (
             <li className="px-2 py-1.5 text-sm text-muted-foreground">{emptyLabel}</li>
           ) : (
-            // Links, not buttons: selecting a project or a team is a navigation —
-            // the project lives in the URL (`?project=`), the team is the page.
+            // Links, not buttons: selecting a team is a navigation — the team
+            // is the page.
             rows.map((option) => {
               const selected = option.id === currentId;
-              const content = (
-                <>
-                  <Icon size={16} className="shrink-0 text-muted-foreground" aria-hidden />
-                  <span className="flex-1 truncate text-sm text-foreground">{option.label}</span>
-                  {selected && <Check size={16} className="shrink-0 text-foreground" aria-hidden />}
-                </>
-              );
               return (
                 <li
                   key={option.id}
-                  // By id, not by label: two projects may share a name.
+                  // By id, not by label: two teams may share a name.
                   aria-current={selected ? "true" : undefined}
                 >
                   <Link {...option.link} onClick={() => setOpen(false)} className={ROW}>
-                    {content}
+                    <Icon size={16} className="shrink-0 text-muted-foreground" aria-hidden />
+                    <span className="flex-1 truncate text-sm text-foreground">{option.label}</span>
+                    {selected && (
+                      <Check size={16} className="shrink-0 text-foreground" aria-hidden />
+                    )}
                   </Link>
                 </li>
               );

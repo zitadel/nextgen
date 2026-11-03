@@ -1,11 +1,13 @@
 import { pbkdf2Sync, randomBytes } from "node:crypto";
-import { chmod, mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 
 import { defaultHumanUserSchemaUrl } from "@zitadel/config";
 
-import { ZitadelError } from "../errors";
+import { ZitadelError, errorMessage } from "../errors";
+import { enforceMode } from "../fs-safe";
+import { ancestors } from "../paths";
 import { isObject } from "../json";
 import {
   findUpward,
@@ -14,6 +16,7 @@ import {
   readRuntimeMetadata,
   sameLocalServer,
 } from "./runtime";
+import { shellCommand, unscopedCommand } from "../suggestion";
 
 /**
  * The local admin's two files under `.zitadel/local/` (gitignored):
@@ -58,44 +61,37 @@ export async function findLocalAdminFor(
   cwd: string,
   serverUrl: string,
 ): Promise<LocalAdmin | undefined> {
-  for (let from = cwd; ; ) {
-    const dir = await findLocalAdminDir(from);
-    if (!dir) return undefined;
+  for (const dir of ancestors(cwd, homedir())) {
+    if ((await findLocalAdminDir(dir)) !== dir) continue;
     const runtime = await readRuntimeMetadata(dir).catch(() => undefined);
     if (runtime && sameLocalServer(runtime.server_url, serverUrl)) {
       return readLocalAdmin(dir);
     }
-    if (dir === homedir() || dirname(dir) === dir) return undefined;
-    from = dirname(dir);
   }
+  return undefined;
 }
 
 /** Reads the local admin credential, or `undefined` when `start` never wrote one. */
 export async function readLocalAdmin(cwd: string): Promise<LocalAdmin | undefined> {
-  let raw: string;
-  try {
-    raw = await readFile(join(cwd, LOCAL_ADMIN_FILE), "utf8");
-  } catch (error) {
+  const raw = await readFile(join(cwd, LOCAL_ADMIN_FILE), "utf8").catch((error: unknown) => {
     // Only a missing file means `start` never created the admin. A file that
     // exists but cannot be read is still the credential the server imported,
     // and minting a replacement would leave the two holding different passwords.
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
     throw new ZitadelError("E_VALIDATION", `${LOCAL_ADMIN_FILE} cannot be read`, {
       hint: `Check that ${LOCAL_ADMIN_FILE} is readable by you; \`zitadel start\` writes it owner-only.`,
-      details: { cause: error instanceof Error ? error.message : String(error) },
+      details: { cause: errorMessage(error) },
     });
-  }
+  });
+  if (raw === undefined) return undefined;
 
-  let parsed: unknown;
   try {
-    parsed = JSON.parse(raw);
+    const parsed: unknown = JSON.parse(raw);
+    if (isLocalAdmin(parsed)) return parsed;
   } catch (error) {
     throw malformedAdminFile(error);
   }
-  if (!isLocalAdmin(parsed)) {
-    throw malformedAdminFile();
-  }
-  return parsed;
+  throw malformedAdminFile();
 }
 
 function isLocalAdmin(value: unknown): value is LocalAdmin {
@@ -118,10 +114,12 @@ function isLocalAdmin(value: unknown): value is LocalAdmin {
 function malformedAdminFile(cause?: unknown): ZitadelError {
   return new ZitadelError("E_VALIDATION", `${LOCAL_ADMIN_FILE} is malformed`, {
     hint: `Delete ${LOCAL_ADMIN_FILE} and run \`zitadel reset --force\`, then \`zitadel start\`. Both are needed: reset keeps ${LOCAL_ADMIN_FILE}, and deleting it alone leaves the server holding the old password.`,
-    nextCommands: [`rm ${LOCAL_ADMIN_FILE}`, "zitadel reset --force", "zitadel start"],
-    ...(cause
-      ? { details: { cause: cause instanceof Error ? cause.message : String(cause) } }
-      : {}),
+    nextCommands: [
+      shellCommand(`rm ${LOCAL_ADMIN_FILE}`),
+      unscopedCommand("reset --force"),
+      unscopedCommand("start"),
+    ],
+    ...(cause ? { details: { cause: errorMessage(cause) } } : {}),
   });
 }
 
@@ -163,7 +161,7 @@ export async function ensureLocalAdmin(
       mode: 0o644,
     },
   );
-  await chmod(staging, 0o644).catch(() => undefined);
+  await enforceMode(staging, 0o644);
   await rename(staging, userFile);
 
   return { admin, userFile };
@@ -197,7 +195,7 @@ async function writePrivateIfAbsent(path: string, content: string): Promise<bool
     if ((error as NodeJS.ErrnoException).code === "EEXIST") return false;
     throw error;
   }
-  await chmod(path, 0o600).catch(() => undefined);
+  await enforceMode(path, 0o600);
   return true;
 }
 

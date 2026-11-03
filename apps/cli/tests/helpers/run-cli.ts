@@ -7,7 +7,7 @@ import type { LocalServers, ManagedRuntimeProcess } from "../../src/lib/local-se
 import { publicCliCommand } from "../../src/lib/public-cli";
 import { cliPackageRoot } from "./oclif-build";
 
-const cliVersion = JSON.parse(
+export const cliVersion = JSON.parse(
   readFileSync(new URL("../../package.json", import.meta.url), "utf8"),
 ) as { version: string };
 
@@ -29,6 +29,7 @@ export async function runCliForTest(
   root: string = cliPackageRoot,
   machine: LocalServers = aMachineRunning(),
 ) {
+  // The patched stream writers below append to these as the command prints.
   let stdout = "";
   let stderr = "";
   const originalOut = process.stdout.write.bind(process.stdout);
@@ -56,26 +57,23 @@ export async function runCliForTest(
     stderr += `${format(...args)}\n`;
   };
 
-  let exitCode = 0;
-  try {
-    const command = await commandSeeing(argv[0], machine);
-    await (command ? command.run(argv.slice(1), root) : run(argv, root));
-  } catch (error) {
-    exitCode = exitCodeOf(error);
-  } finally {
-    process.stdout.write = originalOut;
-    process.stderr.write = originalErr;
-    console.log = originalLog;
-    console.error = originalConsoleError;
-    for (const key of overlaid) {
-      const prior = previous.get(key);
-      if (prior === undefined) {
-        delete process.env[key];
-      } else {
-        process.env[key] = prior;
+  const exitCode = await commandSeeing(argv[0], machine)
+    .then((command) => (command ? command.run(argv.slice(1), root) : run(argv, root)))
+    .then(() => 0, exitCodeOf)
+    .finally(() => {
+      process.stdout.write = originalOut;
+      process.stderr.write = originalErr;
+      console.log = originalLog;
+      console.error = originalConsoleError;
+      for (const key of overlaid) {
+        const prior = previous.get(key);
+        if (prior === undefined) {
+          delete process.env[key];
+        } else {
+          process.env[key] = prior;
+        }
       }
-    }
-  }
+    });
 
   return { exitCode, stdout, stderr };
 }

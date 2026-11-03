@@ -1,8 +1,14 @@
 # ADR 006: Web Component Renderer Direction
 
-> **Status:** Proposed
+> **Status:** Superseded by [ADR 055](./055-lit-only-login-surface.md) (2026-10-24)
 > **Date:** 2026-04-26
 > **Context:** Future Zitadel auth UI renderer
+>
+> The direction held: the login surface is a web component. It shipped as
+> `<zitadel-login>` (`packages/components/src/orchestrator/zitadel-login.ts`)
+> with `project-id`, `flow-name` and `post-sign-in-url` attributes, not the
+> `<zitadel-flow purpose issuer>` contract below, and the CLI's `web-component`
+> renderer is available. ADR 055 is the current decision.
 
 ## Decision
 

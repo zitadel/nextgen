@@ -28,6 +28,7 @@ import { useLoadMore } from "@/hooks/use-load-more";
 import { formatDate } from "@/lib/date";
 import { requireProjectScope, useRequiredProjectScope } from "@/lib/project-scope";
 import { Page } from "@/components/layout";
+import { PAGE_TITLE_ROW } from "@/components/typography";
 
 /**
  * The two states `team-status` defines. The tabs filter on exactly these, so the
@@ -122,9 +123,10 @@ function TeamsScreen() {
         {/* 8px from the title row to the tabs on desktop, 24px on mobile, where
             the design gives the stacked header more room. */}
         <div className={`${RESOURCE_HEADER} flex flex-col gap-6 lg:gap-2`}>
-          {/* The title row: the Add button beside the title at every width
-              (D19); no search until there is a console-wide one. */}
-          <div className="flex min-h-6 items-center justify-between gap-3">
+          {/* The title row, the 36px `PAGE_TITLE_ROW` every screen's title sits
+              on: the Add button beside the title at every width (D19); no
+              search until there is a console-wide one. */}
+          <div className={PAGE_TITLE_ROW}>
             <h1 className={RESOURCE_TITLE}>Teams</h1>
             <AddTeamSheet onCreated={() => router.invalidate()}>
               {/* `px-2.5!` — `Button`'s `has-[>svg]:px-3` out-specifies a plain

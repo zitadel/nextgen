@@ -8,7 +8,7 @@ tasks:
     command: "corepack pnpm run generate"
     inputs:
       - "**/*"
-      - "/api/openapi/**/*.yaml"
+      - "/apps/api/api/openapi/**/*.yaml"
     outputs:
       - "src/generated/**/*"
     options:

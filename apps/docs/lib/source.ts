@@ -1,3 +1,4 @@
+import { API_PREFIX } from "@zitadel/api/runtime/base-url";
 import { renderPlaceholder } from "fumadocs-core/mdx-plugins/remark-llms.runtime";
 import type * as PageTree from "fumadocs-core/page-tree";
 import type { AdvancedIndex } from "fumadocs-core/search/server";
@@ -29,8 +30,13 @@ const docs = defineDocs({
     mdxOptions: (environment) => applyMdxPreset({ rehypeCodeOptions: codeOptions })(environment),
     postprocess: {
       // An API tag's page lists the tag's operations with <Operations />,
-      // which its Markdown renders as the page does (pageText).
-      includeProcessedMarkdown: { mdxAsPlaceholder: ["Operations"] },
+      // which its Markdown renders as the page does (pageText). A live
+      // example, a story's <….WithControl /> (components/examples), works
+      // only on the page: its Markdown leaves it out.
+      includeProcessedMarkdown: {
+        mdxAsPlaceholder: ["Operations"],
+        filterElement: (node) => !("name" in node && node.name?.endsWith(".WithControl")),
+      },
     },
   },
   meta: {
@@ -364,9 +370,10 @@ function operationSamples(
   };
 }
 
-// The page's cURL calls the page's own origin, the spec's server; the
-// Markdown's the local server the spec names, as lib/sdk-sample.ts does.
-const curlServer = "http://localhost:8080";
+// The page's cURL calls the page's own origin under the spec's server,
+// /api/v1; the Markdown's the local server the spec names, as
+// lib/sdk-sample.ts does, under the same prefix.
+const curlServer = `http://localhost:8080${API_PREFIX}`;
 
 // cURL as the page generates it. An operation a project secret authenticates
 // sends it as the bearer, from the variable the TypeScript sample reads; one

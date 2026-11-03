@@ -1,0 +1,84 @@
+/* The generated avatar (`src/avatar.ts`): the person's two design-system
+   gradient starts as one linear gradient across the circle, so both colours
+   always show in the same proportion. `<zl-avatar>` paints with it, and the
+   console imports it as `@zitadel/components/avatar.css`.
+
+   `.zl-avatar` paints it at the person's own angle (`--zl-avatar-base`).
+   `.zl-avatar-moving` sets its direction moving, not evenly: a slow turn
+   plus two sways on different periods, all registered angles so they
+   interpolate. The gradient drifts round, speeds up, slows and sometimes
+   swings back, rather than turning steadily about its centre. Each person
+   starts from their own point in the motion (`--zl-avatar-phase`), so a list
+   of avatars never moves in step. Every name carries the `zl-` prefix: the
+   console loads these rules on its document.
+
+   The moving angles fall back to 0deg, so `.zl-avatar` alone needs none of
+   them registered, as in `<zl-avatar>`'s shadow root, which ignores
+   `@property`. */
+@property --zl-avatar-turn {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@property --zl-avatar-sway-a {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@property --zl-avatar-sway-b {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@keyframes zl-avatar-turn {
+  to {
+    --zl-avatar-turn: 360deg;
+  }
+}
+
+@keyframes zl-avatar-sway-a {
+  from {
+    --zl-avatar-sway-a: -90deg;
+  }
+  to {
+    --zl-avatar-sway-a: 90deg;
+  }
+}
+
+@keyframes zl-avatar-sway-b {
+  from {
+    --zl-avatar-sway-b: -45deg;
+  }
+  to {
+    --zl-avatar-sway-b: 45deg;
+  }
+}
+
+.zl-avatar {
+  border-radius: 9999px;
+  background-image: linear-gradient(
+    calc(
+      var(--zl-avatar-base) + var(--zl-avatar-turn, 0deg) + var(--zl-avatar-sway-a, 0deg) +
+        var(--zl-avatar-sway-b, 0deg)
+    ),
+    var(--zl-avatar-from) 15%,
+    var(--zl-avatar-to) 85%
+  );
+}
+
+.zl-avatar-moving {
+  animation:
+    zl-avatar-turn 60s linear infinite,
+    zl-avatar-sway-a 18s ease-in-out infinite alternate,
+    zl-avatar-sway-b 26s ease-in-out infinite alternate;
+  animation-delay: var(--zl-avatar-phase);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .zl-avatar-moving {
+    animation: none;
+  }
+}

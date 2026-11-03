@@ -1,6 +1,7 @@
 import type { ZitadelProject } from "@zitadel/sdk-react";
 import { useMemo } from "react";
 
+import { addon } from "@/addon";
 import { apiBase } from "@/api/zitadel";
 import { getConsoleProjectId, getPublishableKey } from "@/runtime/runtime";
 
@@ -17,6 +18,10 @@ import { getConsoleProjectId, getPublishableKey } from "@/runtime/runtime";
  * runtime-discovered publishable key (root ADR 036) lets the element send the
  * public-plane bearer itself.
  *
+ * The build's add-on may route the widget's calls elsewhere on the origin
+ * (`signInApiBase`, Console ADR 0006 §2); the hosted cloud's puts its bot check
+ * in front of the server there.
+ *
  * Stable per config tuple: a fresh object every render would re-set the
  * element property and miss the SDK's per-handle client cache. `undefined`
  * until discovery has produced a project id.
@@ -26,7 +31,9 @@ export function useConsoleProject(): ZitadelProject | undefined {
   const publishableKey = getPublishableKey();
   return useMemo<ZitadelProject | undefined>(
     () =>
-      projectId ? Object.freeze({ projectId, proxyPath: apiBase, publishableKey }) : undefined,
+      projectId
+        ? Object.freeze({ projectId, proxyPath: addon.signInApiBase ?? apiBase, publishableKey })
+        : undefined,
     [projectId, publishableKey],
   );
 }

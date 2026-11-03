@@ -44,16 +44,6 @@ const shapeOf = (schema: ZodLike | undefined): Record<string, ZodLike> | undefin
   return Object.keys(merged).length > 0 ? merged : undefined;
 };
 
-/**
- * The element schema of a list response's item array. `key` names the property
- * holding the array; without one the response schema is the array itself.
- */
-export const itemSchemaOf = (response: Schema | undefined, key?: string): Schema | undefined => {
-  const array =
-    key === undefined ? unwrap(response as ZodLike) : unwrap(shapeOf(response as ZodLike)?.[key]);
-  return (unwrap(array?.def?.element) as Schema | undefined) ?? undefined;
-};
-
 /** Walk a record schema into the paths a caller may name. */
 export const fieldPaths = (schema: Schema | undefined, depth = 3): FieldPaths | undefined => {
   const shape = shapeOf(schema as ZodLike);
