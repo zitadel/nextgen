@@ -32,7 +32,8 @@ module that compiles two things into one k6 binary:
 A running, healthy server is the one prerequisite. The harness never starts
 or stops one: the lane's provisioning tool does — Moon locally, a container
 or a cloud deployment elsewhere — and the harness is pointed at it with
-`--base`. Every command first checks that `/healthz` answers.
+`--base`. Every command first checks that `/readyz` answers, which takes the
+server's database answering too.
 
 ```sh
 moon run workspace:server                              # terminal 1: the local server on :8080, migrated

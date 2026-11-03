@@ -17,12 +17,26 @@ import {
 import { ZitadelError } from "../errors";
 import { type FlowFile, readSchemaFiles, type SchemaFile, selectSchema } from "../idp";
 import { stableStringify } from "../json";
-import { optionArgs, portableCommands } from "../public-cli";
+import { optionArgs } from "../public-cli";
 import { flowsForSchema } from "../schema-flows";
 import { reportWarning } from "../warnings";
-import { BaseCommand } from "./base";
+import { EnvironmentCommand } from "./environment-command";
+import { environmentFlags } from "./environment-flags";
+import { portableSuggestions, type SuggestedCommand } from "../suggestion";
 import { nonBlankString } from "./flags";
 import type { JsonEnvelope } from "./types";
+import { Destructive } from "./destructive";
+import { Consent } from "../consent";
+
+/**
+ * What lets a schema change be written: consent when it removes the last way
+ * to sign in, `not-the-last-method` when it does not, and `dry-run`, which
+ * writes nothing. {@link AuthMethodCommand.writeSchema} checks the claim.
+ */
+export type Permit = Consent | "not-the-last-method" | "dry-run";
+
+/** The message `deploy` needs, which only the caller can write. */
+const DEPLOY_MESSAGE = "<what changed>";
 
 /** What every `auth-method` command reads before changing anything. */
 type Target = {
@@ -41,12 +55,20 @@ type Target = {
  * are nothing else, so {@link toggle} is all they run.
  *
  * Only `auth-method sso enable` talks to a server, to store the provider's
- * credentials. Every other edit is local, and `plan` and `apply` publish it
- * like any configuration change.
+ * credentials. Every other edit is local, and `deploy` publishes it like any
+ * configuration change.
  */
-export abstract class AuthMethodCommand extends BaseCommand {
+export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) {
+  // The environment flags are hidden here: most `auth-method` commands only
+  // edit files and resolve no environment. The one that publishes credentials
+  // to the project lists them among its own flags.
   static override baseFlags = {
-    ...BaseCommand.baseFlags,
+    ...EnvironmentCommand.baseFlags,
+    env: { ...environmentFlags.env, hidden: true } as typeof environmentFlags.env,
+    "env-file": {
+      ...environmentFlags["env-file"],
+      hidden: true,
+    } as (typeof environmentFlags)["env-file"],
     schema: nonBlankString({
       description: "User schema to change. Required when the Project has more than one.",
     }),
@@ -59,15 +81,21 @@ export abstract class AuthMethodCommand extends BaseCommand {
    * @param flags - The parsed flags.
    * @param options.resolveServer - Whether the command talks to a server.
    *   Off by default: a stopped local runtime must not block staging a change
-   *   for a later `apply`.
-   * @param options.preflight - Checks that must answer before the schema is
-   *   read, with whatever they read handed back as `preflight`.
+   *   for a later `deploy`.
+   * @param options.preflight - Checks of the flags that must answer before the
+   *   schema is read, with what they read handed back as `preflight`. It must
+   *   not ask a question, use the network or write anything: ask in the
+   *   command's own `run`, after `connect()`.
    */
   protected async target<T = undefined>(
     flags: { schema?: string; cwd?: string },
     options: { resolveServer?: boolean; preflight?: (cwd: string) => Promise<T> } = {},
   ): Promise<Target & { readonly preflight: T }> {
-    await this.toMeta(flags, { resolveServer: options.resolveServer ?? false });
+    await this.toMeta(flags, {
+      resolveServer: options.resolveServer ?? false,
+      // Only a command that talks to a server has an environment to resolve.
+      environment: options.resolveServer === true,
+    });
     const { cwd } = this.meta;
     const preflight = (await options.preflight?.(cwd)) as T;
     const schema = selectSchema(await readSchemaFiles(cwd), flags.schema);
@@ -83,12 +111,13 @@ export abstract class AuthMethodCommand extends BaseCommand {
   }
 
   /**
-   * The last-method guard (ADR 070 §3). Returns `false` when the user declined
-   * the prompt, which ends the run as skipped; refuses without `--force` when
-   * nobody can be asked. The question goes through `input`, which `--force`
-   * answers yes without asking.
+   * The last-method guard (ADR 070 §3). Returns what lets {@link writeSchema}
+   * write the change: consent when it removes the last way to sign in, or
+   * `undefined` when the user declined, which ends the run as skipped. It
+   * refuses without `--force` when nobody can be asked. A change that leaves
+   * a way to sign in, or changes nothing, is never asked about.
    *
-   * A dry run answers before the guard, as it does `variables delete`'s: it
+   * A dry run answers before the guard, as it does `variable rm`'s: it
    * changes nothing, so there is nothing to confirm, and {@link reportOutcome}
    * still warns that the schema would have no way to sign in left.
    *
@@ -97,30 +126,51 @@ export abstract class AuthMethodCommand extends BaseCommand {
    * @param input.retryArgs - The command's own arguments, which the refusal
    *   suggests again with `--force`.
    */
-  protected async confirmLastMethod(input: {
+  protected async lastMethodPermit(input: {
     schema: SchemaFile;
     after: Record<string, unknown>;
     disabling: string;
     retryArgs: string[];
     cwdArgs: string[];
-  }): Promise<boolean> {
-    const { dryRun, force, nonInteractive, cliVersion } = this.meta;
-    if (dryRun || !removesLastMethod(input.schema.body, input.after)) {
-      return true;
+  }): Promise<Permit | undefined> {
+    const { dryRun, cliVersion } = this.meta;
+    if (dryRun) {
+      return "dry-run";
+    }
+    if (!removesLastMethod(input.schema.body, input.after)) {
+      return "not-the-last-method";
     }
     const retryArgs = [...input.retryArgs, ...input.cwdArgs, "--force"];
-    if (nonInteractive && !force) {
-      // Refused here rather than by `input`, whose refusal names only the
-      // --force re-run: this one also lists the methods that could be enabled
-      // instead, as argument lists an agent can run whatever the quoting.
-      refuseLastMethod({ schema: input.schema, retryArgs, cwdArgs: input.cwdArgs, cliVersion });
-    }
-    return this.input({
-      kind: "confirm",
+    return this.consent({
+      verb: "disable",
       name: `disable ${input.disabling}, the last way to sign in to ${input.schema.name}`,
       message: `Disable ${input.disabling} anyway? Nobody will be able to sign in to ${input.schema.name}.`,
-      retry: portableCommands([retryArgs], cliVersion)[0],
+      retry: portableSuggestions([retryArgs], cliVersion)[0],
+      // This refusal also lists the methods that could be enabled instead, as
+      // argument lists an agent can run whatever the quoting.
+      refuse: () =>
+        refuseLastMethod({ schema: input.schema, retryArgs, cwdArgs: input.cwdArgs, cliVersion }),
     });
+  }
+
+  /**
+   * Write a changed schema. One that leaves it no way to sign in takes the
+   * consent {@link lastMethodPermit} asked for; it checks that itself, so a
+   * permit cannot claim a method is kept when the change removes the last.
+   */
+  protected async writeSchema(
+    cwd: string,
+    schema: SchemaFile,
+    after: Record<string, unknown>,
+    permit: Permit,
+  ): Promise<void> {
+    if (permit === "dry-run") {
+      throw new Error(`A dry run tried to write ${schema.path}`);
+    }
+    if (removesLastMethod(schema.body, after)) {
+      Consent.assert(permit);
+    }
+    await writeFile(join(cwd, schema.path), `${stableStringify(after)}\n`);
   }
 
   /**
@@ -172,11 +222,11 @@ export abstract class AuthMethodCommand extends BaseCommand {
 
   /**
    * The follow-up commands of a result, as strings when every argument is
-   * safe to run as written, and always as argument lists.
+   * safe to run as written (the result's `next` commands), and always as
+   * argument lists (its `next_args`).
    *
-   * @param changed - Whether a file changed, which `plan` and `apply` then
-   *   publish.
-   * @param cwdArgs - `--cwd` for `plan` and `apply`, from {@link target}.
+   * @param changed - Whether a file changed, which `deploy` then publishes.
+   * @param cwdArgs - `--cwd` for `deploy`, from {@link target}.
    * @param leading - Commands that come first, such as publishing a credential
    *   that did not reach the project.
    */
@@ -184,17 +234,22 @@ export abstract class AuthMethodCommand extends BaseCommand {
     changed: boolean,
     cwdArgs: string[],
     leading: string[][] = [],
-  ): { next_commands: string[]; next_args: string[][] } {
+  ): { commands: readonly SuggestedCommand[]; args: string[][] } {
     const args = [
       ...leading,
       ...(changed
         ? [
-            ["plan", ...cwdArgs],
-            ["apply", ...cwdArgs],
+            ["deploy", "--dry-run", ...cwdArgs],
+            ["deploy", "-m", DEPLOY_MESSAGE, ...cwdArgs],
           ]
         : []),
     ];
-    return { next_commands: portableCommands(args, this.meta.cliVersion), next_args: args };
+    return {
+      // The message is a placeholder the caller fills in, so it is quoted in
+      // the command string and listed as written in `next_args`.
+      commands: portableSuggestions(args, this.meta.cliVersion, [DEPLOY_MESSAGE]),
+      args,
+    };
   }
 
   /**
@@ -217,7 +272,7 @@ export abstract class AuthMethodCommand extends BaseCommand {
       if (enabled) {
         refuseMissingIdentifier(schema, method);
       }
-      // Both directions: a changed schema re-pins its flows, so `plan` would
+      // Both directions: a changed schema re-pins its flows, so `deploy` would
       // reject one it cannot check either way. Before the last-method guard,
       // because these refusals have no override, and nobody should be asked
       // to confirm a change that fails anyway.
@@ -234,16 +289,16 @@ export abstract class AuthMethodCommand extends BaseCommand {
                 "Login flows are not edited for you.",
             },
       );
-      const proceed = await this.confirmLastMethod({
-        schema,
-        after: change.document,
-        disabling: method,
-        retryArgs: ["auth-method", method, "disable", ...optionArgs("--schema", schema.name)],
-        cwdArgs,
-      });
-      if (!proceed) {
-        return this.emit({ status: "skipped", reason: "disable-cancelled" });
-      }
+    }
+    const permit = await this.lastMethodPermit({
+      schema,
+      after: change.document,
+      disabling: method,
+      retryArgs: ["auth-method", method, "disable", ...optionArgs("--schema", schema.name)],
+      cwdArgs,
+    });
+    if (permit === undefined) {
+      return this.emit({ status: "skipped", reason: "disable-cancelled" });
     }
 
     const flowsAfter = flows.map((file) => file.body);
@@ -281,15 +336,17 @@ export abstract class AuthMethodCommand extends BaseCommand {
       });
     }
     if (change.changed) {
-      await writeFile(join(cwd, schema.path), `${stableStringify(change.document)}\n`);
+      await this.writeSchema(cwd, schema, change.document, permit);
       consola.success(`Updated ${schema.path}`);
     } else {
       consola.info(`${method} is already ${verb}d for ${schema.name}`);
     }
     this.reportOutcome(outcome);
+    const followUps = this.followUps(change.changed, cwdArgs);
     return this.emit({
       status: "ok",
-      data: { ...data, ...this.followUps(change.changed, cwdArgs) },
+      data: { ...data, next_args: followUps.args },
+      next: { commands: followUps.commands },
       pretty: change.changed
         ? `${enabled ? "Enabled" : "Disabled"} ${method} for ${schema.name}`
         : `Nothing to ${verb} for ${schema.name}`,
@@ -373,6 +430,6 @@ function refuseLastMethod(input: {
       usable: enabled,
       suggested_args: suggestedArgs,
     },
-    nextCommands: portableCommands(suggestedArgs, input.cliVersion),
+    nextCommands: portableSuggestions(suggestedArgs, input.cliVersion),
   });
 }

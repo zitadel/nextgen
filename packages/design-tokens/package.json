@@ -38,6 +38,7 @@
   },
   "devDependencies": {
     "@types/node": "catalog:",
+    "@zitadel/vitest-config": "workspace:*",
     "tsdown": "catalog:",
     "tslib": "catalog:",
     "tsx": "catalog:",

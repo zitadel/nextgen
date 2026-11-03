@@ -6,6 +6,10 @@
   },
   "private": true,
   "type": "module",
+  "exports": {
+    "./addon": "./src/addon/contract.ts",
+    "./addon/ui": "./src/addon/ui.ts"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -23,8 +27,6 @@
     "@tanstack/react-devtools": "catalog:",
     "@tanstack/react-router": "catalog:",
     "@tanstack/react-router-devtools": "catalog:",
-    "@vercel/analytics": "catalog:",
-    "@vercel/speed-insights": "catalog:",
     "@zitadel/api": "workspace:*",
     "@zitadel/components": "workspace:*",
     "@zitadel/config": "workspace:*",
@@ -56,6 +58,7 @@
     "@types/react-dom": "catalog:",
     "@vitejs/plugin-react": "catalog:",
     "@zitadel/testing": "workspace:*",
+    "@zitadel/vitest-config": "workspace:*",
     "jsdom": "catalog:",
     "msw": "catalog:",
     "tsx": "catalog:",

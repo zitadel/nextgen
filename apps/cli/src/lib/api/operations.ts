@@ -1,6 +1,9 @@
 import { type ApiOperation, operations } from "@zitadel/api/generated/operations";
+import { API_PREFIX } from "@zitadel/api/runtime/base-url";
 
 import { ZitadelError } from "../errors";
+import { unscopedCommand } from "../suggestion";
+import { distance } from "fastest-levenshtein";
 
 export type { ApiOperation };
 
@@ -16,7 +19,7 @@ export type Target = Readonly<{
   query: URLSearchParams;
 }>;
 
-const LIST = "zitadel api ls --json";
+const LIST = unscopedCommand("api ls --json");
 
 /**
  * Why the CLI cannot call an operation, or `undefined` when it can. It holds a
@@ -57,12 +60,17 @@ export const pathParameterNames = (operation: ApiOperation): readonly string[] =
 
 /**
  * The operation an argument names: an `operationId` (in any case, as the docs
- * and `@zitadel/api` spell it), or a path starting with `/`, matched against
- * the spec's templates. `method` is `-X`: with a path it picks among the
+ * and `@zitadel/api` spell it), or a path starting with `/`, with or without
+ * the API prefix, matched against the spec's templates. `method` is `-X`: with a path it picks among the
  * path's methods; with an id it must be the operation's own.
  */
 export const resolveTarget = (ref: string, method?: string): Target => {
   const wanted = method?.toUpperCase();
+  // The spec's paths leave out the prefix the server serves them under, so a
+  // path copied from a URL, with it, names the same operation.
+  if (ref.startsWith(`${API_PREFIX}/`)) {
+    return byPath(ref.slice(API_PREFIX.length), wanted);
+  }
   if (!ref.startsWith("/")) {
     const operation = byId(ref);
     if (wanted !== undefined && wanted !== operation.method) {
@@ -98,25 +106,6 @@ const byId = (ref: string): ApiOperation => {
   });
 };
 
-/** How many single-letter edits turn `a` into `b` (Levenshtein), for a typo's suggestion. */
-const distance = (a: string, b: string): number => {
-  let previous = Array.from({ length: b.length + 1 }, (_, index) => index);
-  for (const [i, left] of [...a].entries()) {
-    const current = [i + 1];
-    for (const [j, right] of [...b].entries()) {
-      current.push(
-        Math.min(
-          (previous[j + 1] ?? 0) + 1,
-          (current[j] ?? 0) + 1,
-          (previous[j] ?? 0) + (left === right ? 0 : 1),
-        ),
-      );
-    }
-    previous = current;
-  }
-  return previous[b.length] ?? 0;
-};
-
 /** A path's segments, each percent-decoded; `undefined` for a malformed escape. */
 const segmentsOf = (path: string): readonly string[] | undefined => {
   try {
@@ -140,7 +129,6 @@ const matchOf = (
     return undefined;
   }
   const values: Record<string, string> = {};
-  let literals = 0;
   for (const [index, part] of parts.entries()) {
     const segment = segments[index] ?? "";
     const parameter = /^\{([^}]+)\}$/.exec(part)?.[1];
@@ -149,12 +137,13 @@ const matchOf = (
         return undefined;
       }
       values[parameter] = segment;
-    } else if (part === segment) {
-      literals++;
-    } else {
+    } else if (part !== segment) {
       return undefined;
     }
   }
+  // Every part that is not a parameter matched its segment, or the loop would
+  // have returned.
+  const literals = parts.filter((part) => !/^\{[^}]+\}$/.test(part)).length;
   return { literals, values };
 };
 

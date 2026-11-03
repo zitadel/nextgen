@@ -1,5 +1,12 @@
+import { relative } from "node:path";
+
 import { ZitadelError } from "../errors";
-import { type FileReferenceContext, inlineFileReferences } from "../local-files";
+import {
+  type FileReferenceContext,
+  findFileReferences,
+  inlineFileReferences,
+  resolveFileReference,
+} from "../local-files";
 
 /**
  * Relative directory (from the project root) where local branding files live:
@@ -54,6 +61,17 @@ export function readDescriptorTemplate(cwd: string, data: object): string | unde
  * on an unreadable file (the field is left out) so normalizing and hashing stay
  * total; `validate` reports that case with a hint before any planning happens.
  */
+/**
+ * The project-relative files a descriptor's `$file` references point at, for a
+ * diff's pathspec: the bundle inlines them, so editing one changes what a
+ * deploy publishes even though the file may sit outside `.zitadel/branding/`.
+ */
+export function brandingReferencePaths(cwd: string, data: object): string[] {
+  return findFileReferences(data).map(({ ref }) =>
+    relative(cwd, resolveFileReference(referenceContext(cwd), ref)),
+  );
+}
+
 export function toBrandingWireBody(cwd: string, data: object): object {
   const { $schema, ...rest } = data as { $schema?: unknown };
   void $schema;

@@ -2,6 +2,7 @@ import { appendFileSync } from "node:fs";
 import { readdir, readFile, stat, writeFile } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
 
+// @boundaries-ignore root scripts/ belongs to the workspace root, which no package can depend on
 import { isDirectRun } from "../../../scripts/dev-process.mjs";
 // A namespace import, so a local-registry.mjs that sets no UPLINK_MAXAGE reads
 // as undefined instead of failing to link.

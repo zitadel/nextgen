@@ -14,7 +14,7 @@ import { getConsoleProjectId } from "@/runtime/runtime";
 /**
  * Console session helpers (Console ADR 0003).
  *
- * The console authenticates with the `__nextgen_session` HttpOnly cookie the
+ * The console authenticates with the HttpOnly session cookie the
  * platform sets after the login widget exchanges its flow `handoff_token`
  * (`POST /sessions/exchange`). These helpers are the only place the console
  * talks to the session endpoints, mirroring the orchestrator's `api-client`
@@ -60,6 +60,15 @@ let pageUserId: string | undefined;
 
 /** Set once the page is reloading: nothing is read or adopted after that. */
 let reloading = false;
+
+/**
+ * Drops only the cached session, so the next `fetchSession()` reads it again:
+ * for a change to the session's own fields (the user ref's `display` after a
+ * profile save). The CSRF token and the person's other cached reads stay.
+ */
+export function refreshSession(): void {
+  cachedSession = null;
+}
 
 /**
  * Drops the cached session, the CSRF token, and every read cached for the

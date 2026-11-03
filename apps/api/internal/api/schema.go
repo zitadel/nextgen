@@ -1,0 +1,178 @@
+package api
+
+import (
+	"context"
+	"errors"
+	"net/http"
+	"slices"
+
+	api "github.com/zitadel/nextgen/internal/api/generated"
+	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
+)
+
+func (h *Handler) CreateSchema(ctx context.Context, req api.CreateSchemaReq, params api.CreateSchemaParams) (api.CreateSchemaRes, error) {
+	if err := h.requireProjectAccess(ctx, string(params.ProjectID), schemaAccess, opWrite); err != nil {
+		return nil, err
+	}
+	var schema *domain.JSONSchema
+
+	switch req.Type {
+	case api.UserSchemaCreateSchemaReq:
+		schemabs, err := req.UserSchema.MarshalJSON()
+		if err != nil {
+			return nil, err
+		}
+		schema, err = h.schemaService.CreateSchema(ctx,
+			service.CreateSchemaInput{
+				ProjectID: string(params.ProjectID),
+				TeamID:    string(params.TeamID.Value),
+				Schema:    schemabs,
+			})
+		if err != nil {
+			return nil, err
+		}
+		return &api.CreateSchemaResponse{ID: schema.URL}, nil
+	case api.SchemaURLCreateSchemaReq:
+		schema, err := h.schemaService.CreateSchemaByUrl(ctx,
+			service.CreateSchemaByURLInput{
+				ProjectID: string(params.ProjectID),
+				TeamID:    string(params.TeamID.Value),
+				URL:       req.SchemaURL.URL,
+			})
+		if err != nil {
+			return nil, err
+		}
+		return &api.CreateSchemaResponse{ID: schema.URL}, nil
+	default:
+		return nil, unknownSchemaKindError
+	}
+}
+
+func (h *Handler) GetSchemaById(ctx context.Context, params api.GetSchemaByIdParams) (api.GetSchemaByIdRes, error) {
+	projectID, err := h.requireResourceAccessInProject(ctx, string(params.ProjectID.Value), params.ID, schemaAccess, opRead)
+	if err != nil {
+		return nil, err
+	}
+	schema, err := h.schemaService.GetSchema(ctx, projectID, string(params.TeamID.Value), params.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	apiSchema, err := domainSchemaToApiSchema(schema)
+	if err != nil {
+		return nil, err
+	}
+	return apiSchema, nil
+}
+
+func (h *Handler) ListSchemas(ctx context.Context, params api.ListSchemasParams) (api.ListSchemasRes, error) {
+	ctx, projectWide, err := h.requireProjectListAccess(ctx, string(params.ProjectID), schemaAccess, domain.ResourceKindSchema)
+	if err != nil {
+		return nil, err
+	}
+
+	// in_use asks whether any user of the project is on a revision, without the
+	// list authz predicate, so it is only answered to a caller that reads every
+	// user: read on the whole project, plus user.read for a token.
+	includeInUse := slices.Contains(params.Expand, api.SchemaExpandInUse)
+	if includeInUse {
+		if !projectWide {
+			return nil, domain.ErrJSONSchemaPermissionDenied().
+				WithMessage("expanding a schema's in_use flag requires read on the whole project")
+		}
+		scopeCtx, _ := GetScopeContext(ctx)
+		if scopeCtx.PrincipalType != domain.AuthzPrincipalTypeUser {
+			if err := requireExpandScope(ctx, "user.read", domain.ErrJSONSchemaPermissionDenied,
+				"expanding a schema's in_use flag requires user.read"); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	// The wire enum and the domain enum carry the same values, but the mapping
+	// is explicit so an added kind cannot silently pass through unrecognised.
+	var kind *domain.JSONSchemaKind
+	if params.Kind.Set {
+		parsed, err := domain.JSONSchemaKindString(string(params.Kind.Value))
+		if err != nil {
+			return nil, err
+		}
+		kind = &parsed
+	}
+
+	var objectTypes []string
+	if objectType, ok := params.ObjectType.Get(); ok {
+		objectTypes = []string{objectType}
+	}
+	schemas, err := h.schemaService.ListSchemas(ctx, service.ListSchemasInput{
+		ProjectID:                   string(params.ProjectID),
+		ObjectTypes:                 objectTypes,
+		Kind:                        kind,
+		LatestRevisionPerObjectType: params.Revisions.Value == api.ListSchemasRevisionsLatest,
+		IncludeInUse:                includeInUse,
+		PageToken:                   string(params.PageToken.Value),
+		Limit:                       int(params.Limit.Value),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	resp := api.ListSchemasResponse{Schemas: make([]api.Schema, len(schemas.Items))}
+	for i, schema := range schemas.Items {
+		apiSchema, err := domainSchemaToApiSchema(schema)
+		if err != nil {
+			return nil, err
+		}
+		resp.Schemas[i] = *apiSchema
+	}
+	if schemas.NextPageToken != "" {
+		resp.NextPageToken = api.NewOptNilPageToken(api.PageToken(schemas.NextPageToken))
+	}
+
+	return &resp, nil
+}
+
+// domainSchemaToApiSchema wraps the stored customer-authored document in the
+// server-owned envelope; every schema read goes through it.
+func domainSchemaToApiSchema(schema *domain.JSONSchema) (*api.Schema, error) {
+	document := api.UserSchema{}
+	if err := document.UnmarshalJSON(schema.Schema); err != nil {
+		return nil, err
+	}
+
+	metadata := api.SchemaMetadata{CreatedAt: schema.CreatedAt}
+	if schema.InUse != nil {
+		metadata.InUse = api.NewOptBool(*schema.InUse)
+	}
+	return &api.Schema{
+		ID:       schema.URL,
+		Schema:   api.NewUserSchemaSchemaDocument(document),
+		Metadata: metadata,
+	}, nil
+}
+
+// ------------------ Errors ---------------
+
+func schemaErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
+	switch err.Code {
+	case domain.ErrJSONSchemaNotFound().Code:
+		return errorResponseWithStatusCode(http.StatusNotFound, err)
+	case domain.ErrJSONSchemaAlreadyExists().Code,
+		domain.ErrJSONSchemaRevisionConflict().Code:
+		return errorResponseWithStatusCode(http.StatusConflict, err)
+	case domain.ErrJSONSchemaInvalid().Code,
+		domain.ErrJSONSchemaFetchDenied().Code,
+		domain.ErrJSONSchemaFetchTooLarge().Code,
+		domain.ErrJSONSchemaFetchTooManyRedirects().Code,
+		domain.ErrJSONSchemaFetchDowngrade().Code,
+		domain.ErrJSONSchemaFetchTimeout().Code:
+		return errorResponseWithStatusCode(http.StatusBadRequest, err)
+	case domain.ErrJSONSchemaPermissionDenied().Code:
+		return errorResponseWithStatusCode(http.StatusForbidden, err)
+	default:
+		return internalErrorResponse(err)
+	}
+}
+
+var unknownSchemaKindError = errors.New("unknown kind of schema")

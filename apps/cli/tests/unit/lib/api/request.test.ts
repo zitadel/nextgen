@@ -133,12 +133,12 @@ describe("buildRequest", () => {
   });
 
   it("sends no body for an operation that takes none", () => {
-    expect(requestFor("getHealth")).not.toHaveProperty("body");
+    expect(requestFor("getLive")).not.toHaveProperty("body");
   });
 
   it("refuses --input for an operation that takes no body", () => {
-    expect(() => requestFor("getHealth", [], { input: {} })).toThrow(
-      "getHealth takes no body, but --input gave one",
+    expect(() => requestFor("getLive", [], { input: {} })).toThrow(
+      "getLive takes no body, but --input gave one",
     );
   });
 
@@ -180,7 +180,7 @@ describe("urlOf", () => {
     const request = requestFor("listSchemas", ["limit=5"], { projectId: "p 1" });
 
     expect(urlOf("http://localhost:8080/", request)).toBe(
-      "http://localhost:8080/schemas?limit=5&project_id=p+1",
+      "http://localhost:8080/api/v1/schemas?limit=5&project_id=p+1",
     );
   });
 });

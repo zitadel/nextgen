@@ -1,9 +1,12 @@
 import { http, HttpResponse } from "msw";
-import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterEach, describe, expect } from "vitest";
+
+import { it } from "../../../helpers/fixtures";
 
 import type { LocalAdmin } from "../../../../src/lib/local-server/admin-credential";
 import { adminSessionCookie, consoleSignInUrl } from "../../../../src/lib/local-server/sign-in";
+
+const signal = new AbortController().signal;
 
 const SERVER = "http://local-admin.invalid:8080";
 
@@ -15,7 +18,7 @@ const admin: LocalAdmin = {
 };
 
 type Call = { path: string; body: unknown; authorization: string | null; origin: string | null };
-let calls: Call[] = [];
+const calls: Call[] = [];
 
 async function record(request: Request): Promise<void> {
   const url = new URL(request.url);
@@ -40,23 +43,23 @@ const signInHandlers = [
   http.get(`${SERVER}/console/runtime.json`, () =>
     HttpResponse.json({ console_project_id: "proj_platform", publishable_key: "pk_platform" }),
   ),
-  http.post(`${SERVER}/auth_attempts`, async ({ request }) => {
+  http.post(`${SERVER}/api/v1/auth_attempts`, async ({ request }) => {
     await record(request);
     return HttpResponse.json({ attempt_id: "att_1", state: "in_progress" }, { status: 201 });
   }),
-  http.post(`${SERVER}/auth_attempts/:attempt/challenges`, async ({ request }) => {
+  http.post(`${SERVER}/api/v1/auth_attempts/:attempt/challenges`, async ({ request }) => {
     await record(request);
     const { method } = (await request.json()) as { method: string };
     return HttpResponse.json({ challenge_id: `ch_${method}`, method }, { status: 201 });
   }),
   http.post(
-    `${SERVER}/auth_attempts/:attempt/challenges/:challenge/verify`,
+    `${SERVER}/api/v1/auth_attempts/:attempt/challenges/:challenge/verify`,
     async ({ request }) => {
       await record(request);
       return HttpResponse.json({ attempt_id: "att_1", state: "in_progress" });
     },
   ),
-  http.post(`${SERVER}/auth_attempts/:attempt/handoff`, async ({ request }) => {
+  http.post(`${SERVER}/api/v1/auth_attempts/:attempt/handoff`, async ({ request }) => {
     await record(request);
     return HttpResponse.json({
       handoff_token: "handoff/one+time",
@@ -65,18 +68,17 @@ const signInHandlers = [
   }),
 ];
 
-const server = setupServer(...signInHandlers);
-
-beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
-afterEach(() => {
-  server.resetHandlers();
-  calls = [];
+it.beforeEach(({ server }) => {
+  server.use(...signInHandlers);
 });
-afterAll(() => server.close());
+
+afterEach(() => {
+  calls.length = 0;
+});
 
 describe("local admin sign-in", () => {
   it("proves the identifier, then the password, and links the handoff token", async () => {
-    const url = await consoleSignInUrl(SERVER, admin);
+    const url = await consoleSignInUrl(SERVER, admin, signal);
 
     // The token is a bearer credential in a query string, so it is encoded.
     expect(url).toBe(
@@ -84,12 +86,12 @@ describe("local admin sign-in", () => {
     );
 
     expect(calls.map((call) => call.path)).toEqual([
-      "/auth_attempts",
-      "/auth_attempts/att_1/challenges",
-      "/auth_attempts/att_1/challenges/ch_identifier/verify",
-      "/auth_attempts/att_1/challenges",
-      "/auth_attempts/att_1/challenges/ch_password/verify",
-      "/auth_attempts/att_1/handoff",
+      "/api/v1/auth_attempts",
+      "/api/v1/auth_attempts/att_1/challenges",
+      "/api/v1/auth_attempts/att_1/challenges/ch_identifier/verify",
+      "/api/v1/auth_attempts/att_1/challenges",
+      "/api/v1/auth_attempts/att_1/challenges/ch_password/verify",
+      "/api/v1/auth_attempts/att_1/handoff",
     ]);
     expect(calls[0]?.body).toEqual({ project_id: "proj_platform" });
     expect(calls[1]?.body).toEqual({ method: "identifier" });
@@ -107,47 +109,78 @@ describe("local admin sign-in", () => {
     }
   });
 
-  it("exchanges the handoff token for the session cookie", async () => {
-    let exchanged: unknown;
+  it("exchanges the handoff token for the session cookie", async ({ server }) => {
+    const exchanges: unknown[] = [];
     server.use(
-      http.post(`${SERVER}/sessions/exchange`, async ({ request }) => {
-        exchanged = {
+      http.post(`${SERVER}/api/v1/sessions/exchange`, async ({ request }) => {
+        exchanges.push({
           project: new URL(request.url).searchParams.get("project_id"),
           body: await request.json(),
-        };
+        });
         return new HttpResponse(null, {
-          headers: { "set-cookie": "__nextgen_session=sess_cookie_value; Path=/; HttpOnly" },
+          headers: { "set-cookie": "zitadel_session=sess_cookie_value; Path=/; HttpOnly" },
         });
       }),
     );
 
-    const cookie = await adminSessionCookie(SERVER, admin);
+    const cookie = await adminSessionCookie(SERVER, admin, signal);
 
-    expect(cookie).toBe("__nextgen_session=sess_cookie_value");
-    expect(exchanged).toEqual({
+    expect(cookie).toBe("zitadel_session=sess_cookie_value");
+    expect(exchanges[0]).toEqual({
       project: "proj_platform",
       body: { handoff_token: "handoff/one+time" },
     });
   });
 
-  it("fails when the exchange sets no session cookie", async () => {
+  // A server reached over https sets the prefixed name, and takes it back.
+  it("keeps the session cookie under the prefixed name an https server sets", async ({
+    server,
+  }) => {
     server.use(
-      http.post(`${SERVER}/sessions/exchange`, () => HttpResponse.json({}, { status: 200 })),
+      http.post(
+        `${SERVER}/api/v1/sessions/exchange`,
+        () =>
+          new HttpResponse(null, {
+            headers: {
+              "set-cookie": "__Host-zitadel_session=sess_cookie_value; Path=/; HttpOnly; Secure",
+            },
+          }),
+      ),
     );
 
-    await expect(adminSessionCookie(SERVER, admin)).rejects.toThrow(
+    const cookie = await adminSessionCookie(SERVER, admin, signal);
+
+    expect(cookie).toBe("__Host-zitadel_session=sess_cookie_value");
+  });
+
+  it.for<[string, Record<string, string>]>([
+    ["sets no session cookie", {}],
+    [
+      "sets only a session cookie from before ADR 083",
+      { "set-cookie": "__nextgen_session=sess_cookie_value; Path=/; HttpOnly" },
+    ],
+  ])("fails when the exchange %s", async ([_label, headers], { server }) => {
+    server.use(
+      http.post(`${SERVER}/api/v1/sessions/exchange`, () =>
+        HttpResponse.json({}, { status: 200, headers }),
+      ),
+    );
+
+    await expect(adminSessionCookie(SERVER, admin, signal)).rejects.toThrow(
       "Local admin session exchange failed (200)",
     );
   });
 
-  it("refuses a server that does not host the platform project, and says how to fix it", async () => {
+  it("refuses a server that does not host the platform project, and says how to fix it", async ({
+    server,
+  }) => {
     server.use(
       http.get(`${SERVER}/console/runtime.json`, () =>
         HttpResponse.json({ console_project_id: "proj_other", publishable_key: "pk_other" }),
       ),
     );
 
-    const error = await consoleSignInUrl(SERVER, admin).catch((caught: unknown) => caught);
+    const error = await consoleSignInUrl(SERVER, admin, signal).catch((caught: unknown) => caught);
 
     expect(error).toMatchObject({
       code: "E_VALIDATION",
@@ -161,9 +194,11 @@ describe("local admin sign-in", () => {
   // The server reports a failed lookup with the same code as a missing user, so
   // the advice names both causes and never suggests the destructive reset as a
   // command an agent would run.
-  it("explains a rejected identifier without steering an agent into a reset", async () => {
+  it("explains a rejected identifier without steering an agent into a reset", async ({
+    server,
+  }) => {
     server.use(
-      http.post(`${SERVER}/auth_attempts/:attempt/challenges/:challenge/verify`, () =>
+      http.post(`${SERVER}/api/v1/auth_attempts/:attempt/challenges/:challenge/verify`, () =>
         HttpResponse.json(
           { code: "att.proof_rejected", message: "The proof was rejected." },
           { status: 409 },
@@ -171,7 +206,7 @@ describe("local admin sign-in", () => {
       ),
     );
 
-    const error = await consoleSignInUrl(SERVER, admin).catch((caught: unknown) => caught);
+    const error = await consoleSignInUrl(SERVER, admin, signal).catch((caught: unknown) => caught);
 
     expect(error).toMatchObject({
       code: "E_AUTH",
@@ -184,9 +219,9 @@ describe("local admin sign-in", () => {
     );
   });
 
-  it("reports a rejected password with the server's own message", async () => {
+  it("reports a rejected password with the server's own message", async ({ server }) => {
     server.use(
-      http.post(`${SERVER}/auth_attempts/:attempt/challenges/ch_password/verify`, () =>
+      http.post(`${SERVER}/api/v1/auth_attempts/:attempt/challenges/ch_password/verify`, () =>
         HttpResponse.json(
           { code: "att.proof_rejected", message: "The proof was rejected." },
           { status: 409 },
@@ -196,7 +231,7 @@ describe("local admin sign-in", () => {
 
     // Only the identifier gets the data-directory explanation; a password
     // failure is reported as the server gave it.
-    await expect(consoleSignInUrl(SERVER, admin)).rejects.toMatchObject({
+    await expect(consoleSignInUrl(SERVER, admin, signal)).rejects.toMatchObject({
       status: 409,
       body: { message: "The proof was rejected." },
     });

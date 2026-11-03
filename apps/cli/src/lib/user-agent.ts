@@ -27,9 +27,8 @@ import { hostAgent } from "./telemetry/dimensions/host-agent";
 const USER_AGENT_HEADER = "user-agent";
 
 /**
- * Consent outcomes that are the user's own choice. A missing ingestion token
- * or a test run also disables telemetry, but says nothing about what the user
- * wants reported.
+ * Consent outcomes that are the user's own choice. A test run also disables
+ * telemetry, but says nothing about what the user wants reported.
  */
 const OPT_OUT_REASONS: ReadonlySet<Consent["reason"]> = new Set([
   "flag-opt-out",
@@ -201,12 +200,11 @@ function headerEntries(headers: Dispatcher.DispatchOptions["headers"]): Iterable
     return [];
   }
   if (Array.isArray(headers)) {
-    const pairs: HeaderEntry[] = [];
-    for (let index = 0; index < headers.length; index += 2) {
-      // Even length is checked by the caller, so both indexes are in range.
-      pairs.push([headers[index] as string, headers[index + 1]]);
-    }
-    return pairs;
+    // Even length is checked by the caller, so both indexes are in range.
+    return Array.from(
+      { length: Math.ceil(headers.length / 2) },
+      (_, pair): HeaderEntry => [headers[pair * 2] as string, headers[pair * 2 + 1]],
+    );
   }
   if (Symbol.iterator in headers) {
     return headers as Iterable<HeaderEntry>;

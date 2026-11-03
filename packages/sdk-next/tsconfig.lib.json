@@ -12,8 +12,7 @@
     ],
     "experimentalDecorators": true,
     "jsx": "react-jsx",
-    "declaration": true,
-    "declarationMap": true
+    "declaration": true
   },
   "include": [
     "src/**/*.ts",

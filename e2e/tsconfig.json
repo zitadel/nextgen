@@ -14,6 +14,10 @@
   },
   "include": [
     "playwright.shared.ts",
+    "cli/playwright*.config.mts",
+    "cli/global-setup.ts",
+    "cli/src-deployment/**/*.ts",
+    "cli/support/**/*.ts",
     "console/playwright*.config.mts",
     "console/scripts/**/*.mts",
     "console/src/**/*.ts",

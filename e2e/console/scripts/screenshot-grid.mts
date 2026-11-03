@@ -58,7 +58,7 @@ type Screen = {
 
 const SCREENS: Screen[] = [
   { name: "Projects", path: "/projects" },
-  { name: "Project settings", path: "/project" },
+  { name: "Settings", path: "/project" },
   { name: "Teams", path: "/teams" },
   { name: "Team detail", path: "/teams", firstRow: "/teams/" },
   { name: "Users", path: "/users" },

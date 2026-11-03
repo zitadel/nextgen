@@ -4,15 +4,20 @@ import { chmod, mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "n
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Readable } from "node:stream";
+import { parseEnv, promisify } from "node:util";
 
 import { expect } from "vitest";
 
 import { aFakeAppGeneratorPath } from "./app-generator";
 import { aFakeServerBinary, trackLocalServerDir, type ServerShape } from "./local-server";
+import { parseJsonOrUndefined } from "../../src/lib/json";
 import { cliPackageRoot } from "./oclif-build";
 import { nextPort } from "./ports";
 import { aBinaryRecord } from "./runtime-record";
 import { parseJson, runCliForTest } from "./run-cli";
+import { assertRunnableSuggestions } from "./suggestions";
+
+const execFileAsync = promisify(execFile);
 
 const SCHEMA_FILE = ".zitadel/schemas/default-human-user.json";
 const FLOW_FILE = ".zitadel/flows/default-login.json";
@@ -44,11 +49,33 @@ export interface Envelope<T = Record<string, unknown>> {
   readonly data: T;
 }
 
-export interface PlanTotals {
-  readonly creates: number;
-  readonly updates: number;
-  readonly deletes: number;
-  readonly total: number;
+/**
+ * A non-interactive `deploy` outside a git repository, as `aSetUpApp` arranges,
+ * needs a `-m` message, so the helpers default one unless the spec supplied its own.
+ */
+function withDeployMessage(extraArgs: readonly string[]): string[] {
+  const hasMessage = extraArgs.some((arg) => arg === "-m" || arg === "--message");
+  return hasMessage ? [...extraArgs] : ["-m", "test deploy", ...extraArgs];
+}
+
+/** The data a `deploy` envelope carries, for a deploy expected to succeed. */
+export interface DeployResult {
+  readonly content_hash?: string;
+  readonly release_id?: string;
+  readonly deployment_id?: string;
+  readonly resources?: number;
+  readonly origins?: string[];
+  readonly dry_run?: boolean;
+  readonly diff?: {
+    readonly against: string | null;
+    readonly files: ReadonlyArray<{
+      readonly path: string;
+      readonly status: string;
+      readonly previous_path?: string;
+      readonly patch: string;
+    }> | null;
+    readonly note?: string;
+  };
 }
 
 export interface FlowStep {
@@ -83,10 +110,32 @@ export interface ProjectVariable {
   readonly secret?: boolean;
 }
 
+export interface ProjectOrigin {
+  readonly pattern: string;
+  readonly kind: string;
+}
+
+/**
+ * The origin `zitadel setup` registers for the app it scaffolds: the development
+ * server, as a primary pattern, because only a primary one admits the app's own
+ * requests. A fresh project already holds it.
+ */
+export const SETUP_ORIGIN: ProjectOrigin = { pattern: "http://localhost:3000", kind: "primary" };
+
 export interface RegisteredIdp {
   readonly id: string;
   readonly slug: string;
 }
+
+export interface PublishedPolicy {
+  readonly id: string;
+  readonly operation: string;
+  readonly revision_id: string;
+  readonly config: Readonly<Record<string, number>>;
+}
+
+/** The operation the password policy guards, and its file's name. */
+export const PASSWORD_POLICY = "auth.factor.password.set";
 
 /**
  * What a command did to the project, as a tree rather than as content.
@@ -227,6 +276,106 @@ export class ScaffoldedApp {
       PACKAGE_MANAGER_LOG: npm.logPath,
       PATH: `${npm.binDir}:${process.env.PATH ?? ""}`,
     });
+  }
+
+  /**
+   * Runs setup with a git that does everything but commit, as a full disk or a
+   * broken git would: setup creates the repository and then cannot commit.
+   */
+  async setupWithGitThatCannotCommit(): Promise<CliResult> {
+    const git = await gitThatCannotCommit();
+    return this.cli(["setup", "--non-interactive", "--json", "--skip-install"], {
+      PATH: `${git}:${process.env.PATH ?? ""}`,
+    });
+  }
+
+  /**
+   * Puts the app under version control with everything committed, the state a
+   * developer who already uses git is in before they run setup.
+   */
+  async underVersionControl(): Promise<void> {
+    await execFileAsync("git", ["init", "--quiet"], { cwd: this.path });
+    await execFileAsync("git", ["add", "--all"], { cwd: this.path });
+    await execFileAsync(
+      "git",
+      [
+        "-c",
+        "user.name=Dev",
+        "-c",
+        "user.email=dev@example.com",
+        "-c",
+        "commit.gpgsign=false",
+        "commit",
+        "--quiet",
+        "--no-verify",
+        "--message=feat: the developer's own work",
+      ],
+      { cwd: this.path },
+    );
+  }
+
+  /** Detaches HEAD from its branch, as a checkout of a tag or a CI job's checkout does. */
+  async onADetachedHead(): Promise<void> {
+    await execFileAsync("git", ["checkout", "--quiet", "--detach"], { cwd: this.path });
+  }
+
+  /** Leaves a file nobody has committed, as a developer mid-change would. */
+  async withUncommittedWork(): Promise<void> {
+    await writeFile(join(this.path, "notes.md"), "a note to self\n");
+  }
+
+  /**
+   * The paths setup's commit put under version control. Read from git because
+   * that is the behaviour: a secret that reaches version control cannot be
+   * scrubbed later, so what is tracked is the claim being made.
+   */
+  async trackedFiles(): Promise<string[]> {
+    try {
+      const { stdout } = await execFileAsync(
+        "git",
+        ["-c", "core.quotePath=false", "ls-files", "-z"],
+        { cwd: this.path },
+      );
+      return stdout.split("\0").filter((line) => line !== "");
+    } catch {
+      return [];
+    }
+  }
+
+  /** Commits everything outstanding, as the developer would before deploying. */
+  async commitEverything(): Promise<void> {
+    await execFileAsync("git", ["add", "--all"], { cwd: this.path });
+    await execFileAsync(
+      "git",
+      [
+        "-c",
+        "user.name=Dev",
+        "-c",
+        "user.email=dev@example.com",
+        "-c",
+        "commit.gpgsign=false",
+        "commit",
+        "--quiet",
+        "--no-verify",
+        "--message=feat: change the configuration",
+      ],
+      { cwd: this.path },
+    );
+  }
+
+  /** The subjects of the project's commits, newest first, or [] without a repo. */
+  async commitSubjects(): Promise<string[]> {
+    try {
+      const { stdout } = await execFileAsync("git", ["log", "--format=%s"], { cwd: this.path });
+      return stdout.split("\n").filter((line) => line !== "");
+    } catch {
+      return [];
+    }
+  }
+
+  /** `setup` without `--json`, for a spec asserting what the developer reads. */
+  setupRendered(extraArgs: string[] = []): Promise<CliResult> {
+    return this.cli(["setup", "--non-interactive", "--skip-install", ...extraArgs]);
   }
 
   /**
@@ -524,6 +673,13 @@ export class ScaffoldedApp {
     await writeFile(join(this.path, ".zitadel/local/runtime.json"), "{not json");
   }
 
+  /** The log lines a `logs --json` run returned. */
+  loggedLinesOf(result: CliResult): string[] {
+    expect(result, "logs should have succeeded").toSucceed();
+    const { logs } = this.envelopeOf<{ logs: string }>(result).data;
+    return logs.split("\n").filter((line) => line !== "");
+  }
+
   /** The lifecycle `status` reports for the local server. */
   async localServerLifecycle(): Promise<string> {
     const status = await this.cli(["status", "--json"]);
@@ -534,29 +690,122 @@ export class ScaffoldedApp {
     return this.cli(["status", "--json", ...extraArgs]);
   }
 
-  apply(extraArgs: string[] = []): Promise<CliResult> {
-    return this.cli(["apply", "--non-interactive", "--json", ...extraArgs]);
+  /** Add a primary origin, so a deploy to `primary` has somewhere to land. */
+  async addPrimaryOrigin(pattern = "https://app.example.com"): Promise<void> {
+    const result = await this.cli([
+      "origin",
+      "add",
+      pattern,
+      "--kind",
+      "primary",
+      "--non-interactive",
+      "--json",
+    ]);
+    expect(result, "origin add should have succeeded").toSucceed();
   }
 
-  /** The totals `plan` reports, for a plan expected to succeed. */
-  async plan(): Promise<PlanTotals> {
-    const result = await this.planAttempt();
-    expect(result, "plan should have succeeded").toSucceed();
-    return this.envelopeOf<PlanTotals>(result).data;
+  /** How many deployments the project serves, as `deployment list` reports them. */
+  async liveDeploymentCount(): Promise<number> {
+    const result = await this.cli(["deployment", "list", "--json"]);
+    expect(result, "deployment list should have succeeded").toSucceed();
+    return this.envelopeOf<{ count: number }>(result).data.count;
   }
 
-  /** `plan` as a raw result, for a spec asserting a refusal. */
-  planAttempt(): Promise<CliResult> {
-    return this.cli(["plan", "--non-interactive", "--json"]);
+  /** The message a release records, as `release get` reports it. */
+  async releaseMessage(releaseId: string): Promise<string | null> {
+    const result = await this.cli(["release", "get", releaseId, "--json"]);
+    expect(result, "release get should have succeeded").toSucceed();
+    return this.envelopeOf<{ metadata: { message: string | null } }>(result).data.metadata.message;
   }
 
-  /** `plan` without `--json`, for a spec asserting what the developer reads. */
-  planRendered(): Promise<CliResult> {
-    return this.cli(["plan", "--non-interactive"]);
+  /** The message a deployment records, as `deployment get` reports it. */
+  async deploymentMessage(deploymentId: string): Promise<string | null> {
+    const result = await this.cli(["deployment", "get", deploymentId, "--json"]);
+    expect(result, "deployment get should have succeeded").toSucceed();
+    return this.envelopeOf<{ metadata: { message: string | null } }>(result).data.metadata.message;
+  }
+
+  /** Build a release from `.zitadel/` and deploy it to every primary origin. */
+  deploy(extraArgs: string[] = []): Promise<CliResult> {
+    return this.cli(["deploy", "--non-interactive", "--json", ...withDeployMessage(extraArgs)]);
+  }
+
+  /**
+   * What `apply` was for a set-up project: gives it the primary origin a deploy
+   * needs, then deploys.
+   */
+  async publish(): Promise<CliResult> {
+    await this.addPrimaryOrigin();
+    return this.deploy();
+  }
+
+  /** {@link publish}, failing the arrange if the deploy does not succeed. */
+  async publishData(): Promise<DeployResult> {
+    await this.addPrimaryOrigin();
+    return this.deployData();
+  }
+
+  /** The envelope data of a deploy expected to succeed (its content digest). */
+  async deployData(extraArgs: string[] = []): Promise<DeployResult> {
+    const result = await this.deploy(extraArgs);
+    expect(result, "deploy should have succeeded").toSucceed();
+    return this.envelopeOf<DeployResult>(result).data;
+  }
+
+  /** Deploys a preview to `url` and returns its envelope data, failing the arrange if it does not. */
+  async previewData(url: string): Promise<Record<string, unknown>> {
+    const result = await this.run(["preview", "--origin", url, "--json"]);
+    expect(result, "preview should have succeeded").toSucceed();
+    return this.envelopeOf<Record<string, unknown>>(result).data;
+  }
+
+  /** `deploy --dry-run`: validates and shows the diff without writing. */
+  deployDryRun(extraArgs: string[] = []): Promise<CliResult> {
+    return this.cli(["deploy", "--dry-run", "--non-interactive", "--json", ...extraArgs]);
+  }
+
+  /** The envelope data of a dry run expected to succeed (its diff). */
+  async deployDryRunData(extraArgs: string[] = []): Promise<DeployResult> {
+    const result = await this.deployDryRun(extraArgs);
+    expect(result, "deploy --dry-run should have succeeded").toSucceed();
+    return this.envelopeOf<DeployResult>(result).data;
+  }
+
+  /**
+   * Commits the whole app to git, making it a repository the first time, as a
+   * developer does before they deploy: a deploy records the commit it was built
+   * from, and the next one diffs `.zitadel/` against it.
+   */
+  async commit(): Promise<void> {
+    const git = (args: string[]) => promisify(execFile)("git", args, { cwd: this.path });
+    await git(["init", "-q"]);
+    await git(["add", "-A"]);
+    await git([
+      "-c",
+      "user.name=Test",
+      "-c",
+      "user.email=test@example.com",
+      "commit",
+      "-qm",
+      "wip",
+    ]);
+  }
+
+  /** `deploy` without `--json`, for a spec asserting what the developer reads. */
+  deployRendered(extraArgs: string[] = []): Promise<CliResult> {
+    return this.cli(["deploy", "--non-interactive", ...withDeployMessage(extraArgs)]);
   }
 
   run(args: string[], env: NodeJS.ProcessEnv = {}): Promise<CliResult> {
     return this.cli(args, env);
+  }
+
+  /**
+   * `command` as this fixture's runs suggest it again: with the server and
+   * `--cwd` every run is given, so a spec states the whole suggestion.
+   */
+  againAsRun(command: string): string {
+    return `${command} --server ${MOCK_SERVER_URL} --cwd ${this.path}`;
   }
 
   /** For output oclif owns rather than our envelope: `--help`, `--version`. */
@@ -574,15 +823,19 @@ export class ScaffoldedApp {
   }
 
   /** Sets a project variable, whose value is piped rather than passed as a flag. */
-  setVariable(name: string, value: string, { secret = false } = {}): Promise<CliResult> {
+  setVariable(
+    name: string,
+    value: string,
+    { secret = false, preview = false } = {},
+  ): Promise<CliResult> {
     return this.pipingStdin(value, () =>
       this.cli([
-        "variables",
+        "variable",
         "set",
         name,
-        "--project-level",
         "--json",
         ...(secret ? ["--secret"] : []),
+        ...(preview ? ["--preview"] : []),
       ]),
     );
   }
@@ -594,10 +847,9 @@ export class ScaffoldedApp {
   setVariableWithNothingPiped(name: string, { secret = false } = {}): Promise<CliResult> {
     return this.withKeyboardOnStdin(() =>
       this.cli([
-        "variables",
+        "variable",
         "set",
         name,
-        "--project-level",
         "--non-interactive",
         "--json",
         ...(secret ? ["--secret"] : []),
@@ -630,17 +882,83 @@ export class ScaffoldedApp {
     return this.cli(["api", "ls", ...args, "--non-interactive"]);
   }
 
-  getVariable(name: string): Promise<CliResult> {
-    return this.cli(["variables", "get", name, "--project-level", "--json"]);
+  getVariable(name: string, { preview = false } = {}): Promise<CliResult> {
+    return this.cli(["variable", "get", name, "--json", ...(preview ? ["--preview"] : [])]);
   }
 
-  deleteVariable(name: string): Promise<CliResult> {
-    return this.cli(["variables", "delete", name, "--project-level", "--force", "--json"]);
+  /** Adds one origin pattern to the project. */
+  addOrigin(pattern: string, kind: "primary" | "preview"): Promise<CliResult> {
+    return this.cli(["origin", "add", pattern, "--kind", kind, "--json"]);
+  }
+
+  /** Removes one origin pattern, non-interactively. */
+  removeOrigin(pattern: string): Promise<CliResult> {
+    return this.cli(["origin", "rm", pattern, "--force", "--json"]);
+  }
+
+  /**
+   * Removes every origin the project holds, `setup`'s own included, so a spec
+   * starts from the empty list, which admits any origin.
+   */
+  async clearOrigins(): Promise<void> {
+    for (const { pattern } of await this.projectOrigins()) {
+      expect(await this.removeOrigin(pattern), `removing ${pattern}`).toSucceed();
+    }
+  }
+
+  /**
+   * Leaves the app's origins as `zitadel setup` 0.1.0 registered them: its
+   * issuer a preview origin and nothing primary, on the project and in
+   * `.zitadel/secret`.
+   */
+  async hasItsIssuerAsAPreviewOrigin(): Promise<void> {
+    expect(await this.removeOrigin(SETUP_ORIGIN.pattern), "removing the issuer").toSucceed();
+    expect(await this.addOrigin(SETUP_ORIGIN.pattern, "preview"), "adding it back").toSucceed();
+    await this.editDocument<{ primary_origins: string[]; preview_origins: string[] }>(
+      ".zitadel/secret",
+      (secret) => {
+        secret.primary_origins = [];
+        secret.preview_origins = [SETUP_ORIGIN.pattern];
+      },
+    );
+  }
+
+  /** The origin patterns the project admits, read back through `origin list`. */
+  async projectOrigins(): Promise<ProjectOrigin[]> {
+    const result = await this.cli(["origin", "list", "--json"]);
+    expect(result, "origin list should have succeeded").toSucceed();
+    return this.envelopeOf<{ items: ProjectOrigin[] }>(result).data.items;
+  }
+
+  removeVariable(name: string, { preview = false } = {}): Promise<CliResult> {
+    return this.cli([
+      "variable",
+      "rm",
+      name,
+      "--force",
+      "--json",
+      ...(preview ? ["--preview"] : []),
+    ]);
+  }
+
+  /** The variables a target's live deployment froze, read through `variable resolve`. */
+  resolveVariables({ origin }: { origin?: string } = {}): Promise<CliResult> {
+    return this.cli([
+      "variable",
+      "resolve",
+      "--json",
+      ...(origin === undefined ? [] : ["--origin", origin]),
+    ]);
   }
 
   /** The providers the platform has registered. */
   registeredIdps(): Promise<RegisteredIdp[]> {
     return this.listed<RegisteredIdp>("idps");
+  }
+
+  /** The policies the platform holds, each at its newest revision. */
+  publishedPolicies(): Promise<PublishedPolicy[]> {
+    return this.listed<PublishedPolicy>("policies");
   }
 
   publishedSchemas(): Promise<PublishedSchema[]> {
@@ -666,10 +984,15 @@ export class ScaffoldedApp {
    * than a ladder, so this is the project's own set and not a merge of
    * anything an environment holds.
    */
-  async projectVariables(): Promise<ProjectVariable[]> {
-    const result = await this.cli(["variables", "list", "--project-level", "--json"]);
-    expect(result, "variables list should have succeeded").toSucceed();
-    return this.envelopeOf<{ variables: ProjectVariable[] }>(result).data.variables;
+  async projectVariables({ preview = false } = {}): Promise<ProjectVariable[]> {
+    const result = await this.cli([
+      "variable",
+      "list",
+      "--json",
+      ...(preview ? ["--preview"] : []),
+    ]);
+    expect(result, "variable list should have succeeded").toSucceed();
+    return this.envelopeOf<{ items: ProjectVariable[] }>(result).data.items;
   }
 
   /**
@@ -763,6 +1086,32 @@ export class ScaffoldedApp {
     return this.editDocument(SCHEMA_FILE, edit);
   }
 
+  /**
+   * Leaves `method` the schema's only way to sign in, with no login flow that
+   * would refuse removing it, so disabling it removes the last way in.
+   */
+  async signsInOnlyWith(method: "password" | "passkey"): Promise<void> {
+    await this.editUserSchema((schema) => {
+      schema["x-auth-methods"] = {
+        password: { enabled: method === "password" },
+        passkey: { enabled: method === "passkey" },
+      };
+    });
+    await this.deleteProjectFile(FLOW_FILE);
+  }
+
+  /** {@link signsInOnlyWith} for an SSO provider the project already offers. */
+  async signsInOnlyWithSso(provider: string): Promise<void> {
+    await this.editUserSchema((schema) => {
+      schema["x-auth-methods"] = {
+        password: { enabled: false },
+        passkey: { enabled: false },
+        sso: { enabled: true, providers: [provider] },
+      };
+    });
+    await this.deleteProjectFile(FLOW_FILE);
+  }
+
   /** Edits the password step of the committed login flow, as the developer owning it would. */
   editPasswordStep(edit: (step: FlowDocument["steps"][number]) => void): Promise<void> {
     return this.editLoginFlow((flow) => {
@@ -805,6 +1154,14 @@ export class ScaffoldedApp {
     await this.setVariable(`${prefix}_CLIENT_SECRET`, "a-client-secret", { secret: true });
   }
 
+  /**
+   * Removes one editor schema setup wrote, as a project set up by a CLI that
+   * did not ship that dialect yet would lack it.
+   */
+  lacksEditorSchema(dialect: string): Promise<void> {
+    return this.deleteProjectFile(`.zitadel/meta/${dialect}.json`);
+  }
+
   /** Removes a committed connection file, as the developer owning it would. */
   removeConnection(slug: string): Promise<void> {
     return this.deleteProjectFile(`.zitadel/idps/${slug}.json`);
@@ -816,9 +1173,59 @@ export class ScaffoldedApp {
     await this.removeConnection(slug);
   }
 
+  /**
+   * Writes the password policy file, as the developer owning it would: named
+   * after its operation unless `name` says otherwise.
+   */
+  async writePasswordPolicy(
+    config: Record<string, number>,
+    { name = PASSWORD_POLICY, extra = {} }: { name?: string; extra?: Record<string, unknown> } = {},
+  ): Promise<void> {
+    await mkdir(join(this.path, ".zitadel/policies"), { recursive: true });
+    await this.writeProjectFile(
+      this.policyFile(name),
+      `${JSON.stringify({ $schema: "../meta/policy.json", operation: PASSWORD_POLICY, config, ...extra }, null, 2)}\n`,
+    );
+  }
+
+  /** Writes the password policy's test file with `cases`, as the developer owning it would. */
+  async writePolicyTest(cases: ReadonlyArray<Record<string, unknown>>): Promise<void> {
+    await mkdir(join(this.path, ".zitadel/policies"), { recursive: true });
+    await this.writeProjectFile(
+      `.zitadel/policies/${PASSWORD_POLICY}.test.json`,
+      `${JSON.stringify({ $schema: "../meta/policy-test.json", operation: PASSWORD_POLICY, cases }, null, 2)}\n`,
+    );
+  }
+
+  /** Runs `zitadel policies test` with `args`. */
+  testPolicies(args: string[] = []): Promise<CliResult> {
+    return this.run(["policies", "test", "--non-interactive", ...args]);
+  }
+
+  /** Removes the committed password policy file, as the developer owning it would. */
+  removePasswordPolicy(): Promise<void> {
+    return this.deleteProjectFile(this.policyFile(PASSWORD_POLICY));
+  }
+
+  /** The project-relative path of a policy file, as a command reports it. */
+  policyFile(name: string = PASSWORD_POLICY): string {
+    return `.zitadel/policies/${name}.json`;
+  }
+
   /** Edits the committed login flow, as the developer owning it would. */
   editLoginFlow(edit: (flow: FlowDocument) => void): Promise<void> {
     return this.editDocument(FLOW_FILE, edit);
+  }
+
+  /** Edits the step a visitor lands on to log in, as the developer owning the flow would. */
+  editLoginEntryStep(edit: (step: FlowDocument["steps"][number]) => void): Promise<void> {
+    return this.editLoginFlow((flow) => {
+      const step = flow.steps.find((candidate) => candidate.name === flow.purposes.login);
+      if (step === undefined) {
+        throw new Error("the login flow has no login entry step");
+      }
+      edit(step);
+    });
   }
 
   editPackageJson(edit: (pkg: PackageJson) => void): Promise<void> {
@@ -857,6 +1264,39 @@ export class ScaffoldedApp {
         created_at: "2026-01-01T00:00:00.000Z",
       }),
     );
+  }
+
+  /**
+   * The values setup bound the development environment to — its file, then the
+   * project secret for anything the file leaves out — for binding another
+   * environment to the same project.
+   */
+  async developmentValues(): Promise<Record<string, string>> {
+    const file = parseEnv(await readFile(join(this.path, ".env.development.local"), "utf8"));
+    const secret = JSON.parse(await readFile(join(this.path, ".zitadel/secret"), "utf8")) as {
+      project_id: string;
+      project_secret: string;
+      preview_secret: string;
+    };
+    return {
+      ZITADEL_PROJECT_ID: secret.project_id,
+      ZITADEL_PROJECT_SECRET: secret.project_secret,
+      ZITADEL_PREVIEW_TOKEN: secret.preview_secret,
+      ...Object.fromEntries(
+        Object.entries(file).filter((entry): entry is [string, string] => entry[1] !== undefined),
+      ),
+    };
+  }
+
+  /** Writes `.env.<name>.local`, the file that binds an environment to a project. */
+  bindEnvironment(name: string, values: Record<string, string>): Promise<void> {
+    return this.writeProjectFile(`.env.${name}.local`, dotenv(values));
+  }
+
+  /** Writes a dotenv file the developer keeps anywhere, returning the path `--env-file` takes. */
+  async writeEnvFile(fileName: string, values: Record<string, string>): Promise<string> {
+    await this.writeProjectFile(fileName, dotenv(values));
+    return join(this.path, fileName);
   }
 
   private async editDocument<T>(relativePath: string, edit: (document: T) => void): Promise<void> {
@@ -987,6 +1427,12 @@ async function hashTree(root: string, prefix = ""): Promise<Map<string, string>>
   return files;
 }
 
+function dotenv(values: Record<string, string>): string {
+  return `${Object.entries(values)
+    .map(([key, value]) => `${key}=${value}`)
+    .join("\n")}\n`;
+}
+
 function only<T>(items: T[], what: string): T {
   if (items.length !== 1) {
     throw new Error(`expected exactly one ${what} on the platform, found ${items.length}`);
@@ -1003,21 +1449,102 @@ function only<T>(items: T[], what: string): T {
  */
 export function assertEnvelope(result: CliResult, args: string[] = []): void {
   const where = `\`${args.filter((arg) => !arg.startsWith("-")).join(" ")}\` --json`;
-  let envelope: Envelope;
-  try {
-    envelope = parseJson(result.stdout) as Envelope;
-  } catch {
+  // A JSON envelope must never carry a raw ANSI colour byte: one would break
+  // `JSON.parse` and `jq` for every consumer. Checked on every spec's `--json`
+  // run rather than in a suite of its own, so a command that hand-writes colour
+  // onto the structured stream fails in that command's own spec. (A U+001B
+  // inside a string value is safe — `JSON.stringify` escapes it to `\u001b`, so
+  // this only trips on a raw control byte on stdout.)
+  expect(result.stdout, `${where}: JSON output contains ANSI colour codes`).not.toContain("\u001B");
+  const parsed = parseJsonOrUndefined(result.stdout);
+  if (parsed === undefined) {
     throw new Error(
       `${where} emitted no JSON envelope on stdout.\n` +
         `stdout: ${result.stdout || "(empty)"}\nstderr: ${result.stderr || "(empty)"}`,
     );
   }
+  const envelope = parsed as Envelope;
   expect(envelope.cli_version, `${where}: cli_version missing`).toBeTypeOf("string");
   expect(envelope.command, `${where}: command missing`).toBeTypeOf("string");
   expect(envelope.source, `${where}: source missing`).toBeTypeOf("string");
   expect(envelope.status, `${where}: status missing or unknown`).toMatch(/^(ok|skipped|error)$/);
   if (envelope.status === "error") {
     expect(envelope.code, `${where}: error envelope carries no code`).toBeTypeOf("string");
+  }
+  assertRunnableSuggestions(where, envelope);
+  assertDataShape(where, envelope);
+}
+
+/**
+ * The `data`-shape half of the contract, enforced on every command so an agent
+ * reads every command's output the same way.
+ *
+ * Classed off the resolved command id (`envelope.command`), not the raw argv, so
+ * a positional argument that happens to be the word `list` (e.g. `variable get
+ * list`) is never misread as a list command. A `list` command (and `resources`,
+ * the one collection not named `… list`) must use the canonical
+ * `{ items, count, next_page_token }` envelope (`listData`); any command that
+ * emits `items` must carry `count` and `next_page_token`; a delete command must
+ * confirm with `deleted: true` (`deletedData`), and no command anywhere may use
+ * `removed`. A dry run has its own preview shape, so it is exempt. A divergent
+ * shape fails in that command's own spec, not a central list someone forgot to
+ * update.
+ */
+function assertDataShape(where: string, envelope: Envelope): void {
+  if (envelope.status !== "ok") {
+    return;
+  }
+  const data = envelope.data as Record<string, unknown> | undefined;
+  if (!data || typeof data !== "object") {
+    return;
+  }
+  // A dry run previews what a write would do; it carries `dry_run: true` and
+  // not the real result shape, so the shape contract does not apply to it.
+  if (data.dry_run === true) {
+    return;
+  }
+  const command = envelope.command ?? "";
+  const verb = command.split(/[:\s]/).filter(Boolean).pop() ?? "";
+
+  if (verb === "list" || command === "resources") {
+    expect(
+      Array.isArray(data.items),
+      `${where}: a list command must emit its rows under \`items\` (use listData())`,
+    ).toBe(true);
+  }
+  if (Array.isArray(data.items)) {
+    expect(typeof data.count, `${where}: a list envelope needs a numeric \`count\``).toBe("number");
+    const token = data.next_page_token;
+    expect(
+      token === null || typeof token === "string",
+      `${where}: a list envelope needs \`next_page_token\` (string or null), got ${JSON.stringify(token)}`,
+    ).toBe(true);
+  }
+  if (verb === "rm" || verb === "delete" || verb === "remove") {
+    expect(
+      data.deleted === true,
+      `${where}: a \`${verb}\` command must confirm with \`deleted: true\` (use deletedData())`,
+    ).toBe(true);
+  }
+  expect(
+    Object.hasOwn(data, "removed"),
+    `${where}: confirm a delete with \`deleted: true\`, never \`removed\` (use deletedData())`,
+  ).toBe(false);
+}
+
+/**
+ * Runs `fn` with stdout reporting as a terminal, so a list command renders its
+ * aligned table instead of the piped tab-separated rows it emits off a TTY.
+ * The in-process runner shares this process's `process.stdout`, so a terminal
+ * assertion must flip `isTTY` around the call.
+ */
+export async function onATerminal<T>(fn: () => Promise<T>): Promise<T> {
+  const original = process.stdout.isTTY;
+  process.stdout.isTTY = true;
+  try {
+    return await fn();
+  } finally {
+    process.stdout.isTTY = original;
   }
 }
 
@@ -1067,10 +1594,56 @@ export async function aNewAppDirectory(): Promise<ScaffoldedApp> {
   return new ScaffoldedApp(path);
 }
 
-/** An app already through `setup`, for specs about the commands after it. */
+/**
+ * A directory for setup to create a new app in that does not exist yet, under
+ * one that does: how `--cwd` names the folder a new app should live in.
+ */
+export async function aMissingAppDirectory(): Promise<ScaffoldedApp> {
+  const parent = await mkdtemp(join(tmpdir(), "zitadel-new-"));
+  return new ScaffoldedApp(join(parent, "my-app"));
+}
+
+/**
+ * An app already through `setup`, for specs about the commands after it.
+ *
+ * Setup's git commit is turned off here: this is the arrange for every other
+ * command's spec, and a repository of setup's making is not what they are
+ * about. Setup's spec drives setup with it on, and owns what it does.
+ */
 export async function aSetUpApp(extraArgs: string[] = []): Promise<ScaffoldedApp> {
   const app = await anApp();
-  const result = await app.setup(extraArgs);
+  const result = await app.setup(["--no-git", ...extraArgs]);
+  expect(result, "arranging setup should have succeeded").toSucceed();
+  return app;
+}
+
+/**
+ * A set-up app with a second environment, `staging`, that `env add` bound and
+ * nothing has been deployed to: setup deploys its own project, so this is
+ * where a spec finds a first deploy. Address it with `--env staging`.
+ */
+export async function anUndeployedEnvironment(): Promise<ScaffoldedApp> {
+  const app = await aSetUpApp();
+  const added = await app.run([
+    "env",
+    "add",
+    "staging",
+    "--app-url",
+    "https://staging.acme.com",
+    "--non-interactive",
+    "--json",
+  ]);
+  expect(added, "arranging env add should have succeeded").toSucceed();
+  return app;
+}
+
+/**
+ * An app through `setup` with its commit kept, so a release built from it
+ * records a git sha and a later deploy has a baseline to diff against.
+ */
+export async function aCommittedApp(): Promise<ScaffoldedApp> {
+  const app = await anApp();
+  const result = await app.setup();
   expect(result, "arranging setup should have succeeded").toSucceed();
   return app;
 }
@@ -1094,6 +1667,18 @@ process.stderr.write("fake npm stderr\\n");
   );
   await chmod(binPath, 0o755);
   return { binDir, logPath };
+}
+
+/** A `git` on PATH that runs the real one for everything but `commit`, which it refuses. Returns its directory. */
+async function gitThatCannotCommit(): Promise<string> {
+  const binDir = await mkdtemp(join(tmpdir(), "zitadel-git-no-commit-"));
+  const { stdout } = await execFileAsync("sh", ["-c", "command -v git"]);
+  await writeFile(
+    join(binDir, "git"),
+    `#!/bin/sh\nfor arg in "$@"; do\n  if [ "$arg" = "commit" ]; then\n    echo "fatal: cannot commit" >&2\n    exit 1\n  fi\ndone\nexec "${stdout.trim()}" "$@"\n`,
+  );
+  await chmod(join(binDir, "git"), 0o755);
+  return binDir;
 }
 
 /** A fake `docker` on PATH, so doctor's runtime probe needs no daemon. */

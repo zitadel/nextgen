@@ -1,9 +1,8 @@
 import { Flags } from "@oclif/core";
 
-import consola from "consola";
-
-import { ZitadelError, toZitadelError } from "../lib/errors";
-import { ensureLocalAdmin, type LocalAdmin } from "../lib/local-server/admin-credential";
+import { ZitadelError } from "../lib/errors";
+import { serverLogAction } from "../lib/journey-guidance";
+import { ensureLocalAdmin } from "../lib/local-server/admin-credential";
 import { EMPTY_SUMMARY, loadProjectEnv } from "../lib/local-server/env-vars";
 import {
   DEFAULT_LOCAL_SERVER_PORT,
@@ -14,19 +13,19 @@ import {
   localServerUrl,
   peekRuntimeMetadata,
   type RuntimeBackend,
+  resolveRuntimeBackend,
   type RuntimeMetadata,
 } from "../lib/local-server/runtime";
 import { LocalServer } from "../lib/local-server/server";
-import { consoleSignInUrl } from "../lib/local-server/sign-in";
 import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../lib/oclif";
+import type { NextSteps } from "../lib/oclif/next-steps";
 import { resolveCwd } from "../lib/paths";
-import { publicCliCommand } from "../lib/public-cli";
-import { reportWarning } from "../lib/warnings";
+import type { SuggestedCommand } from "../lib/suggestion";
 
 export default class Start extends BaseCommand {
   static override description = "Start a local Zitadel server.";
-  static override group = CommandGroups.localServer;
-  static override groupOrder = 1;
+  static override group = CommandGroups.gettingStarted;
+  static override groupOrder = 2;
   static override flags = {
     image: nonBlankString({ description: "Container image to run." }),
     port: Flags.integer({
@@ -82,10 +81,9 @@ export default class Start extends BaseCommand {
           urls: {
             api: serverUrl,
             console: `${serverUrl}/ui/console/`,
-            login: `${serverUrl}/ui/login/`,
           },
-          next_commands: [publicCliCommand("start", this.meta.cliVersion)],
         },
+        next: { commands: [this.suggestUnscoped("start")] },
       });
     }
 
@@ -120,12 +118,11 @@ export default class Start extends BaseCommand {
     this.meta = { ...this.meta, source: runtime.server_url };
     return this.emit({
       status: "ok",
-      data: readyData(
-        runtime,
-        alreadyRunning,
-        this.meta.cliVersion,
-        await consoleLoginFor(runtime.server_url, local?.admin),
-      ),
+      // Setup reads the server from the directory start ran in, so a run from
+      // elsewhere carries it: `setup --server local` from the shell's directory
+      // finds no server and scaffolds into the wrong place.
+      data: readyData(runtime, alreadyRunning),
+      next: readyNext(this.meta.cliVersion, this.suggestUnscoped("setup --server local")),
     });
   }
 }
@@ -146,44 +143,7 @@ function platformBootstrapEnabled(env: NodeJS.ProcessEnv): boolean {
   return !pinned || pinned === PLATFORM_PROJECT_ID;
 }
 
-/**
- * Mints a console sign-in link for the local admin. A failure (for
- * example a data directory from before the local admin existed) must not fail
- * the start itself, so it degrades to a warning with the fix. Without a local
- * admin there is nothing to sign in as, and the result carries no console.
- */
-async function consoleLoginFor(
-  serverUrl: string,
-  admin: LocalAdmin | undefined,
-): Promise<ConsoleLogin | undefined> {
-  if (!admin) {
-    return undefined;
-  }
-  try {
-    const url = await consoleSignInUrl(serverUrl, admin);
-    consola.log(`Console: signed in as ${admin.email}. Open this link (works once):`);
-    consola.log(url);
-    return { signed_in_as: admin.email, sign_in_url: url };
-  } catch (error) {
-    const reason = toZitadelError(error);
-    reportWarning(`Could not create a console sign-in link: ${reason.message}`);
-    return { signed_in_as: admin.email, error: reason.message, hint: reason.hint };
-  }
-}
-
-type ConsoleLogin = {
-  signed_in_as: string;
-  sign_in_url?: string;
-  error?: string;
-  hint?: string;
-};
-
-function readyData(
-  metadata: RuntimeMetadata,
-  alreadyRunning: boolean,
-  cliVersion: string,
-  console: ConsoleLogin | undefined,
-) {
+function readyData(metadata: RuntimeMetadata, alreadyRunning: boolean) {
   return {
     title: alreadyRunning
       ? "Local Zitadel server is already running."
@@ -209,23 +169,21 @@ function readyData(
     urls: {
       api: metadata.server_url,
       console: `${metadata.server_url}/ui/console/`,
-      login: `${metadata.server_url}/ui/login/`,
     },
-    ...(console ? { console } : {}),
-    next_actions: [
-      ...(console?.sign_in_url
-        ? [`Console: you are ${console.signed_in_as}. Open ${console.sign_in_url} (works once).`]
-        : []),
-      "Run setup in this directory or one inside it, so it finds this server's local admin; the CLI will detect the framework or ask when needed.",
-      "Setup installs dependencies when needed; then start your app dev server.",
+  };
+}
+
+function readyNext(
+  cliVersion: string,
+  setupCommand: SuggestedCommand,
+): NextSteps<SuggestedCommand> {
+  return {
+    actions: [
+      "Create an app with authentication. Run setup in this directory or a subdirectory.",
+      "Setup asks for a framework and sign-in method, creates or updates your app, and installs its dependencies.",
+      serverLogAction(cliVersion),
     ],
-    next_commands: [
-      publicCliCommand("setup --server local", cliVersion),
-      // Only when a link could actually be minted: `zitadel console` mints
-      // the same way, so suggesting it after a failure sends the caller at a
-      // command that fails again.
-      ...(console?.sign_in_url ? [publicCliCommand("console", cliVersion)] : []),
-    ],
+    commands: [setupCommand],
   };
 }
 
@@ -235,20 +193,6 @@ function validatePort(port: number): void {
       hint: "Use a TCP port between 1 and 65535.",
     });
   }
-}
-
-function resolveRuntimeBackend(input: {
-  runtime: unknown;
-  image: string | undefined;
-  envImage: string | undefined;
-}): RuntimeBackend {
-  if (input.runtime === "binary" || input.runtime === "docker") {
-    return input.runtime;
-  }
-  if (input.image || input.envImage) {
-    return "docker";
-  }
-  return "binary";
 }
 
 function assertRuntimeFlags(runtime: RuntimeBackend, image: string | undefined): void {

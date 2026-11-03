@@ -1,7 +1,6 @@
-import { defineConfig } from "@playwright/test";
+import { defineConfig, devices } from "@playwright/test";
 import {
   apiMockServer,
-  chromiumProjects,
   e2eActionTimeouts,
   e2eTimeouts,
   e2eTrace,
@@ -29,6 +28,10 @@ export default defineConfig({
   ...e2eTimeouts,
   testDir: "./src",
   outputDir: "test-results/mock",
+  // The standalone api-mock drives one sign-in flow at a time, and every page
+  // that mounts `<zitadel-login>` starts it over: a spec on a parallel worker
+  // would restart or advance the flow of the spec signing in.
+  workers: 1,
   use: {
     ...e2eActionTimeouts,
     baseURL: "http://localhost:3001",
@@ -58,5 +61,10 @@ export default defineConfig({
       },
     },
   ],
-  projects: chromiumProjects,
+  projects: [
+    // One load of /login before the specs, so none of them waits while
+    // `nuxt dev` builds the browser's modules (src/warm-up.setup.ts).
+    { name: "warm-up", testMatch: /warm-up\.setup\.ts$/, use: { ...devices["Desktop Chrome"] } },
+    { name: "chromium", use: { ...devices["Desktop Chrome"] }, dependencies: ["warm-up"] },
+  ],
 });

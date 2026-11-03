@@ -1,13 +1,8 @@
-import { access, mkdir, writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
-import type {
-  CreateFlowDefinition201,
-  CreateIdpBodyIdp,
-  CreateSchema201,
-  CreateSchemaBody,
-} from "@zitadel/api/generated/model";
-import type { ZitadelClient } from "@zitadel/api/client";
+import type { CreateIdpBodyIdp, PublishPolicy201 } from "@zitadel/api/generated/model";
+import type { ZitadelClient } from "./api-client";
 import {
   DEFAULT_FLOW_CONFIG_PATH,
   DEFAULT_FLOW_SCHEMA_URI,
@@ -15,47 +10,67 @@ import {
   DEFAULT_SETUP_PRESET,
   DEFAULT_SETUP_USE_CASE,
   flowsReadmeContent,
-  getDefaultHumanUserSchema,
+  getDefaultHumanUserSchemaBody,
   getDefaultLoginFlow,
+  policiesReadmeContent,
   schemasReadmeContent,
   type SetupPreset,
   type SetupUseCase,
+  type UserSchemaDocument,
 } from "@zitadel/config/defaults";
 import {
   type ConnectionEndpoints,
   type ConnectionSlug,
   type ProviderSelection,
   providerOf,
-  selectionName,
 } from "@zitadel/config/idp";
 import {
   normalizeFlowBody,
   normalizeIdpBody,
   normalizeSchemaBody,
 } from "@zitadel/config/normalize";
+import { policyConfigSchema } from "@zitadel/config/schemas";
 
 import { FLOWS_DIR } from "./flows";
+import {
+  PASSWORD_POLICY_OPERATION,
+  PASSWORD_POLICY_PATH,
+  type PasswordMinLength,
+  POLICIES_DIR,
+  type PolicyFile,
+  passwordPolicyFile,
+  toPolicyWireBody,
+} from "./policies";
 import {
   applySsoToFlow,
   applySsoToSchema,
   authMethods,
   CONNECTION_SCHEMA_REF,
-  customFlagText,
-  ENABLE_FLAG_NAMES,
   SETUP_FLAG_NAMES,
   IDPS_DIR,
   planConnection,
   readConnectionFiles,
+  ssoEnableArgs,
 } from "./idp";
-import { stableStringify } from "./json";
+import { parseJsonOrUndefined, stableStringify } from "./json";
 import { normalizePublicCliProse } from "./public-cli";
 import { hashForState } from "./sync";
 import { updateState } from "./sync/state";
 import { SCHEMAS_DIR } from "./user-schema";
-import { ZitadelError } from "./errors";
+import { isErrno, isMissingEndpoint, ZitadelError } from "./errors";
+import { pathExists, readIfExists } from "./fs";
+import { type SuggestedCommand, unscopedCommand } from "./suggestion";
+import { reportWarning } from "./warnings";
 
 export type MaterializeSetupResourcesResult = {
   filesWritten: string[];
+  /**
+   * Whether the password policy setup published has a minimum length. A kept
+   * policy file decides that as much as the answers do: one without
+   * `min_length` keeps none when none was given. `false` when nothing was
+   * published.
+   */
+  passwordMinLengthSet: boolean;
 };
 
 /**
@@ -89,6 +104,15 @@ export async function materializeSetupResources(opts: {
    */
   sso?: readonly { selection: ProviderSelection; endpoints?: ConnectionEndpoints }[];
   /**
+   * The minimum password length to put into the password policy: a number,
+   * `null` for an explicit none, or `undefined` when none was given. The
+   * policy is written and published either way. A new one gets the
+   * recommended minimum when none was given, and an empty `config`, which
+   * enforces nothing, for none; a kept file keeps its `min_length` only when
+   * none was given.
+   */
+  passwordMinLength?: PasswordMinLength;
+  /**
    * CLI version used to render `zitadel …` command mentions in the scaffolded
    * READMEs as runnable `npx @zitadel/cli@<version> …` commands — the CLI is
    * not a dependency of the generated app, so the bare command doesn't exist
@@ -102,7 +126,7 @@ export async function materializeSetupResources(opts: {
   const filesWritten: string[] = [];
   const preset = opts.preset ?? DEFAULT_SETUP_PRESET;
   const useCase = opts.useCase ?? DEFAULT_SETUP_USE_CASE;
-  const schemaTemplate = defaultSchemaTemplate(preset, useCase);
+  const schemaTemplate = getDefaultHumanUserSchemaBody({ preset, useCase });
 
   // The connection goes first, and is created before the schema and flow that
   // name its slug: a Project should never be published claiming a provider the
@@ -152,15 +176,15 @@ export async function materializeSetupResources(opts: {
     // The file stays as written: the stored connection spells out defaults
     // the file leaves to the server, and `plan` reads those as no change.
     await updateState(opts.cwd, connectionPath, {
-      id: requiredString(created.id, "created identity provider connection id"),
+      id: created.id,
       hash: hashForState({ normalize: normalizeIdpBody }, connection),
     });
   }
 
   // Each slug in turn: the edits are additive and idempotent, so folding them
   // builds one schema that names every chosen provider.
-  const schemaBody = slugs.reduce<Record<string, unknown>>(
-    (document, slug) => applySsoToSchema(document, slug).document as Record<string, unknown>,
+  const schemaBody = slugs.reduce(
+    (document, slug) => applySsoToSchema(document, slug).document,
     schemaTemplate,
   );
 
@@ -174,11 +198,11 @@ export async function materializeSetupResources(opts: {
     filesWritten.push(join(opts.cwd, DEFAULT_SCHEMA_CONFIG_PATH));
   }
 
-  const schema = (await opts.client.createSchema(schemaBody as CreateSchemaBody, {
+  const schema = await opts.client.createSchema(schemaBody, {
     project_id: opts.projectId,
-  })) as CreateSchema201;
+  });
   await updateState(opts.cwd, DEFAULT_SCHEMA_CONFIG_PATH, {
-    id: requiredString(schema.id, "created schema id"),
+    id: schema.id,
     hash: hashForState({ normalize: normalizeSchemaBody }, schemaBody),
   });
 
@@ -202,21 +226,61 @@ export async function materializeSetupResources(opts: {
     filesWritten.push(join(opts.cwd, DEFAULT_FLOW_CONFIG_PATH));
   }
 
-  const flow = (await opts.client.createFlowDefinition({
+  const flow = await opts.client.createFlowDefinition({
     project_id: opts.projectId,
     schema_uri: DEFAULT_FLOW_SCHEMA_URI,
     flow_definition: flowBody,
-  })) as CreateFlowDefinition201;
+  });
 
   await updateState(opts.cwd, DEFAULT_FLOW_CONFIG_PATH, {
-    id: requiredString(flow.id, "created flow definition id"),
+    id: flow.id,
     hash: hashForState({ normalize: normalizeFlowBody }, flowBody),
     name: flowBody.name,
     status: flowBody.status,
   });
 
+  // The password policy, created before its file like the connections. A new
+  // one gets the recommended minimum unless the developer gave another or
+  // none. A policy file already there (only with --force: without it the
+  // conflict check refused it) holds a project's chosen rules, so it is kept
+  // and published as it is; a minimum given now goes into it.
+  const kept = opts.force ? await readPasswordPolicyFile(opts.cwd) : undefined;
+  const policy =
+    kept === undefined
+      ? passwordPolicyFile(opts.passwordMinLength)
+      : withMinLength(kept, opts.passwordMinLength);
+  const published: PublishPolicy201 | undefined = await opts.client
+    .publishPolicy(toPolicyWireBody(policy), {
+      project_id: opts.projectId,
+    })
+    .catch((error: unknown) => {
+      if (!isMissingEndpoint(error)) {
+        throw error;
+      }
+      // A server from before operation policies: the project works without
+      // one, so setup goes on without the file rather than failing.
+      reportWarning(
+        "The server has no policy endpoints yet, so setup wrote no password policy. Upgrade the server, then add .zitadel/policies/ and run `zitadel deploy`.",
+      );
+      return undefined;
+    });
+  if (published !== undefined) {
+    await mkdir(join(opts.cwd, POLICIES_DIR), { recursive: true });
+    if (
+      (kept === undefined || policy !== kept) &&
+      (await writeResourceFile(opts.cwd, PASSWORD_POLICY_PATH, policy, opts.force))
+    ) {
+      filesWritten.push(join(opts.cwd, PASSWORD_POLICY_PATH));
+    }
+    await updateState(opts.cwd, PASSWORD_POLICY_PATH, {
+      id: published.id,
+      hash: hashForState({ normalize: (body) => toPolicyWireBody(body as PolicyFile) }, policy),
+    });
+  }
+
   const schemasReadme = join(SCHEMAS_DIR, "README.md");
   const flowsReadme = join(FLOWS_DIR, "README.md");
+  const policiesReadme = join(POLICIES_DIR, "README.md");
   if (
     await writeReadmeFile(
       opts.cwd,
@@ -235,8 +299,21 @@ export async function materializeSetupResources(opts: {
   ) {
     filesWritten.push(join(opts.cwd, flowsReadme));
   }
+  if (
+    published !== undefined &&
+    (await writeReadmeFile(
+      opts.cwd,
+      policiesReadme,
+      normalizePublicCliProse(policiesReadmeContent(), opts.cliVersion),
+    ))
+  ) {
+    filesWritten.push(join(opts.cwd, policiesReadme));
+  }
 
-  return { filesWritten };
+  return {
+    filesWritten,
+    passwordMinLengthSet: published !== undefined && policy.config.min_length !== undefined,
+  };
 }
 
 /**
@@ -256,24 +333,11 @@ export async function assertNoSetupResourceConflicts(opts: {
   useCase?: SetupUseCase;
   sso?: readonly { selection: ProviderSelection; endpoints?: ConnectionEndpoints }[];
 }): Promise<void> {
-  const schemaTemplate = defaultSchemaTemplate(
-    opts.preset ?? DEFAULT_SETUP_PRESET,
-    opts.useCase ?? DEFAULT_SETUP_USE_CASE,
-  );
+  const schemaTemplate = getDefaultHumanUserSchemaBody({
+    preset: opts.preset ?? DEFAULT_SETUP_PRESET,
+    useCase: opts.useCase ?? DEFAULT_SETUP_USE_CASE,
+  });
   await refuseResourceConflicts(opts.cwd, opts.force, planConnections(schemaTemplate, opts.sso));
-}
-
-/** The default human user schema for a preset and use case, without the template's `$id`. */
-function defaultSchemaTemplate(
-  preset: SetupPreset,
-  useCase: SetupUseCase,
-): Record<string, unknown> {
-  const { $id: _templateId, ...schemaTemplate } = getDefaultHumanUserSchema({
-    preset,
-    useCase,
-  }) as { $id?: string } & Record<string, unknown>;
-  void _templateId;
-  return schemaTemplate;
 }
 
 type PlannedConnection = {
@@ -285,7 +349,7 @@ type PlannedConnection = {
 
 /** The connection each chosen provider gets, and the file it is written to. */
 function planConnections(
-  schemaTemplate: Record<string, unknown>,
+  schemaTemplate: UserSchemaDocument,
   sso: readonly { selection: ProviderSelection; endpoints?: ConnectionEndpoints }[] | undefined,
 ): PlannedConnection[] {
   const planned: PlannedConnection[] = [];
@@ -293,7 +357,7 @@ function planConnections(
     const provider = providerOf(chosen.selection);
     const connection = provider.connection({
       endpoints: chosen.endpoints,
-      schemaProperties: Object.keys((schemaTemplate.properties as object | undefined) ?? {}),
+      schemaProperties: Object.keys(schemaTemplate.properties ?? {}),
       schemaRef: CONNECTION_SCHEMA_REF,
     });
     planned.push({
@@ -326,7 +390,7 @@ async function refuseResourceConflicts(
   const files = connections.length > 0 ? await readConnectionFiles(cwd) : [];
   for (const { connectionPath, selection } of connections) {
     const existing = planConnection({ selection, files, slugFlag: SETUP_FLAG_NAMES.slug });
-    if (existing.action === "reuse" || (await exists(join(cwd, connectionPath)))) {
+    if (existing.action === "reuse" || (await pathExists(join(cwd, connectionPath)))) {
       throw resourceExists(
         existing.action === "reuse" ? existing.file.path : connectionPath,
         connectionExists(selection),
@@ -334,13 +398,61 @@ async function refuseResourceConflicts(
     }
   }
   if (force) {
+    // --force keeps a policy file and publishes it, so a broken one is refused
+    // here, before the project is created or anything is written.
+    await readPasswordPolicyFile(cwd);
     return;
   }
   for (const path of [DEFAULT_SCHEMA_CONFIG_PATH, DEFAULT_FLOW_CONFIG_PATH]) {
-    if (await exists(join(cwd, path))) {
+    if (await pathExists(join(cwd, path))) {
       throw resourceExists(path);
     }
   }
+  if (await pathExists(join(cwd, PASSWORD_POLICY_PATH))) {
+    throw resourceExists(PASSWORD_POLICY_PATH, {
+      hint: "Rerun setup with --force to keep this policy and publish it to the new project, or move the file aside to start from an empty one.",
+    });
+  }
+}
+
+/**
+ * A kept policy file with the minimum setup was given: unchanged when none was
+ * given, without `min_length` for an explicit "none", with the new value
+ * otherwise. Its other settings stay as the project chose them.
+ */
+function withMinLength(kept: PolicyFile, minLength: PasswordMinLength | undefined): PolicyFile {
+  // Unchanged is the file as it is, so setup neither rewrites nor reports it.
+  if (minLength === undefined || (minLength ?? undefined) === kept.config.min_length) {
+    return kept;
+  }
+  const { min_length: _dropped, ...rest } = kept.config;
+  void _dropped;
+  return { ...kept, config: minLength === null ? rest : { ...rest, min_length: minLength } };
+}
+
+/**
+ * The password policy file a project already has, or `undefined` when there is
+ * none. It must be a valid policy for the password operation: setup publishes
+ * it as it is, so a broken one is refused here, before it reaches the server.
+ */
+async function readPasswordPolicyFile(cwd: string): Promise<PolicyFile | undefined> {
+  const raw = await readIfExists(join(cwd, PASSWORD_POLICY_PATH));
+  if (raw === undefined) {
+    return undefined;
+  }
+  const data = parseJsonOrUndefined(raw);
+  const result = policyConfigSchema.safeParse(data);
+  if (!result.success || result.data.operation !== PASSWORD_POLICY_OPERATION) {
+    throw new ZitadelError(
+      "E_VALIDATION",
+      `${PASSWORD_POLICY_PATH} is not a valid password policy`,
+      {
+        hint: "Setup keeps an existing policy file and publishes it, so fix it against .zitadel/meta/policy.json or move it aside to start from an empty one.",
+        details: { file: PASSWORD_POLICY_PATH },
+      },
+    );
+  }
+  return data as PolicyFile;
 }
 
 /**
@@ -371,30 +483,19 @@ async function writeReadmeFile(cwd: string, relPath: string, content: string): P
  * tenant-owned. So the one rule is that setup does not write there, and the
  * developer decides what happens to the file.
  */
-function connectionExists(selection: ProviderSelection): { hint: string; nextCommands: string[] } {
+function connectionExists(selection: ProviderSelection): {
+  hint: string;
+  nextCommands: SuggestedCommand[];
+} {
   return {
     hint:
       "A connection file is yours to keep, so setup never replaces or removes one. " +
       "Remove it and run setup again to scaffold a fresh one, or keep it and enable the " +
       "provider afterwards to reuse it.",
-    nextCommands: [
-      `zitadel auth-method sso enable --provider ${selectionName(selection)}${
-        selection.kind === "custom"
-          ? ` ${customFlagText(selection.connection, ENABLE_FLAG_NAMES)}`
-          : ""
-      }`,
-    ],
+    // Setup stopped before it created a project, so there is no environment
+    // to carry: the retry is for after the developer reruns setup.
+    nextCommands: [unscopedCommand(ssoEnableArgs(selection))],
   };
-}
-
-/** Whether a path is there, without caring why it is not. */
-async function exists(path: string): Promise<boolean> {
-  try {
-    await access(path);
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 async function writeResourceFile(
@@ -402,7 +503,7 @@ async function writeResourceFile(
   relPath: string,
   body: object,
   force: boolean,
-  onExists?: { hint: string; nextCommands?: string[] },
+  onExists?: { hint: string; nextCommands?: SuggestedCommand[] },
 ): Promise<boolean> {
   const contents = `${stableStringify(body)}\n`;
   try {
@@ -418,7 +519,7 @@ async function writeResourceFile(
 
 function resourceExists(
   relPath: string,
-  onExists?: { hint: string; nextCommands?: string[] },
+  onExists?: { hint: string; nextCommands?: SuggestedCommand[] },
 ): ZitadelError {
   return new ZitadelError("E_CONFLICT", `${relPath} already exists`, {
     hint:
@@ -426,20 +527,4 @@ function resourceExists(
       "Move the file aside or rerun setup with --force if you want setup to replace it.",
     nextCommands: onExists?.nextCommands,
   });
-}
-
-function requiredString(value: unknown, label: string): string {
-  if (typeof value === "string" && value.length > 0) {
-    return value;
-  }
-  throw new ZitadelError("E_VALIDATION", `Missing ${label} in server response.`);
-}
-
-function isErrno(error: unknown, code: string): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    (error as NodeJS.ErrnoException).code === code
-  );
 }

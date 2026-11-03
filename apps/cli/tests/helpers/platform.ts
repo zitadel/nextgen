@@ -25,6 +25,20 @@ export interface PlatformMock {
   rejectsSchemaUploads(): void;
 
   /**
+   * Refuses every release build as a server does a bundle whose schema names a
+   * property it does not have: `rel.invalid`, with the reason under
+   * `details.resources`.
+   */
+  rejectsASchema(): void;
+
+  /**
+   * Refuses every release build as a server does a bundle whose flow fails
+   * against its schema: `rel.invalid`, with the reason under the resource's
+   * own `details`.
+   */
+  rejectsAFlow(): void;
+
+  /**
    * Answers as a server that is reachable but is not a Zitadel platform API,
    * which is what a mistyped or wrong `--server` points at: every route 404s
    * with a body that is not a platform error envelope.
@@ -36,6 +50,9 @@ export interface PlatformMock {
    * but with a 503. The CLI maps that to `E_NETWORK`.
    */
   isUnavailable(): void;
+
+  /** Refuses every project read with 403, as a server does a token without that grant. */
+  refusesProjectReads(): void;
 
   /**
    * Makes every request fail before any response arrives, as a closed port or
@@ -57,6 +74,12 @@ export interface PlatformMock {
   /** Makes a stored connection unreadable while everything else answers. */
   cannotReadConnections(): void;
 
+  /**
+   * Answers the next deployment create with `409 dep.conflict`, as when another
+   * deploy lands between a deploy's inspection and its write.
+   */
+  racesTheNextDeploy(): void;
+
   /** Drops any arranged failure, so the platform answers normally again. */
   recovers(): void;
 
@@ -68,6 +91,9 @@ export interface PlatformMock {
 
   /** Records every published branding revision, which the mock does not keep. */
   capturesBrandingPublishes(): Captured<Record<string, unknown>>;
+
+  /** Records every rollback request's body, then lets the platform answer it. */
+  capturesRollbacks(): Captured<Record<string, unknown>>;
 }
 
 /** Starts the mock platform for a spec file and resets it between tests. */
@@ -85,6 +111,17 @@ export function usePlatformMock(): PlatformMock {
     resetPlatformStore();
   });
 
+  const refuseReleases = (resources: readonly Record<string, unknown>[]) => {
+    server.use(
+      http.post("*/releases/build", () =>
+        HttpResponse.json(
+          { code: "rel.invalid", message: "release: invalid", details: { resources } },
+          { status: 400 },
+        ),
+      ),
+    );
+  };
+
   return {
     rejectsSchemaUploads() {
       server.use(
@@ -94,8 +131,41 @@ export function usePlatformMock(): PlatformMock {
       );
     },
 
+    rejectsASchema() {
+      refuseReleases([
+        {
+          kind: "schema",
+          handle: "human-user",
+          code: "sch.invalid_request",
+          message: 'schema designation invalid: "x-display" names unknown property "nickname"',
+        },
+      ]);
+    },
+
+    rejectsAFlow() {
+      refuseReleases([
+        {
+          kind: "flow",
+          handle: "default-login",
+          code: "flowdef.invalid",
+          message: "flow definition: invalid",
+          details: {
+            details: 'step "register-password": on_success create_user requires "identifier"',
+          },
+        },
+      ]);
+    },
+
     isNotZitadel() {
       server.use(http.all("*", () => HttpResponse.text("<html>not here</html>", { status: 404 })));
+    },
+
+    refusesProjectReads() {
+      server.use(
+        http.get("*/projects/:id", () =>
+          HttpResponse.json({ code: "auth.forbidden", message: "forbidden" }, { status: 403 }),
+        ),
+      );
     },
 
     isUnavailable() {
@@ -121,6 +191,24 @@ export function usePlatformMock(): PlatformMock {
           }),
         );
       });
+    },
+
+    racesTheNextDeploy() {
+      server.use(
+        http.post(
+          "*/deployments",
+          () =>
+            HttpResponse.json(
+              {
+                code: "dep.conflict",
+                message:
+                  "deployment: the newest deployment to the targets does not match expected_deployment_id",
+              },
+              { status: 409 },
+            ),
+          { once: true },
+        ),
+      );
     },
 
     cannotListVariables() {
@@ -184,6 +272,28 @@ export function usePlatformMock(): PlatformMock {
         },
         get last() {
           return published.at(-1);
+        },
+      };
+    },
+
+    capturesRollbacks() {
+      const requests: Array<Record<string, unknown>> = [];
+      server.use(
+        http.post("*/deployments/:id/rollback", async ({ request }) => {
+          const text = await request.clone().text();
+          requests.push(text === "" ? {} : (JSON.parse(text) as Record<string, unknown>));
+          return undefined;
+        }),
+      );
+      return {
+        get all() {
+          return requests;
+        },
+        get count() {
+          return requests.length;
+        },
+        get last() {
+          return requests.at(-1);
         },
       };
     },

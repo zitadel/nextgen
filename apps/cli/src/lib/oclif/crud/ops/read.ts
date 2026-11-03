@@ -2,10 +2,9 @@ import { nonBlankString } from "../../flags";
 
 import { chosenColumns } from "../columns";
 import { fieldPaths } from "../paths";
-import { idArg, idValue } from "../shared";
-import { renderDetail } from "../table";
+import { idArg, idName, idValue } from "../shared";
 import type { GetSpec } from "../types";
-import type { CommandResult, GlobalOptions } from "../../types";
+import type { CommandResult } from "../../types";
 import {
   type OperationDefinition,
   type OperationInput,
@@ -25,10 +24,11 @@ export class GetOperation<Ctx> extends ResourceCommand<Ctx, GetSpec<Ctx>> {
     options,
   }: OperationDefinition<Ctx, GetSpec<Ctx>>): OperationStatics {
     return {
-      description: `Get one ${resource.singular} by id.`,
+      // A resource addressed by more than an id says so, as its argument does.
+      description: `Get one ${resource.singular} by ${resource.idDescription ?? "id"}.`,
       examples: [
-        `<%= config.bin %> ${topic} get <id>`,
-        `<%= config.bin %> ${topic} get <id> --json`,
+        `<%= config.bin %> ${topic} get <${idName(resource)}>`,
+        `<%= config.bin %> ${topic} get <${idName(resource)}> --json`,
       ],
       flags: {
         fields: nonBlankString({
@@ -41,17 +41,14 @@ export class GetOperation<Ctx> extends ResourceCommand<Ctx, GetSpec<Ctx>> {
     };
   }
 
-  protected override async execute(
-    { flags, args }: OperationInput,
-    meta: GlobalOptions,
-  ): Promise<CommandResult> {
+  protected override async execute({ flags, args }: OperationInput): Promise<CommandResult> {
     const { resource, spec } = this.definition;
     // Same as `list`: a schema decides `--fields` before the request is made.
     const shape = fieldPaths(spec.response);
     const early = shape
       ? chosenColumns(flags.fields, resource.detail ?? resource.columns, [], shape)
       : undefined;
-    const item = await spec.call(await this.connect(meta), idValue(resource, args));
+    const item = await spec.call(await this.context(), idValue(resource, args));
     // Validated before the output branch, so the same arguments are valid (or
     // not) whether the result goes to a terminal or a pipe.
     const fields =
@@ -59,10 +56,17 @@ export class GetOperation<Ctx> extends ResourceCommand<Ctx, GetSpec<Ctx>> {
     if (!process.stdout.isTTY) {
       return { status: "ok", data: item, pretty: JSON.stringify(item, null, 2) };
     }
+    const sections =
+      flags.fields === undefined && !this.jsonEnabled()
+        ? ((await spec.sections?.(item, (columns, rows) => this.tabulate(columns, rows))) ?? [])
+        : [];
     return {
       status: "ok",
       data: item,
-      pretty: renderDetail(headingOf(resource.heading ?? resource.idField, item), fields, item),
+      pretty: [
+        this.tabulateDetail(headingOf(resource.heading ?? resource.idField, item), fields, item),
+        ...sections,
+      ].join("\n\n"),
     };
   }
 }

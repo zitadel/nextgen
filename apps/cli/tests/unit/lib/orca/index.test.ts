@@ -5,7 +5,7 @@ import { basename, dirname, join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ZitadelError } from "../../../../src/lib/errors";
-import { inspectScaffoldTarget, Orca } from "../../../../src/lib/orca";
+import { assertDirectoryOrMissing, inspectScaffoldTarget, Orca } from "../../../../src/lib/orca";
 import type { Detector } from "../../../../src/lib/orca";
 import { detectors } from "../../../../src/lib/orca/detectors";
 import { DEFAULT_DEV_PORT } from "../../../../src/lib/orca/detectors/port";
@@ -175,6 +175,13 @@ describe("Orca detection", () => {
     // After `reset`, the runtime is gone and its parent may stay behind empty.
     await rm(join(cwd, ".zitadel/local"), { recursive: true });
     expect(await orca.isFreshScaffoldTarget(cwd)).toBe(true);
+  });
+
+  it("treats a directory that does not exist yet as empty, without creating it", async () => {
+    const cwd = join(await tmp(), "my-zitadel-app");
+
+    await expect(inspectScaffoldTarget(cwd)).resolves.toEqual({ scaffoldable: true, entries: [] });
+    await expect(stat(cwd)).rejects.toMatchObject({ code: "ENOENT" });
   });
 
   it("treats a .gitignore with rules of its own as not fresh, and names only it", async () => {
@@ -347,6 +354,28 @@ describe("Orca.scaffold", () => {
     expect(scaffold).not.toHaveBeenCalled();
   });
 
+  it("leaves no directory behind when a scaffold into a new one fails", async () => {
+    const parent = await tmp();
+    const failingOrca = new Orca(
+      [fakeDetector],
+      [
+        {
+          ...fakeScaffolder,
+          async scaffold(scaffoldCwd) {
+            await writeFile(join(scaffoldCwd, "half-written.txt"), "junk");
+            throw new ZitadelError("E_VALIDATION", "boom");
+          },
+        },
+      ],
+      [],
+    );
+
+    await expect(
+      failingOrca.scaffold(join(parent, "shop", "my-zitadel-app"), "fake"),
+    ).rejects.toMatchObject({ code: "E_VALIDATION" });
+    await expect(readdir(parent)).resolves.toEqual([]);
+  });
+
   it("removes what a failed scaffold left in an empty directory", async () => {
     const cwd = await tmpPackageSafe();
     const failingOrca = new Orca(
@@ -435,6 +464,27 @@ describe("Orca.scaffold", () => {
       await expect(readdir(dirname(cwd))).resolves.toEqual([basename(cwd)]);
     });
 
+    it("creates a directory that does not exist yet", async () => {
+      const cwd = join(await tmp(), "shop", "my-zitadel-app");
+
+      const scaffold = await generatorOrca.scaffoldUndoably(cwd, "fake");
+      await scaffold.keep();
+
+      await expect(readdir(cwd)).resolves.toEqual([".gitignore", "package.json"]);
+    });
+
+    it("removes the directories it created once undone", async () => {
+      const parent = await tmp();
+      const scaffold = await generatorOrca.scaffoldUndoably(
+        join(parent, "shop", "my-zitadel-app"),
+        "fake",
+      );
+
+      await scaffold.undo();
+
+      await expect(readdir(parent)).resolves.toEqual([]);
+    });
+
     it("undoes a scaffold whose app it cannot detect", async () => {
       const cwd = await tmpPackageSafe();
       await writeFile(join(cwd, ".gitignore"), ".zitadel/local/\n");
@@ -470,6 +520,14 @@ describe("Orca.planScaffold", () => {
     await expect(readdir(cwd)).resolves.toEqual([]);
   });
 
+  it("leaves a directory that does not exist yet uncreated", async () => {
+    const cwd = join(await tmp(), "my-zitadel-app");
+
+    await orca.planScaffold(cwd, "next");
+
+    await expect(stat(cwd)).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
   it("offers the dev port a .env file in the directory declares", async () => {
     const cwd = await tmpPackageSafe();
     await writeFile(join(cwd, ".env.local"), "PORT=4321\n");
@@ -493,6 +551,31 @@ describe("Orca.planScaffold", () => {
     await expect(withoutPatchers.planScaffold(cwd, "next")).rejects.toMatchObject({
       code: "E_VALIDATION",
       message: 'No patcher supports "next"',
+    });
+  });
+});
+
+describe("assertDirectoryOrMissing", () => {
+  it("accepts a directory", async () => {
+    await expect(assertDirectoryOrMissing(await tmp())).resolves.toBeUndefined();
+  });
+
+  it("accepts a path that does not exist yet", async () => {
+    await expect(
+      assertDirectoryOrMissing(join(await tmp(), "shop", "web")),
+    ).resolves.toBeUndefined();
+  });
+
+  it.each([
+    ["a file", (file: string) => file],
+    ["a path under a file", (file: string) => join(file, "web")],
+  ])("refuses %s", async (_name, under) => {
+    const file = join(await tmp(), "notes.txt");
+    await writeFile(file, "");
+
+    await expect(assertDirectoryOrMissing(under(file))).rejects.toMatchObject({
+      code: "E_VALIDATION",
+      message: expect.stringContaining("is not a directory"),
     });
   });
 });

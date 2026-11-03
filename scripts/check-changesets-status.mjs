@@ -16,16 +16,13 @@ export const publicPackages = PUBLIC_RELEASE_PACKAGES.map((pkg) => ({
   root: `${pkg.dir}/`,
 }));
 
-// The console and login UI publish no npm package of their own — they are built
-// into the server container, so a user-visible change there ships inside
-// `@zitadel/server` and belongs in the release notes. They are deliberately not
-// in PUBLIC_RELEASE_PACKAGES or the changesets fixed group: they are never
-// packed or published, they only make a changeset mandatory. See
+// The console publishes no npm package of its own — it is built into the
+// server container, so a user-visible change there ships inside
+// `@zitadel/server` and belongs in the release notes. It is deliberately not
+// in PUBLIC_RELEASE_PACKAGES or the changesets fixed group: it is never packed
+// or published, it only makes a changeset mandatory. See
 // `.changeset/README.md#when-a-change-needs-a-changeset`.
-export const embeddedServerSurfaces = [
-  { name: "@zitadel/server", root: "apps/console/" },
-  { name: "@zitadel/server", root: "apps/login-ui/" },
-];
+export const embeddedServerSurfaces = [{ name: "@zitadel/server", root: "apps/console/" }];
 
 const publicPackageNames = publicPackages.map((pkg) => pkg.name);
 const publicPackageNameSet = new Set(publicPackageNames);
@@ -191,6 +188,34 @@ export function parseChangesetReleases(source) {
     });
 }
 
+// A summary renders word for word into every changelog and release note, so
+// past this many words outside its `**Breaking:**` and upgrade paragraphs it
+// is a story for the release notes (`.changeset/README.md#the-summary-is-the-release-note`).
+export const SUMMARY_WORD_LIMIT = 60;
+
+// A paragraph that may run long: what breaks and what to do, or upgrade steps.
+const LONG_FORM_PARAGRAPH = /^\*\*(?:Breaking|Upgrad[^*]*):\*\*/;
+const LIST_ITEM = /^(?:[-*+]|\d+[.)])\s/;
+
+// The summary's words, leaving out its `**Breaking:**` and `**Upgrading …:**`
+// paragraphs and a list that follows one, which holds its steps.
+export function summaryWordCount(source) {
+  const body = source.replace(/\r\n/g, "\n").replace(/^---\n[\s\S]*?\n---(?:\n|$)/, "");
+  let count = 0;
+  let longForm = false;
+  for (const paragraph of body.split(/\n[ \t]*\n/)) {
+    const text = paragraph.trim();
+    if (!text) {
+      continue;
+    }
+    longForm = LONG_FORM_PARAGRAPH.test(text) || (longForm && LIST_ITEM.test(text));
+    if (!longForm) {
+      count += (text.match(/\S+/g) ?? []).filter((word) => /[\p{L}\p{N}]/u.test(word)).length;
+    }
+  }
+  return count;
+}
+
 // Below 1.0.0 a breaking change is a minor bump. Changesets applies `major` as
 // written, and the fixed group would carry every public package to 1.0.0; GA
 // sets that version on purpose instead (docs/adrs/074-preview-releases-on-0x.md).
@@ -249,6 +274,7 @@ export async function checkChangesetsStatus(options) {
     code: "fixed-group",
     message,
   }));
+  const warnings = [];
   const parsedChangesets = [];
   let changesetStatus = options.changesetStatus;
 
@@ -270,6 +296,13 @@ export async function checkChangesetsStatus(options) {
             message: `${file} references ${name}, which is not a public publishable package`,
           });
         }
+      }
+      const words = summaryWordCount(changesetSources[file] ?? "");
+      if (packages.length > 0 && words > SUMMARY_WORD_LIMIT) {
+        warnings.push({
+          code: "long-summary",
+          message: `${file} runs ${words} words outside its **Breaking:** and upgrade paragraphs; a fix is one sentence, a feature a lead sentence with a docs link (.changeset/README.md#the-summary-is-the-release-note)`,
+        });
       }
     }
     errors.push(
@@ -313,6 +346,7 @@ export async function checkChangesetsStatus(options) {
     versionPr,
     analysis,
     errors,
+    warnings,
     parsedChangesets,
     changesetStatus,
     nextAction: nextAction({ analysis, errors, changesetStatus, pending, parsedChangesets }),
@@ -419,6 +453,14 @@ export function renderStepSummary(report) {
     lines.push("");
   }
 
+  if (report.warnings.length > 0) {
+    lines.push("## Warnings", "");
+    for (const warning of report.warnings) {
+      lines.push(`- ${warning.message}`);
+    }
+    lines.push("");
+  }
+
   return `${lines.join("\n")}\n`;
 }
 
@@ -445,6 +487,10 @@ export async function main(args = forwardedArgs(), options = {}) {
   const summary = renderStepSummary(report);
   if (parsed.summary) {
     await writeSummary(summary, options.summaryPath ?? process.env.GITHUB_STEP_SUMMARY);
+  }
+
+  for (const warning of report.warnings) {
+    console.warn(`changesets status warning: ${warning.message}`);
   }
 
   if (report.ok) {
@@ -602,6 +648,7 @@ function printUsage() {
 Checks whether the current diff has valid Changesets coverage for public packages.
 Use --pending to validate every pending .changeset/*.md file; CI runs it on every pull request.
 Use --version-pr only for generated Changesets Version Packages PRs.
+Warns, without failing, about a summary over ${SUMMARY_WORD_LIMIT} words outside its **Breaking:** and upgrade paragraphs.
 `);
 }
 

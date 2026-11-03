@@ -20,7 +20,7 @@ type FlowCheck =
 /**
  * Check what a schema change from `before` to `after` does to a flow.
  *
- * Only new errors count. A schema-rule error the flow already had is `plan`'s
+ * Only new errors count. A schema-rule error the flow already had is `deploy`'s
  * to report, and refusing an unrelated change because of it would block the
  * developer from an edit that might be part of the fix.
  *
@@ -39,7 +39,7 @@ export function checkFlow(
 ): FlowCheck {
   // The semantic validator reads a malformed shape leniently (a string where
   // `fields` should be a list reads as no fields), so the raw file is checked
-  // against the canonical flow schema first, as `plan` does.
+  // against the canonical flow schema first, as `deploy` does.
   const shape = flowConfigSchema.safeParse(flowAfter);
   if (!shape.success) {
     return {
@@ -53,7 +53,10 @@ export function checkFlow(
   }
   // The validator runs the schema rules only over a structurally sound flow,
   // so without this the change would always look harmless on a broken one.
-  const structural = validateFlowDefinition(flowAfter);
+  // A warning describes a flow that works, so it leaves the flow checkable.
+  const structural = validateFlowDefinition(flowAfter).filter(
+    (issue) => issue.severity === "error",
+  );
   if (structural.length > 0) {
     return { kind: "unchecked", issues: structural };
   }
@@ -101,9 +104,9 @@ export function offeredSignInMethods(
 
 /**
  * Outcomes the engine answers by switching from login to register without a
- * `purpose` on the transition: the validator's flip table, plus
- * `sso_user_not_found`, which it leaves out of that table on purpose but
- * which routes to registration the same way.
+ * `purpose` on the transition (`applyOutcomeFlip` in flow_state_machine.go):
+ * the identifier one {@link PURPOSE_FLIP_TARGETS} holds, plus
+ * `sso_user_not_found`.
  */
 const LOGIN_LEAVING_OUTCOMES = new Set([
   ...Object.keys(PURPOSE_FLIP_TARGETS.login ?? {}),
@@ -140,6 +143,8 @@ function loginJourney(flow: Record<string, unknown>): Record<string, unknown> {
       // `action` goes to another flow, whose step names are not this flow's,
       // and one into another purpose (register, say) leaves the login
       // journey. A null `action` or `purpose` is the same as an absent one.
+      // One that names only `purpose: login` goes back to the login entry,
+      // where the walk started, so it adds no step.
       if (
         isObject(transition) &&
         typeof transition.target === "string" &&

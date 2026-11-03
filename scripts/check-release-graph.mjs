@@ -12,10 +12,6 @@ const RELEASE_UI_BUILD_REQUIREMENTS = new Map([
   // except these two, which have no `@zitadel/source` entry: it bundles their
   // dist (components also directly, in the branding preview).
   ["console:build-release", ["sdk-react:build-release", "components:build-release"]],
-  // login-ui imports components directly; api is covered transitively through
-  // components:build-release, but keep both here so the graph check names the
-  // full package release chain that login-ui consumes.
-  ["login-ui:build-release", ["api:build-release", "components:build-release"]],
 ]);
 const BUILD_MUTEX_REQUIREMENTS = new Map([
   ["api:build-release", "public-dist"],

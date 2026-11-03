@@ -1,7 +1,7 @@
 import { playwright } from "@vitest/browser-playwright";
 import { defineConfig } from "vitest/config";
 
-import { baseTest, sourceConditions } from "../../vitest.shared.mjs";
+import { baseTest, sourceConditions } from "@zitadel/vitest-config";
 
 /**
  * Two projects in one config, selected per lane (no separate config files):

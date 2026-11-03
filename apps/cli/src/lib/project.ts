@@ -1,16 +1,19 @@
-import { chmod, readFile, rename, stat, writeFile } from "node:fs/promises";
+import { readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { ZitadelError } from "./errors";
+import { isErrno, ZitadelError } from "./errors";
+import { pathExistsStrict } from "./fs";
+import { enforceMode } from "./fs-safe";
 import { isObject, parseJsonObject, stableStringify } from "./json";
 import { DEFAULT_SERVER } from "./server";
+import { unscopedCommand } from "./suggestion";
 
 /**
  * Reports whether `cwd` has already been initialized, i.e. a committed
  * `zitadel.json` exists. Used to decide whether setup should run or skip.
  */
 export async function hasZitadelConfig(cwd: string): Promise<boolean> {
-  return exists(join(cwd, "zitadel.json"));
+  return pathExistsStrict(join(cwd, "zitadel.json"));
 }
 
 /**
@@ -18,19 +21,7 @@ export async function hasZitadelConfig(cwd: string): Promise<boolean> {
  * commands that need credentials, and signals that secrets were already pulled.
  */
 export async function hasZitadelSecret(cwd: string): Promise<boolean> {
-  return exists(join(cwd, ".zitadel/secret"));
-}
-
-async function exists(path: string): Promise<boolean> {
-  try {
-    await stat(path);
-    return true;
-  } catch (error) {
-    if (isNotFound(error)) {
-      return false;
-    }
-    throw error;
-  }
+  return pathExistsStrict(join(cwd, ".zitadel/secret"));
 }
 
 /**
@@ -67,10 +58,10 @@ export async function readZitadelConfig(cwd: string): Promise<Record<string, unk
   try {
     return parseJsonObject(await readFile(join(cwd, "zitadel.json"), "utf8"), "zitadel.json");
   } catch (error) {
-    if (isNotFound(error)) {
+    if (isErrno(error, "ENOENT")) {
       throw new ZitadelError("E_VALIDATION", "zitadel.json was not found", {
         hint: "Run `zitadel setup` first.",
-        nextCommands: ["zitadel setup"],
+        nextCommands: [unscopedCommand("setup")],
       });
     }
     throw error;
@@ -109,10 +100,10 @@ export async function readZitadelSecret(cwd: string): Promise<ZitadelSecret> {
     }
     return secret as ZitadelSecret;
   } catch (error) {
-    if (isNotFound(error)) {
+    if (isErrno(error, "ENOENT")) {
       throw new ZitadelError("E_VALIDATION", ".zitadel/secret was not found", {
         hint: "Run `zitadel setup` first, or restore the project secret with `zitadel doctor --fix`.",
-        nextCommands: ["zitadel setup", "zitadel doctor --fix"],
+        nextCommands: [unscopedCommand("setup"), unscopedCommand("doctor --fix")],
       });
     }
     throw error;
@@ -136,7 +127,7 @@ export async function writeZitadelSecret(cwd: string, secret: ZitadelSecret): Pr
   const tmp = `${path}.tmp-${process.pid}-${Date.now()}`;
   await writeFile(tmp, `${stableStringify(secret)}\n`, { mode: 0o600 });
   // `writeFile`'s mode is masked by the process umask, so re-assert it.
-  await chmod(tmp, 0o600).catch(() => undefined);
+  await enforceMode(tmp, 0o600);
   await rename(tmp, path);
 }
 
@@ -183,22 +174,4 @@ export function readUseCase(config: Record<string, unknown>): string | undefined
  */
 export function readProjectServer(config: Record<string, unknown>): string {
   return typeof config.server === "string" ? config.server : DEFAULT_SERVER;
-}
-
-/** Reads `environments.development.issuer` from a parsed `zitadel.json`, if present. */
-export function readDevelopmentIssuer(config: Record<string, unknown>): string | undefined {
-  if (isObject(config.environments) && isObject(config.environments.development)) {
-    const issuer = config.environments.development.issuer;
-    return typeof issuer === "string" ? issuer : undefined;
-  }
-  return undefined;
-}
-
-function isNotFound(error: unknown): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    (error as { code?: string }).code === "ENOENT"
-  );
 }

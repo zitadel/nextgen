@@ -88,6 +88,21 @@ describe("checkFlow", () => {
     expect(checkFlow(passwordFlow, before, after)).toEqual({ kind: "checked", introduced: [] });
   });
 
+  it("still checks a flow whose only findings are warnings", () => {
+    // A reserved purpose is a warning: the flow works, so the change to it is
+    // still worth checking.
+    const warned = { ...passwordFlow, purposes: { login: "identifier", recovery: "identifier" } };
+    const before = schema({ password: { enabled: true } });
+    const after = schema({ password: { enabled: false } });
+
+    const check = checkFlow(warned, before, after);
+
+    expect(check.kind).toBe("checked");
+    expect(check.kind === "checked" && check.introduced.map((issue) => issue.step)).toEqual([
+      "password",
+    ]);
+  });
+
   it("reports a malformed flow file as unchecked", () => {
     // A string where `fields` should be a list reads as no fields to the
     // semantic validator, which would hide the password step.

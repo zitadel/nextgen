@@ -1,8 +1,6 @@
-import { randomUUID } from "node:crypto";
-
 import { expect, test } from "@zitadel/testing/playwright";
 
-import { withErrorBody } from "../support/api";
+import { createSchemaFromSeed, withErrorBody } from "../support/api";
 import { expectNoErrorBoundary } from "../support/screens";
 import { signIn } from "../support/sign-in";
 
@@ -22,23 +20,13 @@ test("saves a user's attributes and keeps them across a reload", async ({
   zitadel,
   seed,
 }) => {
-  const { projectId, schemaId: seededSchemaId } = zitadel.handle;
-  const { schema: template } = await zitadel.api.getSchemaById(seededSchemaId);
-  // Its own `objectType`: sharing the seeded one would make this schema the
-  // newest revision of it, the one other specs' Add user drawers pick from.
-  const schema = await withErrorBody(
-    zitadel.api.createSchema(
-      {
-        ...template,
-        objectType: `e2e-attributes-${randomUUID()}`,
-        properties: {
-          ...template.properties,
-          newsletter: { type: "boolean", title: "Newsletter" },
-        },
-      },
-      { project_id: projectId },
-    ),
-  );
+  const { projectId } = zitadel.handle;
+  const schema = await createSchemaFromSeed(zitadel, (template) => ({
+    properties: {
+      ...template.properties,
+      newsletter: { type: "boolean", title: "Newsletter" },
+    },
+  }));
   const email = seed.identity().email;
   const subject = await withErrorBody(
     zitadel.api.createUser({ schema: schema.id, attributes: { email } }, { project_id: projectId }),

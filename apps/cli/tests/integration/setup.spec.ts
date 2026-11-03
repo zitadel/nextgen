@@ -4,9 +4,21 @@ import { describe, expect, it } from "vitest";
 
 import { useLocalServers } from "../helpers/local-server";
 import { usePlatformMock } from "../helpers/platform";
-import { aNewAppDirectory, anApp, type ScaffoldedApp } from "../helpers/project";
+import {
+  aMissingAppDirectory,
+  aNewAppDirectory,
+  anApp,
+  type ScaffoldedApp,
+  PASSWORD_POLICY,
+  SETUP_ORIGIN,
+} from "../helpers/project";
 
 const platform = usePlatformMock();
+
+/** The part of setup's envelope that says what it committed and published. */
+type SetupGitData = {
+  git: { initialized: boolean; commit: string | null };
+};
 useLocalServers();
 
 const SOCIAL_CREDENTIALS = {
@@ -102,6 +114,176 @@ describe("setup", () => {
 
   describe("against a valid server", () => {
     describe("--json", () => {
+      it("deploys what it wrote, so the first sign-in is served a release", async () => {
+        const app = await anApp();
+
+        await app.setup();
+
+        expect(await app.liveDeploymentCount()).toBe(1);
+      });
+
+      it("names the deploy that publishes an edit", async () => {
+        const app = await anApp();
+
+        const result = await app.setup();
+
+        expect(
+          app.envelopeOf<{ next_actions: string[] }>(result).data.next_actions.join("\n"),
+        ).toContain("deploy -m '<what changed>'");
+      });
+
+      it("says an edit takes effect once it is deployed", async () => {
+        const app = await anApp();
+
+        const result = await app.setup();
+
+        expect(
+          app.envelopeOf<{ next_actions: string[] }>(result).data.next_actions.join("\n"),
+        ).toContain("serves only what is deployed");
+      });
+
+      it("reports the commit it made", async () => {
+        const app = await anApp();
+
+        const result = await app.setup();
+
+        expect(app.envelopeOf<SetupGitData>(result).data.git).toMatchObject({
+          initialized: true,
+          commit: expect.stringMatching(/^[0-9a-f]{40}$/),
+        });
+      });
+
+      it("reports the repository it created when it could not commit", async () => {
+        const app = await anApp();
+
+        const result = await app.setupWithGitThatCannotCommit();
+
+        expect(app.envelopeOf<SetupGitData>(result).data.git).toEqual({
+          initialized: true,
+          commit: null,
+        });
+      });
+
+      it("warns that it could not commit and left a new repository", async () => {
+        const app = await anApp();
+
+        const result = await app.setupWithGitThatCannotCommit();
+
+        expect(app.envelopeOf(result).warnings?.join("\n")).toContain(
+          "Setup created a new, empty git repository here.",
+        );
+      });
+
+      it("keeps the project secret it wrote out of the commit it makes", async () => {
+        const app = await anApp();
+
+        await app.setup();
+
+        expect(await app.trackedFiles()).not.toContain(".zitadel/secret");
+      });
+
+      it.each([".env.development.local", ".env.local", ".env"])(
+        "keeps %s out of the commit it makes",
+        async (name) => {
+          const app = await anApp();
+
+          await app.setup();
+
+          expect(await app.trackedFiles()).not.toContain(name);
+        },
+      );
+
+      it("commits the configuration it wrote, which the release is built from", async () => {
+        const app = await anApp();
+
+        await app.setup();
+
+        expect(await app.trackedFiles()).toContain(".zitadel/schemas/default-human-user.json");
+      });
+
+      it("adds one commit on top of an existing repository's history", async () => {
+        const app = await anApp();
+        await app.underVersionControl();
+
+        await app.setup();
+
+        expect(await app.commitSubjects()).toHaveLength(2);
+      });
+
+      it("reports that it committed without having made the repository", async () => {
+        const app = await anApp();
+        await app.underVersionControl();
+
+        const result = await app.setup();
+
+        expect(app.envelopeOf<SetupGitData>(result).data.git).toMatchObject({
+          initialized: false,
+          commit: expect.stringMatching(/^[0-9a-f]{40}$/),
+        });
+      });
+
+      it("refuses a repository with uncommitted work", async () => {
+        const app = await anApp();
+        await app.underVersionControl();
+        await app.withUncommittedWork();
+
+        const result = await app.setup();
+
+        expect(result).toFailWith("E_CONFLICT");
+      });
+
+      it("refuses a detached HEAD, where its commit would be on no branch", async () => {
+        const app = await anApp();
+        await app.underVersionControl();
+        await app.onADetachedHead();
+
+        const result = await app.setup();
+
+        expect(result).toFailWith("E_CONFLICT");
+      });
+
+      it("names the untracked file it refused over", async () => {
+        const app = await anApp();
+        await app.underVersionControl();
+        await app.withUncommittedWork();
+
+        const result = await app.setup();
+
+        expect(result).toExplain("untracked file");
+      });
+
+      it("writes nothing into a project it refuses", async () => {
+        const app = await anApp();
+        await app.underVersionControl();
+        await app.withUncommittedWork();
+        const before = await app.snapshot();
+
+        await app.setup();
+
+        expect(await before.changes()).toMatchObject({ added: [], modified: [], removed: [] });
+      });
+
+      it("sets up a dirty repository anyway under --no-git", async () => {
+        const app = await anApp();
+        await app.underVersionControl();
+        await app.withUncommittedWork();
+
+        const result = await app.setup(["--no-git"]);
+
+        expect(result).toSucceed();
+      });
+
+      it("records no commit under --no-git", async () => {
+        const app = await anApp();
+
+        const result = await app.setup(["--no-git"]);
+
+        expect(app.envelopeOf<SetupGitData>(result).data.git).toEqual({
+          initialized: false,
+          commit: null,
+        });
+      });
+
       it("scaffolds the project", async () => {
         const app = await anApp();
         const before = await app.snapshot();
@@ -112,9 +294,55 @@ describe("setup", () => {
         expect((await before.changes()).added).toEqual(expect.arrayContaining(SCAFFOLDED_PAGES));
       });
 
+      it("publishes a password policy with the recommended minimum length", async () => {
+        const app = await anApp();
+
+        await app.setup();
+
+        expect(await app.publishedPolicies()).toEqual([
+          expect.objectContaining({ operation: PASSWORD_POLICY, config: { min_length: 15 } }),
+        ]);
+      });
+
+      it("puts a given minimum password length into the policy", async () => {
+        const app = await anApp();
+
+        await app.setup(["--password-min-length", "12"]);
+
+        expect(await app.publishedPolicies()).toEqual([
+          expect.objectContaining({ operation: PASSWORD_POLICY, config: { min_length: 12 } }),
+        ]);
+      });
+
+      it("reads a minimum password length of 0 as none", async () => {
+        const app = await anApp();
+
+        await app.setup(["--password-min-length", "0"]);
+
+        expect(await app.publishedPolicies()).toEqual([
+          expect.objectContaining({ operation: PASSWORD_POLICY, config: {} }),
+        ]);
+      });
+
+      it("refuses a minimum password length outside the bounds before creating anything", async () => {
+        const app = await anApp();
+
+        const result = await app.setup(["--password-min-length", "65"]);
+
+        expect(result).toFailWith("E_VALIDATION");
+      });
+
       it("creates a new app in the directory start ran in", async () => {
         const app = await aNewAppDirectory();
         await app.startLocalServer();
+
+        const result = await app.setupNewApp();
+
+        expect(result).toSucceed();
+      });
+
+      it("creates a new app in a directory that does not exist yet", async () => {
+        const app = await aMissingAppDirectory();
 
         const result = await app.setupNewApp();
 
@@ -197,7 +425,7 @@ describe("setup", () => {
 
         expect(await app.setup()).toSucceed();
 
-        expect(await app.plan()).toReportNothingToDo();
+        expect(await app.deployDryRun()).toSucceed();
       });
 
       it("installs the dependencies it added", async () => {
@@ -247,6 +475,57 @@ describe("setup", () => {
         expect(rerun).toBeSkipped();
       });
 
+      describe("--dev-port without --force when no one can be asked", () => {
+        it("still succeeds", async () => {
+          const app = await anApp();
+          expect(await app.setup()).toSucceed();
+
+          const result = await app.setup(["--dev-port", "3001"]);
+
+          expect(result).toSucceed();
+        });
+
+        it("says to pass --force", async () => {
+          const app = await anApp();
+          expect(await app.setup()).toSucceed();
+
+          const result = await app.setup(["--dev-port", "3001"]);
+
+          expect(result).toSay("origin rm http://localhost:3000 --force");
+        });
+
+        it("suggests removing the previous origin with --force", async () => {
+          const app = await anApp();
+          expect(await app.setup()).toSucceed();
+
+          const result = await app.setup(["--dev-port", "3001"]);
+
+          expect(result).toSuggestExactly(
+            `origin rm http://localhost:3000 --force --env-file ${app.path}/.env.development.local --cwd ${app.path}`,
+          );
+        });
+
+        it("removes nothing", async () => {
+          const app = await anApp();
+          expect(await app.setup()).toSucceed();
+
+          await app.setup(["--dev-port", "3001"]);
+
+          expect(await app.projectOrigins()).toContainEqual(SETUP_ORIGIN);
+        });
+      });
+
+      it("replaces the previous origin when --dev-port moves the app with --force", async () => {
+        const app = await anApp();
+        expect(await app.setup()).toSucceed();
+
+        await app.setup(["--dev-port", "3001", "--force"]);
+
+        expect(await app.projectOrigins()).toEqual([
+          { pattern: "http://localhost:3001", kind: "primary" },
+        ]);
+      });
+
       it("leaves the developer's edits in place on a rerun", async () => {
         const app = await anApp();
         expect(await app.setup()).toSucceed();
@@ -256,7 +535,7 @@ describe("setup", () => {
 
         expect(await app.setup()).toBeSkipped();
 
-        expect((await app.plan()).total).toBeGreaterThan(0);
+        expect(await app.deployDryRun()).toSucceed();
       });
 
       it("does not claim to be configured after a failed run", async () => {
@@ -268,6 +547,18 @@ describe("setup", () => {
         expect(await app.hasBeenConfigured()).toBe(false);
       });
 
+      it("rolls back the credential env file a failed run created", async () => {
+        const app = await anApp();
+        platform.rejectsSchemaUploads();
+
+        expect(await app.setup()).toFail();
+
+        // setup created `.env.development.local` with the project it had to
+        // abandon; the rollback removes it so a rerun does not inherit the
+        // abandoned project's id (`merge-env` only adds missing keys).
+        await expect(app.readProjectFile(".env.development.local")).rejects.toThrow();
+      });
+
       it("lets a rerun finish what a failed run started", async () => {
         const app = await anApp();
         platform.rejectsSchemaUploads();
@@ -276,7 +567,7 @@ describe("setup", () => {
 
         expect(await app.setup(["--force"])).toSucceed();
 
-        expect(await app.plan()).toReportNothingToDo();
+        expect(await app.deployDryRun()).toSucceed();
       });
 
       it.each([
@@ -440,7 +731,7 @@ describe("setup", () => {
           const app = await anApp();
           expect(await provider.setUp(app)).toSucceed();
 
-          expect(await app.plan()).toReportNothingToDo();
+          expect(await app.deployDryRun()).toSucceed();
         });
       });
 

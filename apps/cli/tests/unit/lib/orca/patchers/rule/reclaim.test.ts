@@ -24,6 +24,18 @@ describe("reclaimableOps", () => {
     expect(kinds).toEqual(["write", "append-gitignore", "merge-env", "add-dep", "edit"]);
   });
 
+  it("replays an overwriting env merge as additive only", () => {
+    const ops = reclaimableOps({
+      ops: [
+        { kind: "merge-env", path: ".env.development.local", entries: { A: "1" }, overwrite: true },
+      ],
+      summary: [],
+    });
+    expect(ops).toEqual([
+      { kind: "merge-env", path: ".env.development.local", entries: { A: "1" }, overwrite: false },
+    ]);
+  });
+
   it("keeps config edits so doctor --fix can restore a removed proxy", () => {
     const ops = reclaimableOps(plan);
     expect(ops.some((op) => op.kind === "edit" && op.path === "vite.config.ts")).toBe(true);

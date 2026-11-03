@@ -87,6 +87,11 @@ Either this surface adopts `env`, or ADR 035 is amended to the plural —
 recorded below rather than decided here, because it is a public command
 contract someone else already wrote down.
 
+`env` has since shipped, as the amendment above settles it, but as a command
+about the developer's machine rather than a resource: an environment is an env
+file, `zitadel env` shows which one resolved, and there is no `environments`
+resource command.
+
 > Amended 2026-10-07: settled as `env`, which is singular under the amended §2.
 
 Configuration resources are readable but never writable here. They are authored
@@ -302,7 +307,8 @@ those routes exist, the CLI matches the API it has.
 ### 13. Credentials never reach a command line
 
 No flag, argument, or record entry may carry one; the operator credential is
-read from `.zitadel/secret` ([ADR 036](036-api-credential-planes.md)). Shell
+read from `ZITADEL_PROJECT_SECRET` in the environment the command runs in,
+falling back to `.zitadel/secret` ([ADR 036](036-api-credential-planes.md)). Shell
 history and process listings are readable by other users, so this is enforced
 in code rather than documented as advice.
 

@@ -41,10 +41,15 @@ const NON_SHIPPING_TOP_LEVEL_DIRS = [
 ];
 
 // Workspaces that build or exercise the product without ever reaching a user:
-// mocks, demos, and the docs site. (`packages/testing` left this list when it
-// joined the release train in #692 — the manifest-derived PUBLISHED_ROOTS
-// covers it now.)
-const NON_SHIPPING_WORKSPACES = ["apps/docs/", "apps/storybook/", "packages/api-mock/"];
+// mocks, demos, the docs site and the shared test config. (`packages/testing`
+// left this list when it joined the release train in #692 — the
+// manifest-derived PUBLISHED_ROOTS covers it now.)
+const NON_SHIPPING_WORKSPACES = [
+  "apps/docs/",
+  "apps/storybook/",
+  "packages/api-mock/",
+  "packages/vitest-config/",
+];
 
 // Repo-meta markdown, wherever it sits. Every other `.md` is treated as shipping
 // on purpose: `packages/config/defaults/README-*.md` and the CLI's framework
@@ -66,8 +71,6 @@ const NON_SHIPPING_ROOT_FILES = new Set([
   "LICENSE",
   "devbox.json",
   "devbox.lock",
-  "go.sum",
-  "main.go",
   "moon.yml",
   "package.json",
   "pnpm-lock.yaml",
@@ -76,9 +79,13 @@ const NON_SHIPPING_ROOT_FILES = new Set([
   "tsconfig.base.json",
   "tsconfig.json",
   "vitest.config.ts",
-  "vitest.shared.mjs",
-  "vitest.shared.d.mts",
 ]);
+
+// The Go module's own non-shipping files, as the root files above: its
+// lockfile and the entrypoint shim. Its lint analyzers (`tools/`) run in CI
+// only, like the repository's `tools/`.
+const SERVER_MODULE = "apps/api/";
+const NON_SHIPPING_MODULE_FILES = new Set([`${SERVER_MODULE}go.sum`, `${SERVER_MODULE}main.go`]);
 
 export function parseSemanticConfig(source) {
   const types = [];
@@ -133,6 +140,10 @@ export function isNonShippingFile(file) {
 
   const [top] = path.split("/");
   if (path.includes("/") && NON_SHIPPING_TOP_LEVEL_DIRS.includes(top)) {
+    return true;
+  }
+
+  if (NON_SHIPPING_MODULE_FILES.has(path) || path.startsWith(`${SERVER_MODULE}tools/`)) {
     return true;
   }
 

@@ -26,7 +26,6 @@ type Person = { email: string; password: string };
 /** Logs the current person out in `page` and signs `person` in there. */
 async function switchTo(page: Page, person: Person): Promise<void> {
   await page.goto("/ui/console/");
-  await expect(page.getByRole("navigation", { name: "Primary" })).toBeVisible();
   await page.getByRole("button", { name: /^Account:/ }).click();
   await page.getByRole("menuitem", { name: "Log out" }).click();
   await expect(page).toHaveURL(/\/ui\/console\/login/);
@@ -45,7 +44,10 @@ async function prepareTeam(page: Page, name: string) {
 function teamWrites(page: Page): Response[] {
   const seen: Response[] = [];
   page.on("response", (response) => {
-    if (new URL(response.url()).pathname === "/teams" && response.request().method() === "POST") {
+    if (
+      new URL(response.url()).pathname === "/api/v1/teams" &&
+      response.request().method() === "POST"
+    ) {
       seen.push(response);
     }
   });

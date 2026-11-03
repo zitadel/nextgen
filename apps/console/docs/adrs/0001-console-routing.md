@@ -33,7 +33,7 @@ Two product constraints shape the answers:
 - The console is **embedded into the Go server under a configurable deployment
   prefix** and served as a static SPA with an `index.html` fallback for unknown
   client routes (see
-  [`internal/staticui/handler.go`](../../../../internal/staticui/handler.go)).
+  [`internal/staticui/handler.go`](../../../../apps/api/internal/staticui/handler.go)).
   Routing must survive a hard refresh on a deep link, and the client basepath
   must line up with that embed prefix.
 - That embed prefix is owned by the Vite `base`
@@ -197,6 +197,18 @@ the sidebar.
 > first and alone until a project is selected; the selected project's screens
 > follow it.
 
+> **Amendment (2026-10-23, design decision D22):** the sidebar lists the scoped
+> routes whether or not a project is selected, as Vercel's does. Opening one
+> without a selection still goes to Projects with `?next=`; Projects is then
+> headed `Continue to <screen>` with that screen's entry marked, and choosing
+> a project goes on to it. `/` without a selection lands on Projects itself
+> rather than by way of Users, since arriving asked for no screen.
+
+> **Amendment (2026-10-26, design decision D24):** Projects is no longer a
+> sidebar entry (`staticData.nav`); it is the console's home, opened by the
+> logo and the project switcher's `All projects`, and the shell draws it
+> without the sidebar. The sidebar holds the selected project's screens only.
+
 ## Consequences
 
 - **One canonical router.** `main.tsx` renders the factory from `router.tsx`;
@@ -225,7 +237,7 @@ the sidebar.
 - [`apps/console/src/router.tsx`](../../src/router.tsx),
   [`apps/console/src/main.tsx`](../../src/main.tsx),
   [`apps/console/vite.config.ts`](../../vite.config.ts).
-- [`internal/staticui/handler.go`](../../../../internal/staticui/handler.go)
+- [`internal/staticui/handler.go`](../../../../apps/api/internal/staticui/handler.go)
   — SPA fallback that makes deep links survive refresh.
 - Root [ADR 055: A Lit-only login surface, with the console on shadcn/ui](../../../../docs/adrs/055-lit-only-login-surface.md)
   — the shell is built from shadcn/ui in `src/components/ui/`, sharing only

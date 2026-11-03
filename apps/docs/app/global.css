@@ -6,6 +6,8 @@
 @import "fumadocs-ui/css/generated/spacious.css";
 @import "fumadocs-ui/css/preset.css";
 @import "fumadocs-openapi/css/preset.css";
+/* The live examples' controls (components/examples). */
+@import "@fumadocs/story/css/preset.css";
 /* The console's palette: the --zl-* variables, dark on :root and light under
    [data-theme="light"], which the theme switch sets (app/layout.tsx). */
 @import "@zitadel/design-tokens/css/tokens.css";
@@ -70,6 +72,14 @@
    frame is the sidebar's surface, as the console's is. */
 #fd-spacious-layout {
   background-color: var(--sidebar);
+}
+
+/* The layout centres the page and its table of contents together, and only a
+   page with headings renders one (`#nd-toc` sets --fd-toc-width). Keep its
+   width on a page without, so every page's text starts at the same place. A
+   `full` page (an API operation) has no table of contents column at all. */
+#fd-spacious-layout:not(:has(#nd-toc, article[data-full="true"])) {
+  --fd-toc-width: calc(var(--spacing) * 76);
 }
 
 /* The logo (components/logo.tsx) plays as on the website once a hover on it

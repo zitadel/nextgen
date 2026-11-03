@@ -81,9 +81,9 @@ export class ZitadelSurface extends ZitadelConfigured {
   /**
    * Sizing/chrome mode. Components size to content; pages compose them —
    * so the default is `widget`: content-sized, transparent host, no
-   * document-level font injection. Dedicated routes — the hosted shell and
-   * the scaffolded pages — opt into `page`, which claims the viewport, paints
-   * the surface background, and links the tenant's `font_url` when it has one.
+   * document-level font injection. Dedicated routes, such as the scaffolded
+   * login pages, opt into `page`, which claims the viewport, paints the
+   * surface background, and links the tenant's `font_url` when it has one.
    * Fine-grained height override in both modes: `--zl-page-min-height`.
    */
   @property({ type: String, reflect: true }) accessor variant: "widget" | "page" = "widget";
