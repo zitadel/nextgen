@@ -37,6 +37,9 @@
       "identifier": "COMMANDS"
     },
     "helpClass": "./dist/lib/oclif/help",
+    "additionalHelpFlags": [
+      "-h"
+    ],
     "topicSeparator": " ",
     "plugins": [
       "@oclif/plugin-help",

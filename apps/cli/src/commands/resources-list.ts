@@ -1,9 +1,6 @@
-import { Flags } from "@oclif/core";
-
 import { BaseCommand, type JsonEnvelope } from "../lib/oclif";
-import { Tabulatable } from "../lib/oclif/tabulatable";
+import { plainFlag, Tabulatable } from "../lib/oclif/tabulatable";
 import { describeRegistry } from "../lib/oclif/crud";
-import { listData } from "../lib/oclif/envelope";
 import { CommandGroups } from "../lib/oclif/groups";
 import { RESOURCES } from "./resources";
 
@@ -30,19 +27,16 @@ export default class ResourcesList extends Tabulatable(BaseCommand) {
     '<%= config.bin %> resources --json | jq -r \'.data.items[] | "\\(.topic): \\(.verbs | join(", "))"\'',
   ];
   static override flags = {
-    plain: Flags.boolean({
-      description:
-        "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
-    }),
+    plain: plainFlag,
   };
 
   async run(): Promise<JsonEnvelope> {
     const { flags } = await this.parse(ResourcesList);
     // No server call, so no server resolution: the answer is the same offline.
     await this.toMeta(flags, { resolveServer: false });
-    const resources = describeRegistry(RESOURCES);
+    const items = describeRegistry(RESOURCES);
 
-    const rows = resources.map((resource) => ({
+    const rows = items.map((resource) => ({
       topic: String(resource.topic),
       verbs: (resource.verbs as string[]).join(", "),
       // Every list shares one filter grammar now, so the column is simply the
@@ -54,16 +48,21 @@ export default class ResourcesList extends Tabulatable(BaseCommand) {
         .join(", "),
     }));
 
-    const plain = this.isPlain(flags.plain);
-    return this.emit({
-      status: "ok",
-      data: listData(resources),
-      pretty: await this.tabulateList(COLUMNS, rows, {
-        plain,
-        singular: "resource",
-        empty: "No resources.",
-        footer: [`Run \`${this.config.bin} <resource> <verb> --help\` for a command's flags.`],
-      }),
+    const columns = COLUMNS;
+    const empty = "No resources.";
+    const footer = [`Run \`${this.config.bin} <resource> <verb> --help\` for a command's flags.`];
+    const page = null;
+    const extra = {};
+
+    return this.emitList(flags, {
+      columns,
+      rows,
+      items,
+      singular: "resource",
+      empty,
+      footer,
+      page,
+      extra,
     });
   }
 }
