@@ -317,6 +317,7 @@ export class Lifecycle<R extends ServerRecord> {
     if (previous) {
       await this.terminate(previous);
     }
+    // A port race retries on the next port, so both move with each attempt.
     let preferred = previous?.port ?? this.options.previousPort;
     for (let attempt = 0; ; attempt++) {
       const claim = await claimFreePort(
@@ -326,10 +327,7 @@ export class Lifecycle<R extends ServerRecord> {
         this.options.firstPort,
       );
       try {
-        let record: Launched<R>;
-        try {
-          record = await this.launchAndWait(claim.port);
-        } catch (error) {
+        const record = await this.launchAndWait(claim.port).catch(async (error: unknown) => {
           // Someone else took the port between claiming it and binding it (a
           // process outside our claims, or a Docker publish that failed). The
           // choice was automatic, so the next port is tried. A server that failed
@@ -341,10 +339,13 @@ export class Lifecycle<R extends ServerRecord> {
             (error instanceof ServerStartError ? error.reason === "exited" : true) &&
             !(await this.deps.ports.isFree(claim.port))
           ) {
-            preferred = claim.port + 1;
-            continue;
+            return undefined;
           }
           throw error;
+        });
+        if (record === undefined) {
+          preferred = claim.port + 1;
+          continue;
         }
         return { record, alreadyRunning: false };
       } finally {

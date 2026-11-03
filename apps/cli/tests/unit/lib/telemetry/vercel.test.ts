@@ -85,6 +85,12 @@ describe("resolveVercelEndpoint", () => {
     };
     expect(resolveVercelEndpoint(env)).toBe("https://intake.test/event");
   });
+
+  it("names no intake when ZITADEL_TELEMETRY_VERCEL_ENDPOINT is not a URL", () => {
+    const env = { ZITADEL_TELEMETRY_VERCEL_ENDPOINT: "not a url" };
+
+    expect(resolveVercelEndpoint(env)).toBeUndefined();
+  });
 });
 
 describe("Telemetry's Vercel copy", () => {

@@ -1,0 +1,28 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  // The public Go API client, a nested Go module whose api/ package the
+  // server's generation writes; vet waits for it, as bench's does. vet
+  // compiles the module, so there is no build task. Native Go results are
+  // never cached (.moon/AGENTS.md).
+  "tasks": {
+    // Tracked Go files only, as the server project checks them.
+    "format": {
+      "cache": false
+    },
+    "vet": {
+      "cache": false,
+      "dependsOn": ["@zitadel/server#check-generate"],
+      "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"]
+    },
+    "test": {
+      "cache": false,
+      "dependsOn": ["format", "vet"],
+      "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
+      // api/client_test.go holds PathPrefix to the spec's servers URL, a file
+      // outside the module that Go's result cache does not see (-count=1 in
+      // the script, as in moon.yml).
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/apps/api/api/openapi/openapi-spec.yaml"]
+    }
+  }
+}

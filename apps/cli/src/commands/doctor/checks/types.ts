@@ -26,6 +26,8 @@ export type CheckContext = {
   readonly cliVersion: string;
   /** When true, {@link SanityCheck.fix} must preview without writing. */
   readonly dryRun: boolean;
+  /** Aborts what a check has in flight, as Ctrl-C does for the command running it. */
+  readonly signal: AbortSignal;
   /**
    * Asks for consent to a destructive repair: `doctor`'s own confirmation,
    * which `--force` answers. `undefined` is a no. Never called on a dry run.

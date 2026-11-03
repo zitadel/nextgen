@@ -134,7 +134,7 @@ import {
   type Row,
   type Section,
 } from "./summary";
-import { shellArg, shellOption } from "../../lib/shell";
+import { Cmd } from "../../lib/cmd";
 import { showSkillsHint } from "../../lib/skills-hint";
 import { reportWarning } from "../../lib/warnings";
 import {
@@ -601,7 +601,7 @@ export default class Setup extends Destructive(BaseCommand) {
       // server fallback defaults, then setup uploads the local default schema and
       // flow files through the typed resource APIs and records the returned IDs.
       consola.start(`Creating project on ${answers.server}${dryRun ? " (dry run)" : ""}`);
-      const unauthClient = createZitadelClient({ baseUrl: answers.server });
+      const unauthClient = createZitadelClient({ baseUrl: answers.server, signal: this.signal });
       const projectName = defaultProjectName(cwd, app.framework);
       // Register the app's own origin so the backend's origin check allows
       // requests the dev proxy forwards from it.
@@ -667,7 +667,7 @@ export default class Setup extends Destructive(BaseCommand) {
               cwd,
               // Verbatim: what setup reads back is stored in state, never printed.
               client: createZitadelClient(
-                { baseUrl: answers.server, token: project.project_secret },
+                { baseUrl: answers.server, token: project.project_secret, signal: this.signal },
                 { verbatim: true },
               ),
               projectId: project.id,
@@ -769,7 +769,7 @@ export default class Setup extends Destructive(BaseCommand) {
       { clientId: PublishState; secret: SecretOutcome }
     >();
     if (answers.sso.length > 0 && !dryRun) {
-      const publish = ssoCredentialPublisher(answers.server, project);
+      const publish = ssoCredentialPublisher(answers.server, project, this.signal);
       // Only here do both credentials have to exist, and the type says so.
       for (const answer of completeSso(answers.sso)) {
         const slug = providerOf(answer.selection).slug;
@@ -936,6 +936,7 @@ export default class Setup extends Destructive(BaseCommand) {
             projectId: project.id,
             projectSecret: project.project_secret,
             admin,
+            signal: this.signal,
           });
           // The team is whichever one the platform attached the project to —
           // the admin's earliest active membership, which need not be the team
@@ -1217,6 +1218,7 @@ export default class Setup extends Destructive(BaseCommand) {
         client: createZitadelClient({
           baseUrl: opts.server,
           token: opts.project.project_secret,
+          signal: this.signal,
         }),
         projectId: opts.project.id,
         cwd: opts.cwd,
@@ -1258,6 +1260,7 @@ export default class Setup extends Destructive(BaseCommand) {
       orca: createOrca(),
       cliVersion: this.meta.cliVersion,
       dryRun,
+      signal: this.signal,
       consent: (gate) => this.consent(gate),
     });
     for (const file of move.result.filesWritten) {
@@ -1270,7 +1273,7 @@ export default class Setup extends Destructive(BaseCommand) {
     const cleanup =
       move.refused && move.staleOrigin !== undefined
         ? projectCommand(
-            `origin rm ${shellArg(move.staleOrigin)} --force`,
+            `origin rm ${Cmd.quote(move.staleOrigin)} --force`,
             (await access(join(cwd, ".env.development.local")).then(
               () => true,
               () => false,
@@ -1798,11 +1801,12 @@ export function retryOptionsFromFlags(flags: {
 function ssoCredentialPublisher(
   server: string,
   project: CreateProject201,
+  signal: AbortSignal,
 ): SecretPublisher | undefined {
   if (server === "mock") {
     return undefined;
   }
-  const client = createZitadelClient({ baseUrl: server, token: project.project_secret });
+  const client = createZitadelClient({ baseUrl: server, token: project.project_secret, signal });
   return async (name, value, { secret }) => {
     await client.updateVariables({ [name]: { value, secret } }, { project_id: project.id });
   };
@@ -1819,7 +1823,7 @@ function ssoCredentialPublisher(
  */
 /** `--cwd` for a suggested command, when setup was pointed at a directory. */
 function cwdArg(retry: SetupRetryOptions): string {
-  return retry.cwd === undefined ? "" : ` ${shellOption("--cwd", retry.cwd)}`;
+  return retry.cwd === undefined ? "" : ` ${Cmd.option("--cwd", retry.cwd)}`;
 }
 
 function ssoRecovery(
@@ -1960,7 +1964,7 @@ async function assertLocalServerVersion(
         `halfway. Run start to restart it on ${expected}; its data stays. ${where}` +
         "Then rerun setup.",
       nextCommands: [
-        unscopedCommand(`start ${shellOption("--cwd", nearest.dir)}`, cliVersion),
+        unscopedCommand(`start ${Cmd.option("--cwd", nearest.dir)}`, cliVersion),
         unscopedCommand(`setup ${setupRetryFlags(retry)}`, cliVersion),
       ],
       details: {

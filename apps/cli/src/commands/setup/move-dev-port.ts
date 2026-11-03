@@ -47,17 +47,23 @@ export async function moveDevPort(opts: {
   orca: Orca;
   cliVersion: string;
   dryRun: boolean;
+  /** Aborts the requests, as Ctrl-C does for the command that sent them. */
+  signal: AbortSignal;
   /** Asks to remove the previous origin; the command's own confirmation. */
   consent: (gate: Gate) => Promise<Consent | undefined>;
 }): Promise<DevPortMove> {
-  const { cwd, devPort, source, orca, cliVersion, dryRun } = opts;
+  const { cwd, devPort, source, orca, cliVersion, dryRun, signal } = opts;
   const context = await loadPatchContext(cwd, orca, cliVersion);
   const previousIssuer = context.issuer;
   const issuer = issuerFromPort(devPort);
   const secret = await readZitadelSecret(cwd);
   const moving = previousIssuer !== issuer;
 
-  const client = createZitadelClient({ baseUrl: source, token: secret.project_secret });
+  const client = createZitadelClient({
+    baseUrl: source,
+    token: secret.project_secret,
+    signal,
+  });
   if (!dryRun) {
     try {
       await client.addOrigin(secret.project_id, { pattern: issuer, kind: "primary" });
@@ -78,8 +84,6 @@ export async function moveDevPort(opts: {
   const patcher = orca.patcherFor(ctx.framework.id);
   const result = await patcher.moveDevPort(ctx, previousIssuer, { cwd, dryRun, force: false });
 
-  let staleOrigin: string | undefined;
-  let refused: true | undefined;
   if (!dryRun) {
     // The app's own origin is primary, so the move rewrites that list. An
     // older secret that still carries the issuer as a preview pattern is
@@ -97,11 +101,13 @@ export async function moveDevPort(opts: {
     if (manifest !== undefined) {
       await updateScaffold(cwd, { ...manifest, dev_port: devPort });
     }
-    if (moving && portFromIssuer(previousIssuer) !== undefined) {
-      // A refusal for want of --force leaves the origin behind and says so;
-      // anything else the request for consent throws (Ctrl-C, a bug) stops
-      // the run.
-      const consent = await opts
+  }
+  const replacing = !dryRun && moving && portFromIssuer(previousIssuer) !== undefined;
+  // A refusal for want of --force leaves the origin behind and says so;
+  // anything else the request for consent throws (Ctrl-C, a bug) stops
+  // the run.
+  const consent = replacing
+    ? await opts
         .consent({
           verb: "replace",
           name: `remove ${previousIssuer} from the project's origins`,
@@ -109,22 +115,23 @@ export async function moveDevPort(opts: {
         })
         .catch((error: unknown) => {
           if (isRefusal(error)) {
-            refused = true;
-            return undefined;
+            return "refused" as const;
           }
           throw error;
-        });
-      if (consent === undefined) {
-        staleOrigin = previousIssuer;
-      } else {
-        try {
-          await consent.unlock(client).removeOrigin(secret.project_id, { pattern: previousIssuer });
-        } catch {
-          staleOrigin = previousIssuer;
-        }
-      }
-    }
-  }
+        })
+    : undefined;
+  const refused = consent === "refused" ? true : undefined;
+  const staleOrigin = !replacing
+    ? undefined
+    : consent === undefined || consent === "refused"
+      ? previousIssuer
+      : await consent
+          .unlock(client)
+          .removeOrigin(secret.project_id, { pattern: previousIssuer })
+          .then(
+            () => undefined,
+            () => previousIssuer,
+          );
 
   return {
     previousIssuer,
