@@ -1,11 +1,12 @@
 import { Config } from "@oclif/core";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { BaseCommand } from "../../../../src/lib/oclif/base";
 import { CLI_COMMAND_STARTED } from "../../../../src/lib/oclif/command-telemetry";
 import type { JsonEnvelope } from "../../../../src/lib/oclif/types";
 import type { Properties, Telemetry, TelemetryDeps } from "../../../../src/lib/telemetry";
 import { cliPackageRoot } from "../../../helpers/oclif-build";
+import { onTerminalReadingAFile } from "../../../helpers/terminal";
 
 const config = await Config.load(cliPackageRoot);
 
@@ -110,21 +111,16 @@ class Coloured extends BaseCommand {
 describe("whether a run's output is coloured", () => {
   it("asks where the output goes, not whether anyone could be asked something", async () => {
     // A run reading its input from a file still writes to the terminal, so a
-    // redirected stdin says nothing about colour.
+    // redirected stdin says nothing about colour. The colour variables are
+    // pinned because the runner's own are not the ones under test.
+    vi.stubEnv("TERM", "xterm");
+    vi.stubEnv("NO_COLOR", "");
+    vi.stubEnv("FORCE_COLOR", "");
     const coloured = new Coloured(["--no-telemetry"], config);
-    const streams = { stdout: process.stdout.isTTY, stdin: process.stdin.isTTY };
-    Object.defineProperty(process.stdout, "isTTY", { value: true, configurable: true });
-    Object.defineProperty(process.stdin, "isTTY", { value: false, configurable: true });
 
-    try {
-      await coloured.run();
-    } finally {
-      Object.defineProperty(process.stdout, "isTTY", {
-        value: streams.stdout,
-        configurable: true,
-      });
-      Object.defineProperty(process.stdin, "isTTY", { value: streams.stdin, configurable: true });
-    }
+    await onTerminalReadingAFile(() => {
+      return coloured.run();
+    });
 
     expect(coloured.answer).toBe(true);
   });
