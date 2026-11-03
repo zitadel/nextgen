@@ -3,7 +3,7 @@ import { mapBounded } from "../../map-bounded";
 import { reportWarning } from "../../warnings";
 import type { Step, StepContext } from "../pipeline";
 
-/** Users read per page, and the most this check reads in all. */
+/** Users read per page, and the most the whole check reads, across every scan. */
 const PAGE_SIZE = 100;
 const SCAN_CAP = 1000;
 /** Identity-link reads in flight at once. */
@@ -13,15 +13,17 @@ type QueriedUser = Awaited<ReturnType<ZitadelClient["queryUsers"]>>["users"][num
 type QueryUsersBody = Parameters<ZitadelClient["queryUsers"]>[0];
 type UserFilter = NonNullable<QueryUsersBody["filter"]>[number];
 type Flow = { schema: string; identifiers: string[] };
+/** How many users the whole check may still read. */
+type Budget = { remaining: number };
 
 /**
  * Warn when this deploy leaves users who exist today unable to sign in. A
  * deploy that passes validation can still lock people out, because the flow
  * and the schema are judged without the users they will meet:
  *
- * - a login flow that looks users up by a field the existing users of its
- *   schema do not carry sends them to registration when they type their old
- *   identifier;
+ * - a schema whose designated identifier (`x-identifier`) is a property the
+ *   existing users of that schema do not carry sends them to registration when
+ *   they type their old identifier, once a step on the login path collects it;
  * - a flow moved to another schema cannot continue an SSO sign-in whose linked
  *   user is on the old schema.
  *
@@ -50,10 +52,11 @@ async function lockoutWarnings(ctx: StepContext): Promise<string[]> {
   // lookups below do not depend on it, so a failed read costs the names.
   const names = await objectTypes(ctx).catch(() => new Map<string, string>());
   const { flows, unresolved } = servedFlows(ctx, names);
+  const budget: Budget = { remaining: SCAN_CAP };
   const [lookups, sso] = await Promise.all([
-    lookupWarnings(ctx, flows),
+    lookupWarnings(ctx, flows, budget),
     // With a flow whose schema is unknown, "a schema no flow serves" cannot be told.
-    unresolved ? [] : ssoWarnings(ctx, flows, names),
+    unresolved ? [] : ssoWarnings(ctx, flows, names, budget),
   ]);
   return [...lookups, ...sso];
 }
@@ -68,12 +71,16 @@ function servedFlows(
   names: ReadonlyMap<string, string>,
 ): { flows: Flow[]; unresolved: boolean } {
   const objectTypes = new Set<string>();
+  const designated = new Map<string, string>();
   const byId = new Map<string, string>();
   for (const schema of ctx.bundle.schemas) {
     if (typeof schema.objectType !== "string") {
       continue;
     }
     objectTypes.add(schema.objectType);
+    if (typeof schema["x-identifier"] === "string" && schema["x-identifier"] !== "") {
+      designated.set(schema.objectType, schema["x-identifier"]);
+    }
     if (typeof schema.$id === "string") {
       byId.set(schema.$id, schema.objectType);
     }
@@ -90,13 +97,21 @@ function servedFlows(
       unresolved = true;
       continue;
     }
-    flows.push({ schema, identifiers: loginFields(flow) });
+    // Only the schema's designated identifier performs a lookup, and only when
+    // a step on the login path collects it.
+    const identifier = designated.get(schema);
+    const looksUp = identifier !== undefined && loginPathFields(flow).has(identifier);
+    flows.push({ schema, identifiers: looksUp ? [identifier] : [] });
   }
   return { flows, unresolved };
 }
 
 /** A field the login flow looks users up by that the users of its schema lack. */
-async function lookupWarnings(ctx: StepContext, flows: readonly Flow[]): Promise<string[]> {
+async function lookupWarnings(
+  ctx: StepContext,
+  flows: readonly Flow[],
+  budget: Budget,
+): Promise<string[]> {
   const lookups = new Map<string, Set<string>>();
   for (const flow of flows) {
     const known = lookups.get(flow.schema) ?? new Set<string>();
@@ -110,9 +125,11 @@ async function lookupWarnings(ctx: StepContext, flows: readonly Flow[]): Promise
     if (identifiers.size === 0) {
       continue;
     }
-    const { users, truncated } = await readUsers(ctx, [
-      { field: "schema_object_type", operation: "equals", value: objectType },
-    ]);
+    const { users, truncated } = await readUsers(
+      ctx,
+      [{ field: "schema_object_type", operation: "equals", value: objectType }],
+      budget,
+    );
     for (const identifier of identifiers) {
       const missing = users.filter((user) => !carries(user, identifier));
       if (missing.length === 0) {
@@ -131,6 +148,7 @@ async function ssoWarnings(
   ctx: StepContext,
   flows: readonly Flow[],
   names: ReadonlyMap<string, string>,
+  budget: Budget,
 ): Promise<string[]> {
   const served = [...new Set(flows.map((flow) => flow.schema))];
   if (served.length === 0) {
@@ -139,6 +157,7 @@ async function ssoWarnings(
   const { users: stranded, truncated } = await readUsers(
     ctx,
     served.map((value) => ({ field: "schema_object_type", operation: "not_equals", value })),
+    budget,
   );
   // Its own boundary: a link read that fails (a user deleted since the query)
   // must not discard the other warnings.
@@ -168,38 +187,66 @@ async function ssoWarnings(
 }
 
 /**
- * The fields a flow's login step collects: what a visitor types to be found,
- * and the only places the engine looks for it. Authentication-method fields
- * (`x-auth-methods#password`) are not lookups.
+ * The fields collected on a flow's login path: the steps reachable from the
+ * login entry through transitions that stay in the login purpose. A transition
+ * that names another purpose (sign-up) or another flow leaves the path, so the
+ * `passkey-first` preset, which reaches its identifier step from the entry
+ * through `email_fallback`, is covered.
  */
-function loginFields(flow: Record<string, unknown>): string[] {
+function loginPathFields(flow: Record<string, unknown>): Set<string> {
   const purposes = flow.purposes as Record<string, unknown> | undefined;
   const steps = Array.isArray(flow.steps) ? (flow.steps as Array<Record<string, unknown>>) : [];
-  const entry = steps.find((step) => step.name === purposes?.login);
-  const fields = Array.isArray(entry?.fields) ? (entry.fields as unknown[]) : [];
-  return fields.filter(
-    (field): field is string => typeof field === "string" && !field.startsWith("x-auth-methods#"),
-  );
+  const byName = new Map(steps.map((step) => [step.name, step]));
+  const fields = new Set<string>();
+  const seen = new Set<unknown>();
+  const queue: unknown[] = [purposes?.login];
+  for (let head = 0; head < queue.length; head += 1) {
+    const name = queue[head];
+    const step = byName.get(name);
+    if (step === undefined || seen.has(name)) {
+      continue;
+    }
+    seen.add(name);
+    for (const field of Array.isArray(step.fields) ? step.fields : []) {
+      if (typeof field === "string") {
+        fields.add(field);
+      }
+    }
+    const transitions = (step.transitions ?? {}) as Record<string, Record<string, unknown>>;
+    for (const transition of Object.values(transitions)) {
+      const sameFlow = transition.flow === undefined && transition.purpose === undefined;
+      if (sameFlow && typeof transition.target === "string") {
+        queue.push(transition.target);
+      }
+    }
+  }
+  return fields;
 }
 
 async function readUsers(
   ctx: StepContext,
   filter: UserFilter[],
+  budget: Budget,
 ): Promise<{ users: QueriedUser[]; truncated: boolean }> {
   const users: QueriedUser[] = [];
   let pageToken: string | undefined;
+  if (budget.remaining <= 0) {
+    return { users, truncated: true };
+  }
   do {
+    const limit = Math.min(PAGE_SIZE, budget.remaining);
     const page = await ctx.client.queryUsers(
       {
-        limit: PAGE_SIZE,
+        limit,
         filter,
         ...(pageToken === undefined ? {} : { page_token: pageToken }),
       },
       { project_id: ctx.projectId },
     );
     users.push(...page.users);
+    budget.remaining -= page.users.length;
     pageToken = page.next_page_token ?? undefined;
-  } while (pageToken !== undefined && users.length < SCAN_CAP);
+  } while (pageToken !== undefined && budget.remaining > 0);
   return { users, truncated: pageToken !== undefined };
 }
 

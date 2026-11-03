@@ -173,21 +173,15 @@ describe("deploy", () => {
         );
       });
 
-      it("warns when the login step looks users up by a field they lack", async () => {
-        const app = await aSetUpApp();
+      it("warns about a missing identifier the login path reaches through a passkey-first start", async () => {
+        const app = await aSetUpApp(["--preset", "passkey-first"]);
         await app.addPrimaryOrigin();
-        platform.holdsAUserWithAnEmail();
-        await app.editUserSchema((schema) => {
-          schema.properties.username = { type: "string" };
-        });
-        await app.editLoginEntryStep((step) => {
-          step.fields = ["username"];
-        });
+        platform.holdsAUserWithoutAnEmail();
 
         const result = await app.deployDryRun();
 
         expect(app.envelopeOf(result).warnings?.join("\n")).toContain(
-          '1 of 1 existing user of "human-user" has no "username"',
+          '1 of 1 existing user of "human-user" has no "email"',
         );
       });
 

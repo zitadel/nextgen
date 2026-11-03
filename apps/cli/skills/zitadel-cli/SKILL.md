@@ -257,8 +257,8 @@ Each invocation prints one JSON object:
   collision names the user.
 - `deploy` and `deploy --dry-run` read the project's users and add a warning
   to `warnings` when the config would lock existing users out: users of a
-  schema who lack the field its login step looks users up by, or users with an
-  SSO link whose schema no flow uses any more. It only warns, and it is skipped
+  schema who lack its `x-identifier` property while a step on the login path
+  collects it, or users with an SSO link whose schema no flow uses any more. It only warns, and it is skipped
   silently when the users cannot be read.
 - `preview` is `deploy` for a pull-request build: it deploys the release to the
   build's preview URLs (from the platform, or `--origin`) for `--ttl` and emits

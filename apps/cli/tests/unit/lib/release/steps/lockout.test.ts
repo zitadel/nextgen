@@ -20,20 +20,33 @@ function ctx(options: {
   links?: Record<string, number>;
   failQuery?: boolean;
   failListSchemas?: boolean;
+  requested?: number[];
 }): StepContext {
   return {
     cwd: "/unused",
     client: {
-      queryUsers: async (body: { filter: { operation: string; value: string }[] }) => {
-        if (options.failQuery) throw new Error("forbidden");
+      queryUsers: async (body: {
+        filter: { operation: string; value: string }[];
+        limit: number;
+        page_token?: string;
+      }) => {
+        if (options.failQuery) {
+          throw new Error("forbidden");
+        }
         const equals = body.filter.find((f) => f.operation === "equals")?.value;
         const excluded = body.filter
           .filter((f) => f.operation === "not_equals")
           .map((f) => f.value);
+        const matching = options.users.filter((user) =>
+          equals === undefined ? !excluded.includes(user.type) : user.type === equals,
+        );
+        const start = Number(body.page_token ?? 0);
+        const users = matching.slice(start, start + body.limit);
+        options.requested?.push(users.length);
         return {
-          users: options.users.filter((user) =>
-            equals === undefined ? !excluded.includes(user.type) : user.type === equals,
-          ),
+          users,
+          next_page_token:
+            start + users.length < matching.length ? String(start + users.length) : null,
         };
       },
       listUserIdentityLinks: async (id: string) => ({
@@ -65,14 +78,46 @@ function ctx(options: {
   };
 }
 
-const flow = (schema: string, identifier = "email", status = "active") => ({
+const flowCollecting = (schema: string, fields: string[], status = "active") => ({
   name: "default-login",
   status,
   user_schema: schema,
   purposes: { login: "identifier" },
   steps: [
-    { name: "identifier", fields: [identifier] },
+    { name: "identifier", fields, transitions: { submit: { target: "password" } } },
     { name: "password", fields: ["x-auth-methods#password"] },
+  ],
+});
+
+const flow = (schema: string, identifier = "email", status = "active") =>
+  flowCollecting(schema, [identifier], status);
+
+/** The `passkey-first` preset's shape: the identifier step is reached through `email_fallback`. */
+const passkeyFirstFlow = (schema: string) => ({
+  name: "default-login",
+  status: "active",
+  user_schema: schema,
+  purposes: { login: "passkey-first" },
+  steps: [
+    {
+      name: "passkey-first",
+      fields: [],
+      transitions: { email_fallback: { target: "identifier" }, register: { purpose: "register" } },
+    },
+    { name: "identifier", fields: ["email"], transitions: { submit: { target: "password" } } },
+    { name: "password", fields: ["x-auth-methods#password"] },
+  ],
+});
+
+/** A login that collects no identifier itself and only switches to a sign-up that does. */
+const signUpOnlyCollectsFlow = (schema: string) => ({
+  name: "default-login",
+  status: "active",
+  user_schema: schema,
+  purposes: { login: "start", register: "register" },
+  steps: [
+    { name: "start", fields: [], transitions: { register: { purpose: "register" } } },
+    { name: "register", fields: ["email"] },
   ],
 });
 const user = (id: string, type: string, attributes: Record<string, unknown> = {}): FakeUser => ({
@@ -86,7 +131,7 @@ describe("lockoutStep", () => {
   it("warns with the count when users lack the property the schema now signs in with", async () => {
     await lockoutStep.run(
       ctx({
-        schemas: [{ objectType: "human-user" }],
+        schemas: [{ objectType: "human-user", "x-identifier": "username" }],
         flows: [flow("human-user", "username")],
         users: [
           user("u1", "human-user", { email: "a@example.com" }),
@@ -100,7 +145,7 @@ describe("lockoutStep", () => {
     expect(warnings[0]).toContain('1 of 2 existing users of "human-user" has no "username"');
   });
 
-  it("reads the identifier from the flow's login step, not from the schema", async () => {
+  it("does not treat a login field the schema does not designate as a lookup", async () => {
     await lockoutStep.run(
       ctx({
         schemas: [{ objectType: "human-user", "x-identifier": "email" }],
@@ -109,9 +154,62 @@ describe("lockoutStep", () => {
       }),
     );
 
-    const warnings = takeReportedWarnings();
-    expect(warnings).toHaveLength(1);
-    expect(warnings[0]).toContain('has no "username"');
+    expect(takeReportedWarnings()).toEqual([]);
+  });
+
+  it("checks only the designated identifier among the fields a login step collects", async () => {
+    await lockoutStep.run(
+      ctx({
+        schemas: [{ objectType: "human-user", "x-identifier": "email" }],
+        flows: [flowCollecting("human-user", ["email", "nickname"])],
+        users: [user("u1", "human-user", { email: "a@example.com" })],
+      }),
+    );
+
+    expect(takeReportedWarnings()).toEqual([]);
+  });
+
+  it("finds the identifier on a later step of the login path", async () => {
+    await lockoutStep.run(
+      ctx({
+        schemas: [{ objectType: "human-user", "x-identifier": "email" }],
+        flows: [passkeyFirstFlow("human-user")],
+        users: [user("u1", "human-user", {})],
+      }),
+    );
+
+    expect(takeReportedWarnings()[0]).toContain('has no "email"');
+  });
+
+  it("does not follow a purpose change off the login path", async () => {
+    await lockoutStep.run(
+      ctx({
+        schemas: [{ objectType: "human-user", "x-identifier": "email" }],
+        flows: [signUpOnlyCollectsFlow("human-user")],
+        users: [user("u1", "human-user", {})],
+      }),
+    );
+
+    expect(takeReportedWarnings()).toEqual([]);
+  });
+
+  it("reads no more than the scan limit in all, across schemas", async () => {
+    const requested: number[] = [];
+    const many = (type: string) =>
+      Array.from({ length: 700 }, (_, index) => user(`${type}-${index}`, type, {}));
+    await lockoutStep.run(
+      ctx({
+        schemas: [
+          { objectType: "human-user", "x-identifier": "email" },
+          { objectType: "employee", "x-identifier": "email" },
+        ],
+        flows: [flow("human-user"), flow("employee")],
+        users: [...many("human-user"), ...many("employee")],
+        requested,
+      }),
+    );
+
+    expect(requested.reduce((total, count) => total + count, 0)).toBeLessThanOrEqual(1000);
   });
 
   it("stays quiet when every user carries the identifier", async () => {
@@ -145,7 +243,7 @@ describe("lockoutStep", () => {
   it("resolves a flow's schema given by its $id before checking either case", async () => {
     await lockoutStep.run(
       ctx({
-        schemas: [{ objectType: "employee", $id: EMPLOYEE }],
+        schemas: [{ objectType: "employee", $id: EMPLOYEE, "x-identifier": "username" }],
         flows: [flow(EMPLOYEE, "username")],
         users: [user("u1", "employee", { email: "a@example.com" }), user("u2", "human-user")],
         links: { u2: 1, u1: 1 },
@@ -188,7 +286,7 @@ describe("lockoutStep", () => {
   it("suggests the dot-path form for a dotted identifier", async () => {
     await lockoutStep.run(
       ctx({
-        schemas: [{ objectType: "human-user" }],
+        schemas: [{ objectType: "human-user", "x-identifier": "account.handle" }],
         flows: [flow("human-user", "account.handle")],
         users: [user("u1", "human-user", {})],
       }),
@@ -200,7 +298,7 @@ describe("lockoutStep", () => {
   it("does not read an inherited property as the identifier", async () => {
     await lockoutStep.run(
       ctx({
-        schemas: [{ objectType: "human-user" }],
+        schemas: [{ objectType: "human-user", "x-identifier": "constructor" }],
         flows: [flow("human-user", "constructor")],
         users: [user("u1", "human-user", {})],
       }),
@@ -211,7 +309,7 @@ describe("lockoutStep", () => {
 
   it("keeps the identifier warning when a link read fails", async () => {
     const c = ctx({
-      schemas: [{ objectType: "human-user" }],
+      schemas: [{ objectType: "human-user", "x-identifier": "username" }],
       flows: [flow("human-user", "username")],
       users: [user("u1", "human-user", {}), user("u2", "other")],
     });
@@ -254,7 +352,7 @@ describe("lockoutStep", () => {
   it("still warns about missing identifiers when the schemas cannot be listed", async () => {
     await lockoutStep.run(
       ctx({
-        schemas: [{ objectType: "human-user" }],
+        schemas: [{ objectType: "human-user", "x-identifier": "username" }],
         flows: [flow("human-user", "username")],
         users: [user("u1", "human-user", { email: "a@example.com" })],
         failListSchemas: true,
@@ -268,7 +366,7 @@ describe("lockoutStep", () => {
     await expect(
       lockoutStep.run(
         ctx({
-          schemas: [{ objectType: "human-user" }],
+          schemas: [{ objectType: "human-user", "x-identifier": "username" }],
           flows: [flow("human-user", "username")],
           users: [],
           failQuery: true,
