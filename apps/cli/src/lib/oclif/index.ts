@@ -9,6 +9,7 @@ export {
   EnvironmentCommand,
   PREVIEW_CREDENTIAL,
   PreviewCommand,
+  type StandIn,
 } from "./environment-command";
 export { CREDENTIALS, type CredentialKind } from "./credentials";
 export { CommandGroups, type CommandGroup } from "./groups";

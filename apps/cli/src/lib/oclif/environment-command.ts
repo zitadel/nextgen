@@ -1,7 +1,6 @@
 import { consola } from "consola";
 
 import { createZitadelClient } from "../api-client";
-import { developerAccessToken } from "../login/flow";
 import { type Environment, requireValueInteractive, resolveEnvironment } from "../environment";
 import { resolveCwd } from "../paths";
 import { BaseCommand, type MetaOptions } from "./base";
@@ -15,6 +14,9 @@ import {
 import type { ConnectOptions, Connection, GlobalOptions } from "./types";
 
 export type { Connection } from "./types";
+
+/** A credential that stands in for a command's secret, and whom it names. */
+export type StandIn = { token: string; who: string };
 import { type EnvironmentSelector, projectCommand, type SuggestedCommand } from "../suggestion";
 import { optionArgs } from "../public-cli";
 import { Cmd } from "../cmd";
@@ -33,13 +35,6 @@ export abstract class EnvironmentCommand extends BaseCommand {
   static override baseFlags = { ...BaseCommand.baseFlags, ...environmentFlags };
 
   static credential: CredentialKind = "project";
-
-  /**
-   * Whether the developer's own sign-in (`zitadel login`) may stand in when
-   * no project secret resolves: the command then acts as the developer, with
-   * their grants on the project (ADR 053), rather than as the project.
-   */
-  static acceptsDeveloperLogin = false;
 
   private readonly connections = new Map<string, Promise<Connection>>();
 
@@ -198,6 +193,16 @@ export abstract class EnvironmentCommand extends BaseCommand {
     return open;
   }
 
+  /**
+   * A credential the command takes in place of its secret when none resolves,
+   * and who it acts as then: none, unless the command says otherwise.
+   * `deployment list` takes the developer's own sign-in (`zitadel login`), so it
+   * acts with their grants on the project (ADR 053) rather than as the project.
+   */
+  protected async standInCredential(_server: string): Promise<StandIn | undefined> {
+    return undefined;
+  }
+
   private async openConnection(options: ConnectOptions): Promise<Connection> {
     const { credential } = this.constructor as typeof EnvironmentCommand;
     const { environment } = this;
@@ -216,19 +221,17 @@ export abstract class EnvironmentCommand extends BaseCommand {
     const server = await requireValueInteractive(environment, "ZITADEL_URL", ask);
     const projectId = await requireValueInteractive(environment, "ZITADEL_PROJECT_ID", ask);
     // A secret that resolves always wins, so CI keeps acting as the project.
-    const developer =
-      (this.constructor as typeof EnvironmentCommand).acceptsDeveloperLogin &&
+    const standIn =
       environment.values[CREDENTIALS[credential]] === undefined
-        ? await developerAccessToken(server, process.env)
+        ? await this.standInCredential(server)
         : undefined;
     const token =
-      developer?.token ??
-      (await requireValueInteractive(environment, CREDENTIALS[credential], ask));
+      standIn?.token ?? (await requireValueInteractive(environment, CREDENTIALS[credential], ask));
     if (this.isOnScreen && !options.quiet) {
       consola.info(`Project   ${projectId}`);
       consola.info(`Server    ${server}`);
-      if (developer) {
-        consola.info(`As        ${developer.login.user.identifier ?? developer.login.user.id}`);
+      if (standIn) {
+        consola.info(`As        ${standIn.who}`);
       }
     }
     return {

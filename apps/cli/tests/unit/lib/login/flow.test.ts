@@ -280,6 +280,9 @@ describe("the credentials file", () => {
     await writeLogin("https://z.example", login, env);
 
     const path = credentialsPath(env);
+    if (path === undefined) {
+      throw new Error("the test environment names a config directory");
+    }
     expect((await stat(path)).mode & 0o777).toBe(0o600);
     expect((await stat(join(path, ".."))).mode & 0o777).toBe(0o700);
     expect(JSON.parse(await readFile(path, "utf8")).servers["https://z.example"].access_token).toBe(

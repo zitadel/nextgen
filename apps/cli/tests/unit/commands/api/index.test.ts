@@ -23,7 +23,7 @@ describe("the operation zitadel api is pointed at", () => {
 
   it("refuses one the CLI cannot call, saying why", () => {
     expect(() => {
-      readOperation("getMyUser", undefined);
+      readOperation("getMySession", undefined);
     }).toThrow(
       expect.objectContaining({
         code: "E_VALIDATION",

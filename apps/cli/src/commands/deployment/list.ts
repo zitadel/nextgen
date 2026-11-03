@@ -8,7 +8,9 @@ import {
   EnvironmentCommand,
   type JsonEnvelope,
   nonBlankString,
+  type StandIn,
 } from "../../lib/oclif";
+import { developerAccessToken } from "../../lib/login/flow";
 import { reads, type Refused, whole } from "../../lib/oclif/flags";
 import { plainFlag, Tabulatable } from "../../lib/oclif/tabulatable";
 import { pagedFunctions } from "../../lib/api-client";
@@ -46,7 +48,6 @@ const LIMIT: Refused<number> = {
 export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
   static override description = "List the project's deployments, newest first.";
   static override group = CommandGroups.configuration;
-  static override acceptsDeveloperLogin = true;
   static override examples = [
     "<%= config.bin %> deployment list",
     "<%= config.bin %> deployment list --all",
@@ -73,6 +74,21 @@ export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
     }),
     plain: plainFlag,
   };
+
+  /**
+   * The developer's own sign-in (`zitadel login`) when no project secret
+   * resolves: the list then shows what they may see, with their grants on the
+   * project (ADR 053).
+   */
+  protected override async standInCredential(server: string): Promise<StandIn | undefined> {
+    const developer = await developerAccessToken(server, process.env);
+    return (
+      developer && {
+        token: developer.token,
+        who: developer.login.user.identifier ?? developer.login.user.id,
+      }
+    );
+  }
 
   protected async execute({ flags }: Admitted<typeof DeploymentList>): Promise<JsonEnvelope> {
     const { client, projectId } = await this.connect();

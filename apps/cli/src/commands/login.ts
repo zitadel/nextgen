@@ -6,7 +6,7 @@ import { openInBrowser } from "../lib/browser";
 import { discoverAuthorization } from "../lib/login/discovery";
 import { signIn, toStoredLogin } from "../lib/login/flow";
 import { credentialsPath, writeLogin } from "../lib/login/store";
-import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../lib/oclif";
+import { type Admitted, CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../lib/oclif";
 import { DEFAULT_SERVER } from "../lib/server";
 
 /** How long `login` waits for the browser by default. */
@@ -44,12 +44,10 @@ export default class Login extends EnvironmentCommand {
     }),
   };
 
-  async run(): Promise<JsonEnvelope> {
-    const { flags } = await this.parse(Login);
-    await this.toMeta(flags);
+  protected async execute({ flags }: Admitted<typeof Login>): Promise<JsonEnvelope> {
     const server = this.environment.values.ZITADEL_URL?.value ?? DEFAULT_SERVER;
 
-    if (this.meta.dryRun) {
+    if (this.dryRun) {
       const authorization = await discoverAuthorization(server);
       return this.emit({
         status: "ok",
@@ -74,7 +72,7 @@ export default class Login extends EnvironmentCommand {
           consola.info(`Sign in to ${server} in your browser:`);
           consola.log(url);
         }
-        if (!flags["no-open"]) {
+        if (!flags.noOpen) {
           await openInBrowser(url);
         }
       },

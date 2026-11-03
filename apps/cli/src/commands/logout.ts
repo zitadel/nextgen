@@ -16,12 +16,10 @@ export default class Logout extends EnvironmentCommand {
 
   static override examples = ["<%= config.bin %> <%= command.id %> --server local"];
 
-  async run(): Promise<JsonEnvelope> {
-    const { flags } = await this.parse(Logout);
-    await this.toMeta(flags);
+  protected async execute(): Promise<JsonEnvelope> {
     const server = this.environment.values.ZITADEL_URL?.value ?? DEFAULT_SERVER;
 
-    if (this.meta.dryRun) {
+    if (this.dryRun) {
       return this.emit({
         status: "ok",
         data: { title: `Would sign out of ${server}.`, server, dry_run: true },

@@ -21,9 +21,7 @@ export default class Whoami extends EnvironmentCommand {
     "<%= config.bin %> <%= command.id %> --json",
   ];
 
-  async run(): Promise<JsonEnvelope> {
-    const { flags } = await this.parse(Whoami);
-    await this.toMeta(flags);
+  protected async execute(): Promise<JsonEnvelope> {
     const server = this.environment.values.ZITADEL_URL?.value ?? DEFAULT_SERVER;
 
     const signedIn = await developerAccessToken(server, process.env);
