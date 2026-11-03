@@ -281,39 +281,48 @@ func (us userStatements) ListUsers(ctx context.Context, filter *database.ListOpt
 	headers, nextCursor, err := pagination.Page(filter.Pagination, userSchema, func(limit uint32) ([]*domain.User, error) {
 		var compiler statementCompiler
 		compiler.WriteString(userQuery)
+		if opts.UniqueAttributesOnly {
+			for i, a := range opts.Attributes {
+				hash, err := domain.UniqueValueHash(a.Value)
+				if err != nil {
+					return nil, fmt.Errorf("hash attribute %q: %w", a.Key, err)
+				}
+				// A join, not IN: under a filter on an indexed users column
+				// (schema_url) SQLite walks those users and probes the registry per
+				// row. The registry is reached by the outer project_id equality,
+				// which SQLite pushes into the subquery. DISTINCT keeps one row per
+				// user holding the value in several team scopes, so LIMIT counts users.
+				alias := fmt.Sprintf("ua%d", i)
+				compiler.WriteString(" JOIN (SELECT DISTINCT project_id AS ua_project_id, user_id AS ua_user_id FROM user_unique_attributes WHERE key = ")
+				compiler.WriteArg(string(a.Key))
+				compiler.WriteString(" AND value_hash = ")
+				compiler.WriteArg(hash[:])
+				if opts.UniqueTeamID != nil {
+					compiler.WriteString(" AND team_id = ")
+					compiler.WriteArg(*opts.UniqueTeamID)
+				}
+				compiler.WriteString(") " + alias + " ON " + alias + ".ua_project_id = users.project_id AND " + alias + ".ua_user_id = users.id")
+			}
+		}
 
 		hasWhere := false
 		if readFilter != nil {
 			writeConjunct(&compiler, &hasWhere)
 			compileFilter(&compiler, readFilter, userSchema)
 		}
-		for _, a := range opts.Attributes {
-			writeConjunct(&compiler, &hasWhere)
-			if opts.UniqueAttributesOnly {
-				hash, err := domain.UniqueValueHash(a.Value)
+		if !opts.UniqueAttributesOnly {
+			for _, a := range opts.Attributes {
+				writeConjunct(&compiler, &hasWhere)
+				raw, err := json.Marshal(a.Value)
 				if err != nil {
-					return nil, fmt.Errorf("hash attribute %q: %w", a.Key, err)
+					return nil, fmt.Errorf("marshal attribute %q: %w", a.Key, err)
 				}
-				compiler.WriteString("EXISTS (SELECT 1 FROM user_unique_attributes ua WHERE ua.project_id = users.project_id AND ua.user_id = users.id AND ua.key = ")
+				compiler.WriteString("EXISTS (SELECT 1 FROM user_attributes a WHERE a.project_id = users.project_id AND a.user_id = users.id AND a.key = ")
 				compiler.WriteArg(string(a.Key))
-				compiler.WriteString(" AND ua.value_hash = ")
-				compiler.WriteArg(hash[:])
-				if opts.UniqueTeamID != nil {
-					compiler.WriteString(" AND ua.team_id = ")
-					compiler.WriteArg(*opts.UniqueTeamID)
-				}
+				compiler.WriteString(" AND a.value = ")
+				compiler.WriteArg(string(raw))
 				compiler.WriteString(")")
-				continue
 			}
-			raw, err := json.Marshal(a.Value)
-			if err != nil {
-				return nil, fmt.Errorf("marshal attribute %q: %w", a.Key, err)
-			}
-			compiler.WriteString("EXISTS (SELECT 1 FROM user_attributes a WHERE a.project_id = users.project_id AND a.user_id = users.id AND a.key = ")
-			compiler.WriteArg(string(a.Key))
-			compiler.WriteString(" AND a.value = ")
-			compiler.WriteArg(string(raw))
-			compiler.WriteString(")")
 		}
 		if opts.MembershipTeamID != nil {
 			writeConjunct(&compiler, &hasWhere)
