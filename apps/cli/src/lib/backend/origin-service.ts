@@ -9,7 +9,31 @@ export type ProjectOriginEntry = Readonly<{ pattern: string; kind: string }>;
 /** The two kinds an origin pattern can be. */
 export type OriginKind = "primary" | "preview";
 
-/** The origin patterns of one project. */
+/**
+ * What removing a pattern left behind. An empty list admits every origin, so
+ * removing the last pattern opens a project up instead of closing it, which is
+ * the opposite of what removing any other pattern does.
+ */
+export type OriginRemoval = Readonly<{
+  pattern: string;
+  /** The patterns the project still holds, or undefined when they could not be read. */
+  remaining: readonly ProjectOriginEntry[] | undefined;
+  /** Why `remaining` is unknown, when it is. */
+  readFailure?: unknown;
+  /** Whether the project now admits every origin. */
+  admitsEveryOrigin: boolean;
+}>;
+
+/**
+ * The origin patterns of one project: which URLs the project admits.
+ *
+ * @remarks
+ * A Service Layer (Fowler, Patterns of Enterprise Application Architecture) over the generated API client, which plays the Gateway: a command says what should happen and never which endpoint serves it. Bound to one project at construction, so a call carries only what is specific to it.
+ *
+ * Results are Value Objects: immutable, compared by content, and free of presentation, so a command words the warnings and a test asserts on data. A removal reports what the project admits afterwards, because the
+ * project admitting every origin is a fact of the domain and the warning about
+ * it is the command's to word.
+ */
 export class OriginService {
   private readonly client: ZitadelClient;
   private readonly projectId: string;
@@ -53,8 +77,31 @@ export class OriginService {
     return this.client.addOrigin(this.projectId, { pattern, kind });
   }
 
-  /** Remove one pattern. An empty list admits every origin, so this can open a project up. */
-  async remove(consent: Consent, pattern: string): Promise<void> {
+  /**
+   * Remove one pattern and report what the project holds afterwards. The pattern
+   * is gone once the removal returns, so a failed read of what is left is
+   * reported on the outcome rather than thrown as a failed removal.
+   *
+   * @param consent - The proof the caller was allowed to do something irreversible.
+   * @param pattern - The pattern to remove, exactly as the project stores it.
+   * @returns What the project holds afterwards, and whether it now admits every origin.
+   */
+  async remove(consent: Consent, pattern: string): Promise<OriginRemoval> {
     await consent.unlock(this.client).removeOrigin(this.projectId, { pattern });
+    try {
+      const remaining = await this.list();
+      return Object.freeze({
+        pattern,
+        remaining,
+        admitsEveryOrigin: remaining.length === 0,
+      });
+    } catch (cause) {
+      return Object.freeze({
+        pattern,
+        remaining: undefined,
+        readFailure: cause,
+        admitsEveryOrigin: false,
+      });
+    }
   }
 }

@@ -52,10 +52,10 @@ export default class VariableList extends Tabulatable(EnvironmentCommand) {
 
     // The inventory reads both kinds, which a read without a kind answers in
     // one request; `--preview` reads that kind alone.
-    const variables = new VariableService(client, projectId);
+    const variableService = new VariableService(client, projectId);
     const items = flags.preview
-      ? toVariableRows(valuesOfKind(await variables.ofKind(scope.kind), scope.kind))
-      : toInventoryRows(await variables.inventory());
+      ? toVariableRows(valuesOfKind(await variableService.ofKind(scope.kind), scope.kind))
+      : toInventoryRows(await variableService.inventory());
     this.recordTelemetry({ variable_count: items.length });
 
     const rows = flags.preview ? variableCells(items) : variableInventoryCells(items);

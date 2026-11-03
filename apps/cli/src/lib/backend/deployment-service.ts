@@ -62,7 +62,16 @@ export type DeploymentQuery = Readonly<{ origin?: string; live?: boolean }>;
 export type DeploymentPageQuery = DeploymentQuery &
   Readonly<{ limit?: number; page_token?: string }>;
 
-/** The deployments of one project. */
+/**
+ * The deployments of one project: making a release live, undoing that, and
+ * reading what is live now.
+ *
+ * @remarks
+ * A Service Layer (Fowler, Patterns of Enterprise Application Architecture) over the generated API client, which plays the Gateway: a command says what should happen and never which endpoint serves it. Bound to one project at construction, so a call carries only what is specific to it.
+ *
+ * Whether a deployment serves a primary origin is a rule of the domain, not of
+ * any command, so it is a static query beside the operations that need it.
+ */
 export class DeploymentService {
   private readonly client: ZitadelClient;
   private readonly projectId: string;
@@ -109,6 +118,10 @@ export class DeploymentService {
    * long each preview stays live and is only valid with preview URLs. The server
    * answers 201 when it wrote a deployment and 200 when every target already
    * served the release.
+   *
+   * @param input - The release, the targets and the optional guard.
+   * @returns The deployment, new or the one the targets already served.
+   * @throws ApiError `409` (`dep.conflict`) when `expectedDeploymentId` is no longer the newest.
    */
   async deploy(input: DeployInput): Promise<Deployment> {
     return this.client.createDeployment(
@@ -129,6 +142,10 @@ export class DeploymentService {
   /**
    * Re-apply a deployment: a new deployment with its release and its targets,
    * recorded as a rollback. Returns 200 when the targets already serve it.
+   *
+   * @param consent - The proof the caller was allowed to do something irreversible.
+   * @param deploymentId - The deployment to re-apply.
+   * @param options - A message, and the guard against a deploy that raced in.
    */
   async rollback(
     consent: Consent,

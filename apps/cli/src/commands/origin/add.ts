@@ -55,7 +55,8 @@ export default class OriginAdd extends EnvironmentCommand {
 
     const { client, projectId } = await this.connect();
 
-    const added = await new OriginService(client, projectId).add(args.pattern, flags.kind);
+    const originService = new OriginService(client, projectId);
+    const added = await originService.add(args.pattern, flags.kind);
 
     return this.emit({
       status: "ok",

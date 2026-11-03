@@ -214,7 +214,9 @@ export default class Deploy extends EnvironmentCommand {
       );
     }
 
-    const release = await new ReleaseService(client, projectId).create(bundle, {
+    const releaseService = new ReleaseService(client, projectId);
+    const deploymentService = new DeploymentService(client, projectId);
+    const release = await releaseService.create(bundle, {
       message,
       gitSha: await headSha(this.cwd),
       gitDirty,
@@ -225,14 +227,14 @@ export default class Deploy extends EnvironmentCommand {
     // preview, which never targets a primary, is never it. It guards the
     // create against another deploy that raced in since we inspected: the
     // server refuses with 409 rather than overwriting that deploy unseen (#538).
-    const deployments = await new DeploymentService(client, projectId).live();
+    const deployments = await deploymentService.live();
     const observed = deployments.find((deployment) => {
       return deployment.targets.some((entry) => {
         return landing.includes(entry.origin);
       });
     })?.id;
     const targets = ["primary"];
-    const deployment = await new DeploymentService(client, projectId)
+    const deployment = await deploymentService
       .deploy({
         releaseId: release.id,
         targets,
@@ -265,7 +267,7 @@ export default class Deploy extends EnvironmentCommand {
           );
         }
         // The deployment that raced in on a primary origin, not a live preview.
-        const deployments = await new DeploymentService(client, projectId).live();
+        const deployments = await deploymentService.live();
         const current = deployments.find(DeploymentService.servesPrimary);
         throw new ZitadelError(
           "E_CONFLICT",
@@ -308,7 +310,8 @@ export default class Deploy extends EnvironmentCommand {
     projectId: string,
     environment: Connection["environment"],
   ): Promise<string[]> {
-    const origins = await new OriginService(client, projectId).list();
+    const originService = new OriginService(client, projectId);
+    const origins = await originService.list();
     const landing = OriginService.primaryPatterns(origins);
     if (landing.length > 0) {
       return landing;

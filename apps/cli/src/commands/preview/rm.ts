@@ -64,14 +64,12 @@ export default class PreviewRm extends Destructive(PreviewCommand) {
         },
         prepare: async () => {
           const connection = await this.connect();
+          const previewService = new PreviewService(connection.client, connection.projectId);
+          const previews = await previewService.list();
           // The server answers 204 whether or not the URL was live, so a typo
           // would otherwise read as a removal. Checked before asking, so
           // nobody confirms removing what is not there.
-          if (
-            !(await new PreviewService(connection.client, connection.projectId).list()).some(
-              (preview) => preview.origin === args.url,
-            )
-          ) {
+          if (!previews.some((preview) => preview.origin === args.url)) {
             return new Settled({
               status: "skipped",
               reason: "not-live",
@@ -82,7 +80,8 @@ export default class PreviewRm extends Destructive(PreviewCommand) {
           return connection;
         },
         apply: async (consent, { client, projectId }) => {
-          await new PreviewService(client, projectId).remove(consent, args.url);
+          const previewService = new PreviewService(client, projectId);
+          await previewService.remove(consent, args.url);
           return {
             status: "ok",
             data: deletedData({ url: args.url }),

@@ -23,7 +23,13 @@ export type ReleaseSource = {
   gitDirty: boolean;
 };
 
-/** The releases of one project. */
+/**
+ * The releases of one project: building one from a configuration bundle, reading
+ * it back, and revoking it.
+ *
+ * @remarks
+ * A Service Layer (Fowler, Patterns of Enterprise Application Architecture) over the generated API client, which plays the Gateway: a command says what should happen and never which endpoint serves it. Bound to one project at construction, so a call carries only what is specific to it.
+ */
 export class ReleaseService {
   private readonly client: ZitadelClient;
   private readonly projectId: string;
@@ -39,6 +45,11 @@ export class ReleaseService {
    * dedupes on content: re-posting the same bundle returns the release that
    * already carries it. (`POST /releases` pins pre-existing revision ids and is
    * not a CLI flow.)
+   *
+   * @param bundle - What `.zitadel/` holds, as read from disk.
+   * @param source - The commit the bundle was built from.
+   * @returns The release, new or the one that already carried the bundle.
+   * @throws ZitadelError `E_VALIDATION` naming each field the API does not take, before anything is sent.
    */
   async create(bundle: ConfigurationBundle, source: ReleaseSource): Promise<Release> {
     const body = {
@@ -60,7 +71,12 @@ export class ReleaseService {
     return this.client.getReleaseById(releaseId, { project_id: this.projectId });
   }
 
-  /** Revoke a release so its content is never served again. Idempotent. */
+  /**
+   * Revoke a release so its content is never served again. Idempotent.
+   *
+   * @param consent - The proof the caller was allowed to do something irreversible.
+   * @param releaseId - The release to revoke.
+   */
   async revoke(consent: Consent, releaseId: string): Promise<Release> {
     return consent.unlock(this.client).revokeRelease(releaseId, { project_id: this.projectId });
   }

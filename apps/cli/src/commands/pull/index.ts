@@ -164,7 +164,8 @@ export default class Pull extends EnvironmentCommand {
     const { client, projectId } = await this.connect();
 
     const releaseId = await this.resolveReleaseId(client, projectId, args.target);
-    const release = await new ReleaseService(client, projectId).get(releaseId);
+    const releaseService = new ReleaseService(client, projectId);
+    const release = await releaseService.get(releaseId);
 
     const pulled: { kind: string; handle: string; path: string }[] = [];
     const skipped: { kind: string; handle: string }[] = [];
@@ -221,11 +222,12 @@ export default class Pull extends EnvironmentCommand {
     if (target.kind === "release") {
       return target.id;
     }
+    const deploymentService = new DeploymentService(client, projectId);
     if (target.kind === "deployment") {
-      const deployment = await new DeploymentService(client, projectId).get(target.id);
+      const deployment = await deploymentService.get(target.id);
       return deployment.release_id;
     }
-    const deployments = await new DeploymentService(client, projectId).live();
+    const deployments = await deploymentService.live();
     const deployment = deployments.find(DeploymentService.servesPrimary);
     if (deployment === undefined) {
       throw new ZitadelError("E_NOT_FOUND", "Nothing is deployed to a primary origin yet.", {

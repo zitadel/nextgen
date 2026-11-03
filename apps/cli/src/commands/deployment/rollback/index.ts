@@ -170,13 +170,14 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
     args,
   }: Admitted<typeof DeploymentRollback>): Promise<JsonEnvelope> {
     const { client, projectId } = await this.connect();
+    const deploymentService = new DeploymentService(client, projectId);
     const suggest = (command: string) => {
       return this.suggest(command);
     };
     const history = await readPrimaryHistory(
       args.deploymentId,
       async () => {
-        return new DeploymentService(client, projectId).list();
+        return deploymentService.list();
       },
       suggest,
     );
@@ -208,18 +209,12 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
         // cannot stand in for.
         prepare: async () =>
           target.expectedDeploymentId ??
-          (await new DeploymentService(client, projectId).live()).find(
-            DeploymentService.servesPrimary,
-          )?.id,
+          (await deploymentService.live()).find(DeploymentService.servesPrimary)?.id,
         apply: async (consent, guard) => {
-          const deployment = await new DeploymentService(client, projectId).rollback(
-            consent,
-            target.id,
-            {
-              ...(flags.message === undefined ? {} : { message: flags.message }),
-              ...(guard === undefined ? {} : { expectedDeploymentId: guard }),
-            },
-          );
+          const deployment = await deploymentService.rollback(consent, target.id, {
+            ...(flags.message === undefined ? {} : { message: flags.message }),
+            ...(guard === undefined ? {} : { expectedDeploymentId: guard }),
+          });
           const release = await client
             .getReleaseById(deployment.release_id, { project_id: projectId })
             .catch((error: unknown) => {

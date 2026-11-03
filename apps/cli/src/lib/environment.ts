@@ -1,4 +1,4 @@
-import { readdir } from "node:fs/promises";
+import { readdir, stat } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { parseEnv } from "node:util";
 
@@ -6,6 +6,7 @@ import type { ZitadelClient } from "./api-client";
 import {
   buildBundle,
   DeploymentService,
+  type EnvironmentFiles,
   headSha,
   ReleaseService,
   runSteps,
@@ -17,7 +18,7 @@ import { ZitadelError } from "./errors";
 import { readIfExists } from "./fs";
 import { input } from "./input";
 import { hasZitadelSecret, readZitadelSecret } from "./project";
-import { appendManagedEnvValue } from "./fs-safe";
+import { appendManagedEnvValue, writeManagedEnvFile } from "./fs-safe";
 import { parseServer, resolveServer, serverOrigin } from "./server";
 import { type SuggestedCommand, unscopedCommand } from "./suggestion";
 import { Cmd } from "./cmd";
@@ -469,12 +470,14 @@ export async function deployInitialRelease(input: {
     suggest: input.suggest,
   };
   await runSteps([validateStep], ctx);
-  const release = await new ReleaseService(input.client, input.projectId).create(bundle, {
+  const releaseService = new ReleaseService(input.client, input.projectId);
+  const deploymentService = new DeploymentService(input.client, input.projectId);
+  const release = await releaseService.create(bundle, {
     message: input.message,
     gitSha: await headSha(input.cwd),
     gitDirty: await worktreeIsDirty(input.cwd),
   });
-  const deployment = await new DeploymentService(input.client, input.projectId).deploy({
+  const deployment = await deploymentService.deploy({
     releaseId: release.id,
     targets: ["primary"],
     message: input.message,
@@ -485,4 +488,24 @@ export async function deployInitialRelease(input: {
     deploymentId: deployment.id,
     origins: deployment.targets.map((target) => target.origin),
   };
+}
+
+/** The env files of one directory: the store an {@link EnvironmentService} writes through. */
+export class EnvironmentDirectory implements EnvironmentFiles {
+  private readonly cwd: string;
+
+  constructor(cwd: string) {
+    this.cwd = cwd;
+  }
+
+  async exists(file: string): Promise<boolean> {
+    return stat(join(this.cwd, file)).then(
+      () => true,
+      () => false,
+    );
+  }
+
+  async write(file: string, values: Readonly<Record<string, string>>): Promise<void> {
+    await writeManagedEnvFile(join(this.cwd, file), { ...values });
+  }
 }

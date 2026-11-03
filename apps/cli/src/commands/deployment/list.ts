@@ -83,15 +83,13 @@ export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
       limit: flags.limit,
       page_token: flags.pageToken,
     };
+    const deploymentService = new DeploymentService(client, projectId);
     // One page unless `--all`, as every list does; the walk starts at
     // `--page-token`, and a drain leaves no next page to report.
     const paging = new Paging(pagedFunctions.listDeployments);
-    const { items, next } = await paging.collect(
-      new DeploymentService(client, projectId).pages(params),
-      {
-        all: flags.all === true,
-      },
-    );
+    const { items, next } = await paging.collect(deploymentService.pages(params), {
+      all: flags.all === true,
+    });
 
     // Flatten each deployment's targets to one `origins` cell for the table.
     const rows = items.map((deployment) => ({

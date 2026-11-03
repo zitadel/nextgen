@@ -9,7 +9,13 @@ export type CreatedProject = Awaited<ReturnType<ZitadelClient["createProject"]>>
 /** A project as the server returns it on a read. */
 export type Project = Awaited<ReturnType<ZitadelClient["getProject"]>>;
 
-/** The projects of a server. The one service not bound to a project, since it makes them. */
+/**
+ * The projects of a server.
+ *
+ * @remarks
+ * A Service Layer (Fowler, Patterns of Enterprise Application Architecture) over the generated API client, which plays the Gateway: a command says what should happen and never which endpoint serves it. It is the one service bound to a client alone, because it is what
+ * brings a project into being.
+ */
 export class ProjectService {
   private readonly client: ZitadelClient;
 

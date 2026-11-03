@@ -77,15 +77,13 @@ export default class PreviewList extends Tabulatable(PreviewCommand) {
       limit: flags.limit,
       page_token: flags.pageToken,
     };
+    const previewService = new PreviewService(client, projectId);
     // One page unless `--all`, as every list does; the walk starts at
     // `--page-token`, and a drain leaves no next page to report.
     const paging = new Paging(pagedFunctions.listPreviews);
-    const { items, next } = await paging.collect(
-      new PreviewService(client, projectId).pages(params),
-      {
-        all: flags.all === true,
-      },
-    );
+    const { items, next } = await paging.collect(previewService.pages(params), {
+      all: flags.all === true,
+    });
 
     const rows = items.map((preview) => ({
       url: preview.origin,

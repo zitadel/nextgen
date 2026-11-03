@@ -701,8 +701,9 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     if (this.meta.source === "mock") {
       return undefined;
     }
+    const variableService = new VariableService(client, projectId);
     return async (name, value, { secret }) => {
-      await new VariableService(client, projectId).set(name, { value, secret });
+      await variableService.set(name, { value, secret });
     };
   }
 

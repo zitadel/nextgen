@@ -182,8 +182,9 @@ export function readPreviewUrls(
  * rather than after the whole bundle is built.
  */
 async function primaryOrigins(client: ZitadelClient, projectId: string): Promise<string[]> {
+  const originService = new OriginService(client, projectId);
   try {
-    return await new OriginService(client, projectId).primary();
+    return await originService.primary();
   } catch (error) {
     if (error instanceof ApiError && error.status === 403) {
       return [];
@@ -322,12 +323,14 @@ export default class Preview extends PreviewCommand {
     // The release keeps the message of whichever run built it first, usually
     // this one, so the deploy after merge reuses it rather than adding its own.
     const message = await deployMessage(flags.message, this.cwd, this.env);
-    const release = await new ReleaseService(client, projectId).create(bundle, {
+    const releaseService = new ReleaseService(client, projectId);
+    const deploymentService = new DeploymentService(client, projectId);
+    const release = await releaseService.create(bundle, {
       message,
       gitSha: await headSha(this.cwd),
       gitDirty: await worktreeIsDirty(this.cwd),
     });
-    const deployment = await new DeploymentService(client, projectId).deploy({
+    const deployment = await deploymentService.deploy({
       releaseId: release.id,
       targets: [...urls],
       message,

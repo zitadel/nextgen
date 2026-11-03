@@ -84,12 +84,12 @@ export class IssuerOriginCheck implements SanityCheck {
     if (consent === undefined) {
       return;
     }
-    const origins = new OriginService(client, secret.project_id);
-    await origins.remove(consent, pattern);
+    const originService = new OriginService(client, secret.project_id);
+    await originService.remove(consent, pattern);
     try {
-      await origins.add(pattern, "primary");
+      await originService.add(pattern, "primary");
     } catch (error) {
-      await origins.add(pattern, "preview").catch(() => undefined);
+      await originService.add(pattern, "preview").catch(() => undefined);
       throw error;
     }
     await writeZitadelSecret(ctx.cwd, {

@@ -9,7 +9,16 @@ export type VariableWrite = Readonly<{ value: string | number | boolean; secret:
 /** The values a name holds after a write, one per kind. */
 export type VariableKinds = Readonly<Partial<Record<VariableKind, VariableValue>>>;
 
-/** The variables of one project. */
+/**
+ * The variables of one project, each holding a value per kind, primary and
+ * preview.
+ *
+ * @remarks
+ * A Service Layer (Fowler, Patterns of Enterprise Application Architecture) over the generated API client, which plays the Gateway: a command says what should happen and never which endpoint serves it. Bound to one project at construction, so a call carries only what is specific to it.
+ *
+ * A secret is stored but never read back: a read names that a value is held and
+ * never discloses it.
+ */
 export class VariableService {
   private readonly client: ZitadelClient;
   private readonly projectId: string;

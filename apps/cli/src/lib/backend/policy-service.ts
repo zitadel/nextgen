@@ -8,7 +8,13 @@ export type PolicyQuery = Parameters<ZitadelClient["listPolicies"]>[0] extends i
 /** What {@link PolicyService.evaluate} runs a policy against. */
 export type PolicyEvaluation = Parameters<ZitadelClient["evaluatePolicy"]>[0];
 
-/** The operation policies of one project. */
+/**
+ * The operation policies of one project: reading them and evaluating a policy
+ * against an input.
+ *
+ * @remarks
+ * A Service Layer (Fowler, Patterns of Enterprise Application Architecture) over the generated API client, which plays the Gateway: a command says what should happen and never which endpoint serves it. Bound to one project at construction, so a call carries only what is specific to it.
+ */
 export class PolicyService {
   private readonly client: ZitadelClient;
   private readonly projectId: string;

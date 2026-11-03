@@ -49,10 +49,8 @@ export default class ReleaseRevoke extends Destructive(EnvironmentCommand) {
         }),
         prepare: () => this.connect(),
         apply: async (consent, { client, projectId }) => {
-          const release = await new ReleaseService(client, projectId).revoke(
-            consent,
-            args.releaseId,
-          );
+          const releaseService = new ReleaseService(client, projectId);
+          const release = await releaseService.revoke(consent, args.releaseId);
           return {
             status: "ok",
             // The lifecycle-mutation shape every revoke answers with, plus when.

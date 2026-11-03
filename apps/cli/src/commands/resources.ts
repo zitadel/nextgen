@@ -741,11 +741,17 @@ export const RESOURCES = {
       // the paging flags are not generated for it.
       paged: false,
       item: ListBrandingResponse.element,
-      call: ({ client, projectId }) => new BrandingService(client, projectId).list(),
+      call: ({ client, projectId }) => {
+        const brandingService = new BrandingService(client, projectId);
+        return brandingService.list();
+      },
       items: (page) => page,
     }),
     get: get({
-      call: ({ client, projectId }, id) => new BrandingService(client, projectId).get(id),
+      call: ({ client, projectId }, id) => {
+        const brandingService = new BrandingService(client, projectId);
+        return brandingService.get(id);
+      },
       response: GetBrandingByIdResponse,
     }),
   }),
@@ -769,8 +775,10 @@ export const RESOURCES = {
     list: list({
       item: ListPoliciesResponse.shape.policies.element,
       filters: [{ field: "operation", operations: ["equals"] }],
-      call: ({ client, projectId }: Platform, params: Query<"listPolicies">) =>
-        new PolicyService(client, projectId).list(params),
+      call: ({ client, projectId }: Platform, params: Query<"listPolicies">) => {
+        const policyService = new PolicyService(client, projectId);
+        return policyService.list(params);
+      },
       items: pagedFunctions.listPolicies.items,
       next: pagedFunctions.listPolicies.next,
     }),
@@ -781,8 +789,9 @@ export const RESOURCES = {
       // Anything else names no policy: sending it as the filter would be
       // refused as a malformed query rather than reported as not found.
       call: async ({ client, projectId }, ref) => {
+        const policyService = new PolicyService(client, projectId);
         if (ref.startsWith("pol_")) {
-          return new PolicyService(client, projectId).get(ref);
+          return policyService.get(ref);
         }
         const notFound = () =>
           new ZitadelError("E_NOT_FOUND", `No policy for "${ref}"`, {
@@ -792,7 +801,7 @@ export const RESOURCES = {
         if (operation === undefined) {
           throw notFound();
         }
-        const current = await new PolicyService(client, projectId).ofOperation(operation);
+        const current = await policyService.ofOperation(operation);
         if (!current) {
           throw notFound();
         }

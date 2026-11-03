@@ -41,10 +41,11 @@ export default class VariableGet extends Tabulatable(EnvironmentCommand) {
   protected async execute({ args, flags }: Admitted<typeof VariableGet>): Promise<JsonEnvelope> {
     const { client, projectId } = await this.connect();
     const scope = variableReadScope(projectId, flags.preview);
+    const variableService = new VariableService(client, projectId);
 
     // The single-name endpoint answers in the same two forms the collection
     // does, so the row projection is shared rather than duplicated.
-    const value = await new VariableService(client, projectId).get(args.name, scope.kind);
+    const value = await variableService.get(args.name, scope.kind);
     if (value === undefined) {
       throw new ZitadelError("E_NOT_FOUND", `Variable ${args.name} has no ${scope.kind} value.`, {
         hint: flags.preview

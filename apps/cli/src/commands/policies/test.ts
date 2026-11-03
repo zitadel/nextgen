@@ -69,11 +69,12 @@ export default class PoliciesTest extends EnvironmentCommand {
     }
 
     const { client, projectId } = await this.connect();
-    const service = new PolicyService(client, projectId);
+    const policyService = new PolicyService(client, projectId);
+    const releaseService = new ReleaseService(client, projectId);
     const fromRelease =
       flags.release === undefined
         ? undefined
-        : await policiesFromRelease(new ReleaseService(client, projectId), service, flags.release);
+        : await policiesFromRelease(releaseService, policyService, flags.release);
     if (fromRelease?.revoked) {
       reportWarning(`Release ${flags.release} is revoked, so no origin serves its policies.`);
     }
@@ -92,7 +93,7 @@ export default class PoliciesTest extends EnvironmentCommand {
     }
     const policies = source.policies;
 
-    const results = await runPolicyTests(service, suites, policies);
+    const results = await runPolicyTests(policyService, suites, policies);
     const cases = results.flatMap((result) => result.cases);
     const failed = cases.filter((testCase) => !testCase.passed).length;
     this.recordTelemetry({

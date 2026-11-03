@@ -115,7 +115,7 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
     }
 
     const { client, projectId } = await this.connect();
-    const variables = new VariableService(client, projectId);
+    const variableService = new VariableService(client, projectId);
     if (flags.preview && !flags.secret) {
       await refusePreviewOfSecret(client, projectId, args.name, (command) => {
         return this.suggest(command);
@@ -165,7 +165,7 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
     // value is held (ADR 062 §7), never the value itself. The kind this write
     // did not touch is read in a separate call: the platform never merges the
     // two kinds in one answer.
-    const written = await variables.set(
+    const written = await variableService.set(
       args.name,
       { value, secret: flags.secret },
       flags.preview ? "preview" : undefined,
@@ -175,7 +175,7 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
       stateOf(
         written?.[kind] !== undefined
           ? written[kind]
-          : (await variables.ofKind(kind))[args.name]?.[kind],
+          : (await variableService.ofKind(kind))[args.name]?.[kind],
       );
     const primary = await stateOfKind("primary");
     const previewState = await stateOfKind("preview");
@@ -266,7 +266,8 @@ export async function refusePreviewOfSecret(
   name: string,
   suggest: (command: string) => SuggestedCommand,
 ): Promise<void> {
-  const held = await new VariableService(client, projectId)
+  const variableService = new VariableService(client, projectId);
+  const held = await variableService
     .ofKind("primary")
     .then((body) => {
       return body[name]?.primary;

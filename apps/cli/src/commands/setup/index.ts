@@ -2362,8 +2362,9 @@ function ssoCredentialPublisher(
     return undefined;
   }
   const client = createZitadelClient({ baseUrl: server, token: project.project_secret, signal });
+  const variableService = new VariableService(client, project.id);
   return async (name, value, { secret }) => {
-    await new VariableService(client, project.id).set(name, { value, secret });
+    await variableService.set(name, { value, secret });
   };
 }
 
@@ -2375,12 +2376,13 @@ async function createProjectWithLocalHint(
   issuer: string,
   retry: SetupRetryOptions,
 ): Promise<CreateProject201> {
+  const projectService = new ProjectService(client);
   try {
     // Register the app's own origin as primary: only a primary pattern admits
     // the requests the dev proxy forwards from it, and a deploy goes to the
     // project's primary origins. A preview pattern is for the URLs a
     // pull-request build deploys to, which this is not.
-    return await new ProjectService(client).create({
+    return await projectService.create({
       name: projectName,
       origins: [{ pattern: issuer, kind: "primary" }],
       seed_defaults: false,

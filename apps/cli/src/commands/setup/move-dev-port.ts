@@ -66,8 +66,9 @@ export async function moveDevPort(opts: {
     signal,
   });
   if (!dryRun) {
+    const originService = new OriginService(client, secret.project_id);
     try {
-      await new OriginService(client, secret.project_id).add(issuer, "primary");
+      await originService.add(issuer, "primary");
     } catch (error) {
       const normalized = toZitadelError(error);
       throw new ZitadelError(normalized.code, `Could not allow ${issuer} for this project`, {

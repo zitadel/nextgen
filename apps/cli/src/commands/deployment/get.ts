@@ -25,13 +25,13 @@ export default class DeploymentGet extends Tabulatable(EnvironmentCommand) {
   protected async execute({ args }: Admitted<typeof DeploymentGet>): Promise<JsonEnvelope> {
     const { client, projectId } = await this.connect();
 
+    const deploymentService = new DeploymentService(client, projectId);
+    const variableService = new VariableService(client, projectId);
     // `--json` carries the record alone, so only a person's view reads the
     // frozen set.
     const [deployment, variables] = await Promise.all([
-      new DeploymentService(client, projectId).get(args.deploymentId),
-      this.isJson
-        ? undefined
-        : new VariableService(client, projectId).ofDeployment(args.deploymentId),
+      deploymentService.get(args.deploymentId),
+      this.isJson ? undefined : variableService.ofDeployment(args.deploymentId),
     ]);
 
     const origins = deployment.targets.map((target) => target.origin);

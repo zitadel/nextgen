@@ -96,7 +96,8 @@ export default class ReleaseCreate extends EnvironmentCommand {
       });
     }
 
-    const release = await new ReleaseService(client, projectId).create(bundle, {
+    const releaseService = new ReleaseService(client, projectId);
+    const release = await releaseService.create(bundle, {
       message: flags.message,
       gitSha: await headSha(this.cwd),
       gitDirty: await worktreeIsDirty(this.cwd),

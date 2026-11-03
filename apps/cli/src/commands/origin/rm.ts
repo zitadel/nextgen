@@ -54,23 +54,14 @@ export default class OriginRm extends Destructive(EnvironmentCommand) {
         },
         prepare: () => this.connect(),
         apply: async (consent, { client, projectId }) => {
-          const origins = new OriginService(client, projectId);
-          await origins.remove(consent, args.pattern);
-          // An empty list admits every origin, so removing the last pattern opens the
-          // project up rather than closing it: said aloud, since it is the opposite
-          // of what removing one pattern otherwise does.
-          // The pattern is already removed, so a failed read of what is left is said
-          // aloud rather than reported as a failed removal.
-          const remaining = await origins.list().then(
-            (remaining) => remaining,
-            (error: unknown) => {
-              reportWarning(
-                `${args.pattern} was removed, but the project's remaining origins could not be read: ${errorMessage(error)}`,
-              );
-              return undefined;
-            },
-          );
-          if (remaining?.length === 0) {
+          const originService = new OriginService(client, projectId);
+          const removal = await originService.remove(consent, args.pattern);
+          if (removal.remaining === undefined) {
+            reportWarning(
+              `${args.pattern} was removed, but the project's remaining origins could not be read: ${errorMessage(removal.readFailure)}`,
+            );
+          }
+          if (removal.admitsEveryOrigin) {
             reportWarning(
               // Named in the text, not as a next command: the URL is the developer's
               // to fill in, and a `<url>` placeholder is a shell redirection. The
@@ -82,10 +73,9 @@ export default class OriginRm extends Destructive(EnvironmentCommand) {
           return {
             status: "ok",
             data: deletedData({ pattern: args.pattern }),
-            pretty:
-              remaining?.length === 0
-                ? `Removed ${args.pattern}; the project has no origins left and admits every origin`
-                : `Removed ${args.pattern} from the project's origins`,
+            pretty: removal.admitsEveryOrigin
+              ? `Removed ${args.pattern}; the project has no origins left and admits every origin`
+              : `Removed ${args.pattern} from the project's origins`,
           };
         },
       }),

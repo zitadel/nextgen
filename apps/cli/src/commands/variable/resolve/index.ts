@@ -40,7 +40,8 @@ async function nothingDeployed(
       nextCommands: [suggest(DEPLOY_ARGS)],
     });
   }
-  const origins = await new OriginService(client, projectId).list();
+  const originService = new OriginService(client, projectId);
+  const origins = await originService.list();
   if (origins.some((entry) => entry.kind === "primary" && entry.pattern === origin)) {
     return new ZitadelError("E_NOT_FOUND", `Nothing is deployed to ${origin}.`, {
       hint: `Deploy to it first with \`${suggest(DEPLOY_ARGS)}\`, then resolve its variables.`,
@@ -76,7 +77,8 @@ export async function liveDeployment(
   origin: string | undefined,
   suggest: (command: string) => SuggestedCommand,
 ): Promise<LiveDeployment> {
-  const deployments = await new DeploymentService(client, projectId).live(origin);
+  const deploymentService = new DeploymentService(client, projectId);
+  const deployments = await deploymentService.live(origin);
   if (origin === undefined && deployments.length > 1) {
     const origins = [
       ...new Set(deployments.flatMap((deployment) => deployment.targets.map((t) => t.origin))),
@@ -138,9 +140,8 @@ export default class VariableResolve extends Tabulatable(EnvironmentCommand) {
     const servedOrigins = live.targets.map((target) => target.origin).sort();
     const where = servedOrigins.join(", ");
 
-    const items = toVariableRows(
-      await new VariableService(client, projectId).ofDeployment(live.id),
-    );
+    const variableService = new VariableService(client, projectId);
+    const items = toVariableRows(await variableService.ofDeployment(live.id));
     this.recordTelemetry({ variable_count: items.length });
 
     const rows = variableCells(items);

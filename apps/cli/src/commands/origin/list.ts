@@ -31,7 +31,8 @@ export default class OriginList extends Tabulatable(EnvironmentCommand) {
   protected async execute({ flags }: Admitted<typeof OriginList>): Promise<JsonEnvelope> {
     const { client, projectId } = await this.connect();
 
-    const items = await new OriginService(client, projectId).list();
+    const originService = new OriginService(client, projectId);
+    const items = await originService.list();
 
     const rows = items;
     const columns = COLUMNS;
