@@ -197,7 +197,7 @@ npx @zitadel/cli@latest --help               # every command family, grouped by 
 npx @zitadel/cli@latest commands             # flat list of all commands
 npx @zitadel/cli@latest <command> --help     # a command's flags, which are required, and examples
 npx @zitadel/cli@latest resources --json     # the resource surface in one call (see below); contacts no server
-npx @zitadel/cli@latest api ls --json        # every API operation, its parameters, body and paging; contacts no server
+npx @zitadel/cli@latest api ls --json        # every API operation, its parameters, body and paging; contacts no server (`--plain` for tab-separated rows)
 ```
 
 `--help` groups the commands by what you are doing: getting started, local
