@@ -22,8 +22,8 @@
 > remains the ownership/claim rule; a direct user assignment defined here is an
 > access grant and never claim state or project ownership.
 >
-> **Amended 2026-11-03** (§2, §8): a direct grant to a foreign principal needs
-> a claimed project, and the grant read shows a granted principal's label, not
+> **Amended 2026-11-03** (§2, §8): a grant to a foreign user or team needs a
+> claimed project, and the grant read shows a granted principal's label, not
 > its profile (zitadel/nextgen#2653).
 
 ## Context
@@ -148,8 +148,8 @@ can be introduced later if measurements justify it.
 
 ### Amendment (2026-11-03): a foreign grant needs a claimed project
 
-On a server with a platform project, a direct grant to a foreign `user` or
-`team` principal on a project that has not been claimed is refused with
+On a server with a platform project, a grant to a foreign `user` or `team`
+principal on a project that has not been claimed is refused with
 `403 grant.project_unclaimed`. This section
 already calls such a grant access to an already owned project, and a project
 with no active owning-team assignment

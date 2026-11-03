@@ -509,10 +509,12 @@ The stable service-backed test matrix must include:
     restores its owner authority, and a platform-project administrator can
     assign `team.owner` to another active participant. The same privileged
     assignment is rejected while the team still has an active owner (§8).
-18. An unclaimed project cannot grant a platform user or a platform team, by
-    any locator (§4 amendment).
+18. On a server with a platform project, an unclaimed project cannot grant a
+    platform user or a platform team, by any locator (§4 amendment).
 19. A project secret cannot read a granted platform user's schema,
     attributes or metadata through the grant API.
+20. A user-bound session without read on the principal's home project cannot
+    expand a grant principal; it sees the label only.
 
 ## Consequences
 
