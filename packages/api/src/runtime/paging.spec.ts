@@ -174,4 +174,25 @@ describe("Paging#collect", () => {
 
     expect(collected.items).toEqual(["x", "y"]);
   });
+
+  it("reports the cursor of the last page when a walk it did not make ends on a cursor", async () => {
+    async function* pages(): AsyncGenerator<Page> {
+      yield { rows: ["x"], next_page_token: "t1" };
+    }
+
+    const collected = await byRows.collect(pages(), { all: true });
+
+    expect(collected).toMatchObject({ items: ["x"], next: "t1" });
+  });
+
+  it("collects a page too large to pass as call arguments", async () => {
+    const rows = Array.from({ length: 200_000 }, (_, index) => String(index));
+    const one = vi.fn(async (): Promise<Page> => {
+      return { rows };
+    });
+
+    const collected = await byRows.collect(byRows.walk(one), { all: true });
+
+    expect(collected.items).toHaveLength(200_000);
+  });
 });

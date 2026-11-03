@@ -29,14 +29,7 @@ type Hooks = Readonly<{
  * page, and every failure of the walk reaches `hooks.fail` once.
  */
 export function paged(send: (...args: unknown[]) => unknown, shape: PagingShape, hooks: Hooks) {
-  const paging = new Paging<unknown>({
-    items: (page) => {
-      return shape.items(page);
-    },
-    next: (page) => {
-      return shape.next(page);
-    },
-  });
+  const paging = new Paging<unknown>(shape);
 
   async function* walk<T>(args: unknown[], take: (page: unknown) => readonly T[]) {
     const raw = paging.walk(async (token) => {

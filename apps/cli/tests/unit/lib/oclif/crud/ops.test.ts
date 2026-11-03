@@ -9,9 +9,10 @@ vi.mock("@clack/prompts", () => ({
   confirm: vi.fn(),
   cancel: vi.fn(),
   isCancel: vi.fn().mockReturnValue(false),
+  spinner: vi.fn(),
 }));
 
-import { cancel, confirm, isCancel } from "@clack/prompts";
+import { cancel, confirm, isCancel, spinner } from "@clack/prompts";
 
 import { asTerminal } from "../../../../helpers/terminal";
 import { EXIT_CODES } from "../../../../../src/lib/errors";
@@ -466,6 +467,39 @@ describe("list paging", () => {
     await printed(command, ["--page-token", "p2", "--plain"]);
 
     expect(sent).toEqual([expect.objectContaining({ page_token: "p2" })]);
+  });
+
+  it("announces each page of a drain before it asks for it", async () => {
+    const events: string[] = [];
+    vi.mocked(spinner).mockReturnValue({
+      start: vi.fn(),
+      stop: vi.fn(),
+      clear: vi.fn(),
+      message: (text?: string) => {
+        events.push(`say ${text}`);
+      },
+    } as unknown as ReturnType<typeof spinner>);
+    const command = bindOperation(
+      ListOperation as OperationClass<Ctx, ListSpec<Ctx>>,
+      definition({
+        ...list,
+        body: z.object({}).passthrough(),
+        call: async (_ctx, body) => {
+          const token = (body as { page_token?: string }).page_token;
+          events.push(`ask ${token ?? "first"}`);
+          return token === undefined ? { teams: [], next_page_token: "p2" } : { teams: [] };
+        },
+      }),
+    );
+
+    await asTerminal(() => printed(command, ["--all", "--plain"]));
+
+    expect(events).toEqual([
+      "say Fetching teams — page 1",
+      "ask first",
+      "say Fetching teams — page 2",
+      "ask p2",
+    ]);
   });
 });
 

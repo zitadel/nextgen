@@ -183,7 +183,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
     const first = typeof flags["page-token"] === "string" ? flags["page-token"] : undefined;
     const pages = new Paging({
       items: (response) => {
-        return spec.items(response);
+        return sanitizeResponse(spec.items(response));
       },
       next: (response) => {
         return spec.next?.(response);
@@ -200,7 +200,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
       progress?.stop(`Fetching ${topic} failed`);
       throw error;
     });
-    const items = sanitizeResponse(collected.items);
+    const { items } = collected;
     const next = sanitizeResponse(collected.next);
     progress?.stop(`Fetched ${items.length} ${items.length === 1 ? resource.singular : topic}`);
 

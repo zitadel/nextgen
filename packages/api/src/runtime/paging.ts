@@ -130,7 +130,8 @@ export class Paging<P, T = unknown> {
    * that last page itself.
    *
    * Without `all` the walk is left after its first page, so no second one is
-   * fetched. The items are gathered into one array rather than concatenated
+   * fetched. When the walk ends on a page that still names a next page, that
+   * cursor is reported rather than dropped, so a caller can resume from it. The items are gathered into one array rather than concatenated
    * page by page: these lists are unbounded, and a wide drain would otherwise
    * copy every record once per remaining page.
    *
@@ -145,13 +146,15 @@ export class Paging<P, T = unknown> {
     const items: T[] = [];
     let last: P | undefined;
     for await (const page of pages) {
-      items.push(...this.items(page));
+      for (const item of this.items(page)) {
+        items.push(item);
+      }
       last = page;
       if (!all) {
         return { items, next: this.next(page) ?? null, last };
       }
     }
-    return { items, next: null, last };
+    return { items, next: last === undefined ? null : (this.next(last) ?? null), last };
   }
 
   private static cursorIn(page: unknown, field: string): string | undefined {

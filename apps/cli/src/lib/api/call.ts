@@ -124,7 +124,7 @@ export const sendAll = async (
   const responses = new Paging<RawResponse, unknown>({
     items: (response) => {
       try {
-        return fields.items(response.raw);
+        return sanitizeResponse(fields.items(response.raw));
       } catch (error) {
         throw new ZitadelError("E_VALIDATION", errorMessage(error), {
           details: { response: sanitizeResponse(response.raw) },
@@ -143,6 +143,6 @@ export const sendAll = async (
   const body = sanitizeResponse({ ...page, [paging.items]: [] });
   return {
     status: last?.status ?? 200,
-    body: { ...body, [paging.items]: sanitizeResponse(items) },
+    body: { ...body, [paging.items]: items },
   };
 };
