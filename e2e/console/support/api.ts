@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import type { Page } from "@playwright/test";
 import { createZitadelClient } from "@zitadel/api/client";
-import { CSRF_HEADER } from "@zitadel/api/runtime/fetch";
+import { ApiError, CSRF_HEADER } from "@zitadel/api/runtime/fetch";
 import type { ConnectedZitadel } from "@zitadel/testing/playwright";
 
 /**
@@ -35,13 +35,33 @@ export async function grantProjectAdmin(zitadel: ConnectedZitadel, userId: strin
  * from the test process, then `claim/complete` on the page's session cookie
  * and its CSRF token. The claimer is then admin through the owning team. A
  * project must be claimed before it grants a platform user (ADR 054 §4).
+ *
+ * A retried test finds the project claimed by its first attempt; the person
+ * then gets an admin grant by `email` instead, which a claimed project gives.
  */
-export async function claimProject(zitadel: ConnectedZitadel, page: Page): Promise<void> {
+export async function claimProject(
+  zitadel: ConnectedZitadel,
+  page: Page,
+  email: string,
+): Promise<void> {
   const { baseUrl, projectId } = zitadel.handle;
   const origin = new URL(baseUrl).origin;
-  const { challenge_id } = await withErrorBody(
-    zitadel.api.initClaim(projectId, { headers: { origin } }),
-  );
+  const claim = await zitadel.api
+    .initClaim(projectId, { headers: { origin } })
+    .catch((error: unknown) => {
+      const code = error instanceof ApiError && (error.body as { code?: string } | null)?.code;
+      return code === "proj.already_claimed" ? undefined : withErrorBody(Promise.reject(error));
+    });
+  if (!claim) {
+    await withErrorBody(
+      zitadel.api.createGrant(
+        { user: { identifier: email }, relation: "admin" },
+        { project_id: projectId },
+      ),
+    );
+    return;
+  }
+  const { challenge_id } = claim;
 
   // `__Host-zitadel_session` on https, `zitadel_session` on loopback http (ADR 083).
   const session = (await page.context().cookies(baseUrl)).find((cookie) =>

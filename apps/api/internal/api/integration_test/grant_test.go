@@ -1058,12 +1058,51 @@ func TestGrantAnonymousProjectCannotReadPlatformUser(t *testing.T) {
 	require.NoError(t, err)
 	attacker.SetToken(project.ProjectSecret)
 
-	targetID := harness.CreateUserWithTeam(t, platform.ID)
+	// A schema that designates a display, so the label carries one as well as
+	// the identifier; the seeded default designates no display properties.
+	// It lives in the shared platform project, so it goes when the test ends.
+	suffix := strings.ToLower(helpers.RandString(8))
+	displaySchema := harness.CreateUserSchema(t, platform, `{
+		"title": "GrantLabelSchema",
+		"metaSchema": "https://test.example.schemas.com/schemas/user-schema.json",
+		"$id": "https://grant-label-`+suffix+`.example.com/schemas/human-user.json",
+		"kind": "user-schema",
+		"objectType": "grant-label-`+suffix+`",
+		"type": "object",
+		"x-identifier": "email",
+		"x-display": ["givenName", "familyName"],
+		"x-auth-methods": {"password": {"enabled": true}},
+		"properties": {
+			"email": {"type": "string", "format": "email", "x-unique": "project"},
+			"givenName": {"type": "string"},
+			"familyName": {"type": "string"}
+		}
+	}`)
+	var createUser api.CreateUserRequest
+	require.NoError(t, createUser.UnmarshalJSON([]byte(helpers.MustMarshal(t, map[string]any{
+		"schema": displaySchema,
+		"attributes": map[string]any{
+			"email":      helpers.RandString(8) + "@example.com",
+			"givenName":  "Ada",
+			"familyName": "Lovelace",
+		},
+	}))))
+	createdUser, err := platformClient.CreateUser(t.Context(), &createUser, api.CreateUserParams{ProjectID: api.ProjectID(platform.ID)})
+	require.NoError(t, err)
+	createdTarget, ok := createdUser.(*api.User)
+	require.True(t, ok, helpers.MustMarshal(t, createdUser))
+	targetID := string(createdTarget.ID)
+	t.Cleanup(func() {
+		stmts := harness.EnsureServiceDB(t).Statements()
+		_ = stmts.DeleteUserByID(context.Background(), platform.ID, targetID)
+		_ = stmts.DeleteJSONSchemaByID(context.Background(), platform.ID, displaySchema)
+	})
 	targetResp, err := platformClient.GetUserByID(t.Context(), api.GetUserByIDParams{UserID: api.UserID(targetID)})
 	require.NoError(t, err)
 	target, ok := targetResp.(*api.User)
 	require.True(t, ok, helpers.MustMarshal(t, targetResp))
 	require.True(t, target.Identifier.IsSet())
+	require.True(t, target.Display.IsSet())
 	team, err := harness.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{
 		ProjectID: platform.ID,
 		Name:      helpers.TeamName(),

@@ -80,10 +80,12 @@ func (s *GrantService) Create(ctx context.Context, input CreateGrantInput) (_ *G
 	if err := validateCreateGrant(input); err != nil {
 		return nil, err
 	}
-	if input.Identifier != "" || input.TeamName != "" {
-		// Before the lookup: the refusal depends on the project alone, so it
-		// tells the caller nothing about the identifier or name.
-		if err := requireClaimedForForeign(ctx, s.v2Pool.Statements(), input.ProjectID, s.locatorHome(input.ProjectID)); err != nil {
+	// With a platform project every grantable principal is homed there, so
+	// the refusal depends on the project alone and runs before any lookup: it
+	// tells the caller nothing about the principal. Without one, nothing can
+	// be claimed, so nothing is refused.
+	if s.platformProjectID != "" {
+		if err := requireClaimedForForeign(ctx, s.v2Pool.Statements(), input.ProjectID, s.platformProjectID); err != nil {
 			return nil, err
 		}
 	}
@@ -292,7 +294,7 @@ func (s *GrantService) locatorHome(grantProjectID string) string {
 func (s *GrantService) resolveLocator(ctx context.Context, stmts AllStatements, input CreateGrantInput) (domain.AuthzPrincipalType, string, error) {
 	switch {
 	case input.UserID != "":
-		return s.resolveByID(ctx, stmts, input.ProjectID, domain.AuthzPrincipalTypeUser, input.UserID)
+		return s.resolveByID(ctx, stmts, domain.AuthzPrincipalTypeUser, input.UserID)
 	case input.Identifier != "":
 		id, err := s.resolveUserByIdentifier(ctx, stmts, s.locatorHome(input.ProjectID), input.Identifier)
 		if err != nil {
@@ -300,7 +302,7 @@ func (s *GrantService) resolveLocator(ctx context.Context, stmts AllStatements, 
 		}
 		return domain.AuthzPrincipalTypeUser, id, nil
 	case input.TeamID != "":
-		return s.resolveByID(ctx, stmts, input.ProjectID, domain.AuthzPrincipalTypeTeam, input.TeamID)
+		return s.resolveByID(ctx, stmts, domain.AuthzPrincipalTypeTeam, input.TeamID)
 	case input.TeamName != "":
 		id, err := s.resolveTeamByName(ctx, stmts, s.locatorHome(input.ProjectID), input.TeamName)
 		if err != nil {
@@ -312,12 +314,9 @@ func (s *GrantService) resolveLocator(ctx context.Context, stmts AllStatements, 
 	}
 }
 
-func (s *GrantService) resolveByID(ctx context.Context, stmts AllStatements, grantProjectID string, principalType domain.AuthzPrincipalType, id string) (domain.AuthzPrincipalType, string, error) {
+func (s *GrantService) resolveByID(ctx context.Context, stmts AllStatements, principalType domain.AuthzPrincipalType, id string) (domain.AuthzPrincipalType, string, error) {
 	home, err := s.resolvePrincipalHome(ctx, stmts, principalType, id)
 	if err != nil {
-		return "", "", err
-	}
-	if err := requireClaimedForForeign(ctx, stmts, grantProjectID, home); err != nil {
 		return "", "", err
 	}
 	if err := s.loadPrincipal(ctx, stmts, home, principalType, id); err != nil {
@@ -329,7 +328,7 @@ func (s *GrantService) resolveByID(ctx context.Context, stmts AllStatements, gra
 // requireClaimedForForeign refuses a grant to a principal homed outside the
 // granting project while that project has no owning team: an unclaimed
 // project has no owner who may share it (ADR 053 §2, ADR 054 §4 amendments).
-// A project granting its own principals is unaffected.
+// The platform project granting its own principals is unaffected.
 func requireClaimedForForeign(ctx context.Context, stmts AllStatements, grantProjectID, principalHome string) error {
 	if principalHome == grantProjectID {
 		return nil

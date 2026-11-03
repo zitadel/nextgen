@@ -32,7 +32,7 @@ test("a platform operator reaches every management screen without an error", asy
   // Admin on the customer project by claiming it: an unclaimed project
   // cannot grant a platform user (ADR 054 §4 amendment). The claim starts with
   // the project's secret from the test process, never the page.
-  await claimProject(zitadel, page);
+  await claimProject(zitadel, page, operator.email);
 
   const selected = new RegExp(`[?&]project=${zitadel.handle.projectId}(&|$)`);
   for (const [path, heading] of [

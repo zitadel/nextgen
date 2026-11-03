@@ -121,6 +121,7 @@ func TestGrantService_Create(t *testing.T) {
 				Relation:  "viewer",
 			},
 			setupStmt: func(s *servicemocks.MockAllStatements) {
+				expectClaimedProject(s, "proj_customer")
 				s.EXPECT().GetResourceScope(gomock.Any(), userID).
 					Return(nil, database.NewNoRowFoundError(nil))
 			},
@@ -187,6 +188,7 @@ func TestGrantService_Create(t *testing.T) {
 				Relation:  "viewer",
 			},
 			setupStmt: func(s *servicemocks.MockAllStatements) {
+				expectClaimedProject(s, "proj_customer")
 				s.EXPECT().GetResourceScope(gomock.Any(), userID).Return(&domain.ResourceScope{
 					ResourceID:   userID,
 					ResourceKind: domain.ResourceKindTeam,
@@ -203,6 +205,7 @@ func TestGrantService_Create(t *testing.T) {
 				Relation:  "viewer",
 			},
 			setupStmt: func(s *servicemocks.MockAllStatements) {
+				expectClaimedProject(s, "proj_customer")
 				s.EXPECT().GetResourceScope(gomock.Any(), userID).Return(&domain.ResourceScope{
 					ResourceID:   userID,
 					ResourceKind: domain.ResourceKindUser,
@@ -600,6 +603,7 @@ func TestGrantService_CreateLocators(t *testing.T) {
 	t.Run("user_id miss is not found", func(t *testing.T) {
 		t.Parallel()
 		svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {
+			expectClaimedProject(s, "proj_customer")
 			s.EXPECT().GetResourceScope(gomock.Any(), userID).
 				Return(nil, database.NewNoRowFoundError(nil))
 		})
@@ -629,35 +633,20 @@ func TestGrantService_CreateLocators(t *testing.T) {
 		assert.Nil(t, got)
 	})
 
-	// The locators by id resolve the principal's home first; identifier and
-	// team name never reach the lookup (gomock fails on any other call).
-	for name, tc := range map[string]struct {
-		input service.CreateGrantInput
-		setup func(*servicemocks.MockAllStatements)
-	}{
-		"user_id": {service.CreateGrantInput{UserID: userID}, func(s *servicemocks.MockAllStatements) {
-			s.EXPECT().GetResourceScope(gomock.Any(), userID).Return(&domain.ResourceScope{
-				ResourceID: userID, ResourceKind: domain.ResourceKindUser, ProjectID: grantPlatformProjID,
-			}, nil)
-		}},
-		"identifier": {service.CreateGrantInput{Identifier: "alice@acme.com"}, nil},
-		"team_id": {service.CreateGrantInput{TeamID: teamID}, func(s *servicemocks.MockAllStatements) {
-			s.EXPECT().GetResourceScope(gomock.Any(), teamID).Return(&domain.ResourceScope{
-				ResourceID: teamID, ResourceKind: domain.ResourceKindTeam, ProjectID: grantPlatformProjID,
-			}, nil)
-		}},
-		"team name": {service.CreateGrantInput{TeamName: "acme ai admins"}, nil},
+	// Refused before any lookup, for every locator: gomock fails on any other
+	// call, so the answer cannot tell a known principal from an unknown one.
+	for name, input := range map[string]service.CreateGrantInput{
+		"user_id":    {UserID: userID},
+		"identifier": {Identifier: "alice@acme.com"},
+		"team_id":    {TeamID: teamID},
+		"team name":  {TeamName: "acme ai admins"},
 	} {
 		t.Run("unclaimed project cannot grant a foreign principal by "+name, func(t *testing.T) {
 			t.Parallel()
 			svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {
-				if tc.setup != nil {
-					tc.setup(s)
-				}
 				s.EXPECT().GetProjectByID(gomock.Any(), "proj_customer").Return(&domain.Project{ID: "proj_customer"}, nil)
 				s.EXPECT().GetActiveOwningTeamGrant(gomock.Any(), "proj_customer").Return(nil, database.NewNoRowFoundError(nil))
 			})
-			input := tc.input
 			input.ProjectID = "proj_customer"
 			input.Relation = "viewer"
 			got, err := svc.Create(t.Context(), input)
@@ -665,6 +654,29 @@ func TestGrantService_CreateLocators(t *testing.T) {
 			assert.Nil(t, got)
 		})
 	}
+
+	t.Run("without a platform project a cross-project grant needs no claim", func(t *testing.T) {
+		t.Parallel()
+		// Nothing can be claimed without a platform project (gomock fails on
+		// GetActiveOwningTeamGrant).
+		svc := newMockedGrantService(t, "", func(s *servicemocks.MockAllStatements) {
+			s.EXPECT().GetResourceScope(gomock.Any(), userID).Return(&domain.ResourceScope{
+				ResourceID: userID, ResourceKind: domain.ResourceKindUser, ProjectID: "proj_other",
+			}, nil)
+			s.EXPECT().GetUser(gomock.Any(), gomock.Any(), gomock.Any()).Return(&domain.User{
+				ProjectID: "proj_other", ID: userID, Metadata: domain.UserMetadata{Status: domain.UserStatusActive},
+			}, nil)
+			s.EXPECT().CreateAuthzAssignment(gomock.Any(), gomock.Any()).Return(nil)
+			s.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).Return(nil)
+		})
+		got, err := svc.Create(t.Context(), service.CreateGrantInput{
+			ProjectID: "proj_customer",
+			UserID:    userID,
+			Relation:  "viewer",
+		})
+		require.NoError(t, err)
+		require.NotNil(t, got)
+	})
 
 	t.Run("unclaimed project grants its own principal", func(t *testing.T) {
 		t.Parallel()
