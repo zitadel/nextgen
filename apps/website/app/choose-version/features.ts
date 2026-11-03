@@ -223,7 +223,10 @@ export const AREAS: Area[] = [
       },
       {
         name: "Roles and grants",
-        preview: { status: "available" },
+        preview: {
+          status: "partial",
+          note: "Project administration roles only; no application roles yet.",
+        },
         v4: { status: "available" },
       },
       {
