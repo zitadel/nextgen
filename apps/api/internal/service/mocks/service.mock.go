@@ -3949,45 +3949,6 @@ func (c *MockAllStatementsGetSignupChallengeCall) DoAndReturn(f func(context.Con
 	return c
 }
 
-// GetSignupLimits mocks base method.
-func (m *MockAllStatements) GetSignupLimits(arg0 context.Context, arg1 string) (*domain.SignupLimits, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetSignupLimits", arg0, arg1)
-	ret0, _ := ret[0].(*domain.SignupLimits)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetSignupLimits indicates an expected call of GetSignupLimits.
-func (mr *MockAllStatementsMockRecorder) GetSignupLimits(arg0, arg1 any) *MockAllStatementsGetSignupLimitsCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSignupLimits", reflect.TypeOf((*MockAllStatements)(nil).GetSignupLimits), arg0, arg1)
-	return &MockAllStatementsGetSignupLimitsCall{Call: call}
-}
-
-// MockAllStatementsGetSignupLimitsCall wrap *gomock.Call
-type MockAllStatementsGetSignupLimitsCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockAllStatementsGetSignupLimitsCall) Return(arg0 *domain.SignupLimits, arg1 error) *MockAllStatementsGetSignupLimitsCall {
-	c.Call = c.Call.Return(arg0, arg1)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsGetSignupLimitsCall) Do(f func(context.Context, string) (*domain.SignupLimits, error)) *MockAllStatementsGetSignupLimitsCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsGetSignupLimitsCall) DoAndReturn(f func(context.Context, string) (*domain.SignupLimits, error)) *MockAllStatementsGetSignupLimitsCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
 // GetTakenUniqueAttributeKeys mocks base method.
 func (m *MockAllStatements) GetTakenUniqueAttributeKeys(ctx context.Context, projectID, userID string, claims []service.UniqueAttributeClaim) ([]domain.AttributeKey, error) {
 	m.ctrl.T.Helper()
@@ -6435,6 +6396,45 @@ func (c *MockAllStatementsLockProjectCall) Do(f func(context.Context, string) er
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockAllStatementsLockProjectCall) DoAndReturn(f func(context.Context, string) error) *MockAllStatementsLockProjectCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// LockSignupLimits mocks base method.
+func (m *MockAllStatements) LockSignupLimits(arg0 context.Context, arg1, arg2 string) (*domain.SignupLimits, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "LockSignupLimits", arg0, arg1, arg2)
+	ret0, _ := ret[0].(*domain.SignupLimits)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// LockSignupLimits indicates an expected call of LockSignupLimits.
+func (mr *MockAllStatementsMockRecorder) LockSignupLimits(arg0, arg1, arg2 any) *MockAllStatementsLockSignupLimitsCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LockSignupLimits", reflect.TypeOf((*MockAllStatements)(nil).LockSignupLimits), arg0, arg1, arg2)
+	return &MockAllStatementsLockSignupLimitsCall{Call: call}
+}
+
+// MockAllStatementsLockSignupLimitsCall wrap *gomock.Call
+type MockAllStatementsLockSignupLimitsCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsLockSignupLimitsCall) Return(arg0 *domain.SignupLimits, arg1 error) *MockAllStatementsLockSignupLimitsCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsLockSignupLimitsCall) Do(f func(context.Context, string, string) (*domain.SignupLimits, error)) *MockAllStatementsLockSignupLimitsCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsLockSignupLimitsCall) DoAndReturn(f func(context.Context, string, string) (*domain.SignupLimits, error)) *MockAllStatementsLockSignupLimitsCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

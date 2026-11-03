@@ -63,13 +63,13 @@ type AllStatements interface {
 
 // SignupProtectionStatements are infrastructure state for the signup gate.
 // Get methods return nil, nil when absent. Rate writes and issuance run while
-// holding LockProject in a transaction; consumption is an atomic compare/delete.
+// holding LockSignupLimits' row lock in a transaction; consumption is an atomic compare/delete.
 type SignupProtectionStatements interface {
 	GetSignupChallenge(context.Context, string, string) (*domain.SignupChallengeRecord, error)
 	CreateSignupChallenge(context.Context, *domain.SignupChallengeRecord) error
 	ConsumeSignupChallenge(context.Context, string, string, string, int64) (bool, error)
 	DeleteExpiredSignupChallenges(context.Context, string, int64) error
-	GetSignupLimits(context.Context, string) (*domain.SignupLimits, error)
+	LockSignupLimits(context.Context, string, string) (*domain.SignupLimits, error)
 	InsertSignupLimits(context.Context, *domain.SignupLimits) error
 	UpdateSignupLimits(context.Context, *domain.SignupLimits) error
 }

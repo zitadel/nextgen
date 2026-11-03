@@ -2,11 +2,6 @@ package service_test
 
 import (
 	"context"
-	"crypto/pbkdf2"
-	"crypto/sha256"
-	"encoding/binary"
-	"encoding/hex"
-	"encoding/json"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -15,6 +10,7 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/zitadel/nextgen/internal/crypto/pow"
+	"github.com/zitadel/nextgen/internal/crypto/pow/powtest"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
@@ -35,15 +31,15 @@ func TestSignupProofExpiresWhileWaitingForLock(t *testing.T) {
 			func(ctx context.Context, fn func(context.Context, service.Statementer[service.AllStatements]) error) error {
 				return fn(ctx, v2TestTx{stmts: stmts})
 			}).AnyTimes()
-		stmts.EXPECT().GetSignupLimits(gomock.Any(), "project").Return(&domain.SignupLimits{
+		stmts.EXPECT().LockSignupLimits(gomock.Any(), "project", "flow").Return(&domain.SignupLimits{
 			ProjectID: "project", WindowStart: time.Now().Unix(),
-		}, nil).AnyTimes()
+		}, nil).Times(3)
 		stmts.EXPECT().UpdateSignupLimits(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 		var record *domain.SignupChallengeRecord
 		stmts.EXPECT().GetSignupChallenge(gomock.Any(), "project", "flow").DoAndReturn(
 			func(context.Context, string, string) (*domain.SignupChallengeRecord, error) { return record, nil },
 		).AnyTimes()
-		stmts.EXPECT().LockProject(gomock.Any(), "project").Return(nil).Times(2)
+		stmts.EXPECT().InsertSignupLimits(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 		stmts.EXPECT().NewManagedID(string(domain.PrefixChallenge)).Return("challenge", nil)
 		stmts.EXPECT().DeleteExpiredSignupChallenges(gomock.Any(), "project", gomock.Any()).Return(nil)
 		stmts.EXPECT().CreateSignupChallenge(gomock.Any(), gomock.Any()).DoAndReturn(
@@ -54,34 +50,11 @@ func TestSignupProofExpiresWhileWaitingForLock(t *testing.T) {
 		state := &domain.FlowState{ProjectID: "project", ID: "flow"}
 		challenge, err := svc.Challenge(t.Context(), state)
 		require.NoError(t, err)
-		salt, err := hex.DecodeString(challenge.Salt)
-		require.NoError(t, err)
-		nonce, err := hex.DecodeString(challenge.Nonce)
-		require.NoError(t, err)
-		input := make([]byte, 20)
-		copy(input, nonce)
-		var proof string
-		for counter := uint32(0); counter < 512; counter++ {
-			binary.BigEndian.PutUint32(input[16:], counter)
-			key, err := pbkdf2.Key(sha256.New, string(input), salt, 5000, 32)
-			require.NoError(t, err)
-			if hex.EncodeToString(key[:16]) == challenge.KeyPrefix {
-				raw, err := json.Marshal(map[string]string{"protocol": challenge.Protocol, "challenge_id": challenge.ChallengeID, "derived_key": hex.EncodeToString(key)})
-				require.NoError(t, err)
-				proof = string(raw)
-				break
-			}
-		}
-		require.NotEmpty(t, proof)
-		// Charging and verification succeed, then the consumption lock delays
-		// admission past expiry. Synctest advances time without a real wait.
-		gomock.InOrder(
-			stmts.EXPECT().LockProject(gomock.Any(), "project").Return(nil),
-			stmts.EXPECT().LockProject(gomock.Any(), "project").DoAndReturn(func(context.Context, string) error {
-				time.Sleep(pow.MaxLifetime)
-				return nil
-			}),
-		)
+		proof := powtest.Solve(t, challenge)
+		stmts.EXPECT().LockSignupLimits(gomock.Any(), "project", "flow").DoAndReturn(func(context.Context, string, string) (*domain.SignupLimits, error) {
+			time.Sleep(pow.MaxLifetime)
+			return &domain.SignupLimits{}, nil
+		})
 		stmts.EXPECT().ConsumeSignupChallenge(gomock.Any(), "project", "flow", "challenge", gomock.Any()).DoAndReturn(
 			func(_ context.Context, _, _, _ string, now int64) (bool, error) {
 				return record.ExpiresAt > now, nil

@@ -3,14 +3,11 @@
 package integration_test
 
 import (
-	"crypto/pbkdf2"
-	"crypto/sha256"
-	"encoding/binary"
-	"encoding/hex"
-	"encoding/json"
 	"github.com/go-faster/jx"
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
+	"github.com/zitadel/nextgen/internal/crypto/pow"
+	"github.com/zitadel/nextgen/internal/crypto/pow/powtest"
 	api "go.zitadel.com/zitadel/v5/api"
 	"testing"
 )
@@ -24,24 +21,7 @@ func signupProofs(t *testing.T, step api.FlowStep) api.OptFlowSubmitRequestGateP
 	require.Equal(t, "zitadel_pow", gate.Provider)
 	c, ok := gate.Challenge.Get()
 	require.True(t, ok)
-	salt, err := hex.DecodeString(c.Salt)
-	require.NoError(t, err)
-	nonce, err := hex.DecodeString(c.Nonce)
-	require.NoError(t, err)
-	input := make([]byte, 20)
-	copy(input, nonce)
-	for trial := uint32(0); trial < 512; trial++ {
-		binary.BigEndian.PutUint32(input[16:], trial)
-		key, err := pbkdf2.Key(sha256.New, string(input), salt, 5000, 32)
-		require.NoError(t, err)
-		if hex.EncodeToString(key[:16]) == c.KeyPrefix {
-			raw, err := json.Marshal(map[string]string{"protocol": c.Protocol, "challenge_id": c.ChallengeID, "derived_key": hex.EncodeToString(key)})
-			require.NoError(t, err)
-			return api.NewOptFlowSubmitRequestGateProofs(api.FlowSubmitRequestGateProofs{"signup_pow": string(raw)})
-		}
-	}
-	t.Fatal("signup challenge unsolvable")
-	return api.OptFlowSubmitRequestGateProofs{}
+	return api.NewOptFlowSubmitRequestGateProofs(api.FlowSubmitRequestGateProofs{"signup_pow": powtest.Solve(t, &pow.PublicChallenge{Protocol: c.Protocol, ChallengeID: c.ChallengeID, ProfileID: c.ProfileID, Salt: c.Salt, Nonce: c.Nonce, KeyPrefix: c.KeyPrefix, ExpiresAt: c.ExpiresAt})})
 }
 func currentSignupProofs(t *testing.T, client *helpers.ApiClient, id, cookie string) api.OptFlowSubmitRequestGateProofs {
 	t.Helper()
@@ -51,7 +31,7 @@ func currentSignupProofs(t *testing.T, client *helpers.ApiClient, id, cookie str
 	return signupProofs(t, resp.(*api.FlowResponseHeaders).Response.Step)
 }
 
-func TestSignupProofRequiredAndSingleUse(t *testing.T) {
+func TestSignupProofRequiredAndCompletedCookieRejected(t *testing.T) {
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
@@ -72,7 +52,7 @@ func TestSignupProofRequiredAndSingleUse(t *testing.T) {
 	require.NoError(t, err)
 	require.IsType(t, &api.SubmitFlowStepErrorResponseStatusCode{}, missing)
 	require.Equal(t, 403, missing.(*api.SubmitFlowStepErrorResponseStatusCode).StatusCode)
-	req.GateProofs = signupProofs(t, step.Response.Step)
+	req.GateProofs = currentSignupProofs(t, client, start.Response.ID, cookie)
 	done, err := client.SubmitFlowStep(t.Context(), req, params)
 	require.NoError(t, err)
 	require.IsType(t, &api.SubmitFlowStepOK{}, done, helpers.MustMarshal(t, done))

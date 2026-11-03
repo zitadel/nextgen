@@ -1575,6 +1575,7 @@ export class ZitadelLogin extends ZitadelSurface {
   }
 
   private signupSolve?: AbortController;
+  private signupProof?: { id: string; proof: string };
 
   private async submit(
     action: string | null,
@@ -1587,6 +1588,7 @@ export class ZitadelLogin extends ZitadelSurface {
     const { id, session_token } = this.response;
     this.pendingAction = action ?? "submit";
     this.loading = true;
+    let solving = false;
     try {
       // Only send field values the current step defines. `formValues` carries
       // state across steps (e.g. email for the signed-in greeting), but
@@ -1619,19 +1621,32 @@ export class ZitadelLogin extends ZitadelSurface {
           void this.applyResponse(fresh);
           return;
         }
+        solving = true;
         const gate = fresh.step.gates.signup_pow;
         if (gate?.provider !== "zitadel_pow" || gate.kind !== "captcha" || !gate.challenge) {
           throw new Error("Signup check is unavailable. Refresh and try again.");
         }
-        body.gate_proofs = { signup_pow: await solveSignupPow(gate.challenge, controller.signal) };
+        if (this.signupProof?.id !== gate.challenge.challenge_id) {
+          this.signupProof = {
+            id: gate.challenge.challenge_id,
+            proof: await solveSignupPow(gate.challenge, controller.signal),
+          };
+        }
+        body.gate_proofs = { signup_pow: this.signupProof.proof };
       }
+      solving = false;
       const wire = await apiSubmitStep(api, id, body);
       void this.applyResponse(wire);
       emit(this, "zitadel-flow-step", { step: wire.step });
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") return;
       if (await this.restartIfRequired(error)) return;
-      if (this.signupSolve && this.response) {
+      if (
+        this.response &&
+        (solving ||
+          (error instanceof ApiError &&
+            ["flow.proof_invalid", "flow.rate_limited"].includes(apiErrorCode(error) ?? "")))
+      ) {
         const message =
           error instanceof ApiError
             ? apiErrorMessage(error)

@@ -6,7 +6,7 @@
 
 > **Implemented slice (2026-11-03):** Password signup uses ZITADEL-owned PBKDF2
 > proof of work, a native browser solver, database-backed single-use proofs and
-> fixed project rate limits. See the [implementation](../design/flowengine/bot-protection-implementation.md).
+> fixed per-flow retry limits. See the [implementation](../design/flowengine/bot-protection-implementation.md).
 > The broader provider/CEL/signal design below remains proposed.
 
 ## Minimal signup decision
@@ -22,13 +22,19 @@ A proof permits one password signup attempt scoped to its project and flow.
 Storage atomically consumes it, including when the subsequent mutation fails.
 Pending challenges are reused across renders and expire after five minutes.
 The only active profile is PBKDF2-SHA256, 5,000 iterations and up to 512 trials.
-Database budgets allow 60 issuances and 120 proof submissions per project per
-minute across replicas. These conservative fixed limits require no CEL, client
-IP trust, new endpoint or policy configuration. They do not cover other signup
-methods or replace ingress rate limits.
+Database budgets allow 10 issuance attempts and 20 proof submissions per flow per
+minute across replicas. Only that flow's row is locked; there is no project-wide
+signup quota. These limits isolate retries but do not prevent creating new flows,
+which requires ingress rate limits. There is no CEL or client IP trust.
 
-The browser uses native asynchronous Web Crypto, with bounded trials, expiry,
-a deadline and disconnect cancellation. Future algorithms require versioned
+Start and Submit announce the required gate; GET issues or refreshes the puzzle
+before solving. Issuance failure cannot discard a successful transition. GET
+refreshes challenges with less than a minute remaining. Password policy rejection
+leaves the proof usable. Public puzzle data is separate from the encrypted
+verifier; JWE authenticates stored parameters and a single HMAC checks solutions.
+
+The browser uses native asynchronous Web Crypto, with bounded trials, server-enforced expiry,
+a monotonic deadline and disconnect cancellation. Future algorithms require versioned
 supported profiles; arbitrary client cost parameters remain forbidden. Customer
 providers, Cloud BotID, adaptive cost and CEL remain follow-up design work. A
 customer's own provider is still a product goal, not an implemented capability.

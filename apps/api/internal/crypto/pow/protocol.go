@@ -19,7 +19,6 @@ const (
 	keySize           = 32
 	prefixSize        = 16
 	solutionDomain    = "zitadel:pow:poc:solution:1:"
-	parametersDomain  = "zitadel:pow:poc:parameters:1:"
 )
 
 // Binding comes from the caller's trusted state, never from the submitted proof.
@@ -52,29 +51,25 @@ func validBindingString(s string) bool {
 	return len(s) > 0 && len(s) <= 256 && utf8.ValidString(s)
 }
 
-// Keys are independent 256-bit keys resolved by the caller for the project.
+// Keys holds the 256-bit solution MAC key retained in authenticated storage.
 // Never reuse cookie or password keys here.
 type Keys struct {
-	Challenge [keySize]byte `json:"-"`
-	Solution  [keySize]byte `json:"-"`
+	Solution [keySize]byte `json:"-"`
 }
 
 func (k Keys) validate() error {
 	var zero [keySize]byte
-	if subtle.ConstantTimeCompare(k.Challenge[:], zero[:]) == 1 ||
-		subtle.ConstantTimeCompare(k.Solution[:], zero[:]) == 1 ||
-		subtle.ConstantTimeCompare(k.Challenge[:], k.Solution[:]) == 1 {
+	if subtle.ConstantTimeCompare(k.Solution[:], zero[:]) == 1 {
 		return ErrInvalidKeys
 	}
 	return nil
 }
 
 // StoredChallenge contains only server-side data. Body must be retained
-// verbatim; MAC authenticates those exact bytes. Intentionally not
+// verbatim in authenticated storage (the signup service uses JWE). Intentionally not
 // JSON-serializable: use Challenge.Public for the client projection.
 type StoredChallenge struct {
 	Body []byte `json:"-"`
-	MAC  []byte `json:"-"`
 }
 
 type PublicChallenge struct {

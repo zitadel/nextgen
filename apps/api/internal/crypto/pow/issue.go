@@ -96,7 +96,7 @@ func (i issuer) issue(binding Binding, keys Keys, now time.Time) (Challenge, err
 		return Challenge{}, fmt.Errorf("pow: encode challenge: %w", err)
 	}
 	return Challenge{
-		Stored: StoredChallenge{Body: body, MAC: authenticate(keys.Challenge[:], parametersDomain, body)},
+		Stored: StoredChallenge{Body: body},
 		Public: PublicChallenge{
 			Protocol: Protocol, ChallengeID: binding.ChallengeID, ProfileID: profile.ID(),
 			Salt: hex.EncodeToString(salt[:]), Nonce: hex.EncodeToString(nonce[:]),

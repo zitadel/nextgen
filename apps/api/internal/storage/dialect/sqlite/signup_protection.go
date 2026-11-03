@@ -9,13 +9,14 @@ import (
 )
 
 const (
-	getSignupChallengeStmt            = `SELECT project_id, flow_id, id, expires_at, payload FROM signup_challenges WHERE project_id = ? AND flow_id = ?`
-	createSignupChallengeStmt         = `INSERT INTO signup_challenges (project_id, flow_id, id, expires_at, payload) VALUES (?, ?, ?, ?, ?)`
+	getSignupChallengeStmt            = `SELECT project_id, flow_id, id, expires_at, payload, public FROM signup_challenges WHERE project_id = ? AND flow_id = ?`
+	createSignupChallengeStmt         = `INSERT INTO signup_challenges (project_id, flow_id, id, expires_at, payload, public) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (project_id, flow_id) DO UPDATE SET id = excluded.id, expires_at = excluded.expires_at, payload = excluded.payload, public = excluded.public`
 	consumeSignupChallengeStmt        = `DELETE FROM signup_challenges WHERE project_id = ? AND flow_id = ? AND id = ? AND expires_at > ?`
 	deleteExpiredSignupChallengesStmt = `DELETE FROM signup_challenges WHERE project_id = ? AND expires_at <= ?`
-	getSignupLimitsStmt               = `SELECT project_id, window_start, issued, verified FROM signup_limits WHERE project_id = ?`
-	insertSignupLimitsStmt            = `INSERT INTO signup_limits (project_id, window_start, issued, verified) VALUES (?, ?, ?, ?)`
-	updateSignupLimitsStmt            = `UPDATE signup_limits SET window_start = ?, issued = ?, verified = ? WHERE project_id = ?`
+	deleteExpiredSignupLimitsStmt     = `DELETE FROM signup_limits WHERE project_id = ? AND window_start <= ?`
+	getSignupLimitsStmt               = `SELECT project_id, flow_id, window_start, issued, verified FROM signup_limits WHERE project_id = ? AND flow_id = ?`
+	insertSignupLimitsStmt            = `INSERT INTO signup_limits (project_id, flow_id, window_start, issued, verified) VALUES (?, ?, ?, ?, ?) ON CONFLICT (project_id, flow_id) DO NOTHING`
+	updateSignupLimitsStmt            = `UPDATE signup_limits SET window_start = ?, issued = ?, verified = ? WHERE project_id = ? AND flow_id = ?`
 )
 
 type signupProtectionStatements struct{ statement }
@@ -25,7 +26,7 @@ func newSignupProtectionStatements(client queryExecutor) signupProtectionStateme
 }
 func (s signupProtectionStatements) GetSignupChallenge(ctx context.Context, projectID, flowID string) (*domain.SignupChallengeRecord, error) {
 	var record domain.SignupChallengeRecord
-	err := wrapError(s.client.QueryRow(ctx, getSignupChallengeStmt, projectID, flowID).Scan(&record.ProjectID, &record.FlowID, &record.ID, &record.ExpiresAt, &record.Payload))
+	err := wrapError(s.client.QueryRow(ctx, getSignupChallengeStmt, projectID, flowID).Scan(&record.ProjectID, &record.FlowID, &record.ID, &record.ExpiresAt, &record.Payload, &record.Public))
 	if errors.Is(err, new(database.NoRowFoundError)) {
 		return nil, nil
 	}
@@ -34,9 +35,9 @@ func (s signupProtectionStatements) GetSignupChallenge(ctx context.Context, proj
 	}
 	return &record, nil
 }
-func (s signupProtectionStatements) GetSignupLimits(ctx context.Context, projectID string) (*domain.SignupLimits, error) {
+func (s signupProtectionStatements) LockSignupLimits(ctx context.Context, projectID, flowID string) (*domain.SignupLimits, error) {
 	var record domain.SignupLimits
-	err := wrapError(s.client.QueryRow(ctx, getSignupLimitsStmt, projectID).Scan(&record.ProjectID, &record.WindowStart, &record.Issued, &record.Verified))
+	err := wrapError(s.client.QueryRow(ctx, getSignupLimitsStmt, projectID, flowID).Scan(&record.ProjectID, &record.FlowID, &record.WindowStart, &record.Issued, &record.Verified))
 	if errors.Is(err, new(database.NoRowFoundError)) {
 		return nil, nil
 	}
@@ -46,7 +47,7 @@ func (s signupProtectionStatements) GetSignupLimits(ctx context.Context, project
 	return &record, nil
 }
 func (s signupProtectionStatements) CreateSignupChallenge(ctx context.Context, r *domain.SignupChallengeRecord) error {
-	_, err := execAffected(ctx, s.client, createSignupChallengeStmt, r.ProjectID, r.FlowID, r.ID, r.ExpiresAt, r.Payload)
+	_, err := execAffected(ctx, s.client, createSignupChallengeStmt, r.ProjectID, r.FlowID, r.ID, r.ExpiresAt, r.Payload, r.Public)
 	return wrapError(err)
 }
 func (s signupProtectionStatements) ConsumeSignupChallenge(ctx context.Context, projectID, flowID, id string, now int64) (bool, error) {
@@ -54,14 +55,20 @@ func (s signupProtectionStatements) ConsumeSignupChallenge(ctx context.Context, 
 	return n == 1, wrapError(err)
 }
 func (s signupProtectionStatements) DeleteExpiredSignupChallenges(ctx context.Context, projectID string, now int64) error {
-	_, err := execAffected(ctx, s.client, deleteExpiredSignupChallengesStmt, projectID, now)
-	return wrapError(err)
+	return withTransaction(ctx, s.client, func(ctx context.Context, tx queryExecutor) error {
+		if _, err := execAffected(ctx, tx, deleteExpiredSignupChallengesStmt, projectID, now); err != nil {
+			return wrapError(err)
+		}
+		// Retain inactive counters for an hour, well beyond their one-minute window.
+		_, err := execAffected(ctx, tx, deleteExpiredSignupLimitsStmt, projectID, now-3600)
+		return wrapError(err)
+	})
 }
 func (s signupProtectionStatements) InsertSignupLimits(ctx context.Context, r *domain.SignupLimits) error {
-	_, err := execAffected(ctx, s.client, insertSignupLimitsStmt, r.ProjectID, r.WindowStart, r.Issued, r.Verified)
+	_, err := execAffected(ctx, s.client, insertSignupLimitsStmt, r.ProjectID, r.FlowID, r.WindowStart, r.Issued, r.Verified)
 	return wrapError(err)
 }
 func (s signupProtectionStatements) UpdateSignupLimits(ctx context.Context, r *domain.SignupLimits) error {
-	_, err := execAffected(ctx, s.client, updateSignupLimitsStmt, r.WindowStart, r.Issued, r.Verified, r.ProjectID)
+	_, err := execAffected(ctx, s.client, updateSignupLimitsStmt, r.WindowStart, r.Issued, r.Verified, r.ProjectID, r.FlowID)
 	return wrapError(err)
 }

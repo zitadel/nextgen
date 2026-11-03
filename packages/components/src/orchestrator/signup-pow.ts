@@ -18,7 +18,8 @@ export async function solveSignupPow(challenge: Challenge, signal: AbortSignal):
   if (!globalThis.crypto?.subtle) throw new Error("Signup requires a secure browser connection.");
   const expires = Date.parse(challenge.expires_at);
   if (!Number.isFinite(expires)) throw new Error("Invalid signup challenge expiry.");
-  const deadline = Math.min(expires, Date.now() + 30_000);
+  // Server time decides proof expiry; a device clock may be minutes off.
+  const deadline = performance.now() + 30_000;
   const decode = (hex: string) =>
     Uint8Array.from(hex.match(/../g) ?? [], (b) => Number.parseInt(b, 16));
   const salt = decode(challenge.salt);
@@ -28,7 +29,7 @@ export async function solveSignupPow(challenge: Challenge, signal: AbortSignal):
   const prefix = decode(challenge.key_prefix);
   for (let trial = 0; trial < 512; trial++) {
     signal.throwIfAborted();
-    if (Date.now() >= deadline) throw new Error("Signup check expired. Please try again.");
+    if (performance.now() >= deadline) throw new Error("Signup check expired. Please try again.");
     counter.setUint32(16, trial, false);
     const key = await crypto.subtle.importKey("raw", input, "PBKDF2", false, ["deriveBits"]);
     const derived = new Uint8Array(
@@ -39,7 +40,7 @@ export async function solveSignupPow(challenge: Challenge, signal: AbortSignal):
       ),
     );
     signal.throwIfAborted();
-    if (Date.now() >= deadline) throw new Error("Signup check expired. Please try again.");
+    if (performance.now() >= deadline) throw new Error("Signup check expired. Please try again.");
     if (prefix.every((byte, i) => byte === derived[i])) {
       return JSON.stringify({
         protocol: challenge.protocol,

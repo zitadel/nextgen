@@ -941,3 +941,26 @@ func TestFlowService_Start_ResolvesBuiltinSchemaUnderAnotherBase(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, stored.URL, sm.gotStartInput.UserSchemaURL)
 }
+
+func TestFlowService_SignupIssuanceCannotDiscardTransition(t *testing.T) {
+	def := newDef("register", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeRegister)
+	def.Steps = []domain.FlowDefinitionStep{{Name: "start", OnSuccess: new(domain.FlowOnSuccessCreateUser)}}
+	state := &domain.FlowState{ProjectID: def.ProjectID, FlowProgress: domain.FlowProgress{DefinitionID: def.ID}, AuthAttemptID: "attempt"}
+	result := domain.FlowStepResult{State: state, Step: &domain.FlowStep{Name: "start"}}
+	sm := &fakeStateMachine{startResult: result, processResult: result, renderResult: result}
+	protection := stubSignupProtection{err: domain.ErrFlowRateLimited()}
+	svc := service.NewFlowService(stubDB(t), sm, domain.BuiltinSchemaBases{}, protection)
+	started, err := svc.Start(t.Context(), service.StartFlowRequest{Definition: def, Purpose: domain.FlowDefinitionPurposeRegister})
+	require.NoError(t, err)
+	require.True(t, started.Step.SignupRequired)
+	require.Nil(t, started.Step.SignupChallenge)
+	svc = service.NewFlowService(stubSubmitDB(t, def, &domain.AuthAttempt{ProjectID: def.ProjectID, ID: "attempt", CreatedAt: time.Now(), TimeToLive: new(time.Hour)}), sm, domain.BuiltinSchemaBases{}, protection)
+	submitted, err := svc.Submit(t.Context(), service.SubmitFlowRequest{State: state, Action: "submit"})
+	require.NoError(t, err)
+	require.Same(t, state, submitted.State)
+	require.True(t, submitted.Step.SignupRequired)
+	// Issuance is a separate retryable read, after the advanced cookie is returned.
+	svc = service.NewFlowService(stubGetFlowDefinition(t, def), sm, domain.BuiltinSchemaBases{}, protection)
+	_, err = svc.GetStep(t.Context(), service.GetFlowStepRequest{State: state})
+	require.ErrorIs(t, err, domain.ErrFlowRateLimited())
+}

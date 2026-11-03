@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import vector from "./__fixtures__/signup-pow-vector.json";
 import { solveSignupPow } from "./signup-pow.js";
 
@@ -19,13 +19,16 @@ describe("native browser signup solver", () => {
       ),
     ).rejects.toThrow("Unsupported");
   });
-  it("refuses expired challenges and respects cancellation", async () => {
-    await expect(
-      solveSignupPow(
-        { ...challenge(), expires_at: new Date(0).toISOString() },
-        new AbortController().signal,
-      ),
-    ).rejects.toThrow("expired");
+  it("does not trust the device clock for server expiry", async () => {
+    const c = challenge();
+    const clock = vi.spyOn(Date, "now").mockReturnValue(Date.now() + 600_000);
+    try {
+      expect(await solveSignupPow(c, new AbortController().signal)).toBe(vector.proof);
+    } finally {
+      clock.mockRestore();
+    }
+  });
+  it("respects cancellation", async () => {
     const abort = new AbortController();
     abort.abort();
     await expect(solveSignupPow(challenge(), abort.signal)).rejects.toMatchObject({

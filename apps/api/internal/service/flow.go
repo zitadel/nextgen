@@ -358,9 +358,7 @@ func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (res doma
 		}
 	}
 
-	if err := s.attachSignupChallenge(ctx, req.Definition, &result); err != nil {
-		return domain.FlowStepResult{}, err
-	}
+	attachSignupGate(req.Definition, &result)
 	return domain.FlowStepResult{State: result.State, Step: result.Step}, nil
 }
 
@@ -402,9 +400,7 @@ func (s *flowService) Submit(ctx context.Context, req SubmitFlowRequest) (res do
 	if err != nil {
 		return domain.FlowStepResult{}, err
 	}
-	if err := s.attachSignupChallenge(ctx, def, &result); err != nil {
-		return domain.FlowStepResult{}, err
-	}
+	attachSignupGate(def, &result)
 	return domain.FlowStepResult{
 		State:                 result.State,
 		Step:                  result.Step,
@@ -430,8 +426,15 @@ func (s *flowService) GetStep(ctx context.Context, req GetFlowStepRequest) (res 
 	if err != nil {
 		return domain.FlowStepResult{}, err
 	}
-	if err := s.attachSignupChallenge(ctx, def, &result); err != nil {
-		return domain.FlowStepResult{}, err
+	attachSignupGate(def, &result)
+	if result.Step != nil && result.Step.SignupRequired {
+		if s.protection == nil {
+			return domain.FlowStepResult{}, domain.ErrFlowIntegrity()
+		}
+		result.Step.SignupChallenge, err = s.protection.Challenge(ctx, result.State)
+		if err != nil {
+			return domain.FlowStepResult{}, err
+		}
 	}
 	return domain.FlowStepResult{
 		State:                 result.State,
@@ -467,21 +470,10 @@ func pickNewestFlowRevision(defs []*domain.FlowDefinition) *domain.FlowDefinitio
 }
 
 // Runtime enforcement does not depend on template markup or client-selected purpose.
-func (s *flowService) attachSignupChallenge(ctx context.Context, def *domain.FlowDefinition, result *domain.FlowStepResult) error {
+func attachSignupGate(def *domain.FlowDefinition, result *domain.FlowStepResult) {
 	if result.Step == nil || result.State == nil {
-		return nil
+		return
 	}
 	step, ok := def.FindStep(result.Step.Name)
-	if !ok || step.OnSuccess == nil || *step.OnSuccess != domain.FlowOnSuccessCreateUser {
-		return nil
-	}
-	if s.protection == nil {
-		return domain.ErrFlowIntegrity()
-	}
-	challenge, err := s.protection.Challenge(ctx, result.State)
-	if err != nil {
-		return err
-	}
-	result.Step.SignupChallenge = challenge
-	return nil
+	result.Step.SignupRequired = ok && step.OnSuccess != nil && *step.OnSuccess == domain.FlowOnSuccessCreateUser
 }

@@ -9,7 +9,6 @@ const utf8 = (s) => new TextEncoder().encode(s);
 const hex = (b) => Buffer.from(b).toString("hex");
 const fromHex = (s) => Buffer.from(s, "hex");
 const sequence = (start) => Uint8Array.from({ length: 16 }, (_, i) => start + i);
-const challengeKey = Uint8Array.from({ length: 32 }, (_, i) => i);
 const solutionKey = Uint8Array.from({ length: 32 }, (_, i) => 128 + i);
 
 async function mac(key, domain, ...parts) {
@@ -56,11 +55,9 @@ for (const [level, counter] of [
   vectors.push({
     name: `level_${level}_counter_${counter}`,
     counter,
-    challenge_key: hex(challengeKey),
     solution_key: hex(solutionKey),
     context_json: contextJSON,
     body,
-    mac: await mac(challengeKey, "zitadel:pow:poc:parameters:1:", utf8(body)),
     derived_key: hex(key),
     proof: JSON.stringify({
       protocol: context.protocol,

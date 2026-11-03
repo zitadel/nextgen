@@ -60,8 +60,7 @@ func Verify(stored StoredChallenge, proof string, expected Binding, keys Keys, n
 	if err := keys.validate(); err != nil {
 		return err
 	}
-	if len(stored.Body) > MaxChallengeBytes || len(stored.MAC) != sha256.Size ||
-		!hmac.Equal(stored.MAC, authenticate(keys.Challenge[:], parametersDomain, stored.Body)) {
+	if len(stored.Body) > MaxChallengeBytes {
 		return ErrInvalidChallenge
 	}
 	body, err := exactObject(stored.Body, "context", "key_prefix", "key_mac")

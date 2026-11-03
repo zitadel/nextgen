@@ -49,6 +49,7 @@ let testProject = configureZitadel({
   projectId: "demo-project",
 });
 
+const originalSubtle = Object.getOwnPropertyDescriptor(globalThis.crypto, "subtle");
 beforeAll(() => {
   // jsdom has no SubtleCrypto; use Node's native implementation.
   Object.defineProperty(globalThis.crypto, "subtle", {
@@ -76,6 +77,8 @@ afterEach(() => {
 
 afterAll(() => {
   server.close();
+  if (originalSubtle) Object.defineProperty(globalThis.crypto, "subtle", originalSubtle);
+  else Reflect.deleteProperty(globalThis.crypto, "subtle");
 });
 
 async function waitFor<T>(probe: () => T | null | undefined, timeout = 10_000): Promise<T> {
@@ -1804,6 +1807,33 @@ describe("<zitadel-login> against the typed Flow API", () => {
       );
       await waitFor(() => element.shadowRoot?.querySelector('zl-field[type="password"]'));
     }
+
+    it.each([
+      ["flow.cookie_expired", 401, false],
+      ["flow.not_found", 404, false],
+      ["internal", 500, false],
+      ["flow.rate_limited", 429, true],
+      ["flow.proof_invalid", 403, true],
+    ])("routes signup refresh error %s correctly", async (code, status, retryable) => {
+      const element = await mount(host);
+      await navigateToRegisterPassword(element);
+      type(element, PASSWORD_FIELD, "hunter2secure");
+      server.use(
+        http.get("*/flow/:id", () =>
+          HttpResponse.json({ code, message: "test signup failure" }, { status: status as number }),
+        ),
+      );
+      const log = vi.spyOn(console, "error").mockImplementation(() => {});
+      try {
+        submit(element);
+        await waitFor(() =>
+          element.shadowRoot?.textContent?.includes("test signup failure") ? true : null,
+        );
+        expect(!!element.shadowRoot?.querySelector('zl-field[type="password"]')).toBe(retryable);
+      } finally {
+        log.mockRestore();
+      }
+    });
 
     it("keeps signup input after a solver failure and submits a fresh proof on retry", async () => {
       const element = await mount(host);

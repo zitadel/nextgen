@@ -14464,7 +14464,6 @@ type CreateFlowErrorResponse struct {
 	FlowdefPurposeMismatch FlowdefPurposeMismatch
 	FlowIntegrity          FlowIntegrity
 	FlowInvalidPurpose     FlowInvalidPurpose
-	FlowRateLimited        FlowRateLimited
 	Internal               Internal
 	TknInvalid             TknInvalid
 	TknInvalidTknid        TknInvalidTknid
@@ -14494,7 +14493,6 @@ const (
 	FlowdefPurposeMismatchCreateFlowErrorResponse CreateFlowErrorResponseType = "flowdef.purpose_mismatch"
 	FlowIntegrityCreateFlowErrorResponse          CreateFlowErrorResponseType = "flow.integrity"
 	FlowInvalidPurposeCreateFlowErrorResponse     CreateFlowErrorResponseType = "flow.invalid_purpose"
-	FlowRateLimitedCreateFlowErrorResponse        CreateFlowErrorResponseType = "flow.rate_limited"
 	InternalCreateFlowErrorResponse               CreateFlowErrorResponseType = "internal"
 	TknInvalidCreateFlowErrorResponse             CreateFlowErrorResponseType = "tkn.invalid"
 	TknInvalidTknidCreateFlowErrorResponse        CreateFlowErrorResponseType = "tkn.invalid_tknid"
@@ -14553,11 +14551,6 @@ func (s CreateFlowErrorResponse) IsFlowIntegrity() bool {
 // IsFlowInvalidPurpose reports whether CreateFlowErrorResponse is FlowInvalidPurpose.
 func (s CreateFlowErrorResponse) IsFlowInvalidPurpose() bool {
 	return s.Type == FlowInvalidPurposeCreateFlowErrorResponse
-}
-
-// IsFlowRateLimited reports whether CreateFlowErrorResponse is FlowRateLimited.
-func (s CreateFlowErrorResponse) IsFlowRateLimited() bool {
-	return s.Type == FlowRateLimitedCreateFlowErrorResponse
 }
 
 // IsInternal reports whether CreateFlowErrorResponse is Internal.
@@ -14809,27 +14802,6 @@ func (s CreateFlowErrorResponse) GetFlowInvalidPurpose() (v FlowInvalidPurpose, 
 func NewFlowInvalidPurposeCreateFlowErrorResponse(v FlowInvalidPurpose) CreateFlowErrorResponse {
 	var s CreateFlowErrorResponse
 	s.SetFlowInvalidPurpose(v)
-	return s
-}
-
-// SetFlowRateLimited sets CreateFlowErrorResponse to FlowRateLimited.
-func (s *CreateFlowErrorResponse) SetFlowRateLimited(v FlowRateLimited) {
-	s.Type = FlowRateLimitedCreateFlowErrorResponse
-	s.FlowRateLimited = v
-}
-
-// GetFlowRateLimited returns FlowRateLimited and true boolean if CreateFlowErrorResponse is FlowRateLimited.
-func (s CreateFlowErrorResponse) GetFlowRateLimited() (v FlowRateLimited, ok bool) {
-	if !s.IsFlowRateLimited() {
-		return v, false
-	}
-	return s.FlowRateLimited, true
-}
-
-// NewFlowRateLimitedCreateFlowErrorResponse returns new CreateFlowErrorResponse from FlowRateLimited.
-func NewFlowRateLimitedCreateFlowErrorResponse(v FlowRateLimited) CreateFlowErrorResponse {
-	var s CreateFlowErrorResponse
-	s.SetFlowRateLimited(v)
 	return s
 }
 
@@ -29551,12 +29523,12 @@ func (s *FlowStepComplete) UnmarshalText(data []byte) error {
 // Security gates that must be satisfied before the step can be submitted.
 // The engine injects gates dynamically based on policy, even if they
 // are not declared in the flow definition.
-type FlowStepGates map[string]Gate
+type FlowStepGates map[string]RuntimeGate
 
 func (s *FlowStepGates) init() FlowStepGates {
 	m := *s
 	if m == nil {
-		m = map[string]Gate{}
+		m = map[string]RuntimeGate{}
 		*s = m
 	}
 	return m
@@ -31908,10 +31880,9 @@ type Gate struct {
 	Kind GateKind `json:"kind"`
 	// Implementation identifier. `zitadel_pow` protects password signup with
 	// the built-in proof-of-work solver. External providers are not supported.
-	Provider  string          `json:"provider"`
-	Challenge OptPowChallenge `json:"challenge"`
+	Provider string `json:"provider"`
 	// Reserved provider-specific configuration. The built-in signup gate uses
-	// `challenge` and does not accept caller-selected cost parameters.
+	// server-issued runtime parameters and accepts no caller-selected costs.
 	Config OptGateConfig `json:"config"`
 }
 
@@ -31923,11 +31894,6 @@ func (s *Gate) GetKind() GateKind {
 // GetProvider returns the value of Provider.
 func (s *Gate) GetProvider() string {
 	return s.Provider
-}
-
-// GetChallenge returns the value of Challenge.
-func (s *Gate) GetChallenge() OptPowChallenge {
-	return s.Challenge
 }
 
 // GetConfig returns the value of Config.
@@ -31945,18 +31911,13 @@ func (s *Gate) SetProvider(val string) {
 	s.Provider = val
 }
 
-// SetChallenge sets the value of Challenge.
-func (s *Gate) SetChallenge(val OptPowChallenge) {
-	s.Challenge = val
-}
-
 // SetConfig sets the value of Config.
 func (s *Gate) SetConfig(val OptGateConfig) {
 	s.Config = val
 }
 
 // Reserved provider-specific configuration. The built-in signup gate uses
-// `challenge` and does not accept caller-selected cost parameters.
+// server-issued runtime parameters and accepts no caller-selected costs.
 type GateConfig map[string]jx.Raw
 
 func (s *GateConfig) init() GateConfig {
@@ -64124,6 +64085,52 @@ func (o OptRollbackDeploymentRequest) Or(d RollbackDeploymentRequest) RollbackDe
 	return d
 }
 
+// NewOptRuntimeGateConfig returns new OptRuntimeGateConfig with value set to v.
+func NewOptRuntimeGateConfig(v RuntimeGateConfig) OptRuntimeGateConfig {
+	return OptRuntimeGateConfig{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptRuntimeGateConfig is optional RuntimeGateConfig.
+type OptRuntimeGateConfig struct {
+	Value RuntimeGateConfig
+	Set   bool
+}
+
+// IsSet returns true if OptRuntimeGateConfig was set.
+func (o OptRuntimeGateConfig) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptRuntimeGateConfig) Reset() {
+	var v RuntimeGateConfig
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptRuntimeGateConfig) SetTo(v RuntimeGateConfig) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptRuntimeGateConfig) Get() (v RuntimeGateConfig, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptRuntimeGateConfig) Or(d RuntimeGateConfig) RuntimeGateConfig {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptSSOAuthMethod returns new OptSSOAuthMethod with value set to v.
 func NewOptSSOAuthMethod(v SSOAuthMethod) OptSSOAuthMethod {
 	return OptSSOAuthMethod{
@@ -83965,6 +83972,114 @@ func (s *RollbackDeploymentRequest) SetMessage(val OptString) {
 // SetExpectedDeploymentID sets the value of ExpectedDeploymentID.
 func (s *RollbackDeploymentRequest) SetExpectedDeploymentID(val OptDeploymentID) {
 	s.ExpectedDeploymentID = val
+}
+
+// A runtime security challenge that must be satisfied before this step's submission
+// is accepted. The engine may also inject gates at runtime based on policy
+// or risk evaluation.
+// Ref: #
+type RuntimeGate struct {
+	// The gate category. Only `captcha` is currently defined. Authenticator
+	// ceremonies (e.g. passkey) are modelled as credential auth_attempts via
+	// `x-credential` on a field, not as gates.
+	Kind RuntimeGateKind `json:"kind"`
+	// Implementation identifier. `zitadel_pow` protects password signup with
+	// the built-in proof-of-work solver. External providers are not supported.
+	Provider  string          `json:"provider"`
+	Challenge OptPowChallenge `json:"challenge"`
+	// Reserved provider-specific configuration. The built-in signup gate uses
+	// `challenge` and does not accept caller-selected cost parameters.
+	Config OptRuntimeGateConfig `json:"config"`
+}
+
+// GetKind returns the value of Kind.
+func (s *RuntimeGate) GetKind() RuntimeGateKind {
+	return s.Kind
+}
+
+// GetProvider returns the value of Provider.
+func (s *RuntimeGate) GetProvider() string {
+	return s.Provider
+}
+
+// GetChallenge returns the value of Challenge.
+func (s *RuntimeGate) GetChallenge() OptPowChallenge {
+	return s.Challenge
+}
+
+// GetConfig returns the value of Config.
+func (s *RuntimeGate) GetConfig() OptRuntimeGateConfig {
+	return s.Config
+}
+
+// SetKind sets the value of Kind.
+func (s *RuntimeGate) SetKind(val RuntimeGateKind) {
+	s.Kind = val
+}
+
+// SetProvider sets the value of Provider.
+func (s *RuntimeGate) SetProvider(val string) {
+	s.Provider = val
+}
+
+// SetChallenge sets the value of Challenge.
+func (s *RuntimeGate) SetChallenge(val OptPowChallenge) {
+	s.Challenge = val
+}
+
+// SetConfig sets the value of Config.
+func (s *RuntimeGate) SetConfig(val OptRuntimeGateConfig) {
+	s.Config = val
+}
+
+// Reserved provider-specific configuration. The built-in signup gate uses
+// `challenge` and does not accept caller-selected cost parameters.
+type RuntimeGateConfig map[string]jx.Raw
+
+func (s *RuntimeGateConfig) init() RuntimeGateConfig {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// The gate category. Only `captcha` is currently defined. Authenticator
+// ceremonies (e.g. passkey) are modelled as credential auth_attempts via
+// `x-credential` on a field, not as gates.
+type RuntimeGateKind string
+
+const (
+	RuntimeGateKindCaptcha RuntimeGateKind = "captcha"
+)
+
+// AllValues returns all RuntimeGateKind values.
+func (RuntimeGateKind) AllValues() []RuntimeGateKind {
+	return []RuntimeGateKind{
+		RuntimeGateKindCaptcha,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s RuntimeGateKind) MarshalText() ([]byte, error) {
+	switch s {
+	case RuntimeGateKindCaptcha:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *RuntimeGateKind) UnmarshalText(data []byte) error {
+	switch RuntimeGateKind(data) {
+	case RuntimeGateKindCaptcha:
+		*s = RuntimeGateKindCaptcha
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
 }
 
 // Ref: #

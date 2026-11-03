@@ -20,13 +20,11 @@ properties:
       Implementation identifier. `zitadel_pow` protects password signup with
       the built-in proof-of-work solver. External providers are not supported.
     example: zitadel_pow
-  challenge:
-    $ref: pow-challenge.yaml
   config:
     type: object
     description: |
       Reserved provider-specific configuration. The built-in signup gate uses
-      `challenge` and does not accept caller-selected cost parameters.
+      server-issued runtime parameters and accepts no caller-selected costs.
     additionalProperties: true
     example:
       site_key: "0x4AAAAAAA-example-site-key"

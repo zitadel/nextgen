@@ -48,6 +48,17 @@ func (h *FlowCreateUserWithPasswordHandler) Handle(ctx context.Context, in domai
 		return domain.FlowOnSuccessResult{}, fmt.Errorf("%w: create_user has no password in collected data", domain.ErrFlowIntegrity())
 	}
 
+	// Signup has no password history. Check its cheap policy before spending
+	// the proof; SetUserPasswordAction still checks again before hashing.
+	if _, err := h.passwords.CheckPassword(ctx, SetPasswordInput{ProjectID: in.ProjectID, Password: password}); err != nil {
+		if derr, ok := errors.AsType[domain.Error](err); ok && errors.Is(err, domain.ErrUserPasswordPolicyViolation(nil)) {
+			if details, ok := derr.Details.(domain.PasswordPolicyViolations); ok {
+				return domain.FlowOnSuccessResult{StepError: new(domain.PasswordPolicyStepError(details.Violations))}, nil
+			}
+		}
+		return domain.FlowOnSuccessResult{}, err
+	}
+
 	// Spend once, before password hashing or any user mutation. A failed
 	// signup still costs the proof; re-render issues the next challenge.
 	if h.protection == nil {

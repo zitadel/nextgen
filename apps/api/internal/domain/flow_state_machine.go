@@ -228,6 +228,7 @@ type FlowStepResult struct {
 // FlowStep is the capability payload the API surfaces to the client.
 // It mirrors the OpenAPI `flow-step` component in domain terms.
 type FlowStep struct {
+	SignupRequired  bool
 	SignupChallenge *pow.PublicChallenge
 	Name            string
 	Texts           FlowStepTexts

@@ -6,6 +6,7 @@ CREATE TABLE zitadel_nextgen.signup_challenges (
     id TEXT COLLATE "C" NOT NULL,
     expires_at BIGINT NOT NULL,
     payload TEXT COLLATE "C" NOT NULL,
+    public TEXT COLLATE "C" NOT NULL,
     CONSTRAINT fk_signup_challenges_project FOREIGN KEY (project_id) REFERENCES zitadel_nextgen.projects (id) ON DELETE CASCADE,
     PRIMARY KEY (project_id, flow_id)
 );
@@ -13,11 +14,12 @@ CREATE TABLE zitadel_nextgen.signup_challenges (
 -- +goose StatementBegin
 CREATE TABLE zitadel_nextgen.signup_limits (
     project_id TEXT COLLATE "C" NOT NULL,
+    flow_id TEXT COLLATE "C" NOT NULL,
     window_start BIGINT NOT NULL,
     issued BIGINT NOT NULL,
     verified BIGINT NOT NULL,
     CONSTRAINT fk_signup_limits_project FOREIGN KEY (project_id) REFERENCES zitadel_nextgen.projects (id) ON DELETE CASCADE,
-    PRIMARY KEY (project_id)
+    PRIMARY KEY (project_id, flow_id)
 );
 -- +goose StatementEnd
 -- +goose Down

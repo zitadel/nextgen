@@ -14,16 +14,14 @@ import (
 )
 
 type vector struct {
-	Name         string          `json:"name"`
-	Counter      uint32          `json:"counter"`
-	ChallengeKey string          `json:"challenge_key"`
-	SolutionKey  string          `json:"solution_key"`
-	ContextJSON  string          `json:"context_json"`
-	Body         string          `json:"body"`
-	MAC          string          `json:"mac"`
-	DerivedKey   string          `json:"derived_key"`
-	Proof        string          `json:"proof"`
-	Public       PublicChallenge `json:"public"`
+	Name        string          `json:"name"`
+	Counter     uint32          `json:"counter"`
+	SolutionKey string          `json:"solution_key"`
+	ContextJSON string          `json:"context_json"`
+	Body        string          `json:"body"`
+	DerivedKey  string          `json:"derived_key"`
+	Proof       string          `json:"proof"`
+	Public      PublicChallenge `json:"public"`
 }
 
 func vectors(t testing.TB) []vector {
@@ -56,8 +54,8 @@ func (v vector) inputs(t testing.TB) (Binding, Keys, StoredChallenge, time.Time)
 	if err := json.Unmarshal([]byte(v.ContextJSON), &c); err != nil {
 		t.Fatal(err)
 	}
-	return c.Binding, Keys{Challenge: [32]byte(unhex(t, v.ChallengeKey)), Solution: [32]byte(unhex(t, v.SolutionKey))},
-		StoredChallenge{Body: []byte(v.Body), MAC: unhex(t, v.MAC)}, time.Unix(c.ExpiresAt, 0).Add(-MaxLifetime)
+	return c.Binding, Keys{Solution: [32]byte(unhex(t, v.SolutionKey))},
+		StoredChallenge{Body: []byte(v.Body)}, time.Unix(c.ExpiresAt, 0).Add(-MaxLifetime)
 }
 
 type spyDeriver struct {
@@ -94,8 +92,8 @@ func TestReferenceVectors(t *testing.T) {
 			if deriver.calls != 1 || binary.BigEndian.Uint32(deriver.input[16:]) != v.Counter {
 				t.Fatalf("issuance must perform exactly one KDF at counter %d; got calls=%d input=%x", v.Counter, deriver.calls, deriver.input)
 			}
-			if string(issued.Stored.Body) != v.Body || !bytes.Equal(issued.Stored.MAC, stored.MAC) {
-				t.Fatalf("Go framing/MAC differs from WebCrypto vector:\n%s\n%x", issued.Stored.Body, issued.Stored.MAC)
+			if string(issued.Stored.Body) != v.Body {
+				t.Fatalf("Go framing differs from WebCrypto vector:\n%s", issued.Stored.Body)
 			}
 			if !reflect.DeepEqual(issued.Public, v.Public) {
 				t.Fatalf("public projection mismatch: %+v", issued.Public)
@@ -221,7 +219,7 @@ func replaceBody(t testing.TB, stored StoredChallenge, keys Keys, mutate func(ma
 	if err != nil {
 		t.Fatal(err)
 	}
-	return StoredChallenge{Body: data, MAC: authenticate(keys.Challenge[:], parametersDomain, data)}
+	return StoredChallenge{Body: data}
 }
 
 func TestVerifierRejectsTampering(t *testing.T) {
@@ -240,14 +238,11 @@ func TestVerifierRejectsTampering(t *testing.T) {
 		change func(*verification)
 		want   error
 	}{
-		{"missing MAC", func(c *verification) { c.stored.MAC = nil }, ErrInvalidChallenge},
-		{"short MAC", func(c *verification) { c.stored.MAC = c.stored.MAC[:31] }, ErrInvalidChallenge},
-		{"body tampered", func(c *verification) { c.stored.Body = append(c.stored.Body, ' ') }, ErrInvalidChallenge},
+		{"salt tampered", func(c *verification) {
+			c.stored.Body = bytes.Replace(c.stored.Body, []byte(v.Public.Salt), []byte(strings.Repeat("0", 32)), 1)
+		}, ErrInvalidProof},
 		{"oversized body", func(c *verification) { c.stored.Body = bytes.Repeat([]byte(" "), MaxChallengeBytes+1) }, ErrInvalidChallenge},
-		{"wrong challenge key", func(c *verification) { c.keys.Challenge[0] ^= 1 }, ErrInvalidChallenge},
 		{"wrong solution key", func(c *verification) { c.keys.Solution[0] ^= 1 }, ErrInvalidProof},
-		{"exchanged keys", func(c *verification) { c.keys.Challenge, c.keys.Solution = c.keys.Solution, c.keys.Challenge }, ErrInvalidChallenge},
-		{"same purpose key", func(c *verification) { c.keys.Challenge = c.keys.Solution }, ErrInvalidKeys},
 		{"unresolved keys", func(c *verification) { c.keys = Keys{} }, ErrInvalidKeys},
 		{"expired at boundary", func(c *verification) { c.now = time.Unix(binding.ExpiresAt, 0) }, ErrExpired},
 		{"expired after boundary", func(c *verification) { c.now = time.Unix(binding.ExpiresAt+1, 0) }, ErrExpired},
@@ -261,7 +256,7 @@ func TestVerifierRejectsTampering(t *testing.T) {
 	}
 	for _, test := range cases {
 		t.Run(test.name, func(t *testing.T) {
-			c := verification{stored: StoredChallenge{Body: bytes.Clone(stored.Body), MAC: bytes.Clone(stored.MAC)}, proof: v.Proof, keys: keys, binding: binding, now: now}
+			c := verification{stored: StoredChallenge{Body: bytes.Clone(stored.Body)}, proof: v.Proof, keys: keys, binding: binding, now: now}
 			test.change(&c)
 			if err := Verify(c.stored, c.proof, c.binding, c.keys, c.now); !errors.Is(err, test.want) {
 				t.Fatalf("got %v, want %v", err, test.want)
@@ -277,8 +272,7 @@ func TestAuthenticatedMalformedStorage(t *testing.T) {
 	t.Parallel()
 	v := vectors(t)[1]
 	binding, keys, stored, now := v.inputs(t)
-	// Authenticate deliberately malformed bodies to exercise strict stored-data
-	// decoding rather than stopping every negative case at the outer MAC.
+	// Even authenticated storage must pass strict decoding.
 	for name, body := range map[string]string{
 		"null": "null", "array": "[]", "empty": "{}", "trailing": v.Body + "{}",
 		"unknown field":          strings.TrimSuffix(v.Body, "}") + `,"other":true}`,
@@ -298,7 +292,7 @@ func TestAuthenticatedMalformedStorage(t *testing.T) {
 		"short prefix":           strings.Replace(v.Body, v.Public.KeyPrefix, "00", 1),
 	} {
 		t.Run(name, func(t *testing.T) {
-			bad := StoredChallenge{Body: []byte(body), MAC: authenticate(keys.Challenge[:], parametersDomain, []byte(body))}
+			bad := StoredChallenge{Body: []byte(body)}
 			if err := Verify(bad, v.Proof, binding, keys, now); err == nil {
 				t.Fatal("malformed authenticated storage accepted")
 			}
@@ -320,7 +314,7 @@ func TestAuthenticatedMalformedStorage(t *testing.T) {
 	if err := Verify(bad, v.Proof, binding, keys, now); !errors.Is(err, ErrInvalidProof) {
 		t.Fatalf("wrong prefix with correct solution MAC: %v", err)
 	}
-	// Reordering C with only a fresh outer MAC must not authenticate the solution.
+	// Reordering the context must not authenticate the solution.
 	bad = replaceBody(t, stored, keys, func(body map[string]json.RawMessage) {
 		var ctx map[string]json.RawMessage
 		_ = json.Unmarshal(body["context"], &ctx)
@@ -341,7 +335,6 @@ func TestIssuerFailsBeforeKDF(t *testing.T) {
 		"excessive TTL":     func(b *Binding, _ *Keys) { b.ExpiresAt++ },
 		"future algorithm":  func(b *Binding, _ *Keys) { b.ProfileID = "argon2id_4096_l1" },
 		"missing keys":      func(_ *Binding, k *Keys) { *k = Keys{} },
-		"shared keys":       func(_ *Binding, k *Keys) { k.Solution = k.Challenge },
 		"invalid UTF8":      func(b *Binding, _ *Keys) { b.ProjectID = string([]byte{0xff}) },
 		"large ID":          func(b *Binding, _ *Keys) { b.ProjectID = strings.Repeat("a", 257) },
 		"large body after escaping": func(b *Binding, _ *Keys) {
@@ -417,7 +410,7 @@ func TestNoServerMaterialInProjection(t *testing.T) {
 		t.Fatalf("unexpected public fields: %s", data)
 	}
 	for _, secret := range []string{binding.ProjectID, binding.OperationInstanceID,
-		hex.EncodeToString(keys.Challenge[:]), hex.EncodeToString(keys.Solution[:]), hex.EncodeToString(issued.Stored.MAC)} {
+		hex.EncodeToString(keys.Solution[:])} {
 		if bytes.Contains(data, []byte(secret)) {
 			t.Fatalf("public projection leaked server material: %s", data)
 		}
@@ -451,8 +444,8 @@ func FuzzVerifyStoredChallenge(f *testing.F) {
 		if len(body) > MaxChallengeBytes+1 || len(proof) > MaxProofBytes+1 {
 			return
 		}
-		// The fuzz harness knows a test key so mutations reach the stored decoder.
-		stored := StoredChallenge{Body: body, MAC: authenticate(keys.Challenge[:], parametersDomain, body)}
+		// Mutate both stored data and the untrusted proof.
+		stored := StoredChallenge{Body: body}
 		err := Verify(stored, proof, binding, keys, now)
 		if err == nil {
 			parsed, parseErr := ParseProof(proof)

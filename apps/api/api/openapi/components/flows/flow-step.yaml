@@ -180,7 +180,7 @@ properties:
       The engine injects gates dynamically based on policy, even if they
       are not declared in the flow definition.
     additionalProperties:
-      $ref: gate.yaml
+      $ref: runtime-gate.yaml
     default: {}
   sso_providers:
     type: array

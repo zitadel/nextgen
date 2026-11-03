@@ -20,8 +20,9 @@ type SignupProtection interface {
 }
 
 const (
-	signupIssuanceLimit     = 60
-	signupVerificationLimit = 120
+	signupIssuanceLimit     = 10
+	signupVerificationLimit = 20
+	signupRefreshBefore     = time.Minute
 )
 
 type signupProtection struct {
@@ -34,12 +35,11 @@ func NewSignupProtection(db StatementPool, keys KeyService) SignupProtection {
 	return &signupProtection{db: db, keys: keys, now: time.Now}
 }
 
-// The independent per-challenge MAC keys never leave encrypted storage. The
+// The per-challenge solution MAC key never leaves encrypted storage. The
 // existing project secret key wraps them; rotation uses the JWE's key ID.
 type signupPayload struct {
-	Public                    pow.PublicChallenge
-	Body, MAC                 []byte
-	ChallengeKey, SolutionKey [32]byte
+	Body        []byte
+	SolutionKey [32]byte
 }
 
 func signupBinding(state *domain.FlowState, id string, expires int64) pow.Binding {
@@ -47,23 +47,23 @@ func signupBinding(state *domain.FlowState, id string, expires int64) pow.Bindin
 		Operation: "create_user", OperationInstanceID: state.ID, ChallengeID: id, ExpiresAt: expires}
 }
 
-// charge commits before cryptographic work. Fixed project-wide budgets also
-// bound new-flow/IP rotation and work across replicas; no forwarded IP trust is
-// needed. Reads of an existing live challenge do not spend issuance budget.
-func (s *signupProtection) charge(ctx context.Context, project string, issue bool) error {
-	now := s.now().Unix()
+// Limits belong to the server-issued flow, never to the entire project. New
+// flows still need ingress rate limits; forwarded IP headers are not trusted.
+func (s *signupProtection) charge(ctx context.Context, state *domain.FlowState, issue bool) error {
 	return s.db.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		st := tx.Statements()
-		if err := st.LockProject(ctx, project); err != nil {
+		if err := st.InsertSignupLimits(ctx, &domain.SignupLimits{ProjectID: state.ProjectID, FlowID: state.ID}); err != nil {
 			return err
 		}
-		limits, err := st.GetSignupLimits(ctx, project)
+		limits, err := st.LockSignupLimits(ctx, state.ProjectID, state.ID)
 		if err != nil {
 			return err
 		}
-		fresh := limits == nil
-		if fresh || now >= limits.WindowStart+60 {
-			limits = &domain.SignupLimits{ProjectID: project, WindowStart: now}
+		now := s.now().Unix()
+		if now >= limits.WindowStart+60 {
+			limits.WindowStart = now
+			limits.Issued = 0
+			limits.Verified = 0
 		}
 		if issue {
 			if limits.Issued >= signupIssuanceLimit {
@@ -76,11 +76,16 @@ func (s *signupProtection) charge(ctx context.Context, project string, issue boo
 			}
 			limits.Verified++
 		}
-		if fresh {
-			return st.InsertSignupLimits(ctx, limits)
-		}
 		return st.UpdateSignupLimits(ctx, limits)
 	})
+}
+
+func signupPublic(record *domain.SignupChallengeRecord) (*pow.PublicChallenge, error) {
+	var public pow.PublicChallenge
+	if err := json.Unmarshal([]byte(record.Public), &public); err != nil {
+		return nil, err
+	}
+	return &public, nil
 }
 
 func (s *signupProtection) open(ctx context.Context, record *domain.SignupChallengeRecord) (*signupPayload, error) {
@@ -112,14 +117,15 @@ func (s *signupProtection) Challenge(ctx context.Context, state *domain.FlowStat
 	if err != nil {
 		return nil, err
 	}
-	if record != nil && record.ExpiresAt > now.Unix() {
-		payload, err := s.open(ctx, record)
-		if err != nil {
-			return nil, fmt.Errorf("open signup challenge: %w", err)
-		}
-		return &payload.Public, nil
+	if record != nil && record.ExpiresAt > now.Add(signupRefreshBefore).Unix() {
+		return signupPublic(record)
 	}
-	if err := s.charge(ctx, state.ProjectID, true); err != nil {
+	// Sweep before taking a flow lock, so cleanup cannot invert the lock order
+	// between two flows issuing at once.
+	if err := s.db.Statements().DeleteExpiredSignupChallenges(ctx, state.ProjectID, now.Unix()); err != nil {
+		return nil, err
+	}
+	if err := s.charge(ctx, state, true); err != nil {
 		return nil, err
 	}
 	id, err := s.db.Statements().NewManagedID(string(domain.PrefixChallenge))
@@ -127,9 +133,6 @@ func (s *signupProtection) Challenge(ctx context.Context, state *domain.FlowStat
 		return nil, err
 	}
 	keys := pow.Keys{}
-	if _, err := rand.Read(keys.Challenge[:]); err != nil {
-		return nil, err
-	}
 	if _, err := rand.Read(keys.Solution[:]); err != nil {
 		return nil, err
 	}
@@ -137,7 +140,7 @@ func (s *signupProtection) Challenge(ctx context.Context, state *domain.FlowStat
 	if err != nil {
 		return nil, err
 	}
-	payload := signupPayload{Public: challenge.Public, Body: challenge.Stored.Body, MAC: challenge.Stored.MAC, ChallengeKey: keys.Challenge, SolutionKey: keys.Solution}
+	payload := signupPayload{Body: challenge.Stored.Body, SolutionKey: keys.Solution}
 	raw, err := json.Marshal(payload)
 	if err != nil {
 		return nil, err
@@ -147,18 +150,18 @@ func (s *signupProtection) Challenge(ctx context.Context, state *domain.FlowStat
 		return nil, err
 	}
 	encrypted, err := crypter.Encrypt(string(raw))
-	clear(raw)
 	if err != nil {
 		return nil, err
 	}
-	proposed := &domain.SignupChallengeRecord{ProjectID: state.ProjectID, FlowID: state.ID, ID: id, ExpiresAt: challenge.Public.ExpiresAt.Unix(), Payload: encrypted}
+	public, err := json.Marshal(challenge.Public)
+	if err != nil {
+		return nil, err
+	}
+	proposed := &domain.SignupChallengeRecord{ProjectID: state.ProjectID, FlowID: state.ID, ID: id, ExpiresAt: challenge.Public.ExpiresAt.Unix(), Payload: encrypted, Public: string(public)}
 	// No randomness, KDF or key-service calls inside retryable transactions.
 	err = s.db.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		st := tx.Statements()
-		if err := st.LockProject(ctx, state.ProjectID); err != nil {
-			return err
-		}
-		if err := st.DeleteExpiredSignupChallenges(ctx, state.ProjectID, now.Unix()); err != nil {
+		if _, err := st.LockSignupLimits(ctx, state.ProjectID, state.ID); err != nil {
 			return err
 		}
 		var err error
@@ -166,7 +169,7 @@ func (s *signupProtection) Challenge(ctx context.Context, state *domain.FlowStat
 		if err != nil {
 			return err
 		}
-		if record != nil {
+		if record != nil && record.ExpiresAt > s.now().Add(signupRefreshBefore).Unix() {
 			return nil
 		} // Another issuer won: return its challenge.
 		record = proposed
@@ -181,18 +184,14 @@ func (s *signupProtection) Challenge(ctx context.Context, state *domain.FlowStat
 	if record.ID == proposed.ID {
 		return &challenge.Public, nil
 	}
-	other, err := s.open(ctx, record)
-	if err != nil {
-		return nil, err
-	}
-	return &other.Public, nil
+	return signupPublic(record)
 }
 
 func (s *signupProtection) Consume(ctx context.Context, state *domain.FlowState, proof string) error {
 	if state == nil || state.ID == "" || state.ProjectID == "" {
 		return domain.ErrFlowProofInvalid()
 	}
-	if err := s.charge(ctx, state.ProjectID, false); err != nil {
+	if err := s.charge(ctx, state, false); err != nil {
 		return err
 	}
 	parsed, err := pow.ParseProof(proof)
@@ -210,18 +209,17 @@ func (s *signupProtection) Consume(ctx context.Context, state *domain.FlowState,
 	if err != nil {
 		return fmt.Errorf("open signup proof: %w", err)
 	}
-	err = pow.Verify(pow.StoredChallenge{Body: payload.Body, MAC: payload.MAC}, proof,
-		signupBinding(state, record.ID, record.ExpiresAt), pow.Keys{Challenge: payload.ChallengeKey, Solution: payload.SolutionKey}, s.now())
+	err = pow.Verify(pow.StoredChallenge{Body: payload.Body}, proof,
+		signupBinding(state, record.ID, record.ExpiresAt), pow.Keys{Solution: payload.SolutionKey}, s.now())
 	if err != nil {
 		return domain.ErrFlowProofInvalid()
 	}
 	return s.db.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		st := tx.Statements()
-		// Same lock order as issuance/expiry cleanup and its project FK writes.
-		if err := st.LockProject(ctx, state.ProjectID); err != nil {
+		// Serialize only this flow, then resample time after waiting or retrying.
+		if _, err := st.LockSignupLimits(ctx, state.ProjectID, state.ID); err != nil {
 			return err
 		}
-		// Waiting for the lock or retrying the transaction can outlast the proof.
 		consumed, err := st.ConsumeSignupChallenge(ctx, state.ProjectID, state.ID, record.ID, s.now().Unix())
 		if err != nil {
 			return err

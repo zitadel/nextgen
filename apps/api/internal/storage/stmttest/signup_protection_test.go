@@ -4,12 +4,7 @@ package stmttest
 
 import (
 	"context"
-	"crypto/pbkdf2"
 	"crypto/rand"
-	"crypto/sha256"
-	"encoding/binary"
-	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"sync"
@@ -19,7 +14,7 @@ import (
 
 	"github.com/go-jose/go-jose/v4"
 	"github.com/stretchr/testify/require"
-	"github.com/zitadel/nextgen/internal/crypto/pow"
+	"github.com/zitadel/nextgen/internal/crypto/pow/powtest"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/oidc/v3/pkg/op"
@@ -49,27 +44,6 @@ func signupService(t *testing.T, d dialect) service.SignupProtection {
 	require.NoError(t, err)
 	return service.NewSignupProtection(service.NewPool(d.pool), signupTestKeys{crypter: op.NewAES256GCMCrypto(key, id), id: id})
 }
-func solveSignup(t *testing.T, c *pow.PublicChallenge) string {
-	t.Helper()
-	salt, err := hex.DecodeString(c.Salt)
-	require.NoError(t, err)
-	nonce, err := hex.DecodeString(c.Nonce)
-	require.NoError(t, err)
-	input := make([]byte, 20)
-	copy(input, nonce)
-	for counter := uint32(0); counter < 512; counter++ {
-		binary.BigEndian.PutUint32(input[16:], counter)
-		key, err := pbkdf2.Key(sha256.New, string(input), salt, 5000, 32)
-		require.NoError(t, err)
-		if hex.EncodeToString(key[:16]) == c.KeyPrefix {
-			raw, err := json.Marshal(map[string]string{"protocol": c.Protocol, "challenge_id": c.ChallengeID, "derived_key": hex.EncodeToString(key)})
-			require.NoError(t, err)
-			return string(raw)
-		}
-	}
-	t.Fatal("no solution in profile")
-	return ""
-}
 func TestSignupProtection(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		project := ensureProject(t, d.stmts)
@@ -82,10 +56,10 @@ func TestSignupProtection(t *testing.T) {
 		same, err := svc.Challenge(t.Context(), state)
 		require.NoError(t, err)
 		require.Equal(t, challenge, same)
-		limits, err := d.stmts.GetSignupLimits(t.Context(), project)
+		limits, err := readSignupLimits(t, d, project, flow)
 		require.NoError(t, err)
 		require.EqualValues(t, 1, limits.Issued)
-		proof := solveSignup(t, challenge)
+		proof := powtest.Solve(t, challenge)
 		require.ErrorIs(t, svc.Consume(t.Context(), state, ""), domain.ErrFlowProofInvalid())
 		otherFlow := *state
 		otherFlow.ID += "_other"
@@ -119,25 +93,25 @@ func TestSignupProtection(t *testing.T) {
 		require.NotEqual(t, challenge.ChallengeID, next.ChallengeID)
 		// A new pending challenge does not make an old solved proof usable again.
 		require.ErrorIs(t, svc.Consume(t.Context(), state, proof), domain.ErrFlowProofInvalid())
-		limits, err = d.stmts.GetSignupLimits(t.Context(), project)
+		limits, err = readSignupLimits(t, d, project, flow)
 		require.NoError(t, err)
-		limits.Issued = 60
-		limits.Verified = 120
+		limits.Issued = 10
+		limits.Verified = 20
 		require.NoError(t, d.stmts.UpdateSignupLimits(t.Context(), limits))
+		// Exhausting one flow never prevents another flow from signing up.
 		_, err = svc.Challenge(t.Context(), &otherFlow)
-		require.ErrorIs(t, err, domain.ErrFlowRateLimited())
+		require.NoError(t, err)
 		require.ErrorIs(t, svc.Consume(t.Context(), state, proof), domain.ErrFlowRateLimited())
 		reused, err := svc.Challenge(t.Context(), state)
 		require.NoError(t, err)
 		require.Equal(t, next, reused)
 		limits.WindowStart = time.Now().Add(-2 * time.Minute).Unix()
 		require.NoError(t, d.stmts.UpdateSignupLimits(t.Context(), limits))
-		_, err = svc.Challenge(t.Context(), &otherFlow)
+		require.ErrorIs(t, svc.Consume(t.Context(), state, proof), domain.ErrFlowProofInvalid())
+		limits, err = readSignupLimits(t, d, project, flow)
 		require.NoError(t, err)
-		limits, err = d.stmts.GetSignupLimits(t.Context(), project)
-		require.NoError(t, err)
-		require.EqualValues(t, 1, limits.Issued)
-		require.Zero(t, limits.Verified)
+		require.Zero(t, limits.Issued)
+		require.EqualValues(t, 1, limits.Verified)
 	})
 }
 func TestSignupChallengeExpiry(t *testing.T) {
@@ -149,7 +123,11 @@ func TestSignupChallengeExpiry(t *testing.T) {
 		consumed, err := d.stmts.ConsumeSignupChallenge(t.Context(), project, record.FlowID, record.ID, now)
 		require.NoError(t, err)
 		require.False(t, consumed)
+		require.NoError(t, d.stmts.InsertSignupLimits(t.Context(), &domain.SignupLimits{ProjectID: project, FlowID: "inactive", WindowStart: now - 3601}))
 		require.NoError(t, d.stmts.DeleteExpiredSignupChallenges(t.Context(), project, now))
+		limits, err := readSignupLimits(t, d, project, "inactive")
+		require.NoError(t, err)
+		require.Nil(t, limits)
 		missing, err := d.stmts.GetSignupChallenge(t.Context(), project, record.FlowID)
 		require.NoError(t, err)
 		require.Nil(t, missing)
@@ -159,14 +137,13 @@ func TestSignupChallengeExpiry(t *testing.T) {
 func TestSignupIssuanceBudgetConcurrent(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		project := ensureProject(t, d.stmts)
-		require.NoError(t, d.stmts.InsertSignupLimits(t.Context(), &domain.SignupLimits{ProjectID: project, WindowStart: time.Now().Unix(), Issued: 59}))
+		require.NoError(t, d.stmts.InsertSignupLimits(t.Context(), &domain.SignupLimits{ProjectID: project, FlowID: "shared_flow", WindowStart: time.Now().Unix(), Issued: 9}))
 		svc := signupService(t, d)
 		var wg sync.WaitGroup
 		var issued atomic.Int32
 		errs := make(chan error, 8)
 		for range 8 {
-			flow, err := d.stmts.NewManagedID(string(domain.PrefixFlow))
-			require.NoError(t, err)
+			flow := "shared_flow"
 			wg.Go(func() {
 				_, err := svc.Challenge(t.Context(), &domain.FlowState{ProjectID: project, ID: flow})
 				if err == nil {
@@ -178,7 +155,10 @@ func TestSignupIssuanceBudgetConcurrent(t *testing.T) {
 		}
 		wg.Wait()
 		close(errs)
-		require.EqualValues(t, 1, issued.Load())
+		require.Positive(t, issued.Load())
+		limits, err := readSignupLimits(t, d, project, "shared_flow")
+		require.NoError(t, err)
+		require.EqualValues(t, 10, limits.Issued)
 		for err := range errs {
 			require.ErrorIs(t, err, domain.ErrFlowRateLimited())
 		}
@@ -202,9 +182,9 @@ func TestSignupProofSpentOnMutationFailure(t *testing.T) {
 		protection := signupService(t, d)
 		challenge, err := protection.Challenge(t.Context(), state)
 		require.NoError(t, err)
-		proof := solveSignup(t, challenge)
+		proof := powtest.Solve(t, challenge)
 		failed := errors.New("mutation failed")
-		handler := service.NewFlowCreateUserHandler(nil, nil, failedSignupMutation{err: failed}, nil, service.NewPool(d.pool), protection)
+		handler := service.NewFlowCreateUserHandler(nil, signupPasswordGate{}, failedSignupMutation{err: failed}, nil, service.NewPool(d.pool), protection)
 		_, err = handler.Handle(t.Context(), domain.FlowOnSuccessInput{ProjectID: project, State: state, GateProofs: map[string]string{domain.SignupGate: proof}})
 		require.ErrorIs(t, err, failed)
 		require.ErrorIs(t, protection.Consume(t.Context(), state, proof), domain.ErrFlowProofInvalid())
@@ -212,4 +192,56 @@ func TestSignupProofSpentOnMutationFailure(t *testing.T) {
 		require.NoError(t, err)
 		require.NotEqual(t, challenge.ChallengeID, next.ChallengeID)
 	})
+}
+
+type signupPasswordGate struct{}
+
+func (signupPasswordGate) CheckPassword(context.Context, service.SetPasswordInput) (service.PasswordCheck, error) {
+	return service.PasswordCheck{}, nil
+}
+
+func TestSignupRefreshesNearExpiry(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		project := ensureProject(t, d.stmts)
+		state := &domain.FlowState{ProjectID: project, ID: "near_expiry_flow"}
+		svc := signupService(t, d)
+		first, err := svc.Challenge(t.Context(), state)
+		require.NoError(t, err)
+		record, err := d.stmts.GetSignupChallenge(t.Context(), project, state.ID)
+		require.NoError(t, err)
+		record.ExpiresAt = time.Now().Add(30 * time.Second).Unix()
+		record.Payload = "must not decrypt while refreshing"
+		require.NoError(t, d.stmts.CreateSignupChallenge(t.Context(), record))
+		fresh, err := svc.Challenge(t.Context(), state)
+		require.NoError(t, err)
+		require.NotEqual(t, first.ChallengeID, fresh.ChallengeID)
+		require.Greater(t, fresh.ExpiresAt.Unix(), time.Now().Add(time.Minute).Unix())
+	})
+}
+
+func TestSignupJunkOnlyLimitsItsOwnFlow(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		project := ensureProject(t, d.stmts)
+		svc := signupService(t, d)
+		attacker := &domain.FlowState{ProjectID: project, ID: "attacker"}
+		for range 20 {
+			require.ErrorIs(t, svc.Consume(t.Context(), attacker, "junk"), domain.ErrFlowProofInvalid())
+		}
+		require.ErrorIs(t, svc.Consume(t.Context(), attacker, "junk"), domain.ErrFlowRateLimited())
+		victim := &domain.FlowState{ProjectID: project, ID: "victim"}
+		challenge, err := svc.Challenge(t.Context(), victim)
+		require.NoError(t, err)
+		require.NoError(t, svc.Consume(t.Context(), victim, powtest.Solve(t, challenge)))
+	})
+}
+
+// LockSignupLimits is a read-write transaction operation, including on Spanner.
+func readSignupLimits(t *testing.T, d dialect, project, flow string) (limits *domain.SignupLimits, err error) {
+	t.Helper()
+	err = service.NewPool(d.pool).Transaction(t.Context(), func(ctx context.Context, tx service.Statementer[service.AllStatements]) error {
+		var err error
+		limits, err = tx.Statements().LockSignupLimits(ctx, project, flow)
+		return err
+	})
+	return limits, err
 }
