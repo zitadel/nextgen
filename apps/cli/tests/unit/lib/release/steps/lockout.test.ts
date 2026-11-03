@@ -1,10 +1,17 @@
+import { ApiError } from "@zitadel/api/runtime/fetch";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import type { StepContext } from "../../../../../src/lib/release/pipeline";
 import { lockoutStep } from "../../../../../src/lib/release/steps/lockout";
 import { takeReportedWarnings } from "../../../../../src/lib/warnings";
 
-type FakeUser = { id: string; schema: string; type: string; attributes: Record<string, unknown> };
+type FakeUser = {
+  id: string;
+  schema: string;
+  type: string;
+  attributes: Record<string, unknown>;
+  status?: string;
+};
 
 beforeEach(() => {
   takeReportedWarnings();
@@ -25,6 +32,7 @@ function ctx(options: {
   endlessEmptyPages?: boolean;
   failFor?: string;
   failLinks?: boolean;
+  missingLinks?: string[];
   listing?: Array<{ id: string; schema: Record<string, unknown> }>;
   listed?: number[];
 }): StepContext {
@@ -32,7 +40,7 @@ function ctx(options: {
     cwd: "/unused",
     client: {
       queryUsers: async (body: {
-        filter: { operation: string; value: string }[];
+        filter: { field: string; operation: string; value: string }[];
         limit: number;
         page_token?: string;
       }) => {
@@ -48,12 +56,17 @@ function ctx(options: {
         if (options.endlessEmptyPages) {
           return { users: [], next_page_token: "again" };
         }
-        const equals = body.filter.find((f) => f.operation === "equals")?.value;
+        const equals = body.filter.find(
+          (f) => f.field === "schema_object_type" && f.operation === "equals",
+        )?.value;
+        const status = body.filter.find((f) => f.field === "status")?.value;
         const excluded = body.filter
           .filter((f) => f.operation === "not_equals")
           .map((f) => f.value);
-        const matching = options.users.filter((user) =>
-          equals === undefined ? !excluded.includes(user.type) : user.type === equals,
+        const matching = options.users.filter(
+          (user) =>
+            (status === undefined || (user.status ?? "active") === status) &&
+            (equals === undefined ? !excluded.includes(user.type) : user.type === equals),
         );
         const start = Number(body.page_token ?? 0);
         const users = matching.slice(start, start + body.limit);
@@ -67,6 +80,14 @@ function ctx(options: {
       listUserIdentityLinks: async (id: string) => {
         if (options.failLinks) {
           throw new Error("forbidden");
+        }
+        if (options.missingLinks?.includes(id)) {
+          throw new ApiError(
+            404,
+            "http://localhost/users",
+            { code: "user.not_found" },
+            "Not Found",
+          );
         }
         return {
           identity_links: Array.from({ length: options.links?.[id] ?? 0 }, () => ({})),
@@ -615,6 +636,81 @@ describe("lockoutStep", () => {
     const warnings = takeReportedWarnings();
     expect(warnings[0]).toContain("2 existing users of schemas whose names could not be read");
     expect(warnings[0]).not.toContain(HUMAN);
+  });
+
+  it("counts only active users", async () => {
+    const gone = Array.from({ length: 200 }, (_, index) => ({
+      ...user(`d-${index}`, "human-user", {}),
+      status: "deactivated",
+    }));
+    await lockoutStep.run(
+      ctx({
+        schemas: [{ objectType: "human-user", "x-identifier": "email" }],
+        flows: [flow("human-user")],
+        users: [
+          user("a1", "human-user", {}),
+          user("a2", "human-user", {}),
+          user("a3", "human-user", {}),
+          ...gone,
+        ],
+      }),
+    );
+
+    expect(takeReportedWarnings()[0]).toContain('3 of 3 existing users of "human-user"');
+  });
+
+  it("does not report a user deleted since the query as a failure", async () => {
+    await lockoutStep.run(
+      ctx({
+        schemas: [{ objectType: "employee" }],
+        flows: [flow("employee")],
+        users: [user("u1", "human-user"), user("u2", "human-user")],
+        links: { u2: 1 },
+        missingLinks: ["u1"],
+      }),
+    );
+
+    const warnings = takeReportedWarnings();
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain('1 existing user of "human-user" has an SSO link');
+  });
+
+  it("says so when resolving the flows throws before the scans start", async () => {
+    await lockoutStep.run(
+      ctx({
+        schemas: [{ objectType: "human-user", "x-identifier": "email" }],
+        flows: [
+          {
+            name: "default-login",
+            status: "active",
+            user_schema: "human-user",
+            purposes: { login: "identifier" },
+            steps: [{ name: "identifier", fields: ["email"], transitions: { submit: null } }],
+          },
+        ],
+        users: [],
+      }),
+    );
+
+    expect(takeReportedWarnings()[0]).toContain("Could not finish checking existing users");
+  });
+
+  it("names a schema that really has an empty object type instead of calling it unnamed", async () => {
+    await lockoutStep.run(
+      ctx({
+        schemas: [{ objectType: "employee" }],
+        flows: [flow("employee")],
+        users: [user("u1", "human-user")],
+        links: { u1: 1 },
+        listing: [{ id: HUMAN, schema: { objectType: "" } }],
+      }),
+    );
+
+    expect(takeReportedWarnings()[0]).toContain('of "" has an SSO link');
+  });
+
+  it("runs for deploy only", () => {
+    expect(lockoutStep.runsFor).toEqual(["deploy"]);
   });
 
   it("never fails the deploy when users cannot be read", async () => {

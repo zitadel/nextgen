@@ -1,3 +1,5 @@
+import { ApiError } from "@zitadel/api/runtime/fetch";
+
 import type { ZitadelClient } from "../../api-client";
 import { mapBounded } from "../../map-bounded";
 import { reportWarning } from "../../warnings";
@@ -27,7 +29,9 @@ type Names = () => Promise<ReadonlyMap<string, SchemaInfo> | undefined>;
 /** A scan with nothing to report. */
 const nothing = (): Scan => ({ warnings: [], partial: [], failed: false });
 /** What stranded users are counted under when their schema could not be named. */
-const UNNAMED = "";
+const UNNAMED = Symbol("unnamed");
+/** Only active users can sign in, so only they can be locked out. */
+const ACTIVE: UserFilter = { field: "status", operation: "equals", value: "active" };
 
 /**
  * Warn when this deploy leaves users who exist today unable to sign in. A
@@ -48,14 +52,17 @@ const UNNAMED = "";
  */
 export const lockoutStep: Step = {
   name: "lockout",
-  runsFor: ["deploy", "preview"],
+  runsFor: ["deploy"],
   async run(ctx: StepContext): Promise<undefined> {
     try {
       for (const message of await lockoutWarnings(ctx)) {
         reportWarning(message);
       }
     } catch {
-      // Unreadable users mean no warning, never a failed deploy.
+      // Never a failed deploy, but never a silent pass either.
+      reportWarning(
+        "Could not finish checking existing users for sign-in lockouts: an unexpected error stopped the check.",
+      );
     }
     return undefined;
   },
@@ -182,7 +189,7 @@ async function lookupWarnings(
       try {
         const { users, truncated } = await readUsers(
           ctx,
-          [{ field: "schema_object_type", operation: "equals", value: objectType }],
+          [{ field: "schema_object_type", operation: "equals", value: objectType }, ACTIVE],
           share,
         );
         const missing = users.filter((user) => !carries(user, identifier));
@@ -222,7 +229,10 @@ async function ssoWarnings(
   }
   const read = await readUsers(
     ctx,
-    served.map((value) => ({ field: "schema_object_type", operation: "not_equals", value })),
+    [
+      ...served.map((value) => ({ field: "schema_object_type", operation: "not_equals", value })),
+      ACTIVE,
+    ],
     share,
   );
   // One request per user, so only the first few are asked; when more were read
@@ -238,13 +248,16 @@ async function ssoWarnings(
         limit: 1,
       });
       return links.length > 0;
-    } catch {
-      failed = true;
+    } catch (error) {
+      // A user deleted since the query answers 404: nothing to report.
+      if (!(error instanceof ApiError && error.status === 404)) {
+        failed = true;
+      }
       return false;
     }
   });
   // Revisions of one schema share an object type, so they are one count.
-  const linked = new Map<string, number>();
+  const linked = new Map<string | symbol, number>();
   const nameOf = hasLink.some(Boolean) ? await names() : undefined;
   stranded.forEach((user, index) => {
     if (!hasLink[index]) {
@@ -254,7 +267,7 @@ async function ssoWarnings(
     linked.set(name, (linked.get(name) ?? 0) + 1);
   });
   const warnings = [...linked].map(([name, total]) => {
-    const label = name === UNNAMED ? "schemas whose names could not be read" : quote(name);
+    const label = typeof name === "string" ? quote(name) : "schemas whose names could not be read";
     return `${count(total, truncated)} existing ${plural(total, "user")} of ${label} ${total === 1 ? "has" : "have"} an SSO link, but no flow in this release uses that schema, so they cannot sign in with SSO. Passkey sign-in is not affected. Users cannot move between schemas, so keep or restore a flow on ${label}.`;
   });
   return {

@@ -185,6 +185,16 @@ describe("deploy", () => {
         );
       });
 
+      it("does not count deactivated users", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        platform.holdsADeactivatedUserWithoutAnEmail();
+
+        const result = await app.deployDryRun();
+
+        expect(app.envelopeOf(result).warnings ?? []).toEqual([]);
+      });
+
       it("does not warn when every user carries the identifier", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin();

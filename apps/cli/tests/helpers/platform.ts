@@ -31,6 +31,9 @@ export interface PlatformMock {
   /** Holds a user of the login flow's schema that carries no email, the identifier the scaffold signs in with. */
   holdsAUserWithoutAnEmail(): void;
 
+  /** Holds a deactivated user of the login flow's schema that carries no email. */
+  holdsADeactivatedUserWithoutAnEmail(): void;
+
   /** Holds a user of the login flow's schema that carries an email. */
   holdsAUserWithAnEmail(): void;
 
@@ -134,17 +137,24 @@ export function usePlatformMock(): PlatformMock {
     server.use(
       http.post("*/users/query", async ({ request }) => {
         const { filter = [] } = (await request.json()) as {
-          filter?: Array<{ operation: string; value: string }>;
+          filter?: Array<{ field: string; operation: string; value: string }>;
         };
-        const equals = filter.find((entry) => entry.operation === "equals");
+        const status = filter.find((entry) => entry.field === "status")?.value;
+        const alive = (users: Record<string, unknown>[]) =>
+          users.filter((user) => status === undefined || (user.status ?? "active") === status);
+        const equals = filter.find(
+          (entry) => entry.field === "schema_object_type" && entry.operation === "equals",
+        );
         if (equals !== undefined) {
-          return HttpResponse.json({ users: equals.value === SERVED_OBJECT_TYPE ? matching : [] });
+          return HttpResponse.json({
+            users: equals.value === SERVED_OBJECT_TYPE ? alive(matching) : [],
+          });
         }
         const excluded = filter
           .filter((entry) => entry.operation === "not_equals")
           .map((entry) => entry.value);
         return HttpResponse.json({
-          users: excluded.includes(SERVED_OBJECT_TYPE) ? elsewhere : [],
+          users: excluded.includes(SERVED_OBJECT_TYPE) ? alive(elsewhere) : [],
         });
       }),
     );
@@ -164,6 +174,10 @@ export function usePlatformMock(): PlatformMock {
   return {
     holdsAUserWithoutAnEmail() {
       holdUsers([{ id: "user_1", schema: "sch_1", attributes: {} }], []);
+    },
+
+    holdsADeactivatedUserWithoutAnEmail() {
+      holdUsers([{ id: "user_1", schema: "sch_1", status: "deactivated", attributes: {} }], []);
     },
 
     holdsAUserWithAnEmail() {
