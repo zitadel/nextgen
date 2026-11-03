@@ -14,8 +14,9 @@ get:
     - $ref: ../../../components/parameters/project-id.yaml
     - $ref: ../../../components/parameters/policy-id.yaml
   security:
-    - oauth2:
+    - pat:
         - policy.read
+    - oauth2: []
     - sessionCookie: []
   responses:
     '200':

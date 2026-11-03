@@ -36,8 +36,9 @@ get:
         $ref: ../../../components/schemas/team-id.yaml
     - $ref: ../../../components/parameters/user-id.yaml
   security:
-    - oauth2:
+    - pat:
         - user.read
+    - oauth2: []
     - sessionCookie: []
   responses:
     '200':
@@ -75,8 +76,9 @@ patch:
   parameters:
     - $ref: ../../../components/parameters/user-id.yaml
   security:
-    - oauth2:
+    - pat:
         - user.write
+    - oauth2: []
     - sessionCookie: []
   requestBody:
     description: The changes to merge into the user.
@@ -164,8 +166,9 @@ delete:
     parameters:
       - $ref: ../../../components/parameters/user-id.yaml
     security:
-      - oauth2:
+      - pat:
           - user.delete
+      - oauth2: []
       - sessionCookie: []
     responses:
       '204':

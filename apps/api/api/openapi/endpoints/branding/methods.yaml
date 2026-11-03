@@ -15,8 +15,9 @@ post:
   parameters:
     - $ref: ../../components/parameters/project-id.yaml
   security:
-    - oauth2:
+    - pat:
         - branding.write
+    - oauth2: []
   requestBody:
     required: true
     content:
@@ -54,8 +55,9 @@ get:
   parameters:
     - $ref: ../../components/parameters/project-id.yaml
   security:
-    - oauth2:
+    - pat:
         - branding.read
+    - oauth2: []
     - sessionCookie: []
   responses:
     '200':

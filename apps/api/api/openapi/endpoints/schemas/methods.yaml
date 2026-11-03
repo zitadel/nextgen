@@ -17,8 +17,9 @@ post:
     - $ref: ../../components/parameters/project-id.yaml
     - $ref: ../../components/parameters/team-id.yaml
   security:
-    - oauth2:
+    - pat:
         - schema.write
+    - oauth2: []
   requestBody:
     required: true
     content:
@@ -127,8 +128,9 @@ get:
         items:
           $ref: schema-expand.yaml
   security:
-    - oauth2:
+    - pat:
         - schema.read
+    - oauth2: []
     - sessionCookie: []
   responses:
     '200':

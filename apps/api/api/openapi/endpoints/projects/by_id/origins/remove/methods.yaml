@@ -13,8 +13,9 @@ post:
   parameters:
     - $ref: ../../../../../components/parameters/project-id-path.yaml
   security:
-    - oauth2:
+    - pat:
         - origin.delete
+    - oauth2: []
     - sessionCookie: []
   requestBody:
     required: true

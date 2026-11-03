@@ -13,8 +13,9 @@ get:
     - $ref: ../../../components/parameters/variable-name.yaml
     - $ref: ../../../components/parameters/variable-kind.yaml
   security:
-    - oauth2:
+    - pat:
         - variable.read
+    - oauth2: []
     - sessionCookie: []
   responses:
     '200':
@@ -41,8 +42,9 @@ delete:
     - $ref: ../../../components/parameters/variable-name.yaml
     - $ref: ../../../components/parameters/variable-kind.yaml
   security:
-    - oauth2:
+    - pat:
         - variable.write
+    - oauth2: []
   responses:
     '204':
       description: The variable was deleted.

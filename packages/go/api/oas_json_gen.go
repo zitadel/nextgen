@@ -110236,6 +110236,22 @@ func (s QueryProjectsErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case SessTokenInvalidQueryProjectsErrorResponse:
+		e.FieldStart("code")
+		e.Str("sess.token_invalid")
+		{
+			s := s.SessTokenInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case UnavailableQueryProjectsErrorResponse:
 		e.FieldStart("code")
 		e.Str("unavailable")
@@ -110299,6 +110315,9 @@ func (s *QueryProjectsErrorResponse) Decode(d *jx.Decoder) error {
 				case "req.invalid":
 					s.Type = ReqInvalidQueryProjectsErrorResponse
 					found = true
+				case "sess.token_invalid":
+					s.Type = SessTokenInvalidQueryProjectsErrorResponse
+					found = true
 				case "unavailable":
 					s.Type = UnavailableQueryProjectsErrorResponse
 					found = true
@@ -110342,6 +110361,10 @@ func (s *QueryProjectsErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case ReqInvalidQueryProjectsErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case SessTokenInvalidQueryProjectsErrorResponse:
+		if err := s.SessTokenInvalid.Decode(d); err != nil {
 			return err
 		}
 	case UnavailableQueryProjectsErrorResponse:

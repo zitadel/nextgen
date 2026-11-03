@@ -32,9 +32,9 @@ Until 1.0.0 the server also answers every operation at its path without the pref
 
 ## Authentication
 
-An operation's page names the security schemes it accepts; one that names none needs no credential. The API document declares two.
+An operation's page names the security schemes it accepts; one that names none needs no credential. The API document declares three.
 
-### Project secret (`oauth2`)
+### Project secret (`pat`)
 
 Send the project secret as a bearer token:
 
@@ -42,9 +42,19 @@ Send the project secret as a bearer token:
 Authorization: Bearer <project secret>
 ```
 
-The document declares this scheme as OAuth 2.0, with authorization-code and client-credentials flows and their scopes; today the server accepts a project secret for it and no other token.
+The document declares this scheme as a bearer token, a personal access token that acts as the project that owns it. Today the project's secret is the only kind; the scopes an operation lists are the ones the secret needs.
 
 [`zitadel setup`](/docs/get-started/quickstart) creates your project and writes its secret to `.env.local` as `ZITADEL_PROJECT_SECRET`, and to `.zitadel/secret`. [Create project](/docs/reference/api/projects) (`POST /projects`), which needs no credential, returns it as `project_secret`; no other operation returns it. Keep the secret on a server, out of source control and out of the browser ([Configuration as code](/docs/concepts/repo-config#what-stays-out-of-source-control)).
+
+### A person's token (`oauth2`)
+
+A person's access token acts as that person, with the grants they hold, as their console session would. [`zitadel login`](/docs/reference/cli) gets one, and any OAuth client can: the API's protected resource metadata ([RFC 9728](https://www.rfc-editor.org/rfc/rfc9728)), at `/.well-known/oauth-protected-resource/api/v1`, names the authorization server. Sign in there with the authorization code flow and PKCE, and name the API's identifier as `resource` ([RFC 8707](https://www.rfc-editor.org/rfc/rfc8707)). Send the token the way you send the secret:
+
+```http
+Authorization: Bearer <access token>
+```
+
+Every operation that takes the project secret takes it too, except those an app's sign-in calls: auth attempts, challenges, handoffs, creating a session and claiming a project. A person's token is homed in the platform project, so name the project you act on with `project_id` wherever an operation takes one. A server offers it when its platform OAuth is on (`platform.oauth.enabled`).
 
 ### Session cookie (`sessionCookie`)
 
@@ -52,7 +62,7 @@ The session cookie, `__Host-zitadel_session`, authenticates a signed-in user's r
 
 A request the cookie authenticates that changes something must come from the same origin and carry the session's CSRF token, from `GET /sessions/me/csrf`, in the `X-Zitadel-CSRF` header. `GET` requests and the `POST …/query` reads need no token. A missing or invalid cookie answers `401` with the code `auth.unauthorized`, a failed CSRF check `403` with `auth.csrf_invalid`.
 
-When a request to an operation that accepts both schemes carries a valid bearer token, the token is its credential and the cookie is not read.
+When a request to an operation that accepts a bearer token and the cookie carries a valid bearer token, the token is its credential and the cookie is not read.
 
 ## Errors
 

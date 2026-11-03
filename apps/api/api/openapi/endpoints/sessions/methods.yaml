@@ -27,7 +27,7 @@ post:
   tags:
     - Sessions
   security:
-    - oauth2:
+    - pat:
         - session.write
   requestBody:
     required: true

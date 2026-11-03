@@ -40,8 +40,9 @@ post:
   parameters:
     - $ref: ../../../components/parameters/project-id.yaml
   security:
-    - oauth2:
+    - pat:
         - release.write
+    - oauth2: []
   requestBody:
     required: true
     content:

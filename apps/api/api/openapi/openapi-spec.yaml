@@ -379,6 +379,8 @@ webhooks:
 
 components:
   securitySchemes:
+    pat:
+      $ref: security/pat.yaml
     oauth2:
       $ref: security/oauth2.yaml
     sessionCookie:

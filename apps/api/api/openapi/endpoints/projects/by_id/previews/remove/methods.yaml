@@ -18,8 +18,9 @@ post:
   parameters:
     - $ref: ../../../../../components/parameters/project-id-path.yaml
   security:
-    - oauth2:
+    - pat:
         - deployment.write
+    - oauth2: []
   requestBody:
     required: true
     content:

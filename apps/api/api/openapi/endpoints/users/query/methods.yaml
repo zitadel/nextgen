@@ -8,8 +8,8 @@ post:
     `project_id` names the project to list; without it, the credential's own
     project is listed.
 
-    Accepts either a project secret (`oauth2`) or a user-bound Console
-    session cookie (`sessionCookie`). Cookie-authenticated requests
+    Accepts the project's secret (`pat`), a person's token (`oauth2`) or
+    their user-bound Console session cookie (`sessionCookie`). Cookie-authenticated requests
     follow the scheme's CSRF rules (`sessionCookie`).
   tags:
     - Users
@@ -20,8 +20,9 @@ post:
   # condition on the body. `user-expand.yaml` and `user-filter-field.yaml`
   # state it.
   security:
-    - oauth2:
+    - pat:
         - user.read
+    - oauth2: []
     - sessionCookie: []
   parameters:
     - $ref: ../../../components/parameters/project-id-query.yaml

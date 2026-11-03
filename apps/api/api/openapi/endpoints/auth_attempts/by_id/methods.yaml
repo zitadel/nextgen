@@ -12,7 +12,7 @@ get:
   tags:
     - Authentication Attempts
   security:
-    - oauth2:
+    - pat:
         - auth_attempt.read
   parameters:
     - $ref: ../../../components/parameters/attempt-id.yaml

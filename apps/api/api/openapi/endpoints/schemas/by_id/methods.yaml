@@ -16,8 +16,9 @@ get:
   tags:
     - Schemas
   security:
-    - oauth2:
+    - pat:
         - schema.read
+    - oauth2: []
     - sessionCookie: []
   parameters:
     - $ref: ../../../components/parameters/schema-id.yaml

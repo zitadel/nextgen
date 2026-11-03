@@ -9,8 +9,9 @@ post:
   tags:
     - Sessions
   security:
-    - oauth2:
+    - pat:
         - session.read
+    - oauth2: []
   parameters:
     - $ref: ../../../components/parameters/project-id.yaml
   requestBody:

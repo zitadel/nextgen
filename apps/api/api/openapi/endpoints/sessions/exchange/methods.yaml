@@ -29,7 +29,7 @@ post:
   tags:
     - Sessions
   security:
-    - oauth2:
+    - pat:
         - session.write
   parameters:
     - $ref: ../../../components/parameters/project-id.yaml

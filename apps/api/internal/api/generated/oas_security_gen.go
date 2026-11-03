@@ -14,7 +14,21 @@ import (
 // SecurityHandler is handler for security parameters.
 type SecurityHandler interface {
 	// HandleOAuth2 handles oauth2 security.
+	// A person's access token from the platform project's authorization server,
+	// such as the one `zitadel login` gets. The operation acts as that user, with
+	// the grants they hold (ADR 053), as their console session would. Find the
+	// authorization server from the API's protected resource metadata
+	// (RFC 9728) at `/.well-known/oauth-protected-resource/api/v1`, sign in with
+	// PKCE, and name the API's identifier as `resource` (RFC 8707). Send the token
+	// as `Authorization: Bearer <token>`.
 	HandleOAuth2(ctx context.Context, operationName OperationName, t OAuth2) (context.Context, error)
+	// HandlePat handles pat security.
+	// A personal access token: today the project's secret (`ZITADEL_PROJECT_SECRET`)
+	// or a team's, which the identity model makes tokens their project or team
+	// owns. It acts as its owner, capped by the scopes it was minted with; the
+	// scopes an operation lists are the ones it needs. Send it as
+	// `Authorization: Bearer <token>`.
+	HandlePat(ctx context.Context, operationName OperationName, t Pat) (context.Context, error)
 	// HandleSessionCookie handles sessionCookie security.
 	// The session cookie issued at session creation or superseding handoff exchange.
 	// A browser holds it as `__Host-zitadel_session`, with `Secure`. Over plain
@@ -52,6 +66,100 @@ func findAuthorization(h http.Header, prefix string) (string, bool) {
 
 // oauth2ScopesOAuth2 is a private map storing OAuth2 scopes per operation.
 var oauth2ScopesOAuth2 = map[string][]string{
+	AddOriginOperation:              []string{},
+	BuildReleaseOperation:           []string{},
+	CreateBrandingOperation:         []string{},
+	CreateDeploymentOperation:       []string{},
+	CreateFlowDefinitionOperation:   []string{},
+	CreateGrantOperation:            []string{},
+	CreateIdpOperation:              []string{},
+	CreateReleaseOperation:          []string{},
+	CreateSchemaOperation:           []string{},
+	CreateTeamOperation:             []string{},
+	CreateUserOperation:             []string{},
+	DeleteGrantOperation:            []string{},
+	DeleteTeamOperation:             []string{},
+	DeleteUserByIDOperation:         []string{},
+	DeleteVariableOperation:         []string{},
+	EvaluatePolicyOperation:         []string{},
+	GetBrandingByIdOperation:        []string{},
+	GetDeploymentByIdOperation:      []string{},
+	GetDeploymentVariablesOperation: []string{},
+	GetEventOperation:               []string{},
+	GetFlowDefinitionOperation:      []string{},
+	GetGrantOperation:               []string{},
+	GetIdpByIdOperation:             []string{},
+	GetIdpRevisionByIdOperation:     []string{},
+	GetMyUserOperation:              []string{},
+	GetPolicyOperation:              []string{},
+	GetPolicyRevisionOperation:      []string{},
+	GetProjectOperation:             []string{},
+	GetReleaseByIdOperation:         []string{},
+	GetSchemaByIdOperation:          []string{},
+	GetSessionOperation:             []string{},
+	GetTeamOperation:                []string{},
+	GetUserByIDOperation:            []string{},
+	GetUserPasswordStateOperation:   []string{},
+	GetVariableOperation:            []string{},
+	GetVariablesOperation:           []string{},
+	ListBrandingOperation:           []string{},
+	ListDeploymentsOperation:        []string{},
+	ListEventsOperation:             []string{},
+	ListFlowDefinitionsOperation:    []string{},
+	ListIdpRevisionsOperation:       []string{},
+	ListMyProjectsOperation:         []string{},
+	ListPoliciesOperation:           []string{},
+	ListPolicyRevisionsOperation:    []string{},
+	ListPreviewsOperation:           []string{},
+	ListProjectAdminsOperation:      []string{},
+	ListReleasesOperation:           []string{},
+	ListSchemasOperation:            []string{},
+	ListUserIdentityLinksOperation:  []string{},
+	ListUserPasskeysOperation:       []string{},
+	ListUserTeamsOperation:          []string{},
+	PatchProjectOperation:           []string{},
+	PatchUserByIDOperation:          []string{},
+	PublishPolicyOperation:          []string{},
+	QueryGrantsOperation:            []string{},
+	QueryIdpsOperation:              []string{},
+	QueryProjectsOperation:          []string{},
+	QuerySessionsOperation:          []string{},
+	QueryTeamsOperation:             []string{},
+	QueryUsersOperation:             []string{},
+	RemoveOriginOperation:           []string{},
+	RemovePreviewOperation:          []string{},
+	RevokeReleaseOperation:          []string{},
+	RevokeSessionOperation:          []string{},
+	RollbackDeploymentOperation:     []string{},
+	SetUserPasswordOperation:        []string{},
+	UpdateTeamOperation:             []string{},
+	UpdateVariablesOperation:        []string{},
+}
+
+// GetOAuth2ScopesForOAuth2 returns the required OAuth2 scopes for the given operation.
+//
+// This is useful for token exchange scenarios where you need to know which scopes
+// to request when obtaining a token for a downstream API call.
+//
+// Example:
+//
+//	requiredScopes := GetOAuth2ScopesForOAuth2(AddPetOperation)
+//	token := exchangeTokenWithScopes(requiredScopes, "https://api.example.com")
+//
+// Returns nil if the operation has no scope requirements or if the operation is unknown.
+func GetOAuth2ScopesForOAuth2(operation string) []string {
+	scopes, ok := oauth2ScopesOAuth2[operation]
+	if !ok {
+		return nil
+	}
+	// Return a copy to prevent external modification
+	result := make([]string, len(scopes))
+	copy(result, scopes)
+	return result
+}
+
+// operationRolesPat is a private map storing roles per operation.
+var operationRolesPat = map[string][]string{
 	AddOriginOperation: []string{
 		"origin.write",
 	},
@@ -149,7 +257,6 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	GetIdpRevisionByIdOperation: []string{
 		"idp.read",
 	},
-	GetMyUserOperation: []string{},
 	GetPolicyOperation: []string{
 		"policy.read",
 	},
@@ -288,25 +395,24 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	},
 }
 
-// GetOAuth2ScopesForOAuth2 returns the required OAuth2 scopes for the given operation.
+// GetRolesForPat returns the required roles for the given operation.
 //
-// This is useful for token exchange scenarios where you need to know which scopes
-// to request when obtaining a token for a downstream API call.
+// This is useful for authorization scenarios where you need to know which roles
+// are required for an operation.
 //
 // Example:
 //
-//	requiredScopes := GetOAuth2ScopesForOAuth2(AddPetOperation)
-//	token := exchangeTokenWithScopes(requiredScopes, "https://api.example.com")
+//	requiredRoles := GetRolesForPat(AddPetOperation)
 //
-// Returns nil if the operation has no scope requirements or if the operation is unknown.
-func GetOAuth2ScopesForOAuth2(operation string) []string {
-	scopes, ok := oauth2ScopesOAuth2[operation]
+// Returns nil if the operation has no role requirements or if the operation is unknown.
+func GetRolesForPat(operation string) []string {
+	roles, ok := operationRolesPat[operation]
 	if !ok {
 		return nil
 	}
 	// Return a copy to prevent external modification
-	result := make([]string, len(scopes))
-	copy(result, scopes)
+	result := make([]string, len(roles))
+	copy(result, roles)
 	return result
 }
 
@@ -403,6 +509,23 @@ func (s *Server) securityOAuth2(ctx context.Context, operationName OperationName
 	t.Token = token
 	t.Scopes = oauth2ScopesOAuth2[operationName]
 	rctx, err := s.sec.HandleOAuth2(ctx, operationName, t)
+	if errors.Is(err, ogenerrors.ErrSkipServerSecurity) {
+		return nil, false, nil
+	} else if err != nil {
+		return nil, false, err
+	}
+	return rctx, true, err
+}
+
+func (s *Server) securityPat(ctx context.Context, operationName OperationName, req *http.Request) (context.Context, bool, error) {
+	var t Pat
+	token, ok := findAuthorization(req.Header, "Bearer")
+	if !ok {
+		return ctx, false, nil
+	}
+	t.Token = token
+	t.Roles = operationRolesPat[operationName]
+	rctx, err := s.sec.HandlePat(ctx, operationName, t)
 	if errors.Is(err, ogenerrors.ErrSkipServerSecurity) {
 		return nil, false, nil
 	} else if err != nil {

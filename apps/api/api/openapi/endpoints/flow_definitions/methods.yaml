@@ -15,8 +15,9 @@ post:
   tags:
     - Flow Definitions
   security:
-    - oauth2:
+    - pat:
         - flow_definition.write
+    - oauth2: []
   requestBody:
     required: true
     content:
@@ -72,8 +73,9 @@ get:
   tags:
     - Flow Definitions
   security:
-    - oauth2:
+    - pat:
         - flow_definition.read
+    - oauth2: []
     - sessionCookie: []
   parameters:
     - $ref: ../../components/parameters/limit.yaml

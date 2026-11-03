@@ -17,8 +17,9 @@ get:
   tags:
     - Events
   security:
-    - oauth2:
+    - pat:
         - events.read
+    - oauth2: []
   parameters:
     - $ref: ../../components/parameters/project-id.yaml
     - name: category

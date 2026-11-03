@@ -70988,6 +70988,31 @@ func (s *PasswordSetPolicyOperation) UnmarshalText(data []byte) error {
 	}
 }
 
+type Pat struct {
+	Token string
+	Roles []string
+}
+
+// GetToken returns the value of Token.
+func (s *Pat) GetToken() string {
+	return s.Token
+}
+
+// GetRoles returns the value of Roles.
+func (s *Pat) GetRoles() []string {
+	return s.Roles
+}
+
+// SetToken sets the value of Token.
+func (s *Pat) SetToken(val string) {
+	s.Token = val
+}
+
+// SetRoles sets the value of Roles.
+func (s *Pat) SetRoles(val []string) {
+	s.Roles = val
+}
+
 type PatchMyUserBadRequest ErrorDetails
 
 func (*PatchMyUserBadRequest) patchMyUserRes() {}
@@ -78090,6 +78115,7 @@ type QueryProjectsErrorResponse struct {
 	ProjNotFound         ProjNotFound
 	ProjPermissionDenied ProjPermissionDenied
 	ReqInvalid           ReqInvalid
+	SessTokenInvalid     SessTokenInvalid
 	Unavailable          Unavailable
 }
 
@@ -78105,6 +78131,7 @@ const (
 	ProjNotFoundQueryProjectsErrorResponse         QueryProjectsErrorResponseType = "proj.not_found"
 	ProjPermissionDeniedQueryProjectsErrorResponse QueryProjectsErrorResponseType = "proj.permission_denied"
 	ReqInvalidQueryProjectsErrorResponse           QueryProjectsErrorResponseType = "req.invalid"
+	SessTokenInvalidQueryProjectsErrorResponse     QueryProjectsErrorResponseType = "sess.token_invalid"
 	UnavailableQueryProjectsErrorResponse          QueryProjectsErrorResponseType = "unavailable"
 )
 
@@ -78141,6 +78168,11 @@ func (s QueryProjectsErrorResponse) IsProjPermissionDenied() bool {
 // IsReqInvalid reports whether QueryProjectsErrorResponse is ReqInvalid.
 func (s QueryProjectsErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidQueryProjectsErrorResponse
+}
+
+// IsSessTokenInvalid reports whether QueryProjectsErrorResponse is SessTokenInvalid.
+func (s QueryProjectsErrorResponse) IsSessTokenInvalid() bool {
+	return s.Type == SessTokenInvalidQueryProjectsErrorResponse
 }
 
 // IsUnavailable reports whether QueryProjectsErrorResponse is Unavailable.
@@ -78292,6 +78324,27 @@ func (s QueryProjectsErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 func NewReqInvalidQueryProjectsErrorResponse(v ReqInvalid) QueryProjectsErrorResponse {
 	var s QueryProjectsErrorResponse
 	s.SetReqInvalid(v)
+	return s
+}
+
+// SetSessTokenInvalid sets QueryProjectsErrorResponse to SessTokenInvalid.
+func (s *QueryProjectsErrorResponse) SetSessTokenInvalid(v SessTokenInvalid) {
+	s.Type = SessTokenInvalidQueryProjectsErrorResponse
+	s.SessTokenInvalid = v
+}
+
+// GetSessTokenInvalid returns SessTokenInvalid and true boolean if QueryProjectsErrorResponse is SessTokenInvalid.
+func (s QueryProjectsErrorResponse) GetSessTokenInvalid() (v SessTokenInvalid, ok bool) {
+	if !s.IsSessTokenInvalid() {
+		return v, false
+	}
+	return s.SessTokenInvalid, true
+}
+
+// NewSessTokenInvalidQueryProjectsErrorResponse returns new QueryProjectsErrorResponse from SessTokenInvalid.
+func NewSessTokenInvalidQueryProjectsErrorResponse(v SessTokenInvalid) QueryProjectsErrorResponse {
+	var s QueryProjectsErrorResponse
+	s.SetSessTokenInvalid(v)
 	return s
 }
 

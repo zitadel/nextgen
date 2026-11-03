@@ -218,8 +218,8 @@ func (UnimplementedHandler) CreateFlowDefinition(ctx context.Context, req *Creat
 // body on every outcome. Granting the session caller's own user is
 // `grant.invalid` on either user locator. Read the grant back for
 // identifier and display.
-// Accepts either a project secret (`oauth2`) or a user-bound Console
-// session cookie (`sessionCookie`). Session callers are authorized as
+// Accepts the project's secret (`pat`), a person's token (`oauth2`) or
+// their user-bound Console session cookie (`sessionCookie`). Session callers are authorized as
 // the human against the target project (home may differ). Cookie-authenticated
 // requests follow the scheme's CSRF rules (`sessionCookie`).
 //
@@ -387,8 +387,8 @@ func (UnimplementedHandler) CreateUser(ctx context.Context, req *CreateUserReque
 // Already-revoked, missing, project-secret setup, and owning-team grants
 // return 404. The row is not un-revoked. Expired grants can still be
 // revoked so the unique binding can be reused.
-// Accepts either a project secret (`oauth2`) or a user-bound Console
-// session cookie (`sessionCookie`). Cookie-authenticated requests
+// Accepts the project's secret (`pat`), a person's token (`oauth2`) or
+// their user-bound Console session cookie (`sessionCookie`). Cookie-authenticated requests
 // follow the scheme's CSRF rules (`sessionCookie`).
 //
 // DELETE /grants/{id}
@@ -632,8 +632,8 @@ func (UnimplementedHandler) GetFlowStep(ctx context.Context, params GetFlowStepP
 // `user.read` and `team.read` in addition to `project.read` for project
 // secrets. A user-bound Console session that already passed the project
 // Check may expand without those scopes.
-// Accepts either a project secret (`oauth2`) or a user-bound Console
-// session cookie (`sessionCookie`). Cookie-authenticated requests
+// Accepts the project's secret (`pat`), a person's token (`oauth2`) or
+// their user-bound Console session cookie (`sessionCookie`). Cookie-authenticated requests
 // follow the scheme's CSRF rules (`sessionCookie`).
 //
 // GET /grants/{id}
@@ -1122,8 +1122,9 @@ func (UnimplementedHandler) ListPreviews(ctx context.Context, params ListPreview
 // `team_id` only. The grant to such a team still shows in the project's
 // grants.
 // Ordered by `user_id` and paginated with `page_token`.
-// Accepts either a project secret (`oauth2`) or a user-bound Console
-// session cookie (`sessionCookie`) that can read the project.
+// Accepts the project's secret (`pat`), or a person's token (`oauth2`) or
+// user-bound Console session cookie (`sessionCookie`) that can read the
+// project.
 //
 // GET /projects/{project_id}/admins
 func (UnimplementedHandler) ListProjectAdmins(ctx context.Context, params ListProjectAdminsParams) (r ListProjectAdminsRes, _ error) {
@@ -1265,8 +1266,8 @@ func (UnimplementedHandler) PublishPolicy(ctx context.Context, req PublishPolicy
 // scopes cannot be ANDed onto this security block because they are
 // body-conditional). A user-bound Console session that already passed
 // the project Check may expand without those scopes.
-// Accepts either a project secret (`oauth2`) or a user-bound Console
-// session cookie (`sessionCookie`). Cookie-authenticated requests
+// Accepts the project's secret (`pat`), a person's token (`oauth2`) or
+// their user-bound Console session cookie (`sessionCookie`). Cookie-authenticated requests
 // follow the scheme's CSRF rules (`sessionCookie`).
 //
 // POST /grants/query
@@ -1324,8 +1325,8 @@ func (UnimplementedHandler) QueryTeams(ctx context.Context, req *QueryTeamsReque
 // Returns the users of a project, paginated with a cursor.
 // `project_id` names the project to list; without it, the credential's own
 // project is listed.
-// Accepts either a project secret (`oauth2`) or a user-bound Console
-// session cookie (`sessionCookie`). Cookie-authenticated requests
+// Accepts the project's secret (`pat`), a person's token (`oauth2`) or
+// their user-bound Console session cookie (`sessionCookie`). Cookie-authenticated requests
 // follow the scheme's CSRF rules (`sessionCookie`).
 //
 // POST /users/query

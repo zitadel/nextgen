@@ -21,8 +21,9 @@ get:
       schema:
         $ref: ../../components/schemas/policy-operation.yaml
   security:
-    - oauth2:
+    - pat:
         - policy.read
+    - oauth2: []
     - sessionCookie: []
   responses:
     '200':
@@ -73,8 +74,9 @@ post:
   parameters:
     - $ref: ../../components/parameters/project-id.yaml
   security:
-    - oauth2:
+    - pat:
         - policy.write
+    - oauth2: []
   requestBody:
     required: true
     content:

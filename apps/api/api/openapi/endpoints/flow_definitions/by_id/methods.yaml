@@ -6,8 +6,9 @@ get:
   tags:
     - Flow Definitions
   security:
-    - oauth2:
+    - pat:
         - flow_definition.read
+    - oauth2: []
     - sessionCookie: []
   parameters:
     - $ref: ../../../components/parameters/flow-definition-id.yaml

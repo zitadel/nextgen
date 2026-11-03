@@ -36,8 +36,9 @@ post:
   parameters:
     - $ref: ../../components/parameters/project-id.yaml
   security:
-    - oauth2:
+    - pat:
         - deployment.write
+    - oauth2: []
     - sessionCookie: []
   requestBody:
     required: true
@@ -290,8 +291,9 @@ get:
     - $ref: ../../components/parameters/limit.yaml
     - $ref: ../../components/parameters/page-token.yaml
   security:
-    - oauth2:
+    - pat:
         - deployment.read
+    - oauth2: []
     - sessionCookie: []
   responses:
     '200':

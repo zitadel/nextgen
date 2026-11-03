@@ -11,8 +11,9 @@ post:
   tags:
     - Users
   security:
-    - oauth2:
+    - pat:
         - user.write
+    - oauth2: []
     - sessionCookie: []
   parameters:
     - $ref: ../../components/parameters/project-id.yaml

@@ -11,8 +11,9 @@ get:
     - $ref: ../../../../components/parameters/page-token.yaml
     - $ref: ../../../../components/parameters/user-id.yaml
   security:
-    - oauth2:
+    - pat:
         - user.read
+    - oauth2: []
     - sessionCookie: []
   responses:
     '200':

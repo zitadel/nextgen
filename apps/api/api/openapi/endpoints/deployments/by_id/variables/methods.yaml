@@ -9,9 +9,10 @@ get:
   tags:
     - Deployments
   security:
-    - oauth2:
+    - pat:
         - deployment.read
         - variable.read
+    - oauth2: []
   parameters:
     - $ref: ../../../../components/parameters/project-id.yaml
     - $ref: ../../../../components/parameters/deployment-id.yaml

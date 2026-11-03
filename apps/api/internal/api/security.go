@@ -66,13 +66,16 @@ func (s *SecurityHandler) WithPlatformProject(projectID string) *SecurityHandler
 	return s
 }
 
-func (s SecurityHandler) HandleOAuth2(ctx context.Context, operationName api.OperationName, t api.OAuth2) (context.Context, error) {
+// HandlePat handles the pat scheme: a personal access token, today the
+// project's secret or a team's (identity model). Both bearer schemes read the
+// same Authorization header and ogen runs each one the operation lists, so a
+// person's token (a JWS) is skipped here for HandleOAuth2.
+func (s SecurityHandler) HandlePat(ctx context.Context, operationName api.OperationName, t api.Pat) (context.Context, error) {
 	if t.Token == "" {
 		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
 	}
-	// A JWS has three parts, the project secret's JWE five.
-	if s.userBearers != nil && strings.Count(t.Token, ".") == 2 {
-		return s.handleUserBearer(ctx, operationName, t.Token)
+	if isUserBearerToken(t.Token) {
+		return nil, ogenerrors.ErrSkipServerSecurity
 	}
 
 	payload, err := s.tokenService.IntrospectToken(ctx, t.Token)
@@ -153,16 +156,18 @@ func (s SecurityHandler) HandleSessionCookie(ctx context.Context, operationName 
 	return ctx, nil
 }
 
-// handleUserBearer authenticates a user bearer (ADR 053 §5). It is the same
-// principal a console session of that user is, with the same grants, and is
-// accepted exactly where such a session is: the operations a user may call.
-// Everywhere else the operation's ScopeContext assumptions (a project secret's
-// home is its target) do not hold, so the bearer is refused there.
-func (s SecurityHandler) handleUserBearer(ctx context.Context, operationName api.OperationName, token string) (context.Context, error) {
-	if !userBoundSessionOperations[operationName] && !userBearerSelfOperations[operationName] {
-		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+// HandleOAuth2 handles the oauth2 scheme: a person's access token from the
+// platform project's authorization server, a user bearer (ADR 053 §5). It is
+// the same principal a console session of that user is, with the same grants.
+// The spec lists the scheme on every operation but the app plane's, whose
+// handlers take the target from a secret's home, so ogen never calls this
+// there. A secret is skipped for HandlePat, and so is any bearer while no
+// authorization server is wired: a cookie may still carry the request.
+func (s SecurityHandler) HandleOAuth2(ctx context.Context, _ api.OperationName, t api.OAuth2) (context.Context, error) {
+	if s.userBearers == nil || !isUserBearerToken(t.Token) {
+		return nil, ogenerrors.ErrSkipServerSecurity
 	}
-	bearer, err := s.userBearers.VerifyUserBearer(ctx, token)
+	bearer, err := s.userBearers.VerifyUserBearer(ctx, t.Token)
 	if err != nil {
 		return nil, introspectionFailure(err)
 	}
@@ -180,10 +185,10 @@ func (s SecurityHandler) handleUserBearer(ctx context.Context, operationName api
 	return ctx, nil
 }
 
-// userBearerSelfOperations are the self-access operations a user bearer may
-// call besides the session's management ones: who the bearer is.
-var userBearerSelfOperations = map[api.OperationName]bool{
-	api.GetMyUserOperation: true,
+// isUserBearerToken tells a person's access token, a JWS of three parts, from
+// a secret, a JWE of five.
+func isUserBearerToken(token string) bool {
+	return strings.Count(token, ".") == 2
 }
 
 type userBearerKey struct{}

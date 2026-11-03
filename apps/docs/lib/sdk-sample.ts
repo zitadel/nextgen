@@ -15,7 +15,7 @@ import type { RequestData } from "fumadocs-openapi/requests";
 // not arguments; the fetch options carry the headers.
 
 /** The security schemes the spec declares, which pick how the sample authenticates. */
-export const securitySchemes = ["oauth2", "sessionCookie"] as const;
+export const securitySchemes = ["oauth2", "pat", "sessionCookie"] as const;
 
 /** The server: the spec's is the current origin, its local one localhost:8080. */
 const baseUrl = 'process.env.ZITADEL_URL ?? "http://localhost:8080"';
@@ -104,7 +104,7 @@ export function clientMethod(operationId: string): string {
 
 export type Authentication = "none" | "secret" | "session";
 
-// A project secret is the server-side credential: the bearer the oauth2 scheme
+// A project secret is the server-side credential: the bearer the pat scheme
 // accepts. An operation that accepts only the session cookie is called from
 // the browser, through the framework SDK's proxy, which carries the cookie.
 export function authentication(operation: OperationObject, request?: RequestData): Authentication {
@@ -112,7 +112,7 @@ export function authentication(operation: OperationObject, request?: RequestData
   if (requirements.length === 0 || requirements.some((item) => Object.keys(item).length === 0)) {
     return "none";
   }
-  // The playground's selected provider writes Authorization for oauth2,
+  // The playground's selected provider writes Authorization for a bearer scheme,
   // including when its input is empty. Session auth adds no header: the
   // browser carries its HttpOnly cookie. Read the request, not the available
   // schemes, so switching providers updates the sample without exposing a
@@ -124,7 +124,7 @@ export function authentication(operation: OperationObject, request?: RequestData
   ) {
     return "session";
   }
-  return requirements.some((item) => "oauth2" in item) ? "secret" : "session";
+  return requirements.some((item) => "pat" in item) ? "secret" : "session";
 }
 
 function setup(auth: Authentication, csrf: boolean): string[] {

@@ -24,8 +24,9 @@ post:
     - $ref: ../../../../components/parameters/project-id.yaml
     - $ref: ../../../../components/parameters/deployment-id.yaml
   security:
-    - oauth2:
+    - pat:
         - deployment.write
+    - oauth2: []
     - sessionCookie: []
   requestBody:
     required: false

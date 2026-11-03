@@ -1,0 +1,8 @@
+type: http
+scheme: bearer
+description: |
+  A personal access token: today the project's secret (`ZITADEL_PROJECT_SECRET`)
+  or a team's, which the identity model makes tokens their project or team
+  owns. It acts as its owner, capped by the scopes it was minted with; the
+  scopes an operation lists are the ones it needs. Send it as
+  `Authorization: Bearer <token>`.

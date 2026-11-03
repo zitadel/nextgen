@@ -9,8 +9,9 @@ get:
   tags:
     - Policies
   security:
-    - oauth2:
+    - pat:
         - policy.read
+    - oauth2: []
     - sessionCookie: []
   parameters:
     - $ref: ../../../../components/parameters/project-id.yaml

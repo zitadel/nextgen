@@ -12,8 +12,9 @@ get:
   tags:
     - Deployments
   security:
-    - oauth2:
+    - pat:
         - deployment.read
+    - oauth2: []
     - sessionCookie: []
   parameters:
     - $ref: ../../../components/parameters/project-id.yaml

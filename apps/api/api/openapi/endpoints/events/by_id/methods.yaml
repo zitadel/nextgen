@@ -11,8 +11,9 @@ get:
   tags:
     - Events
   security:
-    - oauth2:
+    - pat:
         - events.read
+    - oauth2: []
   parameters:
     - $ref: ../../../components/parameters/event-id.yaml
     - $ref: ../../../components/parameters/project-id.yaml

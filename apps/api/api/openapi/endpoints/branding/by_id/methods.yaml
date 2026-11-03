@@ -6,8 +6,9 @@ get:
   tags:
     - Branding
   security:
-    - oauth2:
+    - pat:
         - branding.read
+    - oauth2: []
     - sessionCookie: []
   parameters:
     - $ref: ../../../components/parameters/branding-id.yaml

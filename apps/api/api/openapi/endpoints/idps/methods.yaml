@@ -38,8 +38,9 @@ post:
   tags:
     - Identity Providers
   security:
-    - oauth2:
+    - pat:
         - idp.write
+    - oauth2: []
   parameters:
     - $ref: ../../components/parameters/project-id.yaml
   requestBody:

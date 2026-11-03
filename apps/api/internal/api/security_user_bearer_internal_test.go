@@ -3,6 +3,8 @@ package api
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -11,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	api "github.com/zitadel/nextgen/internal/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
+	"gopkg.in/yaml.v3"
 )
 
 // fakeBearers verifies one token, as the platform's authorization server would.
@@ -59,11 +62,74 @@ func TestUserBearerActsAsTheSessionUser(t *testing.T) {
 	assert.Equal(t, "user_developer", self.UserID())
 }
 
-// Operations no session may call assume a project secret's home is its
-// target; a user bearer is refused there rather than acting on the platform.
-func TestUserBearerOnlyWhereASessionMayAct(t *testing.T) {
-	_, err := userBearerHandler(fakeBearers{}).HandleOAuth2(t.Context(), api.BuildReleaseOperation, api.OAuth2{Token: testBearer})
-	assert.ErrorIs(t, err, ogenerrors.ErrSecurityRequirementIsNotSatisfied)
+// Both bearer schemes read the same Authorization header, and ogen runs every
+// one an operation lists: each skips the other's tokens, so neither fails a
+// request the other carries.
+func TestTheBearerSchemesSkipEachOthersTokens(t *testing.T) {
+	handler := userBearerHandler(fakeBearers{})
+
+	_, err := handler.HandlePat(t.Context(), api.ListDeploymentsOperation, api.Pat{Token: testBearer})
+	assert.ErrorIs(t, err, ogenerrors.ErrSkipServerSecurity, "a person's token is oauth2's")
+
+	_, err = handler.HandleOAuth2(t.Context(), api.ListDeploymentsOperation, api.OAuth2{Token: "a.five.part.secret.jwe"})
+	assert.ErrorIs(t, err, ogenerrors.ErrSkipServerSecurity, "a secret is pat's")
+
+	_, err = NewSecurityHandler(nil).HandleOAuth2(t.Context(), api.ListDeploymentsOperation, api.OAuth2{Token: testBearer})
+	assert.ErrorIs(t, err, ogenerrors.ErrSkipServerSecurity, "without an authorization server, a cookie may still carry the request")
+}
+
+// The app plane's handlers take their target from a secret's home (auth
+// attempts, handoffs, sessions) or prove a secret (the claim), so a person's
+// token is no credential there. Every other operation a secret may call, a
+// person with the grants may call too: the CLI acts as the developer
+// everywhere else.
+func TestOnlyTheAppPlaneRefusesAPersonsToken(t *testing.T) {
+	t.Parallel()
+	appPlane := map[string]bool{
+		"createAuthAttempt": true, "getAuthAttempt": true, "issueChallenge": true,
+		"verifyChallengeProof": true, "createHandoff": true, "createSession": true,
+		"exchangeHandoff": true, "initClaim": true, "getClaimStatus": true,
+		"beginUserPasskeyRegistration": true, "finishUserPasskeyRegistration": true,
+	}
+	const openapiDir = "../../api/openapi"
+	var spec struct {
+		Paths map[string]struct {
+			Ref string `yaml:"$ref"`
+		} `yaml:"paths"`
+	}
+	raw, err := os.ReadFile(filepath.Join(openapiDir, "openapi-spec.yaml"))
+	require.NoError(t, err)
+	require.NoError(t, yaml.Unmarshal(raw, &spec))
+
+	seen := map[string]bool{}
+	for _, item := range spec.Paths {
+		if item.Ref == "" {
+			continue
+		}
+		var methods map[string]struct {
+			OperationID string                `yaml:"operationId"`
+			Security    []map[string][]string `yaml:"security"`
+		}
+		raw, err := os.ReadFile(filepath.Join(openapiDir, item.Ref))
+		require.NoError(t, err)
+		require.NoError(t, yaml.Unmarshal(raw, &methods), item.Ref)
+		for _, op := range methods {
+			var pat, person bool
+			for _, requirement := range op.Security {
+				_, isPat := requirement["pat"]
+				_, isPerson := requirement["oauth2"]
+				pat, person = pat || isPat, person || isPerson
+			}
+			if !pat {
+				continue
+			}
+			seen[op.OperationID] = true
+			assert.Equal(t, !appPlane[op.OperationID], person, "%s: a person's token (oauth2) belongs everywhere a secret goes but the app plane", op.OperationID)
+		}
+	}
+	for op := range appPlane {
+		assert.True(t, seen[op], "%s is no longer a secret's operation: update the app plane", op)
+	}
 }
 
 func TestUserBearerRefusals(t *testing.T) {

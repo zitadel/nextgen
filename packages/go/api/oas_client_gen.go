@@ -206,8 +206,8 @@ type Invoker interface {
 	// body on every outcome. Granting the session caller's own user is
 	// `grant.invalid` on either user locator. Read the grant back for
 	// identifier and display.
-	// Accepts either a project secret (`oauth2`) or a user-bound Console
-	// session cookie (`sessionCookie`). Session callers are authorized as
+	// Accepts the project's secret (`pat`), a person's token (`oauth2`) or
+	// their user-bound Console session cookie (`sessionCookie`). Session callers are authorized as
 	// the human against the target project (home may differ). Cookie-authenticated
 	// requests follow the scheme's CSRF rules (`sessionCookie`).
 	//
@@ -348,8 +348,8 @@ type Invoker interface {
 	// Already-revoked, missing, project-secret setup, and owning-team grants
 	// return 404. The row is not un-revoked. Expired grants can still be
 	// revoked so the unique binding can be reused.
-	// Accepts either a project secret (`oauth2`) or a user-bound Console
-	// session cookie (`sessionCookie`). Cookie-authenticated requests
+	// Accepts the project's secret (`pat`), a person's token (`oauth2`) or
+	// their user-bound Console session cookie (`sessionCookie`). Cookie-authenticated requests
 	// follow the scheme's CSRF rules (`sessionCookie`).
 	//
 	// DELETE /grants/{id}
@@ -545,8 +545,8 @@ type Invoker interface {
 	// `user.read` and `team.read` in addition to `project.read` for project
 	// secrets. A user-bound Console session that already passed the project
 	// Check may expand without those scopes.
-	// Accepts either a project secret (`oauth2`) or a user-bound Console
-	// session cookie (`sessionCookie`). Cookie-authenticated requests
+	// Accepts the project's secret (`pat`), a person's token (`oauth2`) or
+	// their user-bound Console session cookie (`sessionCookie`). Cookie-authenticated requests
 	// follow the scheme's CSRF rules (`sessionCookie`).
 	//
 	// GET /grants/{id}
@@ -927,8 +927,9 @@ type Invoker interface {
 	// `team_id` only. The grant to such a team still shows in the project's
 	// grants.
 	// Ordered by `user_id` and paginated with `page_token`.
-	// Accepts either a project secret (`oauth2`) or a user-bound Console
-	// session cookie (`sessionCookie`) that can read the project.
+	// Accepts the project's secret (`pat`), or a person's token (`oauth2`) or
+	// user-bound Console session cookie (`sessionCookie`) that can read the
+	// project.
 	//
 	// GET /projects/{project_id}/admins
 	ListProjectAdmins(ctx context.Context, params ListProjectAdminsParams) (ListProjectAdminsRes, error)
@@ -1040,8 +1041,8 @@ type Invoker interface {
 	// scopes cannot be ANDed onto this security block because they are
 	// body-conditional). A user-bound Console session that already passed
 	// the project Check may expand without those scopes.
-	// Accepts either a project secret (`oauth2`) or a user-bound Console
-	// session cookie (`sessionCookie`). Cookie-authenticated requests
+	// Accepts the project's secret (`pat`), a person's token (`oauth2`) or
+	// their user-bound Console session cookie (`sessionCookie`). Cookie-authenticated requests
 	// follow the scheme's CSRF rules (`sessionCookie`).
 	//
 	// POST /grants/query
@@ -1084,8 +1085,8 @@ type Invoker interface {
 	// Returns the users of a project, paginated with a cursor.
 	// `project_id` names the project to list; without it, the credential's own
 	// project is listed.
-	// Accepts either a project secret (`oauth2`) or a user-bound Console
-	// session cookie (`sessionCookie`). Cookie-authenticated requests
+	// Accepts the project's secret (`pat`), a person's token (`oauth2`) or
+	// their user-bound Console session cookie (`sessionCookie`). Cookie-authenticated requests
 	// follow the scheme's CSRF rules (`sessionCookie`).
 	//
 	// POST /users/query
@@ -1420,10 +1421,21 @@ func (c *Client) sendAddOrigin(ctx context.Context, request *ProjectOrigin, para
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, AddOriginOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Pat\"")
+			}
+		}
+		{
 			stage = "Security:OAuth2"
 			switch err := c.securityOAuth2(ctx, AddOriginOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -1434,7 +1446,7 @@ func (c *Client) sendAddOrigin(ctx context.Context, request *ProjectOrigin, para
 			stage = "Security:SessionCookie"
 			switch err := c.securitySessionCookie(ctx, AddOriginOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -1447,6 +1459,7 @@ func (c *Client) sendAddOrigin(ctx context.Context, request *ProjectOrigin, para
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -1577,14 +1590,14 @@ func (c *Client) sendBeginUserPasskeyRegistration(ctx context.Context, request *
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			stage = "Security:OAuth2"
-			switch err := c.securityOAuth2(ctx, BeginUserPasskeyRegistrationOperation, r); {
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, BeginUserPasskeyRegistrationOperation, r); {
 			case err == nil: // if NO error
 				satisfied[0] |= 1 << 0
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
-				return res, errors.Wrap(err, "security \"OAuth2\"")
+				return res, errors.Wrap(err, "security \"Pat\"")
 			}
 		}
 
@@ -1745,10 +1758,21 @@ func (c *Client) sendBuildRelease(ctx context.Context, request *BuildReleaseRequ
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, BuildReleaseOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Pat\"")
+			}
+		}
+		{
 			stage = "Security:OAuth2"
 			switch err := c.securityOAuth2(ctx, BuildReleaseOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -1760,6 +1784,7 @@ func (c *Client) sendBuildRelease(ctx context.Context, request *BuildReleaseRequ
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -2017,14 +2042,14 @@ func (c *Client) sendCreateAuthAttempt(ctx context.Context, request *CreateAuthA
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			stage = "Security:OAuth2"
-			switch err := c.securityOAuth2(ctx, CreateAuthAttemptOperation, r); {
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, CreateAuthAttemptOperation, r); {
 			case err == nil: // if NO error
 				satisfied[0] |= 1 << 0
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
-				return res, errors.Wrap(err, "security \"OAuth2\"")
+				return res, errors.Wrap(err, "security \"Pat\"")
 			}
 		}
 
@@ -2163,10 +2188,21 @@ func (c *Client) sendCreateBranding(ctx context.Context, request *Branding, para
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, CreateBrandingOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Pat\"")
+			}
+		}
+		{
 			stage = "Security:OAuth2"
 			switch err := c.securityOAuth2(ctx, CreateBrandingOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -2178,6 +2214,7 @@ func (c *Client) sendCreateBranding(ctx context.Context, request *Branding, para
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -2327,10 +2364,21 @@ func (c *Client) sendCreateDeployment(ctx context.Context, request *CreateDeploy
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, CreateDeploymentOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Pat\"")
+			}
+		}
+		{
 			stage = "Security:OAuth2"
 			switch err := c.securityOAuth2(ctx, CreateDeploymentOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -2341,7 +2389,7 @@ func (c *Client) sendCreateDeployment(ctx context.Context, request *CreateDeploy
 			stage = "Security:SessionCookie"
 			switch err := c.securitySessionCookie(ctx, CreateDeploymentOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -2354,6 +2402,7 @@ func (c *Client) sendCreateDeployment(ctx context.Context, request *CreateDeploy
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -2592,10 +2641,21 @@ func (c *Client) sendCreateFlowDefinition(ctx context.Context, request *CreateFl
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, CreateFlowDefinitionOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Pat\"")
+			}
+		}
+		{
 			stage = "Security:OAuth2"
 			switch err := c.securityOAuth2(ctx, CreateFlowDefinitionOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -2607,6 +2667,7 @@ func (c *Client) sendCreateFlowDefinition(ctx context.Context, request *CreateFl
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -2654,8 +2715,8 @@ func (c *Client) sendCreateFlowDefinition(ctx context.Context, request *CreateFl
 // body on every outcome. Granting the session caller's own user is
 // `grant.invalid` on either user locator. Read the grant back for
 // identifier and display.
-// Accepts either a project secret (`oauth2`) or a user-bound Console
-// session cookie (`sessionCookie`). Session callers are authorized as
+// Accepts the project's secret (`pat`), a person's token (`oauth2`) or
+// their user-bound Console session cookie (`sessionCookie`). Session callers are authorized as
 // the human against the target project (home may differ). Cookie-authenticated
 // requests follow the scheme's CSRF rules (`sessionCookie`).
 //
@@ -2749,10 +2810,21 @@ func (c *Client) sendCreateGrant(ctx context.Context, request *CreateGrantReques
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, CreateGrantOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Pat\"")
+			}
+		}
+		{
 			stage = "Security:OAuth2"
 			switch err := c.securityOAuth2(ctx, CreateGrantOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -2763,7 +2835,7 @@ func (c *Client) sendCreateGrant(ctx context.Context, request *CreateGrantReques
 			stage = "Security:SessionCookie"
 			switch err := c.securitySessionCookie(ctx, CreateGrantOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -2776,6 +2848,7 @@ func (c *Client) sendCreateGrant(ctx context.Context, request *CreateGrantReques
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -2915,14 +2988,14 @@ func (c *Client) sendCreateHandoff(ctx context.Context, params CreateHandoffPara
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			stage = "Security:OAuth2"
-			switch err := c.securityOAuth2(ctx, CreateHandoffOperation, r); {
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, CreateHandoffOperation, r); {
 			case err == nil: // if NO error
 				satisfied[0] |= 1 << 0
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
-				return res, errors.Wrap(err, "security \"OAuth2\"")
+				return res, errors.Wrap(err, "security \"Pat\"")
 			}
 		}
 
@@ -3080,10 +3153,21 @@ func (c *Client) sendCreateIdp(ctx context.Context, request *CreateIdpRequest, p
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, CreateIdpOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Pat\"")
+			}
+		}
+		{
 			stage = "Security:OAuth2"
 			switch err := c.securityOAuth2(ctx, CreateIdpOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -3095,6 +3179,7 @@ func (c *Client) sendCreateIdp(ctx context.Context, request *CreateIdpRequest, p
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -3325,10 +3410,21 @@ func (c *Client) sendCreateRelease(ctx context.Context, request *CreateReleaseRe
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, CreateReleaseOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Pat\"")
+			}
+		}
+		{
 			stage = "Security:OAuth2"
 			switch err := c.securityOAuth2(ctx, CreateReleaseOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -3340,6 +3436,7 @@ func (c *Client) sendCreateRelease(ctx context.Context, request *CreateReleaseRe
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -3492,10 +3589,21 @@ func (c *Client) sendCreateSchema(ctx context.Context, request CreateSchemaReq, 
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, CreateSchemaOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Pat\"")
+			}
+		}
+		{
 			stage = "Security:OAuth2"
 			switch err := c.securityOAuth2(ctx, CreateSchemaOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -3507,6 +3615,7 @@ func (c *Client) sendCreateSchema(ctx context.Context, request CreateSchemaReq, 
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -3628,14 +3737,14 @@ func (c *Client) sendCreateSession(ctx context.Context, request *CreateSessionRe
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			stage = "Security:OAuth2"
-			switch err := c.securityOAuth2(ctx, CreateSessionOperation, r); {
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, CreateSessionOperation, r); {
 			case err == nil: // if NO error
 				satisfied[0] |= 1 << 0
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
-				return res, errors.Wrap(err, "security \"OAuth2\"")
+				return res, errors.Wrap(err, "security \"Pat\"")
 			}
 		}
 
@@ -3770,10 +3879,21 @@ func (c *Client) sendCreateTeam(ctx context.Context, request *CreateTeamRequest,
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, CreateTeamOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Pat\"")
+			}
+		}
+		{
 			stage = "Security:OAuth2"
 			switch err := c.securityOAuth2(ctx, CreateTeamOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -3784,7 +3904,7 @@ func (c *Client) sendCreateTeam(ctx context.Context, request *CreateTeamRequest,
 			stage = "Security:SessionCookie"
 			switch err := c.securitySessionCookie(ctx, CreateTeamOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -3797,6 +3917,7 @@ func (c *Client) sendCreateTeam(ctx context.Context, request *CreateTeamRequest,
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -3945,10 +4066,21 @@ func (c *Client) sendCreateUser(ctx context.Context, request *CreateUserRequest,
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, CreateUserOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Pat\"")
+			}
+		}
+		{
 			stage = "Security:OAuth2"
 			switch err := c.securityOAuth2(ctx, CreateUserOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -3959,7 +4091,7 @@ func (c *Client) sendCreateUser(ctx context.Context, request *CreateUserRequest,
 			stage = "Security:SessionCookie"
 			switch err := c.securitySessionCookie(ctx, CreateUserOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -3972,6 +4104,7 @@ func (c *Client) sendCreateUser(ctx context.Context, request *CreateUserRequest,
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -4009,8 +4142,8 @@ func (c *Client) sendCreateUser(ctx context.Context, request *CreateUserRequest,
 // Already-revoked, missing, project-secret setup, and owning-team grants
 // return 404. The row is not un-revoked. Expired grants can still be
 // revoked so the unique binding can be reused.
-// Accepts either a project secret (`oauth2`) or a user-bound Console
-// session cookie (`sessionCookie`). Cookie-authenticated requests
+// Accepts the project's secret (`pat`), a person's token (`oauth2`) or
+// their user-bound Console session cookie (`sessionCookie`). Cookie-authenticated requests
 // follow the scheme's CSRF rules (`sessionCookie`).
 //
 // DELETE /grants/{id}
@@ -4109,10 +4242,21 @@ func (c *Client) sendDeleteGrant(ctx context.Context, params DeleteGrantParams) 
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, DeleteGrantOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Pat\"")
+			}
+		}
+		{
 			stage = "Security:OAuth2"
 			switch err := c.securityOAuth2(ctx, DeleteGrantOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -4123,7 +4267,7 @@ func (c *Client) sendDeleteGrant(ctx context.Context, params DeleteGrantParams) 
 			stage = "Security:SessionCookie"
 			switch err := c.securitySessionCookie(ctx, DeleteGrantOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -4136,6 +4280,7 @@ func (c *Client) sendDeleteGrant(ctx context.Context, params DeleteGrantParams) 
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -4258,10 +4403,21 @@ func (c *Client) sendDeleteTeam(ctx context.Context, params DeleteTeamParams) (r
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, DeleteTeamOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Pat\"")
+			}
+		}
+		{
 			stage = "Security:OAuth2"
 			switch err := c.securityOAuth2(ctx, DeleteTeamOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -4273,6 +4429,7 @@ func (c *Client) sendDeleteTeam(ctx context.Context, params DeleteTeamParams) (r
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -4393,10 +4550,21 @@ func (c *Client) sendDeleteUserByID(ctx context.Context, params DeleteUserByIDPa
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, DeleteUserByIDOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Pat\"")
+			}
+		}
+		{
 			stage = "Security:OAuth2"
 			switch err := c.securityOAuth2(ctx, DeleteUserByIDOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -4407,7 +4575,7 @@ func (c *Client) sendDeleteUserByID(ctx context.Context, params DeleteUserByIDPa
 			stage = "Security:SessionCookie"
 			switch err := c.securitySessionCookie(ctx, DeleteUserByIDOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -4420,6 +4588,7 @@ func (c *Client) sendDeleteUserByID(ctx context.Context, params DeleteUserByIDPa
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -4573,10 +4742,21 @@ func (c *Client) sendDeleteVariable(ctx context.Context, params DeleteVariablePa
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, DeleteVariableOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Pat\"")
+			}
+		}
+		{
 			stage = "Security:OAuth2"
 			switch err := c.securityOAuth2(ctx, DeleteVariableOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -4588,6 +4768,7 @@ func (c *Client) sendDeleteVariable(ctx context.Context, params DeleteVariablePa
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -4729,10 +4910,21 @@ func (c *Client) sendEvaluatePolicy(ctx context.Context, request EvaluatePolicyR
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, EvaluatePolicyOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Pat\"")
+			}
+		}
+		{
 			stage = "Security:OAuth2"
 			switch err := c.securityOAuth2(ctx, EvaluatePolicyOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -4743,7 +4935,7 @@ func (c *Client) sendEvaluatePolicy(ctx context.Context, request EvaluatePolicyR
 			stage = "Security:SessionCookie"
 			switch err := c.securitySessionCookie(ctx, EvaluatePolicyOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -4756,6 +4948,7 @@ func (c *Client) sendEvaluatePolicy(ctx context.Context, request EvaluatePolicyR
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -4908,14 +5101,14 @@ func (c *Client) sendExchangeHandoff(ctx context.Context, request *ExchangeReque
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			stage = "Security:OAuth2"
-			switch err := c.securityOAuth2(ctx, ExchangeHandoffOperation, r); {
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, ExchangeHandoffOperation, r); {
 			case err == nil: // if NO error
 				satisfied[0] |= 1 << 0
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
-				return res, errors.Wrap(err, "security \"OAuth2\"")
+				return res, errors.Wrap(err, "security \"Pat\"")
 			}
 		}
 
@@ -5063,14 +5256,14 @@ func (c *Client) sendFinishUserPasskeyRegistration(ctx context.Context, request 
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			stage = "Security:OAuth2"
-			switch err := c.securityOAuth2(ctx, FinishUserPasskeyRegistrationOperation, r); {
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, FinishUserPasskeyRegistrationOperation, r); {
 			case err == nil: // if NO error
 				satisfied[0] |= 1 << 0
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
-				return res, errors.Wrap(err, "security \"OAuth2\"")
+				return res, errors.Wrap(err, "security \"Pat\"")
 			}
 		}
 
@@ -5195,14 +5388,14 @@ func (c *Client) sendGetAuthAttempt(ctx context.Context, params GetAuthAttemptPa
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			stage = "Security:OAuth2"
-			switch err := c.securityOAuth2(ctx, GetAuthAttemptOperation, r); {
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, GetAuthAttemptOperation, r); {
 			case err == nil: // if NO error
 				satisfied[0] |= 1 << 0
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
-				return res, errors.Wrap(err, "security \"OAuth2\"")
+				return res, errors.Wrap(err, "security \"Pat\"")
 			}
 		}
 
@@ -5320,10 +5513,21 @@ func (c *Client) sendGetBrandingById(ctx context.Context, params GetBrandingById
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, GetBrandingByIdOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Pat\"")
+			}
+		}
+		{
 			stage = "Security:OAuth2"
 			switch err := c.securityOAuth2(ctx, GetBrandingByIdOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -5334,7 +5538,7 @@ func (c *Client) sendGetBrandingById(ctx context.Context, params GetBrandingById
 			stage = "Security:SessionCookie"
 			switch err := c.securitySessionCookie(ctx, GetBrandingByIdOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -5347,6 +5551,7 @@ func (c *Client) sendGetBrandingById(ctx context.Context, params GetBrandingById
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -5489,14 +5694,14 @@ func (c *Client) sendGetClaimStatus(ctx context.Context, params GetClaimStatusPa
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			stage = "Security:OAuth2"
-			switch err := c.securityOAuth2(ctx, GetClaimStatusOperation, r); {
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, GetClaimStatusOperation, r); {
 			case err == nil: // if NO error
 				satisfied[0] |= 1 << 0
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
-				return res, errors.Wrap(err, "security \"OAuth2\"")
+				return res, errors.Wrap(err, "security \"Pat\"")
 			}
 		}
 
@@ -5764,10 +5969,21 @@ func (c *Client) sendGetDeploymentById(ctx context.Context, params GetDeployment
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, GetDeploymentByIdOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Pat\"")
+			}
+		}
+		{
 			stage = "Security:OAuth2"
 			switch err := c.securityOAuth2(ctx, GetDeploymentByIdOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -5778,7 +5994,7 @@ func (c *Client) sendGetDeploymentById(ctx context.Context, params GetDeployment
 			stage = "Security:SessionCookie"
 			switch err := c.securitySessionCookie(ctx, GetDeploymentByIdOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -5791,6 +6007,7 @@ func (c *Client) sendGetDeploymentById(ctx context.Context, params GetDeployment
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -5928,10 +6145,21 @@ func (c *Client) sendGetDeploymentVariables(ctx context.Context, params GetDeplo
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, GetDeploymentVariablesOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Pat\"")
+			}
+		}
+		{
 			stage = "Security:OAuth2"
 			switch err := c.securityOAuth2(ctx, GetDeploymentVariablesOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -5943,6 +6171,7 @@ func (c *Client) sendGetDeploymentVariables(ctx context.Context, params GetDeplo
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -6077,10 +6306,21 @@ func (c *Client) sendGetEvent(ctx context.Context, params GetEventParams) (res G
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, GetEventOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Pat\"")
+			}
+		}
+		{
 			stage = "Security:OAuth2"
 			switch err := c.securityOAuth2(ctx, GetEventOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -6092,6 +6332,7 @@ func (c *Client) sendGetEvent(ctx context.Context, params GetEventParams) (res G
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -6202,10 +6443,21 @@ func (c *Client) sendGetFlowDefinition(ctx context.Context, params GetFlowDefini
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, GetFlowDefinitionOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Pat\"")
+			}
+		}
+		{
 			stage = "Security:OAuth2"
 			switch err := c.securityOAuth2(ctx, GetFlowDefinitionOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -6216,7 +6468,7 @@ func (c *Client) sendGetFlowDefinition(ctx context.Context, params GetFlowDefini
 			stage = "Security:SessionCookie"
 			switch err := c.securitySessionCookie(ctx, GetFlowDefinitionOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -6229,6 +6481,7 @@ func (c *Client) sendGetFlowDefinition(ctx context.Context, params GetFlowDefini
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -6386,8 +6639,8 @@ func (c *Client) sendGetFlowStep(ctx context.Context, params GetFlowStepParams) 
 // `user.read` and `team.read` in addition to `project.read` for project
 // secrets. A user-bound Console session that already passed the project
 // Check may expand without those scopes.
-// Accepts either a project secret (`oauth2`) or a user-bound Console
-// session cookie (`sessionCookie`). Cookie-authenticated requests
+// Accepts the project's secret (`pat`), a person's token (`oauth2`) or
+// their user-bound Console session cookie (`sessionCookie`). Cookie-authenticated requests
 // follow the scheme's CSRF rules (`sessionCookie`).
 //
 // GET /grants/{id}
@@ -6512,10 +6765,21 @@ func (c *Client) sendGetGrant(ctx context.Context, params GetGrantParams) (res G
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, GetGrantOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Pat\"")
+			}
+		}
+		{
 			stage = "Security:OAuth2"
 			switch err := c.securityOAuth2(ctx, GetGrantOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -6526,7 +6790,7 @@ func (c *Client) sendGetGrant(ctx context.Context, params GetGrantParams) (res G
 			stage = "Security:SessionCookie"
 			switch err := c.securitySessionCookie(ctx, GetGrantOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -6539,6 +6803,7 @@ func (c *Client) sendGetGrant(ctx context.Context, params GetGrantParams) (res G
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -6672,10 +6937,21 @@ func (c *Client) sendGetIdpById(ctx context.Context, params GetIdpByIdParams) (r
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, GetIdpByIdOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Pat\"")
+			}
+		}
+		{
 			stage = "Security:OAuth2"
 			switch err := c.securityOAuth2(ctx, GetIdpByIdOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -6686,7 +6962,7 @@ func (c *Client) sendGetIdpById(ctx context.Context, params GetIdpByIdParams) (r
 			stage = "Security:SessionCookie"
 			switch err := c.securitySessionCookie(ctx, GetIdpByIdOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -6699,6 +6975,7 @@ func (c *Client) sendGetIdpById(ctx context.Context, params GetIdpByIdParams) (r
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -6832,10 +7109,21 @@ func (c *Client) sendGetIdpRevisionById(ctx context.Context, params GetIdpRevisi
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, GetIdpRevisionByIdOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Pat\"")
+			}
+		}
+		{
 			stage = "Security:OAuth2"
 			switch err := c.securityOAuth2(ctx, GetIdpRevisionByIdOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -6846,7 +7134,7 @@ func (c *Client) sendGetIdpRevisionById(ctx context.Context, params GetIdpRevisi
 			stage = "Security:SessionCookie"
 			switch err := c.securitySessionCookie(ctx, GetIdpRevisionByIdOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -6859,6 +7147,7 @@ func (c *Client) sendGetIdpRevisionById(ctx context.Context, params GetIdpRevisi
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -7767,10 +8056,21 @@ func (c *Client) sendGetPolicy(ctx context.Context, params GetPolicyParams) (res
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, GetPolicyOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Pat\"")
+			}
+		}
+		{
 			stage = "Security:OAuth2"
 			switch err := c.securityOAuth2(ctx, GetPolicyOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -7781,7 +8081,7 @@ func (c *Client) sendGetPolicy(ctx context.Context, params GetPolicyParams) (res
 			stage = "Security:SessionCookie"
 			switch err := c.securitySessionCookie(ctx, GetPolicyOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -7794,6 +8094,7 @@ func (c *Client) sendGetPolicy(ctx context.Context, params GetPolicyParams) (res
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -7930,10 +8231,21 @@ func (c *Client) sendGetPolicyRevision(ctx context.Context, params GetPolicyRevi
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, GetPolicyRevisionOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Pat\"")
+			}
+		}
+		{
 			stage = "Security:OAuth2"
 			switch err := c.securityOAuth2(ctx, GetPolicyRevisionOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -7944,7 +8256,7 @@ func (c *Client) sendGetPolicyRevision(ctx context.Context, params GetPolicyRevi
 			stage = "Security:SessionCookie"
 			switch err := c.securitySessionCookie(ctx, GetPolicyRevisionOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -7957,6 +8269,7 @@ func (c *Client) sendGetPolicyRevision(ctx context.Context, params GetPolicyRevi
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -8070,10 +8383,21 @@ func (c *Client) sendGetProject(ctx context.Context, params GetProjectParams) (r
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, GetProjectOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Pat\"")
+			}
+		}
+		{
 			stage = "Security:OAuth2"
 			switch err := c.securityOAuth2(ctx, GetProjectOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -8084,7 +8408,7 @@ func (c *Client) sendGetProject(ctx context.Context, params GetProjectParams) (r
 			stage = "Security:SessionCookie"
 			switch err := c.securitySessionCookie(ctx, GetProjectOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -8097,6 +8421,7 @@ func (c *Client) sendGetProject(ctx context.Context, params GetProjectParams) (r
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -8317,10 +8642,21 @@ func (c *Client) sendGetReleaseById(ctx context.Context, params GetReleaseByIdPa
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, GetReleaseByIdOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Pat\"")
+			}
+		}
+		{
 			stage = "Security:OAuth2"
 			switch err := c.securityOAuth2(ctx, GetReleaseByIdOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -8331,7 +8667,7 @@ func (c *Client) sendGetReleaseById(ctx context.Context, params GetReleaseByIdPa
 			stage = "Security:SessionCookie"
 			switch err := c.securitySessionCookie(ctx, GetReleaseByIdOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -8344,6 +8680,7 @@ func (c *Client) sendGetReleaseById(ctx context.Context, params GetReleaseByIdPa
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -8506,10 +8843,21 @@ func (c *Client) sendGetSchemaById(ctx context.Context, params GetSchemaByIdPara
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, GetSchemaByIdOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Pat\"")
+			}
+		}
+		{
 			stage = "Security:OAuth2"
 			switch err := c.securityOAuth2(ctx, GetSchemaByIdOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -8520,7 +8868,7 @@ func (c *Client) sendGetSchemaById(ctx context.Context, params GetSchemaByIdPara
 			stage = "Security:SessionCookie"
 			switch err := c.securitySessionCookie(ctx, GetSchemaByIdOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -8533,6 +8881,7 @@ func (c *Client) sendGetSchemaById(ctx context.Context, params GetSchemaByIdPara
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -8650,10 +8999,21 @@ func (c *Client) sendGetSession(ctx context.Context, params GetSessionParams) (r
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, GetSessionOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Pat\"")
+			}
+		}
+		{
 			stage = "Security:OAuth2"
 			switch err := c.securityOAuth2(ctx, GetSessionOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -8665,6 +9025,7 @@ func (c *Client) sendGetSession(ctx context.Context, params GetSessionParams) (r
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -8778,10 +9139,21 @@ func (c *Client) sendGetTeam(ctx context.Context, params GetTeamParams) (res Get
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, GetTeamOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Pat\"")
+			}
+		}
+		{
 			stage = "Security:OAuth2"
 			switch err := c.securityOAuth2(ctx, GetTeamOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -8792,7 +9164,7 @@ func (c *Client) sendGetTeam(ctx context.Context, params GetTeamParams) (res Get
 			stage = "Security:SessionCookie"
 			switch err := c.securitySessionCookie(ctx, GetTeamOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -8805,6 +9177,7 @@ func (c *Client) sendGetTeam(ctx context.Context, params GetTeamParams) (res Get
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -8944,10 +9317,21 @@ func (c *Client) sendGetUserByID(ctx context.Context, params GetUserByIDParams) 
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, GetUserByIDOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Pat\"")
+			}
+		}
+		{
 			stage = "Security:OAuth2"
 			switch err := c.securityOAuth2(ctx, GetUserByIDOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -8958,7 +9342,7 @@ func (c *Client) sendGetUserByID(ctx context.Context, params GetUserByIDParams) 
 			stage = "Security:SessionCookie"
 			switch err := c.securitySessionCookie(ctx, GetUserByIDOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -8971,6 +9355,7 @@ func (c *Client) sendGetUserByID(ctx context.Context, params GetUserByIDParams) 
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -9087,10 +9472,21 @@ func (c *Client) sendGetUserPasswordState(ctx context.Context, params GetUserPas
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, GetUserPasswordStateOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Pat\"")
+			}
+		}
+		{
 			stage = "Security:OAuth2"
 			switch err := c.securityOAuth2(ctx, GetUserPasswordStateOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -9101,7 +9497,7 @@ func (c *Client) sendGetUserPasswordState(ctx context.Context, params GetUserPas
 			stage = "Security:SessionCookie"
 			switch err := c.securitySessionCookie(ctx, GetUserPasswordStateOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -9114,6 +9510,7 @@ func (c *Client) sendGetUserPasswordState(ctx context.Context, params GetUserPas
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -9267,10 +9664,21 @@ func (c *Client) sendGetVariable(ctx context.Context, params GetVariableParams) 
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, GetVariableOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Pat\"")
+			}
+		}
+		{
 			stage = "Security:OAuth2"
 			switch err := c.securityOAuth2(ctx, GetVariableOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -9281,7 +9689,7 @@ func (c *Client) sendGetVariable(ctx context.Context, params GetVariableParams) 
 			stage = "Security:SessionCookie"
 			switch err := c.securitySessionCookie(ctx, GetVariableOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -9294,6 +9702,7 @@ func (c *Client) sendGetVariable(ctx context.Context, params GetVariableParams) 
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -9427,10 +9836,21 @@ func (c *Client) sendGetVariables(ctx context.Context, params GetVariablesParams
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, GetVariablesOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Pat\"")
+			}
+		}
+		{
 			stage = "Security:OAuth2"
 			switch err := c.securityOAuth2(ctx, GetVariablesOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -9441,7 +9861,7 @@ func (c *Client) sendGetVariables(ctx context.Context, params GetVariablesParams
 			stage = "Security:SessionCookie"
 			switch err := c.securitySessionCookie(ctx, GetVariablesOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -9454,6 +9874,7 @@ func (c *Client) sendGetVariables(ctx context.Context, params GetVariablesParams
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -9572,14 +9993,14 @@ func (c *Client) sendInitClaim(ctx context.Context, params InitClaimParams) (res
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			stage = "Security:OAuth2"
-			switch err := c.securityOAuth2(ctx, InitClaimOperation, r); {
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, InitClaimOperation, r); {
 			case err == nil: // if NO error
 				satisfied[0] |= 1 << 0
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
-				return res, errors.Wrap(err, "security \"OAuth2\"")
+				return res, errors.Wrap(err, "security \"Pat\"")
 			}
 		}
 
@@ -9717,14 +10138,14 @@ func (c *Client) sendIssueChallenge(ctx context.Context, request *IssueChallenge
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			stage = "Security:OAuth2"
-			switch err := c.securityOAuth2(ctx, IssueChallengeOperation, r); {
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, IssueChallengeOperation, r); {
 			case err == nil: // if NO error
 				satisfied[0] |= 1 << 0
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
-				return res, errors.Wrap(err, "security \"OAuth2\"")
+				return res, errors.Wrap(err, "security \"Pat\"")
 			}
 		}
 
@@ -9849,10 +10270,21 @@ func (c *Client) sendListBranding(ctx context.Context, params ListBrandingParams
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, ListBrandingOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Pat\"")
+			}
+		}
+		{
 			stage = "Security:OAuth2"
 			switch err := c.securityOAuth2(ctx, ListBrandingOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -9863,7 +10295,7 @@ func (c *Client) sendListBranding(ctx context.Context, params ListBrandingParams
 			stage = "Security:SessionCookie"
 			switch err := c.securitySessionCookie(ctx, ListBrandingOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -9876,6 +10308,7 @@ func (c *Client) sendListBranding(ctx context.Context, params ListBrandingParams
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -10103,10 +10536,21 @@ func (c *Client) sendListDeployments(ctx context.Context, params ListDeployments
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, ListDeploymentsOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Pat\"")
+			}
+		}
+		{
 			stage = "Security:OAuth2"
 			switch err := c.securityOAuth2(ctx, ListDeploymentsOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -10117,7 +10561,7 @@ func (c *Client) sendListDeployments(ctx context.Context, params ListDeployments
 			stage = "Security:SessionCookie"
 			switch err := c.securitySessionCookie(ctx, ListDeploymentsOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -10130,6 +10574,7 @@ func (c *Client) sendListDeployments(ctx context.Context, params ListDeployments
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -10547,10 +10992,21 @@ func (c *Client) sendListEvents(ctx context.Context, params ListEventsParams) (r
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, ListEventsOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Pat\"")
+			}
+		}
+		{
 			stage = "Security:OAuth2"
 			switch err := c.securityOAuth2(ctx, ListEventsOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -10562,6 +11018,7 @@ func (c *Client) sendListEvents(ctx context.Context, params ListEventsParams) (r
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -10794,10 +11251,21 @@ func (c *Client) sendListFlowDefinitions(ctx context.Context, params ListFlowDef
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, ListFlowDefinitionsOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Pat\"")
+			}
+		}
+		{
 			stage = "Security:OAuth2"
 			switch err := c.securityOAuth2(ctx, ListFlowDefinitionsOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -10808,7 +11276,7 @@ func (c *Client) sendListFlowDefinitions(ctx context.Context, params ListFlowDef
 			stage = "Security:SessionCookie"
 			switch err := c.securitySessionCookie(ctx, ListFlowDefinitionsOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -10821,6 +11289,7 @@ func (c *Client) sendListFlowDefinitions(ctx context.Context, params ListFlowDef
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -10995,10 +11464,21 @@ func (c *Client) sendListIdpRevisions(ctx context.Context, params ListIdpRevisio
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, ListIdpRevisionsOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Pat\"")
+			}
+		}
+		{
 			stage = "Security:OAuth2"
 			switch err := c.securityOAuth2(ctx, ListIdpRevisionsOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -11010,6 +11490,7 @@ func (c *Client) sendListIdpRevisions(ctx context.Context, params ListIdpRevisio
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -11731,11 +12212,23 @@ func (c *Client) sendListMyProjects(ctx context.Context, params ListMyProjectsPa
 				return res, errors.Wrap(err, "security \"SessionCookie\"")
 			}
 		}
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, ListMyProjectsOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -12083,10 +12576,21 @@ func (c *Client) sendListPolicies(ctx context.Context, params ListPoliciesParams
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, ListPoliciesOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Pat\"")
+			}
+		}
+		{
 			stage = "Security:OAuth2"
 			switch err := c.securityOAuth2(ctx, ListPoliciesOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -12097,7 +12601,7 @@ func (c *Client) sendListPolicies(ctx context.Context, params ListPoliciesParams
 			stage = "Security:SessionCookie"
 			switch err := c.securitySessionCookie(ctx, ListPoliciesOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -12110,6 +12614,7 @@ func (c *Client) sendListPolicies(ctx context.Context, params ListPoliciesParams
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -12288,10 +12793,21 @@ func (c *Client) sendListPolicyRevisions(ctx context.Context, params ListPolicyR
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, ListPolicyRevisionsOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Pat\"")
+			}
+		}
+		{
 			stage = "Security:OAuth2"
 			switch err := c.securityOAuth2(ctx, ListPolicyRevisionsOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -12302,7 +12818,7 @@ func (c *Client) sendListPolicyRevisions(ctx context.Context, params ListPolicyR
 			stage = "Security:SessionCookie"
 			switch err := c.securitySessionCookie(ctx, ListPolicyRevisionsOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -12315,6 +12831,7 @@ func (c *Client) sendListPolicyRevisions(ctx context.Context, params ListPolicyR
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -12475,10 +12992,21 @@ func (c *Client) sendListPreviews(ctx context.Context, params ListPreviewsParams
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, ListPreviewsOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Pat\"")
+			}
+		}
+		{
 			stage = "Security:OAuth2"
 			switch err := c.securityOAuth2(ctx, ListPreviewsOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -12490,6 +13018,7 @@ func (c *Client) sendListPreviews(ctx context.Context, params ListPreviewsParams
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -12544,8 +13073,9 @@ func (c *Client) sendListPreviews(ctx context.Context, params ListPreviewsParams
 // `team_id` only. The grant to such a team still shows in the project's
 // grants.
 // Ordered by `user_id` and paginated with `page_token`.
-// Accepts either a project secret (`oauth2`) or a user-bound Console
-// session cookie (`sessionCookie`) that can read the project.
+// Accepts the project's secret (`pat`), or a person's token (`oauth2`) or
+// user-bound Console session cookie (`sessionCookie`) that can read the
+// project.
 //
 // GET /projects/{project_id}/admins
 func (c *Client) ListProjectAdmins(ctx context.Context, params ListProjectAdminsParams) (ListProjectAdminsRes, error) {
@@ -12670,10 +13200,21 @@ func (c *Client) sendListProjectAdmins(ctx context.Context, params ListProjectAd
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, ListProjectAdminsOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Pat\"")
+			}
+		}
+		{
 			stage = "Security:OAuth2"
 			switch err := c.securityOAuth2(ctx, ListProjectAdminsOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -12684,7 +13225,7 @@ func (c *Client) sendListProjectAdmins(ctx context.Context, params ListProjectAd
 			stage = "Security:SessionCookie"
 			switch err := c.securitySessionCookie(ctx, ListProjectAdminsOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -12697,6 +13238,7 @@ func (c *Client) sendListProjectAdmins(ctx context.Context, params ListProjectAd
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -12878,10 +13420,21 @@ func (c *Client) sendListReleases(ctx context.Context, params ListReleasesParams
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, ListReleasesOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Pat\"")
+			}
+		}
+		{
 			stage = "Security:OAuth2"
 			switch err := c.securityOAuth2(ctx, ListReleasesOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -12892,7 +13445,7 @@ func (c *Client) sendListReleases(ctx context.Context, params ListReleasesParams
 			stage = "Security:SessionCookie"
 			switch err := c.securitySessionCookie(ctx, ListReleasesOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -12905,6 +13458,7 @@ func (c *Client) sendListReleases(ctx context.Context, params ListReleasesParams
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -13136,10 +13690,21 @@ func (c *Client) sendListSchemas(ctx context.Context, params ListSchemasParams) 
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, ListSchemasOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Pat\"")
+			}
+		}
+		{
 			stage = "Security:OAuth2"
 			switch err := c.securityOAuth2(ctx, ListSchemasOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -13150,7 +13715,7 @@ func (c *Client) sendListSchemas(ctx context.Context, params ListSchemasParams) 
 			stage = "Security:SessionCookie"
 			switch err := c.securitySessionCookie(ctx, ListSchemasOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -13163,6 +13728,7 @@ func (c *Client) sendListSchemas(ctx context.Context, params ListSchemasParams) 
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -13322,10 +13888,21 @@ func (c *Client) sendListUserIdentityLinks(ctx context.Context, params ListUserI
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, ListUserIdentityLinksOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Pat\"")
+			}
+		}
+		{
 			stage = "Security:OAuth2"
 			switch err := c.securityOAuth2(ctx, ListUserIdentityLinksOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -13336,7 +13913,7 @@ func (c *Client) sendListUserIdentityLinks(ctx context.Context, params ListUserI
 			stage = "Security:SessionCookie"
 			switch err := c.securitySessionCookie(ctx, ListUserIdentityLinksOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -13349,6 +13926,7 @@ func (c *Client) sendListUserIdentityLinks(ctx context.Context, params ListUserI
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -13510,10 +14088,21 @@ func (c *Client) sendListUserPasskeys(ctx context.Context, params ListUserPasske
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, ListUserPasskeysOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Pat\"")
+			}
+		}
+		{
 			stage = "Security:OAuth2"
 			switch err := c.securityOAuth2(ctx, ListUserPasskeysOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -13524,7 +14113,7 @@ func (c *Client) sendListUserPasskeys(ctx context.Context, params ListUserPasske
 			stage = "Security:SessionCookie"
 			switch err := c.securitySessionCookie(ctx, ListUserPasskeysOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -13537,6 +14126,7 @@ func (c *Client) sendListUserPasskeys(ctx context.Context, params ListUserPasske
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -13700,10 +14290,21 @@ func (c *Client) sendListUserTeams(ctx context.Context, params ListUserTeamsPara
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, ListUserTeamsOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Pat\"")
+			}
+		}
+		{
 			stage = "Security:OAuth2"
 			switch err := c.securityOAuth2(ctx, ListUserTeamsOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -13714,7 +14315,7 @@ func (c *Client) sendListUserTeams(ctx context.Context, params ListUserTeamsPara
 			stage = "Security:SessionCookie"
 			switch err := c.securitySessionCookie(ctx, ListUserTeamsOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -13727,6 +14328,7 @@ func (c *Client) sendListUserTeams(ctx context.Context, params ListUserTeamsPara
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -13999,10 +14601,21 @@ func (c *Client) sendPatchProject(ctx context.Context, request *PatchProjectRequ
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, PatchProjectOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Pat\"")
+			}
+		}
+		{
 			stage = "Security:OAuth2"
 			switch err := c.securityOAuth2(ctx, PatchProjectOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -14013,7 +14626,7 @@ func (c *Client) sendPatchProject(ctx context.Context, request *PatchProjectRequ
 			stage = "Security:SessionCookie"
 			switch err := c.securitySessionCookie(ctx, PatchProjectOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -14026,6 +14639,7 @@ func (c *Client) sendPatchProject(ctx context.Context, request *PatchProjectRequ
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -14154,10 +14768,21 @@ func (c *Client) sendPatchUserByID(ctx context.Context, request *PatchUserReques
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, PatchUserByIDOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Pat\"")
+			}
+		}
+		{
 			stage = "Security:OAuth2"
 			switch err := c.securityOAuth2(ctx, PatchUserByIDOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -14168,7 +14793,7 @@ func (c *Client) sendPatchUserByID(ctx context.Context, request *PatchUserReques
 			stage = "Security:SessionCookie"
 			switch err := c.securitySessionCookie(ctx, PatchUserByIDOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -14181,6 +14806,7 @@ func (c *Client) sendPatchUserByID(ctx context.Context, request *PatchUserReques
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -14321,10 +14947,21 @@ func (c *Client) sendPublishPolicy(ctx context.Context, request PublishPolicyReq
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, PublishPolicyOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Pat\"")
+			}
+		}
+		{
 			stage = "Security:OAuth2"
 			switch err := c.securityOAuth2(ctx, PublishPolicyOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -14336,6 +14973,7 @@ func (c *Client) sendPublishPolicy(ctx context.Context, request PublishPolicyReq
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -14381,8 +15019,8 @@ func (c *Client) sendPublishPolicy(ctx context.Context, request PublishPolicyReq
 // scopes cannot be ANDed onto this security block because they are
 // body-conditional). A user-bound Console session that already passed
 // the project Check may expand without those scopes.
-// Accepts either a project secret (`oauth2`) or a user-bound Console
-// session cookie (`sessionCookie`). Cookie-authenticated requests
+// Accepts the project's secret (`pat`), a person's token (`oauth2`) or
+// their user-bound Console session cookie (`sessionCookie`). Cookie-authenticated requests
 // follow the scheme's CSRF rules (`sessionCookie`).
 //
 // POST /grants/query
@@ -14475,10 +15113,21 @@ func (c *Client) sendQueryGrants(ctx context.Context, request *QueryGrantsReques
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, QueryGrantsOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Pat\"")
+			}
+		}
+		{
 			stage = "Security:OAuth2"
 			switch err := c.securityOAuth2(ctx, QueryGrantsOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -14489,7 +15138,7 @@ func (c *Client) sendQueryGrants(ctx context.Context, request *QueryGrantsReques
 			stage = "Security:SessionCookie"
 			switch err := c.securitySessionCookie(ctx, QueryGrantsOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -14502,6 +15151,7 @@ func (c *Client) sendQueryGrants(ctx context.Context, request *QueryGrantsReques
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -14628,10 +15278,21 @@ func (c *Client) sendQueryIdps(ctx context.Context, request *QueryIdpsRequest, p
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, QueryIdpsOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Pat\"")
+			}
+		}
+		{
 			stage = "Security:OAuth2"
 			switch err := c.securityOAuth2(ctx, QueryIdpsOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -14642,7 +15303,7 @@ func (c *Client) sendQueryIdps(ctx context.Context, request *QueryIdpsRequest, p
 			stage = "Security:SessionCookie"
 			switch err := c.securitySessionCookie(ctx, QueryIdpsOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -14655,6 +15316,7 @@ func (c *Client) sendQueryIdps(ctx context.Context, request *QueryIdpsRequest, p
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -14763,10 +15425,21 @@ func (c *Client) sendQueryProjects(ctx context.Context, request *QueryProjectsRe
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, QueryProjectsOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Pat\"")
+			}
+		}
+		{
 			stage = "Security:OAuth2"
 			switch err := c.securityOAuth2(ctx, QueryProjectsOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -14778,6 +15451,7 @@ func (c *Client) sendQueryProjects(ctx context.Context, request *QueryProjectsRe
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -14905,10 +15579,21 @@ func (c *Client) sendQuerySessions(ctx context.Context, request *QuerySessionsRe
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, QuerySessionsOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Pat\"")
+			}
+		}
+		{
 			stage = "Security:OAuth2"
 			switch err := c.securityOAuth2(ctx, QuerySessionsOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -14920,6 +15605,7 @@ func (c *Client) sendQuerySessions(ctx context.Context, request *QuerySessionsRe
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -15050,10 +15736,21 @@ func (c *Client) sendQueryTeams(ctx context.Context, request *QueryTeamsRequest,
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, QueryTeamsOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Pat\"")
+			}
+		}
+		{
 			stage = "Security:OAuth2"
 			switch err := c.securityOAuth2(ctx, QueryTeamsOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -15064,7 +15761,7 @@ func (c *Client) sendQueryTeams(ctx context.Context, request *QueryTeamsRequest,
 			stage = "Security:SessionCookie"
 			switch err := c.securitySessionCookie(ctx, QueryTeamsOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -15077,6 +15774,7 @@ func (c *Client) sendQueryTeams(ctx context.Context, request *QueryTeamsRequest,
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -15113,8 +15811,8 @@ func (c *Client) sendQueryTeams(ctx context.Context, request *QueryTeamsRequest,
 // Returns the users of a project, paginated with a cursor.
 // `project_id` names the project to list; without it, the credential's own
 // project is listed.
-// Accepts either a project secret (`oauth2`) or a user-bound Console
-// session cookie (`sessionCookie`). Cookie-authenticated requests
+// Accepts the project's secret (`pat`), a person's token (`oauth2`) or
+// their user-bound Console session cookie (`sessionCookie`). Cookie-authenticated requests
 // follow the scheme's CSRF rules (`sessionCookie`).
 //
 // POST /users/query
@@ -15210,10 +15908,21 @@ func (c *Client) sendQueryUsers(ctx context.Context, request *QueryUsersRequest,
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, QueryUsersOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Pat\"")
+			}
+		}
+		{
 			stage = "Security:OAuth2"
 			switch err := c.securityOAuth2(ctx, QueryUsersOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -15224,7 +15933,7 @@ func (c *Client) sendQueryUsers(ctx context.Context, request *QueryUsersRequest,
 			stage = "Security:SessionCookie"
 			switch err := c.securitySessionCookie(ctx, QueryUsersOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -15237,6 +15946,7 @@ func (c *Client) sendQueryUsers(ctx context.Context, request *QueryUsersRequest,
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -15357,10 +16067,21 @@ func (c *Client) sendRemoveOrigin(ctx context.Context, request *RemoveOriginReq,
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, RemoveOriginOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Pat\"")
+			}
+		}
+		{
 			stage = "Security:OAuth2"
 			switch err := c.securityOAuth2(ctx, RemoveOriginOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -15371,7 +16092,7 @@ func (c *Client) sendRemoveOrigin(ctx context.Context, request *RemoveOriginReq,
 			stage = "Security:SessionCookie"
 			switch err := c.securitySessionCookie(ctx, RemoveOriginOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -15384,6 +16105,7 @@ func (c *Client) sendRemoveOrigin(ctx context.Context, request *RemoveOriginReq,
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -15516,10 +16238,21 @@ func (c *Client) sendRemovePreview(ctx context.Context, request *RemovePreviewRe
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, RemovePreviewOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Pat\"")
+			}
+		}
+		{
 			stage = "Security:OAuth2"
 			switch err := c.securityOAuth2(ctx, RemovePreviewOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -15531,6 +16264,7 @@ func (c *Client) sendRemovePreview(ctx context.Context, request *RemovePreviewRe
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -15975,10 +16709,21 @@ func (c *Client) sendRevokeRelease(ctx context.Context, params RevokeReleasePara
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, RevokeReleaseOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Pat\"")
+			}
+		}
+		{
 			stage = "Security:OAuth2"
 			switch err := c.securityOAuth2(ctx, RevokeReleaseOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -15989,7 +16734,7 @@ func (c *Client) sendRevokeRelease(ctx context.Context, params RevokeReleasePara
 			stage = "Security:SessionCookie"
 			switch err := c.securitySessionCookie(ctx, RevokeReleaseOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -16002,6 +16747,7 @@ func (c *Client) sendRevokeRelease(ctx context.Context, params RevokeReleasePara
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -16121,10 +16867,21 @@ func (c *Client) sendRevokeSession(ctx context.Context, params RevokeSessionPara
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, RevokeSessionOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Pat\"")
+			}
+		}
+		{
 			stage = "Security:OAuth2"
 			switch err := c.securityOAuth2(ctx, RevokeSessionOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -16136,6 +16893,7 @@ func (c *Client) sendRevokeSession(ctx context.Context, params RevokeSessionPara
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -16302,10 +17060,21 @@ func (c *Client) sendRollbackDeployment(ctx context.Context, request OptRollback
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, RollbackDeploymentOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Pat\"")
+			}
+		}
+		{
 			stage = "Security:OAuth2"
 			switch err := c.securityOAuth2(ctx, RollbackDeploymentOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -16316,7 +17085,7 @@ func (c *Client) sendRollbackDeployment(ctx context.Context, request OptRollback
 			stage = "Security:SessionCookie"
 			switch err := c.securitySessionCookie(ctx, RollbackDeploymentOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -16329,6 +17098,7 @@ func (c *Client) sendRollbackDeployment(ctx context.Context, request OptRollback
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -16449,10 +17219,21 @@ func (c *Client) sendSetUserPassword(ctx context.Context, request *SetUserPasswo
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, SetUserPasswordOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Pat\"")
+			}
+		}
+		{
 			stage = "Security:OAuth2"
 			switch err := c.securityOAuth2(ctx, SetUserPasswordOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -16464,6 +17245,7 @@ func (c *Client) sendSetUserPassword(ctx context.Context, request *SetUserPasswo
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -16767,10 +17549,21 @@ func (c *Client) sendUpdateTeam(ctx context.Context, request *UpdateTeamRequest,
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, UpdateTeamOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Pat\"")
+			}
+		}
+		{
 			stage = "Security:OAuth2"
 			switch err := c.securityOAuth2(ctx, UpdateTeamOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -16781,7 +17574,7 @@ func (c *Client) sendUpdateTeam(ctx context.Context, request *UpdateTeamRequest,
 			stage = "Security:SessionCookie"
 			switch err := c.securitySessionCookie(ctx, UpdateTeamOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -16794,6 +17587,7 @@ func (c *Client) sendUpdateTeam(ctx context.Context, request *UpdateTeamRequest,
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -16950,10 +17744,21 @@ func (c *Client) sendUpdateVariables(ctx context.Context, request UpdateVariable
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, UpdateVariablesOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"Pat\"")
+			}
+		}
+		{
 			stage = "Security:OAuth2"
 			switch err := c.securityOAuth2(ctx, UpdateVariablesOperation, r); {
 			case err == nil: // if NO error
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
@@ -16965,6 +17770,7 @@ func (c *Client) sendUpdateVariables(ctx context.Context, request UpdateVariable
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -17128,14 +17934,14 @@ func (c *Client) sendVerifyChallengeProof(ctx context.Context, request *VerifyCh
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			stage = "Security:OAuth2"
-			switch err := c.securityOAuth2(ctx, VerifyChallengeProofOperation, r); {
+			stage = "Security:Pat"
+			switch err := c.securityPat(ctx, VerifyChallengeProofOperation, r); {
 			case err == nil: // if NO error
 				satisfied[0] |= 1 << 0
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
 				// Skip this security.
 			default:
-				return res, errors.Wrap(err, "security \"OAuth2\"")
+				return res, errors.Wrap(err, "security \"Pat\"")
 			}
 		}
 

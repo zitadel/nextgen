@@ -116,6 +116,23 @@ func (s *Server) handleAddOriginRequest(args [1]string, argsEscaped bool, w http
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			sctx, ok, err := s.securityPat(ctx, AddOriginOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Pat",
+					Err:              err,
+				}
+				defer recordError("Security:Pat", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
 			sctx, ok, err := s.securityOAuth2(ctx, AddOriginOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
@@ -128,7 +145,7 @@ func (s *Server) handleAddOriginRequest(args [1]string, argsEscaped bool, w http
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 				ctx = sctx
 			}
 		}
@@ -145,7 +162,7 @@ func (s *Server) handleAddOriginRequest(args [1]string, argsEscaped bool, w http
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 				ctx = sctx
 			}
 		}
@@ -155,6 +172,7 @@ func (s *Server) handleAddOriginRequest(args [1]string, argsEscaped bool, w http
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -340,14 +358,14 @@ func (s *Server) handleBeginUserPasskeyRegistrationRequest(args [1]string, argsE
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			sctx, ok, err := s.securityOAuth2(ctx, BeginUserPasskeyRegistrationOperation, r)
+			sctx, ok, err := s.securityPat(ctx, BeginUserPasskeyRegistrationOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "OAuth2",
+					Security:         "Pat",
 					Err:              err,
 				}
-				defer recordError("Security:OAuth2", err)
+				defer recordError("Security:Pat", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -570,6 +588,23 @@ func (s *Server) handleBuildReleaseRequest(args [0]string, argsEscaped bool, w h
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			sctx, ok, err := s.securityPat(ctx, BuildReleaseOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Pat",
+					Err:              err,
+				}
+				defer recordError("Security:Pat", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
 			sctx, ok, err := s.securityOAuth2(ctx, BuildReleaseOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
@@ -582,7 +617,7 @@ func (s *Server) handleBuildReleaseRequest(args [0]string, argsEscaped bool, w h
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 				ctx = sctx
 			}
 		}
@@ -591,6 +626,7 @@ func (s *Server) handleBuildReleaseRequest(args [0]string, argsEscaped bool, w h
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -986,14 +1022,14 @@ func (s *Server) handleCreateAuthAttemptRequest(args [0]string, argsEscaped bool
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			sctx, ok, err := s.securityOAuth2(ctx, CreateAuthAttemptOperation, r)
+			sctx, ok, err := s.securityPat(ctx, CreateAuthAttemptOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "OAuth2",
+					Security:         "Pat",
 					Err:              err,
 				}
-				defer recordError("Security:OAuth2", err)
+				defer recordError("Security:Pat", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -1179,6 +1215,23 @@ func (s *Server) handleCreateBrandingRequest(args [0]string, argsEscaped bool, w
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			sctx, ok, err := s.securityPat(ctx, CreateBrandingOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Pat",
+					Err:              err,
+				}
+				defer recordError("Security:Pat", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
 			sctx, ok, err := s.securityOAuth2(ctx, CreateBrandingOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
@@ -1191,7 +1244,7 @@ func (s *Server) handleCreateBrandingRequest(args [0]string, argsEscaped bool, w
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 				ctx = sctx
 			}
 		}
@@ -1200,6 +1253,7 @@ func (s *Server) handleCreateBrandingRequest(args [0]string, argsEscaped bool, w
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -1405,6 +1459,23 @@ func (s *Server) handleCreateDeploymentRequest(args [0]string, argsEscaped bool,
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			sctx, ok, err := s.securityPat(ctx, CreateDeploymentOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Pat",
+					Err:              err,
+				}
+				defer recordError("Security:Pat", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
 			sctx, ok, err := s.securityOAuth2(ctx, CreateDeploymentOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
@@ -1417,7 +1488,7 @@ func (s *Server) handleCreateDeploymentRequest(args [0]string, argsEscaped bool,
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 				ctx = sctx
 			}
 		}
@@ -1434,7 +1505,7 @@ func (s *Server) handleCreateDeploymentRequest(args [0]string, argsEscaped bool,
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 				ctx = sctx
 			}
 		}
@@ -1444,6 +1515,7 @@ func (s *Server) handleCreateDeploymentRequest(args [0]string, argsEscaped bool,
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -1814,6 +1886,23 @@ func (s *Server) handleCreateFlowDefinitionRequest(args [0]string, argsEscaped b
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			sctx, ok, err := s.securityPat(ctx, CreateFlowDefinitionOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Pat",
+					Err:              err,
+				}
+				defer recordError("Security:Pat", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
 			sctx, ok, err := s.securityOAuth2(ctx, CreateFlowDefinitionOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
@@ -1826,7 +1915,7 @@ func (s *Server) handleCreateFlowDefinitionRequest(args [0]string, argsEscaped b
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 				ctx = sctx
 			}
 		}
@@ -1835,6 +1924,7 @@ func (s *Server) handleCreateFlowDefinitionRequest(args [0]string, argsEscaped b
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -1937,8 +2027,8 @@ func (s *Server) handleCreateFlowDefinitionRequest(args [0]string, argsEscaped b
 // body on every outcome. Granting the session caller's own user is
 // `grant.invalid` on either user locator. Read the grant back for
 // identifier and display.
-// Accepts either a project secret (`oauth2`) or a user-bound Console
-// session cookie (`sessionCookie`). Session callers are authorized as
+// Accepts the project's secret (`pat`), a person's token (`oauth2`) or
+// their user-bound Console session cookie (`sessionCookie`). Session callers are authorized as
 // the human against the target project (home may differ). Cookie-authenticated
 // requests follow the scheme's CSRF rules (`sessionCookie`).
 //
@@ -2018,6 +2108,23 @@ func (s *Server) handleCreateGrantRequest(args [0]string, argsEscaped bool, w ht
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			sctx, ok, err := s.securityPat(ctx, CreateGrantOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Pat",
+					Err:              err,
+				}
+				defer recordError("Security:Pat", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
 			sctx, ok, err := s.securityOAuth2(ctx, CreateGrantOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
@@ -2030,7 +2137,7 @@ func (s *Server) handleCreateGrantRequest(args [0]string, argsEscaped bool, w ht
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 				ctx = sctx
 			}
 		}
@@ -2047,7 +2154,7 @@ func (s *Server) handleCreateGrantRequest(args [0]string, argsEscaped bool, w ht
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 				ctx = sctx
 			}
 		}
@@ -2057,6 +2164,7 @@ func (s *Server) handleCreateGrantRequest(args [0]string, argsEscaped bool, w ht
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -2246,14 +2354,14 @@ func (s *Server) handleCreateHandoffRequest(args [1]string, argsEscaped bool, w 
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			sctx, ok, err := s.securityOAuth2(ctx, CreateHandoffOperation, r)
+			sctx, ok, err := s.securityPat(ctx, CreateHandoffOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "OAuth2",
+					Security:         "Pat",
 					Err:              err,
 				}
-				defer recordError("Security:OAuth2", err)
+				defer recordError("Security:Pat", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -2462,6 +2570,23 @@ func (s *Server) handleCreateIdpRequest(args [0]string, argsEscaped bool, w http
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			sctx, ok, err := s.securityPat(ctx, CreateIdpOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Pat",
+					Err:              err,
+				}
+				defer recordError("Security:Pat", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
 			sctx, ok, err := s.securityOAuth2(ctx, CreateIdpOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
@@ -2474,7 +2599,7 @@ func (s *Server) handleCreateIdpRequest(args [0]string, argsEscaped bool, w http
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 				ctx = sctx
 			}
 		}
@@ -2483,6 +2608,7 @@ func (s *Server) handleCreateIdpRequest(args [0]string, argsEscaped bool, w http
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -2826,6 +2952,23 @@ func (s *Server) handleCreateReleaseRequest(args [0]string, argsEscaped bool, w 
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			sctx, ok, err := s.securityPat(ctx, CreateReleaseOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Pat",
+					Err:              err,
+				}
+				defer recordError("Security:Pat", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
 			sctx, ok, err := s.securityOAuth2(ctx, CreateReleaseOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
@@ -2838,7 +2981,7 @@ func (s *Server) handleCreateReleaseRequest(args [0]string, argsEscaped bool, w 
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 				ctx = sctx
 			}
 		}
@@ -2847,6 +2990,7 @@ func (s *Server) handleCreateReleaseRequest(args [0]string, argsEscaped bool, w 
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -3035,6 +3179,23 @@ func (s *Server) handleCreateSchemaRequest(args [0]string, argsEscaped bool, w h
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			sctx, ok, err := s.securityPat(ctx, CreateSchemaOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Pat",
+					Err:              err,
+				}
+				defer recordError("Security:Pat", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
 			sctx, ok, err := s.securityOAuth2(ctx, CreateSchemaOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
@@ -3047,7 +3208,7 @@ func (s *Server) handleCreateSchemaRequest(args [0]string, argsEscaped bool, w h
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 				ctx = sctx
 			}
 		}
@@ -3056,6 +3217,7 @@ func (s *Server) handleCreateSchemaRequest(args [0]string, argsEscaped bool, w h
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -3258,14 +3420,14 @@ func (s *Server) handleCreateSessionRequest(args [0]string, argsEscaped bool, w 
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			sctx, ok, err := s.securityOAuth2(ctx, CreateSessionOperation, r)
+			sctx, ok, err := s.securityPat(ctx, CreateSessionOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "OAuth2",
+					Security:         "Pat",
 					Err:              err,
 				}
-				defer recordError("Security:OAuth2", err)
+				defer recordError("Security:Pat", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -3447,6 +3609,23 @@ func (s *Server) handleCreateTeamRequest(args [0]string, argsEscaped bool, w htt
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			sctx, ok, err := s.securityPat(ctx, CreateTeamOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Pat",
+					Err:              err,
+				}
+				defer recordError("Security:Pat", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
 			sctx, ok, err := s.securityOAuth2(ctx, CreateTeamOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
@@ -3459,7 +3638,7 @@ func (s *Server) handleCreateTeamRequest(args [0]string, argsEscaped bool, w htt
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 				ctx = sctx
 			}
 		}
@@ -3476,7 +3655,7 @@ func (s *Server) handleCreateTeamRequest(args [0]string, argsEscaped bool, w htt
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 				ctx = sctx
 			}
 		}
@@ -3486,6 +3665,7 @@ func (s *Server) handleCreateTeamRequest(args [0]string, argsEscaped bool, w htt
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -3670,6 +3850,23 @@ func (s *Server) handleCreateUserRequest(args [0]string, argsEscaped bool, w htt
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			sctx, ok, err := s.securityPat(ctx, CreateUserOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Pat",
+					Err:              err,
+				}
+				defer recordError("Security:Pat", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
 			sctx, ok, err := s.securityOAuth2(ctx, CreateUserOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
@@ -3682,7 +3879,7 @@ func (s *Server) handleCreateUserRequest(args [0]string, argsEscaped bool, w htt
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 				ctx = sctx
 			}
 		}
@@ -3699,7 +3896,7 @@ func (s *Server) handleCreateUserRequest(args [0]string, argsEscaped bool, w htt
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 				ctx = sctx
 			}
 		}
@@ -3709,6 +3906,7 @@ func (s *Server) handleCreateUserRequest(args [0]string, argsEscaped bool, w htt
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -3820,8 +4018,8 @@ func (s *Server) handleCreateUserRequest(args [0]string, argsEscaped bool, w htt
 // Already-revoked, missing, project-secret setup, and owning-team grants
 // return 404. The row is not un-revoked. Expired grants can still be
 // revoked so the unique binding can be reused.
-// Accepts either a project secret (`oauth2`) or a user-bound Console
-// session cookie (`sessionCookie`). Cookie-authenticated requests
+// Accepts the project's secret (`pat`), a person's token (`oauth2`) or
+// their user-bound Console session cookie (`sessionCookie`). Cookie-authenticated requests
 // follow the scheme's CSRF rules (`sessionCookie`).
 //
 // DELETE /grants/{id}
@@ -3900,6 +4098,23 @@ func (s *Server) handleDeleteGrantRequest(args [1]string, argsEscaped bool, w ht
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			sctx, ok, err := s.securityPat(ctx, DeleteGrantOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Pat",
+					Err:              err,
+				}
+				defer recordError("Security:Pat", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
 			sctx, ok, err := s.securityOAuth2(ctx, DeleteGrantOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
@@ -3912,7 +4127,7 @@ func (s *Server) handleDeleteGrantRequest(args [1]string, argsEscaped bool, w ht
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 				ctx = sctx
 			}
 		}
@@ -3929,7 +4144,7 @@ func (s *Server) handleDeleteGrantRequest(args [1]string, argsEscaped bool, w ht
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 				ctx = sctx
 			}
 		}
@@ -3939,6 +4154,7 @@ func (s *Server) handleDeleteGrantRequest(args [1]string, argsEscaped bool, w ht
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -4118,6 +4334,23 @@ func (s *Server) handleDeleteTeamRequest(args [1]string, argsEscaped bool, w htt
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			sctx, ok, err := s.securityPat(ctx, DeleteTeamOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Pat",
+					Err:              err,
+				}
+				defer recordError("Security:Pat", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
 			sctx, ok, err := s.securityOAuth2(ctx, DeleteTeamOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
@@ -4130,7 +4363,7 @@ func (s *Server) handleDeleteTeamRequest(args [1]string, argsEscaped bool, w htt
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 				ctx = sctx
 			}
 		}
@@ -4139,6 +4372,7 @@ func (s *Server) handleDeleteTeamRequest(args [1]string, argsEscaped bool, w htt
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -4312,6 +4546,23 @@ func (s *Server) handleDeleteUserByIDRequest(args [1]string, argsEscaped bool, w
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			sctx, ok, err := s.securityPat(ctx, DeleteUserByIDOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Pat",
+					Err:              err,
+				}
+				defer recordError("Security:Pat", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
 			sctx, ok, err := s.securityOAuth2(ctx, DeleteUserByIDOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
@@ -4324,7 +4575,7 @@ func (s *Server) handleDeleteUserByIDRequest(args [1]string, argsEscaped bool, w
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 				ctx = sctx
 			}
 		}
@@ -4341,7 +4592,7 @@ func (s *Server) handleDeleteUserByIDRequest(args [1]string, argsEscaped bool, w
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 				ctx = sctx
 			}
 		}
@@ -4351,6 +4602,7 @@ func (s *Server) handleDeleteUserByIDRequest(args [1]string, argsEscaped bool, w
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -4519,6 +4771,23 @@ func (s *Server) handleDeleteVariableRequest(args [1]string, argsEscaped bool, w
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			sctx, ok, err := s.securityPat(ctx, DeleteVariableOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Pat",
+					Err:              err,
+				}
+				defer recordError("Security:Pat", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
 			sctx, ok, err := s.securityOAuth2(ctx, DeleteVariableOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
@@ -4531,7 +4800,7 @@ func (s *Server) handleDeleteVariableRequest(args [1]string, argsEscaped bool, w
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 				ctx = sctx
 			}
 		}
@@ -4540,6 +4809,7 @@ func (s *Server) handleDeleteVariableRequest(args [1]string, argsEscaped bool, w
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -4730,6 +5000,23 @@ func (s *Server) handleEvaluatePolicyRequest(args [0]string, argsEscaped bool, w
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			sctx, ok, err := s.securityPat(ctx, EvaluatePolicyOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Pat",
+					Err:              err,
+				}
+				defer recordError("Security:Pat", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
 			sctx, ok, err := s.securityOAuth2(ctx, EvaluatePolicyOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
@@ -4742,7 +5029,7 @@ func (s *Server) handleEvaluatePolicyRequest(args [0]string, argsEscaped bool, w
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 				ctx = sctx
 			}
 		}
@@ -4759,7 +5046,7 @@ func (s *Server) handleEvaluatePolicyRequest(args [0]string, argsEscaped bool, w
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 				ctx = sctx
 			}
 		}
@@ -4769,6 +5056,7 @@ func (s *Server) handleEvaluatePolicyRequest(args [0]string, argsEscaped bool, w
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -4969,14 +5257,14 @@ func (s *Server) handleExchangeHandoffRequest(args [0]string, argsEscaped bool, 
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			sctx, ok, err := s.securityOAuth2(ctx, ExchangeHandoffOperation, r)
+			sctx, ok, err := s.securityPat(ctx, ExchangeHandoffOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "OAuth2",
+					Security:         "Pat",
 					Err:              err,
 				}
-				defer recordError("Security:OAuth2", err)
+				defer recordError("Security:Pat", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -5180,14 +5468,14 @@ func (s *Server) handleFinishUserPasskeyRegistrationRequest(args [2]string, args
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			sctx, ok, err := s.securityOAuth2(ctx, FinishUserPasskeyRegistrationOperation, r)
+			sctx, ok, err := s.securityPat(ctx, FinishUserPasskeyRegistrationOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "OAuth2",
+					Security:         "Pat",
 					Err:              err,
 				}
-				defer recordError("Security:OAuth2", err)
+				defer recordError("Security:Pat", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -5390,14 +5678,14 @@ func (s *Server) handleGetAuthAttemptRequest(args [1]string, argsEscaped bool, w
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			sctx, ok, err := s.securityOAuth2(ctx, GetAuthAttemptOperation, r)
+			sctx, ok, err := s.securityPat(ctx, GetAuthAttemptOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "OAuth2",
+					Security:         "Pat",
 					Err:              err,
 				}
-				defer recordError("Security:OAuth2", err)
+				defer recordError("Security:Pat", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -5577,6 +5865,23 @@ func (s *Server) handleGetBrandingByIdRequest(args [1]string, argsEscaped bool, 
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			sctx, ok, err := s.securityPat(ctx, GetBrandingByIdOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Pat",
+					Err:              err,
+				}
+				defer recordError("Security:Pat", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
 			sctx, ok, err := s.securityOAuth2(ctx, GetBrandingByIdOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
@@ -5589,7 +5894,7 @@ func (s *Server) handleGetBrandingByIdRequest(args [1]string, argsEscaped bool, 
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 				ctx = sctx
 			}
 		}
@@ -5606,7 +5911,7 @@ func (s *Server) handleGetBrandingByIdRequest(args [1]string, argsEscaped bool, 
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 				ctx = sctx
 			}
 		}
@@ -5616,6 +5921,7 @@ func (s *Server) handleGetBrandingByIdRequest(args [1]string, argsEscaped bool, 
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -5789,14 +6095,14 @@ func (s *Server) handleGetClaimStatusRequest(args [1]string, argsEscaped bool, w
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			sctx, ok, err := s.securityOAuth2(ctx, GetClaimStatusOperation, r)
+			sctx, ok, err := s.securityPat(ctx, GetClaimStatusOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "OAuth2",
+					Security:         "Pat",
 					Err:              err,
 				}
-				defer recordError("Security:OAuth2", err)
+				defer recordError("Security:Pat", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -6136,6 +6442,23 @@ func (s *Server) handleGetDeploymentByIdRequest(args [1]string, argsEscaped bool
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			sctx, ok, err := s.securityPat(ctx, GetDeploymentByIdOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Pat",
+					Err:              err,
+				}
+				defer recordError("Security:Pat", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
 			sctx, ok, err := s.securityOAuth2(ctx, GetDeploymentByIdOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
@@ -6148,7 +6471,7 @@ func (s *Server) handleGetDeploymentByIdRequest(args [1]string, argsEscaped bool
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 				ctx = sctx
 			}
 		}
@@ -6165,7 +6488,7 @@ func (s *Server) handleGetDeploymentByIdRequest(args [1]string, argsEscaped bool
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 				ctx = sctx
 			}
 		}
@@ -6175,6 +6498,7 @@ func (s *Server) handleGetDeploymentByIdRequest(args [1]string, argsEscaped bool
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -6347,6 +6671,23 @@ func (s *Server) handleGetDeploymentVariablesRequest(args [1]string, argsEscaped
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			sctx, ok, err := s.securityPat(ctx, GetDeploymentVariablesOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Pat",
+					Err:              err,
+				}
+				defer recordError("Security:Pat", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
 			sctx, ok, err := s.securityOAuth2(ctx, GetDeploymentVariablesOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
@@ -6359,7 +6700,7 @@ func (s *Server) handleGetDeploymentVariablesRequest(args [1]string, argsEscaped
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 				ctx = sctx
 			}
 		}
@@ -6368,6 +6709,7 @@ func (s *Server) handleGetDeploymentVariablesRequest(args [1]string, argsEscaped
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -6541,6 +6883,23 @@ func (s *Server) handleGetEventRequest(args [1]string, argsEscaped bool, w http.
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			sctx, ok, err := s.securityPat(ctx, GetEventOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Pat",
+					Err:              err,
+				}
+				defer recordError("Security:Pat", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
 			sctx, ok, err := s.securityOAuth2(ctx, GetEventOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
@@ -6553,7 +6912,7 @@ func (s *Server) handleGetEventRequest(args [1]string, argsEscaped bool, w http.
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 				ctx = sctx
 			}
 		}
@@ -6562,6 +6921,7 @@ func (s *Server) handleGetEventRequest(args [1]string, argsEscaped bool, w http.
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -6732,6 +7092,23 @@ func (s *Server) handleGetFlowDefinitionRequest(args [1]string, argsEscaped bool
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			sctx, ok, err := s.securityPat(ctx, GetFlowDefinitionOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Pat",
+					Err:              err,
+				}
+				defer recordError("Security:Pat", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
 			sctx, ok, err := s.securityOAuth2(ctx, GetFlowDefinitionOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
@@ -6744,7 +7121,7 @@ func (s *Server) handleGetFlowDefinitionRequest(args [1]string, argsEscaped bool
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 				ctx = sctx
 			}
 		}
@@ -6761,7 +7138,7 @@ func (s *Server) handleGetFlowDefinitionRequest(args [1]string, argsEscaped bool
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 				ctx = sctx
 			}
 		}
@@ -6771,6 +7148,7 @@ func (s *Server) handleGetFlowDefinitionRequest(args [1]string, argsEscaped bool
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -7022,8 +7400,8 @@ func (s *Server) handleGetFlowStepRequest(args [1]string, argsEscaped bool, w ht
 // `user.read` and `team.read` in addition to `project.read` for project
 // secrets. A user-bound Console session that already passed the project
 // Check may expand without those scopes.
-// Accepts either a project secret (`oauth2`) or a user-bound Console
-// session cookie (`sessionCookie`). Cookie-authenticated requests
+// Accepts the project's secret (`pat`), a person's token (`oauth2`) or
+// their user-bound Console session cookie (`sessionCookie`). Cookie-authenticated requests
 // follow the scheme's CSRF rules (`sessionCookie`).
 //
 // GET /grants/{id}
@@ -7102,6 +7480,23 @@ func (s *Server) handleGetGrantRequest(args [1]string, argsEscaped bool, w http.
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			sctx, ok, err := s.securityPat(ctx, GetGrantOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Pat",
+					Err:              err,
+				}
+				defer recordError("Security:Pat", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
 			sctx, ok, err := s.securityOAuth2(ctx, GetGrantOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
@@ -7114,7 +7509,7 @@ func (s *Server) handleGetGrantRequest(args [1]string, argsEscaped bool, w http.
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 				ctx = sctx
 			}
 		}
@@ -7131,7 +7526,7 @@ func (s *Server) handleGetGrantRequest(args [1]string, argsEscaped bool, w http.
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 				ctx = sctx
 			}
 		}
@@ -7141,6 +7536,7 @@ func (s *Server) handleGetGrantRequest(args [1]string, argsEscaped bool, w http.
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -7317,6 +7713,23 @@ func (s *Server) handleGetIdpByIdRequest(args [1]string, argsEscaped bool, w htt
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			sctx, ok, err := s.securityPat(ctx, GetIdpByIdOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Pat",
+					Err:              err,
+				}
+				defer recordError("Security:Pat", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
 			sctx, ok, err := s.securityOAuth2(ctx, GetIdpByIdOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
@@ -7329,7 +7742,7 @@ func (s *Server) handleGetIdpByIdRequest(args [1]string, argsEscaped bool, w htt
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 				ctx = sctx
 			}
 		}
@@ -7346,7 +7759,7 @@ func (s *Server) handleGetIdpByIdRequest(args [1]string, argsEscaped bool, w htt
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 				ctx = sctx
 			}
 		}
@@ -7356,6 +7769,7 @@ func (s *Server) handleGetIdpByIdRequest(args [1]string, argsEscaped bool, w htt
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -7528,6 +7942,23 @@ func (s *Server) handleGetIdpRevisionByIdRequest(args [1]string, argsEscaped boo
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			sctx, ok, err := s.securityPat(ctx, GetIdpRevisionByIdOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Pat",
+					Err:              err,
+				}
+				defer recordError("Security:Pat", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
 			sctx, ok, err := s.securityOAuth2(ctx, GetIdpRevisionByIdOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
@@ -7540,7 +7971,7 @@ func (s *Server) handleGetIdpRevisionByIdRequest(args [1]string, argsEscaped boo
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 				ctx = sctx
 			}
 		}
@@ -7557,7 +7988,7 @@ func (s *Server) handleGetIdpRevisionByIdRequest(args [1]string, argsEscaped boo
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 				ctx = sctx
 			}
 		}
@@ -7567,6 +7998,7 @@ func (s *Server) handleGetIdpRevisionByIdRequest(args [1]string, argsEscaped boo
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -8847,6 +9279,23 @@ func (s *Server) handleGetPolicyRequest(args [1]string, argsEscaped bool, w http
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			sctx, ok, err := s.securityPat(ctx, GetPolicyOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Pat",
+					Err:              err,
+				}
+				defer recordError("Security:Pat", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
 			sctx, ok, err := s.securityOAuth2(ctx, GetPolicyOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
@@ -8859,7 +9308,7 @@ func (s *Server) handleGetPolicyRequest(args [1]string, argsEscaped bool, w http
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 				ctx = sctx
 			}
 		}
@@ -8876,7 +9325,7 @@ func (s *Server) handleGetPolicyRequest(args [1]string, argsEscaped bool, w http
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 				ctx = sctx
 			}
 		}
@@ -8886,6 +9335,7 @@ func (s *Server) handleGetPolicyRequest(args [1]string, argsEscaped bool, w http
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -9058,6 +9508,23 @@ func (s *Server) handleGetPolicyRevisionRequest(args [1]string, argsEscaped bool
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			sctx, ok, err := s.securityPat(ctx, GetPolicyRevisionOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Pat",
+					Err:              err,
+				}
+				defer recordError("Security:Pat", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
 			sctx, ok, err := s.securityOAuth2(ctx, GetPolicyRevisionOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
@@ -9070,7 +9537,7 @@ func (s *Server) handleGetPolicyRevisionRequest(args [1]string, argsEscaped bool
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 				ctx = sctx
 			}
 		}
@@ -9087,7 +9554,7 @@ func (s *Server) handleGetPolicyRevisionRequest(args [1]string, argsEscaped bool
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 				ctx = sctx
 			}
 		}
@@ -9097,6 +9564,7 @@ func (s *Server) handleGetPolicyRevisionRequest(args [1]string, argsEscaped bool
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -9267,6 +9735,23 @@ func (s *Server) handleGetProjectRequest(args [1]string, argsEscaped bool, w htt
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			sctx, ok, err := s.securityPat(ctx, GetProjectOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Pat",
+					Err:              err,
+				}
+				defer recordError("Security:Pat", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
 			sctx, ok, err := s.securityOAuth2(ctx, GetProjectOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
@@ -9279,7 +9764,7 @@ func (s *Server) handleGetProjectRequest(args [1]string, argsEscaped bool, w htt
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 				ctx = sctx
 			}
 		}
@@ -9296,7 +9781,7 @@ func (s *Server) handleGetProjectRequest(args [1]string, argsEscaped bool, w htt
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 				ctx = sctx
 			}
 		}
@@ -9306,6 +9791,7 @@ func (s *Server) handleGetProjectRequest(args [1]string, argsEscaped bool, w htt
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -9608,6 +10094,23 @@ func (s *Server) handleGetReleaseByIdRequest(args [1]string, argsEscaped bool, w
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			sctx, ok, err := s.securityPat(ctx, GetReleaseByIdOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Pat",
+					Err:              err,
+				}
+				defer recordError("Security:Pat", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
 			sctx, ok, err := s.securityOAuth2(ctx, GetReleaseByIdOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
@@ -9620,7 +10123,7 @@ func (s *Server) handleGetReleaseByIdRequest(args [1]string, argsEscaped bool, w
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 				ctx = sctx
 			}
 		}
@@ -9637,7 +10140,7 @@ func (s *Server) handleGetReleaseByIdRequest(args [1]string, argsEscaped bool, w
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 				ctx = sctx
 			}
 		}
@@ -9647,6 +10150,7 @@ func (s *Server) handleGetReleaseByIdRequest(args [1]string, argsEscaped bool, w
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -9825,6 +10329,23 @@ func (s *Server) handleGetSchemaByIdRequest(args [1]string, argsEscaped bool, w 
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			sctx, ok, err := s.securityPat(ctx, GetSchemaByIdOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Pat",
+					Err:              err,
+				}
+				defer recordError("Security:Pat", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
 			sctx, ok, err := s.securityOAuth2(ctx, GetSchemaByIdOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
@@ -9837,7 +10358,7 @@ func (s *Server) handleGetSchemaByIdRequest(args [1]string, argsEscaped bool, w 
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 				ctx = sctx
 			}
 		}
@@ -9854,7 +10375,7 @@ func (s *Server) handleGetSchemaByIdRequest(args [1]string, argsEscaped bool, w 
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 				ctx = sctx
 			}
 		}
@@ -9864,6 +10385,7 @@ func (s *Server) handleGetSchemaByIdRequest(args [1]string, argsEscaped bool, w 
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -10042,6 +10564,23 @@ func (s *Server) handleGetSessionRequest(args [1]string, argsEscaped bool, w htt
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			sctx, ok, err := s.securityPat(ctx, GetSessionOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Pat",
+					Err:              err,
+				}
+				defer recordError("Security:Pat", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
 			sctx, ok, err := s.securityOAuth2(ctx, GetSessionOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
@@ -10054,7 +10593,7 @@ func (s *Server) handleGetSessionRequest(args [1]string, argsEscaped bool, w htt
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 				ctx = sctx
 			}
 		}
@@ -10063,6 +10602,7 @@ func (s *Server) handleGetSessionRequest(args [1]string, argsEscaped bool, w htt
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -10229,6 +10769,23 @@ func (s *Server) handleGetTeamRequest(args [1]string, argsEscaped bool, w http.R
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			sctx, ok, err := s.securityPat(ctx, GetTeamOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Pat",
+					Err:              err,
+				}
+				defer recordError("Security:Pat", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
 			sctx, ok, err := s.securityOAuth2(ctx, GetTeamOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
@@ -10241,7 +10798,7 @@ func (s *Server) handleGetTeamRequest(args [1]string, argsEscaped bool, w http.R
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 				ctx = sctx
 			}
 		}
@@ -10258,7 +10815,7 @@ func (s *Server) handleGetTeamRequest(args [1]string, argsEscaped bool, w http.R
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 				ctx = sctx
 			}
 		}
@@ -10268,6 +10825,7 @@ func (s *Server) handleGetTeamRequest(args [1]string, argsEscaped bool, w http.R
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -10436,6 +10994,23 @@ func (s *Server) handleGetUserByIDRequest(args [1]string, argsEscaped bool, w ht
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			sctx, ok, err := s.securityPat(ctx, GetUserByIDOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Pat",
+					Err:              err,
+				}
+				defer recordError("Security:Pat", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
 			sctx, ok, err := s.securityOAuth2(ctx, GetUserByIDOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
@@ -10448,7 +11023,7 @@ func (s *Server) handleGetUserByIDRequest(args [1]string, argsEscaped bool, w ht
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 				ctx = sctx
 			}
 		}
@@ -10465,7 +11040,7 @@ func (s *Server) handleGetUserByIDRequest(args [1]string, argsEscaped bool, w ht
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 				ctx = sctx
 			}
 		}
@@ -10475,6 +11050,7 @@ func (s *Server) handleGetUserByIDRequest(args [1]string, argsEscaped bool, w ht
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -10647,6 +11223,23 @@ func (s *Server) handleGetUserPasswordStateRequest(args [1]string, argsEscaped b
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			sctx, ok, err := s.securityPat(ctx, GetUserPasswordStateOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Pat",
+					Err:              err,
+				}
+				defer recordError("Security:Pat", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
 			sctx, ok, err := s.securityOAuth2(ctx, GetUserPasswordStateOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
@@ -10659,7 +11252,7 @@ func (s *Server) handleGetUserPasswordStateRequest(args [1]string, argsEscaped b
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 				ctx = sctx
 			}
 		}
@@ -10676,7 +11269,7 @@ func (s *Server) handleGetUserPasswordStateRequest(args [1]string, argsEscaped b
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 				ctx = sctx
 			}
 		}
@@ -10686,6 +11279,7 @@ func (s *Server) handleGetUserPasswordStateRequest(args [1]string, argsEscaped b
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -10854,6 +11448,23 @@ func (s *Server) handleGetVariableRequest(args [1]string, argsEscaped bool, w ht
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			sctx, ok, err := s.securityPat(ctx, GetVariableOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Pat",
+					Err:              err,
+				}
+				defer recordError("Security:Pat", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
 			sctx, ok, err := s.securityOAuth2(ctx, GetVariableOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
@@ -10866,7 +11477,7 @@ func (s *Server) handleGetVariableRequest(args [1]string, argsEscaped bool, w ht
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 				ctx = sctx
 			}
 		}
@@ -10883,7 +11494,7 @@ func (s *Server) handleGetVariableRequest(args [1]string, argsEscaped bool, w ht
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 				ctx = sctx
 			}
 		}
@@ -10893,6 +11504,7 @@ func (s *Server) handleGetVariableRequest(args [1]string, argsEscaped bool, w ht
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -11070,6 +11682,23 @@ func (s *Server) handleGetVariablesRequest(args [0]string, argsEscaped bool, w h
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			sctx, ok, err := s.securityPat(ctx, GetVariablesOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Pat",
+					Err:              err,
+				}
+				defer recordError("Security:Pat", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
 			sctx, ok, err := s.securityOAuth2(ctx, GetVariablesOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
@@ -11082,7 +11711,7 @@ func (s *Server) handleGetVariablesRequest(args [0]string, argsEscaped bool, w h
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 				ctx = sctx
 			}
 		}
@@ -11099,7 +11728,7 @@ func (s *Server) handleGetVariablesRequest(args [0]string, argsEscaped bool, w h
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 				ctx = sctx
 			}
 		}
@@ -11109,6 +11738,7 @@ func (s *Server) handleGetVariablesRequest(args [0]string, argsEscaped bool, w h
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -11283,14 +11913,14 @@ func (s *Server) handleInitClaimRequest(args [1]string, argsEscaped bool, w http
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			sctx, ok, err := s.securityOAuth2(ctx, InitClaimOperation, r)
+			sctx, ok, err := s.securityPat(ctx, InitClaimOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "OAuth2",
+					Security:         "Pat",
 					Err:              err,
 				}
-				defer recordError("Security:OAuth2", err)
+				defer recordError("Security:Pat", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -11474,14 +12104,14 @@ func (s *Server) handleIssueChallengeRequest(args [1]string, argsEscaped bool, w
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			sctx, ok, err := s.securityOAuth2(ctx, IssueChallengeOperation, r)
+			sctx, ok, err := s.securityPat(ctx, IssueChallengeOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "OAuth2",
+					Security:         "Pat",
 					Err:              err,
 				}
-				defer recordError("Security:OAuth2", err)
+				defer recordError("Security:Pat", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}
@@ -11680,6 +12310,23 @@ func (s *Server) handleListBrandingRequest(args [0]string, argsEscaped bool, w h
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			sctx, ok, err := s.securityPat(ctx, ListBrandingOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Pat",
+					Err:              err,
+				}
+				defer recordError("Security:Pat", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
 			sctx, ok, err := s.securityOAuth2(ctx, ListBrandingOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
@@ -11692,7 +12339,7 @@ func (s *Server) handleListBrandingRequest(args [0]string, argsEscaped bool, w h
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 				ctx = sctx
 			}
 		}
@@ -11709,7 +12356,7 @@ func (s *Server) handleListBrandingRequest(args [0]string, argsEscaped bool, w h
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 				ctx = sctx
 			}
 		}
@@ -11719,6 +12366,7 @@ func (s *Server) handleListBrandingRequest(args [0]string, argsEscaped bool, w h
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -11896,6 +12544,23 @@ func (s *Server) handleListDeploymentsRequest(args [0]string, argsEscaped bool, 
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			sctx, ok, err := s.securityPat(ctx, ListDeploymentsOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Pat",
+					Err:              err,
+				}
+				defer recordError("Security:Pat", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
 			sctx, ok, err := s.securityOAuth2(ctx, ListDeploymentsOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
@@ -11908,7 +12573,7 @@ func (s *Server) handleListDeploymentsRequest(args [0]string, argsEscaped bool, 
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 				ctx = sctx
 			}
 		}
@@ -11925,7 +12590,7 @@ func (s *Server) handleListDeploymentsRequest(args [0]string, argsEscaped bool, 
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 				ctx = sctx
 			}
 		}
@@ -11935,6 +12600,7 @@ func (s *Server) handleListDeploymentsRequest(args [0]string, argsEscaped bool, 
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -12129,6 +12795,23 @@ func (s *Server) handleListEventsRequest(args [0]string, argsEscaped bool, w htt
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			sctx, ok, err := s.securityPat(ctx, ListEventsOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Pat",
+					Err:              err,
+				}
+				defer recordError("Security:Pat", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
 			sctx, ok, err := s.securityOAuth2(ctx, ListEventsOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
@@ -12141,7 +12824,7 @@ func (s *Server) handleListEventsRequest(args [0]string, argsEscaped bool, w htt
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 				ctx = sctx
 			}
 		}
@@ -12150,6 +12833,7 @@ func (s *Server) handleListEventsRequest(args [0]string, argsEscaped bool, w htt
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -12382,6 +13066,23 @@ func (s *Server) handleListFlowDefinitionsRequest(args [0]string, argsEscaped bo
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			sctx, ok, err := s.securityPat(ctx, ListFlowDefinitionsOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Pat",
+					Err:              err,
+				}
+				defer recordError("Security:Pat", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
 			sctx, ok, err := s.securityOAuth2(ctx, ListFlowDefinitionsOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
@@ -12394,7 +13095,7 @@ func (s *Server) handleListFlowDefinitionsRequest(args [0]string, argsEscaped bo
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 				ctx = sctx
 			}
 		}
@@ -12411,7 +13112,7 @@ func (s *Server) handleListFlowDefinitionsRequest(args [0]string, argsEscaped bo
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 				ctx = sctx
 			}
 		}
@@ -12421,6 +13122,7 @@ func (s *Server) handleListFlowDefinitionsRequest(args [0]string, argsEscaped bo
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -12613,6 +13315,23 @@ func (s *Server) handleListIdpRevisionsRequest(args [1]string, argsEscaped bool,
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			sctx, ok, err := s.securityPat(ctx, ListIdpRevisionsOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Pat",
+					Err:              err,
+				}
+				defer recordError("Security:Pat", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
 			sctx, ok, err := s.securityOAuth2(ctx, ListIdpRevisionsOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
@@ -12625,7 +13344,7 @@ func (s *Server) handleListIdpRevisionsRequest(args [1]string, argsEscaped bool,
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 				ctx = sctx
 			}
 		}
@@ -12634,6 +13353,7 @@ func (s *Server) handleListIdpRevisionsRequest(args [1]string, argsEscaped bool,
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -13438,11 +14158,29 @@ func (s *Server) handleListMyProjectsRequest(args [0]string, argsEscaped bool, w
 				ctx = sctx
 			}
 		}
+		{
+			sctx, ok, err := s.securityOAuth2(ctx, ListMyProjectsOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "OAuth2",
+					Err:              err,
+				}
+				defer recordError("Security:OAuth2", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 1
+				ctx = sctx
+			}
+		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -13822,6 +14560,23 @@ func (s *Server) handleListPoliciesRequest(args [0]string, argsEscaped bool, w h
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			sctx, ok, err := s.securityPat(ctx, ListPoliciesOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Pat",
+					Err:              err,
+				}
+				defer recordError("Security:Pat", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
 			sctx, ok, err := s.securityOAuth2(ctx, ListPoliciesOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
@@ -13834,7 +14589,7 @@ func (s *Server) handleListPoliciesRequest(args [0]string, argsEscaped bool, w h
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 				ctx = sctx
 			}
 		}
@@ -13851,7 +14606,7 @@ func (s *Server) handleListPoliciesRequest(args [0]string, argsEscaped bool, w h
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 				ctx = sctx
 			}
 		}
@@ -13861,6 +14616,7 @@ func (s *Server) handleListPoliciesRequest(args [0]string, argsEscaped bool, w h
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -14042,6 +14798,23 @@ func (s *Server) handleListPolicyRevisionsRequest(args [1]string, argsEscaped bo
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			sctx, ok, err := s.securityPat(ctx, ListPolicyRevisionsOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Pat",
+					Err:              err,
+				}
+				defer recordError("Security:Pat", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
 			sctx, ok, err := s.securityOAuth2(ctx, ListPolicyRevisionsOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
@@ -14054,7 +14827,7 @@ func (s *Server) handleListPolicyRevisionsRequest(args [1]string, argsEscaped bo
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 				ctx = sctx
 			}
 		}
@@ -14071,7 +14844,7 @@ func (s *Server) handleListPolicyRevisionsRequest(args [1]string, argsEscaped bo
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 				ctx = sctx
 			}
 		}
@@ -14081,6 +14854,7 @@ func (s *Server) handleListPolicyRevisionsRequest(args [1]string, argsEscaped bo
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -14261,6 +15035,23 @@ func (s *Server) handleListPreviewsRequest(args [1]string, argsEscaped bool, w h
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			sctx, ok, err := s.securityPat(ctx, ListPreviewsOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Pat",
+					Err:              err,
+				}
+				defer recordError("Security:Pat", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
 			sctx, ok, err := s.securityOAuth2(ctx, ListPreviewsOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
@@ -14273,7 +15064,7 @@ func (s *Server) handleListPreviewsRequest(args [1]string, argsEscaped bool, w h
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 				ctx = sctx
 			}
 		}
@@ -14282,6 +15073,7 @@ func (s *Server) handleListPreviewsRequest(args [1]string, argsEscaped bool, w h
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -14399,8 +15191,9 @@ func (s *Server) handleListPreviewsRequest(args [1]string, argsEscaped bool, w h
 // `team_id` only. The grant to such a team still shows in the project's
 // grants.
 // Ordered by `user_id` and paginated with `page_token`.
-// Accepts either a project secret (`oauth2`) or a user-bound Console
-// session cookie (`sessionCookie`) that can read the project.
+// Accepts the project's secret (`pat`), or a person's token (`oauth2`) or
+// user-bound Console session cookie (`sessionCookie`) that can read the
+// project.
 //
 // GET /projects/{project_id}/admins
 func (s *Server) handleListProjectAdminsRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -14478,6 +15271,23 @@ func (s *Server) handleListProjectAdminsRequest(args [1]string, argsEscaped bool
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			sctx, ok, err := s.securityPat(ctx, ListProjectAdminsOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Pat",
+					Err:              err,
+				}
+				defer recordError("Security:Pat", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
 			sctx, ok, err := s.securityOAuth2(ctx, ListProjectAdminsOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
@@ -14490,7 +15300,7 @@ func (s *Server) handleListProjectAdminsRequest(args [1]string, argsEscaped bool
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 				ctx = sctx
 			}
 		}
@@ -14507,7 +15317,7 @@ func (s *Server) handleListProjectAdminsRequest(args [1]string, argsEscaped bool
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 				ctx = sctx
 			}
 		}
@@ -14517,6 +15327,7 @@ func (s *Server) handleListProjectAdminsRequest(args [1]string, argsEscaped bool
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -14699,6 +15510,23 @@ func (s *Server) handleListReleasesRequest(args [0]string, argsEscaped bool, w h
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			sctx, ok, err := s.securityPat(ctx, ListReleasesOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Pat",
+					Err:              err,
+				}
+				defer recordError("Security:Pat", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
 			sctx, ok, err := s.securityOAuth2(ctx, ListReleasesOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
@@ -14711,7 +15539,7 @@ func (s *Server) handleListReleasesRequest(args [0]string, argsEscaped bool, w h
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 				ctx = sctx
 			}
 		}
@@ -14728,7 +15556,7 @@ func (s *Server) handleListReleasesRequest(args [0]string, argsEscaped bool, w h
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 				ctx = sctx
 			}
 		}
@@ -14738,6 +15566,7 @@ func (s *Server) handleListReleasesRequest(args [0]string, argsEscaped bool, w h
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -14917,6 +15746,23 @@ func (s *Server) handleListSchemasRequest(args [0]string, argsEscaped bool, w ht
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			sctx, ok, err := s.securityPat(ctx, ListSchemasOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Pat",
+					Err:              err,
+				}
+				defer recordError("Security:Pat", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
 			sctx, ok, err := s.securityOAuth2(ctx, ListSchemasOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
@@ -14929,7 +15775,7 @@ func (s *Server) handleListSchemasRequest(args [0]string, argsEscaped bool, w ht
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 				ctx = sctx
 			}
 		}
@@ -14946,7 +15792,7 @@ func (s *Server) handleListSchemasRequest(args [0]string, argsEscaped bool, w ht
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 				ctx = sctx
 			}
 		}
@@ -14956,6 +15802,7 @@ func (s *Server) handleListSchemasRequest(args [0]string, argsEscaped bool, w ht
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -15147,6 +15994,23 @@ func (s *Server) handleListUserIdentityLinksRequest(args [1]string, argsEscaped 
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			sctx, ok, err := s.securityPat(ctx, ListUserIdentityLinksOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Pat",
+					Err:              err,
+				}
+				defer recordError("Security:Pat", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
 			sctx, ok, err := s.securityOAuth2(ctx, ListUserIdentityLinksOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
@@ -15159,7 +16023,7 @@ func (s *Server) handleListUserIdentityLinksRequest(args [1]string, argsEscaped 
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 				ctx = sctx
 			}
 		}
@@ -15176,7 +16040,7 @@ func (s *Server) handleListUserIdentityLinksRequest(args [1]string, argsEscaped 
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 				ctx = sctx
 			}
 		}
@@ -15186,6 +16050,7 @@ func (s *Server) handleListUserIdentityLinksRequest(args [1]string, argsEscaped 
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -15363,6 +16228,23 @@ func (s *Server) handleListUserPasskeysRequest(args [1]string, argsEscaped bool,
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			sctx, ok, err := s.securityPat(ctx, ListUserPasskeysOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Pat",
+					Err:              err,
+				}
+				defer recordError("Security:Pat", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
 			sctx, ok, err := s.securityOAuth2(ctx, ListUserPasskeysOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
@@ -15375,7 +16257,7 @@ func (s *Server) handleListUserPasskeysRequest(args [1]string, argsEscaped bool,
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 				ctx = sctx
 			}
 		}
@@ -15392,7 +16274,7 @@ func (s *Server) handleListUserPasskeysRequest(args [1]string, argsEscaped bool,
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 				ctx = sctx
 			}
 		}
@@ -15402,6 +16284,7 @@ func (s *Server) handleListUserPasskeysRequest(args [1]string, argsEscaped bool,
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -15581,6 +16464,23 @@ func (s *Server) handleListUserTeamsRequest(args [1]string, argsEscaped bool, w 
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			sctx, ok, err := s.securityPat(ctx, ListUserTeamsOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Pat",
+					Err:              err,
+				}
+				defer recordError("Security:Pat", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
 			sctx, ok, err := s.securityOAuth2(ctx, ListUserTeamsOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
@@ -15593,7 +16493,7 @@ func (s *Server) handleListUserTeamsRequest(args [1]string, argsEscaped bool, w 
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 				ctx = sctx
 			}
 		}
@@ -15610,7 +16510,7 @@ func (s *Server) handleListUserTeamsRequest(args [1]string, argsEscaped bool, w 
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 				ctx = sctx
 			}
 		}
@@ -15620,6 +16520,7 @@ func (s *Server) handleListUserTeamsRequest(args [1]string, argsEscaped bool, w 
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -16000,6 +16901,23 @@ func (s *Server) handlePatchProjectRequest(args [1]string, argsEscaped bool, w h
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			sctx, ok, err := s.securityPat(ctx, PatchProjectOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Pat",
+					Err:              err,
+				}
+				defer recordError("Security:Pat", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
 			sctx, ok, err := s.securityOAuth2(ctx, PatchProjectOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
@@ -16012,7 +16930,7 @@ func (s *Server) handlePatchProjectRequest(args [1]string, argsEscaped bool, w h
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 				ctx = sctx
 			}
 		}
@@ -16029,7 +16947,7 @@ func (s *Server) handlePatchProjectRequest(args [1]string, argsEscaped bool, w h
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 				ctx = sctx
 			}
 		}
@@ -16039,6 +16957,7 @@ func (s *Server) handlePatchProjectRequest(args [1]string, argsEscaped bool, w h
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -16223,6 +17142,23 @@ func (s *Server) handlePatchUserByIDRequest(args [1]string, argsEscaped bool, w 
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			sctx, ok, err := s.securityPat(ctx, PatchUserByIDOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Pat",
+					Err:              err,
+				}
+				defer recordError("Security:Pat", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
 			sctx, ok, err := s.securityOAuth2(ctx, PatchUserByIDOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
@@ -16235,7 +17171,7 @@ func (s *Server) handlePatchUserByIDRequest(args [1]string, argsEscaped bool, w 
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 				ctx = sctx
 			}
 		}
@@ -16252,7 +17188,7 @@ func (s *Server) handlePatchUserByIDRequest(args [1]string, argsEscaped bool, w 
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 				ctx = sctx
 			}
 		}
@@ -16262,6 +17198,7 @@ func (s *Server) handlePatchUserByIDRequest(args [1]string, argsEscaped bool, w 
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -16458,6 +17395,23 @@ func (s *Server) handlePublishPolicyRequest(args [0]string, argsEscaped bool, w 
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			sctx, ok, err := s.securityPat(ctx, PublishPolicyOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Pat",
+					Err:              err,
+				}
+				defer recordError("Security:Pat", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
 			sctx, ok, err := s.securityOAuth2(ctx, PublishPolicyOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
@@ -16470,7 +17424,7 @@ func (s *Server) handlePublishPolicyRequest(args [0]string, argsEscaped bool, w 
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 				ctx = sctx
 			}
 		}
@@ -16479,6 +17433,7 @@ func (s *Server) handlePublishPolicyRequest(args [0]string, argsEscaped bool, w 
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -16594,8 +17549,8 @@ func (s *Server) handlePublishPolicyRequest(args [0]string, argsEscaped bool, w 
 // scopes cannot be ANDed onto this security block because they are
 // body-conditional). A user-bound Console session that already passed
 // the project Check may expand without those scopes.
-// Accepts either a project secret (`oauth2`) or a user-bound Console
-// session cookie (`sessionCookie`). Cookie-authenticated requests
+// Accepts the project's secret (`pat`), a person's token (`oauth2`) or
+// their user-bound Console session cookie (`sessionCookie`). Cookie-authenticated requests
 // follow the scheme's CSRF rules (`sessionCookie`).
 //
 // POST /grants/query
@@ -16674,6 +17629,23 @@ func (s *Server) handleQueryGrantsRequest(args [0]string, argsEscaped bool, w ht
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			sctx, ok, err := s.securityPat(ctx, QueryGrantsOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Pat",
+					Err:              err,
+				}
+				defer recordError("Security:Pat", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
 			sctx, ok, err := s.securityOAuth2(ctx, QueryGrantsOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
@@ -16686,7 +17658,7 @@ func (s *Server) handleQueryGrantsRequest(args [0]string, argsEscaped bool, w ht
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 				ctx = sctx
 			}
 		}
@@ -16703,7 +17675,7 @@ func (s *Server) handleQueryGrantsRequest(args [0]string, argsEscaped bool, w ht
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 				ctx = sctx
 			}
 		}
@@ -16713,6 +17685,7 @@ func (s *Server) handleQueryGrantsRequest(args [0]string, argsEscaped bool, w ht
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -16895,6 +17868,23 @@ func (s *Server) handleQueryIdpsRequest(args [0]string, argsEscaped bool, w http
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			sctx, ok, err := s.securityPat(ctx, QueryIdpsOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Pat",
+					Err:              err,
+				}
+				defer recordError("Security:Pat", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
 			sctx, ok, err := s.securityOAuth2(ctx, QueryIdpsOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
@@ -16907,7 +17897,7 @@ func (s *Server) handleQueryIdpsRequest(args [0]string, argsEscaped bool, w http
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 				ctx = sctx
 			}
 		}
@@ -16924,7 +17914,7 @@ func (s *Server) handleQueryIdpsRequest(args [0]string, argsEscaped bool, w http
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 				ctx = sctx
 			}
 		}
@@ -16934,6 +17924,7 @@ func (s *Server) handleQueryIdpsRequest(args [0]string, argsEscaped bool, w http
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -17119,6 +18110,23 @@ func (s *Server) handleQueryProjectsRequest(args [0]string, argsEscaped bool, w 
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			sctx, ok, err := s.securityPat(ctx, QueryProjectsOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Pat",
+					Err:              err,
+				}
+				defer recordError("Security:Pat", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
 			sctx, ok, err := s.securityOAuth2(ctx, QueryProjectsOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
@@ -17131,7 +18139,7 @@ func (s *Server) handleQueryProjectsRequest(args [0]string, argsEscaped bool, w 
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 				ctx = sctx
 			}
 		}
@@ -17140,6 +18148,7 @@ func (s *Server) handleQueryProjectsRequest(args [0]string, argsEscaped bool, w 
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -17308,6 +18317,23 @@ func (s *Server) handleQuerySessionsRequest(args [0]string, argsEscaped bool, w 
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			sctx, ok, err := s.securityPat(ctx, QuerySessionsOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Pat",
+					Err:              err,
+				}
+				defer recordError("Security:Pat", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
 			sctx, ok, err := s.securityOAuth2(ctx, QuerySessionsOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
@@ -17320,7 +18346,7 @@ func (s *Server) handleQuerySessionsRequest(args [0]string, argsEscaped bool, w 
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 				ctx = sctx
 			}
 		}
@@ -17329,6 +18355,7 @@ func (s *Server) handleQuerySessionsRequest(args [0]string, argsEscaped bool, w 
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -17512,6 +18539,23 @@ func (s *Server) handleQueryTeamsRequest(args [0]string, argsEscaped bool, w htt
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			sctx, ok, err := s.securityPat(ctx, QueryTeamsOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Pat",
+					Err:              err,
+				}
+				defer recordError("Security:Pat", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
 			sctx, ok, err := s.securityOAuth2(ctx, QueryTeamsOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
@@ -17524,7 +18568,7 @@ func (s *Server) handleQueryTeamsRequest(args [0]string, argsEscaped bool, w htt
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 				ctx = sctx
 			}
 		}
@@ -17541,7 +18585,7 @@ func (s *Server) handleQueryTeamsRequest(args [0]string, argsEscaped bool, w htt
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 				ctx = sctx
 			}
 		}
@@ -17551,6 +18595,7 @@ func (s *Server) handleQueryTeamsRequest(args [0]string, argsEscaped bool, w htt
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -17657,8 +18702,8 @@ func (s *Server) handleQueryTeamsRequest(args [0]string, argsEscaped bool, w htt
 // Returns the users of a project, paginated with a cursor.
 // `project_id` names the project to list; without it, the credential's own
 // project is listed.
-// Accepts either a project secret (`oauth2`) or a user-bound Console
-// session cookie (`sessionCookie`). Cookie-authenticated requests
+// Accepts the project's secret (`pat`), a person's token (`oauth2`) or
+// their user-bound Console session cookie (`sessionCookie`). Cookie-authenticated requests
 // follow the scheme's CSRF rules (`sessionCookie`).
 //
 // POST /users/query
@@ -17737,6 +18782,23 @@ func (s *Server) handleQueryUsersRequest(args [0]string, argsEscaped bool, w htt
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			sctx, ok, err := s.securityPat(ctx, QueryUsersOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Pat",
+					Err:              err,
+				}
+				defer recordError("Security:Pat", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
 			sctx, ok, err := s.securityOAuth2(ctx, QueryUsersOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
@@ -17749,7 +18811,7 @@ func (s *Server) handleQueryUsersRequest(args [0]string, argsEscaped bool, w htt
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 				ctx = sctx
 			}
 		}
@@ -17766,7 +18828,7 @@ func (s *Server) handleQueryUsersRequest(args [0]string, argsEscaped bool, w htt
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 				ctx = sctx
 			}
 		}
@@ -17776,6 +18838,7 @@ func (s *Server) handleQueryUsersRequest(args [0]string, argsEscaped bool, w htt
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -17960,6 +19023,23 @@ func (s *Server) handleRemoveOriginRequest(args [1]string, argsEscaped bool, w h
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			sctx, ok, err := s.securityPat(ctx, RemoveOriginOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Pat",
+					Err:              err,
+				}
+				defer recordError("Security:Pat", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
 			sctx, ok, err := s.securityOAuth2(ctx, RemoveOriginOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
@@ -17972,7 +19052,7 @@ func (s *Server) handleRemoveOriginRequest(args [1]string, argsEscaped bool, w h
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 				ctx = sctx
 			}
 		}
@@ -17989,7 +19069,7 @@ func (s *Server) handleRemoveOriginRequest(args [1]string, argsEscaped bool, w h
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 				ctx = sctx
 			}
 		}
@@ -17999,6 +19079,7 @@ func (s *Server) handleRemoveOriginRequest(args [1]string, argsEscaped bool, w h
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -18186,6 +19267,23 @@ func (s *Server) handleRemovePreviewRequest(args [1]string, argsEscaped bool, w 
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			sctx, ok, err := s.securityPat(ctx, RemovePreviewOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Pat",
+					Err:              err,
+				}
+				defer recordError("Security:Pat", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
 			sctx, ok, err := s.securityOAuth2(ctx, RemovePreviewOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
@@ -18198,7 +19296,7 @@ func (s *Server) handleRemovePreviewRequest(args [1]string, argsEscaped bool, w 
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 				ctx = sctx
 			}
 		}
@@ -18207,6 +19305,7 @@ func (s *Server) handleRemovePreviewRequest(args [1]string, argsEscaped bool, w 
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -18792,6 +19891,23 @@ func (s *Server) handleRevokeReleaseRequest(args [1]string, argsEscaped bool, w 
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			sctx, ok, err := s.securityPat(ctx, RevokeReleaseOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Pat",
+					Err:              err,
+				}
+				defer recordError("Security:Pat", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
 			sctx, ok, err := s.securityOAuth2(ctx, RevokeReleaseOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
@@ -18804,7 +19920,7 @@ func (s *Server) handleRevokeReleaseRequest(args [1]string, argsEscaped bool, w 
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 				ctx = sctx
 			}
 		}
@@ -18821,7 +19937,7 @@ func (s *Server) handleRevokeReleaseRequest(args [1]string, argsEscaped bool, w 
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 				ctx = sctx
 			}
 		}
@@ -18831,6 +19947,7 @@ func (s *Server) handleRevokeReleaseRequest(args [1]string, argsEscaped bool, w 
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -19007,6 +20124,23 @@ func (s *Server) handleRevokeSessionRequest(args [1]string, argsEscaped bool, w 
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			sctx, ok, err := s.securityPat(ctx, RevokeSessionOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Pat",
+					Err:              err,
+				}
+				defer recordError("Security:Pat", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
 			sctx, ok, err := s.securityOAuth2(ctx, RevokeSessionOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
@@ -19019,7 +20153,7 @@ func (s *Server) handleRevokeSessionRequest(args [1]string, argsEscaped bool, w 
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 				ctx = sctx
 			}
 		}
@@ -19028,6 +20162,7 @@ func (s *Server) handleRevokeSessionRequest(args [1]string, argsEscaped bool, w 
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -19206,6 +20341,23 @@ func (s *Server) handleRollbackDeploymentRequest(args [1]string, argsEscaped boo
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			sctx, ok, err := s.securityPat(ctx, RollbackDeploymentOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Pat",
+					Err:              err,
+				}
+				defer recordError("Security:Pat", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
 			sctx, ok, err := s.securityOAuth2(ctx, RollbackDeploymentOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
@@ -19218,7 +20370,7 @@ func (s *Server) handleRollbackDeploymentRequest(args [1]string, argsEscaped boo
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 				ctx = sctx
 			}
 		}
@@ -19235,7 +20387,7 @@ func (s *Server) handleRollbackDeploymentRequest(args [1]string, argsEscaped boo
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 				ctx = sctx
 			}
 		}
@@ -19245,6 +20397,7 @@ func (s *Server) handleRollbackDeploymentRequest(args [1]string, argsEscaped boo
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -19433,6 +20586,23 @@ func (s *Server) handleSetUserPasswordRequest(args [1]string, argsEscaped bool, 
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			sctx, ok, err := s.securityPat(ctx, SetUserPasswordOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Pat",
+					Err:              err,
+				}
+				defer recordError("Security:Pat", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
 			sctx, ok, err := s.securityOAuth2(ctx, SetUserPasswordOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
@@ -19445,7 +20615,7 @@ func (s *Server) handleSetUserPasswordRequest(args [1]string, argsEscaped bool, 
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 				ctx = sctx
 			}
 		}
@@ -19454,6 +20624,7 @@ func (s *Server) handleSetUserPasswordRequest(args [1]string, argsEscaped bool, 
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -19841,6 +21012,23 @@ func (s *Server) handleUpdateTeamRequest(args [1]string, argsEscaped bool, w htt
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			sctx, ok, err := s.securityPat(ctx, UpdateTeamOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Pat",
+					Err:              err,
+				}
+				defer recordError("Security:Pat", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
 			sctx, ok, err := s.securityOAuth2(ctx, UpdateTeamOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
@@ -19853,7 +21041,7 @@ func (s *Server) handleUpdateTeamRequest(args [1]string, argsEscaped bool, w htt
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 				ctx = sctx
 			}
 		}
@@ -19870,7 +21058,7 @@ func (s *Server) handleUpdateTeamRequest(args [1]string, argsEscaped bool, w htt
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 1
+				satisfied[0] |= 1 << 2
 				ctx = sctx
 			}
 		}
@@ -19880,6 +21068,7 @@ func (s *Server) handleUpdateTeamRequest(args [1]string, argsEscaped bool, w htt
 			for _, requirement := range []bitset{
 				{0b00000001},
 				{0b00000010},
+				{0b00000100},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -20075,6 +21264,23 @@ func (s *Server) handleUpdateVariablesRequest(args [0]string, argsEscaped bool, 
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
+			sctx, ok, err := s.securityPat(ctx, UpdateVariablesOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "Pat",
+					Err:              err,
+				}
+				defer recordError("Security:Pat", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
 			sctx, ok, err := s.securityOAuth2(ctx, UpdateVariablesOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
@@ -20087,7 +21293,7 @@ func (s *Server) handleUpdateVariablesRequest(args [0]string, argsEscaped bool, 
 				return
 			}
 			if ok {
-				satisfied[0] |= 1 << 0
+				satisfied[0] |= 1 << 1
 				ctx = sctx
 			}
 		}
@@ -20096,6 +21302,7 @@ func (s *Server) handleUpdateVariablesRequest(args [0]string, argsEscaped bool, 
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -20288,14 +21495,14 @@ func (s *Server) handleVerifyChallengeProofRequest(args [2]string, argsEscaped b
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			sctx, ok, err := s.securityOAuth2(ctx, VerifyChallengeProofOperation, r)
+			sctx, ok, err := s.securityPat(ctx, VerifyChallengeProofOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
-					Security:         "OAuth2",
+					Security:         "Pat",
 					Err:              err,
 				}
-				defer recordError("Security:OAuth2", err)
+				defer recordError("Security:Pat", err)
 				s.cfg.ErrorHandler(ctx, w, r, err)
 				return
 			}

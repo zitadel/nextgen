@@ -23,6 +23,7 @@ get:
     - Projects
   security:
     - sessionCookie: []
+    - oauth2: []
   parameters:
     - $ref: ../../../../components/parameters/limit.yaml
     - $ref: ../../../../components/parameters/page-token.yaml

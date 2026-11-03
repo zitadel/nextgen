@@ -14,7 +14,7 @@ post:
     - $ref: ../../../../../../components/parameters/user-id.yaml
     - $ref: ../../../../../../components/parameters/passkey-registration-id.yaml
   security:
-    - oauth2:
+    - pat:
         - user.write
   requestBody:
     required: true
