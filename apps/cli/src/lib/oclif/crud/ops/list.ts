@@ -13,7 +13,7 @@ import { wireOf } from "../wire";
 import { type ParsedFilter, parseFilter, parseSort } from "../query";
 import { parseOrThrow } from "../shared";
 import { chosenColumns } from "../columns";
-import { shellOption } from "../../../shell";
+import { Cmd } from "../../../cmd";
 import { fieldPaths } from "../paths";
 import type { Json, ListSpec } from "../types";
 import {
@@ -183,6 +183,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
     // `--json` has already silenced everything.
     const progress = all && process.stdout.isTTY && !this.jsonEnabled() ? spinner() : undefined;
     progress?.start(`Fetching ${topic}`);
+    // Counted across the fetches: `pages` hands the callback no page number.
     let fetched = 0;
     // The walk begins at the page --page-token names, if any.
     const first = typeof flags["page-token"] === "string" ? flags["page-token"] : undefined;
@@ -235,9 +236,9 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
  */
 const repeatedFlags = (flags: Json): readonly string[] => {
   const limit = typeof flags.limit === "number" ? [`--limit ${flags.limit}`] : [];
-  const sort = typeof flags.sort === "string" ? [shellOption("--sort", flags.sort)] : [];
+  const sort = typeof flags.sort === "string" ? [Cmd.option("--sort", flags.sort)] : [];
   const filters = (Array.isArray(flags.filter) ? flags.filter : []).map((filter) =>
-    shellOption("--filter", String(filter)),
+    Cmd.option("--filter", String(filter)),
   );
   return [...limit, ...sort, ...filters];
 };

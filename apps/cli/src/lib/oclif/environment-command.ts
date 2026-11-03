@@ -5,11 +5,15 @@ import { type Environment, requireValueInteractive, resolveEnvironment } from ".
 import { resolveCwd } from "../paths";
 import { BaseCommand } from "./base";
 import { CREDENTIALS, type CredentialKind } from "./credentials";
-import { environmentFlags, environmentSelectorSuffix } from "./environment-flags";
+import {
+  ENVIRONMENT_SELECTOR_OPTIONS,
+  environmentFlags,
+  environmentSelectorSuffix,
+} from "./environment-flags";
 import type { GlobalOptions } from "./types";
 import { type EnvironmentSelector, projectCommand, type SuggestedCommand } from "../suggestion";
 import { optionArgs } from "../public-cli";
-import { shellArg, withoutOptions } from "../shell";
+import { Cmd } from "../cmd";
 
 /** The platform connection {@link EnvironmentCommand.connect} opens. */
 export type Connection = Readonly<{
@@ -143,8 +147,8 @@ export abstract class EnvironmentCommand extends BaseCommand {
     if ((this.environment as Environment | undefined) === undefined) {
       return super.retryCommand(words);
     }
-    const selector = ["--env", "-e", "--env-file", "--server", "-s", "--cwd", "-c"];
-    return this.suggest(withoutOptions(words, selector).map(shellArg).join(" "));
+    const line = Cmd.of(words).without(ENVIRONMENT_SELECTOR_OPTIONS);
+    return this.suggest(line.toString());
   }
 
   /**
@@ -188,7 +192,10 @@ export abstract class EnvironmentCommand extends BaseCommand {
       consola.info(`Server    ${server}`);
     }
     return {
-      client: createZitadelClient({ baseUrl: server, token }, { verbatim: options.verbatim }),
+      client: createZitadelClient(
+        { baseUrl: server, token, signal: this.signal },
+        { verbatim: options.verbatim },
+      ),
       projectId,
       server,
       environment,

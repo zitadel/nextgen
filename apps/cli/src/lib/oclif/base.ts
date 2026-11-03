@@ -3,10 +3,10 @@ import { randomUUID } from "node:crypto";
 import { Command, Flags } from "@oclif/core";
 
 import { nonBlankString } from "./flags";
+import { Interruptible } from "./interruptible";
 import consola from "consola";
 
 import { toZitadelError, type ZitadelError } from "../errors";
-import { listenForInterrupt, stopListeningForInterrupt } from "../interrupt";
 import { isObject } from "../json";
 import { type LocalServers, PsLocalServers } from "../local-server/processes";
 import { resolveCwd } from "../paths";
@@ -37,12 +37,15 @@ import type {
   JsonEnvelope,
   SkippedEnvelope,
 } from "./types";
-import { shellArg, shellOption, withoutOptions } from "../shell";
+import { Cmd } from "../cmd";
 
 /**
  * The colour variables, which `bin/run.js` sets from `--color`/`--no-color`
  * and the colour libraries read. The libraries agree that off wins.
  */
+/** The spellings of the option that names the project directory. */
+const CWD_OPTIONS: readonly string[] = ["--cwd", "-c"];
+
 const NO_COLOR: FlagVariable = {
   name: "NO_COLOR",
   flag: "color",
@@ -80,7 +83,7 @@ export const FLAG_VARIABLES: readonly FlagVariable[] = [
  * contract (ADR 004) is preserved — oclif only replaces parsing, dispatch,
  * help, and JSON emission.
  */
-export abstract class BaseCommand extends Command {
+export abstract class BaseCommand extends Interruptible(Command) {
   /** Opt into oclif's native `--json` flag and JSON serialisation of the result. */
   static override enableJsonFlag = true;
 
@@ -177,7 +180,7 @@ export abstract class BaseCommand extends Command {
     // the same process (a test run, say) failed before emitting its own.
     takeReportedWarnings();
     await super.init();
-    listenForInterrupt();
+    this.listenForInterrupt();
     const telemetryFlag = this.argv.includes("--no-telemetry") ? false : undefined;
     installUserAgent(buildUserAgent(processUserAgentFacts(this.config.version, telemetryFlag)));
   }
@@ -189,7 +192,8 @@ export abstract class BaseCommand extends Command {
    * selector instead (`EnvironmentCommand`).
    */
   protected retryCommand(words: readonly string[]): SuggestedCommand {
-    return this.suggestUnscoped(withoutOptions(words, ["--cwd", "-c"]).map(shellArg).join(" "));
+    const line = Cmd.of(words).without(CWD_OPTIONS);
+    return this.suggestUnscoped(line.toString());
   }
 
   /**
@@ -213,7 +217,7 @@ export abstract class BaseCommand extends Command {
     // A follow-up run from the shell's directory would act on whatever project
     // is there, so the directory this run addressed goes with it.
     return unscopedCommand(
-      this.typedCwd === undefined ? args : `${args} ${shellOption("--cwd", this.typedCwd)}`,
+      this.typedCwd === undefined ? args : `${args} ${Cmd.option("--cwd", this.typedCwd)}`,
       this.meta.cliVersion,
     );
   }
@@ -460,7 +464,7 @@ export abstract class BaseCommand extends Command {
    * the grace, it force-exits with the resolved code.
    */
   protected override async finally(error: Error | undefined): Promise<void> {
-    stopListeningForInterrupt();
+    this.stopListeningForInterrupt();
     await this.telemetry?.shutdown(1000);
     if (this.telemetry?.enabled) {
       setTimeout(() => process.exit(process.exitCode ?? 0), 250).unref();

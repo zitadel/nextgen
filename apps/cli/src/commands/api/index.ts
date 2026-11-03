@@ -176,8 +176,8 @@ export default class Api extends Destructive(BaseCommand) {
     }
     const token = operation.auth === "secret" ? secret?.project_secret : undefined;
     const response = flags.paginate
-      ? await sendAll(meta.source, token, request)
-      : await send(meta.source, token, request, consent);
+      ? await sendAll(meta.source, token, request, this.signal)
+      : await send(meta.source, token, request, this.signal, consent);
     return this.emit({
       status: "ok",
       data: response.body ?? null,

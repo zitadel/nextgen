@@ -5,7 +5,7 @@ import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../../lib/
 import { plainFlag, Tabulatable } from "../../lib/oclif/tabulatable";
 import { DEPLOY_ARGS, originMatchesPattern } from "../../lib/release";
 import { ZitadelError } from "../../lib/errors";
-import { shellArg } from "../../lib/shell";
+import { Cmd } from "../../lib/cmd";
 import { toVariableRows, variableCells } from "../../lib/variables";
 
 /** The columns `resolve` renders, in order. */
@@ -67,7 +67,7 @@ export default class VariableResolve extends Tabulatable(EnvironmentCommand) {
         {
           hint: `Live origins: ${origins.join(", ")}.`,
           nextCommands: origins.map((o) =>
-            this.suggest(`variable resolve --origin ${shellArg(o)}`),
+            this.suggest(`variable resolve --origin ${Cmd.quote(o)}`),
           ),
         },
       );

@@ -2,7 +2,7 @@ import { Flags } from "@oclif/core";
 
 import { type EscapeOptions, escapeControlCharacters } from "../api-client";
 import { isObject } from "../json";
-import { shellOption } from "../shell";
+import { Cmd } from "../cmd";
 import type { BaseCommand } from "./base";
 import { listData } from "./envelope";
 import type { CommandResult, JsonEnvelope } from "./types";
@@ -163,11 +163,11 @@ export function Tabulatable<TBase extends CommandClass<BaseCommand>>(Base: TBase
     /** {@link emitList}, for a caller that returns the result instead of emitting it. */
     protected async listResult(flags: ListFlags, view: ListView): Promise<CommandResult> {
       const plain = isPlain(flags.plain);
-      // The cursor is opaque text from the server: `shellOption` quotes it so
+      // The cursor is opaque text from the server: `Cmd.option` quotes it so
       // whitespace or shell metacharacters cannot run from a copied command.
       const token = view.page?.token || null;
       const more =
-        token === null ? [] : [`More available: ${shellOption("--page-token", token)} (or --all)`];
+        token === null ? [] : [`More available: ${Cmd.option("--page-token", token)} (or --all)`];
       const nextCommand =
         view.page === undefined || token === null
           ? undefined
@@ -175,7 +175,7 @@ export function Tabulatable<TBase extends CommandClass<BaseCommand>>(Base: TBase
               [
                 view.page.command,
                 ...(view.page.flags ?? []),
-                shellOption("--page-token", token),
+                Cmd.option("--page-token", token),
                 "--json",
               ].join(" "),
             );

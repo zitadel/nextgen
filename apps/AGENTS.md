@@ -8,8 +8,8 @@ Conventions shared by the deployable apps.
   [`.gitignore`](../.gitignore) covers. Never introduce another output name
   (`storybook-static`, `build`, `out`).
 - The exceptions, each dictated by where something else reads the output:
-  - `console` builds into `internal/staticui/console/dist`, the tree the Go
-    server embeds ([`embed.go`](../internal/staticui/console/embed.go)). The
+  - `console` builds into `api/internal/staticui/console/dist`, the tree the
+    Go server embeds ([`embed.go`](api/internal/staticui/console/embed.go)). The
     cloud's `server` service compiles with `-tags noconsole`
     ([`cloud/build-launcher.sh`](cloud/build-launcher.sh)) so it does not
     embed it as well.
@@ -19,6 +19,8 @@ Conventions shared by the deployable apps.
     `dist/nextgen-launcher`, and the `schemas` service's built-in schemas in
     `dist/cloud-schemas` ([`vercel.json`](../vercel.json)), so neither
     serves the other.
+  - The `go-import` service serves `cloud/go-import/public`, a checked-in
+    page, not build output: it has no build, so there is no `dist`.
 
 ## What `next dev` writes
 

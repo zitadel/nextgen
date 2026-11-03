@@ -6,6 +6,8 @@ import { join } from "node:path";
 import { setupServer } from "msw/node";
 import { test as base } from "vitest";
 
+import { nextPort } from "./ports";
+
 /** Starts an HTTP server on a free port, answers with `handler`, and returns its base URL. */
 export type Serve = (handler: RequestListener, host?: string) => Promise<string>;
 
@@ -24,12 +26,15 @@ async function withTempDir(use: (dir: string) => Promise<void>): Promise<void> {
  * - `server` is an MSW server listening for the test, one that fails a request nothing handled.
  * - `serve` starts an HTTP server on a free port, answers with the handler, and gives back its base
  *   URL; every server it started is closed when the test ends.
+ * - `port` is a port from this worker's own block (see `ports.ts`), for a test that hands one to the
+ *   CLI. A test that needs a second one calls `nextPort()`.
  */
 export const test = base.extend<{
   dir: string;
   other: string;
   server: ReturnType<typeof setupServer>;
   serve: Serve;
+  port: number;
 }>({
   // biome-ignore lint/correctness/noEmptyPattern: Vitest requires a destructured first argument.
   dir: ({}, use) => withTempDir(use),
@@ -60,6 +65,8 @@ export const test = base.extend<{
       started.map((server) => new Promise<void>((resolve) => server.close(() => resolve()))),
     );
   },
+  // biome-ignore lint/correctness/noEmptyPattern: Vitest requires a destructured first argument.
+  port: ({}, use) => use(nextPort()),
 });
 
 export { test as it };

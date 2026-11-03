@@ -6,6 +6,8 @@ import { it } from "../../../helpers/fixtures";
 import type { LocalAdmin } from "../../../../src/lib/local-server/admin-credential";
 import { adminSessionCookie, consoleSignInUrl } from "../../../../src/lib/local-server/sign-in";
 
+const signal = new AbortController().signal;
+
 const SERVER = "http://local-admin.invalid:8080";
 
 const admin: LocalAdmin = {
@@ -76,7 +78,7 @@ afterEach(() => {
 
 describe("local admin sign-in", () => {
   it("proves the identifier, then the password, and links the handoff token", async () => {
-    const url = await consoleSignInUrl(SERVER, admin);
+    const url = await consoleSignInUrl(SERVER, admin, signal);
 
     // The token is a bearer credential in a query string, so it is encoded.
     expect(url).toBe(
@@ -121,7 +123,7 @@ describe("local admin sign-in", () => {
       }),
     );
 
-    const cookie = await adminSessionCookie(SERVER, admin);
+    const cookie = await adminSessionCookie(SERVER, admin, signal);
 
     expect(cookie).toBe("zitadel_session=sess_cookie_value");
     expect(exchanges[0]).toEqual({
@@ -146,7 +148,7 @@ describe("local admin sign-in", () => {
       ),
     );
 
-    const cookie = await adminSessionCookie(SERVER, admin);
+    const cookie = await adminSessionCookie(SERVER, admin, signal);
 
     expect(cookie).toBe("__Host-zitadel_session=sess_cookie_value");
   });
@@ -164,7 +166,7 @@ describe("local admin sign-in", () => {
       ),
     );
 
-    await expect(adminSessionCookie(SERVER, admin)).rejects.toThrow(
+    await expect(adminSessionCookie(SERVER, admin, signal)).rejects.toThrow(
       "Local admin session exchange failed (200)",
     );
   });
@@ -178,7 +180,7 @@ describe("local admin sign-in", () => {
       ),
     );
 
-    const error = await consoleSignInUrl(SERVER, admin).catch((caught: unknown) => caught);
+    const error = await consoleSignInUrl(SERVER, admin, signal).catch((caught: unknown) => caught);
 
     expect(error).toMatchObject({
       code: "E_VALIDATION",
@@ -204,7 +206,7 @@ describe("local admin sign-in", () => {
       ),
     );
 
-    const error = await consoleSignInUrl(SERVER, admin).catch((caught: unknown) => caught);
+    const error = await consoleSignInUrl(SERVER, admin, signal).catch((caught: unknown) => caught);
 
     expect(error).toMatchObject({
       code: "E_AUTH",
@@ -229,7 +231,7 @@ describe("local admin sign-in", () => {
 
     // Only the identifier gets the data-directory explanation; a password
     // failure is reported as the server gave it.
-    await expect(consoleSignInUrl(SERVER, admin)).rejects.toMatchObject({
+    await expect(consoleSignInUrl(SERVER, admin, signal)).rejects.toMatchObject({
       status: 409,
       body: { message: "The proof was rejected." },
     });

@@ -8,7 +8,7 @@ import {
 } from "../../lib/oclif";
 import { plainFlag, Tabulatable } from "../../lib/oclif/tabulatable";
 import { collectPages } from "../../lib/oclif/crud/paging";
-import { shellOption } from "../../lib/shell";
+import { Cmd } from "../../lib/cmd";
 
 /** The columns `list` renders, in order. */
 const COLUMNS = ["id", "release_id", "reason", "origins", "deployed_at"] as const;
@@ -89,7 +89,7 @@ export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
         token: next,
         command: "deployment list",
         flags: [
-          ...(flags.origin === undefined ? [] : [shellOption("--origin", flags.origin)]),
+          ...(flags.origin === undefined ? [] : [Cmd.option("--origin", flags.origin)]),
           ...(flags.live ? ["--live"] : []),
           ...(flags.limit === undefined ? [] : [`--limit ${flags.limit}`]),
         ],
