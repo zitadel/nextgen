@@ -21,14 +21,18 @@ const googleBody = (over: Record<string, unknown> = {}) => ({
 });
 
 /** The connections the bundle in hand carries, with the files they came from. */
-let connections: { name: string; body: Record<string, unknown> }[] = [];
+const connections: { name: string; body: Record<string, unknown> }[] = [];
 
 /** Puts the connections in the bundle the checks read, as `buildBundle` would. */
 function project(files: Record<string, unknown>): string {
-  connections = Object.entries(files).map(([name, body]) => ({
-    name,
-    body: body as Record<string, unknown>,
-  }));
+  connections.splice(
+    0,
+    connections.length,
+    ...Object.entries(files).map(([name, body]) => ({
+      name,
+      body: body as Record<string, unknown>,
+    })),
+  );
   return "/tmp/project";
 }
 

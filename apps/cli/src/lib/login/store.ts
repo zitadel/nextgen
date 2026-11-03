@@ -2,6 +2,7 @@ import { chmod, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises"
 import { join } from "node:path";
 import { randomBytes } from "node:crypto";
 
+import { ZitadelError } from "../errors";
 import { telemetryConfigDir } from "../telemetry/identity";
 
 /** A developer's sign-in at one server, as `zitadel login` stores it. */
@@ -31,8 +32,9 @@ type CredentialsFile = {
  * tree, so no commit can carry them. The file and its directory are the
  * owner's alone.
  */
-export function credentialsPath(env: NodeJS.ProcessEnv): string {
-  return join(telemetryConfigDir(env), "credentials.json");
+export function credentialsPath(env: NodeJS.ProcessEnv): string | undefined {
+  const dir = telemetryConfigDir(env);
+  return dir === undefined ? undefined : join(dir, "credentials.json");
 }
 
 async function readFileOrEmpty(path: string): Promise<CredentialsFile> {
@@ -50,7 +52,11 @@ export async function readLogin(
   server: string,
   env: NodeJS.ProcessEnv,
 ): Promise<StoredLogin | undefined> {
-  const file = await readFileOrEmpty(credentialsPath(env));
+  const path = credentialsPath(env);
+  if (path === undefined) {
+    return undefined;
+  }
+  const file = await readFileOrEmpty(path);
   return file.servers[new URL(server).origin];
 }
 
@@ -61,6 +67,11 @@ export async function writeLogin(
   env: NodeJS.ProcessEnv,
 ): Promise<void> {
   const path = credentialsPath(env);
+  if (path === undefined) {
+    throw new ZitadelError("E_VALIDATION", "There is no config directory to keep the sign-in in.", {
+      hint: "Set XDG_CONFIG_HOME to a directory you own, then sign in again.",
+    });
+  }
   const file = await readFileOrEmpty(path);
   file.servers[new URL(server).origin] = login;
   await writePrivate(path, file);
@@ -72,6 +83,9 @@ export async function removeLogin(
   env: NodeJS.ProcessEnv,
 ): Promise<StoredLogin | undefined> {
   const path = credentialsPath(env);
+  if (path === undefined) {
+    return undefined;
+  }
   const file = await readFileOrEmpty(path);
   const origin = new URL(server).origin;
   const removed = file.servers[origin];

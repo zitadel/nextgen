@@ -16,11 +16,15 @@
       "inputs": [
         "$TURBO_EXTENDS$",
         "$TURBO_ROOT$/scripts/task-guard.mjs",
-        "$TURBO_ROOT$/internal/httputil/testdata/redirect_targets.json"
+        "$TURBO_ROOT$/apps/api/internal/httputil/testdata/redirect_targets.json"
       ]
     },
     // bin/start.ts runs the source and imports api's generated client and config.
     "start": {
+      "dependsOn": ["@zitadel/config#build"]
+    },
+    // The same file under `tsx watch`.
+    "dev": {
       "dependsOn": ["@zitadel/config#build"]
     }
   }

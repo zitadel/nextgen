@@ -1,32 +1,35 @@
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import type { SetupServer } from "msw/node";
 import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { HttpResponse, http } from "msw";
-import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, vi } from "vitest";
+
+import { it } from "../../../helpers/fixtures";
 
 vi.mock("@clack/prompts", async () => (await import("../../../helpers/clack")).clackDouble());
 
 import { confirm, text } from "@clack/prompts";
 
 import EnvAdd from "../../../../src/commands/env/add";
-import { parseJson, runCliForTest, stripAnsi } from "../../../helpers/run-cli";
+import {
+  expectedPublicCliCommand,
+  parseJson,
+  runCliForTest,
+  stripAnsi,
+} from "../../../helpers/run-cli";
 import { asTerminal } from "../../../helpers/terminal";
 
 const SERVER = "https://api.zitadel.example";
-const server = setupServer();
 
-let created: Array<Record<string, unknown>> = [];
+const created: Array<Record<string, unknown>> = [];
 
-beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
-afterAll(() => server.close());
-
-beforeEach(() => {
-  created = [];
+it.beforeEach(({ server }) => {
+  created.length = 0;
   server.use(
-    http.post(`${SERVER}/projects`, async ({ request }) => {
+    http.post(`${SERVER}/api/v1/projects`, async ({ request }) => {
       created.push((await request.json()) as Record<string, unknown>);
       return HttpResponse.json(
         {
@@ -42,8 +45,6 @@ beforeEach(() => {
     }),
   );
 });
-
-afterEach(() => server.resetHandlers());
 
 const dirs: string[] = [];
 
@@ -219,8 +220,24 @@ describe("env add", () => {
       const out = stripAnsi(await addRendered(cwd, "--app-url", "https://app.acme.com"));
 
       expect(out).toContain(
-        `Deploy to it: zitadel deploy -m '<what changed>' --env-file ${cwd}/.env.production.local`,
+        `$ ${expectedPublicCliCommand(`deploy -m '<what changed>' --env-file ${cwd}/.env.production.local`)}`,
       );
+    });
+
+    it("names the deploy a person should run only once", async () => {
+      const cwd = await makeProject("next");
+
+      const out = stripAnsi(await addRendered(cwd, "--app-url", "https://app.acme.com"));
+
+      expect(out.split("deploy -m '<what changed>'")).toHaveLength(2);
+    });
+
+    it("names the check of what resolves only once", async () => {
+      const cwd = await makeProject("next");
+
+      const out = stripAnsi(await addRendered(cwd));
+
+      expect(out.split(" env --env-file ")).toHaveLength(2);
     });
 
     it("offers no origin add without an app URL to add", async () => {
@@ -664,12 +681,12 @@ describe("env add asked on a terminal", () => {
   }
 
   /** The platform accepts the release and the deployment. */
-  function platformDeploys(): void {
+  function platformDeploys(server: SetupServer): void {
     server.use(
-      http.post(`${SERVER}/releases/build`, () =>
+      http.post(`${SERVER}/api/v1/releases/build`, () =>
         HttpResponse.json({ id: "rel_1", content_hash: "sha256:abc" }, { status: 201 }),
       ),
-      http.post(`${SERVER}/deployments`, () =>
+      http.post(`${SERVER}/api/v1/deployments`, () =>
         HttpResponse.json(
           { id: "dep_1", targets: [{ origin: "https://app.acme.com", expires_at: null }] },
           { status: 201 },
@@ -679,9 +696,9 @@ describe("env add asked on a terminal", () => {
   }
 
   /** The platform refuses to build the release. */
-  function platformRefusesTheRelease(): void {
+  function platformRefusesTheRelease(server: SetupServer): void {
     server.use(
-      http.post(`${SERVER}/releases/build`, () =>
+      http.post(`${SERVER}/api/v1/releases/build`, () =>
         HttpResponse.json({ code: "rel.invalid", message: "no" }, { status: 400 }),
       ),
     );
@@ -705,9 +722,9 @@ describe("env add asked on a terminal", () => {
     vi.mocked(confirm).mockReset();
   });
 
-  it("deploys the project when the offer is accepted", async () => {
+  it("deploys the project when the offer is accepted", async ({ server }) => {
     const cwd = await makeDeployableProject();
-    platformDeploys();
+    platformDeploys(server);
     vi.mocked(confirm).mockResolvedValueOnce(true as never);
 
     const envelope = (await adding(cwd)) as { data: { deployment: unknown } };
@@ -753,9 +770,9 @@ describe("env add asked on a terminal", () => {
     expect(envelope.data.next_commands.some((command) => command.includes("deploy -m"))).toBe(true);
   });
 
-  it("binds the environment even when the deploy fails", async () => {
+  it("binds the environment even when the deploy fails", async ({ server }) => {
     const cwd = await makeDeployableProject();
-    platformRefusesTheRelease();
+    platformRefusesTheRelease(server);
     vi.mocked(confirm).mockResolvedValueOnce(true as never);
 
     const envelope = (await adding(cwd)) as { status: string; data: { deployment: unknown } };
@@ -764,9 +781,9 @@ describe("env add asked on a terminal", () => {
     expect(envelope.data.deployment).toBeNull();
   });
 
-  it("warns, naming the deploy to re-run, when the deploy fails", async () => {
+  it("warns, naming the deploy to re-run, when the deploy fails", async ({ server }) => {
     const cwd = await makeDeployableProject();
-    platformRefusesTheRelease();
+    platformRefusesTheRelease(server);
     vi.mocked(confirm).mockResolvedValueOnce(true as never);
 
     const envelope = (await adding(cwd)) as { warnings: string[] };

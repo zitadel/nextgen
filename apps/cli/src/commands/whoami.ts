@@ -2,7 +2,6 @@ import { createZitadelClient } from "../lib/api-client";
 import { ZitadelError } from "../lib/errors";
 import { developerAccessToken } from "../lib/login/flow";
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../lib/oclif";
-import { nextCommandsData } from "../lib/oclif/envelope";
 import { DEFAULT_SERVER } from "../lib/server";
 
 /**
@@ -15,7 +14,7 @@ export default class Whoami extends EnvironmentCommand {
   static override description =
     "Show who you are signed in as at a server. It asks the server with your `zitadel login` token.";
   static override group = CommandGroups.gettingStarted;
-  static override groupOrder = 6;
+  static override groupOrder = 7;
 
   static override examples = [
     "<%= config.bin %> <%= command.id %> --server local",
@@ -34,7 +33,11 @@ export default class Whoami extends EnvironmentCommand {
         nextCommands: [this.suggest("login")],
       });
     }
-    const user = await createZitadelClient({ baseUrl: server, token: signedIn.token }).getMyUser();
+    const user = await createZitadelClient({
+      baseUrl: server,
+      token: signedIn.token,
+      signal: this.signal,
+    }).getMyUser();
     const who = user.identifier ?? user.id;
     return this.emit({
       status: "ok",
@@ -46,8 +49,8 @@ export default class Whoami extends EnvironmentCommand {
         ...(user.display === undefined ? {} : { display: user.display }),
         client_id: signedIn.login.client_id,
         access_token_expires_at: signedIn.login.access_token_expires_at,
-        ...nextCommandsData([this.suggest("logout")]),
       },
+      next: { commands: [this.suggest("logout")] },
     });
   }
 }

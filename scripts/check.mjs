@@ -110,7 +110,14 @@ async function phaseGoSpanner() {
 
 async function phaseNode() {
   await run("corepack", ["pnpm", "install", "--frozen-lockfile"]);
-  const gate = workspaceCommand(["lint", "typecheck", "build", "test"]);
+  const gate = workspaceCommand([
+    "lint",
+    "typecheck",
+    "build",
+    "test",
+    "check-typecheck",
+    "check-openapi-rules",
+  ]);
   await run(gate.command, gate.args);
 }
 

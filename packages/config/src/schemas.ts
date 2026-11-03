@@ -8,6 +8,7 @@ import {
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import { z } from "zod";
 
+import defaultPasswordPolicy from "../defaults/default-password-policy.json" with { type: "json" };
 import { isBrandingColor, isBrandingFontFamily, MAX_BRANDING_URL_BYTES } from "./branding-css.js";
 import { isCanonicalLoopbackHttpUrl } from "./branding-url.js";
 
@@ -26,7 +27,7 @@ export const idpConnectionConfigSchema = CreateIdpBody.shape.idp;
 /**
  * A `.zitadel/policies/<operation>.json` file: the publish body
  * (`POST /policies`) plus `$schema`. Strict at both levels, unlike the
- * generated body: a typo in a setting must fail `plan`, as the editor's
+ * generated body: a typo in a setting must fail `deploy --dry-run`, as the editor's
  * meta-schema (`policy.json`) already flags it.
  *
  * With one operation the generated body is a single object. A second
@@ -44,7 +45,7 @@ export const policyConfigSchema = z.strictObject({
  * the only factor. `setup` writes it when given none, and the console warns
  * on a policy under it.
  */
-export const RECOMMENDED_PASSWORD_MIN_LENGTH = 15;
+export const RECOMMENDED_PASSWORD_MIN_LENGTH: number = defaultPasswordPolicy.config.min_length;
 
 /**
  * A `.zitadel/policies/<operation>.test.json` file: cases `zitadel policies

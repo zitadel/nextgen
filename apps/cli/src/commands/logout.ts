@@ -1,7 +1,6 @@
 import { revokeLogin } from "../lib/login/flow";
 import { removeLogin } from "../lib/login/store";
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../lib/oclif";
-import { nextCommandsData } from "../lib/oclif/envelope";
 import { DEFAULT_SERVER } from "../lib/server";
 
 /**
@@ -13,7 +12,7 @@ export default class Logout extends EnvironmentCommand {
   static override description =
     "Sign out of a server. It revokes the `zitadel login` refresh token there and forgets the sign-in.";
   static override group = CommandGroups.gettingStarted;
-  static override groupOrder = 7;
+  static override groupOrder = 8;
 
   static override examples = ["<%= config.bin %> <%= command.id %> --server local"];
 
@@ -44,8 +43,8 @@ export default class Logout extends EnvironmentCommand {
         server,
         signed_out: true,
         revoked,
-        ...nextCommandsData([this.suggest("login")]),
       },
+      next: { commands: [this.suggest("login")] },
     });
   }
 }

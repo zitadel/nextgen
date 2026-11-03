@@ -15,6 +15,7 @@ import {
   removeSsoFromSchema,
   ssoEditRefusal,
 } from "../../../../src/lib/idp";
+import { thrownBy } from "../../../helpers/thrown-value";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "../../../../../..");
 
@@ -95,6 +96,32 @@ describe("applySsoToSchema", () => {
       unknown
     >;
     expect((methods.sso as { providers: string[] }).providers).toEqual(["google", "github"]);
+  });
+
+  it("keeps the schema's keys in their order", () => {
+    const schema = getDefaultHumanUserSchema({ useCase: "minimal" });
+
+    const { document } = applySsoToSchema(schema, slug("google"));
+
+    expect(Object.keys(document)).toEqual(Object.keys(schema));
+  });
+
+  it("leaves the schema it was given as it was", () => {
+    const schema = getDefaultHumanUserSchema({ useCase: "minimal" });
+    const before = structuredClone(schema);
+
+    applySsoToSchema(schema, slug("google"));
+
+    expect(schema).toEqual(before);
+  });
+
+  it("shares nothing under sso with the schema it was given", () => {
+    const options = { prompt: "login" };
+    const schema = { "x-auth-methods": { sso: { enabled: false, providers: [], options } } };
+
+    const { document } = applySsoToSchema(schema, slug("google"));
+
+    expect(document["x-auth-methods"].sso.options).not.toBe(options);
   });
 });
 
@@ -413,12 +440,7 @@ describe("applySsoToFlow", () => {
     ];
     const before = structuredClone(legacy);
 
-    let caught: unknown;
-    try {
-      applySsoToFlow(legacy, slug("github"), bothMethods);
-    } catch (error) {
-      caught = error;
-    }
+    const caught = thrownBy(() => applySsoToFlow(legacy, slug("github"), bothMethods));
 
     expect(caught).toBeInstanceOf(ZitadelError);
     expect((caught as ZitadelError).code).toBe("E_VALIDATION");
@@ -444,12 +466,7 @@ describe("applySsoToFlow", () => {
       });
       const before = structuredClone(legacy);
 
-      let caught: unknown;
-      try {
-        applySsoToFlow(legacy, slug("github"), bothMethods);
-      } catch (error) {
-        caught = error;
-      }
+      const caught = thrownBy(() => applySsoToFlow(legacy, slug("github"), bothMethods));
 
       expect(caught).toBeInstanceOf(ZitadelError);
       expect((caught as ZitadelError).code).toBe("E_VALIDATION");
@@ -471,12 +488,7 @@ describe("applySsoToFlow", () => {
     transitions.callback = { ...transitions.callback, ...extra };
     const before = structuredClone(legacy);
 
-    let caught: unknown;
-    try {
-      applySsoToFlow(legacy, slug("github"), bothMethods);
-    } catch (error) {
-      caught = error;
-    }
+    const caught = thrownBy(() => applySsoToFlow(legacy, slug("github"), bothMethods));
 
     expect(caught).toBeInstanceOf(ZitadelError);
     expect((caught as ZitadelError).code).toBe("E_VALIDATION");
@@ -500,12 +512,7 @@ describe("applySsoToFlow", () => {
     };
     const before = structuredClone(flow);
 
-    let caught: unknown;
-    try {
-      applySsoToFlow(flow, slug("google"), bothMethods);
-    } catch (error) {
-      caught = error;
-    }
+    const caught = thrownBy(() => applySsoToFlow(flow, slug("google"), bothMethods));
 
     expect(caught).toBeInstanceOf(ZitadelError);
     expect((caught as ZitadelError).code).toBe("E_VALIDATION");
@@ -535,12 +542,7 @@ describe("applySsoToFlow", () => {
     };
     const before = structuredClone(flow);
 
-    let caught: unknown;
-    try {
-      applySsoToFlow(flow, slug("google"), bothMethods);
-    } catch (error) {
-      caught = error;
-    }
+    const caught = thrownBy(() => applySsoToFlow(flow, slug("google"), bothMethods));
 
     expect(caught).toBeInstanceOf(ZitadelError);
     expect((caught as ZitadelError).code).toBe("E_VALIDATION");
@@ -941,11 +943,10 @@ describe("removeSsoFromSchema", () => {
 describe("removeSsoFromFlow", () => {
   /** The shipped flow after `auth-method sso enable` added these providers. */
   function enabled(...slugs: string[]): Record<string, unknown> {
-    let flow: object = shippedFlow();
-    for (const name of slugs) {
-      flow = applySsoToFlow(flow, slug(name), bothMethods).document;
-    }
-    return flow as Record<string, unknown>;
+    return slugs.reduce<object>(
+      (flow, name) => applySsoToFlow(flow, slug(name), bothMethods).document,
+      shippedFlow(),
+    ) as Record<string, unknown>;
   }
 
   it("does not change the flow it was given", () => {

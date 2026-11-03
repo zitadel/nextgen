@@ -32,6 +32,7 @@
     "@zitadel/sdk-nuxt": "workspace:*",
     "@zitadel/testing": "workspace:*",
     "@zitadel/vitest-config": "workspace:*",
+    "p-map": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

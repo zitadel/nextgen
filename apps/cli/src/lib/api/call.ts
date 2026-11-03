@@ -1,8 +1,11 @@
 import { ApiError, request as fetchWithPolicy } from "@zitadel/api/runtime/fetch";
+import { Paging } from "@zitadel/api/runtime/paging";
 
 import { REQUEST_TIMEOUT_MS, sanitizeRejection, sanitizeResponse } from "../api-client";
-import { interruptSignal } from "../interrupt";
-import { collectPages } from "../oclif/crud/paging";
+import { Consent } from "../consent";
+import { ZitadelError, errorMessage } from "../errors";
+import { isObject, parseJsonOrUndefined } from "../json";
+import { tryCatch } from "../try-catch";
 import { type ApiRequest, urlOf } from "./request";
 
 /** What the server answered. `body` is `undefined` for a response without one. */
@@ -20,24 +23,48 @@ const readBody = async (res: Response): Promise<unknown> => {
   if (!(res.headers.get("content-type") ?? "").includes("json")) {
     return raw;
   }
-  try {
-    return JSON.parse(raw) as unknown;
-  } catch {
-    return raw;
-  }
+  const parsed = parseJsonOrUndefined(raw);
+  return parsed === undefined ? raw : parsed;
 };
 
 /**
  * Send one request to `server`, with the project secret as the bearer when
- * there is one. It is bounded and cancelled as every platform call is
- * (`createZitadelClient`), and what the server says is escaped the same way:
+ * there is one. It is bounded, and cancelled when `signal` aborts, as every
+ * platform call is (`createZitadelClient`), and what the server says is escaped the same way:
  * a non-2xx is the {@link ApiError} `toZitadelError` maps to an exit code.
+ *
+ * A destructive request (one whose operation the spec marks) is sent only with the
+ * `consent` its command asked for, as the client's are.
  */
 export const send = async (
   server: string,
   token: string | undefined,
   request: ApiRequest,
+  signal: AbortSignal,
+  consent?: Consent,
 ): Promise<ApiResponse> => {
+  const { status, raw } = await sendRaw(server, token, request, signal, consent);
+  return { status, body: sanitizeResponse(raw) };
+};
+
+/** A response as it came off the wire: its status, and its body not yet escaped. */
+type RawResponse = Readonly<{ status: number; raw: unknown }>;
+
+/**
+ * {@link send}, answering the body as the server sent it; a failure is escaped
+ * all the same. Every request goes out here, so a destructive one without
+ * `consent` is refused here, whichever caller sent it.
+ */
+const sendRaw = async (
+  server: string,
+  token: string | undefined,
+  request: ApiRequest,
+  signal: AbortSignal,
+  consent?: Consent,
+): Promise<RawResponse> => {
+  if (request.operation.destructive) {
+    Consent.assert(consent);
+  }
   const url = urlOf(server, request);
   const { method } = request.operation;
   const headers = new Headers({ accept: "application/json" });
@@ -54,7 +81,7 @@ export const send = async (
       headers,
       ...(request.body === undefined ? {} : { body: JSON.stringify(request.body) }),
     },
-    { signal: interruptSignal(), timeoutMs: REQUEST_TIMEOUT_MS },
+    { signal, timeoutMs: REQUEST_TIMEOUT_MS },
     readBody,
   );
   if (!res.ok) {
@@ -62,16 +89,16 @@ export const send = async (
       new ApiError(res.status, url, rawBody, `${method} ${url} returned ${res.status}`),
     );
   }
-  return { status: res.status, body: sanitizeResponse(rawBody) };
+  return { status: res.status, raw: rawBody };
 };
 
 /** The request for the page `token` names; `undefined` leaves the request as it is. */
 const pageOf = (request: ApiRequest, token: string | undefined): ApiRequest => {
-  const paging = request.operation.paging;
-  if (token === undefined || paging === null) {
+  const shape = request.operation.paging;
+  if (token === undefined || shape === null) {
     return request;
   }
-  if (paging.token === "query") {
+  if (shape.token === "query") {
     return {
       ...request,
       query: [...request.query.filter(([name]) => name !== "page_token"), ["page_token", token]],
@@ -82,34 +109,45 @@ const pageOf = (request: ApiRequest, token: string | undefined): ApiRequest => {
 
 /**
  * Send a paged request until the server's `next_page_token` runs out, and
- * answer the last page with the page field holding every page's items. The
- * walk is `collectPages`, the resource lists' `--all`, so a server that
- * repeats a cursor is caught the same way.
+ * answer the last page with the page field holding every page's items.
  */
 export const sendAll = async (
   server: string,
   token: string | undefined,
   request: ApiRequest,
+  signal: AbortSignal,
 ): Promise<ApiResponse> => {
-  const paging = request.operation.paging;
-  if (paging === null) {
-    return send(server, token, request);
+  const shape = request.operation.paging;
+  if (shape === null) {
+    return send(server, token, request, signal);
   }
-  let last: ApiResponse = { status: 200, body: undefined };
-  const { items } = await collectPages(
-    async (cursor) => {
-      last = await send(server, token, pageOf(request, cursor));
-      return last.body;
+  const fields = Paging.byField(shape.items);
+  const paging = new Paging<RawResponse, unknown>({
+    items: (response) => {
+      const [problem, list] = tryCatch(() => {
+        return fields.items(response.raw);
+      });
+
+      if (problem !== null) {
+        throw new ZitadelError("E_VALIDATION", errorMessage(problem), {
+          details: { response: sanitizeResponse(response.raw) },
+        });
+      }
+
+      return sanitizeResponse(list);
     },
-    {
-      items: paging.items,
-      all: true,
-      nextPageToken: "next_page_token",
-      flags: { all: "--paginate", onePage: "-F limit=<n> and -F page_token=<token>" },
+    next: (response) => {
+      return fields.next(response.raw);
     },
-  );
+  });
+  const walk = paging.walk(async (cursor) => {
+    return sendRaw(server, token, pageOf(request, cursor), signal);
+  });
+  const { items, last } = await paging.collect(walk, { all: true });
+  const page = isObject(last?.raw) ? last.raw : {};
+  const body = sanitizeResponse({ ...page, [shape.items]: [] });
   return {
-    status: last.status,
-    body: { ...(last.body as Record<string, unknown>), [paging.items]: items },
+    status: last?.status ?? 200,
+    body: { ...body, [shape.items]: items },
   };
 };

@@ -7,7 +7,6 @@ import { discoverAuthorization } from "../lib/login/discovery";
 import { signIn, toStoredLogin } from "../lib/login/flow";
 import { credentialsPath, writeLogin } from "../lib/login/store";
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../lib/oclif";
-import { nextCommandsData } from "../lib/oclif/envelope";
 import { DEFAULT_SERVER } from "../lib/server";
 
 /** How long `login` waits for the browser by default. */
@@ -27,7 +26,7 @@ export default class Login extends EnvironmentCommand {
   static override description =
     "Sign in to a Zitadel server as yourself, in the browser. Commands that accept it then act as you instead of with a project secret.";
   static override group = CommandGroups.gettingStarted;
-  static override groupOrder = 5;
+  static override groupOrder = 6;
 
   static override examples = [
     "<%= config.bin %> <%= command.id %> --server local",
@@ -86,6 +85,7 @@ export default class Login extends EnvironmentCommand {
     const user = await createZitadelClient({
       baseUrl: server,
       token: tokens.accessToken,
+      signal: this.signal,
     }).getMyUser();
     const login = toStoredLogin(
       tokens,
@@ -107,8 +107,8 @@ export default class Login extends EnvironmentCommand {
         access_token_expires_at: login.access_token_expires_at,
         has_refresh_token: login.refresh_token !== undefined,
         stored_at: credentialsPath(process.env),
-        ...nextCommandsData([this.suggest("whoami")]),
       },
+      next: { commands: [this.suggest("whoami")] },
     });
   }
 }

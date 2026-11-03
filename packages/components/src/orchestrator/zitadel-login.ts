@@ -33,7 +33,7 @@ import type { ResolvedTheme } from "./theme-controller.js";
 import type { Branding } from "./branding.js";
 import { stampExportparts } from "./exportparts.js";
 import { createLiquidEngine, localiseFlowErrorKeys } from "./liquid.js";
-import { localeFor, type Locale } from "./locales/index.js";
+import { isHidden, localeFor, type Locale } from "./locales/index.js";
 import { patchMandatoryGates } from "./mandatory-gates.js";
 import { resolveApi } from "./resolve-api.js";
 import { returnPathFromLocation } from "./return-path.js";
@@ -150,6 +150,26 @@ function clearFlowIdFromLocation(): void {
   if (!url.searchParams.has(FLOW_QUERY_PARAM)) return;
   url.searchParams.delete(FLOW_QUERY_PARAM);
   history.replaceState(history.state, "", url);
+}
+
+/** Autocomplete tokens that mark a field's value as a credential. */
+const SECRET_AUTOCOMPLETE_TOKENS = ["current-password", "new-password", "one-time-code"];
+
+/** Whether a field holds a password or one-time code. */
+function isSecretField(field: CreateFlow201StepFieldsItem): boolean {
+  if (field.type === "password") return true;
+  const tokens = (field.autocomplete ?? "").toLowerCase().split(/\s+/);
+  return tokens.some((token) => SECRET_AUTOCOMPLETE_TOKENS.includes(token));
+}
+
+/** `values` without the ones `step`'s secret fields hold. */
+function withoutSecrets(
+  values: Record<string, string>,
+  step: CreateFlow201Step,
+): Record<string, string> {
+  const secrets = new Set((step.fields ?? []).filter(isSecretField).map((field) => field.name));
+  if (secrets.size === 0) return values;
+  return Object.fromEntries(Object.entries(values).filter(([name]) => !secrets.has(name)));
 }
 
 /** The `code` of a Flow API error envelope, or "" for anything else. */
@@ -474,16 +494,22 @@ export class ZitadelLogin extends ZitadelSurface {
   /**
    * Resolves the effective locale dictionary for the resolved language, with
    * the `locales` map merged over the built-in copy ({@link localeFor}).
-   *
-   * Priority: explicit `lang` attr → `navigator.language` (user preference)
-   * → `document.documentElement.lang` (page default).
    */
   private resolveLocale(): Locale {
-    const code =
+    return localeFor(this.resolveLanguage(), this.locales);
+  }
+
+  /**
+   * The language tag the widget renders in. Priority: explicit `lang` attr →
+   * `navigator.language` (user preference) → `document.documentElement.lang`
+   * (page default).
+   */
+  private resolveLanguage(): string {
+    return (
       this.lang ||
       (typeof navigator !== "undefined" ? navigator.language : "") ||
-      (typeof document !== "undefined" ? document.documentElement.lang : "");
-    return localeFor(code, this.locales);
+      (typeof document !== "undefined" ? document.documentElement.lang : "")
+    );
   }
 
   override willUpdate(changed: PropertyValues<this>): void {
@@ -890,7 +916,7 @@ export class ZitadelLogin extends ZitadelSurface {
       return new Error(
         `<zitadel-login> flow-name="${this.flowName}" does not match any active flow ` +
           `definition in this project. Check the \`name\` in your flow file and that ` +
-          `it has been applied (\`zitadel apply\`).`,
+          `it has been deployed (\`zitadel deploy\`).`,
       );
     }
     if (code === "flowdef.purpose_mismatch") {
@@ -911,6 +937,13 @@ export class ZitadelLogin extends ZitadelSurface {
     // turn later, and by then the terminal screen has already painted. A
     // preview navigates nowhere, so it never holds the loader for it.
     this.completing = !preview && navigatesOnComplete(wire, this.postSignInUrl);
+    // A secret is for the step it was typed on: a step that offers another
+    // account, or a later step that asks for a password again, starts empty.
+    // A re-render of the same step (a refused value) keeps what was typed.
+    const leaving = this.response?.step;
+    if (leaving !== undefined && leaving.name !== wire.step.name) {
+      this.formValues = withoutSecrets(this.formValues, leaving);
+    }
     this.response = wire;
     const { branding, issues } = validateBranding(wire.branding, {
       renderingOrigin: this.ownerDocument.location.origin,
@@ -1138,8 +1171,12 @@ export class ZitadelLogin extends ZitadelSurface {
       challenge: this.loading || this.preview ? null : (step.challenge ?? null),
       identifier: step.identifier ?? null,
       // Why the flow moved between sign-in and sign-up without being asked,
-      // on the step right after the move.
-      messages: step.notice ? [{ level: "info", text_key: step.notice }] : [],
+      // on the step right after the move. A host that sets the notice's text
+      // to "" in `locales` opts out of it ({@link isHidden}).
+      messages:
+        step.notice && !isHidden(this.resolveLanguage(), this.locales, step.notice)
+          ? [{ level: "info", text_key: step.notice }]
+          : [],
       identity: this.deriveIdentity(),
       errors,
       branding: this.brandingForTemplate(),
@@ -1311,11 +1348,7 @@ export class ZitadelLogin extends ZitadelSurface {
     // The widget never broadcasts a password or one-time-code value through its
     // own events. It cannot hide the input from other scripts on the same page.
     const field = this.response?.step.fields?.find((candidate) => candidate.name === name);
-    const autocompleteTokens = (field?.autocomplete ?? "").toLowerCase().split(/\s+/);
-    const secretTokens = ["current-password", "new-password", "one-time-code"];
-    const hasSecretToken = autocompleteTokens.some((token) => secretTokens.includes(token));
-    const isSecret = field?.type === "password" || hasSecretToken;
-    if (isSecret) {
+    if (field !== undefined && isSecretField(field)) {
       return;
     }
     emit(this, "zitadel-flow-input", { name, value });
@@ -1408,10 +1441,12 @@ export class ZitadelLogin extends ZitadelSurface {
   /** Secondary navigation rows (`data-action` on `.zl-card-nav__link`). */
   private handleDelegatedAction = (event: Event): void => {
     const target = (event.target as HTMLElement | null)?.closest<HTMLElement>("[data-action]");
-    if (!target || target.closest("zl-button") || this.loading) return;
+    if (!target || target.closest("zl-button")) return;
     const action = target.getAttribute("data-action");
     if (!action) return;
+    // An ignored click still must not follow href="#" and change history.
     event.preventDefault();
+    if (this.loading) return;
     void this.submit(action);
   };
 

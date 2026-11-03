@@ -1,4 +1,4 @@
-import { isErrno, ZitadelError } from "./errors";
+import { isErrno, ZitadelError, errorMessage } from "./errors";
 import { isObject } from "./json";
 import { readFlowFiles, type FlowFile, type SchemaFile } from "./idp";
 import { readState } from "./sync/state";
@@ -99,7 +99,7 @@ async function publishedIdsOf(cwd: string, path: string): Promise<string[]> {
     }
     throw new ZitadelError(
       "E_VALIDATION",
-      `Cannot read .zitadel/state.json: ${error instanceof Error ? error.message : String(error)}`,
+      `Cannot read .zitadel/state.json: ${errorMessage(error)}`,
       {
         hint:
           "The file records which platform resource each local file was synced as. " +

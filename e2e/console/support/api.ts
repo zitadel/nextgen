@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import type { ConnectedZitadel } from "@zitadel/testing/playwright";
 
 /**
@@ -49,6 +51,30 @@ export async function createIdpConnection(
         },
       },
       { project_id: zitadel.handle.projectId },
+    ),
+  );
+}
+
+type SchemaDocument = Awaited<ReturnType<ConnectedZitadel["api"]["getSchemaById"]>>["schema"];
+
+/**
+ * Writes a schema cloned from the seeded one under its own `objectType`.
+ * Sharing the seeded type would make the clone the newest revision of it, the
+ * one other specs' Add user drawers pick from. `overrides` sit on top of the
+ * seeded document, or are built from it; passing the same `objectType` twice
+ * mints two revisions of one schema.
+ */
+export async function createSchemaFromSeed(
+  zitadel: ConnectedZitadel,
+  overrides: Record<string, unknown> | ((template: SchemaDocument) => Record<string, unknown>) = {},
+): Promise<{ id: string }> {
+  const { projectId, schemaId } = zitadel.handle;
+  const { schema: template } = await zitadel.api.getSchemaById(schemaId);
+  const extra = typeof overrides === "function" ? overrides(template) : overrides;
+  return withErrorBody(
+    zitadel.api.createSchema(
+      { ...template, objectType: `e2e-${randomUUID()}`, ...extra },
+      { project_id: projectId },
     ),
   );
 }

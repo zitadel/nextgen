@@ -1,8 +1,10 @@
+import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
 import { render, screen } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it, vi } from "vitest";
 import { scopedPath } from "@/test/project-scope.fixture";
 import { server } from "@/test/msw";
+import { createAppRouter } from "../../../router";
 
 // The `_authed` layout guards every screen behind `GET /sessions/me`
 // (Console ADR 0003); mock the auth module so routes render as signed in.
@@ -13,9 +15,9 @@ vi.mock("@/auth/session", async (importOriginal) => {
 });
 
 // Absolute base so requests parse under jsdom/undici and MSW can intercept.
-const FLOWS_URL = "http://localhost/api/flow_definitions";
-const FLOW_URL = "http://localhost/api/flow_definitions/flow_1";
-const SCHEMAS_URL = "http://localhost/api/schemas";
+const FLOWS_URL = "http://localhost/api/v1/flow_definitions";
+const FLOW_URL = "http://localhost/api/v1/flow_definitions/flow_1";
+const SCHEMAS_URL = "http://localhost/api/v1/schemas";
 
 /**
  * A definition serving both purposes out of order, so the row's fixed purpose
@@ -67,10 +69,6 @@ function listResponse() {
 }
 
 async function renderAt(path: string, project?: string) {
-  const [{ RouterProvider, createMemoryHistory }, { createAppRouter }] = await Promise.all([
-    import("@tanstack/react-router"),
-    import("../../../router"),
-  ]);
   const router = createAppRouter({
     history: createMemoryHistory({ initialEntries: [scopedPath(path, project)] }),
   });
@@ -176,7 +174,7 @@ describe("login flows list", () => {
         http.get(FLOWS_URL, () =>
           HttpResponse.json({ code: "req.invalid", message: "invalid" }, { status: 400 }),
         ),
-        http.get("http://localhost/api/users/me/projects", () =>
+        http.get("http://localhost/api/v1/users/me/projects", () =>
           HttpResponse.json({ projects: [] }),
         ),
       );
@@ -219,7 +217,7 @@ describe("login flow detail", () => {
     const queries: URLSearchParams[] = [];
     server.use(
       http.get(FLOW_URL, () => HttpResponse.json(DETAIL_RESPONSE)),
-      http.get("*/api/projects/proj_other", () =>
+      http.get("*/api/v1/projects/proj_other", () =>
         HttpResponse.json({ id: "proj_other", name: "Other project" }),
       ),
       http.get(SCHEMAS_URL, ({ request }) => {

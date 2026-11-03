@@ -1,9 +1,10 @@
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 
 import defaultLogin from "@zitadel/config/defaults/default-login.json" with { type: "json" };
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
+
+import { it } from "../../../../helpers/fixtures";
 
 import { validateStep } from "../../../../../src/lib/release/steps/validate";
 import type { StepContext } from "../../../../../src/lib/release/pipeline";
@@ -24,8 +25,6 @@ const validBranding = {
   layout: "centered",
   liquid_template: "<zl-page-shell>{% mandatory_gates %}</zl-page-shell>",
 };
-
-let dir: string;
 
 function ctx(
   bundle: Partial<StepContext["bundle"]>,
@@ -59,12 +58,6 @@ function ctx(
     suggest: (args) => args as SuggestedCommand,
   };
 }
-
-afterEach(async () => {
-  if (dir) {
-    await rm(dir, { recursive: true, force: true });
-  }
-});
 
 describe("validate step", () => {
   it("fails naming an environment variable a resource references but the env lacks", async () => {
@@ -103,6 +96,27 @@ describe("validate step", () => {
     };
 
     await expect(validateStep.run(ctx(bundle))).rejects.toMatchObject({ code: "E_VALIDATION" });
+  });
+
+  it("keeps the fix a literal client_secret gets, rather than the release body's pattern", async () => {
+    const connection = {
+      slug: "acme",
+      protocol: "oidc",
+      display_name: "Acme",
+      oidc: {
+        issuer: "https://sso.acme.example",
+        client_id: "client",
+        client_secret: "a-literal-secret",
+        scopes: ["openid"],
+      },
+    };
+
+    await expect(
+      validateStep.run(ctx({ idps: [connection] }, { idpFiles: ["acme.json"] })),
+    ).rejects.toMatchObject({
+      message: "Connection file's client_secret must reference a variable, not hold a value",
+      hint: expect.stringContaining("variable set NAME --secret"),
+    });
   });
 
   describe("a flow's user_schema", () => {
@@ -226,8 +240,7 @@ describe("validate step", () => {
     );
   });
 
-  it("rejects a branding $file reference that cannot be read", async () => {
-    dir = await mkdtemp(join(tmpdir(), "zitadel-validate-"));
+  it("rejects a branding $file reference that cannot be read", async ({ dir }) => {
     await mkdir(join(dir, ".zitadel", "branding"), { recursive: true });
     const descriptor = { layout: "centered", liquid_template: { $file: "./missing.liquid" } };
     const bundle = { schemas: [], flow_definitions: [], branding: { layout: "centered" } };

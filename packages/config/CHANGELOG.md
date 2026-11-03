@@ -1,5 +1,28 @@
 # @zitadel/config
 
+## 0.4.0
+
+### Minor Changes
+
+- [#2527](https://github.com/zitadel/nextgen/pull/2527) [`0a00b60`](https://github.com/zitadel/nextgen/commit/0a00b60ad40068b39ecb1a4eb9b988f7276d2924) - Every paged list method of the [`@zitadel/api` client](https://preview.zitadel.com/docs/sdks/api-client) now has `items()`, `pages()` and `all()`, which follow the cursor for you, and `createZitadelClient` takes `onResponse` and `onError` hooks; `@zitadel/api/client` exports `pagedFunctions`, each paged function's typed readers of a page's items and cursor and the arguments of its next page. The CLI no longer stops `--all`, the resource list commands or `zitadel api --paginate` when a server sends the same page cursor twice: that is a server bug, and the client trusts the paging contract. `deploy`, `preview`, `release create` and `setup`'s first deploy check the release body against the API's own schema before sending it, and name each field it refuses. `@zitadel/testing` no longer re-checks the ids the server answers its bootstrap and seeding with, and types `BootstrappedProject.previewSecret` as always present, as the server always issues one. `@zitadel/config`'s `getDefaultHumanUserSchema` is typed as the user schema document it returns, `$id` included, and exports that type as `UserSchemaDocument`; `getDefaultHumanUserSchemaBody` returns it without `$id`, as an inline schema in a release bundle must be.
+
+### Patch Changes
+
+- Updated dependencies [[`0a00b60`](https://github.com/zitadel/nextgen/commit/0a00b60ad40068b39ecb1a4eb9b988f7276d2924), [`79d8dd0`](https://github.com/zitadel/nextgen/commit/79d8dd01660b5bb7a2d936aa330c3d591a8d3954), [`eb363f0`](https://github.com/zitadel/nextgen/commit/eb363f04586c594ae893253a6089b21e6e2e390a), [`26097dd`](https://github.com/zitadel/nextgen/commit/26097dd104c9b6fd6b9e8183921464b54f851a10), [`eaa07c3`](https://github.com/zitadel/nextgen/commit/eaa07c36f3c76a963214faa8a230f3befa2cff9b), [`665ea7d`](https://github.com/zitadel/nextgen/commit/665ea7db04c57c3abe2b9d60030fcd68f6339e15), [`db05fbb`](https://github.com/zitadel/nextgen/commit/db05fbb18b1bf33251694382787be8445da608da)]:
+  - @zitadel/api@0.4.0
+
+## 0.3.0
+
+### Minor Changes
+
+- [#2353](https://github.com/zitadel/nextgen/pull/2353) [`1f44571`](https://github.com/zitadel/nextgen/commit/1f445718ef34b78571a5b970665d7556eea79894) - `zitadel policies test` runs the cases in `.zitadel/policies/<operation>.test.json` against your policy. Each case gives the operation's input (for the password policy, the password itself), optionally the facts the operation would look up (`self_service`, `history_matches`), and the decision it expects: `allowed`, and optionally the error `code` and exactly the `violations`. Zitadel evaluates every case as a real password set would, so a case also covers how the password is counted. By default the cases run against the policy file beside them; `--release <id>` runs them against the policy a built release pins, before you deploy it. A failing case fails the command with `E_VALIDATION` and lists what was expected and what Zitadel decided. `deploy` never carries test files, editors validate them against the new `.zitadel/meta/policy-test.json`, and the policies README that `setup` writes shows an example.
+
+### Patch Changes
+
+- [#2417](https://github.com/zitadel/nextgen/pull/2417) [`bc22739`](https://github.com/zitadel/nextgen/commit/bc22739b93d9575f7a278098569df5cecbdf8f15) - `<zitadel-login>` now shows the project's minimum password length under the password field while someone chooses a password, instead of only after a too-short submit. The designs `zitadel branding eject` copies show it too; a template you ejected earlier gets it by adding `| fieldRuleHint: f` to its `field_help` line. A field's clear button no longer appears while the field is empty.
+- Updated dependencies [[`ae0f5eb`](https://github.com/zitadel/nextgen/commit/ae0f5ebf8de64dde144b4748307df315b09607f3), [`ae0f5eb`](https://github.com/zitadel/nextgen/commit/ae0f5ebf8de64dde144b4748307df315b09607f3)]:
+  - @zitadel/api@0.3.0
+
 ## 0.2.0
 
 ### Minor Changes

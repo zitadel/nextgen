@@ -1,5 +1,6 @@
 import { publicCliCommand } from "../public-cli";
 import { shellCommand, type SuggestedCommand, unscopedCommand } from "../suggestion";
+import { errorMessage } from "../errors";
 
 export type DockerRuntimeGuidance = {
   hint: string;
@@ -8,7 +9,7 @@ export type DockerRuntimeGuidance = {
 };
 
 export function dockerUnavailableMessage(error: unknown): string {
-  const detail = error instanceof Error ? error.message : String(error);
+  const detail = errorMessage(error);
   const suffix = detail.trim() ? ` (${detail.trim()})` : "";
   return `Docker is not reachable${suffix}; managed local runtime commands need Docker, but remote or cloud setup can continue with --server <url>.`;
 }

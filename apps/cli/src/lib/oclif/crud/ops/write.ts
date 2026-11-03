@@ -25,6 +25,7 @@ import type {
   ResourceCommandOptions,
   ResourceDescriptor,
   UpdateSpec,
+  WriteResult,
   WriteShape,
 } from "../types";
 import { objectOf, type ZodLike } from "../zod";
@@ -34,7 +35,6 @@ import {
   type OperationStatics,
   ResourceCommand,
 } from "./command";
-import { nextCommandsData } from "../../envelope";
 
 /**
  * `--data` / `--file`: the whole document at once, and `--set`: one field of
@@ -245,25 +245,25 @@ abstract class WriteOperation<
       });
     }
 
+    // Some writes answer without a body (`grants create` by identifier answers
+    // 202), so there is no record to get, and `data` is still an object.
     const result = await this.send(await this.context(), body, id);
-    const resultId = isObject(result) ? result[resource.idField] : undefined;
-    const nextCommands =
-      typeof resultId === "string" && resource.get
-        ? [this.suggest(`${topic} get ${resultId} --json`)]
-        : [];
     return {
       status: "ok",
-      // An ok envelope always carries `data`, also when the server accepts a
-      // write without a body (`grants create` by identifier answers 202).
-      data:
-        isObject(result) && nextCommands.length > 0
-          ? { ...result, ...nextCommandsData(nextCommands) }
-          : (result ?? {}),
+      data: result ?? {},
+      ...(result && resource.get
+        ? {
+            next: {
+              commands: [this.suggest(`${topic} get ${String(resource.idOf(result))} --json`)],
+            },
+          }
+        : {}),
       pretty: JSON.stringify(result, null, 2),
+      machineReadable: true,
     };
   }
 
-  protected abstract send(ctx: Ctx, body: Json, id: string | undefined): Promise<unknown>;
+  protected abstract send(ctx: Ctx, body: Json, id: string | undefined): Promise<WriteResult>;
 }
 
 /** `<topic> create`. */
@@ -274,7 +274,7 @@ export class CreateOperation<Ctx> extends WriteOperation<Ctx, CreateSpec<Ctx>> {
 
   protected readonly verb = "create";
 
-  protected send(ctx: Ctx, body: Json): Promise<unknown> {
+  protected send(ctx: Ctx, body: Json): Promise<WriteResult> {
     return this.definition.spec.call(ctx, body);
   }
 }
@@ -287,7 +287,7 @@ export class UpdateOperation<Ctx> extends WriteOperation<Ctx, UpdateSpec<Ctx>> {
 
   protected readonly verb = "update";
 
-  protected send(ctx: Ctx, body: Json, id: string | undefined): Promise<unknown> {
+  protected send(ctx: Ctx, body: Json, id: string | undefined): Promise<WriteResult> {
     return this.definition.spec.call(ctx, id ?? "", body);
   }
 }

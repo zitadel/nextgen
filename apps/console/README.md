@@ -74,9 +74,11 @@ empty). Attaching `staticData.nav` to a new route lists it.
 ## API access and auth
 
 The console holds **no long-lived credential in the browser bundle**. It calls a
-same-origin API base (`/api` under the dev server, the origin root when
-embedded). Management requests carry no bearer: the `__nextgen_session` cookie
-authorizes them. Sign-in requests send the runtime publishable key (below).
+same-origin API under `/api/v1` (through the Vite proxy under the dev server,
+straight to the Go server when embedded). Management requests carry no bearer:
+the session cookie (`__Host-zitadel_session`, `zitadel_session` on
+`http://localhost`) authorizes them. Sign-in requests send the runtime
+publishable key (below).
 The dev proxy injects no credential. See the Vite proxy config and environment
 variables below.
 
@@ -84,7 +86,7 @@ variables below.
 
 Console users sign in through the embedded `<zitadel-login>` widget on
 `/login` (via `@zitadel/sdk-react`). Completing the flow exchanges the
-widget's handoff token for the `__nextgen_session` HttpOnly cookie; the
+widget's handoff token for the HttpOnly session cookie; the
 pathless `_authed` layout guards every screen by confirming that cookie
 against `GET /sessions/me` and redirects unauthenticated visitors to
 `/login?next=…`. Sign-out lives in the sidebar user menu
@@ -211,7 +213,7 @@ embed base path.
 | --- | --- | --- |
 | `CONSOLE_BACKEND_URL` | Node (dev proxy) | Upstream API origin (defaults in `vite.config.ts`) |
 | `CONSOLE_DEV_PROXY_LOG` | Node (dev proxy) | Set to `1` to print each proxied request — for a screen that answers 401/403/404 when it is not obvious what the server was asked |
-| `VITE_CONSOLE_API_BASE` | Client | Same-origin API base the SDK calls (default `/api` under the dev server, the origin root in a build) |
+| `VITE_CONSOLE_API_BASE` | Client | A path or origin the SDK puts in front of the API's `/api/v1` (default: none, the page's own origin) |
 | `VITE_CONSOLE_RUNTIME_FALLBACK` | Client (build/dev time) | Opt-in for runs with no `/console/runtime.json` (`vite preview`): failed discovery resolves to `standalone` instead of the connectivity error. Never set it for the embedded build |
 
 ## Commands

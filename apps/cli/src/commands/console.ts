@@ -68,7 +68,7 @@ export default class Console extends BaseCommand {
     }
 
     const serverUrl = await LocalServer.resolveUrl(localDir);
-    const signInUrl = await consoleSignInUrl(serverUrl, admin);
+    const signInUrl = await consoleSignInUrl(serverUrl, admin, this.signal);
 
     consola.log(`Signed in to the local console as ${admin.email}:`);
     consola.log(signInUrl);
@@ -85,7 +85,9 @@ export default class Console extends BaseCommand {
         signed_in_as: admin.email,
         sign_in_url: signInUrl,
         browser_opened: opened,
-        next_actions: ["The link signs you in once. Run `zitadel console` again for a fresh one."],
+      },
+      next: {
+        actions: ["The link signs you in once. Run `zitadel console` again for a fresh one."],
       },
     });
   }

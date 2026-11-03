@@ -16,13 +16,12 @@ import { BRANDING_FILE_SCHEMA_REF, META_SCHEMA_DIR } from "@zitadel/config/meta-
 
 import { BRANDING_DIR } from "../../lib/branding";
 import { BRANDING_DESIGN_INFO, resolveBrandingDesign } from "../../lib/branding/designs";
-import { ZitadelError } from "../../lib/errors";
+import { isErrno, ZitadelError } from "../../lib/errors";
 import { stableStringify } from "../../lib/json";
 import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../../lib/oclif";
 import { hasZitadelConfig } from "../../lib/project";
 import { metaSchemaState, projectMetaSchemas } from "../../lib/meta-schemas";
 import { normalizePublicCliProse } from "../../lib/public-cli";
-import { nextCommandsData } from "../../lib/oclif/envelope";
 import { DEPLOY_ARGS } from "../../lib/release";
 import { Promptable } from "../../lib/oclif/promptable";
 
@@ -126,16 +125,15 @@ export default class BrandingEject extends Promptable(BaseCommand) {
       data: {
         design,
         files_written: filesWritten,
-        next_actions: [
+      },
+      next: {
+        actions: [
           `Edit ${DEFAULT_BRANDING_TEMPLATE_PATH} — the login UI is yours now.`,
           "Deploy --dry-run validates the template and shows the diff; deploy publishes it.",
         ],
         // `branding eject` reads no environment, so it has no selector to
         // carry: the follow-ups run against whichever one the developer uses.
-        ...nextCommandsData([
-          this.suggestUnscoped("deploy --dry-run"),
-          this.suggestUnscoped(DEPLOY_ARGS),
-        ]),
+        commands: [this.suggestUnscoped("deploy --dry-run"), this.suggestUnscoped(DEPLOY_ARGS)],
       },
     });
   }
@@ -163,13 +161,4 @@ function swallowConflict(error: unknown): void {
     return;
   }
   throw error;
-}
-
-function isErrno(error: unknown, code: string): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    (error as NodeJS.ErrnoException).code === code
-  );
 }

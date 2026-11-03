@@ -30,6 +30,7 @@ Getting started
   start             Start a local Zitadel server
   status            Summarize the local Zitadel server and project state
   claim             Claim this project to make it permanent
+  skills            Give coding agents the Zitadel skills
   login             Sign in to a Zitadel server as yourself, in the browser
   whoami            Show who you are signed in as at a server
   logout            Sign out of a server
@@ -78,7 +79,7 @@ Diagnostics and utilities
   which             Show which plugin a command is in
 
 Flags
-  --help      Show help for command
+  -h, --help  Show help for command
   --version   Show zitadel version
 
 Examples
