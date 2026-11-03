@@ -38,6 +38,16 @@ describe("api", () => {
     });
   });
 
+  describe("asking for help", () => {
+    it.each([["--help"], ["-h"], ["help"]])("prints the usage for %s", async (ask) => {
+      const app = await aSetUpApp();
+
+      const result = await app.apiRendered(ask);
+
+      expect(result).toPrint("Call any operation of the Zitadel API");
+    });
+  });
+
   describe("against a valid server", () => {
     describe("--json", () => {
       it("answers with the operation's response body", async () => {

@@ -89,6 +89,13 @@ export default class Api extends Destructive(BaseCommand) {
     const { args, argv, flags } = await this.parse(Api);
     const meta = await this.toMeta(flags);
 
+    // `help` is no operation, so `zitadel api help` shows this command's help
+    // as `--help` does.
+    if (args.operation?.toLowerCase() === "help") {
+      await this.config.runCommand("help", [this.id ?? "api"]);
+      return this.emit({ status: "ok", data: null, pretty: "" });
+    }
+
     const ref = args.operation ?? (await this.chooseOperation());
     const target = resolveTarget(ref, flags.method);
     const { operation } = target;
