@@ -113,8 +113,8 @@ func TestSchemaService_CreateSchemaUniqueViolation(t *testing.T) {
 }
 
 // A schema the meta-schema refuses is answered with the property path and the
-// keyword that failed, not a bare "invalid request": the parent error is never
-// serialized, so the message is the only place the client can read it.
+// keyword that failed in its details, not a bare "invalid request": the parent
+// error is never serialized, and the message stays fixed (ADR 030).
 func TestSchemaService_CreateSchemaNamesTheFailingKeyword(t *testing.T) {
 	t.Parallel()
 
@@ -131,8 +131,11 @@ func TestSchemaService_CreateSchemaNamesTheFailingKeyword(t *testing.T) {
 	require.ErrorIs(t, err, domain.ErrJSONSchemaInvalid())
 	de, ok := errors.AsType[domain.Error](err)
 	require.True(t, ok)
-	assert.Contains(t, de.Message, "givenName")
-	assert.Contains(t, de.Message, "type")
+	assert.Equal(t, domain.ErrJSONSchemaInvalid().Message, de.Message)
+	details, ok := de.Details.(string)
+	require.True(t, ok, "details should carry the validator's text, got %T", de.Details)
+	assert.Contains(t, details, "givenName")
+	assert.Contains(t, details, "type")
 }
 
 // listSchemasOpts builds the full statement input the service is expected to
