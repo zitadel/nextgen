@@ -71,7 +71,7 @@ Prefer composite keys `(project_id, id)` where the resource is project-scoped.
 
 ### 3. Go type: `database.Identity`
 
-[`database.Identity`](../../internal/storage/database/identity.go) is a string
+[`database.Identity`](../../apps/api/internal/storage/database/identity.go) is a string
 alias used at the storage boundary. After the alpha cutover it binds and scans
 as string only (no decimal→`int64` coercion for resource PKs).
 
