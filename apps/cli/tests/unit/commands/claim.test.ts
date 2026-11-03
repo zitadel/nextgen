@@ -397,6 +397,37 @@ describe("claim", () => {
     expect((await readSecret(cwd)).team_id).toBeUndefined();
   });
 
+  it("waits longer between each status check that is answered with 429, up to five seconds", async () => {
+    vi.spyOn(process, "exit").mockImplementation((() => undefined) as never);
+    const { cwd } = await makeProject();
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    const askedAt: number[] = [];
+    server.use(
+      http.get("*/projects/:project_id/claim/status", () => {
+        askedAt.push(Date.now());
+        return new HttpResponse(null, { status: 429 });
+      }),
+    );
+
+    const running = claim(cwd, ["--timeout", "60"]);
+    while (askedAt.length < 7) {
+      await new Promise<void>((resolve) => {
+        setImmediate(resolve);
+      });
+      if (vi.getTimerCount() > 0) {
+        await vi.advanceTimersToNextTimerAsync();
+      }
+    }
+    vi.useRealTimers();
+    pressCtrlC();
+    await running;
+
+    const gaps = askedAt.slice(1).map((at, index) => {
+      return at - (askedAt[index] as number);
+    });
+    expect(gaps).toEqual([1000, 1500, 2250, 3375, 5000, 5000]);
+  });
+
   it("mutates neither the platform nor the secret under --dry-run", async () => {
     const { cwd } = await makeProject();
 
