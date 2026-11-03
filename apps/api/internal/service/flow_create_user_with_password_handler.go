@@ -60,7 +60,7 @@ func (h *FlowCreateUserWithPasswordHandler) Handle(ctx context.Context, in domai
 	}
 
 	// Spend once, before password hashing or any user mutation. A failed
-	// signup still costs the proof; re-render issues the next challenge.
+	// signup still costs the proof; the next GET issues a new challenge.
 	if h.protection == nil {
 		return domain.FlowOnSuccessResult{}, domain.ErrFlowIntegrity()
 	}

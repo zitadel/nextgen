@@ -1653,8 +1653,8 @@ export class ZitadelLogin extends ZitadelSurface {
             : error instanceof Error
               ? error.message
               : "Signup check failed. Please try again.";
-        // Keep the form and its values available for a retry. The next submit
-        // refreshes the challenge instead of reusing a possibly spent proof.
+        // Keep the form and its values available for a retry. The next GET
+        // decides whether the cached proof still matches the live challenge.
         await this.applyResponse({
           ...this.response,
           step: { ...this.response.step, error: message },

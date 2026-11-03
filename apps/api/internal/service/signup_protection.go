@@ -120,12 +120,12 @@ func (s *signupProtection) Challenge(ctx context.Context, state *domain.FlowStat
 	if record != nil && record.ExpiresAt > now.Add(signupRefreshBefore).Unix() {
 		return signupPublic(record)
 	}
-	// Sweep before taking a flow lock, so cleanup cannot invert the lock order
-	// between two flows issuing at once.
-	if err := s.db.Statements().DeleteExpiredSignupChallenges(ctx, state.ProjectID, now.Unix()); err != nil {
+	if err := s.charge(ctx, state, true); err != nil {
 		return nil, err
 	}
-	if err := s.charge(ctx, state, true); err != nil {
+	// Refused requests do no cleanup. Sweep via expiry indexes after releasing
+	// the budget lock, so cleanup cannot invert two flows' lock order.
+	if err := s.db.Statements().DeleteExpiredSignupProtection(ctx, state.ProjectID, now.Unix()); err != nil {
 		return nil, err
 	}
 	id, err := s.db.Statements().NewManagedID(string(domain.PrefixChallenge))

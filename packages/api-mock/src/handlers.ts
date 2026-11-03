@@ -1,4 +1,4 @@
-import { validSignupProof } from "./fixtures/signup-pow.js";
+import { signupGate, validSignupProof } from "./fixtures/signup-pow.js";
 /**
  * MSW handler factory for the mock Flow API.
  *
@@ -633,7 +633,15 @@ export function setupMockHandlers(
     }),
     getGetFlowStepMockHandler(async ({ params }) => {
       captured.push({ kind: "getFlowStep", flowId: String(params.id) });
-      return currentResponse();
+      const response = await currentResponse();
+      // As on the server, only GET prepares the announced signup challenge.
+      if (response.step.gates.signup_pow) {
+        response.step.gates = {
+          ...response.step.gates,
+          ...signupGate(actor.getSnapshot().context.sessionToken),
+        };
+      }
+      return response;
     }),
     // Both mounts the engine serves (`internal/api/flow_sso.go`): the
     // published path, and the one an SDK proxy forwards after stripping its

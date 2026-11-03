@@ -14,8 +14,8 @@ const (
 	getSignupChallengeStmt            = `SELECT project_id, flow_id, id, expires_at, payload, public FROM signup_challenges WHERE project_id = @p1 AND flow_id = @p2`
 	createSignupChallengeStmt         = `INSERT OR UPDATE INTO signup_challenges (project_id, flow_id, id, expires_at, payload, public) VALUES (@p1, @p2, @p3, @p4, @p5, @p6)`
 	consumeSignupChallengeStmt        = `DELETE FROM signup_challenges WHERE project_id = @p1 AND flow_id = @p2 AND id = @p3 AND expires_at > @p4`
-	deleteExpiredSignupChallengesStmt = `DELETE FROM signup_challenges WHERE project_id = @p1 AND expires_at <= @p2`
-	deleteExpiredSignupLimitsStmt     = `DELETE FROM signup_limits WHERE project_id = @p1 AND window_start <= @p2`
+	deleteExpiredSignupChallengesStmt = `DELETE FROM signup_challenges@{FORCE_INDEX=idx_signup_challenges_project_expires_at} WHERE project_id = @p1 AND expires_at <= @p2`
+	deleteExpiredSignupLimitsStmt     = `DELETE FROM signup_limits@{FORCE_INDEX=idx_signup_limits_project_window_start} WHERE project_id = @p1 AND window_start <= @p2`
 	getSignupLimitsStmt               = `SELECT project_id, flow_id, window_start, issued, verified FROM signup_limits WHERE project_id = @p1 AND flow_id = @p2 FOR UPDATE`
 	insertSignupLimitsStmt            = `INSERT OR IGNORE INTO signup_limits (project_id, flow_id, window_start, issued, verified) VALUES (@p1, @p2, @p3, @p4, @p5)`
 	updateSignupLimitsStmt            = `UPDATE signup_limits SET window_start = @p1, issued = @p2, verified = @p3 WHERE project_id = @p4 AND flow_id = @p5`
@@ -66,7 +66,7 @@ func (s signupProtectionStatements) ConsumeSignupChallenge(ctx context.Context, 
 	n, err := s.db.Update(ctx, buildStatement(consumeSignupChallengeStmt, projectID, flowID, id, now).statement())
 	return n == 1, wrapError(err)
 }
-func (s signupProtectionStatements) DeleteExpiredSignupChallenges(ctx context.Context, projectID string, now int64) error {
+func (s signupProtectionStatements) DeleteExpiredSignupProtection(ctx context.Context, projectID string, now int64) error {
 	return withTransaction(ctx, s.db, func(ctx context.Context, tx queryExecutor) error {
 		if _, err := tx.Update(ctx, buildStatement(deleteExpiredSignupChallengesStmt, projectID, now).statement()); err != nil {
 			return wrapError(err)

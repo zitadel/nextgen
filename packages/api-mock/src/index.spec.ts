@@ -424,6 +424,26 @@ describe("setupMockHandlers", () => {
     // Same schema pointer as the sign-in credential step — the real flow
     // definition declares `x-auth-methods#password` on both.
     expect(passwordStep.step.fields?.map((f) => f.name)).toEqual([PASSWORD_FIELD]);
+    expect(passwordStep.step.gates.signup_pow).toEqual({
+      kind: "captcha",
+      provider: "zitadel_pow",
+    });
+    const prepared = await getFlowStep(passwordStep.id);
+    expect(prepared.step.gates.signup_pow?.challenge?.challenge_id).toBe(
+      `ch_mock_${prepared.session_token}`,
+    );
+    mock.rejectNextSubmit("error.password_policy");
+    await expect(
+      submitFlowStep(passwordStep.id, {
+        action: "submit",
+        gate_proofs: { signup_pow: signupProof(prepared.session_token) },
+        fields: { [PASSWORD_FIELD]: "short" },
+      }),
+    ).rejects.toHaveProperty("body.step.gates.signup_pow", {
+      kind: "captcha",
+      provider: "zitadel_pow",
+    });
+    expect((await getFlowStep(passwordStep.id)).step.gates.signup_pow?.challenge).toBeDefined();
 
     const done = await submitFlowStep(passwordStep.id, {
       session_token: passwordStep.session_token,

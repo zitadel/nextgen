@@ -54,7 +54,7 @@ func (s signupProtectionStatements) ConsumeSignupChallenge(ctx context.Context, 
 	n, err := s.client.Exec(ctx, consumeSignupChallengeStmt, projectID, flowID, id, now)
 	return n.RowsAffected() == 1, wrapError(err)
 }
-func (s signupProtectionStatements) DeleteExpiredSignupChallenges(ctx context.Context, projectID string, now int64) error {
+func (s signupProtectionStatements) DeleteExpiredSignupProtection(ctx context.Context, projectID string, now int64) error {
 	return withTransaction(ctx, s.client, func(ctx context.Context, tx queryExecutor) error {
 		if _, err := tx.Exec(ctx, deleteExpiredSignupChallengesStmt, projectID, now); err != nil {
 			return wrapError(err)

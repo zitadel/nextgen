@@ -1662,40 +1662,40 @@ func (c *MockAllStatementsDeleteExpiredPreviewCall) DoAndReturn(f func(context.C
 	return c
 }
 
-// DeleteExpiredSignupChallenges mocks base method.
-func (m *MockAllStatements) DeleteExpiredSignupChallenges(arg0 context.Context, arg1 string, arg2 int64) error {
+// DeleteExpiredSignupProtection mocks base method.
+func (m *MockAllStatements) DeleteExpiredSignupProtection(arg0 context.Context, arg1 string, arg2 int64) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteExpiredSignupChallenges", arg0, arg1, arg2)
+	ret := m.ctrl.Call(m, "DeleteExpiredSignupProtection", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// DeleteExpiredSignupChallenges indicates an expected call of DeleteExpiredSignupChallenges.
-func (mr *MockAllStatementsMockRecorder) DeleteExpiredSignupChallenges(arg0, arg1, arg2 any) *MockAllStatementsDeleteExpiredSignupChallengesCall {
+// DeleteExpiredSignupProtection indicates an expected call of DeleteExpiredSignupProtection.
+func (mr *MockAllStatementsMockRecorder) DeleteExpiredSignupProtection(arg0, arg1, arg2 any) *MockAllStatementsDeleteExpiredSignupProtectionCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteExpiredSignupChallenges", reflect.TypeOf((*MockAllStatements)(nil).DeleteExpiredSignupChallenges), arg0, arg1, arg2)
-	return &MockAllStatementsDeleteExpiredSignupChallengesCall{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteExpiredSignupProtection", reflect.TypeOf((*MockAllStatements)(nil).DeleteExpiredSignupProtection), arg0, arg1, arg2)
+	return &MockAllStatementsDeleteExpiredSignupProtectionCall{Call: call}
 }
 
-// MockAllStatementsDeleteExpiredSignupChallengesCall wrap *gomock.Call
-type MockAllStatementsDeleteExpiredSignupChallengesCall struct {
+// MockAllStatementsDeleteExpiredSignupProtectionCall wrap *gomock.Call
+type MockAllStatementsDeleteExpiredSignupProtectionCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockAllStatementsDeleteExpiredSignupChallengesCall) Return(arg0 error) *MockAllStatementsDeleteExpiredSignupChallengesCall {
+func (c *MockAllStatementsDeleteExpiredSignupProtectionCall) Return(arg0 error) *MockAllStatementsDeleteExpiredSignupProtectionCall {
 	c.Call = c.Call.Return(arg0)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsDeleteExpiredSignupChallengesCall) Do(f func(context.Context, string, int64) error) *MockAllStatementsDeleteExpiredSignupChallengesCall {
+func (c *MockAllStatementsDeleteExpiredSignupProtectionCall) Do(f func(context.Context, string, int64) error) *MockAllStatementsDeleteExpiredSignupProtectionCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsDeleteExpiredSignupChallengesCall) DoAndReturn(f func(context.Context, string, int64) error) *MockAllStatementsDeleteExpiredSignupChallengesCall {
+func (c *MockAllStatementsDeleteExpiredSignupProtectionCall) DoAndReturn(f func(context.Context, string, int64) error) *MockAllStatementsDeleteExpiredSignupProtectionCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

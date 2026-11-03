@@ -1,4 +1,3 @@
-import { signupGate } from "./signup-pow.js";
 /**
  * Orval-typed step fixtures for the canonical login flow.
  *
@@ -227,7 +226,7 @@ export function registerPasswordStep(input: StepFixtureInput): CreateFlow201 {
       { name: "back", kind: "back", text_key: "action.back" },
     ],
     // Runtime gate: injected by the server for create_user, absent from the flow definition.
-    gates: signupGate(input.sessionToken),
+    gates: { signup_pow: { kind: "captcha", provider: "zitadel_pow" } },
   });
 }
 

@@ -68,7 +68,7 @@ type SignupProtectionStatements interface {
 	GetSignupChallenge(context.Context, string, string) (*domain.SignupChallengeRecord, error)
 	CreateSignupChallenge(context.Context, *domain.SignupChallengeRecord) error
 	ConsumeSignupChallenge(context.Context, string, string, string, int64) (bool, error)
-	DeleteExpiredSignupChallenges(context.Context, string, int64) error
+	DeleteExpiredSignupProtection(context.Context, string, int64) error
 	LockSignupLimits(context.Context, string, string) (*domain.SignupLimits, error)
 	InsertSignupLimits(context.Context, *domain.SignupLimits) error
 	UpdateSignupLimits(context.Context, *domain.SignupLimits) error

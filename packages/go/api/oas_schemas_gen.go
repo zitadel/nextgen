@@ -31869,20 +31869,18 @@ func (s *FlowdefUpdatedEventDelegationType) UnmarshalText(data []byte) error {
 	}
 }
 
-// A security challenge that must be satisfied before this step's submission
-// is accepted. The engine may also inject gates at runtime based on policy
-// or risk evaluation.
+// A reserved gate declaration. Gates declared in a flow definition are not
+// currently enforced. Required signup gates are attached by the server based
+// on `on_success: create_user`, independently of this declaration.
 // Ref: #
 type Gate struct {
 	// The gate category. Only `captcha` is currently defined. Authenticator
 	// ceremonies (e.g. passkey) are modelled as credential auth_attempts via
 	// `x-credential` on a field, not as gates.
 	Kind GateKind `json:"kind"`
-	// Implementation identifier. `zitadel_pow` protects password signup with
-	// the built-in proof-of-work solver. External providers are not supported.
+	// Reserved implementation identifier. Declaring a provider does not enable it.
 	Provider string `json:"provider"`
-	// Reserved provider-specific configuration. The built-in signup gate uses
-	// server-issued runtime parameters and accepts no caller-selected costs.
+	// Reserved provider-specific configuration. It has no runtime effect.
 	Config OptGateConfig `json:"config"`
 }
 
@@ -31916,8 +31914,7 @@ func (s *Gate) SetConfig(val OptGateConfig) {
 	s.Config = val
 }
 
-// Reserved provider-specific configuration. The built-in signup gate uses
-// server-issued runtime parameters and accepts no caller-selected costs.
+// Reserved provider-specific configuration. It has no runtime effect.
 type GateConfig map[string]jx.Raw
 
 func (s *GateConfig) init() GateConfig {

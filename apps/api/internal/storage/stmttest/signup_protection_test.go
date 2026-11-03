@@ -124,13 +124,28 @@ func TestSignupChallengeExpiry(t *testing.T) {
 		require.NoError(t, err)
 		require.False(t, consumed)
 		require.NoError(t, d.stmts.InsertSignupLimits(t.Context(), &domain.SignupLimits{ProjectID: project, FlowID: "inactive", WindowStart: now - 3601}))
-		require.NoError(t, d.stmts.DeleteExpiredSignupChallenges(t.Context(), project, now))
+		active := &domain.SignupChallengeRecord{ProjectID: project, FlowID: "active", ID: "active_challenge", ExpiresAt: now + 300}
+		require.NoError(t, d.stmts.CreateSignupChallenge(t.Context(), active))
+		require.NoError(t, d.stmts.InsertSignupLimits(t.Context(), &domain.SignupLimits{ProjectID: project, FlowID: active.FlowID, WindowStart: now}))
+		otherProject := ensureProject(t, d.stmts)
+		other := &domain.SignupChallengeRecord{ProjectID: otherProject, FlowID: "other", ID: "other_challenge", ExpiresAt: now}
+		require.NoError(t, d.stmts.CreateSignupChallenge(t.Context(), other))
+		require.NoError(t, d.stmts.InsertSignupLimits(t.Context(), &domain.SignupLimits{ProjectID: otherProject, FlowID: other.FlowID, WindowStart: now - 3601}))
+		require.NoError(t, d.stmts.DeleteExpiredSignupProtection(t.Context(), project, now))
 		limits, err := readSignupLimits(t, d, project, "inactive")
 		require.NoError(t, err)
 		require.Nil(t, limits)
 		missing, err := d.stmts.GetSignupChallenge(t.Context(), project, record.FlowID)
 		require.NoError(t, err)
 		require.Nil(t, missing)
+		for _, retained := range []*domain.SignupChallengeRecord{active, other} {
+			challenge, err := d.stmts.GetSignupChallenge(t.Context(), retained.ProjectID, retained.FlowID)
+			require.NoError(t, err)
+			require.Equal(t, retained, challenge)
+			limits, err := readSignupLimits(t, d, retained.ProjectID, retained.FlowID)
+			require.NoError(t, err)
+			require.NotNil(t, limits)
+		}
 	})
 }
 

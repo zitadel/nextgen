@@ -2,9 +2,9 @@ type: object
 additionalProperties: false
 required: [kind, provider]
 description: |
-  A security challenge that must be satisfied before this step's submission
-  is accepted. The engine may also inject gates at runtime based on policy
-  or risk evaluation.
+  A reserved gate declaration. Gates declared in a flow definition are not
+  currently enforced. Required signup gates are attached by the server based
+  on `on_success: create_user`, independently of this declaration.
 properties:
   kind:
     type: string
@@ -17,12 +17,9 @@ properties:
   provider:
     type: string
     description: |
-      Implementation identifier. `zitadel_pow` protects password signup with
-      the built-in proof-of-work solver. External providers are not supported.
-    example: zitadel_pow
+      Reserved implementation identifier. Declaring a provider does not enable it.
   config:
     type: object
     description: |
-      Reserved provider-specific configuration. The built-in signup gate uses
-      server-issued runtime parameters and accepts no caller-selected costs.
+      Reserved provider-specific configuration. It has no runtime effect.
     additionalProperties: true

@@ -41,7 +41,7 @@ func TestSignupProofExpiresWhileWaitingForLock(t *testing.T) {
 		).AnyTimes()
 		stmts.EXPECT().InsertSignupLimits(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 		stmts.EXPECT().NewManagedID(string(domain.PrefixChallenge)).Return("challenge", nil)
-		stmts.EXPECT().DeleteExpiredSignupChallenges(gomock.Any(), "project", gomock.Any()).Return(nil)
+		stmts.EXPECT().DeleteExpiredSignupProtection(gomock.Any(), "project", gomock.Any()).Return(nil)
 		stmts.EXPECT().CreateSignupChallenge(gomock.Any(), gomock.Any()).DoAndReturn(
 			func(_ context.Context, r *domain.SignupChallengeRecord) error { record = r; return nil },
 		)
@@ -62,4 +62,24 @@ func TestSignupProofExpiresWhileWaitingForLock(t *testing.T) {
 		)
 		require.ErrorIs(t, svc.Consume(t.Context(), state, proof), domain.ErrFlowProofInvalid())
 	})
+}
+
+func TestSignupRateLimitedIssuanceDoesNotSweep(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	pool := servicemocks.NewMockPool(ctrl)
+	stmts := servicemocks.NewMockAllStatements(ctrl)
+	pool.EXPECT().Statements().Return(stmts).AnyTimes()
+	pool.EXPECT().Transaction(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(ctx context.Context, fn func(context.Context, service.Statementer[service.AllStatements]) error) error {
+			return fn(ctx, v2TestTx{stmts: stmts})
+		})
+	stmts.EXPECT().GetSignupChallenge(gomock.Any(), "project", "flow").Return(nil, nil)
+	stmts.EXPECT().InsertSignupLimits(gomock.Any(), gomock.Any()).Return(nil)
+	stmts.EXPECT().LockSignupLimits(gomock.Any(), "project", "flow").Return(&domain.SignupLimits{
+		ProjectID: "project", FlowID: "flow", WindowStart: time.Now().Unix(), Issued: 10,
+	}, nil)
+	// No cleanup, key lookup or KDF may follow a refused issuance.
+	svc := service.NewSignupProtection(pool, nil)
+	_, err := svc.Challenge(t.Context(), &domain.FlowState{ProjectID: "project", ID: "flow"})
+	require.ErrorIs(t, err, domain.ErrFlowRateLimited())
 }
