@@ -1,7 +1,7 @@
 {
   "$schema": "./catalog.schema.json",
   "id": "zitadel-pricing",
-  "version": "2026-11-02.7",
+  "version": "2026-11-02.8",
   "status": "proposal",
   "currency": "usd",
   "decided": ["core", "meters.monthly_active_users.price", "meters.sso_users.allowance", "packages.governance.scope", "packages.compliance.scope", "plans.pro.minimum", "packages.governance.included_in", "packages.compliance.pricing", "plans.enterprise.sla", "plans.pro.limits.requests_per_second_per_project", "plans.free.regions", "plans.pro.regions", "plans.enterprise.regions", "licensed.addendum.plans", "licensed.support_priority.plans"],
@@ -233,7 +233,7 @@
     },
     "enterprise": {
       "tiers": "as plans.enterprise",
-      "includes": ["contractual response SLOs", "TAM", "patch backports", "compliance evidence", "custom terms", "indemnification"]
+      "includes": ["contractual response times", "a technical account manager", "patch backports", "compliance evidence", "custom terms", "indemnification"]
     }
   },
   "future": [
