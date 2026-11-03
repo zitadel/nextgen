@@ -213,7 +213,9 @@ describe("deploy", () => {
         const result = await app.deploy();
 
         expect(result).toSucceed();
-        expect(app.envelopeOf(result).warnings ?? []).toEqual([]);
+        expect(app.envelopeOf(result).warnings?.join("\n")).toContain(
+          "Could not finish checking existing users",
+        );
       });
 
       it("requires -m when non-interactive outside a git repository", async () => {

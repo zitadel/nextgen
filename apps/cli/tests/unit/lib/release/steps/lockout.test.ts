@@ -354,7 +354,9 @@ describe("lockoutStep", () => {
       }),
     );
 
-    expect(takeReportedWarnings()).toEqual([]);
+    const warnings = takeReportedWarnings();
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain("Skipped the SSO lockout check");
   });
 
   it("still warns about missing identifiers when the schemas cannot be listed", async () => {
@@ -445,21 +447,34 @@ describe("lockoutStep", () => {
       }),
     );
 
-    expect(takeReportedWarnings()).toEqual([]);
+    expect(takeReportedWarnings()[0]).toContain("Checked only the first users");
   });
 
-  it("looks up the identity links of only the first stranded users", async () => {
+  it("finds linked users anywhere in the users it read", async () => {
     const stranded = Array.from({ length: 250 }, (_, index) => user(`s-${index}`, "human-user"));
     await lockoutStep.run(
       ctx({
         schemas: [{ objectType: "employee" }],
         flows: [flow("employee")],
         users: stranded,
-        links: Object.fromEntries(stranded.map((entry) => [entry.id, 1])),
+        links: { "s-249": 1 },
       }),
     );
 
-    expect(takeReportedWarnings()[0]).toContain("at least 200 existing users");
+    expect(takeReportedWarnings()[0]).toContain('1 existing user of "human-user" has an SSO link');
+  });
+
+  it("reports an exact count when the read ends exactly at the limit", async () => {
+    const exact = Array.from({ length: 500 }, (_, index) => user(`u-${index}`, "human-user", {}));
+    await lockoutStep.run(
+      ctx({
+        schemas: [{ objectType: "human-user", "x-identifier": "email" }],
+        flows: [flow("human-user")],
+        users: exact,
+      }),
+    );
+
+    expect(takeReportedWarnings()[0]).toContain('500 of 500 existing users of "human-user"');
   });
 
   it("never fails the deploy when users cannot be read", async () => {
@@ -473,6 +488,6 @@ describe("lockoutStep", () => {
         }),
       ),
     ).resolves.toBeUndefined();
-    expect(takeReportedWarnings()).toEqual([]);
+    expect(takeReportedWarnings()[0]).toContain("Could not finish checking existing users");
   });
 });
