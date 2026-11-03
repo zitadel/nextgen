@@ -522,6 +522,95 @@ describe("<zitadel-login> form + focus (chromium)", () => {
     expect(fields?.[0]?.getAttribute("name")).toBe("email");
     expect(fields?.[1]?.getAttribute("name")).toBe("password");
   });
+
+  // The password a user chooses carries its policy's bounds as
+  // `validation.min_length` / `max_length`. The orchestrator checks them
+  // before submitting, in the server's own `error.<field>_min_length`
+  // dialect, so the message is the one the server would send.
+  const registerPasswordStep: CreateFlow201 = {
+    id: "flow_1",
+    session_id: "sess_1",
+    session_token: "tok_1",
+    step: {
+      name: "register-password",
+      texts: { title_key: "register-password.title" },
+      fields: [
+        {
+          name: "x-auth-methods#password",
+          type: "password",
+          text_key: "register-password.field.password",
+          autocomplete: "new-password",
+          required: true,
+          validation: { min_length: 15, max_length: 64 },
+        },
+      ],
+      actions: [
+        {
+          name: "submit",
+          kind: "submit",
+          text_key: "register-password.action.submit",
+          primary: true,
+        },
+      ],
+      gates: {},
+    },
+  };
+
+  async function submitPassword(value: string): Promise<{ root: ShadowRoot; calls: number }> {
+    stub.restore();
+    stub = installFlowFetchStub([registerPasswordStep, passkeyUpsellStep]);
+    const element = document.createElement("zitadel-login") as ZitadelLogin;
+    element.purpose = "register";
+    element.project = testProject;
+    host.appendChild(element);
+    const root = await waitFor(() =>
+      element.shadowRoot?.querySelector('zl-field[name="x-auth-methods#password"]')
+        ? element.shadowRoot
+        : null,
+    );
+    await waitFor(() => (element.getAttribute("aria-busy") === "false" ? element : null));
+    await fillNativeField(root, "x-auth-methods#password", value);
+    const submit = root.querySelector('zl-button[action="submit"]') as HTMLElement & {
+      updateComplete: Promise<unknown>;
+    };
+    await submit.updateComplete;
+    submit.shadowRoot?.querySelector("button")?.click();
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    return { root, calls: stub.calls.length };
+  }
+
+  it("blocks a password shorter than its minimum, naming the minimum on the field", async () => {
+    const { root, calls } = await submitPassword("short123");
+    expect(calls).toBe(1);
+    const field = await waitFor(() => {
+      const el = root.querySelector('zl-field[name="x-auth-methods#password"]');
+      return el?.getAttribute("error") ? el : null;
+    });
+    expect(field?.getAttribute("error")).toContain("15");
+    expect(field?.querySelector('[slot="help"]')).toBeNull();
+  });
+
+  it("blocks a password longer than its maximum", async () => {
+    const { root, calls } = await submitPassword("x".repeat(65));
+    expect(calls).toBe(1);
+    const field = await waitFor(() => {
+      const el = root.querySelector('zl-field[name="x-auth-methods#password"]');
+      return el?.getAttribute("error") ? el : null;
+    });
+    expect(field?.getAttribute("error")).toContain("64");
+  });
+
+  it("counts characters, not UTF-16 units, as the server does", async () => {
+    // Thirteen letters and one emoji: fourteen characters, but fifteen code
+    // units, which `String#length` would let through.
+    const { calls } = await submitPassword(`${"a".repeat(13)}\u{1F511}`);
+    expect(calls).toBe(1);
+  });
+
+  it("submits a password within its bounds", async () => {
+    const { calls } = await submitPassword("a".repeat(15));
+    expect(calls).toBe(2);
+  });
 });
 
 /**

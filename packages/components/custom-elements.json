@@ -8756,18 +8756,18 @@
             },
             {
               "kind": "method",
-              "name": "missingRequiredFields",
+              "name": "fieldRuleErrors",
               "privacy": "private",
               "return": {
                 "type": {
                   "text": "string[]"
                 }
               },
-              "description": "Names of the current step's `required` fields whose captured value is\nempty. Reads each atom's live `formValue` (the getter reflects the native\ncontrol, so autofill that skipped `input` events is still seen), so this\nis browser-independent and does not rely on native constraint validation."
+              "description": "The validation error keys the current step's captured values earn, in the\nserver's own dialect: `error.<field>_required` for an empty required\nfield, `_min_length` / `_max_length` for a value outside the field's\ndeclared bounds. Reads each atom's live `formValue` (the getter reflects\nthe native control, so autofill that skipped `input` events is still\nseen), so this is browser-independent and does not rely on native\nconstraint validation. The server checks the same rules again."
             },
             {
               "kind": "method",
-              "name": "reportRequiredErrors",
+              "name": "reportFieldErrors",
               "privacy": "private",
               "return": {
                 "type": {
@@ -8776,13 +8776,13 @@
               },
               "parameters": [
                 {
-                  "name": "fields",
+                  "name": "keys",
                   "type": {
                     "text": "readonly string[]"
                   }
                 }
               ],
-              "description": "Surface a client-side required-field error using the server's own\nvalidation dialect (`error.<field>_required`, \"; \"-joined), so it flows\nthrough the same localisation and inline/banner routing as a real\nbackend rejection — no native browser bubble. Idempotent: re-running with\nthe same keys (both submit entry points fire on one click) is a no-op."
+              "description": "Surface client-side field errors (keys from fieldRuleErrors,\n\"; \"-joined), so they flow through the same localisation and\ninline/banner routing as a real backend rejection — no native browser\nbubble. Idempotent: re-running with the same keys (both submit entry\npoints fire on one click) is a no-op."
             },
             {
               "kind": "method",

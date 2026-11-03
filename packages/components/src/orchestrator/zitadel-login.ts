@@ -1220,32 +1220,35 @@ export class ZitadelLogin extends ZitadelSurface {
   }
 
   /**
-   * Names of the current step's `required` fields whose captured value is
-   * empty. Reads each atom's live `formValue` (the getter reflects the native
-   * control, so autofill that skipped `input` events is still seen), so this
-   * is browser-independent and does not rely on native constraint validation.
+   * The validation error keys the current step's captured values earn, in the
+   * server's own dialect: `error.<field>_required` for an empty required
+   * field, `_min_length` / `_max_length` for a value outside the field's
+   * declared bounds. Reads each atom's live `formValue` (the getter reflects
+   * the native control, so autofill that skipped `input` events is still
+   * seen), so this is browser-independent and does not rely on native
+   * constraint validation. The server checks the same rules again.
    */
-  private missingRequiredFields(): string[] {
+  private fieldRuleErrors(): string[] {
     const values = new Map<string, string>();
     for (const atom of this.fieldAtoms()) {
       const name = atom.getAttribute("name");
       if (name) values.set(name, atom.formValue);
     }
     return this.response
-      ? requiredFieldNames(this.response.step).filter((name) => (values.get(name) ?? "") === "")
+      ? fieldRuleErrorKeys(this.response.step, (name) => values.get(name) ?? "")
       : [];
   }
 
   /**
-   * Surface a client-side required-field error using the server's own
-   * validation dialect (`error.<field>_required`, "; "-joined), so it flows
-   * through the same localisation and inline/banner routing as a real
-   * backend rejection — no native browser bubble. Idempotent: re-running with
-   * the same keys (both submit entry points fire on one click) is a no-op.
+   * Surface client-side field errors (keys from {@link fieldRuleErrors},
+   * "; "-joined), so they flow through the same localisation and
+   * inline/banner routing as a real backend rejection — no native browser
+   * bubble. Idempotent: re-running with the same keys (both submit entry
+   * points fire on one click) is a no-op.
    */
-  private reportRequiredErrors(fields: readonly string[]): void {
+  private reportFieldErrors(keys: readonly string[]): void {
     if (!this.response) return;
-    const errorKey = fields.map((name) => `error.${name}_required`).join("; ");
+    const errorKey = keys.join("; ");
     if (this.response.step.error === errorKey) return;
     this.stepErrorDismissed = false;
     this.response = {
@@ -1441,9 +1444,9 @@ export class ZitadelLogin extends ZitadelSurface {
     // empty required value for the server to reject. Secondary actions (back,
     // skip, passkey…) arrive via `zl-submit` → `handleAtomSubmit`, so they are
     // never gated.
-    const missing = this.missingRequiredFields();
-    if (missing.length > 0) {
-      this.reportRequiredErrors(missing);
+    const ruleErrors = this.fieldRuleErrors();
+    if (ruleErrors.length > 0) {
+      this.reportFieldErrors(ruleErrors);
       return;
     }
     // `submitter` is the button that triggered the submit. When the user
@@ -1736,6 +1739,24 @@ function requiredFieldNames(step: CreateFlow201Step): string[] {
   return (step.fields ?? [])
     .filter((field) => field.type !== "checkbox" && field.required)
     .map((field) => field.name);
+}
+
+/**
+ * The error keys `valueFor` earns against `step`'s required fields and length
+ * bounds. Length counts code points, as the server does, and an empty value
+ * is judged only by `required`.
+ */
+function fieldRuleErrorKeys(step: CreateFlow201Step, valueFor: (name: string) => string): string[] {
+  const required = new Set(requiredFieldNames(step));
+  return (step.fields ?? []).flatMap((field) => {
+    const value = valueFor(field.name);
+    if (value === "") return required.has(field.name) ? [`error.${field.name}_required`] : [];
+    const length = Array.from(value).length;
+    const { min_length: min, max_length: max } = field.validation ?? {};
+    if (min !== undefined && min > 0 && length < min) return [`error.${field.name}_min_length`];
+    if (max !== undefined && max > 0 && length > max) return [`error.${field.name}_max_length`];
+    return [];
+  });
 }
 
 /**

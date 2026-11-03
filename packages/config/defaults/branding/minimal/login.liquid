@@ -75,7 +75,7 @@
           {% if field_err != "" %}invalid error="{{ field_err }}"{% endif %}
           {% if recover and f.type == 'password' %}forgot-password-href="#" forgot-password-action="{{ recover.name }}" forgot-password-label="{{ recover.text_key | t }}"{% endif %}
         >
-          {% if field_help != "" %}
+          {% if field_help != "" and field_err == "" %}
             <span slot="help">{{ field_help }}</span>
           {% endif %}
         </zl-field>
