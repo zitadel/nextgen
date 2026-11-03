@@ -3,14 +3,14 @@ title: Releases and deployments
 description: How a release snapshots your project's configuration, how a deployment makes it live, and how to roll back or revoke one.
 ---
 
-A release is a snapshot of your project's configuration. A deployment makes it live on the project's [origins](/docs/concepts/origins-and-previews). An edit to `.zitadel/` reaches users only through a deploy. The [deploy guide](/docs/guides/deploy) has the commands.
+A release is a snapshot of your project's configuration. A deployment makes it live on the project's [origins](/docs/concepts/origins-and-previews). Deploying is how an edit to `.zitadel/` reaches users. The [deploy guide](/docs/guides/deploy) has the commands.
 
 ## Release
 
 A release pins one revision of each schema, login flow, policy, identity provider connection and branding. It also records who built it, when, from which commit, and a message saying why.
 
-- A release never changes. Its `content_hash` identifies the content, so building unchanged files returns the same release.
-- A release belongs to one project. Two projects built from the same files have the same digest.
+- A release never changes. Building unchanged files returns the same release.
+- A release belongs to one project.
 - `zitadel release create` builds a release without deploying it.
 
 ## Deployment

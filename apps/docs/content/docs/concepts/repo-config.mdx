@@ -24,13 +24,13 @@ Commit `zitadel.json` and `.zitadel/**`, apart from these: `.env.local` and `.zi
 
 ## Variables
 
-Some values do not belong in your repository: secrets, and values that differ between production and previews. Store them on the project as variables, and reference them from configuration as `${{ NAME }}`. Today an identity provider connection's `oidc.client_id` and `oidc.client_secret` take one. Set a value with `zitadel variable set NAME <value>`, or with `--secret` to store it encrypted so it is never read back.
+Some values do not belong in your repository: secrets, and values that differ between production and previews. Store them on the project as variables, and reference them from configuration as `${{ NAME }}`. Today an identity provider connection's `oidc.client_id` and `oidc.client_secret` take one. Set a value with `zitadel variable set NAME <value>`. For a secret, run `zitadel variable set NAME --secret`: it prompts for the value and stores it encrypted, so it is never read back.
 
-A variable can hold a separate value for [previews](/docs/concepts/origins-and-previews#previews) (`--preview`), so a preview never runs with a production secret. Each deployment keeps the values it was created with: a changed variable reaches users on the next `zitadel deploy`, and a rollback brings back the old values.
+A variable can hold a separate value for [previews](/docs/concepts/origins-and-previews#previews) (`--preview`), so a preview never runs with a production secret. Each deployment keeps the values it was created with: a changed variable reaches users on the next `zitadel deploy`, or the next `zitadel preview` for a preview value, and a rollback brings back the old values.
 
 ## Environments
 
-Your app can run against more than one environment, such as `development` on the [local runtime](/docs/guides/local-runtime) and `production` on a hosted server. Each environment is its own project, on a local or remote server, so environments never share users, sessions or any other data. What they share is your configuration: you deploy the same `.zitadel/` files to each of them.
+Your app can run against more than one environment, such as `development` on the [local runtime](/docs/guides/local-runtime) and `production` on a hosted server. Give each environment its own project, on a local or remote server. Separate projects never share users, sessions or any other data. What they share is your configuration: you deploy the same `.zitadel/` files to each of them.
 
 The CLI keeps each environment's server and project in `.env.<name>.local`. `zitadel env add <name>` binds an environment, creating a project for it if needed, and `zitadel env list` shows the ones this directory has. A command picks the environment from `--env`, then `ZITADEL_ENV`, then the hosting platform (`VERCEL_ENV`, or Netlify's `CONTEXT`), and uses `development` otherwise. `zitadel env` shows which server and project resolved.
 
