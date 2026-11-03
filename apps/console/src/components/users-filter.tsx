@@ -1,11 +1,11 @@
 import { Plus, X } from "lucide-react";
-import type { ReactNode } from "react";
+import { type ReactNode, useRef } from "react";
 
 import {
   REVISION_MENU,
-  RevisionBadges,
+  REVISION_TRIGGER,
   RevisionItems,
-  shortRevisionId,
+  RevisionValue,
 } from "@/components/revision-select";
 import {
   Select,
@@ -26,7 +26,8 @@ import type { SchemaOption, UsersSearch } from "@/lib/user-list";
  *
  * Nothing here counts users: the API has no total, by design. A value the URL
  * carries that no option matches (a deleted schema, an unreadable history)
- * still shows on its trigger, so the filter can be cleared.
+ * still shows on its trigger, so the filter can be cleared. A filter with
+ * nothing to offer and nothing set is disabled rather than opening empty.
  */
 export function UsersFilter({
   options,
@@ -48,6 +49,7 @@ export function UsersFilter({
         name="schema"
         value={search.schema}
         display={<span className="truncate">{chosen?.title ?? search.schema}</span>}
+        disabled={options.length === 0 && !search.schema}
         onChange={(schema) => onChange({ schema })}
       >
         {options.map((option) => (
@@ -60,17 +62,8 @@ export function UsersFilter({
         label="Revision"
         name="revision"
         value={search.revision}
-        display={
-          search.revision && (
-            <>
-              <span className="truncate" title={search.revision}>
-                {shortRevisionId(search.revision)}
-              </span>
-              <RevisionBadges revisions={revisions} id={search.revision} />
-            </>
-          )
-        }
-        disabled={!search.schema}
+        display={search.revision && <RevisionValue revisions={revisions} id={search.revision} />}
+        disabled={!search.schema || (revisions.length === 0 && !search.revision)}
         onChange={(revision) => onChange({ schema: search.schema, revision })}
         menuClassName={REVISION_MENU}
       >
@@ -81,12 +74,13 @@ export function UsersFilter({
 }
 
 /** The design's 36px outline control: 10px inset, 6px gaps inside and out, medium label. */
-const CONTROL = "max-w-full min-w-0 gap-1.5 px-2.5 font-medium *:data-[slot=select-value]:gap-1.5";
+const CONTROL = `${REVISION_TRIGGER} px-2.5 font-medium`;
 
 /**
  * One filter: `+ Label` while unset, `× Label value` once set, where the
  * cross clears it. The cross is a button of its own laid over the trigger's
- * leading icon, since a button cannot sit inside the trigger.
+ * leading icon, since a button cannot sit inside the trigger. It comes first
+ * in the DOM, as it is drawn, and hands focus to the trigger once it clears.
  */
 function FilterSelect({
   label,
@@ -109,10 +103,23 @@ function FilterSelect({
   children: ReactNode;
 }) {
   const Glyph = value ? X : Plus;
+  const trigger = useRef<HTMLButtonElement>(null);
   return (
     <div className="relative min-w-0">
+      {value && (
+        <button
+          type="button"
+          aria-label={`Clear the ${name} filter`}
+          className="absolute top-1/2 left-1.5 z-10 size-6 -translate-y-1/2 rounded-sm outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+          onClick={() => {
+            onChange(undefined);
+            trigger.current?.focus();
+          }}
+        />
+      )}
       <Select value={value ?? ""} onValueChange={onChange} disabled={disabled}>
         <SelectTrigger
+          ref={trigger}
           aria-label={`Filter by ${name}`}
           // A filter has no chevron: the leading plus or cross is its glyph.
           // Unset, the label is the placeholder, in the foreground colour.
@@ -128,14 +135,6 @@ function FilterSelect({
           {children}
         </SelectContent>
       </Select>
-      {value && (
-        <button
-          type="button"
-          aria-label={`Clear the ${name} filter`}
-          className="absolute top-1/2 left-1.5 size-6 -translate-y-1/2 rounded-sm outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
-          onClick={() => onChange(undefined)}
-        />
-      )}
     </div>
   );
 }

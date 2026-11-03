@@ -34,7 +34,7 @@ import {
   type SchemaField,
   type UserSchema,
   attributeValue,
-  fetchSchemaRevisions,
+  fetchLatestSchemaId,
   inputAttributes,
   schemaDisplayName,
   schemaFields,
@@ -78,11 +78,11 @@ export const Route = createFileRoute("/_authed/users/$userId")({
       // The schema's name opens the schema at its newest revision; the user
       // may be on an older one, which the revision box opens. Unreadable, the
       // name opens the user's own revision.
-      readingSchema.then(async (value) => {
+      readingSchema.then((value) => {
         const objectType = value && field(value, "objectType");
-        if (!objectType) return undefined;
-        const revisions = await fetchSchemaRevisions(projectId, objectType).catch(() => []);
-        return revisions[0]?.id;
+        return objectType
+          ? fetchLatestSchemaId(projectId, objectType).catch(() => undefined)
+          : undefined;
       }),
       api.listUserPasskeys.all(params.userId, { limit: 100 }).catch(() => undefined),
       fetchUserIdentityLinks(params.userId).catch(() => undefined),

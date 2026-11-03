@@ -1380,10 +1380,53 @@ describe("users screen", () => {
       "Revisionsch_business",
     );
 
+    // Clearing the revision keeps the schema, and hands focus to its trigger.
+    await userEvent.click(screen.getByRole("button", { name: "Clear the revision filter" }));
+    await waitFor(() =>
+      expect(bodies.at(-1)).toEqual(
+        expect.objectContaining({
+          filter: [{ field: "schema_object_type", operation: "equals", value: "business" }],
+        }),
+      ),
+    );
+    expect(router.state.resolvedLocation?.search).toEqual({
+      project: "proj_test",
+      schema: "business",
+    });
+    expect(screen.getByRole("combobox", { name: "Filter by revision" })).toHaveFocus();
+
     await userEvent.click(screen.getByRole("button", { name: "Clear the schema filter" }));
     await waitFor(() => expect(bodies.at(-1)).not.toHaveProperty("filter"));
     expect(screen.getByRole("combobox", { name: "Filter by revision" })).toBeDisabled();
     expect(router.state.resolvedLocation?.search).toEqual({ project: "proj_test" });
+  });
+
+  it("drops the earlier `latest` and `older` revision values from a link", async () => {
+    serveLineage();
+    const bodies = recordQueries(() => HttpResponse.json({ users: [] }));
+    await renderUsers(`${scopedPath("/users")}&schema=business&revision=older`);
+
+    await screen.findByRole("table");
+    expect(screen.queryByRole("button", { name: "Clear the revision filter" })).toBeNull();
+    expect(bodies.at(-1)).toMatchObject({
+      filter: [{ field: "schema_object_type", operation: "equals", value: "business" }],
+    });
+    expect(bodies.at(-1)?.filter).toHaveLength(1);
+  });
+
+  it("disables a filter with nothing to offer", async () => {
+    // The schemas cannot be read, so neither filter has options to open.
+    recordQueries(() => HttpResponse.json({ users: [] }));
+    server.use(
+      http.get(SCHEMAS_URL, () =>
+        HttpResponse.json({ code: "internal", message: "boom" }, { status: 500 }),
+      ),
+    );
+    await renderUsers();
+
+    await screen.findByRole("table");
+    expect(screen.getByRole("combobox", { name: "Filter by schema" })).toBeDisabled();
+    expect(screen.getByRole("combobox", { name: "Filter by revision" })).toBeDisabled();
   });
 
   it("names an object type the URL carries that no schema has", async () => {

@@ -2,6 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { SelectItem } from "@/components/ui/select";
 import { formatDateTime } from "@/lib/date";
 import type { SchemaRevision } from "@/lib/schema";
+import { cn } from "@/lib/utils";
 
 /**
  * The pieces every revision picker shares (#2502): the Users list's revision
@@ -12,16 +13,46 @@ import type { SchemaRevision } from "@/lib/schema";
 /** The menu's width: wide enough for a date and both badges on one line. */
 export const REVISION_MENU = "w-81";
 
+/** A trigger whose value is a row of pieces: it shrinks to its container, 6px apart. */
+export const REVISION_TRIGGER =
+  "max-w-full min-w-0 gap-1.5 *:data-[slot=select-value]:min-w-0 *:data-[slot=select-value]:gap-1.5";
+
+/** A minted id's lowercase prefix; a URI or other named `$id` has none. */
+const MINTED_PREFIX = /^[a-z]+_(?=[^/:]*$)/;
+
 /**
  * A minted revision id cut to its prefix and its last six characters,
- * `sch_…ZP02S`, which is where two revisions of one schema differ. An id
- * without a `prefix_` (a URI a schema names itself by) is not a ULID and
- * stays whole. The full id goes in a `title` wherever this is shown.
+ * `sch_…ZNP02S`, which is where two revisions of one schema differ. An id
+ * without a minted prefix (a URI a schema names itself by) stays whole. The
+ * full id goes in a `title` wherever this is shown.
  */
 export function shortRevisionId(id: string): string {
-  const prefix = id.indexOf("_") + 1;
+  const prefix = MINTED_PREFIX.exec(id)?.[0].length ?? 0;
   if (prefix === 0 || id.length - prefix <= 10) return id;
   return `${id.slice(0, prefix)}…${id.slice(-6)}`;
+}
+
+/**
+ * A chosen revision on a trigger: its shortened id, with the full one in its
+ * title, and its badges.
+ */
+export function RevisionValue({
+  revisions,
+  id,
+  className,
+}: {
+  revisions: SchemaRevision[];
+  id: string;
+  className?: string;
+}) {
+  return (
+    <>
+      <span className={cn("truncate", className)} title={id}>
+        {shortRevisionId(id)}
+      </span>
+      <RevisionBadges revisions={revisions} id={id} />
+    </>
+  );
 }
 
 /**
@@ -67,11 +98,12 @@ export function RevisionItems({ revisions }: { revisions: SchemaRevision[] }) {
       title={revision.id}
       // The design's rhythm: the id on a 32px row, the meta line 6px under
       // it, 5px below, and 4px between options. The check mark sits on the
-      // id's line, not centred on both.
-      className="items-start pb-1.25 not-first:mt-1 [&>[data-slot=select-item-indicator]]:top-2.5"
+      // id's line, not centred on both. The item text may shrink, so a long
+      // id ends in an ellipsis rather than running under the check mark.
+      className="items-start pb-1.25 not-first:mt-1 *:[span]:last:min-w-0 [&>[data-slot=select-item-indicator]]:top-2.5"
     >
       <span className="flex min-w-0 flex-col items-start gap-1.5">
-        <span className="truncate">{shortRevisionId(revision.id)}</span>
+        <span className="max-w-full truncate">{shortRevisionId(revision.id)}</span>
         <span className="flex flex-wrap items-center gap-1.25">
           {/* Muted text on the highlighted row's accent fill falls under
               4.5:1, so the date takes the accent's own foreground there. */}

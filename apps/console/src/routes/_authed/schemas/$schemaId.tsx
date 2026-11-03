@@ -10,9 +10,9 @@ import { Badge } from "@/components/ui/badge";
 import { InlineCode } from "@/components/ui/inline-code";
 import {
   REVISION_MENU,
-  RevisionBadges,
+  REVISION_TRIGGER,
   RevisionItems,
-  shortRevisionId,
+  RevisionValue,
 } from "@/components/revision-select";
 import { Select, SelectContent, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
@@ -154,17 +154,12 @@ function RevisionSelect({ revisions, current }: { revisions: SchemaRevision[]; c
         void navigate({ to: "/schemas/$schemaId", params: { schemaId } })
       }
     >
-      <SelectTrigger
-        aria-label="Schema revision"
-        className="max-w-full min-w-0 gap-1.5 pr-2 pl-2.5 *:data-[slot=select-value]:gap-1.5"
-        title={current}
-      >
+      <SelectTrigger aria-label="Schema revision" className={`${REVISION_TRIGGER} pr-2 pl-2.5`}>
         <SelectValue>
           <span className="text-muted-foreground">Revision</span>
           {/* 12px, as the design draws it on this card: at 14px the id is cut
               short on a phone, where the trigger takes the card's width. */}
-          <span className="truncate text-xs">{shortRevisionId(current)}</span>
-          <RevisionBadges revisions={revisions} id={current} />
+          <RevisionValue revisions={revisions} id={current} className="text-xs" />
         </SelectValue>
       </SelectTrigger>
       <SelectContent position="popper" sideOffset={4} align="end" className={REVISION_MENU}>

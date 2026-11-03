@@ -31,6 +31,15 @@ describe("shortRevisionId", () => {
       "https://example.com/schemas/staff-v2",
     );
   });
+
+  it("leaves a URI whole when it holds an underscore", () => {
+    for (const id of [
+      "https://acme.example/user_schemas/staff/v1/schema",
+      "urn:acme:user_schema:0123456789abc",
+    ]) {
+      expect(shortRevisionId(id)).toBe(id);
+    }
+  });
 });
 
 describe("RevisionBadges", () => {

@@ -230,7 +230,11 @@ describe("user detail", () => {
       "href",
       scopedPath("/schemas/sch_business"),
     );
-    expect(lists.at(-1)?.get("object_type")).toBe("business");
+    // One row: the newest revision of the type, not its whole history.
+    expect(lists).toHaveLength(1);
+    expect(lists[0]?.get("object_type")).toBe("business");
+    expect(lists[0]?.get("revisions")).toBe("latest");
+    expect(lists[0]?.get("limit")).toBe("1");
   });
 
   it("opens the user's own revision from the name when the history cannot be read", async () => {

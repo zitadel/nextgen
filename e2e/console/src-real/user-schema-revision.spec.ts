@@ -56,9 +56,9 @@ test("opens a user's URI schema revision from the user detail screen", async ({
   await expect(page.getByRole("heading", { name: title })).toBeVisible();
   // The revision picker lists the schema's own history, this one revision,
   // and marks it Latest; a URI id survives the round trip into the picker too,
-  // shortened on the trigger and whole in its title.
+  // shortened on the trigger and whole in the id's title.
   const picker = page.getByRole("combobox", { name: "Schema revision" });
-  await expect(picker).toHaveAttribute("title", schema.id);
+  await expect(picker.getByTitle(schema.id)).toBeVisible();
   await expect(picker).toContainText("Latest");
   await expectNoErrorBoundary(page);
 });

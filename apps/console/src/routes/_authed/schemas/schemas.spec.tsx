@@ -377,7 +377,7 @@ describe("user schema detail", () => {
     // id and creation time (decisions log D10: several can be minted minutes
     // apart), and marked `In use` while some user is on it. None is called
     // active: which revision serves new registrations is the release's
-    // choice. An older one says users stay on it until they are migrated.
+    // choice.
     const NEWER_AT = "2026-08-01T09:30:00Z";
     const plain = envelope("sch_business_2", BUSINESS, NEWER_AT);
     const newer = { ...plain, metadata: { ...plain.metadata, in_use: true } };

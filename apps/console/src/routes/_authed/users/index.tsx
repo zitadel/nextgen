@@ -76,6 +76,9 @@ import {
 import { Page } from "@/components/layout";
 import { cn } from "@/lib/utils";
 
+/** The filter's earlier choices, `Latest only` and `Older revisions`. */
+const LEGACY_REVISIONS = new Set(["latest", "older"]);
+
 export const Route = createFileRoute("/_authed/users/")({
   // `User`, not `Users`: the single-person glyph. The plural two-person one
   // reads as a group.
@@ -84,17 +87,20 @@ export const Route = createFileRoute("/_authed/users/")({
   // The filter lives in the URL, as the Teams tabs do: it is a server-side
   // filter, so it belongs to the request the loader makes, is linkable and
   // survives a reload. Only what the filter can send is kept: a revision
-  // belongs to a schema, so it goes without one.
+  // belongs to a schema, so it goes without one, and `latest` and `older`,
+  // which earlier links carry, name no revision.
   validateSearch: (search: Record<string, unknown>): UsersSearch => {
     const schema = typeof search.schema === "string" && search.schema ? search.schema : undefined;
     const revision =
-      schema && typeof search.revision === "string" && search.revision
+      schema &&
+      typeof search.revision === "string" &&
+      search.revision &&
+      !LEGACY_REVISIONS.has(search.revision)
         ? search.revision
         : undefined;
-    return {
-      ...(schema ? { schema } : {}),
-      ...(revision ? { revision } : {}),
-    };
+    // Both keys, even unset: the router lays this over the raw search, so a
+    // key left out would keep the URL's value.
+    return { schema, revision };
   },
   loaderDeps: ({ search }) => search,
   loader: async ({ deps }) => {
