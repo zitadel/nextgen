@@ -1,16 +1,16 @@
 import { Flags } from "@oclif/core";
 
+import { VariableService } from "../../lib/backend";
 import {
   type Admitted,
   CommandGroups,
   EnvironmentCommand,
   type JsonEnvelope,
+  nonBlankArg,
 } from "../../lib/oclif";
-import { variableNameArg } from "./name";
 import { dryRunResult } from "../../lib/oclif/crud/shared";
-import { deletedData } from "../../lib/oclif/envelope";
-import { variableScope } from "../../lib/variables";
 import { Destructive } from "../../lib/oclif/destructive";
+import { deletedData } from "../../lib/oclif/envelope";
 
 /**
  * `zitadel variable rm NAME` — remove one variable from the project.
@@ -27,14 +27,13 @@ export default class VariableRm extends Destructive(EnvironmentCommand) {
     "<%= config.bin %> variable rm GOOGLE_CLIENT_ID --force",
   ];
   static override args = {
-    name: variableNameArg({ required: true, description: "Variable name to remove." }),
+    name: nonBlankArg({ required: true, description: "Variable name to remove." }),
   };
   static override flags = {
     preview: Flags.boolean({
       default: false,
       description: "Remove the preview value alone, leaving the primary one standing.",
     }),
-    // `--force` is per command, not global: here it permits a removal.
     force: Flags.boolean({
       char: "f",
       description:
@@ -43,7 +42,8 @@ export default class VariableRm extends Destructive(EnvironmentCommand) {
   };
 
   protected async execute({ args, flags }: Admitted<typeof VariableRm>): Promise<JsonEnvelope> {
-    const kinds = flags.preview ? ["preview"] : ["primary", "preview"];
+    const kind = flags.preview ? "preview" : undefined;
+    const suffix = flags.preview ? " (preview)" : "";
 
     return this.emit(
       await this.confirmed({
@@ -51,22 +51,21 @@ export default class VariableRm extends Destructive(EnvironmentCommand) {
         name: `remove ${args.name} from the project`,
         message: `Remove ${args.name} from the project?`,
         preview: () => {
-          const preview = dryRunResult("remove", "variable", args.name);
+          const result = dryRunResult("remove", "variable", args.name);
           return {
-            ...preview,
-            data: { ...(preview.data as object), kinds },
-            pretty: `${preview.pretty} from the project${flags.preview ? " (preview)" : ""}`,
+            ...result,
+            data: { ...(result.data as object), kinds: VariableService.kindsRemoved(kind) },
+            pretty: `${result.pretty} from the project${suffix}`,
           };
         },
         prepare: () => this.connect(),
         apply: async (consent, { client, projectId }) => {
-          await consent
-            .unlock(client)
-            .deleteVariable(args.name, variableScope(projectId, flags.preview));
+          const variableService = new VariableService(client, projectId);
+          const kinds = await variableService.remove(consent, args.name, kind);
           return {
             status: "ok",
             data: { ...deletedData({ name: args.name }), kinds },
-            pretty: `Removed ${args.name} from the project${flags.preview ? " (preview)" : ""}`,
+            pretty: `Removed ${args.name} from the project${suffix}`,
           };
         },
       }),

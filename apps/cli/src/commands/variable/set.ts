@@ -1,32 +1,20 @@
 import { Args, Flags } from "@oclif/core";
-import { ApiError } from "@zitadel/api/runtime/fetch";
-
-import type { ZitadelClient } from "../../../lib/api-client";
-import { ZitadelError } from "../../../lib/errors";
+import { ZitadelError } from "../../lib/errors";
 
 import {
   type Admitted,
   CommandGroups,
   EnvironmentCommand,
   type JsonEnvelope,
-} from "../../../lib/oclif";
-import { variableNameArg } from "../name";
-import { dryRunResult } from "../../../lib/oclif/crud/shared";
-import {
-  parseVariableValue,
-  toVariableRow,
-  VARIABLE_TYPES,
-  variableCells,
-  type VariableRow,
-  type VariableType,
-  type VariableValue,
-  type VariableKind,
-} from "../../../lib/variables";
-import { VariableService } from "../../../lib/backend";
-import { type Refusal, refusalError } from "../../../lib/oclif/refusal";
-import { inShell, type SuggestedCommand } from "../../../lib/suggestion";
-import { Promptable } from "../../../lib/oclif/promptable";
-import { Tabulatable } from "../../../lib/oclif/tabulatable";
+  nonBlankArg,
+} from "../../lib/oclif";
+import { dryRunResult } from "../../lib/oclif/crud/shared";
+import { Variable, VariableService } from "../../lib/backend";
+import { parseVariableValue, VARIABLE_TYPES, type VariableType } from "../../lib/variables";
+import { type Refusal, refusalError } from "../../lib/oclif/refusal";
+import { inShell, type SuggestedCommand } from "../../lib/suggestion";
+import { Promptable } from "../../lib/oclif/promptable";
+import { Tabulatable } from "../../lib/oclif/tabulatable";
 
 /** How a secret asked to be stored as another type is refused. */
 const SECRET_AS_STRING_REFUSAL: Refusal = {
@@ -71,7 +59,7 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
     "<%= config.bin %> variable set API_URL https://preview.acme.com --preview",
   ];
   static override args = {
-    name: variableNameArg({
+    name: nonBlankArg({
       required: true,
       description: "Variable name (letters, digits and underscores).",
     }),
@@ -114,17 +102,19 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
       });
     }
 
+    VariableService.assertName(args.name);
+
     const { client, projectId } = await this.connect();
     const variableService = new VariableService(client, projectId);
     if (flags.preview && !flags.secret) {
-      await refusePreviewOfSecret(client, projectId, args.name, (command) => {
+      await refusePreviewOfSecret(variableService, args.name, (command) => {
         return this.suggest(command);
       });
     }
     // The kinds this write sets, as the platform's rule gives them: the preview
     // kind alone under `--preview`, otherwise both for a plain value and the
     // primary kind for a secret.
-    const kinds = flags.preview ? ["preview"] : flags.secret ? ["primary"] : ["primary", "preview"];
+    const kinds = VariableService.kindsWritten(flags.secret, flags.preview ? "preview" : undefined);
 
     if (this.dryRun) {
       // The resource commands' dry-run contract, plus what this write would
@@ -161,24 +151,14 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
       parse: (raw: string) => parseVariableValue(raw, flags.as),
     });
 
-    // The write answers with the kind it wrote, so a secret says only that a
-    // value is held (ADR 062 §7), never the value itself. The kind this write
-    // did not touch is read in a separate call: the platform never merges the
-    // two kinds in one answer.
     const written = await variableService.set(
       args.name,
       { value, secret: flags.secret },
       flags.preview ? "preview" : undefined,
     );
     this.recordTelemetry({ is_secret: flags.secret });
-    const stateOfKind = async (kind: VariableKind): Promise<KindState> =>
-      stateOf(
-        written?.[kind] !== undefined
-          ? written[kind]
-          : (await variableService.ofKind(kind))[args.name]?.[kind],
-      );
-    const primary = await stateOfKind("primary");
-    const previewState = await stateOfKind("preview");
+    const primary = stateOf(written.primary);
+    const previewState = stateOf(written.preview);
 
     return this.emit({
       status: "ok",
@@ -202,16 +182,13 @@ type KindState =
   | { held: true; secret: true }
   | { held: true; secret: false; value: string | number | boolean };
 
-function stateOf(value: VariableValue | undefined): KindState {
-  // A held kind always carries a value — a scalar, or `{secret:true}` for a
-  // secret — so `undefined` is exactly the name not holding that kind.
-  if (value === undefined) {
+function stateOf(variable: Variable | undefined): KindState {
+  if (variable === undefined) {
     return { held: false };
   }
-  const row = toVariableRow("", value);
-  return row.secret
+  return variable.secret
     ? { held: true, secret: true }
-    : { held: true, secret: false, value: row.value as string | number | boolean };
+    : { held: true, secret: false, value: variable.value as string | number | boolean };
 }
 
 /**
@@ -224,11 +201,10 @@ function stateCell(state: KindState): string {
   if (!state.held) {
     return "(not set)";
   }
-  const row: VariableRow = state.secret
-    ? { name: "", secret: true }
-    : { name: "", secret: false, value: state.value };
-  const [cell] = variableCells([row]);
-  return cell === undefined || cell.value === "" ? '""' : cell.value;
+  const { value } = state.secret
+    ? Variable.of("", { secret: true }).cell()
+    : Variable.of("", state.value).cell();
+  return value === "" ? '""' : value;
 }
 
 /**
@@ -252,33 +228,17 @@ function pipeArgs(name: string, secret: boolean, type: VariableType, preview: bo
 /**
  * Refuses a plain preview value for a name whose primary value is a secret: it
  * holds a credential, so its preview value is one too, and stored plain it
- * would be readable and a preview deploy would freeze it in the clear. A token
- * that may not read the primary values leaves the check to whoever can; any
- * other failure leaves the classification unknown, and writing on an unknown is
- * the one outcome this guard exists to prevent.
+ * would be readable and a preview deploy would freeze it in the clear.
  *
  * The suggestion is built by the caller, because it must carry the run's
  * selector before the stdin redirection.
  */
 export async function refusePreviewOfSecret(
-  client: ZitadelClient,
-  projectId: string,
+  variableService: VariableService,
   name: string,
   suggest: (command: string) => SuggestedCommand,
 ): Promise<void> {
-  const variableService = new VariableService(client, projectId);
-  const held = await variableService
-    .ofKind("primary")
-    .then((body) => {
-      return body[name]?.primary;
-    })
-    .catch((error: unknown) => {
-      if (error instanceof ApiError && error.status === 403) {
-        return undefined;
-      }
-      throw error;
-    });
-  if (typeof held !== "object" || held === null) {
+  if (!(await variableService.holdsSecret(name))) {
     return;
   }
   throw new ZitadelError(

@@ -7,7 +7,6 @@ import {
   nonBlankArg,
 } from "../../lib/oclif";
 import { Tabulatable } from "../../lib/oclif/tabulatable";
-import { frozenVariables } from "../../lib/variables";
 
 /**
  * `zitadel deployment get <deployment_id>` — read one deployment record: the
@@ -39,7 +38,19 @@ export default class DeploymentGet extends Tabulatable(EnvironmentCommand) {
         `  deployed  ${deployment.deployed_at}`,
         `  origins   ${origins.join(", ")}`,
         "",
-        await frozenVariables(variables, (columns, items) => this.tabulate(columns, items)),
+        variables.length === 0
+          ? "  variables  none"
+          : [
+              "  variables",
+              ...(
+                await this.tabulate(
+                  ["name", "value"],
+                  variables.map((variable) => variable.cell()),
+                )
+              )
+                .split("\n")
+                .map((line) => `    ${line}`),
+            ].join("\n"),
       ].join("\n"),
     });
   }

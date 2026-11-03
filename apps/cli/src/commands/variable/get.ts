@@ -1,16 +1,14 @@
 import { Flags } from "@oclif/core";
 
-import { ZitadelError } from "../../lib/errors";
+import { VariableService } from "../../lib/backend";
 import {
   type Admitted,
   CommandGroups,
   EnvironmentCommand,
   type JsonEnvelope,
+  nonBlankArg,
 } from "../../lib/oclif";
-import { variableNameArg } from "./name";
 import { Tabulatable } from "../../lib/oclif/tabulatable";
-import { VariableService } from "../../lib/backend";
-import { toVariableRow, variableCells, variableReadScope } from "../../lib/variables";
 
 /**
  * `zitadel variable get NAME` — read one variable by name from the project.
@@ -29,7 +27,7 @@ export default class VariableGet extends Tabulatable(EnvironmentCommand) {
     "<%= config.bin %> variable get GOOGLE_CLIENT_ID --json",
   ];
   static override args = {
-    name: variableNameArg({ required: true, description: "Variable name to read." }),
+    name: nonBlankArg({ required: true, description: "Variable name to read." }),
   };
   static override flags = {
     preview: Flags.boolean({
@@ -40,39 +38,22 @@ export default class VariableGet extends Tabulatable(EnvironmentCommand) {
 
   protected async execute({ args, flags }: Admitted<typeof VariableGet>): Promise<JsonEnvelope> {
     const { client, projectId } = await this.connect();
-    const scope = variableReadScope(projectId, flags.preview);
     const variableService = new VariableService(client, projectId);
+    const variable = await variableService.get(args.name, flags.preview ? "preview" : "primary");
+    this.recordTelemetry({ is_secret: variable.secret });
 
-    // The single-name endpoint answers in the same two forms the collection
-    // does, so the row projection is shared rather than duplicated.
-    const value = await variableService.get(args.name, scope.kind);
-    if (value === undefined) {
-      throw new ZitadelError("E_NOT_FOUND", `Variable ${args.name} has no ${scope.kind} value.`, {
-        hint: flags.preview
-          ? "A name has a preview value only once one is set with `--preview`."
-          : "Set one with `variable set`.",
+    if (!this.isOnScreen) {
+      return this.emit({
+        status: "ok",
+        data: variable,
+        pretty: JSON.stringify(variable, null, 2),
       });
     }
-    const row = toVariableRow(args.name, value);
-    this.recordTelemetry({ is_secret: row.secret });
-
-    const data = row;
-    // The resource commands' `get`: a pipe receives the whole record, since a
-    // script wants the record rather than a view of it. That is also what keeps
-    // a secret from being mistaken for a value — it reads `"secret": true` and
-    // carries no `value` at all.
-    if (!this.isOnScreen) {
-      return this.emit({ status: "ok", data, pretty: JSON.stringify(data, null, 2) });
-    }
-    const [cell] = variableCells([row]);
+    const { value } = variable.cell();
     return this.emit({
       status: "ok",
-      data,
-      pretty: this.tabulateDetail(args.name, ["value"], {
-        // The detail view drops an empty field, which would hide a value that
-        // is legitimately the empty string.
-        value: cell?.value === "" ? '""' : cell?.value,
-      }),
+      data: variable,
+      pretty: this.tabulateDetail(args.name, ["value"], { value: value === "" ? '""' : value }),
     });
   }
 }

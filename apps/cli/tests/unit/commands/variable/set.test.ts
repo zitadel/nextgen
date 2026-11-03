@@ -1,11 +1,13 @@
 import { ApiError } from "@zitadel/api/runtime/fetch";
 import { describe, expect, it } from "vitest";
 
-import { refusePreviewOfSecret } from "../../../../../src/commands/variable/set/index";
-import { unscopedCommand } from "../../../../../src/lib/suggestion";
+import { refusePreviewOfSecret } from "../../../../src/commands/variable/set";
+import { VariableService } from "../../../../src/lib/backend";
+import { unscopedCommand } from "../../../../src/lib/suggestion";
 
 function refuseFor(getVariables: () => Promise<Record<string, { primary?: unknown }>>) {
-  return refusePreviewOfSecret({ getVariables } as never, "proj_1", "API_KEY", (command) => {
+  const variableService = new VariableService({ getVariables } as never, "proj_1");
+  return refusePreviewOfSecret(variableService, "API_KEY", (command) => {
     return unscopedCommand(command, "1.0.0");
   });
 }

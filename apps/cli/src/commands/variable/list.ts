@@ -1,5 +1,6 @@
 import { Flags } from "@oclif/core";
 
+import { VariableService } from "../../lib/backend";
 import {
   type Admitted,
   CommandGroups,
@@ -7,15 +8,6 @@ import {
   type JsonEnvelope,
 } from "../../lib/oclif";
 import { plainFlag, Tabulatable } from "../../lib/oclif/tabulatable";
-import {
-  toInventoryRows,
-  toVariableRows,
-  valuesOfKind,
-  variableCells,
-  variableInventoryCells,
-  variableReadScope,
-} from "../../lib/variables";
-import { VariableService } from "../../lib/backend";
 
 /** The columns `list` renders, in order; `--preview` leaves out the preview column. */
 const COLUMNS = ["name", "value", "preview"] as const;
@@ -48,17 +40,11 @@ export default class VariableList extends Tabulatable(EnvironmentCommand) {
 
   protected async execute({ flags }: Admitted<typeof VariableList>): Promise<JsonEnvelope> {
     const { client, projectId } = await this.connect();
-    const scope = variableReadScope(projectId, flags.preview);
-
-    // The inventory reads both kinds, which a read without a kind answers in
-    // one request; `--preview` reads that kind alone.
     const variableService = new VariableService(client, projectId);
-    const items = flags.preview
-      ? toVariableRows(valuesOfKind(await variableService.ofKind(scope.kind), scope.kind))
-      : toInventoryRows(await variableService.inventory());
+    const items = await variableService.list(flags.preview ? "preview" : undefined);
     this.recordTelemetry({ variable_count: items.length });
 
-    const rows = flags.preview ? variableCells(items) : variableInventoryCells(items);
+    const rows = items.map((item) => (flags.preview ? item.cell() : item.inventoryCell()));
     const columns = flags.preview ? PREVIEW_COLUMNS : COLUMNS;
     const empty = flags.preview
       ? "No preview values on the project."

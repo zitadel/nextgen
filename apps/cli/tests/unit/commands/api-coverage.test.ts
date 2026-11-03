@@ -557,7 +557,7 @@ const unlockedOperations = async (): Promise<ReadonlySet<string>> => {
   const files = (await readdir(src, { recursive: true })).filter((file) => file.endsWith(".ts"));
   const called = await Promise.all(
     files.map(async (file) =>
-      [...(await readFile(join(src, file), "utf8")).matchAll(/unlock\(\w+\)\s*\.(\w+)\(/g)].map(
+      [...(await readFile(join(src, file), "utf8")).matchAll(/unlock\([\w.]+\)\s*\.(\w+)\(/g)].map(
         (match) => match[1] as string,
       ),
     ),

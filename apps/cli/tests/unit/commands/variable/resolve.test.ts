@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { liveDeployment } from "../../../../../src/commands/variable/resolve/index";
-import { unscopedCommand } from "../../../../../src/lib/suggestion";
+import { liveDeployment } from "../../../../src/commands/variable/resolve";
+import { unscopedCommand } from "../../../../src/lib/suggestion";
 
 type Deployment = { id: string; targets: { origin: string }[] };
 

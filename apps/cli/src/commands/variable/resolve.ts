@@ -1,8 +1,8 @@
-import type { ZitadelClient } from "../../../lib/api-client";
-import { Cmd } from "../../../lib/cmd";
-import { ZitadelError } from "../../../lib/errors";
-import { DEPLOY_ARGS, DeploymentService, OriginService } from "../../../lib/backend";
-import type { SuggestedCommand } from "../../../lib/suggestion";
+import type { ZitadelClient } from "../../lib/api-client";
+import { Cmd } from "../../lib/cmd";
+import { ZitadelError } from "../../lib/errors";
+import { DEPLOY_ARGS, DeploymentService, OriginService } from "../../lib/backend";
+import type { SuggestedCommand } from "../../lib/suggestion";
 
 import {
   type Admitted,
@@ -10,9 +10,8 @@ import {
   EnvironmentCommand,
   type JsonEnvelope,
   nonBlankString,
-} from "../../../lib/oclif";
-import { plainFlag, Tabulatable } from "../../../lib/oclif/tabulatable";
-import { variableCells } from "../../../lib/variables";
+} from "../../lib/oclif";
+import { plainFlag, Tabulatable } from "../../lib/oclif/tabulatable";
 
 /** A deployment that is live on the target now. */
 type LiveDeployment = Awaited<ReturnType<ZitadelClient["listDeployments"]["all"]>>[number];
@@ -139,7 +138,7 @@ export default class VariableResolve extends Tabulatable(EnvironmentCommand) {
     const items = await deploymentService.frozenVariables(live.id);
     this.recordTelemetry({ variable_count: items.length });
 
-    const rows = variableCells(items);
+    const rows = items.map((item) => item.cell());
     const columns = COLUMNS;
     const empty = `${live.id} froze no variables for ${where}.`;
     const footer = [`Frozen by ${live.id} for ${where}`];

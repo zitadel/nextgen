@@ -10,7 +10,7 @@ import { Paging } from "@zitadel/api/runtime/paging";
 
 import { pagedFunctions, type ZitadelClient } from "../api-client";
 import type { Consent } from "../consent";
-import { toVariableRows, type VariableRow } from "../variables";
+import { Variable } from "./variable-service";
 
 /**
  * A deployment, as create returns it: 200 when every target already served it,
@@ -67,7 +67,7 @@ export type DeploymentRecord = Awaited<ReturnType<ZitadelClient["getDeploymentBy
  */
 export type DeploymentDetail = Readonly<{
   deployment: DeploymentRecord;
-  variables: readonly VariableRow[];
+  variables: readonly Variable[];
 }>;
 
 /** One page of the deployment history, or every page when it was asked to drain. */
@@ -133,11 +133,11 @@ export class DeploymentService {
   }
 
   /** The variables a deployment froze when it was made. A secret is named, never disclosed. */
-  async frozenVariables(deploymentId: string): Promise<readonly VariableRow[]> {
+  async frozenVariables(deploymentId: string): Promise<readonly Variable[]> {
     const frozen = await this.client.getDeploymentVariables(deploymentId, {
       project_id: this.projectId,
     });
-    return toVariableRows(frozen);
+    return Variable.fromValues(frozen);
   }
 
   /** Every deployment, across all pages, optionally narrowed to the live ones or one origin. */

@@ -23,7 +23,12 @@ export {
   type Project,
 } from "./project-service";
 export { PreviewService, type PreviewPageQuery } from "./preview-service";
-export { VariableService, type VariableKinds, type VariableWrite } from "./variable-service";
+export {
+  Variable,
+  VariableService,
+  type VariableState,
+  type VariableWrite,
+} from "./variable-service";
 export { BrandingService } from "./branding-service";
 export { PolicyService, type PolicyEvaluation, type PolicyQuery } from "./policy-service";
 export {
