@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect, useNavigate, useRouter } from "@tanstack/react-router";
 import { Box, MoreVertical, Plus, User } from "lucide-react";
 import {
   Fragment,
@@ -38,6 +38,7 @@ import {
   UserIdCell,
   UserIdentityCell,
 } from "@/components/user-cells";
+import { IdText } from "@/components/id-text";
 import { UsersFilter } from "@/components/users-filter";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -62,6 +63,7 @@ import {
   type ColumnPins,
   type SchemaOption,
   type UsersSearch,
+  OLDER_REVISIONS,
   attributeSummary,
   columnsBeyondIdentity,
   columnsForUsers,
@@ -76,8 +78,8 @@ import {
 import { Page } from "@/components/layout";
 import { cn } from "@/lib/utils";
 
-/** The filter's earlier choices, `Latest only` and `Older revisions`. */
-const LEGACY_REVISIONS = new Set(["latest", "older"]);
+/** The filter's earlier `Latest only` choice; the newest revision is picked by its id now. */
+const LEGACY_LATEST = "latest";
 
 export const Route = createFileRoute("/_authed/users/")({
   // `User`, not `Users`: the single-person glyph. The plural two-person one
@@ -87,15 +89,15 @@ export const Route = createFileRoute("/_authed/users/")({
   // The filter lives in the URL, as the Teams tabs do: it is a server-side
   // filter, so it belongs to the request the loader makes, is linkable and
   // survives a reload. Only what the filter can send is kept: a revision
-  // belongs to a schema, so it goes without one, and `latest` and `older`,
-  // which earlier links carry, name no revision.
+  // belongs to a schema, so it goes without one, and `latest`, which earlier
+  // links carry, names no revision.
   validateSearch: (search: Record<string, unknown>): UsersSearch => {
     const schema = typeof search.schema === "string" && search.schema ? search.schema : undefined;
     const revision =
       schema &&
       typeof search.revision === "string" &&
       search.revision &&
-      !LEGACY_REVISIONS.has(search.revision)
+      search.revision !== LEGACY_LATEST
         ? search.revision
         : undefined;
     // Both keys, even unset: the router lays this over the raw search, so a
@@ -109,13 +111,22 @@ export const Route = createFileRoute("/_authed/users/")({
     // the chosen schema's revisions, with whether each is in use, are read for
     // it alone. Both are chrome: unreadable, the list still renders, narrowed
     // by what the URL carries.
-    const filter = userFilter(deps);
+    const readingRevisions = deps.schema
+      ? fetchSchemaRevisions(projectId, deps.schema, { inUse: true }).catch(() => [])
+      : Promise.resolve([]);
+    // `older` compares with the newest revision, so its users wait for the
+    // history. Unreadable, the URL would claim a filter the list cannot
+    // apply, so it drops back to the schema alone.
+    const older = deps.revision === OLDER_REVISIONS;
+    const latestId = older ? (await readingRevisions)[0]?.id : undefined;
+    if (older && !latestId) {
+      throw redirect({ to: "/users", search: (prev) => ({ ...prev, revision: undefined }) });
+    }
+    const filter = userFilter(deps, latestId);
     const [page, options, revisions] = await Promise.all([
       fetchUsers(projectId, undefined, true, filter),
       fetchAllSchemas(projectId).then(schemaOptions, () => []),
-      deps.schema
-        ? fetchSchemaRevisions(projectId, deps.schema, { inUse: true }).catch(() => [])
-        : [],
+      readingRevisions,
     ]);
     return {
       users: page.users,
@@ -321,9 +332,9 @@ function UsersScreen() {
                           to="/schemas/$schemaId"
                           params={{ schemaId: user.schemaId }}
                           title={user.schemaId}
-                          className="hover:text-foreground block truncate underline-offset-2 hover:underline"
+                          className="hover:text-foreground flex min-w-0 underline-offset-2 hover:underline"
                         >
-                          {user.schemaId}
+                          <IdText id={user.schemaId} />
                         </Link>
                       ) : (
                         "—"

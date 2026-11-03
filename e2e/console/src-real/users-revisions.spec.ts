@@ -12,7 +12,7 @@ import { signIn } from "../support/sign-in";
  * The unit specs cover which criteria each choice sends. What only a live
  * backend proves is that the server honours them together: `schema_object_type
  * equals` with `schema equals` one revision returns exactly that revision's
- * users.
+ * users, and with `schema not_equals` the newest returns everyone else.
  */
 
 test("narrows the users to one revision of a schema", async ({ page, zitadel, seed }) => {
@@ -50,5 +50,10 @@ test("narrows the users to one revision of a schema", async ({ page, zitadel, se
   await page.getByRole("option").and(page.getByTitle(newer.id)).click();
   await expect(table.getByRole("link", { name: onNewer })).toBeVisible();
   await expect(table.getByRole("link", { name: onOlder })).toHaveCount(0);
+
+  await page.getByRole("combobox", { name: "Filter by revision" }).click();
+  await page.getByRole("option", { name: "Older revisions" }).click();
+  await expect(table.getByRole("link", { name: onOlder })).toBeVisible();
+  await expect(table.getByRole("link", { name: onNewer })).toHaveCount(0);
   await expectNoErrorBoundary(page);
 });

@@ -1,3 +1,4 @@
+import { IdText } from "@/components/id-text";
 import { Badge } from "@/components/ui/badge";
 import { SelectItem } from "@/components/ui/select";
 import { formatDateTime } from "@/lib/date";
@@ -10,8 +11,11 @@ import { cn } from "@/lib/utils";
  * shortened id, its creation time and its badges.
  */
 
-/** The menu's width: wide enough for a date and both badges on one line. */
-export const REVISION_MENU = "w-81";
+/**
+ * The menu's width: wide enough for a date and both badges on one line, and
+ * never narrower than its trigger, whose width Radix gives the menu's list.
+ */
+export const REVISION_MENU = "w-81 min-w-(--radix-select-trigger-width)";
 
 /** A trigger whose value is a row of pieces: it shrinks to its container, 6px apart. */
 export const REVISION_TRIGGER =
@@ -33,6 +37,17 @@ export function shortRevisionId(id: string): string {
 }
 
 /**
+ * A revision's id on one line, at most the menu's width: a minted one in the
+ * design's short form (`shortRevisionId`), any other cut in the middle.
+ */
+function RevisionId({ id, title, className }: { id: string; title?: string; className?: string }) {
+  const short = shortRevisionId(id);
+  // The short form is as short as the design draws it, so it never gives way.
+  const fixed = short !== id && "shrink-0";
+  return <IdText id={short} title={title} className={cn("max-w-81", fixed, className)} />;
+}
+
+/**
  * A chosen revision on a trigger: its shortened id, with the full one in its
  * title, and its badges.
  */
@@ -47,9 +62,7 @@ export function RevisionValue({
 }) {
   return (
     <>
-      <span className={cn("truncate", className)} title={id}>
-        {shortRevisionId(id)}
-      </span>
+      <RevisionId id={id} title={id} className={className} />
       <RevisionBadges revisions={revisions} id={id} />
     </>
   );
@@ -99,11 +112,11 @@ export function RevisionItems({ revisions }: { revisions: SchemaRevision[] }) {
       // The design's rhythm: the id on a 32px row, the meta line 6px under
       // it, 5px below, and 4px between options. The check mark sits on the
       // id's line, not centred on both. The item text may shrink, so a long
-      // id ends in an ellipsis rather than running under the check mark.
+      // id is cut rather than running under the check mark.
       className="items-start pb-1.25 not-first:mt-1 *:[span]:last:min-w-0 [&>[data-slot=select-item-indicator]]:top-2.5"
     >
       <span className="flex min-w-0 flex-col items-start gap-1.5">
-        <span className="max-w-full truncate">{shortRevisionId(revision.id)}</span>
+        <RevisionId id={revision.id} className="max-w-full" />
         <span className="flex flex-wrap items-center gap-1.25">
           {/* Muted text on the highlighted row's accent fill falls under
               4.5:1, so the date takes the accent's own foreground there. */}

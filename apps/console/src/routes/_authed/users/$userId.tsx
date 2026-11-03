@@ -6,6 +6,7 @@ import { api } from "@/api/zitadel";
 import { DeleteUserDialog } from "@/components/delete-user-dialog";
 import { MetaRule, MetaValue } from "@/components/detail-meta";
 import { DETAIL_BODY, DETAIL_CARD, DetailHeader, DetailSection } from "@/components/detail-page";
+import { IdText } from "@/components/id-text";
 import { FormError } from "@/components/form-error";
 import { Page } from "@/components/layout";
 import { StatusBadge } from "@/components/status-badge";
@@ -396,8 +397,8 @@ function ProfileCard({
 
   return (
     <Card className={DETAIL_CARD}>
-      {/* The row wraps rather than truncate the id, and the box grows past its
-          24px when the id breaks across lines. It is a `field-group` container
+      {/* The row wraps the name above the box on a narrow card, and the box
+          keeps the id on one line, cut in the middle. It is a `field-group` container
           with the fields' inset and gap, so the title takes the label column
           at the fields' breakpoint. */}
       <div className="@container/field-group flex flex-wrap items-center gap-x-3 gap-y-2 px-6 pt-5 pb-4">
@@ -420,7 +421,7 @@ function ProfileCard({
               asChild
               variant="secondary"
               size="xs"
-              className="h-auto min-h-6 max-w-full flex-wrap justify-start py-0.5 whitespace-normal has-[>svg]:px-2"
+              className="h-auto min-h-6 max-w-full justify-start py-0.5 has-[>svg]:px-2"
             >
               <Link
                 to="/schemas/$schemaId"
@@ -430,9 +431,9 @@ function ProfileCard({
                 <GitCommitHorizontal className="size-4" strokeWidth={1.5} aria-hidden />
                 <Badge
                   variant="ghost"
-                  className="h-auto min-h-5 min-w-0 shrink overflow-visible px-0 py-0 font-mono font-normal break-all whitespace-normal"
+                  className="h-auto min-h-5 min-w-0 shrink px-0 py-0 font-mono font-normal"
                 >
-                  {schemaId}
+                  <IdText id={schemaId} title={schemaId} />
                 </Badge>
               </Link>
             </Button>

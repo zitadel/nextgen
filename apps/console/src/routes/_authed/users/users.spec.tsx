@@ -268,8 +268,8 @@ describe("users screen", () => {
       "ID",
       "",
     ]);
-    // The ID is the column that truncates to fit; the tooltip keeps it whole.
-    expect(table.getByText("user_1")).toHaveAttribute("title", "user_1");
+    // The ID is the column that is cut to fit; the tooltip keeps it whole.
+    expect(table.getByTitle("user_1")).toHaveTextContent("user_1");
   });
 
   it("pins the User column and the row menu to the card's edges", async () => {
@@ -1363,11 +1363,12 @@ describe("users screen", () => {
     // The chosen schema's history, newest first; what each option shows is
     // `RevisionItems`' to prove.
     const options = within(await screen.findByRole("listbox")).getAllByRole("option");
-    expect(options.map((option) => option.getAttribute("title"))).toEqual([
+    expect(options.map((option) => option.getAttribute("title") ?? option.textContent)).toEqual([
+      "Older revisions",
       "sch_business_2",
       "sch_business",
     ]);
-    await userEvent.click(options[1]!);
+    await userEvent.click(options[2]!);
     await waitFor(() =>
       expect(bodies.at(-1)).toMatchObject({
         filter: [
@@ -1401,17 +1402,88 @@ describe("users screen", () => {
     expect(router.state.resolvedLocation?.search).toEqual({ project: "proj_test" });
   });
 
-  it("drops the earlier `latest` and `older` revision values from a link", async () => {
+  it("drops the earlier `latest` revision value from a link", async () => {
     serveLineage();
     const bodies = recordQueries(() => HttpResponse.json({ users: [] }));
-    await renderUsers(`${scopedPath("/users")}&schema=business&revision=older`);
+    await renderUsers(`${scopedPath("/users")}&schema=business&revision=latest`);
 
     await screen.findByRole("table");
     expect(screen.queryByRole("button", { name: "Clear the revision filter" })).toBeNull();
-    expect(bodies.at(-1)).toMatchObject({
-      filter: [{ field: "schema_object_type", operation: "equals", value: "business" }],
+    expect(bodies.at(-1)).toEqual(
+      expect.objectContaining({
+        filter: [{ field: "schema_object_type", operation: "equals", value: "business" }],
+      }),
+    );
+  });
+
+  it("narrows to the users not on the newest revision", async () => {
+    // `Older revisions` sends `schema not_equals` the newest revision's id:
+    // who is left to migrate. A link carrying `revision=older` opens it.
+    serveLineage();
+    const bodies = recordQueries(() => HttpResponse.json({ users: [] }));
+    const router = await renderUsers(`${scopedPath("/users")}&schema=business`);
+    await screen.findByRole("table");
+
+    await userEvent.click(screen.getByRole("combobox", { name: "Filter by revision" }));
+    await userEvent.click(await screen.findByRole("option", { name: "Older revisions" }));
+    await waitFor(() =>
+      expect(bodies.at(-1)).toEqual(
+        expect.objectContaining({
+          filter: [
+            { field: "schema_object_type", operation: "equals", value: "business" },
+            { field: "schema", operation: "not_equals", value: "sch_business_2" },
+          ],
+        }),
+      ),
+    );
+    expect(router.state.resolvedLocation?.search).toMatchObject({
+      schema: "business",
+      revision: "older",
     });
-    expect(bodies.at(-1)?.filter).toHaveLength(1);
+    expect(screen.getByRole("combobox", { name: "Filter by revision" })).toHaveTextContent(
+      "RevisionOlder revisions",
+    );
+  });
+
+  it("drops `older` back to the schema when its history cannot be read", async () => {
+    // With no newest revision to compare with, the URL would claim a filter
+    // the list does not apply.
+    const bodies = recordQueries(() => HttpResponse.json({ users: [] }));
+    server.use(
+      http.get(SCHEMAS_URL, ({ request }) =>
+        new URL(request.url).searchParams.get("revisions") === "all"
+          ? HttpResponse.json({ code: "internal", message: "boom" }, { status: 500 })
+          : HttpResponse.json({ schemas: [] }),
+      ),
+    );
+    const router = await renderUsers(`${scopedPath("/users")}&schema=business&revision=older`);
+
+    await screen.findByRole("table");
+    await waitFor(() =>
+      expect(router.state.resolvedLocation?.search).toEqual({
+        project: "proj_test",
+        schema: "business",
+      }),
+    );
+    expect(bodies.every((body) => (body.filter as unknown[]).length === 1)).toBe(true);
+  });
+
+  it("offers no older revisions on a schema with one revision", async () => {
+    const business = { ...BUSINESS_SCHEMA.schema, objectType: "business" };
+    const only = {
+      id: "sch_business",
+      schema: business,
+      metadata: { created_at: "2026-07-01T00:00:00Z" },
+    };
+    server.use(http.get(SCHEMAS_URL, () => HttpResponse.json({ schemas: [only] })));
+    recordQueries(() => HttpResponse.json({ users: [] }));
+    await renderUsers(`${scopedPath("/users")}&schema=business`);
+    await screen.findByRole("table");
+
+    await userEvent.click(screen.getByRole("combobox", { name: "Filter by revision" }));
+    const listbox = within(await screen.findByRole("listbox"));
+    expect(listbox.getAllByRole("option")).toHaveLength(1);
+    expect(listbox.queryByRole("option", { name: "Older revisions" })).toBeNull();
   });
 
   it("disables a filter with nothing to offer", async () => {

@@ -11,16 +11,18 @@ import {
   Select,
   SelectContent,
   SelectItem,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
 import type { SchemaRevision } from "@/lib/schema";
-import type { SchemaOption, UsersSearch } from "@/lib/user-list";
+import { OLDER_REVISIONS, type SchemaOption, type UsersSearch } from "@/lib/user-list";
 
 /**
  * The Users list's filters on the title row (#1669, #2502): a schema by object
- * type, then one revision of it. The revision filter stays in view, disabled
- * until a schema is chosen. There is no sort: revision ids carry no creation
+ * type, then one revision of it, or `Older revisions` for every user not yet
+ * on the newest, which a schema with one revision has none of. The revision
+ * filter stays in view, disabled until a schema is chosen. There is no sort: revision ids carry no creation
  * order (a URI `$id`, a UUID on Spanner), and the user query cannot sort by
  * the revision's creation time.
  *
@@ -62,11 +64,23 @@ export function UsersFilter({
         label="Revision"
         name="revision"
         value={search.revision}
-        display={search.revision && <RevisionValue revisions={revisions} id={search.revision} />}
+        display={
+          search.revision === OLDER_REVISIONS ? (
+            <span className="truncate">Older revisions</span>
+          ) : (
+            search.revision && <RevisionValue revisions={revisions} id={search.revision} />
+          )
+        }
         disabled={!search.schema || (revisions.length === 0 && !search.revision)}
         onChange={(revision) => onChange({ schema: search.schema, revision })}
         menuClassName={REVISION_MENU}
       >
+        {revisions.length > 1 && (
+          <>
+            <SelectItem value={OLDER_REVISIONS}>Older revisions</SelectItem>
+            <SelectSeparator />
+          </>
+        )}
         <RevisionItems revisions={revisions} />
       </FilterSelect>
     </>

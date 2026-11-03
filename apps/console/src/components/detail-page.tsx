@@ -2,6 +2,7 @@ import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { Card, CardContent } from "@/components/ui/card";
+import { IdText } from "@/components/id-text";
 import { CopyButton } from "@/components/ui/copy-button";
 import { Separator } from "@/components/ui/separator";
 import { formatDate } from "@/lib/date";
@@ -186,8 +187,8 @@ export function DetailTitle({
         <span className="flex flex-wrap items-center gap-x-1">
           <span className="whitespace-nowrap">{idLabel}</span>
           <span className="flex min-w-0 items-center gap-1">
-            {/* `break-all`: a URI id has no break point and must not widen the page. */}
-            <span className="text-foreground min-w-0 break-all">{id}</span>
+            {/* One line, cut in the middle: a URI id must not widen the page. */}
+            <IdText id={id} title={id} className="text-foreground" />
             <CopyButton value={id} label={`Copy ${idLabel}`} size="inline" />
           </span>
         </span>
