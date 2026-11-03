@@ -78,7 +78,7 @@ func NewServers(h api.Handler, sec api.SecurityHandler, opts ...api.ServerOption
 func MountAPI(mux *http.ServeMux, chain func(http.Handler) http.Handler, servers Servers) {
 	// Exact path ahead of the prefix catch-all; outside chain so tools need
 	// no CSRF or session cookie.
-	mux.Handle(openapibundled.Path, openapibundled.Handler())
+	mux.Handle(openapibundled.Path, openAPIDocumentHandler())
 	prefixed := chain(servers.API)
 	mux.Handle(client.PathPrefix+"/", prefixed)
 	mux.Handle(client.PathPrefix, prefixed)
