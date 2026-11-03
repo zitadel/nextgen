@@ -152,6 +152,26 @@ function clearFlowIdFromLocation(): void {
   history.replaceState(history.state, "", url);
 }
 
+/** Autocomplete tokens that mark a field's value as a credential. */
+const SECRET_AUTOCOMPLETE_TOKENS = ["current-password", "new-password", "one-time-code"];
+
+/** Whether a field holds a password or one-time code. */
+function isSecretField(field: CreateFlow201StepFieldsItem): boolean {
+  if (field.type === "password") return true;
+  const tokens = (field.autocomplete ?? "").toLowerCase().split(/\s+/);
+  return tokens.some((token) => SECRET_AUTOCOMPLETE_TOKENS.includes(token));
+}
+
+/** `values` without the ones `step`'s secret fields hold. */
+function withoutSecrets(
+  values: Record<string, string>,
+  step: CreateFlow201Step,
+): Record<string, string> {
+  const secrets = new Set((step.fields ?? []).filter(isSecretField).map((field) => field.name));
+  if (secrets.size === 0) return values;
+  return Object.fromEntries(Object.entries(values).filter(([name]) => !secrets.has(name)));
+}
+
 /** The `code` of a Flow API error envelope, or "" for anything else. */
 function apiErrorCode(error: unknown): string {
   if (!(error instanceof ApiError)) return "";
@@ -917,6 +937,13 @@ export class ZitadelLogin extends ZitadelSurface {
     // turn later, and by then the terminal screen has already painted. A
     // preview navigates nowhere, so it never holds the loader for it.
     this.completing = !preview && navigatesOnComplete(wire, this.postSignInUrl);
+    // A secret is for the step it was typed on: a step that offers another
+    // account, or a later step that asks for a password again, starts empty.
+    // A re-render of the same step (a refused value) keeps what was typed.
+    const leaving = this.response?.step;
+    if (leaving !== undefined && leaving.name !== wire.step.name) {
+      this.formValues = withoutSecrets(this.formValues, leaving);
+    }
     this.response = wire;
     const { branding, issues } = validateBranding(wire.branding, {
       renderingOrigin: this.ownerDocument.location.origin,
@@ -1321,11 +1348,7 @@ export class ZitadelLogin extends ZitadelSurface {
     // The widget never broadcasts a password or one-time-code value through its
     // own events. It cannot hide the input from other scripts on the same page.
     const field = this.response?.step.fields?.find((candidate) => candidate.name === name);
-    const autocompleteTokens = (field?.autocomplete ?? "").toLowerCase().split(/\s+/);
-    const secretTokens = ["current-password", "new-password", "one-time-code"];
-    const hasSecretToken = autocompleteTokens.some((token) => secretTokens.includes(token));
-    const isSecret = field?.type === "password" || hasSecretToken;
-    if (isSecret) {
+    if (field !== undefined && isSecretField(field)) {
       return;
     }
     emit(this, "zitadel-flow-input", { name, value });
