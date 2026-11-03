@@ -246,10 +246,19 @@ Each invocation prints one JSON object:
   (the origins it went live on) and `data.resources` (how many it pinned). A
   re-run on unchanged config returns the same digest. Use it to confirm what
   went live.
+- When the server refuses a release, `deploy` fails with `E_VALIDATION` and
+  the `hint` lists each refused resource as `<kind> <handle>: <reason>`, such
+  as `schema human-user: …` or `flow default-login: …`. Read the hint, not
+  only `message` (`release: invalid`); the same entries are in
+  `details.body.details.resources`.
+- `deploy` warns that a password step cannot tell which user to challenge only
+  when no identifier step comes before it. A step reached through a
+  `user_already_exists` collision, such as `sso-conflict`, is exempt: the
+  collision names the user.
 - `deploy` and `deploy --dry-run` read the project's users and add a warning
   to `warnings` when the config would lock existing users out: users of a
-  schema who lack its new `x-identifier` property, or users with an SSO link
-  whose schema no flow uses any more. It only warns, and it is skipped
+  schema who lack the field its login step looks users up by, or users with an
+  SSO link whose schema no flow uses any more. It only warns, and it is skipped
   silently when the users cannot be read.
 - `preview` is `deploy` for a pull-request build: it deploys the release to the
   build's preview URLs (from the platform, or `--origin`) for `--ttl` and emits

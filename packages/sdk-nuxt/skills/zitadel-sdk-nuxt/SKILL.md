@@ -30,7 +30,7 @@ wiring the middleware without the module.
 pnpm add @zitadel/sdk-nuxt@latest
 ```
 
-Peer dependencies: `nuxt >=4`, `h3 >=1`.
+Peer dependencies: `nuxt >=4`, `h3 ^1.15.0`.
 
 ## Integrate
 
