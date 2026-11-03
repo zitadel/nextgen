@@ -4,7 +4,6 @@ import { ApiError, request } from "@zitadel/api/runtime/fetch";
 
 import { createZitadelClient } from "../api-client";
 import { ZitadelError } from "../errors";
-import { interruptSignal } from "../interrupt";
 import { isObject } from "../json";
 import type { LocalAdmin } from "./admin-credential";
 import { PLATFORM_PROJECT_ID, readPlatformRuntime } from "./runtime";
@@ -42,8 +41,12 @@ export function localAdminRequest(
 }
 
 /** A console URL that signs the admin in once, via a fresh handoff token. */
-export async function consoleSignInUrl(serverUrl: string, admin: LocalAdmin): Promise<string> {
-  const { handoffToken } = await signIn(serverUrl, admin);
+export async function consoleSignInUrl(
+  serverUrl: string,
+  admin: LocalAdmin,
+  signal: AbortSignal,
+): Promise<string> {
+  const { handoffToken } = await signIn(serverUrl, admin, signal);
   return `${serverUrl}/ui/console/login?handoff=${encodeURIComponent(handoffToken)}`;
 }
 
@@ -57,12 +60,16 @@ const SESSION_COOKIES = ["zitadel_session", "__Host-zitadel_session"] as const;
  * loopback http and `__Host-zitadel_session` from one on https, and goes back
  * under the name it came with.
  */
-export async function adminSessionCookie(serverUrl: string, admin: LocalAdmin): Promise<string> {
-  const { handoffToken, publishableKey } = await signIn(serverUrl, admin);
+export async function adminSessionCookie(
+  serverUrl: string,
+  admin: LocalAdmin,
+  signal: AbortSignal,
+): Promise<string> {
+  const { handoffToken, publishableKey } = await signIn(serverUrl, admin, signal);
 
   // The one call made without the generated client: the session comes back
   // only as a Set-Cookie header, which that client does not expose. `request`
-  // still types its failures and honours Ctrl-C the way the client does.
+  // still types its failures and honours the signal the way the client does.
   const { res } = await request(
     `${apiBaseUrl(serverUrl)}/sessions/exchange?project_id=${encodeURIComponent(PLATFORM_PROJECT_ID)}`,
     {
@@ -73,7 +80,7 @@ export async function adminSessionCookie(serverUrl: string, admin: LocalAdmin): 
       method: "POST",
       body: JSON.stringify({ handoff_token: handoffToken }),
     },
-    { signal: interruptSignal() },
+    { signal },
   );
   const cookie = res.headers
     .getSetCookie()
@@ -98,6 +105,7 @@ export async function adminSessionCookie(serverUrl: string, admin: LocalAdmin): 
 async function signIn(
   serverUrl: string,
   admin: LocalAdmin,
+  signal: AbortSignal,
 ): Promise<{ handoffToken: string; publishableKey: string }> {
   const runtime = await readPlatformRuntime(serverUrl, REQUEST_TIMEOUT_MS);
   if (!runtime) {
@@ -113,7 +121,11 @@ async function signIn(
       },
     );
   }
-  const client = createZitadelClient({ baseUrl: serverUrl, token: runtime.publishable_key });
+  const client = createZitadelClient({
+    baseUrl: serverUrl,
+    token: runtime.publishable_key,
+    signal,
+  });
 
   const { attempt_id } = await client.createAuthAttempt(
     { project_id: PLATFORM_PROJECT_ID },

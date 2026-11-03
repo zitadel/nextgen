@@ -400,7 +400,7 @@ catalogs:
       version: 1.16.0
     lucide-react:
       specifier: ^1.16.0
-      version: 1.61.0
+      version: 1.20.0
     marked:
       specifier: ^18.0.14
       version: 18.0.14
@@ -428,6 +428,12 @@ catalogs:
     p-map:
       specifier: ^7.1.1
       version: 7.1.1
+    p-reduce:
+      specifier: ^3.0.0
+      version: 3.0.0
+    p-retry:
+      specifier: ^8.0.1
+      version: 8.0.1
     p-timeout:
       specifier: ^8.0.0
       version: 8.0.0
@@ -479,6 +485,9 @@ catalogs:
     sonner:
       specifier: ^2.0.7
       version: 2.0.7
+    sort-keys:
+      specifier: ^6.0.1
+      version: 6.0.1
     storybook:
       specifier: ^10.3.6
       version: 10.4.6
@@ -541,7 +550,7 @@ catalogs:
       version: 5.31.1
     yaml:
       specifier: ^2.9.0
-      version: 2.9.1
+      version: 2.9.0
     zod:
       specifier: ^4.3.6
       version: 4.4.3
@@ -719,6 +728,12 @@ importers:
       open:
         specifier: 'catalog:'
         version: 11.0.4
+      p-reduce:
+        specifier: 'catalog:'
+        version: 3.0.0
+      p-retry:
+        specifier: 'catalog:'
+        version: 8.0.1
       p-timeout:
         specifier: 'catalog:'
         version: 8.0.0
@@ -737,6 +752,9 @@ importers:
       semver:
         specifier: 'catalog:'
         version: 7.8.5
+      sort-keys:
+        specifier: 'catalog:'
+        version: 6.0.1
       undici:
         specifier: ^7.29.1
         version: 7.29.1
@@ -12379,6 +12397,10 @@ packages:
   is-module@1.0.0:
     resolution: {integrity: sha512-51ypPSPCoTEIN9dy5Oy+h4pShgJmPCygKfyRCISBI+JoWT/2oJvK8QPxmwv7b/p239jXrm9M1mlQbyKJ5A152g==}
 
+  is-network-error@1.3.2:
+    resolution: {integrity: sha512-PhBY86zaxNZUuWP6h13Vu5oFe0XY6/UlKzQnYFELzGVHygP3MxmvTfYSG7GN3aIab/iWudSMgjSnG9Dq+nHrgA==}
+    engines: {node: '>=16'}
+
   is-node-process@1.2.0:
     resolution: {integrity: sha512-Vg4o6/fqPxIjtxgUH5QLJhwZ7gW5diGCVlXpuUfELC62CuxM1iHcRe51f2W1FDy04Ai4KJkagKjx3XaqyfRKXw==}
 
@@ -13945,6 +13967,14 @@ packages:
     resolution: {integrity: sha512-6Lh3jQPLthYujSrlw6ccWXBGZTkoTCz27Hd92g79LH/kjAbgoEu0t442cCCNbegPSJsA0lwDX8z0bcKtkpA32g==}
     engines: {node: '>=18'}
 
+  p-reduce@3.0.0:
+    resolution: {integrity: sha512-xsrIUgI0Kn6iyDYm9StOpOeK29XM1aboGji26+QEortiFST1hGZaUQOLhtEbqHErPpGW/aSz6allwK2qcptp0Q==}
+    engines: {node: '>=12'}
+
+  p-retry@8.0.1:
+    resolution: {integrity: sha512-NAigyu8hfvJe7MsS18mnc4is0MZtau3QMdBklaJKK23oBQb6occO3UPM3vHmTckW8KhfyjMZaUOqdTFEYliHgg==}
+    engines: {node: '>=22'}
+
   p-timeout@6.1.4:
     resolution: {integrity: sha512-MyIV3ZA/PmyBN/ud8vV9XzwTrNtR4jFrObymZYnZqMmW0zA8Z17vnT0rBgFE/TlohB+YCHqXMgZzb3Csp49vqg==}
     engines: {node: '>=14.16'}
@@ -15288,6 +15318,10 @@ packages:
   sort-keys@1.1.2:
     resolution: {integrity: sha512-vzn8aSqKgytVik0iwdBEi+zevbTYZogewTUM6dtpmGwEcdzbub/TX4bCzRhebDCRC3QzXgJsLRKB2V/Oof7HXg==}
     engines: {node: '>=0.10.0'}
+
+  sort-keys@6.0.1:
+    resolution: {integrity: sha512-w7xWRu8U9MneKNna8ptG194jp9PLtbd/Rl6gwrmbK4yUeKbE66a64rHgl0iKTBBDr/hpanx7zMGP1Qo8MRkc/w==}
+    engines: {node: '>=20'}
 
   sort-object-keys@1.1.3:
     resolution: {integrity: sha512-855pvK+VkU7PaKYPc+Jjnmt4EzejQHyhhF33q31qG8x7maDzkeFhAAThdCYay11CISO+qAMwjOBP+fPZe0IPyg==}
@@ -28618,6 +28652,8 @@ snapshots:
 
   is-module@1.0.0: {}
 
+  is-network-error@1.3.2: {}
+
   is-node-process@1.2.0: {}
 
   is-number-object@1.1.1:
@@ -31322,6 +31358,12 @@ snapshots:
 
   p-map@7.1.1: {}
 
+  p-reduce@3.0.0: {}
+
+  p-retry@8.0.1:
+    dependencies:
+      is-network-error: 1.3.2
+
   p-timeout@6.1.4: {}
 
   p-timeout@8.0.0: {}
@@ -32934,6 +32976,10 @@ snapshots:
   sort-keys@1.1.2:
     dependencies:
       is-plain-obj: 1.1.0
+
+  sort-keys@6.0.1:
+    dependencies:
+      is-plain-obj: 4.1.0
 
   sort-object-keys@1.1.3: {}
 

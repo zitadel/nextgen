@@ -8,7 +8,7 @@ import { projectMetaSchemas } from "../../../meta-schemas";
 import { DEFAULT_SERVER } from "../../../server";
 import { portFromIssuer } from "../../detectors/port";
 import { configIssuerOp, envIssuerOp } from "./dev-port-move";
-import { scaffold } from "./file-writer";
+import { FileWriter } from "./file-writer";
 import type { FileOp, ScaffoldPlan } from "./file-writer/types";
 import {
   AGENTS_HEADER,
@@ -61,7 +61,7 @@ export abstract class AbstractRulePatcher implements Patcher {
   /** Apply the full plan (base `.zitadel/` files + framework routes). */
   async patch(ctx: PatchContext, opts: PatchExecOptions): Promise<PatchResult> {
     await this.preflight(ctx, opts.cwd);
-    return scaffold(this.plan(ctx), opts);
+    return new FileWriter(opts).scaffold(this.plan(ctx));
   }
 
   /**
@@ -104,7 +104,7 @@ export abstract class AbstractRulePatcher implements Patcher {
             return true;
           });
     const execOpts = opts.missingOnly ? { ...opts, force: false } : opts;
-    return scaffold({ ops, summary: plan.summary }, execOpts);
+    return new FileWriter(execOpts).scaffold({ ops, summary: plan.summary });
   }
 
   /** See {@link Patcher.moveDevPort}. */
@@ -119,7 +119,7 @@ export abstract class AbstractRulePatcher implements Patcher {
       configIssuerOp(previousIssuer, ctx.issuer),
       ...guidanceOps(ctx),
     ];
-    return scaffold({ ops, summary: [this.summary(ctx)] }, opts);
+    return new FileWriter(opts).scaffold({ ops, summary: [this.summary(ctx)] });
   }
 
   /**

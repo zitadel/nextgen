@@ -438,11 +438,14 @@ function transitionTarget(def: FlowDef, t: FlowTransition): string {
 }
 
 /** Adjacency over local (current-flow) transitions: step → target steps. */
-function localAdjacency(def: FlowDef): Map<string, string[]> {
+function localAdjacency(
+  def: FlowDef,
+  skip: ReadonlySet<string> = new Set(),
+): Map<string, string[]> {
   const adj = new Map<string, string[]>();
   for (const step of def.steps) {
-    for (const t of step.transitions.values()) {
-      if (isCurrentFlow(t)) {
+    for (const [event, t] of step.transitions) {
+      if (!skip.has(event) && isCurrentFlow(t)) {
         const targets = adj.get(step.name) ?? [];
         targets.push(transitionTarget(def, t));
         adj.set(step.name, targets);
@@ -936,9 +939,12 @@ function validateAgainstSchema(def: FlowDef, schema: object): FlowValidationIssu
   // (every route through it is covered), so an identifier on a
   // *different* route — e.g. only on the register-purpose chain into a
   // shared step — cannot mask a login route that never collects one.
+  // A `user_already_exists` transition is not walked: the collision itself
+  // tells the engine which user to challenge (an SSO email that matches an
+  // existing password user), so the step it reaches needs no identifier.
   const loginEntry = def.purposes.get("login");
   if (loginEntry !== undefined) {
-    const adj = localAdjacency(def);
+    const adj = localAdjacency(def, new Set(["user_already_exists"]));
     const identifierFree = new Set<string>();
     const queue = [loginEntry];
     for (let head = 0; head < queue.length; head += 1) {

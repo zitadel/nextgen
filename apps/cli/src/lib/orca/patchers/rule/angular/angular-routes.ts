@@ -1,7 +1,7 @@
-import { builders, generateCode } from "magicast";
+import { builders } from "magicast";
 
 import { ZitadelError } from "../../../../errors";
-import { parseConfigModule } from "../utils/magicast";
+import { ConfigModule } from "../utils/config-module";
 
 const AUTH_ROUTE_PATHS = ["login", "register", "profile"] as const;
 
@@ -32,9 +32,9 @@ function isProxifiedArray(value: unknown): value is ProxifiedRouteArray {
 export function angularRoutesEdit(): (source: string | undefined) => string {
   return (source) => {
     const label = "src/app/app.routes.ts";
-    const mod = parseConfigModule(source, label);
+    const file = ConfigModule.open(source, label);
     // magicast types exports as an object with no declared members; reach `routes` as unknown.
-    const moduleExports: unknown = mod.exports;
+    const moduleExports: unknown = file.module.exports;
     const routes: unknown =
       typeof moduleExports === "object" && moduleExports !== null
         ? Reflect.get(moduleExports, "routes")
@@ -55,10 +55,6 @@ export function angularRoutesEdit(): (source: string | undefined) => string {
       routes.push(builders.raw(`{ path: ${JSON.stringify(path)}, children: [] }`));
     }
 
-    if (missing.length === 0 && source !== undefined) {
-      return source;
-    }
-    const code = generateCode(mod).code;
-    return code.endsWith("\n") ? code : `${code}\n`;
+    return file.render(missing.length > 0);
   };
 }

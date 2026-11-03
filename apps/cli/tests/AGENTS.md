@@ -155,7 +155,7 @@ it stays here deliberately rather than by oversight.
 
 ## Ports and network
 
-- A port handed to the CLI comes from `nextPort()`
+- A port handed to the CLI comes from the `port` fixture, or `nextPort()` where a helper picks one
   ([`helpers/ports.ts`](helpers/ports.ts)), never a bind-and-close probe:
   another worker's outbound connection can take it first (`E_PORT_IN_USE`).
   Never retry on that. A listener held for the whole test may bind port 0.

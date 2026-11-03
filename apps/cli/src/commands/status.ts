@@ -25,7 +25,7 @@ import {
   type JsonEnvelope,
 } from "../lib/oclif";
 import { resolveCwd } from "../lib/paths";
-import { shellArg, shellOption } from "../lib/shell";
+import { Cmd } from "../lib/cmd";
 import {
   hasZitadelConfig,
   hasZitadelSecret,
@@ -90,7 +90,7 @@ export default class Status extends EnvironmentCommand {
       this.environmentSelector(),
       // `--cwd` as typed, for the follow-ups the selector does not carry: the
       // runtime and the project files they act on live in that directory.
-      typeof flags.cwd === "string" ? ` ${shellOption("--cwd", flags.cwd)}` : "",
+      typeof flags.cwd === "string" ? ` ${Cmd.option("--cwd", flags.cwd)}` : "",
     );
     const nextActions = nextActionsFor(
       project,
@@ -322,7 +322,7 @@ function nextCommandsFor(
   }
   if (project.lifecycle === "not-configured" && project.environment !== undefined) {
     commands.push(
-      unscopedCommand(`env add ${shellArg(project.environment)}${cwdSuffix}`, cliVersion),
+      unscopedCommand(`env add ${Cmd.quote(project.environment)}${cwdSuffix}`, cliVersion),
     );
   } else if (project.lifecycle === "not-configured") {
     if (project.env_file === undefined) {

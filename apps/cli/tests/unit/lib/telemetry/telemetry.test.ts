@@ -54,6 +54,15 @@ function deps(sink: Tracked[], extra: Partial<TelemetryDeps> = {}): TelemetryDep
 }
 
 describe("Telemetry (generic core)", () => {
+  it("does not serialise a payload for the trace when debugging is off", () => {
+    const sink: Tracked[] = [];
+    const circular: Record<string, unknown> = {};
+    circular.self = circular;
+    const t = Telemetry.create(deps(sink, { debug: false }));
+
+    expect(() => t.track("e", { circular } as never)).not.toThrow();
+  });
+
   it("tracks an event, stamping distinct_id and $insert_id", () => {
     const sink: Tracked[] = [];
     const t = Telemetry.create(deps(sink));
