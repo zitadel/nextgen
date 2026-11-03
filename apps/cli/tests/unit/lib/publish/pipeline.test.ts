@@ -1,13 +1,15 @@
 import { describe, expect, it } from "vitest";
 
 import { runSteps, type Step, type StepContext } from "../../../../src/lib/publish/pipeline";
+import { stepOutput } from "../../../../src/lib/step-output";
 import type { SuggestedCommand } from "../../../../src/lib/suggestion";
 
 function ctx(overrides: Partial<StepContext>): StepContext {
   return {
     cwd: "/tmp",
-    client: {} as never,
-    projectId: "proj_1",
+    deployments: {} as never,
+    variables: {} as never,
+    output: stepOutput,
     env: {},
     mode: "deploy",
     dryRun: false,

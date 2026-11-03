@@ -7,7 +7,7 @@ import { it } from "../../../../helpers/fixtures";
 
 import { ZitadelError } from "../../../../../src/lib/errors";
 import { validateSsoConsistency } from "../../../../../src/lib/publish/steps/sso-consistency";
-import { takeReportedWarnings } from "../../../../../src/lib/warnings";
+import { reportWarning, takeReportedWarnings } from "../../../../../src/lib/warnings";
 
 const SCHEMA = ".zitadel/schemas/staff.json";
 const FLOW = ".zitadel/flows/login.json";
@@ -47,7 +47,7 @@ async function write(cwd: string, path: string, body: object): Promise<void> {
 
 async function failure(cwd: string): Promise<ZitadelError | undefined> {
   try {
-    await validateSsoConsistency(cwd);
+    await validateSsoConsistency(cwd, reportWarning);
   } catch (error) {
     expect(error).toBeInstanceOf(ZitadelError);
     return error as ZitadelError;

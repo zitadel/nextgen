@@ -1,10 +1,8 @@
 import { isVariableReference, missingEndpoints, referencedVariable } from "@zitadel/config/idp";
 import { idpConnectionConfigSchema } from "@zitadel/config/schemas";
-import { ApiError } from "@zitadel/api/runtime/fetch";
 
 import { ZitadelError } from "../../errors";
 import { IDPS_DIR, refuseResolvedSecret } from "../../idp";
-import { valuesOfKind } from "../../variables";
 import type { StepContext } from "../pipeline";
 
 /**
@@ -109,26 +107,8 @@ function valueAt(data: object, path: ReadonlyArray<PropertyKey>): unknown {
  * fallback from one to the other (ADR 069). A preview's token may not read them,
  * which leaves the check to the deploy that merges it.
  */
-async function heldVariables(ctx: StepContext): Promise<Map<string, boolean> | undefined> {
-  const kind = ctx.mode === "preview" ? "preview" : "primary";
-  const held = await ctx.client
-    .getVariables({ project_id: ctx.projectId, kind })
-    .catch((error: unknown) => {
-      if (ctx.mode === "preview" && error instanceof ApiError && error.status === 403) {
-        return undefined;
-      }
-      throw error;
-    });
-  if (held === undefined) {
-    return undefined;
-  }
-  // A secret reads back as `{ secret: true }`, a plain value as the value.
-  return new Map(
-    Object.entries(valuesOfKind(held, kind)).map(([name, value]) => [
-      name,
-      typeof value === "object",
-    ]),
-  );
+async function heldVariables(ctx: StepContext): Promise<ReadonlyMap<string, boolean> | undefined> {
+  return ctx.variables.heldByName(ctx.mode === "preview" ? "preview" : "primary");
 }
 
 /**

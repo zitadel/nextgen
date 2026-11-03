@@ -1,10 +1,19 @@
-import type { ZitadelClient } from "../api-client";
-
+import type { ConfigurationBundle, DeploymentService, VariableService } from "../backend";
 import type { SuggestedCommand } from "../suggestion";
-import type { ConfigurationBundle } from "../backend";
 
 /** Which publish a step runs for. `preview` lands with the preview command. */
 export type PipelineMode = "deploy" | "preview";
+
+/**
+ * Where a step says something to the person running it. The steps decide what
+ * is worth saying; whoever runs them decides how it is shown.
+ */
+export interface StepOutput {
+  /** A problem that does not stop the publish. */
+  warn(message: string): void;
+  /** Text for the person reading the terminal, printed as it is. */
+  say(text: string): void;
+}
 
 /**
  * What every step is handed. The bundle is built once by the command and shared
@@ -12,8 +21,9 @@ export type PipelineMode = "deploy" | "preview";
  */
 export interface StepContext {
   readonly cwd: string;
-  readonly client: ZitadelClient;
-  readonly projectId: string;
+  readonly deployments: DeploymentService;
+  readonly variables: VariableService;
+  readonly output: StepOutput;
   readonly env: Record<string, string | undefined>;
   readonly mode: PipelineMode;
   /** No server write happens on a dry run; a writing step is skipped. */

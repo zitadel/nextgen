@@ -10,18 +10,14 @@ import {
   PREVIEW_CREDENTIAL,
   PreviewCommand,
 } from "../../lib/oclif";
-import { DeploymentService, OriginService, ReleaseService } from "../../lib/backend";
 import {
-  buildBundle,
-  deployMessage,
-  headSha,
-  runSteps,
-  MESSAGE_MAX_LENGTH,
-  messageTooLong,
-  type StepContext,
-  validateStep,
-  worktreeIsDirty,
-} from "../../lib/publish";
+  DeploymentService,
+  OriginService,
+  ReleaseService,
+  VariableService,
+} from "../../lib/backend";
+import { deployMessage, MESSAGE_MAX_LENGTH, messageTooLong, Publisher } from "../../lib/publish";
+import { stepOutput } from "../../lib/step-output";
 import { ApiError } from "@zitadel/api/runtime/fetch";
 
 import type { ZitadelClient } from "../../lib/api-client";
@@ -279,27 +275,24 @@ export default class Preview extends PreviewCommand {
     const { client, projectId } = await this.connect();
     await refusePrimaryOrigins(urls, client, projectId);
 
-    const { bundle, brandingSources, idpFiles, policyFiles } = await buildBundle(this.cwd);
-    const ctx: StepContext = {
-      cwd: this.cwd,
-      client,
-      projectId,
-      env: this.env,
-      mode: "preview",
-      dryRun: this.dryRun,
-      json: this.isJson,
-      color: this.isColored,
-      bundle,
-      brandingSources,
-      idpFiles,
-      policyFiles,
-      suggest: (args) => this.suggest(args),
-    };
-
+    const releaseService = new ReleaseService(client, projectId);
+    const deploymentService = new DeploymentService(client, projectId);
+    const variableService = new VariableService(client, projectId);
+    const publisher = new Publisher(deploymentService, variableService);
     // The IdP step validates the connection files and stops short of syncing
     // them in a preview, so a pull-request build never reconfigures the
     // connections a merged deploy owns.
-    await runSteps([validateStep], ctx);
+    const prepared = await publisher.prepare({
+      cwd: this.cwd,
+      env: this.env,
+      mode: "preview",
+      dryRun: this.dryRun,
+      compare: false,
+      json: this.isJson,
+      color: this.isColored,
+      suggest: (args) => this.suggest(args),
+      output: stepOutput,
+    });
 
     // A dry run validates and resolves the targets but writes nothing — no
     // release, no deployment, no preview registration — so a pull-request build
@@ -321,12 +314,10 @@ export default class Preview extends PreviewCommand {
     // The release keeps the message of whichever run built it first, usually
     // this one, so the deploy after merge reuses it rather than adding its own.
     const message = await deployMessage(flags.message, this.cwd, this.env);
-    const releaseService = new ReleaseService(client, projectId);
-    const deploymentService = new DeploymentService(client, projectId);
-    const release = await releaseService.create(bundle, {
+    const release = await releaseService.create(prepared.bundle, {
       message,
-      gitSha: await headSha(this.cwd),
-      gitDirty: await worktreeIsDirty(this.cwd),
+      gitSha: prepared.gitSha,
+      gitDirty: prepared.gitDirty,
     });
     const deployment = await deploymentService.deploy({
       releaseId: release.id,

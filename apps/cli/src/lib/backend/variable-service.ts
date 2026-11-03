@@ -284,6 +284,30 @@ export class VariableService {
     }
   }
 
+  /**
+   * Which names hold a value in the given kind, and whether each is a secret.
+   *
+   * @returns The names mapped to whether they are secret, or undefined when a
+   * token that may not read the preview values asked for them, which leaves the
+   * check to whoever can.
+   */
+  async heldByName(kind: VariableKind): Promise<ReadonlyMap<string, boolean> | undefined> {
+    try {
+      const held = await this.read(kind);
+      return new Map(
+        Object.entries(valuesOfKind(held, kind)).map(([name, value]) => [
+          name,
+          typeof value === "object",
+        ]),
+      );
+    } catch (error) {
+      if (kind === "preview" && error instanceof ApiError && error.status === 403) {
+        return undefined;
+      }
+      throw error;
+    }
+  }
+
   private async read(kind: VariableKind): Promise<GetVariables200> {
     return this.client.getVariables({ project_id: this.projectId, kind });
   }

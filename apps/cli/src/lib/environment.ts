@@ -3,15 +3,14 @@ import { join, resolve } from "node:path";
 import { parseEnv } from "node:util";
 
 import type { ZitadelClient } from "./api-client";
-import { DeploymentService, type EnvironmentFiles, ReleaseService } from "./backend";
 import {
-  buildBundle,
-  headSha,
-  runSteps,
-  type StepContext,
-  validateStep,
-  worktreeIsDirty,
-} from "./publish";
+  DeploymentService,
+  type EnvironmentFiles,
+  ReleaseService,
+  VariableService,
+} from "./backend";
+import { Publisher } from "./publish";
+import { stepOutput } from "./step-output";
 import { ZitadelError } from "./errors";
 import { readIfExists } from "./fs";
 import { input } from "./input";
@@ -451,29 +450,25 @@ export async function deployInitialRelease(input: {
   message: string;
   suggest: (args: string) => SuggestedCommand;
 }): Promise<InitialDeployment> {
-  const { bundle, brandingSources, idpFiles, policyFiles } = await buildBundle(input.cwd);
-  const ctx: StepContext = {
+  const releaseService = new ReleaseService(input.client, input.projectId);
+  const deploymentService = new DeploymentService(input.client, input.projectId);
+  const variableService = new VariableService(input.client, input.projectId);
+  const publisher = new Publisher(deploymentService, variableService);
+  const prepared = await publisher.prepare({
     cwd: input.cwd,
-    client: input.client,
-    projectId: input.projectId,
     env: input.env,
     mode: "deploy",
     dryRun: false,
+    compare: false,
     json: input.json,
     color: input.color,
-    bundle,
-    brandingSources,
-    idpFiles,
-    policyFiles,
     suggest: input.suggest,
-  };
-  await runSteps([validateStep], ctx);
-  const releaseService = new ReleaseService(input.client, input.projectId);
-  const deploymentService = new DeploymentService(input.client, input.projectId);
-  const release = await releaseService.create(bundle, {
+    output: stepOutput,
+  });
+  const release = await releaseService.create(prepared.bundle, {
     message: input.message,
-    gitSha: await headSha(input.cwd),
-    gitDirty: await worktreeIsDirty(input.cwd),
+    gitSha: prepared.gitSha,
+    gitDirty: prepared.gitDirty,
   });
   const deployment = await deploymentService.deploy({
     releaseId: release.id,

@@ -36,11 +36,7 @@ export const diffStep: Step = {
   name: "diff",
   runsFor: ["deploy", "preview"],
   async run(ctx: StepContext): Promise<StepReport | undefined> {
-    const deployments = await ctx.client.listDeployments.all({
-      project_id: ctx.projectId,
-      live: true,
-      expand: ["release"],
-    });
+    const deployments = await ctx.deployments.list({ live: true, expand: ["release"] });
     // What the primary origins serve: a live preview deployment is never the
     // baseline, even when it is the newest one in the project.
     const live = deployments.find(DeploymentService.servesPrimary)?.release?.metadata;
@@ -88,14 +84,14 @@ export const diffStep: Step = {
     }
 
     if (note !== undefined) {
-      process.stdout.write(`${note}\n`);
+      ctx.output.say(`${note}\n`);
     }
     const diff = await diffConfigAgainst(ctx.cwd, sha, ctx.color, referenced);
     if (diff === null) {
       return noDiff(ctx, sha, unknown);
     }
     const shown = diff.trim() === "" ? `No changes to .zitadel/ since ${sha.slice(0, 12)}.` : diff;
-    process.stdout.write(shown.endsWith("\n") ? shown : `${shown}\n`);
+    ctx.output.say(shown.endsWith("\n") ? shown : `${shown}\n`);
     return undefined;
   },
 };
@@ -103,7 +99,7 @@ export const diffStep: Step = {
 /** No diff to show: the line saying why, printed, or reported under `--json`. */
 function noDiff(ctx: StepContext, against: string | null, note: string): StepReport | undefined {
   if (!ctx.json) {
-    process.stdout.write(`${note}\n`);
+    ctx.output.say(`${note}\n`);
     return undefined;
   }
   const diff: ConfigDiff = { against, files: null, note };

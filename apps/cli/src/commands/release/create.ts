@@ -6,15 +6,9 @@ import {
   EnvironmentCommand,
   type JsonEnvelope,
 } from "../../lib/oclif";
-import { ReleaseService } from "../../lib/backend";
-import {
-  buildBundle,
-  headSha,
-  runSteps,
-  type StepContext,
-  validateStep,
-  worktreeIsDirty,
-} from "../../lib/publish";
+import { DeploymentService, ReleaseService, VariableService } from "../../lib/backend";
+import { Publisher } from "../../lib/publish";
+import { stepOutput } from "../../lib/step-output";
 
 import { reads, type Refused } from "../../lib/oclif/flags";
 import { MESSAGE_MAX_LENGTH, messageTooLong } from "../../lib/publish";
@@ -60,29 +54,25 @@ export default class ReleaseCreate extends EnvironmentCommand {
 
   protected async execute({ flags }: Admitted<typeof ReleaseCreate>): Promise<JsonEnvelope> {
     const { client, projectId } = await this.connect();
-    const { bundle, resourceCount, brandingSources, idpFiles, policyFiles } = await buildBundle(
-      this.cwd,
-    );
-
-    const ctx: StepContext = {
-      cwd: this.cwd,
-      client,
-      projectId,
-      env: this.env,
-      mode: "deploy",
-      dryRun: this.dryRun,
-      json: this.isJson,
-      color: this.isColored,
-      bundle,
-      brandingSources,
-      idpFiles,
-      policyFiles,
-      suggest: (args) => this.suggest(args),
-    };
+    const releaseService = new ReleaseService(client, projectId);
+    const deploymentService = new DeploymentService(client, projectId);
+    const variableService = new VariableService(client, projectId);
+    const publisher = new Publisher(deploymentService, variableService);
     // The IdP connections sync before the build, as `deploy` does: a release
     // names its connections by slug, and the server refuses to build one
     // that names a slug the project does not hold yet.
-    await runSteps([validateStep], ctx);
+    const prepared = await publisher.prepare({
+      cwd: this.cwd,
+      env: this.env,
+      mode: "deploy",
+      dryRun: this.dryRun,
+      compare: false,
+      json: this.isJson,
+      color: this.isColored,
+      suggest: (args) => this.suggest(args),
+      output: stepOutput,
+    });
+    const { resourceCount } = prepared;
 
     // `release create` carries the same no-mutation promise every command does
     // under `--dry-run`: validate the bundle the same way, then stop before the
@@ -95,11 +85,10 @@ export default class ReleaseCreate extends EnvironmentCommand {
       });
     }
 
-    const releaseService = new ReleaseService(client, projectId);
-    const release = await releaseService.create(bundle, {
+    const release = await releaseService.create(prepared.bundle, {
       message: flags.message,
-      gitSha: await headSha(this.cwd),
-      gitDirty: await worktreeIsDirty(this.cwd),
+      gitSha: prepared.gitSha,
+      gitDirty: prepared.gitDirty,
     });
 
     return this.emit({

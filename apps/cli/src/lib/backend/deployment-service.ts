@@ -78,7 +78,12 @@ export type DeploymentHistory = Readonly<{
 }>;
 
 /** What narrows a list of deployments. */
-export type DeploymentQuery = Readonly<{ origin?: string; live?: boolean }>;
+export type DeploymentQuery = Readonly<{
+  origin?: string;
+  live?: boolean;
+  /** Also return the release each deployment serves. */
+  expand?: ["release"];
+}>;
 
 /** What narrows and pages a list of deployments. */
 export type DeploymentPageQuery = DeploymentQuery &

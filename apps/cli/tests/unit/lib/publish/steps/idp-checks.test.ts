@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 
 import type { StepContext } from "../../../../../src/lib/publish/pipeline";
 import { validateConnections } from "../../../../../src/lib/publish/steps/idp-checks";
+import { VariableService } from "../../../../../src/lib/backend";
+import { stepOutput } from "../../../../../src/lib/step-output";
 import type { SuggestedCommand } from "../../../../../src/lib/suggestion";
 
 /** A connection the server would accept: a `${{ NAME }}` client_secret. */
@@ -39,23 +41,31 @@ function project(files: Record<string, unknown>): string {
 /** The variables the project holds unless a test says otherwise: the secret googleBody names. */
 const HELD = { GOOGLE_CLIENT_SECRET: { secret: true } };
 
-function ctx(cwd: string, over: Partial<StepContext>, held: object = HELD): StepContext {
+function ctx(
+  cwd: string,
+  over: Partial<StepContext> & { client?: object },
+  held: object = HELD,
+): StepContext {
   const { client, ...rest } = over;
   return {
     cwd,
-    client: {
-      // Variables read back keyed by kind: these tests hold the same values for
-      // whichever kind the run asks for, unless one stubs its own read.
-      getVariables: async (params: { kind?: string }) =>
-        Object.fromEntries(
-          Object.entries(held).map(([name, value]) => [
-            name,
-            { [params.kind ?? "primary"]: value },
-          ]),
-        ),
-      ...(client as object | undefined),
-    } as never,
-    projectId: "proj_1",
+    deployments: {} as never,
+    output: stepOutput,
+    variables: new VariableService(
+      {
+        // Variables read back keyed by kind: these tests hold the same values for
+        // whichever kind the run asks for, unless one stubs its own read.
+        getVariables: async (params: { kind?: string }) =>
+          Object.fromEntries(
+            Object.entries(held).map(([name, value]) => [
+              name,
+              { [params.kind ?? "primary"]: value },
+            ]),
+          ),
+        ...(client as object | undefined),
+      } as never,
+      "proj_1",
+    ),
     env: {},
     mode: "deploy",
     dryRun: false,

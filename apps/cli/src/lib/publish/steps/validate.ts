@@ -10,7 +10,6 @@ import { ZitadelError, errorMessage } from "../../errors";
 import { tryCatch } from "../../try-catch";
 import { flowEnvRefs } from "../../flows";
 import { POLICIES_DIR, policyFileIssues } from "../../policies";
-import { reportWarning } from "../../warnings";
 import type { Step, StepContext } from "../pipeline";
 import { brandingAssetWarnings } from "./asset-probe";
 import { validateConnections } from "./idp-checks";
@@ -40,9 +39,9 @@ export const validateStep: Step = {
     validateBundleShapes(ctx);
     validateFlows(ctx);
     await validateConnections(ctx);
-    await validateSsoConsistency(ctx.cwd);
+    await validateSsoConsistency(ctx.cwd, (message) => ctx.output.warn(message));
     for (const warning of await brandingAssetWarnings(brandingsOf(ctx))) {
-      reportWarning(warning);
+      ctx.output.warn(warning);
     }
   },
 };
@@ -155,7 +154,7 @@ function validateFlows(ctx: StepContext): void {
       if (issue.severity === "error") {
         failures.push({ handle, issue });
       } else {
-        reportWarning(`${handle}: ${issue.message}`);
+        ctx.output.warn(`${handle}: ${issue.message}`);
       }
     }
   }

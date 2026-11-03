@@ -7,7 +7,6 @@ import { FLOWS_DIR } from "../../flows";
 import { IDPS_DIR } from "../../idp";
 import { type JsonDirEntry, readJsonDirEntries } from "../../json-dir";
 import { SCHEMAS_DIR } from "../../user-schema";
-import { reportWarning } from "../../warnings";
 
 /**
  * Cross-file checks on the SSO configuration, before anything is sent.
@@ -22,7 +21,10 @@ import { reportWarning } from "../../warnings";
  * A deploy publishes everything under `.zitadel/`, so everything is judged;
  * there is no narrower set of files a deploy "touches".
  */
-export async function validateSsoConsistency(cwd: string): Promise<void> {
+export async function validateSsoConsistency(
+  cwd: string,
+  warn: (message: string) => void,
+): Promise<void> {
   const [schemas, flows, connections] = await Promise.all([
     readJsonDirEntries(join(cwd, SCHEMAS_DIR)),
     readJsonDirEntries(join(cwd, FLOWS_DIR)),
@@ -41,7 +43,7 @@ export async function validateSsoConsistency(cwd: string): Promise<void> {
         // Said aloud, because the alternative is a flow that passes by not being
         // checked: its schema may be one this project does not keep locally.
         if (schemaPath === undefined && offeredProviders(flow.body).length > 0) {
-          reportWarning(
+          warn(
             `${path}: could not tell which local schema this flow pins, so its provider rules were not checked against a schema`,
           );
         }

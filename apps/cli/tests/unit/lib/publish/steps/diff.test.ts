@@ -9,6 +9,8 @@ import { it } from "../../../../helpers/fixtures";
 
 import type { StepContext } from "../../../../../src/lib/publish/pipeline";
 import { diffStep } from "../../../../../src/lib/publish/steps/diff";
+import { DeploymentService } from "../../../../../src/lib/backend";
+import { stepOutput } from "../../../../../src/lib/step-output";
 import type { SuggestedCommand } from "../../../../../src/lib/suggestion";
 
 const run = promisify(execFile);
@@ -40,21 +42,25 @@ function ctx(
 ): StepContext {
   return {
     cwd,
-    client: {
-      listDeployments: {
-        all: async (params: unknown) => {
-          asked.push(params);
-          return live.map((deployment) => ({
-            targets: deployment.targets,
-            release_id: deployment.release ?? "rel_1",
-            release: {
-              metadata: { git_sha: deployment.sha, git_dirty: deployment.dirty ?? false },
-            },
-          }));
+    deployments: new DeploymentService(
+      {
+        listDeployments: {
+          all: async (params: unknown) => {
+            asked.push(params);
+            return live.map((deployment) => ({
+              targets: deployment.targets,
+              release_id: deployment.release ?? "rel_1",
+              release: {
+                metadata: { git_sha: deployment.sha, git_dirty: deployment.dirty ?? false },
+              },
+            }));
+          },
         },
-      },
-    } as never,
-    projectId: "proj_1",
+      } as never,
+      "proj_1",
+    ),
+    variables: {} as never,
+    output: stepOutput,
     env,
     mode: "deploy",
     dryRun: false,

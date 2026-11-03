@@ -5,16 +5,15 @@ import {
   EnvironmentCommand,
   type JsonEnvelope,
 } from "../../lib/oclif";
-import { DEPLOY_ARGS, DeploymentService, OriginService, ReleaseService } from "../../lib/backend";
 import {
-  buildBundle,
-  diffStep,
-  headSha,
-  runSteps,
-  type StepContext,
-  validateStep,
-  worktreeIsDirty,
-} from "../../lib/publish";
+  DEPLOY_ARGS,
+  DeploymentService,
+  OriginService,
+  ReleaseService,
+  VariableService,
+} from "../../lib/backend";
+import { Publisher } from "../../lib/publish";
+import { stepOutput } from "../../lib/step-output";
 import { ApiError } from "@zitadel/api/runtime/fetch";
 import { Flags } from "@oclif/core";
 import { z } from "zod";
@@ -164,29 +163,23 @@ export default class Deploy extends EnvironmentCommand {
     // change. A dry run never reaches the deploy, so it is exempt.
     const landing = this.dryRun ? [] : await this.primaryOrigins(client, projectId, environment);
 
-    const { bundle, resourceCount, brandingSources, idpFiles, policyFiles } = await buildBundle(
-      this.cwd,
-    );
-    this.recordTelemetry({ resources: resourceCount });
-    const ctx: StepContext = {
+    const releaseService = new ReleaseService(client, projectId);
+    const deploymentService = new DeploymentService(client, projectId);
+    const variableService = new VariableService(client, projectId);
+    const publisher = new Publisher(deploymentService, variableService);
+    const prepared = await publisher.prepare({
       cwd: this.cwd,
-      client,
-      projectId,
       env: this.env,
       mode: "deploy",
       dryRun: this.dryRun,
+      compare: true,
       json: this.isJson,
       color: this.isColored,
-      bundle,
-      brandingSources,
-      idpFiles,
-      policyFiles,
       suggest: (args) => this.suggest(args),
-    };
-
-    // Before-release steps: validate, then diff, which `--json` reports as
-    // `diff` on a dry run and a deploy alike.
-    const reported = await runSteps([validateStep, diffStep], ctx);
+      output: stepOutput,
+    });
+    const { resourceCount } = prepared;
+    this.recordTelemetry({ resources: resourceCount });
 
     if (this.dryRun) {
       return this.emit({
@@ -195,7 +188,7 @@ export default class Deploy extends EnvironmentCommand {
           dry_run: true,
           resources: resourceCount,
           targets: ["primary"],
-          ...reported,
+          ...prepared.report,
         },
         pretty: `Validated ${resourceCount} resource${resourceCount === 1 ? "" : "s"}. Nothing was deployed (dry run).`,
       });
@@ -204,19 +197,16 @@ export default class Deploy extends EnvironmentCommand {
     // Record whether the whole worktree was dirty when this release was built,
     // and warn: a release pins content, but its git provenance is only exact
     // when the tree was clean, so the reader knows the commit is approximate.
-    const gitDirty = await worktreeIsDirty(this.cwd);
-    if (gitDirty) {
+    if (prepared.gitDirty) {
       reportWarning(
         "The git working tree has uncommitted changes; this release records its commit as approximate.",
       );
     }
 
-    const releaseService = new ReleaseService(client, projectId);
-    const deploymentService = new DeploymentService(client, projectId);
-    const release = await releaseService.create(bundle, {
+    const release = await releaseService.create(prepared.bundle, {
       message,
-      gitSha: await headSha(this.cwd),
-      gitDirty,
+      gitSha: prepared.gitSha,
+      gitDirty: prepared.gitDirty,
     });
 
     // What the targets serve right now. The guard id is the newest deployment
@@ -288,7 +278,7 @@ export default class Deploy extends EnvironmentCommand {
         deployment_id: deployment.id,
         resources: resourceCount,
         origins: servedOrigins,
-        ...reported,
+        ...prepared.report,
       },
       next: { commands: [this.suggest("deployment list")] },
       pretty: [
