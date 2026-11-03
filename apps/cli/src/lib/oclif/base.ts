@@ -197,6 +197,17 @@ export abstract class BaseCommand extends Interruptible(Command) {
   }
 
   /**
+   * The suggestion for a follow-up the framework builds on a command's behalf,
+   * such as a list's next page. A command that talks to a project overrides it
+   * to keep the run's environment selector, so the framework never has to
+   * choose between the scoped and the unscoped form. A command that leaves it
+   * alone has no follow-up to suggest, and being asked to is a bug.
+   */
+  protected suggestFollowUp(_args: string): SuggestedCommand {
+    throw new Error(`${this.id ?? "this command"} suggests no follow-up: override suggestFollowUp`);
+  }
+
+  /**
    * A `zitadel` command that does not target a project, in the public `npx`
    * form: `setup`, `start`, `doctor`, the local runtime. A command that talks
    * to a project suggests through `EnvironmentCommand.suggest` instead, which
