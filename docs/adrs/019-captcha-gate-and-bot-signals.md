@@ -2,394 +2,259 @@
 
 > **Status:** Proposed
 > **Date:** 2026-05-26
-> **Amended:** 2026-11-02 after the internal PoW comparison.
-> **Context:** Flow gates, operation admission, customer bot protection and cloud signals.
+> **Context:** Flow engine gates, bot detection, captcha providers, edge/platform risk signals
+
+> **Experiment:** The [internal PBKDF2 POC](../design/flowengine/bot-protection-implementation.md)
+> evaluates a ZITADEL-owned alternative to the proposed ALTCHA library integration.
+> Its protocol is provisional and no flow enforcement is enabled.
 
 ## Decision
 
-ZITADEL owns bot-protection issuance, verification, keys, persistence and admission.
-The turnkey implementation runs inside the Go server and a first-party browser
-worker, with **no ALTCHA server, Sentinel, hosted service, Redis or customer
-provider account**. Customers can bring challenge-provider keys or evidence from
-a backend they trust.
+Captcha is the single gate kind ([ADR 013][adr013] fixed gates as captcha-only). This
+ADR formalizes the captcha gate contract that ADR 013 deferred, and adds a second,
+complementary bot-detection mechanism for apps deployed behind an edge platform.
 
-The [matched stage 1 benchmark](../design/flowengine/pow-matched-benchmark-2026-11-02.md)
-compares ZITADEL-owned PBKDF2 and Argon2id protocol/solver code against ALTCHA
-using identical puzzles and four increasing search ranges. Select **ZITADEL-owned
-precomputed PBKDF2-HMAC-SHA-256 as the initial default**, using Go's standard
-library and browser WebCrypto. ALTCHA stays a research/reference dependency; it is not the product
-protocol or runtime dependency. Own the small protocol and admission adapter,
-not a new cryptographic primitive.
+Two mechanisms, one trust rule. They are **complementary, not alternatives**, and have
+nothing to do with whether Zitadel itself is self-hosted or running on Zitadel Cloud:
+#1 is what challenges the user *when* a challenge is required; #2 is a signal that
+informs *whether* a challenge is required for a given request. A clean edge verdict
+can suppress #1; a suspicious one can require it. When a user-facing challenge is
+shown, it always comes from #1.
 
-Matched solve times provide no material performance reason to depend on ALTCHA;
-our narrower verifier also has lower measured overhead. Argon2id works in Go and
-browser WASM, but raises issuer CPU/memory cost, needs a WASM CSP allowance and
-has not established an attacker-cost benefit on GPUs or slower devices here.
-Keep it as a measured candidate for a later supported algorithm family; it is
-not enabled by the initial profile table. Implement the registry/configuration
-boundary now so projects can change to a qualified algorithm in a later release.
-This decides ownership and protocol; production activation and calibration still
-require the device, security-review and admission-load gates below.
+1. **In-flow captcha gate (#1).** A step carries a `captcha` gate. The engine issues a
+   provider-specific challenge — either the built-in **Altcha** proof-of-work (the one
+   we ship; no third-party account, no per-customer keys) or a **third-party** provider
+   the customer already uses (Cloudflare Turnstile / hCaptcha / reCAPTCHA, with their
+   own keys). The invisible `<zl-captcha>` component solves it, the proof returns via
+   `gate_proofs`, and the engine verifies it through the existing `auth_attempts`
+   challenge/verify path. The public `site_key` lives in the client-visible gate
+   `config`; any third-party **secret** stays server-side in the project secret store
+   ([ADR 005][adr005]).
 
-Progressive work allocation is part of the admission design independently of the
-primitive. CEL requests a bounded work level from trusted attempt accounting;
-the server maps it to calibrated profiles, preserves hard guards and consumes
-admission once. A PoW-free band followed by capped exponential work is supported
-in the design, not yet in the runtime.
+2. **Edge / platform bot signal (#2).** When the customer's *app* runs behind an edge
+   platform with bot management — e.g. Cloudflare (managed challenge / WAF), Vercel
+   (BotID), Netlify — the edge already produces a server-side verdict with **no
+   widget**. The SDK Edge proxy reads that verdict server-side and stamps it as an
+   authenticated inline header on the proxied flow request, tagging the source via the
+   header's `provider` field (an open identifier — the contract is provider-agnostic,
+   not tied to any specific vendor). The risk evaluator consumes it to **suppress** an
+   otherwise-required captcha (the edge already cleared the request) or **inject** one
+   (the edge flagged it).
 
-PoW prices an operation; it proves neither humanity nor identity. Agents can pay
-it. Keep ADR 078's hard guards, quotas and volume limits regardless of a solved
-challenge or a clean vendor verdict. Legitimate automation uses authenticated
-API operations and their applicable limits, not a spoofable User-Agent exemption.
+**Trust boundary (shared rule).** Only server-injected, authenticated signals count;
+browser-relayed signals never do. This is the same principle as [ADR 005][adr005]: the
+browser carries public runtime only; anything trusted enters through a server-side,
+credentialed channel.
 
-This ADR specifies the implementation contract. It does not claim the feature is
-shipped: the flow runtime currently emits empty gates and rejects nonempty
-`gate_proofs`; the existing auth-attempt verifier returns authentication factors.
-The pure [PoW core](../../internal/crypto/pow/doc.go) now implements the four
-PBKDF2 profiles, issuance, bounded verification and
-[permanent WebCrypto/Go byte vectors](../design/flowengine/testdata/README.md).
-It grants no admission and exposes no endpoint; persistent one-use consumption
-and shared operation enforcement remain pending.
-The [implementation plan](../design/flowengine/bot-protection-implementation.md) sequences
-that missing work. Production calibration remains gated on real-device results.
+### #1 — In-flow captcha gate
 
-## One admission service, three evidence sources
+**Gate shape.** Already defined in [`gate.yaml`][gate]; no schema change:
 
-| Source | Client/backend work | ZITADEL's responsibility |
-|---|---|---|
-| Built-in `zitadel_pow` | First-party worker or native client derives a key | Issue locally, verify locally, bind and consume admission |
-| Customer challenge provider | Widget obtains Turnstile/hCaptcha/reCAPTCHA token | Verify with configured adapter and server-held secret; check expected action/host where supported |
-| Customer backend | Backend verifies BotID, an edge verdict or its own system | Authenticate that backend, validate its scope, issue a bound receipt; treat it as a trusted assertion |
-
-Evidence alternatives for one requirement compose with OR **only when configured**;
-separate required gates compose with AND. A hard guard refusal wins over all of
-these. A customer's backend assertion is not independent verification by ZITADEL
-that a vendor was called. Missing, forged or unavailable evidence is never clean.
-
-## Built-in profile: `zitadel_pow_v1`
-
-### Selected construction and immutable profiles
-
-| Parameter | v1 contract |
-|---|---|
-| Initial default algorithm | PBKDF2-HMAC-SHA-256 (`pbkdf2_sha256`) |
-| Iterations per trial | 5,000, fixed at every level |
-| Salt / nonce | Independent 16-byte CSPRNG values |
-| KDF password bytes | Raw nonce bytes followed by the unsigned counter as four big-endian bytes |
-| Derived key | 32 bytes |
-| Public derived-key prefix | First 16 bytes, never the entire key |
-| Hidden counter | Uniform integer in `[0, N-1]`; use unbiased sampling |
-| Authenticators | Two independent HMAC-SHA-256 keys; framing below |
-| Validity | Five minutes; server time and stored requirement expiry are authoritative |
-| Browser work | One worker; bounded trials and a five-second foreground budget |
-
-| `profile_id` | Level | N (maximum trials) | Expected trials `(N+1)/2` |
-|---|---:|---:|---:|
-| `pbkdf2_sha256_5000_l1` | 1 | 512 | 256.5 |
-| `pbkdf2_sha256_5000_l2` | 2 | 1,024 | 512.5 |
-| `pbkdf2_sha256_5000_l3` | 3 | 2,048 | 1,024.5 |
-| `pbkdf2_sha256_5000_l4` | 4 | 4,096 | 2,048.5 |
-
-Level zero issues no puzzle. These are the measured profile definitions for
-implementation/preview, not enabled production thresholds. Increasing the search
-range approximates doubling expected work without changing server KDF cost.
-Individual solve times vary with the hidden counter; there is no minimum-work
-or duration guarantee. Select an allowed subset at deployment; do not change a
-profile's meaning after publication. The initial implementation accepts only
-these PBKDF2 profiles. A later supported algorithm gets new immutable profiles;
-compatible KDFs can share the envelope/construction version. Incompatible input
-framing, output/proof semantics or binding requires a new protocol version.
-CEL and clients never supply raw KDF parameters.
-
-Issuance evaluates the KDF once at the hidden counter, publishes only its first
-half and stores authenticators for its full key and context. Discard the counter
-and full key after issuance. The client searches from zero up to `N-1`, comparing
-the first half, and returns the full key. Verification checks authenticators and
-scope without evaluating PBKDF2, including for invalid proofs. No missing-field
-fallback may turn verification into KDF work. Neither a counter nor reported
-solve time is accepted as evidence.
-
-PBKDF2 is not memory-hard; specialized hardware can still have advantages. The
-Argon2id experiment does not prove GPU resistance or equal security between
-profiles. Never silently replace required work with an easier algorithm. An
-explicitly permitted external evidence alternative is a separate policy choice.
-
-### Binding, authenticators and public wire representation
-
-Persist one immutable context `C` as compact UTF-8 JSON with exact snake_case
-fields: `protocol`, `profile_id`, `project_id`, `deployment_id`, `release_id`,
-`policy_revision`, `config_revision`, `attempt_id`, `operation`,
-`operation_instance_id`, `requirement_id`, `challenge_id`, `generation`,
-`challenge_key_version`, `solution_key_version`, `expires_at`, `salt`, and `nonce`.
-Revision identifiers may be null only when that policy/config resource is absent;
-all required bindings must be resolved before issuance. Expiry is integer Unix
-seconds internally. The operation instance pins its target and immutable operation
-metadata in server state; changing protected input needs a new operation instance.
-Never persist a plaintext password or expose identifying inputs in challenge data.
-Generation starts at one. Required binding strings are nonempty valid UTF-8 and
-at most 256 bytes; their storage/resource schemas can impose tighter validation.
-
-Serialize `C` once on the server and retain its exact bytes. With raw 32-byte
-solution `K`, use the following framing (`||` is byte concatenation; literal
-prefixes are ASCII):
-
-```text
-key_mac = HMAC-SHA-256(solution_key, "zitadel:pow:solution:1:" || C || K)
-B = UTF8_JSON({"context": C, "key_prefix": hex(K[0:16]), "key_mac": hex(key_mac)})
-mac = HMAC-SHA-256(challenge_key, "zitadel:pow:parameters:1:" || B)
+```yaml
+kind: captcha          # the only gate kind
+provider: altcha       # altcha | turnstile | hcaptcha | recaptcha — sibling of config
+config: { ... }        # provider-specific, opaque to the engine, CLIENT-VISIBLE
 ```
 
-Here `context` embeds the stored JSON object bytes, not a quoted string. Preserve
-`B` exactly too; verify its MAC before treating it as authenticated data. No
-client must reproduce a canonical JSON serializer. Load key versions from the
-requirement, authenticate the stored bytes, strictly parse and match every binding
-to authoritative state, then verify the solution MAC and prefix. Compare MACs in
-constant time. Keys and MACs stay server-side; the browser needs only the public
-projection below. Authenticated bytes alone never override expiry, revocation,
-current guard decisions or one-use consumption. The benchmark uses the same
-construction with a smaller fixture context; production binding and persistence
-costs remain unmeasured.
+`config` is surfaced to the browser, so it carries **public values only**. Two provider
+modes differ in what fills `config` and where verification credentials live:
 
-Runtime gate and proof maps remain keyed by **gate name**, not gate kind
-([ADR 021](021-ordered-arrays-for-step-fields-actions-gates.md)):
+- **Altcha (built-in — "we bring it along").** The engine generates the proof-of-work
+  challenge at render time (salt, HMAC over a server-held key, a target number) and places
+  the public challenge parameters in `config`:
 
-```json
-{
-  "gates": {
-    "bot_check": {
-      "kind": "captcha",
-      "provider": "zitadel_pow",
-      "config": {
-        "protocol": "zitadel_pow_v1",
-        "challenge_id": "<storage-generated-id>",
-        "profile_id": "pbkdf2_sha256_5000_l1",
-        "salt": "<32 lowercase hex characters>",
-        "nonce": "<32 lowercase hex characters>",
-        "key_prefix": "<32 lowercase hex characters>",
-        "expires_at": "2026-11-02T15:05:00Z"
-      }
-    }
-  }
-}
+  ```json
+  { "kind": "captcha", "provider": "altcha",
+    "config": { "algorithm": "SHA-256", "challenge": "abc…", "salt": "xyz…", "max_number": 100000 } }
+  ```
+
+  No third-party account, no per-customer secret. The HMAC key is a Zitadel-managed
+  server secret. Difficulty scales with risk level (see bot-detection.md).
+
+- **Third-party (BYO account).** Only the public `site_key` goes in `config`:
+
+  ```json
+  { "kind": "captcha", "provider": "turnstile", "config": { "site_key": "0x4AAA…" } }
+  ```
+
+  `<zl-captcha>` loads the vendor widget with that site key; the proof is the vendor token.
+  The **secret key** is resolved server-side at verify time from the project secret store
+  (see *Secret placement*) and is never serialized into `config`.
+
+**Runtime surfacing.** `step.gates` is already required on the runtime step in
+[`flow-step.yaml`][flowstep], but the Go runtime does not surface it yet — `FlowStep`
+(`internal/domain/flow_state_machine.go:62`) has no gates field and `buildStep` (`:438`)
+never emits one. This ADR makes surfacing gates a requirement.
+
+**Proof submission.** Proofs return in `gate_proofs` (already in
+`flow-submit-request.yaml`), a map keyed by gate name, collected from `<zl-captcha>`
+events. No schema change.
+
+**Verification placement.** Captcha verifies through the existing `auth_attempts`
+challenge/verify model as a new `captcha` method, exactly mirroring passkey
+([ADR 013][adr013] §Context):
+
+- Issue: `POST /auth_attempts/{id}/challenges { "method": "captcha" }`
+- Verify: `POST /auth_attempts/{id}/challenges/{cid}/verify { "captcha": { … } }`
+
+The flow engine drives this internally — it does not require a separate client round-trip
+to `auth_attempts`. Routing through `auth_attempts` means captcha behaves identically in
+the flow path **and** for direct API clients (bot-detection.md principle 5). On failure the
+engine re-renders the current step with an error and a fresh challenge; captcha is a
+bot-detection gate and **does not** contribute to the session's `assurance_levels`.
+
+**Secret placement.** A third-party provider's secret key is stored in the project secret
+store keyed by project (and team), resolved server-side at verify. The gate `config`
+carries only the public `site_key` ([ADR 005][adr005]; secret store per [secret.md][secret]).
+
+**Frontend.** `<zl-captcha>` is an invisible, auto-submitting Lit component modeled on
+`<zl-passkey>` ([ADR 013][adr013] §3). It dispatches on the gate's `provider`, and mounts
+third-party vendor widgets in **light DOM** to avoid shadow-DOM and cross-origin iframe
+friction (Turnstile tolerates shadow DOM; reCAPTCHA/hCaptcha do not). It declares
+`satisfies_gate: "captcha"` in its manifest, and the `mandatory-gates` patcher gains a gate
+branch that auto-injects it when a required gate has no matching consumer in the template.
+
+```mermaid
+sequenceDiagram
+    participant B as Browser (<zl-captcha>)
+    participant E as Flow engine
+    participant A as auth_attempts
+    participant P as Provider (Altcha self / vendor API)
+    E->>B: step.gates[bot_check] = { kind, provider, config }
+    Note over E,A: Altcha challenge minted server-side at render
+    B->>B: solve PoW (Altcha) OR vendor widget token
+    B->>E: POST /flow/{id}/submit { gate_proofs: { bot_check: "<proof>" } }
+    E->>A: issue+verify challenge (method: captcha)
+    A->>P: verify (Altcha recompute / vendor siteverify + secret)
+    P-->>A: ok / fail
+    A-->>E: verified / rejected
+    E-->>B: advance (ok) or re-render with fresh challenge (fail)
 ```
 
-All public fields are ZITADEL-owned snake_case; there is no opaque ALTCHA payload.
-The worker validates exact lengths, the supported profile and deadline before
-starting bounded work. It never loads code or a URL from challenge data. The
-profile fixes the trial bound, so there is no second client-controlled range.
-Public projections carry no authorization; the stored challenge is authoritative.
+### #2 — Edge / platform bot signal
 
-`gate_proofs.bot_check` remains a string: the strict JSON serialization of
-`{"protocol":"zitadel_pow_v1","challenge_id":"…","derived_key":"<64 lowercase hex characters>"}`.
-The server loads its challenge; clients never echo or override its parameters.
-Enforce a 2 KiB proof-string limit, exact case-sensitive fields/types, no duplicate
-keys, nulls or trailing data; limit the stored challenge body to 4 KiB. Reject
-unknown versions, profiles and providers. Resource IDs follow
-[ADR 047](047-dialect-id-generation.md); random puzzle nonces are not resource IDs.
+**Motivation.** Many customers deploy to Vercel or Cloudflare, whose edge layers already
+run bot management (Vercel BotID, Cloudflare managed challenge / WAF). The verdict is
+server-side and widget-less. Reusing it avoids showing a redundant captcha to a request the
+edge already cleared, and lets us require one when the edge is suspicious.
 
-### Lifecycle and resource limits
+**Capture point.** The SDK Edge proxy (`proxyRequest` in
+`packages/sdk-next/src/middleware.ts`, and the Nuxt equivalent). It already runs in the
+customer's Vercel/Cloudflare deployment and rewrites the forwarded request. It reads the
+platform verdict (a `cf-*` header, a `checkBotId()` result) **server-side** and stamps an
+inline header **before** the upstream `fetch`.
 
-Persist requirements separately from `AuthFactor`:
+**Contract.** A reserved request header `X-Zitadel-Risk-Signal` carries a compact verdict.
+Use an RFC 8941 structured-field dictionary so it stays header-safe and debuggable:
 
-```text
-pending -> satisfied -> consumed
-           (expiry, supersession and hard guards can still refuse admission)
+```
+X-Zitadel-Risk-Signal: provider=vercel-botid; level=clean; score=0.02
+X-Zitadel-Risk-Signal: provider=cloudflare; level=suspicious; reasons="managed_challenge_failed"
 ```
 
-A read/render returns the existing unexpired pending challenge. It does not run
-PBKDF2 or create another row. Reserve bounded issuance capacity before deriving a
-new challenge; derive outside retryable database transactions and publish with a
-conditional generation check. Concurrent contenders have one authoritative
-challenge; limit wasted precomputation too. Allow one active challenge per gate
-and operation instance, initially at most four live gates per attempt. These
-are conservative engineering caps, not capacity results from the microbenchmark.
+Fields: `provider` (required), `level` ∈ `clean|suspicious|blocked` (required), `score`
+(optional 0–1), `reasons` (optional token list). The engine treats unknown providers and
+fields leniently — the signal is advisory input, not a hard gate.
 
-No refresh on every failed proof or automatic timeout loop. A refresh supersedes
-the previous generation and spends issuance budget. Expired challenges need an
-explicit retry subject to the same limits. Bound new attempts, outstanding
-requirements, refreshes, proof bytes, verification concurrency and key lookups.
-Use ADR 078's edge budgets and service admission limits; do not add a database
-write for each rejected request. Garbage-collect expired/abandoned state.
+**Trust.** Zitadel honors `X-Zitadel-Risk-Signal` **only** when the same request presents a
+valid project / origin-scoped `sk_proj_` secret and the request origin matches that secret's
+patterns ([secret.md][secret] already enforces this with a 403 on mismatch). The
+origin-scoped secret is the one the setup CLI already provisions into the deploy platform's
+env store (`ZITADEL_PREVIEW_SECRET` for Vercel / Netlify / Cloudflare). A risk-signal header
+that arrives **without** that server-side credential — i.e. relayed from a browser or sent by
+an arbitrary client — is **ignored**, never trusted.
 
-Before password hashing, user creation, code sending or another protected side
-effect, atomically check and consume **all** required admissions and recheck hard
-guards. One success authorizes one operation attempt, including a failed password
-check. Retries with the same idempotency/operation instance recover status; they
-never run a second protected attempt for the same spent proof. New input or target
-that changes the protected operation needs fresh admission. Preserve the bound
-operation across a crash, and fail closed if consumption cannot be established.
+This closes a real gap: today the flow-path proxy hop is unauthenticated (it strips
+`x-nextgen-auth-token` and adds no upstream credential). For the signal to be trustworthy,
+the proxy must attach the project secret on the flow hop and add `X-Zitadel-Risk-Signal` to
+its forward allowlist.
 
-Verify evidence before a short transaction; consume with a compare-and-set in
-shared storage. Process-local caches, flow cookies and provider one-use tokens
-cannot provide cross-replica replay prevention. Implement/test the same semantics
-on Postgres, SQLite and Spanner. Full database/HTTP load tests remain stage 2 work.
+**Channel.** Inline on the proxied get-step / submit request (synchronous). The engine reads
+the signal when deciding whether to inject or suppress the captcha gate for the current step
+— `gate.yaml` already states the engine "may inject gates at runtime based on policy or risk
+evaluation." A `clean` verdict can suppress a declared captcha; a `suspicious`/`blocked`
+verdict can inject one the definition did not declare.
 
-## Flow and direct API enforcement
+```mermaid
+sequenceDiagram
+    participant Edge as Vercel/Cloudflare edge
+    participant Proxy as SDK Edge proxy (/__nextgen)
+    participant Z as Zitadel flow engine
+    Edge->>Proxy: request + platform verdict (cf-* header / BotID)
+    Proxy->>Z: forward + X-Zitadel-Risk-Signal + sk_proj_ secret (origin-scoped)
+    Z->>Z: secret + origin valid? else drop the signal
+    Z->>Z: risk evaluator fuses signal → suppress/require captcha gate
+    Z-->>Proxy: step (captcha gate present or absent)
+```
 
-The operation service owns admission. The flow engine presents requirements and
-collects proof strings; editing templates, omitting `gate_proofs`, changing flow
-paths or calling the service directly cannot skip required evidence.
+**Risk evaluator.** The edge signal is one input among many (captcha result, fingerprint,
+rate-limit state, request context); it never affects session `assurance_levels`.
 
-Keep `captcha` as the sole gate kind. Surface gates in domain/runtime/API
-projection; add `<zl-captcha>` and the mandatory-consumer patcher. A first-party
-same-origin worker runs independently of the UI thread. Cancel it on navigation
-or supersession; show accessible working/timeout/retry states. A blocked worker
-or a slow device does not silently pass. External widget tokens use separate
-provider adapters and only their public settings reach the browser.
+## Context
 
-Auth-attempt issue/verify endpoints may delegate a `captcha` ceremony to this
-service, so custom clients have the same requirements. **Do not reuse the existing
-factor-success transition unchanged.** CAPTCHA must never add a factor, complete
-an auth attempt, raise ACR/assurance, or become reusable session clearance.
+[ADR 013][adr013] established that gates are captcha-only (passkey is an action, not a gate)
+but explicitly did not specify the captcha gate contract. The captcha design lives in
+[bot-detection.md][botdetection], which is marked **Preliminary** and covers providers and
+the risk-evaluator model but neither the edge/platform-signal mechanism nor its trust model.
+Prior proof-of-concept work is recorded in the oxidel POC ADRs 021 (Bot Detection &
+Telemetry) and 024 (Risk Evaluation) referenced from bot-detection.md.
 
-Operation templates initially cover self-service signup (`user.create`) and
-password checks (`auth.check`), before expensive preparation/verification. Code
-send/recovery endpoints require their send quotas and admission when introduced.
-Registration by passkey or SSO still reaches the signup guard. Authorized operator
-provisioning uses its distinct operation context, not a browser-selectable bypass.
-Pre-flow allocation defense is separate from a gate that needs an existing attempt.
+The contract surfaces captcha needs already exist: `gate.yaml`, `flow-step.yaml` `gates`,
+`flow-submit-request.yaml` `gate_proofs`, and the `auth_attempts` challenge/verify endpoints.
+What is missing is the decision record tying them together and the runtime wiring — which
+this ADR provides for review.
 
-## Configuration and policies
+## Consequences
 
-Add a revisioned `bot_protection` configuration resource, resolved from the same
-pinned deployment as the flow/policy. It selects allowed evidence, named provider
-connections, trusted backend sources and explicit fallback rules. Public site
-keys may be projected; secrets are references resolved server-side from the
-project secret infrastructure. Provider connections and source lists are not
-CEL settings or untyped JSON stuffed into today's boolean/integer policy schema.
+This list doubles as the implementation checklist for the follow-up PRs.
 
-[ADR 066](066-operation-policies.md) remains the decision layer: an operation
-policy may require evidence and tighten guards. Introduce its `require` result,
-undisclosed rule support, a typed integer `pow_level` output and audit mode with
-that consumer. The current allow/deny
-password-setting consumer does not already provide them. No instance means no
-project policy, not disabled server guards. A release validates all selected
-connections/fallbacks; rollback cannot revive revoked keys or consumed evidence.
+**Backend**
+- `flow-step.yaml` — `gates` already present; **Go `FlowStep` + `buildStep` must surface
+  gates** (`internal/domain/flow_state_machine.go:62`, `:438`).
+- Flow state machine — `Process()` must stop returning `ErrUnsupported` for `gate_proofs`
+  (`internal/domain/flow_state_machine.go:179`) and instead verify via `auth_attempts`.
+- `auth_attempts` challenges — add a `captcha` method: `captcha-challenge-payload.yaml` and
+  `captcha-proof.yaml` under `api/openapi/endpoints/auth_attempts/by_id/challenges/`, plus
+  verify wiring (mirror the passkey payload files already there).
+- Secret store — third-party captcha secret keyed by project/team ([secret.md][secret]).
+- Risk evaluator — accept `X-Zitadel-Risk-Signal` as an input; gate suppress/inject decision.
+- Signal trust — accept the header only with a valid origin-scoped `sk_proj_` secret.
+- `gate.yaml` — unchanged; affirm `config` is public-only.
+- `flow-submit-request.yaml` `gate_proofs` — unchanged.
+- Session factors — unaffected (captcha is not an auth factor).
 
-### Algorithm configuration and evolution
+**Frontend**
+- New `<zl-captcha>` component — invisible/auto-submit, dispatch on `provider`, third-party
+  widgets in light DOM; manifest declares `satisfies_gate: "captcha"`.
+- `mandatory-gates` patcher — add a gate branch to inject `<zl-captcha>` for a required gate
+  with no consumer.
+- SDK proxy (`sdk-next`, `sdk-nuxt` middleware) — read the platform verdict, stamp
+  `X-Zitadel-Risk-Signal`, attach the project secret on the flow hop, extend the forward
+  allowlist.
 
-A built-in provider has `kind: zitadel_pow` and `algorithm: pbkdf2_sha256` by
-default. The revisioned bot configuration, rather than the password-hashing
-policy or CEL, selects this algorithm. Initially the allowed project value is
-only `pbkdf2_sha256`; a future release can add `argon2id` after qualification.
-Persist/materialize the default in the canonical configuration revision. When
-no resource exists, the v1 built-in default remains PBKDF2 and each requirement
-pins the resolved profile; a binary upgrade cannot silently change that choice.
+**Contract / docs**
+- New reserved header `X-Zitadel-Risk-Signal`; document in
+  `docs/design/api/security-and-origins.md` and the SDK middleware.
+- `bot-detection.md` updated to point here and to add the edge-signal section.
 
-The operator's enabled algorithms/profiles constrain project choices. Unsupported
-or disabled values fail configuration/deployment validation; do not substitute
-a different algorithm. The registry fixes the algorithm, KDF parameters, input/
-output framing, work level and trial bound for every `profile_id`. That identifier
-is authenticated and matched to stored state, so clients need no second algorithm
-selector in their proof. No public configuration supplies code, a remote solver
-URL, arbitrary parameters or an unregistered algorithm.
+## Reviewer split
 
-CEL requests a level within the resolved family. Work levels across algorithm
-families are not comparable evidence: Argon2 level two cannot automatically
-satisfy PBKDF2 level two. Apply guard floors for the selected, operator-approved
-family and reject a configuration that cannot meet them. Verify the exact issued
-profile/requirement/generation before considering whether its level satisfies the
-current price. Never reinterpret or upgrade a proof into another family.
+- **Frontend engineers:** the `<zl-captcha>` component, provider dispatch and light-DOM
+  mount, manifest + `mandatory-gates` injection, and the proxy header stamping.
+- **Backend engineers:** runtime `FlowStep` gates, the `Process()` verify path, the
+  `auth_attempts` captcha method, the secret store, risk-signal trust + header acceptance,
+  and risk-evaluator consumption.
 
-Ordinary algorithm changes take effect through a new configuration revision and
-deployment. Existing requirements remain pinned to their original revision and
-profile for their short lifetime; they are not rehashed. Preserve compatible
-verification support through that lifetime. Registry status distinguishes
-`enabled` (issue and verify), `verify_only` (drain issued work; no fresh issuance)
-and `disabled` (reject immediately, including pending work). A pinned deployment
-that can no longer issue its selected profile must move to a supported deployment
-or fail with an actionable unavailable result. Rollback cannot revive revoked
-profiles or keys, or switch a live challenge's algorithm. Mutable availability is
-separate from immutable parameters; authoritative shared revocation and cache
-invalidation must prevent a stale replica from admitting disabled profiles.
+## Future work
 
-Ship matching server registry and browser/SDK support before enabling a new family.
-Mixed-replica and rollback validation must retain every profile still needed by
-live requirements/deployments. An unsupported browser/client reports an explicit
-unsupported result; claimed client capabilities are not permission to choose
-cheaper work. Only an explicitly configured evidence alternative may satisfy the
-requirement. The [implementation plan](../design/flowengine/bot-protection-implementation.md)
-contains the rollout sequence and Passwap assessment.
+- **Risk-based difficulty and dynamic injection** depend on the policy engine; this ADR
+  fixes the contract so they can land without a contract change.
+- **Fingerprint / behavioral telemetry** continue to flow through `/flow/{id}/event`
+  (observation-only); only the synchronous edge verdict uses the inline header.
 
-### Progressive work and protected accounting
-
-A policy can request a PoW-free allowance and then increasing work, for example
-ten checks followed by doubling every five checks up to a fixed ceiling. These
-are illustrative parameters, not shipping defaults. ADR 066 defines the typed
-CEL output; ADR 078 owns trusted event/window counts and atomic in-flight
-execution reservations. The [worked plan](../design/flowengine/bot-protection-plan.md#progressive-work-allocation-through-cel)
-provides the expression, curve and exact boundary semantics.
-
-Reserve an execution slot even for a PoW-free operation; do not let parallel
-requests all claim the first slot. Unsolved challenges are not execution slots.
-At proof submission, check current price and hard guards, require sufficient
-work, consume evidence and reserve execution before the protected operation.
-Bind issued profile/level to the requirement, generation, operation and policy
-revision. A cheap proof cannot be reused for a later more expensive attempt.
-The ceiling caps work, not the server's independent hard refusals.
-
-For a precomputed KDF puzzle, vary a bounded search range within a profile family
-while keeping per-trial KDF/memory cost fixed. This raises expected client work
-while issuance still needs one fixed-cost evaluation. Never exponentially grow
-server issuance cost or Argon2 memory from a user-influenced attempt count.
-The v1 profile table above is fixed; production enablement and the allowed level
-ceiling remain subject to real-device and integrated-load measurements.
-
-## Backend evidence and the cloud
-
-Replace the former unsigned `X-Zitadel-Risk-Signal` dictionary plus secret-injecting
-proxy with one explicit app-plane exchange ([ADR 036](036-api-credential-planes.md)):
-
-1. The flow exposes an opaque, short-lived `bot_context` bound to the protected
-   action and requirement generation. It carries no authorization by itself.
-2. A trusted backend evaluates its bot system for this incoming action and calls
-   proposed `POST /api/v1/bot_protection/evidence`, authenticated server-to-server,
-   with the context, configured source and normalized verdict. ZITADEL validates
-   project/source ownership and the action binding. Do not offer a blind public
-   relay to that credentialed endpoint.
-3. ZITADEL returns an opaque scoped receipt. The backend removes incoming
-   caller-supplied receipt/signal headers and forwards the receipt in
-   `X-Zitadel-Bot-Evidence` on the corresponding public request. No project secret
-   is attached to ordinary flow traffic. The receipt enters the same admission
-   state machine; it is not a general clearance token.
-4. Duplicate exchanges for the same context are idempotent. Expiry, target/action
-   changes, superseded generations and consumption invalidate reuse. Arbitrary
-   browser verdicts or headers have no authority. A direct API call without a
-   receipt gets the configured challenge or refusal.
-
-The extra backend round trip is deliberate; measure it on preview before rollout.
-Directly signed customer assertions need a separate issuer-key/revocation design
-and are not another v1 channel. Preserve credential-free static SPA proxies.
-
-The hosted cloud uses this same integration: BotID in `apps/cloud-functions`, its
-client in `apps/cloud-console`, no Vercel dependency in the Go service or general
-login package. The current temporary `403 auth.bot_suspected` must be replaced
-when admission is available. A suspicious verdict may require PoW, but must let
-the flow render it and submit a valid solution through that same proxy. Test
-prefixed and legacy paths and direct API bypass together. A verified crawler is
-not automatically authorized to register an account.
-
-## Keys, failure and rollout
-
-[ADR 029](029-cryptography-secrets-and-key-lifecycle.md) owns dedicated per-project
-bot key purposes: independent challenge-HMAC and full-key-HMAC secrets, plus a
-separate encryption key for opaque contexts/receipts. Existing cookie, session,
-provider and project API credentials are not those keys. Pin key versions on
-requirements; retain old validation keys only for their short remaining lifetime.
-Emergency revocation beats a pinned release and invalidates pending evidence.
-
-Unavailable third-party verification uses only an explicitly configured fallback;
-otherwise return a retryable error. Unavailable built-in keys/replay storage fail
-the protected operation. Hard guards always win. Do not log secrets, proof bodies,
-derived keys or receipts; expose bounded metrics for required/solved/expired/
-replayed/denied/unavailable/abandoned outcomes.
-
-Stage 1 completed desktop comparison and cross-language proof checks; Firefox,
-shipping Safari, real Android/iOS, a slower device, GPU/native optimization,
-issuance saturation, replay under concurrency and cloud latency remain unmeasured.
-The matched comparison closes algorithm/library selection for v1. Keep production
-adaptive enforcement disabled until the applicable device and admission gates
-pass, and review the full protocol binding/implementation before release.
-The [implementation plan](../design/flowengine/bot-protection-implementation.md) and
-[matched benchmark report](../design/flowengine/pow-matched-benchmark-2026-11-02.md) distinguish
-measured results from those remaining integration obligations.
+[adr005]: 005-public-runtime-private-credentials.md
+[adr013]: 013-passkey-gate-contract.md
+[botdetection]: ../design/flowengine/bot-detection.md
+[secret]: ../design/platform/secret.md
+[gate]: ../../api/openapi/components/flows/gate.yaml
+[flowstep]: ../../api/openapi/components/flows/flow-step.yaml

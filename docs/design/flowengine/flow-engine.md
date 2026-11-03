@@ -594,7 +594,7 @@ GET /flow/flow_2
     {
       "name": "profile",
       "fields": ["email", "given_name", "family_name"],
-      "gates": { "captcha": { "kind": "captcha", "provider": "zitadel_pow" } },
+      "gates": { "captcha": { "kind": "captcha", "provider": "altcha" } },
       "actions": [
         {"name": "submit", "kind": "submit", "primary": true}
       ],

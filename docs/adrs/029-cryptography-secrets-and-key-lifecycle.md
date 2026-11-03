@@ -93,46 +93,6 @@ we default to a [JWT](https://datatracker.ietf.org/doc/html/rfc7519).
 Authorization tokens should always be signed using an asymmetric key. For more
 info on keys, see [the signing/encryption keys decision](#signingencryption-keys).
 
-### Bot-protection key purposes (amendment 2026-11-02)
-
-[ADR 019](019-captcha-gate-and-bot-signals.md) defines internal PoW admission;
-PBKDF2 is the initial PoW default and uses separate authentication keys.
-Extend the project key service with independent
-256-bit symmetric materials for `bot_protection_challenge` (parameter HMAC),
-`bot_protection_solution` (full derived-key HMAC), and
-`bot_protection_context` (opaque evidence contexts/receipts, compact JWE using
-`dir` / `A256GCM`, with authenticated type, purpose, audience and expiry).
-Generate with the platform CSPRNG and wrap them under the project's KEK, using
-the existing key hierarchy. These purpose types are new work, not existing enums.
-
-PoW algorithm configuration is independent of password hashing. Keep Passwap for
-password hash verification/migration; it does not provide the raw supplied-salt
-KDF API, HMAC-only proof verification or admission lifecycle required here.
-[The Passwap assessment](../design/flowengine/bot-protection-implementation.md#passwap-assessment)
-records the inspected API and optional future raw-key extension. Use standard Go
-PBKDF2 behind a narrow issuer adapter initially. Future PoW algorithms select new
-immutable profiles through ADR 019; do not import password defaults, verifier
-fallbacks or automatic rehashing into the PoW path.
-
-HMAC-SHA-256 is for internal puzzle authenticity, not an asymmetric access-token
-signature or a human authentication factor. This scoped use is an explicit
-exception to the general asymmetric-signature default. Do not reuse project API
-credentials, provider secrets, cookie keys or session keys. Do not derive the
-solution HMAC from the publicly exposed half-key. The internal verifier resolves both
-secret keys explicitly; neither ever reaches the browser. ADR 019 defines
-domain separation and exact stored-byte authentication; no general KDF verifier
-or expensive verification fallback is exposed.
-
-The pending requirement records the relevant key versions. A normal rotation
-keeps old verification keys only until the last permitted challenge/receipt
-expires (five-minute initial lifetime, with an explicit bounded clock allowance
-for inter-server checks). Expiry at admission is authoritative and is not extended
-by that retention allowance. Emergency revocation invalidates pending evidence
-across all replicas, even when an old deployment still pins its configuration.
-Key-store/cache invalidation, unavailable keys and restart behavior must be tested
-with the admission store; the isolated benchmark used public fixture keys and
-does not establish these operational properties.
-
 ### Signing/encryption keys
 
 The application uses different keys for different use-cases:
@@ -146,7 +106,6 @@ graph TD
     SecretEncryptionKey["AES Secret Encryption Key"]
     TokenEncryptionKey["AES Token Encryption Key"]
     CookieEncryptionKey["AES Cookie Encryption Key"]
-    BotKeys["Bot challenge / solution HMAC keys and context encryption key"]
     ThirdPartySecrets["Third-Party Secrets"]
     OpaqueTokens["Opaque tokens"]
     Cookies["Flow cookies"]
@@ -156,7 +115,6 @@ graph TD
     KEK --> SecretEncryptionKey
     KEK --> TokenEncryptionKey
     KEK --> CookieEncryptionKey
-    KEK --> BotKeys
     SecretEncryptionKey --> ThirdPartySecrets
     TokenEncryptionKey --> OpaqueTokens
     CookieEncryptionKey --> Cookies

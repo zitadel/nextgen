@@ -18,46 +18,30 @@ const (
 	nonceSize         = 16
 	keySize           = 32
 	prefixSize        = 16
-	solutionDomain    = "zitadel:pow:solution:1:"
-	parametersDomain  = "zitadel:pow:parameters:1:"
+	solutionDomain    = "zitadel:pow:poc:solution:1:"
+	parametersDomain  = "zitadel:pow:poc:parameters:1:"
 )
 
-// Binding is resolved from server state, never assembled from a submitted proof.
-// Empty revision strings mean the corresponding resource is absent. The operation
-// instance must pin the protected input/target privately; do not put it here.
+// Binding comes from the caller's trusted state, never from the submitted proof.
+// The operation instance must pin the protected input/target privately; changing
+// that input requires a new operation instance. Do not put passwords here.
 // ExpiresAt is integer Unix seconds, with no client-controlled clock allowance.
 type Binding struct {
-	ProfileID           string
-	ProjectID           string
-	DeploymentID        string
-	ReleaseID           string
-	PolicyRevision      string
-	ConfigRevision      string
-	AttemptID           string
-	Operation           string
-	OperationInstanceID string
-	RequirementID       string
-	ChallengeID         string
-	Generation          uint64
-	ChallengeKeyVersion string
-	SolutionKeyVersion  string
-	ExpiresAt           int64
+	ProfileID           string `json:"profile_id"`
+	ProjectID           string `json:"project_id"`
+	Operation           string `json:"operation"`
+	OperationInstanceID string `json:"operation_instance_id"`
+	ChallengeID         string `json:"challenge_id"`
+	ExpiresAt           int64  `json:"expires_at"`
 }
 
 func (b Binding) validate() error {
-	for _, value := range []string{b.ProfileID, b.ProjectID, b.DeploymentID,
-		b.ReleaseID, b.AttemptID, b.Operation, b.OperationInstanceID, b.RequirementID,
-		b.ChallengeID, b.ChallengeKeyVersion, b.SolutionKeyVersion} {
+	for _, value := range []string{b.ProfileID, b.ProjectID, b.Operation, b.OperationInstanceID, b.ChallengeID} {
 		if !validBindingString(value) {
 			return ErrInvalidBinding
 		}
 	}
-	for _, revision := range []string{b.PolicyRevision, b.ConfigRevision} {
-		if revision != "" && !validBindingString(revision) {
-			return ErrInvalidBinding
-		}
-	}
-	if b.Generation == 0 || b.ExpiresAt <= 0 {
+	if b.ExpiresAt <= 0 {
 		return ErrInvalidBinding
 	}
 	return nil
@@ -67,9 +51,8 @@ func validBindingString(s string) bool {
 	return len(s) > 0 && len(s) <= 256 && utf8.ValidString(s)
 }
 
-// Keys are independent, dedicated 256-bit project-purpose keys. The caller must
-// resolve non-revoked versions from Binding, retaining old versions only for
-// their allowed verification lifetime. Never use cookie or password keys here.
+// Keys are independent 256-bit keys resolved by the caller for the project.
+// Never reuse cookie or password keys here.
 type Keys struct {
 	Challenge [keySize]byte `json:"-"`
 	Solution  [keySize]byte `json:"-"`
@@ -85,8 +68,8 @@ func (k Keys) validate() error {
 	return nil
 }
 
-// StoredChallenge contains only server-side data. Body is B in ADR 019 and must
-// be persisted verbatim; MAC authenticates those exact bytes. Intentionally not
+// StoredChallenge contains only server-side data. Body must be retained
+// verbatim; MAC authenticates those exact bytes. Intentionally not
 // JSON-serializable: use Challenge.Public for the client projection.
 type StoredChallenge struct {
 	Body []byte `json:"-"`
@@ -109,42 +92,14 @@ type Challenge struct {
 }
 
 type challengeContext struct {
-	Protocol            string  `json:"protocol"`
-	ProfileID           string  `json:"profile_id"`
-	ProjectID           string  `json:"project_id"`
-	DeploymentID        string  `json:"deployment_id"`
-	ReleaseID           string  `json:"release_id"`
-	PolicyRevision      *string `json:"policy_revision"`
-	ConfigRevision      *string `json:"config_revision"`
-	AttemptID           string  `json:"attempt_id"`
-	Operation           string  `json:"operation"`
-	OperationInstanceID string  `json:"operation_instance_id"`
-	RequirementID       string  `json:"requirement_id"`
-	ChallengeID         string  `json:"challenge_id"`
-	Generation          uint64  `json:"generation"`
-	ChallengeKeyVersion string  `json:"challenge_key_version"`
-	SolutionKeyVersion  string  `json:"solution_key_version"`
-	ExpiresAt           int64   `json:"expires_at"`
-	Salt                string  `json:"salt"`
-	Nonce               string  `json:"nonce"`
+	Protocol string `json:"protocol"`
+	Binding
+	Salt  string `json:"salt"`
+	Nonce string `json:"nonce"`
 }
 
 func (b Binding) context(salt, nonce string) challengeContext {
-	optional := func(s string) *string {
-		if s == "" {
-			return nil
-		}
-		return new(s)
-	}
-	return challengeContext{
-		Protocol: Protocol, ProfileID: b.ProfileID, ProjectID: b.ProjectID,
-		DeploymentID: b.DeploymentID, ReleaseID: b.ReleaseID,
-		PolicyRevision: optional(b.PolicyRevision), ConfigRevision: optional(b.ConfigRevision),
-		AttemptID: b.AttemptID, Operation: b.Operation, OperationInstanceID: b.OperationInstanceID,
-		RequirementID: b.RequirementID, ChallengeID: b.ChallengeID, Generation: b.Generation,
-		ChallengeKeyVersion: b.ChallengeKeyVersion, SolutionKeyVersion: b.SolutionKeyVersion,
-		ExpiresAt: b.ExpiresAt, Salt: salt, Nonce: nonce,
-	}
+	return challengeContext{Protocol: Protocol, Binding: b, Salt: salt, Nonce: nonce}
 }
 
 type challengeBody struct {

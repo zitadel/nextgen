@@ -1,7 +1,6 @@
 package pow
 
 import (
-	"bytes"
 	"crypto/hmac"
 	"crypto/sha256"
 	"crypto/subtle"
@@ -44,9 +43,9 @@ func ParseProof(proof string) (Proof, error) {
 }
 
 // Verify uses only bounded decoding and HMACs. A successful return is necessary
-// but insufficient for admission: it does not consume the requirement. All state,
-// key eligibility and profile availability must come from authoritative storage.
-func Verify(stored StoredChallenge, proof string, expected Binding, keys Keys, availability Availability, now time.Time) error {
+// but insufficient for admission: it does not consume the challenge. The expected
+// binding and project keys must come from the caller's trusted state.
+func Verify(stored StoredChallenge, proof string, expected Binding, keys Keys, now time.Time) error {
 	parsed, err := ParseProof(proof)
 	if err != nil {
 		return err
@@ -57,9 +56,6 @@ func Verify(stored StoredChallenge, proof string, expected Binding, keys Keys, a
 	}
 	if _, err := LookupProfile(expected.ProfileID); err != nil {
 		return err
-	}
-	if availability != Enabled && availability != VerifyOnly {
-		return ErrUnavailableProfile
 	}
 	if err := keys.validate(); err != nil {
 		return err
@@ -72,44 +68,25 @@ func Verify(stored StoredChallenge, proof string, expected Binding, keys Keys, a
 	if err != nil {
 		return ErrInvalidChallenge
 	}
-	ctx, err := exactObject(body["context"], "protocol", "profile_id", "project_id", "deployment_id",
-		"release_id", "policy_revision", "config_revision", "attempt_id", "operation",
-		"operation_instance_id", "requirement_id", "challenge_id", "generation",
-		"challenge_key_version", "solution_key_version", "expires_at", "salt", "nonce")
+	_, err = exactObject(body["context"], "protocol", "profile_id", "project_id", "operation",
+		"operation_instance_id", "challenge_id", "expires_at", "salt", "nonce")
 	if err != nil {
 		return ErrInvalidChallenge
 	}
-	// Compare every field against the authoritative binding. Comparing normalized
-	// primitive JSON also rejects nulls, wrong types and non-integer number syntax;
-	// no client or stored field is allowed to overwrite an expected binding.
-	salt, saltOK := stringValue(ctx["salt"])
-	nonce, nonceOK := stringValue(ctx["nonce"])
-	if _, ok := lowerHex(salt, saltSize); !ok || !saltOK {
+	// Exact member validation precedes typed decoding so Go's case-insensitive
+	// field matching and duplicate/null handling cannot weaken the binding.
+	var ctx challengeContext
+	if err := json.Unmarshal(body["context"], &ctx); err != nil || ctx.Protocol != Protocol {
 		return ErrInvalidChallenge
 	}
-	if _, ok := lowerHex(nonce, nonceSize); !ok || !nonceOK {
+	if _, ok := lowerHex(ctx.Salt, saltSize); !ok {
 		return ErrInvalidChallenge
 	}
-	expectedJSON, err := json.Marshal(expected.context(salt, nonce))
-	if err != nil {
-		return ErrInvalidBinding
+	if _, ok := lowerHex(ctx.Nonce, nonceSize); !ok {
+		return ErrInvalidChallenge
 	}
-	var expectedFields map[string]json.RawMessage
-	if err := json.Unmarshal(expectedJSON, &expectedFields); err != nil {
-		return ErrInvalidBinding
-	}
-	for name, want := range expectedFields {
-		// String escapes/order need not be canonical. The MAC always covers the
-		// original bytes, while binding equality compares decoded string values.
-		if len(want) > 0 && want[0] == '"' {
-			got, ok := stringValue(ctx[name])
-			wantString, _ := stringValue(want)
-			if !ok || got != wantString {
-				return ErrBindingMismatch
-			}
-		} else if !bytes.Equal(ctx[name], want) {
-			return ErrBindingMismatch
-		}
+	if ctx.Binding != expected {
+		return ErrBindingMismatch
 	}
 	if parsed.ChallengeID != expected.ChallengeID {
 		return ErrInvalidProof

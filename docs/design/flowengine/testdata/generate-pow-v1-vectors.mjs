@@ -40,27 +40,18 @@ for (const [level, counter] of [
     ),
   );
   const context = {
-    protocol: "zitadel_pow_v1",
+    protocol: "zitadel_pow_poc_v1",
     profile_id: `pbkdf2_sha256_5000_l${level}`,
     project_id: "prj_vector",
-    deployment_id: "dpl_vector",
-    release_id: "rel_vector",
-    policy_revision: level === 1 ? null : "rev_policy",
-    config_revision: level === 1 ? null : "rev_config",
-    attempt_id: "aat_vector",
     operation: "auth.factor.password.check",
     operation_instance_id: "op_vector",
-    requirement_id: "req_vector",
     challenge_id: `chl_vector_${level}`,
-    generation: level,
-    challenge_key_version: "enc_key_challenge",
-    solution_key_version: "enc_key_solution",
     expires_at: 1793631900,
     salt: hex(salt),
     nonce: hex(nonce),
   };
   const contextJSON = JSON.stringify(context);
-  const keyMAC = await mac(solutionKey, "zitadel:pow:solution:1:", utf8(contextJSON), key);
+  const keyMAC = await mac(solutionKey, "zitadel:pow:poc:solution:1:", utf8(contextJSON), key);
   const body = JSON.stringify({ context, key_prefix: hex(key.slice(0, 16)), key_mac: keyMAC });
   vectors.push({
     name: `level_${level}_counter_${counter}`,
@@ -69,7 +60,7 @@ for (const [level, counter] of [
     solution_key: hex(solutionKey),
     context_json: contextJSON,
     body,
-    mac: await mac(challengeKey, "zitadel:pow:parameters:1:", utf8(body)),
+    mac: await mac(challengeKey, "zitadel:pow:poc:parameters:1:", utf8(body)),
     derived_key: hex(key),
     proof: JSON.stringify({
       protocol: context.protocol,
@@ -120,9 +111,9 @@ const output = `${JSON.stringify(
 )}\n`;
 if (process.argv.includes("--check")) {
   if ((await readFile(destination, "utf8")) !== output) {
-    throw new Error("PoW v1 vectors changed; review protocol compatibility before regenerating.");
+    throw new Error("PoW POC vectors changed; review the construction before regenerating.");
   }
-  console.log("PoW v1: four permanent WebCrypto vectors match.");
+  console.log("PoW POC: four WebCrypto vectors match.");
 } else {
   await writeFile(destination, output);
 }

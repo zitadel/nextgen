@@ -211,7 +211,7 @@ already send:
 - **Costs:** a project and two users per run in the branch's preview
   database, dropped with it. ADR 078 §2's per-address limit on
   `createProject` would apply to the runner; one call per run stays far below
-  it. ADR 078 §5's built-in PoW is solvable by a script, by design. The edge's rules
+  it. ADR 078 §5's Altcha is solvable by a script, by design. The edge's rules
   and Attack Mode have to let the suite's requests through.
 - **To verify first:** that `createProject` answers through Deployment
   Protection with the bypass header, and that sign-up and claim are open on a

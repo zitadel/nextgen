@@ -59,15 +59,12 @@ Every step response contains the capability collections and step-level metadata:
     "gates": {
       "captcha": {
         "kind": "captcha",
-        "provider": "zitadel_pow",
+        "provider": "altcha",
         "config": {
-          "protocol": "zitadel_pow_v1",
-          "challenge_id": "<storage-generated-id>",
-          "profile_id": "pbkdf2_sha256_5000_l1",
-          "salt": "<32 lowercase hex characters>",
-          "nonce": "<32 lowercase hex characters>",
-          "key_prefix": "<32 lowercase hex characters>",
-          "expires_at": "2026-11-02T15:05:00Z"
+          "algorithm": "SHA-256",
+          "challenge": "abc...",
+          "salt": "xyz...",
+          "max_number": 100000
         }
       }
     },

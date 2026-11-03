@@ -4,7 +4,6 @@ projects:
     workspace: "."
     release: "tools/release"
     bench: "tools/bench"
-    pow-bench: "tools/pow-bench"
     oidc-mock: "tools/oidc-mock"
     cli: "apps/cli"
     e2e: "e2e"

@@ -36,22 +36,18 @@ type issuer struct {
 }
 
 // Issue performs exactly one KDF invocation at any supported cost level. The
-// caller reserves capacity first, then conditionally persists the result against
-// the requirement's generation. Re-rendering must return that persisted result.
-func Issue(binding Binding, keys Keys, availability Availability, now time.Time) (Challenge, error) {
-	return issuer{random: rand.Reader, deriver: pbkdf2Deriver{}}.issue(binding, keys, availability, now)
+// caller must bound issuance and retain the result for repeated reads.
+func Issue(binding Binding, keys Keys, now time.Time) (Challenge, error) {
+	return issuer{random: rand.Reader, deriver: pbkdf2Deriver{}}.issue(binding, keys, now)
 }
 
-func (i issuer) issue(binding Binding, keys Keys, availability Availability, now time.Time) (Challenge, error) {
+func (i issuer) issue(binding Binding, keys Keys, now time.Time) (Challenge, error) {
 	if err := binding.validate(); err != nil {
 		return Challenge{}, err
 	}
 	profile, err := LookupProfile(binding.ProfileID)
 	if err != nil {
 		return Challenge{}, err
-	}
-	if availability != Enabled {
-		return Challenge{}, ErrUnavailableProfile
 	}
 	if err := keys.validate(); err != nil {
 		return Challenge{}, err

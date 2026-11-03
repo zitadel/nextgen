@@ -206,9 +206,6 @@ catalogs:
     '@mswjs/http-middleware':
       specifier: ^0.10.3
       version: 0.10.3
-    '@noble/hashes':
-      specifier: ^2.4.0
-      version: 2.4.0
     '@nuxt/kit':
       specifier: ^4.5.1
       version: 4.5.2
@@ -335,9 +332,6 @@ catalogs:
     ajv:
       specifier: ^8.20.0
       version: 8.20.0
-    altcha-lib:
-      specifier: ^2.8.0
-      version: 2.8.0
     botid:
       specifier: ^1.5.12
       version: 1.5.12
@@ -359,9 +353,6 @@ catalogs:
     dompurify:
       specifier: ^3.4.16
       version: 3.4.17
-    esbuild:
-      specifier: ^0.28.1
-      version: 0.28.2
     escape-string-regexp:
       specifier: ^5.0.0
       version: 5.0.0
@@ -386,9 +377,6 @@ catalogs:
     fumadocs-ui:
       specifier: npm:@fumadocs/base-ui@^16.17.1
       version: 16.17.1
-    hash-wasm:
-      specifier: ^4.12.0
-      version: 4.12.0
     is-wsl:
       specifier: ^3.1.0
       version: 3.1.1
@@ -2381,24 +2369,6 @@ importers:
   tools/bench: {}
 
   tools/oidc-mock: {}
-
-  tools/pow-bench:
-    devDependencies:
-      '@noble/hashes':
-        specifier: 'catalog:'
-        version: 2.4.0
-      altcha-lib:
-        specifier: 'catalog:'
-        version: 2.8.0
-      esbuild:
-        specifier: 'catalog:'
-        version: 0.28.2
-      hash-wasm:
-        specifier: 'catalog:'
-        version: 4.12.0
-      playwright:
-        specifier: 'catalog:'
-        version: 1.64.1
 
   tools/release: {}
 
@@ -4915,10 +4885,6 @@ packages:
   '@noble/hashes@1.8.0':
     resolution: {integrity: sha512-jCs9ldd7NwzpgXDIf6P3+NrHh9/sD6CQdxHyjQI+h/6rDNo88ypBxxz45UDuZHz9r3tNz7N/VInSVoVdtXEI4A==}
     engines: {node: ^14.21.3 || >=16}
-
-  '@noble/hashes@2.4.0':
-    resolution: {integrity: sha512-X5XaVWZIBCT7HHZGm5I7ZQXDwLG+bGXuSrMQAW+7Zvl87h1kmc1ZB1VSRJcpUfoUrGQp4Fkoxm5kZ+Ms+aW+eA==}
-    engines: {node: '>= 20.19.0'}
 
   '@nodable/entities@2.1.1':
     resolution: {integrity: sha512-Pig3HxDIoMgjdEH8OCf/dkcTmLFjJRjWuq8jSnklu284/TKOPibSRERmOykiwmyXTtv61mP+44f3GMx0tLAyjg==}
@@ -9872,54 +9838,6 @@ packages:
   alien-signals@3.2.0:
     resolution: {integrity: sha512-5J9+NpCLHgic4xnZtI8SznvNagwJsZSvRFsAwoLlLw+Edaqa4upCiOC19P8Vx2DqmEvqK2qJBMtI8+9eXOEb/A==}
 
-  altcha-lib@2.8.0:
-    resolution: {integrity: sha512-at1DAqS8u6Z+XbPV2xQd/oATDTxYN83gITqIfsCSz7a2ENqUNIvn9h9xPuAbjeQ3JFqrW8KCjinphhm+bUrRzQ==}
-    hasBin: true
-    peerDependencies:
-      '@fastify/cookie': ^11.0.0
-      '@fastify/cors': ^11.0.0
-      '@fastify/formbody': ^8.0.0 || ^9.0.0
-      '@nestjs/common': ^10.0.0 || ^11.0.0 || ^12.0.0
-      '@nestjs/core': ^10.0.0 || ^11.0.0 || ^12.0.0
-      '@nestjs/platform-express': ^10.0.0 || ^11.0.0 || ^12.0.0
-      '@nestjs/platform-fastify': ^10.0.0 || ^11.0.0 || ^12.0.0
-      '@sveltejs/kit': ^2.0.0 || ^3.0.0
-      cookie-parser: ^1.0.0
-      cors: ^2.0.0
-      express: ^4.0.0 || ^5.0.0
-      fastify: ^5.0.0
-      h3: ^1.15.0 || ^2.0.0
-      hono: ^4.0.0
-    peerDependenciesMeta:
-      '@fastify/cookie':
-        optional: true
-      '@fastify/cors':
-        optional: true
-      '@fastify/formbody':
-        optional: true
-      '@nestjs/common':
-        optional: true
-      '@nestjs/core':
-        optional: true
-      '@nestjs/platform-express':
-        optional: true
-      '@nestjs/platform-fastify':
-        optional: true
-      '@sveltejs/kit':
-        optional: true
-      cookie-parser:
-        optional: true
-      cors:
-        optional: true
-      express:
-        optional: true
-      fastify:
-        optional: true
-      h3:
-        optional: true
-      hono:
-        optional: true
-
   ansi-align@3.0.1:
     resolution: {integrity: sha512-IOfwwBF5iczOjp/WeY4YxyjqAFMQoZufdQWDd19SEExbVLNXqvpzSJ/M7Za4/sCPmQ0+GRquoA7bGcINcxew6w==}
 
@@ -12021,9 +11939,6 @@ packages:
   has-tostringtag@1.0.2:
     resolution: {integrity: sha512-NqADB8VjPFLM2V0VvHUewwwsw0ZWBaIdgo+ieHtK3hasLz4qeCRjYcqfB6AQrBggRKppKF8L52/VqdVsO47Dlw==}
     engines: {node: '>= 0.4'}
-
-  hash-wasm@4.12.0:
-    resolution: {integrity: sha512-+/2B2rYLb48I/evdOIhP+K/DD2ca2fgBjp6O+GBEnCDk2e4rpeXIK8GvIyRPjTezgmWn9gmKwkQjjx6BtqDHVQ==}
 
   hasown@2.0.4:
     resolution: {integrity: sha512-T2UbfbBEF32wiepXIsMlTW9+dDYC6wMh/t/vYA4tuOMKqWz/n3vr1NFSxQiyP+zk2mXsoMA/i/7qV6LKut1t1A==}
@@ -19894,8 +19809,6 @@ snapshots:
   '@noble/hashes@1.8.0':
     optional: true
 
-  '@noble/hashes@2.4.0': {}
-
   '@nodable/entities@2.1.1': {}
 
   '@nodelib/fs.scandir@2.1.5':
@@ -25764,8 +25677,6 @@ snapshots:
 
   alien-signals@3.2.0: {}
 
-  altcha-lib@2.8.0: {}
-
   ansi-align@3.0.1:
     dependencies:
       string-width: 4.2.3
@@ -28055,8 +27966,6 @@ snapshots:
   has-tostringtag@1.0.2:
     dependencies:
       has-symbols: 1.1.0
-
-  hash-wasm@4.12.0: {}
 
   hasown@2.0.4:
     dependencies:

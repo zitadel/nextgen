@@ -56,21 +56,7 @@ func (v vector) inputs(t testing.TB) (Binding, Keys, StoredChallenge, time.Time)
 	if err := json.Unmarshal([]byte(v.ContextJSON), &c); err != nil {
 		t.Fatal(err)
 	}
-	b := Binding{
-		ProfileID: c.ProfileID, ProjectID: c.ProjectID, DeploymentID: c.DeploymentID,
-		ReleaseID: c.ReleaseID, AttemptID: c.AttemptID, Operation: c.Operation,
-		OperationInstanceID: c.OperationInstanceID, RequirementID: c.RequirementID,
-		ChallengeID: c.ChallengeID, Generation: c.Generation,
-		ChallengeKeyVersion: c.ChallengeKeyVersion, SolutionKeyVersion: c.SolutionKeyVersion,
-		ExpiresAt: c.ExpiresAt,
-	}
-	if c.PolicyRevision != nil {
-		b.PolicyRevision = *c.PolicyRevision
-	}
-	if c.ConfigRevision != nil {
-		b.ConfigRevision = *c.ConfigRevision
-	}
-	return b, Keys{Challenge: [32]byte(unhex(t, v.ChallengeKey)), Solution: [32]byte(unhex(t, v.SolutionKey))},
+	return c.Binding, Keys{Challenge: [32]byte(unhex(t, v.ChallengeKey)), Solution: [32]byte(unhex(t, v.SolutionKey))},
 		StoredChallenge{Body: []byte(v.Body), MAC: unhex(t, v.MAC)}, time.Unix(c.ExpiresAt, 0).Add(-MaxLifetime)
 }
 
@@ -90,18 +76,18 @@ func (d *spyDeriver) derive(p Profile, input [20]byte, salt [16]byte) ([32]byte,
 	return pbkdf2Deriver{}.derive(p, input, salt)
 }
 
-func TestPermanentVectors(t *testing.T) {
+func TestReferenceVectors(t *testing.T) {
 	t.Parallel()
 	for _, v := range vectors(t) {
 		t.Run(v.Name, func(t *testing.T) {
 			binding, keys, stored, now := v.inputs(t)
-			if err := Verify(stored, v.Proof, binding, keys, Enabled, now); err != nil {
+			if err := Verify(stored, v.Proof, binding, keys, now); err != nil {
 				t.Fatalf("verify independently generated WebCrypto proof: %v", err)
 			}
 			entropy := append(unhex(t, v.Public.Salt), unhex(t, v.Public.Nonce)...)
 			entropy = binary.BigEndian.AppendUint16(entropy, uint16(v.Counter))
 			deriver := new(spyDeriver)
-			issued, err := (issuer{random: bytes.NewReader(entropy), deriver: deriver}).issue(binding, keys, Enabled, now)
+			issued, err := (issuer{random: bytes.NewReader(entropy), deriver: deriver}).issue(binding, keys, now)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -119,16 +105,7 @@ func TestPermanentVectors(t *testing.T) {
 			if err != nil || hex.EncodeToString(key[:]) != v.DerivedKey {
 				t.Fatalf("native KDF differs from WebCrypto: %x %v", key, err)
 			}
-			// A verifier has no reference to the issuer/deriver. Valid and invalid
-			// proofs cannot invoke it or trigger a fallback password verifier.
-			deriver.calls = 0
-			deriver.err = errors.New("verification must not derive")
-			for _, proof := range []string{v.Proof, "{}", strings.Replace(v.Proof, "zitadel_pow_v1", "zitadel_pow_v2", 1)} {
-				_ = Verify(issued.Stored, proof, binding, keys, Enabled, now)
-			}
-			if deriver.calls != 0 {
-				t.Fatalf("verification ran %d KDFs", deriver.calls)
-			}
+
 		})
 	}
 }
@@ -151,12 +128,12 @@ func TestProfiles(t *testing.T) {
 	}
 	for _, algorithm := range []Algorithm{"", "argon2id", "bcrypt", "PBKDF2_SHA256"} {
 		if _, err := ProfileForLevel(algorithm, 1); !errors.Is(err, ErrUnsupportedProfile) {
-			t.Fatalf("unreleased algorithm %q accepted", algorithm)
+			t.Fatalf("unsupported algorithm %q accepted", algorithm)
 		}
 	}
 	for _, id := range []string{"", "pbkdf2_sha256_5000_l0", "pbkdf2_sha256_5000_l5", "argon2id_4096_l1", "PBKDF2_SHA256_5000_L1"} {
 		if _, err := LookupProfile(id); !errors.Is(err, ErrUnsupportedProfile) {
-			t.Fatalf("unreleased profile %q accepted", id)
+			t.Fatalf("unsupported profile %q accepted", id)
 		}
 	}
 }
@@ -171,9 +148,9 @@ func TestProofParsing(t *testing.T) {
 		"over limit":        valid + strings.Repeat(" ", MaxProofBytes),
 		"unknown field":     strings.TrimSuffix(valid, "}") + `,"counter":1023}`,
 		"duplicate field":   strings.TrimSuffix(valid, "}") + `,"challenge_id":"other"}`,
-		"escaped duplicate": strings.TrimSuffix(valid, "}") + `,"\u0070rotocol":"zitadel_pow_v1"}`,
+		"escaped duplicate": strings.TrimSuffix(valid, "}") + `,"\u0070rotocol":"zitadel_pow_poc_v1"}`,
 		"case alias":        strings.Replace(valid, "protocol", "Protocol", 1),
-		"unknown version":   strings.Replace(valid, Protocol, "zitadel_pow_v2", 1),
+		"unknown version":   strings.Replace(valid, Protocol, "zitadel_pow_poc_v2", 1),
 		"numeric version":   strings.Replace(valid, `"`+Protocol+`"`, "1", 1),
 		"null version":      strings.Replace(valid, `"`+Protocol+`"`, "null", 1),
 		"null key":          strings.Replace(valid, `"`+v.DerivedKey+`"`, "null", 1),
@@ -185,7 +162,7 @@ func TestProofParsing(t *testing.T) {
 		"empty challenge":   strings.Replace(valid, v.Public.ChallengeID, "", 1),
 		"oversized id":      strings.Replace(valid, v.Public.ChallengeID, strings.Repeat("a", 257), 1),
 		"invalid UTF8":      strings.Replace(valid, v.Public.ChallengeID, string([]byte{0xff}), 1),
-		"missing key":       `{"protocol":"zitadel_pow_v1","challenge_id":"chl_vector_2"}`,
+		"missing key":       `{"protocol":"zitadel_pow_poc_v1","challenge_id":"chl_vector_2"}`,
 	}
 	for name, proof := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -225,22 +202,12 @@ func TestEveryBindingIsRequired(t *testing.T) {
 			if name == "ProfileID" {
 				changed.ProfileID = "pbkdf2_sha256_5000_l3"
 			}
-			if err := Verify(stored, v.Proof, changed, keys, Enabled, now); !errors.Is(err, want) {
+			if err := Verify(stored, v.Proof, changed, keys, now); !errors.Is(err, want) {
 				t.Fatalf("binding substitution: got %v, want %v", err, want)
 			}
 		})
 	}
-	for _, revision := range []string{"policy_revision", "config_revision"} {
-		bad := replaceBody(t, stored, keys, func(body map[string]json.RawMessage) {
-			var ctx map[string]json.RawMessage
-			_ = json.Unmarshal(body["context"], &ctx)
-			ctx[revision] = json.RawMessage("null")
-			body["context"], _ = json.Marshal(ctx)
-		})
-		if err := Verify(bad, v.Proof, binding, keys, Enabled, now); !errors.Is(err, ErrBindingMismatch) {
-			t.Fatalf("present revision became absent: %v", err)
-		}
-	}
+
 }
 
 func replaceBody(t testing.TB, stored StoredChallenge, keys Keys, mutate func(map[string]json.RawMessage)) StoredChallenge {
@@ -262,12 +229,11 @@ func TestVerifierRejectsTampering(t *testing.T) {
 	v := vectors(t)[1]
 	binding, keys, stored, now := v.inputs(t)
 	type verification struct {
-		stored       StoredChallenge
-		proof        string
-		keys         Keys
-		binding      Binding
-		availability Availability
-		now          time.Time
+		stored  StoredChallenge
+		proof   string
+		keys    Keys
+		binding Binding
+		now     time.Time
 	}
 	cases := []struct {
 		name   string
@@ -285,9 +251,6 @@ func TestVerifierRejectsTampering(t *testing.T) {
 		{"unresolved keys", func(c *verification) { c.keys = Keys{} }, ErrInvalidKeys},
 		{"expired at boundary", func(c *verification) { c.now = time.Unix(binding.ExpiresAt, 0) }, ErrExpired},
 		{"expired after boundary", func(c *verification) { c.now = time.Unix(binding.ExpiresAt+1, 0) }, ErrExpired},
-		{"revoked profile", func(c *verification) { c.availability = Disabled }, ErrUnavailableProfile},
-		{"unspecified availability", func(c *verification) { c.availability = 0 }, ErrUnavailableProfile},
-		{"unknown availability", func(c *verification) { c.availability = 255 }, ErrUnavailableProfile},
 		{"unknown profile", func(c *verification) { c.binding.ProfileID = "future" }, ErrUnsupportedProfile},
 		{"unresolved binding", func(c *verification) { c.binding.OperationInstanceID = "" }, ErrInvalidBinding},
 		{"wrong challenge id", func(c *verification) { c.proof = strings.Replace(v.Proof, v.Public.ChallengeID, "other", 1) }, ErrInvalidProof},
@@ -298,15 +261,15 @@ func TestVerifierRejectsTampering(t *testing.T) {
 	}
 	for _, test := range cases {
 		t.Run(test.name, func(t *testing.T) {
-			c := verification{stored: StoredChallenge{Body: bytes.Clone(stored.Body), MAC: bytes.Clone(stored.MAC)}, proof: v.Proof, keys: keys, binding: binding, availability: Enabled, now: now}
+			c := verification{stored: StoredChallenge{Body: bytes.Clone(stored.Body), MAC: bytes.Clone(stored.MAC)}, proof: v.Proof, keys: keys, binding: binding, now: now}
 			test.change(&c)
-			if err := Verify(c.stored, c.proof, c.binding, c.keys, c.availability, c.now); !errors.Is(err, test.want) {
+			if err := Verify(c.stored, c.proof, c.binding, c.keys, c.now); !errors.Is(err, test.want) {
 				t.Fatalf("got %v, want %v", err, test.want)
 			}
 		})
 	}
-	if err := Verify(stored, v.Proof, binding, keys, VerifyOnly, time.Unix(binding.ExpiresAt, 0).Add(-time.Nanosecond)); err != nil {
-		t.Fatalf("verify-only profile must drain until exact expiry: %v", err)
+	if err := Verify(stored, v.Proof, binding, keys, time.Unix(binding.ExpiresAt, 0).Add(-time.Nanosecond)); err != nil {
+		t.Fatalf("valid proof must work until exact expiry: %v", err)
 	}
 }
 
@@ -320,15 +283,15 @@ func TestAuthenticatedMalformedStorage(t *testing.T) {
 		"null": "null", "array": "[]", "empty": "{}", "trailing": v.Body + "{}",
 		"unknown field":          strings.TrimSuffix(v.Body, "}") + `,"other":true}`,
 		"duplicate":              strings.Replace(v.Body, `"context":`, `"key_prefix":"00","context":`, 1),
-		"context duplicate":      strings.Replace(v.Body, `"protocol":`, `"protocol":"zitadel_pow_v1","protocol":`, 1),
+		"context duplicate":      strings.Replace(v.Body, `"protocol":`, `"protocol":"zitadel_pow_poc_v1","protocol":`, 1),
 		"context case alias":     strings.Replace(v.Body, `"profile_id"`, `"Profile_id"`, 1),
 		"null context":           `{"context":null,"key_prefix":"00","key_mac":"00"}`,
-		"missing context member": strings.Replace(v.Body, `"generation":2,`, "", 1),
-		"null generation":        strings.Replace(v.Body, `"generation":2`, `"generation":null`, 1),
-		"float generation":       strings.Replace(v.Body, `"generation":2`, `"generation":2.0`, 1),
-		"negative generation":    strings.Replace(v.Body, `"generation":2`, `"generation":-2`, 1),
+		"missing context member": strings.Replace(v.Body, `"expires_at":1793631900,`, "", 1),
+		"null expiry":            strings.Replace(v.Body, `"expires_at":1793631900`, `"expires_at":null`, 1),
+		"float expiry":           strings.Replace(v.Body, `"expires_at":1793631900`, `"expires_at":1793631900.0`, 1),
+		"negative expiry":        strings.Replace(v.Body, `"expires_at":1793631900`, `"expires_at":-1`, 1),
 		"null project":           strings.Replace(v.Body, `"prj_vector"`, "null", 1),
-		"unknown protocol":       strings.Replace(v.Body, Protocol, "zitadel_pow_v2", 1),
+		"unknown protocol":       strings.Replace(v.Body, Protocol, "zitadel_pow_poc_v2", 1),
 		"uppercase salt":         strings.Replace(v.Body, v.Public.Salt, strings.ToUpper(v.Public.Salt), 1),
 		"short nonce":            strings.Replace(v.Body, v.Public.Nonce, "00", 1),
 		"null prefix":            strings.Replace(v.Body, `"`+v.Public.KeyPrefix+`"`, "null", 1),
@@ -336,7 +299,7 @@ func TestAuthenticatedMalformedStorage(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			bad := StoredChallenge{Body: []byte(body), MAC: authenticate(keys.Challenge[:], parametersDomain, []byte(body))}
-			if err := Verify(bad, v.Proof, binding, keys, Enabled, now); err == nil {
+			if err := Verify(bad, v.Proof, binding, keys, now); err == nil {
 				t.Fatal("malformed authenticated storage accepted")
 			}
 		})
@@ -344,7 +307,7 @@ func TestAuthenticatedMalformedStorage(t *testing.T) {
 	for _, field := range []string{"key_mac", "key_prefix"} {
 		for _, raw := range []string{"null", "[]", `""`, `"00"`, `"` + strings.Repeat("F", 64) + `"`} {
 			bad := replaceBody(t, stored, keys, func(body map[string]json.RawMessage) { body[field] = json.RawMessage(raw) })
-			if err := Verify(bad, v.Proof, binding, keys, Enabled, now); err == nil {
+			if err := Verify(bad, v.Proof, binding, keys, now); err == nil {
 				t.Fatalf("invalid %s accepted: %s", field, raw)
 			}
 		}
@@ -354,7 +317,7 @@ func TestAuthenticatedMalformedStorage(t *testing.T) {
 	bad := replaceBody(t, stored, keys, func(body map[string]json.RawMessage) {
 		body["key_prefix"] = json.RawMessage(`"` + strings.Repeat("0", 32) + `"`)
 	})
-	if err := Verify(bad, v.Proof, binding, keys, Enabled, now); !errors.Is(err, ErrInvalidProof) {
+	if err := Verify(bad, v.Proof, binding, keys, now); !errors.Is(err, ErrInvalidProof) {
 		t.Fatalf("wrong prefix with correct solution MAC: %v", err)
 	}
 	// Reordering C with only a fresh outer MAC must not authenticate the solution.
@@ -363,7 +326,7 @@ func TestAuthenticatedMalformedStorage(t *testing.T) {
 		_ = json.Unmarshal(body["context"], &ctx)
 		body["context"], _ = json.Marshal(ctx)
 	})
-	if err := Verify(bad, v.Proof, binding, keys, Enabled, now); !errors.Is(err, ErrInvalidProof) {
+	if err := Verify(bad, v.Proof, binding, keys, now); !errors.Is(err, ErrInvalidProof) {
 		t.Fatalf("solution MAC must cover original context bytes: %v", err)
 	}
 }
@@ -372,28 +335,24 @@ func TestIssuerFailsBeforeKDF(t *testing.T) {
 	t.Parallel()
 	v := vectors(t)[0]
 	binding, keys, _, now := v.inputs(t)
-	for name, modify := range map[string]func(*Binding, *Keys, *Availability){
-		"zero generation":      func(b *Binding, _ *Keys, _ *Availability) { b.Generation = 0 },
-		"missing operation":    func(b *Binding, _ *Keys, _ *Availability) { b.Operation = "" },
-		"expired":              func(b *Binding, _ *Keys, _ *Availability) { b.ExpiresAt = now.Unix() },
-		"excessive TTL":        func(b *Binding, _ *Keys, _ *Availability) { b.ExpiresAt++ },
-		"future algorithm":     func(b *Binding, _ *Keys, _ *Availability) { b.ProfileID = "argon2id_4096_l1" },
-		"missing keys":         func(_ *Binding, k *Keys, _ *Availability) { *k = Keys{} },
-		"shared keys":          func(_ *Binding, k *Keys, _ *Availability) { k.Solution = k.Challenge },
-		"verify only":          func(_ *Binding, _ *Keys, a *Availability) { *a = VerifyOnly },
-		"disabled":             func(_ *Binding, _ *Keys, a *Availability) { *a = Disabled },
-		"unknown availability": func(_ *Binding, _ *Keys, a *Availability) { *a = 0 },
-		"invalid UTF8":         func(b *Binding, _ *Keys, _ *Availability) { b.ProjectID = string([]byte{0xff}) },
-		"large ID":             func(b *Binding, _ *Keys, _ *Availability) { b.ProjectID = strings.Repeat("a", 257) },
-		"large body after escaping": func(b *Binding, _ *Keys, _ *Availability) {
-			b.ProjectID, b.AttemptID, b.ReleaseID = strings.Repeat("\x00", 256), strings.Repeat("\x00", 256), strings.Repeat("\x00", 256)
+	for name, modify := range map[string]func(*Binding, *Keys){
+		"missing operation": func(b *Binding, _ *Keys) { b.Operation = "" },
+		"expired":           func(b *Binding, _ *Keys) { b.ExpiresAt = now.Unix() },
+		"excessive TTL":     func(b *Binding, _ *Keys) { b.ExpiresAt++ },
+		"future algorithm":  func(b *Binding, _ *Keys) { b.ProfileID = "argon2id_4096_l1" },
+		"missing keys":      func(_ *Binding, k *Keys) { *k = Keys{} },
+		"shared keys":       func(_ *Binding, k *Keys) { k.Solution = k.Challenge },
+		"invalid UTF8":      func(b *Binding, _ *Keys) { b.ProjectID = string([]byte{0xff}) },
+		"large ID":          func(b *Binding, _ *Keys) { b.ProjectID = strings.Repeat("a", 257) },
+		"large body after escaping": func(b *Binding, _ *Keys) {
+			b.ProjectID, b.Operation, b.OperationInstanceID = strings.Repeat("\x00", 256), strings.Repeat("\x00", 256), strings.Repeat("\x00", 256)
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			b, k, a := binding, keys, Enabled
-			modify(&b, &k, &a)
+			b, k := binding, keys
+			modify(&b, &k)
 			deriver := new(spyDeriver)
-			issued, err := (issuer{random: bytes.NewReader(make([]byte, 34)), deriver: deriver}).issue(b, k, a, now)
+			issued, err := (issuer{random: bytes.NewReader(make([]byte, 34)), deriver: deriver}).issue(b, k, now)
 			if err == nil || deriver.calls != 0 || len(issued.Stored.Body) != 0 {
 				t.Fatalf("invalid issuance performed work: error=%v calls=%d", err, deriver.calls)
 			}
@@ -401,14 +360,14 @@ func TestIssuerFailsBeforeKDF(t *testing.T) {
 	}
 	for _, size := range []int{0, 15, 16, 31, 32, 33} {
 		deriver := new(spyDeriver)
-		_, err := (issuer{random: bytes.NewReader(make([]byte, size)), deriver: deriver}).issue(binding, keys, Enabled, now)
+		_, err := (issuer{random: bytes.NewReader(make([]byte, size)), deriver: deriver}).issue(binding, keys, now)
 		if err == nil || deriver.calls != 0 {
 			t.Fatalf("entropy failure at %d bytes must not derive: %v", size, err)
 		}
 	}
 	derivationFailure := errors.New("derivation unavailable")
 	deriver := &spyDeriver{err: derivationFailure}
-	_, err := (issuer{random: bytes.NewReader(make([]byte, 34)), deriver: deriver}).issue(binding, keys, Enabled, now)
+	_, err := (issuer{random: bytes.NewReader(make([]byte, 34)), deriver: deriver}).issue(binding, keys, now)
 	if !errors.Is(err, derivationFailure) || deriver.calls != 1 {
 		t.Fatalf("preserve issuer failure for server-fault mapping: %v", err)
 	}
@@ -417,7 +376,7 @@ func TestIssuerFailsBeforeKDF(t *testing.T) {
 func TestIssueAndSolve(t *testing.T) {
 	t.Parallel()
 	binding, keys, _, now := vectors(t)[0].inputs(t)
-	issued, err := Issue(binding, keys, Enabled, now)
+	issued, err := Issue(binding, keys, now)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -435,7 +394,7 @@ func TestIssueAndSolve(t *testing.T) {
 			continue
 		}
 		proof := `{"protocol":"` + Protocol + `","challenge_id":"` + binding.ChallengeID + `","derived_key":"` + hex.EncodeToString(key[:]) + `"}`
-		if err := Verify(issued.Stored, proof, binding, keys, Enabled, now); err != nil {
+		if err := Verify(issued.Stored, proof, binding, keys, now); err != nil {
 			t.Fatalf("native solver could not verify: %v", err)
 		}
 		return
@@ -446,7 +405,7 @@ func TestIssueAndSolve(t *testing.T) {
 func TestNoServerMaterialInProjection(t *testing.T) {
 	t.Parallel()
 	binding, keys, _, now := vectors(t)[0].inputs(t)
-	issued, err := Issue(binding, keys, Enabled, now)
+	issued, err := Issue(binding, keys, now)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -457,7 +416,7 @@ func TestNoServerMaterialInProjection(t *testing.T) {
 	if _, err := exactObject(data, "protocol", "challenge_id", "profile_id", "salt", "nonce", "key_prefix", "expires_at"); err != nil {
 		t.Fatalf("unexpected public fields: %s", data)
 	}
-	for _, secret := range []string{binding.ProjectID, binding.OperationInstanceID, binding.ChallengeKeyVersion,
+	for _, secret := range []string{binding.ProjectID, binding.OperationInstanceID,
 		hex.EncodeToString(keys.Challenge[:]), hex.EncodeToString(keys.Solution[:]), hex.EncodeToString(issued.Stored.MAC)} {
 		if bytes.Contains(data, []byte(secret)) {
 			t.Fatalf("public projection leaked server material: %s", data)
@@ -472,7 +431,7 @@ func FuzzParseProof(f *testing.F) {
 	for _, v := range vectors(f) {
 		f.Add(v.Proof)
 	}
-	for _, seed := range []string{"null", "{}", `{"Protocol":"zitadel_pow_v1"}`, strings.Repeat("x", MaxProofBytes+1)} {
+	for _, seed := range []string{"null", "{}", `{"Protocol":"zitadel_pow_poc_v1"}`, strings.Repeat("x", MaxProofBytes+1)} {
 		f.Add(seed)
 	}
 	f.Fuzz(func(t *testing.T, input string) {
@@ -494,7 +453,7 @@ func FuzzVerifyStoredChallenge(f *testing.F) {
 		}
 		// The fuzz harness knows a test key so mutations reach the stored decoder.
 		stored := StoredChallenge{Body: body, MAC: authenticate(keys.Challenge[:], parametersDomain, body)}
-		err := Verify(stored, proof, binding, keys, Enabled, now)
+		err := Verify(stored, proof, binding, keys, now)
 		if err == nil {
 			parsed, parseErr := ParseProof(proof)
 			if parseErr != nil || hex.EncodeToString(parsed.DerivedKey[:]) != v.DerivedKey {
@@ -502,26 +461,4 @@ func FuzzVerifyStoredChallenge(f *testing.F) {
 			}
 		}
 	})
-}
-
-func BenchmarkVerify(b *testing.B) {
-	v := vectors(b)[0]
-	binding, keys, stored, now := v.inputs(b)
-	b.ReportAllocs()
-	b.ResetTimer()
-	for b.Loop() {
-		if err := Verify(stored, v.Proof, binding, keys, Enabled, now); err != nil {
-			b.Fatal(err)
-		}
-	}
-}
-
-func BenchmarkIssue(b *testing.B) {
-	binding, keys, _, now := vectors(b)[0].inputs(b)
-	b.ReportAllocs()
-	for b.Loop() {
-		if _, err := Issue(binding, keys, Enabled, now); err != nil {
-			b.Fatal(err)
-		}
-	}
 }

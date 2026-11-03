@@ -1,17 +1,11 @@
-// Package pow implements the cryptographic core of zitadel_pow_v1 (ADR 019).
+// Package pow is an experimental PBKDF2 proof-of-work core. Its protocol and
+// profiles are provisional; no endpoint or authentication flow uses it.
 //
-// Issue must run after reserving bounded issuance capacity, outside retryable
-// database transactions. Resource IDs and key versions come from storage; random
-// salt, nonce and counter bytes are puzzle material, never resource IDs.
+// Issue derives one solution; Verify checks HMACs without deriving a key.
+// IDs, expected operation bindings and independent purpose keys come from the
+// caller. Salt, nonce and counter randomness is puzzle material, not resource IDs.
 //
-// Verify authenticates one proof against an authoritative requirement. It does
-// not grant admission: the caller must atomically recheck expiry, generation,
-// revocation, hard guards and one-use consumption before protected work. Resolve
-// keys by the requirement's project, purpose and version, never by proof fields.
-// Neither these keys nor StoredChallenge may be sent to a client.
-//
-// This package has no database, network, password-hasher or mutable registry
-// dependency. Availability is a snapshot supplied by the admission service, not
-// a process-local substitute for shared revocation state. No public endpoint is
-// enabled by this package.
+// Verification alone does not grant admission or prevent replay. Before any
+// public use, the caller needs bounded issuance, rate limits and atomic one-use
+// consumption for the protected operation. Keys and StoredChallenge stay private.
 package pow

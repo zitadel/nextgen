@@ -2,15 +2,14 @@ package pow
 
 import "errors"
 
-const Protocol = "zitadel_pow_v1"
+const Protocol = "zitadel_pow_poc_v1"
 
 type Algorithm string
 
 const DefaultAlgorithm Algorithm = "pbkdf2_sha256"
 
-// Profile is an immutable value from the released registry. Its zero value is
-// invalid. New algorithms must add a reviewed definition and client support;
-// callers cannot construct profiles with arbitrary KDF parameters.
+// Profile fixes the POC's KDF parameters and search range. Its zero value is
+// invalid. These experimental profiles are not a released compatibility contract.
 type Profile struct {
 	level uint8
 }
@@ -40,8 +39,8 @@ func (p Profile) MaxTrials() uint32 {
 	return 256 << p.level
 }
 
-// ProfileForLevel resolves only released algorithm/level pairs. Level zero is
-// handled by admission as "no puzzle"; it must never mint a zero-cost challenge.
+// ProfileForLevel accepts only the POC's PBKDF2 levels. Level zero means no
+// puzzle and must be handled by the caller, without issuing a challenge.
 func ProfileForLevel(algorithm Algorithm, level int) (Profile, error) {
 	if algorithm != DefaultAlgorithm || level < 1 || level > 4 {
 		return Profile{}, ErrUnsupportedProfile
@@ -59,19 +58,8 @@ func LookupProfile(id string) (Profile, error) {
 	return Profile{}, ErrUnsupportedProfile
 }
 
-// Availability is authoritative operational state, separate from the immutable
-// registry. Its zero value fails closed. Admission must recheck it at consumption.
-type Availability uint8
-
-const (
-	Enabled Availability = iota + 1
-	VerifyOnly
-	Disabled
-)
-
 var (
 	ErrUnsupportedProfile = errors.New("pow: unsupported profile or algorithm")
-	ErrUnavailableProfile = errors.New("pow: profile unavailable")
 	ErrInvalidBinding     = errors.New("pow: invalid authoritative binding")
 	ErrInvalidKeys        = errors.New("pow: invalid purpose keys")
 	ErrInvalidChallenge   = errors.New("pow: invalid stored challenge")

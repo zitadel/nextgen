@@ -1,12 +1,12 @@
-# PoW v1 interoperability vectors
+# Experimental PoW interoperability vectors
 
-These MIT-licensed fixtures pin the construction in [ADR 019](../../../adrs/019-captcha-gate-and-bot-signals.md).
+These MIT-licensed fixtures check the [PBKDF2 experiment](../bot-protection-implementation.md).
 All keys, IDs, salts, nonces and solutions are **public test data**.
 
-`pow-v1-vectors.json` contains one vector for each released PBKDF2 profile, including
+`pow-v1-vectors.json` contains one vector for each experimental PBKDF2 profile, including
 counter zero, counters above 255 and the maximum level-four counter. It records
 the exact context/body bytes, both server keys, the public projection, the derived
-key, proof and parameter MAC. Level one exercises absent policy/config revisions.
+key, proof and parameter MAC.
 
 `generate-pow-v1-vectors.mjs` independently derives these values with WebCrypto.
 The Go protocol tests compare issuance byte for byte and verify the proofs.
@@ -19,7 +19,7 @@ test run also executes fuzz seeds. For bounded exploratory fuzzing, pass
 with `FuzzVerifyStoredChallenge`. The normal server test task includes the Go
 tests and depends on `server:check-pow-vectors`.
 
-Regenerate only after reviewing an intentional change with
+Regenerate after reviewing an intentional change with
 `node docs/design/flowengine/testdata/generate-pow-v1-vectors.mjs` from the repository
-root. An incompatible wire change needs a new protocol version and new fixtures;
-do not overwrite these to make a failing compatibility check pass.
+root. The protocol is provisional, with no released compatibility promise;
+review changes to the construction before updating the reference values.
