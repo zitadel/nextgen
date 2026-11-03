@@ -87,5 +87,10 @@ The repo pins `@redocly/openapi-core` (the library behind the
 
 ```shell
 moon run server:openapi          # lint openapi-spec.yaml
+moon run server:generate         # also writes bundled/openapi.json (embedded at /api/v1/openapi.json)
 moon run docs:generate          # bundle it into apps/docs/.generated/openapi.mjs
 ```
+
+`scripts/bundle-openapi.mjs` produces both: the committed `bundled/openapi.json`
+the Go server embeds, and the docs site's `.generated/openapi.mjs`. CI's
+`server:check-generate-pruned` fails when the JSON drifts from the YAML sources.

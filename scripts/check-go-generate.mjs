@@ -15,7 +15,7 @@
 import { runCapture } from "./dev-process.mjs";
 import { cleanGenerated } from "./clean-generated.mjs";
 import { GENERATED_GLOBS } from "./generated-outputs.mjs";
-import { goGenerate } from "./go-generate.mjs";
+import { serverGenerate } from "./go-generate.mjs";
 
 // Same globs the cleaner uses, as git pathspecs — a narrower hand-maintained
 // list silently missed idgenmock/ and user_examples/, which matters far more
@@ -29,7 +29,7 @@ try {
   if (prune) {
     cleanGenerated({ quiet: true });
   }
-  await goGenerate();
+  await serverGenerate();
 } catch (error) {
   // The generator's own output is already folded into the message; a stack
   // trace on top of it only buries the line that explains the failure.

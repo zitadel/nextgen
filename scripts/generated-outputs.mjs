@@ -27,6 +27,9 @@ export const GENERATED_GLOBS = [
   // scripts/generate-meta-schemas.ts. Single-segment `*` on purpose: the
   // `examples/` subdirectory holds hand-written documents.
   "apps/api/api/openapi/endpoints/schemas/*.json",
+  // Bundled OpenAPI document the server embeds at /api/v1/openapi.json
+  // (scripts/bundle-openapi.mjs).
+  "apps/api/api/openapi/bundled/openapi.json",
   "apps/api/internal/**/*_enumer.go",
   "apps/api/internal/**/*.mock.go",
   // The public Go client (go.zitadel.com/zitadel/v5/api), ogen output of

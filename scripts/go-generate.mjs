@@ -44,6 +44,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { bundleOpenAPI } from "./bundle-openapi.mjs";
 import { isDirectRun, run, runCapture } from "./dev-process.mjs";
 import { mapAll } from "./map-all.mjs";
 import { serverModuleRoot } from "./server-build.mjs";
@@ -125,6 +126,15 @@ export async function goGenerate({ log = console.log } = {}) {
   }
 
   await runPhase(rest, MOCKGEN_PHASE, log);
+}
+
+/**
+ * Everything `server:generate` / `server:check-generate` must produce: Go
+ * generate directives, then the OpenAPI JSON the binary embeds.
+ */
+export async function serverGenerate({ log = console.log } = {}) {
+  await goGenerate({ log });
+  await bundleOpenAPI({ api: true, log });
 }
 
 // `go generate -run` filters directives by matching against the command text,
@@ -231,7 +241,7 @@ export function findGeneratePackages(root = ROOT) {
 
 if (isDirectRun(import.meta.url)) {
   try {
-    await goGenerate();
+    await serverGenerate();
   } catch (error) {
     // runCapture folds the generator's own stdout/stderr into the message; a
     // Node stack trace on top of it only buries the line that explains the
