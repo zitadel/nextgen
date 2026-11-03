@@ -23,6 +23,6 @@ A pull request that changes `.zitadel/` should be tried before it reaches users.
 
 A project admits preview URLs through a preview pattern, such as `https://*-acme.vercel.app`, since each build's URL is new. A pattern only admits URLs; a URL is served once `zitadel preview` deploys to it.
 
-A preview expires, after 7 days by default, because anyone who finds its URL can open it. For the same reason it never sees production secrets: it gets its own [variable](/docs/concepts/repo-config#variables) values. It does share the project's users and sessions, so test data entered on a preview is real data. A test setup with users of its own needs a second [project](/docs/concepts/project-team-user#project).
+A preview expires, after 7 days by default, because anyone who finds its URL can open it. For the same reason it never sees production secrets: it gets its own [variable](/docs/concepts/repo-config#variables) values. It does share the project's users and sessions, so test data entered on a preview is real data. A test setup with users of its own needs a separate [environment](/docs/concepts/repo-config#environments).
 
 The [deploy guide](/docs/guides/deploy#deploy-from-github-actions) shows previews in a GitHub Actions workflow.

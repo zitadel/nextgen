@@ -28,6 +28,14 @@ Some values do not belong in your repository: secrets, and values that differ be
 
 A variable can hold a separate value for [previews](/docs/concepts/origins-and-previews#previews) (`--preview`), so a preview never runs with a production secret. Each deployment keeps the values it was created with: a changed variable reaches users on the next `zitadel deploy`, and a rollback brings back the old values.
 
+## Environments
+
+Your app can run against more than one environment, such as `development` on the [local runtime](/docs/guides/local-runtime) and `production` on a hosted server. Each environment is its own project, on a local or remote server, so environments never share users, sessions or any other data. What they share is your configuration: you deploy the same `.zitadel/` files to each of them.
+
+The CLI keeps each environment's server and project in `.env.<name>.local`. `zitadel env add <name>` binds an environment, creating a project for it if needed, and `zitadel env list` shows the ones this directory has. A command picks the environment from `--env`, then `ZITADEL_ENV`, then the hosting platform (`VERCEL_ENV`, or Netlify's `CONTEXT`), and uses `development` otherwise. `zitadel env` shows which server and project resolved.
+
+A preview is not an environment. It runs on a URL of an existing project and shares that project's data ([Origins and previews](/docs/concepts/origins-and-previews#previews)).
+
 ## How deploying works
 
 `zitadel deploy --dry-run` validates local configuration and shows what would change without mutating files or platform state. `zitadel deploy` builds a release from it and makes the release live.
