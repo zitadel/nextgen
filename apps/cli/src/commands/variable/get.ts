@@ -50,6 +50,7 @@ export default class VariableGet extends Tabulatable(EnvironmentCommand) {
       });
     }
     const { value } = variable.cell();
+
     return this.emit({
       status: "ok",
       data: variable,

@@ -433,6 +433,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
 
     if (this.dryRun) {
       this.reportOutcome(outcome);
+
       return this.emit({
         status: "skipped",
         reason: "dry-run",
@@ -658,8 +659,6 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     return this.emit({
       status: "ok",
       data: {
-        // Configured is not live, and stored credentials are only claimed once
-        // they reached the Project (a failed or deferred publish warns instead).
         title: unpublished
           ? [`${name} sign-in is configured locally.`, ...stored].join(" ")
           : `${name} sign-in is already configured locally.`,

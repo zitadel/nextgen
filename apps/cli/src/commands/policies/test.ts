@@ -119,6 +119,11 @@ export default class PoliciesTest extends EnvironmentCommand {
         { details: data, hint: pretty },
       );
     }
-    return this.emit({ status: "ok", data, pretty });
+
+    return this.emit({
+      status: "ok",
+      data,
+      pretty,
+    });
   }
 }

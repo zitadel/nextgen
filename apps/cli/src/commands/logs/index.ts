@@ -113,6 +113,7 @@ export default class Logs extends BaseCommand {
           }
         },
       });
+
       return this.emit({
         status: "ok",
         data: { title: "Stopped following local Zitadel logs." },
@@ -120,9 +121,9 @@ export default class Logs extends BaseCommand {
     }
 
     const { runtime, lines } = await server.logs({ tail: flags.tail, level: flags.level });
+
     return this.emit({
       status: "ok",
-      pretty: render(lines, this.isColored),
       data: {
         title: "Local Zitadel server logs.",
         runtime:
@@ -138,6 +139,7 @@ export default class Logs extends BaseCommand {
               },
         logs: logText(lines),
       },
+      pretty: render(lines, this.isColored),
     });
   }
 }

@@ -63,8 +63,6 @@ export default class OriginAdd extends EnvironmentCommand {
       data: {
         pattern: added.pattern,
         kind: added.kind,
-        // Carry the in-effect selectors so the follow-up list reads the same
-        // environment this add targeted, not the default one.
       },
       next: { commands: [this.suggest("origin list")] },
       pretty: `Added ${added.pattern} (${added.kind})`,

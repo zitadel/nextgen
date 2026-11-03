@@ -191,8 +191,8 @@ export default class Pull extends EnvironmentCommand {
       reportSkipped(resource);
     }
 
-    const nextCommands = this.dryRun ? [] : [this.suggest(DEPLOY_ARGS)];
     const summary = pulled.map((entry) => entry.path).join("\n");
+
     return this.emit({
       status: "ok",
       data: {
@@ -201,7 +201,7 @@ export default class Pull extends EnvironmentCommand {
         skipped,
         ...(this.dryRun ? { dry_run: true } : {}),
       },
-      next: { commands: nextCommands },
+      next: { commands: this.dryRun ? [] : [this.suggest(DEPLOY_ARGS)] },
       pretty: this.dryRun
         ? `Would write ${pulled.length} file${pulled.length === 1 ? "" : "s"} from ${release.id} (dry run).\n${summary}`
         : `Pulled ${pulled.length} file${pulled.length === 1 ? "" : "s"} from ${release.id}.\n${summary}`,

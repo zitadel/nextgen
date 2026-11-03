@@ -77,6 +77,7 @@ export default class DeploymentCreate extends EnvironmentCommand {
     });
 
     const origins = deployment.targets.map((target) => target.origin);
+
     return this.emit({
       status: "ok",
       data: {

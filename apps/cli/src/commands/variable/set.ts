@@ -120,6 +120,7 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
       // The resource commands' dry-run contract, plus what this write would
       // store. Never the value: it may be a credential.
       const preview = dryRunResult("set", "variable", args.name);
+
       return this.emit({
         ...preview,
         data: {

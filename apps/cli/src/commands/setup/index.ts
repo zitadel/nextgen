@@ -1135,7 +1135,11 @@ export default class Setup extends Destructive(BaseCommand) {
       if (flags.devPort !== undefined) {
         return this.moveToDevPort(this.cwd, flags.cwd, flags.devPort, this.dryRun);
       }
-      return this.emit({ status: "skipped", reason: "already-initialized" });
+
+      return this.emit({
+        status: "skipped",
+        reason: "already-initialized",
+      });
     }
 
     // Resolved before anything is detected, created or written: an
@@ -1813,13 +1817,10 @@ export default class Setup extends Destructive(BaseCommand) {
     // The box holds the next steps, so the base command does not repeat them.
     const nextShown: StepsShown | undefined = this.isJson ? undefined : asStepsShown();
 
+    // The box and the per-step narration already showed the summary, so `pretty`
+    // is empty and stdout carries it once.
     return this.emit({
       status: "ok",
-      // Human-facing output was already shown via consola (box + per-step
-      // narration). Pass an empty `pretty` so the base command's fallback
-      // renderer doesn't duplicate the summary on stdout. The JSON envelope
-      // still carries the full structured payload.
-      pretty: "",
       data: {
         title: "Zitadel is ready.",
         project: { project_id: project.id, issuer },
@@ -1838,9 +1839,6 @@ export default class Setup extends Destructive(BaseCommand) {
         files_skipped: result.filesSkipped.map((file) => relativeDisplay(this.cwd, file)),
         install: installOutcome.install,
         git: gitReport(commit),
-        // The provider enabled during scaffolding, or null. `secret` reports
-        // where the value went, never the value itself — `published` is the
-        // one that decides whether the provider button works.
         // A list, one entry per provider enabled during scaffolding, empty
         // when none was. An agent reading this needs to know which provider a
         // deferred publish belongs to, so the outcomes stay per entry.
@@ -1863,8 +1861,6 @@ export default class Setup extends Destructive(BaseCommand) {
               : null,
           };
         }),
-        // Branding guidance before the claim nudge: make it yours, then
-        // claim to keep it (the same order the manifesto's journey walks).
         // What setup's first deploy published, or null when there was none:
         // a dry run, or a deploy that failed, which is a warning.
         deployment:
@@ -1915,6 +1911,7 @@ export default class Setup extends Destructive(BaseCommand) {
           ...claimNudge.commands,
         ],
       },
+      pretty: "",
       nextShown,
     });
   }
@@ -2065,6 +2062,7 @@ export default class Setup extends Destructive(BaseCommand) {
     } else {
       consola.success(`Already on ${move.issuer}`);
     }
+
     return this.emit({
       status: "ok",
       data: {

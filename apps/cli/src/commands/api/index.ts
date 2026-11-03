@@ -259,12 +259,12 @@ export default class Api extends Destructive(BaseCommand) {
     if (!this.jsonEnabled()) {
       await this.config.runCommand("help", [Api.id]);
     }
+
     return this.emit({
       status: "ok",
       data: {},
-      pretty: "",
-      // Under --json the usage is not printed, so the envelope points on.
       next: this.jsonEnabled() ? { commands: [this.suggestUnscoped("api ls")] } : undefined,
+      pretty: "",
     });
   }
 
@@ -320,12 +320,16 @@ export default class Api extends Destructive(BaseCommand) {
         })
       : undefined;
     if (destructive && consent === undefined) {
-      return this.emit({ status: "skipped", reason: "call-cancelled" });
+      return this.emit({
+        status: "skipped",
+        reason: "call-cancelled",
+      });
     }
     const token = operation.auth === "secret" ? secret?.project_secret : undefined;
     const response = flags.paginate
       ? await sendAll(this.meta.source, token, request, this.signal)
       : await send(this.meta.source, token, request, this.signal, consent);
+
     return this.emit({
       status: "ok",
       data: response.body ?? null,

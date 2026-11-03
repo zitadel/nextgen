@@ -320,7 +320,10 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
       cwdArgs,
     });
     if (permit === undefined) {
-      return this.emit({ status: "skipped", reason: "disable-cancelled" });
+      return this.emit({
+        status: "skipped",
+        reason: "disable-cancelled",
+      });
     }
 
     const flowsAfter = flows.map((file) => file.body);
@@ -348,6 +351,7 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
 
     if (this.dryRun) {
       this.reportOutcome(outcome);
+
       return this.emit({
         status: "skipped",
         reason: "dry-run",
@@ -365,6 +369,7 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
     }
     this.reportOutcome(outcome);
     const followUps = this.followUps(change.changed, cwdArgs);
+
     return this.emit({
       status: "ok",
       data: { ...data, next_args: followUps.args },

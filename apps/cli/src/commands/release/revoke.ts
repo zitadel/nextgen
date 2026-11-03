@@ -53,7 +53,6 @@ export default class ReleaseRevoke extends Destructive(EnvironmentCommand) {
           const release = await releaseService.revoke(consent, args.releaseId);
           return {
             status: "ok",
-            // The lifecycle-mutation shape every revoke answers with, plus when.
             data: {
               ...mutatedData({ release_id: release.id }, "revoked"),
               revoked_at: release.revoked_at,

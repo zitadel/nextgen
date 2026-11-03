@@ -282,6 +282,7 @@ export default class Deploy extends EnvironmentCommand {
 
     const servedOrigins = deployment.targets.map((target) => target.origin);
     this.recordTelemetry({ origin_count: servedOrigins.length });
+
     return this.emit({
       status: "ok",
       data: {

@@ -81,7 +81,11 @@ export default class OriginRm extends Destructive(EnvironmentCommand) {
           if (warning !== undefined) {
             reportWarning(warning);
           }
-          return { status: "ok", data: deletedData({ pattern: args.pattern }), pretty };
+          return {
+            status: "ok",
+            data: deletedData({ pattern: args.pattern }),
+            pretty,
+          };
         },
       }),
     );

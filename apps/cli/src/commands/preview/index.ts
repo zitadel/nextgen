@@ -343,6 +343,7 @@ export default class Preview extends PreviewCommand {
       url: target.origin,
       expires_at: target.expires_at ?? null,
     }));
+
     return this.emit({
       status: "ok",
       data: {

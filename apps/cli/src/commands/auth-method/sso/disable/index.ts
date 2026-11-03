@@ -134,7 +134,10 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
       cwdArgs,
     });
     if (permit === undefined) {
-      return this.emit({ status: "skipped", reason: "disable-cancelled" });
+      return this.emit({
+        status: "skipped",
+        reason: "disable-cancelled",
+      });
     }
 
     // When only a flow still offered the provider, say so: the schema itself
@@ -157,6 +160,7 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
 
     if (this.dryRun) {
       this.reportOutcome(outcome);
+
       return this.emit({
         status: "skipped",
         reason: "dry-run",
@@ -181,6 +185,7 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
     }
     this.reportOutcome(outcome);
     const followUps = this.followUps(changed.length > 0, cwdArgs);
+
     return this.emit({
       status: "ok",
       data: { ...data, next_args: followUps.args },

@@ -224,6 +224,7 @@ export default class Claim extends EnvironmentCommand {
           ? "Open a browser to claim this project"
           : "Wait for the link to be used to claim this project";
       this.recordTelemetry({ claim_outcome: "dry_run" });
+
       return this.emit({
         status: "skipped",
         reason: "dry-run",
@@ -352,6 +353,7 @@ export default class Claim extends EnvironmentCommand {
     consola.success("Project claimed");
 
     this.recordTelemetry({ claim_outcome: "completed", browser_opened: opened });
+
     return this.emit({
       status: "ok",
       data: {
@@ -361,7 +363,6 @@ export default class Claim extends EnvironmentCommand {
         claimed_at: completed.claimed_at,
         dashboard_url: completed.dashboard_url,
       },
-      // Two entries so the URL is printed on its own line.
       next: {
         actions: ["Manage your Project and collaborate in the Console:", completed.dashboard_url],
       },
@@ -463,6 +464,7 @@ export default class Claim extends EnvironmentCommand {
     challenge: { claim_url: string; challenge_id: string; expires_at: string },
   ): JsonEnvelope {
     this.recordTelemetry({ claim_outcome: "link_issued" });
+
     return this.emit({
       status: "ok",
       data: {
@@ -492,6 +494,7 @@ export default class Claim extends EnvironmentCommand {
   }): JsonEnvelope {
     this.recordTelemetry({ claim_outcome: "already_claimed" });
     consola.info(`This project already belongs to team ${data.team_id}.`);
+
     return this.emit({
       status: "skipped",
       reason: "already-claimed",
