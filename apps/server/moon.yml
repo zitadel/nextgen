@@ -225,6 +225,7 @@ tasks:
     inputs:
       - "/docs/design/flowengine/testdata/generate-pow-v1-vectors.mjs"
       - "/docs/design/flowengine/testdata/pow-v1-vectors.json"
+      - "/packages/components/src/orchestrator/__fixtures__/signup-pow-vector.json"
     options:
       runFromWorkspaceRoot: true
 

@@ -148,7 +148,8 @@
     "check-pow-vectors": {
       "inputs": [
         "$TURBO_ROOT$/docs/design/flowengine/testdata/generate-pow-v1-vectors.mjs",
-        "$TURBO_ROOT$/docs/design/flowengine/testdata/pow-v1-vectors.json"
+        "$TURBO_ROOT$/docs/design/flowengine/testdata/pow-v1-vectors.json",
+        "$TURBO_ROOT$/packages/components/src/orchestrator/__fixtures__/signup-pow-vector.json"
       ]
     },
     "test-pow": {

@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
-import vectors from "../../../../docs/design/flowengine/testdata/pow-v1-vectors.json";
+import vector from "./__fixtures__/signup-pow-vector.json";
 import { solveSignupPow } from "./signup-pow.js";
 
-const vector = vectors.vectors[0]!;
 const challenge = () => ({
   ...vector.public,
   expires_at: new Date(Date.now() + 300_000).toISOString(),
