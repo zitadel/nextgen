@@ -4,7 +4,6 @@
  * oclif and the Zitadel envelope contract (ADR 004) is in one place.
  */
 export { type Admitted, BaseCommand, type MetaOptions } from "./base";
-export { atLeastOne, excludes, needs, refuses, type Rule } from "./rules";
 export type { Refusal } from "./refusal";
 export {
   EnvironmentCommand,

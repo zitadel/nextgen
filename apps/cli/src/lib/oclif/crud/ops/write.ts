@@ -1,7 +1,7 @@
 import { nonBlankString } from "../../flags";
 import { named } from "../../names";
 
-import { refuses } from "../../rules";
+import { type Refusal, refusalError } from "../../refusal";
 import { resourceBody } from "../resource-body";
 import type { CommandResult } from "../../types";
 import {
@@ -107,13 +107,13 @@ const describeWrite = <
     ],
     flags: { ...bodyFieldFlags(fields), ...rawBodyFlags(document, fields), ...options.flags },
     args: verb === "create" ? {} : idArg(resource),
-    rules: [
-      refuses((view) => !givesBody(view.flags, fields), {
-        message: `${topic} ${verb} needs a body`,
-        hint: `Pass the body's fields as flags (see \`${topic} ${verb} --help\`), --set <path>=<value>, or --data '<json>' / --file <path>.`,
-      }),
-    ],
   };
+};
+
+/** What a write without a body to send is refused for. */
+const NEEDS_BODY_REFUSAL: Refusal = {
+  message: "{command} needs a body",
+  hint: "Pass the body's fields as flags (see `{command} --help`), --set <path>=<value>, or --data '<json>' / --file <path>.",
 };
 
 const givesBody = (flags: Json, fields: readonly BodyField[]): boolean => {
@@ -141,6 +141,12 @@ abstract class WriteOperation<
 
   protected override async operate({ args, flags }: WriteInput): Promise<CommandResult> {
     const { topic, spec, resource, options } = this.definition;
+    const fields = fieldsOf(spec, options);
+    if (!givesBody(flags, fields)) {
+      throw refusalError(NEEDS_BODY_REFUSAL, {
+        command: `${topic} ${this.verb}`,
+      });
+    }
     const body = await resourceBody(
       {
         topic,
@@ -148,7 +154,7 @@ abstract class WriteOperation<
         root: spec.root,
         schema: spec.schema,
         document: documentSchemaOf(spec.schema, spec.root),
-        fields: fieldsOf(spec, options),
+        fields,
         references: options.references,
       },
       flags,

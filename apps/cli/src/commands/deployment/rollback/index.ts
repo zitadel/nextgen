@@ -12,8 +12,13 @@ import {
   nonBlankArg,
 } from "../../../lib/oclif";
 import { Tabulatable } from "../../../lib/oclif/tabulatable";
-import { rollbackDeployment, servesPrimary } from "../../../lib/release";
-import { messageFlag } from "../flags/message";
+import { refuseBlank } from "../../../lib/oclif/flags";
+import {
+  MESSAGE_MAX_LENGTH,
+  messageTooLong,
+  rollbackDeployment,
+  servesPrimary,
+} from "../../../lib/release";
 import { type Refusal, refusalError } from "../../../lib/oclif/refusal";
 import { toZitadelError } from "../../../lib/errors";
 import type { SuggestedCommand } from "../../../lib/suggestion";
@@ -113,6 +118,29 @@ export function readRollbackTarget(
  * one. It reports the revisions that release pins, and that users keep theirs:
  * configuration rolls back, user data does not.
  */
+const MESSAGE_TOO_LONG_REFUSAL: Refusal = {
+  message: "the message is longer than {limit} characters",
+  hint: "Pass a shorter summary with -m.",
+  details: {
+    argument: "--message",
+  },
+};
+
+/**
+ * What `-m/--message` records. It refuses a blank message, which would record
+ * nothing, and one longer than the server records, which the server would
+ * reject. It returns the message trimmed.
+ */
+function readMessage(input: string): string {
+  const value = refuseBlank(input, "--message", "the value is empty");
+  if (messageTooLong(value)) {
+    throw refusalError(MESSAGE_TOO_LONG_REFUSAL, {
+      limit: MESSAGE_MAX_LENGTH,
+    });
+  }
+  return value;
+}
+
 export default class DeploymentRollback extends Tabulatable(Destructive(EnvironmentCommand)) {
   static override description = "Roll back to an earlier deployment.";
   static override group = CommandGroups.configuration;
@@ -133,7 +161,14 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
       description:
         "Re-apply the deployment without the confirmation prompt. Required when non-interactive.",
     }),
-    message: messageFlag("A short summary of why this rolls back."),
+    message: Flags.custom<string>({
+      char: "m",
+      parse: async (input) => {
+        return readMessage(input);
+      },
+    })({
+      description: "A short summary of why this rolls back.",
+    }),
   };
 
   protected async execute({

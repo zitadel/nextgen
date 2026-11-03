@@ -7,7 +7,6 @@ import {
   type JsonEnvelope,
 } from "../../lib/oclif";
 import { createDeployment } from "../../lib/release";
-import { messageFlag } from "./flags/message";
 
 /**
  * `zitadel deployment create --release <id>` — make an existing release live.
@@ -17,6 +16,33 @@ import { messageFlag } from "./flags/message";
  * every primary origin: primary origins are never named one by one. Deploying
  * the release a target already serves changes nothing.
  */
+import { refuseBlank } from "../../lib/oclif/flags";
+import { type Refusal, refusalError } from "../../lib/oclif/refusal";
+import { MESSAGE_MAX_LENGTH, messageTooLong } from "../../lib/release";
+
+const MESSAGE_TOO_LONG_REFUSAL: Refusal = {
+  message: "the message is longer than {limit} characters",
+  hint: "Pass a shorter summary with -m.",
+  details: {
+    argument: "--message",
+  },
+};
+
+/**
+ * What `-m/--message` records. It refuses a blank message, which would record
+ * nothing, and one longer than the server records, which the server would
+ * reject. It returns the message trimmed.
+ */
+function readMessage(input: string): string {
+  const value = refuseBlank(input, "--message", "the value is empty");
+  if (messageTooLong(value)) {
+    throw refusalError(MESSAGE_TOO_LONG_REFUSAL, {
+      limit: MESSAGE_MAX_LENGTH,
+    });
+  }
+  return value;
+}
+
 export default class DeploymentCreate extends EnvironmentCommand {
   static override description = "Deploy an existing release to the project's origins.";
   static override group = CommandGroups.configuration;
@@ -25,7 +51,14 @@ export default class DeploymentCreate extends EnvironmentCommand {
   ];
   static override flags = {
     release: Flags.string({ description: "The release id to deploy.", required: true }),
-    message: messageFlag("A short summary of why this deploys."),
+    message: Flags.custom<string>({
+      char: "m",
+      parse: async (input) => {
+        return readMessage(input);
+      },
+    })({
+      description: "A short summary of why this deploys.",
+    }),
   };
 
   protected async execute({ flags }: Admitted<typeof DeploymentCreate>): Promise<JsonEnvelope> {

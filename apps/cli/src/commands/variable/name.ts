@@ -1,8 +1,8 @@
 import { Args } from "@oclif/core";
 
-import { refuseBlank } from "../../../lib/oclif/flags";
-import { type Refusal, refusalError } from "../../../lib/oclif/refusal";
-import { VARIABLE_NAME_MAX, variableNameProblem } from "../../../lib/variables";
+import { refuseBlank } from "../../lib/oclif/flags";
+import { type Refusal, refusalError } from "../../lib/oclif/refusal";
+import { VARIABLE_NAME_MAX, variableNameProblem } from "../../lib/variables";
 
 /** What a name holding anything but letters, digits and underscores is refused for. */
 const VARIABLE_NAME_INVALID_REFUSAL: Refusal = {

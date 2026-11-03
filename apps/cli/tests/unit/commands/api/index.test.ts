@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { readOperation, refuseUnforced, refuseUnpaged } from "../../../../src/commands/api/index";
+import Api, {
+  readOperation,
+  refuseUnforced,
+  refuseUnpaged,
+} from "../../../../src/commands/api/index";
+import { parseFlag } from "../../../helpers/inputs";
 import { resolveTarget } from "../../../../src/lib/api/operations";
 
 describe("the operation zitadel api is pointed at", () => {
@@ -126,4 +131,24 @@ describe("--force on a call that cannot be asked about", () => {
       );
     }).not.toThrow();
   });
+});
+
+describe("-X", () => {
+  it.each(["GET", "POST", "PUT", "PATCH", "DELETE"])("sends %s", async (method) => {
+    await expect(parseFlag(Api.flags.method, method, "method")).resolves.toBe(method);
+  });
+
+  it("takes any case, as curl does", async () => {
+    await expect(parseFlag(Api.flags.method, "delete", "method")).resolves.toBe("DELETE");
+  });
+
+  it.each(["trace", "OPTIONS", ""])(
+    "refuses %j, naming it and the methods that exist",
+    async (value) => {
+      await expect(parseFlag(Api.flags.method, value, "method")).rejects.toMatchObject({
+        code: "E_VALIDATION",
+        message: `-X ${value} is not one of GET, POST, PUT, PATCH, DELETE`,
+      });
+    },
+  );
 });

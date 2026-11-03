@@ -28,7 +28,7 @@ import {
 } from "../../../../lib/oclif";
 import { optionArgs } from "../../../../lib/public-cli";
 import { AuthMethodCommand } from "../../command";
-import type { SchemaTarget } from "../../target";
+import type { SchemaTarget } from "../../command";
 
 /** What a run that names no provider is refused for. */
 const NAME_PROVIDER_REFUSAL: Refusal = {

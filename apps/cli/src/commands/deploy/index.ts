@@ -5,8 +5,6 @@ import {
   EnvironmentCommand,
   type JsonEnvelope,
 } from "../../lib/oclif";
-import { messageFlag } from "./flags/message";
-import { missingPrimaryOrigin } from "./missing-primary-origin";
 import {
   buildBundle,
   createDeployment,
@@ -21,14 +19,88 @@ import {
   worktreeIsDirty,
 } from "../../lib/release";
 import { ApiError } from "@zitadel/api/runtime/fetch";
+import { Flags } from "@oclif/core";
 
+import { Cmd } from "../../lib/cmd";
 import { ZitadelError } from "../../lib/errors";
+import { refuseBlank } from "../../lib/oclif/flags";
 import { type Refusal, refusalError } from "../../lib/oclif/refusal";
-import { deployMessage } from "../../lib/release";
+import { issuerHeldAsPreview, originOf, type ProjectOrigin } from "../../lib/origins";
 import { readZitadelSecret } from "../../lib/project";
+import { deployMessage, MESSAGE_MAX_LENGTH, messageTooLong } from "../../lib/release";
+import type { SuggestedCommand } from "../../lib/suggestion";
 import { reportWarning } from "../../lib/warnings";
 
 /** How a non-interactive deploy with no message to fall back on is refused. */
+const MESSAGE_TOO_LONG_REFUSAL: Refusal = {
+  message: "the message is longer than {limit} characters",
+  hint: "Pass a shorter summary with -m.",
+  details: {
+    argument: "--message",
+  },
+};
+
+/**
+ * What `-m/--message` records on the release this deploys. It refuses a blank
+ * message, which would record nothing, and one longer than the server records,
+ * which the server would reject after the bundle was built. It returns the
+ * message trimmed.
+ */
+function readMessage(input: string): string {
+  const value = refuseBlank(input, "--message", "the value is empty");
+  if (messageTooLong(value)) {
+    throw refusalError(MESSAGE_TOO_LONG_REFUSAL, {
+      limit: MESSAGE_MAX_LENGTH,
+    });
+  }
+  return value;
+}
+
+/**
+ * What a deploy with no primary origin to land on tells the developer, naming
+ * the step that gives the project one. A project `zitadel setup` 0.1.0 created
+ * holds its issuer as a preview origin, which `origin add --kind primary`
+ * refuses as a conflict: `doctor --fix` makes it primary for the project
+ * `.zitadel/secret` records, the one doctor repairs, and any other project
+ * removes the pattern and adds it back. Otherwise the issuer is added as
+ * primary, or the URL the developer fills in when no issuer resolves.
+ */
+export function missingPrimaryOrigin(input: {
+  origins: ReadonlyArray<ProjectOrigin>;
+  issuer: string | undefined;
+  setupProject: boolean;
+  suggest: (command: string) => SuggestedCommand;
+}): { hint: string; next: string } {
+  const preview =
+    input.issuer === undefined ? undefined : issuerHeldAsPreview(input.origins, input.issuer);
+  if (preview !== undefined) {
+    const held = `It holds its issuer ${preview} as a preview origin, as \`zitadel setup\` 0.1.0 registered it, so adding it as primary conflicts.`;
+    if (input.setupProject) {
+      return {
+        hint: `${held} Run \`${input.suggest("doctor --fix")}\` to make it primary, then deploy.`,
+        next: "doctor --fix",
+      };
+    }
+    const remove = `origin rm ${Cmd.quote(preview)} --force`;
+    const add = `origin add ${Cmd.quote(preview)} --kind primary`;
+    return {
+      hint: `${held} Remove it with \`${input.suggest(remove)}\`, add it back with \`${input.suggest(add)}\`, then deploy.`,
+      next: remove,
+    };
+  }
+  if (input.issuer !== undefined) {
+    const add = `origin add ${Cmd.quote(originOf(input.issuer))} --kind primary`;
+    return {
+      hint: `Add the URL the app serves from with \`${input.suggest(add)}\`, then deploy.`,
+      next: add,
+    };
+  }
+  return {
+    hint: `Add one with \`${input.suggest("origin add <url> --kind primary")}\`, then deploy.`,
+    next: "origin list",
+  };
+}
+
 const NEEDS_MESSAGE_REFUSAL: Refusal = {
   message: "A deploy needs a message in non-interactive mode",
   hint: "Pass -m/--message with a short summary of what this release changes, or deploy from a clean git commit.",
@@ -63,7 +135,12 @@ export default class Deploy extends EnvironmentCommand {
     "<%= config.bin %> deploy --dry-run",
   ];
   static override flags = {
-    message: messageFlag({
+    message: Flags.custom<string>({
+      char: "m",
+      parse: async (input) => {
+        return readMessage(input);
+      },
+    })({
       description:
         "A short summary of what this release changes. Defaults to the pull request's title or the current commit's subject.",
     }),

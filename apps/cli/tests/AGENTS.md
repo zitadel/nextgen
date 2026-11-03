@@ -14,11 +14,9 @@ reclassified until it is one.
 - Unit tests own all detail: wording, key order, classification, renderer
   output, validation messages, id prefixes, envelope fields. A spec never
   asserts what a unit test can, so a failure names the module that broke.
-- A command's `flags/`, `args/` and `rules/` modules mirror too:
-  `src/commands/env/flags/app-url.ts` →
-  `tests/unit/commands/env/flags/app-url.test.ts`.
-- Drive the pure validator directly, one table over its refusal cases, and put
-  a single value through the flag itself to prove the wiring.
+- A command's flags and checks live in its own file, so its unit test covers
+  them: drive the flag through `parseFlag`/`parseArg` (`tests/helpers/inputs.ts`)
+  with one table over its refusal cases.
 - Refusal wording is asserted there and nowhere else: a spec asserts that the
   command refused, never the words it refused with.
 - **Specs** (`tests/integration/**/*.spec.ts`) drive the built CLI through

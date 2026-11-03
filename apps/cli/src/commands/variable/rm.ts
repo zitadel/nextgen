@@ -6,7 +6,7 @@ import {
   EnvironmentCommand,
   type JsonEnvelope,
 } from "../../lib/oclif";
-import { variableNameArg } from "./args/name";
+import { variableNameArg } from "./name";
 import { dryRunResult } from "../../lib/oclif/crud/shared";
 import { deletedData } from "../../lib/oclif/envelope";
 import { variableScope } from "../../lib/variables";

@@ -22,7 +22,7 @@ import {
   portInUseWarning,
   ssoFromFlags,
 } from "../../../src/commands/setup";
-import { retryOptionsFromFlags, setupRetryFlags } from "../../../src/commands/setup/retry";
+import { retryOptionsFromFlags, setupRetryFlags } from "../../../src/commands/setup";
 import { askCustomSettings } from "../../../src/commands/setup/prompts";
 import type { Asker } from "../../../src/lib/input";
 import { writeRuntimeMetadata } from "../../../src/lib/local-server/runtime";

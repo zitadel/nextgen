@@ -17,25 +17,28 @@ import { describe, expect, it } from "vitest";
 const commandsDir = join(import.meta.dirname, "../../../../src/commands/variable");
 
 /** What a command's own directory holds beside its body, and never a command. */
-const INPUTS = new Set(["flags", "args", "rules", "requirements", "prompts"]);
-
 /**
  * Every `variable` command's body: the file itself, or the `index.ts` of the
- * directory a command with its own flags, rules or requirements becomes.
+ * directory a command becomes once it carries its own inputs. A file that
+ * declares no command, such as a validator several of them share, is not one.
  */
 async function commandBodies(): Promise<Map<string, string>> {
   const entries = await readdir(commandsDir, { withFileTypes: true });
   const bodies = new Map<string, string>();
   for (const entry of entries) {
-    if (entry.isDirectory()) {
-      if (!INPUTS.has(entry.name)) {
-        bodies.set(`${entry.name}.ts`, join(commandsDir, entry.name, "index.ts"));
-      }
+    const body = entry.isDirectory()
+      ? join(commandsDir, entry.name, "index.ts")
+      : join(commandsDir, entry.name);
+    if (!entry.isDirectory() && !entry.name.endsWith(".ts")) {
       continue;
     }
-    if (entry.name.endsWith(".ts")) {
-      bodies.set(entry.name, join(commandsDir, entry.name));
+    const source = await readFile(body, "utf8").catch(() => {
+      return "";
+    });
+    if (!source.includes("export default class")) {
+      continue;
     }
+    bodies.set(entry.isDirectory() ? `${entry.name}.ts` : entry.name, body);
   }
   return bodies;
 }

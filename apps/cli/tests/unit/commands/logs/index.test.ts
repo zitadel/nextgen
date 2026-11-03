@@ -1,9 +1,8 @@
 import type { Config } from "@oclif/core";
 import { describe, expect, it } from "vitest";
 
-import Logs from "../../../../../src/commands/logs";
-import { tailFlag } from "../../../../../src/commands/logs/flags/tail";
-import { parseFlag } from "../../../../helpers/inputs";
+import Logs, { tailFlag } from "../../../../src/commands/logs";
+import { parseFlag } from "../../../helpers/inputs";
 
 const config = {
   version: "0.0.0-test",
@@ -43,6 +42,26 @@ describe("--tail", () => {
     await expect(logs.run()).rejects.toMatchObject({
       code: "E_VALIDATION",
       message: expect.stringContaining("0 is not a valid tail"),
+    });
+  });
+});
+
+describe("--follow beside --json", () => {
+  it("is refused, since a stream is never the one envelope --json promises", async () => {
+    const logs = new Logs(["--no-telemetry", "--follow", "--json"], config);
+
+    await expect(logs.run()).rejects.toMatchObject({
+      code: "E_VALIDATION",
+      message: "Cannot stream logs with --json",
+      hint: "Run without --json, or omit --follow.",
+    });
+  });
+
+  it("is accepted without --json", async () => {
+    const logs = new Logs(["--no-telemetry", "--follow"], config);
+
+    await expect(logs.run()).rejects.toMatchObject({
+      message: "Local Zitadel runtime has not been started",
     });
   });
 });

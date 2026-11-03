@@ -17,8 +17,10 @@ import {
   integerFlag,
   type JsonEnvelope,
 } from "../../lib/oclif";
-import { challengeIdRule } from "./rules/challenge-id";
 import { hasZitadelSecret, readZitadelSecret, writeZitadelSecret } from "../../lib/project";
+import { getClaimStatusQueryChallengeIdRegExp } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
+
+import { type Refusal, refusalError } from "../../lib/oclif/refusal";
 import { isLoopbackUrl } from "../../lib/server";
 import { reportWarning } from "../../lib/warnings";
 import type { SuggestedCommand } from "../../lib/suggestion";
@@ -78,6 +80,22 @@ export function claimDeadline(input: {
   return Math.min(serverDeadline, input.now + input.timeoutSeconds * 1000);
 }
 
+/** Whether `value` has the shape the claim contract gives a `challenge_id`. */
+function isChallengeId(value: string): boolean {
+  return getClaimStatusQueryChallengeIdRegExp.test(value);
+}
+
+/**
+ * How a `--challenge-id` that is not the contract's shape is refused. The id
+ * goes back to the platform and into the suggestions a run makes, so it has to
+ * be right before anything is asked or sent.
+ */
+const CHALLENGE_ID_REFUSAL: Refusal = {
+  message:
+    "--challenge-id takes the challenge_id a `claim --no-wait` run returned, which starts with ch_.",
+  next: ["claim --no-wait"],
+};
+
 /**
  * `zitadel claim` — claim this project for a team to make it permanent.
  *
@@ -130,9 +148,12 @@ export default class Claim extends EnvironmentCommand {
     }),
   };
 
-  static override rules = [challengeIdRule];
-
   protected async execute({ flags }: Admitted<typeof Claim>): Promise<JsonEnvelope> {
+    if (flags.challengeId !== undefined && !isChallengeId(flags.challengeId)) {
+      throw refusalError(CHALLENGE_ID_REFUSAL, {}, (next) => {
+        return this.suggest(next);
+      });
+    }
     // Where a fresh link comes from when this one dies: a run that is part of
     // the two-step flow suggests the step that hands the link back, so
     // following the suggestion never blocks with the link out of sight.

@@ -4,6 +4,7 @@ import { intro, note, outro } from "@clack/prompts";
 import { Flags } from "@oclif/core";
 import type { CreateProject201 } from "@zitadel/api/generated/model";
 import {
+  BRANDING_DESIGNS,
   DEFAULT_SETUP_PRESET,
   DEFAULT_SETUP_USE_CASE,
   SETUP_PRESETS,
@@ -12,14 +13,22 @@ import {
   type SetupUseCase,
 } from "@zitadel/config/defaults";
 import {
-  credentialVariables,
   type ClientId,
+  type ConnectionSlug,
+  credentialVariables,
   CUSTOM_PROVIDER,
   IDP_PROVIDERS,
+  parseClientId,
   parseClientSecret,
+  parseConnectionSlug,
+  parseDisplayName,
+  parseIssuer,
+  parseProviderSelection,
+  parseScopes,
   providerOf,
+  type ProviderSelection,
+  RESERVED_SLUGS,
   selectionName,
-  type ConnectionSlug,
 } from "@zitadel/config/idp";
 import { consola } from "consola";
 import { createZitadelClient } from "../../lib/api-client";
@@ -32,22 +41,26 @@ import {
   claimState,
   claimWindowDeadline,
 } from "../../lib/claim-state";
-import { isErrno, toZitadelError, ZitadelError, errorMessage } from "../../lib/errors";
+import { errorMessage, isErrno, toZitadelError, ZitadelError } from "../../lib/errors";
 import {
   callbackUriFor,
   customExample,
+  customFlagText,
+  type CustomFlagValues,
+  flagText,
   loopbackIssuerWarning,
   publishClientId,
   type PublishState,
-  selectionFromFlags,
   reportClientIdOutcome,
   reportSecretOutcome,
   republishCommands,
-  SETUP_FLAG_KEYS,
-  SETUP_FLAG_NAMES,
-  storeClientSecret,
   type SecretOutcome,
   type SecretPublisher,
+  selectionFromFlags,
+  SETUP_FLAG_KEYS,
+  SETUP_FLAG_NAMES,
+  ssoEnableArgs,
+  storeClientSecret,
 } from "../../lib/idp";
 import { brandingGuidanceAction, exploreAllCommands } from "../../lib/journey-guidance";
 import {
@@ -62,8 +75,10 @@ import { serverKind } from "../../lib/oclif/server-kind";
 import { findLocalAdminFor } from "../../lib/local-server/admin-credential";
 import { claimProjectAsAdmin } from "../../lib/local-server/claim-as-admin";
 import { LocalServer } from "../../lib/local-server/server";
-import { readPlatformRuntime } from "../../lib/local-server/runtime";
+import { readNearestRuntimeMetadata, readPlatformRuntime } from "../../lib/local-server/runtime";
 import {
+  hasZitadelConfig,
+  hasZitadelSecret,
   readProjectServer,
   readZitadelConfig,
   readZitadelSecret,
@@ -71,9 +86,10 @@ import {
 } from "../../lib/project";
 import {
   createOrca,
-  inspectScaffoldTarget,
-  issuerFromPort,
   type FrameworkFacts,
+  inspectScaffoldTarget,
+  isDirectoryOrMissing,
+  issuerFromPort,
   type Orca,
   type ScaffoldTarget,
   type UndoableScaffold,
@@ -84,7 +100,11 @@ import {
 } from "../../lib/orca/patchers/rule/next/renderers/registry";
 import type { PatchContext } from "../../lib/orca/patchers/types";
 import type { Asker } from "../../lib/input";
-import { PASSWORD_POLICY_PATH } from "../../lib/policies";
+import {
+  parsePasswordMinLength,
+  PASSWORD_POLICY_PATH,
+  type PasswordMinLength,
+} from "../../lib/policies";
 import { derivePosture } from "../../lib/orca/patchers/posture";
 import { writeScaffoldManifest } from "../../lib/scaffold-manifest";
 import {
@@ -98,16 +118,18 @@ import {
   ensureInitialCommit,
   gitReport,
   type InitialCommitOutcome,
+  inspectWorktree,
   unavailableWarning,
+  type WorktreeState,
 } from "./initial-commit";
 import { moveDevPort } from "./move-dev-port";
 import {
   askCustomSettings,
+  completeSso,
   PickFrameworkPrompt,
   SETUP_PROMPTS,
   type SetupAnswers,
   type SsoDraft,
-  completeSso,
 } from "./prompts";
 import {
   detectProjectFacts,
@@ -117,10 +139,10 @@ import {
   path as stylePath,
   relativeDisplayPath as relativeDisplay,
   renderSummary,
-  signInSummary,
-  url as styleUrl,
   type Row,
   type Section,
+  signInSummary,
+  url as styleUrl,
 } from "./summary";
 import { Cmd } from "../../lib/cmd";
 import { showSkillsHint } from "../../lib/skills-hint";
@@ -135,27 +157,837 @@ import {
 import { asStepsShown, type StepsShown } from "../../lib/oclif/next-steps";
 import { Destructive } from "../../lib/oclif/destructive";
 import { portFlag } from "../local-server/flags/port";
-import { clientIdFlag } from "./flags/client-id";
-import { passwordMinLengthFlag } from "./flags/password-min-length";
-import { ssoDisplayNameFlag } from "./flags/sso-display-name";
-import { ssoIssuerFlag } from "./flags/sso-issuer";
-import { ssoScopesFlag } from "./flags/sso-scopes";
-import { ssoSlugFlag } from "./flags/sso-slug";
-import { setupPreflight } from "./preflight";
-import { clientIdNeedsSsoRule } from "./rules/client-id-needs-sso";
-import { customConnectionIncompleteRule } from "./rules/custom-connection-incomplete";
-import { customSettingsNeedSsoRules } from "./rules/custom-settings-need-sso";
-import { designRemovedRule } from "./rules/design-removed";
-import { settingsNeedCustomRule } from "./rules/settings-need-custom";
-import { ssoNeedsClientIdRule } from "./rules/sso-needs-client-id";
-import {
-  cwdArg,
-  customSettingsOf,
-  retryOptionsOf,
-  type SetupRetryOptions,
-  setupRetryFlags,
-  ssoRecovery,
-} from "./retry";
+import semver from "semver";
+import { type Refusal, refusalError } from "../../lib/oclif/refusal";
+import type { GlobalOptions } from "../../lib/oclif/types";
+import { type ResolvedServer, resolveServer } from "../../lib/server";
+import { PAGE_LAYOUT_HINT } from "../../lib/branding/designs";
+import { refuseBlank } from "../../lib/oclif/flags";
+
+/**
+ * {@link recoverySelector} plus `--server local`, for the recovery after a
+ * local-server failure (see `ssoRecovery`).
+ */
+export function localRecoverySelector(cwd: string | undefined): EnvironmentSelector {
+  return environmentSelectorSuffix({
+    envFile: projectEnvFile(cwd, ".env.development.local"),
+    server: "local",
+    cwd,
+  });
+}
+
+/**
+ * The parts of a setup invocation that a retry suggestion must reproduce.
+ * Suggested retries are followed verbatim (especially by agents), so dropping
+ * a flag here silently changes what the retry scaffolds.
+ */
+export type SetupRetryOptions = {
+  /**
+   * The directory setup was pointed at, as typed. Every suggested rerun
+   * carries it as `--cwd`, quoted for a shell, so it configures that project
+   * from wherever it is run.
+   */
+  cwd?: string;
+  framework?: string;
+  preset?: SetupPreset;
+  useCase?: SetupUseCase;
+  renderer?: string;
+  devPort?: number;
+  nonInteractive?: boolean;
+  /**
+   * The `--sso` flags as typed, when they could not be resolved to a provider
+   * yet: a custom connection described in part, which the wizard completes.
+   * Dropping them would send the developer back without what they typed.
+   */
+  ssoTyped?: string;
+  /**
+   * The social provider and its client id. The secret is deliberately absent:
+   * a retry asks for it again, or takes it on stdin, because putting a
+   * credential in suggested command text is exactly what piping the secret
+   * exists to avoid. It never reaches the filesystem either way — the value
+   * goes to the project's variables, which is where the engine resolves the
+   * connection's `${{ NAME }}` from.
+   */
+  sso?: readonly ProviderSelection[];
+  /**
+   * The minimum password length the run was given: a number, or `null` for
+   * an explicit "none", carried as `--password-min-length 0` so a kept policy
+   * file still loses its minimum on the retry.
+   */
+  passwordMinLength?: PasswordMinLength;
+};
+
+/**
+ * Reconstructs the flag list of the current invocation for retry guidance,
+ * ending in `--server local`. Flags whose resolved value equals the default
+ * are omitted — the retry reproduces the same outcome without them.
+ */
+export function setupRetryFlags(opts: SetupRetryOptions): string {
+  const parts: string[] = [];
+  if (opts.framework) {
+    parts.push(`--framework ${opts.framework}`);
+  }
+  if (opts.preset && opts.preset !== DEFAULT_SETUP_PRESET) {
+    parts.push(`--preset ${opts.preset}`);
+  }
+  if (opts.useCase && opts.useCase !== DEFAULT_SETUP_USE_CASE) {
+    parts.push(`--use-case ${opts.useCase}`);
+  }
+  if (opts.renderer && opts.renderer !== "react") {
+    parts.push(`--renderer ${opts.renderer}`);
+  }
+  if (opts.devPort !== undefined) {
+    parts.push(`--dev-port ${opts.devPort}`);
+  }
+  // Even the recommended one, unlike the defaults above: without the flag, a
+  // policy file `--force` keeps keeps its own minimum.
+  if (opts.passwordMinLength !== undefined) {
+    parts.push(`--password-min-length ${opts.passwordMinLength ?? 0}`);
+  }
+  // Only the first: `--sso` takes one provider, and a scripted rerun can pipe
+  // only one secret. A retry naming several would not be runnable, which is
+  // the whole point of this line. The rest are not silently dropped -- the
+  // guidance that uses this emits an `auth-method sso enable` command for each, because
+  // `--sso` makes the rerun skip the multi-select, so a provider left out here
+  // could not be reselected.
+  const [firstSso] = opts.sso ?? [];
+  if (firstSso === undefined && opts.ssoTyped !== undefined) {
+    parts.push(opts.ssoTyped);
+  }
+  if (firstSso) {
+    // Provider only. `--sso-client-id` would interpolate a value the wizard
+    // accepted on emptiness alone into a command run verbatim, and nothing
+    // here escapes it for a shell. The rerun asks for the id.
+    parts.push(`--sso ${selectionName(firstSso)}`);
+    // A custom connection is nothing without its description, and none of it is
+    // a credential, so unlike the client id it travels in the command.
+    if (firstSso.kind === "custom") {
+      parts.push(customFlagText(firstSso.connection, SETUP_FLAG_NAMES));
+    }
+  }
+  // `--non-interactive` is dropped when a provider is being configured: that
+  // combination reads the client secret from stdin, and a command handed over
+  // as text has no stdin to read. Offering it would advertise a retry that
+  // fails the moment it is run. Interactively the rerun asks for the secret,
+  // which is the one way a plain command can obtain it -- putting it in the
+  // command text is never an option.
+  if (opts.nonInteractive && firstSso === undefined && opts.ssoTyped === undefined) {
+    parts.push("--non-interactive");
+  }
+  parts.push("--server local");
+  return `${parts.join(" ")}${cwdArg(opts)}`;
+}
+
+/** Whether `--sso` names a provider this CLI offers. */
+const isKnownSsoName = (name: string): boolean =>
+  name === CUSTOM_PROVIDER || (IDP_PROVIDERS as readonly string[]).includes(name);
+
+/**
+ * Retry options straight from parsed flags, for failures before the wizard
+ * resolves answers. `--non-interactive` is echoed only when explicitly passed
+ * — TTY/JSON-inferred non-interactivity re-infers itself on the retry.
+ */
+export function retryOptionsFromFlags(flags: {
+  cwd?: string;
+  framework?: string;
+  preset?: string;
+  useCase?: string;
+  renderer?: string;
+  devPort?: number;
+  nonInteractive?: boolean;
+  passwordMinLength?: PasswordMinLength;
+  sso?: string;
+  ssoClientId?: string;
+  ssoSlug?: string;
+  ssoDisplayName?: string;
+  ssoIssuer?: string;
+  ssoScopes?: string;
+}): SetupRetryOptions {
+  // The provider survives on its own. A suggested retry carries `--sso`
+  // without `--sso-client-id` -- the id is never put in command text -- so
+  // requiring both here would drop the provider from the next suggestion if
+  // that retry failed again before the wizard ran, and the developer would be
+  // told to set up without the provider they asked for. An empty id means "ask
+  // for it", which is what the wizard does with it.
+  //
+  // A custom connection is restated as typed, minus the credentials. One the
+  // checks refuse is left out: it was refused, and a retry carrying it would be
+  // refused again.
+  let selection: ProviderSelection | undefined;
+  if (flags.sso !== undefined) {
+    try {
+      selection = selectionFromFlags(flags.sso, customSettingsOf(flags), SETUP_FLAG_NAMES, "");
+    } catch {
+      selection = undefined;
+    }
+  }
+  // What was typed for a provider this run knows, kept when it cannot become a
+  // selection yet, so a retry reproduces it.
+  const typed =
+    selection === undefined && flags.sso !== undefined && isKnownSsoName(flags.sso)
+      ? [`--sso ${flags.sso}`, flagText(customSettingsOf(flags), SETUP_FLAG_NAMES)]
+          .filter((part) => part !== "")
+          .join(" ")
+      : undefined;
+  return {
+    ssoTyped: typed,
+    framework: flags.framework,
+    preset: flags.preset as SetupPreset | undefined,
+    useCase: flags.useCase as SetupUseCase | undefined,
+    cwd: flags.cwd,
+    renderer: flags.renderer,
+    devPort: flags.devPort,
+    nonInteractive: Boolean(flags.nonInteractive),
+    passwordMinLength: flags.passwordMinLength,
+    // The provider survives on its own. A suggested retry carries `--sso`
+    // without `--sso-client-id` -- the id is never put in command text -- so
+    // requiring both here would drop the provider from the next suggestion if
+    // that retry failed again before the wizard ran, and the developer would
+    // be told to set up without the provider they asked for. An empty id
+    // means "ask for it", which is what the wizard does with it.
+    sso: selection === undefined ? undefined : [selection],
+  };
+}
+
+/**
+ * The providers a setup retry cannot carry, and how to restore them.
+ *
+ * `--sso` names one provider and makes the rerun skip the multi-select, so
+ * every other provider chosen would be lost unless it is restored explicitly.
+ * Both recovery paths need this -- the one before the wizard and the one for a
+ * failed project creation -- and the second was missed when this was written
+ * inline, which is exactly the kind of thing one copy prevents.
+ */
+/** `--cwd` for a suggested command, when setup was pointed at a directory. */
+export function cwdArg(retry: SetupRetryOptions): string {
+  return retry.cwd === undefined ? "" : ` ${Cmd.option("--cwd", retry.cwd)}`;
+}
+
+export function ssoRecovery(
+  retry: SetupRetryOptions,
+  cliVersion: string,
+): { hint: string; commands: SuggestedCommand[] } {
+  const chosen = retry.sso ?? [];
+  const remaining = chosen.slice(1);
+  if (remaining.length === 0) {
+    return { hint: "", commands: [] };
+  }
+  return {
+    hint:
+      `The rerun configures ${chosen[0] ? providerOf(chosen[0]).slug : ""} only; add the rest with the auth-method sso enable ` +
+      "commands below, which ask for each client id. ",
+    // The client id is not interpolated into the command. These strings are
+    // run verbatim, especially by agents, and nothing escapes them for a
+    // shell: a value the wizard accepted -- it only refuses an empty one --
+    // could split into two arguments or carry a metacharacter that changes
+    // what the command does. `auth-method sso enable` asks for the id, exactly as it asks
+    // for the secret, which was never put in command text for the same
+    // reason.
+    // localRecoverySelector carries `--server local`, as the setup retry
+    // pins it. An unpinned `auth-method sso enable`
+    // takes its server from `ZITADEL_URL`, so with that variable set to
+    // another server it would publish the client id and secret there --
+    // leaving the local provider unconfigured and the credentials somewhere
+    // nobody asked for. Both callers of this are local-server failures, so
+    // `local` is the server meant in every case.
+    //
+    // `--env-file .env.development.local` pins the project and credential too:
+    // `auth-method sso enable` is an EnvironmentCommand that resolves those from the
+    // environment, where the process environment outranks the `.env` files, so
+    // in a shell holding production values `--server local` alone would send
+    // the production token to the local server. `--env-file` outranks the
+    // process environment (unlike `--env`), so it is the one that forces the
+    // generated development credential the local project actually expects.
+    commands: remaining.map((selection) =>
+      projectCommand(ssoEnableArgs(selection), localRecoverySelector(retry.cwd), cliVersion),
+    ),
+  };
+}
+
+/** {@link retryOptionsFromFlags} for flags as an admitted run carries them. */
+export function retryOptionsOf(flags: Record<string, unknown>): SetupRetryOptions {
+  return retryOptionsFromFlags(flags as Parameters<typeof retryOptionsFromFlags>[0]);
+}
+
+/** The custom connection settings `--sso-*` flags gave, as typed. */
+export function customSettingsOf(flags: {
+  ssoSlug?: string;
+  ssoDisplayName?: string;
+  ssoIssuer?: string;
+  ssoScopes?: string;
+}): CustomFlagValues {
+  return {
+    slug: flags.ssoSlug,
+    displayName: flags.ssoDisplayName,
+    issuer: flags.ssoIssuer,
+    scopes: flags.ssoScopes,
+  };
+}
+
+/** How `--server local` with nothing running is refused. */
+const NO_LOCAL_SERVER_REFUSAL: Refusal = {
+  code: "E_LOCAL_SERVER_NOT_RUNNING",
+  message: "Local Zitadel server is not running",
+  hint:
+    "{reason}Start local Zitadel first, then rerun setup. {scripting}{recovery}" +
+    "After setup succeeds, follow its next_commands to start the app and verify registration, logout, and login in the browser.",
+  next: ["start", "{setup}"],
+};
+
+/** How a `--cwd` that is a file, or lies under one, is refused. */
+const NOT_A_DIRECTORY_REFUSAL: Refusal = {
+  message: "{cwd} is not a directory",
+  hint: "Point --cwd at the app's directory, or at one that does not exist yet for setup to create.",
+};
+
+/** How a directory holding a project secret with no configuration is refused. */
+const SECRET_WITHOUT_CONFIG_REFUSAL: Refusal = {
+  code: "E_CONFLICT",
+  message: ".zitadel/secret exists without zitadel.json",
+  hint: "Move the secret aside or restore zitadel.json before running setup.",
+};
+
+/** How a repository git cannot answer about is refused. */
+const WORKTREE_UNKNOWN_REFUSAL: Refusal = {
+  code: "E_CONFLICT",
+  message: "Could not tell whether the git working tree is clean: {reason}",
+  hint:
+    "Setup commits the files it writes, and will not do that without knowing the tree " +
+    "started clean. Fix what git is reporting, then run setup again, or pass --no-git to " +
+    "set up without touching version control.",
+};
+
+/** How a repository where a commit would land in the wrong place is refused. */
+const WORKTREE_BLOCKED_REFUSAL: Refusal = {
+  code: "E_CONFLICT",
+  message: "Setup cannot commit here: {blocked}",
+  hint:
+    "Setup commits the project so the first release records a commit. Finish or abort what " +
+    "is under way, or check out a branch, then run setup again, or pass --no-git to set up " +
+    "without touching version control.",
+};
+
+/** How a repository holding work the CLI did not write is refused. */
+const WORKTREE_DIRTY_REFUSAL: Refusal = {
+  code: "E_CONFLICT",
+  message: "The git working tree has {parts}",
+  hint:
+    "Setup commits the project directory so the first release records a commit, and it will not " +
+    "do that while there is work it did not write, which would be committed under setup's name. " +
+    "Run `git status` to see them, commit or stash them, then run setup again. If you have just scaffolded " +
+    "the app yourself, committing it first is the expected step. To set up without touching " +
+    "version control at all, pass --no-git.",
+  details: {
+    modified: "{modified}",
+    untracked: "{untracked}",
+  },
+};
+
+/** How a local server another CLI release started is refused. */
+const SERVER_VERSION_REFUSAL: Refusal = {
+  code: "E_CONFLICT",
+  message: "The local Zitadel server runs {running}, but this CLI ships {expected}",
+  hint:
+    "A server another CLI release started serves that release's API, so setup would stop " +
+    "halfway. Run start to restart it on {expected}; its data stays. {where}" +
+    "Then rerun setup.",
+  next: ["{start}", "{setup}"],
+  details: {
+    server_url: "{serverUrl}",
+    server_version: "{running}",
+    cli_server_version: "{expected}",
+  },
+};
+
+/** What setup needs to know about the run before it detects or writes anything. */
+export type SetupPreflight = Readonly<{
+  server: ResolvedServer;
+  configured: boolean;
+}>;
+
+/** How the preflight turns a command it names into one the reader can run. */
+type Suggest = (command: string) => SuggestedCommand;
+
+/** The flags setup's preflight reads. */
+type PreflightFlags = Readonly<{
+  git?: boolean;
+  [flag: string]: unknown;
+}>;
+
+function plural(list: readonly unknown[]): string {
+  return list.length === 1 ? "" : "s";
+}
+
+/**
+ * The server setup is about, from `--server` or the cloud default. Refuses
+ * `--server local` with nothing running, and says how to start it and how to
+ * rerun setup against it once it is.
+ */
+async function resolveSetupServer(
+  flags: PreflightFlags,
+  meta: GlobalOptions,
+  suggest: Suggest,
+): Promise<ResolvedServer> {
+  try {
+    return await resolveServer({
+      cwd: meta.cwd,
+      serverFlag: meta.serverFlag,
+    });
+  } catch (error) {
+    const normalized = toZitadelError(error);
+    if (normalized.code !== "E_LOCAL_SERVER_NOT_RUNNING") {
+      throw error;
+    }
+    const retry = retryOptionsOf(flags);
+    const recovery = ssoRecovery(retry, meta.cliVersion);
+    throw refusalError(
+      NO_LOCAL_SERVER_REFUSAL,
+      {
+        reason: normalized.hint ? `${normalized.hint} ` : "",
+        scripting:
+          retry.sso && retry.sso.length > 0
+            ? "The rerun asks for the client id and secret, because a command carries neither. " +
+              "To script it instead, add --sso-client-id and --non-interactive, and pipe the secret in. "
+            : "",
+        recovery:
+          recovery.commands.length > 0
+            ? `${recovery.hint}${recovery.commands.map((command) => `\`${command}\``).join(" ")} `
+            : recovery.hint,
+        setup: `setup ${setupRetryFlags({ ...retry, cwd: undefined })}`,
+      },
+      suggest,
+    );
+  }
+}
+
+/**
+ * Refuses a repository setup must not commit in. One snapshot answers all
+ * three questions: git is asked once, not once per refusal.
+ */
+function refuseWorktree(state: WorktreeState): void {
+  if (state.kind === "unknown") {
+    throw refusalError(WORKTREE_UNKNOWN_REFUSAL, {
+      reason: state.reason,
+    });
+  }
+  if (state.kind === "blocked") {
+    throw refusalError(WORKTREE_BLOCKED_REFUSAL, {
+      blocked: state.blocked,
+    });
+  }
+  if (state.kind !== "dirty") {
+    return;
+  }
+  const parts = [
+    state.modified.length > 0
+      ? `${state.modified.length} uncommitted change${plural(state.modified)}`
+      : undefined,
+    state.untracked.length > 0
+      ? `${state.untracked.length} untracked file${plural(state.untracked)}`
+      : undefined,
+  ].filter((part) => {
+    return part !== undefined;
+  });
+  throw refusalError(WORKTREE_DIRTY_REFUSAL, {
+    parts: parts.join(" and "),
+    modified: state.modified,
+    untracked: state.untracked,
+  });
+}
+
+/**
+ * Refuses a local server another CLI release started. `start` restarts such a
+ * server, but one left running stays that release's until `start` runs again,
+ * and its API is that release's: setup would create the project, then fail
+ * uploading the default schema and flow, and `--force` would not help.
+ *
+ * Only a binary runtime records the version it runs, and only release versions
+ * are compared: an override records `override`, which says nothing about its
+ * API. An unreadable `runtime.json` is doctor's to report, not setup's.
+ */
+async function refuseOtherReleasesServer(
+  flags: PreflightFlags,
+  meta: GlobalOptions,
+  suggest: Suggest,
+): Promise<void> {
+  const nearest = await readNearestRuntimeMetadata(meta.cwd).catch(() => {
+    return undefined;
+  });
+  const runtime = nearest?.runtime;
+  if (!nearest || runtime?.backend !== "binary" || runtime.server_url !== meta.source) {
+    return;
+  }
+  const expected = LocalServer.bundledVersion();
+  if (
+    expected === undefined ||
+    !semver.valid(expected) ||
+    !semver.valid(runtime.server_version) ||
+    runtime.server_version === expected
+  ) {
+    return;
+  }
+  throw refusalError(
+    SERVER_VERSION_REFUSAL,
+    {
+      running: runtime.server_version,
+      expected,
+      serverUrl: runtime.server_url,
+      start: nearest.dir === meta.cwd ? "start" : `start ${Cmd.option("--cwd", nearest.dir)}`,
+      where:
+        nearest.dir === meta.cwd
+          ? ""
+          : `Run start in ${nearest.dir}, where the server was started. `,
+      setup: `setup ${setupRetryFlags({ ...retryOptionsOf(flags), cwd: undefined })}`,
+    },
+    suggest,
+  );
+}
+
+/**
+ * Everything setup checks before it detects, creates or writes anything: the
+ * server it is about, that the directory can hold an app, that a half-removed
+ * project is not sitting there, and that git is in a state setup may commit
+ * in. A directory already set up skips the git and server-version checks,
+ * which are about making a project rather than changing one.
+ */
+export async function setupPreflight(
+  flags: PreflightFlags,
+  meta: GlobalOptions,
+  suggest: Suggest,
+): Promise<SetupPreflight> {
+  const server = await resolveSetupServer(flags, meta, suggest);
+  if (!(await isDirectoryOrMissing(meta.cwd))) {
+    throw refusalError(NOT_A_DIRECTORY_REFUSAL, {
+      cwd: meta.cwd,
+    });
+  }
+  // The version check compares against the server this run is about, so the
+  // rest of the preflight sees the resolved one.
+  const resolved: GlobalOptions = {
+    ...meta,
+    source: server.value,
+  };
+  const configured = await hasZitadelConfig(meta.cwd);
+  if (!configured && (await hasZitadelSecret(meta.cwd))) {
+    throw refusalError(SECRET_WITHOUT_CONFIG_REFUSAL, {});
+  }
+  if (configured) {
+    return {
+      server,
+      configured,
+    };
+  }
+  if (flags.git !== false) {
+    refuseWorktree(await inspectWorktree(meta.cwd));
+  }
+  await refuseOtherReleasesServer(flags, resolved, suggest);
+  return {
+    server,
+    configured,
+  };
+}
+
+/** The `--sso-*` flags that describe a custom connection, and whether one is needed. */
+const CUSTOM_SETTINGS = [
+  { name: "ssoSlug", flag: "--sso-slug", needed: true },
+  { name: "ssoDisplayName", flag: "--sso-display-name", needed: true },
+  { name: "ssoIssuer", flag: "--sso-issuer", needed: true },
+  { name: "ssoScopes", flag: "--sso-scopes", needed: false },
+] as const;
+
+/** The flags {@link refuseUnusableFlags} reads, as a command reads them. */
+export type SetupFlagsToCheck = Readonly<{
+  design?: string;
+  sso?: string;
+  ssoClientId?: string;
+  ssoSlug?: string;
+  ssoDisplayName?: string;
+  ssoIssuer?: string;
+  ssoScopes?: string;
+}>;
+
+const DESIGN_REMOVED_REFUSAL: Refusal = {
+  message: "setup no longer applies a login template, so --design was removed",
+  hint: `Rerun setup without --design. ${PAGE_LAYOUT_HINT} To own the widget's structure after setup, eject one of: ${BRANDING_DESIGNS.join(", ")}.`,
+  next: ["branding eject"],
+};
+
+const CLIENT_ID_NEEDS_SSO_REFUSAL: Refusal = {
+  message: "--sso-client-id needs --sso",
+  hint: "Name the provider with --sso, e.g. --sso google.",
+};
+
+const SETTING_NEEDS_SSO_REFUSAL: Refusal = {
+  message: `{flag} needs --sso ${CUSTOM_PROVIDER}`,
+  hint: `Name the provider with --sso ${CUSTOM_PROVIDER}.`,
+};
+
+const SETTINGS_NEED_CUSTOM_REFUSAL: Refusal = {
+  message: "{names} only applies to a custom connection",
+  hint: `Add --sso ${CUSTOM_PROVIDER}, or remove {them}.`,
+  details: {
+    flags: "{flags}",
+  },
+};
+
+const CUSTOM_CONNECTION_INCOMPLETE_REFUSAL: Refusal = {
+  message: "A custom connection needs {list}",
+  hint: `Describe the connection, e.g. ${customExample(SETUP_FLAG_NAMES)}`,
+  details: {
+    missing: "{missing}",
+  },
+};
+
+const SSO_NEEDS_CLIENT_ID_REFUSAL: Refusal = {
+  message: "--sso {sso} needs --sso-client-id",
+  hint: "Register {registration} and pass its client id.",
+};
+
+/** Where an application for `provider` is registered, for the hint to name. */
+function whereToRegister(flags: SetupFlagsToCheck, provider: string): string {
+  const entry = provider === CUSTOM_PROVIDER ? undefined : parseProviderSelection(provider);
+  const catalog = entry === undefined ? undefined : providerOf(entry);
+  if (catalog?.consoleUrl !== undefined) {
+    return `an OAuth application at ${catalog.consoleUrl}`;
+  }
+  return `a client at ${catalog?.issuer ?? String(flags.ssoIssuer)}`;
+}
+
+/**
+ * Refuses a command line setup cannot act on, before anything is detected,
+ * created or written: a removed flag, and a set of `--sso` flags that
+ * contradict each other or leaves out what nobody can be asked for. `scripted`
+ * says nobody can be asked; a person at a terminal is asked for what is
+ * missing instead.
+ */
+export function refuseUnusableFlags(
+  flags: SetupFlagsToCheck,
+  scripted: boolean,
+  suggest: (command: string) => SuggestedCommand,
+): void {
+  if (flags.design !== undefined) {
+    throw refusalError(DESIGN_REMOVED_REFUSAL, {}, suggest);
+  }
+  if (flags.ssoClientId !== undefined && flags.sso === undefined) {
+    throw refusalError(CLIENT_ID_NEEDS_SSO_REFUSAL, {});
+  }
+  if (flags.sso === undefined) {
+    const orphan = CUSTOM_SETTINGS.find((setting) => {
+      return flags[setting.name] !== undefined;
+    });
+    if (orphan !== undefined) {
+      throw refusalError(SETTING_NEEDS_SSO_REFUSAL, {
+        flag: orphan.flag,
+      });
+    }
+    return;
+  }
+  if (flags.sso !== CUSTOM_PROVIDER) {
+    const given = CUSTOM_SETTINGS.filter((setting) => {
+      return flags[setting.name] !== undefined;
+    });
+    if (given.length > 0) {
+      throw refusalError(SETTINGS_NEED_CUSTOM_REFUSAL, {
+        names: given.map((setting) => setting.flag).join(", "),
+        them: given.length === 1 ? "it" : "them",
+        flags: given.map((setting) => setting.flag),
+      });
+    }
+  }
+  if (!scripted) {
+    return;
+  }
+  if (flags.sso === CUSTOM_PROVIDER) {
+    const missing = CUSTOM_SETTINGS.filter((setting) => {
+      return setting.needed && flags[setting.name] === undefined;
+    }).map((setting) => setting.flag);
+    if (missing.length > 0) {
+      throw refusalError(CUSTOM_CONNECTION_INCOMPLETE_REFUSAL, {
+        list: missing.join(", "),
+        missing,
+      });
+    }
+  }
+  if (flags.ssoClientId === undefined) {
+    throw refusalError(SSO_NEEDS_CLIENT_ID_REFUSAL, {
+      sso: flags.sso,
+      registration: whereToRegister(flags, flags.sso),
+    });
+  }
+}
+
+const CLIENT_ID_REFUSAL: Refusal = {
+  message: "--sso-client-id: {problem}",
+  hint: "Fix --sso-client-id and run the command again.",
+  details: {
+    argument: "--sso-client-id",
+  },
+};
+
+/** Reads the client id of an OAuth application, refusing one the platform would not accept. */
+function readClientId(input: string): ClientId {
+  const parsed = parseClientId(refuseBlank(input, "--sso-client-id", "the value is empty"));
+  if (!parsed.ok) {
+    throw refusalError(CLIENT_ID_REFUSAL, {
+      problem: parsed.problem,
+    });
+  }
+  return parsed.value;
+}
+
+/** A flag that holds the client id of the application registered with the provider. */
+export const clientIdFlag = Flags.custom<ClientId>({
+  parse: async (input) => {
+    return readClientId(input);
+  },
+});
+
+const REFUSAL: Refusal = {
+  message: "{problem}",
+  hint: "Pass a whole number for {flag}, or 0 for none.",
+  details: {
+    argument: "{flag}",
+  },
+};
+
+/**
+ * A password minimum length flag, read with the prompt's parser so the two
+ * cannot disagree: a whole number the policy accepts, or `null` for none.
+ */
+export const passwordMinLengthFlag = Flags.custom<PasswordMinLength>({
+  parse: async (input, _command, flag) => {
+    const parsed = parsePasswordMinLength(
+      refuseBlank(input, `--${flag.name}`, `--${flag.name} was given an empty value`),
+    );
+    if (parsed.ok) {
+      return parsed.value;
+    }
+    throw refusalError(REFUSAL, {
+      problem: parsed.problem,
+      flag: `--${flag.name}`,
+    });
+  },
+});
+
+const SSO_SLUG_REFUSAL: Refusal = {
+  message: "--sso-slug: {problem}",
+  hint: "Fix --sso-slug and run the command again.",
+  details: {
+    flag: "--sso-slug",
+  },
+};
+
+/**
+ * Reads the connection slug of a custom connection, refusing one the server would refuse
+ * on apply, and keeps it as typed.
+ */
+function readSsoSlug(input: string): string {
+  const trimmed = refuseBlank(input, "--sso-slug", "the value is empty");
+  const parsed = parseConnectionSlug(trimmed, RESERVED_SLUGS);
+  if (!parsed.ok) {
+    throw refusalError(SSO_SLUG_REFUSAL, {
+      problem: parsed.problem,
+    });
+  }
+  return trimmed;
+}
+
+/** A flag that holds the connection slug of a custom connection. */
+export const ssoSlugFlag = Flags.custom<string>({
+  parse: async (input) => {
+    return readSsoSlug(input);
+  },
+});
+
+const SSO_DISPLAY_NAME_REFUSAL: Refusal = {
+  message: "--sso-display-name: {problem}",
+  hint: "Fix --sso-display-name and run the command again.",
+  details: {
+    flag: "--sso-display-name",
+  },
+};
+
+/**
+ * Reads the display name of a custom connection, refusing one the server would refuse
+ * on apply, and keeps it as typed.
+ */
+function readSsoDisplayName(input: string): string {
+  const trimmed = refuseBlank(input, "--sso-display-name", "the value is empty");
+  const parsed = parseDisplayName(trimmed);
+  if (!parsed.ok) {
+    throw refusalError(SSO_DISPLAY_NAME_REFUSAL, {
+      problem: parsed.problem,
+    });
+  }
+  return trimmed;
+}
+
+/** A flag that holds the display name of a custom connection. */
+export const ssoDisplayNameFlag = Flags.custom<string>({
+  parse: async (input) => {
+    return readSsoDisplayName(input);
+  },
+});
+
+const SSO_ISSUER_REFUSAL: Refusal = {
+  message: "--sso-issuer: {problem}",
+  hint: "Fix --sso-issuer and run the command again.",
+  details: {
+    flag: "--sso-issuer",
+  },
+};
+
+/**
+ * Reads the issuer of a custom connection, refusing one the server would refuse
+ * on apply, and keeps it as typed.
+ */
+function readSsoIssuer(input: string): string {
+  const trimmed = refuseBlank(input, "--sso-issuer", "the value is empty");
+  const parsed = parseIssuer(trimmed);
+  if (!parsed.ok) {
+    throw refusalError(SSO_ISSUER_REFUSAL, {
+      problem: parsed.problem,
+    });
+  }
+  return trimmed;
+}
+
+/** A flag that holds the issuer of a custom connection. */
+export const ssoIssuerFlag = Flags.custom<string>({
+  parse: async (input) => {
+    return readSsoIssuer(input);
+  },
+});
+
+const SSO_SCOPES_REFUSAL: Refusal = {
+  message: "--sso-scopes: {problem}",
+  hint: "Fix --sso-scopes and run the command again.",
+  details: {
+    flag: "--sso-scopes",
+  },
+};
+
+/**
+ * Reads the scopes of a custom connection, refusing one the server would refuse
+ * on apply, and keeps it as typed.
+ */
+function readSsoScopes(input: string): string {
+  const trimmed = refuseBlank(input, "--sso-scopes", "the value is empty");
+  const parsed = parseScopes(trimmed);
+  if (!parsed.ok) {
+    throw refusalError(SSO_SCOPES_REFUSAL, {
+      problem: parsed.problem,
+    });
+  }
+  return trimmed;
+}
+
+/** A flag that holds the scopes of a custom connection. */
+export const ssoScopesFlag = Flags.custom<string>({
+  parse: async (input) => {
+    return readSsoScopes(input);
+  },
+});
 
 /**
  * The frameworks `--framework` accepts, derived from Orca's registry so the
@@ -295,16 +1127,10 @@ export default class Setup extends Destructive(BaseCommand) {
     resolveServer: false,
   };
 
-  static override rules = [
-    designRemovedRule,
-    clientIdNeedsSsoRule,
-    ...customSettingsNeedSsoRules,
-    settingsNeedCustomRule,
-    customConnectionIncompleteRule,
-    ssoNeedsClientIdRule,
-  ];
-
   protected async execute({ flags }: Admitted<typeof Setup>): Promise<JsonEnvelope> {
+    refuseUnusableFlags(flags, this.nonInteractive, (next) => {
+      return this.suggestUnscoped(next);
+    });
     const preflight = await setupPreflight(flags, this.meta, (next) => {
       return this.suggestUnscoped(next);
     });

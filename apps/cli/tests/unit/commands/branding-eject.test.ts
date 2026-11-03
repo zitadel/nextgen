@@ -149,11 +149,19 @@ describe("branding eject", () => {
       const cwd = await makeProject();
       const res = await eject(cwd, "--design", design);
       expect(res.exitCode, design).toBe(3);
-      const json = parseJson(res.stdout) as { code: string; message: string; hint: string };
+      const json = parseJson(res.stdout) as {
+        code: string;
+        message: string;
+        hint: string;
+        next_commands: string[];
+      };
       expect(json.code, design).toBe("E_VALIDATION");
       expect(json.message, design).toContain(`The ${design} design was retired`);
       expect(json.hint, design).toContain("<zitadel-login>");
       expect(json.hint, design).toContain("centered, minimal");
+      expect(json.next_commands, design).toEqual([
+        expect.stringContaining("branding eject --design centered"),
+      ]);
       await expect(readFile(join(cwd, ".zitadel/branding/login.liquid"), "utf8")).rejects.toThrow();
     }
   });

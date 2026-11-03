@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { readSchemaTarget } from "../../../../../../src/commands/auth-method/target";
+import { readSchemaTarget } from "../../../../../../src/commands/auth-method/command";
 import { ssoFlows } from "../../../../../../src/commands/auth-method/sso/enable/index";
 import { defaultSchema, makeProject, setUpProject } from "../../../../../helpers/local-project";
 

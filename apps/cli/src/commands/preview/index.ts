@@ -15,6 +15,8 @@ import {
   deployMessage,
   headSha,
   runSteps,
+  MESSAGE_MAX_LENGTH,
+  messageTooLong,
   type StepContext,
   validateStep,
   worktreeIsDirty,
@@ -22,13 +24,12 @@ import {
 import { ApiError } from "@zitadel/api/runtime/fetch";
 
 import type { ZitadelClient } from "../../lib/api-client";
+import { refuseBlank } from "../../lib/oclif/flags";
 import { type Refusal, refusalError } from "../../lib/oclif/refusal";
 import { detectPreviewUrls } from "../../lib/preview";
+import { runsInCi } from "../../lib/telemetry/dimensions/ci-provider";
+import { parseTtl, type Ttl } from "../../lib/ttl";
 import { reportWarning } from "../../lib/warnings";
-import { originFlag } from "./flags/origin";
-import { messageFlag } from "./flags/message";
-import { ttlFlag } from "./flags/ttl";
-import { previewVerdict, runsInCi } from "./verdict";
 
 const CREDENTIAL_REQUIRED_REFUSAL: Refusal = {
   message: "{credential} is not set",
@@ -44,6 +45,111 @@ const PRIMARY_ORIGIN_REFUSAL: Refusal = {
   message: "{origins} is a primary origin",
   hint: "Pass the preview URLs with --origin; production is deployed by `zitadel deploy`, after merge.",
 };
+
+const ORIGIN_IS_PRIMARY_KEYWORD_REFUSAL: Refusal = {
+  message: "A preview cannot target the primary origins",
+  hint: "Pass the preview URLs with --origin; production is deployed by `zitadel deploy`, after merge.",
+};
+
+const TTL_OUT_OF_RANGE_REFUSAL: Refusal = {
+  message: "{value} is outside the allowed range",
+  hint: "A preview lives between 60s and 365d.",
+};
+
+const MESSAGE_TOO_LONG_REFUSAL: Refusal = {
+  message: "the message is longer than {limit} characters",
+  hint: "Pass a shorter summary with -m.",
+  details: {
+    argument: "--message",
+  },
+};
+
+/** The shortest and longest a preview may live, as the server fixes them. */
+const TTL_MINIMUM_MS = 60 * 1000;
+const TTL_MAXIMUM_MS = 365 * 24 * 60 * 60 * 1000;
+
+/**
+ * A preview URL as `--origin` names it. An origin has no path, so a trailing
+ * slash is dropped and one preview is one spelling. It refuses a blank value
+ * and `primary`, the deployment keyword for every primary origin, which a
+ * preview build must never reach with its narrower credential.
+ */
+function readOrigin(input: string, label: string): string {
+  const url = refuseBlank(input, label, "the value is empty").replace(/\/+$/, "");
+  if (url === "primary") {
+    throw refusalError(ORIGIN_IS_PRIMARY_KEYWORD_REFUSAL, {});
+  }
+  return url;
+}
+
+/**
+ * How long a preview stays live, as `7d`, `12h` or `90m`. It refuses a value
+ * that is not a duration and one outside the server's fixed limits of a minute
+ * and 365 days.
+ */
+function readTtl(input: string): Ttl {
+  const ttl = parseTtl(input);
+  if (ttl.ms < TTL_MINIMUM_MS || ttl.ms > TTL_MAXIMUM_MS) {
+    throw refusalError(TTL_OUT_OF_RANGE_REFUSAL, {
+      value: input,
+    });
+  }
+  return ttl;
+}
+
+/**
+ * What `-m/--message` records on the release this publishes. It refuses a blank
+ * message, which would record nothing, and one longer than the server records,
+ * which the server would reject after the bundle was built. It returns the
+ * message trimmed.
+ */
+function readMessage(input: string): string {
+  const value = refuseBlank(input, "--message", "the value is empty");
+  if (messageTooLong(value)) {
+    throw refusalError(MESSAGE_TOO_LONG_REFUSAL, {
+      limit: MESSAGE_MAX_LENGTH,
+    });
+  }
+  return value;
+}
+
+/** Why a preview is skipped, or refused, instead of deployed. */
+export type PreviewVerdict =
+  | "preview"
+  | "production-build"
+  | "unnamed-ci-build"
+  | "no-credential"
+  | "credential-required";
+
+/**
+ * Whether this build has a preview to deploy. Only a preview or development
+ * build does: a production build serves the release `zitadel deploy` published
+ * after merge. The environment gates this, not `--origin`, which only selects
+ * the targets and never authorizes a preview deploy into an environment that
+ * must not take writes. In a CI build `development` is only a platform the
+ * resolver cannot read, so it is skipped rather than taken for a preview. A
+ * fork pull-request build cannot read the preview credential, so a missing one
+ * skips the preview and the build carries on (#1312); `--strict` refuses
+ * instead, for a trusted build that expects it.
+ */
+export function previewVerdict(input: {
+  environment: string;
+  fromDefault: boolean;
+  ci: boolean;
+  credentialSet: boolean;
+  strict: boolean;
+}): PreviewVerdict {
+  if (input.environment !== "preview" && input.environment !== "development") {
+    return "production-build";
+  }
+  if (input.fromDefault && input.ci) {
+    return "unnamed-ci-build";
+  }
+  if (input.credentialSet) {
+    return "preview";
+  }
+  return input.strict ? "credential-required" : "no-credential";
+}
 
 /**
  * The preview URLs to deploy to: `--origin`, each given once as the request's
@@ -145,18 +251,32 @@ export default class Preview extends PreviewCommand {
     "<%= config.bin %> preview -m 'add phone_number to human-user'",
   ];
   static override flags = {
-    origin: originFlag({
+    origin: Flags.custom<string>({
+      parse: async (input, _command, flag) => {
+        return readOrigin(input, `--${flag.name}`);
+      },
+    })({
       description:
         "A preview URL to deploy to, instead of detecting them from the platform build. Repeatable.",
       multiple: true,
     }),
-    ttl: ttlFlag({
+    ttl: Flags.custom<Ttl>({
+      parse: async (input) => {
+        return readTtl(input);
+      },
+    })({
       description:
         "How long the preview stays live, such as 7d, 12h or 90m. Between 60s and 365d. Defaults to the project's own lifetime.",
     }),
-    message: messageFlag(
-      "A short summary of what this release changes. Defaults to the pull request's title or the current commit's subject.",
-    ),
+    message: Flags.custom<string>({
+      char: "m",
+      parse: async (input) => {
+        return readMessage(input);
+      },
+    })({
+      description:
+        "A short summary of what this release changes. Defaults to the pull request's title or the current commit's subject.",
+    }),
     strict: Flags.boolean({
       description: `Fail instead of warning when no preview credential (${CREDENTIALS[PREVIEW_CREDENTIAL]}) is set.`,
     }),

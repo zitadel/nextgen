@@ -5,7 +5,6 @@ import { type Environment, requireValueInteractive, resolveEnvironment } from ".
 import { resolveCwd } from "../paths";
 import { BaseCommand, type MetaOptions } from "./base";
 import { byName } from "./names";
-import { excludes, type Rule } from "./rules";
 import { CREDENTIALS, type CredentialKind } from "./credentials";
 import {
   ENVIRONMENT_SELECTOR_OPTIONS,
@@ -31,13 +30,6 @@ import { Cmd } from "../cmd";
  */
 export abstract class EnvironmentCommand extends BaseCommand {
   static override baseFlags = { ...BaseCommand.baseFlags, ...environmentFlags };
-
-  static override rules: readonly Rule[] = [
-    excludes("env", "env-file", {
-      message: "--env and --env-file cannot be used together",
-      hint: "--env picks the .env.<name>.local files; --env-file names one file outright.",
-    }),
-  ];
 
   static credential: CredentialKind = "project";
 
@@ -180,13 +172,6 @@ export abstract class EnvironmentCommand extends BaseCommand {
     const open = this.connections.get(key) ?? this.openConnection(options);
     this.connections.set(key, open);
     return open;
-  }
-
-  protected override suggestRefusal(command: string): SuggestedCommand {
-    if ((this.environment as Environment | undefined) === undefined) {
-      return super.suggestRefusal(command);
-    }
-    return this.suggest(command);
   }
 
   private async openConnection(options: ConnectOptions): Promise<Connection> {

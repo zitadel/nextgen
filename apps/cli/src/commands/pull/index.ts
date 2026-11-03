@@ -1,10 +1,11 @@
+import { Args } from "@oclif/core";
+
 import { mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 import type { GetReleaseById200PointersItemKind } from "@zitadel/api/generated/model";
 
 import type { ZitadelClient } from "../../lib/api-client";
-import { LATEST_TARGET, type ReadablePullTarget, targetArg } from "./args/target";
 import { ZitadelError } from "../../lib/errors";
 import { FLOWS_DIR } from "../../lib/flows";
 import { readJsonDirEntries } from "../../lib/json-dir";
@@ -17,7 +18,47 @@ import {
 import { DEPLOY_ARGS, servesPrimary } from "../../lib/release";
 import { writeBackResource } from "../../lib/sync";
 import { SCHEMAS_DIR } from "../../lib/user-schema";
+import { type Refusal, refusalError } from "../../lib/oclif/refusal";
 import { reportWarning } from "../../lib/warnings";
+
+/** What a pull target names, or that it names nothing pull understands. */
+type PullTarget =
+  | { readonly kind: "latest" }
+  | { readonly kind: "release"; readonly id: string }
+  | { readonly kind: "deployment"; readonly id: string }
+  | { readonly kind: "invalid" };
+
+/** A pull target that names something pull can read. */
+type ReadablePullTarget = Exclude<PullTarget, { readonly kind: "invalid" }>;
+
+const TARGET_REFUSAL: Refusal = {
+  message: 'Don\'t know how to pull "{value}".',
+  hint: "Pass 'latest', a release id (rel_…), or a deployment id (dep_…).",
+};
+
+/** The live release, what is pulled when no target is given. */
+const LATEST_TARGET: ReadablePullTarget = {
+  kind: "latest",
+};
+
+/**
+ * Reads what to pull: `latest` (the live release), a release id (`rel_…`) or a
+ * deployment id (`dep_…`), refusing anything else.
+ */
+function readTarget(input: string): ReadablePullTarget {
+  if (input === "latest") {
+    return { kind: "latest" };
+  }
+  if (input.startsWith("rel_")) {
+    return { kind: "release", id: input };
+  }
+  if (input.startsWith("dep_")) {
+    return { kind: "deployment", id: input };
+  }
+  throw refusalError(TARGET_REFUSAL, {
+    value: input,
+  });
+}
 
 /**
  * A resource kind `pull` can rebuild on disk from the revision a release pins:
@@ -107,7 +148,11 @@ export default class Pull extends EnvironmentCommand {
     "<%= config.bin %> pull dep_01KX5N7C9D2E7F0N9WD3P2E4YM6",
   ];
   static override args = {
-    target: targetArg({
+    target: Args.custom<ReadablePullTarget>({
+      parse: async (input) => {
+        return readTarget(input);
+      },
+    })({
       default: LATEST_TARGET,
       defaultHelp: async () => "latest",
       description:

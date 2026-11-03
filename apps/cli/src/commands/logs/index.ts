@@ -10,8 +10,54 @@ import {
 } from "../../lib/local-server/server-log";
 import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "../../lib/oclif";
 import { type Refusal, refusalError } from "../../lib/oclif/refusal";
-import { tailFlag } from "./flags/tail";
-import { followIsNotJsonRule } from "./rules/follow-is-not-json";
+
+/** How many lines `--tail` shows when it is not given. */
+const DEFAULT_TAIL = 200;
+
+/** How `--tail` refuses a count that is not a number of lines. */
+const TAIL_REFUSAL: Refusal = {
+  message: "{value} is not a valid tail",
+  hint: "Use a positive integer.",
+};
+
+/**
+ * Reads how many lines to show, refusing anything that is not a whole number
+ * of one or more: a server writes whole lines, so a fraction names none of
+ * them, and zero lines is a run that would print nothing. Digits alone are not
+ * enough, and nor is the number alone: `1e3` is not a count a person typed,
+ * while enough digits overflow to `Infinity`, which Docker is handed verbatim
+ * and the binary backend reads as the whole log.
+ */
+function readTail(input: string): number {
+  const value = Number(input);
+  if (/^\d+$/.test(input.trim()) && Number.isSafeInteger(value) && value >= 1) {
+    return value;
+  }
+  throw refusalError(TAIL_REFUSAL, {
+    value: input,
+  });
+}
+
+/**
+ * A flag that holds how many lines to show, {@link DEFAULT_TAIL} of them when
+ * it is not given.
+ */
+export const tailFlag = Flags.custom<number>({
+  default: DEFAULT_TAIL,
+  parse: async (input) => {
+    return readTail(input);
+  },
+});
+
+/**
+ * How following the lines into the envelope is refused: following writes lines
+ * as the server writes them, which is a stream and never the one envelope
+ * `--json` promises.
+ */
+const FOLLOW_IS_NOT_JSON_REFUSAL: Refusal = {
+  message: "Cannot stream logs with --json",
+  hint: "Run without --json, or omit --follow.",
+};
 
 /** How a directory where `zitadel start` never ran is refused. */
 const NOT_STARTED_REFUSAL: Refusal = {
@@ -46,9 +92,10 @@ export default class Logs extends BaseCommand {
     resolveServer: false,
   };
 
-  static override rules = [followIsNotJsonRule];
-
   protected async execute({ flags }: Admitted<typeof Logs>): Promise<JsonEnvelope> {
+    if (flags.follow && this.isJson) {
+      throw refusalError(FOLLOW_IS_NOT_JSON_REFUSAL, {});
+    }
     // The server this directory uses: the one `zitadel start` ran in here or
     // in the nearest parent, as `doctor` and `console` find it.
     const started = await readNearestRuntimeMetadata(this.cwd);

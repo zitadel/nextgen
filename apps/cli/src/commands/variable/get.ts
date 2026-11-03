@@ -7,7 +7,7 @@ import {
   EnvironmentCommand,
   type JsonEnvelope,
 } from "../../lib/oclif";
-import { variableNameArg } from "./args/name";
+import { variableNameArg } from "./name";
 import { Tabulatable } from "../../lib/oclif/tabulatable";
 import { toVariableRow, variableCells, variableReadScope } from "../../lib/variables";
 

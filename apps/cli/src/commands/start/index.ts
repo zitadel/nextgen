@@ -4,7 +4,6 @@ import { serverLogAction } from "../../lib/journey-guidance";
 import { ensureLocalAdmin } from "../../lib/local-server/admin-credential";
 import { EMPTY_SUMMARY, loadProjectEnv } from "../../lib/local-server/env-vars";
 import { portFlag } from "../local-server/flags/port";
-import { imageNeedsDockerRule } from "./rules/image-needs-docker";
 import {
   DEFAULT_LOCAL_SERVER_PORT,
   PLATFORM_PROJECT_ID,
@@ -25,7 +24,17 @@ import {
   nonBlankString,
 } from "../../lib/oclif";
 import type { NextSteps } from "../../lib/oclif/next-steps";
+import { type Refusal, refusalError } from "../../lib/oclif/refusal";
 import type { SuggestedCommand } from "../../lib/suggestion";
+
+/**
+ * How an image beside the binary runtime is refused: an image is a container's,
+ * and the npm binary runtime has none to run.
+ */
+const IMAGE_NEEDS_DOCKER_REFUSAL: Refusal = {
+  message: "--image requires --runtime docker",
+  hint: "Use `zitadel start --runtime docker --image <tag>`, or omit --image for the npm binary runtime.",
+};
 
 export default class Start extends BaseCommand {
   static override description = "Start a local Zitadel server.";
@@ -47,9 +56,10 @@ export default class Start extends BaseCommand {
     resolveServer: false,
   };
 
-  static override rules = [imageNeedsDockerRule];
-
   protected async execute({ flags }: Admitted<typeof Start>): Promise<JsonEnvelope> {
+    if (flags.runtime === "binary" && flags.image !== undefined) {
+      throw refusalError(IMAGE_NEEDS_DOCKER_REFUSAL, {});
+    }
     const requestedPort = flags.port;
     // Where the server will be, as far as is known before one is chosen: the
     // port asked for, else the one this directory already has.

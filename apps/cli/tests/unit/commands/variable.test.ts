@@ -889,6 +889,27 @@ describe("variable set --as", () => {
     expect(bodies).toEqual([]);
   });
 
+  it("refuses a secret given on the command line, where shell history would keep it", async () => {
+    const cwd = await makeProject();
+    const bodies = capture();
+
+    const res = await runCliForTest([
+      "variable",
+      "set",
+      "API_KEY",
+      "s3cret",
+      "--secret",
+      ...base(cwd),
+    ]);
+
+    expect(res.exitCode).toBe(3);
+    const json = parseJson(res.stdout) as { code: string; message: string; hint: string };
+    expect(json.code).toBe("E_VALIDATION");
+    expect(json.message).toBe("A secret value is not given on the command line.");
+    expect(json.hint).toContain("pipe it in");
+    expect(bodies).toEqual([]);
+  });
+
   it("refuses a typed secret before reading the value", async () => {
     const cwd = await makeProject();
     const bodies = capture();

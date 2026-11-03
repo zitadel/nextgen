@@ -5,6 +5,7 @@ import { Flags } from "@oclif/core";
 import { consola } from "consola";
 
 import {
+  type ClientId,
   type ClientIdVariable,
   type ConnectionSlug,
   credentialVariables,
@@ -23,6 +24,7 @@ import {
   type ProviderSelection,
   RESERVED_SLUGS,
   selectionName,
+  validated,
 } from "@zitadel/config/idp";
 
 import type { ZitadelClient } from "../../../../lib/api-client";
@@ -73,9 +75,7 @@ import {
   nonBlankString,
 } from "../../../../lib/oclif";
 import { AuthMethodCommand } from "../../command";
-import type { SchemaTarget } from "../../target";
-import { clientIdFlag } from "./flags/client-id";
-import { providerIsNamedRule } from "./rules/provider-is-named";
+import type { SchemaTarget } from "../../command";
 import { environmentFlags } from "../../../../lib/oclif/environment-flags";
 import { inShell, type SuggestedCommand } from "../../../../lib/suggestion";
 import { reportWarning } from "../../../../lib/warnings";
@@ -87,6 +87,7 @@ import {
   selectionFromFlags as selectionFromGivenFlags,
   ssoEditRefusal as editRefusalFor,
 } from "../../../../lib/idp";
+import { refuseBlank } from "../../../../lib/oclif/flags";
 import { type Refusal, refusalError } from "../../../../lib/oclif/refusal";
 
 /**
@@ -107,6 +108,32 @@ function hasAllCustomSettings(values: CustomFlagValues): boolean {
     values.slug !== undefined && values.displayName !== undefined && values.issuer !== undefined
   );
 }
+
+/**
+ * The client id a value holds, trimmed as the one a prompt would have
+ * accepted. Refuses a blank value, naming the flag, and one the provider
+ * could not have issued.
+ */
+function readClientId(input: string, flag: string): ClientId {
+  return validated(parseClientId(refuseBlank(input, flag, `${flag} was given an empty value`)));
+}
+
+/** `--client-id`, refused before the command runs by {@link readClientId}. */
+const clientIdFlag = Flags.custom<ClientId>({
+  parse: async (input, _command, flag) => {
+    return readClientId(input, `--${flag.name}`);
+  },
+});
+
+/**
+ * How a run that names no provider is refused. `--provider` is not oclif's
+ * `required` so that its own refusal, which carries no hint, never answers
+ * first; this one names the next move.
+ */
+const PROVIDER_IS_NAMED_REFUSAL: Refusal = {
+  message: "Name the provider to enable",
+  hint: `Pass --provider, e.g. --provider ${IDP_PROVIDERS[0]}.`,
+};
 
 /** What the flags say about the provider to add. */
 export function ssoProvider(
@@ -249,9 +276,10 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     environment: true,
   };
 
-  static override rules = [providerIsNamedRule];
-
   protected async execute({ flags }: Admitted<typeof AuthMethodSsoEnable>): Promise<JsonEnvelope> {
+    if (flags[ENABLE_FLAG_KEYS.provider] === undefined) {
+      throw refusalError(PROVIDER_IS_NAMED_REFUSAL, {});
+    }
     const project = ssoProvider(flags, {
       interactive: !this.nonInteractive && !this.dryRun,
     });

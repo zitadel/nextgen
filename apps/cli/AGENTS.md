@@ -42,35 +42,29 @@
 ## Command code
 
 - A command does its work in `execute`, never `run`: `BaseCommand.run`
-  (`src/lib/oclif/base.ts`) parses, resolves `static meta`, checks
-  `static rules`, and only then calls it.
-- Validate no flag or argument in `execute`: a value reaching it has already
-  been refused if the command does not accept it.
-- Refuse one bad value in a typed flag or argument, and a bad combination of
-  them in a rule (`src/lib/oclif/rules.ts`).
-- Check a precondition the project or the server decides — a started local
-  server, a deployment to roll back — in a plain async function `execute` calls
-  on its first lines, which returns what it found or throws `refusalError`.
-  There is no framework for this, and none is wanted.
+  (`src/lib/oclif/base.ts`) parses the flags, resolves `static meta`, and only
+  then calls it.
+- Refuse a bad value in the flag or argument itself, so `execute` never checks
+  one: a typed `Flags.custom`/`Args.custom` whose `parse` calls a validator
+  that throws `refusalError`, or returns `Parsed<T>` where a prompt reuses it.
+- Refuse everything else on `execute`'s first lines, in plain code: two flags
+  that disagree as an `if`, a precondition the project or server decides as an
+  async function returning what it found. There is no framework for either, and
+  none is wanted.
+- Keep it all in the command's own file, above the class: refusal consts, then
+  validators, then the flag definitions. No `flags/`, `args/` or `rules/`
+  directory, and no helper module beside a command.
+- Duplicate a few lines into two commands rather than add a file; share only
+  what a whole topic needs, in that topic's own directory.
 - Write every refusal once, as a `Refusal` template with `{name}` placeholders
-  (`src/lib/oclif/refusal.ts`), never a `ZitadelError` built in a command.
+  (`src/lib/oclif/refusal.ts`), never a `ZitadelError` built by hand. Thread
+  `this.suggest(...)` in where one names a follow-up: `refusalError` throws
+  without a suggester, which costs the refusal its code.
 - Declare a flag or argument by its CLI spelling and read it as code reads it
   (`"client-id"` is read `flags.clientId`); see `src/lib/oclif/names.ts`.
 - Keep the CLI spelling in three places only: the definition key, oclif's own
   cross-references (`char`, `aliases`, `exclusive`, `dependsOn`,
-  `relationships`) and the flag as a refusal's message names it. A rule's name
-  and a refusal's placeholders take the code spelling.
-- Keep a command's own inputs beside it, one named export per file:
-  `src/commands/<name>/{flags,args,rules}/*.ts`. A precondition function lives
-  in the command's own file, or in its topic's directory when several commands
-  share it.
-- Write no classes there: a flag or argument is a pure validator function plus a
-  `Flags.custom`/`Args.custom` whose `parse` only calls it, and a rule is a
-  plain function.
-- Let that validator throw `refusalError` with a module-level `Refusal`, or
-  return `Parsed<T>` where a prompt's `parse` reuses it.
-- Share an input only within its own topic's directory; duplicate it rather
-  than import another command's.
+  `relationships`) and the flag as a refusal's message names it.
 - Keep `src/lib/oclif` generic: no product concept and no domain-lib import. A
   unit test fails on a leak (`tests/unit/lib/oclif/layering.test.ts`).
 - A domain lib under `src/lib` stays plain functions and parsers, and never

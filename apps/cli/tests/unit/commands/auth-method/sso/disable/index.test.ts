@@ -4,7 +4,7 @@ import {
   providerToRemove,
   removableFlows,
 } from "../../../../../../src/commands/auth-method/sso/disable/index";
-import { readSchemaTarget } from "../../../../../../src/commands/auth-method/target";
+import { readSchemaTarget } from "../../../../../../src/commands/auth-method/command";
 import { defaultSchema, setUpProject } from "../../../../../helpers/local-project";
 
 function targetOf(cwd: string) {

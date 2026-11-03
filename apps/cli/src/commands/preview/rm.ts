@@ -1,10 +1,19 @@
-import { Flags } from "@oclif/core";
+import { Args, Flags } from "@oclif/core";
 
 import { type Admitted, CommandGroups, type JsonEnvelope, PreviewCommand } from "../../lib/oclif";
-import { urlArg } from "./args/url";
 import { dryRunResult } from "../../lib/oclif/crud/shared";
 import { deletedData } from "../../lib/oclif/envelope";
 import { Destructive, Settled } from "../../lib/oclif/destructive";
+import { refuseBlank } from "../../lib/oclif/flags";
+
+/**
+ * A preview URL given as an argument. It refuses a blank value, and drops a
+ * trailing slash that names the same origin but, sent as typed, would match
+ * nothing.
+ */
+function readUrl(input: string, label: string): string {
+  return refuseBlank(input, label, `${label} was given an empty value`).replace(/\/+$/, "");
+}
 
 /**
  * `zitadel preview rm <url>` — end a live preview before it expires.
@@ -21,7 +30,14 @@ export default class PreviewRm extends Destructive(PreviewCommand) {
     "<%= config.bin %> preview rm https://acme-git-sso-acmeinc.vercel.app --force",
   ];
   static override args = {
-    url: urlArg({ required: true, description: "The preview URL to remove." }),
+    url: Args.custom<string>({
+      parse: async (input, _command, arg) => {
+        return readUrl(input, arg.name);
+      },
+    })({
+      required: true,
+      description: "The preview URL to remove.",
+    }),
   };
   static override flags = {
     // `--force` is per command, not global: here it permits a removal.

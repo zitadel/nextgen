@@ -1,10 +1,12 @@
 import { stat } from "node:fs/promises";
 import { basename, join } from "node:path";
 
-import { Flags } from "@oclif/core";
+import { Args, Flags } from "@oclif/core";
+import type { Parsed } from "@zitadel/config/idp";
 import { consola } from "consola";
 
 import { createZitadelClient } from "../../../lib/api-client";
+import { isEnvironmentName } from "../../../lib/environment";
 import { toZitadelError } from "../../../lib/errors";
 import { writeManagedEnvFile } from "../../../lib/fs-safe";
 import { isObject } from "../../../lib/json";
@@ -17,8 +19,6 @@ import {
   type JsonEnvelope,
   nonBlankString,
 } from "../../../lib/oclif";
-import { environmentNameArg } from "./args/name";
-import { appUrlFlag, readAppUrl } from "./flags/app-url";
 import { PUBLIC_PROJECT_ID_VARIABLE } from "../../../lib/orca/patchers/rule/public-project-id";
 import { readZitadelConfig } from "../../../lib/project";
 import { DEFAULT_SERVER, parseServer, resolveServer } from "../../../lib/server";
@@ -26,7 +26,7 @@ import { Cmd } from "../../../lib/cmd";
 import { environmentSelectorSuffix, projectEnvFile } from "../../../lib/oclif/environment-flags";
 import { type EnvironmentSelector, projectCommand } from "../../../lib/suggestion";
 import { Promptable } from "../../../lib/oclif/promptable";
-import { type Refusal, refusalError } from "../../../lib/oclif/refusal";
+import { interpolate, type Refusal, refusalError } from "../../../lib/oclif/refusal";
 
 /** What a `.env.<name>.local` that already exists is refused for. */
 const FILE_EXISTS_REFUSAL: Refusal = {
@@ -74,6 +74,58 @@ const SERVER_RENDERED = ["next", "nuxt"];
 /** The message the release this command publishes carries. */
 const INITIAL_DEPLOY_MESSAGE = "Initial deployment from zitadel env add";
 
+/** What an environment name is refused for: it must be usable in a `.env.<name>.local` file name. */
+const ENVIRONMENT_NAME_REFUSAL: Refusal = {
+  message: '"{value}" is not a usable environment name',
+  hint: 'Use letters, digits, dot, dash and underscore, and no "..", e.g. production.',
+};
+
+/** What an app URL is refused for: it must be an http(s) URL. */
+const APP_URL_REFUSAL: Refusal = {
+  message: 'Invalid app URL "{value}"',
+  hint: "Use a URL like https://app.acme.com.",
+};
+
+/** The environment name `input` holds, or the refusal for why it cannot name a file. */
+function readEnvironmentName(input: string): string {
+  if (!isEnvironmentName(input)) {
+    throw refusalError(ENVIRONMENT_NAME_REFUSAL, {
+      value: input,
+    });
+  }
+  return input;
+}
+
+function isHttpUrl(value: string): boolean {
+  return URL.canParse(value) && /^https?:$/.test(new URL(value).protocol);
+}
+
+/**
+ * What a person typed as the URL their app is served from, for a prompt's
+ * `parse`: an empty answer is none, and anything else is an http(s) URL.
+ */
+export function readAppUrl(answer: string): Parsed<string | undefined> {
+  const typed = answer.trim();
+  if (typed === "") {
+    return {
+      ok: true,
+      value: undefined,
+    };
+  }
+  if (!isHttpUrl(typed)) {
+    return {
+      ok: false,
+      problem: interpolate(APP_URL_REFUSAL.message, {
+        value: typed,
+      }),
+    };
+  }
+  return {
+    ok: true,
+    value: typed,
+  };
+}
+
 /**
  * `zitadel env add` — bind an environment to a project: create one on the
  * server, or bind an id a teammate sent over, and write the
@@ -90,7 +142,11 @@ export default class EnvAdd extends Promptable(BaseCommand) {
     "<%= config.bin %> env add staging --server https://api.zitadel.cloud --project proj_01K9AA9M3K7E2QX8VB4T",
   ];
   static override args = {
-    name: environmentNameArg({
+    name: Args.custom<string>({
+      parse: async (input) => {
+        return readEnvironmentName(input);
+      },
+    })({
       required: true,
       description: "The environment name, e.g. production.",
     }),
@@ -100,7 +156,17 @@ export default class EnvAdd extends Promptable(BaseCommand) {
       description:
         "Bind this existing project instead of creating one. Its secrets come from ZITADEL_PROJECT_SECRET and ZITADEL_PREVIEW_TOKEN in the process environment.",
     }),
-    "app-url": appUrlFlag({
+    "app-url": Flags.custom<string>({
+      parse: async (input) => {
+        const parsed = readAppUrl(input);
+        if (!parsed.ok || parsed.value === undefined) {
+          throw refusalError(APP_URL_REFUSAL, {
+            value: input,
+          });
+        }
+        return parsed.value;
+      },
+    })({
       description:
         "The URL this environment's app is served from. It becomes ZITADEL_ISSUER and is registered with a new project.",
     }),

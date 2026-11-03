@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { variableNameArg } from "../../../../../src/commands/variable/args/name";
-import { parseArg } from "../../../../helpers/inputs";
+import { variableNameArg } from "../../../../src/commands/variable/name";
+import { parseArg } from "../../../helpers/inputs";
 
 describe("the variable name argument", () => {
   it.each(["GOOGLE_CLIENT_ID", "a", "_x1", "A".repeat(255)])("accepts %j", async (name) => {

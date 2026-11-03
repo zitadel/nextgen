@@ -10,10 +10,7 @@ import {
   EnvironmentCommand,
   type JsonEnvelope,
 } from "../../../lib/oclif";
-import { secretAsStringRule } from "./rules/secret-as-string";
-import { secretValueRule } from "./rules/secret-value";
-import { valueTypeRule } from "./rules/value-type";
-import { variableNameArg } from "../args/name";
+import { variableNameArg } from "../name";
 import { dryRunResult } from "../../../lib/oclif/crud/shared";
 import {
   parseVariableValue,
@@ -27,9 +24,28 @@ import {
   variableReadScope,
   variableScope,
 } from "../../../lib/variables";
+import { type Refusal, refusalError } from "../../../lib/oclif/refusal";
 import { inShell, type SuggestedCommand } from "../../../lib/suggestion";
 import { Promptable } from "../../../lib/oclif/promptable";
 import { Tabulatable } from "../../../lib/oclif/tabulatable";
+
+/** How a secret asked to be stored as another type is refused. */
+const SECRET_AS_STRING_REFUSAL: Refusal = {
+  message: "A secret is stored as a string.",
+  hint: "Drop --as, or drop --secret for a non-credential number or boolean.",
+};
+
+/** How a secret given on the command line, where it would reach shell history, is refused. */
+const SECRET_VALUE_REFUSAL: Refusal = {
+  message: "A secret value is not given on the command line.",
+  hint: "Drop the value and pipe it in, or let the prompt ask for it.",
+};
+
+/** How a value that does not parse as the type `--as` names is refused. */
+const VALUE_TYPE_REFUSAL: Refusal = {
+  message: '"{value}" is not a valid {as} value.',
+  hint: "A boolean variable is exactly `true` or `false`, and a number is a JSON number such as 5, -1.5 or 1e3. Pass --as string to keep it as text.",
+};
 
 /**
  * `zitadel variable set NAME [VALUE]` — enter or replace one variable on the
@@ -74,21 +90,31 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
       default: false,
       description: "Store the value encrypted. It can be replaced later but never read back.",
     }),
-    as: Flags.string({
-      options: [...VARIABLE_TYPES],
+    as: Flags.option({
+      options: VARIABLE_TYPES,
       default: "string",
       description: "Store the value as this JSON type.",
-    }),
+    })(),
     preview: Flags.boolean({
       default: false,
       description: "Write the preview value alone, leaving the primary one as it is.",
     }),
   };
 
-  static override rules = [secretAsStringRule, secretValueRule, valueTypeRule];
-
   protected async execute({ args, flags }: Admitted<typeof VariableSet>): Promise<JsonEnvelope> {
-    const type = flags.as as VariableType;
+    const type = flags.as;
+    if (flags.secret && type !== "string") {
+      throw refusalError(SECRET_AS_STRING_REFUSAL, {});
+    }
+    if (flags.secret && args.value !== undefined) {
+      throw refusalError(SECRET_VALUE_REFUSAL, {});
+    }
+    if (args.value !== undefined && !parseVariableValue(args.value, type).ok) {
+      throw refusalError(VALUE_TYPE_REFUSAL, {
+        value: args.value,
+        as: type,
+      });
+    }
 
     const { client, projectId } = await this.connect();
     if (flags.preview && !flags.secret) {

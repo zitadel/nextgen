@@ -3,7 +3,6 @@ import { randomUUID } from "node:crypto";
 import { Command, Flags, type Interfaces } from "@oclif/core";
 
 import { byName, type ByName } from "./names";
-import { placeholdersOf, type Rule, type RuleView } from "./rules";
 import { nonBlankString, serverFlag } from "./flags";
 import { Interruptible } from "./interruptible";
 import consola from "consola";
@@ -30,7 +29,6 @@ import {
 } from "./command-telemetry";
 import type { CommandGroup } from "./groups";
 import { type NextSteps, nextStepsData, renderNextSteps } from "./next-steps";
-import { refusalError } from "./refusal";
 import type {
   CommandResult,
   ErrorEnvelope,
@@ -160,12 +158,6 @@ export abstract class BaseCommand extends Interruptible(Command) {
   /** How the run's context is resolved; see {@link toMeta}. */
   static meta: MetaOptions = {};
 
-  /**
-   * Rules between this command's flags and arguments, checked right after they
-   * parse. A command's rules follow those of every class it extends.
-   */
-  static rules: readonly Rule[] = [];
-
   /** Resolved context for the current invocation; set by {@link toMeta}. */
   protected meta: GlobalOptions = this.fallbackMeta();
 
@@ -250,20 +242,17 @@ export abstract class BaseCommand extends Interruptible(Command) {
 
   /**
    * The one lifecycle every command shares: parse the flags, resolve the
-   * context and check the command's rules, and only then hand the work to
-   * {@link execute}. A flag or argument reaching `execute` has already been
-   * refused if it was not one the command accepts.
+   * context, and only then hand the work to {@link execute}. A flag or
+   * argument reaching `execute` has already been refused if it was not one the
+   * command accepts; anything else a command needs settled, it settles on
+   * `execute`'s first lines.
    */
   async run(): Promise<JsonEnvelope> {
     return this.execute(await this.admit());
   }
 
-  /** The command's work, which receives only flags, arguments and findings that passed. */
+  /** The command's work, which receives the flags and arguments it accepts. */
   protected abstract execute(input: Admitted<typeof BaseCommand>): Promise<JsonEnvelope>;
-
-  protected suggestRefusal(command: string): SuggestedCommand {
-    return this.suggestUnscoped(command);
-  }
 
   private get command(): typeof BaseCommand {
     return this.ctor as typeof BaseCommand;
@@ -274,52 +263,12 @@ export abstract class BaseCommand extends Interruptible(Command) {
       throw asRaised(error);
     });
     const flags = byName(parsed.flags);
-    const args = byName(parsed.args);
     await this.toMeta(flags, this.command.meta);
-    const view = {
-      flags: {
-        ...flags,
-        json: this.jsonEnabled(),
-      },
-      args,
-      argv: parsed.argv.map(String),
-    };
-    this.refuseBrokenRules(view);
     return {
       flags,
-      args,
-      argv: view.argv,
+      args: byName(parsed.args),
+      argv: parsed.argv.map(String),
     } as Admitted<typeof BaseCommand>;
-  }
-
-  private everyRule(): Rule[] {
-    const rules: Rule[] = [];
-    for (
-      let current: object | null = this.command;
-      current !== null && current !== Function.prototype;
-      current = Object.getPrototypeOf(current)
-    ) {
-      if (Object.hasOwn(current, "rules")) {
-        rules.unshift(...(current as typeof BaseCommand).rules);
-      }
-    }
-    return rules;
-  }
-
-  private refuseBrokenRules(view: RuleView): void {
-    for (const rule of this.everyRule()) {
-      const outcome = rule.broken(view);
-      if (outcome) {
-        throw refusalError(
-          rule.refusal,
-          {
-            ...placeholdersOf(view),
-            ...(outcome === true ? {} : outcome),
-          },
-          (next) => this.suggestRefusal(next),
-        );
-      }
-    }
   }
 
   /**

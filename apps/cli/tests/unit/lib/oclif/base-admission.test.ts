@@ -2,7 +2,7 @@ import { Config, Flags } from "@oclif/core";
 import { describe, expect, it } from "vitest";
 
 import { type Admitted, BaseCommand } from "../../../../src/lib/oclif/base";
-import { excludes, needs, refuses } from "../../../../src/lib/oclif/rules";
+import { integerFlag } from "../../../../src/lib/oclif/flags";
 import type { JsonEnvelope } from "../../../../src/lib/oclif/types";
 import { cliPackageRoot } from "../../../helpers/oclif-build";
 
@@ -13,28 +13,18 @@ class Admission extends BaseCommand {
     resolveServer: false,
   };
 
-  static override flags = {
-    name: Flags.string({ default: "here" }),
-    image: Flags.string(),
-    runtime: Flags.string({ options: ["binary", "docker"] }),
-    follow: Flags.boolean(),
-  };
+  static override strict = false;
 
-  static override rules = [
-    needs(
-      "image",
-      {
-        runtime: "docker",
+  static override flags = {
+    "client-id": Flags.string(),
+    port: integerFlag({
+      min: 1,
+      max: 65_535,
+      refusal: {
+        message: "{value} is not a TCP port",
       },
-      {
-        message: "{image} needs --runtime docker",
-        hint: "Pass --runtime docker.",
-      },
-    ),
-    excludes("follow", "json", {
-      message: "Cannot follow with --json",
     }),
-  ];
+  };
 
   public received: Admitted<typeof Admission> | undefined;
 
@@ -52,71 +42,37 @@ function command(argv: string[]): Admission {
 }
 
 describe("the lifecycle every command shares", () => {
-  it("hands execute its parsed flags, read as code reads them", async () => {
-    const admitted = command(["--name", "api"]);
+  it("hands execute a flag read as code reads it, not as the command line spells it", async () => {
+    const admitted = command(["--client-id", "abc"]);
 
     await admitted.run();
 
-    expect(admitted.received?.flags.name).toBe("api");
+    expect(admitted.received?.flags.clientId).toBe("abc");
   });
 
   it("hands execute the positional words a non-strict command takes", async () => {
-    const admitted = command(["--name", "api"]);
+    const admitted = command(["one", "two"]);
 
     await admitted.run();
 
-    expect(admitted.received?.argv).toEqual([]);
+    expect(admitted.received?.argv).toEqual(["one", "two"]);
   });
 
-  it("refuses a broken rule with its message filled from the flags, before execute runs", async () => {
-    const admitted = command(["--image", "tag", "--runtime", "binary"]);
+  it("refuses a flag the command does not accept before execute runs", async () => {
+    const admitted = command(["--port", "0"]);
 
     await expect(admitted.run()).rejects.toMatchObject({
       code: "E_VALIDATION",
-      message: "tag needs --runtime docker",
-      hint: "Pass --runtime docker.",
+      message: "0 is not a TCP port",
     });
     expect(admitted.received).toBeUndefined();
   });
 
-  it("lets a rule read whether the run answers in JSON", async () => {
-    const admitted = command(["--follow", "--json"]);
+  it("puts back the message a flag raised, which oclif rewrites with its own prefix", async () => {
+    const admitted = command(["--port", "0"]);
 
     await expect(admitted.run()).rejects.toMatchObject({
-      code: "E_VALIDATION",
-      message: "Cannot follow with --json",
-    });
-  });
-});
-
-describe("what a rule can work out for its refusal", () => {
-  it("fills the refusal from the values the rule answers with", async () => {
-    class Worked extends BaseCommand {
-      static override meta = {
-        resolveServer: false,
-      };
-
-      static override rules = [
-        refuses(
-          () => {
-            return { problem: "it is wrong" };
-          },
-          {
-            message: "Not valid: {problem}",
-          },
-        ),
-      ];
-
-      protected async execute(): Promise<JsonEnvelope> {
-        return this.emit({
-          status: "ok",
-          data: {},
-        });
-      }
-    }
-
-    await expect(new Worked(["--no-telemetry"], config).run()).rejects.toMatchObject({
-      message: "Not valid: it is wrong",
+      message: "0 is not a TCP port",
     });
   });
 });

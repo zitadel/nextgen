@@ -15,7 +15,11 @@ import {
 import { BRANDING_FILE_SCHEMA_REF, META_SCHEMA_DIR } from "@zitadel/config/meta-schemas";
 
 import { BRANDING_DIR } from "../../lib/branding";
-import { BRANDING_DESIGN_INFO } from "../../lib/branding/designs";
+import {
+  BRANDING_DESIGN_INFO,
+  PAGE_LAYOUT_HINT,
+  RETIRED_BRANDING_DESIGNS,
+} from "../../lib/branding/designs";
 import { isErrno, ZitadelError } from "../../lib/errors";
 import { stableStringify } from "../../lib/json";
 import {
@@ -25,11 +29,16 @@ import {
   type JsonEnvelope,
   nonBlankString,
 } from "../../lib/oclif";
-import { retiredDesignRule } from "./rules/retired-design";
-import { unknownDesignRule } from "./rules/unknown-design";
-import { isBrandingDesign } from "./design-catalog";
 import { hasZitadelConfig } from "../../lib/project";
 import { type Refusal, refusalError } from "../../lib/oclif/refusal";
+import { metaSchemaState, projectMetaSchemas } from "../../lib/meta-schemas";
+import { normalizePublicCliProse } from "../../lib/public-cli";
+import { DEPLOY_ARGS } from "../../lib/release";
+import { Promptable } from "../../lib/oclif/promptable";
+import type { BrandingDesign } from "@zitadel/config/defaults";
+
+/** The shipped designs, as a list for a hint to offer. */
+const DESIGN_CATALOG = BRANDING_DESIGNS.join(", ");
 
 /** How a directory that `setup` has not made a project is refused. */
 const NOT_A_PROJECT_REFUSAL: Refusal = {
@@ -37,10 +46,33 @@ const NOT_A_PROJECT_REFUSAL: Refusal = {
   hint: "Run setup first; branding files live under .zitadel/.",
   next: ["setup"],
 };
-import { metaSchemaState, projectMetaSchemas } from "../../lib/meta-schemas";
-import { normalizePublicCliProse } from "../../lib/public-cli";
-import { DEPLOY_ARGS } from "../../lib/release";
-import { Promptable } from "../../lib/oclif/promptable";
+
+/**
+ * How a `--design` the eject catalog used to ship is refused, by name, with a
+ * pointer to where page layout lives now, so scripts and agents that learned
+ * `--design split` get an actionable error instead of oclif's generic one.
+ */
+const RETIRED_DESIGN_REFUSAL: Refusal = {
+  message: "The {design} design was retired: it was page layout, not widget structure",
+  hint: `${PAGE_LAYOUT_HINT} To own the widget's structure, eject one of: ${DESIGN_CATALOG}.`,
+  next: ["branding eject --design centered"],
+};
+
+/** How a `--design` that names no design, retired or shipped, is refused. */
+const UNKNOWN_DESIGN_REFUSAL: Refusal = {
+  message: 'Unknown design "{design}"',
+  hint: `Pick one of: ${DESIGN_CATALOG}.`,
+};
+
+/** Whether `value` names a design the CLI ships. */
+function isBrandingDesign(value: string): value is BrandingDesign {
+  return (BRANDING_DESIGNS as readonly string[]).includes(value);
+}
+
+/** Whether `value` names a design the CLI used to ship and retired. */
+function isRetiredDesign(value: string): boolean {
+  return (RETIRED_BRANDING_DESIGNS as readonly string[]).includes(value);
+}
 
 /**
  * The `branding eject` command — take ownership of the login template.
@@ -60,9 +92,9 @@ export default class BrandingEject extends Promptable(BaseCommand) {
   static override group = CommandGroups.configuration;
   static override flags = {
     force: Flags.boolean({ char: "f", description: "Overwrite an existing branding file." }),
-    // No oclif `options`: the retired designs (#1039) must reach
-    // brandingDesignRules to get their targeted error instead of oclif's
-    // generic "expected one of".
+    // No oclif `options`: a retired design (#1039) must reach the checks in
+    // `execute` to get its targeted error instead of oclif's generic
+    // "expected one of".
     design: nonBlankString({
       description: `Design to start from: ${BRANDING_DESIGNS.join(" or ")} (default: ${DEFAULT_BRANDING_DESIGN}).`,
     }),
@@ -72,19 +104,30 @@ export default class BrandingEject extends Promptable(BaseCommand) {
     resolveServer: false,
   };
 
-  static override rules = [retiredDesignRule, unknownDesignRule];
-
   protected async execute({ flags }: Admitted<typeof BrandingEject>): Promise<JsonEnvelope> {
-    if (!(await hasZitadelConfig(this.cwd))) {
-      throw refusalError(NOT_A_PROJECT_REFUSAL, {}, (next) => {
-        return this.suggestUnscoped(next);
+    const suggest = (next: string) => {
+      return this.suggestUnscoped(next);
+    };
+    if (flags.design !== undefined && isRetiredDesign(flags.design)) {
+      throw refusalError(
+        RETIRED_DESIGN_REFUSAL,
+        {
+          design: flags.design,
+        },
+        suggest,
+      );
+    }
+    if (flags.design !== undefined && !isBrandingDesign(flags.design)) {
+      throw refusalError(UNKNOWN_DESIGN_REFUSAL, {
+        design: flags.design,
       });
     }
-    // The design rules have already refused one that is not a design, so a
-    // value that survives them is either a design or absent, and absent is
-    // asked for.
-    const requested =
-      flags.design !== undefined && isBrandingDesign(flags.design) ? flags.design : undefined;
+    if (!(await hasZitadelConfig(this.cwd))) {
+      throw refusalError(NOT_A_PROJECT_REFUSAL, {}, suggest);
+    }
+    // The checks above refused one that is not a design, so a value that got
+    // here is either a design or absent, and absent is asked for.
+    const requested = flags.design;
     const design = requested ?? (await this.promptDesign(this.nonInteractive));
     this.recordTelemetry({ design, force: this.force });
     const { branding, template } = getDefaultBrandingConfig(design);

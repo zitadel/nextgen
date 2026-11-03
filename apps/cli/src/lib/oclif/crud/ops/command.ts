@@ -3,7 +3,6 @@ import type { Command, Interfaces } from "@oclif/core";
 import { ZitadelError } from "../../../errors";
 import { EnvironmentCommand } from "../../environment-command";
 import type { Admitted, BaseCommand } from "../../base";
-import type { Rule } from "../../rules";
 import type { CommandResult, JsonEnvelope } from "../../types";
 import type { Json, ResourceCommandOptions, ResourceDescriptor } from "../types";
 import { Destructive } from "../../destructive";
@@ -23,7 +22,6 @@ export type OperationStatics = Readonly<{
   examples: readonly string[];
   flags: Interfaces.FlagInput;
   args: Interfaces.ArgInput;
-  rules?: readonly Rule[];
 }>;
 
 /**
@@ -112,7 +110,6 @@ export const bindOperation = <Ctx, Spec>(
     static override examples = [...statics.examples];
     static override flags = statics.flags;
     static override args = statics.args;
-    static override rules: readonly Rule[] = statics.rules ?? [];
     static override group = definition.resource.group;
     static override groupOrder = definition.resource.groupOrder;
   };
