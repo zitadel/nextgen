@@ -122,7 +122,9 @@ func (r *RuntimeResolver) resolve(ctx context.Context, projectID, origin string)
 	if err != nil {
 		return nil, err
 	}
-	if matched.miss == missDefault {
+	// The console's own origin, where the project lists none, is served the
+	// default; every other admitted origin its own target.
+	if matched.pattern == "" && r.isOwnOrigin(matched.origin) {
 		return r.resolutionForDefault(ctx, project, matched.origin)
 	}
 
@@ -181,25 +183,12 @@ func (r *RuntimeResolver) deploymentOf(ctx context.Context, projectID string, ma
 	return dep, nil
 }
 
-// missKind is where an admitted origin looks for its deployment.
-type missKind uint8
-
-const (
-	// missNotDeployed is a listed origin, a loopback origin, or a live preview:
-	// its own target, refused when nothing is deployed there.
-	missNotDeployed missKind = iota
-	// missDefault is a console host the project does not list.
-	missDefault
-)
-
 // matchedOrigin is an origin the gate admitted: the normalized request
-// origin, the project origin pattern that matched it (empty when the
-// admission was not a stored pattern), and whether a preview row admitted it.
+// origin and the project origin pattern that matched it, empty when the
+// project lists none.
 type matchedOrigin struct {
 	origin  string
 	pattern string
-	preview bool
-	miss    missKind
 }
 
 // gateOpening is Gate for the request that opens an attempt, which also
@@ -212,10 +201,6 @@ type matchedOrigin struct {
 func (r *RuntimeResolver) gateOpening(ctx context.Context, project *domain.Project, origin string) (*matchedOrigin, error) {
 	matched, err := r.Gate(ctx, project, origin)
 	if err == nil {
-		// Gate admits every loopback origin, the console's on a local server too.
-		if matched != nil && matched.pattern == "" && r.isOwnOrigin(origin) {
-			matched.miss = missDefault
-		}
 		return matched, nil
 	}
 	if !r.isOwnOrigin(origin) || !errors.Is(err, domain.ErrProjectOriginNotAllowed(nil)) {
@@ -225,7 +210,7 @@ func (r *RuntimeResolver) gateOpening(ctx context.Context, project *domain.Proje
 	if normErr != nil {
 		return nil, err
 	}
-	return &matchedOrigin{origin: normalized, miss: missDefault}, nil
+	return &matchedOrigin{origin: normalized}, nil
 }
 
 func (r *RuntimeResolver) isOwnOrigin(origin string) bool {
@@ -241,8 +226,9 @@ func (r *RuntimeResolver) isOwnOrigin(origin string) bool {
 
 // Gate decides whether a request from origin may be served at all. An absent
 // origin is not a browser and passes with no match. An empty origin list
-// admits nothing. A loopback origin is always admitted. A preview pattern
-// admits nothing by itself: the preview row for the exact URL does.
+// admits nothing. A loopback origin is always admitted, with the pattern that
+// lists it if any. A preview pattern admits nothing else by itself: the
+// preview row for the exact URL does.
 func (r *RuntimeResolver) Gate(ctx context.Context, project *domain.Project, origin string) (*matchedOrigin, error) {
 	origin = strings.TrimSpace(origin)
 	if origin == "" {
@@ -255,7 +241,7 @@ func (r *RuntimeResolver) Gate(ctx context.Context, project *domain.Project, ori
 	}
 	entry, ok := domain.MatchOrigin(project.Origins, normalized)
 	if domain.IsLoopbackOrigin(normalized) {
-		if ok && entry.Kind == domain.OriginKindPrimary {
+		if ok {
 			return &matchedOrigin{origin: normalized, pattern: entry.Pattern}, nil
 		}
 		return &matchedOrigin{origin: normalized}, nil
@@ -279,7 +265,7 @@ func (r *RuntimeResolver) Gate(ctx context.Context, project *domain.Project, ori
 		return nil, domain.ErrProjectPreviewNotLive(map[string]string{"origin": normalized}).
 			WithMessage("no live preview for " + normalized + "; run zitadel preview on this branch")
 	}
-	return &matchedOrigin{origin: normalized, pattern: entry.Pattern, preview: true}, nil
+	return &matchedOrigin{origin: normalized, pattern: entry.Pattern}, nil
 }
 
 type runtimeResolutionKey struct{}
