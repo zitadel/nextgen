@@ -37,6 +37,9 @@ export interface PlatformMock {
   /** Holds a user with a linked sign-in provider on a schema no flow serves. */
   holdsASsoUserOnAnotherSchema(): void;
 
+  /** Holds a user on a schema no flow serves whose provider links cannot be read. */
+  holdsAUserWhoseLinksCannotBeRead(): void;
+
   /** Makes the project's users unreadable while everything else answers. */
   cannotQueryUsers(): void;
 
@@ -179,6 +182,15 @@ export function usePlatformMock(): PlatformMock {
               { id: "link_1", connection_id: "idp_1", created_at: "2026-01-01T00:00:00Z" },
             ],
           }),
+        ),
+      );
+    },
+
+    holdsAUserWhoseLinksCannotBeRead() {
+      holdUsers([], [{ id: "user_2", schema: "sch_2", attributes: {} }]);
+      server.use(
+        http.get("*/users/:id/identity_links", () =>
+          HttpResponse.json({ code: "internal", message: "boom" }, { status: 500 }),
         ),
       );
     },

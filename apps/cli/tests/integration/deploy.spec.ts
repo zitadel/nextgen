@@ -205,6 +205,18 @@ describe("deploy", () => {
         expect(app.envelopeOf(result).warnings?.join("\n")).toContain("has an SSO link");
       });
 
+      it("says it could not finish when the provider links cannot be read", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        platform.holdsAUserWhoseLinksCannotBeRead();
+
+        const result = await app.deployDryRun();
+
+        expect(app.envelopeOf(result).warnings?.join("\n")).toContain(
+          "Could not finish checking existing users",
+        );
+      });
+
       it("still deploys when the users cannot be read", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin();

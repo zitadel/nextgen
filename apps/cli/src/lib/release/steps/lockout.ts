@@ -20,8 +20,14 @@ type Flow = { schema: string; identifier?: string };
  * and whether a request failed.
  */
 type Scan = { warnings: string[]; partial: string[]; failed: boolean };
-/** The schema names by id, or nothing when the listing could not be read. */
-type Names = () => Promise<ReadonlyMap<string, string> | undefined>;
+/** A schema as the project lists it: its object type and designated identifier. */
+type SchemaInfo = { objectType: string; identifier?: string };
+/** The project's schemas by id, or nothing when the listing could not be read. */
+type Names = () => Promise<ReadonlyMap<string, SchemaInfo> | undefined>;
+/** A scan with nothing to report. */
+const nothing = (): Scan => ({ warnings: [], partial: [], failed: false });
+/** What stranded users are counted under when their schema could not be named. */
+const UNNAMED = "";
 
 /**
  * Warn when this deploy leaves users who exist today unable to sign in. A
@@ -58,7 +64,7 @@ export const lockoutStep: Step = {
 async function lockoutWarnings(ctx: StepContext): Promise<string[]> {
   // Names are only needed for flows that name a schema by id and for the SSO
   // warning, so they are read on first use, and a failed read costs the names.
-  let listed: Promise<ReadonlyMap<string, string> | undefined> | undefined;
+  let listed: Promise<ReadonlyMap<string, SchemaInfo> | undefined> | undefined;
   const names: Names = () => {
     listed ??= objectTypes(ctx).catch(() => undefined);
     return listed;
@@ -74,9 +80,7 @@ async function lockoutWarnings(ctx: StepContext): Promise<string[]> {
   const settled = await Promise.allSettled([
     lookupWarnings(ctx, flows, share),
     // With a flow whose schema is unknown, "a schema no flow serves" cannot be told.
-    unresolved || unreadable
-      ? { warnings: [], partial: [], failed: false }
-      : ssoWarnings(ctx, flows, names, share),
+    unresolved || unreadable ? nothing() : ssoWarnings(ctx, flows, names, share),
   ]);
   const scans = settled.flatMap((outcome) =>
     outcome.status === "fulfilled" ? [outcome.value] : [],
@@ -101,7 +105,7 @@ async function lockoutWarnings(ctx: StepContext): Promise<string[]> {
   const partial = scans.flatMap((scan) => scan.partial);
   if (partial.length > 0) {
     notes.push(
-      `Checked only some of the users of ${partial.map(quote).join(", ")} for sign-in lockouts (the read limit was reached), so a clean result is not proof.`,
+      `Checked only some of the users of ${partial.join(", ")} for sign-in lockouts (the read limit was reached), so a clean result is not proof.`,
     );
   }
   return [...scans.flatMap((scan) => scan.warnings), ...notes];
@@ -141,7 +145,8 @@ async function servedFlows(
     const ref = flow.user_schema;
     const known = objectTypes.has(ref) ? ref : byId.get(ref);
     const listing = known === undefined ? await names() : undefined;
-    const schema = known ?? listing?.get(ref);
+    const listed = listing?.get(ref);
+    const schema = known ?? listed?.objectType;
     if (schema === undefined) {
       // Without the listing it is not known whether the schema exists.
       unreadable ||= known === undefined && listing === undefined;
@@ -150,7 +155,7 @@ async function servedFlows(
     }
     // Only the schema's designated identifier performs a lookup, and only when
     // a step on the login path collects it.
-    const identifier = designated.get(schema);
+    const identifier = designated.get(schema) ?? listed?.identifier;
     const looksUp = identifier !== undefined && loginPathFields(flow).has(identifier);
     flows.push({ schema, ...(looksUp ? { identifier } : {}) });
   }
@@ -182,7 +187,7 @@ async function lookupWarnings(
         );
         const missing = users.filter((user) => !carries(user, identifier));
         if (missing.length === 0) {
-          return { warnings: [], partial: truncated ? [objectType] : [], failed: false };
+          return { warnings: [], partial: truncated ? [quote(objectType)] : [], failed: false };
         }
         return {
           warnings: [
@@ -213,7 +218,7 @@ async function ssoWarnings(
 ): Promise<Scan> {
   const served = [...new Set(flows.map((flow) => flow.schema))];
   if (served.length === 0) {
-    return { warnings: [], partial: [], failed: false };
+    return nothing();
   }
   const read = await readUsers(
     ctx,
@@ -226,6 +231,7 @@ async function ssoWarnings(
   const truncated = read.truncated || read.users.length > LINK_CHECKS;
   // Its own boundary: a link read that fails (a user deleted since the query)
   // must not discard the other warnings.
+  let failed = false;
   const hasLink = await mapBounded(stranded, CONCURRENCY, async (user) => {
     try {
       const { identity_links: links } = await ctx.client.listUserIdentityLinks(user.id, {
@@ -233,6 +239,7 @@ async function ssoWarnings(
       });
       return links.length > 0;
     } catch {
+      failed = true;
       return false;
     }
   });
@@ -243,17 +250,17 @@ async function ssoWarnings(
     if (!hasLink[index]) {
       return;
     }
-    const name = nameOf?.get(user.schema) ?? user.schema;
+    const name = nameOf?.get(user.schema)?.objectType ?? UNNAMED;
     linked.set(name, (linked.get(name) ?? 0) + 1);
   });
-  const warnings = [...linked].map(
-    ([name, total]) =>
-      `${count(total, truncated)} existing ${plural(total, "user")} of ${quote(name)} ${total === 1 ? "has" : "have"} an SSO link, but no flow in this release uses that schema, so they cannot sign in with SSO. Passkey sign-in is not affected. Users cannot move between schemas, so keep or restore a flow on ${quote(name)}.`,
-  );
+  const warnings = [...linked].map(([name, total]) => {
+    const label = name === UNNAMED ? "schemas whose names could not be read" : quote(name);
+    return `${count(total, truncated)} existing ${plural(total, "user")} of ${label} ${total === 1 ? "has" : "have"} an SSO link, but no flow in this release uses that schema, so they cannot sign in with SSO. Passkey sign-in is not affected. Users cannot move between schemas, so keep or restore a flow on ${label}.`;
+  });
   return {
     warnings,
-    partial: truncated && warnings.length === 0 ? ["schemas without a flow"] : [],
-    failed: false,
+    partial: truncated && warnings.length === 0 ? ["the schemas no flow serves"] : [],
+    failed,
   };
 }
 
@@ -347,14 +354,18 @@ function carries(user: QueriedUser, path: string): boolean {
   return node !== undefined && node !== null && node !== "";
 }
 
-/** Each schema's URL against its object type, to name it as the files do. */
-async function objectTypes(ctx: StepContext): Promise<Map<string, string>> {
-  const names = new Map<string, string>();
+/** Each schema revision's id against its object type and designated identifier. */
+async function objectTypes(ctx: StepContext): Promise<Map<string, SchemaInfo>> {
+  const names = new Map<string, SchemaInfo>();
   const listed = await ctx.client.listSchemas.all({ project_id: ctx.projectId });
   for (const entry of listed) {
-    const objectType = (entry.schema as { objectType?: unknown } | undefined)?.objectType;
-    if (typeof objectType === "string") {
-      names.set(entry.id, objectType);
+    const document = entry.schema as { objectType?: unknown; "x-identifier"?: unknown } | undefined;
+    if (typeof document?.objectType === "string") {
+      const identifier = document["x-identifier"];
+      names.set(entry.id, {
+        objectType: document.objectType,
+        ...(typeof identifier === "string" && identifier !== "" ? { identifier } : {}),
+      });
     }
   }
   return names;

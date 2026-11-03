@@ -24,6 +24,8 @@ function ctx(options: {
   failNotEquals?: boolean;
   endlessEmptyPages?: boolean;
   failFor?: string;
+  failLinks?: boolean;
+  listing?: Array<{ id: string; schema: Record<string, unknown> }>;
   listed?: number[];
 }): StepContext {
   return {
@@ -62,14 +64,22 @@ function ctx(options: {
             start + users.length < matching.length ? String(start + users.length) : null,
         };
       },
-      listUserIdentityLinks: async (id: string) => ({
-        identity_links: Array.from({ length: options.links?.[id] ?? 0 }, () => ({})),
-      }),
+      listUserIdentityLinks: async (id: string) => {
+        if (options.failLinks) {
+          throw new Error("forbidden");
+        }
+        return {
+          identity_links: Array.from({ length: options.links?.[id] ?? 0 }, () => ({})),
+        };
+      },
       listSchemas: {
         all: async () => {
           options.listed?.push(1);
           if (options.failListSchemas) {
             throw new Error("forbidden");
+          }
+          if (options.listing) {
+            return options.listing;
           }
           return [
             { id: HUMAN, schema: { objectType: "human-user" } },
@@ -467,7 +477,9 @@ describe("lockoutStep", () => {
       }),
     );
 
-    expect(takeReportedWarnings()[0]).toContain("Checked only some of the users of");
+    expect(takeReportedWarnings()[0]).toContain(
+      "Checked only some of the users of the schemas no flow serves",
+    );
   });
 
   it("counts linked users among the first stranded ones", async () => {
@@ -556,6 +568,51 @@ describe("lockoutStep", () => {
     );
 
     expect(takeReportedWarnings()[0]).toContain("the project's schemas could not be read");
+  });
+
+  it("reports failed identity-link reads instead of counting the users as unlinked", async () => {
+    await lockoutStep.run(
+      ctx({
+        schemas: [{ objectType: "employee" }],
+        flows: [flow("employee")],
+        users: [user("u1", "human-user")],
+        links: { u1: 1 },
+        failLinks: true,
+      }),
+    );
+
+    expect(takeReportedWarnings()).toEqual([
+      expect.stringContaining("Could not finish checking existing users"),
+    ]);
+  });
+
+  it("checks the identifier of a schema that is only in the project's listing", async () => {
+    await lockoutStep.run(
+      ctx({
+        schemas: [],
+        flows: [flow(HUMAN)],
+        users: [user("u1", "human-user", {})],
+        listing: [{ id: HUMAN, schema: { objectType: "human-user", "x-identifier": "email" } }],
+      }),
+    );
+
+    expect(takeReportedWarnings()[0]).toContain('has no "email"');
+  });
+
+  it("counts users together, without schema ids, when their schemas cannot be named", async () => {
+    await lockoutStep.run(
+      ctx({
+        schemas: [{ objectType: "employee" }],
+        flows: [flow("employee")],
+        users: [user("u1", "human-user"), user("u2", "human-user")],
+        links: { u1: 1, u2: 1 },
+        failListSchemas: true,
+      }),
+    );
+
+    const warnings = takeReportedWarnings();
+    expect(warnings[0]).toContain("2 existing users of schemas whose names could not be read");
+    expect(warnings[0]).not.toContain(HUMAN);
   });
 
   it("never fails the deploy when users cannot be read", async () => {
