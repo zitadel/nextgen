@@ -1,7 +1,7 @@
 import { Cmd } from "../../../lib/cmd";
-import { DEPLOY_ARGS, type EnvironmentBinding, type PlatformVariable } from "../../../lib/backend";
+import type { EnvironmentBinding, PlatformVariable } from "../../../lib/backend";
 import type { InitialDeployment } from "../../../lib/environment";
-import { type EnvironmentSelector, projectCommand } from "../../../lib/suggestion";
+import { DEPLOY_ARGS, type EnvironmentSelector, projectCommand } from "../../../lib/suggestion";
 
 /** What a finished `env add` reports: the binding, and the deployment made for it if any. */
 export type BindingReport = Readonly<{

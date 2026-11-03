@@ -14,6 +14,13 @@ declare const suggestedCommand: unique symbol;
  * string does not typecheck where a suggestion is expected, so forgetting the
  * selector means choosing {@link unscopedCommand} by name, not by accident.
  */
+/**
+ * The arguments of a suggested publish. A non-interactive `deploy` with no
+ * message to fall back on refuses to run without `-m`, so a suggested deploy
+ * carries one for the reader to fill in.
+ */
+export const DEPLOY_ARGS = "deploy -m '<what changed>'";
+
 export type SuggestedCommand = string & { readonly [suggestedCommand]: true };
 
 declare const environmentSelector: unique symbol;

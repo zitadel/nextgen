@@ -42,7 +42,7 @@ import {
   type SuggestedCommand,
   unscopedCommand,
 } from "../lib/suggestion";
-import { DEPLOY_ARGS } from "../lib/backend";
+import { DEPLOY_ARGS } from "../lib/suggestion";
 
 /**
  * `zitadel status` — summarize the local server and project state.

@@ -1,10 +1,27 @@
-import type { GetVariables200 } from "@zitadel/api/generated/model";
+import type { GetVariable200, GetVariables200 } from "@zitadel/api/generated/model";
 import { ApiError } from "@zitadel/api/runtime/fetch";
 
 import { escapeControlCharacters, type ZitadelClient } from "../api-client";
 import type { Consent } from "../consent";
 import { ZitadelError } from "../errors";
-import { valuesOfKind, type VariableKind, type VariableValue } from "../variables";
+
+/** The kinds of value a name can hold: what primary deploys freeze, and what preview deploys freeze. */
+export type VariableKind = "primary" | "preview";
+
+/** One value on the wire: a bare scalar, or `{"secret": true}` for a secret. */
+export type VariableValue = NonNullable<GetVariable200["primary"]>;
+
+/** The values of one kind in a read, keyed by name. */
+export function valuesOfKind(
+  body: GetVariables200,
+  kind: VariableKind,
+): Record<string, VariableValue> {
+  return Object.fromEntries(
+    Object.entries(body).flatMap(([name, byKind]) =>
+      byKind[kind] === undefined ? [] : [[name, byKind[kind]]],
+    ),
+  );
+}
 
 type Scalar = string | number | boolean;
 

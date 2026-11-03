@@ -1,24 +1,4 @@
-import type { GetVariable200, GetVariables200 } from "@zitadel/api/generated/model";
-
 import type { Parsed } from "@zitadel/config/idp";
-
-/** The kinds of value a name can hold: what primary deploys freeze, and what preview deploys freeze. */
-export type VariableKind = "primary" | "preview";
-
-/** One value on the wire: a bare scalar, or `{"secret": true}` for a secret. */
-export type VariableValue = NonNullable<GetVariable200["primary"]>;
-
-/** The values of one kind in a read, keyed by name. */
-export function valuesOfKind(
-  body: GetVariables200,
-  kind: VariableKind,
-): Record<string, VariableValue> {
-  return Object.fromEntries(
-    Object.entries(body).flatMap(([name, byKind]) =>
-      byKind[kind] === undefined ? [] : [[name, byKind[kind]]],
-    ),
-  );
-}
 
 /**
  * The scalar types a variable can hold — the API's JSON scalars (ADR 062 §1).

@@ -1,6 +1,6 @@
 import { publicCliCommand } from "./public-cli";
 import { type EnvironmentSelector, projectCommand } from "./suggestion";
-import { DEPLOY_ARGS } from "./backend";
+import { DEPLOY_ARGS } from "./suggestion";
 
 /**
  * Guidance copy that commands share, so the story doesn't fork; most of it is

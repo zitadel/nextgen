@@ -16,7 +16,8 @@ import {
   EnvironmentCommand,
   type JsonEnvelope,
 } from "../../lib/oclif";
-import { DEPLOY_ARGS, DeploymentService, ReleaseService } from "../../lib/backend";
+import { DeploymentService, ReleaseService } from "../../lib/backend";
+import { DEPLOY_ARGS } from "../../lib/suggestion";
 import { writeBackResource } from "../../lib/sync";
 import { SCHEMAS_DIR } from "../../lib/user-schema";
 import { type Refused, taken } from "../../lib/oclif/flags";

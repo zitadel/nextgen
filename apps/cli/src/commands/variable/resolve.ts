@@ -1,8 +1,8 @@
 import type { ZitadelClient } from "../../lib/api-client";
 import { Cmd } from "../../lib/cmd";
 import { ZitadelError } from "../../lib/errors";
-import { DEPLOY_ARGS, DeploymentService, OriginService } from "../../lib/backend";
-import type { SuggestedCommand } from "../../lib/suggestion";
+import { DeploymentService, OriginService } from "../../lib/backend";
+import { DEPLOY_ARGS, type SuggestedCommand } from "../../lib/suggestion";
 
 import {
   type Admitted,

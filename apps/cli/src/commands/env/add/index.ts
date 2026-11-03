@@ -14,7 +14,7 @@ import {
 } from "../../../lib/environment";
 import { toZitadelError } from "../../../lib/errors";
 import { isObject } from "../../../lib/json";
-import { DEPLOY_ARGS, EnvironmentService, ProjectService } from "../../../lib/backend";
+import { EnvironmentService, ProjectService } from "../../../lib/backend";
 import { describeBinding } from "./result";
 import { reportWarning } from "../../../lib/warnings";
 import {
@@ -29,7 +29,7 @@ import { readZitadelConfig } from "../../../lib/project";
 import { DEFAULT_SERVER, parseServer, resolveServer } from "../../../lib/server";
 import { Cmd } from "../../../lib/cmd";
 import { environmentSelectorSuffix, projectEnvFile } from "../../../lib/oclif/environment-flags";
-import { type EnvironmentSelector, projectCommand } from "../../../lib/suggestion";
+import { DEPLOY_ARGS, type EnvironmentSelector, projectCommand } from "../../../lib/suggestion";
 import { Promptable } from "../../../lib/oclif/promptable";
 import { reads, type Refused, taken } from "../../../lib/oclif/flags";
 import { interpolate, type Refusal, refusalError } from "../../../lib/oclif/refusal";

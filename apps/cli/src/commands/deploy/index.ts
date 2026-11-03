@@ -6,7 +6,6 @@ import {
   type JsonEnvelope,
 } from "../../lib/oclif";
 import {
-  DEPLOY_ARGS,
   DeploymentService,
   OriginService,
   ReleaseService,
@@ -25,7 +24,7 @@ import { type Refusal, refusalError } from "../../lib/oclif/refusal";
 import { issuerHeldAsPreview, originOf, type ProjectOrigin } from "../../lib/origins";
 import { readZitadelSecret } from "../../lib/project";
 import { deployMessage, MESSAGE_MAX_LENGTH, messageTooLong } from "../../lib/publish";
-import type { SuggestedCommand } from "../../lib/suggestion";
+import { DEPLOY_ARGS, type SuggestedCommand } from "../../lib/suggestion";
 import { reportWarning } from "../../lib/warnings";
 
 /** How a non-interactive deploy with no message to fall back on is refused. */

@@ -1,8 +1,11 @@
 /**
- * The publish pipeline: build a release bundle from `.zitadel/`, run the steps
- * that prepare and check it, create the release, and deploy it. Each noun of the
- * backend is a service bound to one project — {@link ReleaseService},
- * {@link DeploymentService}, {@link OriginService}. `deploy` and `preview` are thin compositions of these.
+ * The backend: one service per noun of the Zitadel API, each bound to a project
+ * and each returning immutable values. A command asks a service for what it
+ * wants and never reaches the generated client itself.
+ *
+ * Nothing in this module reads the disk, prints, or knows the command line. It
+ * depends on the API client, the consent a destructive call needs, and the
+ * error type, and on nothing else under `lib/`.
  */
 export {
   ReleaseService,
@@ -50,10 +53,3 @@ export {
   type OriginRemoval,
   type ProjectOriginEntry,
 } from "./origin-service";
-
-/**
- * The arguments of a suggested publish. A non-interactive `deploy` with no
- * message to fall back on refuses to run without `-m`, so a suggested deploy
- * carries one for the reader to fill in.
- */
-export const DEPLOY_ARGS = "deploy -m '<what changed>'";
