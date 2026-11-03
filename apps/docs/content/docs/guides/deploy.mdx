@@ -6,64 +6,18 @@ description: Build a release from local Zitadel configuration and deploy it.
 `.zitadel/schemas/*.json`, `.zitadel/flows/*.json` and `.zitadel/branding/` are the source of truth for your project's user schemas, login flows and branding. Edit them, then publish with `deploy`: it builds the files into one immutable release and makes that release live on your project's origins.
 
 ```sh
-npx @zitadel/cli@alpha deploy
+npx @zitadel/cli@latest deploy
 ```
 
 `deploy` validates the configuration, shows a git diff of `.zitadel/` against the release that is live now, creates the release, and deploys it to every primary origin. `--dry-run` stops after the diff and writes nothing:
 
 ```sh
-npx @zitadel/cli@alpha deploy --dry-run
+npx @zitadel/cli@latest deploy --dry-run
 ```
 
 A release carries a content digest, so re-running `deploy` on unchanged configuration returns the same release and changes nothing.
 
-## Walkthrough: add a field to registration
-
-Add an optional `company` property to `.zitadel/schemas/default-human-user.json`:
-
-```json
-"properties": {
-  "company": { "type": "string", "description": "Company name" }
-}
-```
-
-(Leave `required` untouched to keep the field optional.)
-
-Then let users enter it during registration — add `"company"` to the `register` step's `fields` in `.zitadel/flows/default-login.json`.
-
-Preview, then publish:
-
-```sh
-npx @zitadel/cli@alpha deploy --dry-run
-npx @zitadel/cli@alpha deploy
-```
-
-## Walkthrough: a second flow, selected by name
-
-Every file in `.zitadel/flows/` goes into the release, but the widget runs exactly one flow per sign-in — an extra flow needs a distinct `name` so the app can ask for it.
-
-Drop `.zitadel/flows/kiosk-login.json` next to the default flow. Same shape as `default-login.json` (start from a copy), with its own `name` and whatever steps the journey needs:
-
-```json
-{
-  "$schema": "../meta/flow-definition.json",
-  "name": "kiosk-login",
-  "status": "active",
-  "user_schema": "human-user",
-  "purposes": { "login": "identifier" },
-  "steps": [ "…copied from default-login.json, then edited…" ]
-}
-```
-
-Deploy it, then point the widget at it:
-
-```tsx
-<ZitadelLogin flowName="kiosk-login" />
-```
-
-(or `flow-name="kiosk-login"` on the plain `<zitadel-login>` element). An unknown name or a flow that doesn't serve the requested purpose surfaces as a startup error in the widget.
-
-Without `flowName`, the platform serves the newest active flow that has no `audience`. A flow scoped via `audience.app_ids` / `audience.team_ids` is selected only when the flow-start request's hints identify that app or team (app match beats team match) — it never captures the project default.
+[Edit the login flow](/docs/guides/edit-login-flow) walks through the common edits: a new field, the order of fields, a new step, and a second flow selected by name.
 
 ## Releases, deployments and rollback
 
@@ -90,7 +44,7 @@ Run `preview` on pull requests and `deploy` on pushes to the main branch:
 # Your hosting deploy, reporting the preview URL as an output named url.
 - id: host
   run: echo "url=https://your-preview.example.com" >> "$GITHUB_OUTPUT"
-- run: npx @zitadel/cli@alpha preview --origin "$PREVIEW_URL" --non-interactive --json
+- run: npx @zitadel/cli@latest preview --origin "$PREVIEW_URL" --non-interactive --json
   env:
     ZITADEL_ENV: preview
     ZITADEL_URL: ${{ vars.ZITADEL_URL }}
@@ -102,7 +56,7 @@ Run `preview` on pull requests and `deploy` on pushes to the main branch:
 - uses: actions/checkout@v4
   with:
     fetch-depth: 0
-- run: npx @zitadel/cli@alpha deploy --non-interactive --json
+- run: npx @zitadel/cli@latest deploy --non-interactive --json
   env:
     ZITADEL_ENV: production
     ZITADEL_URL: ${{ vars.ZITADEL_URL }}
@@ -127,8 +81,8 @@ Run `preview` on pull requests and `deploy` on pushes to the main branch:
 For agents:
 
 ```sh
-npx @zitadel/cli@alpha deploy --dry-run --non-interactive --json
-npx @zitadel/cli@alpha deploy -m "<message>" --non-interactive --json
+npx @zitadel/cli@latest deploy --dry-run --non-interactive --json
+npx @zitadel/cli@latest deploy -m "<message>" --non-interactive --json
 ```
 
 Under `--json`, both carry the diff the terminal shows in `data.diff`: `files` lists each changed file with its `status` and its `patch`, the file's part of the diff. `files` is `null` when there is nothing to diff against yet, such as before the first deploy, and `note` says why.
