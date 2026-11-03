@@ -215,14 +215,14 @@ func (s *signupProtection) Consume(ctx context.Context, state *domain.FlowState,
 	if err != nil {
 		return domain.ErrFlowProofInvalid()
 	}
-	now := s.now().Unix()
 	return s.db.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		st := tx.Statements()
 		// Same lock order as issuance/expiry cleanup and its project FK writes.
 		if err := st.LockProject(ctx, state.ProjectID); err != nil {
 			return err
 		}
-		consumed, err := st.ConsumeSignupChallenge(ctx, state.ProjectID, state.ID, record.ID, now)
+		// Waiting for the lock or retrying the transaction can outlast the proof.
+		consumed, err := st.ConsumeSignupChallenge(ctx, state.ProjectID, state.ID, record.ID, s.now().Unix())
 		if err != nil {
 			return err
 		}
