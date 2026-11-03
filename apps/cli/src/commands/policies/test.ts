@@ -4,7 +4,6 @@ import { ZitadelError } from "../../lib/errors";
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../../lib/oclif";
 import { POLICIES_DIR } from "../../lib/policies";
 import {
-  type PolicyUnderTest,
   policiesFromFiles,
   policiesFromRelease,
   readPolicyTests,
@@ -67,29 +66,27 @@ export default class PoliciesTest extends EnvironmentCommand {
     }
 
     const { client, projectId } = await this.connect();
-    let policies: Map<string, PolicyUnderTest>;
-    if (flags.release === undefined) {
-      const fromFiles = await policiesFromFiles(cwd, operations);
-      if (fromFiles.issues.length > 0) {
-        throw new ZitadelError("E_VALIDATION", "The policy files are not valid", {
-          details: { issues: fromFiles.issues },
-          hint: fromFiles.issues.join("\n"),
-        });
-      }
-      policies = fromFiles.policies;
-    } else {
-      const fromRelease = await policiesFromRelease(client, projectId, flags.release);
-      if (fromRelease.revoked) {
-        reportWarning(`Release ${flags.release} is revoked, so no origin serves its policies.`);
-      }
-      if (!fromRelease.pinsFlow) {
-        // TODO(#2331): drop once runtime reads follow every release's pins.
-        reportWarning(
-          `Release ${flags.release} pins no flow, so sign-ins served it use the newest policy revisions, not the ones tested here.`,
-        );
-      }
-      policies = fromRelease.policies;
+    const fromRelease =
+      flags.release === undefined
+        ? undefined
+        : await policiesFromRelease(client, projectId, flags.release);
+    if (fromRelease?.revoked) {
+      reportWarning(`Release ${flags.release} is revoked, so no origin serves its policies.`);
     }
+    if (fromRelease && !fromRelease.pinsFlow) {
+      // TODO(#2331): drop once runtime reads follow every release's pins.
+      reportWarning(
+        `Release ${flags.release} pins no flow, so sign-ins served it use the newest policy revisions, not the ones tested here.`,
+      );
+    }
+    const source = fromRelease ?? (await policiesFromFiles(cwd, operations));
+    if ("issues" in source && source.issues.length > 0) {
+      throw new ZitadelError("E_VALIDATION", "The policy files are not valid", {
+        details: { issues: source.issues },
+        hint: source.issues.join("\n"),
+      });
+    }
+    const policies = source.policies;
 
     const results = await runPolicyTests(client, projectId, suites, policies);
     const cases = results.flatMap((result) => result.cases);

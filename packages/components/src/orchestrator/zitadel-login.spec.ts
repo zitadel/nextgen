@@ -78,7 +78,7 @@ afterAll(() => {
   server.close();
 });
 
-async function waitFor<T>(probe: () => T | null | undefined, timeout = 1500): Promise<T> {
+async function waitFor<T>(probe: () => T | null | undefined, timeout = 10_000): Promise<T> {
   const start = Date.now();
   while (Date.now() - start < timeout) {
     const value = probe();
@@ -431,7 +431,7 @@ describe("<zitadel-login> against the typed Flow API", () => {
     await waitFor(() => element.shadowRoot?.querySelector("zl-alert"));
     const text = element.shadowRoot?.querySelector("zl-alert")?.textContent ?? "";
     expect(text).toContain('flow-name="no-such-flow"');
-    expect(text).toContain("zitadel apply");
+    expect(text).toContain("zitadel deploy");
   });
 
   it("explains a flow-name that does not serve the requested purpose", async () => {

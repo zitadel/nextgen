@@ -38,7 +38,7 @@ workflow, not the task graph.
 |---|---|---|
 | Task graph | root `turbo.json`, 26 package `turbo.json` files (`"extends": ["//"]`) | Every moon task, with the same dependency edges. The root file holds the shared task shapes (moon's `.moon/tasks/*.yml`); each package file adds only what differs, which turbo merges field by field. |
 | Scripts as the task contract | 30 `package.json` files | Every task runs a `package.json` script: `lint` scripts for the 26 TypeScript packages, the Go server's 13 tasks as scripts in `apps/server/package.json`, 16 `build-release` scripts, the e2e lanes with the environment moon used to set. |
-| Tool packages | `tools/bench/package.json`, `tools/release/package.json`, `pnpm-workspace.yaml` (`tools/*`) | Moon's `bench` and `release` projects become private workspace packages (`@zitadel/bench`, `@zitadel/release`) so turbo can address their tasks. |
+| Tool packages | `tools/release/package.json`, `pnpm-workspace.yaml` (`tools/*`), `go.work` | Moon's `release` project becomes a private workspace package (`@zitadel/release`) so turbo can address its tasks. Its `go`, `bench` and `oidc-mock` projects are Go modules, which turbo reads from `go.work` as the packages `zitadel/v5`, `bench` and `oidc-mock`. |
 | Mutex and retry | `scripts/task-guard.mjs` | `--mutex <name>` (a lock directory in the OS temp dir, keyed by repository root, stale holders reclaimed) and `--retries <n>`. Used by the four browser-mode test scripts and the six generated-sources tasks. It acts only when turbo runs the task (`TURBO_HASH` is set); under moon, which has its own `mutex` and `retryCount`, and when a person runs the script, it runs the command once, unchanged. |
 | Inline scripts | `scripts/go-format-check.mjs`, `scripts/go-lint.mjs` | Turbo's versions of the `format` and `lint` inline scripts of the two Go projects; moon keeps its inline scripts until the cutover. |
 | Runner selection | `scripts/task-runner.mjs` (+ `.d.mts`) | `NEXTGEN_TASK_RUNNER=moon\|turbo` picks the runner the contributor scripts build through, turbo when a turbo task runs them (`TURBO_HASH`); maps `project:task` to turbo tasks. |
@@ -193,8 +193,8 @@ as they were.
 | storybook | `test` (mutex, retry) | `#test` | guarded script |
 | storybook | `dev` | `#dev` | existing |
 | website | `lint`, `typecheck`, `build`, `dev`, `start` | same | **new** `lint` script; `typecheck` depends on `build` (`next typegen` and `next build` both write `.next/types`), and so does moon's since it dropped its `website-next` mutex, which held only while a command ran, not while a cache hit restored `.next`; `build` outputs `.next/**` without its cache |
-| server | `openapi`, `format`, `generate`, `clean-generated`, `check-generate`, `check-generate-pruned`, `vet`, `lint`, `test`, `test-postgres`, `test-spanner`, `test-sqlite`, `build` | `@zitadel/server#…` | **new** scripts in `apps/server/package.json`, each `cd ../.. && …`; `format` and `lint` run the new script files; the generation tasks hold the guard's lock; `serverInputs` are the inputs of a script-less `go-sources` task that every Go task depends on |
-| bench | `format`, `vet`, `lint`, `build`, `test`, `sweep`, `summarize` | `@zitadel/bench#…` | **new** `tools/bench/package.json`; `benchInputs` are the inputs of its own `go-sources`. `vet` depends on `@zitadel/server#check-generate` in turbo: the first `ci-turbo` run caught it compiling `api/generated` while the server's generation rewrote it, a race moon's order could hit too, so moon's `bench:vet` has the same dependency since #1704 |
+| server | `openapi`, `format`, `generate`, `clean-generated`, `check-generate`, `check-generate-pruned`, `vet`, `lint`, `test`, `test-postgres`, `test-spanner`, `test-sqlite`, `build` | `@zitadel/server#…` | **new** scripts in `apps/server/package.json`, each `cd ../.. && …`; `format` and `lint` run the new script files; the generation tasks hold the guard's lock; `go-sources`, a script-less task every Go task depends on, depends on `nextgen#go-sources` (the server module and the modules it requires, through `go.work`) and lists what generation reads outside them |
+| bench | `format`, `vet`, `lint`, `build`, `test`, `sweep`, `summarize` | `bench#…` | the Go module from `go.work`, moon's commands in `tools/bench/turbo.json`; its `go-sources` reaches the modules it requires through the module graph. `vet` depends on `@zitadel/server#check-generate` in turbo: the first `ci-turbo` run caught it compiling `api/generated` while the server's generation rewrote it, a race moon's order could hit too, so moon's `bench:vet` has the same dependency since #1704 |
 | release | `changesets`, `check-graph`, `build-public-packages`, `version`, `pack`, `snapshot`, `publish` | `@zitadel/release#…` | **new** `tools/release/package.json` (`cd ../.. && node scripts/release.mjs …`); `build-public-packages` has no script |
 | workspace | `test`, `check-typecheck`, `check-openapi-rules`, `check-moon-graph`, `check-adrs` | `//#…` | root scripts (**new** for the four checks), explicit inputs as in moon.yml |
 | workspace | `doctor`, `server`, `server-debug`, `build-local-image`, `smoke-container`, `check` | `//#…` | root scripts (**new** `server-debug`, `build-local-image`, `smoke-container`); `journey` moved to `@zitadel/e2e#journey`, and moon keeps `workspace:journey` as a deprecated alias |
@@ -281,9 +281,10 @@ moon task wrapped anyway.
 ### `mergeOutputs` / `mergeArgs` (6), `fileGroups` (2), `implicitInputs`
 
 A package `turbo.json` replaces the root's field, so "replace" is the only
-mode and the options disappear. File groups do not exist: the server's input
-globs are the inputs of a script-less `go-sources` task that each of its
-tasks depends on (`apps/server/turbo.json`), and bench's likewise.
+mode and the options disappear. File groups do not exist: each Go module's
+production files are the inputs of a script-less `go-sources` task, which
+depends on those of the modules it requires, and each Go task depends on its
+module's (`turbo.json`, `apps/server/turbo.json`).
 `implicitInputs` become `globalDependencies` in the root; `pnpm-lock.yaml` is
 left out because turbo hashes each package's slice of it.
 

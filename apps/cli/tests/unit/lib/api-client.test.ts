@@ -4,6 +4,8 @@ import { ApiError } from "@zitadel/api/runtime/fetch";
 
 import { createZitadelClient, escapeControlCharacters } from "../../../src/lib/api-client";
 
+const signal = new AbortController().signal;
+
 /** Answer every request with one JSON body and status. */
 function stubFetch(status: number, body: unknown): void {
   vi.stubGlobal(
@@ -36,7 +38,8 @@ describe("escapeControlCharacters", () => {
 });
 
 describe("createZitadelClient", () => {
-  const client = () => createZitadelClient({ baseUrl: "http://localhost:8080", token: "t" });
+  const client = () =>
+    createZitadelClient({ signal, baseUrl: "http://localhost:8080", token: "t" });
 
   it("escapes a hostile string at any depth of a response", async () => {
     stubFetch(200, {
@@ -108,7 +111,7 @@ describe("createZitadelClient", () => {
     stubFetch(200, body);
 
     const verbatim = createZitadelClient(
-      { baseUrl: "http://localhost:8080", token: "t" },
+      { baseUrl: "http://localhost:8080", token: "t", signal },
       { verbatim: true },
     );
 
@@ -119,7 +122,7 @@ describe("createZitadelClient", () => {
     stubFetch(404, { code: "not_found", message: "no \u001b[2Jproject" });
 
     const verbatim = createZitadelClient(
-      { baseUrl: "http://localhost:8080", token: "t" },
+      { baseUrl: "http://localhost:8080", token: "t", signal },
       { verbatim: true },
     );
 

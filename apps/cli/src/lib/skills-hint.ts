@@ -43,7 +43,11 @@ export async function showSkillsHint({
     if (!interactive || isCI(env) || isOptedOut(env)) {
       return;
     }
-    const shownPath = join(telemetryConfigDir(env), SHOWN_FILE);
+    const configDir = telemetryConfigDir(env);
+    if (configDir === undefined) {
+      return;
+    }
+    const shownPath = join(configDir, SHOWN_FILE);
     if (existsSync(shownPath)) {
       return;
     }

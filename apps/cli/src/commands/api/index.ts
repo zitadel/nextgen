@@ -87,6 +87,25 @@ export default class Api extends Destructive(BaseCommand) {
 
   async run(): Promise<JsonEnvelope> {
     const { args, argv, flags } = await this.parse(Api);
+    // No operation is called help, so the word asks for this command's help as
+    // --help does. It comes before the server is resolved, which help never
+    // needs, and under --json the envelope stays the only thing on stdout.
+    if (args.operation?.toLowerCase() === "help") {
+      // Only the command's name is needed for the envelope: `toMeta` would also
+      // open telemetry and the first-run notice, which `--help` does not.
+      this.meta = { ...this.meta, command: this.id ?? this.meta.command };
+      if (!this.jsonEnabled()) {
+        await this.config.runCommand("help", [Api.id]);
+      }
+      return this.emit({
+        status: "ok",
+        data: {},
+        pretty: "",
+        // Under --json the usage is not printed, so the envelope points on.
+        next: this.jsonEnabled() ? { commands: [this.suggestUnscoped("api ls")] } : undefined,
+      });
+    }
+
     const meta = await this.toMeta(flags);
 
     const ref = args.operation ?? (await this.chooseOperation());
@@ -176,8 +195,8 @@ export default class Api extends Destructive(BaseCommand) {
     }
     const token = operation.auth === "secret" ? secret?.project_secret : undefined;
     const response = flags.paginate
-      ? await sendAll(meta.source, token, request)
-      : await send(meta.source, token, request, consent);
+      ? await sendAll(meta.source, token, request, this.signal)
+      : await send(meta.source, token, request, this.signal, consent);
     return this.emit({
       status: "ok",
       data: response.body ?? null,

@@ -13,6 +13,8 @@ import { Consent, type Gate, isRefusal } from "../../../src/lib/consent";
 import { ZitadelError } from "../../../src/lib/errors";
 import { unscopedCommand } from "../../../src/lib/suggestion";
 
+const signal = new AbortController().signal;
+
 const GATE: Gate = {
   verb: "remove",
   name: "remove API_URL from the project",
@@ -20,7 +22,7 @@ const GATE: Gate = {
   retry: unscopedCommand("variable rm API_URL --force"),
 };
 /** A client as every command gets one; nothing here sends a request. */
-const aClient = () => createZitadelClient({ baseUrl: "http://localhost:8080" });
+const aClient = () => createZitadelClient({ signal, baseUrl: "http://localhost:8080" });
 const asked = { interactive: true, force: false, dryRun: false };
 const forced = { interactive: false, force: true, dryRun: false };
 const scripted = { interactive: false, force: false, dryRun: false };
