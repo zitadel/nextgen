@@ -22,6 +22,12 @@ Repo files describe configuration; server APIs own runtime resources. Your proje
 
 Commit `zitadel.json` and `.zitadel/**`, apart from these: `.env.local` and `.zitadel/secret` hold the project secret, and `.zitadel/local/**` is a local server's runtime data, not product configuration. Setup adds `.zitadel/secret` and `.env*` (all but `.env.example`) to `.gitignore`; `start` adds `.zitadel/local/`.
 
+## Variables
+
+Some values do not belong in your repository: secrets, and values that differ between production and previews. Store them on the project as variables, and reference them from configuration as `${{ NAME }}`. Today an identity provider connection's `oidc.client_id` and `oidc.client_secret` take one. Set a value with `zitadel variable set NAME <value>`, or with `--secret` to store it encrypted so it is never read back.
+
+A variable can hold a separate value for [previews](/docs/concepts/origins-and-previews#previews) (`--preview`), so a preview never runs with a production secret. Each deployment keeps the values it was created with: a changed variable reaches users on the next `zitadel deploy`, and a rollback brings back the old values.
+
 ## How deploying works
 
 `zitadel deploy --dry-run` validates local configuration and shows what would change without mutating files or platform state. `zitadel deploy` builds a release from it and makes the release live.
