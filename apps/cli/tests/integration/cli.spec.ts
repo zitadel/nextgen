@@ -170,8 +170,8 @@ describe("the cli", () => {
         expect(result).toFailWith("E_VALIDATION");
       });
 
-      it("accepts -h as the short form of --help", async () => {
-        const result = await runCliForTest(["resources", "-h"]);
+      it.each([["resources"], ["status"], ["logs"]])("accepts -h on %s", async (command) => {
+        const result = await runCliForTest([command, "-h"]);
 
         expect(result).toPrint("USAGE");
       });

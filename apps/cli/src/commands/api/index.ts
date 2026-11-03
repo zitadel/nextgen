@@ -94,7 +94,11 @@ export default class Api extends Destructive(BaseCommand) {
       if (!this.jsonEnabled()) {
         await this.config.runCommand("help", [Api.id]);
       }
-      return this.emit({ status: "ok", data: null, pretty: "" });
+      return this.emit({
+        status: "ok",
+        data: { usage: `${this.config.bin} ${Api.id} --help` },
+        pretty: "",
+      });
     }
 
     const meta = await this.toMeta(flags);

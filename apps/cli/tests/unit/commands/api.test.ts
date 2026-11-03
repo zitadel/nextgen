@@ -56,6 +56,14 @@ async function apiIn(cwd: string, ...argv: string[]) {
   );
 }
 
+describe("zitadel api help", () => {
+  it("is no operation, in any case and whatever follows", async () => {
+    const envelope = await api("Help", "getVariable");
+
+    expect(envelope).toMatchObject({ status: "ok", data: { usage: "zitadel api --help" } });
+  });
+});
+
 describe("zitadel api without an operation, at a terminal", () => {
   it("asks for the part of the API, the operation and its path parameters", async () => {
     vi.mocked(select).mockResolvedValueOnce("Sessions" as never);
