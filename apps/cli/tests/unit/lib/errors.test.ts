@@ -408,6 +408,31 @@ describe("resources the platform rejected", () => {
     );
   });
 
+  it("appends a flow's reason from the resource's own details", () => {
+    const error = rejected({
+      code: "rel.invalid",
+      message: "release: invalid",
+      details: {
+        resources: [
+          {
+            code: "flowdef.invalid",
+            kind: "flow",
+            handle: "default-login",
+            message: "flow definition: invalid",
+            details: {
+              details:
+                'step "register-password": on_success create_user requires "identifier" to be collected upstream',
+            },
+          },
+        ],
+      },
+    });
+
+    expect(error.hint).toBe(
+      'flow default-login: flow definition: invalid: step "register-password": on_success create_user requires "identifier" to be collected upstream.',
+    );
+  });
+
   it("adds no hint when a resource has no message", () => {
     expect(rejected({ details: { resources: [{ kind: "schema", handle: "a" }] } }).hint).toBe(
       undefined,

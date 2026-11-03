@@ -270,7 +270,9 @@ function listedInDetails(
  * The resources a refusal names, one line each: `<kind> <handle>: <message>`.
  * A rejected release carries the reason per schema or flow under
  * `details.resources`, and the top-level message only says the release was
- * invalid, so without these lines the reason shows only in `--json`.
+ * invalid, so without these lines the reason shows only in `--json`. A flow
+ * keeps its reason in the resource's own `details.details`, behind a generic
+ * message, so that text is appended when the message does not already hold it.
  */
 function rejectedResources(body: unknown): string[] {
   const lines: string[] = [];
@@ -279,17 +281,33 @@ function rejectedResources(body: unknown): string[] {
     const listed = (node as Record<string, unknown>).resources;
     if (Array.isArray(listed)) {
       for (const item of listed) {
-        if (!isObject(item)) continue;
-        const { kind, handle, message } = item as Record<string, unknown>;
-        if (typeof message !== "string" || message === "") continue;
-        const subject = [kind, handle].filter((v) => typeof v === "string" && v !== "").join(" ");
-        lines.push(subject === "" ? message : `${subject}: ${message}`);
+        const line = resourceLine(item);
+        if (line !== undefined) {
+          lines.push(line);
+        }
       }
       break;
     }
     node = (node as { details?: unknown }).details;
   }
   return lines;
+}
+
+function resourceLine(item: unknown): string | undefined {
+  if (!isObject(item)) {
+    return undefined;
+  }
+  const { kind, handle, message, details } = item as Record<string, unknown>;
+  const reason = typeof message === "string" ? message : "";
+  const nested = isObject(details) ? (details as Record<string, unknown>).details : undefined;
+  const detail = typeof nested === "string" ? nested : "";
+  const text =
+    detail === "" || reason.includes(detail) ? reason : [reason, detail].filter(Boolean).join(": ");
+  if (text === "") {
+    return undefined;
+  }
+  const subject = [kind, handle].filter((v) => typeof v === "string" && v !== "").join(" ");
+  return subject === "" ? text : `${subject}: ${text}`;
 }
 
 /**
