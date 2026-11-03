@@ -8975,6 +8975,14 @@
               "privacy": "private"
             },
             {
+              "kind": "field",
+              "name": "signupProof",
+              "type": {
+                "text": "{ id: string; proof: string } | undefined"
+              },
+              "privacy": "private"
+            },
+            {
               "kind": "method",
               "name": "submit",
               "privacy": "private",
