@@ -507,7 +507,7 @@ describe("lockoutStep", () => {
     expect(takeReportedWarnings()[0]).toContain("Checked only some of the users of");
   });
 
-  it("says so when it only looked up the links of the first stranded users", async () => {
+  it("counts every stranded user but looks up the links of only the first ones", async () => {
     const stranded = Array.from({ length: 250 }, (_, index) => user(`s-${index}`, "human-user"));
     await lockoutStep.run(
       ctx({
@@ -518,9 +518,9 @@ describe("lockoutStep", () => {
       }),
     );
 
-    expect(takeReportedWarnings()[0]).toContain(
-      "Checked only some of the users of the schemas no flow serves",
-    );
+    const warning = takeReportedWarnings()[0];
+    expect(warning).toContain('250 existing users of "human-user" are on a schema');
+    expect(warning).not.toContain("SSO link");
   });
 
   it("counts linked users among the first stranded ones", async () => {
@@ -534,7 +534,7 @@ describe("lockoutStep", () => {
       }),
     );
 
-    expect(takeReportedWarnings()[0]).toContain("at least 1 existing user");
+    expect(takeReportedWarnings()[0]).toContain("(at least 1 of them has an SSO link)");
   });
 
   it("reports an exact count when the read ends exactly at the limit", async () => {
@@ -625,6 +625,7 @@ describe("lockoutStep", () => {
     );
 
     expect(takeReportedWarnings()).toEqual([
+      expect.stringContaining('1 existing user of "human-user" is on a schema'),
       expect.stringContaining("Could not finish checking existing users"),
     ]);
   });

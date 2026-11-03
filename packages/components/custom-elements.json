@@ -8551,7 +8551,7 @@
               },
               "privacy": "private",
               "default": "false",
-              "description": "Set while a fresh flow replaces one the server refused to continue\n(`flow.restart_required`). It bypasses the resume handle, puts the notice\non the new first step, and refuses a second restart until a step renders,\nso a server that keeps refusing cannot loop the widget."
+              "description": "Set while a fresh flow replaces one the server refused to continue\n(`flow.restart_required`, or `flow.sso_user_schema_mismatch` for an SSO\nsign-in the user's schema cannot complete). It bypasses the resume handle, puts the notice\non the new first step, and refuses a second restart until a step renders,\nso a server that keeps refusing cannot loop the widget."
             },
             {
               "kind": "field",
