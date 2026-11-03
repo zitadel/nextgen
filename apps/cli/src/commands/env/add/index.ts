@@ -1,4 +1,5 @@
-import { basename } from "node:path";
+import { stat } from "node:fs/promises";
+import { basename, join } from "node:path";
 
 import { Flags } from "@oclif/core";
 import { consola } from "consola";
@@ -18,15 +19,51 @@ import {
 } from "../../../lib/oclif";
 import { environmentNameArg } from "./args/name";
 import { appUrlFlag, readAppUrl } from "./flags/app-url";
-import { environmentFile } from "./requirements/file";
-import { givenServer } from "./requirements/server";
 import { PUBLIC_PROJECT_ID_VARIABLE } from "../../../lib/orca/patchers/rule/public-project-id";
 import { readZitadelConfig } from "../../../lib/project";
-import { DEFAULT_SERVER, parseServer } from "../../../lib/server";
+import { DEFAULT_SERVER, parseServer, resolveServer } from "../../../lib/server";
 import { Cmd } from "../../../lib/cmd";
 import { environmentSelectorSuffix, projectEnvFile } from "../../../lib/oclif/environment-flags";
 import { type EnvironmentSelector, projectCommand } from "../../../lib/suggestion";
 import { Promptable } from "../../../lib/oclif/promptable";
+import { type Refusal, refusalError } from "../../../lib/oclif/refusal";
+
+/** What a `.env.<name>.local` that already exists is refused for. */
+const FILE_EXISTS_REFUSAL: Refusal = {
+  code: "E_CONFLICT",
+  message: "{file} already exists",
+  hint: "Pass --force to overwrite it.",
+};
+
+/**
+ * The `.env.<name>.local` file this run writes. One that already exists is a
+ * conflict unless `--force` says it may be overwritten.
+ */
+async function environmentFile(
+  cwd: string,
+  name: string,
+  force: boolean,
+): Promise<{ file: string; path: string }> {
+  const file = `.env.${name}.local`;
+  const path = join(cwd, file);
+  const exists = await stat(path).then(
+    () => {
+      return true;
+    },
+    () => {
+      return false;
+    },
+  );
+  if (exists && !force) {
+    throw refusalError(FILE_EXISTS_REFUSAL, {
+      file,
+    });
+  }
+  return {
+    file,
+    path,
+  };
+}
 
 /** A variable to set on a hosting platform or in a pipeline. A secret is named, never printed. */
 type PlatformVariable = { name: string; value?: string; secret?: boolean };
@@ -74,18 +111,14 @@ export default class EnvAdd extends Promptable(BaseCommand) {
     resolveServer: false,
   };
 
-  static override requires = {
-    environment: environmentFile,
-    given: givenServer,
-  };
-
-  protected async execute({
-    args,
-    flags,
-    environment,
-    given,
-  }: Admitted<typeof EnvAdd>): Promise<JsonEnvelope> {
+  protected async execute({ args, flags }: Admitted<typeof EnvAdd>): Promise<JsonEnvelope> {
     const { cwd, env, nonInteractive, dryRun } = this.meta;
+    const environment = await environmentFile(cwd, args.name, flags.force);
+    // `--server` resolves to an origin as it does everywhere; one that was not
+    // given is left to the prompt below.
+    const givenServer = this.meta.serverFlag
+      ? (await resolveServer({ cwd, serverFlag: this.meta.serverFlag })).value
+      : undefined;
 
     const config = await readZitadelConfig(cwd);
     const frameworkId = isObject(config.framework) ? config.framework.id : undefined;
@@ -95,7 +128,7 @@ export default class EnvAdd extends Promptable(BaseCommand) {
         : undefined;
 
     const server =
-      given.value ??
+      givenServer ??
       (await this.input({
         kind: "text",
         name: "server",

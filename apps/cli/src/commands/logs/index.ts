@@ -1,5 +1,6 @@
 import { Flags } from "@oclif/core";
 
+import { readNearestRuntimeMetadata } from "../../lib/local-server/runtime";
 import { LocalServer } from "../../lib/local-server/server";
 import {
   LOG_LEVELS,
@@ -8,9 +9,16 @@ import {
   renderLogLine,
 } from "../../lib/local-server/server-log";
 import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "../../lib/oclif";
-import { localRuntimeStarted } from "../local-server/requirements/local-runtime-started";
+import { type Refusal, refusalError } from "../../lib/oclif/refusal";
 import { tailFlag } from "./flags/tail";
 import { followIsNotJsonRule } from "./rules/follow-is-not-json";
+
+/** How a directory where `zitadel start` never ran is refused. */
+const NOT_STARTED_REFUSAL: Refusal = {
+  message: "Local Zitadel runtime has not been started",
+  hint: "Run `zitadel start` first.",
+  next: ["start"],
+};
 
 export default class Logs extends BaseCommand {
   static override description =
@@ -40,11 +48,19 @@ export default class Logs extends BaseCommand {
 
   static override rules = [followIsNotJsonRule];
 
-  static override requires = {
-    started: localRuntimeStarted,
-  };
-
-  protected async execute({ flags, started }: Admitted<typeof Logs>): Promise<JsonEnvelope> {
+  protected async execute({ flags }: Admitted<typeof Logs>): Promise<JsonEnvelope> {
+    // The server this directory uses: the one `zitadel start` ran in here or
+    // in the nearest parent, as `doctor` and `console` find it.
+    const started = await readNearestRuntimeMetadata(this.cwd);
+    if (started === undefined) {
+      throw refusalError(NOT_STARTED_REFUSAL, {}, (next) => {
+        return this.suggestUnscoped(next);
+      });
+    }
+    this.meta = {
+      ...this.meta,
+      source: started.runtime.server_url,
+    };
     const server = LocalServer.at(started.dir, {
       cliVersion: this.cliVersion,
     });

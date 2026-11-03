@@ -1,5 +1,8 @@
 import { Flags } from "@oclif/core";
-import type { GetReleaseById200PointersItem } from "@zitadel/api/generated/model";
+import type {
+  GetReleaseById200PointersItem,
+  ListDeployments200DeploymentsItem,
+} from "@zitadel/api/generated/model";
 
 import {
   type Admitted,
@@ -11,11 +14,95 @@ import {
 import { Tabulatable } from "../../../lib/oclif/tabulatable";
 import { rollbackDeployment, servesPrimary } from "../../../lib/release";
 import { messageFlag } from "../flags/message";
-import { deploymentHistory } from "./requirements/history";
-import { rollbackTarget } from "./requirements/target";
+import { type Refusal, refusalError } from "../../../lib/oclif/refusal";
 import { toZitadelError } from "../../../lib/errors";
+import type { SuggestedCommand } from "../../../lib/suggestion";
 import { Destructive } from "../../../lib/oclif/destructive";
 import { reportWarning } from "../../../lib/warnings";
+
+type Deployment = ListDeployments200DeploymentsItem;
+
+const NOTHING_DEPLOYED_REFUSAL: Refusal = {
+  message: "There is no deployment to roll back",
+  hint: "Nothing has been deployed yet; check `zitadel deployment list`.",
+  next: ["deployment list"],
+};
+
+const NOTHING_EARLIER_REFUSAL: Refusal = {
+  message: "There is no earlier deployment to roll back to",
+  hint: "Name a deployment to re-apply, or check `zitadel deployment list`.",
+  next: ["deployment list"],
+};
+
+/** The newest primary deployment and the one before it, either of which may not exist. */
+export type History = Readonly<{
+  latest: Deployment | undefined;
+  prior: Deployment | undefined;
+}>;
+
+/** The deployment a rollback re-applies, and the one it expects to be live. */
+export type RollbackTarget = Readonly<{
+  id: string;
+  expectedDeploymentId: string | undefined;
+}>;
+
+/**
+ * The primary deployments a bare rollback decides from. A preview deployment is
+ * never the one a bare rollback undoes, nor one it can restore. Naming a
+ * deployment needs none of it, and reads nothing. Nothing deployed is a
+ * refusal, since there is nothing to undo.
+ *
+ * The whole history is read, not the first page, because the prior deployment
+ * of a long-lived origin can sit beyond it, and a bare rollback that missed it
+ * would refuse a rollback it should resolve.
+ */
+export async function readPrimaryHistory(
+  given: string | undefined,
+  load: () => Promise<readonly Deployment[]>,
+  suggest: (command: string) => SuggestedCommand,
+): Promise<History> {
+  if (given !== undefined) {
+    return {
+      latest: undefined,
+      prior: undefined,
+    };
+  }
+  const [latest, prior] = (await load()).filter(servesPrimary);
+  if (latest === undefined) {
+    throw refusalError(NOTHING_DEPLOYED_REFUSAL, {}, suggest);
+  }
+  return {
+    latest,
+    prior,
+  };
+}
+
+/**
+ * A named deployment is taken as given. A bare rollback decides from the one
+ * read of the history, so its guard comes from that same read: a deploy landing
+ * after it is one the caller never saw, and must make the server refuse rather
+ * than become the expected one. With no deployment before the latest there is
+ * nothing to roll back to, which is a refusal.
+ */
+export function readRollbackTarget(
+  given: string | undefined,
+  history: History,
+  suggest: (command: string) => SuggestedCommand,
+): RollbackTarget {
+  if (given !== undefined) {
+    return {
+      id: given,
+      expectedDeploymentId: undefined,
+    };
+  }
+  if (history.latest === undefined || history.prior === undefined) {
+    throw refusalError(NOTHING_EARLIER_REFUSAL, {}, suggest);
+  }
+  return {
+    id: history.prior.id,
+    expectedDeploymentId: history.latest.id,
+  };
+}
 
 /**
  * `zitadel deployment rollback [<deployment_id>]` — re-apply an earlier
@@ -49,16 +136,22 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
     message: messageFlag("A short summary of why this rolls back."),
   };
 
-  static override requires = {
-    history: deploymentHistory,
-    target: rollbackTarget,
-  };
-
   protected async execute({
     flags,
-    target,
+    args,
   }: Admitted<typeof DeploymentRollback>): Promise<JsonEnvelope> {
     const { client, projectId } = await this.connect();
+    const suggest = (command: string) => {
+      return this.suggest(command);
+    };
+    const history = await readPrimaryHistory(
+      args.deploymentId,
+      async () => {
+        return client.listDeployments.all({ project_id: projectId });
+      },
+      suggest,
+    );
+    const target = readRollbackTarget(args.deploymentId, history, suggest);
 
     return this.emit(
       await this.confirmed({

@@ -20,6 +20,7 @@ import {
   parseScopes,
   type ProviderName,
   providerOf,
+  type ProviderSelection,
   RESERVED_SLUGS,
   selectionName,
 } from "@zitadel/config/idp";
@@ -72,15 +73,129 @@ import {
   nonBlankString,
 } from "../../../../lib/oclif";
 import { AuthMethodCommand } from "../../command";
-import { schemaTarget } from "../../requirements/target";
+import type { SchemaTarget } from "../../target";
 import { clientIdFlag } from "./flags/client-id";
-import { ssoFlows } from "./requirements/flows";
-import { developmentIssuer } from "./requirements/issuer";
-import { ssoProvider } from "./requirements/provider";
 import { providerIsNamedRule } from "./rules/provider-is-named";
 import { environmentFlags } from "../../../../lib/oclif/environment-flags";
 import { inShell, type SuggestedCommand } from "../../../../lib/suggestion";
 import { reportWarning } from "../../../../lib/warnings";
+import { refuseUneditable } from "../../../../lib/auth-methods";
+import { resolveEnvironment } from "../../../../lib/environment";
+import {
+  checkGivenCustomFlags,
+  customFlagValues,
+  selectionFromFlags as selectionFromGivenFlags,
+  ssoEditRefusal as editRefusalFor,
+} from "../../../../lib/idp";
+import { type Refusal, refusalError } from "../../../../lib/oclif/refusal";
+
+/**
+ * The provider the run was asked for. `selection` is undefined for a custom
+ * provider whose settings a person will be asked for once everything that can
+ * fail has passed; `values` are the settings the flags gave. A person at a
+ * terminal is asked for the settings they left out, but later: here the ones
+ * they did give are only checked. A script, a dry run or `--non-interactive`
+ * is held to the flags and told which are missing.
+ */
+type SsoProvider = {
+  readonly selection: ProviderSelection | undefined;
+  readonly values: CustomFlagValues;
+};
+
+function hasAllCustomSettings(values: CustomFlagValues): boolean {
+  return (
+    values.slug !== undefined && values.displayName !== undefined && values.issuer !== undefined
+  );
+}
+
+/** What the flags say about the provider to add. */
+export function ssoProvider(
+  flags: { readonly [K in (typeof ENABLE_FLAG_KEYS)[keyof typeof ENABLE_FLAG_KEYS]]?: string },
+  run: { interactive: boolean },
+): SsoProvider {
+  const provider = String(flags[ENABLE_FLAG_KEYS.provider]);
+  const values = customFlagValues(flags, ENABLE_FLAG_KEYS);
+  const askLater = provider === CUSTOM_PROVIDER && run.interactive && !hasAllCustomSettings(values);
+  if (askLater) {
+    checkGivenCustomFlags(values, ENABLE_FLAG_NAMES);
+  }
+  return {
+    selection: askLater
+      ? undefined
+      : selectionFromGivenFlags(
+          provider,
+          values,
+          ENABLE_FLAG_NAMES,
+          customExample(ENABLE_FLAG_NAMES),
+        ),
+    values,
+  };
+}
+
+/** What a Project with no development issuer is refused for. */
+const NO_ISSUER_REFUSAL: Refusal = {
+  message: "This Project has no development issuer",
+  hint: "Run `zitadel setup` first, or set ZITADEL_ISSUER to the origin your app serves from.",
+};
+
+/**
+ * The origin the app serves from, as the run's environment names it. A Project
+ * that has none has not been set up.
+ */
+export async function developmentIssuer(
+  cwd: string,
+  flags: {
+    server?: string | undefined;
+    env?: string | undefined;
+    envFile?: string | undefined;
+  },
+): Promise<string> {
+  const environment = await resolveEnvironment({
+    cwd,
+    env: process.env,
+    serverFlag: flags.server,
+    envName: flags.env,
+    envFile: flags.envFile,
+  });
+  const issuer = environment.values.ZITADEL_ISSUER?.value;
+  if (issuer === undefined) {
+    throw refusalError(NO_ISSUER_REFUSAL, {});
+  }
+  return issuer;
+}
+
+/** What a schema no login flow runs against is refused for. */
+const NO_FLOW_REFUSAL: Refusal = {
+  code: "E_NOT_FOUND",
+  message: "No login flow runs against {schema}",
+  hint:
+    "The provider is offered by a flow, and none of the files under .zitadel/flows/ " +
+    "names this schema. Check that the flow's user_schema names the schema's objectType.",
+  details: {
+    schema: "{path}",
+  },
+};
+
+/**
+ * The flows a provider must be added to. No flow means no button however well
+ * everything else went, so a run without one is refused before anything is
+ * asked or written, as is a schema or flow with a region the editors cannot
+ * recognise and would write over.
+ */
+export function ssoFlows(target: SchemaTarget): FlowFile[] {
+  const { schema, flows } = target;
+  if (flows.length === 0) {
+    throw refusalError(NO_FLOW_REFUSAL, {
+      schema: schema.name,
+      path: schema.path,
+    });
+  }
+  refuseUneditable(schema.path, editRefusalFor(schema.body, "schema"));
+  for (const flow of flows) {
+    refuseUneditable(flow.path, editRefusalFor(flow.body, "flow"));
+  }
+  return flows;
+}
 
 /**
  * The `auth-method sso enable` command (ADR 070) — add a provider to a
@@ -136,20 +251,13 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
 
   static override rules = [providerIsNamedRule];
 
-  static override requires = {
-    project: ssoProvider,
-    issuer: developmentIssuer,
-    target: schemaTarget,
-    flows: ssoFlows,
-  };
-
-  protected async execute({
-    flags,
-    project,
-    issuer,
-    target,
-    flows,
-  }: Admitted<typeof AuthMethodSsoEnable>): Promise<JsonEnvelope> {
+  protected async execute({ flags }: Admitted<typeof AuthMethodSsoEnable>): Promise<JsonEnvelope> {
+    const project = ssoProvider(flags, {
+      interactive: !this.nonInteractive && !this.dryRun,
+    });
+    const issuer = await developmentIssuer(this.cwd, flags);
+    const target = await this.schemaTarget(flags);
+    const flows = ssoFlows(target);
     const connections = await readConnectionFiles(target.cwd);
     // Resolved before anything else is asked for: being turned away after
     // typing a secret would mean typing it again.

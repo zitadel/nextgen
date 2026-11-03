@@ -11,8 +11,8 @@ export default class AuthMethodPasskeyEnable extends AuthMethodCommand {
   ];
 
   protected async execute({
-    target,
+    flags,
   }: Admitted<typeof AuthMethodPasskeyEnable>): Promise<JsonEnvelope> {
-    return this.toggle(target, "passkey", true);
+    return this.toggle(await this.schemaTarget(flags), "passkey", true);
   }
 }

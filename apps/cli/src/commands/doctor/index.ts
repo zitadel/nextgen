@@ -15,9 +15,11 @@ import {
 import type { LocalServers, ManagedRuntimeProcess } from "../../lib/local-server/processes";
 import {
   DEFAULT_LOCAL_SERVER_PORT,
+  LOCAL_RUNTIME_FILE,
   assertLocalStateWritable,
   checkLocalServerHealth,
   defaultLocalServerImageForCliVersion,
+  findUpward,
   localServerUrl,
   readNearestRuntimeMetadata,
   type RuntimeBackend,
@@ -33,7 +35,6 @@ import {
   nonBlankString,
 } from "../../lib/oclif";
 import { portFlag } from "../local-server/flags/port";
-import { target } from "./requirements/target";
 import { Destructive } from "../../lib/oclif/destructive";
 import { isRefusal } from "../../lib/consent";
 import { reportWarning } from "../../lib/warnings";
@@ -43,6 +44,7 @@ import {
   projectEnvFile,
 } from "../../lib/oclif/environment-flags";
 import { createOrca } from "../../lib/orca";
+import { isLoopbackUrl } from "../../lib/server";
 import {
   hasZitadelConfig,
   hasZitadelSecret,
@@ -115,12 +117,17 @@ export default class Doctor extends Destructive(BaseCommand) {
     resolveServer: false,
   };
 
-  static override requires = {
-    target: target,
-  };
-
-  protected async execute({ flags, target }: Admitted<typeof Doctor>): Promise<JsonEnvelope> {
-    const { port, hostedServer } = target;
+  protected async execute({ flags }: Admitted<typeof Doctor>): Promise<JsonEnvelope> {
+    // An unreadable record only costs the port hint; the read below reports it.
+    const hint = await readNearestRuntimeMetadata(this.cwd).catch(() => {
+      return undefined;
+    });
+    const port = flags.port ?? hint?.runtime.port ?? DEFAULT_LOCAL_SERVER_PORT;
+    const hostedServer = await this.hostedServerWithoutLocalRuntime(flags);
+    this.meta = {
+      ...this.meta,
+      source: hostedServer ?? localServerUrl(port),
+    };
     const nearest = await readNearestRuntimeMetadata(this.cwd);
     const existingRuntime = nearest?.runtime;
     const parentRuntimeDir =
@@ -315,6 +322,32 @@ export default class Doctor extends Destructive(BaseCommand) {
       next,
       warnings: warnings.map((warning) => `${warning.name}: ${warning.message}`),
     });
+  }
+
+  /**
+   * The server of a project set up against a hosted server, for which doctor
+   * checks no local runtime: no local server runs for it, so the runtime says
+   * nothing about it, and a port another app holds would fail it. `undefined`
+   * (check the runtime) before setup, for a project on a local server or with
+   * a `zitadel.json` that does not parse, where a server was started in the
+   * directory or a parent, and when a flag asks about the runtime.
+   */
+  private async hostedServerWithoutLocalRuntime(
+    flags: Admitted<typeof Doctor>["flags"],
+  ): Promise<string | undefined> {
+    if (flags.port !== undefined || flags.runtime !== undefined || flags.image !== undefined) {
+      return undefined;
+    }
+    if (
+      (await findUpward(this.cwd, LOCAL_RUNTIME_FILE)) !== undefined ||
+      !(await hasZitadelConfig(this.cwd))
+    ) {
+      return undefined;
+    }
+    const server = await readZitadelConfig(this.cwd).then(readProjectServer, () => {
+      return undefined;
+    });
+    return server === undefined || isLoopbackUrl(server) ? undefined : server;
   }
 }
 

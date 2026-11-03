@@ -1,14 +1,24 @@
-import { AuthMethodCommand } from "../../command";
-import { removableFlows } from "./requirements/flows";
-import { providerToRemove } from "./requirements/provider";
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { Flags } from "@oclif/core";
 import { consola } from "consola";
+import { IDP_PROVIDERS } from "@zitadel/config/idp";
 
-import { refuseBrokenFlows, usableSignInMethods } from "../../../../lib/auth-methods";
-import { removeSsoFromFlow, removeSsoFromSchema } from "../../../../lib/idp";
+import {
+  listedProviders,
+  refuseBrokenFlows,
+  refuseUneditable,
+  usableSignInMethods,
+} from "../../../../lib/auth-methods";
+import {
+  type FlowFile,
+  removeSsoFromFlow,
+  removeSsoFromSchema,
+  ssoEditRefusal,
+  ssoProvidersRefusal,
+} from "../../../../lib/idp";
+import { type Refusal, refusalError } from "../../../../lib/oclif/refusal";
 import { stableStringify } from "../../../../lib/json";
 import {
   type Admitted,
@@ -17,6 +27,43 @@ import {
   nonBlankString,
 } from "../../../../lib/oclif";
 import { optionArgs } from "../../../../lib/public-cli";
+import { AuthMethodCommand } from "../../command";
+import type { SchemaTarget } from "../../target";
+
+/** What a run that names no provider is refused for. */
+const NAME_PROVIDER_REFUSAL: Refusal = {
+  message: "Name the provider to remove",
+  hint: "Pass --provider, e.g. --provider {example}. {schema} offers: {offered}.",
+};
+
+/**
+ * The provider to remove. It is always named, because removing every provider
+ * at once would be a different, larger change; the refusal lists the providers
+ * the schema offers, well-formed or not.
+ */
+export function providerToRemove(given: string | undefined, target: SchemaTarget): string {
+  if (given !== undefined) {
+    return given;
+  }
+  throw refusalError(NAME_PROVIDER_REFUSAL, {
+    example: IDP_PROVIDERS[0],
+    schema: target.schema.name,
+    offered: listedProviders(target.schema.body).join(", ") || "none",
+  });
+}
+
+/**
+ * The flows a provider is removed from, once the schema and each flow are in
+ * the shapes the editors write: a region that is not what they write is
+ * someone's, and is not overwritten.
+ */
+export function removableFlows(target: SchemaTarget): FlowFile[] {
+  refuseUneditable(target.schema.path, ssoEditRefusal(target.schema.body, "schema"));
+  for (const flow of target.flows) {
+    refuseUneditable(flow.path, ssoProvidersRefusal(flow.body));
+  }
+  return target.flows;
+}
 
 /**
  * `auth-method sso disable` (ADR 070 §2): remove one provider from a schema
@@ -46,17 +93,10 @@ export default class AuthMethodSsoDisable extends AuthMethodCommand {
     }),
   };
 
-  static override requires = {
-    ...AuthMethodCommand.requires,
-    provider: providerToRemove,
-    flows: removableFlows,
-  };
-
-  protected async execute({
-    target,
-    provider,
-    flows,
-  }: Admitted<typeof AuthMethodSsoDisable>): Promise<JsonEnvelope> {
+  protected async execute({ flags }: Admitted<typeof AuthMethodSsoDisable>): Promise<JsonEnvelope> {
+    const target = await this.schemaTarget(flags);
+    const provider = providerToRemove(flags.provider, target);
+    const flows = removableFlows(target);
     const { cwd, cwdArgs, schema } = target;
 
     const schemaChange = removeSsoFromSchema(schema.body, provider);

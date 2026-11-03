@@ -3,35 +3,21 @@ import { describe, expect, it } from "vitest";
 
 import { describeBody } from "../../../../../src/lib/oclif/crud";
 import { documentSchemaOf } from "../../../../../src/lib/oclif/crud/fields";
-import { refusalError } from "../../../../../src/lib/oclif/refusal";
 import { resourceBody } from "../../../../../src/lib/oclif/crud/resource-body";
-import { isUnmet } from "../../../../../src/lib/oclif/requirements";
-import type { GlobalOptions } from "../../../../../src/lib/oclif/types";
-
-const requirement = resourceBody({
-  topic: "teams",
-  verb: "create",
-  root: undefined,
-  schema: CreateTeamBody,
-  document: documentSchemaOf(CreateTeamBody, undefined),
-  fields: describeBody(CreateTeamBody),
-  references: undefined,
-});
 
 const resolve = (flags: Record<string, unknown>) => {
-  return requirement.resolve({
+  return resourceBody(
+    {
+      topic: "teams",
+      verb: "create",
+      root: undefined,
+      schema: CreateTeamBody,
+      document: documentSchemaOf(CreateTeamBody, undefined),
+      fields: describeBody(CreateTeamBody),
+      references: undefined,
+    },
     flags,
-    args: {},
-    argv: [],
-    meta: {} as GlobalOptions,
-    resolved: {},
-    connect: () => {
-      return Promise.reject(new Error("a body needs no connection"));
-    },
-    suggest: () => {
-      throw new Error("a body suggests nothing");
-    },
-  });
+  );
 };
 
 describe("resourceBody", () => {
@@ -51,27 +37,15 @@ describe("resourceBody", () => {
     expect(body).toMatchObject({ name: "Platform" });
   });
 
-  it("names the required fields a body lacks", async () => {
-    expect(await resolve({ data: "{}" })).toMatchObject({
-      unmet: {
-        command: "teams create",
-        noun: "field",
-        names: ["name"],
+  it("words the refusal for what it lacks, naming the fields in the error's details", async () => {
+    await expect(resolve({ data: "{}" })).rejects.toMatchObject({
+      code: "E_VALIDATION",
+      message: "teams create is missing required field: --name",
+      hint: expect.stringContaining("Pass --name, or include it in --data / --file."),
+      details: {
+        missing: ["name"],
       },
     });
-  });
-
-  it("words the refusal for what it lacks, naming the fields in the error's details", async () => {
-    const found = await resolve({ data: "{}" });
-
-    expect(isUnmet(found)).toBe(true);
-    const error = refusalError(
-      requirement.refusal ?? { message: "" },
-      isUnmet(found) ? found.unmet : {},
-    );
-    expect(error.message).toBe("teams create is missing required field: --name");
-    expect(error.hint).toContain("Pass --name, or include it in --data / --file.");
-    expect(error.details).toEqual({ missing: ["name"] });
   });
 
   it("refuses a body that does not fit the API schema", async () => {

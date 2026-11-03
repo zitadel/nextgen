@@ -1,5 +1,5 @@
 import { isObject } from "../../json";
-import { requirement, unmet } from "../requirements";
+import { refusalError, type Refusal } from "../refusal";
 import { type Assignment, fragmentOf } from "./assign";
 import { readRawBody } from "./body";
 import { mergeDocuments, setAt, valueAt } from "./document";
@@ -92,48 +92,47 @@ export type ResourceBodySource = Readonly<{
 }>;
 
 /**
- * The body of a write: the document from `--data`, `--file` or stdin, the field
+ * The body of a write, read from the flags: the document from `--data`, `--file` or stdin, the field
  * flags and each `--set` merged over it in that order, checked for credentials
  * on the command line, for the fields it must carry, and against the request
  * schema, so a command is handed a body that is ready to send.
  */
-export const resourceBody = (source: ResourceBodySource) => {
-  return requirement<Json>({
-    refusal: {
-      message: "{command} is missing required {noun}: {spellings}",
-      hint: "Pass {alternatives}, or include {pronoun} in --data / --file. See `{command} --help`.",
-      details: {
-        missing: "{names}",
-      },
-    },
-    resolve: async ({ flags }) => {
-      const raw = await readRawBody(flags, `${source.topic} ${source.verb}`);
-      const base = raw === undefined ? undefined : unwrapRoot(raw, source.root, source.document);
-      const fromFlags = bodyFromFlags(source.fields, flags);
-      const assignments = (flags.set ?? []) as readonly Assignment[];
-      refuseArgvCredentials(
-        argvParts(flags, base, source.fields, fromFlags, assignments),
-        source.document,
-        source.references,
-      );
-      const merged = [fromFlags, ...assignments.map(fragmentOf)].reduce<unknown>(
-        (body, overlay) => (overlay === undefined ? body : mergeDocuments(body, overlay)),
-        base ?? {},
-      );
-      const missing = source.fields.filter((field) => isMissing(field, merged));
-      if (missing.length > 0) {
-        const flagNames = missing.map(spelling);
-        return unmet({
-          command: `${source.topic} ${source.verb}`,
-          noun: missing.length === 1 ? "field" : "fields",
-          pronoun: missing.length === 1 ? "it" : "them",
-          spellings: flagNames.join(", "),
-          alternatives: flagNames.join(" and "),
-          names: missing.map((field) => field.name),
-        });
-      }
-      const wrapped = source.root === undefined ? merged : { [source.root]: merged };
-      return parseOrThrow(source.schema, wrapped, "Body does not match the API schema") as Json;
-    },
-  });
+const MISSING_FIELDS_REFUSAL: Refusal = {
+  message: "{command} is missing required {noun}: {spellings}",
+  hint: "Pass {alternatives}, or include {pronoun} in --data / --file. See `{command} --help`.",
+  details: {
+    missing: "{names}",
+  },
+};
+
+export const resourceBody = async (source: ResourceBodySource, flags: Json): Promise<Json> => {
+  {
+    const raw = await readRawBody(flags, `${source.topic} ${source.verb}`);
+    const base = raw === undefined ? undefined : unwrapRoot(raw, source.root, source.document);
+    const fromFlags = bodyFromFlags(source.fields, flags);
+    const assignments = (flags.set ?? []) as readonly Assignment[];
+    refuseArgvCredentials(
+      argvParts(flags, base, source.fields, fromFlags, assignments),
+      source.document,
+      source.references,
+    );
+    const merged = [fromFlags, ...assignments.map(fragmentOf)].reduce<unknown>(
+      (body, overlay) => (overlay === undefined ? body : mergeDocuments(body, overlay)),
+      base ?? {},
+    );
+    const missing = source.fields.filter((field) => isMissing(field, merged));
+    if (missing.length > 0) {
+      const flagNames = missing.map(spelling);
+      throw refusalError(MISSING_FIELDS_REFUSAL, {
+        command: `${source.topic} ${source.verb}`,
+        noun: missing.length === 1 ? "field" : "fields",
+        pronoun: missing.length === 1 ? "it" : "them",
+        spellings: flagNames.join(", "),
+        alternatives: flagNames.join(" and "),
+        names: missing.map((field) => field.name),
+      });
+    }
+    const wrapped = source.root === undefined ? merged : { [source.root]: merged };
+    return parseOrThrow(source.schema, wrapped, "Body does not match the API schema") as Json;
+  }
 };

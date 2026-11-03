@@ -1,12 +1,12 @@
 import {
   type Admitted,
   CommandGroups,
+  type Connection,
   EnvironmentCommand,
   type JsonEnvelope,
 } from "../../lib/oclif";
 import { messageFlag } from "./flags/message";
-import { origins } from "./requirements/origins";
-import { reason } from "./requirements/reason";
+import { missingPrimaryOrigin } from "./missing-primary-origin";
 import {
   buildBundle,
   createDeployment,
@@ -23,7 +23,23 @@ import {
 import { ApiError } from "@zitadel/api/runtime/fetch";
 
 import { ZitadelError } from "../../lib/errors";
+import { type Refusal, refusalError } from "../../lib/oclif/refusal";
+import { deployMessage } from "../../lib/release";
+import { readZitadelSecret } from "../../lib/project";
 import { reportWarning } from "../../lib/warnings";
+
+/** How a non-interactive deploy with no message to fall back on is refused. */
+const NEEDS_MESSAGE_REFUSAL: Refusal = {
+  message: "A deploy needs a message in non-interactive mode",
+  hint: "Pass -m/--message with a short summary of what this release changes, or deploy from a clean git commit.",
+};
+
+/** How a project with nowhere to land a deploy is refused. */
+const NO_PRIMARY_ORIGIN_REFUSAL: Refusal = {
+  message: "The project has no primary origin to deploy to",
+  hint: "{hint}",
+  next: ["{next}"],
+};
 
 /**
  * `zitadel deploy` — publish `.zitadel/` to the project's primary origins.
@@ -53,13 +69,23 @@ export default class Deploy extends EnvironmentCommand {
     }),
   };
 
-  static override requires = {
-    reason: reason,
-    origins: origins,
-  };
-
-  protected async execute({ reason, origins }: Admitted<typeof Deploy>): Promise<JsonEnvelope> {
-    const { client, projectId } = await this.connect();
+  protected async execute({ flags }: Admitted<typeof Deploy>): Promise<JsonEnvelope> {
+    const { client, projectId, environment } = await this.connect();
+    // Why the deploy happened: the message it was given, or the one its
+    // environment implies. Interactively it can be left off; a scripted run
+    // with nothing to fall back on must name one, and is refused before
+    // anything is built. A dry run records nothing, so it needs none.
+    const message = this.dryRun
+      ? undefined
+      : await deployMessage(flags.message, this.cwd, this.env);
+    if (!this.dryRun && this.nonInteractive && message === undefined) {
+      throw refusalError(NEEDS_MESSAGE_REFUSAL, {});
+    }
+    // A deploy goes to every primary origin, so the project must have one.
+    // Checked before the bundle is built and the IdP connections are synced,
+    // so a project with none fails before the IdP step writes part of a
+    // change. A dry run never reaches the deploy, so it is exempt.
+    const landing = this.dryRun ? [] : await this.primaryOrigins(client, projectId, environment);
 
     const { bundle, resourceCount, brandingSources, idpFiles, policyFiles } = await buildBundle(
       this.cwd,
@@ -109,7 +135,7 @@ export default class Deploy extends EnvironmentCommand {
     }
 
     const release = await createReleaseFromBundle(client, projectId, bundle, {
-      message: reason.message,
+      message,
       gitSha: await headSha(this.cwd),
       gitDirty,
     });
@@ -123,14 +149,16 @@ export default class Deploy extends EnvironmentCommand {
       project_id: projectId,
       live: true,
     });
-    const observed = deployments.find((deployment) =>
-      deployment.targets.some((entry) => origins.landing.includes(entry.origin)),
-    )?.id;
+    const observed = deployments.find((deployment) => {
+      return deployment.targets.some((entry) => {
+        return landing.includes(entry.origin);
+      });
+    })?.id;
     const targets = ["primary"];
     const deployment = await createDeployment(client, projectId, {
       releaseId: release.id,
       targets,
-      message: reason.message,
+      message,
       // On a project's first deploy nothing is live, so there is no
       // deployment to guard against: the field is omitted rather than sent
       // empty or as a placeholder, which an optional id cannot stand in for.
@@ -193,6 +221,51 @@ export default class Deploy extends EnvironmentCommand {
         ...servedOrigins.map((served) => `  - ${served}`),
       ].join("\n"),
     });
+  }
+
+  /**
+   * The primary origins this deploy lands on, refusing a project with none and
+   * naming the step that gives it one.
+   */
+  private async primaryOrigins(
+    client: Connection["client"],
+    projectId: string,
+    environment: Connection["environment"],
+  ): Promise<string[]> {
+    const project = await client.getProject(projectId);
+    const origins = project.origins ?? [];
+    const landing = origins
+      .filter((entry) => {
+        return entry.kind === "primary";
+      })
+      .map((entry) => {
+        return entry.pattern;
+      });
+    if (landing.length > 0) {
+      return landing;
+    }
+    const setupProject = await readZitadelSecret(this.cwd).then(
+      (secret) => {
+        return secret.project_id;
+      },
+      () => {
+        return undefined;
+      },
+    );
+    throw refusalError(
+      NO_PRIMARY_ORIGIN_REFUSAL,
+      missingPrimaryOrigin({
+        origins,
+        issuer: environment.values.ZITADEL_ISSUER?.value,
+        setupProject: setupProject === projectId,
+        suggest: (command) => {
+          return this.suggest(command);
+        },
+      }),
+      (next) => {
+        return this.suggest(next);
+      },
+    );
   }
 }
 

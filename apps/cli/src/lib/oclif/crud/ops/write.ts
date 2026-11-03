@@ -113,17 +113,6 @@ const describeWrite = <
         hint: `Pass the body's fields as flags (see \`${topic} ${verb} --help\`), --set <path>=<value>, or --data '<json>' / --file <path>.`,
       }),
     ],
-    requires: {
-      body: resourceBody({
-        topic,
-        verb,
-        root: spec.root,
-        schema: spec.schema,
-        document,
-        fields,
-        references: options.references,
-      }),
-    },
   };
 };
 
@@ -150,8 +139,20 @@ abstract class WriteOperation<
 > extends ResourceCommand<Ctx, Spec, WriteInput> {
   protected abstract verb: "create" | "update";
 
-  protected override async operate({ args, body }: WriteInput): Promise<CommandResult> {
-    const { topic, resource, spec, options } = this.definition;
+  protected override async operate({ args, flags }: WriteInput): Promise<CommandResult> {
+    const { topic, spec, resource, options } = this.definition;
+    const body = await resourceBody(
+      {
+        topic,
+        verb: this.verb,
+        root: spec.root,
+        schema: spec.schema,
+        document: documentSchemaOf(spec.schema, spec.root),
+        fields: fieldsOf(spec, options),
+        references: options.references,
+      },
+      flags,
+    );
     const idKey = named(idName(resource));
     const id = typeof args[idKey] === "string" ? (args[idKey] as string) : undefined;
     if (this.dryRun) {

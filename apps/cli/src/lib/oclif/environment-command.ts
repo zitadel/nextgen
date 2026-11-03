@@ -189,10 +189,6 @@ export abstract class EnvironmentCommand extends BaseCommand {
     return this.suggest(command);
   }
 
-  protected override connectionForRequirement(options: ConnectOptions): Promise<Connection> {
-    return this.connect(options);
-  }
-
   private async openConnection(options: ConnectOptions): Promise<Connection> {
     const { credential } = this.constructor as typeof EnvironmentCommand;
     const { environment } = this;

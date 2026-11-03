@@ -1,9 +1,12 @@
 import { Flags } from "@oclif/core";
 
-import { localContainerName } from "../lib/local-server/runtime";
+import {
+  DEFAULT_LOCAL_SERVER_URL,
+  localContainerName,
+  readRuntimeMetadata,
+} from "../lib/local-server/runtime";
 import { LocalServer } from "../lib/local-server/server";
 import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
-import { recordedRuntime } from "./local-server/requirements/recorded-runtime";
 
 export default class Stop extends BaseCommand {
   static override description = "Stop the local Zitadel server.";
@@ -19,12 +22,14 @@ export default class Stop extends BaseCommand {
     resolveServer: false,
   };
 
-  static override requires = {
-    recorded: recordedRuntime,
-  };
-
-  protected async execute({ flags, recorded }: Admitted<typeof Stop>): Promise<JsonEnvelope> {
-    const { runtime } = recorded;
+  protected async execute({ flags }: Admitted<typeof Stop>): Promise<JsonEnvelope> {
+    // A directory with no server is not refused: there is simply nothing to
+    // stop, which the result says.
+    const runtime = await readRuntimeMetadata(this.cwd);
+    this.meta = {
+      ...this.meta,
+      source: runtime?.server_url ?? DEFAULT_LOCAL_SERVER_URL,
+    };
 
     if (flags.all) {
       return this.stopAllManagedRuntimes();

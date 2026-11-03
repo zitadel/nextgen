@@ -392,6 +392,25 @@ describe("env add", () => {
       expect((await stat(join(cwd, ".env.production.local"))).mode & 0o777).toBe(0o600);
     });
 
+    it("refuses a --server that is not an http(s) URL, before creating anything", async () => {
+      const cwd = await makeProject();
+
+      const result = await runCliForTest([
+        "env",
+        "add",
+        "production",
+        "--cwd",
+        cwd,
+        "--server",
+        "not a url",
+        "--non-interactive",
+        "--json",
+      ]);
+
+      expect((parseJson(result.stdout) as { code?: string }).code).toBe("E_VALIDATION");
+      expect(created).toEqual([]);
+    });
+
     it("is left alone, and no project created, when it already exists", async () => {
       const cwd = await makeProject();
       await writeFile(join(cwd, ".env.production.local"), "OLD=1\n");

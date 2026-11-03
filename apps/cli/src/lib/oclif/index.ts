@@ -6,7 +6,6 @@
 export { type Admitted, BaseCommand, type MetaOptions } from "./base";
 export { atLeastOne, excludes, needs, refuses, type Rule } from "./rules";
 export type { Refusal } from "./refusal";
-export { ends, type Requirement, requirement, unmet } from "./requirements";
 export {
   EnvironmentCommand,
   PREVIEW_CREDENTIAL,

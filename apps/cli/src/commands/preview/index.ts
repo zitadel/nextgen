@@ -19,12 +19,99 @@ import {
   validateStep,
   worktreeIsDirty,
 } from "../../lib/release";
+import { ApiError } from "@zitadel/api/runtime/fetch";
+
+import type { ZitadelClient } from "../../lib/api-client";
+import { type Refusal, refusalError } from "../../lib/oclif/refusal";
+import { detectPreviewUrls } from "../../lib/preview";
+import { reportWarning } from "../../lib/warnings";
 import { originFlag } from "./flags/origin";
 import { messageFlag } from "./flags/message";
 import { ttlFlag } from "./flags/ttl";
-import { previewable } from "./requirements/previewable";
-import { previewTargets } from "./requirements/targets";
-import { previewUrls } from "./requirements/urls";
+import { previewVerdict, runsInCi } from "./verdict";
+
+const CREDENTIAL_REQUIRED_REFUSAL: Refusal = {
+  message: "{credential} is not set",
+  hint: "Set {credential} for this build, or drop --strict to skip the preview when it is absent.",
+};
+
+const NO_URLS_REFUSAL: Refusal = {
+  message: "No preview URLs to deploy to",
+  hint: "Pass --origin, or run inside a pull-request build that sets one of: {variables}.",
+};
+
+const PRIMARY_ORIGIN_REFUSAL: Refusal = {
+  message: "{origins} is a primary origin",
+  hint: "Pass the preview URLs with --origin; production is deployed by `zitadel deploy`, after merge.",
+};
+
+/**
+ * The preview URLs to deploy to: `--origin`, each given once as the request's
+ * unique targets require, else the ones the platform's own build variables
+ * name. None of either is a refusal naming the variables it looked for.
+ */
+export function readPreviewUrls(
+  requested: readonly string[],
+  env: NodeJS.ProcessEnv,
+): readonly string[] {
+  const unique = [...new Set(requested)];
+  if (unique.length > 0) {
+    return unique;
+  }
+  const found = detectPreviewUrls(env);
+  if (found.urls.length === 0) {
+    throw refusalError(NO_URLS_REFUSAL, {
+      variables: found.variablesLookedFor.join(", "),
+    });
+  }
+  return [...found.urls];
+}
+
+/**
+ * The project's primary origins, or none when the preview token may not read
+ * the project (403): the server then decides alone what the token can deploy
+ * to. A 401 is a token the server does not accept at all, which fails here
+ * rather than after the whole bundle is built.
+ */
+async function primaryOrigins(client: ZitadelClient, projectId: string): Promise<string[]> {
+  try {
+    const project = await client.getProject(projectId);
+    return project.origins
+      .filter((entry) => {
+        return entry.kind === "primary";
+      })
+      .map((entry) => {
+        return entry.pattern;
+      });
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 403) {
+      return [];
+    }
+    throw error;
+  }
+}
+
+/**
+ * Refuses a preview URL that is a primary origin: an exact primary origin is
+ * production as surely as the `primary` keyword is. The server is the authority
+ * on what the preview token may reach; this catches the mistake before anything
+ * is built, whenever the token can read the project's origins.
+ */
+export async function refusePrimaryOrigins(
+  urls: readonly string[],
+  client: ZitadelClient,
+  projectId: string,
+): Promise<void> {
+  const primaries = await primaryOrigins(client, projectId);
+  const production = urls.filter((url) => {
+    return primaries.includes(url);
+  });
+  if (production.length > 0) {
+    throw refusalError(PRIMARY_ORIGIN_REFUSAL, {
+      origins: production.join(", "),
+    });
+  }
+}
 
 /**
  * `zitadel preview` — publish `.zitadel/` to a pull-request build's preview URLs.
@@ -75,17 +162,63 @@ export default class Preview extends PreviewCommand {
     }),
   };
 
-  static override requires = {
-    environment: previewable,
-    urls: previewUrls,
-    targets: previewTargets,
-  };
+  /**
+   * Why this build previews nothing, as the result it answers with, or
+   * `undefined` when it does. A build outside a preview environment has nothing
+   * to preview, and one without the preview credential — a fork's, which cannot
+   * read it — warns and exits cleanly unless `--strict` asks to fail.
+   */
+  private whyNothingToPreview(strict: boolean): JsonEnvelope | undefined {
+    const credential = CREDENTIALS[PREVIEW_CREDENTIAL];
+    const verdict = previewVerdict({
+      environment: this.environment.name.value,
+      fromDefault: this.environment.name.source === "default",
+      ci: runsInCi(this.env),
+      credentialSet: this.environment.values[credential] !== undefined,
+      strict,
+    });
+    switch (verdict) {
+      case "preview":
+        return undefined;
+      case "credential-required":
+        throw refusalError(CREDENTIAL_REQUIRED_REFUSAL, {
+          credential,
+        });
+      case "production-build":
+        return this.emit({
+          status: "skipped",
+          reason: "nothing-to-preview",
+          pretty: "nothing to preview — production is deployed by `zitadel deploy`, after merge",
+        });
+      case "unnamed-ci-build":
+        reportWarning(
+          "This CI build names no environment, so the preview is skipped. Set ZITADEL_ENV=preview in the pull-request build that should deploy one.",
+        );
+        return this.emit({
+          status: "skipped",
+          reason: "nothing-to-preview",
+          pretty: "nothing to preview — set ZITADEL_ENV=preview in the pull-request build",
+        });
+      case "no-credential":
+        reportWarning(
+          `No preview credential (${credential}) is set, so the preview is skipped; a fork pull-request build cannot read it. Pass --strict to fail instead.`,
+        );
+        return this.emit({
+          status: "skipped",
+          reason: "no-preview-credential",
+          pretty: `no preview credential (${credential}) — preview skipped`,
+        });
+    }
+  }
 
-  protected async execute({
-    flags,
-    targets: urls,
-  }: Admitted<typeof Preview>): Promise<JsonEnvelope> {
+  protected async execute({ flags }: Admitted<typeof Preview>): Promise<JsonEnvelope> {
+    const nothingToPreview = this.whyNothingToPreview(flags.strict);
+    if (nothingToPreview !== undefined) {
+      return nothingToPreview;
+    }
+    const urls = readPreviewUrls(flags.origin ?? [], this.env);
     const { client, projectId } = await this.connect();
+    await refusePrimaryOrigins(urls, client, projectId);
 
     const { bundle, brandingSources, idpFiles, policyFiles } = await buildBundle(this.cwd);
     const ctx: StepContext = {

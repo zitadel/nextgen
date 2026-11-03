@@ -10,8 +10,16 @@ import {
   type Target,
   uncallable,
 } from "../../lib/api/operations";
-import { type PathValues, urlOf, withPathValues } from "../../lib/api/request";
-import type { ZitadelSecret } from "../../lib/project";
+import {
+  type ApiRequest,
+  buildRequest,
+  type PathValues,
+  pathValuesOf,
+  readInput,
+  urlOf,
+  withPathValues,
+} from "../../lib/api/request";
+import { readZitadelSecret, type ZitadelSecret } from "../../lib/project";
 import {
   type Admitted,
   BaseCommand,
@@ -19,14 +27,135 @@ import {
   type JsonEnvelope,
   nonBlankString,
 } from "../../lib/oclif";
+import { type Refusal, refusalError } from "../../lib/oclif/refusal";
 import { methodFlag } from "./flags/method";
-import { apiForce } from "./requirements/force";
-import { apiOperation } from "./requirements/operation";
-import { apiPaging } from "./requirements/paging";
-import { apiPath, pathValuesFromWords } from "./requirements/path";
-import { apiPayload, requestOf } from "./requirements/payload";
-import { apiSecret } from "./requirements/secret";
 import { Destructive } from "../../lib/oclif/destructive";
+
+const UNCALLABLE_REFUSAL: Refusal = {
+  message: "{reason}",
+  hint: "Call it from the app it belongs to, through the SDK; `zitadel api ls` marks what the CLI can call.",
+};
+
+const NOTHING_TO_PAGE_REFUSAL: Refusal = {
+  message: "{operation} does not page, so --paginate has nothing to follow",
+  hint: "Leave out --paginate.",
+};
+
+const FORCE_REQUIRED_REFUSAL: Refusal = {
+  message: "Cannot call {operation} without --force in non-interactive mode",
+  hint: "Run the same command again, with its --field values or the pipe into --input, and add --force.",
+};
+
+/**
+ * The operation the command line points at: an operation id or a path, with
+ * `-X` choosing among a path's methods. It refuses one the spec does not have
+ * and one the CLI cannot call, because only an end user's session cookie
+ * authenticates it. `undefined` is an operation left to be chosen from a list.
+ */
+export function readOperation(
+  ref: string | undefined,
+  method: string | undefined,
+): Target | undefined {
+  if (ref === undefined) {
+    return undefined;
+  }
+  const target = resolveTarget(ref, method);
+  const reason = uncallable(target.operation);
+  if (reason !== undefined) {
+    throw refusalError(UNCALLABLE_REFUSAL, {
+      reason,
+    });
+  }
+  return target;
+}
+
+/**
+ * Refuses `--paginate` on an operation with no cursor to follow. One still to
+ * be chosen takes it, because only callable paging operations are then offered.
+ */
+export function refuseUnpaged(target: Target | undefined, paginate: boolean): void {
+  if (paginate && target !== undefined && target.operation.paging === null) {
+    throw refusalError(NOTHING_TO_PAGE_REFUSAL, {
+      operation: target.operation.id,
+    });
+  }
+}
+
+/**
+ * The project the operation is called on behalf of, when there is one. An
+ * operation that needs no credential runs anywhere; one that does needs the
+ * project `zitadel setup` wrote, and is refused without it. Either way a
+ * project at hand fills a `project_id` left out, and with the operation still
+ * to be chosen a missing project only narrows what can be chosen.
+ */
+export async function readProjectSecret(
+  target: Target | undefined,
+  cwd: string,
+): Promise<ZitadelSecret | undefined> {
+  if (target?.operation.auth === "secret") {
+    return readZitadelSecret(cwd);
+  }
+  return readZitadelSecret(cwd).catch(() => undefined);
+}
+
+/**
+ * Every path parameter's value the command line gives: from the path itself
+ * when the target was a path, else from the words after the operation in the
+ * order the path has them, with a `project_id` left out filled from the project
+ * at hand. It refuses a word too many, and one given both in the path and as an
+ * argument. The names still without a value are asked for, so they are
+ * reported rather than refused.
+ */
+export function pathValuesFromWords(
+  target: Target,
+  argv: readonly string[],
+  named: boolean,
+  projectId: string | undefined,
+): PathValues {
+  return pathValuesOf(target, argv.slice(named ? 1 : 0), projectId);
+}
+
+/**
+ * `--field` and `--input` laid over the operation's schema, each typed by it.
+ * It refuses a field the operation does not take, a value of the wrong type, a
+ * body on an operation that takes none, and `--input -` with nothing piped in.
+ */
+export async function requestOf(
+  target: Target,
+  flags: Readonly<Record<string, unknown>>,
+  projectId: string | undefined,
+): Promise<ApiRequest> {
+  return buildRequest({
+    target,
+    fields: (flags.field as readonly string[] | undefined) ?? [],
+    input: await readInput(flags.input as string | undefined),
+    projectId,
+  });
+}
+
+/**
+ * Refuses a destructive call nobody can be asked about. An operation that
+ * deletes, revokes or rolls back asks first; with a body it cannot name a
+ * retry, since a body can hold a secret or have come from a pipe a rerun of
+ * the command alone would not have, so the refusal says what to do instead. A
+ * dry run calls nothing, so it asks nothing.
+ */
+export function refuseUnforced(
+  request: ApiRequest,
+  run: { dryRun: boolean; nonInteractive: boolean; force: boolean },
+): void {
+  const asks =
+    request.operation.destructive &&
+    request.body !== undefined &&
+    run.nonInteractive &&
+    !run.force &&
+    !run.dryRun;
+  if (asks) {
+    throw refusalError(FORCE_REQUIRED_REFUSAL, {
+      operation: request.operation.id,
+    });
+  }
+}
 
 /**
  * `zitadel api` — call any operation of the Zitadel API with the server and
@@ -86,15 +215,6 @@ export default class Api extends Destructive(BaseCommand) {
     }),
   };
 
-  static override requires = {
-    operation: apiOperation,
-    paging: apiPaging,
-    secret: apiSecret,
-    path: apiPath,
-    payload: apiPayload,
-    force: apiForce,
-  };
-
   /**
    * No operation is called help, so the word asks for this command's help as
    * `--help` does. It answers before the run is admitted, because help needs
@@ -124,29 +244,23 @@ export default class Api extends Destructive(BaseCommand) {
     });
   }
 
-  protected async execute({
-    argv,
-    args,
-    flags,
-    operation: chosen,
-    secret: { secret },
-    path,
-    payload,
-  }: Admitted<typeof Api>): Promise<JsonEnvelope> {
-    // Only a prompted operation is resolved here: a requirement cannot ask, so
-    // the one the command line named brought its path values and request with it.
-    const prompted = chosen.target === undefined;
-    const target =
-      chosen.target ?? resolveTarget(await this.chooseOperation(flags.paginate, secret));
+  protected async execute({ argv, args, flags }: Admitted<typeof Api>): Promise<JsonEnvelope> {
+    const named = readOperation(args.operation, flags.method);
+    refuseUnpaged(named, flags.paginate);
+    const secret = await readProjectSecret(named, this.cwd);
+
+    const target = named ?? resolveTarget(await this.chooseOperation(flags.paginate, secret));
     const { operation } = target;
     this.recordTelemetry({ operation: operation.id, is_paginated: flags.paginate });
 
-    const given = prompted
-      ? pathValuesFromWords(target, argv, args.operation !== undefined, secret?.project_id)
-      : path;
+    const built = await requestOf(target, flags, secret?.project_id);
+    refuseUnforced(built, this.meta);
     const request = withPathValues(
-      payload.request ?? (await requestOf(target, flags, secret?.project_id)),
-      await this.pathValues(target, given),
+      built,
+      await this.pathValues(
+        target,
+        pathValuesFromWords(target, argv, args.operation !== undefined, secret?.project_id),
+      ),
     );
 
     if (this.dryRun) {

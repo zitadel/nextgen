@@ -31,11 +31,8 @@ import {
 import type { CommandGroup } from "./groups";
 import { type NextSteps, nextStepsData, renderNextSteps } from "./next-steps";
 import { refusalError } from "./refusal";
-import { type Ended, isEnded, isUnmet, type Requirements, type Resolved } from "./requirements";
 import type {
   CommandResult,
-  ConnectOptions,
-  Connection,
   ErrorEnvelope,
   EnvelopeMeta,
   FlagVariable,
@@ -87,16 +84,14 @@ export type MetaOptions = {
 
 /**
  * What {@link BaseCommand.execute} receives once a command has been admitted:
- * its parsed flags, arguments and positional words, and what each of its
- * requirements found, under the name it is declared with. A flag or argument is
- * read as code reads it (`flags.clientId` for `--client-id`); see `./names`.
+ * its parsed flags, arguments and positional words. A flag or argument is read
+ * as code reads it (`flags.clientId` for `--client-id`); see `./names`.
  */
 export type Admitted<C extends typeof BaseCommand> = Readonly<{
   flags: ByName<Interfaces.InferredFlags<C["flags"] & C["baseFlags"]>>;
   args: ByName<Interfaces.InferredArgs<C["args"]>>;
   argv: readonly string[];
-}> &
-  Resolved<C["requires"]>;
+}>;
 
 /**
  * Base class for every oclif command. Owns the global flags, builds the
@@ -170,9 +165,6 @@ export abstract class BaseCommand extends Interruptible(Command) {
    * parse. A command's rules follow those of every class it extends.
    */
   static rules: readonly Rule[] = [];
-
-  /** What this command needs from outside its flags, found before it runs. */
-  static requires: Requirements = {};
 
   /** Resolved context for the current invocation; set by {@link toMeta}. */
   protected meta: GlobalOptions = this.fallbackMeta();
@@ -258,16 +250,12 @@ export abstract class BaseCommand extends Interruptible(Command) {
 
   /**
    * The one lifecycle every command shares: parse the flags, resolve the
-   * context, check the command's rules, find what it requires, and only
-   * then hand the work to {@link execute}. Nothing in `execute` needs to check
-   * anything it was given.
+   * context and check the command's rules, and only then hand the work to
+   * {@link execute}. A flag or argument reaching `execute` has already been
+   * refused if it was not one the command accepts.
    */
   async run(): Promise<JsonEnvelope> {
-    const admitted = await this.admit();
-    if (isEnded(admitted)) {
-      return this.emit(admitted.ended);
-    }
-    return this.execute(admitted);
+    return this.execute(await this.admit());
   }
 
   /** The command's work, which receives only flags, arguments and findings that passed. */
@@ -277,15 +265,11 @@ export abstract class BaseCommand extends Interruptible(Command) {
     return this.suggestUnscoped(command);
   }
 
-  protected connectionForRequirement(_options: ConnectOptions): Promise<Connection> {
-    return Promise.reject(new Error(`${this.id ?? "This command"} has no project to connect to`));
-  }
-
   private get command(): typeof BaseCommand {
     return this.ctor as typeof BaseCommand;
   }
 
-  private async admit(): Promise<Admitted<typeof BaseCommand> | Ended> {
+  private async admit(): Promise<Admitted<typeof BaseCommand>> {
     const parsed = await this.parse(this.command).catch((error: unknown) => {
       throw asRaised(error);
     });
@@ -301,15 +285,10 @@ export abstract class BaseCommand extends Interruptible(Command) {
       argv: parsed.argv.map(String),
     };
     this.refuseBrokenRules(view);
-    const resolved = await this.resolveRequirements(view);
-    if (isEnded(resolved)) {
-      return resolved;
-    }
     return {
       flags,
       args,
       argv: view.argv,
-      ...resolved,
     } as Admitted<typeof BaseCommand>;
   }
 
@@ -341,43 +320,6 @@ export abstract class BaseCommand extends Interruptible(Command) {
         );
       }
     }
-  }
-
-  private async resolveRequirements(view: RuleView): Promise<Record<string, unknown> | Ended> {
-    const resolved: Record<string, unknown> = {};
-    for (const [name, requirement] of Object.entries(this.command.requires)) {
-      const found = await requirement.resolve({
-        ...view,
-        meta: this.meta,
-        connect: (options = {}) => this.connectionForRequirement(options),
-        suggest: (next) => this.suggestRefusal(next),
-        resolved,
-      });
-      if (found === undefined || isUnmet(found)) {
-        throw refusalError(
-          requirement.refusal ?? {
-            message: `${name} could not be found`,
-          },
-          {
-            ...placeholdersOf(view),
-            cwd: this.meta.cwd,
-            ...(found === undefined ? {} : found.unmet),
-          },
-          (next) => this.suggestRefusal(next),
-        );
-      }
-      if (isEnded(found)) {
-        return found;
-      }
-      resolved[name] = found;
-      if (requirement.source !== undefined) {
-        this.meta = {
-          ...this.meta,
-          source: requirement.source(found),
-        };
-      }
-    }
-    return resolved;
   }
 
   /**

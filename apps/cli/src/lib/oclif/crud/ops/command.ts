@@ -4,7 +4,6 @@ import { ZitadelError } from "../../../errors";
 import { EnvironmentCommand } from "../../environment-command";
 import type { Admitted, BaseCommand } from "../../base";
 import type { Rule } from "../../rules";
-import type { Requirements } from "../../requirements";
 import type { CommandResult, JsonEnvelope } from "../../types";
 import type { Json, ResourceCommandOptions, ResourceDescriptor } from "../types";
 import { Destructive } from "../../destructive";
@@ -25,13 +24,11 @@ export type OperationStatics = Readonly<{
   flags: Interfaces.FlagInput;
   args: Interfaces.ArgInput;
   rules?: readonly Rule[];
-  requires?: Requirements;
 }>;
 
 /**
  * What an operation receives: its parsed flags and args, as each operation
- * types them, and what its requirements found under the names it declared
- * them with.
+ * types them.
  */
 export type OperationInput<
   Flags extends object = Json,
@@ -116,7 +113,6 @@ export const bindOperation = <Ctx, Spec>(
     static override flags = statics.flags;
     static override args = statics.args;
     static override rules: readonly Rule[] = statics.rules ?? [];
-    static override requires: Requirements = statics.requires ?? {};
     static override group = definition.resource.group;
     static override groupOrder = definition.resource.groupOrder;
   };

@@ -1,4 +1,8 @@
 import { Args, Flags } from "@oclif/core";
+import { ApiError } from "@zitadel/api/runtime/fetch";
+
+import type { ZitadelClient } from "../../../lib/api-client";
+import { ZitadelError } from "../../../lib/errors";
 
 import {
   type Admitted,
@@ -9,7 +13,6 @@ import {
 import { secretAsStringRule } from "./rules/secret-as-string";
 import { secretValueRule } from "./rules/secret-value";
 import { valueTypeRule } from "./rules/value-type";
-import { previewSecret } from "./requirements/preview-secret";
 import { variableNameArg } from "../args/name";
 import { dryRunResult } from "../../../lib/oclif/crud/shared";
 import {
@@ -24,7 +27,7 @@ import {
   variableReadScope,
   variableScope,
 } from "../../../lib/variables";
-import { inShell } from "../../../lib/suggestion";
+import { inShell, type SuggestedCommand } from "../../../lib/suggestion";
 import { Promptable } from "../../../lib/oclif/promptable";
 import { Tabulatable } from "../../../lib/oclif/tabulatable";
 
@@ -84,14 +87,15 @@ export default class VariableSet extends Tabulatable(Promptable(EnvironmentComma
 
   static override rules = [secretAsStringRule, secretValueRule, valueTypeRule];
 
-  static override requires = {
-    preview: previewSecret,
-  };
-
   protected async execute({ args, flags }: Admitted<typeof VariableSet>): Promise<JsonEnvelope> {
     const type = flags.as as VariableType;
 
     const { client, projectId } = await this.connect();
+    if (flags.preview && !flags.secret) {
+      await refusePreviewOfSecret(client, projectId, args.name, (command) => {
+        return this.suggest(command);
+      });
+    }
     const scope = variableScope(projectId, flags.preview);
     // The kinds this write sets, as the platform's rule gives them: the preview
     // kind alone under `--preview`, otherwise both for a plain value and the
@@ -219,4 +223,49 @@ function pipeArgs(name: string, secret: boolean, type: VariableType, preview: bo
     ...(type === "string" ? [] : ["--as", type]),
     ...(preview ? ["--preview"] : []),
   ].join(" ");
+}
+
+/**
+ * Refuses a plain preview value for a name whose primary value is a secret: it
+ * holds a credential, so its preview value is one too, and stored plain it
+ * would be readable and a preview deploy would freeze it in the clear. A token
+ * that may not read the primary values leaves the check to whoever can; any
+ * other failure leaves the classification unknown, and writing on an unknown is
+ * the one outcome this guard exists to prevent.
+ *
+ * The suggestion is built by the caller, because it must carry the run's
+ * selector before the stdin redirection.
+ */
+export async function refusePreviewOfSecret(
+  client: ZitadelClient,
+  projectId: string,
+  name: string,
+  suggest: (command: string) => SuggestedCommand,
+): Promise<void> {
+  const held = await client
+    .getVariables({ project_id: projectId, kind: "primary" })
+    .then((body) => {
+      return body[name]?.primary;
+    })
+    .catch((error: unknown) => {
+      if (error instanceof ApiError && error.status === 403) {
+        return undefined;
+      }
+      throw error;
+    });
+  if (typeof held !== "object" || held === null) {
+    return;
+  }
+  throw new ZitadelError(
+    "E_VALIDATION",
+    `${name} is a secret, so its preview value must be one too.`,
+    {
+      hint: "Set the preview value with --secret, piped in or prompted for.",
+      nextCommands: [
+        inShell(suggest(`variable set ${name} --secret --preview`), {
+          after: " < value.txt",
+        }),
+      ],
+    },
+  );
 }

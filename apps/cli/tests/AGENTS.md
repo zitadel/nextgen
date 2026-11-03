@@ -14,8 +14,8 @@ reclassified until it is one.
 - Unit tests own all detail: wording, key order, classification, renderer
   output, validation messages, id prefixes, envelope fields. A spec never
   asserts what a unit test can, so a failure names the module that broke.
-- A command's `flags/`, `args/`, `rules/` and `requirements/` modules mirror
-  too: `src/commands/env/flags/app-url.ts` →
+- A command's `flags/`, `args/` and `rules/` modules mirror too:
+  `src/commands/env/flags/app-url.ts` →
   `tests/unit/commands/env/flags/app-url.test.ts`.
 - Drive the pure validator directly, one table over its refusal cases, and put
   a single value through the flag itself to prove the wiring.

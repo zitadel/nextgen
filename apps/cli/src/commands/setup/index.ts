@@ -141,13 +141,7 @@ import { ssoDisplayNameFlag } from "./flags/sso-display-name";
 import { ssoIssuerFlag } from "./flags/sso-issuer";
 import { ssoScopesFlag } from "./flags/sso-scopes";
 import { ssoSlugFlag } from "./flags/sso-slug";
-import { directory } from "./requirements/directory";
-import { localServerVersion } from "./requirements/local-server-version";
-import { project } from "./requirements/project";
-import { server } from "./requirements/server";
-import { worktreeAnswerable } from "./requirements/worktree-answerable";
-import { worktreeClean } from "./requirements/worktree-clean";
-import { worktreeCommittable } from "./requirements/worktree-committable";
+import { setupPreflight } from "./preflight";
 import { clientIdNeedsSsoRule } from "./rules/client-id-needs-sso";
 import { customConnectionIncompleteRule } from "./rules/custom-connection-incomplete";
 import { customSettingsNeedSsoRules } from "./rules/custom-settings-need-sso";
@@ -310,18 +304,15 @@ export default class Setup extends Destructive(BaseCommand) {
     ssoNeedsClientIdRule,
   ];
 
-  static override requires = {
-    server: server,
-    directory: directory,
-    target: project,
-    answerable: worktreeAnswerable,
-    committable: worktreeCommittable,
-    clean: worktreeClean,
-    serverVersion: localServerVersion,
-  };
-
-  protected async execute({ flags, target }: Admitted<typeof Setup>): Promise<JsonEnvelope> {
-    if (target.configured) {
+  protected async execute({ flags }: Admitted<typeof Setup>): Promise<JsonEnvelope> {
+    const preflight = await setupPreflight(flags, this.meta, (next) => {
+      return this.suggestUnscoped(next);
+    });
+    this.meta = {
+      ...this.meta,
+      source: preflight.server.value,
+    };
+    if (preflight.configured) {
       // An app already set up has nothing left to scaffold, but an explicit
       // --dev-port is how it moves to another port.
       if (flags.devPort !== undefined) {

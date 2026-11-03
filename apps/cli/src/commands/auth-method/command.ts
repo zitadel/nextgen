@@ -23,7 +23,7 @@ import { EnvironmentCommand } from "../../lib/oclif/environment-command";
 import { environmentFlags } from "../../lib/oclif/environment-flags";
 import { portableSuggestions, type SuggestedCommand } from "../../lib/suggestion";
 import { nonBlankString } from "../../lib/oclif/flags";
-import { type SchemaTarget, schemaTarget } from "./requirements/target";
+import { readSchemaTarget, type SchemaTarget } from "./target";
 import type { JsonEnvelope } from "../../lib/oclif/types";
 import { Destructive } from "../../lib/oclif/destructive";
 import { Consent } from "../../lib/consent";
@@ -69,9 +69,20 @@ export abstract class AuthMethodCommand extends Destructive(EnvironmentCommand) 
     environment: false,
   };
 
-  static override requires = {
-    target: schemaTarget,
-  };
+  /**
+   * The schema this run changes and the login flows that run against it. Every
+   * `auth-method` command reads it first, before it asks or writes anything.
+   */
+  protected schemaTarget(flags: {
+    schema?: string | undefined;
+    cwd?: string | undefined;
+  }): Promise<SchemaTarget> {
+    return readSchemaTarget({
+      cwd: this.cwd,
+      schema: flags.schema,
+      cwdGiven: flags.cwd !== undefined,
+    });
+  }
 
   /**
    * The last-method guard (ADR 070 §3). Returns what lets {@link writeSchema}

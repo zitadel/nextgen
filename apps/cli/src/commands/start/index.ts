@@ -4,14 +4,15 @@ import { serverLogAction } from "../../lib/journey-guidance";
 import { ensureLocalAdmin } from "../../lib/local-server/admin-credential";
 import { EMPTY_SUMMARY, loadProjectEnv } from "../../lib/local-server/env-vars";
 import { portFlag } from "../local-server/flags/port";
-import { localPort } from "../local-server/requirements/local-port";
 import { imageNeedsDockerRule } from "./rules/image-needs-docker";
 import {
+  DEFAULT_LOCAL_SERVER_PORT,
   PLATFORM_PROJECT_ID,
   defaultLocalServerImageForCliVersion,
   ensureLocalState,
   localContainerName,
   localServerUrl,
+  peekRuntimeMetadata,
   resolveRuntimeBackend,
   type RuntimeMetadata,
 } from "../../lib/local-server/runtime";
@@ -48,13 +49,17 @@ export default class Start extends BaseCommand {
 
   static override rules = [imageNeedsDockerRule];
 
-  static override requires = {
-    port: localPort,
-  };
-
-  protected async execute({ flags, port }: Admitted<typeof Start>): Promise<JsonEnvelope> {
+  protected async execute({ flags }: Admitted<typeof Start>): Promise<JsonEnvelope> {
     const requestedPort = flags.port;
+    // Where the server will be, as far as is known before one is chosen: the
+    // port asked for, else the one this directory already has.
+    const recorded = await peekRuntimeMetadata(this.cwd);
+    const port = requestedPort ?? recorded?.port ?? DEFAULT_LOCAL_SERVER_PORT;
     const serverUrl = localServerUrl(port);
+    this.meta = {
+      ...this.meta,
+      source: serverUrl,
+    };
     const runtimeBackend = resolveRuntimeBackend({
       image: flags.image,
       runtime: flags.runtime,

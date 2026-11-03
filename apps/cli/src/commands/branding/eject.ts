@@ -25,10 +25,18 @@ import {
   type JsonEnvelope,
   nonBlankString,
 } from "../../lib/oclif";
-import { design } from "./requirements/design";
-import { project } from "./requirements/project";
 import { retiredDesignRule } from "./rules/retired-design";
 import { unknownDesignRule } from "./rules/unknown-design";
+import { isBrandingDesign } from "./design-catalog";
+import { hasZitadelConfig } from "../../lib/project";
+import { type Refusal, refusalError } from "../../lib/oclif/refusal";
+
+/** How a directory that `setup` has not made a project is refused. */
+const NOT_A_PROJECT_REFUSAL: Refusal = {
+  message: "This directory is not a Zitadel project",
+  hint: "Run setup first; branding files live under .zitadel/.",
+  next: ["setup"],
+};
 import { metaSchemaState, projectMetaSchemas } from "../../lib/meta-schemas";
 import { normalizePublicCliProse } from "../../lib/public-cli";
 import { DEPLOY_ARGS } from "../../lib/release";
@@ -66,13 +74,18 @@ export default class BrandingEject extends Promptable(BaseCommand) {
 
   static override rules = [retiredDesignRule, unknownDesignRule];
 
-  static override requires = {
-    requested: design,
-    project: project,
-  };
-
-  protected async execute({ requested }: Admitted<typeof BrandingEject>): Promise<JsonEnvelope> {
-    const design = requested.design ?? (await this.promptDesign(this.nonInteractive));
+  protected async execute({ flags }: Admitted<typeof BrandingEject>): Promise<JsonEnvelope> {
+    if (!(await hasZitadelConfig(this.cwd))) {
+      throw refusalError(NOT_A_PROJECT_REFUSAL, {}, (next) => {
+        return this.suggestUnscoped(next);
+      });
+    }
+    // The design rules have already refused one that is not a design, so a
+    // value that survives them is either a design or absent, and absent is
+    // asked for.
+    const requested =
+      flags.design !== undefined && isBrandingDesign(flags.design) ? flags.design : undefined;
+    const design = requested ?? (await this.promptDesign(this.nonInteractive));
     this.recordTelemetry({ design, force: this.force });
     const { branding, template } = getDefaultBrandingConfig(design);
 
