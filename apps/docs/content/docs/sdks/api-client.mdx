@@ -79,7 +79,7 @@ const schemas = await client.listSchemas.all({ project_id, limit: 100 });
 `items()` and `pages()` fetch the next page only when the loop reaches it, so a loop that stops early reads nothing more. `limit` sets the page size, and a `page_token` among the arguments is where the walk starts. To change what every call returns, each page included, pass `onResponse` or `onError` to `createZitadelClient`.
 
 <Callout title="Edit the OpenAPI source" type="warn">
-  Do not hand-edit generated API package output. Update `api/openapi/**` and regenerate through the repo tasks.
+  Do not hand-edit generated API package output. Update `apps/api/api/openapi/**` and regenerate through the repo tasks.
 </Callout>
 
 <Cards>

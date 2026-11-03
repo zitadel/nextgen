@@ -4,7 +4,7 @@ import { CommandGroups, type JsonEnvelope, nonBlankString, PreviewCommand } from
 import { Tabulatable } from "../../lib/oclif/tabulatable";
 import { collectPages } from "../../lib/oclif/crud/paging";
 import { listData } from "../../lib/oclif/envelope";
-import { shellArg } from "../../lib/shell";
+import { Cmd } from "../../lib/cmd";
 
 /** The columns `list` renders, in order. */
 const COLUMNS = ["url", "expires", "created"] as const;
@@ -81,7 +81,7 @@ export default class PreviewList extends Tabulatable(PreviewCommand) {
             [
               "preview list",
               ...(flags.limit === undefined ? [] : [`--limit ${flags.limit}`]),
-              `--page-token ${shellArg(next)}`,
+              `--page-token ${Cmd.quote(next)}`,
               "--json",
             ].join(" "),
           )
@@ -97,7 +97,7 @@ export default class PreviewList extends Tabulatable(PreviewCommand) {
         plain,
         singular: "preview",
         empty: "No live previews.",
-        footer: next ? [`More available: --page-token ${shellArg(next)} (or --all)`] : [],
+        footer: next ? [`More available: --page-token ${Cmd.quote(next)} (or --all)`] : [],
       }),
     });
   }
