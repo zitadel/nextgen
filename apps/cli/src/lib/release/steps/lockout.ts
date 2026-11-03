@@ -82,9 +82,17 @@ async function lockoutWarnings(ctx: StepContext): Promise<string[]> {
     return listed;
   };
   const { flows, unresolved, unreadable } = await servedFlows(ctx, names);
-  // A release with no flow definitions leaves the project's flows as they are,
-  // so it strands no one (unlike one whose flows are all drafts).
-  const noFlows = ctx.bundle.flow_definitions.length === 0;
+  // Why the SSO check cannot run, if it cannot. A release with no flow
+  // definitions needs no note: against a real server, such a release leaves the
+  // project serving the flows it already had, so it strands no one (unlike one
+  // whose flows are all drafts).
+  const ssoSkipped = unreadable
+    ? "Skipped the SSO lockout check: the project's schemas could not be read."
+    : unresolved
+      ? "Skipped the SSO lockout check: a flow names a schema that this release does not define."
+      : ctx.bundle.flow_definitions.length === 0
+        ? ""
+        : undefined;
   // Every scan gets its own share of the cap up front, so none can starve
   // another and the total stays within it.
   const scanned = new Set(
@@ -94,8 +102,7 @@ async function lockoutWarnings(ctx: StepContext): Promise<string[]> {
   // One scan failing must not discard what the other found.
   const settled = await Promise.allSettled([
     lookupWarnings(ctx, flows, share),
-    // With a flow whose schema is unknown, "a schema no flow serves" cannot be told.
-    unresolved || unreadable || noFlows ? nothing() : ssoWarnings(ctx, flows, names, share),
+    ssoSkipped === undefined ? ssoWarnings(ctx, flows, names, share) : nothing(),
   ]);
   const scans = settled.flatMap((outcome) =>
     outcome.status === "fulfilled" ? [outcome.value] : [],
@@ -110,12 +117,8 @@ async function lockoutWarnings(ctx: StepContext): Promise<string[]> {
       "Could not finish checking existing users for sign-in lockouts: a request to the server failed.",
     );
   }
-  if (unreadable) {
-    notes.push("Skipped the SSO lockout check: the project's schemas could not be read.");
-  } else if (unresolved) {
-    notes.push(
-      "Skipped the SSO lockout check: a flow names a schema that this release does not define.",
-    );
+  if (ssoSkipped) {
+    notes.push(ssoSkipped);
   }
   const partial = scans.flatMap((scan) => scan.partial);
   if (partial.length > 0) {

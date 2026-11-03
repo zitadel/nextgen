@@ -4,6 +4,7 @@ import {
   setupPlatformHandlers,
   snapshotPlatformStore,
 } from "@zitadel/api-mock/platform";
+import { QueryUsersBody } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import { getDefaultHumanUserSchema } from "@zitadel/config/defaults";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
@@ -136,7 +137,16 @@ export function usePlatformMock(): PlatformMock {
   const holdUsers = (matching: Record<string, unknown>[], elsewhere: Record<string, unknown>[]) => {
     server.use(
       http.post("*/users/query", async ({ request }) => {
-        const { filter = [] } = (await request.json()) as {
+        const body: unknown = await request.json();
+        // Held to the API's own request schema, as the real server holds it, so a
+        // filter shape the API would refuse fails the spec instead of passing.
+        if (!QueryUsersBody.safeParse(body).success) {
+          return HttpResponse.json(
+            { code: "req.invalid", message: "the request is invalid" },
+            { status: 400 },
+          );
+        }
+        const { filter = [] } = body as {
           filter?: Array<{ field: string; operation: string; value: string }>;
         };
         const status = filter.find((entry) => entry.field === "status")?.value;
