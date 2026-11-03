@@ -1,11 +1,11 @@
-import type {
-  CreateFlow201,
-  CreateFlow201Step,
-  CreateFlow201StepFieldsItem,
+import {
+  type CreateFlow201,
+  type CreateFlow201Step,
+  type CreateFlow201StepFieldsItem,
   CreateFlowBodyPurpose,
-  SubmitFlowStepBody,
-  SubmitFlowStepBodyChallengeResponse,
-  SubmitFlowStepBodyFields,
+  type SubmitFlowStepBody,
+  type SubmitFlowStepBodyChallengeResponse,
+  type SubmitFlowStepBodyFields,
 } from "@zitadel/api/generated/model";
 import { ApiError, apiErrorMessage } from "@zitadel/api/runtime/fetch";
 import { zitadelTrustmarkInnerHtml } from "../internal/attribution-markup.js";
@@ -180,6 +180,21 @@ function apiErrorCode(error: unknown): string {
     ? String((body as { code: unknown }).code)
     : "";
 }
+
+/**
+ * The request fields a `req.invalid` envelope names (`details.details.fields`),
+ * or none for any other error.
+ */
+function apiErrorFields(error: unknown): string[] {
+  if (!(error instanceof ApiError)) return [];
+  const details = (error.body as { details?: { details?: { fields?: unknown } } } | null)?.details;
+  const fields = details?.details?.fields;
+  return Array.isArray(fields) ? fields.filter((field) => typeof field === "string") : [];
+}
+
+/** Where a `<zitadel-login>` gets its project id, for errors about it. */
+const PROJECT_ID_FIX =
+  "Check the `project-id` attribute, `configureZitadel({ projectId })` or the `project` handle.";
 
 /**
  * Orchestrator element `<zitadel-login>` — drives a login flow end to end and
@@ -808,11 +823,13 @@ export class ZitadelLogin extends ZitadelSurface {
   private async startFlow(): Promise<void> {
     this.loading = true;
     this.startupError = null;
+    let projectId = "";
     try {
       // Resolve inside the try so a missing configuration surfaces through
       // `handleTransportError` (rendered as `startupError`) rather than as an
       // unhandled promise rejection from `firstUpdated`'s microtask.
       const { project: cfg, api } = resolveApi(this.project, this.projectAttrs, "<zitadel-login>");
+      projectId = cfg.projectId ?? "";
       let wire: CreateFlow201 | undefined;
       const resumeId = this.restarting ? "" : this.resumeFlowId || flowIdFromLocation();
       if (resumeId) {
@@ -857,7 +874,7 @@ export class ZitadelLogin extends ZitadelSurface {
       emit(this, "zitadel-flow-step", { step: wire.step });
     } catch (error) {
       if (await this.restartIfRequired(error)) return;
-      this.handleTransportError(this.describeFlowSelectionError(error));
+      this.handleTransportError(this.describeFlowSelectionError(error, projectId));
     } finally {
       this.loading = false;
     }
@@ -904,22 +921,50 @@ export class ZitadelLogin extends ZitadelSurface {
   }
 
   /**
-   * When a `flow-name` lookup fails, the server's envelope only says
-   * "not found" / "purpose mismatch" — it cannot know the name came from
-   * an attribute. Rewrap those two codes with the attribute and the fix;
-   * every other error passes through untouched.
+   * The server's envelope names what was wrong (a code, and for `req.invalid`
+   * the fields), but not that the value came from one of this element's
+   * attributes. Rewrap the codes a misconfigured element produces with the
+   * attribute, its value and the fix; every other error passes through.
    */
-  private describeFlowSelectionError(error: unknown): unknown {
-    if (!this.flowName) return error;
+  private describeFlowSelectionError(error: unknown, projectId: string): unknown {
     const code = apiErrorCode(error);
-    if (code === "flowdef.not_found") {
+    if (code === "req.invalid") {
+      const fields = apiErrorFields(error);
+      if (fields.includes("purpose")) {
+        return new Error(
+          `<zitadel-login> purpose="${this.purpose}" is not a flow purpose. ` +
+            `Use one of: ${Object.values(CreateFlowBodyPurpose).join(", ")}.`,
+        );
+      }
+      if (fields.includes("flow_definition_name")) {
+        return new Error(
+          `<zitadel-login> flow-name="${this.flowName}" is not a flow name. A name ` +
+            `starts with a lowercase letter and holds only lowercase letters, digits ` +
+            `and hyphens, as the \`name\` in your flow file does.`,
+        );
+      }
+      if (fields.includes("project_id")) {
+        return new Error(`<zitadel-login> "${projectId}" is not a project id. ${PROJECT_ID_FIX}`);
+      }
+      return error;
+    }
+    if (code === "proj.not_found") {
       return new Error(
-        `<zitadel-login> flow-name="${this.flowName}" does not match any active flow ` +
-          `definition in this project. Check the \`name\` in your flow file and that ` +
-          `it has been deployed (\`zitadel deploy\`).`,
+        `<zitadel-login> no project "${projectId}" exists on this server. ${PROJECT_ID_FIX}`,
       );
     }
-    if (code === "flowdef.purpose_mismatch") {
+    if (code === "flowdef.not_found") {
+      return new Error(
+        this.flowName
+          ? `<zitadel-login> flow-name="${this.flowName}" does not match any active flow ` +
+              `definition in this project. Check the \`name\` in your flow file and that ` +
+              `it has been deployed (\`zitadel deploy\`).`
+          : `<zitadel-login> no active flow definition without an \`audience\` serves ` +
+              `purpose "${this.purpose}" in this project. Deploy one whose \`purposes\` ` +
+              `include "${this.purpose}" (\`zitadel deploy\`), or name one with \`flow-name\`.`,
+      );
+    }
+    if (code === "flowdef.purpose_mismatch" && this.flowName) {
       return new Error(
         `<zitadel-login> flow-name="${this.flowName}" matched a flow definition that ` +
           `does not serve purpose "${this.purpose}".`,

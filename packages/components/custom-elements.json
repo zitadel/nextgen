@@ -8143,6 +8143,10 @@
       "path": "src/orchestrator/zitadel-login.ts",
       "declarations": [
         {
+          "kind": "variable",
+          "name": "fields"
+        },
+        {
           "kind": "class",
           "description": "Orchestrator element `<zitadel-login>` — drives a login flow end to end and\nsurfaces its progress through the public `zitadel-*` events.",
           "name": "ZitadelLogin",
@@ -8608,9 +8612,15 @@
                   "type": {
                     "text": "unknown"
                   }
+                },
+                {
+                  "name": "projectId",
+                  "type": {
+                    "text": "string"
+                  }
                 }
               ],
-              "description": "When a `flow-name` lookup fails, the server's envelope only says\n\"not found\" / \"purpose mismatch\" — it cannot know the name came from\nan attribute. Rewrap those two codes with the attribute and the fix;\nevery other error passes through untouched."
+              "description": "The server's envelope names what was wrong (a code, and for `req.invalid`\nthe fields), but not that the value came from one of this element's\nattributes. Rewrap the codes a misconfigured element produces with the\nattribute, its value and the fix; every other error passes through."
             },
             {
               "kind": "method",
@@ -9372,10 +9382,6 @@
           },
           "tagName": "zitadel-login",
           "customElement": true
-        },
-        {
-          "kind": "variable",
-          "name": "fields"
         },
         {
           "kind": "variable",

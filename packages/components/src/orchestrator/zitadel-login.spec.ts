@@ -454,6 +454,69 @@ describe("<zitadel-login> against the typed Flow API", () => {
     expect(text).toContain('purpose "login"');
   });
 
+  describe("explains a misconfigured element from the server's envelope", () => {
+    /** Mounts an element whose flow start the server answers with `body` and `status`. */
+    const startRefused = async (
+      body: Record<string, unknown>,
+      status: number,
+      attributes: Record<string, string> = {},
+    ) => {
+      server.use(http.post("*/flow", () => HttpResponse.json(body, { status }), { once: true }));
+      const element = document.createElement("zitadel-login") as ZitadelLogin;
+      element.project = testProject;
+      for (const [name, value] of Object.entries(attributes)) element.setAttribute(name, value);
+      host.appendChild(element);
+      await waitFor(() => element.shadowRoot?.querySelector("zl-alert"));
+      return element.shadowRoot?.querySelector("zl-alert")?.textContent ?? "";
+    };
+    const invalid = (...fields: string[]) => ({
+      code: "req.invalid",
+      message: "The request is invalid and fails base validation.",
+      details: { details: { fields } },
+    });
+
+    it("names the purpose and lists the valid ones", async () => {
+      const text = await startRefused(invalid("purpose"), 400, { purpose: "signin" });
+      expect(text).toContain('purpose="signin" is not a flow purpose');
+      expect(text).toContain("login, register, recovery, profiling, reauth, link_account");
+    });
+
+    it("names a flow-name the server's pattern refuses", async () => {
+      const text = await startRefused(invalid("flow_definition_name"), 400, {
+        "flow-name": "New_Login",
+      });
+      expect(text).toContain('flow-name="New_Login" is not a flow name');
+    });
+
+    it("names a project id the server refuses", async () => {
+      const text = await startRefused(invalid("project_id"), 400);
+      expect(text).toContain(`"${testProject.projectId}" is not a project id`);
+    });
+
+    it("names a project the server does not have", async () => {
+      const text = await startRefused(
+        { code: "proj.not_found", message: "project not found" },
+        404,
+      );
+      expect(text).toContain(`no project "${testProject.projectId}" exists`);
+    });
+
+    it("names the purpose no default flow serves when no flow-name is set", async () => {
+      const text = await startRefused(
+        { code: "flowdef.not_found", message: "flow definition: not found" },
+        404,
+        { purpose: "recovery" },
+      );
+      expect(text).toContain('serves purpose "recovery"');
+      expect(text).toContain("flow-name");
+    });
+
+    it("passes a req.invalid about any other field through", async () => {
+      const text = await startRefused(invalid("schema_version"), 400);
+      expect(text).toContain("fails base validation");
+    });
+  });
+
   it("submits with {session_token, action, fields} and applies the next step", async () => {
     const element = await mount(host);
 
