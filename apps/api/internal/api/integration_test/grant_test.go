@@ -61,6 +61,7 @@ func TestGrantCreateGetRevoke(t *testing.T) {
 	platform := harness.EnsurePlatformProject(t)
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
+	claimProject(t, project.ID)
 
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
@@ -227,16 +228,10 @@ func TestGrantCreateGetRevoke(t *testing.T) {
 	t.Run("owning-team assignment get and delete are not found", func(t *testing.T) {
 		t.Parallel()
 
-		team, err := harness.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{
-			ProjectID: platform.ID,
-			Name:      helpers.TeamName(),
-		})
-		require.NoError(t, err)
-
+		// The project's claim: claimProject wrote it.
 		stmts := harness.EnsureServiceDB(t).Statements()
-		asgn := domain.NewClaimTeamAssignment(project.ID, team.ID)
-		require.NoError(t, stmts.CreateAuthzAssignment(t.Context(), asgn))
-		require.NotEmpty(t, asgn.ID)
+		asgn, err := stmts.GetActiveOwningTeamGrant(t.Context(), project.ID)
+		require.NoError(t, err)
 
 		getResp, err := client.GetGrant(t.Context(), api.GetGrantParams{
 			ID:        asgn.ID,
@@ -265,6 +260,7 @@ func TestGrantCreateLocators(t *testing.T) {
 	platform := harness.EnsurePlatformProject(t)
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
+	claimProject(t, project.ID)
 
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
@@ -320,6 +316,7 @@ func TestGrantCreateLocators(t *testing.T) {
 		// would otherwise make a global QueryGrants length assertion race.
 		isolated, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 		require.NoError(t, err)
+		claimProject(t, isolated.ID)
 		isolatedClient, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 		require.NoError(t, err)
 		harness.SetProjectSecretOnApiClient(t, isolatedClient, isolated)
@@ -485,6 +482,15 @@ func grantsForUser(t *testing.T, client *helpers.ApiClient, projectID, userID st
 	return page.Grants
 }
 
+// claimProject gives the project an owning team from the platform project,
+// as claim/complete does: a project needs one before it grants a platform
+// user or team (ADR 054 §4 amendment).
+func claimProject(t *testing.T, projectID string) {
+	t.Helper()
+	_, teamID := harness.CreateUserOwnedByTeam(t, harness.EnsurePlatformProject(t).ID)
+	harness.SeedOwningTeam(t, projectID, teamID)
+}
+
 // platformReader signs in a platform user who may read the project's grants
 // and the platform project's users: the caller expand=principal admits.
 func platformReader(t *testing.T, projectID string) *helpers.ApiClient {
@@ -509,6 +515,16 @@ func TestGrantQuery(t *testing.T) {
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
 	harness.SetProjectSecretOnApiClient(t, client, project)
+
+	// The claim the grants below need, and a row the list must not show.
+	stmts := harness.EnsureServiceDB(t).Statements()
+	owningTeam, err := harness.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{
+		ProjectID: platform.ID,
+		Name:      helpers.TeamName(),
+	})
+	require.NoError(t, err)
+	owning := domain.NewClaimTeamAssignment(project.ID, owningTeam.ID)
+	require.NoError(t, stmts.CreateAuthzAssignment(t.Context(), owning))
 
 	params := api.QueryGrantsParams{ProjectID: api.ProjectID(project.ID)}
 	getParams := func(id string) api.GetGrantParams {
@@ -543,7 +559,6 @@ func TestGrantQuery(t *testing.T) {
 	require.NoError(t, err)
 	require.IsType(t, &api.DeleteGrantNoContent{}, delResp, helpers.MustMarshal(t, delResp))
 
-	stmts := harness.EnsureServiceDB(t).Statements()
 	expiredUserID := harness.CreateUserWithTeam(t, platform.ID)
 	expiredAt := time.Now().Add(-time.Hour)
 	expiredAsgn := &domain.AuthzAssignment{
@@ -557,14 +572,6 @@ func TestGrantQuery(t *testing.T) {
 	}
 	expiredAsgn.ApplyScope(domain.NewProjectAssignmentScope())
 	require.NoError(t, stmts.CreateAuthzAssignment(t.Context(), expiredAsgn))
-
-	owningTeam, err := harness.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{
-		ProjectID: platform.ID,
-		Name:      helpers.TeamName(),
-	})
-	require.NoError(t, err)
-	owning := domain.NewClaimTeamAssignment(project.ID, owningTeam.ID)
-	require.NoError(t, stmts.CreateAuthzAssignment(t.Context(), owning))
 
 	setupAsgns, err := stmts.ListAuthzAssignments(t.Context(), project.ID, domain.AuthzPrincipalTypeSKProj, project.ID, false)
 	require.NoError(t, err)
@@ -679,6 +686,7 @@ func TestGrantQueryExpand(t *testing.T) {
 	platform := harness.EnsurePlatformProject(t)
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
+	claimProject(t, project.ID)
 
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
@@ -928,6 +936,7 @@ func TestGrantSessionCaller(t *testing.T) {
 	platform := harness.EnsurePlatformProject(t)
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
+	claimProject(t, project.ID)
 
 	operatorID := harness.CreateUserWithTeam(t, platform.ID)
 	harness.SeedProjectAdmin(t, project.ID, operatorID)
@@ -1086,8 +1095,7 @@ func TestGrantAnonymousProjectCannotReadPlatformUser(t *testing.T) {
 
 	// Claimed the way claim/complete leaves it: an owning team from the
 	// platform project.
-	_, owningTeamID := harness.CreateUserOwnedByTeam(t, platform.ID)
-	harness.SeedOwningTeam(t, project.ID, owningTeamID)
+	claimProject(t, project.ID)
 
 	createResp, err := attacker.CreateGrant(t.Context(), userIDGrant(targetID, api.CreateGrantRequestRelationEditor), createParams)
 	require.NoError(t, err)

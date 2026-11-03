@@ -208,6 +208,7 @@ func TestGrantErrorResponse(t *testing.T) {
 		{"principal_not_found", domain.ErrGrantPrincipalNotFound(), http.StatusNotFound},
 		{"already_exists", domain.ErrGrantAlreadyExists(), http.StatusConflict},
 		{"permission_denied", domain.ErrGrantPermissionDenied(), http.StatusForbidden},
+		{"project_unclaimed", domain.ErrGrantProjectUnclaimed(), http.StatusForbidden},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

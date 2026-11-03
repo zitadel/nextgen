@@ -251,7 +251,7 @@ func grantErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 		return errorResponseWithStatusCode(http.StatusNotFound, err)
 	case domain.ErrGrantAlreadyExists().Code:
 		return errorResponseWithStatusCode(http.StatusConflict, err)
-	case domain.ErrGrantPermissionDenied().Code:
+	case domain.ErrGrantPermissionDenied().Code, domain.ErrGrantProjectUnclaimed().Code:
 		return errorResponseWithStatusCode(http.StatusForbidden, err)
 	default:
 		return internalErrorResponse(err)
