@@ -372,7 +372,10 @@ export default class Doctor extends Destructive(BaseCommand) {
   }
 
   private checks(flags: Asked, cwd: string): Promise<Checking> {
-    const already = this.checking.get(cwd);
+    // What was asked for as well as where, because the answer is read from
+    // both: the same directory with another port named is another answer.
+    const asked = `${cwd}\u0000${flags.port ?? ""}\u0000${flags.runtime ?? ""}\u0000${flags.image ?? ""}`;
+    const already = this.checking.get(asked);
     if (already !== undefined) {
       return already;
     }
@@ -387,7 +390,7 @@ export default class Doctor extends Destructive(BaseCommand) {
         hostedServer: await this.hostedServerWithoutLocalRuntime(flags, cwd),
       };
     })();
-    this.checking.set(cwd, working);
+    this.checking.set(asked, working);
     return working;
   }
 

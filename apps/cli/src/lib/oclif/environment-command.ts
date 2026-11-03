@@ -168,8 +168,24 @@ export abstract class EnvironmentCommand extends BaseCommand {
    * non-interactively.
    */
   protected connect(options: ConnectOptions = {}): Promise<Connection> {
-    const key = JSON.stringify(options);
-    const open = this.connections.get(key) ?? this.openConnection(options);
+    // The options read for what they are, not in the order they were written,
+    // so the same two asked for twice are one connection and not two clients,
+    // two "Project/Server" lines and two credential prompts.
+    const key = JSON.stringify(
+      Object.fromEntries(
+        Object.entries(options).sort(([one], [other]) => one.localeCompare(other)),
+      ),
+    );
+    const already = this.connections.get(key);
+    if (already !== undefined) {
+      return already;
+    }
+    // A failed connection is forgotten rather than kept: a credential given
+    // after the first attempt was refused would otherwise never be tried.
+    const open = this.openConnection(options).catch((error: unknown) => {
+      this.connections.delete(key);
+      throw error;
+    });
     this.connections.set(key, open);
     return open;
   }

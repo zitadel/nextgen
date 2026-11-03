@@ -1,7 +1,10 @@
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 
-import { readNearestRuntimeMetadata } from "../../lib/local-server/runtime";
+import {
+  DEFAULT_LOCAL_SERVER_URL,
+  readNearestRuntimeMetadata,
+} from "../../lib/local-server/runtime";
 import { LocalServer } from "../../lib/local-server/server";
 import { startedServer } from "../local-server/started";
 import {
@@ -79,8 +82,10 @@ export default class Logs extends BaseCommand {
 
   private readonly started = startedServer(readNearestRuntimeMetadata);
 
-  protected override async sourceOf(_flags: unknown, cwd: string): Promise<string | undefined> {
-    return (await this.started.of(cwd))?.runtime.server_url;
+  protected override async sourceOf(_flags: unknown, cwd: string): Promise<string> {
+    // The default where nothing was started here, because a run still reports
+    // the server it is about: an empty one would name no server at all.
+    return (await this.started.of(cwd))?.runtime.server_url ?? DEFAULT_LOCAL_SERVER_URL;
   }
 
   protected async execute({ flags }: Admitted<typeof Logs>): Promise<JsonEnvelope> {

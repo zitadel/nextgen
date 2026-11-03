@@ -115,6 +115,12 @@ describe("--origin", () => {
       hint: expect.stringContaining("--origin"),
     });
   });
+
+  it("says a blank value is empty, in the words every blank value is refused with", async () => {
+    await expect(parseFlag(Preview.flags.origin, "", "origin")).rejects.toMatchObject({
+      message: "it was given an empty value",
+    });
+  });
 });
 
 describe("-m", () => {

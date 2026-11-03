@@ -58,9 +58,13 @@ const RETIRED_DESIGN_REFUSAL: Refusal = {
   next: ["branding eject --design centered"],
 };
 
-/** How a `--design` that names no design, retired or shipped, is refused. */
+/**
+ * How a `--design` that names no design, retired or shipped, is refused. The
+ * value is quoted as JSON, so an escape sequence in it reads as text rather
+ * than driving the terminal it is printed on.
+ */
 const UNKNOWN_DESIGN_REFUSAL: Refusal = {
-  message: 'Unknown design "{design}"',
+  message: "Unknown design {design}",
   hint: `Pick one of: ${DESIGN_CATALOG}.`,
 };
 
@@ -119,7 +123,7 @@ export default class BrandingEject extends Promptable(BaseCommand) {
     }
     if (flags.design !== undefined && !isBrandingDesign(flags.design)) {
       throw refusalError(UNKNOWN_DESIGN_REFUSAL, {
-        design: flags.design,
+        design: JSON.stringify(flags.design),
       });
     }
     if (!(await hasZitadelConfig(this.cwd))) {

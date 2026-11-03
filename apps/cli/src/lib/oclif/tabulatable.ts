@@ -169,6 +169,14 @@ export function Tabulatable<TBase extends CommandClass<BaseCommand>>(Base: TBase
         columns: columns.map((key) => ({ key, name: key.split(".").at(-1) ?? key })),
         borderStyle: "headers-only-with-underline",
         maxWidth: "none",
+        // The library styles a header bold blue from its own reading of the
+        // environment, and spreads what it is given over that, so turning the
+        // style off means naming both. The run has already settled the
+        // question, and a `--no-color` run whose table arrived coloured anyway
+        // would be the answer going unheard.
+        headerOptions: this.isColored
+          ? { bold: true, color: "blue" }
+          : { bold: false, color: undefined },
       });
       return table.replace(/\n+$/, "");
     }

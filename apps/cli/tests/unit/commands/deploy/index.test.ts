@@ -20,7 +20,7 @@ describe("missingPrimaryOrigin", () => {
   it("suggests doctor --fix for setup's project holding its issuer as a preview origin", () => {
     const outcome = outcomeFor({ origins: PREVIEW_ISSUER });
 
-    expect(outcome.next).toBe("doctor --fix");
+    expect(outcome.next).toEqual(["doctor --fix"]);
     expect(outcome.hint).toContain("`zitadel doctor --fix`");
   });
 
@@ -33,7 +33,10 @@ describe("missingPrimaryOrigin", () => {
   it("suggests removing and re-adding the issuer for a project doctor does not repair", () => {
     const outcome = outcomeFor({ origins: PREVIEW_ISSUER, setupProject: false });
 
-    expect(outcome.next).toBe(`origin rm ${ISSUER} --force`);
+    expect(outcome.next).toEqual([
+      `origin rm ${ISSUER} --force`,
+      `origin add ${ISSUER} --kind primary`,
+    ]);
     expect(outcome.hint).toContain(`zitadel origin add ${ISSUER} --kind primary`);
   });
 
@@ -42,11 +45,13 @@ describe("missingPrimaryOrigin", () => {
       origins: [{ pattern: "https://*-acme.vercel.app", kind: "preview" }],
     });
 
-    expect(outcome.next).toBe(`origin add ${ISSUER} --kind primary`);
+    expect(outcome.next).toEqual([`origin add ${ISSUER} --kind primary`]);
   });
 
   it("adds the issuer as its origin, without a trailing slash", () => {
-    expect(outcomeFor({ issuer: `${ISSUER}/` }).next).toBe(`origin add ${ISSUER} --kind primary`);
+    expect(outcomeFor({ issuer: `${ISSUER}/` }).next).toEqual([
+      `origin add ${ISSUER} --kind primary`,
+    ]);
   });
 
   it("names origin add with a URL to fill in when no issuer resolves", () => {
@@ -54,7 +59,7 @@ describe("missingPrimaryOrigin", () => {
   });
 
   it("suggests origin list when no issuer resolves", () => {
-    expect(outcomeFor({ issuer: undefined }).next).toBe("origin list");
+    expect(outcomeFor({ issuer: undefined }).next).toEqual(["origin list"]);
   });
 });
 

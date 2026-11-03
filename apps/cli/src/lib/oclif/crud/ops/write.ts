@@ -70,8 +70,13 @@ const rawBodyFlags = (document: ZodLike | undefined, fields: readonly BodyField[
   };
 };
 
-/** Each schema's fields, described once: the walk is the same every time. */
-const described = new WeakMap<object, readonly BodyField[]>();
+/**
+ * Each schema's fields, described once: the walk is the same every time it is
+ * asked for. The description also depends on which part of the body is read
+ * and which flag names are already taken, and two writes can share one body
+ * schema while differing in either, so the answer is kept under both.
+ */
+const described = new WeakMap<object, Map<string, readonly BodyField[]>>();
 
 /**
  * A write's fields, read the same way for its `--help` and for a run, and
@@ -81,15 +86,16 @@ const fieldsOf = <Ctx>(
   spec: WriteShape & { schema: CreateSpec<Ctx>["schema"] },
   options: ResourceCommandOptions<Ctx>,
 ): readonly BodyField[] => {
-  const already = described.get(spec.schema as object);
+  const reserved = Object.keys(options.flags ?? {});
+  const under = `${spec.root ?? ""}\u0000${reserved.join("\u0000")}`;
+  const forSchema = described.get(spec.schema as object) ?? new Map();
+  described.set(spec.schema as object, forSchema);
+  const already = forSchema.get(under);
   if (already !== undefined) {
     return already;
   }
-  const fields = describeBody(spec.schema, {
-    root: spec.root,
-    reserved: Object.keys(options.flags ?? {}),
-  });
-  described.set(spec.schema as object, fields);
+  const fields = describeBody(spec.schema, { root: spec.root, reserved });
+  forSchema.set(under, fields);
   return fields;
 };
 

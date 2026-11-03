@@ -40,12 +40,20 @@ export default class Console extends BaseCommand {
 
   static override meta = {
     resolveServer: false,
-    source: DEFAULT_LOCAL_SERVER_URL,
   };
 
+  /**
+   * The server the console signs into, read before the run has a context so
+   * that every event and any refusal names it: `start` may have run in a
+   * parent of the app directory, and its runtime metadata sits beside the
+   * admin it created, so both are read from there.
+   */
+  protected override async sourceOf(_flags: unknown, cwd: string): Promise<string> {
+    const localDir = (await findLocalAdminDir(cwd)) ?? cwd;
+    return (await readRuntimeMetadata(localDir))?.server_url ?? DEFAULT_LOCAL_SERVER_URL;
+  }
+
   protected async execute({ flags }: Admitted<typeof Console>): Promise<JsonEnvelope> {
-    // `start` may have run in a parent of the app directory, and its runtime
-    // metadata sits beside the admin it created, so both are read from there.
     const localDir = (await findLocalAdminDir(this.cwd)) ?? this.cwd;
     const admin = await readLocalAdmin(localDir);
     if (admin === undefined) {
@@ -53,10 +61,6 @@ export default class Console extends BaseCommand {
         return this.suggestUnscoped(next);
       });
     }
-    this.meta = {
-      ...this.meta,
-      source: (await readRuntimeMetadata(localDir))?.server_url ?? DEFAULT_LOCAL_SERVER_URL,
-    };
 
     // A link is minted by running the real login flow, which burns a one-time
     // handoff token on the server — a mutation, so a dry run only reports who

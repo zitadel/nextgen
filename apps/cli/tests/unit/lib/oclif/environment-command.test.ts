@@ -27,6 +27,23 @@ class ProjectProbe extends EnvironmentCommand {
   }
 }
 
+/** Connects more than once, as a command that probes before it works does. */
+class RepeatedProbe extends EnvironmentCommand {
+  protected async execute(): Promise<never> {
+    throw new Error("unused");
+  }
+
+  async probe(...asked: ReadonlyArray<{ quiet?: boolean; prompt?: boolean }>) {
+    const { flags } = await this.parse(RepeatedProbe);
+    await this.toMeta(flags);
+    const opened = [];
+    for (const options of asked) {
+      opened.push(await this.connect(options).catch((error: unknown) => error));
+    }
+    return opened;
+  }
+}
+
 /** Declares the preview token instead, as `zitadel preview` will. */
 class PreviewProbe extends EnvironmentCommand {
   static override credential = "preview" as const;
@@ -100,6 +117,30 @@ describe("EnvironmentCommand.connect", () => {
       projectId: "proj_staging",
       server: "https://staging.example",
     });
+  });
+
+  it("opens one connection however the same options were written", async ({ dir }) => {
+    const file = await envFile(dir, `${URL_AND_PROJECT}ZITADEL_PROJECT_SECRET=sk_staging\n`);
+
+    const opened = await new RepeatedProbe(["--cwd", dir, "--env-file", file], config).probe(
+      { quiet: true, prompt: false },
+      { prompt: false, quiet: true },
+    );
+
+    expect(opened[0]).toBe(opened[1]);
+  });
+
+  it("forgets a connection that failed, so a second attempt is made", async ({ dir }) => {
+    const file = await envFile(dir, URL_AND_PROJECT);
+
+    const opened = await new RepeatedProbe(["--cwd", dir, "--env-file", file], config).probe(
+      { prompt: false },
+      { prompt: false },
+    );
+
+    expect(opened[0]).not.toBe(opened[1]);
+    expect(opened[0]).toMatchObject({ code: "E_VALIDATION" });
+    expect(opened[1]).toMatchObject({ code: "E_VALIDATION" });
   });
 
   it("names the variable when the credential is missing", async ({ dir }) => {

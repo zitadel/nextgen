@@ -196,7 +196,12 @@ describe("variable list", () => {
       http.get("*/variables", () => HttpResponse.json({ V: { primary: "one\ntwo\u001b[31m" } })),
     );
 
-    const table = await asTerminal(() => runCliForTest(["variable", "list", ...plainArgs(cwd)]));
+    // `--no-color` because the subject is the table and what a cell may
+    // carry, not colour: a coloured run puts an escape sequence between the
+    // headings, which is the run honouring the terminal rather than a defect.
+    const table = await asTerminal(() =>
+      runCliForTest(["variable", "list", "--no-color", ...plainArgs(cwd)]),
+    );
     const plain = await asTerminal(() =>
       runCliForTest(["variable", "list", "--plain", ...plainArgs(cwd)]),
     );

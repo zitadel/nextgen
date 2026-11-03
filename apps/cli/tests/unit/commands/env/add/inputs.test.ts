@@ -8,6 +8,10 @@ describe("the environment name argument", () => {
     await expect(parseArg(EnvAdd.args.name, name)).resolves.toBe(name);
   });
 
+  it("accepts one a shell padded with spaces, as the prompt does", async () => {
+    await expect(parseArg(EnvAdd.args.name, " production ")).resolves.toBe("production");
+  });
+
   it.each(["../escape", "local", "staging.local", "", "a/b"])(
     "refuses %j, quoting it",
     async (name) => {
@@ -44,6 +48,12 @@ describe("--app-url", () => {
   it("is the URL the flag holds", async () => {
     await expect(
       parseFlag(EnvAdd.flags["app-url"], "https://app.acme.com", "app-url"),
+    ).resolves.toBe("https://app.acme.com");
+  });
+
+  it("accepts one a shell padded with spaces, as the prompt does", async () => {
+    await expect(
+      parseFlag(EnvAdd.flags["app-url"], " https://app.acme.com ", "app-url"),
     ).resolves.toBe("https://app.acme.com");
   });
 

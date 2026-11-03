@@ -166,6 +166,15 @@ describe("branding eject", () => {
     }
   });
 
+  it("quotes an unknown design as JSON, so an escape sequence in it cannot drive the terminal", async () => {
+    const cwd = await makeProject();
+
+    const res = await eject(cwd, "--design", "x\u001b[31m");
+
+    const json = parseJson(res.stdout) as { message: string };
+    expect(json.message).toBe('Unknown design "x\\u001b[31m"');
+  });
+
   it("rejects an unknown design and lists the catalog", async () => {
     const cwd = await makeProject();
     const res = await eject(cwd, "--design", "nope");

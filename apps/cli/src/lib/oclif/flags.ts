@@ -66,7 +66,7 @@ export function taken<T>(refused: Refused<T>) {
  * "expects a value"; quoted, nothing complained and the empty string travelled
  * on as if it were a real answer.
  */
-export const filled = z.string().trim().min(1);
+export const filled = z.string().trim().min(1, "it was given an empty value");
 
 /**
  * A whole number the value spells out in digits, which `Number` holds exactly.

@@ -15,7 +15,8 @@ import { asEnvironmentSelector, type EnvironmentSelector } from "../suggestion";
  * for a clashing name or short form.
  */
 const environmentNameFlag = Flags.custom<string>({
-  parse: async (input) => {
+  parse: async (given) => {
+    const input = given.trim();
     if (!isEnvironmentName(input)) {
       throw refusalError(
         {

@@ -172,6 +172,8 @@ export default class Start extends BaseCommand {
    */
   private async portOf(flags: Record<string, unknown>, cwd = this.cwd): Promise<number> {
     const asked = typeof flags.port === "number" ? flags.port : undefined;
+    // A record whose port is no port is no record: `readRuntimeMetadata`
+    // drops it, so the default stands and nothing here reads it again.
     return asked ?? (await this.recorded.of(cwd))?.port ?? DEFAULT_LOCAL_SERVER_PORT;
   }
 }

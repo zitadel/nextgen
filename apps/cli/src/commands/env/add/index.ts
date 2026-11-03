@@ -90,13 +90,16 @@ const APP_URL_REFUSAL: Refusal = {
 
 /** The environment name the argument holds: one that can name a `.env.<name>.local` file. */
 const ENVIRONMENT_NAME: Refused<string> = {
-  schema: z.string().refine(isEnvironmentName),
+  schema: z.string().trim().refine(isEnvironmentName),
   refusal: ENVIRONMENT_NAME_REFUSAL,
 };
 
 /** The URL the app is served from, which must be an http(s) one. */
 const APP_URL: Refused<string> = {
-  schema: z.url({ protocol: /^https?$/ }),
+  schema: z
+    .string()
+    .trim()
+    .pipe(z.url({ protocol: /^https?$/ })),
   refusal: APP_URL_REFUSAL,
 };
 

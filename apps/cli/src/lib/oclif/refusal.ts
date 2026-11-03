@@ -84,6 +84,21 @@ function fill(details: unknown, values: Placeholders): unknown {
 }
 
 /**
+ * The commands one `next` entry stands for. An entry that is only a
+ * placeholder takes its value as it is, as a refusal's `details` do, so a
+ * check that found two steps — remove an origin, then add it back — writes one
+ * entry and hands over both, and one that found a single step is unchanged.
+ */
+function commandsOf(entry: string, values: Placeholders): string[] {
+  const whole = WHOLE_PLACEHOLDER.exec(entry);
+  const value = whole?.[1] === undefined ? undefined : values[whole[1]];
+  if (Array.isArray(value)) {
+    return value.map(String);
+  }
+  return [interpolate(entry, values)];
+}
+
+/**
  * The error a {@link Refusal} describes, `E_VALIDATION` unless it names a code.
  * `suggest` turns each of its `next` commands into the suggestion the run's own
  * builders make, so a refusal names a command and never spells one out; a
@@ -100,8 +115,8 @@ export function refusalError(
   const suggested =
     suggest === undefined
       ? undefined
-      : refusal.next?.map((command) => {
-          return suggest(interpolate(command, values));
+      : refusal.next?.flatMap((command) => {
+          return commandsOf(command, values).map((one) => suggest(one));
         });
   return new ZitadelError(refusal.code ?? "E_VALIDATION", interpolate(refusal.message, values), {
     hint: refusal.hint === undefined ? undefined : interpolate(refusal.hint, values),

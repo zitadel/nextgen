@@ -47,6 +47,21 @@ describe("--tail", () => {
   });
 });
 
+/** `logs`, with the server it resolves before the run has a context exposed. */
+class Reading extends Logs {
+  public sourceFor(cwd: string): Promise<string> {
+    return this.sourceOf({}, cwd);
+  }
+}
+
+describe("the server a run of logs is about", () => {
+  it("is the default local one where nothing was started in the directory", async ({ dir }) => {
+    const logs = new Reading(["--no-telemetry", "--cwd", dir], config);
+
+    await expect(logs.sourceFor(dir)).resolves.toBe("http://localhost:8080");
+  });
+});
+
 // Every run names a directory of its own. `--follow` tails the server started
 // in the nearest directory upwards, so a run that named none would find the
 // developer's own server and never stop.

@@ -45,6 +45,24 @@ describe("refusalError", () => {
     expect(error.hint).toBe("Use a port from 1.");
   });
 
+  it("expands a next entry whose value is a list, so one entry can name both steps", () => {
+    const error = refusalError(
+      {
+        message: "No primary origin",
+        next: ["{next}"],
+      },
+      {
+        next: ["origin rm http://localhost:3000 --force", "origin add http://localhost:3000"],
+      },
+      (command) => unscopedCommand(command, "1.0.0"),
+    );
+
+    expect(error.nextCommands).toEqual([
+      unscopedCommand("origin rm http://localhost:3000 --force", "1.0.0"),
+      unscopedCommand("origin add http://localhost:3000", "1.0.0"),
+    ]);
+  });
+
   it("turns each next command into a suggestion through the builder it is given", () => {
     const error = refusalError(
       {

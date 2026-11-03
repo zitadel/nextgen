@@ -71,7 +71,7 @@ export function missingPrimaryOrigin(input: {
   issuer: string | undefined;
   setupProject: boolean;
   suggest: (command: string) => SuggestedCommand;
-}): { hint: string; next: string } {
+}): { hint: string; next: readonly string[] } {
   const preview =
     input.issuer === undefined ? undefined : issuerHeldAsPreview(input.origins, input.issuer);
   if (preview !== undefined) {
@@ -79,26 +79,28 @@ export function missingPrimaryOrigin(input: {
     if (input.setupProject) {
       return {
         hint: `${held} Run \`${input.suggest("doctor --fix")}\` to make it primary, then deploy.`,
-        next: "doctor --fix",
+        next: ["doctor --fix"],
       };
     }
     const remove = `origin rm ${Cmd.quote(preview)} --force`;
     const add = `origin add ${Cmd.quote(preview)} --kind primary`;
     return {
       hint: `${held} Remove it with \`${input.suggest(remove)}\`, add it back with \`${input.suggest(add)}\`, then deploy.`,
-      next: remove,
+      // Both steps, in the order they must run: removing the pattern leaves
+      // the project admitting every origin until it is added back.
+      next: [remove, add],
     };
   }
   if (input.issuer !== undefined) {
     const add = `origin add ${Cmd.quote(originOf(input.issuer))} --kind primary`;
     return {
       hint: `Add the URL the app serves from with \`${input.suggest(add)}\`, then deploy.`,
-      next: add,
+      next: [add],
     };
   }
   return {
     hint: `Add one with \`${input.suggest("origin add <url> --kind primary")}\`, then deploy.`,
-    next: "origin list",
+    next: ["origin list"],
   };
 }
 
@@ -146,17 +148,19 @@ export default class Deploy extends EnvironmentCommand {
   };
 
   protected async execute({ flags }: Admitted<typeof Deploy>): Promise<JsonEnvelope> {
-    const { client, projectId, environment } = await this.connect();
     // Why the deploy happened: the message it was given, or the one its
     // environment implies. Interactively it can be left off; a scripted run
     // with nothing to fall back on must name one, and is refused before
-    // anything is built. A dry run records nothing, so it needs none.
+    // anything is built or asked for — the message is the directory's and the
+    // environment's to answer, so nothing is connected to find it out. A dry
+    // run records nothing, so it needs none.
     const message = this.dryRun
       ? undefined
       : await deployMessage(flags.message, this.cwd, this.env);
     if (!this.dryRun && this.nonInteractive && message === undefined) {
       throw refusalError(NEEDS_MESSAGE_REFUSAL, {});
     }
+    const { client, projectId, environment } = await this.connect();
     // A deploy goes to every primary origin, so the project must have one.
     // Checked before the bundle is built and the IdP connections are synced,
     // so a project with none fails before the IdP step writes part of a
