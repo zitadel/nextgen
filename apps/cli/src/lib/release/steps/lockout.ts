@@ -157,8 +157,7 @@ async function servedFlows(
     const ref = flow.user_schema;
     const known = objectTypes.has(ref) ? ref : byId.get(ref);
     const listing = known === undefined ? await names() : undefined;
-    const listed = listing?.byId.get(ref) ?? listing?.byObjectType.get(ref);
-    const schema = known ?? listed?.objectType;
+    const schema = known ?? (listing?.byId.get(ref) ?? listing?.byObjectType.get(ref))?.objectType;
     if (schema === undefined) {
       // Without the listing it is not known whether the schema exists.
       unreadable ||= known === undefined && listing === undefined;
@@ -167,7 +166,9 @@ async function servedFlows(
     }
     // Only the schema's designated identifier performs a lookup, and only when
     // a step on the login path collects it.
-    const identifier = designated.get(schema) ?? listed?.identifier;
+    // The release pins the newest revision, so a revision id only names the
+    // object type; the identifier is the bundle's, or the newest listed one.
+    const identifier = designated.get(schema) ?? listing?.byObjectType.get(schema)?.identifier;
     const looksUp = identifier !== undefined && loginPathFields(flow).has(identifier);
     flows.push({ schema, ...(looksUp ? { identifier } : {}) });
   }
@@ -203,7 +204,7 @@ async function lookupWarnings(
         }
         return {
           warnings: [
-            `${count(missing.length, truncated)} of ${count(users.length, truncated)} existing ${plural(users.length, "user")} of ${quote(objectType)} ${missing.length === 1 ? "has" : "have"} no ${quote(identifier)}, the field the login flow looks users up by, so typing it offers them registration instead of signing them in. Move each user to the schema revision that defines it and set it in one update: zitadel users update <user_id> --schema <revision_id> --set attributes.${identifier}=<value>`,
+            `${count(missing.length, truncated)} of ${count(users.length, truncated)} existing ${plural(users.length, "user")} of ${quote(objectType)} ${missing.length === 1 ? "has" : "have"} no ${quote(identifier)}, the field the login flow looks users up by, so typing it offers them registration instead of signing them in. Move each user to the schema revision that defines it and set it in one update: ${ctx.suggest(`users update <user_id> --schema <revision_id> --set attributes.${identifier}=<value>`)}`,
           ],
           partial: [],
           failed: false,
@@ -229,9 +230,6 @@ async function ssoWarnings(
   share: number,
 ): Promise<Scan> {
   const served = [...new Set(flows.map((flow) => flow.schema))];
-  if (served.length === 0) {
-    return nothing();
-  }
   const read = await readUsers(
     ctx,
     [
@@ -275,7 +273,7 @@ async function ssoWarnings(
   });
   const warnings = [...linked].map(([name, total]) => {
     const label = typeof name === "string" ? quote(name) : "schemas whose names could not be read";
-    return `${count(total, truncated)} existing ${plural(total, "user")} of ${label} ${total === 1 ? "has" : "have"} an SSO link, but no flow in this release uses that schema, so they cannot sign in with SSO. Passkey sign-in is not affected. Users cannot move between schemas, so keep or restore a flow on ${label}.`;
+    return `${count(total, truncated)} existing ${plural(total, "user")} of ${label} ${total === 1 ? "has" : "have"} an SSO link, but no flow in this release uses that schema, so they cannot sign in with SSO.${served.length > 0 ? " Passkey sign-in is not affected." : ""} Users cannot move between schemas, so keep or restore a flow on ${label}.`;
   });
   return {
     warnings,
@@ -297,13 +295,8 @@ function loginPathFields(flow: Record<string, unknown>): Set<string> {
   const byName = new Map(steps.map((step) => [step.name, step]));
   const fields = new Set<string>();
   const seen = new Set<unknown>();
-  // Another purpose's entry step is where a switch lands, and a missing account
-  // continues as a sign-up: neither is part of logging in.
-  const otherEntries = new Set(
-    Object.entries(purposes ?? {})
-      .filter(([purpose]) => purpose !== "login")
-      .map(([, entry]) => entry),
-  );
+  // An explicit purpose change and a missing account (which continues as a
+  // sign-up) leave the login path; a plain transition to any step stays on it.
   const queue: unknown[] = [purposes?.login];
   for (let head = 0; head < queue.length; head += 1) {
     const name = queue[head];
@@ -321,12 +314,7 @@ function loginPathFields(flow: Record<string, unknown>): Set<string> {
     for (const [outcome, transition] of Object.entries(transitions)) {
       const sameFlow = transition.flow === undefined && transition.purpose === undefined;
       const signsUp = outcome === "user_not_found" || outcome === "sso_user_not_found";
-      if (
-        sameFlow &&
-        !signsUp &&
-        typeof transition.target === "string" &&
-        !otherEntries.has(transition.target)
-      ) {
+      if (sameFlow && !signsUp && typeof transition.target === "string") {
         queue.push(transition.target);
       }
     }

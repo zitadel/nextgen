@@ -32,6 +32,7 @@ function ctx(options: {
   endlessEmptyPages?: boolean;
   failFor?: string;
   failLinks?: boolean;
+  selector?: string;
   missingLinks?: string[];
   listing?: Array<{
     id: string;
@@ -123,7 +124,7 @@ function ctx(options: {
     brandingSources: [],
     idpFiles: [],
     policyFiles: [],
-    suggest: (args) => args as never,
+    suggest: (args) => (options.selector ? `${args} ${options.selector}` : args) as never,
   };
 }
 
@@ -766,8 +767,85 @@ describe("lockoutStep", () => {
     );
 
     expect(takeReportedWarnings()[0]).toContain(
-      "zitadel users update <user_id> --schema <revision_id> --set attributes.username=<value>",
+      "users update <user_id> --schema <revision_id> --set attributes.username=<value>",
     );
+  });
+
+  it("builds the recovery command with the deployment's environment selector", async () => {
+    await lockoutStep.run(
+      ctx({
+        schemas: [{ objectType: "human-user", "x-identifier": "username" }],
+        flows: [flow("human-user", "username")],
+        users: [user("u1", "human-user", { email: "a@example.com" })],
+        selector: "--env production",
+      }),
+    );
+
+    expect(takeReportedWarnings()[0]).toContain(
+      "users update <user_id> --schema <revision_id> --set attributes.username=<value> --env production",
+    );
+  });
+
+  it("takes the identifier from the newest revision when a flow names an older one by id", async () => {
+    await lockoutStep.run(
+      ctx({
+        schemas: [],
+        flows: [flow("sch_old", "username")],
+        users: [user("e1", "employee", { email: "a@example.com" })],
+        listing: [
+          {
+            id: "sch_old",
+            schema: { objectType: "employee", "x-identifier": "email" },
+            metadata: { created_at: "2026-01-01T00:00:00Z" },
+          },
+          {
+            id: "sch_new",
+            schema: { objectType: "employee", "x-identifier": "username" },
+            metadata: { created_at: "2026-02-01T00:00:00Z" },
+          },
+        ],
+      }),
+    );
+
+    expect(takeReportedWarnings()[0]).toContain('has no "username"');
+  });
+
+  it("still checks SSO users when no active flow is left, without the passkey reassurance", async () => {
+    await lockoutStep.run(
+      ctx({
+        schemas: [{ objectType: "employee" }],
+        flows: [flow("employee", "email", "draft")],
+        users: [user("u1", "human-user")],
+        links: { u1: 1 },
+      }),
+    );
+
+    const warnings = takeReportedWarnings();
+    expect(warnings[0]).toContain('of "human-user" has an SSO link');
+    expect(warnings[0]).not.toContain("Passkey sign-in is not affected");
+  });
+
+  it("follows a plain transition to a step that is also the sign-up entry", async () => {
+    await lockoutStep.run(
+      ctx({
+        schemas: [{ objectType: "human-user", "x-identifier": "email" }],
+        flows: [
+          {
+            name: "default-login",
+            status: "active",
+            user_schema: "human-user",
+            purposes: { login: "start", register: "register" },
+            steps: [
+              { name: "start", fields: [], transitions: { go: { target: "register" } } },
+              { name: "register", fields: ["email"] },
+            ],
+          },
+        ],
+        users: [user("u1", "human-user", {})],
+      }),
+    );
+
+    expect(takeReportedWarnings()[0]).toContain('has no "email"');
   });
 
   it("never fails the deploy when users cannot be read", async () => {
