@@ -356,6 +356,79 @@ func TestVercelJSONServesTheConsoleAtConsolePath(t *testing.T) {
 	assert.Equal(t, []string{"/console/runtime.json → server", consolePath + "/(.*) → console"}, routes)
 }
 
+// go.zitadel.com serves Go's vanity-import metadata for the client module
+// (packages/go): every path on that host answers with one static page, whose
+// go-import prefix is the module path and whose subdirectory is the module's
+// directory. The three live in different files, so this test holds them
+// together, and it pins the host rewrite ahead of the catch-all that would
+// otherwise send the request to the website.
+func TestVercelJSONServesGoImportMetadataOnGoHost(t *testing.T) {
+	repo := filepath.Join("..", "..", "..", "..")
+	raw, err := os.ReadFile(filepath.Join(repo, "vercel.json"))
+	require.NoError(t, err)
+	var config struct {
+		Services map[string]struct {
+			OutputDirectory string `json:"outputDirectory"`
+			Rewrites        []struct {
+				Source      string `json:"source"`
+				Destination string `json:"destination"`
+			} `json:"rewrites"`
+		} `json:"services"`
+		Rewrites []struct {
+			Source string `json:"source"`
+			Has    []struct {
+				Type  string `json:"type"`
+				Value string `json:"value"`
+			} `json:"has"`
+			Destination json.RawMessage `json:"destination"`
+		} `json:"rewrites"`
+	}
+	require.NoError(t, json.Unmarshal(raw, &config))
+
+	const host = goImportHost
+	// Top-level rewrites match in order: the host rule must come before any
+	// catch-all without a host condition, or the website answers for the host.
+	hostRule := -1
+	for i, rewrite := range config.Rewrites {
+		var destination struct{ Service string }
+		_ = json.Unmarshal(rewrite.Destination, &destination)
+		if len(rewrite.Has) == 1 && rewrite.Has[0].Type == "host" && rewrite.Has[0].Value == host {
+			assert.Equal(t, "/(.*)", rewrite.Source, "every path on the host")
+			assert.Equal(t, "go-import", destination.Service)
+			hostRule = i
+			break
+		}
+		if rewrite.Source == "/(.*)" && len(rewrite.Has) == 0 {
+			t.Fatalf("the catch-all %q → %s precedes the %s host rewrite", rewrite.Source, destination.Service, host)
+		}
+	}
+	require.NotEqual(t, -1, hostRule, "no top-level rewrite for host %s", host)
+
+	service, ok := config.Services["go-import"]
+	require.True(t, ok, "no go-import service")
+	require.Len(t, service.Rewrites, 1)
+	assert.Equal(t, "/(.*) → /index.html", service.Rewrites[0].Source+" → "+service.Rewrites[0].Destination,
+		"the one page answers every path")
+
+	page, err := os.ReadFile(filepath.Join(repo, "apps", "cloud", "go-import", service.OutputDirectory, "index.html"))
+	require.NoError(t, err)
+	goImport := regexp.MustCompile(`<meta name="go-import" content="([^"]*)"`).FindSubmatch(page)
+	require.NotNil(t, goImport, "index.html has no go-import meta")
+	fields := strings.Fields(string(goImport[1]))
+	require.Len(t, fields, 4, "go-import content is PREFIX VCS REPO SUBDIR (Go 1.25+)")
+
+	goMod, err := os.ReadFile(filepath.Join(repo, "packages", "go", "go.mod"))
+	require.NoError(t, err)
+	module := regexp.MustCompile(`(?m)^module (\S+)$`).FindSubmatch(goMod)
+	require.NotNil(t, module, "packages/go/go.mod has no module line")
+	assert.Equal(t, string(module[1]), fields[0], "the go-import prefix is the module path")
+	assert.True(t, strings.HasPrefix(fields[0], host+"/"), "the module path lives under the host")
+	assert.Equal(t, "git", fields[1])
+	assert.Equal(t, "https://github.com/zitadel/zitadel", fields[2],
+		"the repository the module ships from after the migration; see the runbook's Go import path")
+	assert.Equal(t, "packages/go", fields[3], "the module's directory in the repository")
+}
+
 // The other services' functions run in the project-wide regions; the server
 // stays beside its database in Frankfurt. @vercel/go matches a functions key
 // against the entrypoint's path and silently ignores one that does not match.
@@ -396,6 +469,7 @@ func TestVercelJSONSchedulesTheEventRetentionPurge(t *testing.T) {
 		} `json:"redirects"`
 		Rewrites []struct {
 			Source      string          `json:"source"`
+			Has         []hasCondition  `json:"has"`
 			Destination json.RawMessage `json:"destination"`
 		} `json:"rewrites"`
 	}
@@ -410,6 +484,11 @@ func TestVercelJSONSchedulesTheEventRetentionPurge(t *testing.T) {
 	}
 	var service string
 	for _, rewrite := range config.Rewrites {
+		// The cron job calls the cloud's own host, so go.zitadel.com's rule
+		// does not apply; every other rule still does.
+		if forGoImportHost(rewrite.Has) {
+			continue
+		}
 		if routeMatches(rewrite.Source, audit.RetentionTriggerPath) {
 			var destination struct{ Service string }
 			require.NoError(t, json.Unmarshal(rewrite.Destination, &destination))
@@ -433,13 +512,16 @@ func TestVercelJSONSendsTheServerOnlyItsOwnPaths(t *testing.T) {
 	var config struct {
 		Rewrites []struct {
 			Source      string          `json:"source"`
+			Has         []hasCondition  `json:"has"`
 			Destination json.RawMessage `json:"destination"`
 		} `json:"rewrites"`
 	}
 	require.NoError(t, json.Unmarshal(raw, &config))
 	serviceFor := func(path string) string {
 		for _, rewrite := range config.Rewrites {
-			if !routeMatches(rewrite.Source, path) {
+			// These paths are the cloud's own host's, so go.zitadel.com's rule
+			// does not apply; every other rule still does.
+			if forGoImportHost(rewrite.Has) || !routeMatches(rewrite.Source, path) {
 				continue
 			}
 			var destination struct{ Service string }
@@ -492,6 +574,27 @@ func TestVercelJSONSendsTheServerOnlyItsOwnPaths(t *testing.T) {
 	for path, want := range others {
 		assert.Equal(t, want, serviceFor(path), path)
 	}
+}
+
+// goImportHost is the host vercel.json gives to the go-import service whole
+// (TestVercelJSONServesGoImportMetadataOnGoHost).
+const goImportHost = "go.zitadel.com"
+
+// hasCondition is one entry of a vercel.json rule's `has`: the request
+// property it is conditioned on (host, header, cookie or query) and its value.
+type hasCondition struct {
+	Type  string `json:"type"`
+	Value string `json:"value"`
+}
+
+// forGoImportHost reports whether a rule applies only on goImportHost, never
+// on the cloud's own host. Any other condition keeps the rule in the cloud's
+// routing, a host condition naming another host included, so a rule that
+// takes one of the cloud's paths there still fails the tests.
+func forGoImportHost(has []hasCondition) bool {
+	return slices.ContainsFunc(has, func(c hasCondition) bool {
+		return c.Type == "host" && c.Value == goImportHost
+	})
 }
 
 // routeMatches reports whether a vercel.json source matches path, for the

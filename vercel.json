@@ -63,6 +63,34 @@
       "installCommand": "pnpm install --os=current --cpu=current --optimistic-repeat-install",
       "buildCommand": "turbo run build --filter=@zitadel/cloud-functions"
     },
+    "go-import": {
+      "root": "apps/cloud/go-import",
+      "installCommand": "true",
+      "buildCommand": "true",
+      "devCommand": "node serve.mjs",
+      "outputDirectory": "public",
+      "rewrites": [
+        {
+          "source": "/(.*)",
+          "destination": "/index.html"
+        }
+      ],
+      "headers": [
+        {
+          "source": "/(.*)",
+          "headers": [
+            {
+              "key": "Content-Type",
+              "value": "text/html; charset=utf-8"
+            },
+            {
+              "key": "Cache-Control",
+              "value": "public, max-age=3600, stale-while-revalidate=86400"
+            }
+          ]
+        }
+      ]
+    },
     "schemas": {
       "root": "apps/cloud",
       "installCommand": "pnpm install --os=current --cpu=current --optimistic-repeat-install",
@@ -140,6 +168,18 @@
     }
   ],
   "rewrites": [
+    {
+      "source": "/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "go.zitadel.com"
+        }
+      ],
+      "destination": {
+        "service": "go-import"
+      }
+    },
     {
       "source": "/api/(.*)",
       "destination": {
