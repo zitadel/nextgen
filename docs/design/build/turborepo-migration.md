@@ -467,8 +467,9 @@ sets them up:
   requests get no build, and so no token, until a team member approves one
   (the project's Git fork protection). A planted entry is removed by
   clearing the team's cache (owners only). The cloud's launcher, which runs
-  with production's secrets, uses `--cache=local:rw` and Vercel's branch build
-  cache instead (`@zitadel/cloud#build`, repo-root `vercel.json`).
+  with production's secrets, stays `cache: false` in every environment
+  (`@zitadel/cloud#build`). Go's compiler cache persists in Vercel's branch
+  build cache; each deployment links fresh metadata.
 - **GitHub Actions on pull requests** run the pull request's code, and the
   OIDC policy gives every run of this repository a token that can write
   (Vercel's docs describe no read-only policy; forks get no token).

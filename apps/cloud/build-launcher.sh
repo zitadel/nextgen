@@ -15,16 +15,14 @@ set -eu
 cd "$(dirname "$0")/../.."
 repo="$PWD"
 
-# A cached cloud artifact always targets Vercel's Linux/amd64 runtime, even
-# when built on a developer's machine. Use the exact workspace compiler,
-# not whichever newer compiler or persistent `go env -w` settings it has.
-export GOENV=off GOOS=linux GOARCH=amd64 GOAMD64=v1 CGO_ENABLED=0
+# Vercel supplies GOOS/GOARCH for the function's architecture. Go caches
+# compilation for that target; each deployment links fresh commit/date metadata.
+export GOENV=off CGO_ENABLED=0
 export GOTOOLCHAIN="$(awk '$1 == "toolchain" { print $2 }' "$repo/go.work")"
-test -n "$GOTOOLCHAIN"
+[ -n "$GOTOOLCHAIN" ] || { echo "go.work needs a toolchain directive" >&2; exit 1; }
 
 version="$(node -p 'require("./apps/server/package.json").version')"
-# These describe the compilation, not every deployment that reuses it.
-# The branch is a hashed input; commit/date are retained on a cache hit.
+# The date orders platform configuration deployments; never reuse an old one.
 commit="${VERCEL_GIT_COMMIT_SHA:-$(git rev-parse HEAD 2>/dev/null || echo unknown)}"
 # The branch picks a preview's database; stamped in so the serving function
 # knows it even where Vercel exposes no Git metadata at runtime.
@@ -52,9 +50,13 @@ echo "built apps/cloud/dist/nextgen-launcher (version ${version}+cloud, commit $
 # used in the last two hours (Go refreshes an entry's time at most hourly).
 if [ -n "${VERCEL:-}" ]; then
   find -H "$(go env GOCACHE)" -mindepth 2 -type f -mmin +120 -delete
+  # Extracted modules plus .mod/.info/.ziphash are sufficient for go build.
+  # Keeping their original ZIPs duplicates them in Vercel's limited archive.
+  find -H "$(go env GOMODCACHE)/cache/download" -type f -name '*.zip' -delete
   # The persistent paths in vercel.json replace these preset caches. Keep
   # the service's toolchain, without archiving duplicate module/build caches.
   rm -rf "$repo/.vercel/cache/golang" \
+    "$repo/.vercel/cache/cloud-go/turbo" \
     "$repo/apps/api/.vercel/cache/golang/pkg/mod" \
     "$repo/apps/api/.vercel/cache/golang/go-build"
 fi

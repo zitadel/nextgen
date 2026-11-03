@@ -7,21 +7,20 @@
   // in @zitadel/server#test (`go -C apps/api test ./...`).
   "tasks": {
     // The `server` service's function binary (build-launcher.sh), which
-    // `migrate` runs and `deploy` hands to Vercel. vercel.json selects a local
-    // Turbo cache persisted in Vercel's branch build cache, so production
-    // cannot consume an executable planted in the shared remote cache.
+    // `migrate` runs and `deploy` hands to Vercel. Go's compiler cache persists
+    // in Vercel's branch build cache. Always link fresh commit/date metadata:
+    // the build date orders platform configuration deployments. Keeping this
+    // task uncached also keeps executable artifacts out of the remote cache.
     //
     // What it compiles still decides when it is affected: the production
     // sources of the server module and of every module it requires, through
     // `nextgen#go-sources` (the module graph), and the server's version,
-    // which it stamps in. The script pins the target and exact go.work
-    // toolchain. Branches select preview databases, so they cannot share a
-    // binary. Commit/date describe its original compilation on a cache hit.
+    // which it stamps in. Vercel supplies the function's GOOS/GOARCH; the
+    // script pins CGO off and the exact go.work toolchain.
     "build": {
-      "cache": true,
+      "cache": false,
       "dependsOn": ["nextgen#go-sources"],
-      "env": ["GOFLAGS", "GOEXPERIMENT", "VERCEL_GIT_COMMIT_REF"],
-      "passThroughEnv": ["VERCEL", "VERCEL_GIT_COMMIT_SHA"],
+      "env": ["GOFLAGS", "GOEXPERIMENT", "GOOS", "GOARCH", "GOAMD64", "GOARM64", "VERCEL_GIT_COMMIT_REF"],
       "inputs": ["build-launcher.sh", "$TURBO_ROOT$/apps/server/package.json", "$TURBO_ROOT$/go.work", "$TURBO_ROOT$/go.work.sum"],
       "outputs": ["dist/nextgen-launcher"]
     },
