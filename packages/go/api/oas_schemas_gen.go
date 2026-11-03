@@ -93131,6 +93131,9 @@ func (s *UserPermissionDeniedDetails) init() UserPermissionDeniedDetails {
 // are accepted without being listed below. `writeOnly: true` is reserved for a
 // value that may be written but is never returned by the read API; nothing
 // enforces it today, so responses still include write-only properties.
+// `format` is enforced on user writes for the standard JSON Schema names, such
+// as `email`, `uri`, `uuid`, `date` and `date-time`. Any other name, such as
+// `phone`, is only an annotation; use `pattern` to enforce one.
 // Ref: #
 type UserProperty struct {
 	// The level of uniqueness for this property, if applicable.

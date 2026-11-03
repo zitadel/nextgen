@@ -11,6 +11,9 @@
 > `objectType` (#2036). Schemas have no update endpoint, so a published
 > version does not change.
 >
+> **Amendment (2026-11-03):** user writes assert `format`, per
+> [§5](#5-format-is-asserted-on-user-writes) (#2651).
+>
 > **Amended by:** [ADR 052](052-user-envelope-and-attributes.md) — the API
 > property is `schema`, not `$schema`, and it sits on an envelope beside the
 > validated `attributes` document.
@@ -75,6 +78,16 @@ sequenceDiagram
         API-->>Client: 4xx
     end
 ```
+
+### 5. `format` is asserted on user writes
+
+JSON Schema 2020-12 treats `format` as an annotation unless an implementation opts in. Zitadel opts in for user attributes: a schema author who writes `"format": "email"` on an identifier means it, the default schemas do, and the sign-up flow already refused what the user API stored.
+
+- **Where:** creating a user, patching one, and every flow that creates one. A flow step refuses the value itself, so the user can correct it there. A hidden SSO claim that fails its format is left out, as one failing any other keyword is. A `--user-file` bootstrap document is held to `format` when it creates its user, and to no other keyword: it carries markers its schema does not declare. A user it already created is skipped first, so a document cannot stop a server from starting once its user exists.
+- **Which names:** the standard ones the validator implements: `date`, `date-time`, `duration`, `email`, `hostname`, `idn-email`, `idn-hostname`, `ipv4`, `ipv6`, `iri`, `iri-reference`, `json-pointer`, `regex`, `relative-json-pointer`, `time`, `uri`, `uri-reference`, `uri-template`, `uuid`. Any other name, such as `phone` or `tel`, stays an annotation; use `pattern` to enforce one.
+- **`email`:** a single address, with no display name, angle brackets or padding. Non-ASCII characters are allowed in both parts, since real addresses have them and rejecting one would lock its owner out of sign-up.
+- **Values stored before this rule:** a patch asserts only the values it changes, so a stored `not-an-email` does not stop an administrator from editing another attribute. Replacing it with another invalid value is refused. A move to another schema asserts every value (§4): the request can correct them in the same transaction.
+- **Sign-in is unaffected:** identifier lookups never validate, so a user stored with an invalid value can still sign in.
 
 ## Consequences
 

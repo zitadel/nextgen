@@ -4,7 +4,6 @@ import (
 	"cmp"
 	"reflect"
 	"slices"
-	"strings"
 	"unicode/utf8"
 )
 
@@ -141,18 +140,8 @@ func applyValidationRules(name, value string, v *FlowFieldValidation) []FlowFiel
 	if v.MaxLength > 0 && n > v.MaxLength {
 		out = append(out, FlowFieldValidationError{Field: name, Rule: FlowFieldValidationRuleMaxLength})
 	}
-	if v.Format == "email" && !looksLikeEmail(value) {
+	if v.Format != "" && !AttributeFormatValid(v.Format, value) {
 		out = append(out, FlowFieldValidationError{Field: name, Rule: FlowFieldValidationRuleFormat})
 	}
 	return out
-}
-
-// looksLikeEmail is a deliberately minimal MVP check: one '@' with
-// non-empty local and domain parts.
-func looksLikeEmail(s string) bool {
-	at := strings.IndexByte(s, '@')
-	if at <= 0 || at == len(s)-1 {
-		return false
-	}
-	return strings.IndexByte(s[at+1:], '@') < 0
 }
