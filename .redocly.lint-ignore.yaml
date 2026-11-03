@@ -2,25 +2,25 @@
 # every failure: it suppresses whatever is failing instead of fixing it and
 # deletes these notes.
 # Each entry pins one JSON pointer, so the new camelCase in the same file is still an error.
-api/openapi/endpoints/schemas/user-schema.yaml:
+apps/api/api/openapi/endpoints/schemas/user-schema.yaml:
   rule/wire-field-snake-case:
     # Stored user-schema document fields, not envelope fields; renaming them is
     # a data-format migration.
     - '#/properties/objectType'
     - '#/properties/metaSchema'
-api/openapi/endpoints/schemas/app-client-jwk.yaml:
+apps/api/api/openapi/endpoints/schemas/app-client-jwk.yaml:
   rule/wire-enum-no-camel-case:
     # `EdDSA` is the JOSE name of the Ed25519 signature algorithm (RFC 8037), a
     # value a JWK carries as written, not a wire enum of ours.
     - '#/properties/alg/enum'
-api/openapi/endpoints/schemas/sso-auth-method.yaml:
+apps/api/api/openapi/endpoints/schemas/sso-auth-method.yaml:
   no-required-schema-properties-undefined:
     # `providers` is defined at the schema root; the if/then/else arms only
     # require or forbid it depending on `enabled`, which is what gives editors
     # a precise error instead of an "all arms failed" oneOf.
     - '#/then/required/0'
     - '#/else/not/required/0'
-api/openapi/openapi-spec.yaml:
+apps/api/api/openapi/openapi-spec.yaml:
   no-ambiguous-paths:
     # Redocly compares templates and does not know the id format. Exactly one
     # request fits both `/idps/{id}/revisions` and
@@ -34,7 +34,7 @@ api/openapi/openapi-spec.yaml:
     - '#/paths/~1policies~1revisions~1{revision_id}'
     # The same for apps, whose ids carry the `app_` prefix.
     - '#/paths/~1apps~1revisions~1{revision_id}'
-api/openapi/components/flows/flow-definition-step.yaml:
+apps/api/api/openapi/components/flows/flow-definition-step.yaml:
   no-required-schema-properties-undefined:
     # Every name is a step property defined at the schema root; each arm of the
     # rejection `not` only tests whether it is present, which is how the dialect

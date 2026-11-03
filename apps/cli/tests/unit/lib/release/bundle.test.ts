@@ -1,15 +1,13 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect } from "vitest";
+
+import { it } from "../../../helpers/fixtures";
 
 import { buildBundle } from "../../../../src/lib/release/bundle";
 
-let dir: string;
-
-async function project(files: Record<string, unknown>): Promise<string> {
-  dir = await mkdtemp(join(tmpdir(), "zitadel-bundle-"));
+async function project(dir: string, files: Record<string, unknown>): Promise<string> {
   for (const [relPath, content] of Object.entries(files)) {
     await mkdir(join(dir, relPath, ".."), { recursive: true });
     await writeFile(join(dir, relPath), JSON.stringify(content));
@@ -17,15 +15,9 @@ async function project(files: Record<string, unknown>): Promise<string> {
   return dir;
 }
 
-afterEach(async () => {
-  if (dir) {
-    await rm(dir, { recursive: true, force: true });
-  }
-});
-
 describe("buildBundle", () => {
-  it("groups the resources by kind and strips the $schema affordance", async () => {
-    const cwd = await project({
+  it("groups the resources by kind and strips the $schema affordance", async ({ dir }) => {
+    const cwd = await project(dir, {
       ".zitadel/schemas/human-user.json": {
         $schema: "../meta/user-schema.json",
         objectType: "human-user",
@@ -44,8 +36,10 @@ describe("buildBundle", () => {
     expect(bundle.branding).toBeUndefined();
   });
 
-  it("sends the branding as one object under `branding`, never a `brandings` list", async () => {
-    const cwd = await project({
+  it("sends the branding as one object under `branding`, never a `brandings` list", async ({
+    dir,
+  }) => {
+    const cwd = await project(dir, {
       ".zitadel/schemas/human-user.json": { objectType: "human-user" },
       ".zitadel/branding/branding.json": { layout: "centered" },
     });
@@ -57,8 +51,8 @@ describe("buildBundle", () => {
     expect(bundle).not.toHaveProperty("brandings");
   });
 
-  it("carries policy files under `policies`, named in step with their files", async () => {
-    const cwd = await project({
+  it("carries policy files under `policies`, named in step with their files", async ({ dir }) => {
+    const cwd = await project(dir, {
       ".zitadel/policies/auth.factor.password.set.json": {
         $schema: "../meta/policy.json",
         operation: "auth.factor.password.set",
@@ -75,8 +69,8 @@ describe("buildBundle", () => {
     expect(policyFiles).toEqual(["auth.factor.password.set.json"]);
   });
 
-  it("never carries a policy test file, valid or not", async () => {
-    const cwd = await project({
+  it("never carries a policy test file, valid or not", async ({ dir }) => {
+    const cwd = await project(dir, {
       ".zitadel/policies/auth.factor.password.set.json": {
         operation: "auth.factor.password.set",
         config: {},
@@ -91,16 +85,20 @@ describe("buildBundle", () => {
     expect(policyFiles).toEqual(["auth.factor.password.set.json"]);
   });
 
-  it("leaves `policies` out when there are none, so a server without the kind takes it", async () => {
-    const cwd = await project({ ".zitadel/schemas/human-user.json": { objectType: "human-user" } });
+  it("leaves `policies` out when there are none, so a server without the kind takes it", async ({
+    dir,
+  }) => {
+    const cwd = await project(dir, {
+      ".zitadel/schemas/human-user.json": { objectType: "human-user" },
+    });
 
     const { bundle } = await buildBundle(cwd);
 
     expect(bundle).not.toHaveProperty("policies");
   });
 
-  it("carries app files under `apps`, named in step with their files", async () => {
-    const cwd = await project({
+  it("carries app files under `apps`, named in step with their files", async ({ dir }) => {
+    const cwd = await project(dir, {
       ".zitadel/apps/shop.json": { $schema: "../meta/app.json", slug: "shop", name: "Shop" },
     });
 
@@ -111,23 +109,22 @@ describe("buildBundle", () => {
     expect(appFiles).toEqual(["shop.json"]);
   });
 
-  it("leaves `apps` out when there are none, so a server without the kind takes it", async () => {
-    const cwd = await project({ ".zitadel/schemas/human-user.json": { objectType: "human-user" } });
+  it("leaves `apps` out when there are none, so a server without the kind takes it", async ({
+    dir,
+  }) => {
+    const cwd = await project(dir, { ".zitadel/schemas/human-user.json": { objectType: "human-user" } });
 
     const { bundle } = await buildBundle(cwd);
 
     expect(bundle).not.toHaveProperty("apps");
   });
 
-  it("refuses an empty .zitadel/ directory", async () => {
-    const cwd = await mkdtemp(join(tmpdir(), "zitadel-bundle-empty-"));
-    dir = cwd;
-
+  it("refuses an empty .zitadel/ directory", async ({ dir: cwd }) => {
     await expect(buildBundle(cwd)).rejects.toMatchObject({ code: "E_VALIDATION" });
   });
 
-  it("refuses more than one branding descriptor", async () => {
-    const cwd = await project({
+  it("refuses more than one branding descriptor", async ({ dir }) => {
+    const cwd = await project(dir, {
       ".zitadel/branding/one.json": { name: "one" },
       ".zitadel/branding/two.json": { name: "two" },
     });
@@ -135,12 +132,14 @@ describe("buildBundle", () => {
     await expect(buildBundle(cwd)).rejects.toMatchObject({ code: "E_VALIDATION" });
   });
 
-  it("refuses a bundle over the fifty-resource cap", async () => {
-    const files: Record<string, unknown> = {};
-    for (let i = 0; i < 51; i += 1) {
-      files[`.zitadel/schemas/schema-${i}.json`] = { objectType: `type-${i}` };
-    }
-    const cwd = await project(files);
+  it("refuses a bundle over the fifty-resource cap", async ({ dir }) => {
+    const files = Object.fromEntries(
+      Array.from({ length: 51 }, (_, i) => [
+        `.zitadel/schemas/schema-${i}.json`,
+        { objectType: `type-${i}` },
+      ]),
+    );
+    const cwd = await project(dir, files);
 
     await expect(buildBundle(cwd)).rejects.toMatchObject({ code: "E_VALIDATION" });
   });

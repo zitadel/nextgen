@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"github.com/go-faster/jx"
-	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
 	configdefaults "github.com/zitadel/nextgen/packages/config/defaults"
+	api "go.zitadel.com/zitadel/v5/api"
 )
 
 // Fixture declares what a benchmark target needs: one project and one user
@@ -102,7 +102,7 @@ func originsToAPI(in []FixtureOrigin) []api.ProjectOrigin {
 func Bootstrap(ctx context.Context, base, lane string, fx Fixture) (Target, error) {
 	creds := NewCredentials("")
 	//egress:allow benchmark harness provisioning the server under test
-	c, err := api.NewClient(base, creds, api.WithClient(originDoer{origin: fx.Project.Origins[0].Pattern, client: &http.Client{Timeout: 30 * time.Second}}))
+	c, err := api.New(base, creds, api.WithClient(originDoer{origin: fx.Project.Origins[0].Pattern, client: &http.Client{Timeout: 30 * time.Second}}))
 	if err != nil {
 		return Target{}, err
 	}

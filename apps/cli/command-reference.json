@@ -121,7 +121,7 @@
         {
           "name": "force",
           "char": "f",
-          "description": "Overwrite managed files that already exist, and scaffold into a non-empty directory.",
+          "description": "Overwrite managed files that already exist, scaffold into a non-empty directory, and remove the previous origin when --dev-port moves the app.",
           "type": "boolean"
         },
         {
@@ -346,6 +346,21 @@
       ]
     },
     {
+      "id": "skills add",
+      "group": "Getting started",
+      "description": "Add the Zitadel agent skills to this project.\n\nAdds the skills of this CLI's version to .agents/skills, which most coding agents read, and to .claude/skills for Claude Code. Run it again after updating the CLI to replace them with the new version's.",
+      "args": [],
+      "flags": [],
+      "examples": [
+        {
+          "command": "skills add"
+        },
+        {
+          "command": "skills add --cwd my-app"
+        }
+      ]
+    },
+    {
       "id": "console",
       "group": "Local development",
       "description": "Open the local console, signed in as the local admin.\n\nThe local admin is the one `zitadel start` created. Run this in the directory `zitadel start` ran in, or one inside it: the local admin is read from the nearest `.zitadel/local/` on the way up.",
@@ -427,7 +442,7 @@
         {
           "name": "force",
           "char": "f",
-          "description": "Delete the local runtime and its data without the confirmation prompt.",
+          "description": "Delete the local runtime and its data without the confirmation prompt. Required when non-interactive.",
           "type": "boolean"
         }
       ],
@@ -445,7 +460,7 @@
         {
           "name": "force",
           "char": "f",
-          "description": "Remove the managed files without the confirmation prompt.",
+          "description": "Remove the managed files and local state without the confirmation prompt. Required when non-interactive.",
           "type": "boolean"
         }
       ],
@@ -626,11 +641,6 @@
           "type": "option"
         },
         {
-          "name": "plain",
-          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
-          "type": "boolean"
-        },
-        {
           "name": "filter",
           "description": "Filter as field=operation:value (operation defaults to equals). Fields: created_at (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), id (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), schema (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), schema_object_type (equals|not_equals|contains), status (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), team_id (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), lifecycle_owner_team_id (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal).",
           "type": "option",
@@ -640,6 +650,11 @@
           "name": "sort",
           "description": "Sort as field:direction (asc|desc). Fields: created_at, id, schema, status, lifecycle_owner_team_id.",
           "type": "option"
+        },
+        {
+          "name": "plain",
+          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
+          "type": "boolean"
         },
         {
           "name": "env",
@@ -904,11 +919,6 @@
           "type": "option"
         },
         {
-          "name": "plain",
-          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
-          "type": "boolean"
-        },
-        {
           "name": "filter",
           "description": "Filter as field=operation:value (operation defaults to equals). Fields: created_at (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), name (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), status (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal).",
           "type": "option",
@@ -918,6 +928,11 @@
           "name": "sort",
           "description": "Sort as field:direction (asc|desc). Fields: created_at, name, status.",
           "type": "option"
+        },
+        {
+          "name": "plain",
+          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
+          "type": "boolean"
         },
         {
           "name": "env",
@@ -1210,11 +1225,6 @@
           "type": "option"
         },
         {
-          "name": "plain",
-          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
-          "type": "boolean"
-        },
-        {
           "name": "filter",
           "description": "Filter as field=operation:value (operation defaults to equals). Fields: created_at (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), user_id (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), team_id (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), relation (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), expires_at (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal).",
           "type": "option",
@@ -1224,6 +1234,11 @@
           "name": "sort",
           "description": "Sort as field:direction (asc|desc). Fields: created_at, expires_at, id.",
           "type": "option"
+        },
+        {
+          "name": "plain",
+          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
+          "type": "boolean"
         },
         {
           "name": "env",
@@ -2053,11 +2068,6 @@
           "type": "option"
         },
         {
-          "name": "plain",
-          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
-          "type": "boolean"
-        },
-        {
           "name": "filter",
           "description": "Filter as field=operation:value (operation defaults to equals). Fields: slug (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), created_at (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal).",
           "type": "option",
@@ -2067,6 +2077,11 @@
           "name": "sort",
           "description": "Sort as field:direction (asc|desc). Fields: slug, created_at.",
           "type": "option"
+        },
+        {
+          "name": "plain",
+          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
+          "type": "boolean"
         },
         {
           "name": "env",
@@ -2163,11 +2178,6 @@
           "type": "option"
         },
         {
-          "name": "plain",
-          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
-          "type": "boolean"
-        },
-        {
           "name": "filter",
           "description": "Filter as field=operation:value (operation defaults to equals). Fields: created_at (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), user_id (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), state (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), lifecycle_owner_team_id (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal).",
           "type": "option",
@@ -2177,6 +2187,11 @@
           "name": "sort",
           "description": "Sort as field:direction (asc|desc). Fields: created_at, user_id.",
           "type": "option"
+        },
+        {
+          "name": "plain",
+          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
+          "type": "boolean"
         },
         {
           "name": "env",
@@ -2247,7 +2262,7 @@
         {
           "name": "message",
           "char": "m",
-          "description": "A short summary of what this release changes.",
+          "description": "A short summary of what this release changes. Defaults to the pull request's title or the current commit's subject.",
           "type": "option"
         },
         {
@@ -2289,6 +2304,12 @@
           "type": "option"
         },
         {
+          "name": "message",
+          "char": "m",
+          "description": "A short summary of what this release changes. Defaults to the pull request's title or the current commit's subject.",
+          "type": "option"
+        },
+        {
           "name": "strict",
           "description": "Fail instead of warning when no preview credential (ZITADEL_PROJECT_SECRET) is set.",
           "type": "boolean"
@@ -2314,6 +2335,9 @@
         },
         {
           "command": "preview --ttl 24h"
+        },
+        {
+          "command": "preview -m 'add phone_number to human-user'"
         }
       ]
     },
@@ -2593,8 +2617,14 @@
         {
           "name": "force",
           "char": "f",
-          "description": "Roll back without the confirmation prompt. Required when non-interactive.",
+          "description": "Re-apply the deployment without the confirmation prompt. Required when non-interactive.",
           "type": "boolean"
+        },
+        {
+          "name": "message",
+          "char": "m",
+          "description": "A short summary of why this rolls back.",
+          "type": "option"
         },
         {
           "name": "env",
@@ -2790,15 +2820,15 @@
           "type": "option"
         },
         {
-          "name": "plain",
-          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
-          "type": "boolean"
-        },
-        {
           "name": "filter",
           "description": "Filter as field=operation:value (operation defaults to equals). Fields: name (equals), purpose (equals), revisions (equals; values all|latest).",
           "type": "option",
           "multiple": true
+        },
+        {
+          "name": "plain",
+          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
+          "type": "boolean"
         },
         {
           "name": "env",
@@ -3009,15 +3039,15 @@
           "type": "option"
         },
         {
-          "name": "plain",
-          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
-          "type": "boolean"
-        },
-        {
           "name": "filter",
           "description": "Filter as field=operation:value (operation defaults to equals). Fields: operation (equals).",
           "type": "option",
           "multiple": true
+        },
+        {
+          "name": "plain",
+          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
+          "type": "boolean"
         },
         {
           "name": "env",
@@ -3252,11 +3282,6 @@
           "type": "option"
         },
         {
-          "name": "plain",
-          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
-          "type": "boolean"
-        },
-        {
           "name": "filter",
           "description": "Filter as field=operation:value (operation defaults to equals). Fields: created_at (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal).",
           "type": "option",
@@ -3266,6 +3291,11 @@
           "name": "sort",
           "description": "Sort as field:direction (asc|desc). Fields: created_at.",
           "type": "option"
+        },
+        {
+          "name": "plain",
+          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
+          "type": "boolean"
         },
         {
           "name": "env",
@@ -3556,7 +3586,7 @@
         {
           "name": "force",
           "char": "f",
-          "description": "Revoke without the confirmation prompt. Required when non-interactive.",
+          "description": "Revoke the release without the confirmation prompt. Required when non-interactive.",
           "type": "boolean"
         },
         {
@@ -3651,15 +3681,15 @@
           "type": "option"
         },
         {
-          "name": "plain",
-          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
-          "type": "boolean"
-        },
-        {
           "name": "filter",
           "description": "Filter as field=operation:value (operation defaults to equals). Fields: object_type (equals), kind (equals), revisions (equals; values all|latest).",
           "type": "option",
           "multiple": true
+        },
+        {
+          "name": "plain",
+          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
+          "type": "boolean"
         },
         {
           "name": "env",
@@ -3929,6 +3959,12 @@
           "type": "boolean"
         },
         {
+          "name": "force",
+          "char": "f",
+          "description": "With --fix, make repairs that replace an origin without the confirmation prompt. Required when non-interactive.",
+          "type": "boolean"
+        },
+        {
           "name": "image",
           "description": "Container image to check.",
           "type": "option"
@@ -3971,6 +4007,7 @@
           "description": "An operationId (queryUsers) or a path (/users/query), then the path parameters. Omit it to choose one."
         }
       ],
+      "variadic": true,
       "flags": [
         {
           "name": "method",
@@ -3993,6 +4030,12 @@
         {
           "name": "paginate",
           "description": "Follow next_page_token to the last page, and answer with every page's items in one list.",
+          "type": "boolean"
+        },
+        {
+          "name": "force",
+          "char": "f",
+          "description": "Call an operation that deletes, revokes or rolls back without the confirmation prompt. Required when non-interactive.",
           "type": "boolean"
         }
       ],
@@ -4032,6 +4075,11 @@
           "name": "tag",
           "description": "Only the operations of this part of the API (Users, Teams, …).",
           "type": "option"
+        },
+        {
+          "name": "plain",
+          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
+          "type": "boolean"
         }
       ],
       "examples": [
@@ -4120,11 +4168,6 @@
           "type": "option"
         },
         {
-          "name": "plain",
-          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
-          "type": "boolean"
-        },
-        {
           "name": "filter",
           "description": "Filter as field=operation:value (operation defaults to equals). Fields: category (equals; values request|auth|session|admin|entity|signal; repeats widen), event_type (equals; repeats widen), actor_id (equals), session_id (equals), flow_id (equals), request_id (equals), entity_type (equals), entity_id (equals), team_id (equals), created_at (greater_than_or_equal|less_than).",
           "type": "option",
@@ -4134,6 +4177,11 @@
           "name": "sort",
           "description": "Sort as field:direction (asc|desc). Fields: occurred_at.",
           "type": "option"
+        },
+        {
+          "name": "plain",
+          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
+          "type": "boolean"
         },
         {
           "name": "env",

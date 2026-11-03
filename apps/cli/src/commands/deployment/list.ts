@@ -1,3 +1,4 @@
+import { Paging } from "@zitadel/api/runtime/paging";
 import { Flags } from "@oclif/core";
 
 import {
@@ -6,22 +7,12 @@ import {
   type JsonEnvelope,
   nonBlankString,
 } from "../../lib/oclif";
-import { collectPages } from "../../lib/oclif/crud/paging";
-import { renderList } from "../../lib/oclif/crud/table";
-import { listData } from "../../lib/oclif/envelope";
-import { shellArg } from "../../lib/shell";
+import { plainFlag, Tabulatable } from "../../lib/oclif/tabulatable";
+import { pagedFunctions } from "../../lib/api-client";
+import { Cmd } from "../../lib/cmd";
 
 /** The columns `list` renders, in order. */
 const COLUMNS = ["id", "release_id", "reason", "origins", "deployed_at"] as const;
-
-/** A deployment as the list endpoint returns it, narrowed to what the table reads. */
-type DeploymentRow = {
-  id: string;
-  release_id: string;
-  metadata: { reason?: string };
-  targets: { origin: string }[];
-  deployed_at: string;
-};
 
 /**
  * `zitadel deployment list` — show the project's deployment history.
@@ -32,7 +23,7 @@ type DeploymentRow = {
  * `next_page_token`; `--all` drains the history, `--limit` / `--page-token`
  * walk it a page at a time.
  */
-export default class DeploymentList extends EnvironmentCommand {
+export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
   static override description = "List the project's deployments, newest first.";
   static override group = CommandGroups.configuration;
   static override examples = [
@@ -57,10 +48,7 @@ export default class DeploymentList extends EnvironmentCommand {
       description: "Fetch every page instead of one.",
       exclusive: ["page-token"],
     }),
-    plain: Flags.boolean({
-      description:
-        "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
-    }),
+    plain: plainFlag,
   };
 
   async run(): Promise<JsonEnvelope> {
@@ -68,65 +56,52 @@ export default class DeploymentList extends EnvironmentCommand {
     await this.toMeta(flags);
     const { client, projectId } = await this.connect();
 
-    const request = (token?: string): Promise<unknown> =>
-      client.listDeployments({
-        project_id: projectId,
-        ...(flags.origin === undefined ? {} : { origin: flags.origin }),
-        ...(flags.live ? { live: true } : {}),
-        ...(flags.limit === undefined ? {} : { limit: flags.limit }),
-        ...(token === undefined ? {} : { page_token: token }),
-      });
-
-    const { items, next } = await collectPages(request, {
-      items: "deployments",
+    const params = {
+      project_id: projectId,
+      origin: flags.origin,
+      live: flags.live,
+      limit: flags.limit,
+      page_token: flags["page-token"],
+    };
+    // One page unless `--all`, as every list does; the walk starts at
+    // `--page-token`, and a drain leaves no next page to report.
+    const paging = new Paging(pagedFunctions.listDeployments);
+    const { items, next } = await paging.collect(client.listDeployments.pages(params), {
       all: flags.all === true,
-      token: flags["page-token"],
-      nextPageToken: "next_page_token",
     });
-    const deployments = items as DeploymentRow[];
 
     // Flatten each deployment's targets to one `origins` cell for the table.
-    const rows = deployments.map((deployment) => ({
+    const rows = items.map((deployment) => ({
       id: deployment.id,
       release_id: deployment.release_id,
-      reason: deployment.metadata.reason ?? "deploy",
+      reason: deployment.metadata.reason,
       origins: deployment.targets.map((target) => target.origin).join(", "),
       deployed_at: deployment.deployed_at,
     }));
 
-    // A page token is only valid alongside the flags that issued it, so the
-    // suggested next page repeats the whole invocation rather than a bare
-    // token. `--all` already drained everything, so it suggests nothing.
-    const nextCommand =
-      next && flags.all !== true
-        ? this.suggest(
-            [
-              "deployment list",
-              ...(flags.origin === undefined ? [] : [`--origin ${shellArg(flags.origin)}`]),
-              ...(flags.live ? ["--live"] : []),
-              ...(flags.limit === undefined ? [] : [`--limit ${flags.limit}`]),
-              // `next` is an opaque server cursor: quote it so whitespace or shell
-              // metacharacters in a copied command cannot execute as server-controlled
-              // text or break the suggestion.
-              `--page-token ${shellArg(next)}`,
-              "--json",
-            ].join(" "),
-          )
-        : undefined;
+    const columns = COLUMNS;
+    const empty = "No deployments yet.";
+    const footer: string[] = [];
+    const page = {
+      token: next,
+      command: "deployment list",
+      flags: [
+        ...(flags.origin === undefined ? [] : [Cmd.option("--origin", flags.origin)]),
+        ...(flags.live ? ["--live"] : []),
+        ...(flags.limit === undefined ? [] : [`--limit ${flags.limit}`]),
+      ],
+    };
+    const extra = {};
 
-    const plain = flags.plain || !process.stdout.isTTY;
-    return this.emit({
-      status: "ok",
-      data: listData(deployments, {
-        nextPageToken: next,
-        nextCommands: nextCommand === undefined ? undefined : [nextCommand],
-      }),
-      pretty: renderList(COLUMNS, rows, {
-        plain,
-        singular: "deployment",
-        empty: "No deployments yet.",
-        footer: next ? [`More available: --page-token ${shellArg(next)} (or --all)`] : [],
-      }),
+    return this.emitList(flags, {
+      columns,
+      rows,
+      items,
+      singular: "deployment",
+      empty,
+      footer,
+      page,
+      extra,
     });
   }
 }

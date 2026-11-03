@@ -10,6 +10,7 @@ import {
   anApp,
   type ScaffoldedApp,
   PASSWORD_POLICY,
+  SETUP_ORIGIN,
 } from "../helpers/project";
 
 const platform = usePlatformMock();
@@ -113,15 +114,15 @@ describe("setup", () => {
 
   describe("against a valid server", () => {
     describe("--json", () => {
-      it("publishes nothing, leaving the deploy to the developer", async () => {
+      it("deploys what it wrote, so the first sign-in is served a release", async () => {
         const app = await anApp();
 
         await app.setup();
 
-        expect(await app.liveDeploymentCount()).toBe(0);
+        expect(await app.liveDeploymentCount()).toBe(1);
       });
 
-      it("names the deploy that publishes what it wrote", async () => {
+      it("names the deploy that publishes an edit", async () => {
         const app = await anApp();
 
         const result = await app.setup();
@@ -131,14 +132,14 @@ describe("setup", () => {
         ).toContain("deploy -m '<what changed>'");
       });
 
-      it("says the configuration is not live yet", async () => {
+      it("says an edit takes effect once it is deployed", async () => {
         const app = await anApp();
 
         const result = await app.setup();
 
         expect(
           app.envelopeOf<{ next_actions: string[] }>(result).data.next_actions.join("\n"),
-        ).toContain("Nothing is released yet");
+        ).toContain("serves only what is deployed");
       });
 
       it("reports the commit it made", async () => {
@@ -150,6 +151,27 @@ describe("setup", () => {
           initialized: true,
           commit: expect.stringMatching(/^[0-9a-f]{40}$/),
         });
+      });
+
+      it("reports the repository it created when it could not commit", async () => {
+        const app = await anApp();
+
+        const result = await app.setupWithGitThatCannotCommit();
+
+        expect(app.envelopeOf<SetupGitData>(result).data.git).toEqual({
+          initialized: true,
+          commit: null,
+        });
+      });
+
+      it("warns that it could not commit and left a new repository", async () => {
+        const app = await anApp();
+
+        const result = await app.setupWithGitThatCannotCommit();
+
+        expect(app.envelopeOf(result).warnings?.join("\n")).toContain(
+          "Setup created a new, empty git repository here.",
+        );
       });
 
       it("keeps the project secret it wrote out of the commit it makes", async () => {
@@ -204,6 +226,16 @@ describe("setup", () => {
         const app = await anApp();
         await app.underVersionControl();
         await app.withUncommittedWork();
+
+        const result = await app.setup();
+
+        expect(result).toFailWith("E_CONFLICT");
+      });
+
+      it("refuses a detached HEAD, where its commit would be on no branch", async () => {
+        const app = await anApp();
+        await app.underVersionControl();
+        await app.onADetachedHead();
 
         const result = await app.setup();
 
@@ -441,6 +473,57 @@ describe("setup", () => {
         const rerun = await app.setup();
 
         expect(rerun).toBeSkipped();
+      });
+
+      describe("--dev-port without --force when no one can be asked", () => {
+        it("still succeeds", async () => {
+          const app = await anApp();
+          expect(await app.setup()).toSucceed();
+
+          const result = await app.setup(["--dev-port", "3001"]);
+
+          expect(result).toSucceed();
+        });
+
+        it("says to pass --force", async () => {
+          const app = await anApp();
+          expect(await app.setup()).toSucceed();
+
+          const result = await app.setup(["--dev-port", "3001"]);
+
+          expect(result).toSay("origin rm http://localhost:3000 --force");
+        });
+
+        it("suggests removing the previous origin with --force", async () => {
+          const app = await anApp();
+          expect(await app.setup()).toSucceed();
+
+          const result = await app.setup(["--dev-port", "3001"]);
+
+          expect(result).toSuggestExactly(
+            `origin rm http://localhost:3000 --force --env-file ${app.path}/.env.development.local --cwd ${app.path}`,
+          );
+        });
+
+        it("removes nothing", async () => {
+          const app = await anApp();
+          expect(await app.setup()).toSucceed();
+
+          await app.setup(["--dev-port", "3001"]);
+
+          expect(await app.projectOrigins()).toContainEqual(SETUP_ORIGIN);
+        });
+      });
+
+      it("replaces the previous origin when --dev-port moves the app with --force", async () => {
+        const app = await anApp();
+        expect(await app.setup()).toSucceed();
+
+        await app.setup(["--dev-port", "3001", "--force"]);
+
+        expect(await app.projectOrigins()).toEqual([
+          { pattern: "http://localhost:3001", kind: "primary" },
+        ]);
       });
 
       it("leaves the developer's edits in place on a rerun", async () => {

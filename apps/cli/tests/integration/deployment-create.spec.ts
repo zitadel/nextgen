@@ -58,6 +58,7 @@ describe("deployment create", () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin("https://app.acme.com");
         const releaseId = await aRelease(app);
+        const before = await app.liveDeploymentCount();
 
         const result = await app.run([
           "deployment",
@@ -71,8 +72,7 @@ describe("deployment create", () => {
 
         expect(result).toSucceed();
         expect(app.envelopeOf<{ dry_run: boolean }>(result).data.dry_run).toBe(true);
-        const listed = await app.run(["deployment", "list", "--json"]);
-        expect(app.envelopeOf<{ count: number }>(listed).data.count).toBe(0);
+        expect(await app.liveDeploymentCount()).toBe(before);
       });
 
       it("takes no --origin, as primary origins are never named one by one", async () => {

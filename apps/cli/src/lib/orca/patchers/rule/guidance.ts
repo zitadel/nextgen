@@ -86,10 +86,10 @@ export function agentsGuidanceSection(ctx: PatchContext): string {
   // the contract details live with each helper's own docs.
   const sessionStateParagraph =
     ctx.framework.id === "next"
-      ? "Your app's own chrome (header navigation, account menus) reads session state with `getSession({ projectId: process.env.NEXT_PUBLIC_ZITADEL_PROJECT_ID })` from `@zitadel/sdk-next/session` — a no-store client read of the same-origin `/__nextgen/sessions/me?project_id=…` that the session card itself uses. It returns identity only for 200 with a non-empty `user_id` in this app's project, and signed-out for the backend's canonical `401/auth.unauthorized`, `403/sess.project_mismatch` (a session of another project on the same host, such as the console's on localhost) or `404/sess.not_found`; any other response is unknown/error, never signed-out. In Server Components, `auth()` from `@zitadel/sdk-next/server` works too, on every page: the request boundary's `matcher` covers every route, which also makes `protectedRoutes` the one list of routes that need a sign-in (a protected route that a narrower `matcher` leaves out stays public). Sign-in and sign-out navigate (`post-sign-in-url` / `post-sign-out-url`), so chrome re-reads on the next page load without extra wiring."
+      ? "Your app's own chrome (header navigation, account menus) reads session state with `getSession({ projectId: process.env.NEXT_PUBLIC_ZITADEL_PROJECT_ID })` from `@zitadel/sdk-next/session` — a no-store client read of the same-origin `/__nextgen/api/v1/sessions/me?project_id=…` that the session card itself uses. It returns identity only for 200 with a non-empty `user_id` in this app's project, and signed-out for the backend's canonical `401/auth.unauthorized`, `403/sess.project_mismatch` (a session of another project on the same host, such as the console's on localhost) or `404/sess.not_found`; any other response is unknown/error, never signed-out. In Server Components, `auth()` from `@zitadel/sdk-next/server` works too, on every page: the request boundary's `matcher` covers every route, which also makes `protectedRoutes` the one list of routes that need a sign-in (a protected route that a narrower `matcher` leaves out stays public). Sign-in and sign-out navigate (`post-sign-in-url` / `post-sign-out-url`), so chrome re-reads on the next page load without extra wiring."
       : ctx.framework.id === "nuxt"
         ? "Your app's own chrome (header navigation, account menus) reads session state with the auto-imported `useAuth()` composable — seeded from the server on every render by the scaffolded auth plugin. Sign-in and sign-out navigate (`post-sign-in-url` / `post-sign-out-url`), so the state is fresh on every page load."
-        : 'Your app\'s own chrome (header navigation, account menus) can read session state from the same-origin `/__nextgen/sessions/me?project_id=<project id>`, naming the project id the app passes to `configureZitadel()` — the same server-answered read the session card performs. Fetch with `credentials: "include"`, `cache: "no-store"`, and `Accept: application/json`; treat 200 as signed-in only with a non-empty `user_id` and that `project_id`, and signed-out only for the canonical error envelope `401/auth.unauthorized`, `403/sess.project_mismatch` (a session of another project on the same host, such as the console\'s on localhost) or `404/sess.not_found`. Any other response is unknown/error, never signed-out. Sign-in and sign-out navigate (`post-sign-in-url` / `post-sign-out-url`), so chrome re-reads on the next page load.';
+        : 'Your app\'s own chrome (header navigation, account menus) can read session state from the same-origin `/__nextgen/api/v1/sessions/me?project_id=<project id>`, naming the project id the app passes to `configureZitadel()` — the same server-answered read the session card performs. Fetch with `credentials: "include"`, `cache: "no-store"`, and `Accept: application/json`; treat 200 as signed-in only with a non-empty `user_id` and that `project_id`, and signed-out only for the canonical error envelope `401/auth.unauthorized`, `403/sess.project_mismatch` (a session of another project on the same host, such as the console\'s on localhost) or `404/sess.not_found`. Any other response is unknown/error, never signed-out. Sign-in and sign-out navigate (`post-sign-in-url` / `post-sign-out-url`), so chrome re-reads on the next page load.';
   // Where sign-in lands is otherwise only in the SDK's type comments, so an
   // app that protects a checkout cannot tell whether the visitor returns to it.
   const returnPathParagraph =
@@ -100,7 +100,7 @@ This app's login is managed by Zitadel. Local config is the source of truth for 
 
 The golden path:
 
-1. Start the dev server and open ${ctx.issuer}/login — **exactly this origin, not 127.0.0.1**. Passkeys and the origin allowlist are bound to it. (Freshly scaffolded apps also redirect / there; pre-existing apps keep their homepage.)
+1. Start the dev server and open ${ctx.issuer}/register to create the first user — **exactly this origin, not 127.0.0.1**. Passkeys and the origin allowlist are bound to it. Returning users sign in at /login. (Freshly scaffolded apps also redirect / to /login; pre-existing apps keep their homepage.)
    - Port taken (\`EADDRINUSE\`) or another port wanted: run \`${movePort}\`. It moves the dev script or dev-server config, \`ZITADEL_ISSUER\` and the project's allowed origin together; changing only one of them breaks sign-in.
 2. Prove the loop in a real browser: register a user → sign out → sign in → /profile shows signed in.${passkeyVerifyNote}
 3. Customize by editing local config:
@@ -126,7 +126,7 @@ Machine-readable dialect (read these before authoring flow or schema edits):
 - \`.zitadel/meta/user-schema.json\` (with its companions \`user-property.json\`, \`auth-methods.json\`, \`auth-method.json\`, \`sso-auth-method.json\`) specifies the user-schema dialect (\`x-auth-methods\`, \`x-unique\`, property constraints).
 - \`.zitadel/meta/idp-connection.json\` specifies a provider connection file under \`.zitadel/idps/\` (protocol block, credentials as \`\${{ NAME }}\` variable references, claim mapping). A user schema lists the connection slugs it allows under \`x-auth-methods.sso.providers\`.
 - The files in \`.zitadel/meta/\` are generated by the CLI; do not edit them. After upgrading the CLI, run the new version's \`doctor --fix\` (\`npx @zitadel/cli@<version> doctor --fix\`) to write its schemas.
-- Worked flow examples: https://github.com/zitadel/nextgen/tree/main/api/openapi/endpoints/flow_definitions/examples
+- Worked flow examples: https://github.com/zitadel/nextgen/tree/main/apps/api/api/openapi/endpoints/flow_definitions/examples
 
 Never edit \`.zitadel/state.json\` (sync bookkeeping) or \`.zitadel/secret\` (credentials, git-ignored). Keep \`.zitadel/local/\` out of source control.`;
 }
@@ -138,7 +138,7 @@ export function readmeGuidanceSection(ctx: PatchContext): string {
   const movePort = movePortCommand(ctx);
   return `## Authentication (Zitadel)
 
-Login for this app is managed by [Zitadel](https://zitadel.com). Try it: start the dev server, open ${ctx.issuer}/login (use this exact origin — passkeys are bound to it), register a user, sign out, and sign in again.
+Login for this app is managed by [Zitadel](https://zitadel.com). Try it: start the dev server, open ${ctx.issuer}/register (use this exact origin — passkeys are bound to it), register a user, sign out, and sign in again at /login.
 
 If the dev server's port is taken (\`EADDRINUSE\`), or you want another one, move the app with \`${movePort}\`: it updates the dev script, \`ZITADEL_ISSUER\` and the project's allowed origin together.
 

@@ -1,5 +1,5 @@
 import { Flags } from "@oclif/core";
-import type { ZitadelClient } from "@zitadel/api/client";
+import type { ZitadelClient } from "../../lib/api-client";
 import { ApiError } from "@zitadel/api/runtime/fetch";
 
 import {
@@ -14,7 +14,9 @@ import {
   buildBundle,
   createDeployment,
   createReleaseFromBundle,
+  deployMessage,
   headSha,
+  messageFlag,
   runSteps,
   type StepContext,
   validateStep,
@@ -56,9 +58,13 @@ export default class Preview extends PreviewCommand {
     "<%= config.bin %> preview",
     "<%= config.bin %> preview --origin https://acme-git-sso-acmeinc.vercel.app",
     "<%= config.bin %> preview --ttl 24h",
+    "<%= config.bin %> preview -m 'add phone_number to human-user'",
   ];
   static override flags = {
     ...previewFlags,
+    message: messageFlag(
+      "A short summary of what this release changes. Defaults to the pull request's title or the current commit's subject.",
+    ),
     // Preview-only: `preview list` and `preview rm` share the credential but
     // have no deploy to make strict, so this lives here, not in `previewFlags`.
     strict: Flags.boolean({
@@ -152,16 +158,13 @@ export default class Preview extends PreviewCommand {
     }
 
     // Preview URLs come from `--origin`, else from the platform build variables.
-    let urls = requested;
-    if (urls.length === 0) {
-      const detected = detectPreviewUrls(env);
-      if (detected.urls.length === 0) {
-        throw new ZitadelError("E_VALIDATION", "No preview URLs to deploy to", {
-          hint: `Pass --origin, or run inside a pull-request build that sets one of: ${detected.variablesLookedFor.join(", ")}.`,
-        });
-      }
-      urls = [...detected.urls];
+    const detected = requested.length === 0 ? detectPreviewUrls(env) : undefined;
+    if (detected !== undefined && detected.urls.length === 0) {
+      throw new ZitadelError("E_VALIDATION", "No preview URLs to deploy to", {
+        hint: `Pass --origin, or run inside a pull-request build that sets one of: ${detected.variablesLookedFor.join(", ")}.`,
+      });
     }
+    const urls = detected === undefined ? requested : [...detected.urls];
 
     const { client, projectId } = await this.connect();
 
@@ -216,13 +219,18 @@ export default class Preview extends PreviewCommand {
       });
     }
 
+    // The release keeps the message of whichever run built it first, usually
+    // this one, so the deploy after merge reuses it rather than adding its own.
+    const message = await deployMessage(flags.message, cwd, env);
     const release = await createReleaseFromBundle(client, projectId, bundle, {
+      message,
       gitSha: await headSha(cwd),
       gitDirty: await worktreeIsDirty(cwd),
     });
     const deployment = await createDeployment(client, projectId, {
       releaseId: release.id,
       targets: urls,
+      message,
       // The wire takes an ISO-8601 duration; `--ttl` keeps the `7d`/`12h`
       // spelling a person writes (create-deployment-request.yaml).
       ...(ttl === undefined ? {} : { ttl: ttl.iso }),
@@ -262,7 +270,8 @@ export default class Preview extends PreviewCommand {
  */
 async function primaryOrigins(client: ZitadelClient, projectId: string): Promise<string[]> {
   try {
-    const origins = (await client.getProject(projectId)).origins ?? [];
+    const project = await client.getProject(projectId);
+    const origins = project.origins;
     return origins.filter((entry) => entry.kind === "primary").map((entry) => entry.pattern);
   } catch (error) {
     if (error instanceof ApiError && error.status === 403) {

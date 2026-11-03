@@ -1,9 +1,12 @@
+import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { formatDateTime } from "@/lib/date";
 import { scopedPath } from "@/test/project-scope.fixture";
 import { server } from "@/test/msw";
+import { createAppRouter } from "../../../router";
 
 // The `_authed` layout guards every screen behind `GET /sessions/me`
 // (Console ADR 0003); mock the auth module so routes render as signed in.
@@ -13,15 +16,11 @@ vi.mock("@/auth/session", async (importOriginal) => {
   return { ...actual, fetchSession: vi.fn(async () => makeTestSession()) };
 });
 
-const USERS_URL = "http://localhost/api/users";
+const USERS_URL = "http://localhost/api/v1/users";
 const USERS_QUERY_URL = `${USERS_URL}/query`;
-const SCHEMAS_URL = "http://localhost/api/schemas";
+const SCHEMAS_URL = "http://localhost/api/v1/schemas";
 
 async function renderUsers(path = scopedPath("/users")) {
-  const [{ RouterProvider, createMemoryHistory }, { createAppRouter }] = await Promise.all([
-    import("@tanstack/react-router"),
-    import("../../../router"),
-  ]);
   const router = createAppRouter({
     history: createMemoryHistory({ initialEntries: [path] }),
   });
@@ -100,7 +99,7 @@ describe("users screen", () => {
     // not the one selected here.
     const projects: (string | null)[] = [];
     server.use(
-      http.get("*/api/projects/proj_other", () =>
+      http.get("*/api/v1/projects/proj_other", () =>
         HttpResponse.json({ id: "proj_other", name: "Other project" }),
       ),
       http.post(USERS_QUERY_URL, async ({ request }) => {
@@ -136,7 +135,7 @@ describe("users screen", () => {
     // ambiguous one in the caller's own project unless `project_id` names it.
     const schemaProjects: Record<string, string | null> = {};
     server.use(
-      http.get("*/api/projects/proj_other", () =>
+      http.get("*/api/v1/projects/proj_other", () =>
         HttpResponse.json({ id: "proj_other", name: "Other project" }),
       ),
       http.post(USERS_QUERY_URL, async ({ request }) => {
@@ -215,6 +214,7 @@ describe("users screen", () => {
     // order, without the email that would only repeat the line under the name.
     expect(table.getAllByRole("columnheader").map((cell) => cell.textContent)).toEqual([
       "User",
+      "Revision",
       "Attributes",
       "Status",
       "Member of",
@@ -263,6 +263,7 @@ describe("users screen", () => {
     expect(within(link.parentElement as HTMLElement).getByText("email")).toBeInTheDocument();
     expect(table.getAllByRole("columnheader").map((cell) => cell.textContent)).toEqual([
       "User",
+      "Revision",
       "Status",
       "Member of",
       "ID",
@@ -662,7 +663,7 @@ describe("users screen", () => {
     );
     vi.stubGlobal("localStorage", storage);
     server.use(
-      http.get("*/api/projects/proj_other", () =>
+      http.get("*/api/v1/projects/proj_other", () =>
         HttpResponse.json({ id: "proj_other", name: "Other project" }),
       ),
       http.post(USERS_QUERY_URL, () =>
@@ -863,7 +864,8 @@ describe("users screen", () => {
     expect(within(screen.getByRole("table")).getByText("Acme")).toBeInTheDocument();
     expect(within(minimal as HTMLElement).getByText("email: min@acme.com")).toBeInTheDocument();
     const cells = within(minimal as HTMLElement).getAllByRole("cell");
-    expect(cells[1]).toHaveTextContent("—");
+    // User, Revision, then the pinned column.
+    expect(cells[2]).toHaveTextContent("—");
   });
 
   it("renders the server-resolved identity chain, never deriving from attributes", async () => {
@@ -1193,7 +1195,9 @@ describe("users screen", () => {
     // leaving the row a column short.
     const soloRow = screen.getByRole("link", { name: "solo@acme.com" }).closest("tr");
     expect(soloRow).not.toBeNull();
-    expect(within(soloRow as HTMLElement).getByText("—")).toBeInTheDocument();
+    // The Member of cell: third from the end, before the ID and the row menu.
+    const soloCells = within(soloRow as HTMLElement).getAllByRole("cell");
+    expect(soloCells.at(-3)).toHaveTextContent("—");
   });
 
   it("says when a user is on more teams than the row carries", async () => {
@@ -1271,5 +1275,177 @@ describe("users screen", () => {
     expect(bodies).toHaveLength(3);
     expect(bodies.at(-1)).toMatchObject({ page_token: "page-2" });
     expect(bodies.at(-1)).not.toHaveProperty("expand");
+  });
+
+  /**
+   * One schema in two revisions, the newer one still in use: the latest-only
+   * read the filter's options come from, and the full history the revision
+   * menu reads for the chosen schema.
+   */
+  function serveLineage() {
+    const business = { ...BUSINESS_SCHEMA.schema, objectType: "business" };
+    const newer = {
+      id: "sch_business_2",
+      schema: business,
+      metadata: { created_at: "2026-08-01T09:30:00Z", in_use: true },
+    };
+    const older = {
+      id: "sch_business",
+      schema: business,
+      metadata: { created_at: "2026-07-01T00:00:00Z", in_use: false },
+    };
+    server.use(
+      http.get(SCHEMAS_URL, ({ request }) => {
+        const params = new URL(request.url).searchParams;
+        if (params.get("revisions") !== "all") return HttpResponse.json({ schemas: [newer] });
+        return HttpResponse.json({
+          schemas: params.get("object_type") === "business" ? [newer, older] : [],
+        });
+      }),
+    );
+  }
+
+  it("shows the revision each user is on, opening that schema", async () => {
+    // A revision is a schema of its own, so the column carries the user's
+    // `schema` id and opens it (#1669).
+    server.use(
+      http.post(USERS_QUERY_URL, () =>
+        HttpResponse.json({
+          users: [
+            {
+              id: "user_1",
+              schema: "sch_business",
+              identifier: "maya@acme.com",
+              identifier_property: "email",
+              attributes: { email: "maya@acme.com" },
+            },
+          ],
+        }),
+      ),
+      http.get(`${SCHEMAS_URL}/sch_business`, () => HttpResponse.json(BUSINESS_SCHEMA)),
+    );
+    await renderUsers();
+
+    const table = within(await screen.findByRole("table"));
+    expect(table.getByRole("columnheader", { name: "Revision" })).toBeInTheDocument();
+    expect(table.getByRole("link", { name: "sch_business" })).toHaveAttribute(
+      "href",
+      scopedPath("/schemas/sch_business"),
+    );
+  });
+
+  it("narrows the list to a schema, then to its older revisions, on the server", async () => {
+    // Every revision of a schema shares its object type, so the schema filter
+    // sends that; `Older revisions` adds `schema not_equals` the newest id.
+    // The revision belongs to the schema, so changing the schema drops it.
+    serveLineage();
+    const bodies = recordQueries(() => HttpResponse.json({ users: [] }));
+    const router = await renderUsers();
+    await screen.findByRole("table");
+    expect(bodies.at(-1)).not.toHaveProperty("filter");
+    expect(screen.queryByRole("combobox", { name: "Filter by revision" })).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("combobox", { name: "Filter by schema" }));
+    await userEvent.click(await screen.findByRole("option", { name: "Business" }));
+    await waitFor(() =>
+      expect(router.state.resolvedLocation?.search).toMatchObject({ schema: "business" }),
+    );
+    await waitFor(() =>
+      expect(bodies.at(-1)).toMatchObject({
+        filter: [{ field: "schema_object_type", operation: "equals", value: "business" }],
+      }),
+    );
+    expect(await screen.findByText("No users match this filter.")).toBeInTheDocument();
+
+    await userEvent.click(await screen.findByRole("combobox", { name: "Filter by revision" }));
+    const options = within(await screen.findByRole("listbox")).getAllByRole("option");
+    expect(options.map((option) => option.textContent)).toEqual([
+      "All revisions",
+      "Latest only",
+      "Older revisions",
+      `sch_business_2${formatDateTime("2026-08-01T09:30:00Z")}latestin use`,
+      `sch_business${formatDateTime("2026-07-01T00:00:00Z")}`,
+    ]);
+    await userEvent.click(screen.getByRole("option", { name: "Older revisions" }));
+    await waitFor(() =>
+      expect(bodies.at(-1)).toMatchObject({
+        filter: [
+          { field: "schema_object_type", operation: "equals", value: "business" },
+          { field: "schema", operation: "not_equals", value: "sch_business_2" },
+        ],
+      }),
+    );
+    expect(screen.getByRole("combobox", { name: "Filter by revision" })).toHaveTextContent(
+      "Older revisions",
+    );
+
+    await userEvent.click(screen.getByRole("combobox", { name: "Filter by schema" }));
+    await userEvent.click(await screen.findByRole("option", { name: "All schemas" }));
+    await waitFor(() => expect(bodies.at(-1)).not.toHaveProperty("filter"));
+    expect(screen.queryByRole("combobox", { name: "Filter by revision" })).not.toBeInTheDocument();
+  });
+
+  it("drops a latest or older filter the URL carries when the newest revision is unknown", async () => {
+    // `older` compares with the newest revision's id. With the lineages
+    // unreadable there is none to compare with, and a list that quietly widened
+    // under the same URL would claim a filter it does not send; the URL loses
+    // the revision instead, and keeps the schema it can still narrow by.
+    server.use(
+      http.get(SCHEMAS_URL, () =>
+        HttpResponse.json({ code: "internal", message: "boom" }, { status: 500 }),
+      ),
+    );
+    const bodies = recordQueries(() => HttpResponse.json({ users: [] }));
+    const router = await renderUsers(`${scopedPath("/users")}&schema=business&revision=older`);
+
+    await screen.findByRole("table");
+    await waitFor(() =>
+      expect(router.state.resolvedLocation?.search).toEqual({
+        project: "proj_test",
+        schema: "business",
+      }),
+    );
+    expect(bodies.at(-1)).toMatchObject({
+      filter: [{ field: "schema_object_type", operation: "equals", value: "business" }],
+    });
+  });
+
+  it("names an object type the URL carries that no schema has", async () => {
+    // A link kept after its schema was deleted still narrows the list; the
+    // trigger says so rather than going blank for want of a matching option.
+    serveLineage();
+    recordQueries(() => HttpResponse.json({ users: [] }));
+    await renderUsers(`${scopedPath("/users")}&schema=ghost`);
+
+    await screen.findByRole("table");
+    expect(screen.getByRole("combobox", { name: "Filter by schema" })).toHaveTextContent("ghost");
+    expect(screen.getByText("No users match this filter.")).toBeInTheDocument();
+  });
+
+  it("filters by one revision from the URL, and keeps the filter in view when the schemas cannot be read", async () => {
+    // The schema reads are chrome: unreadable, the list still narrows by what
+    // the URL carries, and the filter stays on the title row naming it, so
+    // it can be cleared from there rather than by editing the URL.
+    server.use(
+      http.get(SCHEMAS_URL, () =>
+        HttpResponse.json({ code: "internal", message: "boom" }, { status: 500 }),
+      ),
+    );
+    const bodies = recordQueries(() => HttpResponse.json({ users: [] }));
+    await renderUsers(`${scopedPath("/users")}&schema=business&revision=sch_business`);
+
+    await screen.findByRole("table");
+    expect(bodies.at(-1)).toMatchObject({
+      filter: [
+        { field: "schema_object_type", operation: "equals", value: "business" },
+        { field: "schema", operation: "equals", value: "sch_business" },
+      ],
+    });
+    expect(screen.getByRole("combobox", { name: "Filter by schema" })).toHaveTextContent(
+      "business",
+    );
+    expect(screen.getByRole("combobox", { name: "Filter by revision" })).toHaveTextContent(
+      "sch_business",
+    );
   });
 });

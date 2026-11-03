@@ -44,6 +44,8 @@ const startedDirs: string[] = [];
 /** A stand-in for the server binary, which the CLI starts from the path in `ZITADEL_SERVER_BINARY`. */
 export async function aFakeServerBinary(shape: ServerShape): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), "zitadel-fake-server-"));
+  // The run that made this server, so a later run can tell it from one left behind.
+  await writeFile(join(dir, "owner"), String(process.pid));
   const server = join(dir, "nextgen");
   await writeFile(
     server,

@@ -5,8 +5,8 @@ import consola from "consola";
 
 import { createZitadelClient } from "../../lib/api-client";
 import { claimAction, claimCommand, claimWindowClosedAction } from "../../lib/claim-state";
-import { type Environment, resolveEnvironment } from "../../lib/environment";
-import { ZitadelError } from "../../lib/errors";
+import { resolveEnvironment } from "../../lib/environment";
+import { ZitadelError, errorMessage } from "../../lib/errors";
 import { serverLogAction } from "../../lib/journey-guidance";
 import {
   dockerRuntimeGuidance,
@@ -23,10 +23,14 @@ import {
   localServerUrl,
   readNearestRuntimeMetadata,
   type RuntimeBackend,
+  resolveRuntimeBackend,
   type RuntimeMetadata,
 } from "../../lib/local-server/runtime";
 import { LocalServer } from "../../lib/local-server/server";
 import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../../lib/oclif";
+import { Destructive } from "../../lib/oclif/destructive";
+import { isRefusal } from "../../lib/consent";
+import { reportWarning } from "../../lib/warnings";
 import {
   environmentFlags,
   environmentSelectorSuffix,
@@ -52,7 +56,7 @@ import {
   type SuggestedCommand,
   unscopedCommand,
 } from "../../lib/suggestion";
-import { nextCommandsData } from "../../lib/oclif/envelope";
+import { type NextSteps, nextStepsData } from "../../lib/oclif/next-steps";
 
 const LOCAL_RUNTIME_CHECK_NAMES = new Set([
   "server-binary",
@@ -77,12 +81,18 @@ const LOCAL_RUNTIME_CHECK_NAMES = new Set([
  * level and skipped, not propagated — the post-fix re-verify still reports
  * whatever remains broken.
  */
-export default class Doctor extends BaseCommand {
+export default class Doctor extends Destructive(BaseCommand) {
   static override description = "Verify local runtime and project state.";
   static override group = CommandGroups.diagnostics;
   static override groupOrder = 1;
   static override flags = {
     fix: Flags.boolean({ description: "Repair missing files and stale managed wiring." }),
+    force: Flags.boolean({
+      char: "f",
+      description:
+        "With --fix, make repairs that replace an origin without the confirmation prompt. Required when non-interactive.",
+      dependsOn: ["fix"],
+    }),
     image: nonBlankString({ description: "Container image to check." }),
     port: Flags.integer({
       description: "Local HTTP port to check. Defaults to the port this directory's server uses.",
@@ -137,7 +147,14 @@ export default class Doctor extends BaseCommand {
           )
         : [];
     const hasConfig = await hasZitadelConfig(cwd);
-    const ctx: CheckContext = { cwd, orca: createOrca(), cliVersion: this.meta.cliVersion, dryRun };
+    const ctx: CheckContext = {
+      cwd,
+      orca: createOrca(),
+      cliVersion: this.meta.cliVersion,
+      dryRun,
+      signal: this.signal,
+      consent: (gate) => this.consent(gate),
+    };
 
     if (hasConfig && flags.fix) {
       const before = await Promise.all(SANITY_CHECKS.map((check) => check.run(ctx)));
@@ -150,6 +167,16 @@ export default class Doctor extends BaseCommand {
         try {
           await check.fix(ctx);
         } catch (error) {
+          // Ctrl-C stops the run. A repair refused for want of --force is the
+          // person's to approve, not one that failed: it is said, the other
+          // repairs still run, and the check below still reports what is left.
+          if (error instanceof ZitadelError && error.code === "E_CANCELLED") {
+            throw error;
+          }
+          if (isRefusal(error) && error instanceof ZitadelError) {
+            reportWarning(`${error.message}. ${error.hint ?? ""}`.trim());
+            continue;
+          }
           consola.debug(`doctor --fix: ${check.name} repair failed`, error);
         }
       }
@@ -164,6 +191,7 @@ export default class Doctor extends BaseCommand {
       envName: typeof flags.env === "string" ? flags.env : undefined,
       envFile: typeof flags["env-file"] === "string" ? flags["env-file"] : undefined,
       serverFlag: typeof flags.server === "string" ? flags.server : undefined,
+      signal: this.signal,
     });
     const checks = [...runtimeChecks, ...projectChecks, ...environmentChecks];
     const failed = checks.filter((check) => check.status === "fail");
@@ -250,8 +278,10 @@ export default class Doctor extends BaseCommand {
         lifecycle: hasConfig ? "configured" : "not-configured",
       },
       checks,
-      ...(nextActions.length > 0 ? { next_actions: nextActions } : {}),
-      ...(warningAdvice ? nextCommandsData(warningAdvice.nextCommands) : {}),
+    };
+    const next: NextSteps<SuggestedCommand> = {
+      ...(nextActions.length > 0 ? { actions: nextActions } : {}),
+      ...(warningAdvice ? { commands: warningAdvice.nextCommands } : {}),
     };
 
     if (failed.length > 0) {
@@ -267,7 +297,9 @@ export default class Doctor extends BaseCommand {
       // A check that failed with a typed CLI error advertises its own
       // category (e.g. the framework floor's E_UNSUPPORTED_PROJECT_SHAPE) —
       // surface that instead of the generic validation class so agents can
-      // branch on it. The port check keeps its dedicated code first.
+      // branch on it. The port check keeps its dedicated code first. The
+      // details are the report a passing run would emit, next steps included.
+      const report = { ...data, ...nextStepsData(next) };
       const code = failed.some((check) => check.name === "port")
         ? "E_PORT_IN_USE"
         : (failed.find((check) => check.code !== undefined)?.code ?? "E_VALIDATION");
@@ -276,14 +308,15 @@ export default class Doctor extends BaseCommand {
         nextCommands: advice.nextCommands,
         details:
           advice.suggestedArgs === undefined
-            ? data
-            : { ...data, suggested_args: advice.suggestedArgs },
+            ? report
+            : { ...report, suggested_args: advice.suggestedArgs },
       });
     }
 
     return this.emit({
       status: "ok",
       data,
+      next,
       warnings: warnings.map((warning) => `${warning.name}: ${warning.message}`),
     });
   }
@@ -485,7 +518,8 @@ export function advisoryForWarnings(
     nextActions.push(
       "Make the app's issuer a primary origin; `zitadel deploy` lands only on primary origins, and `zitadel setup` 0.1.0 registered it as a preview one.",
     );
-    nextCommands.push(projectCommand("doctor --fix", selector, cliVersion));
+    // The repair removes the origin and adds it back, which needs consent.
+    nextCommands.push(projectCommand("doctor --fix --force", selector, cliVersion));
   }
 
   if (hasRepairableMetaSchemas(warnings.find((check) => check.name === "meta-schemas"))) {
@@ -498,7 +532,7 @@ export function advisoryForWarnings(
   if (nextActions.length === 0 && nextCommands.length === 0) {
     return undefined;
   }
-  return { nextActions: unique(nextActions), nextCommands: unique(nextCommands) };
+  return { nextActions: [...new Set(nextActions)], nextCommands: [...new Set(nextCommands)] };
 }
 
 /**
@@ -519,28 +553,31 @@ async function runEnvironmentChecks(input: {
   envName?: string;
   envFile?: string;
   serverFlag?: string;
+  signal: AbortSignal;
 }): Promise<CheckOutcome[]> {
   if (input.envName === undefined && input.envFile === undefined) {
     return [];
   }
-  let environment: Environment;
-  try {
-    environment = await resolveEnvironment({
-      cwd: input.cwd,
-      env: input.env,
-      envName: input.envName,
-      envFile: input.envFile,
-      serverFlag: input.serverFlag,
-    });
-  } catch (error) {
+  const resolved = await resolveEnvironment({
+    cwd: input.cwd,
+    env: input.env,
+    envName: input.envName,
+    envFile: input.envFile,
+    serverFlag: input.serverFlag,
+  }).then(
+    (environment) => ({ environment }),
+    (error: unknown) => ({ failure: error }),
+  );
+  if ("failure" in resolved) {
     return [
       {
         name: "environment",
         status: "fail",
-        message: error instanceof Error ? error.message : String(error),
+        message: errorMessage(resolved.failure),
       },
     ];
   }
+  const { environment } = resolved;
   const name = environment.name.value;
   return [
     await check(`environment`, `Resolved ${name} environment connects`, async () => {
@@ -557,7 +594,11 @@ async function runEnvironmentChecks(input: {
           `ZITADEL_PROJECT_SECRET must resolve to verify project ${projectId} on ${server}`,
         );
       }
-      const project = await createZitadelClient({ baseUrl: server, token }).getProject(projectId);
+      const project = await createZitadelClient({
+        baseUrl: server,
+        token,
+        signal: input.signal,
+      }).getProject(projectId);
       if (project.id !== projectId) {
         throw new Error(`${server} returned project ${project.id}, not the resolved ${projectId}`);
       }
@@ -632,12 +673,9 @@ async function runLocalRuntimeChecks(
     "docker-cli",
     "Docker is reachable",
     async () => {
-      let result: Awaited<ReturnType<typeof LocalServer.dockerReachable>>;
-      try {
-        result = await LocalServer.dockerReachable();
-      } catch (error) {
+      const result = await LocalServer.dockerReachable().catch((error: unknown) => {
         throw new Error(dockerUnavailableMessage(error), { cause: error });
-      }
+      });
       if (result.status !== 0) {
         throw new Error(dockerUnavailableMessage(result.stderr || "docker version failed"));
       }
@@ -865,28 +903,6 @@ function hasManagedRuntimeProcesses(check: CheckOutcome | undefined): boolean {
   );
 }
 
-function unique<T extends string>(values: T[]): T[] {
-  return [...new Set(values)];
-}
-
-function resolveRuntimeBackend(input: {
-  runtime: unknown;
-  image: string | undefined;
-  envImage: string | undefined;
-  existingRuntime: { backend: RuntimeBackend } | undefined;
-}): RuntimeBackend {
-  if (input.runtime === "binary" || input.runtime === "docker") {
-    return input.runtime;
-  }
-  if (input.existingRuntime) {
-    return input.existingRuntime.backend;
-  }
-  if (input.image || input.envImage) {
-    return "docker";
-  }
-  return "binary";
-}
-
 async function check(
   name: string,
   fallback: string,
@@ -917,7 +933,7 @@ async function check(
 }
 
 function imageUnavailableMessage(image: string, error: unknown): string {
-  const detail = error instanceof Error ? error.message : String(error);
+  const detail = errorMessage(error);
   const suffix = detail.trim() ? ` (${detail.trim()})` : "";
   return `Image ${image} is not available to Docker${suffix}; \`zitadel start\` may need a pull or a different image.`;
 }

@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect, useNavigate, useRouter } from "@tanstack/react-router";
 import { Box, MoreVertical, Plus, User } from "lucide-react";
 import {
   Fragment,
@@ -38,6 +38,7 @@ import {
   UserIdCell,
   UserIdentityCell,
 } from "@/components/user-cells";
+import { UsersFilter } from "@/components/users-filter";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -52,22 +53,24 @@ import { DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdow
 import { Table, TableBody, TableCell, TableHeader } from "@/components/ui/table";
 import { useLoadMore } from "@/hooks/use-load-more";
 import { useScrollEdges } from "@/hooks/use-scroll-edges";
-import {
-  projectScopeDeps,
-  requireProjectScope,
-  useRequiredProjectScope,
-} from "@/lib/project-scope";
+import { requireProjectScope, useRequiredProjectScope } from "@/lib/project-scope";
+import { fetchAllSchemas, fetchSchemaRevisions } from "@/lib/schema";
+import type { UserSchema } from "@/lib/schema";
 import type { UserTeam } from "@/lib/user";
 import {
   type ColumnGroup,
   type ColumnPins,
+  type SchemaOption,
+  type UsersSearch,
   attributeSummary,
   columnsBeyondIdentity,
   columnsForUsers,
   fetchUsers,
   pinnedColumns,
   readColumnPins,
+  schemaOptions,
   toUserRow,
+  userFilter,
   writeColumnPins,
 } from "@/lib/user-list";
 import { Page } from "@/components/layout";
@@ -78,19 +81,63 @@ export const Route = createFileRoute("/_authed/users/")({
   // reads as a group.
   // Order 3: Teams sits at 2.
   staticData: { scope: "project", nav: { label: "Users", order: 3, icon: User } },
-  loaderDeps: projectScopeDeps,
+  // The filter lives in the URL, as the Teams tabs do: it is a server-side
+  // filter, so it belongs to the request the loader makes, is linkable and
+  // survives a reload. Only what the filter can send is kept: a revision
+  // belongs to a schema, so it goes without one.
+  validateSearch: (search: Record<string, unknown>): UsersSearch => {
+    const schema = typeof search.schema === "string" && search.schema ? search.schema : undefined;
+    const revision =
+      schema && typeof search.revision === "string" && search.revision
+        ? search.revision
+        : undefined;
+    return { ...(schema ? { schema } : {}), ...(revision ? { revision } : {}) };
+  },
+  loaderDeps: ({ search }) => search,
   loader: async ({ deps }) => {
     const projectId = requireProjectScope(deps.project);
-    const page = await fetchUsers(projectId);
+    // The filter's options are the project's schemas at their latest revision,
+    // which also names the newest id a `latest` or `older` criterion compares
+    // with; the chosen schema's revisions, with whether each is in use, are
+    // read for it alone. Both are chrome: unreadable, the list still renders,
+    // narrowed by whatever the URL can still express.
+    const readingOptions = fetchAllSchemas(projectId).then(schemaOptions, () => []);
+    const needsLatest = deps.revision === "latest" || deps.revision === "older";
+    // Only those two criteria wait for the options; the users read runs
+    // beside the schema reads otherwise.
+    const chosenFirst = needsLatest
+      ? (await readingOptions).find((option) => option.objectType === deps.schema)
+      : undefined;
+    if (needsLatest && !chosenFirst) {
+      // The URL asks for a comparison nobody can make. Dropping it from the URL
+      // keeps the list from claiming a narrower filter than it sends.
+      throw redirect({ to: "/users", search: { ...deps, revision: undefined } });
+    }
+    const filter = userFilter(deps, chosenFirst?.latestId);
+    const [page, options, revisions] = await Promise.all([
+      fetchUsers(projectId, undefined, true, filter),
+      readingOptions,
+      deps.schema
+        ? fetchSchemaRevisions(projectId, deps.schema, { inUse: true }).catch(() => [])
+        : [],
+    ]);
     return {
       users: page.users,
       teamsExpanded: page.teamsExpanded,
       nextPageToken: page.next_page_token ?? undefined,
-      columns: await columnsForUsers(projectId, page.users),
+      columns: await columnsForUsers(projectId, page.users, latestDocuments(options)),
+      options,
+      revisions,
+      filter,
     };
   },
   component: UsersScreen,
 });
+
+/** The latest revisions' documents, keyed by id: what `columnsForUsers` need not read again. */
+function latestDocuments(options: SchemaOption[]): Map<string, UserSchema> {
+  return new Map(options.map((option) => [option.latestId, option.schema]));
+}
 
 /** One fetched page, with the list state it carries besides its rows. */
 interface UsersPage {
@@ -103,6 +150,8 @@ interface UsersPage {
 function UsersScreen() {
   const projectId = useRequiredProjectScope();
   const loaded = Route.useLoaderData();
+  const search = Route.useSearch();
+  const navigate = useNavigate({ from: Route.fullPath });
   const router = useRouter();
 
   const [columns, setColumns] = useState(loaded.columns);
@@ -115,13 +164,17 @@ function UsersScreen() {
   const paging = useLoadMore(
     loaded,
     async (pageToken): Promise<UsersPage> => {
-      const page = await fetchUsers(projectId, pageToken, teamsExpanded);
+      const page = await fetchUsers(projectId, pageToken, teamsExpanded, loaded.filter);
       return {
         items: page.users,
         nextPageToken: page.next_page_token ?? undefined,
         // A later page can carry a schema the first page never referenced, whose
         // properties the Columns menu would otherwise not offer.
-        columns: await columnsForUsers(projectId, [...users, ...page.users]),
+        columns: await columnsForUsers(
+          projectId,
+          [...users, ...page.users],
+          latestDocuments(loaded.options),
+        ),
         teamsExpanded: page.teamsExpanded,
       };
     },
@@ -181,6 +234,20 @@ function UsersScreen() {
       {/* No search beside the title: it is out of the page headers until there
           is a console-wide solution (D19). */}
       <ResourceTitle
+        filter={
+          (loaded.options.length > 0 || search.schema) && (
+            <UsersFilter
+              options={loaded.options}
+              revisions={loaded.revisions}
+              search={search}
+              onChange={(next) =>
+                void navigate({
+                  search: (prev) => ({ ...prev, schema: next.schema, revision: next.revision }),
+                })
+              }
+            />
+          )
+        }
         action={
           <AddUserSheet onCreated={() => router.invalidate()}>
             {/* `px-2.5!` — `Button`'s `has-[>svg]:px-3` out-specifies a plain
@@ -212,6 +279,9 @@ function UsersScreen() {
             <TableHeader>
               <ResourceHeaderRow>
                 <ResourceHeadCell className={RESOURCE_STICKY_START}>User</ResourceHeadCell>
+                {/* The revision the user is on (#1669): the schema id, since a
+                    revision is a schema of its own. It opens that schema. */}
+                <ResourceHeadCell>Revision</ResourceHeadCell>
                 {pinned.map((column) => (
                   <ResourceHeadCell key={column.key}>{column.label}</ResourceHeadCell>
                 ))}
@@ -232,9 +302,9 @@ function UsersScreen() {
             <TableBody>
               {rows.length === 0 ? (
                 <ResourceEmptyRow
-                  colSpan={pinned.length + (showAttributes ? 1 : 0) + (teamsExpanded ? 5 : 4)}
+                  colSpan={pinned.length + (showAttributes ? 1 : 0) + (teamsExpanded ? 6 : 5)}
                 >
-                  No users yet.
+                  {search.schema ? "No users match this filter." : "No users yet."}
                 </ResourceEmptyRow>
               ) : (
                 summaries.map(({ row: user, summary }) => (
@@ -247,6 +317,20 @@ function UsersScreen() {
                         teamsKnown: teamsExpanded,
                       }}
                     />
+                    <TableCell className={`${RESOURCE_CELL_MUTED} ${USER_CLAMP}`}>
+                      {user.schemaId ? (
+                        <Link
+                          to="/schemas/$schemaId"
+                          params={{ schemaId: user.schemaId }}
+                          title={user.schemaId}
+                          className="hover:text-foreground block truncate underline-offset-2 hover:underline"
+                        >
+                          {user.schemaId}
+                        </Link>
+                      ) : (
+                        "—"
+                      )}
+                    </TableCell>
                     {pinned.map((column) => (
                       <TableCell
                         key={column.key}

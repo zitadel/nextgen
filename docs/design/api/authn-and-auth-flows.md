@@ -113,8 +113,8 @@ verified state:
 
 ```http
 POST   /sessions                         # pre-allocate anonymous session (optional, pre-auth)
-GET    /sessions/me                      # read the caller's session (__nextgen_session cookie)
-DELETE /sessions/me                      # end-user logout (__nextgen_session cookie)
+GET    /sessions/me                      # read the caller's session (__Host-zitadel_session cookie)
+DELETE /sessions/me                      # end-user logout (__Host-zitadel_session cookie)
 GET    /sessions/{id}                    # read state, factors, assurance_levels[] (operator, session.read)
 DELETE /sessions/{id}                    # operator revoke (session.delete; idempotent 204)
 POST   /sessions/query                   # operator list — cursor-paginated, structured filters

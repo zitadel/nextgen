@@ -308,3 +308,21 @@ a project that lists that origin keeps its own rules there, deployments and
 previews included. Only opening a flow takes this exemption: every later
 step is held to the project's origins without it, so a page on the server's
 own origin can show a project's first step but cannot sign anyone in to it.
+
+## Amendment (2026-10-29): the console may be reached at more than one origin
+
+A deployment can be reached at more than one hostname, and its console with
+it: the hosted cloud serves a deployment at its own URL beside its branch
+alias or production domain, and a preview is reviewed on either. The
+exemption above therefore covers the origin of `server.public_base` and each
+origin in `server.console_origins`. The hosted cloud's launcher adds the URLs
+Vercel serves the deployment at to that list; the server reads no hosting
+provider's environment itself.
+
+## Amendment (2026-10-30): the console signs in only at the public base
+
+The exemption for the console's origins opens a flow and nothing more. The
+platform project, which the console signs operators in to, lists the origin of
+`server.public_base` as its one primary origin. So the console signs in there
+and on a loopback origin; at any other console origin a sign-in opens and its
+first submit is refused, while previewing a project's login keeps working.

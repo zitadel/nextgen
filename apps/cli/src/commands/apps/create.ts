@@ -16,7 +16,6 @@ import { APPS_DIR } from "../../lib/app";
 import { ZitadelError } from "../../lib/errors";
 import { stableStringify } from "../../lib/json";
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope, nonBlankArg } from "../../lib/oclif";
-import { nextCommandsData } from "../../lib/oclif/envelope";
 import { Promptable } from "../../lib/oclif/promptable";
 
 /** A slug as the app schema takes it. */
@@ -145,7 +144,8 @@ export default class AppCreate extends Promptable(EnvironmentCommand) {
     if (this.meta.dryRun) {
       return this.emit({
         status: "ok",
-        data: { dry_run: true, path, app: document, variables, ...nextCommandsData(next) },
+        data: { dry_run: true, path, app: document, variables },
+        next: { commands: next },
         pretty: `Would write ${path}`,
       });
     }
@@ -168,7 +168,8 @@ export default class AppCreate extends Promptable(EnvironmentCommand) {
     }
     return this.emit({
       status: "ok",
-      data: { path, app: document, variables, ...nextCommandsData(next) },
+      data: { path, app: document, variables },
+      next: { commands: next },
       pretty: [
         `Wrote ${path}.`,
         ...variables.map((name) => `Set ${name} before you deploy: the client authenticates with it.`),

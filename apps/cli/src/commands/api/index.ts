@@ -14,7 +14,7 @@ import { buildRequest, pathValuesOf, readInput, urlOf } from "../../lib/api/requ
 import { ZitadelError } from "../../lib/errors";
 import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../../lib/oclif";
 import { readZitadelSecret } from "../../lib/project";
-import { Promptable } from "../../lib/oclif/promptable";
+import { Destructive } from "../../lib/oclif/destructive";
 
 const METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"] as const;
 
@@ -27,9 +27,10 @@ const METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"] as const;
  * operation is named by its `operationId` or found by its path, a field is
  * typed by the operation's schema, and `--paginate` knows where the cursor
  * goes. `--json`'s `data` is the response body as the API reference documents
- * it.
+ * it. An operation that deletes, revokes or rolls back asks first, as the
+ * command that covers it does.
  */
-export default class Api extends Promptable(BaseCommand) {
+export default class Api extends Destructive(BaseCommand) {
   static override group = CommandGroups.diagnostics;
   static override description =
     "Call any operation of the Zitadel API, with this project's server and project secret.";
@@ -77,10 +78,34 @@ export default class Api extends Promptable(BaseCommand) {
       description:
         "Follow next_page_token to the last page, and answer with every page's items in one list.",
     }),
+    force: Flags.boolean({
+      char: "f",
+      description:
+        "Call an operation that deletes, revokes or rolls back without the confirmation prompt. Required when non-interactive.",
+    }),
   };
 
   async run(): Promise<JsonEnvelope> {
     const { args, argv, flags } = await this.parse(Api);
+    // No operation is called help, so the word asks for this command's help as
+    // --help does. It comes before the server is resolved, which help never
+    // needs, and under --json the envelope stays the only thing on stdout.
+    if (args.operation?.toLowerCase() === "help") {
+      // Only the command's name is needed for the envelope: `toMeta` would also
+      // open telemetry and the first-run notice, which `--help` does not.
+      this.meta = { ...this.meta, command: this.id ?? this.meta.command };
+      if (!this.jsonEnabled()) {
+        await this.config.runCommand("help", [Api.id]);
+      }
+      return this.emit({
+        status: "ok",
+        data: {},
+        pretty: "",
+        // Under --json the usage is not printed, so the envelope points on.
+        next: this.jsonEnabled() ? { commands: [this.suggestUnscoped("api ls")] } : undefined,
+      });
+    }
+
     const meta = await this.toMeta(flags);
 
     const ref = args.operation ?? (await this.chooseOperation());
@@ -138,10 +163,40 @@ export default class Api extends Promptable(BaseCommand) {
     if (process.stdout.isTTY) {
       consola.info(`${operation.method} ${urlOf(meta.source, request)}`);
     }
+    const destructive = request.operation.destructive;
+    const consent = destructive
+      ? await this.consent({
+          verb: "call",
+          name: `call ${operation.id}`,
+          message: [
+            `Would you like to call ${operation.id} at ${urlOf(meta.source, request)}?`,
+            ...(operation.summary === "" ? [] : [`${operation.summary}.`]),
+          ].join(" "),
+          // A body is not repeated in a suggestion: it can hold a secret, or
+          // have come from a pipe a rerun of the command alone would not have.
+          ...(request.body === undefined
+            ? {}
+            : {
+                retry: undefined,
+                refuse: () => {
+                  throw new ZitadelError(
+                    "E_VALIDATION",
+                    `Cannot call ${operation.id} without --force in non-interactive mode`,
+                    {
+                      hint: "Run the same command again, with its --field values or the pipe into --input, and add --force.",
+                    },
+                  );
+                },
+              }),
+        })
+      : undefined;
+    if (destructive && consent === undefined) {
+      return this.emit({ status: "skipped", reason: "call-cancelled" });
+    }
     const token = operation.auth === "secret" ? secret?.project_secret : undefined;
     const response = flags.paginate
-      ? await sendAll(meta.source, token, request)
-      : await send(meta.source, token, request);
+      ? await sendAll(meta.source, token, request, this.signal)
+      : await send(meta.source, token, request, this.signal, consent);
     return this.emit({
       status: "ok",
       data: response.body ?? null,

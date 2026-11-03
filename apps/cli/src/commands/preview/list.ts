@@ -1,20 +1,12 @@
+import { Paging } from "@zitadel/api/runtime/paging";
 import { Flags } from "@oclif/core";
 
 import { CommandGroups, type JsonEnvelope, nonBlankString, PreviewCommand } from "../../lib/oclif";
-import { collectPages } from "../../lib/oclif/crud/paging";
-import { renderList } from "../../lib/oclif/crud/table";
-import { listData } from "../../lib/oclif/envelope";
-import { shellArg } from "../../lib/shell";
+import { plainFlag, Tabulatable } from "../../lib/oclif/tabulatable";
+import { pagedFunctions } from "../../lib/api-client";
 
 /** The columns `list` renders, in order. */
 const COLUMNS = ["url", "expires", "created"] as const;
-
-/** A preview as the list endpoint returns it, narrowed to what the table reads. */
-type PreviewRow = {
-  origin: string;
-  expires_at: string;
-  created_at: string;
-};
 
 /**
  * `zitadel preview list` — show the project's live previews.
@@ -25,7 +17,7 @@ type PreviewRow = {
  * fetches one page and reports `next_page_token`; `--all` drains them,
  * `--limit` / `--page-token` walk them a page at a time.
  */
-export default class PreviewList extends PreviewCommand {
+export default class PreviewList extends Tabulatable(PreviewCommand) {
   static override description = "List the project's live previews, newest first.";
   static override group = CommandGroups.configuration;
   static override examples = [
@@ -47,10 +39,7 @@ export default class PreviewList extends PreviewCommand {
       description: "Fetch every page instead of one.",
       exclusive: ["page-token"],
     }),
-    plain: Flags.boolean({
-      description:
-        "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
-    }),
+    plain: plainFlag,
   };
 
   async run(): Promise<JsonEnvelope> {
@@ -58,54 +47,42 @@ export default class PreviewList extends PreviewCommand {
     await this.toMeta(flags);
     const { client, projectId } = await this.connect();
 
-    const request = (token?: string): Promise<unknown> =>
-      client.listPreviews(projectId, {
-        ...(flags.limit === undefined ? {} : { limit: flags.limit }),
-        ...(token === undefined ? {} : { page_token: token }),
-      });
-
-    const { items, next } = await collectPages(request, {
-      items: "previews",
+    const params = {
+      limit: flags.limit,
+      page_token: flags["page-token"],
+    };
+    // One page unless `--all`, as every list does; the walk starts at
+    // `--page-token`, and a drain leaves no next page to report.
+    const paging = new Paging(pagedFunctions.listPreviews);
+    const { items, next } = await paging.collect(client.listPreviews.pages(projectId, params), {
       all: flags.all === true,
-      token: flags["page-token"],
-      nextPageToken: "next_page_token",
     });
-    const previews = items as PreviewRow[];
 
-    const rows = previews.map((preview) => ({
+    const rows = items.map((preview) => ({
       url: preview.origin,
       expires: preview.expires_at,
       created: preview.created_at,
     }));
 
-    // A page token is only valid alongside the flags that issued it, so the
-    // suggested next page repeats the whole invocation rather than a bare
-    // token. `--all` already drained everything, so it suggests nothing.
-    const nextCommand =
-      next && flags.all !== true
-        ? this.suggest(
-            [
-              "preview list",
-              ...(flags.limit === undefined ? [] : [`--limit ${flags.limit}`]),
-              `--page-token ${shellArg(next)}`,
-              "--json",
-            ].join(" "),
-          )
-        : undefined;
+    const columns = COLUMNS;
+    const empty = "No live previews.";
+    const footer: string[] = [];
+    const page = {
+      token: next,
+      command: "preview list",
+      flags: flags.limit === undefined ? [] : [`--limit ${flags.limit}`],
+    };
+    const extra = {};
 
-    const plain = flags.plain || !process.stdout.isTTY;
-    return this.emit({
-      status: "ok",
-      data: listData(previews, {
-        nextPageToken: next,
-        nextCommands: nextCommand === undefined ? undefined : [nextCommand],
-      }),
-      pretty: renderList(COLUMNS, rows, {
-        plain,
-        singular: "preview",
-        empty: "No live previews.",
-        footer: next ? [`More available: --page-token ${shellArg(next)} (or --all)`] : [],
-      }),
+    return this.emitList(flags, {
+      columns,
+      rows,
+      items,
+      singular: "preview",
+      empty,
+      footer,
+      page,
+      extra,
     });
   }
 }

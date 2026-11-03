@@ -6,9 +6,9 @@ import Link from "next/link";
 
 /**
  * A docs path no page answers, inside the docs' own layout, so the sidebar
- * and the search stay at hand; app/not-found.tsx shows it without them for a
- * path no route matches. It has the anatomy every error page shares
- * (ADR 076): the status, a title, one sentence and the ways on.
+ * and the search stay at hand; app/not-found.tsx prerenders it in the same
+ * chrome for an unknown slug or route. It has the anatomy every error page
+ * shares (ADR 076): the status, a title, one sentence and the ways on.
  */
 export default function NotFound() {
   const search = useSearchContext();

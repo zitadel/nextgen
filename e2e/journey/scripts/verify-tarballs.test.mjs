@@ -154,6 +154,12 @@ async function makeTarball(
   }
   if (name === "@zitadel/cli" && !omitCliSkill) {
     await cp(join(repoRoot, "apps/cli/skills"), join(packageDir, "skills"), { recursive: true });
+    await cp(join(repoRoot, "apps/cli/skills"), join(packageDir, "dist/skills"), {
+      recursive: true,
+    });
+    await cp(join(repoRoot, "skills/zitadel"), join(packageDir, "dist/skills/zitadel"), {
+      recursive: true,
+    });
   }
   await writeFile(join(packageDir, "package.json"), JSON.stringify(manifest));
   const tar = spawnSync("tar", ["-czf", join(outDir, `${safe}.tgz`), "-C", stage, "package"], {
