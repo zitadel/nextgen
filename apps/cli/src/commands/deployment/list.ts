@@ -72,9 +72,7 @@ export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
     const paging = new Paging(pagedFunctions.listDeployments);
     const { items: deployments, next } = await paging.collect(
       client.listDeployments.pages(params),
-      {
-        all: flags.all === true,
-      },
+      { all: flags.all === true },
     );
 
     // Flatten each deployment's targets to one `origins` cell for the table.

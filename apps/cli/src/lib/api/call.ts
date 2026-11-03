@@ -117,12 +117,12 @@ export const sendAll = async (
   request: ApiRequest,
   signal: AbortSignal,
 ): Promise<ApiResponse> => {
-  const paging = request.operation.paging;
-  if (paging === null) {
+  const shape = request.operation.paging;
+  if (shape === null) {
     return send(server, token, request, signal);
   }
-  const fields = Paging.byField(paging.items);
-  const responses = new Paging<RawResponse, unknown>({
+  const fields = Paging.byField(shape.items);
+  const paging = new Paging<RawResponse, unknown>({
     items: (response) => {
       const [problem, list] = tryCatch(() => {
         return fields.items(response.raw);
@@ -140,14 +140,14 @@ export const sendAll = async (
       return fields.next(response.raw);
     },
   });
-  const walk = responses.walk(async (cursor) => {
+  const walk = paging.walk(async (cursor) => {
     return sendRaw(server, token, pageOf(request, cursor), signal);
   });
-  const { items, last } = await responses.collect(walk, { all: true });
+  const { items, last } = await paging.collect(walk, { all: true });
   const page = isObject(last?.raw) ? last.raw : {};
-  const body = sanitizeResponse({ ...page, [paging.items]: [] });
+  const body = sanitizeResponse({ ...page, [shape.items]: [] });
   return {
     status: last?.status ?? 200,
-    body: { ...body, [paging.items]: items },
+    body: { ...body, [shape.items]: items },
   };
 };

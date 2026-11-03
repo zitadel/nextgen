@@ -117,7 +117,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
     // An unpaged endpoint has no cursor flags to read and would reject the
     // parameters anyway, so nothing is sent and one request is the whole list.
     const paged = spec.paged !== false;
-    const paging = (token?: string): Json =>
+    const pageFields = (token?: string): Json =>
       paged
         ? {
             ...(typeof flags.limit === "number" && { [wire.limit]: flags.limit }),
@@ -152,7 +152,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
             parseOrThrow(
               spec.body,
               wire.query({
-                paging: paging(token),
+                paging: pageFields(token),
                 sorting,
                 filters: parsed.map(({ field, operation, value }) => ({
                   field: field.field,
@@ -165,7 +165,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
             ),
           )
         : spec.call(ctx, {
-            ...paging(token),
+            ...pageFields(token),
             ...queryParams(parsed),
             ...(sorting && spec.sortParam ? { [spec.sortParam]: sorting.direction } : {}),
           });
@@ -181,7 +181,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
     progress?.start(`Fetching ${topic}`);
     // The walk begins at the page --page-token names, if any.
     const first = typeof flags["page-token"] === "string" ? flags["page-token"] : undefined;
-    const pages = new Paging({
+    const paging = new Paging({
       items: (response) => {
         return sanitizeResponse(spec.items(response));
       },
@@ -189,7 +189,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
         return spec.next?.(response);
       },
     });
-    const walk = pages.walk(async (token, number) => {
+    const walk = paging.walk(async (token, number) => {
       const page = await request(token ?? first);
       progress?.message(`Fetching ${topic} — page ${number}`);
       return page;
@@ -197,7 +197,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
     // The spinner owns the cursor and a SIGINT handler until it is stopped, so a
     // page that fails mid-drain has to stop it too; otherwise the error prints
     // under a live spinner and the handler outlives the command.
-    const collected = await pages.collect(walk, { all }).catch((error: unknown) => {
+    const collected = await paging.collect(walk, { all }).catch((error: unknown) => {
       progress?.stop(`Fetching ${topic} failed`);
       throw error;
     });

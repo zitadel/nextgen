@@ -471,7 +471,7 @@ describe("list paging", () => {
 
   it("reports each page of a drain once it has it", async () => {
     const events: string[] = [];
-    vi.mocked(spinner).mockReturnValue({
+    vi.mocked(spinner).mockReturnValueOnce({
       start: vi.fn(),
       stop: vi.fn(),
       clear: vi.fn(),
