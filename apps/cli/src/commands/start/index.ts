@@ -3,7 +3,7 @@ import { Flags } from "@oclif/core";
 import { serverLogAction } from "../../lib/journey-guidance";
 import { ensureLocalAdmin } from "../../lib/local-server/admin-credential";
 import { EMPTY_SUMMARY, loadProjectEnv } from "../../lib/local-server/env-vars";
-import { portFlag } from "../local-server/port";
+import { portFlag, startedServer } from "../local-server/port";
 import {
   DEFAULT_LOCAL_SERVER_PORT,
   PLATFORM_PROJECT_ID,
@@ -17,6 +17,7 @@ import {
   type RuntimeMetadata,
 } from "../../lib/local-server/runtime";
 import { LocalServer } from "../../lib/local-server/server";
+import { resolveCwd } from "../../lib/paths";
 import {
   type Admitted,
   BaseCommand,
@@ -57,20 +58,28 @@ export default class Start extends BaseCommand {
     resolveServer: false,
   };
 
+  private readonly recorded = startedServer(peekRuntimeMetadata);
+
+  protected override async sourceOf(flags: Record<string, unknown>): Promise<string> {
+    return localServerUrl(await this.portOf(flags));
+  }
+
+  /**
+   * Where the server will be, as far as is known before one is chosen: the
+   * port asked for, else the one this directory already has.
+   */
+  private async portOf(flags: Record<string, unknown>): Promise<number> {
+    const asked = typeof flags.port === "number" ? flags.port : undefined;
+    const cwd = resolveCwd(typeof flags.cwd === "string" ? flags.cwd : undefined);
+    return asked ?? (await this.recorded.of(cwd))?.port ?? DEFAULT_LOCAL_SERVER_PORT;
+  }
+
   protected async execute({ flags }: Admitted<typeof Start>): Promise<JsonEnvelope> {
     if (flags.runtime === "binary" && flags.image !== undefined) {
       throw refusalError(IMAGE_NEEDS_DOCKER_REFUSAL, {});
     }
-    const requestedPort = flags.port;
-    // Where the server will be, as far as is known before one is chosen: the
-    // port asked for, else the one this directory already has.
-    const recorded = await peekRuntimeMetadata(this.cwd);
-    const port = requestedPort ?? recorded?.port ?? DEFAULT_LOCAL_SERVER_PORT;
+    const port = await this.portOf(flags);
     const serverUrl = localServerUrl(port);
-    this.meta = {
-      ...this.meta,
-      source: serverUrl,
-    };
     const runtimeBackend = resolveRuntimeBackend({
       image: flags.image,
       runtime: flags.runtime,
@@ -130,7 +139,7 @@ export default class Start extends BaseCommand {
       runtimeBackend === "docker"
         ? { backend: "docker", image, env, userFile: local?.userFile }
         : { backend: "binary", env, userFile: local?.userFile },
-      { port: requestedPort },
+      { port: flags.port },
     );
     // The envelope's `source` named the port guessed before one was chosen; an
     // agent that follows it would target a different server than the one started.

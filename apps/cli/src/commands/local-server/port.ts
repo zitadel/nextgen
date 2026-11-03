@@ -1,5 +1,6 @@
 import { Flags } from "@oclif/core";
 import type { Parsed } from "@zitadel/config/idp";
+
 import { z } from "zod";
 
 import { type Refused, reads, whole } from "../../lib/oclif/flags";
@@ -43,4 +44,22 @@ export function readPort(value: string): Parsed<number> {
         ok: false,
         problem: "Must be a port number",
       };
+}
+
+/**
+ * Reads what a directory records about the server started in it, once per run.
+ *
+ * A command that reports which server it was about needs that before the run's
+ * context is built, so its first event names the right server, and again while
+ * it works. Reading it twice would ask the filesystem twice for the same
+ * answer, so the first read is kept.
+ */
+export function startedServer<T>(read: (cwd: string) => Promise<T | undefined>) {
+  let found: Promise<T | undefined> | undefined;
+  return {
+    of: (cwd: string): Promise<T | undefined> => {
+      found ??= read(cwd);
+      return found;
+    },
+  };
 }

@@ -28,6 +28,7 @@ import {
   type RuntimeMetadata,
 } from "../../lib/local-server/runtime";
 import { LocalServer } from "../../lib/local-server/server";
+import { resolveCwd } from "../../lib/paths";
 import {
   type Admitted,
   BaseCommand,
@@ -118,17 +119,31 @@ export default class Doctor extends Destructive(BaseCommand) {
     resolveServer: false,
   };
 
-  protected async execute({ flags }: Admitted<typeof Doctor>): Promise<JsonEnvelope> {
-    // An unreadable record only costs the port hint; the read below reports it.
-    const hint = await readNearestRuntimeMetadata(this.cwd).catch(() => {
+  protected override async sourceOf(flags: Record<string, unknown>): Promise<string> {
+    const asked = flags as Admitted<typeof Doctor>["flags"];
+    const cwd = resolveCwd(typeof flags.cwd === "string" ? flags.cwd : undefined);
+    const hosted = await this.hostedServerWithoutLocalRuntime(asked, cwd);
+    return hosted ?? localServerUrl(await this.portOf(asked, cwd));
+  }
+
+  /**
+   * The port doctor checks: the one asked for, else the one this directory
+   * records, else the default. An unreadable record only costs the hint; the
+   * read `execute` makes reports it.
+   */
+  private async portOf(
+    flags: Admitted<typeof Doctor>["flags"],
+    cwd: string = this.cwd,
+  ): Promise<number> {
+    const hint = await readNearestRuntimeMetadata(cwd).catch(() => {
       return undefined;
     });
-    const port = flags.port ?? hint?.runtime.port ?? DEFAULT_LOCAL_SERVER_PORT;
+    return flags.port ?? hint?.runtime.port ?? DEFAULT_LOCAL_SERVER_PORT;
+  }
+
+  protected async execute({ flags }: Admitted<typeof Doctor>): Promise<JsonEnvelope> {
+    const port = await this.portOf(flags);
     const hostedServer = await this.hostedServerWithoutLocalRuntime(flags);
-    this.meta = {
-      ...this.meta,
-      source: hostedServer ?? localServerUrl(port),
-    };
     const nearest = await readNearestRuntimeMetadata(this.cwd);
     const existingRuntime = nearest?.runtime;
     const parentRuntimeDir =
@@ -335,17 +350,18 @@ export default class Doctor extends Destructive(BaseCommand) {
    */
   private async hostedServerWithoutLocalRuntime(
     flags: Admitted<typeof Doctor>["flags"],
+    cwd: string = this.cwd,
   ): Promise<string | undefined> {
     if (flags.port !== undefined || flags.runtime !== undefined || flags.image !== undefined) {
       return undefined;
     }
     if (
-      (await findUpward(this.cwd, LOCAL_RUNTIME_FILE)) !== undefined ||
-      !(await hasZitadelConfig(this.cwd))
+      (await findUpward(cwd, LOCAL_RUNTIME_FILE)) !== undefined ||
+      !(await hasZitadelConfig(cwd))
     ) {
       return undefined;
     }
-    const server = await readZitadelConfig(this.cwd).then(readProjectServer, () => {
+    const server = await readZitadelConfig(cwd).then(readProjectServer, () => {
       return undefined;
     });
     return server === undefined || isLoopbackUrl(server) ? undefined : server;

@@ -6,6 +6,8 @@ import {
   readRuntimeMetadata,
 } from "../lib/local-server/runtime";
 import { LocalServer } from "../lib/local-server/server";
+import { resolveCwd } from "../lib/paths";
+import { startedServer } from "./local-server/port";
 import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
 
 export default class Stop extends BaseCommand {
@@ -22,14 +24,17 @@ export default class Stop extends BaseCommand {
     resolveServer: false,
   };
 
+  private readonly started = startedServer(readRuntimeMetadata);
+
+  protected override async sourceOf(flags: Record<string, unknown>): Promise<string> {
+    const cwd = resolveCwd(typeof flags.cwd === "string" ? flags.cwd : undefined);
+    return (await this.started.of(cwd))?.server_url ?? DEFAULT_LOCAL_SERVER_URL;
+  }
+
   protected async execute({ flags }: Admitted<typeof Stop>): Promise<JsonEnvelope> {
     // A directory with no server is not refused: there is simply nothing to
     // stop, which the result says.
-    const runtime = await readRuntimeMetadata(this.cwd);
-    this.meta = {
-      ...this.meta,
-      source: runtime?.server_url ?? DEFAULT_LOCAL_SERVER_URL,
-    };
+    const runtime = await this.started.of(this.cwd);
 
     if (flags.all) {
       return this.stopAllManagedRuntimes();

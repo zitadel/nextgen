@@ -3,6 +3,8 @@ import { z } from "zod";
 
 import { readNearestRuntimeMetadata } from "../../lib/local-server/runtime";
 import { LocalServer } from "../../lib/local-server/server";
+import { resolveCwd } from "../../lib/paths";
+import { startedServer } from "../local-server/port";
 import {
   LOG_LEVELS,
   type LogLine,
@@ -82,22 +84,27 @@ export default class Logs extends BaseCommand {
     resolveServer: false,
   };
 
+  private readonly started = startedServer(readNearestRuntimeMetadata);
+
+  protected override async sourceOf(flags: Record<string, unknown>): Promise<string | undefined> {
+    const found = await this.started.of(
+      resolveCwd(typeof flags.cwd === "string" ? flags.cwd : undefined),
+    );
+    return found?.runtime.server_url;
+  }
+
   protected async execute({ flags }: Admitted<typeof Logs>): Promise<JsonEnvelope> {
     if (flags.follow && this.isJson) {
       throw refusalError(FOLLOW_IS_NOT_JSON_REFUSAL, {});
     }
     // The server this directory uses: the one `zitadel start` ran in here or
     // in the nearest parent, as `doctor` and `console` find it.
-    const started = await readNearestRuntimeMetadata(this.cwd);
+    const started = await this.started.of(this.cwd);
     if (started === undefined) {
       throw refusalError(NOT_STARTED_REFUSAL, {}, (next) => {
         return this.suggestUnscoped(next);
       });
     }
-    this.meta = {
-      ...this.meta,
-      source: started.runtime.server_url,
-    };
     const server = LocalServer.at(started.dir, {
       cliVersion: this.cliVersion,
     });

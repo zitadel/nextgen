@@ -251,6 +251,17 @@ export abstract class BaseCommand extends Interruptible(Command) {
     return this.execute(await this.admit());
   }
 
+  /**
+   * The server this run is about, where the command knows it before any work:
+   * the one a local runtime's record names, say. It is resolved before the
+   * context is built, so every event this run reports — the first one included
+   * — classifies the same invocation the same way. A command that learns its
+   * server later sets `this.meta.source` when it does.
+   */
+  protected async sourceOf(_flags: Record<string, unknown>): Promise<string | undefined> {
+    return undefined;
+  }
+
   /** The command's work, which receives the flags and arguments it accepts. */
   protected abstract execute(input: Admitted<typeof BaseCommand>): Promise<JsonEnvelope>;
 
@@ -263,7 +274,11 @@ export abstract class BaseCommand extends Interruptible(Command) {
       throw asRaised(error);
     });
     const flags = byName(parsed.flags);
-    await this.toMeta(flags, this.command.meta);
+    const source = await this.sourceOf(flags);
+    await this.toMeta(flags, {
+      ...this.command.meta,
+      ...(source === undefined ? {} : { source }),
+    });
     return {
       flags,
       args: byName(parsed.args),
