@@ -3,44 +3,35 @@ title: Origins and previews
 description: How a project lists the URLs its app runs on, how preview URLs from pull-request builds go live, and why a request is refused.
 ---
 
-An origin is the scheme, host and port a browser page runs on, such as `https://app.acme.com`. Browsers send it with every request in the `Origin` header. A project lists the origins its app runs on, and Zitadel uses that list to decide two things: whether a page may use the project at all, and which [release](/docs/concepts/releases-and-deployments) it is served.
+An origin is the scheme, host and port a page runs on, such as `https://app.acme.com`. Browsers send it in the `Origin` header. A project's origin list decides whether a page may use the project and which [release](/docs/concepts/releases-and-deployments) it gets.
 
 ## Primary origins
 
-A primary origin is a URL where your app is served to its users, such as production. Add one with `zitadel origin add <url> --kind primary`.
+A primary origin is an exact URL where users reach your app, added with `zitadel origin add <url> --kind primary`. It cannot hold a `*` (`origin.primary_not_exact`).
 
-- A primary origin is an exact URL. It cannot hold a `*` (`origin.primary_not_exact`).
-- `zitadel deploy` deploys to every primary origin at once. You never deploy to one primary origin alone.
-- A project needs at least one primary origin before its first deploy.
-- An origin added after a deploy serves nothing until the next deploy (`409 rel.not_deployed`).
-- One app reached at two URLs, such as `localhost:3000` and `127.0.0.1:3000`, needs both listed.
+`zitadel deploy` always deploys to every primary origin together, and needs at least one. An origin added later serves nothing until the next deploy. An app reached at `localhost:3000` and `127.0.0.1:3000` needs both listed.
 
 ## Preview patterns and previews
 
-A preview pattern admits the URLs your hosting platform gives pull-request builds. Add one with `zitadel origin add 'https://*-acme.vercel.app' --kind preview`.
+A preview pattern admits the URLs your host gives pull-request builds: `zitadel origin add 'https://*-acme.vercel.app' --kind preview`. The one `*` matches within a single part of the host name. On a shared host, keep the pattern narrow; `https://*.vercel.app` admits every Vercel customer's builds.
 
-- A pattern may hold one `*`. It stands for one or more characters inside one part of the host name, never across a dot.
-- On a shared host such as `vercel.app` or `netlify.app`, narrow the pattern to your builds. `https://*.vercel.app` would admit every Vercel customer's builds.
+A preview is one URL matching a pattern, with its own deployment. `zitadel preview` builds the branch's `.zitadel/` and deploys it there ([example workflow](/docs/guides/deploy#deploy-from-github-actions)).
 
-A pattern alone serves nothing. A preview is one exact URL that matches a pattern and has a deployment of its own. `zitadel preview` creates it from a pull-request build: it builds a release from the branch's `.zitadel/` and deploys it to the build's URLs.
-
-- A preview stays live for 7 days by default. `--ttl` sets between 60 seconds and 365 days, and each new `preview` to the URL renews it.
-- `zitadel preview list` shows the live previews, and `zitadel preview rm <url>` ends one early.
-- Removing a preview pattern refuses its previews at once (`403 proj.origin_not_allowed`), even ones that have not expired.
-- A preview shares the project's users and sessions with production. Only its configuration and [variables](/docs/concepts/variables#primary-and-preview-values) differ.
-
-[Deploy](/docs/guides/deploy#deploy-from-github-actions) shows `preview` in a GitHub Actions workflow.
+- A preview lives 7 days, or 60 seconds to 365 days with `--ttl`. Each new `preview` renews it.
+- `zitadel preview list` shows live previews; `zitadel preview rm <url>` ends one.
+- Removing the pattern refuses its previews at once.
+- Previews share the project's users and sessions. Only configuration and [variables](/docs/concepts/variables#primary-and-preview-values) differ.
 
 ## Local development
 
-A loopback origin, such as `http://localhost:3000` or `http://acme.localhost:5173`, is always admitted, listed or not. When a deployment named it, it is served that release. Otherwise it is served the newest revisions the project stores. To test exactly what a deploy ships, list the dev server's URL as a primary origin and deploy.
+A loopback origin, such as `http://localhost:3000`, is always admitted. It gets the release of a deployment that named it, or else the newest revisions the project stores. To test exactly what a deploy ships, list the URL as a primary origin and deploy.
 
 ## When an origin is refused
 
 | Answer | Cause | Fix |
 | --- | --- | --- |
-| `403 proj.origin_not_allowed` | The origin matches no primary origin and no preview pattern. | Add it with `zitadel origin add`. |
-| `403 proj.preview_not_live` | The origin matches a preview pattern, but no preview is live for that URL. | Run `zitadel preview` for the build, or check that it has not expired. |
-| `409 rel.not_deployed` | The origin is a primary origin, but no primary deployment named it, for example because it was added after the last deploy. | Run `zitadel deploy`. |
+| `403 proj.origin_not_allowed` | No primary origin or preview pattern matches. | `zitadel origin add` |
+| `403 proj.preview_not_live` | A pattern matches, but no preview is live for the URL. | Run `zitadel preview` again. |
+| `409 rel.not_deployed` | A primary origin that no primary deployment named. | `zitadel deploy` |
 
-A project with no origins at all admits every origin and serves it the newest revisions the project stores. Removing the last origin opens the project up.
+A project with no origins admits every origin and serves the newest stored revisions, so removing the last origin opens the project up.

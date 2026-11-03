@@ -3,11 +3,11 @@ title: Variables
 description: How a project stores values that differ between production and previews, keeps secrets encrypted, and freezes the values with each deployment.
 ---
 
-A variable is a named value a project stores on the server, outside your repository. Configuration files reference it by name, so a value that differs between production and previews, or one that must stay secret, never goes into `.zitadel/`. The most common use is an identity provider's client ID and client secret ([Social sign-in](/docs/guides/social-sign-in)).
+A variable is a named value the project stores on the server. Configuration files reference it, so secrets and values that differ between production and previews stay out of `.zitadel/`. The usual case is an identity provider's client ID and secret ([Social sign-in](/docs/guides/social-sign-in)).
 
 ## Reference a variable
 
-A configuration file names a variable as `${{ NAME }}`. Today an identity provider connection's `oidc.client_id` and `oidc.client_secret` take one:
+Write `${{ NAME }}`. Today an identity provider connection's `oidc.client_id` and `oidc.client_secret` take one:
 
 ```json
 {
@@ -18,36 +18,24 @@ A configuration file names a variable as `${{ NAME }}`. Today an identity provid
 }
 ```
 
-The release keeps the reference, not the value. The value comes from the deployment that serves the request.
-
-A name holds letters, digits and underscores. A value is a string, a number or a boolean; `zitadel variable set --as number` stores a number.
+The release holds the reference; the deployment supplies the value. A name uses letters, digits and underscores. A value is a string, number or boolean (`--as number`).
 
 ## Secrets
 
-A secret is a variable whose value is stored encrypted. It can be replaced, but no command or API reads it back.
-
-- Set one with `zitadel variable set GOOGLE_CLIENT_SECRET --secret`, which prompts for the value or reads it from standard input. A secret is never accepted on the command line, so it stays out of shell history and CI logs.
-- A connection's `client_secret` takes only a reference, never a literal value, and the variable it names must be a secret.
-- A connection's `client_id` takes a literal or a reference to a plain variable. `zitadel deploy` checks both before it uploads.
+A secret is stored encrypted and can be replaced but never read back. `zitadel variable set NAME --secret` prompts for it or reads standard input, never the command line. A connection's `client_secret` must reference a secret; its `client_id` takes a literal or a plain variable. `zitadel deploy` checks both.
 
 ## Primary and preview values
 
-Each variable has up to two values: one for the project's [primary origins](/docs/concepts/origins-and-previews#primary-origins), one for its [previews](/docs/concepts/origins-and-previews#preview-patterns-and-previews). A preview URL is reachable by anyone who finds it, so it must never run with a production secret.
+A variable has up to two values, one for [primary origins](/docs/concepts/origins-and-previews#primary-origins) and one for [previews](/docs/concepts/origins-and-previews#preview-patterns-and-previews). Anyone who finds a preview URL can open it, so it must never run with a production secret.
 
-- `zitadel variable set NAME <value>` writes a plain value for both.
-- `zitadel variable set NAME --secret` writes a secret for primary only, and removes the name's preview value.
-- `--preview` writes the preview value alone and leaves the primary one as it is.
-- `zitadel variable list` shows the primary values, `zitadel variable list --preview` the preview ones. A secret is listed without its value.
+- A plain `zitadel variable set NAME <value>` writes both values.
+- `--secret` writes the primary value only and removes the preview one.
+- `--preview` writes the preview value only.
 
-There is no fallback between the two. A preview never gets the primary value, and a primary deploy never gets the preview one.
+Neither falls back to the other. `zitadel variable list` shows primary values and `--preview` the preview ones, with secrets hidden.
 
 ## Values are frozen per deployment
 
-A [deployment](/docs/concepts/releases-and-deployments#deployment) copies the values for its target when it is created, and serves those copies for as long as it is live.
+A [deployment](/docs/concepts/releases-and-deployments#deployment) copies its target's values when it is created. A changed variable reaches users on the next `zitadel deploy`, which creates a new deployment even when the files are unchanged. A rollback brings back the old values with the old release, and a sign-in in progress keeps the values it started with. `zitadel variable resolve` shows what the live deployment froze.
 
-- Changing a variable changes nothing already live. Run `zitadel deploy` to deploy the new value; with unchanged files it reuses the release and creates a new deployment.
-- A rollback restores the values the earlier deployment froze, alongside its release.
-- A sign-in in progress keeps the values it started with.
-- `zitadel variable resolve` shows the values the live deployment froze, and `--origin <url>` picks the deployment serving that URL.
-
-A deploy whose release references a name, in any of its files, with no value for its target is refused with `dep.variables_missing`, which lists the names. Set them with `zitadel variable set`, or with `--preview` for a preview deploy, then deploy again.
+A deploy that references a name with no value for its target fails with `dep.variables_missing`, listing the names. Set them with `zitadel variable set` (`--preview` for a preview deploy) and deploy again.
