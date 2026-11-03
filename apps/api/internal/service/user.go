@@ -12,11 +12,13 @@ import (
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	v2user "github.com/zitadel/nextgen/internal/storage/user"
 )
 
 const (
 	userFieldCreatedAt            = "created_at"
 	userFieldID                   = "id"
+	userFieldIdentifier           = "identifier"
 	userFieldSchema               = "schema"
 	userFieldSchemaObjectType     = "schema_object_type"
 	userFieldStatus               = "status"
@@ -312,8 +314,27 @@ func (s *userService) ListUsers(ctx context.Context, input ListUsersInput) (_ *L
 
 	filters := make([]database.Filter[domain.UserField], 0, len(columnFilters)+1)
 	filters = append(filters, database.Equal(database.Col(domain.UserFieldProjectID), input.ProjectID))
+	var designated map[string][]string
 	for _, f := range columnFilters {
-		filter, err := userFilter(f, s.builtinBases)
+		if f.Field != userFieldIdentifier {
+			filter, err := userFilter(f, s.builtinBases)
+			if err != nil {
+				return nil, err
+			}
+			filters = append(filters, filter)
+			continue
+		}
+		value, err := identifierFilterValue(f)
+		if err != nil {
+			return nil, err
+		}
+		if designated == nil {
+			designated, err = designatedIdentifierKeys(ctx, s.v2Pool.Statements(), input.ProjectID)
+			if err != nil {
+				return nil, mapListError(err, "failed to list schemas from database")
+			}
+		}
+		filter, err := userIdentifierFilter(f.Operation, value, designated)
 		if err != nil {
 			return nil, err
 		}
@@ -449,6 +470,55 @@ func userFilter(f Filter, builtinBases domain.BuiltinSchemaBases) (database.Filt
 	}
 }
 
+// identifierFilterValue reads the value of an identifier filter, refusing an
+// operation it has no comparison for before any schema is read. An empty value
+// is refused too: as a substring it would select every user with an identifier.
+func identifierFilterValue(f Filter) (string, error) {
+	switch f.Operation {
+	case filterOpEquals, filterOpContains:
+	default:
+		return "", domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("operation %q is not valid for %s", f.Operation, userFieldIdentifier))
+	}
+	value, err := stringFilterValue(f)
+	if err != nil {
+		return "", err
+	}
+	if value == "" {
+		return "", domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("%s filter value must not be empty", userFieldIdentifier))
+	}
+	return value, nil
+}
+
+// userIdentifierFilter matches users on the identifier their own schema
+// designates. Each property is read only for the schemas that designate it, as
+// an identifier lookup is (ADR 058 §5), so an equal value in another schema's
+// undesignated property never matches. With no designation nobody has an
+// identifier, which it says as a filter nothing passes, since no user has an
+// empty id: the query still runs, so the page token and the authz list filter
+// are checked as on any other list.
+func userIdentifierFilter(op, value string, designated map[string][]string) (database.Filter[domain.UserField], error) {
+	if len(designated) == 0 {
+		return database.StringEqual(database.Col(domain.UserFieldID), ""), nil
+	}
+	keys := make([]string, 0, len(designated))
+	for key := range designated {
+		keys = append(keys, key)
+	}
+	slices.Sort(keys)
+	arms := make([]database.Filter[domain.UserField], 0, len(keys))
+	for _, key := range keys {
+		match := v2user.IdentifierContains(key, value)
+		if op == filterOpEquals {
+			var err error
+			if match, err = v2user.IdentifierEqual(key, value); err != nil {
+				return nil, domain.ErrInternal(err)
+			}
+		}
+		arms = append(arms, database.And(database.Or(equalIDFilters(domain.UserFieldSchemaURL, designated[key])...), match))
+	}
+	return database.Or(arms...), nil
+}
+
 // userStatusFilter filters on the user's lifecycle status.
 func userStatusFilter(op, status string) (database.Filter[domain.UserField], error) {
 	switch op {
@@ -483,7 +553,7 @@ func userField(field string) (domain.UserField, error) {
 		return domain.UserFieldStatus, nil
 	case userFieldLifecycleOwnerTeamID:
 		return domain.UserFieldLifecycleOwnerTeamID, nil
-	case userFieldTeamID, userFieldSchemaObjectType:
+	case userFieldTeamID, userFieldSchemaObjectType, userFieldIdentifier:
 		// Not a column on the user: the keyset cursor is built from the last
 		// row's sort values, and there is no such value on that row.
 		return domain.UserFieldUnspecified, domain.ErrRequestInvalid().

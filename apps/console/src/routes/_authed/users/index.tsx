@@ -1,4 +1,11 @@
-import { createFileRoute, Link, redirect, useNavigate, useRouter } from "@tanstack/react-router";
+import {
+  createFileRoute,
+  isRedirect,
+  Link,
+  redirect,
+  useNavigate,
+  useRouter,
+} from "@tanstack/react-router";
 import { Box, MoreVertical, Plus, User } from "lucide-react";
 import {
   Fragment,
@@ -8,6 +15,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 
@@ -38,6 +46,7 @@ import {
   UserIdCell,
   UserIdentityCell,
 } from "@/components/user-cells";
+import { SearchField } from "@/components/search-field";
 import { UsersFilter } from "@/components/users-filter";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -91,48 +100,61 @@ export const Route = createFileRoute("/_authed/users/")({
       schema && typeof search.revision === "string" && search.revision
         ? search.revision
         : undefined;
-    return { ...(schema ? { schema } : {}), ...(revision ? { revision } : {}) };
-  },
-  loaderDeps: ({ search }) => search,
-  loader: async ({ deps }) => {
-    const projectId = requireProjectScope(deps.project);
-    // The filter's options are the project's schemas at their latest revision,
-    // which also names the newest id a `latest` or `older` criterion compares
-    // with; the chosen schema's revisions, with whether each is in use, are
-    // read for it alone. Both are chrome: unreadable, the list still renders,
-    // narrowed by whatever the URL can still express.
-    const readingOptions = fetchAllSchemas(projectId).then(schemaOptions, () => []);
-    const needsLatest = deps.revision === "latest" || deps.revision === "older";
-    // Only those two criteria wait for the options; the users read runs
-    // beside the schema reads otherwise.
-    const chosenFirst = needsLatest
-      ? (await readingOptions).find((option) => option.objectType === deps.schema)
-      : undefined;
-    if (needsLatest && !chosenFirst) {
-      // The URL asks for a comparison nobody can make. Dropping it from the URL
-      // keeps the list from claiming a narrower filter than it sends.
-      throw redirect({ to: "/users", search: { ...deps, revision: undefined } });
-    }
-    const filter = userFilter(deps, chosenFirst?.latestId);
-    const [page, options, revisions] = await Promise.all([
-      fetchUsers(projectId, undefined, true, filter),
-      readingOptions,
-      deps.schema
-        ? fetchSchemaRevisions(projectId, deps.schema, { inUse: true }).catch(() => [])
-        : [],
-    ]);
+    const q = typeof search.q === "string" ? search.q.trim() : "";
     return {
-      users: page.users,
-      teamsExpanded: page.teamsExpanded,
-      nextPageToken: page.next_page_token ?? undefined,
-      columns: await columnsForUsers(projectId, page.users, latestDocuments(options)),
-      options,
-      revisions,
-      filter,
+      ...(q ? { q } : {}),
+      ...(schema ? { schema } : {}),
+      ...(revision ? { revision } : {}),
     };
   },
+  // The search term is left out of the deps, so a new term is not a new match:
+  // past the router's pending delay a new match swaps the screen for the pending
+  // state, and the field being typed in goes with it. The screen reads a term that
+  // comes after the load itself. A first load keeps the delay.
+  loaderDeps: ({ search: { q: _q, ...deps } }) => deps,
+  loader: ({ deps, location }) => loadUsers({ ...deps, q: (location.search as UsersSearch).q }),
   component: UsersScreen,
 });
+
+/** The first page of a search, and what the screen draws around it. */
+async function loadUsers(search: UsersSearch & { project?: string }) {
+  const projectId = requireProjectScope(search.project);
+  // The filter's options are the project's schemas at their latest revision,
+  // which also names the newest id a `latest` or `older` criterion compares
+  // with; the chosen schema's revisions, with whether each is in use, are
+  // read for it alone. Both are chrome: unreadable, the list still renders,
+  // narrowed by whatever the URL can still express.
+  const readingOptions = fetchAllSchemas(projectId).then(schemaOptions, () => []);
+  const needsLatest = search.revision === "latest" || search.revision === "older";
+  // Only those two criteria wait for the options; the users read runs
+  // beside the schema reads otherwise.
+  const chosenFirst = needsLatest
+    ? (await readingOptions).find((option) => option.objectType === search.schema)
+    : undefined;
+  if (needsLatest && !chosenFirst) {
+    // The URL asks for a comparison nobody can make. Dropping it from the URL
+    // keeps the list from claiming a narrower filter than it sends.
+    throw redirect({ to: "/users", search: { ...search, revision: undefined } });
+  }
+  const filter = userFilter(search, chosenFirst?.latestId);
+  const [page, options, revisions] = await Promise.all([
+    fetchUsers(projectId, undefined, true, filter),
+    readingOptions,
+    search.schema
+      ? fetchSchemaRevisions(projectId, search.schema, { inUse: true }).catch(() => [])
+      : [],
+  ]);
+  return {
+    users: page.users,
+    teamsExpanded: page.teamsExpanded,
+    nextPageToken: page.next_page_token ?? undefined,
+    columns: await columnsForUsers(projectId, page.users, latestDocuments(options)),
+    options,
+    revisions,
+    filter,
+    q: search.q,
+  };
+}
 
 /** The latest revisions' documents, keyed by id: what `columnsForUsers` need not read again. */
 function latestDocuments(options: SchemaOption[]): Map<string, UserSchema> {
@@ -149,10 +171,49 @@ interface UsersPage {
 
 function UsersScreen() {
   const projectId = useRequiredProjectScope();
-  const loaded = Route.useLoaderData();
+  const fromRoute = Route.useLoaderData();
   const search = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
   const router = useRouter();
+
+  // The answer to a term settled after the load, for as long as that load stands.
+  // Only the latest term's answer is kept, whichever comes back last.
+  const [found, setFound] = useState<{ base: typeof fromRoute; page: typeof fromRoute }>();
+  const [searchError, setSearchError] = useState<unknown>();
+  if (searchError) throw searchError;
+  useEffect(() => {
+    if (search.q === fromRoute.q) {
+      setFound(undefined);
+      return;
+    }
+    let latest = true;
+    loadUsers(search).then(
+      (page) => {
+        if (latest) setFound({ base: fromRoute, page });
+      },
+      (cause) => {
+        if (!latest) return;
+        if (isRedirect(cause)) void router.navigate(cause.options);
+        else setSearchError(cause);
+      },
+    );
+    return () => {
+      latest = false;
+    };
+  }, [search, fromRoute, router]);
+  const loaded = found?.base === fromRoute ? found.page : fromRoute;
+  // The rows of the last search stand until the next one answers.
+  const searching = loaded.q !== search.q;
+  const searchField = useRef<HTMLInputElement>(null);
+  const onSearch = useCallback(
+    (q: string) =>
+      void navigate({
+        search: (prev) => ({ ...prev, q: q || undefined }),
+        // Each pause in typing is not a place to come back to.
+        replace: true,
+      }),
+    [navigate],
+  );
 
   const [columns, setColumns] = useState(loaded.columns);
   const [teamsExpanded, setTeamsExpanded] = useState(loaded.teamsExpanded);
@@ -221,6 +282,11 @@ function UsersScreen() {
   const showAttributes = summaries.some(
     ({ summary }) => summary.entries.length > 0 || summary.more > 0,
   );
+  // Latched for the screen's lifetime, as on Projects: a cleared search drops
+  // `?q=` before the full list is back, and the field must not unmount in
+  // between. A project with no users has nothing to search.
+  const [searchable, setSearchable] = useState(false);
+  if (!searchable && (rows.length > 0 || search.q || search.schema)) setSearchable(true);
   const scroll = useScrollEdges();
   // Each row's schema, for the identity card's title and the attributes
   // popover's field labels.
@@ -229,23 +295,36 @@ function UsersScreen() {
     [columns],
   );
 
+  const hasFilter = loaded.options.length > 0 || Boolean(search.schema);
+
   return (
     <Page>
-      {/* No search beside the title: it is out of the page headers until there
-          is a console-wide solution (D19). */}
       <ResourceTitle
         filter={
-          (loaded.options.length > 0 || search.schema) && (
-            <UsersFilter
-              options={loaded.options}
-              revisions={loaded.revisions}
-              search={search}
-              onChange={(next) =>
-                void navigate({
-                  search: (prev) => ({ ...prev, schema: next.schema, revision: next.revision }),
-                })
-              }
-            />
+          (searchable || hasFilter) && (
+            <>
+              {searchable && (
+                <SearchField
+                  inputRef={searchField}
+                  query={search.q ?? ""}
+                  onSearch={onSearch}
+                  label="Search by identifier"
+                  className="grow basis-48 @3xl/title-row:max-w-48"
+                />
+              )}
+              {hasFilter && (
+                <UsersFilter
+                  options={loaded.options}
+                  revisions={loaded.revisions}
+                  search={search}
+                  onChange={(next) =>
+                    void navigate({
+                      search: (prev) => ({ ...prev, schema: next.schema, revision: next.revision }),
+                    })
+                  }
+                />
+              )}
+            </>
           )
         }
         action={
@@ -273,7 +352,11 @@ function UsersScreen() {
           ref={scroll.ref}
           data-scroll-start={scroll.edges.start || undefined}
           data-scroll-end={scroll.edges.end || undefined}
-          className={`${RESOURCE_TABLE_WRAP} ${RESOURCE_TABLE_TOP} ${RESOURCE_TABLE_SCROLL}`}
+          aria-busy={searching || undefined}
+          className={cn(
+            `${RESOURCE_TABLE_WRAP} ${RESOURCE_TABLE_TOP} ${RESOURCE_TABLE_SCROLL}`,
+            searching && "opacity-60",
+          )}
         >
           <Table className="text-xs" onContextMenu={keepLinkMenu} onPointerDown={keepLinkPress}>
             <TableHeader>
@@ -304,7 +387,34 @@ function UsersScreen() {
                 <ResourceEmptyRow
                   colSpan={pinned.length + (showAttributes ? 1 : 0) + (teamsExpanded ? 6 : 5)}
                 >
-                  {search.schema ? "No users match this filter." : "No users yet."}
+                  {loaded.q || search.schema ? (
+                    // On a phone the empty table still scrolls sideways, so the
+                    // message and its control hold to the visible edge rather
+                    // than center on a width that is partly out of view.
+                    <span className="sticky left-0 flex w-fit flex-wrap items-center gap-x-3 gap-y-2 sm:static sm:mx-auto">
+                      {loaded.q ? "No users match this search." : "No users match this filter."}
+                      <Button
+                        variant="secondary"
+                        size="xs"
+                        onClick={() => {
+                          // This button goes with the row, so focus goes first.
+                          searchField.current?.focus();
+                          void navigate({
+                            search: (prev) => ({
+                              ...prev,
+                              q: undefined,
+                              schema: undefined,
+                              revision: undefined,
+                            }),
+                          });
+                        }}
+                      >
+                        Clear filters
+                      </Button>
+                    </span>
+                  ) : (
+                    "No users yet."
+                  )}
                 </ResourceEmptyRow>
               ) : (
                 summaries.map(({ row: user, summary }) => (

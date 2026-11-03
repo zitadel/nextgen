@@ -14,6 +14,7 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/dialect/authz"
 	"github.com/zitadel/nextgen/internal/storage/policystore"
+	v2user "github.com/zitadel/nextgen/internal/storage/user"
 )
 
 func TestAuthzListPredicate_Teams(t *testing.T) {
@@ -143,6 +144,59 @@ func TestAuthzListPredicate_Users(t *testing.T) {
 			assert.Contains(t, got, u2)
 			assert.Contains(t, got, principal)
 		})
+	})
+}
+
+// The identifier predicate narrows a list; it must not reach around the caller's
+// grants, or stand in for the filter a management list has to carry.
+func TestAuthzListPredicate_UsersByIdentifier(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
+		suffix := uniqueSuffix(t)
+		granted := "usr-granted-" + suffix
+		other := "usr-other-" + suffix
+		principal := "usr-principal-" + suffix
+		require.NoError(t, d.stmts.CreateUser(t.Context(), newTestUser(t, projectID, schemaURL, granted, "search-"+granted+"@example.com", "Granted")))
+		require.NoError(t, d.stmts.CreateUser(t.Context(), newTestUser(t, projectID, schemaURL, other, "search-"+other+"@example.com", "Other")))
+		require.NoError(t, d.stmts.CreateUser(t.Context(), newTestUser(t, projectID, schemaURL, principal, principal+"@example.com", "Principal")))
+
+		catalogID, err := d.stmts.ActiveSystemCatalogID(t.Context())
+		require.NoError(t, err)
+		ctx := service.WithAuthzListFilter(t.Context(), service.AuthzListFilter{
+			AuthzCheckParams: domain.AuthzCheckParams{
+				CatalogID: catalogID, ProjectID: projectID, PrincipalHomeProjectID: projectID,
+				PrincipalType: domain.AuthzPrincipalTypeUser, PrincipalID: principal,
+				ObjectType: "project", Relation: "viewer",
+			},
+			ResourceKind: domain.ResourceKindUser,
+		})
+		list := func(t *testing.T, ctx context.Context) []string {
+			t.Helper()
+			res, err := d.stmts.ListUsers(ctx, &database.ListOptions[domain.UserField]{
+				Filter: database.And(
+					database.Equal(database.Col(domain.UserFieldProjectID), projectID),
+					v2user.IdentifierContains("email", "search-"),
+				),
+			}, service.UserQueryOptions{})
+			require.NoError(t, err)
+			return userIDs(res.Items)
+		}
+
+		// Both users match the search, and with no grant neither may be seen.
+		assert.ElementsMatch(t, []string{granted, other}, list(t, service.WithAuthzListUnrestricted(t.Context())))
+		assert.Empty(t, list(t, ctx))
+
+		require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
+			newTestAssignment(projectID, "asgn-"+uniqueSuffix(t), domain.AuthzPrincipalTypeUser, principal, "project", "viewer", domain.NewResourceAssignmentScope(granted))))
+		assert.Equal(t, []string{granted}, list(t, ctx))
+
+		_, err = d.stmts.ListUsers(t.Context(), &database.ListOptions[domain.UserField]{
+			Filter: database.And(
+				database.Equal(database.Col(domain.UserFieldProjectID), projectID),
+				v2user.IdentifierContains("email", "search-"),
+			),
+		}, service.UserQueryOptions{})
+		require.ErrorIs(t, err, service.ErrListFilterRequired)
 	})
 }
 

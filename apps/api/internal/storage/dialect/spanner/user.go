@@ -15,7 +15,13 @@ import (
 	v2user "github.com/zitadel/nextgen/internal/storage/user"
 )
 
-var userSchema = v2user.NewSchema("users", jsonSchemasTable)
+var userSchema = v2user.NewSchema(v2user.SchemaSQL{
+	UsersTable:                "users",
+	JSONSchemasTable:          jsonSchemasTable,
+	UserAttributesTable:       userAttributesTable,
+	UserUniqueAttributesTable: "user_unique_attributes",
+	AttributeString:           `CASE WHEN STARTS_WITH(TO_JSON_STRING(a.value), '"') THEN JSON_VALUE(a.value, '$') END`,
+})
 
 const (
 	createUserHeaderStmt = `INSERT INTO users (project_id, schema_url, id, lifecycle_owner_team_id, status)

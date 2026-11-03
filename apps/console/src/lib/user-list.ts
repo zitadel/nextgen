@@ -74,6 +74,8 @@ export async function fetchUsers(
 
 /** What the Users list is narrowed to, as the URL carries it. */
 export interface UsersSearch {
+  /** Part of a user's identifier; absent for every user. */
+  q?: string;
   /** A schema's object type; absent for every schema. */
   schema?: string;
   /** `latest`, `older`, or one revision's id; absent for every revision. */
@@ -116,16 +118,18 @@ export function schemaOptions(entries: SchemaEntry[]): SchemaOption[] {
 }
 
 /**
- * The server-side criteria for a search (#1669). Every revision of a schema
+ * The server-side criteria for a search (#1669). `q` is matched by the server
+ * across every page, never against the rows already loaded. Every revision of a schema
  * shares its `object_type`; `latest` and `older` compare the user's `schema`
  * with the newest revision's id, `latest`. The route sends neither without
  * it, so a URL never claims a narrower list than it shows.
  */
 export function userFilter(search: UsersSearch, latest: string | undefined): UserFilter {
-  if (!search.schema) return [];
-  const criteria: UserFilter = [
-    { field: "schema_object_type", operation: "equals", value: search.schema },
-  ];
+  const criteria: UserFilter = search.q
+    ? [{ field: "identifier", operation: "contains", value: search.q }]
+    : [];
+  if (!search.schema) return criteria;
+  criteria.push({ field: "schema_object_type", operation: "equals", value: search.schema });
   if (search.revision === "latest") {
     if (latest) criteria.push({ field: "schema", operation: "equals", value: latest });
   } else if (search.revision === "older") {

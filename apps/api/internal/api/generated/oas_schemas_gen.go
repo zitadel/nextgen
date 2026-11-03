@@ -92427,6 +92427,20 @@ func (s *UserExpand) UnmarshalText(data []byte) error {
 // Field to filter users by:
 // - `created_at`: RFC3339 timestamp
 // - `id`: user id
+// - `identifier`: the value returned as the user's `identifier`: the property
+// designated by `x-identifier` in the revision of the schema the user is on,
+// which is not always the property a newer revision signs them in with.
+// `equals` compares the whole value and `contains` a substring. Those are the
+// only two operations and the value may not be empty. Only string values
+// match: a user whose schema designates no identifier, or whose identifier is
+// a number or a boolean, never does. `equals` folds case in full, as sign-in
+// does. `contains` folds case through the database, so whether non-ASCII
+// letters fold differs by database and can disagree with `equals`.
+// Neither is backed by an index on the value. `contains` always reads the
+// identifier of every user of the designating schemas. `equals` can take one
+// key lookup per such user, depending on the database and on whether the
+// schemas designate more than one property. Narrow a search with other
+// filters on a large project.
 // - `schema`: the schema the user's attributes satisfy, matched against the
 // value the user carries as `schema`. Each revision of a schema has its own
 // URL, so `equals` selects the users on one revision and `not_equals` the
@@ -92451,8 +92465,9 @@ func (s *UserExpand) UnmarshalText(data []byte) error {
 // team may deprovision the user. A user can belong to many teams while owning
 // their own lifecycle, so the two disagree often and neither implies the other
 // (ADR 024).
-// `team_id` and `schema_object_type` are filterable but not sortable: neither
-// is a column on the user, so both are absent from the sort-field enum.
+// `identifier`, `team_id` and `schema_object_type` are filterable but not
+// sortable: none is a column on the user, so all three are absent from the
+// sort-field enum.
 // Filtering on `team_id` requires `team_membership.read` in addition to
 // `user.read`: it reads the same memberships that `expand: ["teams"]` embeds.
 // A Console session, which carries no scopes, may filter on it when it may read
@@ -92464,6 +92479,7 @@ type UserFilterField string
 const (
 	UserFilterFieldCreatedAt            UserFilterField = "created_at"
 	UserFilterFieldID                   UserFilterField = "id"
+	UserFilterFieldIdentifier           UserFilterField = "identifier"
 	UserFilterFieldSchema               UserFilterField = "schema"
 	UserFilterFieldSchemaObjectType     UserFilterField = "schema_object_type"
 	UserFilterFieldStatus               UserFilterField = "status"
@@ -92476,6 +92492,7 @@ func (UserFilterField) AllValues() []UserFilterField {
 	return []UserFilterField{
 		UserFilterFieldCreatedAt,
 		UserFilterFieldID,
+		UserFilterFieldIdentifier,
 		UserFilterFieldSchema,
 		UserFilterFieldSchemaObjectType,
 		UserFilterFieldStatus,
@@ -92490,6 +92507,8 @@ func (s UserFilterField) MarshalText() ([]byte, error) {
 	case UserFilterFieldCreatedAt:
 		return []byte(s), nil
 	case UserFilterFieldID:
+		return []byte(s), nil
+	case UserFilterFieldIdentifier:
 		return []byte(s), nil
 	case UserFilterFieldSchema:
 		return []byte(s), nil
@@ -92514,6 +92533,9 @@ func (s *UserFilterField) UnmarshalText(data []byte) error {
 		return nil
 	case UserFilterFieldID:
 		*s = UserFilterFieldID
+		return nil
+	case UserFilterFieldIdentifier:
+		*s = UserFilterFieldIdentifier
 		return nil
 	case UserFilterFieldSchema:
 		*s = UserFilterFieldSchema

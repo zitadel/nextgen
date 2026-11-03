@@ -325,6 +325,7 @@ export const RESOURCES = {
       filters: [
         { field: "created_at", operations: USER_OPERATIONS },
         { field: "id", operations: USER_OPERATIONS },
+        { field: "identifier", operations: ["equals", "contains"] },
         { field: "schema", operations: USER_OPERATIONS },
         { field: "schema_object_type", operations: ["equals", "not_equals", "contains"] },
         { field: "status", operations: USER_OPERATIONS },
