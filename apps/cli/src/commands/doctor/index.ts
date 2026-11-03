@@ -134,10 +134,14 @@ export default class Doctor extends Destructive(BaseCommand) {
    */
   private readonly started = startedServer(readNearestRuntimeMetadata);
 
-  private checking: Promise<Checking> | undefined;
+  private readonly checking = new Map<string, Promise<Checking>>();
 
   private checks(flags: Admitted<typeof Doctor>["flags"], cwd: string): Promise<Checking> {
-    this.checking ??= (async () => {
+    const already = this.checking.get(cwd);
+    if (already !== undefined) {
+      return already;
+    }
+    const working = (async () => {
       // An unreadable record only costs the port hint; the read below reports it.
       const hint = await this.started.of(cwd).catch(() => {
         return undefined;
@@ -148,7 +152,8 @@ export default class Doctor extends Destructive(BaseCommand) {
         hostedServer: await this.hostedServerWithoutLocalRuntime(flags, cwd),
       };
     })();
-    return this.checking;
+    this.checking.set(cwd, working);
+    return working;
   }
 
   protected override async sourceOf(flags: Record<string, unknown>, cwd: string): Promise<string> {

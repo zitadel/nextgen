@@ -226,7 +226,7 @@ export abstract class BaseCommand extends Interruptible(Command) {
    */
   protected telemetryProps: Readonly<Properties> = Object.freeze({});
 
-  private reading: Promise<Interfaces.ParserOutput> | undefined;
+  private reading: ReturnType<BaseCommand["parse"]> | undefined;
 
   /** `--cwd` as typed, carried into the unscoped follow-ups this run suggests. */
   private typedCwd: string | undefined;
@@ -286,11 +286,15 @@ export abstract class BaseCommand extends Interruptible(Command) {
    * message a flag's `parse` raised put back (see {@link asRaised}). A command
    * that reads an argument before the run is admitted — `api`, for the `help`
    * word — asks for it here rather than parsing again.
+   *
+   * The flags come back as oclif types them for `BaseCommand`, which is what
+   * the command is here: only {@link execute} is handed the names and types
+   * its own command declared, which is why {@link admit} asserts them.
    */
-  protected parseOnce(): Promise<Interfaces.ParserOutput> {
+  protected parseOnce(): ReturnType<BaseCommand["parse"]> {
     this.reading ??= this.parse(this.command).catch((error: unknown) => {
       throw asRaised(error);
-    }) as Promise<Interfaces.ParserOutput>;
+    });
     return this.reading;
   }
 
@@ -305,11 +309,14 @@ export abstract class BaseCommand extends Interruptible(Command) {
       ...this.command.meta,
       ...(source === undefined ? {} : { source }),
     });
+    // oclif types a parse against `BaseCommand` by its base flags alone, so
+    // the names and types a command declared for itself are known only to
+    // `execute`, which {@link Admitted} states for the concrete command.
     return {
       flags,
       args: byName(parsed.args),
       argv: parsed.argv.map(String),
-    } as Admitted<typeof BaseCommand>;
+    } as unknown as Admitted<typeof BaseCommand>;
   }
 
   /**

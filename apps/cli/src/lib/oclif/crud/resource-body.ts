@@ -106,33 +106,31 @@ const MISSING_FIELDS_REFUSAL: Refusal = {
 };
 
 export const resourceBody = async (source: ResourceBodySource, flags: Json): Promise<Json> => {
-  {
-    const raw = await readRawBody(flags, `${source.topic} ${source.verb}`);
-    const base = raw === undefined ? undefined : unwrapRoot(raw, source.root, source.document);
-    const fromFlags = bodyFromFlags(source.fields, flags);
-    const assignments = (flags.set ?? []) as readonly Assignment[];
-    refuseArgvCredentials(
-      argvParts(flags, base, source.fields, fromFlags, assignments),
-      source.document,
-      source.references,
-    );
-    const merged = [fromFlags, ...assignments.map(fragmentOf)].reduce<unknown>(
-      (body, overlay) => (overlay === undefined ? body : mergeDocuments(body, overlay)),
-      base ?? {},
-    );
-    const missing = source.fields.filter((field) => isMissing(field, merged));
-    if (missing.length > 0) {
-      const flagNames = missing.map(spelling);
-      throw refusalError(MISSING_FIELDS_REFUSAL, {
-        command: `${source.topic} ${source.verb}`,
-        noun: missing.length === 1 ? "field" : "fields",
-        pronoun: missing.length === 1 ? "it" : "them",
-        spellings: flagNames.join(", "),
-        alternatives: flagNames.join(" and "),
-        names: missing.map((field) => field.name),
-      });
-    }
-    const wrapped = source.root === undefined ? merged : { [source.root]: merged };
-    return parseOrThrow(source.schema, wrapped, "Body does not match the API schema") as Json;
+  const raw = await readRawBody(flags, `${source.topic} ${source.verb}`);
+  const base = raw === undefined ? undefined : unwrapRoot(raw, source.root, source.document);
+  const fromFlags = bodyFromFlags(source.fields, flags);
+  const assignments = (flags.set ?? []) as readonly Assignment[];
+  refuseArgvCredentials(
+    argvParts(flags, base, source.fields, fromFlags, assignments),
+    source.document,
+    source.references,
+  );
+  const merged = [fromFlags, ...assignments.map(fragmentOf)].reduce<unknown>(
+    (body, overlay) => (overlay === undefined ? body : mergeDocuments(body, overlay)),
+    base ?? {},
+  );
+  const missing = source.fields.filter((field) => isMissing(field, merged));
+  if (missing.length > 0) {
+    const flagNames = missing.map(spelling);
+    throw refusalError(MISSING_FIELDS_REFUSAL, {
+      command: `${source.topic} ${source.verb}`,
+      noun: missing.length === 1 ? "field" : "fields",
+      pronoun: missing.length === 1 ? "it" : "them",
+      spellings: flagNames.join(", "),
+      alternatives: flagNames.join(" and "),
+      names: missing.map((field) => field.name),
+    });
   }
+  const wrapped = source.root === undefined ? merged : { [source.root]: merged };
+  return parseOrThrow(source.schema, wrapped, "Body does not match the API schema") as Json;
 };

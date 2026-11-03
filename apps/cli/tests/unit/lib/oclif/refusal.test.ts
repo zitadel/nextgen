@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { interpolate, refusalError } from "../../../../src/lib/oclif/refusal";
+import { interpolate, refusalError, unmetBy } from "../../../../src/lib/oclif/refusal";
 import { unscopedCommand } from "../../../../src/lib/suggestion";
 
 describe("interpolate", () => {
@@ -135,5 +135,26 @@ describe("refusalError's details", () => {
     const error = refusalError({ message: "No", details: { at } }, {});
 
     expect(error.details).toEqual({ at });
+  });
+});
+
+describe("unmetBy", () => {
+  it("names what a refusal's wording would leave unfilled", () => {
+    const refusal = {
+      message: "{value} is not a valid page size",
+      hint: "Use a whole number from {min} to {max}.",
+    };
+
+    expect(unmetBy(refusal, { value: "0", min: 1 })).toEqual(["max"]);
+  });
+
+  it("is empty for a refusal every placeholder of which is filled", () => {
+    const refusal = {
+      message: "{value} is not a TCP port",
+      hint: "Use a TCP port from {min} to {max}.",
+      next: ["start --port {min}"],
+    };
+
+    expect(unmetBy(refusal, { value: "0", min: 1, max: 65_535 })).toEqual([]);
   });
 });

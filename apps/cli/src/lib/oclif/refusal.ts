@@ -17,6 +17,23 @@ export type Refusal = Readonly<{
 /** What a refusal's placeholders are filled from. */
 export type Placeholders = Readonly<Record<string, unknown>>;
 
+/**
+ * The names a refusal's wording would leave unfilled, given the values it
+ * would be raised with.
+ *
+ * A refusal with one is a defect in its own wording, not in the run, so the
+ * person still gets refused and reads `{min}` where a number belonged. That
+ * makes it a defect only a test can catch: a refusal's own test asserts this
+ * is empty.
+ */
+export function unmetBy(refusal: Refusal, values: Placeholders): string[] {
+  const unfilled = [refusal.message, refusal.hint ?? "", ...(refusal.next ?? [])]
+    .flatMap((template) => [...template.matchAll(PLACEHOLDER)])
+    .map((match) => match[1] as string)
+    .filter((name) => values[name] === undefined);
+  return [...new Set(unfilled)];
+}
+
 const PLACEHOLDER = /\{([\w-]+)\}/g;
 
 /**

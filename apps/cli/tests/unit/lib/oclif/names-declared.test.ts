@@ -13,12 +13,13 @@ const config = await Config.load(cliPackageRoot);
  * declaration mistake, so it fails here rather than on the run.
  */
 describe("the names every command declares", () => {
-  it("never gives two of them the same reading", async () => {
+  it("never gives two of them the same reading", () => {
     const colliding: string[] = [];
 
     for (const command of config.commands) {
-      const loaded = await command.load();
-      for (const bag of [loaded.flags, loaded.baseFlags, loaded.args]) {
+      // The manifest already carries what each command declares, so nothing
+      // here loads a command module to read it.
+      for (const bag of [command.flags, command.args]) {
         const read = new Map<string, string>();
         for (const declared of Object.keys(bag ?? {})) {
           const already = read.get(named(declared));

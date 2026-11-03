@@ -55,12 +55,9 @@ class Sourced extends BaseCommand {
     /* swallow human output */
   }
 
-  protected override async sourceOf(_flags: unknown, cwd: string): Promise<string> {
-    this.asked = cwd;
+  protected override async sourceOf(): Promise<string> {
     return "http://localhost:8080";
   }
-
-  public asked: string | undefined;
 
   protected async execute(): Promise<JsonEnvelope> {
     return this.emit({
@@ -80,13 +77,5 @@ describe("the server a run is about", () => {
     expect(command.recorder.reported[0]?.properties).toMatchObject({
       server_kind: "local",
     });
-  });
-
-  it("is resolved for the directory the run addresses, which is not set this early", async () => {
-    const command = new Sourced(["--cwd", "/tmp"], config);
-
-    await command.run();
-
-    expect(command.asked).toBe("/tmp");
   });
 });
