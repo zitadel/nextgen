@@ -51,8 +51,10 @@ export function paged(send: (...args: unknown[]) => unknown, shape: PagingShape,
     items: (...args: unknown[]) => walk(args, (page) => shape.items(page)),
     all: async (...args: unknown[]) => {
       const collected: unknown[] = [];
-      for await (const value of walk(args, (page) => shape.items(page))) {
-        collected.push(value);
+      for await (const list of walk(args, (page) => [shape.items(page)])) {
+        for (const value of list) {
+          collected.push(value);
+        }
       }
       return collected;
     },
