@@ -47,14 +47,14 @@ describe("api", () => {
       expect(result).toPrint("Call any operation of the Zitadel API");
     });
 
-    it("points to --help under --json", async () => {
+    it("points to api ls under --json", async () => {
       const app = await aSetUpApp();
 
       const result = await app.api("help");
 
       expect(app.envelopeOf(result)).toMatchObject({
         command: "api",
-        data: { usage: "zitadel api --help" },
+        data: { next_commands: [expect.stringMatching(/ api ls$/)] },
       });
     });
   });

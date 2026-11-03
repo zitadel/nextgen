@@ -91,15 +91,18 @@ export default class Api extends Destructive(BaseCommand) {
     // --help does. It comes before the server is resolved, which help never
     // needs, and under --json the envelope stays the only thing on stdout.
     if (args.operation?.toLowerCase() === "help") {
-      await this.toMeta(flags, { resolveServer: false });
-      if (!this.jsonEnabled()) {
-        await this.config.runCommand("help", [Api.id]);
+      // Only the command's name is needed for the envelope: `toMeta` would also
+      // open telemetry and the first-run notice, which `--help` does not.
+      this.meta = { ...this.meta, command: this.id ?? this.meta.command };
+      if (this.jsonEnabled()) {
+        return this.emit({
+          status: "ok",
+          data: {},
+          next: { commands: [this.suggestUnscoped("api ls")] },
+        });
       }
-      return this.emit({
-        status: "ok",
-        data: { usage: `${this.config.bin} ${Api.id} --help` },
-        pretty: "",
-      });
+      await this.config.runCommand("help", [Api.id]);
+      return this.emit({ status: "ok", data: null, pretty: "" });
     }
 
     const meta = await this.toMeta(flags);

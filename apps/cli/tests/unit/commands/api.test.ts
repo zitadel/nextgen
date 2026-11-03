@@ -60,7 +60,20 @@ describe("zitadel api help", () => {
   it("is no operation, in any case and whatever follows", async () => {
     const envelope = await api("Help", "getVariable");
 
-    expect(envelope).toMatchObject({ status: "ok", data: { usage: "zitadel api --help" } });
+    expect(envelope).toMatchObject({ status: "ok", data: null });
+  });
+
+  it("needs no server it can resolve", async () => {
+    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    const config = await Config.load({ root: cliPackageRoot });
+    const cwd = await makeProject({ linked: true });
+
+    const envelope = await Api.run(
+      ["help", "--cwd", cwd, "--no-telemetry", "--server", "local"],
+      config,
+    );
+
+    expect(envelope).toMatchObject({ status: "ok" });
   });
 });
 
