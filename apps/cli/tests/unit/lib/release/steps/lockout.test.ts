@@ -40,6 +40,7 @@ function ctx(options: {
     metadata?: { created_at: string };
   }>;
   listed?: number[];
+  learned?: StepContext["learned"];
 }): StepContext {
   return {
     cwd: "/unused",
@@ -125,6 +126,7 @@ function ctx(options: {
     idpFiles: [],
     policyFiles: [],
     suggest: (args) => (options.selector ? `${args} ${options.selector}` : args) as never,
+    learned: options.learned,
   };
 }
 
@@ -274,7 +276,7 @@ describe("lockoutStep", () => {
     expect(takeReportedWarnings()).toEqual([]);
   });
 
-  it("warns when users of a schema no flow serves have an SSO link", async () => {
+  it("warns about every user of a schema no flow serves and counts the SSO ones on top", async () => {
     await lockoutStep.run(
       ctx({
         schemas: [{ objectType: "employee" }],
@@ -286,7 +288,9 @@ describe("lockoutStep", () => {
 
     const warnings = takeReportedWarnings();
     expect(warnings).toHaveLength(1);
-    expect(warnings[0]).toContain('1 existing user of "human-user" has an SSO link');
+    expect(warnings[0]).toContain(
+      '2 existing users of "human-user" are on a schema no flow in this release uses (1 of them has an SSO link)',
+    );
     expect(warnings[0]).toContain('keep or restore a flow on "human-user"');
   });
 
@@ -318,10 +322,12 @@ describe("lockoutStep", () => {
 
     const warnings = takeReportedWarnings();
     expect(warnings).toHaveLength(1);
-    expect(warnings[0]).toContain('2 existing users of "human-user" have an SSO link');
+    expect(warnings[0]).toContain(
+      '2 existing users of "human-user" are on a schema no flow in this release uses (2 of them have an SSO link)',
+    );
   });
 
-  it("does not warn about users of the old schema who have no SSO link", async () => {
+  it("warns about users of the old schema who have no SSO link, such as password users", async () => {
     await lockoutStep.run(
       ctx({
         schemas: [{ objectType: "employee" }],
@@ -330,7 +336,12 @@ describe("lockoutStep", () => {
       }),
     );
 
-    expect(takeReportedWarnings()).toEqual([]);
+    const warnings = takeReportedWarnings();
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain(
+      '1 existing user of "human-user" is on a schema no flow in this release uses, so they cannot sign in',
+    );
+    expect(warnings[0]).not.toContain("SSO link");
   });
 
   it("suggests the dot-path form for a dotted identifier", async () => {
@@ -385,7 +396,9 @@ describe("lockoutStep", () => {
       }),
     );
 
-    expect(takeReportedWarnings()[0]).toContain('of "human-user" has an SSO link');
+    expect(takeReportedWarnings()[0]).toContain(
+      'of "human-user" is on a schema no flow in this release uses (1 of them has an SSO link)',
+    );
   });
 
   it("does not guess which schema is unserved when a flow's schema cannot be resolved", async () => {
@@ -400,7 +413,7 @@ describe("lockoutStep", () => {
 
     const warnings = takeReportedWarnings();
     expect(warnings).toHaveLength(1);
-    expect(warnings[0]).toContain("Skipped the SSO lockout check");
+    expect(warnings[0]).toContain("Skipped the check for users of schemas no flow serves");
   });
 
   it("still warns about missing identifiers when the schemas cannot be listed", async () => {
@@ -582,7 +595,9 @@ describe("lockoutStep", () => {
     );
 
     expect(listed).toHaveLength(1);
-    expect(takeReportedWarnings()[0]).toContain('of "human-user" has an SSO link');
+    expect(takeReportedWarnings()[0]).toContain(
+      'of "human-user" is on a schema no flow in this release uses (1 of them has an SSO link)',
+    );
   });
 
   it("says the schemas could not be read, not that a flow's schema is undefined", async () => {
@@ -677,7 +692,9 @@ describe("lockoutStep", () => {
 
     const warnings = takeReportedWarnings();
     expect(warnings).toHaveLength(1);
-    expect(warnings[0]).toContain('1 existing user of "human-user" has an SSO link');
+    expect(warnings[0]).toContain(
+      '2 existing users of "human-user" are on a schema no flow in this release uses (1 of them has an SSO link)',
+    );
   });
 
   it("says so when resolving the flows throws before the scans start", async () => {
@@ -711,7 +728,38 @@ describe("lockoutStep", () => {
       }),
     );
 
-    expect(takeReportedWarnings()[0]).toContain('of "" has an SSO link');
+    expect(takeReportedWarnings()[0]).toContain(
+      'of "" is on a schema no flow in this release uses (1 of them has an SSO link)',
+    );
+  });
+
+  it("reads no users when the diff found no schema or flow changed", async () => {
+    const requested: number[] = [];
+    await lockoutStep.run(
+      ctx({
+        schemas: [{ objectType: "employee" }],
+        flows: [flow("employee")],
+        users: [user("u1", "human-user")],
+        requested,
+        learned: { schemasOrFlowsChanged: false },
+      }),
+    );
+
+    expect(requested).toEqual([]);
+    expect(takeReportedWarnings()).toEqual([]);
+  });
+
+  it("checks the users when the diff found a schema or flow changed", async () => {
+    await lockoutStep.run(
+      ctx({
+        schemas: [{ objectType: "employee" }],
+        flows: [flow("employee")],
+        users: [user("u1", "human-user")],
+        learned: { schemasOrFlowsChanged: true },
+      }),
+    );
+
+    expect(takeReportedWarnings()).toHaveLength(1);
   });
 
   it("runs for deploy only", () => {
@@ -810,7 +858,7 @@ describe("lockoutStep", () => {
     expect(takeReportedWarnings()[0]).toContain('has no "username"');
   });
 
-  it("still checks SSO users when no active flow is left, without the passkey reassurance", async () => {
+  it("still checks the users of unserved schemas when no active flow is left", async () => {
     await lockoutStep.run(
       ctx({
         schemas: [{ objectType: "employee" }],
@@ -821,8 +869,9 @@ describe("lockoutStep", () => {
     );
 
     const warnings = takeReportedWarnings();
-    expect(warnings[0]).toContain('of "human-user" has an SSO link');
-    expect(warnings[0]).not.toContain("Passkey sign-in is not affected");
+    expect(warnings[0]).toContain(
+      'of "human-user" is on a schema no flow in this release uses (1 of them has an SSO link)',
+    );
   });
 
   it("follows a plain transition to a step that is also the sign-up entry", async () => {

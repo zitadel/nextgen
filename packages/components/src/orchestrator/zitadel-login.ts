@@ -779,7 +779,8 @@ export class ZitadelLogin extends ZitadelSurface {
 
   /**
    * Set while a fresh flow replaces one the server refused to continue
-   * (`flow.restart_required`). It bypasses the resume handle, puts the notice
+   * (`flow.restart_required`, or `flow.sso_user_schema_mismatch` for an SSO
+   * sign-in the user's schema cannot complete). It bypasses the resume handle, puts the notice
    * on the new first step, and refuses a second restart until a step renders,
    * so a server that keeps refusing cannot loop the widget.
    */

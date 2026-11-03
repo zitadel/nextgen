@@ -260,8 +260,12 @@ Each invocation prints one JSON object:
 - `deploy` and `deploy --dry-run` read the project's users and add a warning
   to `warnings` when the config would lock existing users out: users of a
   schema who lack its `x-identifier` property while a step on the login path
-  collects it, or users with an SSO link whose schema no flow uses any more. It only warns and never fails the
-  deploy. When it could not finish (a request failed, the SSO part was skipped,
+  collects it (it cannot tell who signs in with a password, so it counts them
+  all), or users of a schema no flow uses any more, who cannot sign in at all
+  (the warning counts those with an SSO link on top). It runs only when the
+  diff finds schemas or flows changed, or cannot tell, and it only warns and
+  never fails the deploy. When it could not finish (a request failed, the
+  unserved-schema part was skipped,
   or the read limit was reached), `warnings` carries a note saying so, such as
   "Could not finish checking existing users"; that note means the check was
   incomplete, not that users are locked out.

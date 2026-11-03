@@ -46,9 +46,9 @@ const ACTIVE: UserFilter = { field: "status", operation: "equals", value: "activ
  * - a schema whose designated identifier (`x-identifier`) is a property the
  *   existing users of that schema do not carry sends them to registration when
  *   they type their old identifier, once a step on the login path collects it;
- * - users with a linked provider account on a schema that no flow in the
- *   release serves cannot continue an SSO sign-in (a flow moved to another
- *   schema leaves them there).
+ * - users of a schema that no flow in the release serves cannot sign in at all
+ *   (a flow moved to another schema leaves them there), and those with a
+ *   linked provider account cannot continue an SSO sign-in either.
  *
  * Both are read from the users the project holds now, so they hold whatever
  * the previous release said. Warn only: a deploy that does this on purpose, or
@@ -59,6 +59,11 @@ export const lockoutStep: Step = {
   name: "lockout",
   runsFor: ["deploy"],
   async run(ctx: StepContext): Promise<undefined> {
+    // Branding, policies and connections cannot lock anyone out. Without a
+    // diff to say so, the check runs.
+    if (ctx.learned?.schemasOrFlowsChanged === false) {
+      return undefined;
+    }
     try {
       for (const message of await lockoutWarnings(ctx)) {
         reportWarning(message);
@@ -82,14 +87,14 @@ async function lockoutWarnings(ctx: StepContext): Promise<string[]> {
     return listed;
   };
   const { flows, unresolved, unreadable } = await servedFlows(ctx, names);
-  // Why the SSO check cannot run, if it cannot. A release with no flow
+  // Why the unserved-schema check cannot run, if it cannot. A release with no flow
   // definitions needs no note: against a real server, such a release leaves the
   // project serving the flows it already had, so it strands no one (unlike one
   // whose flows are all drafts).
   const ssoSkipped = unreadable
-    ? "Skipped the SSO lockout check: the project's schemas could not be read."
+    ? "Skipped the check for users of schemas no flow serves: the project's schemas could not be read."
     : unresolved
-      ? "Skipped the SSO lockout check: a flow names a schema that this release does not define."
+      ? "Skipped the check for users of schemas no flow serves: a flow names a schema that this release does not define."
       : ctx.bundle.flow_definitions.length === 0
         ? ""
         : undefined;
@@ -98,11 +103,11 @@ async function lockoutWarnings(ctx: StepContext): Promise<string[]> {
   const scanned = new Set(
     flows.filter((flow) => flow.identifier !== undefined).map((flow) => flow.schema),
   );
-  const share = Math.floor(SCAN_CAP / (scanned.size + 1));
+  const share = Math.max(1, Math.floor(SCAN_CAP / (scanned.size + 1)));
   // One scan failing must not discard what the other found.
   const settled = await Promise.allSettled([
     lookupWarnings(ctx, flows, share),
-    ssoSkipped === undefined ? ssoWarnings(ctx, flows, names, share) : nothing(),
+    ssoSkipped === undefined ? unservedWarnings(ctx, flows, names, share) : nothing(),
   ]);
   const scans = settled.flatMap((outcome) =>
     outcome.status === "fulfilled" ? [outcome.value] : [],
@@ -213,7 +218,7 @@ async function lookupWarnings(
         }
         return {
           warnings: [
-            `${count(missing.length, truncated)} of ${count(users.length, truncated)} existing ${plural(users.length, "user")} of ${quote(objectType)} ${missing.length === 1 ? "has" : "have"} no ${quote(identifier)}, the field the login flow looks users up by, so typing it offers them registration instead of signing them in. Move each user to the schema revision that defines it and set it in one update: ${ctx.suggest(`users update <user_id> --schema <revision_id> --set attributes.${identifier}=<value>`)}`,
+            `${count(missing.length, truncated)} of ${count(users.length, truncated)} existing ${plural(users.length, "user")} of ${quote(objectType)} ${missing.length === 1 ? "has" : "have"} no ${quote(identifier)}, the field the login flow looks users up by, so those who sign in with a password and type it are offered registration instead of being signed in. Move each user to the schema revision that defines it and set it in one update: ${ctx.suggest(`users update <user_id> --schema <revision_id> --set attributes.${identifier}=<value>`)}`,
           ],
           partial: [],
           failed: false,
@@ -231,8 +236,8 @@ async function lookupWarnings(
   };
 }
 
-/** Users on a schema no flow serves any more, who have a provider linked. */
-async function ssoWarnings(
+/** Users on a schema no flow serves any more, and which of them have a provider linked. */
+async function unservedWarnings(
   ctx: StepContext,
   flows: readonly Flow[],
   names: Names,
@@ -249,14 +254,15 @@ async function ssoWarnings(
     ],
     share,
   );
-  // One request per user, so only the first few are asked; when more were read
-  // the result is partial, and a clean one says so.
-  const stranded = read.users.slice(0, LINK_CHECKS);
-  const truncated = read.truncated || read.users.length > LINK_CHECKS;
+  // Every one of them is stranded, linked or not. The link read is one request
+  // per user, so only the first few are asked, and the SSO count says so.
+  const stranded = read.users;
+  const linkChecked = stranded.slice(0, LINK_CHECKS);
+  const linksPartial = stranded.length > LINK_CHECKS;
   // Its own boundary: a link read that fails (a user deleted since the query)
   // must not discard the other warnings.
   let failed = false;
-  const hasLink = await mapBounded(stranded, CONCURRENCY, async (user) => {
+  const hasLink = await mapBounded(linkChecked, CONCURRENCY, async (user) => {
     try {
       const { identity_links: links } = await ctx.client.listUserIdentityLinks(user.id, {
         limit: 1,
@@ -271,22 +277,26 @@ async function ssoWarnings(
     }
   });
   // Revisions of one schema share an object type, so they are one count.
-  const linked = new Map<string | symbol, number>();
-  const nameOf = hasLink.some(Boolean) ? await names() : undefined;
+  const found = new Map<string | symbol, { users: number; linked: number }>();
+  const nameOf = stranded.length > 0 ? await names() : undefined;
   stranded.forEach((user, index) => {
-    if (!hasLink[index]) {
-      return;
-    }
     const name = nameOf?.byId.get(user.schema)?.objectType ?? UNNAMED;
-    linked.set(name, (linked.get(name) ?? 0) + 1);
+    const entry = found.get(name) ?? { users: 0, linked: 0 };
+    entry.users += 1;
+    entry.linked += hasLink[index] ? 1 : 0;
+    found.set(name, entry);
   });
-  const warnings = [...linked].map(([name, total]) => {
+  const warnings = [...found].map(([name, { users, linked }]) => {
     const label = typeof name === "string" ? quote(name) : "schemas whose names could not be read";
-    return `${count(total, truncated)} existing ${plural(total, "user")} of ${label} ${total === 1 ? "has" : "have"} an SSO link, but no flow in this release uses that schema, so they cannot sign in with SSO.${served.length > 0 ? " Passkey sign-in is not affected." : ""} Users cannot move between schemas, so keep or restore a flow on ${label}.`;
+    const sso =
+      linked > 0
+        ? ` (${count(linked, linksPartial)} of them ${linked === 1 ? "has" : "have"} an SSO link)`
+        : "";
+    return `${count(users, read.truncated)} existing ${plural(users, "user")} of ${label} ${users === 1 ? "is" : "are"} on a schema no flow in this release uses${sso}, so they cannot sign in with a password or SSO. Users cannot move between schemas, so keep or restore a flow on ${label}.`;
   });
   return {
     warnings,
-    partial: truncated && warnings.length === 0 ? ["the schemas no flow serves"] : [],
+    partial: read.truncated && warnings.length === 0 ? ["the schemas no flow serves"] : [],
     failed,
   };
 }

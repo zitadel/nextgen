@@ -10,10 +10,10 @@ import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll } from "vitest";
 
-/** What the platform was asked to publish, for a surface the mock does not keep. */
 /** The object type of the schema the scaffolded login flow serves, read from the scaffold's own default. */
 const SERVED_OBJECT_TYPE = String(getDefaultHumanUserSchema().objectType);
 
+/** What the platform was asked to publish, for a surface the mock does not keep. */
 export interface Captured<T> {
   readonly all: T[];
   readonly count: number;
