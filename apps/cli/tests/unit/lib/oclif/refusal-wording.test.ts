@@ -15,13 +15,18 @@ const ALWAYS = ["value", "input", "problem"];
  */
 const PLACEHOLDER = /(?<!\$)\{([\w-]+)\}/g;
 
+/** What a flag or argument is refused for, filled only by `read`. */
+const REFUSED = /const (\w+): Refused<[^>]*> = \{/g;
+
+/** A refusal thrown by hand, filled by whoever throws it. */
+const REFUSAL = /const (\w+): Refusal = \{/g;
+
 /**
- * What a flag or argument is refused for. Only these are weighed: `read`
- * (`src/lib/oclif/flags.ts`) is their only caller, so the declaration is the
- * only place their wording can be filled from. A `Refusal` thrown by hand is
- * filled at the throw, which sits beside it in the same file.
+ * Where a refusal is thrown: everything from the call to the values it hands
+ * over, so a refusal chosen by a condition — `problem === "too-long" ? A : B`
+ * — is paired with its values as surely as one named outright.
  */
-const DECLARATION = /const \w+: Refused<[^>]*> = \{/g;
+const THROWN = /refusalError\(([^{]*)\{/g;
 
 type Declared = Readonly<{ file: string; text: string }>;
 
@@ -51,14 +56,31 @@ function literalAt(source: string, opened: number): string {
   return source.slice(opened);
 }
 
-/** Every refusal declared in `src`, each with the text it was declared as. */
+/**
+ * Every refusal declared in `src`, each with its wording and everything that
+ * fills it.
+ *
+ * A `Refused` is filled by `read` alone, so its own declaration is all there
+ * is. A `Refusal` is filled wherever it is thrown, so each `refusalError` of
+ * it in the same file counts too — a name no throw of it ever passes reaches
+ * the person as braces.
+ */
 async function declared(): Promise<Declared[]> {
   const found: Declared[] = [];
   for (const file of await sources()) {
     const source = await readFile(join(root, file), "utf8");
-    for (const match of source.matchAll(DECLARATION)) {
+    for (const match of source.matchAll(REFUSED)) {
       const opened = match.index + match[0].length - 1;
       found.push({ file, text: literalAt(source, opened) });
+    }
+    for (const match of source.matchAll(REFUSAL)) {
+      const opened = match.index + match[0].length - 1;
+      const thrown = [...source.matchAll(THROWN)]
+        .filter((throwing) => (throwing[1] ?? "").includes(match[1] as string))
+        .map((throwing) => literalAt(source, throwing.index + throwing[0].length - 1));
+      // A refusal nothing throws is dead, which another test would catch; it
+      // is weighed on its wording alone.
+      found.push({ file, text: [literalAt(source, opened), ...thrown].join("\n") });
     }
   }
   return found;
@@ -67,11 +89,12 @@ async function declared(): Promise<Declared[]> {
 /** What a refusal's wording asks for that nothing in its declaration fills. */
 function unfilled(text: string): string[] {
   const asked = [...text.matchAll(PLACEHOLDER)].map((match) => match[1] as string);
-  const filled = [
-    ...ALWAYS,
-    ...[...text.matchAll(/^\s{2,}([\w-]+):/gm)].map((m) => m[1] as string),
-  ];
-  return [...new Set(asked.filter((name) => !filled.includes(name)))];
+  // A key is written either way a property can be: `reason: reason`, or the
+  // shorthand `reason`, which ends at the comma instead of a colon.
+  const keys = [...text.matchAll(/^\s{2,}\.{0,3}([\w-]+)\s*[:,]/gm)].map(
+    (match) => match[1] as string,
+  );
+  return [...new Set(asked.filter((name) => ![...ALWAYS, ...keys].includes(name)))];
 }
 
 /**

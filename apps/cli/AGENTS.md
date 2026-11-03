@@ -67,7 +67,9 @@
 - Name a `Refused` for its flag (`PORT`, `TTL`) and a `Refusal` for what it
   refuses, ending `_REFUSAL`, so the two read apart. A `Refused`'s wording must
   stand on its own: `read` fills `{value}`, `{input}` and `{problem}`, and
-  anything else comes from its `values`, which a unit test checks
+  anything else comes from its `values`. A `Refusal` is filled where it is
+  thrown. Either way a name nothing fills reaches the person as braces, so a
+  unit test weighs every refusal against what fills it
   (`tests/unit/lib/oclif/refusal-wording.test.ts`).
 - No `flags/`, `args/` or `rules/` directory, and no helper module beside a
   command.
