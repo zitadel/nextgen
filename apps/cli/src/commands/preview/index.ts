@@ -277,55 +277,6 @@ export default class Preview extends PreviewCommand {
     }),
   };
 
-  /**
-   * Why this build previews nothing, as the result it answers with, or
-   * `undefined` when it does. A build outside a preview environment has nothing
-   * to preview, and one without the preview credential — a fork's, which cannot
-   * read it — warns and exits cleanly unless `--strict` asks to fail.
-   */
-  private skippedUnlessPreviewable(strict: boolean): CommandResult | undefined {
-    const credential = CREDENTIALS[PREVIEW_CREDENTIAL];
-    const verdict = previewVerdict({
-      environment: this.environment.name.value,
-      fromDefault: this.environment.name.source === "default",
-      ci: runsInCi(this.env),
-      credentialSet: this.environment.values[credential] !== undefined,
-      strict,
-    });
-    switch (verdict) {
-      case "preview":
-        return undefined;
-      case "credential-required":
-        throw refusalError(CREDENTIAL_REQUIRED_REFUSAL, {
-          credential,
-        });
-      case "production-build":
-        return {
-          status: "skipped",
-          reason: "nothing-to-preview",
-          pretty: "nothing to preview — production is deployed by `zitadel deploy`, after merge",
-        };
-      case "unnamed-ci-build":
-        reportWarning(
-          "This CI build names no environment, so the preview is skipped. Set ZITADEL_ENV=preview in the pull-request build that should deploy one.",
-        );
-        return {
-          status: "skipped",
-          reason: "nothing-to-preview",
-          pretty: "nothing to preview — set ZITADEL_ENV=preview in the pull-request build",
-        };
-      case "no-credential":
-        reportWarning(
-          `No preview credential (${credential}) is set, so the preview is skipped; a fork pull-request build cannot read it. Pass --strict to fail instead.`,
-        );
-        return {
-          status: "skipped",
-          reason: "no-preview-credential",
-          pretty: `no preview credential (${credential}) — preview skipped`,
-        };
-    }
-  }
-
   protected async execute({ flags }: Admitted<typeof Preview>): Promise<JsonEnvelope> {
     const skipped = this.skippedUnlessPreviewable(flags.strict);
     if (skipped !== undefined) {
@@ -414,5 +365,54 @@ export default class Preview extends PreviewCommand {
         `NEXT_PUBLIC_ZITADEL_RELEASE=${release.content_hash}`,
       ].join("\n"),
     });
+  }
+
+  /**
+   * Why this build previews nothing, as the result it answers with, or
+   * `undefined` when it does. A build outside a preview environment has nothing
+   * to preview, and one without the preview credential — a fork's, which cannot
+   * read it — warns and exits cleanly unless `--strict` asks to fail.
+   */
+  private skippedUnlessPreviewable(strict: boolean): CommandResult | undefined {
+    const credential = CREDENTIALS[PREVIEW_CREDENTIAL];
+    const verdict = previewVerdict({
+      environment: this.environment.name.value,
+      fromDefault: this.environment.name.source === "default",
+      ci: runsInCi(this.env),
+      credentialSet: this.environment.values[credential] !== undefined,
+      strict,
+    });
+    switch (verdict) {
+      case "preview":
+        return undefined;
+      case "credential-required":
+        throw refusalError(CREDENTIAL_REQUIRED_REFUSAL, {
+          credential,
+        });
+      case "production-build":
+        return {
+          status: "skipped",
+          reason: "nothing-to-preview",
+          pretty: "nothing to preview — production is deployed by `zitadel deploy`, after merge",
+        };
+      case "unnamed-ci-build":
+        reportWarning(
+          "This CI build names no environment, so the preview is skipped. Set ZITADEL_ENV=preview in the pull-request build that should deploy one.",
+        );
+        return {
+          status: "skipped",
+          reason: "nothing-to-preview",
+          pretty: "nothing to preview — set ZITADEL_ENV=preview in the pull-request build",
+        };
+      case "no-credential":
+        reportWarning(
+          `No preview credential (${credential}) is set, so the preview is skipped; a fork pull-request build cannot read it. Pass --strict to fail instead.`,
+        );
+        return {
+          status: "skipped",
+          reason: "no-preview-credential",
+          pretty: `no preview credential (${credential}) — preview skipped`,
+        };
+    }
   }
 }

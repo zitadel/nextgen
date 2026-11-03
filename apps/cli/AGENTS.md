@@ -41,6 +41,9 @@
 
 ## Command code
 
+- Read a command top-down: its description, group and flags, then what it
+  remembers for a run, then `sourceOf`, then `execute`, then the private
+  methods `execute` calls. Nothing it calls is declared above it.
 - A command does its work in `execute`, never `run`: `BaseCommand.run`
   (`src/lib/oclif/base.ts`) parses the flags, resolves `static meta`, and only
   then calls it.

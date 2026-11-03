@@ -86,15 +86,6 @@ export default class Start extends BaseCommand {
     return localServerUrl(await this.portOf(flags, cwd));
   }
 
-  /**
-   * Where the server will be, as far as is known before one is chosen: the
-   * port asked for, else the one this directory already has.
-   */
-  private async portOf(flags: Record<string, unknown>, cwd = this.cwd): Promise<number> {
-    const asked = typeof flags.port === "number" ? flags.port : undefined;
-    return asked ?? (await this.recorded.of(cwd))?.port ?? DEFAULT_LOCAL_SERVER_PORT;
-  }
-
   protected async execute({ flags }: Admitted<typeof Start>): Promise<JsonEnvelope> {
     if (flags.runtime === "binary" && flags.image !== undefined) {
       throw refusalError(IMAGE_NEEDS_DOCKER_REFUSAL, {});
@@ -173,6 +164,15 @@ export default class Start extends BaseCommand {
       data: readyData(runtime, alreadyRunning),
       next: readyNext(this.cliVersion, this.suggestUnscoped("setup --server local")),
     });
+  }
+
+  /**
+   * Where the server will be, as far as is known before one is chosen: the
+   * port asked for, else the one this directory already has.
+   */
+  private async portOf(flags: Record<string, unknown>, cwd = this.cwd): Promise<number> {
+    const asked = typeof flags.port === "number" ? flags.port : undefined;
+    return asked ?? (await this.recorded.of(cwd))?.port ?? DEFAULT_LOCAL_SERVER_PORT;
   }
 }
 

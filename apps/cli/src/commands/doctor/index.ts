@@ -170,26 +170,6 @@ export default class Doctor extends Destructive(BaseCommand) {
 
   private readonly checking = new Map<string, Promise<Checking>>();
 
-  private checks(flags: Asked, cwd: string): Promise<Checking> {
-    const already = this.checking.get(cwd);
-    if (already !== undefined) {
-      return already;
-    }
-    const working = (async () => {
-      // An unreadable record only costs the port hint; the read below reports it.
-      const hint = await this.started.of(cwd).catch(() => {
-        return undefined;
-      });
-      return {
-        cwd,
-        port: flags.port ?? hint?.runtime.port ?? DEFAULT_LOCAL_SERVER_PORT,
-        hostedServer: await this.hostedServerWithoutLocalRuntime(flags, cwd),
-      };
-    })();
-    this.checking.set(cwd, working);
-    return working;
-  }
-
   protected override async sourceOf(flags: Asked, cwd: string): Promise<string> {
     const { port, hostedServer } = await this.checks(flags, cwd);
     return hostedServer ?? localServerUrl(port);
@@ -389,6 +369,26 @@ export default class Doctor extends Destructive(BaseCommand) {
       next,
       warnings: warnings.map((warning) => `${warning.name}: ${warning.message}`),
     });
+  }
+
+  private checks(flags: Asked, cwd: string): Promise<Checking> {
+    const already = this.checking.get(cwd);
+    if (already !== undefined) {
+      return already;
+    }
+    const working = (async () => {
+      // An unreadable record only costs the port hint; the read below reports it.
+      const hint = await this.started.of(cwd).catch(() => {
+        return undefined;
+      });
+      return {
+        cwd,
+        port: flags.port ?? hint?.runtime.port ?? DEFAULT_LOCAL_SERVER_PORT,
+        hostedServer: await this.hostedServerWithoutLocalRuntime(flags, cwd),
+      };
+    })();
+    this.checking.set(cwd, working);
+    return working;
   }
 
   /**
