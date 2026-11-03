@@ -2738,7 +2738,7 @@
     {
       "id": "policies test",
       "group": "Configuration and releases",
-      "description": "Run the test cases in .zitadel/policies/ against the policies",
+      "description": "Run the test cases in .zitadel/policies/ against the policies.",
       "args": [
         {
           "name": "operation",

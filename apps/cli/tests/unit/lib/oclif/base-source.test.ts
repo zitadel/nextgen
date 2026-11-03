@@ -91,12 +91,14 @@ class Coloured extends BaseCommand {
 
   public answer: boolean | undefined;
 
-  public override jsonEnabled(): boolean {
-    return false;
-  }
-
+  // `jsonEnabled` is not overridden: `--json` is one of the things that
+  // decides colour, so a double that answered it for itself would hide that.
   public override log(): void {
     /* swallow human output */
+  }
+
+  public override logJson(): void {
+    /* swallow the envelope */
   }
 
   protected async execute(): Promise<JsonEnvelope> {
@@ -108,20 +110,38 @@ class Coloured extends BaseCommand {
   }
 }
 
+/**
+ * Every answer the run gives about colour. Colour itself cannot be asserted
+ * through the CLI: picocolors and consola decide it when they load, from the
+ * real process streams, so a run in a test never emits an escape byte whatever
+ * the flags say. What the run decides is the thing worth pinning, and
+ * `biome-plugins/no-own-colour.grit` keeps a command from deciding its own.
+ */
 describe("whether a run's output is coloured", () => {
-  it("asks where the output goes, not whether anyone could be asked something", async () => {
-    // A run reading its input from a file still writes to the terminal, so a
-    // redirected stdin says nothing about colour. The colour variables are
-    // pinned because the runner's own are not the ones under test.
-    vi.stubEnv("TERM", "xterm");
-    vi.stubEnv("NO_COLOR", "");
-    vi.stubEnv("FORCE_COLOR", "");
-    const coloured = new Coloured(["--no-telemetry"], config);
+  it.each([
+    ["on a terminal", [], { TERM: "xterm" }, true],
+    ["for --no-color", ["--no-color"], { TERM: "xterm" }, false],
+    ["for NO_COLOR", [], { TERM: "xterm", NO_COLOR: "1" }, false],
+    ["for NO_COLOR over FORCE_COLOR", [], { NO_COLOR: "1", FORCE_COLOR: "1" }, false],
+    ["for --no-color over FORCE_COLOR", ["--no-color"], { FORCE_COLOR: "1" }, false],
+    ["for FORCE_COLOR off a terminal", [], { FORCE_COLOR: "1" }, true],
+    ["on a dumb terminal", [], { TERM: "dumb" }, false],
+    ["for --json, which carries no colour", ["--json"], { TERM: "xterm" }, false],
+  ])("is %s", async (_case, argv, env, expected) => {
+    for (const [name, value] of Object.entries({
+      TERM: "",
+      NO_COLOR: "",
+      FORCE_COLOR: "",
+      ...env,
+    })) {
+      vi.stubEnv(name, value);
+    }
+    const coloured = new Coloured(["--no-telemetry", ...argv], config);
 
     await onTerminalReadingAFile(() => {
       return coloured.run();
     });
 
-    expect(coloured.answer).toBe(true);
+    expect(coloured.answer).toBe(expected);
   });
 });

@@ -96,7 +96,8 @@
     "./biome-plugins/no-raw-next-commands.grit",
     "./biome-plugins/no-consent-bypass.grit",
     "./biome-plugins/no-flag-alias.grit",
-    "./biome-plugins/no-cli-spelling-read.grit"
+    "./biome-plugins/no-cli-spelling-read.grit",
+    "./biome-plugins/no-own-colour.grit"
   ],
   "overrides": [
     {

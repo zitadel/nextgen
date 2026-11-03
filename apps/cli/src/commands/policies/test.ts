@@ -28,7 +28,7 @@ import { reportWarning } from "../../lib/warnings";
  * command with `E_VALIDATION`, carrying the full results.
  */
 export default class PoliciesTest extends EnvironmentCommand {
-  static override description = "Run the test cases in .zitadel/policies/ against the policies";
+  static override description = "Run the test cases in .zitadel/policies/ against the policies.";
   static override group = CommandGroups.configuration;
   static override examples = [
     "<%= config.bin %> policies test",
