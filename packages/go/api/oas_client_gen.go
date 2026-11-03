@@ -113,7 +113,7 @@ type Invoker interface {
 	// The `liquid_template` is validated lexically on save (size, encoding,
 	// banned patterns such as `<script>` tags, inline event handlers, and the
 	// `| raw` filter). Authoritative LiquidJS validation runs at authoring
-	// time via `zitadel plan` / `zitadel apply`.
+	// time, in `zitadel deploy` and `zitadel deploy --dry-run`.
 	//
 	// POST /branding
 	CreateBranding(ctx context.Context, request *Branding, params CreateBrandingParams) (CreateBrandingRes, error)
@@ -2047,7 +2047,7 @@ func (c *Client) sendCreateAuthAttempt(ctx context.Context, request *CreateAuthA
 // The `liquid_template` is validated lexically on save (size, encoding,
 // banned patterns such as `<script>` tags, inline event handlers, and the
 // `| raw` filter). Authoritative LiquidJS validation runs at authoring
-// time via `zitadel plan` / `zitadel apply`.
+// time, in `zitadel deploy` and `zitadel deploy --dry-run`.
 //
 // POST /branding
 func (c *Client) CreateBranding(ctx context.Context, request *Branding, params CreateBrandingParams) (CreateBrandingRes, error) {

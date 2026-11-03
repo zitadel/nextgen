@@ -896,7 +896,7 @@ export class ZitadelLogin extends ZitadelSurface {
       return new Error(
         `<zitadel-login> flow-name="${this.flowName}" does not match any active flow ` +
           `definition in this project. Check the \`name\` in your flow file and that ` +
-          `it has been applied (\`zitadel apply\`).`,
+          `it has been deployed (\`zitadel deploy\`).`,
       );
     }
     if (code === "flowdef.purpose_mismatch") {
