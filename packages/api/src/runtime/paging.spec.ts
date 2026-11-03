@@ -73,6 +73,15 @@ describe("Paging#walk", () => {
     ]);
   });
 
+  it("ends at an empty cursor", async () => {
+    const fetch = fetchPage({ "": { rows: ["a"], next: "" } });
+
+    const { items } = await byRows.collect(byRows.walk(fetch), { all: true });
+
+    expect(items).toEqual(["a"]);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
   it("tells the fetch which page of the walk it is", async () => {
     const fetch = fetchPage({
       "": { rows: ["a"], next: "t1" },

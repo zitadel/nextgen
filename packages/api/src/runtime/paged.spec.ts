@@ -65,11 +65,11 @@ describe("paged", () => {
 
   it("collects a page too large to pass as call arguments", async () => {
     const large = Array.from({ length: 200_000 }, (_, index) => String(index));
-    const send = vi.fn(async () => {
+    const call = vi.fn(async () => {
       return { rows: large };
     });
 
-    const collected = await paged(send, rows, asIs).all();
+    const collected = await paged(call, rows, asIs).all();
 
     expect(collected).toHaveLength(200_000);
   });
