@@ -105,11 +105,17 @@ func (s *SchemaService) prepareSchema(input CreateSchemaInput) (*domain.JSONSche
 	}
 	if err := s.schemaValidator.ValidateAgainstMetaSchema(input.Schema); err != nil {
 		invalid := domain.ErrJSONSchemaInvalid().WithParent(err)
-		if errors.Is(err, domain.ErrSchemaDesignationInvalid) {
+		switch {
+		case errors.Is(err, domain.ErrSchemaDesignationInvalid):
 			// The designation rules are semantic and their text is the only
 			// pointer to which rule fired; Parent is never serialized
 			// (ADR 030), so carry the message to the client.
 			invalid = invalid.WithMessage(err.Error())
+		case errors.Is(err, domain.ErrSchemaValidationFailed):
+			// The meta-schema failure names the property path and keyword. It is
+			// a schema validation issue, which ADR 030 allows in Details; the
+			// Message stays fixed because it is the validator's own text.
+			invalid = invalid.WithDetails(err.Error())
 		}
 		return nil, invalid
 	}
