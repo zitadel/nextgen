@@ -1,7 +1,9 @@
 import { Flags } from "@oclif/core";
 
+import { LOCAL_ADMIN_FILE } from "../lib/local-server/admin-credential";
 import {
   DEFAULT_LOCAL_SERVER_URL,
+  LOCAL_DATA_DIR,
   localContainerName,
   readRuntimeMetadata,
 } from "../lib/local-server/runtime";
@@ -45,7 +47,13 @@ export default class Reset extends Destructive(BaseCommand) {
       await this.confirmed({
         verb: "reset",
         name: "delete the local runtime and its data",
-        message: "Delete the local Zitadel runtime and .zitadel/local/nextgen-data?",
+        message: [
+          `Permanently delete the local Zitadel server's data in ${LOCAL_DATA_DIR}?`,
+          "",
+          "This stops the server and deletes its database: every organization, user, application and setting you created. It cannot be undone.",
+          `Kept: ${LOCAL_ADMIN_FILE}, the local admin sign-in, and everything else in your project.`,
+          "Run `zitadel start` afterwards to set up a fresh server.",
+        ].join("\n"),
         preview: () => ({
           status: "ok",
           data: { title: "Local Zitadel server runtime reset plan.", runtime: described },

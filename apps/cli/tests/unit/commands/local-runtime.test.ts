@@ -9,8 +9,10 @@ vi.mock("@clack/prompts", async () => (await import("../../helpers/clack")).clac
 
 import { cancel, confirm, isCancel } from "@clack/prompts";
 
+import { LOCAL_ADMIN_FILE } from "../../../src/lib/local-server/admin-credential";
 import {
   CONTAINER_DATA_DIR,
+  LOCAL_DATA_DIR,
   LOCAL_RUNTIME_FILE,
   defaultLocalServerImageForCliVersion,
   localContainerName,
@@ -986,6 +988,22 @@ describe("local runtime commands", () => {
         envelope: { status: "skipped", reason: "reset-cancelled" },
       });
       expect(kept).toBe(true);
+    });
+
+    it("deletes the data when the answer is yes", async () => {
+      const { outcome, kept } = await resetting(true, false);
+
+      expect(outcome).toMatchObject({ envelope: { status: "ok" } });
+      expect(kept).toBe(false);
+    });
+
+    it("says what is deleted, that it cannot be undone, and what is kept", async () => {
+      await resetting(false, false);
+
+      const { message } = vi.mocked(confirm).mock.calls[0][0];
+      expect(message).toContain(LOCAL_DATA_DIR);
+      expect(message).toContain("cannot be undone");
+      expect(message).toContain(`Kept: ${LOCAL_ADMIN_FILE}`);
     });
 
     it("fails, deleting nothing, on Ctrl-C", async () => {
