@@ -1,7 +1,13 @@
-import { Args, Flags } from "@oclif/core";
+import { Args } from "@oclif/core";
 
 import { type ApiOperation, findOperations, uncallable } from "../../lib/api/operations";
-import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "../../lib/oclif";
+import {
+  type Admitted,
+  BaseCommand,
+  CommandGroups,
+  type JsonEnvelope,
+  nonBlankString,
+} from "../../lib/oclif";
 import { plainFlag, Tabulatable } from "../../lib/oclif/tabulatable";
 
 /** The columns `ls` renders, in order. */
@@ -45,7 +51,7 @@ export default class ApiLs extends Tabulatable(BaseCommand) {
     }),
   };
   static override flags = {
-    tag: Flags.string({
+    tag: nonBlankString({
       description: "Only the operations of this part of the API (Users, Teams, …).",
     }),
     plain: plainFlag,

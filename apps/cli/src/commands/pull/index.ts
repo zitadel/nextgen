@@ -20,7 +20,6 @@ import { DEPLOY_ARGS, servesPrimary } from "../../lib/release";
 import { writeBackResource } from "../../lib/sync";
 import { SCHEMAS_DIR } from "../../lib/user-schema";
 import { type Refused, taken } from "../../lib/oclif/flags";
-import type { Refusal } from "../../lib/oclif/refusal";
 import { reportWarning } from "../../lib/warnings";
 
 /** What a pull target names, or that it names nothing pull understands. */
@@ -32,11 +31,6 @@ type PullTarget =
 
 /** A pull target that names something pull can read. */
 type ReadablePullTarget = Exclude<PullTarget, { readonly kind: "invalid" }>;
-
-const TARGET_REFUSAL: Refusal = {
-  message: 'Don\'t know how to pull "{value}".',
-  hint: "Pass 'latest', a release id (rel_…), or a deployment id (dep_…).",
-};
 
 /** The live release, what is pulled when no target is given. */
 const LATEST_TARGET: ReadablePullTarget = {
@@ -62,7 +56,10 @@ const TARGET: Refused<ReadablePullTarget> = {
       }
       return { kind: "deployment", id: target };
     }),
-  refusal: TARGET_REFUSAL,
+  refusal: {
+    message: 'Don\'t know how to pull "{value}".',
+    hint: "Pass 'latest', a release id (rel_…), or a deployment id (dep_…).",
+  },
 };
 
 /**

@@ -1,4 +1,4 @@
-import { Args, Flags } from "@oclif/core";
+import { Args } from "@oclif/core";
 
 import { ZitadelError } from "../../lib/errors";
 import {
@@ -6,6 +6,7 @@ import {
   CommandGroups,
   EnvironmentCommand,
   type JsonEnvelope,
+  nonBlankString,
 } from "../../lib/oclif";
 import { POLICIES_DIR } from "../../lib/policies";
 import {
@@ -43,7 +44,7 @@ export default class PoliciesTest extends EnvironmentCommand {
     }),
   };
   static override flags = {
-    release: Flags.string({
+    release: nonBlankString({
       description:
         "Test the policies a release pins (rel_…) instead of the files in .zitadel/policies/.",
     }),

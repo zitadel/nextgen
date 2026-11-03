@@ -22,15 +22,10 @@ import {
 } from "../../lib/branding/designs";
 import { isErrno, ZitadelError } from "../../lib/errors";
 import { stableStringify } from "../../lib/json";
-import {
-  type Admitted,
-  BaseCommand,
-  CommandGroups,
-  type JsonEnvelope,
-  nonBlankString,
-} from "../../lib/oclif";
+import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "../../lib/oclif";
 import { hasZitadelConfig } from "../../lib/project";
 import { type Refusal, refusalError } from "../../lib/oclif/refusal";
+import { filled, reads, suggesterOf } from "../../lib/oclif/flags";
 import { metaSchemaState, projectMetaSchemas } from "../../lib/meta-schemas";
 import { normalizePublicCliProse } from "../../lib/public-cli";
 import { DEPLOY_ARGS } from "../../lib/release";
@@ -68,6 +63,33 @@ const UNKNOWN_DESIGN_REFUSAL: Refusal = {
   hint: `Pick one of: ${DESIGN_CATALOG}.`,
 };
 
+/**
+ * The `parse` of `--design`: a design the CLI ships, refused by name where it
+ * names one that was retired, and as unknown where it names none. Both are
+ * refused on the way in, so nothing the command does can run against a design
+ * that does not exist, and each keeps its own words and follow-up.
+ */
+async function readsDesign(
+  given: string,
+  command: unknown,
+  definition: { name: string },
+): Promise<BrandingDesign> {
+  const design = await reads<string>({
+    schema: filled,
+    refusal: {
+      message: "{input} was given an empty value",
+      hint: "Pass a value for {input}, or omit it entirely.",
+    },
+  })(given, command, definition);
+  if (isRetiredDesign(design)) {
+    throw refusalError(RETIRED_DESIGN_REFUSAL, { design }, suggesterOf(command));
+  }
+  if (!isBrandingDesign(design)) {
+    throw refusalError(UNKNOWN_DESIGN_REFUSAL, { design: JSON.stringify(design) });
+  }
+  return design;
+}
+
 /** Whether `value` names a design the CLI ships. */
 function isBrandingDesign(value: string): value is BrandingDesign {
   return (BRANDING_DESIGNS as readonly string[]).includes(value);
@@ -96,10 +118,12 @@ export default class BrandingEject extends Promptable(BaseCommand) {
   static override group = CommandGroups.configuration;
   static override flags = {
     force: Flags.boolean({ char: "f", description: "Overwrite an existing branding file." }),
-    // No oclif `options`: a retired design (#1039) must reach the checks in
-    // `execute` to get its targeted error instead of oclif's generic
+    // No oclif `options`: a retired design (#1039) is refused by name, with a
+    // pointer to where page layout lives now, rather than by oclif's generic
     // "expected one of".
-    design: nonBlankString({
+    design: Flags.custom<BrandingDesign>({
+      parse: readsDesign,
+    })({
       description: `Design to start from: ${BRANDING_DESIGNS.join(" or ")} (default: ${DEFAULT_BRANDING_DESIGN}).`,
     }),
   };
@@ -112,20 +136,6 @@ export default class BrandingEject extends Promptable(BaseCommand) {
     const suggest = (next: string) => {
       return this.suggestUnscoped(next);
     };
-    if (flags.design !== undefined && isRetiredDesign(flags.design)) {
-      throw refusalError(
-        RETIRED_DESIGN_REFUSAL,
-        {
-          design: flags.design,
-        },
-        suggest,
-      );
-    }
-    if (flags.design !== undefined && !isBrandingDesign(flags.design)) {
-      throw refusalError(UNKNOWN_DESIGN_REFUSAL, {
-        design: JSON.stringify(flags.design),
-      });
-    }
     if (!(await hasZitadelConfig(this.cwd))) {
       throw refusalError(NOT_A_PROJECT_REFUSAL, {}, suggest);
     }

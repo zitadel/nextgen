@@ -3,6 +3,7 @@ import { dirname, join } from "node:path";
 
 import { Flags } from "@oclif/core";
 import { consola } from "consola";
+import { z } from "zod";
 
 import {
   type ClientId,
@@ -68,12 +69,7 @@ import {
   type SecretOutcome,
   type SecretPublisher,
 } from "../../../../lib/idp";
-import {
-  type Admitted,
-  CommandGroups,
-  type JsonEnvelope,
-  nonBlankString,
-} from "../../../../lib/oclif";
+import { type Admitted, CommandGroups, type JsonEnvelope } from "../../../../lib/oclif";
 import { AuthMethodCommand } from "../../command";
 import type { SchemaTarget } from "../../command";
 import { environmentFlags } from "../../../../lib/oclif/environment-flags";
@@ -82,7 +78,6 @@ import { reportWarning } from "../../../../lib/warnings";
 import { refuseUneditable } from "../../../../lib/auth-methods";
 import { resolveEnvironment } from "../../../../lib/environment";
 import {
-  checkGivenCustomFlags,
   customFlagValues,
   selectionFromFlags as selectionFromGivenFlags,
   ssoEditRefusal as editRefusalFor,
@@ -125,6 +120,37 @@ const CLIENT_ID: Refused<ClientId> = {
 };
 
 /**
+ * One of the settings that describe a custom connection, refused with what
+ * the platform's own parser found wrong with it. The flag names itself in the
+ * refusal, because a run gives four of them and the complaint belongs to one.
+ * `setup` declares the same settings under its own `--sso-*` names.
+ */
+function settingFlag(flag: string, parse: (value: string) => Parsed<unknown>) {
+  return Flags.custom<string>({
+    parse: reads({
+      schema: filled.transform((value, ctx) => {
+        const parsed = parse(value);
+        if (!parsed.ok) {
+          ctx.addIssue({
+            code: "custom",
+            message: parsed.problem,
+          });
+          return z.NEVER;
+        }
+        return value;
+      }),
+      refusal: {
+        message: `${flag}: {problem}`,
+        hint: `Fix ${flag} and run the command again.`,
+        details: {
+          flag,
+        },
+      },
+    }),
+  });
+}
+
+/**
  * How a run that names no provider is refused. `--provider` is not oclif's
  * `required` so that its own refusal, which carries no hint, never answers
  * first; this one names the next move.
@@ -139,12 +165,13 @@ export function ssoProvider(
   flags: { readonly [K in (typeof ENABLE_FLAG_KEYS)[keyof typeof ENABLE_FLAG_KEYS]]?: string },
   run: { interactive: boolean },
 ): SsoProvider {
-  const provider = String(flags[ENABLE_FLAG_KEYS.provider]);
+  const provider = String(flags.provider);
   const values = customFlagValues(flags, ENABLE_FLAG_KEYS);
+  // Each setting was refused under its own flag on its way in, so a run that
+  // will ask for the rest has nothing left to check: the settings that were
+  // given are already good, and being turned away after typing a secret would
+  // mean typing it again.
   const askLater = provider === CUSTOM_PROVIDER && run.interactive && !hasAllCustomSettings(values);
-  if (askLater) {
-    checkGivenCustomFlags(values, ENABLE_FLAG_NAMES);
-  }
   return {
     selection: askLater
       ? undefined
@@ -175,10 +202,11 @@ export async function developmentIssuer(
     env?: string | undefined;
     envFile?: string | undefined;
   },
+  env: NodeJS.ProcessEnv = process.env,
 ): Promise<string> {
   const environment = await resolveEnvironment({
     cwd,
-    env: process.env,
+    env,
     serverFlag: flags.server,
     envName: flags.env,
     envFile: flags.envFile,
@@ -248,20 +276,31 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
   ];
   static override baseFlags = { ...AuthMethodCommand.baseFlags, ...environmentFlags };
   static override flags = {
-    [ENABLE_FLAG_KEYS.provider]: Flags.string({
+    provider: Flags.string({
       options: [...IDP_PROVIDERS, CUSTOM_PROVIDER],
       description: `Identity provider to enable, or "${CUSTOM_PROVIDER}" for a custom OpenID Connect (OIDC) provider.`,
     }),
-    [ENABLE_FLAG_KEYS.slug]: nonBlankString({
+    slug: settingFlag("--slug", (value) => {
+      return parseConnectionSlug(value, RESERVED_SLUGS);
+    })({
       description: "Name of the custom connection. Schemas and flows refer to it by this.",
     }),
-    [ENABLE_FLAG_KEYS.displayName]: nonBlankString({
+    "display-name": settingFlag(
+      "--display-name",
+      parseDisplayName,
+    )({
       description: "Name shown on the custom connection's sign-in button.",
     }),
-    [ENABLE_FLAG_KEYS.issuer]: nonBlankString({
+    issuer: settingFlag(
+      "--issuer",
+      parseIssuer,
+    )({
       description: "Issuer URL of the custom provider. Its endpoints are found by OIDC discovery.",
     }),
-    [ENABLE_FLAG_KEYS.scopes]: nonBlankString({
+    scopes: settingFlag(
+      "--scopes",
+      parseScopes,
+    )({
       description:
         "Scopes the custom connection requests, separated by spaces or commas. Must include openid. Default: openid profile email.",
     }),
@@ -278,13 +317,13 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
   };
 
   protected async execute({ flags }: Admitted<typeof AuthMethodSsoEnable>): Promise<JsonEnvelope> {
-    if (flags[ENABLE_FLAG_KEYS.provider] === undefined) {
+    if (flags.provider === undefined) {
       throw refusalError(PROVIDER_IS_NAMED_REFUSAL, {});
     }
     const project = ssoProvider(flags, {
       interactive: !this.nonInteractive && !this.dryRun,
     });
-    const issuer = await developmentIssuer(this.cwd, flags);
+    const issuer = await developmentIssuer(this.cwd, flags, this.env);
     const target = await this.schemaTarget(flags);
     const flows = ssoFlows(target);
     const connections = await readConnectionFiles(target.cwd);
@@ -343,7 +382,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       selection,
       files: connections,
       clientId: flags.clientId,
-      scopesGiven: flags[ENABLE_FLAG_KEYS.scopes] !== undefined,
+      scopesGiven: flags.scopes !== undefined,
       slugFlag: ENABLE_FLAG_NAMES.slug,
     });
     // The connection's own route, so the slug decides it: a reused connection
@@ -691,7 +730,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
    * moment it is typed (`checkCustomSlug`, then `beforeAsking`), and a connection that already exists
    * answers the rest from its file. A given value goes through the same parser
    * as a typed one, and the ones given on the command line were checked under
-   * their flag before this ran (`checkGivenCustomFlags`).
+   * their own flag on the way in.
    *
    * @param beforeAsking - Raises whatever else is known once the slug is.
    */

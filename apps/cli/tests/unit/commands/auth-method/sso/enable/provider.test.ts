@@ -56,12 +56,4 @@ describe("ssoProvider", () => {
       },
     });
   });
-
-  it("checks the settings a person did give before asking for the rest", () => {
-    expect(provider({ provider: "custom", issuer: "not a url" }, { interactive: true })).toThrow(
-      expect.objectContaining({
-        code: "E_VALIDATION",
-      }),
-    );
-  });
 });

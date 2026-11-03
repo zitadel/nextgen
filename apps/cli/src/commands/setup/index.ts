@@ -1153,7 +1153,7 @@ export default class Setup extends Destructive(BaseCommand) {
 
     const orca = createOrca();
 
-    consola.start(`Detecting framework in ${shortPath(this.cwd)}`);
+    consola.start(`Detecting framework in ${shortPath(this.cwd, this.env)}`);
     // The app the questions are about: the one detected here, or else a new
     // one. Setup creates a new app only once it has every answer, just before
     // it patches it, so cancelling a question leaves the directory as it was,
@@ -1493,7 +1493,7 @@ export default class Setup extends Destructive(BaseCommand) {
       }
     } catch (error) {
       if (newApp !== undefined) {
-        await removeNewApp(newApp, this.cwd);
+        await removeNewApp(newApp, this.cwd, this.env);
       }
       throw error;
     }
@@ -1802,8 +1802,8 @@ export default class Setup extends Destructive(BaseCommand) {
       // Only on a run that succeeded: a failed or cancelled setup never reaches here,
       // so it does not use up the once-per-machine note.
       await showSkillsHint({
-        env: process.env,
-        interactive: !this.dryRun && !flags.nonInteractive && this.isTTY,
+        env: this.env,
+        interactive: !this.dryRun && !this.nonInteractive && this.isTTY,
         cliVersion: this.cliVersion,
       });
     }
@@ -2159,10 +2159,14 @@ export async function localServerHostsPlatform(server: string, timeoutMs = 1500)
  * back what the directory held. A failure to do so is reported, not thrown:
  * the error that stopped setup is the one the developer needs.
  */
-async function removeNewApp(newApp: UndoableScaffold, cwd: string): Promise<void> {
+async function removeNewApp(
+  newApp: UndoableScaffold,
+  cwd: string,
+  env: NodeJS.ProcessEnv,
+): Promise<void> {
   try {
     await newApp.undo();
-    consola.info(`Removed the new app, so ${shortPath(cwd)} holds what it did before setup`);
+    consola.info(`Removed the new app, so ${shortPath(cwd, env)} holds what it did before setup`);
   } catch (error) {
     reportWarning(
       `Could not remove the new app setup scaffolded in ${cwd}: ${toZitadelError(error).message}`,
@@ -2408,10 +2412,12 @@ function defaultProjectName(cwd: string, framework: string): string {
 
 /**
  * Replaces the user's `$HOME` with `~` in a path for compact terminal output.
- * Falls back to the raw path when `HOME` isn't set or doesn't match.
+ * Falls back to the raw path when `HOME` isn't set or doesn't match. The
+ * environment is the run's, not the process's, so a run told what its
+ * environment is reads the same one everywhere.
  */
-function shortPath(absolute: string): string {
-  const home = process.env.HOME;
+function shortPath(absolute: string, env: NodeJS.ProcessEnv): string {
+  const home = env.HOME;
   if (home && absolute.startsWith(home)) {
     return `~${absolute.slice(home.length)}`;
   }

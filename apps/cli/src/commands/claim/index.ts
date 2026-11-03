@@ -21,7 +21,6 @@ import { hasZitadelSecret, readZitadelSecret, writeZitadelSecret } from "../../l
 import { getClaimStatusQueryChallengeIdRegExp } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 
 import { reads, type Refused, whole } from "../../lib/oclif/flags";
-import { type Refusal, refusalError } from "../../lib/oclif/refusal";
 import { isLoopbackUrl } from "../../lib/server";
 import { reportWarning } from "../../lib/warnings";
 import type { SuggestedCommand } from "../../lib/suggestion";
@@ -81,9 +80,6 @@ export function claimDeadline(input: {
   return Math.min(serverDeadline, input.now + input.timeoutSeconds * 1000);
 }
 
-/** The shape the claim contract gives a `challenge_id`. */
-const CHALLENGE_ID = z.string().regex(getClaimStatusQueryChallengeIdRegExp);
-
 /**
  * Seconds to wait for the browser step, which must be a whole number of at
  * least one: a fraction names no tick of the poll, and zero would wait for
@@ -100,14 +96,18 @@ const TIMEOUT: Refused<number> = {
 };
 
 /**
- * How a `--challenge-id` that is not the contract's shape is refused. The id
- * goes back to the platform and into the suggestions a run makes, so it has to
- * be right before anything is asked or sent.
+ * The challenge a `--no-wait` run returned, in the shape the claim contract
+ * gives it. The id goes back to the platform and into the suggestions a run
+ * makes, so it is refused on its way in rather than once something has been
+ * asked or sent.
  */
-const CHALLENGE_ID_REFUSAL: Refusal = {
-  message:
-    "--challenge-id takes the challenge_id a `claim --no-wait` run returned, which starts with ch_.",
-  next: ["claim --no-wait"],
+const CHALLENGE_ID: Refused<string> = {
+  schema: z.string().regex(getClaimStatusQueryChallengeIdRegExp),
+  refusal: {
+    message:
+      "--challenge-id takes the challenge_id a `claim --no-wait` run returned, which starts with ch_.",
+    next: ["claim --no-wait"],
+  },
 };
 
 /**
@@ -159,17 +159,14 @@ export default class Claim extends EnvironmentCommand {
         "Print the link and exit, without opening a browser or waiting for the browser step. The result names the command that waits for it.",
       exclusive: ["challenge-id", "timeout"],
     }),
-    "challenge-id": Flags.string({
+    "challenge-id": Flags.custom<string>({
+      parse: reads(CHALLENGE_ID),
+    })({
       description: "Wait for the link a --no-wait run printed, instead of creating a new one.",
     }),
   };
 
   protected async execute({ flags }: Admitted<typeof Claim>): Promise<JsonEnvelope> {
-    if (flags.challengeId !== undefined && !CHALLENGE_ID.safeParse(flags.challengeId).success) {
-      throw refusalError(CHALLENGE_ID_REFUSAL, {}, (next) => {
-        return this.suggest(next);
-      });
-    }
     // Where a fresh link comes from when this one dies: a run that is part of
     // the two-step flow suggests the step that hands the link back, so
     // following the suggestion never blocks with the link out of sight.

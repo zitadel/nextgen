@@ -6,6 +6,7 @@ import {
   CommandGroups,
   EnvironmentCommand,
   type JsonEnvelope,
+  nonBlankString,
 } from "../../lib/oclif";
 import { createDeployment } from "../../lib/release";
 
@@ -42,7 +43,7 @@ export default class DeploymentCreate extends EnvironmentCommand {
     "<%= config.bin %> deployment create --release rel_01KX3RG8A7F0N9WD3P2E4YM5C1",
   ];
   static override flags = {
-    release: Flags.string({ description: "The release id to deploy.", required: true }),
+    release: nonBlankString({ description: "The release id to deploy.", required: true }),
     message: Flags.custom<string>({
       parse: reads(MESSAGE),
     })({

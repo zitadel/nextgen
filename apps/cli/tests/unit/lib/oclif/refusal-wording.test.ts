@@ -89,9 +89,16 @@ async function declared(): Promise<Declared[]> {
 /** What a refusal's wording asks for that nothing in its declaration fills. */
 function unfilled(text: string): string[] {
   const asked = [...text.matchAll(PLACEHOLDER)].map((match) => match[1] as string);
-  // A key is written either way a property can be: `reason: reason`, or the
-  // shorthand `reason`, which ends at the comma instead of a colon.
-  const keys = [...text.matchAll(/^\s{2,}\.{0,3}([\w-]+)\s*[:,]/gm)].map(
+  // A key is written every way a property can be — `reason: reason`, the
+  // shorthand `reason`, a spread — and a literal handed to a throw is as
+  // often one line as several, so a key is read from what opens it rather
+  // than from the indentation it happens to sit at. The wording is taken out
+  // first: a placeholder reads exactly like a shorthand property, so a
+  // refusal's own `{reason}` would otherwise count as filling itself.
+  const code = text.replace(/"[^"]*"|'[^']*'|`[^`]*`/g, '""');
+  // The delimiter that ends a key is looked ahead to, not consumed: it opens
+  // the key after it, and a match that ate it would skip every second one.
+  const keys = [...code.matchAll(/[{,]\s*\.{0,3}([\w-]+)\s*(?=[:,}])/g)].map(
     (match) => match[1] as string,
   );
   return [...new Set(asked.filter((name) => ![...ALWAYS, ...keys].includes(name)))];

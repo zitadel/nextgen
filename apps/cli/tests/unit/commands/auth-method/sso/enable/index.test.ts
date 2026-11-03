@@ -17,6 +17,7 @@ import {
   withStdin,
   writeJson,
 } from "../../../../../helpers/local-project";
+import { parseFlag } from "../../../../../helpers/inputs";
 import { usePlatformServer } from "../../../../../helpers/platform-project";
 import { parseJson, runCliForTest } from "../../../../../helpers/run-cli";
 import { asTerminal } from "../../../../../helpers/terminal";
@@ -222,6 +223,33 @@ async function withAcmeConnection(cwd: string): Promise<void> {
     ]),
   );
 }
+
+describe("each setting a custom connection is described by", () => {
+  it.each([
+    ["slug", "Acme SSO"],
+    ["display-name", ""],
+    ["issuer", "not a url"],
+    ["scopes", "profile"],
+  ])("refuses what --%s cannot carry, naming that flag", async (name, value) => {
+    const flag = AuthMethodSsoEnable.flags[name as "slug"];
+
+    await expect(parseFlag(flag, value, name)).rejects.toMatchObject({
+      code: "E_VALIDATION",
+      message: expect.stringContaining(`--${name}`),
+    });
+  });
+
+  it.each([
+    ["slug", "acme-sso"],
+    ["display-name", "Acme SSO"],
+    ["issuer", "https://sso.acme.example"],
+    ["scopes", "openid profile"],
+  ])("takes what --%s can, trimmed", async (name, value) => {
+    const flag = AuthMethodSsoEnable.flags[name as "slug"];
+
+    await expect(parseFlag(flag, ` ${value} `, name)).resolves.toBe(value);
+  });
+});
 
 describe("auth-method sso enable --provider custom refuses before it asks", () => {
   it("when no login flow runs against the schema, even before the Project is connected", async () => {

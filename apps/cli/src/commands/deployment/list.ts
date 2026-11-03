@@ -53,7 +53,7 @@ export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
     "<%= config.bin %> deployment list --origin https://app.acme.com",
   ];
   static override flags = {
-    origin: Flags.string({ description: "Only deployments that targeted this origin." }),
+    origin: nonBlankString({ description: "Only deployments that targeted this origin." }),
     live: Flags.boolean({ description: "What each target serves now, not the full history." }),
     limit: Flags.custom<number>({
       parse: reads(LIMIT),

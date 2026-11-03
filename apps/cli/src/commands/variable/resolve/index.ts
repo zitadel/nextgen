@@ -1,5 +1,3 @@
-import { Flags } from "@oclif/core";
-
 import type { ZitadelClient } from "../../../lib/api-client";
 import { Cmd } from "../../../lib/cmd";
 import { ZitadelError } from "../../../lib/errors";
@@ -11,6 +9,7 @@ import {
   CommandGroups,
   EnvironmentCommand,
   type JsonEnvelope,
+  nonBlankString,
 } from "../../../lib/oclif";
 import { plainFlag, Tabulatable } from "../../../lib/oclif/tabulatable";
 import { toVariableRows, variableCells } from "../../../lib/variables";
@@ -121,7 +120,7 @@ export default class VariableResolve extends Tabulatable(EnvironmentCommand) {
     "<%= config.bin %> variable resolve --json",
   ];
   static override flags = {
-    origin: Flags.string({ description: "The origin whose live deployment to read." }),
+    origin: nonBlankString({ description: "The origin whose live deployment to read." }),
     plain: plainFlag,
   };
 

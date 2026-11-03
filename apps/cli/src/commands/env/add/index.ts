@@ -76,12 +76,6 @@ const SERVER_RENDERED = ["next", "nuxt"];
 /** The message the release this command publishes carries. */
 const INITIAL_DEPLOY_MESSAGE = "Initial deployment from zitadel env add";
 
-/** What an environment name is refused for: it must be usable in a `.env.<name>.local` file name. */
-const ENVIRONMENT_NAME_REFUSAL: Refusal = {
-  message: '"{value}" is not a usable environment name',
-  hint: 'Use letters, digits, dot, dash and underscore, and no "..", e.g. production.',
-};
-
 /** What an app URL is refused for: it must be an http(s) URL. */
 const APP_URL_REFUSAL: Refusal = {
   message: 'Invalid app URL "{value}"',
@@ -91,7 +85,10 @@ const APP_URL_REFUSAL: Refusal = {
 /** The environment name the argument holds: one that can name a `.env.<name>.local` file. */
 const ENVIRONMENT_NAME: Refused<string> = {
   schema: z.string().trim().refine(isEnvironmentName),
-  refusal: ENVIRONMENT_NAME_REFUSAL,
+  refusal: {
+    message: '"{value}" is not a usable environment name',
+    hint: 'Use letters, digits, dot, dash and underscore, and no "..", e.g. production.',
+  },
 };
 
 /** The URL the app is served from, which must be an http(s) one. */
