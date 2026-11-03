@@ -1,10 +1,5 @@
 import { ENVIRONMENT_KEYS, type EnvironmentKey } from "../../lib/environment";
-import {
-  type Admitted,
-  CommandGroups,
-  EnvironmentCommand,
-  type JsonEnvelope,
-} from "../../lib/oclif";
+import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../../lib/oclif";
 import { Tabulatable } from "../../lib/oclif/tabulatable";
 
 /** The values that grant access, never printed — only named and masked. */
@@ -35,7 +30,7 @@ export default class Env extends Tabulatable(EnvironmentCommand) {
     "<%= config.bin %> env --env-file ./infra/acme-staging.env",
   ];
 
-  protected async execute(_input: Admitted<typeof Env>): Promise<JsonEnvelope> {
+  protected async execute(): Promise<JsonEnvelope> {
     const { name, values, consulted } = this.environment;
 
     const resolved = ENVIRONMENT_KEYS.flatMap((key) => {

@@ -18,9 +18,9 @@ const COLUMNS = ["topic", "verbs", "filters"] as const;
  */
 export default class ResourcesList extends Tabulatable(BaseCommand) {
   static override id = "resources";
-  static override group = CommandGroups.diagnostics;
   static override description =
     "List the resources this CLI manages.\n\nShows what can be done to each.";
+  static override group = CommandGroups.diagnostics;
   static override examples = [
     "<%= config.bin %> resources",
     "<%= config.bin %> resources --json",

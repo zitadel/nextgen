@@ -110,6 +110,18 @@ const PORT: Refused<number> = {
 };
 
 /** What doctor is about, worked out once however many times it is asked for. */
+/**
+ * What doctor reads off the run to decide which server it is about. Named for
+ * itself rather than taken from the command, so neither `sourceOf`, which is
+ * handed the flags before the run has a context, nor `execute` has to assert
+ * what the other one has.
+ */
+type Asked = Readonly<{
+  port?: number;
+  runtime?: string;
+  image?: string;
+}>;
+
 type Checking = Readonly<{
   cwd: string;
   port: number;
@@ -158,7 +170,7 @@ export default class Doctor extends Destructive(BaseCommand) {
 
   private readonly checking = new Map<string, Promise<Checking>>();
 
-  private checks(flags: Admitted<typeof Doctor>["flags"], cwd: string): Promise<Checking> {
+  private checks(flags: Asked, cwd: string): Promise<Checking> {
     const already = this.checking.get(cwd);
     if (already !== undefined) {
       return already;
@@ -178,11 +190,8 @@ export default class Doctor extends Destructive(BaseCommand) {
     return working;
   }
 
-  protected override async sourceOf(flags: Record<string, unknown>, cwd: string): Promise<string> {
-    const { port, hostedServer } = await this.checks(
-      flags as Admitted<typeof Doctor>["flags"],
-      cwd,
-    );
+  protected override async sourceOf(flags: Asked, cwd: string): Promise<string> {
+    const { port, hostedServer } = await this.checks(flags, cwd);
     return hostedServer ?? localServerUrl(port);
   }
 
@@ -391,7 +400,7 @@ export default class Doctor extends Destructive(BaseCommand) {
    * directory or a parent, and when a flag asks about the runtime.
    */
   private async hostedServerWithoutLocalRuntime(
-    flags: Admitted<typeof Doctor>["flags"],
+    flags: Asked,
     cwd: string = this.cwd,
   ): Promise<string | undefined> {
     if (flags.port !== undefined || flags.runtime !== undefined || flags.image !== undefined) {

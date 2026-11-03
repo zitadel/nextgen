@@ -7,7 +7,7 @@ import {
 } from "../lib/local-server/runtime";
 import { LocalServer } from "../lib/local-server/server";
 import { startedServer } from "./local-server/started";
-import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
+import { BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
 import { Destructive } from "../lib/oclif/destructive";
 
 export default class Reset extends Destructive(BaseCommand) {
@@ -32,7 +32,7 @@ export default class Reset extends Destructive(BaseCommand) {
     return (await this.started.of(cwd))?.server_url ?? DEFAULT_LOCAL_SERVER_URL;
   }
 
-  protected async execute(_input: Admitted<typeof Reset>): Promise<JsonEnvelope> {
+  protected async execute(): Promise<JsonEnvelope> {
     // A directory with no server is not refused: there is simply nothing to
     // reset, which the result says.
     const runtime = await this.started.of(this.cwd);
