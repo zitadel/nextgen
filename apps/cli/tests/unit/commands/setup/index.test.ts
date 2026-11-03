@@ -1374,9 +1374,11 @@ describe("--sso-slug", () => {
     });
   });
 
-  it("refuses a blank value", async () => {
+  it("refuses a blank value, saying to pass one rather than to fix it", async () => {
     await expect(parseFlag(ssoSlugFlag({}), "  ", "sso-slug")).rejects.toMatchObject({
       code: "E_VALIDATION",
+      message: "the value is empty",
+      hint: "Pass a value for --sso-slug, or omit it entirely.",
     });
   });
 });

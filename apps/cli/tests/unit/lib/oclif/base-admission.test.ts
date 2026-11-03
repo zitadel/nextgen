@@ -1,8 +1,9 @@
 import { Config, Flags } from "@oclif/core";
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import { type Admitted, BaseCommand } from "../../../../src/lib/oclif/base";
-import { integerFlag } from "../../../../src/lib/oclif/flags";
+import { reads, whole } from "../../../../src/lib/oclif/flags";
 import type { JsonEnvelope } from "../../../../src/lib/oclif/types";
 import { cliPackageRoot } from "../../../helpers/oclif-build";
 
@@ -17,13 +18,14 @@ class Admission extends BaseCommand {
 
   static override flags = {
     "client-id": Flags.string(),
-    port: integerFlag({
-      min: 1,
-      max: 65_535,
-      refusal: {
-        message: "{value} is not a TCP port",
-      },
-    }),
+    port: Flags.custom<number>({
+      parse: reads({
+        schema: whole.pipe(z.number().min(1).max(65_535)),
+        refusal: {
+          message: "{value} is not a TCP port",
+        },
+      }),
+    })(),
   };
 
   public received: Admitted<typeof Admission> | undefined;

@@ -4,16 +4,21 @@ import { type Admitted, CommandGroups, type JsonEnvelope, PreviewCommand } from 
 import { dryRunResult } from "../../lib/oclif/crud/shared";
 import { deletedData } from "../../lib/oclif/envelope";
 import { Destructive, Settled } from "../../lib/oclif/destructive";
-import { refuseBlank } from "../../lib/oclif/flags";
+import { filled, type Refused, taken } from "../../lib/oclif/flags";
 
 /**
- * A preview URL given as an argument. It refuses a blank value, and drops a
- * trailing slash that names the same origin but, sent as typed, would match
- * nothing.
+ * The preview URL to remove. It refuses a blank value, and drops a trailing
+ * slash that names the same origin but, sent as typed, would match nothing.
  */
-function readUrl(input: string, label: string): string {
-  return refuseBlank(input, label, `${label} was given an empty value`).replace(/\/+$/, "");
-}
+const URL_ARG: Refused<string> = {
+  schema: filled.transform((url) => {
+    return url.replace(/\/+$/, "");
+  }),
+  refusal: {
+    message: "{input} was given an empty value",
+    hint: "Pass a value for {input}, or omit it entirely.",
+  },
+};
 
 /**
  * `zitadel preview rm <url>` — end a live preview before it expires.
@@ -31,9 +36,7 @@ export default class PreviewRm extends Destructive(PreviewCommand) {
   ];
   static override args = {
     url: Args.custom<string>({
-      parse: async (input, _command, arg) => {
-        return readUrl(input, arg.name);
-      },
+      parse: taken(URL_ARG),
     })({
       required: true,
       description: "The preview URL to remove.",

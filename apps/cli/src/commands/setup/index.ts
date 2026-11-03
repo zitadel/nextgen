@@ -2,6 +2,7 @@ import { access, readFile, rm, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { intro, note, outro } from "@clack/prompts";
 import { Flags } from "@oclif/core";
+import { z } from "zod";
 import type { CreateProject201 } from "@zitadel/api/generated/model";
 import {
   BRANDING_DESIGNS,
@@ -23,6 +24,7 @@ import {
   parseConnectionSlug,
   parseDisplayName,
   parseIssuer,
+  type Parsed,
   parseProviderSelection,
   parseScopes,
   providerOf,
@@ -156,13 +158,13 @@ import {
 } from "../../lib/suggestion";
 import { asStepsShown, type StepsShown } from "../../lib/oclif/next-steps";
 import { Destructive } from "../../lib/oclif/destructive";
-import { portFlag } from "../local-server/flags/port";
+import { portFlag } from "../local-server/port";
 import semver from "semver";
 import { type Refusal, refusalError } from "../../lib/oclif/refusal";
 import type { GlobalOptions } from "../../lib/oclif/types";
 import { type ResolvedServer, resolveServer } from "../../lib/server";
 import { PAGE_LAYOUT_HINT } from "../../lib/branding/designs";
-import { refuseBlank } from "../../lib/oclif/flags";
+import { filled, type Refused, reads } from "../../lib/oclif/flags";
 
 /**
  * {@link recoverySelector} plus `--server local`, for the recovery after a
@@ -816,178 +818,135 @@ export function refuseUnusableFlags(
   }
 }
 
-const CLIENT_ID_REFUSAL: Refusal = {
-  message: "--sso-client-id: {problem}",
-  hint: "Fix --sso-client-id and run the command again.",
-  details: {
-    argument: "--sso-client-id",
-  },
+/**
+ * How a setting that holds nothing is refused: what to do about an empty value
+ * is to pass one or leave the flag out, which is not what to do about a value
+ * the provider would reject, so the two are worded apart.
+ */
+const EMPTY_SETTING: Refusal = {
+  message: "the value is empty",
+  hint: "Pass a value for {input}, or omit it entirely.",
 };
 
-/** Reads the client id of an OAuth application, refusing one the platform would not accept. */
-function readClientId(input: string): ClientId {
-  const parsed = parseClientId(refuseBlank(input, "--sso-client-id", "the value is empty"));
-  if (!parsed.ok) {
-    throw refusalError(CLIENT_ID_REFUSAL, {
-      problem: parsed.problem,
-    });
-  }
-  return parsed.value;
+/**
+ * A trimmed value one of the platform's own parsers accepts, kept as it was
+ * typed. The parser's `problem` becomes the schema's message, so a flag and the
+ * prompt that asks the same thing cannot word a refusal differently.
+ */
+function accepted(parse: (value: string) => Parsed<unknown>) {
+  return filled.transform((value, ctx) => {
+    const parsed = parse(value);
+    if (!parsed.ok) {
+      ctx.addIssue({
+        code: "custom",
+        message: parsed.problem,
+      });
+      return z.NEVER;
+    }
+    return value;
+  });
+}
+
+/** What one of those parsers makes of a trimmed value. See {@link accepted}. */
+function made<T>(parse: (value: string) => Parsed<T>) {
+  return filled.transform((value, ctx) => {
+    const parsed = parse(value);
+    if (!parsed.ok) {
+      ctx.addIssue({
+        code: "custom",
+        message: parsed.problem,
+      });
+      return z.NEVER;
+    }
+    return parsed.value;
+  });
+}
+
+/**
+ * The `parse` of a flag that refuses an empty value as any flag does, and
+ * everything else as `refused` words it.
+ */
+function readsFilled<T>(refused: Refused<T>, empty: Refusal = EMPTY_SETTING) {
+  const blank = reads<string>({
+    schema: filled,
+    refusal: empty,
+  });
+  const value = reads(refused);
+  return async (given: string, command: unknown, definition: { name: string }): Promise<T> => {
+    await blank(given, command, definition);
+    return value(given, command, definition);
+  };
+}
+
+/**
+ * A custom connection's setting, refused with what the platform's own parser
+ * found wrong with it.
+ */
+function settingFlag(flag: string, parse: (value: string) => Parsed<unknown>) {
+  return Flags.custom<string>({
+    parse: readsFilled({
+      schema: accepted(parse),
+      refusal: {
+        message: `${flag}: {problem}`,
+        hint: `Fix ${flag} and run the command again.`,
+        details: {
+          flag,
+        },
+      },
+    }),
+  });
 }
 
 /** A flag that holds the client id of the application registered with the provider. */
 export const clientIdFlag = Flags.custom<ClientId>({
-  parse: async (input) => {
-    return readClientId(input);
-  },
+  parse: readsFilled({
+    schema: made(parseClientId),
+    refusal: {
+      message: "--sso-client-id: {problem}",
+      hint: "Fix --sso-client-id and run the command again.",
+      details: {
+        argument: "--sso-client-id",
+      },
+    },
+  }),
 });
 
-const REFUSAL: Refusal = {
-  message: "{problem}",
-  hint: "Pass a whole number for {flag}, or 0 for none.",
-  details: {
-    argument: "{flag}",
-  },
-};
-
 /**
- * A password minimum length flag, read with the prompt's parser so the two
- * cannot disagree: a whole number the policy accepts, or `null` for none.
+ * A flag that holds the shortest password the policy accepts, read with the
+ * prompt's own parser so the two cannot disagree.
  */
 export const passwordMinLengthFlag = Flags.custom<PasswordMinLength>({
-  parse: async (input, _command, flag) => {
-    const parsed = parsePasswordMinLength(
-      refuseBlank(input, `--${flag.name}`, `--${flag.name} was given an empty value`),
-    );
-    if (parsed.ok) {
-      return parsed.value;
-    }
-    throw refusalError(REFUSAL, {
-      problem: parsed.problem,
-      flag: `--${flag.name}`,
-    });
-  },
+  parse: readsFilled(
+    {
+      schema: made(parsePasswordMinLength),
+      refusal: {
+        message: "{problem}",
+        hint: "Pass a whole number for {input}, or 0 for none.",
+        details: {
+          argument: "{input}",
+        },
+      },
+    },
+    {
+      message: "{input} was given an empty value",
+      hint: "Pass a value for {input}, or omit it entirely.",
+    },
+  ),
 });
-
-const SSO_SLUG_REFUSAL: Refusal = {
-  message: "--sso-slug: {problem}",
-  hint: "Fix --sso-slug and run the command again.",
-  details: {
-    flag: "--sso-slug",
-  },
-};
-
-/**
- * Reads the connection slug of a custom connection, refusing one the server would refuse
- * on apply, and keeps it as typed.
- */
-function readSsoSlug(input: string): string {
-  const trimmed = refuseBlank(input, "--sso-slug", "the value is empty");
-  const parsed = parseConnectionSlug(trimmed, RESERVED_SLUGS);
-  if (!parsed.ok) {
-    throw refusalError(SSO_SLUG_REFUSAL, {
-      problem: parsed.problem,
-    });
-  }
-  return trimmed;
-}
 
 /** A flag that holds the connection slug of a custom connection. */
-export const ssoSlugFlag = Flags.custom<string>({
-  parse: async (input) => {
-    return readSsoSlug(input);
-  },
+export const ssoSlugFlag = settingFlag("--sso-slug", (value) => {
+  return parseConnectionSlug(value, RESERVED_SLUGS);
 });
-
-const SSO_DISPLAY_NAME_REFUSAL: Refusal = {
-  message: "--sso-display-name: {problem}",
-  hint: "Fix --sso-display-name and run the command again.",
-  details: {
-    flag: "--sso-display-name",
-  },
-};
-
-/**
- * Reads the display name of a custom connection, refusing one the server would refuse
- * on apply, and keeps it as typed.
- */
-function readSsoDisplayName(input: string): string {
-  const trimmed = refuseBlank(input, "--sso-display-name", "the value is empty");
-  const parsed = parseDisplayName(trimmed);
-  if (!parsed.ok) {
-    throw refusalError(SSO_DISPLAY_NAME_REFUSAL, {
-      problem: parsed.problem,
-    });
-  }
-  return trimmed;
-}
 
 /** A flag that holds the display name of a custom connection. */
-export const ssoDisplayNameFlag = Flags.custom<string>({
-  parse: async (input) => {
-    return readSsoDisplayName(input);
-  },
-});
-
-const SSO_ISSUER_REFUSAL: Refusal = {
-  message: "--sso-issuer: {problem}",
-  hint: "Fix --sso-issuer and run the command again.",
-  details: {
-    flag: "--sso-issuer",
-  },
-};
-
-/**
- * Reads the issuer of a custom connection, refusing one the server would refuse
- * on apply, and keeps it as typed.
- */
-function readSsoIssuer(input: string): string {
-  const trimmed = refuseBlank(input, "--sso-issuer", "the value is empty");
-  const parsed = parseIssuer(trimmed);
-  if (!parsed.ok) {
-    throw refusalError(SSO_ISSUER_REFUSAL, {
-      problem: parsed.problem,
-    });
-  }
-  return trimmed;
-}
+export const ssoDisplayNameFlag = settingFlag("--sso-display-name", parseDisplayName);
 
 /** A flag that holds the issuer of a custom connection. */
-export const ssoIssuerFlag = Flags.custom<string>({
-  parse: async (input) => {
-    return readSsoIssuer(input);
-  },
-});
-
-const SSO_SCOPES_REFUSAL: Refusal = {
-  message: "--sso-scopes: {problem}",
-  hint: "Fix --sso-scopes and run the command again.",
-  details: {
-    flag: "--sso-scopes",
-  },
-};
-
-/**
- * Reads the scopes of a custom connection, refusing one the server would refuse
- * on apply, and keeps it as typed.
- */
-function readSsoScopes(input: string): string {
-  const trimmed = refuseBlank(input, "--sso-scopes", "the value is empty");
-  const parsed = parseScopes(trimmed);
-  if (!parsed.ok) {
-    throw refusalError(SSO_SCOPES_REFUSAL, {
-      problem: parsed.problem,
-    });
-  }
-  return trimmed;
-}
+export const ssoIssuerFlag = settingFlag("--sso-issuer", parseIssuer);
 
 /** A flag that holds the scopes of a custom connection. */
-export const ssoScopesFlag = Flags.custom<string>({
-  parse: async (input) => {
-    return readSsoScopes(input);
-  },
-});
+export const ssoScopesFlag = settingFlag("--sso-scopes", parseScopes);
 
 /**
  * The frameworks `--framework` accepts, derived from Orca's registry so the

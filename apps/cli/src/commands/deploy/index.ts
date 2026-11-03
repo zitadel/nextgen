@@ -20,10 +20,11 @@ import {
 } from "../../lib/release";
 import { ApiError } from "@zitadel/api/runtime/fetch";
 import { Flags } from "@oclif/core";
+import { z } from "zod";
 
 import { Cmd } from "../../lib/cmd";
 import { ZitadelError } from "../../lib/errors";
-import { refuseBlank } from "../../lib/oclif/flags";
+import { reads, type Refused } from "../../lib/oclif/flags";
 import { type Refusal, refusalError } from "../../lib/oclif/refusal";
 import { issuerHeldAsPreview, originOf, type ProjectOrigin } from "../../lib/origins";
 import { readZitadelSecret } from "../../lib/project";
@@ -32,29 +33,29 @@ import type { SuggestedCommand } from "../../lib/suggestion";
 import { reportWarning } from "../../lib/warnings";
 
 /** How a non-interactive deploy with no message to fall back on is refused. */
-const MESSAGE_TOO_LONG_REFUSAL: Refusal = {
-  message: "the message is longer than {limit} characters",
-  hint: "Pass a shorter summary with -m.",
-  details: {
-    argument: "--message",
-  },
-};
 
 /**
- * What `-m/--message` records on the release this deploys. It refuses a blank
- * message, which would record nothing, and one longer than the server records,
- * which the server would reject after the bundle was built. It returns the
- * message trimmed.
+ * What `-m/--message` records. It refuses a blank message, which would record
+ * nothing, and one longer than the server records, which the server would
+ * reject later. `messageTooLong` counts code points, as the server does, so
+ * the length is its call and not the schema's. The message is trimmed.
  */
-function readMessage(input: string): string {
-  const value = refuseBlank(input, "--message", "the value is empty");
-  if (messageTooLong(value)) {
-    throw refusalError(MESSAGE_TOO_LONG_REFUSAL, {
-      limit: MESSAGE_MAX_LENGTH,
-    });
-  }
-  return value;
-}
+const MESSAGE: Refused<string> = {
+  schema: z
+    .string()
+    .trim()
+    .min(1, "the value is empty")
+    .refine((message) => {
+      return !messageTooLong(message);
+    }, `the message is longer than ${MESSAGE_MAX_LENGTH} characters`),
+  refusal: {
+    message: "{problem}",
+    hint: "Pass a shorter summary with -m.",
+    details: {
+      argument: "--message",
+    },
+  },
+};
 
 /**
  * What a deploy with no primary origin to land on tells the developer, naming
@@ -136,11 +137,9 @@ export default class Deploy extends EnvironmentCommand {
   ];
   static override flags = {
     message: Flags.custom<string>({
-      char: "m",
-      parse: async (input) => {
-        return readMessage(input);
-      },
+      parse: reads(MESSAGE),
     })({
+      char: "m",
       description:
         "A short summary of what this release changes. Defaults to the pull request's title or the current commit's subject.",
     }),

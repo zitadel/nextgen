@@ -1,4 +1,5 @@
 import { Flags } from "@oclif/core";
+import { z } from "zod";
 
 import { readNearestRuntimeMetadata } from "../../lib/local-server/runtime";
 import { LocalServer } from "../../lib/local-server/server";
@@ -9,34 +10,25 @@ import {
   renderLogLine,
 } from "../../lib/local-server/server-log";
 import { type Admitted, BaseCommand, CommandGroups, type JsonEnvelope } from "../../lib/oclif";
+import { type Refused, reads, whole } from "../../lib/oclif/flags";
 import { type Refusal, refusalError } from "../../lib/oclif/refusal";
 
 /** How many lines `--tail` shows when it is not given. */
 const DEFAULT_TAIL = 200;
 
-/** How `--tail` refuses a count that is not a number of lines. */
-const TAIL_REFUSAL: Refusal = {
-  message: "{value} is not a valid tail",
-  hint: "Use a positive integer.",
-};
-
 /**
- * Reads how many lines to show, refusing anything that is not a whole number
- * of one or more: a server writes whole lines, so a fraction names none of
- * them, and zero lines is a run that would print nothing. Digits alone are not
- * enough, and nor is the number alone: `1e3` is not a count a person typed,
- * while enough digits overflow to `Infinity`, which Docker is handed verbatim
- * and the binary backend reads as the whole log.
+ * How many lines to show: a whole number of one or more, since a server writes
+ * whole lines and zero of them would print nothing. An overflowing count is
+ * refused too, because Docker is handed it verbatim and the binary backend
+ * reads it as the whole log.
  */
-function readTail(input: string): number {
-  const value = Number(input);
-  if (/^\d+$/.test(input.trim()) && Number.isSafeInteger(value) && value >= 1) {
-    return value;
-  }
-  throw refusalError(TAIL_REFUSAL, {
-    value: input,
-  });
-}
+const TAIL: Refused<number> = {
+  schema: whole.pipe(z.number().min(1)),
+  refusal: {
+    message: "{value} is not a valid tail",
+    hint: "Use a positive integer.",
+  },
+};
 
 /**
  * A flag that holds how many lines to show, {@link DEFAULT_TAIL} of them when
@@ -44,9 +36,7 @@ function readTail(input: string): number {
  */
 export const tailFlag = Flags.custom<number>({
   default: DEFAULT_TAIL,
-  parse: async (input) => {
-    return readTail(input);
-  },
+  parse: reads(TAIL),
 });
 
 /**

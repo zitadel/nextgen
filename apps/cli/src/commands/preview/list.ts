@@ -1,19 +1,33 @@
 import { Paging } from "@zitadel/api/runtime/paging";
 import { Flags } from "@oclif/core";
+import { z } from "zod";
 
 import {
   type Admitted,
   CommandGroups,
-  integerFlag,
   type JsonEnvelope,
   nonBlankString,
   PreviewCommand,
 } from "../../lib/oclif";
+import { reads, type Refused, whole } from "../../lib/oclif/flags";
 import { plainFlag, Tabulatable } from "../../lib/oclif/tabulatable";
 import { pagedFunctions } from "../../lib/api-client";
 
 /** The columns `list` renders, in order. */
 const COLUMNS = ["url", "expires", "created"] as const;
+
+/** The page sizes the server accepts, quoted by the refusal and the reference. */
+const LIMIT_MIN = 1;
+const LIMIT_MAX = 100;
+
+/** The page size `--limit` asks for, as the server bounds it. */
+const LIMIT_FLAG: Refused<number> = {
+  schema: whole.pipe(z.number().min(LIMIT_MIN).max(LIMIT_MAX)),
+  refusal: {
+    message: "{value} is not a valid {input}",
+    hint: "Use a whole number from 1 to 100.",
+  },
+};
 
 /**
  * `zitadel preview list` — show the project's live previews.
@@ -33,10 +47,12 @@ export default class PreviewList extends Tabulatable(PreviewCommand) {
     "<%= config.bin %> preview list --plain",
   ];
   static override flags = {
-    limit: integerFlag({
+    limit: Flags.custom<number>({
+      parse: reads(LIMIT_FLAG),
+    })({
+      min: LIMIT_MIN,
+      max: LIMIT_MAX,
       description: "Page size (server default 20, max 100).",
-      min: 1,
-      max: 100,
     }),
     "page-token": nonBlankString({
       description: "Continue from a previous page's next_page_token.",

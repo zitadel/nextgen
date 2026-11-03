@@ -1,4 +1,5 @@
 import { Args } from "@oclif/core";
+import { z } from "zod";
 
 import { mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
@@ -18,7 +19,8 @@ import {
 import { DEPLOY_ARGS, servesPrimary } from "../../lib/release";
 import { writeBackResource } from "../../lib/sync";
 import { SCHEMAS_DIR } from "../../lib/user-schema";
-import { type Refusal, refusalError } from "../../lib/oclif/refusal";
+import { type Refused, taken } from "../../lib/oclif/flags";
+import type { Refusal } from "../../lib/oclif/refusal";
 import { reportWarning } from "../../lib/warnings";
 
 /** What a pull target names, or that it names nothing pull understands. */
@@ -42,23 +44,26 @@ const LATEST_TARGET: ReadablePullTarget = {
 };
 
 /**
- * Reads what to pull: `latest` (the live release), a release id (`rel_…`) or a
+ * What to pull: `latest` (the live release), a release id (`rel_…`) or a
  * deployment id (`dep_…`), refusing anything else.
  */
-function readTarget(input: string): ReadablePullTarget {
-  if (input === "latest") {
-    return { kind: "latest" };
-  }
-  if (input.startsWith("rel_")) {
-    return { kind: "release", id: input };
-  }
-  if (input.startsWith("dep_")) {
-    return { kind: "deployment", id: input };
-  }
-  throw refusalError(TARGET_REFUSAL, {
-    value: input,
-  });
-}
+const TARGET: Refused<ReadablePullTarget> = {
+  schema: z
+    .string()
+    .refine((target) => {
+      return target === "latest" || target.startsWith("rel_") || target.startsWith("dep_");
+    })
+    .transform((target): ReadablePullTarget => {
+      if (target === "latest") {
+        return { kind: "latest" };
+      }
+      if (target.startsWith("rel_")) {
+        return { kind: "release", id: target };
+      }
+      return { kind: "deployment", id: target };
+    }),
+  refusal: TARGET_REFUSAL,
+};
 
 /**
  * A resource kind `pull` can rebuild on disk from the revision a release pins:
@@ -149,9 +154,7 @@ export default class Pull extends EnvironmentCommand {
   ];
   static override args = {
     target: Args.custom<ReadablePullTarget>({
-      parse: async (input) => {
-        return readTarget(input);
-      },
+      parse: taken(TARGET),
     })({
       default: LATEST_TARGET,
       defaultHelp: async () => "latest",

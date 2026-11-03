@@ -1,6 +1,6 @@
 import { Args } from "@oclif/core";
 
-import { refuseBlank } from "../../lib/oclif/flags";
+import { filled } from "../../lib/oclif/flags";
 import { type Refusal, refusalError } from "../../lib/oclif/refusal";
 import { VARIABLE_NAME_MAX, variableNameProblem } from "../../lib/variables";
 
@@ -16,13 +16,26 @@ const VARIABLE_NAME_TOO_LONG_REFUSAL: Refusal = {
   hint: "Shorten the name.",
 };
 
+/** What a blank name is refused for, named after the argument that took it. */
+const VARIABLE_NAME_EMPTY_REFUSAL: Refusal = {
+  message: "{input} was given an empty value",
+  hint: "Pass a value for {input}, or omit it entirely.",
+};
+
 /**
  * The variable name `input` holds, trimmed as the one a prompt would have
- * accepted. Refuses a blank value, naming `label`, and one the platform would
- * refuse.
+ * accepted. Refuses a blank value, naming `input`, and one the platform would
+ * refuse — each with its own wording, which is why this reads the two schemas
+ * itself rather than declaring one {@link import("../../lib/oclif/flags").Refused}.
  */
-function readVariableName(input: string, label = "name"): string {
-  const value = refuseBlank(input, label, `${label} was given an empty value`);
+function readVariableName(input: string, label: string): string {
+  const name = filled.safeParse(input);
+  if (!name.success) {
+    throw refusalError(VARIABLE_NAME_EMPTY_REFUSAL, {
+      input: label,
+    });
+  }
+  const value = name.data;
   const problem = variableNameProblem(value);
   if (problem === undefined) {
     return value;

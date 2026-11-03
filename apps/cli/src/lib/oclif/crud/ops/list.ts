@@ -1,10 +1,11 @@
 import { spinner } from "@clack/prompts";
+import { z } from "zod";
 import { Flags } from "@oclif/core";
 import { Paging } from "@zitadel/api/runtime/paging";
 
 import { sanitizeResponse } from "../../../api-client";
 
-import { integerFlag, nonBlankString } from "../../flags";
+import { nonBlankString, type Refused, reads, whole } from "../../flags";
 
 import type { CommandResult } from "../../types";
 import { plainFlag } from "../../tabulatable";
@@ -40,6 +41,27 @@ type ListInput = OperationInput<ListFlags, Json>;
  * for query-backed lists or one flag per parameter for GET-backed ones.
  * Emits `{ items, count, next_page_token }` and a column table for humans.
  */
+/** The page sizes the server accepts, quoted by the refusal and the reference. */
+const LIMIT_MIN = 1;
+const LIMIT_MAX = 100;
+
+/** What a page size the server would refuse is refused for. */
+const LIMIT: Refused<number> = {
+  schema: whole.pipe(z.number().min(LIMIT_MIN).max(LIMIT_MAX)),
+  refusal: {
+    message: "{value} is not a valid page size",
+    hint: "Use a whole number from {min} to {max}.",
+  },
+  values: {
+    min: LIMIT_MIN,
+    max: LIMIT_MAX,
+  },
+};
+
+const limitFlag = Flags.custom<number>({
+  parse: reads(LIMIT),
+});
+
 export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>, ListInput> {
   static describe<Ctx>({
     topic,
@@ -49,14 +71,10 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>, List
   }: OperationDefinition<Ctx, ListSpec<Ctx>>): OperationStatics {
     const paged = spec.paged !== false;
     const pagingFlags = {
-      limit: integerFlag({
+      limit: limitFlag({
         description: "Page size (server default 20, max 100).",
-        min: 1,
-        max: 100,
-        refusal: {
-          message: "{value} is not a valid page size",
-          hint: "Use a whole number from {min} to {max}.",
-        },
+        min: LIMIT_MIN,
+        max: LIMIT_MAX,
       }),
       "page-token": nonBlankString({
         description: "Continue from a previous page's next_page_token.",

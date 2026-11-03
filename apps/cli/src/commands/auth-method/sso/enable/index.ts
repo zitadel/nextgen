@@ -87,7 +87,7 @@ import {
   selectionFromFlags as selectionFromGivenFlags,
   ssoEditRefusal as editRefusalFor,
 } from "../../../../lib/idp";
-import { refuseBlank } from "../../../../lib/oclif/flags";
+import { filled, reads, type Refused } from "../../../../lib/oclif/flags";
 import { type Refusal, refusalError } from "../../../../lib/oclif/refusal";
 
 /**
@@ -111,18 +111,22 @@ function hasAllCustomSettings(values: CustomFlagValues): boolean {
 
 /**
  * The client id a value holds, trimmed as the one a prompt would have
- * accepted. Refuses a blank value, naming the flag, and one the provider
- * could not have issued.
+ * accepted. Refuses a blank value, naming the flag; `parseClientId` then
+ * blesses what is left as one the provider could have issued.
  */
-function readClientId(input: string, flag: string): ClientId {
-  return validated(parseClientId(refuseBlank(input, flag, `${flag} was given an empty value`)));
-}
-
-/** `--client-id`, refused before the command runs by {@link readClientId}. */
-const clientIdFlag = Flags.custom<ClientId>({
-  parse: async (input, _command, flag) => {
-    return readClientId(input, `--${flag.name}`);
+const CLIENT_ID: Refused<ClientId> = {
+  schema: filled.transform((id) => {
+    return validated(parseClientId(id));
+  }),
+  refusal: {
+    message: "{input} was given an empty value",
+    hint: "Pass a value for {input}, or omit it entirely.",
   },
+};
+
+/** `--client-id`, refused before the command runs by {@link CLIENT_ID}. */
+const clientIdFlag = Flags.custom<ClientId>({
+  parse: reads(CLIENT_ID),
 });
 
 /**

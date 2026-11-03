@@ -1,4 +1,5 @@
 import { Flags } from "@oclif/core";
+import { z } from "zod";
 import type {
   GetReleaseById200PointersItem,
   ListDeployments200DeploymentsItem,
@@ -12,7 +13,7 @@ import {
   nonBlankArg,
 } from "../../../lib/oclif";
 import { Tabulatable } from "../../../lib/oclif/tabulatable";
-import { refuseBlank } from "../../../lib/oclif/flags";
+import { reads, type Refused } from "../../../lib/oclif/flags";
 import {
   MESSAGE_MAX_LENGTH,
   messageTooLong,
@@ -118,28 +119,28 @@ export function readRollbackTarget(
  * one. It reports the revisions that release pins, and that users keep theirs:
  * configuration rolls back, user data does not.
  */
-const MESSAGE_TOO_LONG_REFUSAL: Refusal = {
-  message: "the message is longer than {limit} characters",
-  hint: "Pass a shorter summary with -m.",
-  details: {
-    argument: "--message",
-  },
-};
-
 /**
  * What `-m/--message` records. It refuses a blank message, which would record
  * nothing, and one longer than the server records, which the server would
- * reject. It returns the message trimmed.
+ * reject. `messageTooLong` counts code points, as the server does, so the
+ * length is its call and not the schema's. The message is trimmed.
  */
-function readMessage(input: string): string {
-  const value = refuseBlank(input, "--message", "the value is empty");
-  if (messageTooLong(value)) {
-    throw refusalError(MESSAGE_TOO_LONG_REFUSAL, {
-      limit: MESSAGE_MAX_LENGTH,
-    });
-  }
-  return value;
-}
+const MESSAGE: Refused<string> = {
+  schema: z
+    .string()
+    .trim()
+    .min(1, "the value is empty")
+    .refine((message) => {
+      return !messageTooLong(message);
+    }, `the message is longer than ${MESSAGE_MAX_LENGTH} characters`),
+  refusal: {
+    message: "{problem}",
+    hint: "Pass a shorter summary with -m.",
+    details: {
+      argument: "--message",
+    },
+  },
+};
 
 export default class DeploymentRollback extends Tabulatable(Destructive(EnvironmentCommand)) {
   static override description = "Roll back to an earlier deployment.";
@@ -163,9 +164,7 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
     }),
     message: Flags.custom<string>({
       char: "m",
-      parse: async (input) => {
-        return readMessage(input);
-      },
+      parse: reads(MESSAGE),
     })({
       description: "A short summary of why this rolls back.",
     }),

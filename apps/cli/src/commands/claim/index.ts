@@ -1,4 +1,5 @@
 import { Flags } from "@oclif/core";
+import { z } from "zod";
 import { ApiError } from "@zitadel/api/runtime/fetch";
 import consola from "consola";
 import pRetry, { AbortError } from "p-retry";
@@ -14,12 +15,12 @@ import {
   type Admitted,
   CommandGroups,
   EnvironmentCommand,
-  integerFlag,
   type JsonEnvelope,
 } from "../../lib/oclif";
 import { hasZitadelSecret, readZitadelSecret, writeZitadelSecret } from "../../lib/project";
 import { getClaimStatusQueryChallengeIdRegExp } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 
+import { reads, type Refused, whole } from "../../lib/oclif/flags";
 import { type Refusal, refusalError } from "../../lib/oclif/refusal";
 import { isLoopbackUrl } from "../../lib/server";
 import { reportWarning } from "../../lib/warnings";
@@ -80,10 +81,23 @@ export function claimDeadline(input: {
   return Math.min(serverDeadline, input.now + input.timeoutSeconds * 1000);
 }
 
-/** Whether `value` has the shape the claim contract gives a `challenge_id`. */
-function isChallengeId(value: string): boolean {
-  return getClaimStatusQueryChallengeIdRegExp.test(value);
-}
+/** The shape the claim contract gives a `challenge_id`. */
+const CHALLENGE_ID = z.string().regex(getClaimStatusQueryChallengeIdRegExp);
+
+/**
+ * Seconds to wait for the browser step, which must be a whole number of at
+ * least one: a fraction names no tick of the poll, and zero would wait for
+ * nothing.
+ */
+const TIMEOUT_MIN = 1;
+
+const TIMEOUT: Refused<number> = {
+  schema: whole.pipe(z.number().min(TIMEOUT_MIN)),
+  refusal: {
+    message: "{value} is not a valid {input}",
+    hint: "Use a whole number of 1 or more.",
+  },
+};
 
 /**
  * How a `--challenge-id` that is not the contract's shape is refused. The id
@@ -133,8 +147,10 @@ export default class Claim extends EnvironmentCommand {
     "no-open": Flags.boolean({
       description: "Print the link instead of opening a browser.",
     }),
-    timeout: integerFlag({
-      min: 1,
+    timeout: Flags.custom<number>({
+      parse: reads(TIMEOUT),
+    })({
+      min: TIMEOUT_MIN,
       description:
         "Seconds to wait for the browser step. Defaults to the link's own expiry (10 minutes).",
     }),
@@ -149,7 +165,7 @@ export default class Claim extends EnvironmentCommand {
   };
 
   protected async execute({ flags }: Admitted<typeof Claim>): Promise<JsonEnvelope> {
-    if (flags.challengeId !== undefined && !isChallengeId(flags.challengeId)) {
+    if (flags.challengeId !== undefined && !CHALLENGE_ID.safeParse(flags.challengeId).success) {
       throw refusalError(CHALLENGE_ID_REFUSAL, {}, (next) => {
         return this.suggest(next);
       });

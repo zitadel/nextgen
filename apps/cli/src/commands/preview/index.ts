@@ -1,4 +1,5 @@
 import { Flags } from "@oclif/core";
+import { z } from "zod";
 
 import {
   type Admitted,
@@ -24,7 +25,7 @@ import {
 import { ApiError } from "@zitadel/api/runtime/fetch";
 
 import type { ZitadelClient } from "../../lib/api-client";
-import { refuseBlank } from "../../lib/oclif/flags";
+import { filled, reads, type Refused } from "../../lib/oclif/flags";
 import { type Refusal, refusalError } from "../../lib/oclif/refusal";
 import { detectPreviewUrls } from "../../lib/preview";
 import { runsInCi } from "../../lib/telemetry/dimensions/ci-provider";
@@ -46,24 +47,6 @@ const PRIMARY_ORIGIN_REFUSAL: Refusal = {
   hint: "Pass the preview URLs with --origin; production is deployed by `zitadel deploy`, after merge.",
 };
 
-const ORIGIN_IS_PRIMARY_KEYWORD_REFUSAL: Refusal = {
-  message: "A preview cannot target the primary origins",
-  hint: "Pass the preview URLs with --origin; production is deployed by `zitadel deploy`, after merge.",
-};
-
-const TTL_OUT_OF_RANGE_REFUSAL: Refusal = {
-  message: "{value} is outside the allowed range",
-  hint: "A preview lives between 60s and 365d.",
-};
-
-const MESSAGE_TOO_LONG_REFUSAL: Refusal = {
-  message: "the message is longer than {limit} characters",
-  hint: "Pass a shorter summary with -m.",
-  details: {
-    argument: "--message",
-  },
-};
-
 /** The shortest and longest a preview may live, as the server fixes them. */
 const TTL_MINIMUM_MS = 60 * 1000;
 const TTL_MAXIMUM_MS = 365 * 24 * 60 * 60 * 1000;
@@ -74,44 +57,61 @@ const TTL_MAXIMUM_MS = 365 * 24 * 60 * 60 * 1000;
  * and `primary`, the deployment keyword for every primary origin, which a
  * preview build must never reach with its narrower credential.
  */
-function readOrigin(input: string, label: string): string {
-  const url = refuseBlank(input, label, "the value is empty").replace(/\/+$/, "");
-  if (url === "primary") {
-    throw refusalError(ORIGIN_IS_PRIMARY_KEYWORD_REFUSAL, {});
-  }
-  return url;
-}
+const ORIGIN: Refused<string> = {
+  schema: filled
+    .transform((origin) => {
+      return origin.replace(/\/+$/, "");
+    })
+    .refine((origin) => {
+      return origin !== "primary";
+    }, "A preview cannot target the primary origins"),
+  refusal: {
+    message: "{problem}",
+    hint: "Pass the preview URLs with --origin; production is deployed by `zitadel deploy`, after merge.",
+  },
+};
 
 /**
- * How long a preview stays live, as `7d`, `12h` or `90m`. It refuses a value
- * that is not a duration and one outside the server's fixed limits of a minute
- * and 365 days.
+ * How long a preview stays live, as `7d`, `12h` or `90m`. `parseTtl` refuses a
+ * value that is not a duration, in its own words; the schema refuses one
+ * outside the server's fixed limits of a minute and 365 days.
  */
-function readTtl(input: string): Ttl {
-  const ttl = parseTtl(input);
-  if (ttl.ms < TTL_MINIMUM_MS || ttl.ms > TTL_MAXIMUM_MS) {
-    throw refusalError(TTL_OUT_OF_RANGE_REFUSAL, {
-      value: input,
-    });
-  }
-  return ttl;
-}
+const TTL: Refused<Ttl> = {
+  schema: z
+    .string()
+    .transform(parseTtl)
+    .refine((ttl) => {
+      return ttl.ms >= TTL_MINIMUM_MS && ttl.ms <= TTL_MAXIMUM_MS;
+    }),
+  refusal: {
+    message: "{value} is outside the allowed range",
+    hint: "A preview lives between 60s and 365d.",
+  },
+};
 
 /**
  * What `-m/--message` records on the release this publishes. It refuses a blank
  * message, which would record nothing, and one longer than the server records,
- * which the server would reject after the bundle was built. It returns the
- * message trimmed.
+ * which the server would reject after the bundle was built. `messageTooLong`
+ * counts code points, as the server does, so the length is its call and not the
+ * schema's. The message is trimmed.
  */
-function readMessage(input: string): string {
-  const value = refuseBlank(input, "--message", "the value is empty");
-  if (messageTooLong(value)) {
-    throw refusalError(MESSAGE_TOO_LONG_REFUSAL, {
-      limit: MESSAGE_MAX_LENGTH,
-    });
-  }
-  return value;
-}
+const MESSAGE: Refused<string> = {
+  schema: z
+    .string()
+    .trim()
+    .min(1, "the value is empty")
+    .refine((message) => {
+      return !messageTooLong(message);
+    }, `the message is longer than ${MESSAGE_MAX_LENGTH} characters`),
+  refusal: {
+    message: "{problem}",
+    hint: "Pass a shorter summary with -m.",
+    details: {
+      argument: "--message",
+    },
+  },
+};
 
 /** Why a preview is skipped, or refused, instead of deployed. */
 export type PreviewVerdict =
@@ -252,27 +252,21 @@ export default class Preview extends PreviewCommand {
   ];
   static override flags = {
     origin: Flags.custom<string>({
-      parse: async (input, _command, flag) => {
-        return readOrigin(input, `--${flag.name}`);
-      },
+      parse: reads(ORIGIN),
     })({
       description:
         "A preview URL to deploy to, instead of detecting them from the platform build. Repeatable.",
       multiple: true,
     }),
     ttl: Flags.custom<Ttl>({
-      parse: async (input) => {
-        return readTtl(input);
-      },
+      parse: reads(TTL),
     })({
       description:
         "How long the preview stays live, such as 7d, 12h or 90m. Between 60s and 365d. Defaults to the project's own lifetime.",
     }),
     message: Flags.custom<string>({
       char: "m",
-      parse: async (input) => {
-        return readMessage(input);
-      },
+      parse: reads(MESSAGE),
     })({
       description:
         "A short summary of what this release changes. Defaults to the pull request's title or the current commit's subject.",

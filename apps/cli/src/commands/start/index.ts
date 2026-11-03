@@ -3,7 +3,7 @@ import { Flags } from "@oclif/core";
 import { serverLogAction } from "../../lib/journey-guidance";
 import { ensureLocalAdmin } from "../../lib/local-server/admin-credential";
 import { EMPTY_SUMMARY, loadProjectEnv } from "../../lib/local-server/env-vars";
-import { portFlag } from "../local-server/flags/port";
+import { portFlag } from "../local-server/port";
 import {
   DEFAULT_LOCAL_SERVER_PORT,
   PLATFORM_PROJECT_ID,
@@ -13,6 +13,7 @@ import {
   localServerUrl,
   peekRuntimeMetadata,
   resolveRuntimeBackend,
+  RUNTIME_BACKENDS,
   type RuntimeMetadata,
 } from "../../lib/local-server/runtime";
 import { LocalServer } from "../../lib/local-server/server";
@@ -46,10 +47,10 @@ export default class Start extends BaseCommand {
       description:
         "Local HTTP port. By default this directory keeps the port it had, or takes the first free one from 8080.",
     }),
-    runtime: Flags.string({
+    runtime: Flags.option({
       description: "Local runtime backend.",
-      options: ["binary", "docker"],
-    }),
+      options: RUNTIME_BACKENDS,
+    })(),
   };
 
   static override meta = {

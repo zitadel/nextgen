@@ -1,11 +1,9 @@
-import { Config } from "@oclif/core";
+import { Args, Flags } from "@oclif/core";
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
-import { BaseCommand } from "../../../../src/lib/oclif/base";
-import { integerFlag } from "../../../../src/lib/oclif/flags";
-import type { JsonEnvelope } from "../../../../src/lib/oclif/types";
-import { cliPackageRoot } from "../../../helpers/oclif-build";
-
+import { filled, reads, serverFlag, taken, whole } from "../../../../src/lib/oclif/flags";
+import { parseArg, parseFlag } from "../../../helpers/inputs";
 import { parseJson, runCliForTest } from "../../../helpers/run-cli";
 
 /**
@@ -85,106 +83,123 @@ describe("an argument that must not be blank", () => {
   });
 });
 
-class Numbers extends BaseCommand {
-  static override meta = {
-    resolveServer: false,
-  };
-
-  static override flags = {
-    port: integerFlag({
-      min: 1,
-      max: 65_535,
-      refusal: {
-        message: "{value} is not a TCP port",
-        hint: "Use a TCP port from {min} to {max}.",
-      },
-    }),
-    tail: integerFlag({
-      min: 1,
-    }),
-    level: integerFlag({
-      min: 1,
-      max: 5,
-      refusal: {
-        message: "{value} is not a level",
-        hint: "Pick {min} to {max} for {flag}.",
-      },
-    }),
-  };
-
-  public received: Record<string, unknown> = {};
-
-  protected async execute(input: { flags: Record<string, unknown> }): Promise<JsonEnvelope> {
-    this.received = input.flags;
-    return this.emit({
-      status: "ok",
-      data: {},
+describe("the schemas a flag is built from", () => {
+  describe("filled", () => {
+    it("keeps a value, trimmed", () => {
+      expect(filled.parse("  FOO  ")).toBe("FOO");
     });
-  }
-}
 
-const config = await Config.load(cliPackageRoot);
-
-async function parse(...argv: string[]): Promise<Record<string, unknown>> {
-  const command = new Numbers(["--no-telemetry", ...argv], config);
-  await command.run();
-  return command.received;
-}
-
-describe("an integer flag bounded as a TCP port", () => {
-  it("passes a port through as a number", async () => {
-    expect((await parse("--port", "8080")).port).toBe(8080);
+    it.each(["", "   "])("refuses %j, which holds nothing", (value) => {
+      expect(filled.safeParse(value).success).toBe(false);
+    });
   });
 
-  it.each(["0", "65536", "-1", "80.5", "http", ""])("refuses %j", async (value) => {
-    await expect(parse("--port", value)).rejects.toMatchObject({
+  describe("whole", () => {
+    it.each([
+      ["8080", 8080],
+      ["  80  ", 80],
+      ["-1", -1],
+      ["0", 0],
+    ])("reads %j as %d", (value, expected) => {
+      expect(whole.parse(value)).toBe(expected);
+    });
+
+    it.each([
+      ["80.5", "is not whole"],
+      ["http", "is not a number"],
+      ["", "holds nothing"],
+      ["1e3", "is not how a count is typed"],
+      ["9".repeat(309), "overflows to Infinity"],
+      ["9007199254740993", "rounds past what Number holds exactly"],
+    ])("refuses %j, which %s", (value) => {
+      expect(whole.safeParse(value).success).toBe(false);
+    });
+  });
+});
+
+describe("a flag built with reads", () => {
+  const portFlag = Flags.custom<number>({
+    parse: reads({
+      schema: whole.pipe(z.number().min(1).max(65_535)),
+      refusal: {
+        message: "{value} is not a TCP port",
+        hint: "Use a TCP port from 1 to 65535.",
+      },
+    }),
+  });
+
+  it("hands the command the parsed value, not the text", async () => {
+    await expect(parseFlag(portFlag({}), "8080", "port")).resolves.toBe(8080);
+  });
+
+  it.each(["0", "65536", "80.5", "1e3", ""])("refuses %j in its own words", async (value) => {
+    await expect(parseFlag(portFlag({}), value, "port")).rejects.toMatchObject({
       code: "E_VALIDATION",
       message: `${value} is not a TCP port`,
       hint: "Use a TCP port from 1 to 65535.",
     });
   });
+
+  it("names the flag the value was given for", async () => {
+    const named = Flags.custom<string>({
+      parse: reads({
+        schema: filled,
+        refusal: {
+          message: "{input} was given an empty value",
+        },
+      }),
+    });
+
+    await expect(parseFlag(named({}), "", "client-id")).rejects.toMatchObject({
+      message: "--client-id was given an empty value",
+    });
+  });
+
+  it("words a refusal with what the schema found wrong", async () => {
+    const level = Flags.custom<number>({
+      parse: reads({
+        schema: whole.pipe(z.number().max(5, "there is no level above 5")),
+        refusal: {
+          message: "{value} is not a level: {problem}",
+        },
+      }),
+    });
+
+    await expect(parseFlag(level({}), "9", "level")).rejects.toMatchObject({
+      message: "9 is not a level: there is no level above 5",
+    });
+  });
 });
 
-describe("an integer flag", () => {
-  it("refuses a value under its minimum, with the default wording", async () => {
-    await expect(parse("--tail", "0")).rejects.toMatchObject({
-      code: "E_VALIDATION",
-      message: "0 is not a valid --tail",
-      hint: "Use a whole number of 1 or more.",
-    });
+describe("an argument built with taken", () => {
+  const nameArg = Args.custom<string>({
+    parse: taken({
+      schema: filled,
+      refusal: {
+        message: "{input} was given an empty value",
+      },
+    }),
   });
 
-  it("refuses what is not a whole number", async () => {
-    await expect(parse("--tail", "1.5")).rejects.toMatchObject({
-      code: "E_VALIDATION",
+  it("names the argument as the help does, without a dash", async () => {
+    await expect(parseArg(nameArg({}), "", "release_id")).rejects.toMatchObject({
+      message: "release_id was given an empty value",
     });
-  });
-
-  it("words its refusal as it is told, filling the placeholders", async () => {
-    await expect(parse("--level", "9")).rejects.toMatchObject({
-      message: "9 is not a level",
-      hint: "Pick 1 to 5 for --level.",
-    });
-  });
-
-  it("accepts a value on its bounds", async () => {
-    expect((await parse("--level", "5")).level).toBe(5);
   });
 });
 
-describe("a number flag against what Number makes of a long digit run", () => {
-  it.each([
-    ["9".repeat(309), "overflows to Infinity"],
-    ["9007199254740993", "rounds past the safe range"],
-  ])("refuses %j, which %s", async (value) => {
-    await expect(parse("--tail", value)).rejects.toMatchObject({
-      code: "E_VALIDATION",
-    });
-  });
+describe("the server flag", () => {
+  it.each(["local", "https://acme.zitadel.cloud", "http://localhost:8080"])(
+    "takes %j as typed",
+    async (value) => {
+      await expect(parseFlag(serverFlag({}), value, "server")).resolves.toBe(value);
+    },
+  );
 
-  it("refuses the same value for a bounded flag", async () => {
-    await expect(parse("--port", "9".repeat(309))).rejects.toMatchObject({
+  it.each(["ftp://acme.example", "acme.example", ""])("refuses %j", async (value) => {
+    await expect(parseFlag(serverFlag({}), value, "server")).rejects.toMatchObject({
       code: "E_VALIDATION",
+      message: `Invalid server "${value}"`,
     });
   });
 });

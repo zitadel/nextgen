@@ -1,4 +1,5 @@
 import { Args, Flags } from "@oclif/core";
+import { z } from "zod";
 import { consola } from "consola";
 
 import { sendAll, send } from "../../lib/api/call";
@@ -27,31 +28,29 @@ import {
   type JsonEnvelope,
   nonBlankString,
 } from "../../lib/oclif";
+import { reads, type Refused } from "../../lib/oclif/flags";
 import { type Refusal, refusalError } from "../../lib/oclif/refusal";
 import { Destructive } from "../../lib/oclif/destructive";
 
 /** The HTTP methods `zitadel api` sends. */
 const HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"] as const;
 
-const METHOD_NOT_SENT_REFUSAL: Refusal = {
-  message: "-X {value} is not one of {methods}",
-};
-
 /**
  * The HTTP method `-X` names, in any case as curl takes it: oclif's `options`
- * would refuse `-X delete`. It refuses a method the CLI does not send, and
- * returns the others in upper case.
+ * would refuse `-X delete`, so the value is upper-cased before the set decides
+ * it. It refuses a method the CLI does not send.
  */
-function readMethod(input: string): string {
-  const method = input.toUpperCase();
-  if (!(HTTP_METHODS as readonly string[]).includes(method)) {
-    throw refusalError(METHOD_NOT_SENT_REFUSAL, {
-      value: input,
-      methods: HTTP_METHODS.join(", "),
-    });
-  }
-  return method;
-}
+const METHOD: Refused<string> = {
+  schema: z
+    .string()
+    .transform((method) => {
+      return method.toUpperCase();
+    })
+    .pipe(z.enum(HTTP_METHODS)),
+  refusal: {
+    message: `-X {value} is not one of ${HTTP_METHODS.join(", ")}`,
+  },
+};
 
 const UNCALLABLE_REFUSAL: Refusal = {
   message: "{reason}",
@@ -214,9 +213,7 @@ export default class Api extends Destructive(BaseCommand) {
   static override flags = {
     method: Flags.custom<string>({
       helpValue: HTTP_METHODS.join("|"),
-      parse: async (input) => {
-        return readMethod(input);
-      },
+      parse: reads(METHOD),
     })({
       char: "X",
       description: "The HTTP method, to choose among a path's operations.",

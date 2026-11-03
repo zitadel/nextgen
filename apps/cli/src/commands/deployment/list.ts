@@ -1,20 +1,34 @@
 import { Paging } from "@zitadel/api/runtime/paging";
 import { Flags } from "@oclif/core";
+import { z } from "zod";
 
 import {
   type Admitted,
   CommandGroups,
-  integerFlag,
   EnvironmentCommand,
   type JsonEnvelope,
   nonBlankString,
 } from "../../lib/oclif";
+import { reads, type Refused, whole } from "../../lib/oclif/flags";
 import { plainFlag, Tabulatable } from "../../lib/oclif/tabulatable";
 import { pagedFunctions } from "../../lib/api-client";
 import { Cmd } from "../../lib/cmd";
 
 /** The columns `list` renders, in order. */
 const COLUMNS = ["id", "release_id", "reason", "origins", "deployed_at"] as const;
+
+/** The page sizes the server accepts, quoted by the refusal and the reference. */
+const LIMIT_MIN = 1;
+const LIMIT_MAX = 100;
+
+/** The page size `--limit` asks for, as the server bounds it. */
+const LIMIT_FLAG: Refused<number> = {
+  schema: whole.pipe(z.number().min(LIMIT_MIN).max(LIMIT_MAX)),
+  refusal: {
+    message: "{value} is not a valid {input}",
+    hint: "Use a whole number from 1 to 100.",
+  },
+};
 
 /**
  * `zitadel deployment list` — show the project's deployment history.
@@ -37,10 +51,12 @@ export default class DeploymentList extends Tabulatable(EnvironmentCommand) {
   static override flags = {
     origin: Flags.string({ description: "Only deployments that targeted this origin." }),
     live: Flags.boolean({ description: "What each target serves now, not the full history." }),
-    limit: integerFlag({
+    limit: Flags.custom<number>({
+      parse: reads(LIMIT_FLAG),
+    })({
+      min: LIMIT_MIN,
+      max: LIMIT_MAX,
       description: "Page size (server default 20, max 100).",
-      min: 1,
-      max: 100,
     }),
     "page-token": nonBlankString({
       description: "Continue from a previous page's next_page_token.",

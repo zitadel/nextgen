@@ -24,6 +24,7 @@ import {
   readNearestRuntimeMetadata,
   type RuntimeBackend,
   resolveRuntimeBackend,
+  RUNTIME_BACKENDS,
   type RuntimeMetadata,
 } from "../../lib/local-server/runtime";
 import { LocalServer } from "../../lib/local-server/server";
@@ -34,7 +35,7 @@ import {
   type JsonEnvelope,
   nonBlankString,
 } from "../../lib/oclif";
-import { portFlag } from "../local-server/flags/port";
+import { portFlag } from "../local-server/port";
 import { Destructive } from "../../lib/oclif/destructive";
 import { isRefusal } from "../../lib/consent";
 import { reportWarning } from "../../lib/warnings";
@@ -103,10 +104,10 @@ export default class Doctor extends Destructive(BaseCommand) {
     port: portFlag({
       description: "Local HTTP port to check. Defaults to the port this directory's server uses.",
     }),
-    runtime: Flags.string({
+    runtime: Flags.option({
       description: "Local runtime backend.",
-      options: ["binary", "docker"],
-    }),
+      options: RUNTIME_BACKENDS,
+    })(),
     // Doctor's local-runtime checks are about the machine, but with `--env` /
     // `--env-file` it also verifies the environment a command would connect to:
     // the same flags every EnvironmentCommand takes, resolved the same way.

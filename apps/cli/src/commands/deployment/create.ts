@@ -1,4 +1,5 @@
 import { Flags } from "@oclif/core";
+import { z } from "zod";
 
 import {
   type Admitted,
@@ -8,40 +9,31 @@ import {
 } from "../../lib/oclif";
 import { createDeployment } from "../../lib/release";
 
-/**
- * `zitadel deployment create --release <id>` — make an existing release live.
- *
- * The low-level counterpart of `deploy`: it deploys a release that already
- * exists rather than assembling one from `.zitadel/`. By default it targets
- * every primary origin: primary origins are never named one by one. Deploying
- * the release a target already serves changes nothing.
- */
-import { refuseBlank } from "../../lib/oclif/flags";
-import { type Refusal, refusalError } from "../../lib/oclif/refusal";
+import { reads, type Refused } from "../../lib/oclif/flags";
 import { MESSAGE_MAX_LENGTH, messageTooLong } from "../../lib/release";
-
-const MESSAGE_TOO_LONG_REFUSAL: Refusal = {
-  message: "the message is longer than {limit} characters",
-  hint: "Pass a shorter summary with -m.",
-  details: {
-    argument: "--message",
-  },
-};
 
 /**
  * What `-m/--message` records. It refuses a blank message, which would record
  * nothing, and one longer than the server records, which the server would
- * reject. It returns the message trimmed.
+ * reject later. `messageTooLong` counts code points, as the server does, so
+ * the length is its call and not the schema's. The message is trimmed.
  */
-function readMessage(input: string): string {
-  const value = refuseBlank(input, "--message", "the value is empty");
-  if (messageTooLong(value)) {
-    throw refusalError(MESSAGE_TOO_LONG_REFUSAL, {
-      limit: MESSAGE_MAX_LENGTH,
-    });
-  }
-  return value;
-}
+const MESSAGE: Refused<string> = {
+  schema: z
+    .string()
+    .trim()
+    .min(1, "the value is empty")
+    .refine((message) => {
+      return !messageTooLong(message);
+    }, `the message is longer than ${MESSAGE_MAX_LENGTH} characters`),
+  refusal: {
+    message: "{problem}",
+    hint: "Pass a shorter summary with -m.",
+    details: {
+      argument: "--message",
+    },
+  },
+};
 
 export default class DeploymentCreate extends EnvironmentCommand {
   static override description = "Deploy an existing release to the project's origins.";
@@ -52,11 +44,9 @@ export default class DeploymentCreate extends EnvironmentCommand {
   static override flags = {
     release: Flags.string({ description: "The release id to deploy.", required: true }),
     message: Flags.custom<string>({
-      char: "m",
-      parse: async (input) => {
-        return readMessage(input);
-      },
+      parse: reads(MESSAGE),
     })({
+      char: "m",
       description: "A short summary of why this deploys.",
     }),
   };

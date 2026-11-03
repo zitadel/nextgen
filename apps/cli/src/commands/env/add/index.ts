@@ -1,4 +1,5 @@
 import { stat } from "node:fs/promises";
+import { z } from "zod";
 import { basename, join } from "node:path";
 
 import { Args, Flags } from "@oclif/core";
@@ -26,6 +27,7 @@ import { Cmd } from "../../../lib/cmd";
 import { environmentSelectorSuffix, projectEnvFile } from "../../../lib/oclif/environment-flags";
 import { type EnvironmentSelector, projectCommand } from "../../../lib/suggestion";
 import { Promptable } from "../../../lib/oclif/promptable";
+import { reads, type Refused, taken } from "../../../lib/oclif/flags";
 import { interpolate, type Refusal, refusalError } from "../../../lib/oclif/refusal";
 
 /** What a `.env.<name>.local` that already exists is refused for. */
@@ -86,19 +88,17 @@ const APP_URL_REFUSAL: Refusal = {
   hint: "Use a URL like https://app.acme.com.",
 };
 
-/** The environment name `input` holds, or the refusal for why it cannot name a file. */
-function readEnvironmentName(input: string): string {
-  if (!isEnvironmentName(input)) {
-    throw refusalError(ENVIRONMENT_NAME_REFUSAL, {
-      value: input,
-    });
-  }
-  return input;
-}
+/** The environment name the argument holds: one that can name a `.env.<name>.local` file. */
+const ENVIRONMENT_NAME: Refused<string> = {
+  schema: z.string().refine(isEnvironmentName),
+  refusal: ENVIRONMENT_NAME_REFUSAL,
+};
 
-function isHttpUrl(value: string): boolean {
-  return URL.canParse(value) && /^https?:$/.test(new URL(value).protocol);
-}
+/** The URL the app is served from, which must be an http(s) one. */
+const APP_URL: Refused<string> = {
+  schema: z.url({ protocol: /^https?$/ }),
+  refusal: APP_URL_REFUSAL,
+};
 
 /**
  * What a person typed as the URL their app is served from, for a prompt's
@@ -112,7 +112,7 @@ export function readAppUrl(answer: string): Parsed<string | undefined> {
       value: undefined,
     };
   }
-  if (!isHttpUrl(typed)) {
+  if (!APP_URL.schema.safeParse(typed).success) {
     return {
       ok: false,
       problem: interpolate(APP_URL_REFUSAL.message, {
@@ -143,9 +143,7 @@ export default class EnvAdd extends Promptable(BaseCommand) {
   ];
   static override args = {
     name: Args.custom<string>({
-      parse: async (input) => {
-        return readEnvironmentName(input);
-      },
+      parse: taken(ENVIRONMENT_NAME),
     })({
       required: true,
       description: "The environment name, e.g. production.",
@@ -157,15 +155,7 @@ export default class EnvAdd extends Promptable(BaseCommand) {
         "Bind this existing project instead of creating one. Its secrets come from ZITADEL_PROJECT_SECRET and ZITADEL_PREVIEW_TOKEN in the process environment.",
     }),
     "app-url": Flags.custom<string>({
-      parse: async (input) => {
-        const parsed = readAppUrl(input);
-        if (!parsed.ok || parsed.value === undefined) {
-          throw refusalError(APP_URL_REFUSAL, {
-            value: input,
-          });
-        }
-        return parsed.value;
-      },
+      parse: reads(APP_URL),
     })({
       description:
         "The URL this environment's app is served from. It becomes ZITADEL_ISSUER and is registered with a new project.",
