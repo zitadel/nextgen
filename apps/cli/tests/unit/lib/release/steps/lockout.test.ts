@@ -19,6 +19,7 @@ function ctx(options: {
   users: FakeUser[];
   links?: Record<string, number>;
   failQuery?: boolean;
+  failListSchemas?: boolean;
 }): StepContext {
   return {
     cwd: "/unused",
@@ -39,10 +40,15 @@ function ctx(options: {
         identity_links: Array.from({ length: options.links?.[id] ?? 0 }, () => ({})),
       }),
       listSchemas: {
-        all: async () => [
-          { id: HUMAN, schema: { objectType: "human-user" } },
-          { id: EMPLOYEE, schema: { objectType: "employee" } },
-        ],
+        all: async () => {
+          if (options.failListSchemas) {
+            throw new Error("forbidden");
+          }
+          return [
+            { id: HUMAN, schema: { objectType: "human-user" } },
+            { id: EMPLOYEE, schema: { objectType: "employee" } },
+          ];
+        },
       },
     } as never,
     projectId: "proj_1",
@@ -59,8 +65,9 @@ function ctx(options: {
   };
 }
 
-const flow = (schema: string, identifier = "email") => ({
+const flow = (schema: string, identifier = "email", status = "active") => ({
   name: "default-login",
+  status,
   user_schema: schema,
   purposes: { login: "identifier" },
   steps: [
@@ -216,6 +223,45 @@ describe("lockoutStep", () => {
     await lockoutStep.run(c);
 
     expect(takeReportedWarnings()).toHaveLength(1);
+  });
+
+  it("does not count a draft flow as serving its schema", async () => {
+    await lockoutStep.run(
+      ctx({
+        schemas: [{ objectType: "employee" }, { objectType: "human-user" }],
+        flows: [flow("employee"), flow("human-user", "email", "draft")],
+        users: [user("u1", "human-user")],
+        links: { u1: 1 },
+      }),
+    );
+
+    expect(takeReportedWarnings()[0]).toContain('of "human-user" has an SSO link');
+  });
+
+  it("does not guess which schema is unserved when a flow's schema cannot be resolved", async () => {
+    await lockoutStep.run(
+      ctx({
+        schemas: [{ objectType: "employee" }],
+        flows: [flow("employee"), flow("https://schemas.test/unknown.json")],
+        users: [user("u1", "human-user")],
+        links: { u1: 1 },
+      }),
+    );
+
+    expect(takeReportedWarnings()).toEqual([]);
+  });
+
+  it("still warns about missing identifiers when the schemas cannot be listed", async () => {
+    await lockoutStep.run(
+      ctx({
+        schemas: [{ objectType: "human-user" }],
+        flows: [flow("human-user", "username")],
+        users: [user("u1", "human-user", { email: "a@example.com" })],
+        failListSchemas: true,
+      }),
+    );
+
+    expect(takeReportedWarnings()[0]).toContain('has no "username"');
   });
 
   it("never fails the deploy when users cannot be read", async () => {

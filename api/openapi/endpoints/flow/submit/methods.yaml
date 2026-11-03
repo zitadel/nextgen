@@ -112,8 +112,10 @@ post:
       description: |
         Conflict. The flow session moved on under another request
         (`flow.session_conflict`), the flow's auth attempt expired or was
-        already handed off (`flow.restart_required`): start a new flow, or
-        the sealed release was revoked (`rel.revoked`). A submission racing
+        already handed off (`flow.restart_required`): start a new flow, the
+        provider's identity is linked to a user of a schema this flow does not
+        serve (`flow.sso_user_schema_mismatch`), which a new flow does not
+        fix, or the sealed release was revoked (`rel.revoked`). A submission racing
         the request that hands the attempt off can still fail with
         `att.already_handed_off`.
       content:
