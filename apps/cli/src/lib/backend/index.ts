@@ -19,6 +19,10 @@ export {
   type DeploymentRecord,
   type DeploymentSummary,
   type DeployTargets,
+  type Publication,
+  type PublishRequest,
+  type RollbackPlan,
+  type RollbackTarget,
   type RollbackOptions,
   type RolledBackDeployment,
 } from "./deployment-service";

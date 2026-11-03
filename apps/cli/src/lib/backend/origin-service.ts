@@ -1,3 +1,4 @@
+import { ApiError } from "@zitadel/api/runtime/fetch";
 import escapeStringRegexp from "escape-string-regexp";
 
 import type { ZitadelClient } from "../api-client";
@@ -92,6 +93,24 @@ export class OriginService {
   }
 
   /**
+   * List the patterns a deploy lands on, or none when the token may not read
+   * the project (403): the server then decides alone what the token can deploy
+   * to. A 401 is a token the server does not accept at all, which fails here.
+   *
+   * @returns The project's primary patterns, or none when reading is forbidden.
+   */
+  async primaryIfReadable(): Promise<readonly string[]> {
+    try {
+      return await this.primary();
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 403) {
+        return [];
+      }
+      throw error;
+    }
+  }
+
+  /**
    * Add one pattern.
    *
    * @param pattern - The pattern to add.
@@ -100,6 +119,25 @@ export class OriginService {
    */
   async add(pattern: string, kind: OriginKind): Promise<ProjectOriginEntry> {
     return this.client.addOrigin(this.projectId, { pattern, kind });
+  }
+
+  /**
+   * Turn a preview pattern into a primary origin: it is removed and added back
+   * as primary, and if the add fails it is put back as a preview pattern so the
+   * project never loses it.
+   *
+   * @param consent - The proof the caller was allowed to do something irreversible.
+   * @param pattern - The pattern to promote.
+   * @throws ApiError the add's failure, after the pattern was restored.
+   */
+  async promote(consent: Consent, pattern: string): Promise<void> {
+    await consent.unlock(this.client).removeOrigin(this.projectId, { pattern });
+    try {
+      await this.add(pattern, "primary");
+    } catch (error) {
+      await this.add(pattern, "preview").catch(() => undefined);
+      throw error;
+    }
   }
 
   /**

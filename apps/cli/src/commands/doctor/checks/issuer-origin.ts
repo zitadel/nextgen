@@ -85,13 +85,7 @@ export class IssuerOriginCheck implements SanityCheck {
       return;
     }
     const originService = new OriginService(client, secret.project_id);
-    await originService.remove(consent, pattern);
-    try {
-      await originService.add(pattern, "primary");
-    } catch (error) {
-      await originService.add(pattern, "preview").catch(() => undefined);
-      throw error;
-    }
+    await originService.promote(consent, pattern);
     await writeZitadelSecret(ctx.cwd, {
       ...secret,
       primary_origins: [...secret.primary_origins, pattern],

@@ -13,7 +13,6 @@ import {
 } from "../../lib/backend";
 import { Publisher } from "../../lib/publish";
 import { stepOutput } from "../../lib/step-output";
-import { ApiError } from "@zitadel/api/runtime/fetch";
 import { Flags } from "@oclif/core";
 import { z } from "zod";
 
@@ -208,63 +207,36 @@ export default class Deploy extends EnvironmentCommand {
       gitDirty: prepared.gitDirty,
     });
 
-    // What the targets serve right now. The guard id is the newest deployment
-    // to any origin this deploy lands on — the contract's rule — so a live
-    // preview, which never targets a primary, is never it. It guards the
-    // create against another deploy that raced in since we inspected: the
-    // server refuses with 409 rather than overwriting that deploy unseen (#538).
-    const deployments = await deploymentService.live();
-    const observed = deployments.find((deployment) => {
-      return deployment.targets.some((entry) => {
-        return landing.includes(entry.origin);
-      });
-    })?.id;
-    const targets = ["primary"];
-    const deployment = await deploymentService
-      .deploy({
-        releaseId: release.id,
-        targets,
-        message,
-        // On a project's first deploy nothing is live, so there is no
-        // deployment to guard against: the field is omitted rather than sent
-        // empty or as a placeholder, which an optional id cannot stand in for.
-        // When a deployment is live its id is sent so a racing deploy is caught
-        // with a 409 (#538).
-        ...(observed === undefined ? {} : { expectedDeploymentId: observed }),
-      })
-      .catch(async (error: unknown): Promise<never> => {
-        // A 409 means another deploy landed between our inspection and this
-        // create. Re-read what the targets serve now and report that actual
-        // deployment, so the caller re-runs against current state (#538).
-        if (!(error instanceof ApiError) || error.status !== 409) {
-          throw error;
-        }
-        // Building dedupes on content, revoked releases included, so a tree
-        // that matches a revoked release builds back to it and cannot deploy.
-        // That is not a race: re-running would fail the same way.
-        if (errorCode(error) === "rel.revoked") {
-          throw new ZitadelError(
-            "E_CONFLICT",
-            `This content was already released as ${release.id}, which is revoked`,
-            {
-              hint: "A revoked release can never be served again. Change the configuration so it builds a new release, then deploy.",
-              details: { release_id: release.id, content_hash: release.content_hash },
-            },
-          );
-        }
-        // The deployment that raced in on a primary origin, not a live preview.
-        const deployments = await deploymentService.live();
-        const current = deployments.find(DeploymentService.servesPrimary);
-        throw new ZitadelError(
-          "E_CONFLICT",
-          "Another deploy changed the targets since this one was prepared",
-          {
-            hint: `Re-run \`zitadel ${DEPLOY_ARGS}${this.environmentSelector()}\`; it will build and deploy against the current state.`,
-            details: current === undefined ? undefined : { current_deployment: current },
-            nextCommands: [this.suggest("deployment list --live")],
-          },
-        );
-      });
+    const publication = await deploymentService.publish({
+      releaseId: release.id,
+      landing,
+      message,
+    });
+    if (publication.outcome === "revoked") {
+      throw new ZitadelError(
+        "E_CONFLICT",
+        `This content was already released as ${release.id}, which is revoked`,
+        {
+          hint: "A revoked release can never be served again. Change the configuration so it builds a new release, then deploy.",
+          details: { release_id: release.id, content_hash: release.content_hash },
+        },
+      );
+    }
+    if (publication.outcome === "raced") {
+      throw new ZitadelError(
+        "E_CONFLICT",
+        "Another deploy changed the targets since this one was prepared",
+        {
+          hint: `Re-run \`zitadel ${DEPLOY_ARGS}${this.environmentSelector()}\`; it will build and deploy against the current state.`,
+          details:
+            publication.current === undefined
+              ? undefined
+              : { current_deployment: publication.current },
+          nextCommands: [this.suggest("deployment list --live")],
+        },
+      );
+    }
+    const { deployment } = publication;
 
     const servedOrigins = deployment.targets.map((target) => target.origin);
     this.recordTelemetry({ origin_count: servedOrigins.length });
@@ -326,14 +298,4 @@ export default class Deploy extends EnvironmentCommand {
       },
     );
   }
-}
-
-/** The `code` of an API error body, when it carries one. */
-function errorCode(error: ApiError): string | undefined {
-  const body = error.body;
-  return typeof body === "object" &&
-    body !== null &&
-    typeof (body as { code?: unknown }).code === "string"
-    ? (body as { code: string }).code
-    : undefined;
 }

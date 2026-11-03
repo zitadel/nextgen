@@ -5,6 +5,7 @@ import type {
   RollbackDeployment200,
   RollbackDeployment201,
 } from "@zitadel/api/generated/model";
+import { ApiError } from "@zitadel/api/runtime/fetch";
 import { Paging } from "@zitadel/api/runtime/paging";
 
 import { pagedFunctions, type ZitadelClient } from "../api-client";
@@ -64,6 +65,44 @@ export type DeploymentHistory = Readonly<{
   /** The cursor to the next page, or null when none remains. */
   next: string | null;
 }>;
+
+/** What {@link DeploymentService.publish} makes live, and where it lands. */
+export type PublishRequest = Readonly<{
+  releaseId: string;
+  /** The primary origins the deploy lands on, which decide the concurrency guard. */
+  landing: readonly string[];
+  message?: string;
+}>;
+
+/**
+ * What publishing a release to the primary origins came to.
+ *
+ * `raced` means another deploy landed between reading what the origins serve
+ * and writing, so nothing was overwritten; `current` is that deployment.
+ * `revoked` means the release was revoked before it could be deployed, which
+ * is not a race: trying again fails the same way.
+ */
+export type Publication = Readonly<
+  | { outcome: "deployed"; deployment: Deployment }
+  | { outcome: "raced"; current: DeploymentSummary | undefined }
+  | { outcome: "revoked" }
+>;
+
+/** The deployment a rollback re-applies, and the one it expects to be live. */
+export type RollbackTarget = Readonly<{
+  id: string;
+  expectedDeploymentId: string | undefined;
+}>;
+
+/**
+ * What a rollback would re-apply, decided from the primary deployments: a
+ * named deployment is taken as given, and a bare rollback undoes the newest.
+ */
+export type RollbackPlan = Readonly<
+  | { outcome: "target"; target: RollbackTarget }
+  | { outcome: "nothing-deployed" }
+  | { outcome: "nothing-earlier" }
+>;
 
 /** What {@link DeploymentService.deploy} publishes, and where. */
 export type DeployInput = Readonly<{
@@ -148,6 +187,16 @@ export class DeploymentService {
   }
 
   /**
+   * Find the newest deployment serving a primary origin. A live preview is
+   * never it, even when it is the newest in the project.
+   *
+   * @returns The deployment, or undefined when nothing is deployed to a primary origin.
+   */
+  async newestPrimary(): Promise<DeploymentSummary | undefined> {
+    return (await this.live()).find(DeploymentService.servesPrimary);
+  }
+
+  /**
    * List the deployment history, a page at a time.
    *
    * @param query - The filters, the page size, the cursor to continue from, and
@@ -229,6 +278,68 @@ export class DeploymentService {
   }
 
   /**
+   * Make a release live on the primary origins, guarded against a deploy that
+   * raced in. The guard is the newest deployment to any origin this deploy
+   * lands on, so a live preview, which never targets a primary, is never it. On
+   * a project's first deploy nothing is live, so no guard is sent.
+   *
+   * @param request - The release, the origins it lands on and a message.
+   * @returns Whether it deployed, lost a race, or met a revoked release.
+   * @throws ApiError for any failure that is not one of those two outcomes.
+   */
+  async publish(request: PublishRequest): Promise<Publication> {
+    const live = await this.live();
+    const observed = live.find((deployment) =>
+      deployment.targets.some((target) => request.landing.includes(target.origin)),
+    )?.id;
+    try {
+      const deployment = await this.deploy({
+        releaseId: request.releaseId,
+        targets: ["primary"],
+        message: request.message,
+        ...(observed === undefined ? {} : { expectedDeploymentId: observed }),
+      });
+      return Object.freeze({ outcome: "deployed", deployment });
+    } catch (error) {
+      if (!(error instanceof ApiError) || error.status !== 409) {
+        throw error;
+      }
+      if (DeploymentService.codeOf(error) === "rel.revoked") {
+        return Object.freeze({ outcome: "revoked" });
+      }
+      return Object.freeze({ outcome: "raced", current: await this.newestPrimary() });
+    }
+  }
+
+  /**
+   * Decide what a rollback re-applies. The whole primary history is read, not
+   * the first page, because the prior deployment of a long-lived origin can sit
+   * beyond it. Naming a deployment needs none of it and reads nothing.
+   *
+   * @param deploymentId - The deployment to re-apply, or omitted to undo the last deploy.
+   * @returns The target, or why there is none.
+   */
+  async planRollback(deploymentId?: string): Promise<RollbackPlan> {
+    if (deploymentId !== undefined) {
+      return Object.freeze({
+        outcome: "target",
+        target: Object.freeze({ id: deploymentId, expectedDeploymentId: undefined }),
+      });
+    }
+    const [latest, prior] = (await this.list()).filter(DeploymentService.servesPrimary);
+    if (latest === undefined) {
+      return Object.freeze({ outcome: "nothing-deployed" });
+    }
+    if (prior === undefined) {
+      return Object.freeze({ outcome: "nothing-earlier" });
+    }
+    return Object.freeze({
+      outcome: "target",
+      target: Object.freeze({ id: prior.id, expectedDeploymentId: latest.id }),
+    });
+  }
+
+  /**
    * Re-apply a deployment: a new deployment with its release and its targets,
    * recorded as a rollback. Returns 200 when the targets already serve it.
    *
@@ -256,5 +367,14 @@ export class DeploymentService {
         { project_id: this.projectId },
         Object.keys(body).length === 0 ? undefined : body,
       );
+  }
+
+  private static codeOf(error: ApiError): string | undefined {
+    const body = error.body;
+    return typeof body === "object" &&
+      body !== null &&
+      typeof (body as { code?: unknown }).code === "string"
+      ? (body as { code: string }).code
+      : undefined;
   }
 }

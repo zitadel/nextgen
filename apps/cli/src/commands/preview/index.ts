@@ -18,7 +18,6 @@ import {
 } from "../../lib/backend";
 import { deployMessage, MESSAGE_MAX_LENGTH, messageTooLong, Publisher } from "../../lib/publish";
 import { stepOutput } from "../../lib/step-output";
-import { ApiError } from "@zitadel/api/runtime/fetch";
 
 import type { ZitadelClient } from "../../lib/api-client";
 import { filled, reads, type Refused } from "../../lib/oclif/flags";
@@ -170,27 +169,6 @@ export function readPreviewUrls(
 }
 
 /**
- * The project's primary origins, or none when the preview token may not read
- * the project (403): the server then decides alone what the token can deploy
- * to. A 401 is a token the server does not accept at all, which fails here
- * rather than after the whole bundle is built.
- */
-async function primaryOrigins(
-  client: ZitadelClient,
-  projectId: string,
-): Promise<readonly string[]> {
-  const originService = new OriginService(client, projectId);
-  try {
-    return await originService.primary();
-  } catch (error) {
-    if (error instanceof ApiError && error.status === 403) {
-      return [];
-    }
-    throw error;
-  }
-}
-
-/**
  * Refuses a preview URL that is a primary origin: an exact primary origin is
  * production as surely as the `primary` keyword is. The server is the authority
  * on what the preview token may reach; this catches the mistake before anything
@@ -201,7 +179,8 @@ export async function refusePrimaryOrigins(
   client: ZitadelClient,
   projectId: string,
 ): Promise<void> {
-  const primaries = await primaryOrigins(client, projectId);
+  const originService = new OriginService(client, projectId);
+  const primaries = await originService.primaryIfReadable();
   const production = urls.filter((url) => {
     return primaries.includes(url);
   });
