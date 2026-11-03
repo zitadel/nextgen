@@ -190,8 +190,9 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
       },
     });
     const walk = pages.walk(async (token, number) => {
+      const page = await request(token ?? first);
       progress?.message(`Fetching ${topic} — page ${number}`);
-      return request(token ?? first);
+      return page;
     });
     // The spinner owns the cursor and a SIGINT handler until it is stopped, so a
     // page that fails mid-drain has to stop it too; otherwise the error prints

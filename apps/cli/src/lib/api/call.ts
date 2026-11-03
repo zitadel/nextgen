@@ -5,6 +5,7 @@ import { REQUEST_TIMEOUT_MS, sanitizeRejection, sanitizeResponse } from "../api-
 import { Consent } from "../consent";
 import { ZitadelError, errorMessage } from "../errors";
 import { isObject, parseJsonOrUndefined } from "../json";
+import { tryCatch } from "../try-catch";
 import { type ApiRequest, urlOf } from "./request";
 
 /** What the server answered. `body` is `undefined` for a response without one. */
@@ -123,13 +124,17 @@ export const sendAll = async (
   const fields = Paging.byField(paging.items);
   const responses = new Paging<RawResponse, unknown>({
     items: (response) => {
-      try {
-        return sanitizeResponse(fields.items(response.raw));
-      } catch (error) {
-        throw new ZitadelError("E_VALIDATION", errorMessage(error), {
+      const [problem, list] = tryCatch(() => {
+        return fields.items(response.raw);
+      });
+
+      if (problem !== null) {
+        throw new ZitadelError("E_VALIDATION", errorMessage(problem), {
           details: { response: sanitizeResponse(response.raw) },
         });
       }
+
+      return sanitizeResponse(list);
     },
     next: (response) => {
       return fields.next(response.raw);

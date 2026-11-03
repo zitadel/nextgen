@@ -21,7 +21,7 @@ export type PageReaders<P, T> = {
  */
 export type Collected<P, T> = {
   /** The items of every page it read, in order. */
-  readonly items: T[];
+  readonly items: readonly T[];
   /** The cursor to the page after the last one it read, or `null` when none remains. */
   readonly next: string | null;
   /** The last page it read, or `undefined` when the walk yielded none. */
@@ -112,15 +112,22 @@ export class Paging<P, T = unknown> {
    * @param fetchPage - Fetches the page a cursor names, and is told which page
    * of the walk it is.
    */
-  async *walk(fetchPage: FetchPage<P>): AsyncGenerator<P, void, undefined> {
-    let token: string | undefined;
-    for (let number = 1; ; number += 1) {
-      const page = await fetchPage(token, number);
-      token = this.next(page);
-      yield page;
-      if (token === undefined) {
-        return;
-      }
+  walk(fetchPage: FetchPage<P>): AsyncGenerator<P, void, undefined> {
+    return this.from(fetchPage, undefined, 1);
+  }
+
+  private async *from(
+    fetchPage: FetchPage<P>,
+    token: string | undefined,
+    number: number,
+  ): AsyncGenerator<P, void, undefined> {
+    const page = await fetchPage(token, number);
+    const following = this.next(page);
+
+    yield page;
+
+    if (following !== undefined) {
+      yield* this.from(fetchPage, following, number + 1);
     }
   }
 
@@ -131,9 +138,11 @@ export class Paging<P, T = unknown> {
    *
    * Without `all` the walk is left after its first page, so no second one is
    * fetched. When the walk ends on a page that still names a next page, that
-   * cursor is reported rather than dropped, so a caller can resume from it. The items are gathered into one array rather than concatenated
-   * page by page: these lists are unbounded, and a wide drain would otherwise
-   * copy every record once per remaining page.
+   * cursor is reported rather than dropped, so a caller can resume from it.
+   *
+   * The items are gathered into one array rather than concatenated page by
+   * page: these lists are unbounded, and a wide drain would otherwise copy
+   * every record once per remaining page.
    *
    * @param pages - A walk of this list's pages, from {@link Paging.walk} or a
    * client function's `.pages()`.

@@ -469,7 +469,7 @@ describe("list paging", () => {
     expect(sent).toEqual([expect.objectContaining({ page_token: "p2" })]);
   });
 
-  it("announces each page of a drain before it asks for it", async () => {
+  it("reports each page of a drain once it has it", async () => {
     const events: string[] = [];
     vi.mocked(spinner).mockReturnValue({
       start: vi.fn(),
@@ -495,10 +495,10 @@ describe("list paging", () => {
     await asTerminal(() => printed(command, ["--all", "--plain"]));
 
     expect(events).toEqual([
-      "say Fetching teams — page 1",
       "ask first",
-      "say Fetching teams — page 2",
+      "say Fetching teams — page 1",
       "ask p2",
+      "say Fetching teams — page 2",
     ]);
   });
 });
