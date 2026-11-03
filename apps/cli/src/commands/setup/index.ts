@@ -114,7 +114,8 @@ import {
   materializeSetupResources,
   type MaterializeSetupResourcesResult,
 } from "../../lib/setup-resources";
-import { DEPLOY_ARGS, deployInitialRelease, type InitialDeployment } from "../../lib/release";
+import { DEPLOY_ARGS } from "../../lib/backend";
+import { deployInitialRelease, type InitialDeployment } from "../../lib/environment";
 import { installDependenciesForSetup } from "./install";
 import {
   ensureInitialCommit,

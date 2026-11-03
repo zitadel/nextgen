@@ -7,7 +7,7 @@ import { describe, expect } from "vitest";
 
 import { it } from "../../../helpers/fixtures";
 
-import { deployMessage } from "../../../../src/lib/release/message";
+import { deployMessage } from "../../../../src/lib/backend/message";
 
 const run = promisify(execFile);
 

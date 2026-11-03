@@ -6,8 +6,8 @@ import { describe, expect } from "vitest";
 
 import { it } from "../../../../helpers/fixtures";
 
-import { validateStep } from "../../../../../src/lib/release/steps/validate";
-import type { StepContext } from "../../../../../src/lib/release/pipeline";
+import { validateStep } from "../../../../../src/lib/backend/steps/validate";
+import type { StepContext } from "../../../../../src/lib/backend/pipeline";
 import type { SuggestedCommand } from "../../../../../src/lib/suggestion";
 
 /** A valid user-schema the server would accept, so schema parsing passes. */

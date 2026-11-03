@@ -7,17 +7,16 @@ import {
 } from "../../lib/oclif";
 import {
   buildBundle,
-  createDeployment,
   DEPLOY_ARGS,
-  createReleaseFromBundle,
+  DeploymentService,
+  ReleaseService,
   diffStep,
   headSha,
   runSteps,
-  servesPrimary,
   type StepContext,
   validateStep,
   worktreeIsDirty,
-} from "../../lib/release";
+} from "../../lib/backend";
 import { ApiError } from "@zitadel/api/runtime/fetch";
 import { Flags } from "@oclif/core";
 import { z } from "zod";
@@ -28,7 +27,7 @@ import { reads, type Refused } from "../../lib/oclif/flags";
 import { type Refusal, refusalError } from "../../lib/oclif/refusal";
 import { issuerHeldAsPreview, originOf, type ProjectOrigin } from "../../lib/origins";
 import { readZitadelSecret } from "../../lib/project";
-import { deployMessage, MESSAGE_MAX_LENGTH, messageTooLong } from "../../lib/release";
+import { deployMessage, MESSAGE_MAX_LENGTH, messageTooLong } from "../../lib/backend";
 import type { SuggestedCommand } from "../../lib/suggestion";
 import { reportWarning } from "../../lib/warnings";
 
@@ -214,7 +213,7 @@ export default class Deploy extends EnvironmentCommand {
       );
     }
 
-    const release = await createReleaseFromBundle(client, projectId, bundle, {
+    const release = await new ReleaseService(client, projectId).create(bundle, {
       message,
       gitSha: await headSha(this.cwd),
       gitDirty,
@@ -235,52 +234,54 @@ export default class Deploy extends EnvironmentCommand {
       });
     })?.id;
     const targets = ["primary"];
-    const deployment = await createDeployment(client, projectId, {
-      releaseId: release.id,
-      targets,
-      message,
-      // On a project's first deploy nothing is live, so there is no
-      // deployment to guard against: the field is omitted rather than sent
-      // empty or as a placeholder, which an optional id cannot stand in for.
-      // When a deployment is live its id is sent so a racing deploy is caught
-      // with a 409 (#538).
-      ...(observed === undefined ? {} : { expectedDeploymentId: observed }),
-    }).catch(async (error: unknown): Promise<never> => {
-      // A 409 means another deploy landed between our inspection and this
-      // create. Re-read what the targets serve now and report that actual
-      // deployment, so the caller re-runs against current state (#538).
-      if (!(error instanceof ApiError) || error.status !== 409) {
-        throw error;
-      }
-      // Building dedupes on content, revoked releases included, so a tree
-      // that matches a revoked release builds back to it and cannot deploy.
-      // That is not a race: re-running would fail the same way.
-      if (errorCode(error) === "rel.revoked") {
+    const deployment = await new DeploymentService(client, projectId)
+      .deploy({
+        releaseId: release.id,
+        targets,
+        message,
+        // On a project's first deploy nothing is live, so there is no
+        // deployment to guard against: the field is omitted rather than sent
+        // empty or as a placeholder, which an optional id cannot stand in for.
+        // When a deployment is live its id is sent so a racing deploy is caught
+        // with a 409 (#538).
+        ...(observed === undefined ? {} : { expectedDeploymentId: observed }),
+      })
+      .catch(async (error: unknown): Promise<never> => {
+        // A 409 means another deploy landed between our inspection and this
+        // create. Re-read what the targets serve now and report that actual
+        // deployment, so the caller re-runs against current state (#538).
+        if (!(error instanceof ApiError) || error.status !== 409) {
+          throw error;
+        }
+        // Building dedupes on content, revoked releases included, so a tree
+        // that matches a revoked release builds back to it and cannot deploy.
+        // That is not a race: re-running would fail the same way.
+        if (errorCode(error) === "rel.revoked") {
+          throw new ZitadelError(
+            "E_CONFLICT",
+            `This content was already released as ${release.id}, which is revoked`,
+            {
+              hint: "A revoked release can never be served again. Change the configuration so it builds a new release, then deploy.",
+              details: { release_id: release.id, content_hash: release.content_hash },
+            },
+          );
+        }
+        // The deployment that raced in on a primary origin, not a live preview.
+        const deployments = await client.listDeployments.all({
+          project_id: projectId,
+          live: true,
+        });
+        const current = deployments.find(DeploymentService.servesPrimary);
         throw new ZitadelError(
           "E_CONFLICT",
-          `This content was already released as ${release.id}, which is revoked`,
+          "Another deploy changed the targets since this one was prepared",
           {
-            hint: "A revoked release can never be served again. Change the configuration so it builds a new release, then deploy.",
-            details: { release_id: release.id, content_hash: release.content_hash },
+            hint: `Re-run \`zitadel ${DEPLOY_ARGS}${this.environmentSelector()}\`; it will build and deploy against the current state.`,
+            details: current === undefined ? undefined : { current_deployment: current },
+            nextCommands: [this.suggest("deployment list --live")],
           },
         );
-      }
-      // The deployment that raced in on a primary origin, not a live preview.
-      const deployments = await client.listDeployments.all({
-        project_id: projectId,
-        live: true,
       });
-      const current = deployments.find(servesPrimary);
-      throw new ZitadelError(
-        "E_CONFLICT",
-        "Another deploy changed the targets since this one was prepared",
-        {
-          hint: `Re-run \`zitadel ${DEPLOY_ARGS}${this.environmentSelector()}\`; it will build and deploy against the current state.`,
-          details: current === undefined ? undefined : { current_deployment: current },
-          nextCommands: [this.suggest("deployment list --live")],
-        },
-      );
-    });
 
     const servedOrigins = deployment.targets.map((target) => target.origin);
     this.recordTelemetry({ origin_count: servedOrigins.length });

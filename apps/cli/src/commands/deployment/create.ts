@@ -8,10 +8,10 @@ import {
   type JsonEnvelope,
   nonBlankString,
 } from "../../lib/oclif";
-import { createDeployment } from "../../lib/release";
+import { DeploymentService } from "../../lib/backend";
 
 import { reads, type Refused } from "../../lib/oclif/flags";
-import { MESSAGE_MAX_LENGTH, messageTooLong } from "../../lib/release";
+import { MESSAGE_MAX_LENGTH, messageTooLong } from "../../lib/backend";
 
 /**
  * What `-m/--message` records. It refuses a blank message, which would record
@@ -69,7 +69,7 @@ export default class DeploymentCreate extends EnvironmentCommand {
 
     const { client, projectId } = await this.connect();
 
-    const deployment = await createDeployment(client, projectId, {
+    const deployment = await new DeploymentService(client, projectId).deploy({
       releaseId: flags.release,
       targets,
       message: flags.message,

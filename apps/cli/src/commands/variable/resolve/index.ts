@@ -1,7 +1,7 @@
 import type { ZitadelClient } from "../../../lib/api-client";
 import { Cmd } from "../../../lib/cmd";
 import { ZitadelError } from "../../../lib/errors";
-import { DEPLOY_ARGS, originMatchesPattern } from "../../../lib/release";
+import { DEPLOY_ARGS, OriginService } from "../../../lib/backend";
 import type { SuggestedCommand } from "../../../lib/suggestion";
 
 import {
@@ -44,7 +44,9 @@ async function nothingDeployed(
     });
   }
   if (
-    origins.some((entry) => entry.kind === "preview" && originMatchesPattern(entry.pattern, origin))
+    origins.some(
+      (entry) => entry.kind === "preview" && OriginService.matches(entry.pattern, origin),
+    )
   ) {
     return new ZitadelError("E_NOT_FOUND", `Nothing is deployed to ${origin}.`, {
       hint: "A preview URL is served by a pull-request build, not by `deploy`; resolve its variables once that build has deployed it.",

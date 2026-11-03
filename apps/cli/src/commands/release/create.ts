@@ -8,17 +8,17 @@ import {
 } from "../../lib/oclif";
 import {
   buildBundle,
-  createReleaseFromBundle,
+  ReleaseService,
   headSha,
   runSteps,
   type StepContext,
   validateStep,
   worktreeIsDirty,
-} from "../../lib/release";
+} from "../../lib/backend";
 import { ZitadelError } from "../../lib/errors";
 
 import { reads, type Refused } from "../../lib/oclif/flags";
-import { MESSAGE_MAX_LENGTH, messageTooLong } from "../../lib/release";
+import { MESSAGE_MAX_LENGTH, messageTooLong } from "../../lib/backend";
 
 /**
  * What `-m/--message` records. It refuses a blank message, which would record
@@ -96,7 +96,7 @@ export default class ReleaseCreate extends EnvironmentCommand {
       });
     }
 
-    const release = await createReleaseFromBundle(client, projectId, bundle, {
+    const release = await new ReleaseService(client, projectId).create(bundle, {
       message: flags.message,
       gitSha: await headSha(this.cwd),
       gitDirty: await worktreeIsDirty(this.cwd),

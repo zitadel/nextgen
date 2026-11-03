@@ -28,7 +28,7 @@ import { type Refusal, refusalError } from "../../lib/oclif/refusal";
 import { filled, reads, suggesterOf } from "../../lib/oclif/flags";
 import { metaSchemaState, projectMetaSchemas } from "../../lib/meta-schemas";
 import { normalizePublicCliProse } from "../../lib/public-cli";
-import { DEPLOY_ARGS } from "../../lib/release";
+import { DEPLOY_ARGS } from "../../lib/backend";
 import { Promptable } from "../../lib/oclif/promptable";
 import type { BrandingDesign } from "@zitadel/config/defaults";
 

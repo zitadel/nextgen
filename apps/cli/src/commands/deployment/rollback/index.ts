@@ -14,12 +14,7 @@ import {
 } from "../../../lib/oclif";
 import { Tabulatable } from "../../../lib/oclif/tabulatable";
 import { reads, type Refused } from "../../../lib/oclif/flags";
-import {
-  MESSAGE_MAX_LENGTH,
-  messageTooLong,
-  rollbackDeployment,
-  servesPrimary,
-} from "../../../lib/release";
+import { MESSAGE_MAX_LENGTH, messageTooLong, DeploymentService } from "../../../lib/backend";
 import { type Refusal, refusalError } from "../../../lib/oclif/refusal";
 import { toZitadelError } from "../../../lib/errors";
 import type { SuggestedCommand } from "../../../lib/suggestion";
@@ -73,7 +68,7 @@ export async function readPrimaryHistory(
       prior: undefined,
     };
   }
-  const [latest, prior] = (await load()).filter(servesPrimary);
+  const [latest, prior] = (await load()).filter(DeploymentService.servesPrimary);
   if (latest === undefined) {
     throw refusalError(NOTHING_DEPLOYED_REFUSAL, {}, suggest);
   }
@@ -214,13 +209,17 @@ export default class DeploymentRollback extends Tabulatable(Destructive(Environm
         prepare: async () =>
           target.expectedDeploymentId ??
           (await client.listDeployments.all({ project_id: projectId, live: true })).find(
-            servesPrimary,
+            DeploymentService.servesPrimary,
           )?.id,
         apply: async (consent, guard) => {
-          const deployment = await rollbackDeployment(consent, client, projectId, target.id, {
-            ...(flags.message === undefined ? {} : { message: flags.message }),
-            ...(guard === undefined ? {} : { expectedDeploymentId: guard }),
-          });
+          const deployment = await new DeploymentService(client, projectId).rollback(
+            consent,
+            target.id,
+            {
+              ...(flags.message === undefined ? {} : { message: flags.message }),
+              ...(guard === undefined ? {} : { expectedDeploymentId: guard }),
+            },
+          );
           const release = await client
             .getReleaseById(deployment.release_id, { project_id: projectId })
             .catch((error: unknown) => {

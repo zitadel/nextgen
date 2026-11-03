@@ -7,6 +7,7 @@ import {
   type JsonEnvelope,
   nonBlankArg,
 } from "../../lib/oclif";
+import { OriginService } from "../../lib/backend";
 import { dryRunResult } from "../../lib/oclif/crud/shared";
 
 /** The two kinds an origin pattern can be, as the `--kind` flag accepts them. */
@@ -54,7 +55,7 @@ export default class OriginAdd extends EnvironmentCommand {
 
     const { client, projectId } = await this.connect();
 
-    const added = await client.addOrigin(projectId, { pattern: args.pattern, kind: flags.kind });
+    const added = await new OriginService(client, projectId).add(args.pattern, flags.kind);
 
     return this.emit({
       status: "ok",

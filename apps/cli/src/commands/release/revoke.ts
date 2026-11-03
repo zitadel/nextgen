@@ -8,7 +8,7 @@ import {
   nonBlankArg,
 } from "../../lib/oclif";
 import { mutatedData } from "../../lib/oclif/envelope";
-import { revokeRelease } from "../../lib/release";
+import { ReleaseService } from "../../lib/backend";
 import { Destructive } from "../../lib/oclif/destructive";
 
 /**
@@ -49,7 +49,10 @@ export default class ReleaseRevoke extends Destructive(EnvironmentCommand) {
         }),
         prepare: () => this.connect(),
         apply: async (consent, { client, projectId }) => {
-          const release = await revokeRelease(consent, client, projectId, args.releaseId);
+          const release = await new ReleaseService(client, projectId).revoke(
+            consent,
+            args.releaseId,
+          );
           return {
             status: "ok",
             // The lifecycle-mutation shape every revoke answers with, plus when.

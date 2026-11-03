@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { runSteps, type Step, type StepContext } from "../../../../src/lib/release/pipeline";
+import { runSteps, type Step, type StepContext } from "../../../../src/lib/backend/pipeline";
 import type { SuggestedCommand } from "../../../../src/lib/suggestion";
 
 function ctx(overrides: Partial<StepContext>): StepContext {

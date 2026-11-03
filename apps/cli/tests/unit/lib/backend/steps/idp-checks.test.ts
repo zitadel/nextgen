@@ -1,8 +1,8 @@
 import { ApiError } from "@zitadel/api/runtime/fetch";
 import { describe, expect, it } from "vitest";
 
-import type { StepContext } from "../../../../../src/lib/release/pipeline";
-import { validateConnections } from "../../../../../src/lib/release/steps/idp-checks";
+import type { StepContext } from "../../../../../src/lib/backend/pipeline";
+import { validateConnections } from "../../../../../src/lib/backend/steps/idp-checks";
 import type { SuggestedCommand } from "../../../../../src/lib/suggestion";
 
 /** A connection the server would accept: a `${{ NAME }}` client_secret. */

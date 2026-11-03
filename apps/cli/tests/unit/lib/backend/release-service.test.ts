@@ -1,7 +1,7 @@
 import { getDefaultHumanUserSchemaBody } from "@zitadel/config/defaults";
 import { describe, expect, it, vi } from "vitest";
 
-import { createReleaseFromBundle } from "../../../../src/lib/release/release";
+import { ReleaseService } from "../../../../src/lib/backend/release-service";
 
 /** A client whose build answers with an empty release, recording what it was sent. */
 function aClient() {
@@ -11,12 +11,12 @@ function aClient() {
 
 const source = { gitSha: null, gitDirty: false };
 
-describe("createReleaseFromBundle", () => {
+describe("ReleaseService.create", () => {
   it("sends the bundle as read, with nothing filled in", async () => {
     const { buildRelease, client } = aClient();
     const bundle = { schemas: [getDefaultHumanUserSchemaBody()], flow_definitions: [], idps: [] };
 
-    await createReleaseFromBundle(client, "proj_1", bundle, source);
+    await new ReleaseService(client, "proj_1").create(bundle, source);
 
     expect(buildRelease).toHaveBeenCalledWith(
       { bundle, git_dirty: false },
@@ -28,10 +28,12 @@ describe("createReleaseFromBundle", () => {
     const { buildRelease, client } = aClient();
     const bundle = { schemas: [{ kind: "user-schema" }], flow_definitions: [], idps: [] };
 
-    await expect(createReleaseFromBundle(client, "proj_1", bundle, source)).rejects.toMatchObject({
-      code: "E_VALIDATION",
-      message: expect.stringMatching(/nothing was sent[\s\S]*bundle\.schemas\.0/),
-    });
+    await expect(new ReleaseService(client, "proj_1").create(bundle, source)).rejects.toMatchObject(
+      {
+        code: "E_VALIDATION",
+        message: expect.stringMatching(/nothing was sent[\s\S]*bundle\.schemas\.0/),
+      },
+    );
     expect(buildRelease).not.toHaveBeenCalled();
   });
 });

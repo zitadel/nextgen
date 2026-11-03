@@ -7,6 +7,7 @@ import {
   type JsonEnvelope,
   nonBlankArg,
 } from "../../lib/oclif";
+import { OriginService } from "../../lib/backend";
 import { dryRunResult } from "../../lib/oclif/crud/shared";
 import { deletedData } from "../../lib/oclif/envelope";
 import { reportWarning } from "../../lib/warnings";
@@ -53,14 +54,15 @@ export default class OriginRm extends Destructive(EnvironmentCommand) {
         },
         prepare: () => this.connect(),
         apply: async (consent, { client, projectId }) => {
-          await consent.unlock(client).removeOrigin(projectId, { pattern: args.pattern });
+          const origins = new OriginService(client, projectId);
+          await origins.remove(consent, args.pattern);
           // An empty list admits every origin, so removing the last pattern opens the
           // project up rather than closing it: said aloud, since it is the opposite
           // of what removing one pattern otherwise does.
           // The pattern is already removed, so a failed read of what is left is said
           // aloud rather than reported as a failed removal.
-          const remaining = await client.getProject(projectId).then(
-            (project) => project.origins,
+          const remaining = await origins.list().then(
+            (remaining) => remaining,
             (error: unknown) => {
               reportWarning(
                 `${args.pattern} was removed, but the project's remaining origins could not be read: ${errorMessage(error)}`,

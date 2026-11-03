@@ -12,8 +12,8 @@ import {
 } from "../../lib/oclif";
 import {
   buildBundle,
-  createDeployment,
-  createReleaseFromBundle,
+  DeploymentService,
+  ReleaseService,
   deployMessage,
   headSha,
   runSteps,
@@ -22,7 +22,7 @@ import {
   type StepContext,
   validateStep,
   worktreeIsDirty,
-} from "../../lib/release";
+} from "../../lib/backend";
 import { ApiError } from "@zitadel/api/runtime/fetch";
 
 import type { ZitadelClient } from "../../lib/api-client";
@@ -328,12 +328,12 @@ export default class Preview extends PreviewCommand {
     // The release keeps the message of whichever run built it first, usually
     // this one, so the deploy after merge reuses it rather than adding its own.
     const message = await deployMessage(flags.message, this.cwd, this.env);
-    const release = await createReleaseFromBundle(client, projectId, bundle, {
+    const release = await new ReleaseService(client, projectId).create(bundle, {
       message,
       gitSha: await headSha(this.cwd),
       gitDirty: await worktreeIsDirty(this.cwd),
     });
-    const deployment = await createDeployment(client, projectId, {
+    const deployment = await new DeploymentService(client, projectId).deploy({
       releaseId: release.id,
       targets: [...urls],
       message,

@@ -6,7 +6,7 @@ import { beforeEach, describe, expect } from "vitest";
 import { it } from "../../../../helpers/fixtures";
 
 import { ZitadelError } from "../../../../../src/lib/errors";
-import { validateSsoConsistency } from "../../../../../src/lib/release/steps/sso-consistency";
+import { validateSsoConsistency } from "../../../../../src/lib/backend/steps/sso-consistency";
 import { takeReportedWarnings } from "../../../../../src/lib/warnings";
 
 const SCHEMA = ".zitadel/schemas/staff.json";

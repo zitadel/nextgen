@@ -16,7 +16,7 @@ import {
   EnvironmentCommand,
   type JsonEnvelope,
 } from "../../lib/oclif";
-import { DEPLOY_ARGS, servesPrimary } from "../../lib/release";
+import { DEPLOY_ARGS, DeploymentService } from "../../lib/backend";
 import { writeBackResource } from "../../lib/sync";
 import { SCHEMAS_DIR } from "../../lib/user-schema";
 import { type Refused, taken } from "../../lib/oclif/flags";
@@ -231,7 +231,7 @@ export default class Pull extends EnvironmentCommand {
       project_id: projectId,
       live: true,
     });
-    const deployment = deployments.find(servesPrimary);
+    const deployment = deployments.find(DeploymentService.servesPrimary);
     if (deployment === undefined) {
       throw new ZitadelError("E_NOT_FOUND", "Nothing is deployed to a primary origin yet.", {
         hint: `Deploy first with \`zitadel ${DEPLOY_ARGS}${this.environmentSelector()}\`, then pull.`,

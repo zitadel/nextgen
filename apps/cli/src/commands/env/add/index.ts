@@ -7,11 +7,15 @@ import type { Parsed } from "@zitadel/config/idp";
 import { consola } from "consola";
 
 import { createZitadelClient } from "../../../lib/api-client";
-import { isEnvironmentName } from "../../../lib/environment";
+import {
+  deployInitialRelease,
+  type InitialDeployment,
+  isEnvironmentName,
+} from "../../../lib/environment";
 import { toZitadelError } from "../../../lib/errors";
 import { writeManagedEnvFile } from "../../../lib/fs-safe";
 import { isObject } from "../../../lib/json";
-import { DEPLOY_ARGS, deployInitialRelease, type InitialDeployment } from "../../../lib/release";
+import { DEPLOY_ARGS } from "../../../lib/backend";
 import { reportWarning } from "../../../lib/warnings";
 import {
   type Admitted,

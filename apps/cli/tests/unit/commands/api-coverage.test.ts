@@ -200,13 +200,13 @@ const STANDALONE: Readonly<Record<string, readonly string[]>> = {
   releases: ["deploy", "release/create", "release/revoke"],
   // A deployment is an act, not a file: `deploy` and `deployment create` make a
   // release live, `deployment list`/`get` read the history, `deployment
-  // rollback` re-applies one. The operations live in the `lib/release` wrappers
+  // rollback` re-applies one. The operations live in the `lib/backend` wrappers
   // these commands call, which {@link standaloneOperations} scans too.
   deployments: ["deployment/create", "deployment/list", "deployment/get", "deployment/rollback"],
   // A preview is written by a preview deployment, not created directly: `preview`
   // deploys to the preview URLs, `preview list` reads the live ones and
   // `preview rm` removes one. `preview` reaches the release/deployment
-  // operations through the `lib/release` wrappers scanned above.
+  // operations through the `lib/backend` wrappers scanned above.
   previews: ["preview/index", "preview/list", "preview/rm"],
 };
 
@@ -217,10 +217,10 @@ const STANDALONE: Readonly<Record<string, readonly string[]>> = {
  * is for the registry.
  */
 const PIPELINE_SOURCES: readonly string[] = [
-  "lib/release/release.ts",
-  "lib/release/deployment.ts",
-  "lib/release/steps/diff.ts",
-  "lib/release/steps/idp-checks.ts",
+  "lib/backend/release-service.ts",
+  "lib/backend/deployment-service.ts",
+  "lib/backend/steps/diff.ts",
+  "lib/backend/steps/idp-checks.ts",
 ];
 
 /**
@@ -275,13 +275,17 @@ const standaloneCommandOperations = async (): Promise<ReadonlyMap<string, Readon
       PIPELINE_SOURCES.map((file) => callsIn(join(import.meta.dirname, "../../../src", file))),
     )
   ).flat();
+  const originService = await callsIn(
+    join(import.meta.dirname, "../../../src/lib/backend/origin-service.ts"),
+  );
   return new Map(
     await Promise.all(
       Object.entries(STANDALONE).flatMap(([group, commands]) =>
         commands.map(async (command): Promise<[string, ReadonlySet<string>]> => {
           const own = await callsInCommand(command);
           const viaPipeline = group === "releases" || group === "deployments" ? pipeline : [];
-          return [command.replaceAll("/", " "), new Set([...own, ...viaPipeline])];
+          const viaService = group === "origin" ? originService : [];
+          return [command.replaceAll("/", " "), new Set([...own, ...viaPipeline, ...viaService])];
         }),
       ),
     ),
