@@ -24,8 +24,13 @@ type Flow = { schema: string; identifier?: string };
 type Scan = { warnings: string[]; partial: string[]; failed: boolean };
 /** A schema as the project lists it: its object type and designated identifier. */
 type SchemaInfo = { objectType: string; identifier?: string };
-/** The project's schemas by id, or nothing when the listing could not be read. */
-type Names = () => Promise<ReadonlyMap<string, SchemaInfo> | undefined>;
+/** The project's schemas by revision id and by object type, or nothing when the listing could not be read. */
+type Listing = {
+  byId: ReadonlyMap<string, SchemaInfo>;
+  /** The newest revision of each object type, which is what a flow naming the object type runs on. */
+  byObjectType: ReadonlyMap<string, SchemaInfo>;
+};
+type Names = () => Promise<Listing | undefined>;
 /** A scan with nothing to report. */
 const nothing = (): Scan => ({ warnings: [], partial: [], failed: false });
 /** What stranded users are counted under when their schema could not be named. */
@@ -71,7 +76,7 @@ export const lockoutStep: Step = {
 async function lockoutWarnings(ctx: StepContext): Promise<string[]> {
   // Names are only needed for flows that name a schema by id and for the SSO
   // warning, so they are read on first use, and a failed read costs the names.
-  let listed: Promise<ReadonlyMap<string, SchemaInfo> | undefined> | undefined;
+  let listed: Promise<Listing | undefined> | undefined;
   const names: Names = () => {
     listed ??= objectTypes(ctx).catch(() => undefined);
     return listed;
@@ -152,7 +157,7 @@ async function servedFlows(
     const ref = flow.user_schema;
     const known = objectTypes.has(ref) ? ref : byId.get(ref);
     const listing = known === undefined ? await names() : undefined;
-    const listed = listing?.get(ref);
+    const listed = listing?.byId.get(ref) ?? listing?.byObjectType.get(ref);
     const schema = known ?? listed?.objectType;
     if (schema === undefined) {
       // Without the listing it is not known whether the schema exists.
@@ -198,7 +203,7 @@ async function lookupWarnings(
         }
         return {
           warnings: [
-            `${count(missing.length, truncated)} of ${count(users.length, truncated)} existing ${plural(users.length, "user")} of ${quote(objectType)} ${missing.length === 1 ? "has" : "have"} no ${quote(identifier)}, the field the login flow looks users up by, so typing it offers them registration instead of signing them in. Set it on each user: zitadel users update <user_id> --set attributes.${identifier}=<value> (add --schema <revision_id> to move a user to a newer revision of the schema)`,
+            `${count(missing.length, truncated)} of ${count(users.length, truncated)} existing ${plural(users.length, "user")} of ${quote(objectType)} ${missing.length === 1 ? "has" : "have"} no ${quote(identifier)}, the field the login flow looks users up by, so typing it offers them registration instead of signing them in. Move each user to the schema revision that defines it and set it in one update: zitadel users update <user_id> --schema <revision_id> --set attributes.${identifier}=<value>`,
           ],
           partial: [],
           failed: false,
@@ -265,7 +270,7 @@ async function ssoWarnings(
     if (!hasLink[index]) {
       return;
     }
-    const name = nameOf?.get(user.schema)?.objectType ?? UNNAMED;
+    const name = nameOf?.byId.get(user.schema)?.objectType ?? UNNAMED;
     linked.set(name, (linked.get(name) ?? 0) + 1);
   });
   const warnings = [...linked].map(([name, total]) => {
@@ -369,21 +374,32 @@ function carries(user: QueriedUser, path: string): boolean {
   return node !== undefined && node !== null && node !== "";
 }
 
-/** Each schema revision's id against its object type and designated identifier. */
-async function objectTypes(ctx: StepContext): Promise<Map<string, SchemaInfo>> {
-  const names = new Map<string, SchemaInfo>();
+/** The project's schemas, by revision id and by object type. */
+async function objectTypes(ctx: StepContext): Promise<Listing> {
+  const byId = new Map<string, SchemaInfo>();
+  const newest = new Map<string, { createdAt: string; info: SchemaInfo }>();
   const listed = await ctx.client.listSchemas.all({ project_id: ctx.projectId });
   for (const entry of listed) {
     const document = entry.schema as { objectType?: unknown; "x-identifier"?: unknown } | undefined;
-    if (typeof document?.objectType === "string") {
-      const identifier = document["x-identifier"];
-      names.set(entry.id, {
-        objectType: document.objectType,
-        ...(typeof identifier === "string" && identifier !== "" ? { identifier } : {}),
-      });
+    if (typeof document?.objectType !== "string") {
+      continue;
+    }
+    const identifier = document["x-identifier"];
+    const info: SchemaInfo = {
+      objectType: document.objectType,
+      ...(typeof identifier === "string" && identifier !== "" ? { identifier } : {}),
+    };
+    byId.set(entry.id, info);
+    const createdAt = String(entry.metadata?.created_at ?? "");
+    const seen = newest.get(info.objectType);
+    if (seen === undefined || createdAt >= seen.createdAt) {
+      newest.set(info.objectType, { createdAt, info });
     }
   }
-  return names;
+  return {
+    byId,
+    byObjectType: new Map([...newest].map(([objectType, { info }]) => [objectType, info])),
+  };
 }
 
 const quote = (value: string) => `"${value}"`;

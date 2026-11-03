@@ -183,6 +183,9 @@ describe("deploy", () => {
         expect(app.envelopeOf(result).warnings?.join("\n")).toContain(
           '1 of 1 existing user of "human-user" has no "email"',
         );
+        expect(app.envelopeOf(result).warnings?.join("\n")).toContain(
+          "zitadel users update <user_id> --schema <revision_id> --set attributes.email=<value>",
+        );
       });
 
       it("does not count deactivated users", async () => {

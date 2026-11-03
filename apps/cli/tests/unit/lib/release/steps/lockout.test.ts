@@ -33,7 +33,11 @@ function ctx(options: {
   failFor?: string;
   failLinks?: boolean;
   missingLinks?: string[];
-  listing?: Array<{ id: string; schema: Record<string, unknown> }>;
+  listing?: Array<{
+    id: string;
+    schema: Record<string, unknown>;
+    metadata?: { created_at: string };
+  }>;
   listed?: number[];
 }): StepContext {
   return {
@@ -711,6 +715,59 @@ describe("lockoutStep", () => {
 
   it("runs for deploy only", () => {
     expect(lockoutStep.runsFor).toEqual(["deploy"]);
+  });
+
+  it("checks a flow whose schema exists only on the server, named by object type", async () => {
+    await lockoutStep.run(
+      ctx({
+        schemas: [],
+        flows: [flow("employee")],
+        users: [user("e1", "employee", {})],
+        listing: [{ id: EMPLOYEE, schema: { objectType: "employee", "x-identifier": "email" } }],
+      }),
+    );
+
+    const warnings = takeReportedWarnings();
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain('has no "email"');
+  });
+
+  it("uses the newest revision of a server-only schema for its identifier", async () => {
+    await lockoutStep.run(
+      ctx({
+        schemas: [],
+        flows: [flow("employee", "email")],
+        users: [user("e1", "employee", { email: "a@example.com" })],
+        listing: [
+          {
+            id: "sch_new",
+            schema: { objectType: "employee", "x-identifier": "email" },
+            metadata: { created_at: "2026-02-01T00:00:00Z" },
+          },
+          {
+            id: "sch_old",
+            schema: { objectType: "employee", "x-identifier": "username" },
+            metadata: { created_at: "2026-01-01T00:00:00Z" },
+          },
+        ],
+      }),
+    );
+
+    expect(takeReportedWarnings()).toEqual([]);
+  });
+
+  it("tells the reader to move each user to the revision that defines the identifier", async () => {
+    await lockoutStep.run(
+      ctx({
+        schemas: [{ objectType: "human-user", "x-identifier": "username" }],
+        flows: [flow("human-user", "username")],
+        users: [user("u1", "human-user", { email: "a@example.com" })],
+      }),
+    );
+
+    expect(takeReportedWarnings()[0]).toContain(
+      "zitadel users update <user_id> --schema <revision_id> --set attributes.username=<value>",
+    );
   });
 
   it("never fails the deploy when users cannot be read", async () => {
