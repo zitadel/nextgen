@@ -101,6 +101,8 @@ tasks:
       - "vercel.json"
       - "apps/cloud/build-launcher.sh"
       - "apps/cloud/deploy.sh"
+      - "apps/api/internal/build/info.go"
+      - "go.work"
       # The regression fixture reads both runners' real graphs and CI gates.
       - "moon.yml"
       - "turbo.json"

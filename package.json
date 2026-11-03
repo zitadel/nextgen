@@ -9,6 +9,7 @@
     "cli": "node scripts/run-cli.mjs",
     "server": "node scripts/run-server.mjs",
     "cloud": "node scripts/run-cloud.mjs",
+    "install:cloud": "pnpm install --filter=@zitadel/source --filter='@zitadel/cloud*...' --filter=@zitadel/docs... --filter=@zitadel/website... --os=current --cpu=current --optimistic-repeat-install",
     "docs": "moon run docs:dev",
     "check": "node scripts/check.mjs",
     "check:cloud": "turbo run e2e-deployment console-deployment schemas-deployment cli-deployment --continue",

@@ -288,13 +288,11 @@ On Vercel, every service of the hosted cloud builds through turbo (repo-root
 `vercel.json`): the console, the docs and the website with
 `turbo run build`, the server with `@zitadel/cloud`'s `build`, `migrate`
 and `deploy`, in that order (`dependsOn`), and the schemas with its `schemas`.
-The launcher build, migrations and deployment always run. Go reuses compiled
-packages from the repository-root `.vercel/cache/cloud-go/build`; its module
-cache lives alongside it in `modules`. Each build links the current commit,
-branch and date, because platform bootstrap uses that date to order deployments.
-Turbo never stores or restores the executable, locally or remotely. Vercel's
-Go builder supplies the function's GOOS/GOARCH; the script pins CGO off and
-the exact `go.work` toolchain. The server's build command installs the cloud
+The launcher build, migrations and deployment always run; Go's compiler cache
+persists in Vercel's branch build cache. See [apps/cloud/turbo.json](../../../apps/cloud/turbo.json)
+for the cache boundary and deployment ordering, and the
+[cloud runbook](../../runbooks/cloud.md#operating) for cache diagnostics.
+The server's build command installs the cloud
 services and their dependencies before running Turbo: Vercel's Go builder runs
 no `installCommand`, and Turbo comes with the install. `migrate` passes the whole environment through
 (`passThroughEnv: ["*"]`): the launcher checks every variable the function

@@ -712,12 +712,9 @@ project and imports the root admin.
   entries: the console, the schemas and the packages the docs and the
   website render. The docs' and the website's own builds never come from it:
   their keys hold the deployment's ID. The launcher build is `cache: false`
-  everywhere, so CI and developer builds neither upload nor restore launcher
-  binaries from the shared remote cache. Go reuses its compiled packages;
-  every deployment links fresh commit/date/branch metadata. The date matters:
-  platform bootstrap must not mistake a new deployment for an older server.
-  Vercel supplies the function's GOOS/GOARCH, with CGO disabled by the script.
-  Migration and deployment remain uncached and use the current environment.
+  everywhere; see [its task definition](../../apps/cloud/turbo.json) for the
+  security and deployment-ordering reasons. Migration and deployment remain
+  uncached.
   Each build's log shows `cache hit` or
   `cache miss` per task, and the deployment's Run Summary shows why a task
   missed. A build with a
@@ -725,40 +722,20 @@ project and imports the root admin.
   entry) is fixed by a team owner clearing the cache (team Settings → Build
   and Deployment → Remote Caching); a redeploy without the build cache
   skips the remote cache too.
-- **Build cache:** Vercel keeps one per branch (a branch's first build
-  starts from production's) and restores it before the installs: every
-  `node_modules`, the Next.js services' `.next/cache`, the Go preset's
-  toolchain cache, and the repository-root `.vercel/cache/cloud-go`:
-  `modules` for GOMODCACHE and `build` for GOCACHE. These explicit root paths
-  survive service-root changes and the Go preset replacing its own cache.
-  The first build fills them; subsequent builds reuse unchanged Go packages
-  and run only the final link when just deployment metadata changes.
+- **Build cache:** Vercel restores a branch's archive before installation;
+  a branch's first build starts from production's. The archive includes
+  `node_modules`, Next.js caches and the Go caches configured in
+  [vercel.json](../../vercel.json). All services use the root
+  [`install:cloud` script](../../package.json). A redeploy without the build
+  cache also clears dependencies retained from an older, broader install.
 
-  Compressed, the archive must stay below the Standard build machine's
-  1.5 GB limit. The initial cache change produced 1.53 GB and Vercel discarded
-  it after almost four minutes creating it. The services now install only
-  `@zitadel/source`, `@zitadel/cloud*`, `@zitadel/docs`, `@zitadel/website`
-  and their workspace dependencies, with `--os=current --cpu=current`.
-  Every service uses the same selection and `--optimistic-repeat-install`
-  so the later installs can skip work in the shared checkout. Demo and
-  Storybook-only dependencies no longer need installing or archiving on a
-  clean build. pnpm retains unselected packages from an older restored cache;
-  a redeploy without the build cache removes that legacy install as well.
-
-  After a build, `build-launcher.sh` removes obsolete preset module/compiler
-  caches and old Turbo launcher artifacts. It retains the preset's toolchain:
-  the Go builder still invokes it after the custom command returns. It also
-  removes downloaded module ZIPs, retaining extracted modules and their
-  `.mod`, `.info` and `.ziphash` metadata, and drops compiler entries unused
-  for two hours (Go's default is five days). No custom cache manager runs.
-
-  `scripts/cloud-build.test.mjs` builds and executes a real small Go launcher.
-  A fresh checkout restored only from `.vercel/cache` must skip compilation,
-  link fresh metadata, run migration and deployment, and recompile a changed
-  source. The hosted archive's final size and creation time must still be
-  checked in deployment logs; a successful deployment alone does not prove
-  its cache was saved. Look for `Uploading build cache [...]`, not
-  `Build cache size ... exceeds limit`.
+  The compressed archive must stay below the Standard build machine's
+  1.5 GB limit. [build-launcher.sh](../../apps/cloud/build-launcher.sh) bounds
+  the Go caches and removes duplicate data while preserving the preset's
+  toolchain. A successful deployment alone does not prove its cache was
+  saved: check the final log for `Uploading build cache [...]`, not
+  `Build cache size ... exceeds limit`, and note the creation time. On the
+  next build, check `Restored build cache` and the launcher's build duration.
 
 ## Later: read replicas in other regions
 

@@ -20,9 +20,6 @@ const realPnpm = (process.env.PATH ?? "")
   .split(delimiter)
   .map((directory) => join(directory, "pnpm"))
   .find(existsSync);
-const [goos, goarch] = execFileSync("go", ["env", "GOOS", "GOARCH"], { encoding: "utf8" })
-  .trim()
-  .split("\n");
 function write(root, file, contents, mode) {
   mkdirSync(dirname(join(root, file)), { recursive: true });
   writeFileSync(join(root, file), contents, { mode });
@@ -44,10 +41,16 @@ function fixture() {
   ]) {
     write(root, file, readFileSync(join(repo, file)));
   }
+  const { packageManager, scripts } = JSON.parse(readFileSync(join(repo, "package.json")));
   write(
     root,
     "package.json",
-    JSON.stringify({ name: "@zitadel/source", private: true, packageManager: "pnpm@12.14.0" }),
+    JSON.stringify({
+      name: "@zitadel/source",
+      private: true,
+      packageManager,
+      scripts: { "install:cloud": scripts["install:cloud"] },
+    }),
   );
   write(root, "pnpm-workspace.yaml", "packages:\n  - apps/*\n");
   write(
@@ -96,7 +99,8 @@ func main() {
     "bin/pnpm",
     `#!${process.execPath}
 if (process.argv[2] === 'install') process.exit(0);
-const result = require('node:child_process').spawnSync(${JSON.stringify(realPnpm)}, process.argv.slice(2), {env: process.env, stdio: 'inherit'});
+const [command, ...prefix] = ${JSON.stringify(realPnpm ? [realPnpm] : ["corepack", "pnpm"])};
+const result = require('node:child_process').spawnSync(command, [...prefix, ...process.argv.slice(2)], {env: process.env, stdio: 'inherit'});
 process.exit(result.status ?? 1);
 `,
     0o755,
@@ -108,6 +112,18 @@ process.exit(result.status ?? 1);
 }
 
 function run(root, overrides = {}) {
+  let target;
+  try {
+    target = execFileSync("go", ["env", "GOOS", "GOARCH"], {
+      encoding: "utf8",
+      env: { ...process.env, GOTOOLCHAIN: "local" },
+    });
+  } catch (cause) {
+    throw new Error("cloud-build.test.mjs requires Go on PATH; see CONTRIBUTING.md for setup.", {
+      cause,
+    });
+  }
+  const [goos, goarch] = target.trim().split("\n");
   const command = JSON.parse(readFileSync(join(root, "vercel.json"))).services.server.buildCommand;
   return execFileSync("sh", ["-c", command], {
     cwd: join(root, "apps/api"),
@@ -129,6 +145,7 @@ function run(root, overrides = {}) {
       GOFLAGS: "-x",
       GOPROXY: "off",
       GOSUMDB: "off",
+      GOTOOLCHAIN: "local",
       ...overrides,
     },
     stdio: "pipe",
@@ -141,34 +158,35 @@ function metadata(root) {
 test("restored Go caches skip compilation, refresh metadata and still migrate and deploy", async () => {
   const first = fixture();
   write(first, ".vercel/cache/golang/obsolete", "old cache");
-  write(first, ".vercel/cache/cloud-go/turbo/obsolete", "old artifact");
   write(first, "apps/api/.vercel/cache/golang/pkg/mod/obsolete", "old module");
   write(first, "apps/api/.vercel/cache/golang/go-build/obsolete", "old object");
   write(first, "apps/api/.vercel/cache/golang/bin/go", "preset toolchain");
-  const downloaded = ".vercel/cache/cloud-go/modules/cache/download/example.com/module/@v/v1.0.0";
-  write(first, `${downloaded}.zip`, "redundant archive");
-  write(first, `${downloaded}.ziphash`, "preserved checksum");
   expect(run(first)).toMatch(/\/compile /);
   expect(metadata(first).slice(0, 2)).toEqual(["0.1.0+cloud", "first"]);
   expect(existsSync(join(first, ".vercel/cache/golang"))).toBe(false);
-  expect(existsSync(join(first, ".vercel/cache/cloud-go/turbo"))).toBe(false);
   expect(existsSync(join(first, "apps/api/.vercel/cache/golang/pkg/mod"))).toBe(false);
   expect(existsSync(join(first, "apps/api/.vercel/cache/golang/go-build"))).toBe(false);
   expect(readFileSync(join(first, "apps/api/.vercel/cache/golang/bin/go"), "utf8")).toBe(
     "preset toolchain",
   );
-  expect(existsSync(join(first, `${downloaded}.zip`))).toBe(false);
   expect(readFileSync(join(first, "calls"), "utf8")).toBe("migrate\ndeploy\n");
 
   await new Promise((resolve) => setTimeout(resolve, 1100));
   const next = fixture();
   cpSync(join(first, ".vercel/cache"), join(next, ".vercel/cache"), { recursive: true });
-  const log = run(next, { VERCEL_GIT_COMMIT_SHA: "docs-only-commit", TURBO_CACHE: "remote:rw" });
+  const downloaded = ".vercel/cache/cloud-go/modules/cache/download/example.com/module/@v/v1.0.0";
+  write(next, `${downloaded}.zip`, "redundant archive");
+  write(next, `${downloaded}.ziphash`, "preserved checksum");
+  const extracted = ".vercel/cache/cloud-go/modules/example.com/module@v1.0.0/module.go";
+  write(next, extracted, "old extracted module");
+  const log = run(next, { VERCEL_GIT_COMMIT_SHA: "docs-only-commit" });
   expect(log).not.toMatch(/\/compile /);
   expect(log).toMatch(/\/link /);
   expect(metadata(next).slice(0, 2)).toEqual(["0.1.0+cloud", "docs-only-commit"]);
   expect(Date.parse(metadata(next)[2])).toBeGreaterThan(Date.parse(metadata(first)[2]));
   expect(metadata(next)[3]).toBe("feature");
+  expect(existsSync(join(next, `${downloaded}.zip`))).toBe(false);
+  expect(existsSync(join(next, extracted))).toBe(true);
   expect(readFileSync(join(next, `${downloaded}.ziphash`), "utf8")).toBe("preserved checksum");
   expect(readFileSync(join(next, "calls"), "utf8")).toBe("migrate\ndeploy\n");
   // Identical Turbo inputs still execute both side effects on the next run.
@@ -180,4 +198,10 @@ test("restored Go caches skip compilation, refresh metadata and still migrate an
   expect(readFileSync(join(next, "calls"), "utf8")).toBe(
     "migrate\ndeploy\nmigrate\ndeploy\nmigrate\ndeploy\n",
   );
+  // A changed workspace dependency set drops obsolete modules, keeping compiled packages.
+  write(next, "apps/other/go.mod", "module example.com/other\ngo 1.26.0\n");
+  write(next, "go.work", `${readFileSync(join(next, "go.work"), "utf8")}use ./apps/other\n`);
+  expect(run(next)).not.toMatch(/\/compile /);
+  expect(existsSync(join(next, extracted))).toBe(false);
+  expect(existsSync(join(next, `${downloaded}.ziphash`))).toBe(false);
 }, 120_000);
