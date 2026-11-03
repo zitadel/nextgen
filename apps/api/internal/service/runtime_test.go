@@ -161,6 +161,26 @@ func TestRuntimeResolver_Resolve(t *testing.T) {
 		assert.Equal(t, console, got.Origin)
 	})
 
+	t.Run("a console on a loopback origin the project lists as a preview serves its preview", func(t *testing.T) {
+		const console = "http://localhost:8080"
+		resolver, statements, releases := newRuntimeResolverOwning(t, console)
+		statements.EXPECT().GetProjectByID(gomock.Any(), projectID).Return(&domain.Project{
+			ID:      projectID,
+			Origins: []domain.Origin{{Pattern: console, Kind: domain.OriginKindPreview}},
+		}, nil)
+		statements.EXPECT().GetLiveDeployment(gomock.Any(), projectID, console, gomock.Any()).Return(&domain.Deployment{
+			ID: "dep_preview", ProjectID: projectID, ReleaseID: "rel_preview",
+		}, nil)
+		releases.EXPECT().Get(gomock.Any(), projectID, "rel_preview").Return(&domain.Release{
+			ID: "rel_preview", ProjectID: projectID,
+		}, nil)
+
+		got, err := resolver.Resolve(t.Context(), projectID, console)
+		require.NoError(t, err)
+		assert.Equal(t, "origin", got.Source)
+		assert.Equal(t, "rel_preview", got.Release.ID)
+	})
+
 	t.Run("loopback with no deployment is not deployed", func(t *testing.T) {
 		resolver, statements, _ := newMockedRuntimeResolver(t)
 		loopback := "http://localhost:3000"
