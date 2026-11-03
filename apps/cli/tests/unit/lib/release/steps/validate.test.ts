@@ -203,6 +203,28 @@ describe("validate step", () => {
         },
       });
     });
+
+    it.each(["sch_01J000000000000000000000", "https://schemas.zitadel.com/human-user/v1"])(
+      "leaves a user_schema that is a schema id (%s) to the server",
+      async (ref) => {
+        const { client, listSchemas } = projectHolding();
+        const bundle = { schemas: [validSchema], flow_definitions: [flowNaming(ref, ["email"])] };
+
+        await expect(validateStep.run(ctx(bundle, { client }))).resolves.toBeUndefined();
+        expect(listSchemas).not.toHaveBeenCalled();
+      },
+    );
+
+    it("leaves a user_schema to the server when the bundle holds a schema-url entry", async () => {
+      const { client, listSchemas } = projectHolding();
+      const bundle = {
+        schemas: [{ kind: "schema-url", url: "https://example.com/human.json" }],
+        flow_definitions: [flowNaming("fetched-schema", ["email"])],
+      };
+
+      await expect(validateStep.run(ctx(bundle, { client }))).resolves.toBeUndefined();
+      expect(listSchemas).not.toHaveBeenCalled();
+    });
   });
 
   describe("a policy file", () => {

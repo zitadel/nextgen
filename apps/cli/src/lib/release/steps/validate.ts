@@ -147,6 +147,11 @@ function schemaFor(ctx: StepContext, flow: Record<string, unknown>): object | un
  * holds. The server pins the project's latest revision of a schema the bundle
  * leaves out (`autoPinReferences`) and refuses the release when there is none
  * (`rel.unresolved_reference`), so a dry run asks the project the same thing.
+ *
+ * Only an `objectType` reference is checked. A schema id (`sch_…` or a `$id`
+ * URL) resolves through the server's built-in bases, and a bundled
+ * `schema-url` entry learns its `objectType` only when the server fetches it,
+ * so a flow could name either without the bundle or the project listing it.
  */
 async function unresolvedSchema(
   ctx: StepContext,
@@ -154,7 +159,10 @@ async function unresolvedSchema(
   bundled: object | undefined,
 ): Promise<FlowFailure | undefined> {
   const ref = flow.user_schema;
-  if (typeof ref !== "string" || ref === "" || bundled !== undefined) {
+  if (typeof ref !== "string" || ref === "" || bundled !== undefined || isSchemaID(ref)) {
+    return undefined;
+  }
+  if (ctx.bundle.schemas.some((schema) => typeof schema.objectType !== "string")) {
     return undefined;
   }
   const page = await ctx.client.listSchemas({
@@ -175,6 +183,11 @@ async function unresolvedSchema(
     rule: USER_SCHEMA_RESOLVES,
     message: `user_schema "${ref}" is not the objectType of a schema in ${SCHEMAS_DIR}/ (${listed}) or in the project.`,
   };
+}
+
+/** A `user_schema` that is a schema id rather than an `objectType`, told apart as the server's `isUserSchemaID` does. */
+function isSchemaID(ref: string): boolean {
+  return /^sch_./.test(ref) || /^[a-z][a-z0-9+.-]*:/i.test(ref);
 }
 
 /** The CLI's own rule id for {@link unresolvedSchema}; the others are `validateFlowDefinition`'s. */
