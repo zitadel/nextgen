@@ -2,7 +2,7 @@
  * The client's own use of the cursor walk: `pages`, `items` and `all` on one
  * generated function. Internal to the package; `./paging` is what it exports.
  */
-import { pages } from "./paging";
+import { Paging } from "./paging";
 
 /**
  * How a generated function pages: its page's items and cursor, read off a page
@@ -29,13 +29,12 @@ type Hooks = Readonly<{
  * page, and every failure of the walk reaches `hooks.fail` once.
  */
 export function paged(send: (...args: unknown[]) => unknown, shape: PagingShape, hooks: Hooks) {
+  const paging = new Paging<unknown>(shape);
+
   async function* walk<T>(args: unknown[], take: (page: unknown) => readonly T[]) {
-    const raw = pages(
-      async (token) => {
-        return token === undefined ? send(...args) : send(...shape.withToken(args, token));
-      },
-      { next: (page) => shape.next(page) ?? undefined },
-    );
+    const raw = paging.walk(async (token) => {
+      return token === undefined ? send(...args) : send(...shape.withToken(args, token));
+    });
     try {
       for await (const page of raw) {
         for (const value of take(await hooks.respond(page))) {
@@ -53,7 +52,9 @@ export function paged(send: (...args: unknown[]) => unknown, shape: PagingShape,
     all: async (...args: unknown[]) => {
       const collected: unknown[] = [];
       for await (const list of walk(args, (page) => [shape.items(page)])) {
-        collected.push(...list);
+        for (const value of list) {
+          collected.push(value);
+        }
       }
       return collected;
     },

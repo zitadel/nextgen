@@ -1,6 +1,6 @@
 # Evaluation
 
-The engine ([`internal/policy`](../../../internal/policy/)) evaluates one
+The engine ([`internal/policy`](../../../apps/api/internal/policy/)) evaluates one
 resolved instance against one request context and returns a decision. It is
 stateless: it never fetches its own inputs. Every active rule runs, so a
 denial lists every requirement the request missed.

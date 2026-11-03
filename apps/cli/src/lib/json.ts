@@ -122,3 +122,26 @@ export function parseJsonOrUndefined(text: string): unknown {
 export function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
+
+/**
+ * @param target - The object to lay a patch over. It is not changed.
+ * @param patch - What to lay over it.
+ * @returns A new object: `target` with `patch` over it, where objects found at
+ * the same key are merged and everything else, arrays included, is replaced.
+ */
+export function deepMerge(
+  target: Readonly<Record<string, unknown>>,
+  patch: Readonly<Record<string, unknown>>,
+): Record<string, unknown> {
+  const entries = Object.entries(patch).map(([key, item]) => {
+    const existing = target[key];
+    const value = isObject(item) && isObject(existing) ? deepMerge(existing, item) : item;
+
+    return [key, value] as const;
+  });
+
+  return {
+    ...target,
+    ...Object.fromEntries(entries),
+  };
+}

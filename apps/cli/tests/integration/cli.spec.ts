@@ -170,6 +170,12 @@ describe("the cli", () => {
         expect(result).toFailWith("E_VALIDATION");
       });
 
+      it.each([["resources"], ["status"], ["logs"]])("accepts -h on %s", async (command) => {
+        const result = await runCliForTest([command, "-h"]);
+
+        expect(result).toPrint("USAGE");
+      });
+
       it("accepts --no-color", async () => {
         const result = await runCliForTest(["resources", "--no-color", "--json"]);
 

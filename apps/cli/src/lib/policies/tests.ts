@@ -144,8 +144,8 @@ export type ReleasePolicies = {
 
 /**
  * The policies a release pins, by operation, read as the revisions it pins.
- * Whether it is revoked and whether it pins a flow come along: neither stops
- * the test, but both mean its sign-ins do not use these policies.
+ * Whether it is revoked comes along: that does not stop the test, but its
+ * policies then serve no origin.
  */
 export async function policiesFromRelease(
   client: ZitadelClient,

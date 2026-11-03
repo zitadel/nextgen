@@ -27,8 +27,8 @@ Some work was planned as part of ([zitadel#11596](https://github.com/zitadel/zit
 ### Nextgen
 
 No defined settings / policy model. Some configuration is hard-coded, for example:
-- Password minimum length: [`MinLength: 8`](../../internal/domain/flow_field_resolver_schema.go)
-- Passkey user verification is a fixed [`"preferred"`](../../internal/domain/flow_state_machine.go)
+- Password minimum length: [`MinLength: 8`](../../apps/api/internal/domain/flow_field_resolver_schema.go)
+- Passkey user verification is a fixed [`"preferred"`](../../apps/api/internal/domain/flow_state_machine.go)
 - Failed authentication attempts are recorded "for rate-limiting purposes" with no threshold reading them.
 
 The first priority is to introduce proper password policies ([#898](https://github.com/zitadel/nextgen/issues/898)):
@@ -229,7 +229,7 @@ cannot add an operation to it. Templates ship with the server; today's list:
 #### Where the catalog lives and how an operation is added
 
 The catalog is the set of template files embedded in the server binary,
-[`internal/policy/templates/*.json`](../../internal/policy/templates/), plus
+[`internal/policy/templates/*.json`](../../apps/api/internal/policy/templates/), plus
 the index that names each operation's evaluation point,
 [`docs/design/policies/catalog.md`](../design/policies/catalog.md). The two
 must agree; the index is what a reviewer reads, the files are what the

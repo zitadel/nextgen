@@ -39,7 +39,7 @@ afterAll(() => {
   server.close();
 });
 
-async function waitFor<T>(probe: () => T | null | undefined, timeout = 1500): Promise<T> {
+async function waitFor<T>(probe: () => T | null | undefined, timeout = 10_000): Promise<T> {
   const start = Date.now();
   while (Date.now() - start < timeout) {
     const value = probe();

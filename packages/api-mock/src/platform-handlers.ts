@@ -1398,7 +1398,7 @@ const DEFAULT_PREVIEW_TTL = "P7D";
 
 /** The milliseconds an ISO-8601 duration spans, or undefined when it is not one. */
 function isoDurationMs(ttl: string): number | undefined {
-  // The same shapes the server's parser takes (internal/api/ogenx): whole days
+  // The same shapes the server's parser takes (packages/go/ogenx): whole days
   // and a time part in hours, minutes or fractional seconds. Weeks, months and
   // years are not among them, so the mock refuses what the server would.
   const match = /^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?)?$/.exec(ttl);
