@@ -101,7 +101,8 @@ export default class Api extends Destructive(BaseCommand) {
         status: "ok",
         data: {},
         pretty: "",
-        next: { commands: [this.suggestUnscoped("api ls")] },
+        // Under --json the usage is not printed, so the envelope points on.
+        next: this.jsonEnabled() ? { commands: [this.suggestUnscoped("api ls")] } : undefined,
       });
     }
 

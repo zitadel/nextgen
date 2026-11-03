@@ -47,6 +47,14 @@ describe("api", () => {
       expect(result).toPrint("Call any operation of the Zitadel API");
     });
 
+    it("ends with the usage, as --help does", async () => {
+      const app = await aSetUpApp();
+
+      const result = await app.apiRendered("help");
+
+      expect(result.stdout).not.toMatch(/npx @zitadel\/cli@\S+ api ls/);
+    });
+
     it("points to api ls under --json", async () => {
       const app = await aSetUpApp();
 

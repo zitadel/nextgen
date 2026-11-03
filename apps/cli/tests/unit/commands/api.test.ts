@@ -35,6 +35,7 @@ beforeEach(() => {
 afterEach(() => {
   restore(process.stdout, tty.stdout);
   restore(process.stdin, tty.stdin);
+  vi.restoreAllMocks();
   vi.mocked(select).mockReset();
   vi.mocked(text).mockReset();
 });
@@ -69,7 +70,6 @@ describe("zitadel api help", () => {
     await api("help");
 
     expect(toMeta).not.toHaveBeenCalled();
-    toMeta.mockRestore();
   });
 });
 
