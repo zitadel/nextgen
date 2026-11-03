@@ -1,5 +1,5 @@
 import { readFile, readdir } from "node:fs/promises";
-import { join, normalize, posix } from "node:path";
+import { join, normalize, posix, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
@@ -44,10 +44,20 @@ const LEAKS = [
 
 const IMPORT = /\bfrom\s+"(\.[^"]*)"/g;
 
+/**
+ * A path as this file reads one: `readdir` answers in the platform's
+ * separator, and every path here is compared as a module specifier is written.
+ */
+function asSpecifier(path: string): string {
+  return path.split(sep).join(posix.sep);
+}
+
 /** Every `.ts` file in the layer, as a path relative to `src`. */
 async function layerFiles(): Promise<string[]> {
   const files = await readdir(join(root, LAYER), { recursive: true });
-  return files.filter((file) => file.endsWith(".ts")).map((file) => posix.join(LAYER, file));
+  return files
+    .filter((file) => file.endsWith(".ts"))
+    .map((file) => posix.join(LAYER, asSpecifier(file)));
 }
 
 /**
@@ -78,7 +88,7 @@ async function reachesOutside(file: string): Promise<string[]> {
  */
 async function filesIn(directory: string): Promise<string[]> {
   return readdir(join(root, normalize(directory)), { recursive: true })
-    .then((files) => files.filter((file) => file.endsWith(".ts")))
+    .then((files) => files.filter((file) => file.endsWith(".ts")).map(asSpecifier))
     .catch(() => []);
 }
 
