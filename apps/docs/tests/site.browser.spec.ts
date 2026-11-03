@@ -234,7 +234,8 @@ test("an unsent rating stays on its page when the reader moves on", async ({ pag
  * The Spacious layout centres a page together with its table of contents, and
  * only a page with headings renders one. `app/global.css` keeps the column's
  * width on a page without, so every page's title starts at one place; a
- * `full` page (an API operation) has no such column and stays wider.
+ * `full` page (an API operation) has no such column and stays wider where
+ * the table of contents shows.
  */
 test.describe("a page's title starts where every page's does", () => {
   const withHeadings = "/docs/get-started/quickstart";
@@ -260,7 +261,7 @@ test.describe("a page's title starts where every page's does", () => {
       for (const path of withoutHeadings) {
         expect((await box(page, path)).left, path).toBeCloseTo(expected.left, 0);
       }
-      if (width >= 1100) {
+      if (width === 1440) {
         expect((await box(page, operation)).right, operation).toBeGreaterThan(expected.right);
       }
     });
