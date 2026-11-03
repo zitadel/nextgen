@@ -123,7 +123,7 @@ jobs:
       id-token: write
     env:
       # check-generate-pruned runs in a step of its own before them.
-      GATE_TASKS: lint typecheck build test check-typecheck check-openapi-rules check-adrs check-moon-graph
+      GATE_TASKS: lint typecheck build test check-typecheck check-openapi-rules check-adrs check-moon-graph check-go-work
     steps:
       # Write dirty pages back early so Docker's container creates do not
       # wait for a backlog of dirty pages.
@@ -176,7 +176,7 @@ jobs:
           ' -- "$image" </dev/null >"$RUNNER_TEMP/postgres-image-pull.log" 2>&1 &
 
       # Cache Go's build and module caches through GitHub Actions, keyed on
-      # every module's go.sum.
+      # every module's go.sum and go.work.sum.
       - &setup-go
         if: ${{ steps.affected.outputs.run == 'true' }}
         uses: actions/setup-go@v6
@@ -188,6 +188,7 @@ jobs:
             packages/go/go.sum
             tools/bench/go.sum
             tools/oidc-mock/go.sum
+            go.work.sum
 
       - &setup-pnpm
         if: ${{ steps.affected.outputs.run == 'true' }}

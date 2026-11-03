@@ -1,6 +1,11 @@
 import { Flags } from "@oclif/core";
-
-import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../../lib/oclif";
+import { z } from "zod";
+import {
+  type Admitted,
+  CommandGroups,
+  EnvironmentCommand,
+  type JsonEnvelope,
+} from "../../lib/oclif";
 import {
   buildBundle,
   createReleaseFromBundle,
@@ -12,15 +17,32 @@ import {
 } from "../../lib/release";
 import { ZitadelError } from "../../lib/errors";
 
+import { reads, type Refused } from "../../lib/oclif/flags";
+import { MESSAGE_MAX_LENGTH, messageTooLong } from "../../lib/release";
+
 /**
- * `zitadel release create` — build a release from `.zitadel/` and post it,
- * without deploying it.
- *
- * The same bundle `deploy` assembles, validated the same way, but it stops at
- * the release: nothing is made live. Use it to pin a release a pipeline deploys
- * later, or to read back its content digest. Re-running on unchanged content
- * returns the release that already carries it.
+ * What `-m/--message` records. It refuses a blank message, which would record
+ * nothing, and one longer than the server records, which the server would
+ * reject later. `messageTooLong` counts code points, as the server does, so
+ * the length is its call and not the schema's. The message is trimmed.
  */
+const MESSAGE: Refused<string> = {
+  schema: z
+    .string()
+    .trim()
+    .min(1, "the value is empty")
+    .refine((message) => {
+      return !messageTooLong(message);
+    }, `the message is longer than ${MESSAGE_MAX_LENGTH} characters`),
+  refusal: {
+    message: "{problem}",
+    hint: "Pass a shorter summary with -m.",
+    details: {
+      argument: "--message",
+    },
+  },
+};
+
 export default class ReleaseCreate extends EnvironmentCommand {
   static override description = "Build a release from .zitadel/ without deploying it.";
   static override group = CommandGroups.configuration;
@@ -29,31 +51,29 @@ export default class ReleaseCreate extends EnvironmentCommand {
     "<%= config.bin %> release create -m 'add phone_number to human-user'",
   ];
   static override flags = {
-    message: Flags.string({
+    message: Flags.custom<string>({
+      parse: reads(MESSAGE),
+    })({
       char: "m",
       description: "A short summary of what this release changes.",
     }),
   };
 
-  async run(): Promise<JsonEnvelope> {
-    const { flags } = await this.parse(ReleaseCreate);
-    await this.toMeta(flags);
-    const { cwd, env, dryRun, isTTY } = this.meta;
-    const json = this.jsonEnabled();
-
+  protected async execute({ flags }: Admitted<typeof ReleaseCreate>): Promise<JsonEnvelope> {
     const { client, projectId } = await this.connect();
-    const { bundle, resourceCount, brandingSources, idpFiles, policyFiles } =
-      await buildBundle(cwd);
+    const { bundle, resourceCount, brandingSources, idpFiles, policyFiles } = await buildBundle(
+      this.cwd,
+    );
 
     const ctx: StepContext = {
-      cwd,
+      cwd: this.cwd,
       client,
       projectId,
-      env,
+      env: this.env,
       mode: "deploy",
-      dryRun,
-      json,
-      color: !json && isTTY && flags.color !== false && !process.env.NO_COLOR,
+      dryRun: this.dryRun,
+      json: this.isJson,
+      color: this.isColored,
       bundle,
       brandingSources,
       idpFiles,
@@ -68,7 +88,7 @@ export default class ReleaseCreate extends EnvironmentCommand {
     // `release create` carries the same no-mutation promise every command does
     // under `--dry-run`: validate the bundle the same way, then stop before the
     // release is posted so nothing is written server-side.
-    if (dryRun) {
+    if (this.dryRun) {
       return this.emit({
         status: "ok",
         data: { dry_run: true, resources: resourceCount },
@@ -78,8 +98,8 @@ export default class ReleaseCreate extends EnvironmentCommand {
 
     const release = await createReleaseFromBundle(client, projectId, bundle, {
       message: flags.message,
-      gitSha: await headSha(cwd),
-      gitDirty: await worktreeIsDirty(cwd),
+      gitSha: await headSha(this.cwd),
+      gitDirty: await worktreeIsDirty(this.cwd),
     });
     // Building dedupes on content, revoked releases included: the same tree
     // answers with the revoked release, which can never be deployed.

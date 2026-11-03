@@ -22,7 +22,7 @@ const marker =
   "The docs site renders it as its CLI reference (apps/docs/lib/cli-reference.ts).";
 
 class Fake extends BaseCommand {
-  async run(): Promise<never> {
+  protected async execute(): Promise<never> {
     throw new Error("unused");
   }
 }
