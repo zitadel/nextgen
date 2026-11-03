@@ -1,25 +1,28 @@
 ---
 title: Origins and previews
-description: How a project lists the URLs its app runs on, and how preview URLs from pull-request builds go live.
+description: Why a project lists the URLs its app runs on, and how preview URLs let a pull request's configuration run before production.
 ---
 
-An origin is the scheme, host and port a page runs on, such as `https://app.acme.com`. Browsers send it in the `Origin` header. A project's origin list decides whether a page may use the project and which [release](/docs/concepts/releases-and-deployments) it is served.
+An origin is the scheme, host and port a page runs on, such as `https://app.acme.com`. Browsers send it with every request in the `Origin` header. A project lists the origins its app runs on.
+
+## Why a project lists origins
+
+Your sign-in runs in the browser, and code in a browser cannot keep a secret: anyone can read your project ID in the page source. The origin is what ties a request to your app. Zitadel refuses a page whose origin the project does not list, so another site cannot use your project from its own pages.
+
+The origin also decides which configuration a page gets. Your production site and a pull request's preview build can run different [releases](/docs/concepts/releases-and-deployments) of the same project, because Zitadel tells them apart by origin.
 
 ## Primary origins
 
-A primary origin is an exact URL where users reach your app, added with `zitadel origin add <url> --kind primary`. It cannot hold a `*` (`origin.primary_not_exact`).
+A primary origin is a URL where your users reach your app, such as production. It is an exact URL, never a pattern. `zitadel deploy` makes a release live on every primary origin at once, so all of them always run the same configuration.
 
-`zitadel deploy` always deploys to every primary origin together, and needs at least one. An origin added later serves nothing until the next deploy. An app reached at `localhost:3000` and `127.0.0.1:3000` needs both listed.
+A loopback origin, such as `http://localhost:3000`, is always admitted.
 
-## Preview patterns and previews
+## Previews
 
-A preview pattern admits the URLs your host gives pull-request builds: `zitadel origin add 'https://*-acme.vercel.app' --kind preview`. The one `*` matches within a single part of the host name. On a shared host, keep the pattern narrow; `https://*.vercel.app` admits every Vercel customer's builds.
+A pull request that changes `.zitadel/` should be tried before it reaches users. Hosting platforms such as Vercel and Netlify give each pull-request build its own URL, and a preview puts the branch's configuration live on that URL only. Production keeps running its own release until you deploy.
 
-A preview is one URL matching a pattern, with its own deployment. `zitadel preview` builds the branch's `.zitadel/` and deploys it there ([example workflow](/docs/guides/deploy#deploy-from-github-actions)).
+A project admits preview URLs through a preview pattern, such as `https://*-acme.vercel.app`, since each build's URL is new. A pattern only admits URLs; a URL is served once `zitadel preview` deploys to it.
 
-- A preview stays live for 7 days. `--ttl` sets anything from 60 seconds to 365 days, and each new `preview` to the URL renews it.
-- `zitadel preview list` shows live previews; `zitadel preview rm <url>` ends one.
-- Removing the pattern refuses its previews at once.
-- Previews share the project's users and sessions. Only configuration and [variables](/docs/concepts/variables#primary-and-preview-values) differ.
+A preview expires, after 7 days by default, because anyone who finds its URL can open it. For the same reason it never sees production secrets: it gets its own [variable](/docs/concepts/variables#primary-and-preview-values) values. It does share the project's users and sessions, so test data entered on a preview is real data. A test setup with users of its own needs a second [project](/docs/concepts/project-team-user#project).
 
-A page on an origin the project does not list is refused, except a loopback origin such as `http://localhost:3000`, which is always admitted. A project with no origins admits every origin, so removing the last one opens the project up.
+The [deploy guide](/docs/guides/deploy#deploy-from-github-actions) shows previews in a GitHub Actions workflow.

@@ -26,7 +26,7 @@ A secret is stored encrypted and can be replaced but never read back. `zitadel v
 
 ## Primary and preview values
 
-A variable has up to two values, one for [primary origins](/docs/concepts/origins-and-previews#primary-origins) and one for [previews](/docs/concepts/origins-and-previews#preview-patterns-and-previews). Anyone who finds a preview URL can open it, so it must never run with a production secret.
+A variable has up to two values, one for [primary origins](/docs/concepts/origins-and-previews#primary-origins) and one for [previews](/docs/concepts/origins-and-previews#previews). Anyone who finds a preview URL can open it, so it must never run with a production secret.
 
 - A plain `zitadel variable set NAME <value>` writes both values.
 - `--secret` writes the primary value only and removes the preview one.
