@@ -71,9 +71,9 @@ func (f appFixture) at() service.AppLookup {
 const shopDocument = `{
   "slug": "shop", "name": "Shop",
   "clients": [
-    {"slug": "web", "type": "confidential", "grants": ["authorization_code", "refresh_token"],
+    {"slug": "web", "type": "confidential", "grant_types": ["authorization_code", "refresh_token"],
      "redirect_uris": ["https://shop.example.com/callback"], "apis": [{"api": "orders"}]},
-    {"slug": "desktop", "client_id": "ShopDesktop", "type": "public", "grants": ["authorization_code"],
+    {"slug": "desktop", "client_id": "ShopDesktop", "type": "public", "grant_types": ["authorization_code"],
      "redirect_uris": ["http://127.0.0.1/callback"], "apis": [{"api": "orders", "scopes": ["orders.read"]}]}
   ],
   "apis": [{"slug": "orders", "identifier": "https://api.shop.example.com",
@@ -99,7 +99,8 @@ func TestAppService_RegisteredApp(t *testing.T) {
 	assert.True(t, domain.PrefixAppClient.Matches(ids["web"]), "a client without a client_id gets a minted one, got %q", ids["web"])
 	assert.Equal(t, "ShopDesktop", ids["desktop"], "a chosen client_id is kept")
 	require.Len(t, created.Secrets, 1, "only the confidential client gets a secret")
-	assert.True(t, strings.HasPrefix(created.Secrets["web"], "zcs_"))
+	assert.True(t, strings.HasPrefix(created.Secrets["web"].Secret, "zcs_"))
+	assert.True(t, domain.PrefixAppClientCredential.Matches(created.Secrets["web"].CredentialID))
 
 	t.Run("a revision keeps every client_id and generates no second secret", func(t *testing.T) {
 		revised, err := f.apps.CreateOrRevise(f.ctx, f.projectID, []byte(strings.Replace(shopDocument, `"name": "Shop"`, `"name": "Shop 2"`, 1)))
@@ -118,7 +119,7 @@ func TestAppService_RegisteredApp(t *testing.T) {
 
 	t.Run("another app may not take a client_id or an identifier", func(t *testing.T) {
 		_, err := f.apps.CreateOrRevise(f.ctx, f.projectID, []byte(`{"slug":"thief","name":"Thief","clients":[
-			{"slug":"c","client_id":"ShopDesktop","type":"public","grants":["authorization_code"],"redirect_uris":["https://thief.example/cb"]}]}`))
+			{"slug":"c","client_id":"ShopDesktop","type":"public","grant_types":["authorization_code"],"redirect_uris":["https://thief.example/cb"]}]}`))
 		require.ErrorIs(t, err, domain.ErrAppClientIDTaken(nil))
 		_, err = f.apps.CreateOrRevise(f.ctx, f.projectID, []byte(`{"slug":"thief","name":"Thief","apis":[
 			{"slug":"a","identifier":"https://api.shop.example.com"}]}`))
@@ -145,18 +146,22 @@ func TestAppService_RegisteredApp(t *testing.T) {
 		require.ErrorIs(t, err, domain.ErrAppAPINotFound())
 	})
 
-	t.Run("a generated secret verifies, a wrong one does not", func(t *testing.T) {
+	t.Run("a generated secret verifies, a wrong or malformed one does not", func(t *testing.T) {
 		app, web, err := f.directory.Client(f.ctx, f.at(), ids["web"])
 		require.NoError(t, err)
-		require.NoError(t, f.directory.VerifyClientSecret(f.ctx, f.at(), app, web, created.Secrets["web"]))
+		secret := created.Secrets["web"].Secret
+		require.NoError(t, f.directory.VerifyClientSecret(f.ctx, f.at(), app, web, secret))
 		require.ErrorIs(t, f.directory.VerifyClientSecret(f.ctx, f.at(), app, web, "zcs_wrong"), domain.ErrAppClientSecretInvalid())
+		typo := secret[:10] + string(secret[10]^1) + secret[11:]
+		require.ErrorIs(t, f.directory.VerifyClientSecret(f.ctx, f.at(), app, web, typo), domain.ErrAppClientSecretInvalid(),
+			"the checksum catches a typo")
 	})
 
 	t.Run("an imported bcrypt hash verifies and is moved to the server's hash", func(t *testing.T) {
 		hash, err := bcrypt.GenerateFromPassword([]byte("from-v4"), 4)
 		require.NoError(t, err)
-		added, err := f.apps.AddClientSecret(f.ctx, service.AddAppClientSecretInput{
-			ProjectID: f.projectID, AppID: created.App.ID, ClientSlug: "web", Hash: string(hash),
+		added, err := f.apps.AddClientCredential(f.ctx, service.AddAppClientCredentialInput{
+			ProjectID: f.projectID, AppID: created.App.ID, ClientSlug: "web", Name: "from-v4", Hash: string(hash),
 		})
 		require.NoError(t, err)
 		assert.Empty(t, added.Secret, "an import shows no secret")
@@ -165,41 +170,78 @@ func TestAppService_RegisteredApp(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, f.directory.VerifyClientSecret(f.ctx, f.at(), app, web, "from-v4"))
 
-		row, err := f.pool.Statements().GetAppClientIDByClientID(f.ctx, f.projectID, ids["web"])
+		listed, err := f.apps.ListClientCredentials(f.ctx, f.projectID, created.App.ID, "web")
 		require.NoError(t, err)
-		stored, err := f.pool.Statements().ListAppClientSecrets(f.ctx, f.projectID, row.ID)
-		require.NoError(t, err)
-		for _, s := range stored {
-			assert.True(t, strings.HasPrefix(s.EncodedHash, "sha256:"), "secret %s still holds %q", s.ID, s.EncodedHash[:4])
+		require.Len(t, listed.Credentials, 2, "the initial secret and the import")
+		for _, c := range listed.Credentials {
+			assert.True(t, strings.HasPrefix(c.EncodedHash, "sha256:"), "credential %s still holds %q", c.Name, c.EncodedHash[:4])
 		}
 		require.NoError(t, f.directory.VerifyClientSecret(f.ctx, f.at(), app, web, "from-v4"))
 	})
 
-	t.Run("an imported plaintext verifies", func(t *testing.T) {
-		_, err := f.apps.AddClientSecret(f.ctx, service.AddAppClientSecretInput{
-			ProjectID: f.projectID, AppID: created.App.ID, ClientSlug: "web", Secret: "ownCloud-hardcoded",
+	t.Run("each credential is named, and revoked on its own", func(t *testing.T) {
+		rotated, err := f.apps.AddClientCredential(f.ctx, service.AddAppClientCredentialInput{
+			ProjectID: f.projectID, AppID: created.App.ID, ClientSlug: "web", Name: "rotated",
+		})
+		require.NoError(t, err)
+		require.NotEmpty(t, rotated.Secret)
+		_, err = f.apps.AddClientCredential(f.ctx, service.AddAppClientCredentialInput{
+			ProjectID: f.projectID, AppID: created.App.ID, ClientSlug: "web", Name: "rotated",
+		})
+		require.ErrorIs(t, err, domain.ErrAppCredentialTaken(nil))
+
+		require.NoError(t, f.apps.RevokeClientCredential(f.ctx, f.projectID, created.App.ID, "web", created.Secrets["web"].CredentialID))
+		app, web, err := f.directory.Client(f.ctx, f.at(), ids["web"])
+		require.NoError(t, err)
+		require.ErrorIs(t, f.directory.VerifyClientSecret(f.ctx, f.at(), app, web, created.Secrets["web"].Secret), domain.ErrAppClientSecretInvalid(),
+			"the revoked secret")
+		require.NoError(t, f.directory.VerifyClientSecret(f.ctx, f.at(), app, web, rotated.Secret), "the client keeps its other secrets")
+		require.ErrorIs(t, f.apps.RevokeClientCredential(f.ctx, f.projectID, created.App.ID, "web", created.Secrets["web"].CredentialID),
+			domain.ErrAppCredentialNotFound())
+	})
+
+	t.Run("an expired credential no longer authenticates", func(t *testing.T) {
+		past := time.Now().Add(-time.Minute)
+		_, err := f.apps.AddClientCredential(f.ctx, service.AddAppClientCredentialInput{
+			ProjectID: f.projectID, AppID: created.App.ID, ClientSlug: "web", Name: "expired", Secret: "old-but-gold", ExpiresAt: &past,
 		})
 		require.NoError(t, err)
 		app, web, err := f.directory.Client(f.ctx, f.at(), ids["web"])
 		require.NoError(t, err)
-		require.NoError(t, f.directory.VerifyClientSecret(f.ctx, f.at(), app, web, "ownCloud-hardcoded"))
+		require.ErrorIs(t, f.directory.VerifyClientSecret(f.ctx, f.at(), app, web, "old-but-gold"), domain.ErrAppClientSecretInvalid())
 	})
 
-	t.Run("a private_key_jwt client gets no secret, and takes none", func(t *testing.T) {
+	t.Run("a client that brings its keys gets no secret; keys come from the document and the API", func(t *testing.T) {
 		withKeys, err := f.apps.CreateOrRevise(f.ctx, f.projectID, []byte(`{"slug":"jobs","name":"Jobs","clients":[
-			{"slug":"runner","type":"confidential","auth_method":"private_key_jwt","grants":["client_credentials"],
-			 "jwks":{"keys":[{"kty":"OKP","crv":"Ed25519","x":"11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo"}]}}]}`))
+			{"slug":"runner","type":"confidential","grant_types":["client_credentials"],
+			 "jwks":{"keys":[{"kty":"OKP","crv":"Ed25519","kid":"file-1","x":"11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo"}]}}]}`))
 		require.NoError(t, err)
 		assert.Empty(t, withKeys.Secrets)
-		_, err = f.apps.AddClientSecret(f.ctx, service.AddAppClientSecretInput{
-			ProjectID: f.projectID, AppID: withKeys.App.ID, ClientSlug: "runner",
+		key := []byte(`{"kty":"OKP","crv":"Ed25519","kid":"ci-1","x":"3p7bfXt9wbTTW2HC7OQ1Nz-DQ8hbeGdNrfx-FG-IK08"}`)
+		added, err := f.apps.AddClientCredential(f.ctx, service.AddAppClientCredentialInput{
+			ProjectID: f.projectID, AppID: withKeys.App.ID, ClientSlug: "runner", Name: "ci", PublicKey: key,
 		})
-		require.ErrorIs(t, err, domain.ErrAppInvalid(nil))
+		require.NoError(t, err)
+		assert.Equal(t, domain.CredentialKindKey, added.Credential.Kind)
+		assert.Equal(t, "ci-1", added.Credential.KeyID)
+		_, err = f.apps.AddClientCredential(f.ctx, service.AddAppClientCredentialInput{
+			ProjectID: f.projectID, AppID: withKeys.App.ID, ClientSlug: "runner", Name: "dup",
+			PublicKey: []byte(`{"kty":"OKP","crv":"Ed25519","kid":"file-1","x":"3p7bfXt9wbTTW2HC7OQ1Nz-DQ8hbeGdNrfx-FG-IK08"}`),
+		})
+		require.ErrorIs(t, err, domain.ErrAppCredentialTaken(nil), "a kid the document already has")
+
+		app, runner, err := f.directory.Client(f.ctx, f.at(), clientIDs(withKeys.AppView)["runner"])
+		require.NoError(t, err)
+		keys, err := f.directory.ClientKeys(f.ctx, f.at(), app, runner)
+		require.NoError(t, err)
+		require.Len(t, keys, 2)
+		assert.Contains(t, string(keys[0]), `"kid":"file-1"`)
+		assert.JSONEq(t, string(key), string(keys[1]))
 	})
 
-	t.Run("a public client takes no secret", func(t *testing.T) {
-		_, err := f.apps.AddClientSecret(f.ctx, service.AddAppClientSecretInput{
-			ProjectID: f.projectID, AppID: created.App.ID, ClientSlug: "desktop",
+	t.Run("a public client holds no credential", func(t *testing.T) {
+		_, err := f.apps.AddClientCredential(f.ctx, service.AddAppClientCredentialInput{
+			ProjectID: f.projectID, AppID: created.App.ID, ClientSlug: "desktop", Name: "nope",
 		})
 		require.ErrorIs(t, err, domain.ErrAppInvalid(nil))
 	})
@@ -210,8 +252,8 @@ const portalDocument = `{
   "slug": "portal", "name": "Portal",
   "clients": [
     {"slug": "web", "type": "confidential", "secret": "${{ PORTAL_WEB_SECRET }}",
-     "grants": ["authorization_code"], "redirect_uris": ["https://portal.example.com/cb"]},
-    {"slug": "admin", "type": "public", "grants": ["authorization_code"],
+     "grant_types": ["authorization_code"], "redirect_uris": ["https://portal.example.com/cb"]},
+    {"slug": "admin", "type": "public", "grant_types": ["authorization_code"],
      "redirect_uris": ["https://portal.example.com/admin/cb"]}
   ]
 }`
@@ -220,7 +262,7 @@ const portalDocumentV2 = `{
   "slug": "portal", "name": "Portal",
   "clients": [
     {"slug": "web", "type": "confidential", "secret": "${{ PORTAL_WEB_SECRET }}",
-     "grants": ["authorization_code"], "redirect_uris": ["https://portal.example.com/cb"]}
+     "grant_types": ["authorization_code"], "redirect_uris": ["https://portal.example.com/cb"]}
   ]
 }`
 
@@ -300,12 +342,20 @@ func TestAppService_DeclaredApp(t *testing.T) {
 		assert.Equal(t, "crm", bundleErr.Resources[0].Handle)
 	})
 
-	t.Run("a declared confidential client must name its secret", func(t *testing.T) {
-		_, err := f.releases.Build(f.ctx, service.BuildReleaseInput{ProjectID: f.projectID, Apps: []service.BuildApp{
-			{Index: 0, Document: []byte(`{"slug":"bad","name":"Bad","clients":[{"slug":"c","type":"confidential","grants":["client_credentials"]}]}`)},
-		}})
-		var bundleErr *service.BundleValidationError
-		require.ErrorAs(t, err, &bundleErr)
+	t.Run("a declared client takes credentials through the API, and a deploy keeps them", func(t *testing.T) {
+		const ci = `{"slug":"ci","name":"CI","clients":[{"slug":"deploy","type":"confidential","grant_types":["client_credentials"]}]}`
+		f.build(t, ci)
+		added, err := f.apps.AddClientCredential(f.ctx, service.AddAppClientCredentialInput{
+			ProjectID: f.projectID, AppID: mustAppID(t, f, "ci"), ClientSlug: "deploy", Name: "github",
+		})
+		require.NoError(t, err)
+		require.NotEmpty(t, added.Secret)
+
+		f.build(t, strings.Replace(ci, `"name":"CI"`, `"name":"CI 2"`, 1))
+		app, deploy, err := f.directory.Client(f.ctx, f.at(), added.ClientID)
+		require.NoError(t, err)
+		require.NoError(t, f.directory.VerifyClientSecret(f.ctx, f.at(), app, deploy, added.Secret),
+			"the release revised the app, and the credential stays")
 	})
 }
 

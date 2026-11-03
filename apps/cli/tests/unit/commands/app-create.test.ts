@@ -41,13 +41,12 @@ describe("apps create", () => {
       $schema: "../meta/app.json",
       slug: "shop",
       name: "shop",
-      preset: "web",
       clients: [
         {
           slug: "web",
           type: "confidential",
           secret: "${{ SHOP_WEB_CLIENT_SECRET }}",
-          grants: ["authorization_code", "refresh_token"],
+          grant_types: ["authorization_code", "refresh_token"],
           redirect_uris: ["https://shop.example.com/callback"],
         },
       ],
@@ -78,7 +77,10 @@ describe("apps create", () => {
   it("never overwrites an app file", async () => {
     const cwd = await makeProject();
     await mkdir(join(cwd, ".zitadel/apps"), { recursive: true });
-    await writeFile(join(cwd, ".zitadel/apps/shop.json"), JSON.stringify({ slug: "shop", name: "Mine" }));
+    await writeFile(
+      join(cwd, ".zitadel/apps/shop.json"),
+      JSON.stringify({ slug: "shop", name: "Mine" }),
+    );
 
     const { exitCode, envelope } = await run(cwd, ...WEB);
 
@@ -113,5 +115,15 @@ describe("apps create", () => {
 
     expect(envelope.data?.path).toBe(".zitadel/apps/shop.json");
     expect(existsSync(join(cwd, ".zitadel/apps/shop.json"))).toBe(false);
+  });
+
+  it("registers the app without a secret reference, so the server generates the secret", async () => {
+    const cwd = await makeProject();
+
+    const { envelope } = await run(cwd, ...WEB, "--registered", "--dry-run");
+
+    const app = envelope.data?.app as { clients: Record<string, unknown>[] };
+    expect(app.clients[0]).not.toHaveProperty("secret");
+    expect(app.clients[0]).toMatchObject({ slug: "web", type: "confidential" });
   });
 });

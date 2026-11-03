@@ -8,10 +8,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	api "go.zitadel.com/zitadel/v5/api"
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
+	api "go.zitadel.com/zitadel/v5/api"
 )
 
 // Clients register at the authorization server, which writes through the
@@ -39,6 +39,7 @@ func TestClientRegistrations_OverHTTP(t *testing.T) {
 	require.Len(t, listed, 1)
 	assert.Equal(t, id, listed[0].ID)
 	assert.Equal(t, "Claude Code", listed[0].ClientName.Or(""))
+	assert.False(t, listed[0].App.IsSet(), "no app until its first authorization request names an API")
 	assert.Equal(t, api.ClientRegistrationResponseTokenEndpointAuthMethodClientSecretPost, listed[0].TokenEndpointAuthMethod)
 	assert.NotContains(t, helpers.MustMarshal(t, queried), out.Secret, "a read never shows the secret")
 

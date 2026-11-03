@@ -226,3 +226,61 @@ func TestAppDirectory_Registration(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, domain.AppRegistration{ClientIDMetadataDocuments: true, Dynamic: true}, open, "built-in and stored apps together")
 }
+
+// A registered client joins the app whose API its first authorization request
+// names, if that app opens dynamic registration, and is refused every other
+// app's API from then on.
+func TestAppDirectory_JoinClientRegistration(t *testing.T) {
+	f := newAppFixture(t)
+	registrations := service.NewClientRegistrationService(f.pool, service.NoConsents{})
+	for _, document := range []string{
+		`{"slug":"shop","name":"Shop","registration":{"dynamic":true},
+		  "apis":[{"slug":"mcp","identifier":"https://shop.example.com/mcp","third_party":true}]}`,
+		`{"slug":"docs","name":"Docs","registration":{"dynamic":true},
+		  "apis":[{"slug":"mcp","identifier":"https://docs.example.com/mcp","third_party":true}]}`,
+		`{"slug":"wiki","name":"Wiki","apis":[{"slug":"mcp","identifier":"https://wiki.example.com/mcp","third_party":true}]}`,
+	} {
+		_, err := f.apps.CreateOrRevise(f.ctx, f.projectID, []byte(document))
+		require.NoError(t, err)
+	}
+	api := func(identifier string) (*domain.ResolvedApp, domain.AppAPI) {
+		t.Helper()
+		app, api, err := f.directory.API(f.ctx, f.at(), identifier)
+		require.NoError(t, err)
+		return app, api
+	}
+	out, err := registrations.Register(f.ctx, service.RegisterClientInput{ProjectID: f.projectID, Metadata: agentMetadata()})
+	require.NoError(t, err)
+	registration, err := f.directory.ClientRegistration(f.ctx, f.at(), out.Registration.ID)
+	require.NoError(t, err)
+	assert.Empty(t, registration.AppSlug)
+
+	wiki, wikiMCP := api("https://wiki.example.com/mcp")
+	unjoined, err := f.directory.JoinClientRegistration(f.ctx, f.at(), registration, wiki, wikiMCP)
+	require.NoError(t, err)
+	assert.Empty(t, unjoined.AppSlug, "an app that does not open dynamic registration takes no client")
+	assert.False(t, unjoined.AccessTo(wiki, wikiMCP).Allowed)
+
+	shop, shopMCP := api("https://shop.example.com/mcp")
+	joined, err := f.directory.JoinClientRegistration(f.ctx, f.at(), registration, shop, shopMCP)
+	require.NoError(t, err)
+	assert.Equal(t, "shop", joined.AppSlug)
+	assert.True(t, joined.AccessTo(shop, shopMCP).Allowed)
+
+	stored, err := f.directory.ClientRegistration(f.ctx, f.at(), out.Registration.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "shop", stored.AppSlug, "the join is stored")
+	docs, docsMCP := api("https://docs.example.com/mcp")
+	_, err = f.directory.JoinClientRegistration(f.ctx, f.at(), stored, docs, docsMCP)
+	assert.ErrorIs(t, err, domain.ErrClientRegistrationOtherApp())
+	_, err = f.directory.JoinClientRegistration(f.ctx, f.at(), registration, docs, docsMCP)
+	assert.ErrorIs(t, err, domain.ErrClientRegistrationOtherApp(), "a stale copy joins nothing: the stored app decides")
+
+	listed, err := registrations.List(f.ctx, service.ListClientRegistrationsInput{
+		ProjectID: f.projectID,
+		Filters:   []service.Filter{{Field: "app", Operation: "equals", Value: "shop"}},
+	})
+	require.NoError(t, err)
+	require.Len(t, listed.Items, 1)
+	assert.Equal(t, out.Registration.ID, listed.Items[0].ID)
+}

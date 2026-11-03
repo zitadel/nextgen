@@ -96,28 +96,44 @@ CREATE TABLE zitadel_nextgen.app_api_identifiers (
 CREATE INDEX idx_app_api_identifiers_app
     ON zitadel_nextgen.app_api_identifiers (project_id, app_id);
 
--- A registered app's client secrets, as hashes. A declared app's secret is a
--- variable reference in its document and has no row here.
-CREATE TABLE zitadel_nextgen.app_client_secrets (
+-- The credentials a confidential client holds through the API, whether its app
+-- is declared or registered, each named and revoked on its own: a secret's
+-- hash or a public key, never a secret. A declared client's ${{ NAME }}
+-- reference and the keys in its document have no row here, and a deploy never
+-- removes a row.
+CREATE TABLE zitadel_nextgen.app_client_credentials (
     project_id TEXT COLLATE "C" NOT NULL
     , id TEXT COLLATE "C" NOT NULL CHECK (id <> '')
     , client_row_id TEXT COLLATE "C" NOT NULL
-    , encoded_hash TEXT COLLATE "C" NOT NULL CHECK (encoded_hash <> '')
+    , name TEXT COLLATE "C" NOT NULL CHECK (name <> '')
+    , kind TEXT COLLATE "C" NOT NULL CHECK (kind IN ('secret', 'key'))
+    , encoded_hash TEXT COLLATE "C"
+    , public_key JSONB
+    , key_id TEXT COLLATE "C"
     , created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    , expires_at TIMESTAMPTZ
 
     , PRIMARY KEY (project_id, id)
-    , CONSTRAINT fk_app_client_secrets_client
+    , CONSTRAINT fk_app_client_credentials_client
         FOREIGN KEY (project_id, client_row_id)
         REFERENCES zitadel_nextgen.app_clients (project_id, id)
         ON DELETE CASCADE
+    , CONSTRAINT chk_app_client_credentials_kind CHECK (
+        (kind = 'secret' AND encoded_hash IS NOT NULL AND encoded_hash <> ''
+            AND public_key IS NULL AND key_id IS NULL)
+        OR (kind = 'key' AND encoded_hash IS NULL AND public_key IS NOT NULL
+            AND jsonb_typeof(public_key) = 'object' AND key_id IS NOT NULL AND key_id <> '')
+    )
 );
 
-CREATE INDEX idx_app_client_secrets_client
-    ON zitadel_nextgen.app_client_secrets (project_id, client_row_id);
+-- A credential is rotated and revoked by its name, so a client holds one of
+-- each. A key's kid is checked by the service, which holds the app's lock.
+CREATE UNIQUE INDEX uq_app_client_credentials_client_name
+    ON zitadel_nextgen.app_client_credentials (project_id, client_row_id, name);
 
 -- +goose Down
-DROP INDEX IF EXISTS zitadel_nextgen.idx_app_client_secrets_client;
-DROP TABLE IF EXISTS zitadel_nextgen.app_client_secrets;
+DROP INDEX IF EXISTS zitadel_nextgen.uq_app_client_credentials_client_name;
+DROP TABLE IF EXISTS zitadel_nextgen.app_client_credentials;
 DROP INDEX IF EXISTS zitadel_nextgen.idx_app_api_identifiers_app;
 DROP TABLE IF EXISTS zitadel_nextgen.app_api_identifiers;
 DROP INDEX IF EXISTS zitadel_nextgen.uq_app_clients_app_slug;

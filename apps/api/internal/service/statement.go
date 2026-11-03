@@ -298,6 +298,10 @@ type ClientRegistrationStatements interface {
 	// ExtendClientRegistration moves the registration's expiry to expiresAt.
 	// None returns *database.NoRowFoundError.
 	ExtendClientRegistration(ctx context.Context, projectID, id string, expiresAt time.Time) error
+	// JoinClientRegistrationApp sets the app a registration joined, unless it
+	// joined one already, and returns the app it holds now. None returns
+	// *database.NoRowFoundError.
+	JoinClientRegistrationApp(ctx context.Context, projectID, id, appSlug string) (string, error)
 }
 
 // AppStatements persists apps and their revisions, like
@@ -349,16 +353,20 @@ type AppStatements interface {
 	// *database.NoRowFoundError.
 	GetAppAPIIdentifier(ctx context.Context, projectID, identifier string) (*domain.AppAPIIdentifier, error)
 
-	// CreateAppClientSecret stores a secret hash under a client row and mints
-	// its id.
-	CreateAppClientSecret(ctx context.Context, entity *domain.AppClientSecret) error
-	// ListAppClientSecrets returns the secrets stored under a client row,
-	// newest first.
-	ListAppClientSecrets(ctx context.Context, projectID, clientRowID string) ([]*domain.AppClientSecret, error)
-	// UpdateAppClientSecretHash replaces a stored hash, as when an imported
-	// hash is moved to the server's own method on its first use. An unknown
-	// secret returns *database.NoRowFoundError.
-	UpdateAppClientSecretHash(ctx context.Context, projectID, id, encodedHash string) error
+	// CreateAppClientCredential stores a credential under a client row and
+	// mints its id. A name the client's credentials already hold returns
+	// *database.UniqueError.
+	CreateAppClientCredential(ctx context.Context, entity *domain.AppClientCredential) error
+	// ListAppClientCredentials returns the credentials stored under a client
+	// row, oldest first, expired ones included.
+	ListAppClientCredentials(ctx context.Context, projectID, clientRowID string) ([]*domain.AppClientCredential, error)
+	// UpdateAppClientCredentialHash replaces a secret's stored hash, as when
+	// an imported hash is moved to the server's own method on its first use.
+	// An unknown credential returns *database.NoRowFoundError.
+	UpdateAppClientCredentialHash(ctx context.Context, projectID, id, encodedHash string) error
+	// DeleteAppClientCredential deletes the credential with id under the
+	// client row. None returns *database.NoRowFoundError.
+	DeleteAppClientCredential(ctx context.Context, projectID, clientRowID, id string) error
 }
 
 // IDPIdentityLinkStatements stores which user a provider subject resolves to.

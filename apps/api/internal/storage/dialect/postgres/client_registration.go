@@ -17,7 +17,7 @@ const (
 	createClientRegistrationStmt = `INSERT INTO zitadel_nextgen.client_registrations ` +
 		`(project_id, id, metadata, secret_hash, expires_at) VALUES ($1, $2, $3, $4, $5) RETURNING created_at`
 
-	clientRegistrationQuery = `SELECT project_id, id, metadata, secret_hash, created_at, expires_at ` +
+	clientRegistrationQuery = `SELECT project_id, id, app_slug, metadata, secret_hash, created_at, expires_at ` +
 		`FROM zitadel_nextgen.client_registrations`
 
 	getClientRegistrationStmt = clientRegistrationQuery + ` WHERE project_id = $1 AND id = $2`
@@ -29,6 +29,14 @@ const (
 
 	extendClientRegistrationStmt = `UPDATE zitadel_nextgen.client_registrations ` +
 		`SET expires_at = $3 WHERE project_id = $1 AND id = $2`
+
+	// Only a registration that joined no app takes one; the select then reads
+	// the app it holds, this one or the one an earlier request set.
+	joinClientRegistrationAppStmt = `UPDATE zitadel_nextgen.client_registrations ` +
+		`SET app_slug = $3 WHERE project_id = $1 AND id = $2 AND app_slug IS NULL`
+
+	clientRegistrationAppStmt = `SELECT app_slug FROM zitadel_nextgen.client_registrations ` +
+		`WHERE project_id = $1 AND id = $2`
 )
 
 type clientRegistrationStatements struct{ statement }
@@ -143,13 +151,29 @@ func (s clientRegistrationStatements) ExtendClientRegistration(ctx context.Conte
 	return nil
 }
 
+// JoinClientRegistrationApp implements [service.ClientRegistrationStatements].
+func (s clientRegistrationStatements) JoinClientRegistrationApp(ctx context.Context, projectID, id, appSlug string) (string, error) {
+	if _, err := s.client.Exec(ctx, joinClientRegistrationAppStmt, projectID, id, appSlug); err != nil {
+		return "", wrapError(err)
+	}
+	var joined *string
+	if err := s.client.QueryRow(ctx, clientRegistrationAppStmt, projectID, id).Scan(&joined); err != nil {
+		return "", wrapError(err)
+	}
+	if joined == nil {
+		return "", nil
+	}
+	return *joined, nil
+}
+
 func scanClientRegistration(row pgx.CollectableRow) (*domain.ClientRegistration, error) {
 	var (
 		entity     domain.ClientRegistration
+		appSlug    *string
 		metadata   []byte
 		secretHash *string
 	)
-	if err := row.Scan(&entity.ProjectID, &entity.ID, &metadata, &secretHash, &entity.CreatedAt, &entity.ExpiresAt); err != nil {
+	if err := row.Scan(&entity.ProjectID, &entity.ID, &appSlug, &metadata, &secretHash, &entity.CreatedAt, &entity.ExpiresAt); err != nil {
 		return nil, err
 	}
 	m, err := appstore.DecodeClientRegistrationMetadata(metadata)
@@ -157,6 +181,9 @@ func scanClientRegistration(row pgx.CollectableRow) (*domain.ClientRegistration,
 		return nil, err
 	}
 	entity.Metadata = m
+	if appSlug != nil {
+		entity.AppSlug = *appSlug
+	}
 	if secretHash != nil {
 		entity.SecretHash = *secretHash
 	}

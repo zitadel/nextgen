@@ -51,14 +51,6 @@ properties:
     pattern: ^https://
     maxLength: 2048
     description: The app's terms of service, linked from the consent screen.
-  preset:
-    type: string
-    pattern: ^[a-z0-9][a-z0-9_-]*$
-    maxLength: 64
-    description: The preset the app was made from, such as `web` or `service-account`. A label for
-      the console and agents; it carries no behavior, which comes only from the configs.
-    examples:
-    - web
   clients:
     type: array
     maxItems: 20

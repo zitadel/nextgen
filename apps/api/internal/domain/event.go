@@ -96,7 +96,8 @@ const (
 
 	EventTypeAppCreated           EventType = "app.created"
 	EventTypeAppUpdated           EventType = "app.updated"
-	EventTypeAppClientSecretAdded EventType = "app.client_secret.added"
+	EventTypeAppCredentialAdded   EventType = "app.credential.added"
+	EventTypeAppCredentialRevoked EventType = "app.credential.revoked"
 
 	EventTypeClientRegistrationCreated EventType = "client_registration.created"
 	EventTypeClientRegistrationDeleted EventType = "client_registration.deleted"

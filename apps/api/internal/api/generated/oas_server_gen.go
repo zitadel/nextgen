@@ -8,16 +8,17 @@ import (
 
 // Handler handles operations described by OpenAPI v3 specification.
 type Handler interface {
-	// AddAppClientSecret implements addAppClientSecret operation.
+	// AddAppClientCredential implements addAppClientCredential operation.
 	//
-	// Adds a secret to a confidential client of an app registered through the
-	// API: a generated one, shown once, or an imported value or hash, so a client
-	// with a secret it cannot change keeps working. An app the release declares
-	// names its secrets as `${{ NAME }}` variables instead, and is refused with
-	// `app.declared`.
+	// Adds a named credential to a confidential client: a secret the server
+	// generates and shows once, an imported secret or hash, or a public key.
+	// The app may be declared in the release or registered through the API, and
+	// a deploy never removes a credential written here. A public client holds
+	// no credential, and a request for one is refused with `app.invalid`.
+	// Emits `app.credential.added`.
 	//
-	// POST /apps/{id}/clients/{client}/secrets
-	AddAppClientSecret(ctx context.Context, req *AddAppClientSecretRequest, params AddAppClientSecretParams) (AddAppClientSecretRes, error)
+	// POST /apps/{id}/clients/{client}/credentials
+	AddAppClientCredential(ctx context.Context, req *AddAppClientCredentialRequest, params AddAppClientCredentialParams) (AddAppClientCredentialRes, error)
 	// AddOrigin implements addOrigin operation.
 	//
 	// Adds one `{pattern, kind}` to the project's origins. A primary pattern
@@ -87,8 +88,9 @@ type Handler interface {
 	// document becomes its new revision. An app the release declares
 	// (`.zitadel/apps/<slug>.json`) changes only with a release, and a write to
 	// one is refused with `app.declared`.
-	// The answer carries what comes next: the `client_id` of each client, and a
-	// generated secret for each confidential client that had none, shown once.
+	// The answer carries what comes next: the `client_id` of each client, and
+	// for each new confidential client that holds no key, a generated secret,
+	// shown once, as its credential named `initial`.
 	// A client keeps its `client_id` for life: one the document leaves out is
 	// minted on first write and kept, one it sets is used as given, and a
 	// revision that changes it is refused with `app.field_immutable`. No two
@@ -97,8 +99,8 @@ type Handler interface {
 	// The document is validated against the `app.json` schema, then against the
 	// rules across its fields: a client's `apis` name APIs the app serves, a
 	// redirect URI is https or a loopback http URI in canonical form, and a
-	// registered app's secrets come from the server, never a `${{ NAME }}`
-	// reference. A refused document stores nothing.
+	// registered app's credentials are written through the API, never a
+	// `${{ NAME }}` reference. A refused document stores nothing.
 	//
 	// POST /apps
 	CreateApp(ctx context.Context, req *CreateAppRequest, params CreateAppParams) (CreateAppRes, error)
@@ -803,6 +805,13 @@ type Handler interface {
 	//
 	// POST /auth_attempts/{attempt_id}/challenges
 	IssueChallenge(ctx context.Context, req *IssueChallengeRequest, params IssueChallengeParams) (IssueChallengeRes, error)
+	// ListAppClientCredentials implements listAppClientCredentials operation.
+	//
+	// Lists the credentials a client holds through the API, revoked ones left
+	// out, without any secret.
+	//
+	// GET /apps/{id}/clients/{client}/credentials
+	ListAppClientCredentials(ctx context.Context, params ListAppClientCredentialsParams) (ListAppClientCredentialsRes, error)
 	// ListAppRevisions implements listAppRevisions operation.
 	//
 	// Returns every revision of one app, newest first, paginated with a cursor.
@@ -1164,6 +1173,13 @@ type Handler interface {
 	//
 	// POST /projects/{project_id}/previews/remove
 	RemovePreview(ctx context.Context, req *RemovePreviewRequest, params RemovePreviewParams) (RemovePreviewRes, error)
+	// RevokeAppClientCredential implements revokeAppClientCredential operation.
+	//
+	// Revokes one credential: the client can no longer authenticate with it,
+	// and its other credentials keep working. Emits `app.credential.revoked`.
+	//
+	// DELETE /apps/{id}/clients/{client}/credentials/{credential_id}
+	RevokeAppClientCredential(ctx context.Context, params RevokeAppClientCredentialParams) (RevokeAppClientCredentialRes, error)
 	// RevokeMySession implements revokeMySession operation.
 	//
 	// Logs out by permanently deleting the session.

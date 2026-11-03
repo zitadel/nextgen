@@ -463,14 +463,17 @@ func appAPISlugs(doc AppDocument) []string {
 	return slugs
 }
 
-// AppClientSecretAddedPayload is app.client_secret.added: which client of
-// the app (the entity) got a secret, and whether the server generated it or
-// it was imported. Never the secret or its hash.
-type AppClientSecretAddedPayload struct {
-	Client   string `json:"client"`
-	ClientID string `json:"client_id"`
-	SecretID string `json:"secret_id"`
-	Origin   string `json:"origin"`
+// AppCredentialPayload is app.credential.added and app.credential.revoked:
+// which credential of which client of the app (the entity) changed. Origin
+// says how a secret was added and is empty for a key and on a revoke. Never a
+// secret, its hash or a key.
+type AppCredentialPayload struct {
+	Client       string `json:"client"`
+	ClientID     string `json:"client_id"`
+	CredentialID string `json:"credential_id"`
+	Name         string `json:"name"`
+	Kind         string `json:"kind"`
+	Origin       string `json:"origin,omitempty"`
 }
 
 // ClientRegistrationPayload is client_registration.created and

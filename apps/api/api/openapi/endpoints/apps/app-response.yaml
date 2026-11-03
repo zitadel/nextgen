@@ -45,9 +45,9 @@ properties:
   client_secrets:
     type: array
     description: |
-      The client secrets this write generated: one for each confidential
-      client of a registered app that had none. Present only in the answer to
-      the write that generated them.
+      The secrets this write generated: one for each new confidential client
+      of a registered app that holds no key, as its credential named
+      `initial`. Present only in the answer to the write that generated them.
     items:
       $ref: app-client-secret.yaml
   created_at:

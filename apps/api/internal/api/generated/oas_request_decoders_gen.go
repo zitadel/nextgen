@@ -14,8 +14,8 @@ import (
 	"github.com/ogen-go/ogen/validate"
 )
 
-func (s *Server) decodeAddAppClientSecretRequest(r *http.Request) (
-	req *AddAppClientSecretRequest,
+func (s *Server) decodeAddAppClientCredentialRequest(r *http.Request) (
+	req *AddAppClientCredentialRequest,
 	rawBody []byte,
 	close func() error,
 	rerr error,
@@ -62,7 +62,7 @@ func (s *Server) decodeAddAppClientSecretRequest(r *http.Request) (
 		rawBody = append(rawBody, buf...)
 		d := jx.DecodeBytes(buf)
 
-		var request AddAppClientSecretRequest
+		var request AddAppClientCredentialRequest
 		if err := func() error {
 			if err := request.Decode(d); err != nil {
 				return err

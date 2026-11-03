@@ -32,7 +32,11 @@ func (h *Handler) CreateApp(ctx context.Context, req *api.CreateAppRequest, para
 	}
 	for _, client := range result.Clients {
 		if secret, ok := result.Secrets[client.Slug]; ok {
-			resp.ClientSecrets = append(resp.ClientSecrets, api.AppClientSecret{Client: client.Slug, Secret: secret})
+			resp.ClientSecrets = append(resp.ClientSecrets, api.AppClientSecret{
+				Client:       client.Slug,
+				CredentialID: secret.CredentialID,
+				Secret:       secret.Secret,
+			})
 		}
 	}
 	if result.Created {
@@ -143,29 +147,85 @@ func (h *Handler) QueryApps(ctx context.Context, req *api.QueryAppsRequest, para
 	return resp, nil
 }
 
-func (h *Handler) AddAppClientSecret(ctx context.Context, req *api.AddAppClientSecretRequest, params api.AddAppClientSecretParams) (api.AddAppClientSecretRes, error) {
+// Credentials belong to a client of an app, so they resolve the app id
+// through the resource scope index as the app's other reads and writes do. A
+// declared app's clients take them too.
+
+func (h *Handler) AddAppClientCredential(ctx context.Context, req *api.AddAppClientCredentialRequest, params api.AddAppClientCredentialParams) (api.AddAppClientCredentialRes, error) {
 	projectID, err := h.requireResourceAccessInProject(ctx, string(params.ProjectID), params.ID, appAccess, opWrite)
 	if err != nil {
 		return nil, err
 	}
-	result, err := h.appService.AddClientSecret(ctx, service.AddAppClientSecretInput{
+	input := service.AddAppClientCredentialInput{
 		ProjectID:  projectID,
 		AppID:      params.ID,
 		ClientSlug: params.Client,
+		Name:       req.Name,
 		Secret:     req.Secret.Or(""),
 		Hash:       req.Hash.Or(""),
-	})
+	}
+	if key, ok := req.PublicKey.Get(); ok {
+		if input.PublicKey, err = key.MarshalJSON(); err != nil {
+			return nil, domain.ErrInternal(err).WithMessage("failed to encode the public key")
+		}
+	}
+	if expiresAt, ok := req.ExpiresAt.Get(); ok {
+		input.ExpiresAt = &expiresAt
+	}
+	result, err := h.appService.AddClientCredential(ctx, input)
 	if err != nil {
 		return nil, err
 	}
-	resp := &api.AddAppClientSecretResponse{ID: result.SecretID, ClientID: result.ClientID}
+	resp := toAPIAppClientCredential(result.Credential, result.ClientID)
 	if result.Secret != "" {
 		resp.Secret = api.NewOptString(result.Secret)
+	}
+	return &resp, nil
+}
+
+func (h *Handler) ListAppClientCredentials(ctx context.Context, params api.ListAppClientCredentialsParams) (api.ListAppClientCredentialsRes, error) {
+	projectID, err := h.requireResourceAccessInProject(ctx, string(params.ProjectID), params.ID, appAccess, opRead)
+	if err != nil {
+		return nil, err
+	}
+	result, err := h.appService.ListClientCredentials(ctx, projectID, params.ID, params.Client)
+	if err != nil {
+		return nil, err
+	}
+	resp := &api.ListAppClientCredentialsResponse{Credentials: make([]api.AppClientCredential, 0, len(result.Credentials))}
+	for _, credential := range result.Credentials {
+		resp.Credentials = append(resp.Credentials, toAPIAppClientCredential(credential, result.ClientID))
 	}
 	return resp, nil
 }
 
+func (h *Handler) RevokeAppClientCredential(ctx context.Context, params api.RevokeAppClientCredentialParams) (api.RevokeAppClientCredentialRes, error) {
+	projectID, err := h.requireResourceAccessInProject(ctx, string(params.ProjectID), params.ID, appAccess, opWrite)
+	if err != nil {
+		return nil, err
+	}
+	if err := h.appService.RevokeClientCredential(ctx, projectID, params.ID, params.Client, params.CredentialID); err != nil {
+		return nil, err
+	}
+	return &api.RevokeAppClientCredentialNoContent{}, nil
+}
+
 /* ---------------- CONVERTERS ---------------- */
+
+func toAPIAppClientCredential(credential *domain.AppClientCredential, clientID string) api.AppClientCredential {
+	resp := api.AppClientCredential{
+		ID:        credential.ID,
+		Name:      credential.Name,
+		Kind:      api.AppClientCredentialKind(credential.Kind),
+		ClientID:  clientID,
+		KeyID:     optAPIString(credential.KeyID),
+		CreatedAt: credential.CreatedAt,
+	}
+	if credential.ExpiresAt != nil {
+		resp.ExpiresAt = api.NewOptDateTime(*credential.ExpiresAt)
+	}
+	return resp
+}
 
 func toAPIAppResponse(view *service.AppView) (api.AppResponse, error) {
 	entity := view.App
@@ -218,9 +278,16 @@ func appErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 		// The authorization server answers invalid_client itself; an API path
 		// that ever surfaced this would be refusing a credential.
 		return errorResponseWithStatusCode(http.StatusUnauthorized, err)
-	case err.Code == domain.ErrClientRegistrationNotFound().Code:
+	case slices.Contains([]string{
+		domain.ErrClientRegistrationNotFound().Code,
+		domain.ErrAppCredentialNotFound().Code,
+	}, err.Code):
 		return errorResponseWithStatusCode(http.StatusNotFound, err)
 	case err.Code == domain.ErrClientRegistrationInvalid(nil).Code:
+		return errorResponseWithStatusCode(http.StatusBadRequest, err)
+	case err.Code == domain.ErrClientRegistrationOtherApp().Code:
+		// The authorization server answers invalid_target itself; an API
+		// path that ever surfaced this would be refusing the request.
 		return errorResponseWithStatusCode(http.StatusBadRequest, err)
 	case err.Code == domain.ErrAppPermissionDenied().Code:
 		return errorResponseWithStatusCode(http.StatusForbidden, err)
@@ -229,6 +296,7 @@ func appErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 		domain.ErrAppClientIDTaken(nil).Code,
 		domain.ErrAppIdentifierTaken(nil).Code,
 		domain.ErrAppRevisionConflict().Code,
+		domain.ErrAppCredentialTaken(nil).Code,
 	}, err.Code):
 		return errorResponseWithStatusCode(http.StatusConflict, err)
 	default:

@@ -556,6 +556,44 @@ func (c *MockAllStatementsCreateAppAPIIdentifierCall) DoAndReturn(f func(context
 	return c
 }
 
+// CreateAppClientCredential mocks base method.
+func (m *MockAllStatements) CreateAppClientCredential(ctx context.Context, entity *domain.AppClientCredential) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateAppClientCredential", ctx, entity)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// CreateAppClientCredential indicates an expected call of CreateAppClientCredential.
+func (mr *MockAllStatementsMockRecorder) CreateAppClientCredential(ctx, entity any) *MockAllStatementsCreateAppClientCredentialCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateAppClientCredential", reflect.TypeOf((*MockAllStatements)(nil).CreateAppClientCredential), ctx, entity)
+	return &MockAllStatementsCreateAppClientCredentialCall{Call: call}
+}
+
+// MockAllStatementsCreateAppClientCredentialCall wrap *gomock.Call
+type MockAllStatementsCreateAppClientCredentialCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsCreateAppClientCredentialCall) Return(arg0 error) *MockAllStatementsCreateAppClientCredentialCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsCreateAppClientCredentialCall) Do(f func(context.Context, *domain.AppClientCredential) error) *MockAllStatementsCreateAppClientCredentialCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsCreateAppClientCredentialCall) DoAndReturn(f func(context.Context, *domain.AppClientCredential) error) *MockAllStatementsCreateAppClientCredentialCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // CreateAppClientID mocks base method.
 func (m *MockAllStatements) CreateAppClientID(ctx context.Context, entity *domain.AppClientID) error {
 	m.ctrl.T.Helper()
@@ -590,44 +628,6 @@ func (c *MockAllStatementsCreateAppClientIDCall) Do(f func(context.Context, *dom
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockAllStatementsCreateAppClientIDCall) DoAndReturn(f func(context.Context, *domain.AppClientID) error) *MockAllStatementsCreateAppClientIDCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
-// CreateAppClientSecret mocks base method.
-func (m *MockAllStatements) CreateAppClientSecret(ctx context.Context, entity *domain.AppClientSecret) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateAppClientSecret", ctx, entity)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// CreateAppClientSecret indicates an expected call of CreateAppClientSecret.
-func (mr *MockAllStatementsMockRecorder) CreateAppClientSecret(ctx, entity any) *MockAllStatementsCreateAppClientSecretCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateAppClientSecret", reflect.TypeOf((*MockAllStatements)(nil).CreateAppClientSecret), ctx, entity)
-	return &MockAllStatementsCreateAppClientSecretCall{Call: call}
-}
-
-// MockAllStatementsCreateAppClientSecretCall wrap *gomock.Call
-type MockAllStatementsCreateAppClientSecretCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockAllStatementsCreateAppClientSecretCall) Return(arg0 error) *MockAllStatementsCreateAppClientSecretCall {
-	c.Call = c.Call.Return(arg0)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsCreateAppClientSecretCall) Do(f func(context.Context, *domain.AppClientSecret) error) *MockAllStatementsCreateAppClientSecretCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsCreateAppClientSecretCall) DoAndReturn(f func(context.Context, *domain.AppClientSecret) error) *MockAllStatementsCreateAppClientSecretCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -1579,6 +1579,44 @@ func (c *MockAllStatementsDeactivateUserCall) Do(f func(context.Context, string,
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockAllStatementsDeactivateUserCall) DoAndReturn(f func(context.Context, string, string) error) *MockAllStatementsDeactivateUserCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// DeleteAppClientCredential mocks base method.
+func (m *MockAllStatements) DeleteAppClientCredential(ctx context.Context, projectID, clientRowID, id string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteAppClientCredential", ctx, projectID, clientRowID, id)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteAppClientCredential indicates an expected call of DeleteAppClientCredential.
+func (mr *MockAllStatementsMockRecorder) DeleteAppClientCredential(ctx, projectID, clientRowID, id any) *MockAllStatementsDeleteAppClientCredentialCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteAppClientCredential", reflect.TypeOf((*MockAllStatements)(nil).DeleteAppClientCredential), ctx, projectID, clientRowID, id)
+	return &MockAllStatementsDeleteAppClientCredentialCall{Call: call}
+}
+
+// MockAllStatementsDeleteAppClientCredentialCall wrap *gomock.Call
+type MockAllStatementsDeleteAppClientCredentialCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsDeleteAppClientCredentialCall) Return(arg0 error) *MockAllStatementsDeleteAppClientCredentialCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsDeleteAppClientCredentialCall) Do(f func(context.Context, string, string, string) error) *MockAllStatementsDeleteAppClientCredentialCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsDeleteAppClientCredentialCall) DoAndReturn(f func(context.Context, string, string, string) error) *MockAllStatementsDeleteAppClientCredentialCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -5035,6 +5073,45 @@ func (c *MockAllStatementsIssueSSOStateCall) DoAndReturn(f func(context.Context,
 	return c
 }
 
+// JoinClientRegistrationApp mocks base method.
+func (m *MockAllStatements) JoinClientRegistrationApp(ctx context.Context, projectID, id, appSlug string) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "JoinClientRegistrationApp", ctx, projectID, id, appSlug)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// JoinClientRegistrationApp indicates an expected call of JoinClientRegistrationApp.
+func (mr *MockAllStatementsMockRecorder) JoinClientRegistrationApp(ctx, projectID, id, appSlug any) *MockAllStatementsJoinClientRegistrationAppCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "JoinClientRegistrationApp", reflect.TypeOf((*MockAllStatements)(nil).JoinClientRegistrationApp), ctx, projectID, id, appSlug)
+	return &MockAllStatementsJoinClientRegistrationAppCall{Call: call}
+}
+
+// MockAllStatementsJoinClientRegistrationAppCall wrap *gomock.Call
+type MockAllStatementsJoinClientRegistrationAppCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsJoinClientRegistrationAppCall) Return(arg0 string, arg1 error) *MockAllStatementsJoinClientRegistrationAppCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsJoinClientRegistrationAppCall) Do(f func(context.Context, string, string, string) (string, error)) *MockAllStatementsJoinClientRegistrationAppCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsJoinClientRegistrationAppCall) DoAndReturn(f func(context.Context, string, string, string) (string, error)) *MockAllStatementsJoinClientRegistrationAppCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // LinkDeploymentVariableSet mocks base method.
 func (m *MockAllStatements) LinkDeploymentVariableSet(ctx context.Context, projectID, deploymentID, setHash string) error {
 	m.ctrl.T.Helper()
@@ -5112,6 +5189,45 @@ func (c *MockAllStatementsListActiveAuthzAssignmentsByRelationCall) DoAndReturn(
 	return c
 }
 
+// ListAppClientCredentials mocks base method.
+func (m *MockAllStatements) ListAppClientCredentials(ctx context.Context, projectID, clientRowID string) ([]*domain.AppClientCredential, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListAppClientCredentials", ctx, projectID, clientRowID)
+	ret0, _ := ret[0].([]*domain.AppClientCredential)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListAppClientCredentials indicates an expected call of ListAppClientCredentials.
+func (mr *MockAllStatementsMockRecorder) ListAppClientCredentials(ctx, projectID, clientRowID any) *MockAllStatementsListAppClientCredentialsCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListAppClientCredentials", reflect.TypeOf((*MockAllStatements)(nil).ListAppClientCredentials), ctx, projectID, clientRowID)
+	return &MockAllStatementsListAppClientCredentialsCall{Call: call}
+}
+
+// MockAllStatementsListAppClientCredentialsCall wrap *gomock.Call
+type MockAllStatementsListAppClientCredentialsCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsListAppClientCredentialsCall) Return(arg0 []*domain.AppClientCredential, arg1 error) *MockAllStatementsListAppClientCredentialsCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsListAppClientCredentialsCall) Do(f func(context.Context, string, string) ([]*domain.AppClientCredential, error)) *MockAllStatementsListAppClientCredentialsCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsListAppClientCredentialsCall) DoAndReturn(f func(context.Context, string, string) ([]*domain.AppClientCredential, error)) *MockAllStatementsListAppClientCredentialsCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // ListAppClientIDs mocks base method.
 func (m *MockAllStatements) ListAppClientIDs(ctx context.Context, projectID, appID string) ([]*domain.AppClientID, error) {
 	m.ctrl.T.Helper()
@@ -5147,45 +5263,6 @@ func (c *MockAllStatementsListAppClientIDsCall) Do(f func(context.Context, strin
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockAllStatementsListAppClientIDsCall) DoAndReturn(f func(context.Context, string, string) ([]*domain.AppClientID, error)) *MockAllStatementsListAppClientIDsCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
-// ListAppClientSecrets mocks base method.
-func (m *MockAllStatements) ListAppClientSecrets(ctx context.Context, projectID, clientRowID string) ([]*domain.AppClientSecret, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListAppClientSecrets", ctx, projectID, clientRowID)
-	ret0, _ := ret[0].([]*domain.AppClientSecret)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ListAppClientSecrets indicates an expected call of ListAppClientSecrets.
-func (mr *MockAllStatementsMockRecorder) ListAppClientSecrets(ctx, projectID, clientRowID any) *MockAllStatementsListAppClientSecretsCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListAppClientSecrets", reflect.TypeOf((*MockAllStatements)(nil).ListAppClientSecrets), ctx, projectID, clientRowID)
-	return &MockAllStatementsListAppClientSecretsCall{Call: call}
-}
-
-// MockAllStatementsListAppClientSecretsCall wrap *gomock.Call
-type MockAllStatementsListAppClientSecretsCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockAllStatementsListAppClientSecretsCall) Return(arg0 []*domain.AppClientSecret, arg1 error) *MockAllStatementsListAppClientSecretsCall {
-	c.Call = c.Call.Return(arg0, arg1)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsListAppClientSecretsCall) Do(f func(context.Context, string, string) ([]*domain.AppClientSecret, error)) *MockAllStatementsListAppClientSecretsCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsListAppClientSecretsCall) DoAndReturn(f func(context.Context, string, string) ([]*domain.AppClientSecret, error)) *MockAllStatementsListAppClientSecretsCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -7591,40 +7668,40 @@ func (c *MockAllStatementsSetVariableCall) DoAndReturn(f func(context.Context, *
 	return c
 }
 
-// UpdateAppClientSecretHash mocks base method.
-func (m *MockAllStatements) UpdateAppClientSecretHash(ctx context.Context, projectID, id, encodedHash string) error {
+// UpdateAppClientCredentialHash mocks base method.
+func (m *MockAllStatements) UpdateAppClientCredentialHash(ctx context.Context, projectID, id, encodedHash string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpdateAppClientSecretHash", ctx, projectID, id, encodedHash)
+	ret := m.ctrl.Call(m, "UpdateAppClientCredentialHash", ctx, projectID, id, encodedHash)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// UpdateAppClientSecretHash indicates an expected call of UpdateAppClientSecretHash.
-func (mr *MockAllStatementsMockRecorder) UpdateAppClientSecretHash(ctx, projectID, id, encodedHash any) *MockAllStatementsUpdateAppClientSecretHashCall {
+// UpdateAppClientCredentialHash indicates an expected call of UpdateAppClientCredentialHash.
+func (mr *MockAllStatementsMockRecorder) UpdateAppClientCredentialHash(ctx, projectID, id, encodedHash any) *MockAllStatementsUpdateAppClientCredentialHashCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateAppClientSecretHash", reflect.TypeOf((*MockAllStatements)(nil).UpdateAppClientSecretHash), ctx, projectID, id, encodedHash)
-	return &MockAllStatementsUpdateAppClientSecretHashCall{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateAppClientCredentialHash", reflect.TypeOf((*MockAllStatements)(nil).UpdateAppClientCredentialHash), ctx, projectID, id, encodedHash)
+	return &MockAllStatementsUpdateAppClientCredentialHashCall{Call: call}
 }
 
-// MockAllStatementsUpdateAppClientSecretHashCall wrap *gomock.Call
-type MockAllStatementsUpdateAppClientSecretHashCall struct {
+// MockAllStatementsUpdateAppClientCredentialHashCall wrap *gomock.Call
+type MockAllStatementsUpdateAppClientCredentialHashCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockAllStatementsUpdateAppClientSecretHashCall) Return(arg0 error) *MockAllStatementsUpdateAppClientSecretHashCall {
+func (c *MockAllStatementsUpdateAppClientCredentialHashCall) Return(arg0 error) *MockAllStatementsUpdateAppClientCredentialHashCall {
 	c.Call = c.Call.Return(arg0)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsUpdateAppClientSecretHashCall) Do(f func(context.Context, string, string, string) error) *MockAllStatementsUpdateAppClientSecretHashCall {
+func (c *MockAllStatementsUpdateAppClientCredentialHashCall) Do(f func(context.Context, string, string, string) error) *MockAllStatementsUpdateAppClientCredentialHashCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsUpdateAppClientSecretHashCall) DoAndReturn(f func(context.Context, string, string, string) error) *MockAllStatementsUpdateAppClientSecretHashCall {
+func (c *MockAllStatementsUpdateAppClientCredentialHashCall) DoAndReturn(f func(context.Context, string, string, string) error) *MockAllStatementsUpdateAppClientCredentialHashCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

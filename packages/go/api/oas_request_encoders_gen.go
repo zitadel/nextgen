@@ -10,8 +10,8 @@ import (
 	ht "github.com/ogen-go/ogen/http"
 )
 
-func encodeAddAppClientSecretRequest(
-	req *AddAppClientSecretRequest,
+func encodeAddAppClientCredentialRequest(
+	req *AddAppClientCredentialRequest,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"

@@ -52,7 +52,7 @@ func findAuthorization(h http.Header, prefix string) (string, bool) {
 
 // oauth2ScopesOAuth2 is a private map storing OAuth2 scopes per operation.
 var oauth2ScopesOAuth2 = map[string][]string{
-	AddAppClientSecretOperation: []string{
+	AddAppClientCredentialOperation: []string{
 		"app.write",
 	},
 	AddOriginOperation: []string{
@@ -206,6 +206,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	IssueChallengeOperation: []string{
 		"auth_attempt.write",
 	},
+	ListAppClientCredentialsOperation: []string{
+		"app.read",
+	},
 	ListAppRevisionsOperation: []string{
 		"app.read",
 	},
@@ -291,6 +294,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	RemovePreviewOperation: []string{
 		"deployment.write",
 	},
+	RevokeAppClientCredentialOperation: []string{
+		"app.write",
+	},
 	RevokeReleaseOperation: []string{
 		"release.write",
 	},
@@ -338,6 +344,7 @@ func GetOAuth2ScopesForOAuth2(operation string) []string {
 
 // operationRolesSessionCookie is a private map storing roles per operation.
 var operationRolesSessionCookie = map[string][]string{
+	AddAppClientCredentialOperation:    []string{},
 	AddOriginOperation:                 []string{},
 	CompleteClaimOperation:             []string{},
 	CreateDeploymentOperation:          []string{},
@@ -372,6 +379,7 @@ var operationRolesSessionCookie = map[string][]string{
 	GetUserPasswordStateOperation:      []string{},
 	GetVariableOperation:               []string{},
 	GetVariablesOperation:              []string{},
+	ListAppClientCredentialsOperation:  []string{},
 	ListBrandingOperation:              []string{},
 	ListDeploymentsOperation:           []string{},
 	ListFlowDefinitionsOperation:       []string{},
@@ -397,6 +405,7 @@ var operationRolesSessionCookie = map[string][]string{
 	QueryTeamsOperation:                []string{},
 	QueryUsersOperation:                []string{},
 	RemoveOriginOperation:              []string{},
+	RevokeAppClientCredentialOperation: []string{},
 	RevokeMySessionOperation:           []string{},
 	RevokeReleaseOperation:             []string{},
 	RollbackDeploymentOperation:        []string{},

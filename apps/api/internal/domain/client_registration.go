@@ -43,6 +43,13 @@ func ErrClientRegistrationInvalid(details any) Error {
 	return newError(PrefixApp.ErrorCodePrefix("client_registration_invalid"), "app: the client metadata is invalid", details, nil)
 }
 
+// ErrClientRegistrationOtherApp refuses a registered client that asks for an
+// API of another app than the one it joined with its first authorization
+// request. The authorization server answers invalid_target.
+func ErrClientRegistrationOtherApp() Error {
+	return newError(PrefixApp.ErrorCodePrefix("client_registration_other_app"), "app: the registered client joined another app", nil, nil)
+}
+
 // ClientRegistrationMetadata is what a client says about itself when it
 // registers (RFC 7591 §2), as the server keeps it: where a browser may be
 // sent, how the client authenticates, and the display fields. The consent
@@ -61,14 +68,19 @@ type ClientRegistrationMetadata struct {
 	AuthMethod      ClientAuthMethod `json:"token_endpoint_auth_method"`
 }
 
-// ClientRegistration is a client that registered itself. It belongs to the
-// project, not to an app: the app is the one whose API a request names, and
-// that app must open dynamic registration (AccessTo). It is transient data,
-// purged once past ExpiresAt unless a live consent names it.
+// ClientRegistration is a client that registered itself. It registers at the
+// project, since an endpoint per app would need an issuer per app, and joins
+// the app whose API its first authorization request names as `resource`,
+// which then has to open dynamic registration (AccessTo). It is transient
+// data, purged once past ExpiresAt unless a live consent names it.
 type ClientRegistration struct {
 	ProjectID string
 	// ID is the client_id.
-	ID       string
+	ID string
+	// AppSlug is the app the client joined, by its slug, which is fixed for
+	// the app's life; empty until its first authorization request names an
+	// API.
+	AppSlug  string
 	Metadata ClientRegistrationMetadata
 	// SecretHash is "sha256:<hex>" of the secret the server generated for a
 	// registration that authenticates with one, and empty otherwise.
@@ -88,6 +100,7 @@ const (
 	ClientRegistrationFieldUnspecified ClientRegistrationField = iota
 	ClientRegistrationFieldProjectID
 	ClientRegistrationFieldID
+	ClientRegistrationFieldAppSlug
 	ClientRegistrationFieldCreatedAt
 	ClientRegistrationFieldExpiresAt
 )
@@ -195,10 +208,12 @@ func (m ClientRegistrationMetadata) Validate() error {
 }
 
 // AccessTo says what the registered client may get for api, an API of
-// apiApp: a third_party API of an app that opens dynamic registration, with
-// any of its scopes, each with the user's consent.
+// apiApp: a third_party API of the app it joined, while that app opens
+// dynamic registration, with any of its scopes, each with the user's
+// consent. A client that joined no app yet gets nothing: the authorization
+// server joins it first (AppDirectory.JoinClientRegistration).
 func (r *ClientRegistration) AccessTo(apiApp *ResolvedApp, api AppAPI) ClientAPIAccess {
-	if !apiApp.Document.Registration.Dynamic || !api.ThirdParty {
+	if r.AppSlug == "" || r.AppSlug != apiApp.Slug || !apiApp.Document.Registration.Dynamic || !api.ThirdParty {
 		return ClientAPIAccess{}
 	}
 	return ClientAPIAccess{Allowed: true, Scopes: api.ScopeNames()}

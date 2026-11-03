@@ -245,6 +245,12 @@ func clientRegistrationFilter(f Filter) (database.Filter[domain.ClientRegistrati
 		return createdAtFilter(f.Operation, database.Col(domain.ClientRegistrationFieldCreatedAt), f.Value)
 	case "expires_at":
 		return timestampFilter("expires_at", f.Operation, database.Col(domain.ClientRegistrationFieldExpiresAt), f.Value)
+	case "app":
+		value, err := stringFilterValue(f)
+		if err != nil {
+			return nil, err
+		}
+		return stringFilter(f.Operation, database.Col(domain.ClientRegistrationFieldAppSlug), value)
 	default:
 		return nil, domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("unknown field %q", f.Field))
 	}

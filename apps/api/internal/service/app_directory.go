@@ -3,9 +3,11 @@ package service
 import (
 	"context"
 	"crypto/subtle"
+	"encoding/json"
 	"errors"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
@@ -35,19 +37,29 @@ type AppDirectory interface {
 	// API finds the API whose identifier is resource, exactly, by the same
 	// rules. domain.ErrAppAPINotFound when none.
 	API(ctx context.Context, at AppLookup, resource string) (*domain.ResolvedApp, domain.AppAPI, error)
-	// VerifyClientSecret checks the secret of a client that authenticates
-	// with one: a registered app's stored hashes, or a declared app's
-	// ${{ NAME }} variable as the deployment froze it.
-	// domain.ErrAppClientSecretInvalid when it matches none. A private_key_jwt
-	// client's assertion is checked by the authorization server against the
-	// client's JWKS.
+	// VerifyClientSecret checks a secret a confidential client presents
+	// against every secret it holds: a declared client's ${{ NAME }} variable
+	// as the deployment froze it, and the secrets written through the API,
+	// expired ones left out. domain.ErrAppClientSecretInvalid when it matches
+	// none.
 	VerifyClientSecret(ctx context.Context, at AppLookup, app *domain.ResolvedApp, client domain.AppClient, secret string) error
+	// ClientKeys returns the public keys a confidential client signs its
+	// private_key_jwt assertions with, as JWKs: the ones in its document and
+	// the ones written through the API, expired ones left out. The
+	// authorization server picks one by the assertion's kid.
+	ClientKeys(ctx context.Context, at AppLookup, app *domain.ResolvedApp, client domain.AppClient) ([]json.RawMessage, error)
 	// ClientRegistration finds a client that registered itself through
 	// dynamic registration (RFC 7591) by its client_id.
 	// domain.ErrClientRegistrationNotFound when none holds it: never
 	// registered, purged or deleted. The registration's AccessTo says which
 	// APIs it may get.
 	ClientRegistration(ctx context.Context, at AppLookup, clientID string) (*domain.ClientRegistration, error)
+	// JoinClientRegistration joins the registration to apiApp, the app whose
+	// API api its authorization request names, when that app opens dynamic
+	// registration and api is third_party, and returns the registration as it
+	// stands. A registration joins the first such app for good:
+	// domain.ErrClientRegistrationOtherApp when it joined another one.
+	JoinClientRegistration(ctx context.Context, at AppLookup, registration *domain.ClientRegistration, apiApp *domain.ResolvedApp, api domain.AppAPI) (*domain.ClientRegistration, error)
 	// VerifyClientRegistrationSecret checks the secret of a registration that
 	// authenticates with one. domain.ErrAppClientSecretInvalid when it does
 	// not match.
@@ -139,28 +151,57 @@ func (d *appDirectory) VerifyClientSecret(ctx context.Context, at AppLookup, app
 	ctx, end := startSpan(ctx, "AppDirectory.VerifyClientSecret")
 	defer end(&err)
 
-	if !client.EffectiveAuthMethod().UsesSecret() || secret == "" {
+	// A malformed generated secret is a typo or a guess: no hash runs for it.
+	if client.Type != domain.ClientTypeConfidential || secret == "" || !clientSecretWellFormed(secret) {
 		return domain.ErrAppClientSecretInvalid()
 	}
-	switch app.Source {
-	case domain.AppSourceDeclared:
-		name, ok := domain.VariableReferenceName(client.Secret)
-		if !ok {
-			return domain.ErrAppClientSecretInvalid()
+	if app.Source == domain.AppSourceDeclared && client.Secret != "" {
+		if name, ok := domain.VariableReferenceName(client.Secret); ok {
+			want, err := secretVariable(ctx, d.variables, decrypterOfWritingKey(ctx, d.keys), at.ProjectID, at.DeploymentID, name)
+			if err != nil {
+				return err
+			}
+			if want != "" && subtle.ConstantTimeCompare([]byte(want), []byte(secret)) == 1 {
+				return nil
+			}
 		}
-		want, err := secretVariable(ctx, d.variables, decrypterOfWritingKey(ctx, d.keys), at.ProjectID, at.DeploymentID, name)
-		if err != nil {
-			return err
-		}
-		if want == "" || subtle.ConstantTimeCompare([]byte(want), []byte(secret)) != 1 {
-			return domain.ErrAppClientSecretInvalid()
-		}
-		return nil
-	case domain.AppSourceRegistered:
-		return d.verifyStoredSecret(ctx, at.ProjectID, client.ClientID, secret)
-	default:
+	}
+	if app.Source == domain.AppSourceBuiltin {
 		return domain.ErrAppClientSecretInvalid()
 	}
+	return d.verifyStoredSecret(ctx, at.ProjectID, client.ClientID, secret)
+}
+
+func (d *appDirectory) ClientKeys(ctx context.Context, at AppLookup, app *domain.ResolvedApp, client domain.AppClient) (_ []json.RawMessage, err error) {
+	ctx, end := startSpan(ctx, "AppDirectory.ClientKeys")
+	defer end(&err)
+
+	if client.Type != domain.ClientTypeConfidential {
+		return nil, nil
+	}
+	var keys []json.RawMessage
+	if len(client.JWKS) > 0 {
+		var set struct {
+			Keys []json.RawMessage `json:"keys"`
+		}
+		if err := json.Unmarshal(client.JWKS, &set); err != nil {
+			return nil, domain.ErrInternal(err).WithMessage("stored client jwks does not parse")
+		}
+		keys = append(keys, set.Keys...)
+	}
+	if app.Source == domain.AppSourceBuiltin {
+		return keys, nil
+	}
+	stored, err := d.credentials(ctx, at.ProjectID, client.ClientID)
+	if err != nil {
+		return nil, err
+	}
+	for _, credential := range stored {
+		if credential.Kind == domain.CredentialKindKey {
+			keys = append(keys, credential.PublicKey)
+		}
+	}
+	return keys, nil
 }
 
 func (d *appDirectory) ClientRegistration(ctx context.Context, at AppLookup, clientID string) (_ *domain.ClientRegistration, err error) {
@@ -173,6 +214,25 @@ func (d *appDirectory) ClientRegistration(ctx context.Context, at AppLookup, cli
 	registration, err := d.pool.Statements().GetClientRegistration(ctx, at.ProjectID, clientID)
 	if err != nil {
 		return nil, notFoundAs(err, domain.ErrClientRegistrationNotFound())
+	}
+	return registration, nil
+}
+
+func (d *appDirectory) JoinClientRegistration(ctx context.Context, at AppLookup, registration *domain.ClientRegistration, apiApp *domain.ResolvedApp, api domain.AppAPI) (_ *domain.ClientRegistration, err error) {
+	ctx, end := startSpan(ctx, "AppDirectory.JoinClientRegistration")
+	defer end(&err)
+
+	if registration.AppSlug == "" && apiApp.Document.Registration.Dynamic && api.ThirdParty {
+		joined, err := d.pool.Statements().JoinClientRegistrationApp(ctx, at.ProjectID, registration.ID, apiApp.Slug)
+		if err != nil {
+			return nil, notFoundAs(err, domain.ErrClientRegistrationNotFound())
+		}
+		updated := *registration
+		updated.AppSlug = joined
+		registration = &updated
+	}
+	if registration.AppSlug != "" && registration.AppSlug != apiApp.Slug {
+		return nil, domain.ErrClientRegistrationOtherApp()
 	}
 	return registration, nil
 }
@@ -253,35 +313,52 @@ func (d *appDirectory) Registration(ctx context.Context, at AppLookup) (_ domain
 	}
 }
 
-// verifyStoredSecret checks secret against the client's stored hashes. A hash
-// another system wrote that matches is replaced by the server's own, so the
-// slow hash runs once.
+// verifyStoredSecret checks secret against the client's stored secrets. A
+// hash another system wrote that matches is replaced by the server's own, so
+// the slow hash runs once.
 func (d *appDirectory) verifyStoredSecret(ctx context.Context, projectID, clientID, secret string) error {
-	stmts := d.pool.Statements()
-	row, err := stmts.GetAppClientIDByClientID(ctx, projectID, clientID)
-	if err != nil {
-		return notFoundAs(err, domain.ErrAppClientSecretInvalid())
-	}
-	stored, err := stmts.ListAppClientSecrets(ctx, projectID, row.ID)
+	stored, err := d.credentials(ctx, projectID, clientID)
 	if err != nil {
 		return err
 	}
-	for _, s := range stored {
-		if strings.HasPrefix(s.EncodedHash, sha256Scheme) {
-			if matchSHA256(s.EncodedHash, secret) {
+	for _, credential := range stored {
+		if credential.Kind != domain.CredentialKindSecret {
+			continue
+		}
+		if strings.HasPrefix(credential.EncodedHash, sha256Scheme) {
+			if matchSHA256(credential.EncodedHash, secret) {
 				return nil
 			}
 			continue
 		}
-		if d.imported == nil || d.imported.VerifyHash(s.EncodedHash, secret) != nil {
+		if d.imported == nil || d.imported.VerifyHash(credential.EncodedHash, secret) != nil {
 			continue
 		}
-		if err := stmts.UpdateAppClientSecretHash(ctx, projectID, s.ID, sha256Encoded(secret)); err != nil {
-			getLoggingContext(ctx, "app").Warn("imported client secret matched but could not be rehashed", "secret_id", s.ID, "error", err)
+		if err := d.pool.Statements().UpdateAppClientCredentialHash(ctx, projectID, credential.ID, sha256Encoded(secret)); err != nil {
+			getLoggingContext(ctx, "app").Warn("imported client secret matched but could not be rehashed", "credential_id", credential.ID, "error", err)
 		}
 		return nil
 	}
 	return domain.ErrAppClientSecretInvalid()
+}
+
+// credentials returns the credentials the client with clientID holds through
+// the API and that have not expired. A client_id no row holds has none.
+func (d *appDirectory) credentials(ctx context.Context, projectID, clientID string) ([]*domain.AppClientCredential, error) {
+	stmts := d.pool.Statements()
+	row, err := stmts.GetAppClientIDByClientID(ctx, projectID, clientID)
+	if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	stored, err := stmts.ListAppClientCredentials(ctx, projectID, row.ID)
+	if err != nil {
+		return nil, err
+	}
+	now := time.Now()
+	return slices.DeleteFunc(stored, func(c *domain.AppClientCredential) bool { return c.Expired(now) }), nil
 }
 
 // resolve reads app id at the revision that serves at, with each client's

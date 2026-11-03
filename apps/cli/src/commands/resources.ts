@@ -265,7 +265,9 @@ const GRANT_OPERATIONS = Object.values(QueryGrantsBodyFilterItemOperation);
 const IDP_OPERATIONS = Object.values(QueryIdpsBodyFilterItemOperation);
 const PROJECT_OPERATIONS = Object.values(QueryProjectsBodyFilterItemOperation);
 const APP_OPERATIONS = Object.values(QueryAppsBodyFilterItemOperation);
-const CLIENT_REGISTRATION_OPERATIONS = Object.values(QueryClientRegistrationsBodyFilterItemOperation);
+const CLIENT_REGISTRATION_OPERATIONS = Object.values(
+  QueryClientRegistrationsBodyFilterItemOperation,
+);
 
 /** A filter operation any of the API's structured queries takes. */
 type Operation =
@@ -596,17 +598,19 @@ export const RESOURCES = {
   }),
 
   // Clients that registered themselves through dynamic client registration
-  // (RFC 7591). They register at the authorization server, so there is no
-  // create; an operator lists them and deletes one, which takes its consents
-  // and their tokens with it.
+  // (RFC 7591), each in the app its first authorization request named. They
+  // register at the authorization server, so there is no create; an operator
+  // lists them and deletes one, which takes its consents and their tokens
+  // with it.
   "client-registrations": resource({
     group: CommandGroups.authentication,
     singular: "client registration",
     idField: "id",
-    columns: ["id", "client_name", "token_endpoint_auth_method", "created_at", "expires_at"],
+    columns: ["id", "app", "client_name", "token_endpoint_auth_method", "created_at", "expires_at"],
     heading: "id",
     detail: [
       "id",
+      "app",
       "client_name",
       "client_uri",
       "software_id",
@@ -621,6 +625,7 @@ export const RESOURCES = {
       body: QueryClientRegistrationsBody,
       item: QueryClientRegistrationsResponse.shape.client_registrations.element,
       filters: [
+        { field: "app", operations: CLIENT_REGISTRATION_OPERATIONS },
         { field: "created_at", operations: CLIENT_REGISTRATION_OPERATIONS },
         { field: "expires_at", operations: CLIENT_REGISTRATION_OPERATIONS },
       ],

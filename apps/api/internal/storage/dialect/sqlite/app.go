@@ -49,14 +49,18 @@ JOIN app_revisions r
 	getAppAPIIdentifierStmt = `SELECT project_id, identifier, app_id, created_at ` +
 		`FROM app_api_identifiers WHERE project_id = ? AND identifier = ?`
 
-	createAppClientSecretStmt = `INSERT INTO app_client_secrets ` +
-		`(project_id, id, client_row_id, encoded_hash, created_at) VALUES (?, ?, ?, ?, ?)`
+	createAppClientCredentialStmt = `INSERT INTO app_client_credentials ` +
+		`(project_id, id, client_row_id, name, kind, encoded_hash, public_key, key_id, created_at, expires_at) ` +
+		`VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 
-	listAppClientSecretsStmt = `SELECT project_id, id, client_row_id, encoded_hash, created_at ` +
-		`FROM app_client_secrets WHERE project_id = ? AND client_row_id = ? ` +
-		`ORDER BY created_at DESC, id DESC`
+	listAppClientCredentialsStmt = `SELECT project_id, id, client_row_id, name, kind, encoded_hash, public_key, ` +
+		`key_id, created_at, expires_at FROM app_client_credentials ` +
+		`WHERE project_id = ? AND client_row_id = ? ORDER BY created_at, id`
 
-	updateAppClientSecretHashStmt = `UPDATE app_client_secrets SET encoded_hash = ? WHERE project_id = ? AND id = ?`
+	updateAppClientCredentialHashStmt = `UPDATE app_client_credentials SET encoded_hash = ? ` +
+		`WHERE project_id = ? AND id = ? AND kind = 'secret'`
+
+	deleteAppClientCredentialStmt = `DELETE FROM app_client_credentials WHERE project_id = ? AND client_row_id = ? AND id = ?`
 )
 
 type appStatements struct{ statement }
@@ -312,18 +316,30 @@ func (s appStatements) GetAppAPIIdentifier(ctx context.Context, projectID, ident
 	return &entity, nil
 }
 
-// CreateAppClientSecret implements [service.AppStatements].
-func (s appStatements) CreateAppClientSecret(ctx context.Context, entity *domain.AppClientSecret) error {
-	if err := ensureManagedID(&entity.ID, domain.PrefixAppClientSecret); err != nil {
+// CreateAppClientCredential implements [service.AppStatements].
+func (s appStatements) CreateAppClientCredential(ctx context.Context, entity *domain.AppClientCredential) error {
+	if err := ensureManagedID(&entity.ID, domain.PrefixAppClientCredential); err != nil {
 		return err
 	}
+	var publicKey, expiresAt any
+	if len(entity.PublicKey) > 0 {
+		publicKey = string(entity.PublicKey)
+	}
+	if entity.ExpiresAt != nil {
+		expiresAt = entity.ExpiresAt.UnixNano()
+	}
 	now := nowUnixNano()
-	if _, err := s.client.Exec(ctx, createAppClientSecretStmt,
+	if _, err := s.client.Exec(ctx, createAppClientCredentialStmt,
 		entity.ProjectID,
 		entity.ID,
 		entity.ClientRowID,
-		entity.EncodedHash,
+		entity.Name,
+		string(entity.Kind),
+		emptyAsNull(entity.EncodedHash),
+		publicKey,
+		emptyAsNull(entity.KeyID),
 		now,
+		expiresAt,
 	); err != nil {
 		return wrapError(err)
 	}
@@ -331,22 +347,36 @@ func (s appStatements) CreateAppClientSecret(ctx context.Context, entity *domain
 	return nil
 }
 
-// ListAppClientSecrets implements [service.AppStatements].
-func (s appStatements) ListAppClientSecrets(ctx context.Context, projectID, clientRowID string) ([]*domain.AppClientSecret, error) {
-	rows, err := s.client.Query(ctx, listAppClientSecretsStmt, projectID, clientRowID)
+// ListAppClientCredentials implements [service.AppStatements].
+func (s appStatements) ListAppClientCredentials(ctx context.Context, projectID, clientRowID string) ([]*domain.AppClientCredential, error) {
+	rows, err := s.client.Query(ctx, listAppClientCredentialsStmt, projectID, clientRowID)
 	if err != nil {
 		return nil, wrapError(err)
 	}
 	defer rows.Close()
-	items, err := collectRows(rows, func(rows *sql.Rows) (*domain.AppClientSecret, error) {
+	items, err := collectRows(rows, func(rows *sql.Rows) (*domain.AppClientCredential, error) {
 		var (
-			entity      domain.AppClientSecret
-			createdNano int64
+			entity                      domain.AppClientCredential
+			kind                        string
+			encodedHash, publicKey, kid sql.NullString
+			createdNano                 int64
+			expiresNano                 sql.NullInt64
 		)
-		if err := rows.Scan(&entity.ProjectID, &entity.ID, &entity.ClientRowID, &entity.EncodedHash, &createdNano); err != nil {
+		if err := rows.Scan(&entity.ProjectID, &entity.ID, &entity.ClientRowID, &entity.Name, &kind,
+			&encodedHash, &publicKey, &kid, &createdNano, &expiresNano); err != nil {
 			return nil, err
 		}
+		entity.Kind = domain.CredentialKind(kind)
+		entity.EncodedHash = encodedHash.String
+		if publicKey.Valid {
+			entity.PublicKey = []byte(publicKey.String)
+		}
+		entity.KeyID = kid.String
 		entity.CreatedAt = timeFromUnixNano(createdNano)
+		if expiresNano.Valid {
+			expires := timeFromUnixNano(expiresNano.Int64)
+			entity.ExpiresAt = &expires
+		}
 		return &entity, nil
 	})
 	if err != nil {
@@ -355,9 +385,9 @@ func (s appStatements) ListAppClientSecrets(ctx context.Context, projectID, clie
 	return items, nil
 }
 
-// UpdateAppClientSecretHash implements [service.AppStatements].
-func (s appStatements) UpdateAppClientSecretHash(ctx context.Context, projectID, id, encodedHash string) error {
-	n, err := execAffected(ctx, s.client, updateAppClientSecretHashStmt, encodedHash, projectID, id)
+// UpdateAppClientCredentialHash implements [service.AppStatements].
+func (s appStatements) UpdateAppClientCredentialHash(ctx context.Context, projectID, id, encodedHash string) error {
+	n, err := execAffected(ctx, s.client, updateAppClientCredentialHashStmt, encodedHash, projectID, id)
 	if err != nil {
 		return err
 	}
@@ -365,6 +395,27 @@ func (s appStatements) UpdateAppClientSecretHash(ctx context.Context, projectID,
 		return database.NewNoRowFoundError(nil)
 	}
 	return nil
+}
+
+// DeleteAppClientCredential implements [service.AppStatements].
+func (s appStatements) DeleteAppClientCredential(ctx context.Context, projectID, clientRowID, id string) error {
+	n, err := execAffected(ctx, s.client, deleteAppClientCredentialStmt, projectID, clientRowID, id)
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return database.NewNoRowFoundError(nil)
+	}
+	return nil
+}
+
+// emptyAsNull stores an empty string as NULL, for a column only one kind of
+// row fills.
+func emptyAsNull(value string) any {
+	if value == "" {
+		return nil
+	}
+	return value
 }
 
 var _ service.AppStatements = (*appStatements)(nil)

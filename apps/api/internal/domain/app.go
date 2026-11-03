@@ -26,9 +26,9 @@ const PrefixAppRevision ResourcePrefix = "apprev"
 // (ADR 047 §4).
 const PrefixAppClient ResourcePrefix = "client"
 
-// PrefixAppClientSecret namespaces stored client secret hashes
-// ("csec_01KWH3B..."), storage-only rows under a client.
-const PrefixAppClientSecret ResourcePrefix = "csec"
+// PrefixAppClientCredential namespaces the credentials a client holds through
+// the API ("cred_01KWH3B..."), each named and revoked on its own.
+const PrefixAppClientCredential ResourcePrefix = "cred"
 
 // AppSource says who writes an app, and so where the authorization server
 // reads it from. Every app has one writer.
@@ -113,6 +113,17 @@ func ErrAppClientSecretInvalid() Error {
 	return newError(PrefixApp.ErrorCodePrefix("client_secret_invalid"), "app: the client secret does not match", nil, nil)
 }
 
+// ErrAppCredentialNotFound reports a credential id the client does not hold.
+func ErrAppCredentialNotFound() Error {
+	return newError(PrefixApp.ErrorCodePrefix("credential_not_found"), "app: the client holds no credential with the id", nil, nil)
+}
+
+// ErrAppCredentialTaken refuses a credential whose name, or whose key's kid,
+// another credential of the client has. details names the field.
+func ErrAppCredentialTaken(details any) Error {
+	return newError(PrefixApp.ErrorCodePrefix("credential_taken"), "app: another credential of the client has the name or the key id", details, nil)
+}
+
 // ErrInvalidScope reports a requested scope the API does not define, or one
 // the client may not get. The authorization server answers invalid_scope:
 // a scope is refused, never dropped silently. details names the scopes.
@@ -174,17 +185,42 @@ type AppAPIIdentifier struct {
 	CreatedAt  time.Time
 }
 
-// AppClientSecret is one stored secret of a registered app's client: a hash,
-// never the value.
-type AppClientSecret struct {
+// CredentialKind is what a client authenticates with at the token endpoint.
+type CredentialKind string
+
+const (
+	// CredentialKindSecret authenticates with client_secret_basic or
+	// client_secret_post.
+	CredentialKindSecret CredentialKind = "secret"
+	// CredentialKindKey authenticates with a private_key_jwt assertion.
+	CredentialKindKey CredentialKind = "key"
+)
+
+// AppClientCredential is a credential a confidential client holds through the
+// API, whether its app is declared or registered: a secret's hash or a public
+// key, never a secret. A deploy never removes one.
+type AppClientCredential struct {
 	ProjectID   string
 	ID          string
 	ClientRowID string
-	// EncodedHash is "sha256:<hex>" for a secret the server generated or an
-	// imported plaintext, or a passwap encoding for an imported hash, which
-	// is moved to sha256 on its first successful use.
+	Name        string
+	Kind        CredentialKind
+	// EncodedHash is a secret's "sha256:<hex>" when the server generated it
+	// or it was imported as plaintext, or a passwap encoding for an imported
+	// hash, which is moved to sha256 on its first successful use.
 	EncodedHash string
-	CreatedAt   time.Time
+	// PublicKey is a key's JWK, with public members only.
+	PublicKey json.RawMessage
+	// KeyID is a key's kid.
+	KeyID     string
+	CreatedAt time.Time
+	// ExpiresAt is when the credential stops working; nil for never.
+	ExpiresAt *time.Time
+}
+
+// Expired reports whether the credential no longer works at now.
+func (c *AppClientCredential) Expired(now time.Time) bool {
+	return c.ExpiresAt != nil && !now.Before(*c.ExpiresAt)
 }
 
 // ClientType is an OAuth client type (RFC 6749 §2.1).
@@ -248,24 +284,26 @@ type AppDocument struct {
 	ClientURI    string          `json:"client_uri,omitempty"`
 	PolicyURI    string          `json:"policy_uri,omitempty"`
 	TOSURI       string          `json:"tos_uri,omitempty"`
-	Preset       string          `json:"preset,omitempty"`
 	Clients      []AppClient     `json:"clients,omitempty"`
 	APIs         []AppAPI        `json:"apis,omitempty"`
 	Registration AppRegistration `json:"registration,omitzero"`
 }
 
-// AppClient is an OAuth client of an app.
+// AppClient is a client of an app. Its grant types and redirect URIs are its
+// OAuth config; a confidential client without grant types holds only
+// credentials.
 type AppClient struct {
-	Slug       string           `json:"slug"`
-	Name       string           `json:"name,omitempty"`
-	ClientID   string           `json:"client_id,omitempty"`
-	Type       ClientType       `json:"type"`
-	AuthMethod ClientAuthMethod `json:"auth_method,omitempty"`
-	Secret     string           `json:"secret,omitempty"`
-	// JWKS is the public key set a private_key_jwt client signs its
-	// assertions with, passed to the authorization server as written.
+	Slug     string     `json:"slug"`
+	Name     string     `json:"name,omitempty"`
+	ClientID string     `json:"client_id,omitempty"`
+	Type     ClientType `json:"type"`
+	// Secret is a declared client's ${{ NAME }} reference to a project
+	// variable.
+	Secret string `json:"secret,omitempty"`
+	// JWKS is public keys the client signs private_key_jwt assertions with,
+	// passed to the authorization server as written.
 	JWKS                   json.RawMessage `json:"jwks,omitempty"`
-	Grants                 []GrantType     `json:"grants"`
+	GrantTypes             []GrantType     `json:"grant_types,omitempty"`
 	RedirectURIs           []string        `json:"redirect_uris,omitempty"`
 	PostLogoutRedirectURIs []string        `json:"post_logout_redirect_uris,omitempty"`
 	FirstParty             *bool           `json:"first_party,omitempty"`
@@ -387,39 +425,47 @@ func (d AppDocument) Validate(source AppSource) error {
 		switch c.Type {
 		case ClientTypePublic:
 			// A public client proves itself with PKCE alone: it holds nothing a
-			// token endpoint could check, so it cannot act as itself.
-			if c.AuthMethod != "" && c.AuthMethod != ClientAuthNone {
-				add(base+"/auth_method", "a public client authenticates with none")
-			}
+			// token endpoint could check, so it only acts for the user who
+			// signed in.
 			if c.Secret != "" {
 				add(base+"/secret", "a public client holds no secret")
 			}
-			if slices.Contains(c.Grants, GrantClientCredentials) {
-				add(base+"/grants", "a public client may not use client_credentials")
+			if len(c.JWKS) > 0 {
+				add(base+"/jwks", "a public client holds no key")
+			}
+			if !c.HasGrant(GrantAuthorizationCode) {
+				add(base+"/grant_types", "a public client signs users in, so it needs authorization_code")
+			}
+			if c.HasGrant(GrantClientCredentials) {
+				add(base+"/grant_types", "a public client may not use client_credentials")
 			}
 		case ClientTypeConfidential:
-			if c.AuthMethod == ClientAuthNone {
-				add(base+"/auth_method", "a confidential client authenticates with a secret or a key")
+			if len(c.JWKS) > 0 {
+				if err := checkJWKS(c.JWKS); err != nil {
+					add(base+"/jwks", "%s", err)
+				}
+			}
+			if len(c.GrantTypes) == 0 && len(c.APIs) > 0 {
+				add(base+"/apis", "a client without grant_types holds only credentials and gets no token from the token endpoint")
 			}
 		}
-		if c.EffectiveAuthMethod() == ClientAuthPrivateKeyJWT {
-			if err := checkJWKS(c.JWKS); err != nil {
-				add(base+"/jwks", "%s", err)
-			}
-			if c.Secret != "" {
-				add(base+"/secret", "a private_key_jwt client authenticates with its keys, not a secret")
-			}
-		} else if len(c.JWKS) > 0 {
-			add(base+"/jwks", "jwks is for a private_key_jwt client")
+		if source == AppSourceRegistered && c.Secret != "" {
+			add(base+"/secret", "an app registered through the API holds no variable reference: its secrets are credentials written through the API")
 		}
 		if c.Consent == ConsentSkip && !c.IsFirstParty(source) {
 			add(base+"/consent", "only a first-party client may skip consent")
 		}
-		if slices.Contains(c.Grants, GrantRefreshToken) && !slices.Contains(c.Grants, GrantAuthorizationCode) {
-			add(base+"/grants", "refresh_token needs authorization_code: OAuth 2.1 issues no refresh token for client_credentials")
+		if c.HasGrant(GrantRefreshToken) && !c.HasGrant(GrantAuthorizationCode) {
+			add(base+"/grant_types", "refresh_token needs authorization_code: OAuth 2.1 issues no refresh token for client_credentials")
 		}
-		if slices.Contains(c.Grants, GrantAuthorizationCode) && len(c.RedirectURIs) == 0 {
+		switch {
+		case c.HasGrant(GrantAuthorizationCode) && len(c.RedirectURIs) == 0:
 			add(base+"/redirect_uris", "authorization_code needs at least one redirect URI")
+		case !c.HasGrant(GrantAuthorizationCode) && len(c.RedirectURIs) > 0:
+			add(base+"/redirect_uris", "a redirect URI sends a user back after sign-in, so it needs authorization_code")
+		}
+		if !c.HasGrant(GrantAuthorizationCode) && len(c.PostLogoutRedirectURIs) > 0 {
+			add(base+"/post_logout_redirect_uris", "a post-logout redirect URI needs authorization_code")
 		}
 		for j, uri := range c.RedirectURIs {
 			if err := checkRedirectURI(uri, c.Type); err != nil {
@@ -429,14 +475,6 @@ func (d AppDocument) Validate(source AppSource) error {
 		for j, uri := range c.PostLogoutRedirectURIs {
 			if err := checkRedirectURI(uri, c.Type); err != nil {
 				add(fmt.Sprintf("%s/post_logout_redirect_uris/%d", base, j), "%s", err)
-			}
-		}
-		if c.EffectiveAuthMethod().UsesSecret() {
-			switch {
-			case source == AppSourceRegistered && c.Secret != "":
-				add(base+"/secret", "an app registered through the API gets its secrets from the server or an import, not a variable reference")
-			case source == AppSourceDeclared && c.Secret == "":
-				add(base+"/secret", "a confidential client declared in the release needs its secret as a ${{ NAME }} reference")
 			}
 		}
 		refs := map[string]bool{}
@@ -531,17 +569,6 @@ func splitAPIRef(ref string) (appSlug, apiSlug string) {
 	return "", ref
 }
 
-// EffectiveAuthMethod is the client's auth_method, or its type's default.
-func (c AppClient) EffectiveAuthMethod() ClientAuthMethod {
-	if c.AuthMethod != "" {
-		return c.AuthMethod
-	}
-	if c.Type == ClientTypePublic {
-		return ClientAuthNone
-	}
-	return ClientAuthClientSecretBasic
-}
-
 // EffectiveConsent is the client's consent policy, or else skip for a
 // first-party client and new_scopes for a third-party one.
 func (c AppClient) EffectiveConsent(source AppSource) ConsentPolicy {
@@ -566,7 +593,7 @@ func (c AppClient) IsFirstParty(source AppSource) bool {
 
 // HasGrant reports whether the client may use grant.
 func (c AppClient) HasGrant(grant GrantType) bool {
-	return slices.Contains(c.Grants, grant)
+	return slices.Contains(c.GrantTypes, grant)
 }
 
 // ResolvedApp is an app as the authorization server reads it: the revision
@@ -675,6 +702,51 @@ func checkJWKS(raw json.RawMessage) error {
 		seen[key.Kid] = true
 	}
 	return nil
+}
+
+// PublicJWKKeyID checks that raw is one public key a client can sign
+// private_key_jwt assertions with, and returns its kid: a key written through
+// the API always has one, so an assertion's kid picks it among the client's
+// keys.
+func PublicJWKKeyID(raw json.RawMessage) (string, error) {
+	var key map[string]any
+	if err := json.Unmarshal(raw, &key); err != nil || key == nil {
+		return "", fmt.Errorf("the key is not a JSON object")
+	}
+	for _, private := range []string{"d", "p", "q", "dp", "dq", "qi", "oth", "k"} {
+		if _, ok := key[private]; ok {
+			return "", fmt.Errorf("the key carries the private member %q", private)
+		}
+	}
+	has := func(names ...string) bool {
+		for _, name := range names {
+			if v, _ := key[name].(string); v == "" {
+				return false
+			}
+		}
+		return true
+	}
+	kid, _ := key["kid"].(string)
+	if kid == "" {
+		return "", fmt.Errorf("the key needs a kid")
+	}
+	switch key["kty"] {
+	case "RSA":
+		if !has("n", "e") {
+			return "", fmt.Errorf("an RSA key needs n and e")
+		}
+	case "EC":
+		if !has("crv", "x", "y") {
+			return "", fmt.Errorf("an EC key needs crv, x and y")
+		}
+	case "OKP":
+		if !has("crv", "x") {
+			return "", fmt.Errorf("an OKP key needs crv and x")
+		}
+	default:
+		return "", fmt.Errorf("kty must be RSA, EC or OKP")
+	}
+	return kid, nil
 }
 
 // checkAPIIdentifier accepts an https URL, an http URL on a loopback host, or

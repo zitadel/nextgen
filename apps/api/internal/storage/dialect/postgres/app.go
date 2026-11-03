@@ -62,15 +62,19 @@ JOIN zitadel_nextgen.app_revisions r
 	getAppAPIIdentifierStmt = `SELECT project_id, identifier, app_id, created_at ` +
 		`FROM zitadel_nextgen.app_api_identifiers WHERE project_id = $1 AND identifier = $2`
 
-	createAppClientSecretStmt = `INSERT INTO zitadel_nextgen.app_client_secrets ` +
-		`(project_id, id, client_row_id, encoded_hash) VALUES ($1, $2, $3, $4) RETURNING created_at`
+	createAppClientCredentialStmt = `INSERT INTO zitadel_nextgen.app_client_credentials ` +
+		`(project_id, id, client_row_id, name, kind, encoded_hash, public_key, key_id, expires_at) ` +
+		`VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING created_at`
 
-	listAppClientSecretsStmt = `SELECT project_id, id, client_row_id, encoded_hash, created_at ` +
-		`FROM zitadel_nextgen.app_client_secrets WHERE project_id = $1 AND client_row_id = $2 ` +
-		`ORDER BY created_at DESC, id DESC`
+	listAppClientCredentialsStmt = `SELECT project_id, id, client_row_id, name, kind, encoded_hash, public_key, ` +
+		`key_id, created_at, expires_at FROM zitadel_nextgen.app_client_credentials ` +
+		`WHERE project_id = $1 AND client_row_id = $2 ORDER BY created_at, id`
 
-	updateAppClientSecretHashStmt = `UPDATE zitadel_nextgen.app_client_secrets ` +
-		`SET encoded_hash = $3 WHERE project_id = $1 AND id = $2`
+	updateAppClientCredentialHashStmt = `UPDATE zitadel_nextgen.app_client_credentials ` +
+		`SET encoded_hash = $3 WHERE project_id = $1 AND id = $2 AND kind = 'secret'`
+
+	deleteAppClientCredentialStmt = `DELETE FROM zitadel_nextgen.app_client_credentials ` +
+		`WHERE project_id = $1 AND client_row_id = $2 AND id = $3`
 )
 
 type appStatements struct{ statement }
@@ -303,16 +307,25 @@ func (s appStatements) GetAppAPIIdentifier(ctx context.Context, projectID, ident
 	return entity, nil
 }
 
-// CreateAppClientSecret implements [service.AppStatements].
-func (s appStatements) CreateAppClientSecret(ctx context.Context, entity *domain.AppClientSecret) error {
-	if err := ensureManagedID(&entity.ID, domain.PrefixAppClientSecret); err != nil {
+// CreateAppClientCredential implements [service.AppStatements].
+func (s appStatements) CreateAppClientCredential(ctx context.Context, entity *domain.AppClientCredential) error {
+	if err := ensureManagedID(&entity.ID, domain.PrefixAppClientCredential); err != nil {
 		return err
 	}
-	if err := s.client.QueryRow(ctx, createAppClientSecretStmt,
+	var publicKey []byte
+	if len(entity.PublicKey) > 0 {
+		publicKey = entity.PublicKey
+	}
+	if err := s.client.QueryRow(ctx, createAppClientCredentialStmt,
 		entity.ProjectID,
 		entity.ID,
 		entity.ClientRowID,
-		entity.EncodedHash,
+		entity.Name,
+		string(entity.Kind),
+		emptyAsNull(entity.EncodedHash),
+		publicKey,
+		emptyAsNull(entity.KeyID),
+		entity.ExpiresAt,
 	).Scan(&entity.CreatedAt); err != nil {
 		return wrapError(err)
 	}
@@ -320,19 +333,37 @@ func (s appStatements) CreateAppClientSecret(ctx context.Context, entity *domain
 	return nil
 }
 
-// ListAppClientSecrets implements [service.AppStatements].
-func (s appStatements) ListAppClientSecrets(ctx context.Context, projectID, clientRowID string) ([]*domain.AppClientSecret, error) {
-	rows, err := s.client.Query(ctx, listAppClientSecretsStmt, projectID, clientRowID)
+// ListAppClientCredentials implements [service.AppStatements].
+func (s appStatements) ListAppClientCredentials(ctx context.Context, projectID, clientRowID string) ([]*domain.AppClientCredential, error) {
+	rows, err := s.client.Query(ctx, listAppClientCredentialsStmt, projectID, clientRowID)
 	if err != nil {
 		return nil, wrapError(err)
 	}
-	items, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (*domain.AppClientSecret, error) {
-		entity := new(domain.AppClientSecret)
-		if err := row.Scan(&entity.ProjectID, &entity.ID, &entity.ClientRowID, &entity.EncodedHash, &entity.CreatedAt); err != nil {
+	items, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (*domain.AppClientCredential, error) {
+		var (
+			entity           domain.AppClientCredential
+			kind             string
+			encodedHash, kid *string
+			publicKey        []byte
+		)
+		if err := row.Scan(&entity.ProjectID, &entity.ID, &entity.ClientRowID, &entity.Name, &kind,
+			&encodedHash, &publicKey, &kid, &entity.CreatedAt, &entity.ExpiresAt); err != nil {
 			return nil, err
 		}
+		entity.Kind = domain.CredentialKind(kind)
+		if encodedHash != nil {
+			entity.EncodedHash = *encodedHash
+		}
+		if kid != nil {
+			entity.KeyID = *kid
+		}
+		entity.PublicKey = publicKey
 		entity.CreatedAt = entity.CreatedAt.UTC()
-		return entity, nil
+		if entity.ExpiresAt != nil {
+			expires := entity.ExpiresAt.UTC()
+			entity.ExpiresAt = &expires
+		}
+		return &entity, nil
 	})
 	if err != nil {
 		return nil, wrapError(err)
@@ -340,9 +371,9 @@ func (s appStatements) ListAppClientSecrets(ctx context.Context, projectID, clie
 	return items, nil
 }
 
-// UpdateAppClientSecretHash implements [service.AppStatements].
-func (s appStatements) UpdateAppClientSecretHash(ctx context.Context, projectID, id, encodedHash string) error {
-	tag, err := s.client.Exec(ctx, updateAppClientSecretHashStmt, projectID, id, encodedHash)
+// UpdateAppClientCredentialHash implements [service.AppStatements].
+func (s appStatements) UpdateAppClientCredentialHash(ctx context.Context, projectID, id, encodedHash string) error {
+	tag, err := s.client.Exec(ctx, updateAppClientCredentialHashStmt, projectID, id, encodedHash)
 	if err != nil {
 		return wrapError(err)
 	}
@@ -350,6 +381,27 @@ func (s appStatements) UpdateAppClientSecretHash(ctx context.Context, projectID,
 		return database.NewNoRowFoundError(nil)
 	}
 	return nil
+}
+
+// DeleteAppClientCredential implements [service.AppStatements].
+func (s appStatements) DeleteAppClientCredential(ctx context.Context, projectID, clientRowID, id string) error {
+	tag, err := s.client.Exec(ctx, deleteAppClientCredentialStmt, projectID, clientRowID, id)
+	if err != nil {
+		return wrapError(err)
+	}
+	if tag.RowsAffected() == 0 {
+		return database.NewNoRowFoundError(nil)
+	}
+	return nil
+}
+
+// emptyAsNull stores an empty string as NULL, for a column only one kind of
+// row fills.
+func emptyAsNull(value string) *string {
+	if value == "" {
+		return nil
+	}
+	return &value
 }
 
 var _ service.AppStatements = (*appStatements)(nil)

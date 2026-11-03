@@ -2,8 +2,8 @@
 
 package api
 
-// AddAppClientSecretParams is parameters of addAppClientSecret operation.
-type AddAppClientSecretParams struct {
+// AddAppClientCredentialParams is parameters of addAppClientCredential operation.
+type AddAppClientCredentialParams struct {
 	// The unique identifier of the project.
 	ProjectID ProjectID
 	// The app id, allocated when the app was created.
@@ -495,6 +495,16 @@ type IssueChallengeParams struct {
 	AttemptID AttemptID
 }
 
+// ListAppClientCredentialsParams is parameters of listAppClientCredentials operation.
+type ListAppClientCredentialsParams struct {
+	// The unique identifier of the project.
+	ProjectID ProjectID
+	// The app id, allocated when the app was created.
+	ID string
+	// The slug of a client of the app.
+	Client string
+}
+
 // ListAppRevisionsParams is parameters of listAppRevisions operation.
 type ListAppRevisionsParams struct {
 	// The unique identifier of the project.
@@ -948,6 +958,18 @@ type RemoveOriginParams struct {
 type RemovePreviewParams struct {
 	// The unique identifier of the project.
 	ProjectID ProjectID
+}
+
+// RevokeAppClientCredentialParams is parameters of revokeAppClientCredential operation.
+type RevokeAppClientCredentialParams struct {
+	// The unique identifier of the project.
+	ProjectID ProjectID
+	// The app id, allocated when the app was created.
+	ID string
+	// The slug of a client of the app.
+	Client string
+	// The id of a credential of the client.
+	CredentialID string
 }
 
 // RevokeMySessionParams is parameters of revokeMySession operation.

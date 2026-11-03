@@ -57,7 +57,8 @@ tags:
       OIDC clients, the APIs it serves and whether clients may register into
       it. The developer's own apps are declared in the release; apps a product
       creates for its customers are registered here. Create-or-revise, query,
-      read by id, revision reads, and client secrets.
+      read by id, revision reads, the credentials of their clients, and the
+      clients that registered themselves.
   - name: Policies
     description: |
       Operation policies (ADR 066): a project publishes, per guarded
@@ -251,8 +252,10 @@ paths:
     $ref: endpoints/apps/by_id/methods.yaml
   /apps/{id}/revisions:
     $ref: endpoints/apps/by_id/revisions/methods.yaml
-  /apps/{id}/clients/{client}/secrets:
-    $ref: endpoints/apps/by_id/clients/by_slug/secrets/methods.yaml
+  /apps/{id}/clients/{client}/credentials:
+    $ref: endpoints/apps/by_id/clients/by_slug/credentials/methods.yaml
+  /apps/{id}/clients/{client}/credentials/{credential_id}:
+    $ref: endpoints/apps/by_id/clients/by_slug/credentials/by_id/methods.yaml
   /apps/revisions/{revision_id}:
     $ref: endpoints/apps/revisions/by_id/methods.yaml
   /client_registrations/query:
@@ -303,10 +306,12 @@ paths:
 # One per domain event type, keyed by its event_type. gen_event_schemas writes
 # the files and fails until this list names exactly the domain's event types.
 webhooks:
-  app.client_secret.added:
-    $ref: endpoints/events/webhooks/app-client_secret-added.yaml
   app.created:
     $ref: endpoints/events/webhooks/app-created.yaml
+  app.credential.added:
+    $ref: endpoints/events/webhooks/app-credential-added.yaml
+  app.credential.revoked:
+    $ref: endpoints/events/webhooks/app-credential-revoked.yaml
   app.updated:
     $ref: endpoints/events/webhooks/app-updated.yaml
   auth.attempt.created:

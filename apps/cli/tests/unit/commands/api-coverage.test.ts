@@ -123,8 +123,11 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
   getIdpRevisionById: "reads one revision by revision id; same shape question as above",
   listAppRevisions: "sub-resource listing; same grammar question as `listIdpRevisions`",
   getAppRevisionById: "reads one revision by revision id; same shape question as above",
-  addAppClientSecret:
+  addAppClientCredential:
     "not yet exposed — a secret is shown once or imported, which needs the credential-safe input route (ADR 064 §12)",
+  listAppClientCredentials: "sub-resource listing; same grammar question as `listIdpRevisions`",
+  revokeAppClientCredential:
+    "not yet exposed — sub-resource of a client, same as `addAppClientCredential`",
   evaluatePolicy:
     "a dry run `policies test` sends per case from lib/policies/tests.ts; no registry verb evaluates",
 

@@ -66,6 +66,7 @@ func toAPIClientRegistration(registration *domain.ClientRegistration) api.Client
 	m := registration.Metadata
 	resp := api.ClientRegistrationResponse{
 		ID:                      registration.ID,
+		App:                     optAPIString(registration.AppSlug),
 		ClientName:              optAPIString(m.ClientName),
 		ClientURI:               optAPIString(m.ClientURI),
 		LogoURI:                 optAPIString(m.LogoURI),

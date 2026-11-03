@@ -9,9 +9,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	api "go.zitadel.com/zitadel/v5/api"
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 	"github.com/zitadel/nextgen/internal/service"
+	api "go.zitadel.com/zitadel/v5/api"
 )
 
 // appDocument decodes a document the way the API takes it.
@@ -23,8 +23,8 @@ func appDocument(t *testing.T, raw string) api.App {
 }
 
 const shopAppDocument = `{"slug":"shop","name":"Shop","clients":[
-  {"slug":"web","type":"confidential","grants":["authorization_code"],"redirect_uris":["https://shop.example.com/cb"],"apis":[{"api":"orders"}]},
-  {"slug":"desktop","client_id":"ShopDesktop","type":"public","grants":["authorization_code"],"redirect_uris":["http://127.0.0.1/cb"]}],
+  {"slug":"web","type":"confidential","grant_types":["authorization_code"],"redirect_uris":["https://shop.example.com/cb"],"apis":[{"api":"orders"}]},
+  {"slug":"desktop","client_id":"ShopDesktop","type":"public","grant_types":["authorization_code"],"redirect_uris":["http://127.0.0.1/cb"]}],
   "apis":[{"slug":"orders","identifier":"https://api.shop.example.com","scopes":[{"name":"orders.read"}]}]}`
 
 func TestApps_RegisteredAppOverHTTP(t *testing.T) {
@@ -64,12 +64,37 @@ func TestApps_RegisteredAppOverHTTP(t *testing.T) {
 	require.IsType(t, &api.CreateAppOK{}, revised, helpers.MustMarshal(t, revised))
 	assert.Equal(t, created.Clients, revised.(*api.CreateAppOK).Clients)
 
-	secret, err := f.client.AddAppClientSecret(t.Context(), &api.AddAppClientSecretRequest{}, api.AddAppClientSecretParams{
+	params2 := api.AddAppClientCredentialParams{ProjectID: f.projectID(), ID: created.ID, Client: "web"}
+	added, err := f.client.AddAppClientCredential(t.Context(), &api.AddAppClientCredentialRequest{Name: "rotated"}, params2)
+	require.NoError(t, err)
+	require.IsType(t, &api.AppClientCredential{}, added, helpers.MustMarshal(t, added))
+	credential := added.(*api.AppClientCredential)
+	assert.True(t, credential.Secret.IsSet(), "a generated secret is shown once")
+	assert.Equal(t, api.AppClientCredentialKindSecret, credential.Kind)
+
+	listed, err := f.client.ListAppClientCredentials(t.Context(), api.ListAppClientCredentialsParams{
 		ProjectID: f.projectID(), ID: created.ID, Client: "web",
 	})
 	require.NoError(t, err)
-	require.IsType(t, &api.AddAppClientSecretResponse{}, secret, helpers.MustMarshal(t, secret))
-	assert.True(t, secret.(*api.AddAppClientSecretResponse).Secret.IsSet())
+	require.IsType(t, &api.ListAppClientCredentialsResponse{}, listed, helpers.MustMarshal(t, listed))
+	names := []string{}
+	for _, c := range listed.(*api.ListAppClientCredentialsResponse).Credentials {
+		names = append(names, c.Name)
+		assert.False(t, c.Secret.IsSet(), "a read never shows a secret")
+	}
+	assert.Equal(t, []string{"initial", "rotated"}, names)
+
+	revoked, err := f.client.RevokeAppClientCredential(t.Context(), api.RevokeAppClientCredentialParams{
+		ProjectID: f.projectID(), ID: created.ID, Client: "web", CredentialID: created.ClientSecrets[0].CredentialID,
+	})
+	require.NoError(t, err)
+	require.IsType(t, &api.RevokeAppClientCredentialNoContent{}, revoked, helpers.MustMarshal(t, revoked))
+
+	again, err := f.client.AddAppClientCredential(t.Context(), &api.AddAppClientCredentialRequest{Name: "rotated"}, params2)
+	require.NoError(t, err)
+	_, code, _, ok := errorResponseParts(t, again)
+	require.True(t, ok, helpers.MustMarshal(t, again))
+	assert.Equal(t, "app.credential_taken", code)
 }
 
 func TestApps_DeclaredAppRefusesTheAPI(t *testing.T) {
@@ -77,7 +102,7 @@ func TestApps_DeclaredAppRefusesTheAPI(t *testing.T) {
 	_, err := harness.EnsureReleaseService(t).Build(t.Context(), service.BuildReleaseInput{
 		ProjectID: f.project.ID,
 		Apps: []service.BuildApp{{Index: 0, Document: []byte(
-			`{"slug":"portal","name":"Portal","clients":[{"slug":"spa","type":"public","grants":["authorization_code"],"redirect_uris":["https://portal.example.com/cb"]}]}`,
+			`{"slug":"portal","name":"Portal","clients":[{"slug":"spa","type":"public","grant_types":["authorization_code"],"redirect_uris":["https://portal.example.com/cb"]}]}`,
 		)}},
 	})
 	require.NoError(t, err)

@@ -132,3 +132,35 @@ func TestClientRegistrationStatements_ListPagesOldestFirst(t *testing.T) {
 		assert.Equal(t, want, got, "every registration of the project, once, oldest first")
 	})
 }
+
+// A registration joins one app, once: the first join sets it, a later one
+// reads the app it holds.
+func TestClientRegistrationStatements_JoinApp(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID := ensureProject(t, d.stmts)
+		entity := createClientRegistration(t, d.stmts, projectID, time.Now().Add(time.Hour), "")
+
+		joined, err := d.stmts.JoinClientRegistrationApp(t.Context(), projectID, entity.ID, "shop")
+		require.NoError(t, err)
+		assert.Equal(t, "shop", joined)
+		joined, err = d.stmts.JoinClientRegistrationApp(t.Context(), projectID, entity.ID, "docs")
+		require.NoError(t, err)
+		assert.Equal(t, "shop", joined, "the first app stays")
+
+		got, err := d.stmts.GetClientRegistration(t.Context(), projectID, entity.ID)
+		require.NoError(t, err)
+		assert.Equal(t, "shop", got.AppSlug)
+
+		page, err := d.stmts.ListClientRegistrations(t.Context(), &database.ListOptions[domain.ClientRegistrationField]{
+			Filter: database.And(
+				database.Equal(database.Col(domain.ClientRegistrationFieldProjectID), projectID),
+				database.Equal(database.Col(domain.ClientRegistrationFieldAppSlug), "shop"),
+			),
+		})
+		require.NoError(t, err)
+		require.Len(t, page.Items, 1)
+
+		_, err = d.stmts.JoinClientRegistrationApp(t.Context(), projectID, "dcr_unknown", "shop")
+		assert.ErrorIs(t, err, new(database.NoRowFoundError))
+	})
+}

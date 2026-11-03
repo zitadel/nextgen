@@ -12,23 +12,24 @@ import (
 	"go.zitadel.com/zitadel/v5/ogenx"
 )
 
-type AddAppClientSecretBadRequest ErrorDetails
+type AddAppClientCredentialBadRequest ErrorDetails
 
-func (*AddAppClientSecretBadRequest) addAppClientSecretRes() {}
+func (*AddAppClientCredentialBadRequest) addAppClientCredentialRes() {}
 
-type AddAppClientSecretConflict ErrorDetails
+type AddAppClientCredentialConflict ErrorDetails
 
-func (*AddAppClientSecretConflict) addAppClientSecretRes() {}
+func (*AddAppClientCredentialConflict) addAppClientCredentialRes() {}
 
-// AddAppClientSecretErrorResponse represents sum type.
-type AddAppClientSecretErrorResponse struct {
-	Type                AddAppClientSecretErrorResponseType // switch on this field
+// AddAppClientCredentialErrorResponse represents sum type.
+type AddAppClientCredentialErrorResponse struct {
+	Type                AddAppClientCredentialErrorResponseType // switch on this field
 	AppClientNotFound   AppClientNotFound
-	AppDeclared         AppDeclared
+	AppCredentialTaken  AppCredentialTaken
 	AppInvalid          AppInvalid
 	AppNotFound         AppNotFound
 	AppPermissionDenied AppPermissionDenied
 	AppRevisionConflict AppRevisionConflict
+	AuthCsrfInvalid     AuthCsrfInvalid
 	AuthUnauthorized    AuthUnauthorized
 	EvtInvalid          EvtInvalid
 	Internal            Internal
@@ -37,455 +38,477 @@ type AddAppClientSecretErrorResponse struct {
 	Unavailable         Unavailable
 }
 
-// AddAppClientSecretErrorResponseType is oneOf type of AddAppClientSecretErrorResponse.
-type AddAppClientSecretErrorResponseType string
+// AddAppClientCredentialErrorResponseType is oneOf type of AddAppClientCredentialErrorResponse.
+type AddAppClientCredentialErrorResponseType string
 
-// Possible values for AddAppClientSecretErrorResponseType.
+// Possible values for AddAppClientCredentialErrorResponseType.
 const (
-	AppClientNotFoundAddAppClientSecretErrorResponse   AddAppClientSecretErrorResponseType = "app.client_not_found"
-	AppDeclaredAddAppClientSecretErrorResponse         AddAppClientSecretErrorResponseType = "app.declared"
-	AppInvalidAddAppClientSecretErrorResponse          AddAppClientSecretErrorResponseType = "app.invalid"
-	AppNotFoundAddAppClientSecretErrorResponse         AddAppClientSecretErrorResponseType = "app.not_found"
-	AppPermissionDeniedAddAppClientSecretErrorResponse AddAppClientSecretErrorResponseType = "app.permission_denied"
-	AppRevisionConflictAddAppClientSecretErrorResponse AddAppClientSecretErrorResponseType = "app.revision_conflict"
-	AuthUnauthorizedAddAppClientSecretErrorResponse    AddAppClientSecretErrorResponseType = "auth.unauthorized"
-	EvtInvalidAddAppClientSecretErrorResponse          AddAppClientSecretErrorResponseType = "evt.invalid"
-	InternalAddAppClientSecretErrorResponse            AddAppClientSecretErrorResponseType = "internal"
-	NotImplementedAddAppClientSecretErrorResponse      AddAppClientSecretErrorResponseType = "not_implemented"
-	ReqInvalidAddAppClientSecretErrorResponse          AddAppClientSecretErrorResponseType = "req.invalid"
-	UnavailableAddAppClientSecretErrorResponse         AddAppClientSecretErrorResponseType = "unavailable"
+	AppClientNotFoundAddAppClientCredentialErrorResponse   AddAppClientCredentialErrorResponseType = "app.client_not_found"
+	AppCredentialTakenAddAppClientCredentialErrorResponse  AddAppClientCredentialErrorResponseType = "app.credential_taken"
+	AppInvalidAddAppClientCredentialErrorResponse          AddAppClientCredentialErrorResponseType = "app.invalid"
+	AppNotFoundAddAppClientCredentialErrorResponse         AddAppClientCredentialErrorResponseType = "app.not_found"
+	AppPermissionDeniedAddAppClientCredentialErrorResponse AddAppClientCredentialErrorResponseType = "app.permission_denied"
+	AppRevisionConflictAddAppClientCredentialErrorResponse AddAppClientCredentialErrorResponseType = "app.revision_conflict"
+	AuthCsrfInvalidAddAppClientCredentialErrorResponse     AddAppClientCredentialErrorResponseType = "auth.csrf_invalid"
+	AuthUnauthorizedAddAppClientCredentialErrorResponse    AddAppClientCredentialErrorResponseType = "auth.unauthorized"
+	EvtInvalidAddAppClientCredentialErrorResponse          AddAppClientCredentialErrorResponseType = "evt.invalid"
+	InternalAddAppClientCredentialErrorResponse            AddAppClientCredentialErrorResponseType = "internal"
+	NotImplementedAddAppClientCredentialErrorResponse      AddAppClientCredentialErrorResponseType = "not_implemented"
+	ReqInvalidAddAppClientCredentialErrorResponse          AddAppClientCredentialErrorResponseType = "req.invalid"
+	UnavailableAddAppClientCredentialErrorResponse         AddAppClientCredentialErrorResponseType = "unavailable"
 )
 
-// IsAppClientNotFound reports whether AddAppClientSecretErrorResponse is AppClientNotFound.
-func (s AddAppClientSecretErrorResponse) IsAppClientNotFound() bool {
-	return s.Type == AppClientNotFoundAddAppClientSecretErrorResponse
+// IsAppClientNotFound reports whether AddAppClientCredentialErrorResponse is AppClientNotFound.
+func (s AddAppClientCredentialErrorResponse) IsAppClientNotFound() bool {
+	return s.Type == AppClientNotFoundAddAppClientCredentialErrorResponse
 }
 
-// IsAppDeclared reports whether AddAppClientSecretErrorResponse is AppDeclared.
-func (s AddAppClientSecretErrorResponse) IsAppDeclared() bool {
-	return s.Type == AppDeclaredAddAppClientSecretErrorResponse
+// IsAppCredentialTaken reports whether AddAppClientCredentialErrorResponse is AppCredentialTaken.
+func (s AddAppClientCredentialErrorResponse) IsAppCredentialTaken() bool {
+	return s.Type == AppCredentialTakenAddAppClientCredentialErrorResponse
 }
 
-// IsAppInvalid reports whether AddAppClientSecretErrorResponse is AppInvalid.
-func (s AddAppClientSecretErrorResponse) IsAppInvalid() bool {
-	return s.Type == AppInvalidAddAppClientSecretErrorResponse
+// IsAppInvalid reports whether AddAppClientCredentialErrorResponse is AppInvalid.
+func (s AddAppClientCredentialErrorResponse) IsAppInvalid() bool {
+	return s.Type == AppInvalidAddAppClientCredentialErrorResponse
 }
 
-// IsAppNotFound reports whether AddAppClientSecretErrorResponse is AppNotFound.
-func (s AddAppClientSecretErrorResponse) IsAppNotFound() bool {
-	return s.Type == AppNotFoundAddAppClientSecretErrorResponse
+// IsAppNotFound reports whether AddAppClientCredentialErrorResponse is AppNotFound.
+func (s AddAppClientCredentialErrorResponse) IsAppNotFound() bool {
+	return s.Type == AppNotFoundAddAppClientCredentialErrorResponse
 }
 
-// IsAppPermissionDenied reports whether AddAppClientSecretErrorResponse is AppPermissionDenied.
-func (s AddAppClientSecretErrorResponse) IsAppPermissionDenied() bool {
-	return s.Type == AppPermissionDeniedAddAppClientSecretErrorResponse
+// IsAppPermissionDenied reports whether AddAppClientCredentialErrorResponse is AppPermissionDenied.
+func (s AddAppClientCredentialErrorResponse) IsAppPermissionDenied() bool {
+	return s.Type == AppPermissionDeniedAddAppClientCredentialErrorResponse
 }
 
-// IsAppRevisionConflict reports whether AddAppClientSecretErrorResponse is AppRevisionConflict.
-func (s AddAppClientSecretErrorResponse) IsAppRevisionConflict() bool {
-	return s.Type == AppRevisionConflictAddAppClientSecretErrorResponse
+// IsAppRevisionConflict reports whether AddAppClientCredentialErrorResponse is AppRevisionConflict.
+func (s AddAppClientCredentialErrorResponse) IsAppRevisionConflict() bool {
+	return s.Type == AppRevisionConflictAddAppClientCredentialErrorResponse
 }
 
-// IsAuthUnauthorized reports whether AddAppClientSecretErrorResponse is AuthUnauthorized.
-func (s AddAppClientSecretErrorResponse) IsAuthUnauthorized() bool {
-	return s.Type == AuthUnauthorizedAddAppClientSecretErrorResponse
+// IsAuthCsrfInvalid reports whether AddAppClientCredentialErrorResponse is AuthCsrfInvalid.
+func (s AddAppClientCredentialErrorResponse) IsAuthCsrfInvalid() bool {
+	return s.Type == AuthCsrfInvalidAddAppClientCredentialErrorResponse
 }
 
-// IsEvtInvalid reports whether AddAppClientSecretErrorResponse is EvtInvalid.
-func (s AddAppClientSecretErrorResponse) IsEvtInvalid() bool {
-	return s.Type == EvtInvalidAddAppClientSecretErrorResponse
+// IsAuthUnauthorized reports whether AddAppClientCredentialErrorResponse is AuthUnauthorized.
+func (s AddAppClientCredentialErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedAddAppClientCredentialErrorResponse
 }
 
-// IsInternal reports whether AddAppClientSecretErrorResponse is Internal.
-func (s AddAppClientSecretErrorResponse) IsInternal() bool {
-	return s.Type == InternalAddAppClientSecretErrorResponse
+// IsEvtInvalid reports whether AddAppClientCredentialErrorResponse is EvtInvalid.
+func (s AddAppClientCredentialErrorResponse) IsEvtInvalid() bool {
+	return s.Type == EvtInvalidAddAppClientCredentialErrorResponse
 }
 
-// IsNotImplemented reports whether AddAppClientSecretErrorResponse is NotImplemented.
-func (s AddAppClientSecretErrorResponse) IsNotImplemented() bool {
-	return s.Type == NotImplementedAddAppClientSecretErrorResponse
+// IsInternal reports whether AddAppClientCredentialErrorResponse is Internal.
+func (s AddAppClientCredentialErrorResponse) IsInternal() bool {
+	return s.Type == InternalAddAppClientCredentialErrorResponse
 }
 
-// IsReqInvalid reports whether AddAppClientSecretErrorResponse is ReqInvalid.
-func (s AddAppClientSecretErrorResponse) IsReqInvalid() bool {
-	return s.Type == ReqInvalidAddAppClientSecretErrorResponse
+// IsNotImplemented reports whether AddAppClientCredentialErrorResponse is NotImplemented.
+func (s AddAppClientCredentialErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedAddAppClientCredentialErrorResponse
 }
 
-// IsUnavailable reports whether AddAppClientSecretErrorResponse is Unavailable.
-func (s AddAppClientSecretErrorResponse) IsUnavailable() bool {
-	return s.Type == UnavailableAddAppClientSecretErrorResponse
+// IsReqInvalid reports whether AddAppClientCredentialErrorResponse is ReqInvalid.
+func (s AddAppClientCredentialErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidAddAppClientCredentialErrorResponse
 }
 
-// SetAppClientNotFound sets AddAppClientSecretErrorResponse to AppClientNotFound.
-func (s *AddAppClientSecretErrorResponse) SetAppClientNotFound(v AppClientNotFound) {
-	s.Type = AppClientNotFoundAddAppClientSecretErrorResponse
+// IsUnavailable reports whether AddAppClientCredentialErrorResponse is Unavailable.
+func (s AddAppClientCredentialErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableAddAppClientCredentialErrorResponse
+}
+
+// SetAppClientNotFound sets AddAppClientCredentialErrorResponse to AppClientNotFound.
+func (s *AddAppClientCredentialErrorResponse) SetAppClientNotFound(v AppClientNotFound) {
+	s.Type = AppClientNotFoundAddAppClientCredentialErrorResponse
 	s.AppClientNotFound = v
 }
 
-// GetAppClientNotFound returns AppClientNotFound and true boolean if AddAppClientSecretErrorResponse is AppClientNotFound.
-func (s AddAppClientSecretErrorResponse) GetAppClientNotFound() (v AppClientNotFound, ok bool) {
+// GetAppClientNotFound returns AppClientNotFound and true boolean if AddAppClientCredentialErrorResponse is AppClientNotFound.
+func (s AddAppClientCredentialErrorResponse) GetAppClientNotFound() (v AppClientNotFound, ok bool) {
 	if !s.IsAppClientNotFound() {
 		return v, false
 	}
 	return s.AppClientNotFound, true
 }
 
-// NewAppClientNotFoundAddAppClientSecretErrorResponse returns new AddAppClientSecretErrorResponse from AppClientNotFound.
-func NewAppClientNotFoundAddAppClientSecretErrorResponse(v AppClientNotFound) AddAppClientSecretErrorResponse {
-	var s AddAppClientSecretErrorResponse
+// NewAppClientNotFoundAddAppClientCredentialErrorResponse returns new AddAppClientCredentialErrorResponse from AppClientNotFound.
+func NewAppClientNotFoundAddAppClientCredentialErrorResponse(v AppClientNotFound) AddAppClientCredentialErrorResponse {
+	var s AddAppClientCredentialErrorResponse
 	s.SetAppClientNotFound(v)
 	return s
 }
 
-// SetAppDeclared sets AddAppClientSecretErrorResponse to AppDeclared.
-func (s *AddAppClientSecretErrorResponse) SetAppDeclared(v AppDeclared) {
-	s.Type = AppDeclaredAddAppClientSecretErrorResponse
-	s.AppDeclared = v
+// SetAppCredentialTaken sets AddAppClientCredentialErrorResponse to AppCredentialTaken.
+func (s *AddAppClientCredentialErrorResponse) SetAppCredentialTaken(v AppCredentialTaken) {
+	s.Type = AppCredentialTakenAddAppClientCredentialErrorResponse
+	s.AppCredentialTaken = v
 }
 
-// GetAppDeclared returns AppDeclared and true boolean if AddAppClientSecretErrorResponse is AppDeclared.
-func (s AddAppClientSecretErrorResponse) GetAppDeclared() (v AppDeclared, ok bool) {
-	if !s.IsAppDeclared() {
+// GetAppCredentialTaken returns AppCredentialTaken and true boolean if AddAppClientCredentialErrorResponse is AppCredentialTaken.
+func (s AddAppClientCredentialErrorResponse) GetAppCredentialTaken() (v AppCredentialTaken, ok bool) {
+	if !s.IsAppCredentialTaken() {
 		return v, false
 	}
-	return s.AppDeclared, true
+	return s.AppCredentialTaken, true
 }
 
-// NewAppDeclaredAddAppClientSecretErrorResponse returns new AddAppClientSecretErrorResponse from AppDeclared.
-func NewAppDeclaredAddAppClientSecretErrorResponse(v AppDeclared) AddAppClientSecretErrorResponse {
-	var s AddAppClientSecretErrorResponse
-	s.SetAppDeclared(v)
+// NewAppCredentialTakenAddAppClientCredentialErrorResponse returns new AddAppClientCredentialErrorResponse from AppCredentialTaken.
+func NewAppCredentialTakenAddAppClientCredentialErrorResponse(v AppCredentialTaken) AddAppClientCredentialErrorResponse {
+	var s AddAppClientCredentialErrorResponse
+	s.SetAppCredentialTaken(v)
 	return s
 }
 
-// SetAppInvalid sets AddAppClientSecretErrorResponse to AppInvalid.
-func (s *AddAppClientSecretErrorResponse) SetAppInvalid(v AppInvalid) {
-	s.Type = AppInvalidAddAppClientSecretErrorResponse
+// SetAppInvalid sets AddAppClientCredentialErrorResponse to AppInvalid.
+func (s *AddAppClientCredentialErrorResponse) SetAppInvalid(v AppInvalid) {
+	s.Type = AppInvalidAddAppClientCredentialErrorResponse
 	s.AppInvalid = v
 }
 
-// GetAppInvalid returns AppInvalid and true boolean if AddAppClientSecretErrorResponse is AppInvalid.
-func (s AddAppClientSecretErrorResponse) GetAppInvalid() (v AppInvalid, ok bool) {
+// GetAppInvalid returns AppInvalid and true boolean if AddAppClientCredentialErrorResponse is AppInvalid.
+func (s AddAppClientCredentialErrorResponse) GetAppInvalid() (v AppInvalid, ok bool) {
 	if !s.IsAppInvalid() {
 		return v, false
 	}
 	return s.AppInvalid, true
 }
 
-// NewAppInvalidAddAppClientSecretErrorResponse returns new AddAppClientSecretErrorResponse from AppInvalid.
-func NewAppInvalidAddAppClientSecretErrorResponse(v AppInvalid) AddAppClientSecretErrorResponse {
-	var s AddAppClientSecretErrorResponse
+// NewAppInvalidAddAppClientCredentialErrorResponse returns new AddAppClientCredentialErrorResponse from AppInvalid.
+func NewAppInvalidAddAppClientCredentialErrorResponse(v AppInvalid) AddAppClientCredentialErrorResponse {
+	var s AddAppClientCredentialErrorResponse
 	s.SetAppInvalid(v)
 	return s
 }
 
-// SetAppNotFound sets AddAppClientSecretErrorResponse to AppNotFound.
-func (s *AddAppClientSecretErrorResponse) SetAppNotFound(v AppNotFound) {
-	s.Type = AppNotFoundAddAppClientSecretErrorResponse
+// SetAppNotFound sets AddAppClientCredentialErrorResponse to AppNotFound.
+func (s *AddAppClientCredentialErrorResponse) SetAppNotFound(v AppNotFound) {
+	s.Type = AppNotFoundAddAppClientCredentialErrorResponse
 	s.AppNotFound = v
 }
 
-// GetAppNotFound returns AppNotFound and true boolean if AddAppClientSecretErrorResponse is AppNotFound.
-func (s AddAppClientSecretErrorResponse) GetAppNotFound() (v AppNotFound, ok bool) {
+// GetAppNotFound returns AppNotFound and true boolean if AddAppClientCredentialErrorResponse is AppNotFound.
+func (s AddAppClientCredentialErrorResponse) GetAppNotFound() (v AppNotFound, ok bool) {
 	if !s.IsAppNotFound() {
 		return v, false
 	}
 	return s.AppNotFound, true
 }
 
-// NewAppNotFoundAddAppClientSecretErrorResponse returns new AddAppClientSecretErrorResponse from AppNotFound.
-func NewAppNotFoundAddAppClientSecretErrorResponse(v AppNotFound) AddAppClientSecretErrorResponse {
-	var s AddAppClientSecretErrorResponse
+// NewAppNotFoundAddAppClientCredentialErrorResponse returns new AddAppClientCredentialErrorResponse from AppNotFound.
+func NewAppNotFoundAddAppClientCredentialErrorResponse(v AppNotFound) AddAppClientCredentialErrorResponse {
+	var s AddAppClientCredentialErrorResponse
 	s.SetAppNotFound(v)
 	return s
 }
 
-// SetAppPermissionDenied sets AddAppClientSecretErrorResponse to AppPermissionDenied.
-func (s *AddAppClientSecretErrorResponse) SetAppPermissionDenied(v AppPermissionDenied) {
-	s.Type = AppPermissionDeniedAddAppClientSecretErrorResponse
+// SetAppPermissionDenied sets AddAppClientCredentialErrorResponse to AppPermissionDenied.
+func (s *AddAppClientCredentialErrorResponse) SetAppPermissionDenied(v AppPermissionDenied) {
+	s.Type = AppPermissionDeniedAddAppClientCredentialErrorResponse
 	s.AppPermissionDenied = v
 }
 
-// GetAppPermissionDenied returns AppPermissionDenied and true boolean if AddAppClientSecretErrorResponse is AppPermissionDenied.
-func (s AddAppClientSecretErrorResponse) GetAppPermissionDenied() (v AppPermissionDenied, ok bool) {
+// GetAppPermissionDenied returns AppPermissionDenied and true boolean if AddAppClientCredentialErrorResponse is AppPermissionDenied.
+func (s AddAppClientCredentialErrorResponse) GetAppPermissionDenied() (v AppPermissionDenied, ok bool) {
 	if !s.IsAppPermissionDenied() {
 		return v, false
 	}
 	return s.AppPermissionDenied, true
 }
 
-// NewAppPermissionDeniedAddAppClientSecretErrorResponse returns new AddAppClientSecretErrorResponse from AppPermissionDenied.
-func NewAppPermissionDeniedAddAppClientSecretErrorResponse(v AppPermissionDenied) AddAppClientSecretErrorResponse {
-	var s AddAppClientSecretErrorResponse
+// NewAppPermissionDeniedAddAppClientCredentialErrorResponse returns new AddAppClientCredentialErrorResponse from AppPermissionDenied.
+func NewAppPermissionDeniedAddAppClientCredentialErrorResponse(v AppPermissionDenied) AddAppClientCredentialErrorResponse {
+	var s AddAppClientCredentialErrorResponse
 	s.SetAppPermissionDenied(v)
 	return s
 }
 
-// SetAppRevisionConflict sets AddAppClientSecretErrorResponse to AppRevisionConflict.
-func (s *AddAppClientSecretErrorResponse) SetAppRevisionConflict(v AppRevisionConflict) {
-	s.Type = AppRevisionConflictAddAppClientSecretErrorResponse
+// SetAppRevisionConflict sets AddAppClientCredentialErrorResponse to AppRevisionConflict.
+func (s *AddAppClientCredentialErrorResponse) SetAppRevisionConflict(v AppRevisionConflict) {
+	s.Type = AppRevisionConflictAddAppClientCredentialErrorResponse
 	s.AppRevisionConflict = v
 }
 
-// GetAppRevisionConflict returns AppRevisionConflict and true boolean if AddAppClientSecretErrorResponse is AppRevisionConflict.
-func (s AddAppClientSecretErrorResponse) GetAppRevisionConflict() (v AppRevisionConflict, ok bool) {
+// GetAppRevisionConflict returns AppRevisionConflict and true boolean if AddAppClientCredentialErrorResponse is AppRevisionConflict.
+func (s AddAppClientCredentialErrorResponse) GetAppRevisionConflict() (v AppRevisionConflict, ok bool) {
 	if !s.IsAppRevisionConflict() {
 		return v, false
 	}
 	return s.AppRevisionConflict, true
 }
 
-// NewAppRevisionConflictAddAppClientSecretErrorResponse returns new AddAppClientSecretErrorResponse from AppRevisionConflict.
-func NewAppRevisionConflictAddAppClientSecretErrorResponse(v AppRevisionConflict) AddAppClientSecretErrorResponse {
-	var s AddAppClientSecretErrorResponse
+// NewAppRevisionConflictAddAppClientCredentialErrorResponse returns new AddAppClientCredentialErrorResponse from AppRevisionConflict.
+func NewAppRevisionConflictAddAppClientCredentialErrorResponse(v AppRevisionConflict) AddAppClientCredentialErrorResponse {
+	var s AddAppClientCredentialErrorResponse
 	s.SetAppRevisionConflict(v)
 	return s
 }
 
-// SetAuthUnauthorized sets AddAppClientSecretErrorResponse to AuthUnauthorized.
-func (s *AddAppClientSecretErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
-	s.Type = AuthUnauthorizedAddAppClientSecretErrorResponse
+// SetAuthCsrfInvalid sets AddAppClientCredentialErrorResponse to AuthCsrfInvalid.
+func (s *AddAppClientCredentialErrorResponse) SetAuthCsrfInvalid(v AuthCsrfInvalid) {
+	s.Type = AuthCsrfInvalidAddAppClientCredentialErrorResponse
+	s.AuthCsrfInvalid = v
+}
+
+// GetAuthCsrfInvalid returns AuthCsrfInvalid and true boolean if AddAppClientCredentialErrorResponse is AuthCsrfInvalid.
+func (s AddAppClientCredentialErrorResponse) GetAuthCsrfInvalid() (v AuthCsrfInvalid, ok bool) {
+	if !s.IsAuthCsrfInvalid() {
+		return v, false
+	}
+	return s.AuthCsrfInvalid, true
+}
+
+// NewAuthCsrfInvalidAddAppClientCredentialErrorResponse returns new AddAppClientCredentialErrorResponse from AuthCsrfInvalid.
+func NewAuthCsrfInvalidAddAppClientCredentialErrorResponse(v AuthCsrfInvalid) AddAppClientCredentialErrorResponse {
+	var s AddAppClientCredentialErrorResponse
+	s.SetAuthCsrfInvalid(v)
+	return s
+}
+
+// SetAuthUnauthorized sets AddAppClientCredentialErrorResponse to AuthUnauthorized.
+func (s *AddAppClientCredentialErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedAddAppClientCredentialErrorResponse
 	s.AuthUnauthorized = v
 }
 
-// GetAuthUnauthorized returns AuthUnauthorized and true boolean if AddAppClientSecretErrorResponse is AuthUnauthorized.
-func (s AddAppClientSecretErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if AddAppClientCredentialErrorResponse is AuthUnauthorized.
+func (s AddAppClientCredentialErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
 	if !s.IsAuthUnauthorized() {
 		return v, false
 	}
 	return s.AuthUnauthorized, true
 }
 
-// NewAuthUnauthorizedAddAppClientSecretErrorResponse returns new AddAppClientSecretErrorResponse from AuthUnauthorized.
-func NewAuthUnauthorizedAddAppClientSecretErrorResponse(v AuthUnauthorized) AddAppClientSecretErrorResponse {
-	var s AddAppClientSecretErrorResponse
+// NewAuthUnauthorizedAddAppClientCredentialErrorResponse returns new AddAppClientCredentialErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedAddAppClientCredentialErrorResponse(v AuthUnauthorized) AddAppClientCredentialErrorResponse {
+	var s AddAppClientCredentialErrorResponse
 	s.SetAuthUnauthorized(v)
 	return s
 }
 
-// SetEvtInvalid sets AddAppClientSecretErrorResponse to EvtInvalid.
-func (s *AddAppClientSecretErrorResponse) SetEvtInvalid(v EvtInvalid) {
-	s.Type = EvtInvalidAddAppClientSecretErrorResponse
+// SetEvtInvalid sets AddAppClientCredentialErrorResponse to EvtInvalid.
+func (s *AddAppClientCredentialErrorResponse) SetEvtInvalid(v EvtInvalid) {
+	s.Type = EvtInvalidAddAppClientCredentialErrorResponse
 	s.EvtInvalid = v
 }
 
-// GetEvtInvalid returns EvtInvalid and true boolean if AddAppClientSecretErrorResponse is EvtInvalid.
-func (s AddAppClientSecretErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
+// GetEvtInvalid returns EvtInvalid and true boolean if AddAppClientCredentialErrorResponse is EvtInvalid.
+func (s AddAppClientCredentialErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
 	if !s.IsEvtInvalid() {
 		return v, false
 	}
 	return s.EvtInvalid, true
 }
 
-// NewEvtInvalidAddAppClientSecretErrorResponse returns new AddAppClientSecretErrorResponse from EvtInvalid.
-func NewEvtInvalidAddAppClientSecretErrorResponse(v EvtInvalid) AddAppClientSecretErrorResponse {
-	var s AddAppClientSecretErrorResponse
+// NewEvtInvalidAddAppClientCredentialErrorResponse returns new AddAppClientCredentialErrorResponse from EvtInvalid.
+func NewEvtInvalidAddAppClientCredentialErrorResponse(v EvtInvalid) AddAppClientCredentialErrorResponse {
+	var s AddAppClientCredentialErrorResponse
 	s.SetEvtInvalid(v)
 	return s
 }
 
-// SetInternal sets AddAppClientSecretErrorResponse to Internal.
-func (s *AddAppClientSecretErrorResponse) SetInternal(v Internal) {
-	s.Type = InternalAddAppClientSecretErrorResponse
+// SetInternal sets AddAppClientCredentialErrorResponse to Internal.
+func (s *AddAppClientCredentialErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalAddAppClientCredentialErrorResponse
 	s.Internal = v
 }
 
-// GetInternal returns Internal and true boolean if AddAppClientSecretErrorResponse is Internal.
-func (s AddAppClientSecretErrorResponse) GetInternal() (v Internal, ok bool) {
+// GetInternal returns Internal and true boolean if AddAppClientCredentialErrorResponse is Internal.
+func (s AddAppClientCredentialErrorResponse) GetInternal() (v Internal, ok bool) {
 	if !s.IsInternal() {
 		return v, false
 	}
 	return s.Internal, true
 }
 
-// NewInternalAddAppClientSecretErrorResponse returns new AddAppClientSecretErrorResponse from Internal.
-func NewInternalAddAppClientSecretErrorResponse(v Internal) AddAppClientSecretErrorResponse {
-	var s AddAppClientSecretErrorResponse
+// NewInternalAddAppClientCredentialErrorResponse returns new AddAppClientCredentialErrorResponse from Internal.
+func NewInternalAddAppClientCredentialErrorResponse(v Internal) AddAppClientCredentialErrorResponse {
+	var s AddAppClientCredentialErrorResponse
 	s.SetInternal(v)
 	return s
 }
 
-// SetNotImplemented sets AddAppClientSecretErrorResponse to NotImplemented.
-func (s *AddAppClientSecretErrorResponse) SetNotImplemented(v NotImplemented) {
-	s.Type = NotImplementedAddAppClientSecretErrorResponse
+// SetNotImplemented sets AddAppClientCredentialErrorResponse to NotImplemented.
+func (s *AddAppClientCredentialErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedAddAppClientCredentialErrorResponse
 	s.NotImplemented = v
 }
 
-// GetNotImplemented returns NotImplemented and true boolean if AddAppClientSecretErrorResponse is NotImplemented.
-func (s AddAppClientSecretErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+// GetNotImplemented returns NotImplemented and true boolean if AddAppClientCredentialErrorResponse is NotImplemented.
+func (s AddAppClientCredentialErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
 	if !s.IsNotImplemented() {
 		return v, false
 	}
 	return s.NotImplemented, true
 }
 
-// NewNotImplementedAddAppClientSecretErrorResponse returns new AddAppClientSecretErrorResponse from NotImplemented.
-func NewNotImplementedAddAppClientSecretErrorResponse(v NotImplemented) AddAppClientSecretErrorResponse {
-	var s AddAppClientSecretErrorResponse
+// NewNotImplementedAddAppClientCredentialErrorResponse returns new AddAppClientCredentialErrorResponse from NotImplemented.
+func NewNotImplementedAddAppClientCredentialErrorResponse(v NotImplemented) AddAppClientCredentialErrorResponse {
+	var s AddAppClientCredentialErrorResponse
 	s.SetNotImplemented(v)
 	return s
 }
 
-// SetReqInvalid sets AddAppClientSecretErrorResponse to ReqInvalid.
-func (s *AddAppClientSecretErrorResponse) SetReqInvalid(v ReqInvalid) {
-	s.Type = ReqInvalidAddAppClientSecretErrorResponse
+// SetReqInvalid sets AddAppClientCredentialErrorResponse to ReqInvalid.
+func (s *AddAppClientCredentialErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidAddAppClientCredentialErrorResponse
 	s.ReqInvalid = v
 }
 
-// GetReqInvalid returns ReqInvalid and true boolean if AddAppClientSecretErrorResponse is ReqInvalid.
-func (s AddAppClientSecretErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+// GetReqInvalid returns ReqInvalid and true boolean if AddAppClientCredentialErrorResponse is ReqInvalid.
+func (s AddAppClientCredentialErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 	if !s.IsReqInvalid() {
 		return v, false
 	}
 	return s.ReqInvalid, true
 }
 
-// NewReqInvalidAddAppClientSecretErrorResponse returns new AddAppClientSecretErrorResponse from ReqInvalid.
-func NewReqInvalidAddAppClientSecretErrorResponse(v ReqInvalid) AddAppClientSecretErrorResponse {
-	var s AddAppClientSecretErrorResponse
+// NewReqInvalidAddAppClientCredentialErrorResponse returns new AddAppClientCredentialErrorResponse from ReqInvalid.
+func NewReqInvalidAddAppClientCredentialErrorResponse(v ReqInvalid) AddAppClientCredentialErrorResponse {
+	var s AddAppClientCredentialErrorResponse
 	s.SetReqInvalid(v)
 	return s
 }
 
-// SetUnavailable sets AddAppClientSecretErrorResponse to Unavailable.
-func (s *AddAppClientSecretErrorResponse) SetUnavailable(v Unavailable) {
-	s.Type = UnavailableAddAppClientSecretErrorResponse
+// SetUnavailable sets AddAppClientCredentialErrorResponse to Unavailable.
+func (s *AddAppClientCredentialErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableAddAppClientCredentialErrorResponse
 	s.Unavailable = v
 }
 
-// GetUnavailable returns Unavailable and true boolean if AddAppClientSecretErrorResponse is Unavailable.
-func (s AddAppClientSecretErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+// GetUnavailable returns Unavailable and true boolean if AddAppClientCredentialErrorResponse is Unavailable.
+func (s AddAppClientCredentialErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
 	if !s.IsUnavailable() {
 		return v, false
 	}
 	return s.Unavailable, true
 }
 
-// NewUnavailableAddAppClientSecretErrorResponse returns new AddAppClientSecretErrorResponse from Unavailable.
-func NewUnavailableAddAppClientSecretErrorResponse(v Unavailable) AddAppClientSecretErrorResponse {
-	var s AddAppClientSecretErrorResponse
+// NewUnavailableAddAppClientCredentialErrorResponse returns new AddAppClientCredentialErrorResponse from Unavailable.
+func NewUnavailableAddAppClientCredentialErrorResponse(v Unavailable) AddAppClientCredentialErrorResponse {
+	var s AddAppClientCredentialErrorResponse
 	s.SetUnavailable(v)
 	return s
 }
 
-// AddAppClientSecretErrorResponseStatusCode wraps AddAppClientSecretErrorResponse with StatusCode.
-type AddAppClientSecretErrorResponseStatusCode struct {
+// AddAppClientCredentialErrorResponseStatusCode wraps AddAppClientCredentialErrorResponse with StatusCode.
+type AddAppClientCredentialErrorResponseStatusCode struct {
 	StatusCode int
-	Response   AddAppClientSecretErrorResponse
+	Response   AddAppClientCredentialErrorResponse
 }
 
 // GetStatusCode returns the value of StatusCode.
-func (s *AddAppClientSecretErrorResponseStatusCode) GetStatusCode() int {
+func (s *AddAppClientCredentialErrorResponseStatusCode) GetStatusCode() int {
 	return s.StatusCode
 }
 
 // GetResponse returns the value of Response.
-func (s *AddAppClientSecretErrorResponseStatusCode) GetResponse() AddAppClientSecretErrorResponse {
+func (s *AddAppClientCredentialErrorResponseStatusCode) GetResponse() AddAppClientCredentialErrorResponse {
 	return s.Response
 }
 
 // SetStatusCode sets the value of StatusCode.
-func (s *AddAppClientSecretErrorResponseStatusCode) SetStatusCode(val int) {
+func (s *AddAppClientCredentialErrorResponseStatusCode) SetStatusCode(val int) {
 	s.StatusCode = val
 }
 
 // SetResponse sets the value of Response.
-func (s *AddAppClientSecretErrorResponseStatusCode) SetResponse(val AddAppClientSecretErrorResponse) {
+func (s *AddAppClientCredentialErrorResponseStatusCode) SetResponse(val AddAppClientCredentialErrorResponse) {
 	s.Response = val
 }
 
-func (*AddAppClientSecretErrorResponseStatusCode) addAppClientSecretRes() {}
+func (*AddAppClientCredentialErrorResponseStatusCode) addAppClientCredentialRes() {}
 
-type AddAppClientSecretForbidden ErrorDetails
+type AddAppClientCredentialForbidden ErrorDetails
 
-func (*AddAppClientSecretForbidden) addAppClientSecretRes() {}
+func (*AddAppClientCredentialForbidden) addAppClientCredentialRes() {}
 
-type AddAppClientSecretNotFound ErrorDetails
+type AddAppClientCredentialNotFound ErrorDetails
 
-func (*AddAppClientSecretNotFound) addAppClientSecretRes() {}
+func (*AddAppClientCredentialNotFound) addAppClientCredentialRes() {}
 
-// Adds a secret to a confidential client of a registered app. An empty body
-// generates one. `secret` imports a value the client already uses, such as one
-// compiled into it; `hash` imports a hash another identity provider wrote,
-// such as v4's bcrypt, which the server replaces with its own hash the first
-// time the client authenticates with it. Every secret the client holds stays
-// valid until it is removed, so a secret can be rotated without downtime.
+// Adds a credential to a confidential client, whether the app is declared in
+// the release or registered through the API; a deploy never removes it. Send
+// only `name` and the server generates a secret, shown once. `secret`
+// imports a value the client already uses, such as one compiled into it;
+// `hash` imports a hash another identity provider wrote, such as v4's bcrypt,
+// which the server replaces with its own hash the first time the client
+// authenticates with it; `public_key` adds a key for `private_key_jwt`. Give
+// at most one of the three. Every credential stays valid until it is revoked
+// or expires, so rotating one needs no downtime.
 // Ref: #
-type AddAppClientSecretRequest struct {
+type AddAppClientCredentialRequest struct {
+	// Names the credential, unique among the client's credentials.
+	Name string `json:"name"`
 	// A secret to import, as plaintext. Stored as a hash.
 	Secret OptString `json:"secret"`
 	// An encoded hash to import, in a format passwap reads: bcrypt (`$2a$`,
 	// `$2b$`, `$2y$`), argon2, scrypt, pbkdf2 and the others the server's hash
 	// configuration lists as verifiers.
-	Hash OptString `json:"hash"`
+	Hash      OptString       `json:"hash"`
+	PublicKey OptAppClientJwk `json:"public_key"`
+	// When the credential stops working. It never expires when left out.
+	ExpiresAt OptDateTime `json:"expires_at"`
+}
+
+// GetName returns the value of Name.
+func (s *AddAppClientCredentialRequest) GetName() string {
+	return s.Name
 }
 
 // GetSecret returns the value of Secret.
-func (s *AddAppClientSecretRequest) GetSecret() OptString {
+func (s *AddAppClientCredentialRequest) GetSecret() OptString {
 	return s.Secret
 }
 
 // GetHash returns the value of Hash.
-func (s *AddAppClientSecretRequest) GetHash() OptString {
+func (s *AddAppClientCredentialRequest) GetHash() OptString {
 	return s.Hash
 }
 
+// GetPublicKey returns the value of PublicKey.
+func (s *AddAppClientCredentialRequest) GetPublicKey() OptAppClientJwk {
+	return s.PublicKey
+}
+
+// GetExpiresAt returns the value of ExpiresAt.
+func (s *AddAppClientCredentialRequest) GetExpiresAt() OptDateTime {
+	return s.ExpiresAt
+}
+
+// SetName sets the value of Name.
+func (s *AddAppClientCredentialRequest) SetName(val string) {
+	s.Name = val
+}
+
 // SetSecret sets the value of Secret.
-func (s *AddAppClientSecretRequest) SetSecret(val OptString) {
+func (s *AddAppClientCredentialRequest) SetSecret(val OptString) {
 	s.Secret = val
 }
 
 // SetHash sets the value of Hash.
-func (s *AddAppClientSecretRequest) SetHash(val OptString) {
+func (s *AddAppClientCredentialRequest) SetHash(val OptString) {
 	s.Hash = val
 }
 
-// The secret that was added.
-// Ref: #
-type AddAppClientSecretResponse struct {
-	// The secret's id.
-	ID string `json:"id"`
-	// The client the secret authenticates.
-	ClientID string `json:"client_id"`
-	// The generated secret, shown once. Absent for an import.
-	Secret OptString `json:"secret"`
+// SetPublicKey sets the value of PublicKey.
+func (s *AddAppClientCredentialRequest) SetPublicKey(val OptAppClientJwk) {
+	s.PublicKey = val
 }
 
-// GetID returns the value of ID.
-func (s *AddAppClientSecretResponse) GetID() string {
-	return s.ID
+// SetExpiresAt sets the value of ExpiresAt.
+func (s *AddAppClientCredentialRequest) SetExpiresAt(val OptDateTime) {
+	s.ExpiresAt = val
 }
 
-// GetClientID returns the value of ClientID.
-func (s *AddAppClientSecretResponse) GetClientID() string {
-	return s.ClientID
-}
+type AddAppClientCredentialUnauthorized ErrorDetails
 
-// GetSecret returns the value of Secret.
-func (s *AddAppClientSecretResponse) GetSecret() OptString {
-	return s.Secret
-}
-
-// SetID sets the value of ID.
-func (s *AddAppClientSecretResponse) SetID(val string) {
-	s.ID = val
-}
-
-// SetClientID sets the value of ClientID.
-func (s *AddAppClientSecretResponse) SetClientID(val string) {
-	s.ClientID = val
-}
-
-// SetSecret sets the value of Secret.
-func (s *AddAppClientSecretResponse) SetSecret(val OptString) {
-	s.Secret = val
-}
-
-func (*AddAppClientSecretResponse) addAppClientSecretRes() {}
-
-type AddAppClientSecretUnauthorized ErrorDetails
-
-func (*AddAppClientSecretUnauthorized) addAppClientSecretRes() {}
+func (*AddAppClientCredentialUnauthorized) addAppClientCredentialRes() {}
 
 // AddOriginErrorResponse represents sum type.
 type AddOriginErrorResponse struct {
@@ -1101,9 +1124,6 @@ type App struct {
 	PolicyURI OptString `json:"policy_uri"`
 	// The app's terms of service, linked from the consent screen.
 	TosURI OptString `json:"tos_uri"`
-	// The preset the app was made from, such as `web` or `service-account`. A label for the console and
-	// agents; it carries no behavior, which comes only from the configs.
-	Preset OptString `json:"preset"`
 	// The app's OAuth and OIDC clients. A slug is unique among the app's clients and APIs.
 	Clients []AppClient `json:"clients"`
 	// The APIs the app serves, MCP servers among them.
@@ -1144,11 +1164,6 @@ func (s *App) GetPolicyURI() OptString {
 // GetTosURI returns the value of TosURI.
 func (s *App) GetTosURI() OptString {
 	return s.TosURI
-}
-
-// GetPreset returns the value of Preset.
-func (s *App) GetPreset() OptString {
-	return s.Preset
 }
 
 // GetClients returns the value of Clients.
@@ -1199,11 +1214,6 @@ func (s *App) SetPolicyURI(val OptString) {
 // SetTosURI sets the value of TosURI.
 func (s *App) SetTosURI(val OptString) {
 	s.TosURI = val
-}
-
-// SetPreset sets the value of Preset.
-func (s *App) SetPreset(val OptString) {
-	s.Preset = val
 }
 
 // SetClients sets the value of Clients.
@@ -1378,9 +1388,11 @@ func (s *AppAPISigningAlg) UnmarshalText(data []byte) error {
 	}
 }
 
-// An OAuth 2.1 client of the app: a web app, a SPA, a native app, a CLI or a
-// service that gets tokens from the project's authorization server. OpenID
-// Connect is OAuth plus the `openid` scope, so one client shape serves both.
+// A client of the app: a web app, a SPA, a native app, a CLI or a service. Its
+// `grant_types` and redirect URIs are its OAuth config, and OpenID Connect is
+// OAuth plus the `openid` scope, so one shape serves both. A confidential client
+// without `grant_types` holds only credentials, and turns on client credentials
+// later without becoming a new principal.
 // Ref: #
 type AppClient struct {
 	// Stable identifier of the client, unique among the app's clients and APIs. Other documents and the
@@ -1393,32 +1405,34 @@ type AppClient struct {
 	// or mobile app, one a v4 or another identity provider issued, or one every project the release
 	// ships to should share. Either way it is fixed for the life of the client: a revision that
 	// changes it is refused, and a revision that leaves it out keeps it. Unique within the project,
-	// and never in the form the server mints (`client_` followed by an id).
+	// and never in a form the server mints (`client_` or `dcr_` followed by an id).
 	ClientID OptString `json:"client_id"`
-	// `public` clients (SPAs, native apps, CLIs) hold no credential and prove themselves with PKCE alone.
-	//  `confidential` clients authenticate at the token endpoint.
+	// `public` clients (SPAs, native apps, CLIs) hold no credential and prove themselves with PKCE alone,
+	//  so they only act for the user who signed in. `confidential` clients hold credentials and
+	// authenticate with any of them: a secret (`client_secret_basic` or `client_secret_post`) or a key
+	// (`private_key_jwt`).
 	Type AppClientType `json:"type"`
-	// How the client authenticates at the token endpoint. A public client uses `none`, which is also its
-	// default. A confidential client uses a secret, `client_secret_basic` unless this says
-	// `client_secret_post`, or signs an assertion with a key in `jwks` (`private_key_jwt`).
-	AuthMethod OptAppClientAuthMethod `json:"auth_method"`
-	// The client secret of an app declared in the release, as a `${{ NAME }}` reference to a
-	// project variable (ADR 062), never the value itself. The server reads the variable from the
-	// deployment when the client authenticates. An app registered through the API holds no
-	// reference: its secrets are generated by the server or imported.
+	// A secret of a client declared in the release, as a `${{ NAME }}` reference to a project
+	// variable (ADR 062), never the value itself. The server reads the variable from the deployment
+	// when the client authenticates. Optional: a confidential client can hold secrets and keys
+	// written through the API instead, or beside it, which a deploy never removes. An app
+	// registered through the API holds no reference.
 	Secret OptString `json:"secret"`
-	// The public keys a `private_key_jwt` client signs its assertions with, as a JWK set. Public members
-	// only, so a private key can never be committed.
+	// Public keys the confidential client signs its `private_key_jwt` assertions with, as a JWK set.
+	// Public members only, so a private key can never be committed. Keys written through the API count
+	// too.
 	Jwks OptAppClientJwks `json:"jwks"`
-	// The grant types the client may use. `authorization_code` signs a user in with PKCE (every
-	// client, OAuth 2.1); `refresh_token` keeps a grant alive; `client_credentials` lets a
-	// confidential client act as itself, so the tokens it gets have the client as `sub`. A public
-	// client holds no secret and may not use `client_credentials`.
-	Grants []AppClientGrantsItem `json:"grants"`
+	// The grant types the client may use, with RFC 7591's name and values. `authorization_code`
+	// signs a user in with PKCE (every client, OAuth 2.1); `refresh_token` keeps a grant alive;
+	// `client_credentials` lets a confidential client act as itself, so the tokens it gets have the
+	// client as `sub`. A public client needs `authorization_code` and may not use
+	// `client_credentials`. A confidential client that leaves it out holds only credentials, and
+	// then takes none of the fields below.
+	GrantTypes []AppClientGrantTypesItem `json:"grant_types"`
 	// Where the authorization endpoint may send the user back, matched exactly. A loopback
 	// `http://127.0.0.1`, `http://[::1]` or `http://localhost` URI matches on any port (RFC 8252
 	// §7.3), and a public client may use a private-use scheme such as `com.example.app:/callback`
-	// (RFC 8252 §7.1). Required with `authorization_code`.
+	// (RFC 8252 §7.1). Required with `authorization_code`, and only with it.
 	RedirectUris []string `json:"redirect_uris"`
 	// Where RP-initiated logout may send the user afterwards, matched exactly.
 	PostLogoutRedirectUris []string `json:"post_logout_redirect_uris"`
@@ -1462,11 +1476,6 @@ func (s *AppClient) GetType() AppClientType {
 	return s.Type
 }
 
-// GetAuthMethod returns the value of AuthMethod.
-func (s *AppClient) GetAuthMethod() OptAppClientAuthMethod {
-	return s.AuthMethod
-}
-
 // GetSecret returns the value of Secret.
 func (s *AppClient) GetSecret() OptString {
 	return s.Secret
@@ -1477,9 +1486,9 @@ func (s *AppClient) GetJwks() OptAppClientJwks {
 	return s.Jwks
 }
 
-// GetGrants returns the value of Grants.
-func (s *AppClient) GetGrants() []AppClientGrantsItem {
-	return s.Grants
+// GetGrantTypes returns the value of GrantTypes.
+func (s *AppClient) GetGrantTypes() []AppClientGrantTypesItem {
+	return s.GrantTypes
 }
 
 // GetRedirectUris returns the value of RedirectUris.
@@ -1537,11 +1546,6 @@ func (s *AppClient) SetType(val AppClientType) {
 	s.Type = val
 }
 
-// SetAuthMethod sets the value of AuthMethod.
-func (s *AppClient) SetAuthMethod(val OptAppClientAuthMethod) {
-	s.AuthMethod = val
-}
-
 // SetSecret sets the value of Secret.
 func (s *AppClient) SetSecret(val OptString) {
 	s.Secret = val
@@ -1552,9 +1556,9 @@ func (s *AppClient) SetJwks(val OptAppClientJwks) {
 	s.Jwks = val
 }
 
-// SetGrants sets the value of Grants.
-func (s *AppClient) SetGrants(val []AppClientGrantsItem) {
-	s.Grants = val
+// SetGrantTypes sets the value of GrantTypes.
+func (s *AppClient) SetGrantTypes(val []AppClientGrantTypesItem) {
+	s.GrantTypes = val
 }
 
 // SetRedirectUris sets the value of RedirectUris.
@@ -1621,64 +1625,6 @@ func (s *AppClientAPI) SetScopes(val []string) {
 	s.Scopes = val
 }
 
-// How the client authenticates at the token endpoint. A public client uses `none`, which is also its
-// default. A confidential client uses a secret, `client_secret_basic` unless this says
-// `client_secret_post`, or signs an assertion with a key in `jwks` (`private_key_jwt`).
-type AppClientAuthMethod string
-
-const (
-	AppClientAuthMethodNone              AppClientAuthMethod = "none"
-	AppClientAuthMethodClientSecretBasic AppClientAuthMethod = "client_secret_basic"
-	AppClientAuthMethodClientSecretPost  AppClientAuthMethod = "client_secret_post"
-	AppClientAuthMethodPrivateKeyJwt     AppClientAuthMethod = "private_key_jwt"
-)
-
-// AllValues returns all AppClientAuthMethod values.
-func (AppClientAuthMethod) AllValues() []AppClientAuthMethod {
-	return []AppClientAuthMethod{
-		AppClientAuthMethodNone,
-		AppClientAuthMethodClientSecretBasic,
-		AppClientAuthMethodClientSecretPost,
-		AppClientAuthMethodPrivateKeyJwt,
-	}
-}
-
-// MarshalText implements encoding.TextMarshaler.
-func (s AppClientAuthMethod) MarshalText() ([]byte, error) {
-	switch s {
-	case AppClientAuthMethodNone:
-		return []byte(s), nil
-	case AppClientAuthMethodClientSecretBasic:
-		return []byte(s), nil
-	case AppClientAuthMethodClientSecretPost:
-		return []byte(s), nil
-	case AppClientAuthMethodPrivateKeyJwt:
-		return []byte(s), nil
-	default:
-		return nil, errors.Errorf("invalid value: %q", s)
-	}
-}
-
-// UnmarshalText implements encoding.TextUnmarshaler.
-func (s *AppClientAuthMethod) UnmarshalText(data []byte) error {
-	switch AppClientAuthMethod(data) {
-	case AppClientAuthMethodNone:
-		*s = AppClientAuthMethodNone
-		return nil
-	case AppClientAuthMethodClientSecretBasic:
-		*s = AppClientAuthMethodClientSecretBasic
-		return nil
-	case AppClientAuthMethodClientSecretPost:
-		*s = AppClientAuthMethodClientSecretPost
-		return nil
-	case AppClientAuthMethodPrivateKeyJwt:
-		*s = AppClientAuthMethodPrivateKeyJwt
-		return nil
-	default:
-		return errors.Errorf("invalid value: %q", data)
-	}
-}
-
 // When the user is asked to consent. `skip` never asks unless the request says `prompt=consent`,
 // and only a first-party client may skip. `new_scopes` asks for scopes the user has not consented
 // to yet. `always` asks on every request. Defaults to `skip` for a first-party client and
@@ -1731,31 +1677,138 @@ func (s *AppClientConsent) UnmarshalText(data []byte) error {
 	}
 }
 
-type AppClientGrantsItem string
+// One credential a confidential client authenticates with: a secret the
+// server generated or imported, or a public key the client signs its
+// `private_key_jwt` assertions with. Each is named, and rotated or revoked on
+// its own: rotating adds the new one and revokes the old one later, so the
+// client, its `client_id` and its history stay. A secret's value is shown
+// once, when the server generates it, and never stored.
+// Ref: #
+type AppClientCredential struct {
+	// The credential's id.
+	ID string `json:"id"`
+	// Names the credential, unique among the client's credentials.
+	Name string `json:"name"`
+	// `secret` authenticates with `client_secret_basic` or `client_secret_post`, `key` with
+	// `private_key_jwt`.
+	Kind AppClientCredentialKind `json:"kind"`
+	// The client the credential authenticates.
+	ClientID string `json:"client_id"`
+	// The public key's `kid`, for a key.
+	KeyID     OptString `json:"key_id"`
+	CreatedAt time.Time `json:"created_at"`
+	// When the credential stops working. Absent for one that does not expire.
+	ExpiresAt OptDateTime `json:"expires_at"`
+	// The generated secret, shown once, in the answer that created it. Absent on reads and for an import
+	// or a key.
+	Secret OptString `json:"secret"`
+}
+
+// GetID returns the value of ID.
+func (s *AppClientCredential) GetID() string {
+	return s.ID
+}
+
+// GetName returns the value of Name.
+func (s *AppClientCredential) GetName() string {
+	return s.Name
+}
+
+// GetKind returns the value of Kind.
+func (s *AppClientCredential) GetKind() AppClientCredentialKind {
+	return s.Kind
+}
+
+// GetClientID returns the value of ClientID.
+func (s *AppClientCredential) GetClientID() string {
+	return s.ClientID
+}
+
+// GetKeyID returns the value of KeyID.
+func (s *AppClientCredential) GetKeyID() OptString {
+	return s.KeyID
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *AppClientCredential) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetExpiresAt returns the value of ExpiresAt.
+func (s *AppClientCredential) GetExpiresAt() OptDateTime {
+	return s.ExpiresAt
+}
+
+// GetSecret returns the value of Secret.
+func (s *AppClientCredential) GetSecret() OptString {
+	return s.Secret
+}
+
+// SetID sets the value of ID.
+func (s *AppClientCredential) SetID(val string) {
+	s.ID = val
+}
+
+// SetName sets the value of Name.
+func (s *AppClientCredential) SetName(val string) {
+	s.Name = val
+}
+
+// SetKind sets the value of Kind.
+func (s *AppClientCredential) SetKind(val AppClientCredentialKind) {
+	s.Kind = val
+}
+
+// SetClientID sets the value of ClientID.
+func (s *AppClientCredential) SetClientID(val string) {
+	s.ClientID = val
+}
+
+// SetKeyID sets the value of KeyID.
+func (s *AppClientCredential) SetKeyID(val OptString) {
+	s.KeyID = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *AppClientCredential) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetExpiresAt sets the value of ExpiresAt.
+func (s *AppClientCredential) SetExpiresAt(val OptDateTime) {
+	s.ExpiresAt = val
+}
+
+// SetSecret sets the value of Secret.
+func (s *AppClientCredential) SetSecret(val OptString) {
+	s.Secret = val
+}
+
+func (*AppClientCredential) addAppClientCredentialRes() {}
+
+// `secret` authenticates with `client_secret_basic` or `client_secret_post`, `key` with
+// `private_key_jwt`.
+type AppClientCredentialKind string
 
 const (
-	AppClientGrantsItemAuthorizationCode AppClientGrantsItem = "authorization_code"
-	AppClientGrantsItemRefreshToken      AppClientGrantsItem = "refresh_token"
-	AppClientGrantsItemClientCredentials AppClientGrantsItem = "client_credentials"
+	AppClientCredentialKindSecret AppClientCredentialKind = "secret"
+	AppClientCredentialKindKey    AppClientCredentialKind = "key"
 )
 
-// AllValues returns all AppClientGrantsItem values.
-func (AppClientGrantsItem) AllValues() []AppClientGrantsItem {
-	return []AppClientGrantsItem{
-		AppClientGrantsItemAuthorizationCode,
-		AppClientGrantsItemRefreshToken,
-		AppClientGrantsItemClientCredentials,
+// AllValues returns all AppClientCredentialKind values.
+func (AppClientCredentialKind) AllValues() []AppClientCredentialKind {
+	return []AppClientCredentialKind{
+		AppClientCredentialKindSecret,
+		AppClientCredentialKindKey,
 	}
 }
 
 // MarshalText implements encoding.TextMarshaler.
-func (s AppClientGrantsItem) MarshalText() ([]byte, error) {
+func (s AppClientCredentialKind) MarshalText() ([]byte, error) {
 	switch s {
-	case AppClientGrantsItemAuthorizationCode:
+	case AppClientCredentialKindSecret:
 		return []byte(s), nil
-	case AppClientGrantsItemRefreshToken:
-		return []byte(s), nil
-	case AppClientGrantsItemClientCredentials:
+	case AppClientCredentialKindKey:
 		return []byte(s), nil
 	default:
 		return nil, errors.Errorf("invalid value: %q", s)
@@ -1763,16 +1816,61 @@ func (s AppClientGrantsItem) MarshalText() ([]byte, error) {
 }
 
 // UnmarshalText implements encoding.TextUnmarshaler.
-func (s *AppClientGrantsItem) UnmarshalText(data []byte) error {
-	switch AppClientGrantsItem(data) {
-	case AppClientGrantsItemAuthorizationCode:
-		*s = AppClientGrantsItemAuthorizationCode
+func (s *AppClientCredentialKind) UnmarshalText(data []byte) error {
+	switch AppClientCredentialKind(data) {
+	case AppClientCredentialKindSecret:
+		*s = AppClientCredentialKindSecret
 		return nil
-	case AppClientGrantsItemRefreshToken:
-		*s = AppClientGrantsItemRefreshToken
+	case AppClientCredentialKindKey:
+		*s = AppClientCredentialKindKey
 		return nil
-	case AppClientGrantsItemClientCredentials:
-		*s = AppClientGrantsItemClientCredentials
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+type AppClientGrantTypesItem string
+
+const (
+	AppClientGrantTypesItemAuthorizationCode AppClientGrantTypesItem = "authorization_code"
+	AppClientGrantTypesItemRefreshToken      AppClientGrantTypesItem = "refresh_token"
+	AppClientGrantTypesItemClientCredentials AppClientGrantTypesItem = "client_credentials"
+)
+
+// AllValues returns all AppClientGrantTypesItem values.
+func (AppClientGrantTypesItem) AllValues() []AppClientGrantTypesItem {
+	return []AppClientGrantTypesItem{
+		AppClientGrantTypesItemAuthorizationCode,
+		AppClientGrantTypesItemRefreshToken,
+		AppClientGrantTypesItemClientCredentials,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s AppClientGrantTypesItem) MarshalText() ([]byte, error) {
+	switch s {
+	case AppClientGrantTypesItemAuthorizationCode:
+		return []byte(s), nil
+	case AppClientGrantTypesItemRefreshToken:
+		return []byte(s), nil
+	case AppClientGrantTypesItemClientCredentials:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *AppClientGrantTypesItem) UnmarshalText(data []byte) error {
+	switch AppClientGrantTypesItem(data) {
+	case AppClientGrantTypesItemAuthorizationCode:
+		*s = AppClientGrantTypesItemAuthorizationCode
+		return nil
+	case AppClientGrantTypesItemRefreshToken:
+		*s = AppClientGrantTypesItemRefreshToken
+		return nil
+	case AppClientGrantTypesItemClientCredentials:
+		*s = AppClientGrantTypesItemClientCredentials
 		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)
@@ -2181,8 +2279,9 @@ func (s *AppClientJwkUse) UnmarshalText(data []byte) error {
 	}
 }
 
-// The public keys a `private_key_jwt` client signs its assertions with, as a JWK set. Public members
-// only, so a private key can never be committed.
+// Public keys the confidential client signs its `private_key_jwt` assertions with, as a JWK set.
+// Public members only, so a private key can never be committed. Keys written through the API count
+// too.
 type AppClientJwks struct {
 	Keys []AppClientJwk `json:"keys"`
 }
@@ -2308,6 +2407,8 @@ func (s *AppClientRegistrationNotFoundDetails) init() AppClientRegistrationNotFo
 type AppClientSecret struct {
 	// The slug of the client the secret belongs to.
 	Client string `json:"client"`
+	// The id of the credential that holds the secret, which revokes it.
+	CredentialID string `json:"credential_id"`
 	// The secret. The server keeps only its hash, so it cannot be shown again.
 	Secret string `json:"secret"`
 }
@@ -2315,6 +2416,11 @@ type AppClientSecret struct {
 // GetClient returns the value of Client.
 func (s *AppClientSecret) GetClient() string {
 	return s.Client
+}
+
+// GetCredentialID returns the value of CredentialID.
+func (s *AppClientSecret) GetCredentialID() string {
+	return s.CredentialID
 }
 
 // GetSecret returns the value of Secret.
@@ -2327,586 +2433,22 @@ func (s *AppClientSecret) SetClient(val string) {
 	s.Client = val
 }
 
+// SetCredentialID sets the value of CredentialID.
+func (s *AppClientSecret) SetCredentialID(val string) {
+	s.CredentialID = val
+}
+
 // SetSecret sets the value of Secret.
 func (s *AppClientSecret) SetSecret(val string) {
 	s.Secret = val
 }
 
-// AppClientSecretAdded2XX is 2XX pattern response for AppClientSecretAdded operation.
-type AppClientSecretAdded2XX struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *AppClientSecretAdded2XX) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *AppClientSecretAdded2XX) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*AppClientSecretAdded2XX) appClientSecretAddedRes() {}
-
-// AppClientSecretAddedDef is default response for AppClientSecretAdded operation.
-type AppClientSecretAddedDef struct {
-	StatusCode int
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *AppClientSecretAddedDef) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *AppClientSecretAddedDef) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-func (*AppClientSecretAddedDef) appClientSecretAddedRes() {}
-
-// Merged schema.
-// Ref: #
-type AppClientSecretAddedEvent struct {
-	// Managed event id (`evt_<opaque>`).
-	ID        string    `json:"id"`
-	ProjectID ProjectID `json:"project_id"`
-	// Emit-time team scope, when the actor operated under a team.
-	TeamID OptNilString `json:"team_id"`
-	// Merged property.
-	EventType string `json:"event_type"`
-	// Wide-event category.
-	Category AppClientSecretAddedEventCategory `json:"category"`
-	// When the action happened (server/storage clock, dialect-owned).
-	OccurredAt time.Time `json:"occurred_at"`
-	// When the row was inserted (server/storage clock, dialect-owned).
-	CreatedAt time.Time `json:"created_at"`
-	// Who triggered the event.
-	ActorID OptNilString `json:"actor_id"`
-	// Actor kind.
-	ActorType OptNilAppClientSecretAddedEventActorType `json:"actor_type"`
-	// Resource type affected.
-	EntityType OptNilString `json:"entity_type"`
-	// Resource id affected.
-	EntityID OptNilString `json:"entity_id"`
-	// Application or agent that produced the event.
-	ClientID string `json:"client_id"`
-	// Token id present at emit time, when any.
-	TokenID OptString `json:"token_id"`
-	// Delegation kind (omit when unset).
-	DelegationType OptAppClientSecretAddedEventDelegationType `json:"delegation_type"`
-	DelegationID   OptString                                  `json:"delegation_id"`
-	Grantor        OptString                                  `json:"grantor"`
-	// Device fingerprint correlation id.
-	Fingerprint OptString `json:"fingerprint"`
-	// HTTP request correlation id.
-	RequestID OptNilString `json:"request_id"`
-	// Session correlation id.
-	SessionID OptNilString `json:"session_id"`
-	// Login flow correlation id.
-	FlowID   OptNilString                `json:"flow_id"`
-	Metadata OptEventMetadata            `json:"metadata"`
-	Payload  AppClientSecretAddedPayload `json:"payload"`
-}
-
-// GetID returns the value of ID.
-func (s *AppClientSecretAddedEvent) GetID() string {
-	return s.ID
-}
-
-// GetProjectID returns the value of ProjectID.
-func (s *AppClientSecretAddedEvent) GetProjectID() ProjectID {
-	return s.ProjectID
-}
-
-// GetTeamID returns the value of TeamID.
-func (s *AppClientSecretAddedEvent) GetTeamID() OptNilString {
-	return s.TeamID
-}
-
-// GetEventType returns the value of EventType.
-func (s *AppClientSecretAddedEvent) GetEventType() string {
-	return s.EventType
-}
-
-// GetCategory returns the value of Category.
-func (s *AppClientSecretAddedEvent) GetCategory() AppClientSecretAddedEventCategory {
-	return s.Category
-}
-
-// GetOccurredAt returns the value of OccurredAt.
-func (s *AppClientSecretAddedEvent) GetOccurredAt() time.Time {
-	return s.OccurredAt
-}
-
-// GetCreatedAt returns the value of CreatedAt.
-func (s *AppClientSecretAddedEvent) GetCreatedAt() time.Time {
-	return s.CreatedAt
-}
-
-// GetActorID returns the value of ActorID.
-func (s *AppClientSecretAddedEvent) GetActorID() OptNilString {
-	return s.ActorID
-}
-
-// GetActorType returns the value of ActorType.
-func (s *AppClientSecretAddedEvent) GetActorType() OptNilAppClientSecretAddedEventActorType {
-	return s.ActorType
-}
-
-// GetEntityType returns the value of EntityType.
-func (s *AppClientSecretAddedEvent) GetEntityType() OptNilString {
-	return s.EntityType
-}
-
-// GetEntityID returns the value of EntityID.
-func (s *AppClientSecretAddedEvent) GetEntityID() OptNilString {
-	return s.EntityID
-}
-
-// GetClientID returns the value of ClientID.
-func (s *AppClientSecretAddedEvent) GetClientID() string {
-	return s.ClientID
-}
-
-// GetTokenID returns the value of TokenID.
-func (s *AppClientSecretAddedEvent) GetTokenID() OptString {
-	return s.TokenID
-}
-
-// GetDelegationType returns the value of DelegationType.
-func (s *AppClientSecretAddedEvent) GetDelegationType() OptAppClientSecretAddedEventDelegationType {
-	return s.DelegationType
-}
-
-// GetDelegationID returns the value of DelegationID.
-func (s *AppClientSecretAddedEvent) GetDelegationID() OptString {
-	return s.DelegationID
-}
-
-// GetGrantor returns the value of Grantor.
-func (s *AppClientSecretAddedEvent) GetGrantor() OptString {
-	return s.Grantor
-}
-
-// GetFingerprint returns the value of Fingerprint.
-func (s *AppClientSecretAddedEvent) GetFingerprint() OptString {
-	return s.Fingerprint
-}
-
-// GetRequestID returns the value of RequestID.
-func (s *AppClientSecretAddedEvent) GetRequestID() OptNilString {
-	return s.RequestID
-}
-
-// GetSessionID returns the value of SessionID.
-func (s *AppClientSecretAddedEvent) GetSessionID() OptNilString {
-	return s.SessionID
-}
-
-// GetFlowID returns the value of FlowID.
-func (s *AppClientSecretAddedEvent) GetFlowID() OptNilString {
-	return s.FlowID
-}
-
-// GetMetadata returns the value of Metadata.
-func (s *AppClientSecretAddedEvent) GetMetadata() OptEventMetadata {
-	return s.Metadata
-}
-
-// GetPayload returns the value of Payload.
-func (s *AppClientSecretAddedEvent) GetPayload() AppClientSecretAddedPayload {
-	return s.Payload
-}
-
-// SetID sets the value of ID.
-func (s *AppClientSecretAddedEvent) SetID(val string) {
-	s.ID = val
-}
-
-// SetProjectID sets the value of ProjectID.
-func (s *AppClientSecretAddedEvent) SetProjectID(val ProjectID) {
-	s.ProjectID = val
-}
-
-// SetTeamID sets the value of TeamID.
-func (s *AppClientSecretAddedEvent) SetTeamID(val OptNilString) {
-	s.TeamID = val
-}
-
-// SetEventType sets the value of EventType.
-func (s *AppClientSecretAddedEvent) SetEventType(val string) {
-	s.EventType = val
-}
-
-// SetCategory sets the value of Category.
-func (s *AppClientSecretAddedEvent) SetCategory(val AppClientSecretAddedEventCategory) {
-	s.Category = val
-}
-
-// SetOccurredAt sets the value of OccurredAt.
-func (s *AppClientSecretAddedEvent) SetOccurredAt(val time.Time) {
-	s.OccurredAt = val
-}
-
-// SetCreatedAt sets the value of CreatedAt.
-func (s *AppClientSecretAddedEvent) SetCreatedAt(val time.Time) {
-	s.CreatedAt = val
-}
-
-// SetActorID sets the value of ActorID.
-func (s *AppClientSecretAddedEvent) SetActorID(val OptNilString) {
-	s.ActorID = val
-}
-
-// SetActorType sets the value of ActorType.
-func (s *AppClientSecretAddedEvent) SetActorType(val OptNilAppClientSecretAddedEventActorType) {
-	s.ActorType = val
-}
-
-// SetEntityType sets the value of EntityType.
-func (s *AppClientSecretAddedEvent) SetEntityType(val OptNilString) {
-	s.EntityType = val
-}
-
-// SetEntityID sets the value of EntityID.
-func (s *AppClientSecretAddedEvent) SetEntityID(val OptNilString) {
-	s.EntityID = val
-}
-
-// SetClientID sets the value of ClientID.
-func (s *AppClientSecretAddedEvent) SetClientID(val string) {
-	s.ClientID = val
-}
-
-// SetTokenID sets the value of TokenID.
-func (s *AppClientSecretAddedEvent) SetTokenID(val OptString) {
-	s.TokenID = val
-}
-
-// SetDelegationType sets the value of DelegationType.
-func (s *AppClientSecretAddedEvent) SetDelegationType(val OptAppClientSecretAddedEventDelegationType) {
-	s.DelegationType = val
-}
-
-// SetDelegationID sets the value of DelegationID.
-func (s *AppClientSecretAddedEvent) SetDelegationID(val OptString) {
-	s.DelegationID = val
-}
-
-// SetGrantor sets the value of Grantor.
-func (s *AppClientSecretAddedEvent) SetGrantor(val OptString) {
-	s.Grantor = val
-}
-
-// SetFingerprint sets the value of Fingerprint.
-func (s *AppClientSecretAddedEvent) SetFingerprint(val OptString) {
-	s.Fingerprint = val
-}
-
-// SetRequestID sets the value of RequestID.
-func (s *AppClientSecretAddedEvent) SetRequestID(val OptNilString) {
-	s.RequestID = val
-}
-
-// SetSessionID sets the value of SessionID.
-func (s *AppClientSecretAddedEvent) SetSessionID(val OptNilString) {
-	s.SessionID = val
-}
-
-// SetFlowID sets the value of FlowID.
-func (s *AppClientSecretAddedEvent) SetFlowID(val OptNilString) {
-	s.FlowID = val
-}
-
-// SetMetadata sets the value of Metadata.
-func (s *AppClientSecretAddedEvent) SetMetadata(val OptEventMetadata) {
-	s.Metadata = val
-}
-
-// SetPayload sets the value of Payload.
-func (s *AppClientSecretAddedEvent) SetPayload(val AppClientSecretAddedPayload) {
-	s.Payload = val
-}
-
-type AppClientSecretAddedEventActorType string
-
-const (
-	AppClientSecretAddedEventActorTypeHuman   AppClientSecretAddedEventActorType = "human"
-	AppClientSecretAddedEventActorTypeService AppClientSecretAddedEventActorType = "service"
-	AppClientSecretAddedEventActorTypeSystem  AppClientSecretAddedEventActorType = "system"
-	AppClientSecretAddedEventActorTypeAgent   AppClientSecretAddedEventActorType = "agent"
-)
-
-// AllValues returns all AppClientSecretAddedEventActorType values.
-func (AppClientSecretAddedEventActorType) AllValues() []AppClientSecretAddedEventActorType {
-	return []AppClientSecretAddedEventActorType{
-		AppClientSecretAddedEventActorTypeHuman,
-		AppClientSecretAddedEventActorTypeService,
-		AppClientSecretAddedEventActorTypeSystem,
-		AppClientSecretAddedEventActorTypeAgent,
-	}
-}
-
-// MarshalText implements encoding.TextMarshaler.
-func (s AppClientSecretAddedEventActorType) MarshalText() ([]byte, error) {
-	switch s {
-	case AppClientSecretAddedEventActorTypeHuman:
-		return []byte(s), nil
-	case AppClientSecretAddedEventActorTypeService:
-		return []byte(s), nil
-	case AppClientSecretAddedEventActorTypeSystem:
-		return []byte(s), nil
-	case AppClientSecretAddedEventActorTypeAgent:
-		return []byte(s), nil
-	default:
-		return nil, errors.Errorf("invalid value: %q", s)
-	}
-}
-
-// UnmarshalText implements encoding.TextUnmarshaler.
-func (s *AppClientSecretAddedEventActorType) UnmarshalText(data []byte) error {
-	switch AppClientSecretAddedEventActorType(data) {
-	case AppClientSecretAddedEventActorTypeHuman:
-		*s = AppClientSecretAddedEventActorTypeHuman
-		return nil
-	case AppClientSecretAddedEventActorTypeService:
-		*s = AppClientSecretAddedEventActorTypeService
-		return nil
-	case AppClientSecretAddedEventActorTypeSystem:
-		*s = AppClientSecretAddedEventActorTypeSystem
-		return nil
-	case AppClientSecretAddedEventActorTypeAgent:
-		*s = AppClientSecretAddedEventActorTypeAgent
-		return nil
-	default:
-		return errors.Errorf("invalid value: %q", data)
-	}
-}
-
-// Wide-event category.
-type AppClientSecretAddedEventCategory string
-
-const (
-	AppClientSecretAddedEventCategoryRequest AppClientSecretAddedEventCategory = "request"
-	AppClientSecretAddedEventCategoryAuth    AppClientSecretAddedEventCategory = "auth"
-	AppClientSecretAddedEventCategorySession AppClientSecretAddedEventCategory = "session"
-	AppClientSecretAddedEventCategoryAdmin   AppClientSecretAddedEventCategory = "admin"
-	AppClientSecretAddedEventCategoryEntity  AppClientSecretAddedEventCategory = "entity"
-	AppClientSecretAddedEventCategorySignal  AppClientSecretAddedEventCategory = "signal"
-)
-
-// AllValues returns all AppClientSecretAddedEventCategory values.
-func (AppClientSecretAddedEventCategory) AllValues() []AppClientSecretAddedEventCategory {
-	return []AppClientSecretAddedEventCategory{
-		AppClientSecretAddedEventCategoryRequest,
-		AppClientSecretAddedEventCategoryAuth,
-		AppClientSecretAddedEventCategorySession,
-		AppClientSecretAddedEventCategoryAdmin,
-		AppClientSecretAddedEventCategoryEntity,
-		AppClientSecretAddedEventCategorySignal,
-	}
-}
-
-// MarshalText implements encoding.TextMarshaler.
-func (s AppClientSecretAddedEventCategory) MarshalText() ([]byte, error) {
-	switch s {
-	case AppClientSecretAddedEventCategoryRequest:
-		return []byte(s), nil
-	case AppClientSecretAddedEventCategoryAuth:
-		return []byte(s), nil
-	case AppClientSecretAddedEventCategorySession:
-		return []byte(s), nil
-	case AppClientSecretAddedEventCategoryAdmin:
-		return []byte(s), nil
-	case AppClientSecretAddedEventCategoryEntity:
-		return []byte(s), nil
-	case AppClientSecretAddedEventCategorySignal:
-		return []byte(s), nil
-	default:
-		return nil, errors.Errorf("invalid value: %q", s)
-	}
-}
-
-// UnmarshalText implements encoding.TextUnmarshaler.
-func (s *AppClientSecretAddedEventCategory) UnmarshalText(data []byte) error {
-	switch AppClientSecretAddedEventCategory(data) {
-	case AppClientSecretAddedEventCategoryRequest:
-		*s = AppClientSecretAddedEventCategoryRequest
-		return nil
-	case AppClientSecretAddedEventCategoryAuth:
-		*s = AppClientSecretAddedEventCategoryAuth
-		return nil
-	case AppClientSecretAddedEventCategorySession:
-		*s = AppClientSecretAddedEventCategorySession
-		return nil
-	case AppClientSecretAddedEventCategoryAdmin:
-		*s = AppClientSecretAddedEventCategoryAdmin
-		return nil
-	case AppClientSecretAddedEventCategoryEntity:
-		*s = AppClientSecretAddedEventCategoryEntity
-		return nil
-	case AppClientSecretAddedEventCategorySignal:
-		*s = AppClientSecretAddedEventCategorySignal
-		return nil
-	default:
-		return errors.Errorf("invalid value: %q", data)
-	}
-}
-
-// Delegation kind (omit when unset).
-type AppClientSecretAddedEventDelegationType string
-
-const (
-	AppClientSecretAddedEventDelegationTypeDirect    AppClientSecretAddedEventDelegationType = "direct"
-	AppClientSecretAddedEventDelegationTypeDelegated AppClientSecretAddedEventDelegationType = "delegated"
-	AppClientSecretAddedEventDelegationTypePatShared AppClientSecretAddedEventDelegationType = "pat_shared"
-	AppClientSecretAddedEventDelegationTypeExchanged AppClientSecretAddedEventDelegationType = "exchanged"
-)
-
-// AllValues returns all AppClientSecretAddedEventDelegationType values.
-func (AppClientSecretAddedEventDelegationType) AllValues() []AppClientSecretAddedEventDelegationType {
-	return []AppClientSecretAddedEventDelegationType{
-		AppClientSecretAddedEventDelegationTypeDirect,
-		AppClientSecretAddedEventDelegationTypeDelegated,
-		AppClientSecretAddedEventDelegationTypePatShared,
-		AppClientSecretAddedEventDelegationTypeExchanged,
-	}
-}
-
-// MarshalText implements encoding.TextMarshaler.
-func (s AppClientSecretAddedEventDelegationType) MarshalText() ([]byte, error) {
-	switch s {
-	case AppClientSecretAddedEventDelegationTypeDirect:
-		return []byte(s), nil
-	case AppClientSecretAddedEventDelegationTypeDelegated:
-		return []byte(s), nil
-	case AppClientSecretAddedEventDelegationTypePatShared:
-		return []byte(s), nil
-	case AppClientSecretAddedEventDelegationTypeExchanged:
-		return []byte(s), nil
-	default:
-		return nil, errors.Errorf("invalid value: %q", s)
-	}
-}
-
-// UnmarshalText implements encoding.TextUnmarshaler.
-func (s *AppClientSecretAddedEventDelegationType) UnmarshalText(data []byte) error {
-	switch AppClientSecretAddedEventDelegationType(data) {
-	case AppClientSecretAddedEventDelegationTypeDirect:
-		*s = AppClientSecretAddedEventDelegationTypeDirect
-		return nil
-	case AppClientSecretAddedEventDelegationTypeDelegated:
-		*s = AppClientSecretAddedEventDelegationTypeDelegated
-		return nil
-	case AppClientSecretAddedEventDelegationTypePatShared:
-		*s = AppClientSecretAddedEventDelegationTypePatShared
-		return nil
-	case AppClientSecretAddedEventDelegationTypeExchanged:
-		*s = AppClientSecretAddedEventDelegationTypeExchanged
-		return nil
-	default:
-		return errors.Errorf("invalid value: %q", data)
-	}
-}
-
-// A client of the app (the event's `entity_id`) got a secret: one the server
-// generated, or one imported from another system. Never the secret or its
-// hash.
-// Ref: #
-type AppClientSecretAddedPayload struct {
-	// The client's slug.
-	Client   string                            `json:"client"`
-	ClientID string                            `json:"client_id"`
-	SecretID string                            `json:"secret_id"`
-	Origin   AppClientSecretAddedPayloadOrigin `json:"origin"`
-}
-
-// GetClient returns the value of Client.
-func (s *AppClientSecretAddedPayload) GetClient() string {
-	return s.Client
-}
-
-// GetClientID returns the value of ClientID.
-func (s *AppClientSecretAddedPayload) GetClientID() string {
-	return s.ClientID
-}
-
-// GetSecretID returns the value of SecretID.
-func (s *AppClientSecretAddedPayload) GetSecretID() string {
-	return s.SecretID
-}
-
-// GetOrigin returns the value of Origin.
-func (s *AppClientSecretAddedPayload) GetOrigin() AppClientSecretAddedPayloadOrigin {
-	return s.Origin
-}
-
-// SetClient sets the value of Client.
-func (s *AppClientSecretAddedPayload) SetClient(val string) {
-	s.Client = val
-}
-
-// SetClientID sets the value of ClientID.
-func (s *AppClientSecretAddedPayload) SetClientID(val string) {
-	s.ClientID = val
-}
-
-// SetSecretID sets the value of SecretID.
-func (s *AppClientSecretAddedPayload) SetSecretID(val string) {
-	s.SecretID = val
-}
-
-// SetOrigin sets the value of Origin.
-func (s *AppClientSecretAddedPayload) SetOrigin(val AppClientSecretAddedPayloadOrigin) {
-	s.Origin = val
-}
-
-type AppClientSecretAddedPayloadOrigin string
-
-const (
-	AppClientSecretAddedPayloadOriginGenerated AppClientSecretAddedPayloadOrigin = "generated"
-	AppClientSecretAddedPayloadOriginImported  AppClientSecretAddedPayloadOrigin = "imported"
-)
-
-// AllValues returns all AppClientSecretAddedPayloadOrigin values.
-func (AppClientSecretAddedPayloadOrigin) AllValues() []AppClientSecretAddedPayloadOrigin {
-	return []AppClientSecretAddedPayloadOrigin{
-		AppClientSecretAddedPayloadOriginGenerated,
-		AppClientSecretAddedPayloadOriginImported,
-	}
-}
-
-// MarshalText implements encoding.TextMarshaler.
-func (s AppClientSecretAddedPayloadOrigin) MarshalText() ([]byte, error) {
-	switch s {
-	case AppClientSecretAddedPayloadOriginGenerated:
-		return []byte(s), nil
-	case AppClientSecretAddedPayloadOriginImported:
-		return []byte(s), nil
-	default:
-		return nil, errors.Errorf("invalid value: %q", s)
-	}
-}
-
-// UnmarshalText implements encoding.TextUnmarshaler.
-func (s *AppClientSecretAddedPayloadOrigin) UnmarshalText(data []byte) error {
-	switch AppClientSecretAddedPayloadOrigin(data) {
-	case AppClientSecretAddedPayloadOriginGenerated:
-		*s = AppClientSecretAddedPayloadOriginGenerated
-		return nil
-	case AppClientSecretAddedPayloadOriginImported:
-		*s = AppClientSecretAddedPayloadOriginImported
-		return nil
-	default:
-		return errors.Errorf("invalid value: %q", data)
-	}
-}
-
-// `public` clients (SPAs, native apps, CLIs) hold no credential and prove themselves with PKCE alone.
+// `public` clients (SPAs, native apps, CLIs) hold no credential and prove themselves with PKCE alone,
 //
-//	`confidential` clients authenticate at the token endpoint.
+//	so they only act for the user who signed in. `confidential` clients hold credentials and
+//
+// authenticate with any of them: a secret (`client_secret_basic` or `client_secret_post`) or a key
+// (`private_key_jwt`).
 type AppClientType string
 
 const (
@@ -3427,6 +2969,1229 @@ func (s *AppCreatedEventDelegationType) UnmarshalText(data []byte) error {
 	}
 }
 
+// AppCredentialAdded2XX is 2XX pattern response for AppCredentialAdded operation.
+type AppCredentialAdded2XX struct {
+	StatusCode int
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *AppCredentialAdded2XX) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *AppCredentialAdded2XX) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+func (*AppCredentialAdded2XX) appCredentialAddedRes() {}
+
+// AppCredentialAddedDef is default response for AppCredentialAdded operation.
+type AppCredentialAddedDef struct {
+	StatusCode int
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *AppCredentialAddedDef) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *AppCredentialAddedDef) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+func (*AppCredentialAddedDef) appCredentialAddedRes() {}
+
+// Merged schema.
+// Ref: #
+type AppCredentialAddedEvent struct {
+	// Managed event id (`evt_<opaque>`).
+	ID        string    `json:"id"`
+	ProjectID ProjectID `json:"project_id"`
+	// Emit-time team scope, when the actor operated under a team.
+	TeamID OptNilString `json:"team_id"`
+	// Merged property.
+	EventType string `json:"event_type"`
+	// Wide-event category.
+	Category AppCredentialAddedEventCategory `json:"category"`
+	// When the action happened (server/storage clock, dialect-owned).
+	OccurredAt time.Time `json:"occurred_at"`
+	// When the row was inserted (server/storage clock, dialect-owned).
+	CreatedAt time.Time `json:"created_at"`
+	// Who triggered the event.
+	ActorID OptNilString `json:"actor_id"`
+	// Actor kind.
+	ActorType OptNilAppCredentialAddedEventActorType `json:"actor_type"`
+	// Resource type affected.
+	EntityType OptNilString `json:"entity_type"`
+	// Resource id affected.
+	EntityID OptNilString `json:"entity_id"`
+	// Application or agent that produced the event.
+	ClientID string `json:"client_id"`
+	// Token id present at emit time, when any.
+	TokenID OptString `json:"token_id"`
+	// Delegation kind (omit when unset).
+	DelegationType OptAppCredentialAddedEventDelegationType `json:"delegation_type"`
+	DelegationID   OptString                                `json:"delegation_id"`
+	Grantor        OptString                                `json:"grantor"`
+	// Device fingerprint correlation id.
+	Fingerprint OptString `json:"fingerprint"`
+	// HTTP request correlation id.
+	RequestID OptNilString `json:"request_id"`
+	// Session correlation id.
+	SessionID OptNilString `json:"session_id"`
+	// Login flow correlation id.
+	FlowID   OptNilString         `json:"flow_id"`
+	Metadata OptEventMetadata     `json:"metadata"`
+	Payload  AppCredentialPayload `json:"payload"`
+}
+
+// GetID returns the value of ID.
+func (s *AppCredentialAddedEvent) GetID() string {
+	return s.ID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *AppCredentialAddedEvent) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetTeamID returns the value of TeamID.
+func (s *AppCredentialAddedEvent) GetTeamID() OptNilString {
+	return s.TeamID
+}
+
+// GetEventType returns the value of EventType.
+func (s *AppCredentialAddedEvent) GetEventType() string {
+	return s.EventType
+}
+
+// GetCategory returns the value of Category.
+func (s *AppCredentialAddedEvent) GetCategory() AppCredentialAddedEventCategory {
+	return s.Category
+}
+
+// GetOccurredAt returns the value of OccurredAt.
+func (s *AppCredentialAddedEvent) GetOccurredAt() time.Time {
+	return s.OccurredAt
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *AppCredentialAddedEvent) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetActorID returns the value of ActorID.
+func (s *AppCredentialAddedEvent) GetActorID() OptNilString {
+	return s.ActorID
+}
+
+// GetActorType returns the value of ActorType.
+func (s *AppCredentialAddedEvent) GetActorType() OptNilAppCredentialAddedEventActorType {
+	return s.ActorType
+}
+
+// GetEntityType returns the value of EntityType.
+func (s *AppCredentialAddedEvent) GetEntityType() OptNilString {
+	return s.EntityType
+}
+
+// GetEntityID returns the value of EntityID.
+func (s *AppCredentialAddedEvent) GetEntityID() OptNilString {
+	return s.EntityID
+}
+
+// GetClientID returns the value of ClientID.
+func (s *AppCredentialAddedEvent) GetClientID() string {
+	return s.ClientID
+}
+
+// GetTokenID returns the value of TokenID.
+func (s *AppCredentialAddedEvent) GetTokenID() OptString {
+	return s.TokenID
+}
+
+// GetDelegationType returns the value of DelegationType.
+func (s *AppCredentialAddedEvent) GetDelegationType() OptAppCredentialAddedEventDelegationType {
+	return s.DelegationType
+}
+
+// GetDelegationID returns the value of DelegationID.
+func (s *AppCredentialAddedEvent) GetDelegationID() OptString {
+	return s.DelegationID
+}
+
+// GetGrantor returns the value of Grantor.
+func (s *AppCredentialAddedEvent) GetGrantor() OptString {
+	return s.Grantor
+}
+
+// GetFingerprint returns the value of Fingerprint.
+func (s *AppCredentialAddedEvent) GetFingerprint() OptString {
+	return s.Fingerprint
+}
+
+// GetRequestID returns the value of RequestID.
+func (s *AppCredentialAddedEvent) GetRequestID() OptNilString {
+	return s.RequestID
+}
+
+// GetSessionID returns the value of SessionID.
+func (s *AppCredentialAddedEvent) GetSessionID() OptNilString {
+	return s.SessionID
+}
+
+// GetFlowID returns the value of FlowID.
+func (s *AppCredentialAddedEvent) GetFlowID() OptNilString {
+	return s.FlowID
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *AppCredentialAddedEvent) GetMetadata() OptEventMetadata {
+	return s.Metadata
+}
+
+// GetPayload returns the value of Payload.
+func (s *AppCredentialAddedEvent) GetPayload() AppCredentialPayload {
+	return s.Payload
+}
+
+// SetID sets the value of ID.
+func (s *AppCredentialAddedEvent) SetID(val string) {
+	s.ID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *AppCredentialAddedEvent) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *AppCredentialAddedEvent) SetTeamID(val OptNilString) {
+	s.TeamID = val
+}
+
+// SetEventType sets the value of EventType.
+func (s *AppCredentialAddedEvent) SetEventType(val string) {
+	s.EventType = val
+}
+
+// SetCategory sets the value of Category.
+func (s *AppCredentialAddedEvent) SetCategory(val AppCredentialAddedEventCategory) {
+	s.Category = val
+}
+
+// SetOccurredAt sets the value of OccurredAt.
+func (s *AppCredentialAddedEvent) SetOccurredAt(val time.Time) {
+	s.OccurredAt = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *AppCredentialAddedEvent) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetActorID sets the value of ActorID.
+func (s *AppCredentialAddedEvent) SetActorID(val OptNilString) {
+	s.ActorID = val
+}
+
+// SetActorType sets the value of ActorType.
+func (s *AppCredentialAddedEvent) SetActorType(val OptNilAppCredentialAddedEventActorType) {
+	s.ActorType = val
+}
+
+// SetEntityType sets the value of EntityType.
+func (s *AppCredentialAddedEvent) SetEntityType(val OptNilString) {
+	s.EntityType = val
+}
+
+// SetEntityID sets the value of EntityID.
+func (s *AppCredentialAddedEvent) SetEntityID(val OptNilString) {
+	s.EntityID = val
+}
+
+// SetClientID sets the value of ClientID.
+func (s *AppCredentialAddedEvent) SetClientID(val string) {
+	s.ClientID = val
+}
+
+// SetTokenID sets the value of TokenID.
+func (s *AppCredentialAddedEvent) SetTokenID(val OptString) {
+	s.TokenID = val
+}
+
+// SetDelegationType sets the value of DelegationType.
+func (s *AppCredentialAddedEvent) SetDelegationType(val OptAppCredentialAddedEventDelegationType) {
+	s.DelegationType = val
+}
+
+// SetDelegationID sets the value of DelegationID.
+func (s *AppCredentialAddedEvent) SetDelegationID(val OptString) {
+	s.DelegationID = val
+}
+
+// SetGrantor sets the value of Grantor.
+func (s *AppCredentialAddedEvent) SetGrantor(val OptString) {
+	s.Grantor = val
+}
+
+// SetFingerprint sets the value of Fingerprint.
+func (s *AppCredentialAddedEvent) SetFingerprint(val OptString) {
+	s.Fingerprint = val
+}
+
+// SetRequestID sets the value of RequestID.
+func (s *AppCredentialAddedEvent) SetRequestID(val OptNilString) {
+	s.RequestID = val
+}
+
+// SetSessionID sets the value of SessionID.
+func (s *AppCredentialAddedEvent) SetSessionID(val OptNilString) {
+	s.SessionID = val
+}
+
+// SetFlowID sets the value of FlowID.
+func (s *AppCredentialAddedEvent) SetFlowID(val OptNilString) {
+	s.FlowID = val
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *AppCredentialAddedEvent) SetMetadata(val OptEventMetadata) {
+	s.Metadata = val
+}
+
+// SetPayload sets the value of Payload.
+func (s *AppCredentialAddedEvent) SetPayload(val AppCredentialPayload) {
+	s.Payload = val
+}
+
+type AppCredentialAddedEventActorType string
+
+const (
+	AppCredentialAddedEventActorTypeHuman   AppCredentialAddedEventActorType = "human"
+	AppCredentialAddedEventActorTypeService AppCredentialAddedEventActorType = "service"
+	AppCredentialAddedEventActorTypeSystem  AppCredentialAddedEventActorType = "system"
+	AppCredentialAddedEventActorTypeAgent   AppCredentialAddedEventActorType = "agent"
+)
+
+// AllValues returns all AppCredentialAddedEventActorType values.
+func (AppCredentialAddedEventActorType) AllValues() []AppCredentialAddedEventActorType {
+	return []AppCredentialAddedEventActorType{
+		AppCredentialAddedEventActorTypeHuman,
+		AppCredentialAddedEventActorTypeService,
+		AppCredentialAddedEventActorTypeSystem,
+		AppCredentialAddedEventActorTypeAgent,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s AppCredentialAddedEventActorType) MarshalText() ([]byte, error) {
+	switch s {
+	case AppCredentialAddedEventActorTypeHuman:
+		return []byte(s), nil
+	case AppCredentialAddedEventActorTypeService:
+		return []byte(s), nil
+	case AppCredentialAddedEventActorTypeSystem:
+		return []byte(s), nil
+	case AppCredentialAddedEventActorTypeAgent:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *AppCredentialAddedEventActorType) UnmarshalText(data []byte) error {
+	switch AppCredentialAddedEventActorType(data) {
+	case AppCredentialAddedEventActorTypeHuman:
+		*s = AppCredentialAddedEventActorTypeHuman
+		return nil
+	case AppCredentialAddedEventActorTypeService:
+		*s = AppCredentialAddedEventActorTypeService
+		return nil
+	case AppCredentialAddedEventActorTypeSystem:
+		*s = AppCredentialAddedEventActorTypeSystem
+		return nil
+	case AppCredentialAddedEventActorTypeAgent:
+		*s = AppCredentialAddedEventActorTypeAgent
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Wide-event category.
+type AppCredentialAddedEventCategory string
+
+const (
+	AppCredentialAddedEventCategoryRequest AppCredentialAddedEventCategory = "request"
+	AppCredentialAddedEventCategoryAuth    AppCredentialAddedEventCategory = "auth"
+	AppCredentialAddedEventCategorySession AppCredentialAddedEventCategory = "session"
+	AppCredentialAddedEventCategoryAdmin   AppCredentialAddedEventCategory = "admin"
+	AppCredentialAddedEventCategoryEntity  AppCredentialAddedEventCategory = "entity"
+	AppCredentialAddedEventCategorySignal  AppCredentialAddedEventCategory = "signal"
+)
+
+// AllValues returns all AppCredentialAddedEventCategory values.
+func (AppCredentialAddedEventCategory) AllValues() []AppCredentialAddedEventCategory {
+	return []AppCredentialAddedEventCategory{
+		AppCredentialAddedEventCategoryRequest,
+		AppCredentialAddedEventCategoryAuth,
+		AppCredentialAddedEventCategorySession,
+		AppCredentialAddedEventCategoryAdmin,
+		AppCredentialAddedEventCategoryEntity,
+		AppCredentialAddedEventCategorySignal,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s AppCredentialAddedEventCategory) MarshalText() ([]byte, error) {
+	switch s {
+	case AppCredentialAddedEventCategoryRequest:
+		return []byte(s), nil
+	case AppCredentialAddedEventCategoryAuth:
+		return []byte(s), nil
+	case AppCredentialAddedEventCategorySession:
+		return []byte(s), nil
+	case AppCredentialAddedEventCategoryAdmin:
+		return []byte(s), nil
+	case AppCredentialAddedEventCategoryEntity:
+		return []byte(s), nil
+	case AppCredentialAddedEventCategorySignal:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *AppCredentialAddedEventCategory) UnmarshalText(data []byte) error {
+	switch AppCredentialAddedEventCategory(data) {
+	case AppCredentialAddedEventCategoryRequest:
+		*s = AppCredentialAddedEventCategoryRequest
+		return nil
+	case AppCredentialAddedEventCategoryAuth:
+		*s = AppCredentialAddedEventCategoryAuth
+		return nil
+	case AppCredentialAddedEventCategorySession:
+		*s = AppCredentialAddedEventCategorySession
+		return nil
+	case AppCredentialAddedEventCategoryAdmin:
+		*s = AppCredentialAddedEventCategoryAdmin
+		return nil
+	case AppCredentialAddedEventCategoryEntity:
+		*s = AppCredentialAddedEventCategoryEntity
+		return nil
+	case AppCredentialAddedEventCategorySignal:
+		*s = AppCredentialAddedEventCategorySignal
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Delegation kind (omit when unset).
+type AppCredentialAddedEventDelegationType string
+
+const (
+	AppCredentialAddedEventDelegationTypeDirect    AppCredentialAddedEventDelegationType = "direct"
+	AppCredentialAddedEventDelegationTypeDelegated AppCredentialAddedEventDelegationType = "delegated"
+	AppCredentialAddedEventDelegationTypePatShared AppCredentialAddedEventDelegationType = "pat_shared"
+	AppCredentialAddedEventDelegationTypeExchanged AppCredentialAddedEventDelegationType = "exchanged"
+)
+
+// AllValues returns all AppCredentialAddedEventDelegationType values.
+func (AppCredentialAddedEventDelegationType) AllValues() []AppCredentialAddedEventDelegationType {
+	return []AppCredentialAddedEventDelegationType{
+		AppCredentialAddedEventDelegationTypeDirect,
+		AppCredentialAddedEventDelegationTypeDelegated,
+		AppCredentialAddedEventDelegationTypePatShared,
+		AppCredentialAddedEventDelegationTypeExchanged,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s AppCredentialAddedEventDelegationType) MarshalText() ([]byte, error) {
+	switch s {
+	case AppCredentialAddedEventDelegationTypeDirect:
+		return []byte(s), nil
+	case AppCredentialAddedEventDelegationTypeDelegated:
+		return []byte(s), nil
+	case AppCredentialAddedEventDelegationTypePatShared:
+		return []byte(s), nil
+	case AppCredentialAddedEventDelegationTypeExchanged:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *AppCredentialAddedEventDelegationType) UnmarshalText(data []byte) error {
+	switch AppCredentialAddedEventDelegationType(data) {
+	case AppCredentialAddedEventDelegationTypeDirect:
+		*s = AppCredentialAddedEventDelegationTypeDirect
+		return nil
+	case AppCredentialAddedEventDelegationTypeDelegated:
+		*s = AppCredentialAddedEventDelegationTypeDelegated
+		return nil
+	case AppCredentialAddedEventDelegationTypePatShared:
+		*s = AppCredentialAddedEventDelegationTypePatShared
+		return nil
+	case AppCredentialAddedEventDelegationTypeExchanged:
+		*s = AppCredentialAddedEventDelegationTypeExchanged
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Merged schema.
+// Ref: #
+type AppCredentialNotFound struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptAppCredentialNotFoundDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *AppCredentialNotFound) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *AppCredentialNotFound) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *AppCredentialNotFound) GetDetails() OptAppCredentialNotFoundDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *AppCredentialNotFound) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *AppCredentialNotFound) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *AppCredentialNotFound) SetDetails(val OptAppCredentialNotFoundDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type AppCredentialNotFoundDetails map[string]jx.Raw
+
+func (s *AppCredentialNotFoundDetails) init() AppCredentialNotFoundDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// A credential of a client of the app (the event's `entity_id`) was added or
+// revoked. Never a secret, its hash or a key.
+// Ref: #
+type AppCredentialPayload struct {
+	// The client's slug.
+	Client       string                   `json:"client"`
+	ClientID     string                   `json:"client_id"`
+	CredentialID string                   `json:"credential_id"`
+	Name         string                   `json:"name"`
+	Kind         AppCredentialPayloadKind `json:"kind"`
+	// How a secret was added, on `app.credential.added`. Absent for a key and on `app.credential.
+	// revoked`.
+	Origin OptAppCredentialPayloadOrigin `json:"origin"`
+}
+
+// GetClient returns the value of Client.
+func (s *AppCredentialPayload) GetClient() string {
+	return s.Client
+}
+
+// GetClientID returns the value of ClientID.
+func (s *AppCredentialPayload) GetClientID() string {
+	return s.ClientID
+}
+
+// GetCredentialID returns the value of CredentialID.
+func (s *AppCredentialPayload) GetCredentialID() string {
+	return s.CredentialID
+}
+
+// GetName returns the value of Name.
+func (s *AppCredentialPayload) GetName() string {
+	return s.Name
+}
+
+// GetKind returns the value of Kind.
+func (s *AppCredentialPayload) GetKind() AppCredentialPayloadKind {
+	return s.Kind
+}
+
+// GetOrigin returns the value of Origin.
+func (s *AppCredentialPayload) GetOrigin() OptAppCredentialPayloadOrigin {
+	return s.Origin
+}
+
+// SetClient sets the value of Client.
+func (s *AppCredentialPayload) SetClient(val string) {
+	s.Client = val
+}
+
+// SetClientID sets the value of ClientID.
+func (s *AppCredentialPayload) SetClientID(val string) {
+	s.ClientID = val
+}
+
+// SetCredentialID sets the value of CredentialID.
+func (s *AppCredentialPayload) SetCredentialID(val string) {
+	s.CredentialID = val
+}
+
+// SetName sets the value of Name.
+func (s *AppCredentialPayload) SetName(val string) {
+	s.Name = val
+}
+
+// SetKind sets the value of Kind.
+func (s *AppCredentialPayload) SetKind(val AppCredentialPayloadKind) {
+	s.Kind = val
+}
+
+// SetOrigin sets the value of Origin.
+func (s *AppCredentialPayload) SetOrigin(val OptAppCredentialPayloadOrigin) {
+	s.Origin = val
+}
+
+type AppCredentialPayloadKind string
+
+const (
+	AppCredentialPayloadKindSecret AppCredentialPayloadKind = "secret"
+	AppCredentialPayloadKindKey    AppCredentialPayloadKind = "key"
+)
+
+// AllValues returns all AppCredentialPayloadKind values.
+func (AppCredentialPayloadKind) AllValues() []AppCredentialPayloadKind {
+	return []AppCredentialPayloadKind{
+		AppCredentialPayloadKindSecret,
+		AppCredentialPayloadKindKey,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s AppCredentialPayloadKind) MarshalText() ([]byte, error) {
+	switch s {
+	case AppCredentialPayloadKindSecret:
+		return []byte(s), nil
+	case AppCredentialPayloadKindKey:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *AppCredentialPayloadKind) UnmarshalText(data []byte) error {
+	switch AppCredentialPayloadKind(data) {
+	case AppCredentialPayloadKindSecret:
+		*s = AppCredentialPayloadKindSecret
+		return nil
+	case AppCredentialPayloadKindKey:
+		*s = AppCredentialPayloadKindKey
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// How a secret was added, on `app.credential.added`. Absent for a key and on `app.credential.
+// revoked`.
+type AppCredentialPayloadOrigin string
+
+const (
+	AppCredentialPayloadOriginGenerated AppCredentialPayloadOrigin = "generated"
+	AppCredentialPayloadOriginImported  AppCredentialPayloadOrigin = "imported"
+)
+
+// AllValues returns all AppCredentialPayloadOrigin values.
+func (AppCredentialPayloadOrigin) AllValues() []AppCredentialPayloadOrigin {
+	return []AppCredentialPayloadOrigin{
+		AppCredentialPayloadOriginGenerated,
+		AppCredentialPayloadOriginImported,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s AppCredentialPayloadOrigin) MarshalText() ([]byte, error) {
+	switch s {
+	case AppCredentialPayloadOriginGenerated:
+		return []byte(s), nil
+	case AppCredentialPayloadOriginImported:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *AppCredentialPayloadOrigin) UnmarshalText(data []byte) error {
+	switch AppCredentialPayloadOrigin(data) {
+	case AppCredentialPayloadOriginGenerated:
+		*s = AppCredentialPayloadOriginGenerated
+		return nil
+	case AppCredentialPayloadOriginImported:
+		*s = AppCredentialPayloadOriginImported
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// AppCredentialRevoked2XX is 2XX pattern response for AppCredentialRevoked operation.
+type AppCredentialRevoked2XX struct {
+	StatusCode int
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *AppCredentialRevoked2XX) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *AppCredentialRevoked2XX) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+func (*AppCredentialRevoked2XX) appCredentialRevokedRes() {}
+
+// AppCredentialRevokedDef is default response for AppCredentialRevoked operation.
+type AppCredentialRevokedDef struct {
+	StatusCode int
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *AppCredentialRevokedDef) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *AppCredentialRevokedDef) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+func (*AppCredentialRevokedDef) appCredentialRevokedRes() {}
+
+// Merged schema.
+// Ref: #
+type AppCredentialRevokedEvent struct {
+	// Managed event id (`evt_<opaque>`).
+	ID        string    `json:"id"`
+	ProjectID ProjectID `json:"project_id"`
+	// Emit-time team scope, when the actor operated under a team.
+	TeamID OptNilString `json:"team_id"`
+	// Merged property.
+	EventType string `json:"event_type"`
+	// Wide-event category.
+	Category AppCredentialRevokedEventCategory `json:"category"`
+	// When the action happened (server/storage clock, dialect-owned).
+	OccurredAt time.Time `json:"occurred_at"`
+	// When the row was inserted (server/storage clock, dialect-owned).
+	CreatedAt time.Time `json:"created_at"`
+	// Who triggered the event.
+	ActorID OptNilString `json:"actor_id"`
+	// Actor kind.
+	ActorType OptNilAppCredentialRevokedEventActorType `json:"actor_type"`
+	// Resource type affected.
+	EntityType OptNilString `json:"entity_type"`
+	// Resource id affected.
+	EntityID OptNilString `json:"entity_id"`
+	// Application or agent that produced the event.
+	ClientID string `json:"client_id"`
+	// Token id present at emit time, when any.
+	TokenID OptString `json:"token_id"`
+	// Delegation kind (omit when unset).
+	DelegationType OptAppCredentialRevokedEventDelegationType `json:"delegation_type"`
+	DelegationID   OptString                                  `json:"delegation_id"`
+	Grantor        OptString                                  `json:"grantor"`
+	// Device fingerprint correlation id.
+	Fingerprint OptString `json:"fingerprint"`
+	// HTTP request correlation id.
+	RequestID OptNilString `json:"request_id"`
+	// Session correlation id.
+	SessionID OptNilString `json:"session_id"`
+	// Login flow correlation id.
+	FlowID   OptNilString         `json:"flow_id"`
+	Metadata OptEventMetadata     `json:"metadata"`
+	Payload  AppCredentialPayload `json:"payload"`
+}
+
+// GetID returns the value of ID.
+func (s *AppCredentialRevokedEvent) GetID() string {
+	return s.ID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *AppCredentialRevokedEvent) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetTeamID returns the value of TeamID.
+func (s *AppCredentialRevokedEvent) GetTeamID() OptNilString {
+	return s.TeamID
+}
+
+// GetEventType returns the value of EventType.
+func (s *AppCredentialRevokedEvent) GetEventType() string {
+	return s.EventType
+}
+
+// GetCategory returns the value of Category.
+func (s *AppCredentialRevokedEvent) GetCategory() AppCredentialRevokedEventCategory {
+	return s.Category
+}
+
+// GetOccurredAt returns the value of OccurredAt.
+func (s *AppCredentialRevokedEvent) GetOccurredAt() time.Time {
+	return s.OccurredAt
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *AppCredentialRevokedEvent) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetActorID returns the value of ActorID.
+func (s *AppCredentialRevokedEvent) GetActorID() OptNilString {
+	return s.ActorID
+}
+
+// GetActorType returns the value of ActorType.
+func (s *AppCredentialRevokedEvent) GetActorType() OptNilAppCredentialRevokedEventActorType {
+	return s.ActorType
+}
+
+// GetEntityType returns the value of EntityType.
+func (s *AppCredentialRevokedEvent) GetEntityType() OptNilString {
+	return s.EntityType
+}
+
+// GetEntityID returns the value of EntityID.
+func (s *AppCredentialRevokedEvent) GetEntityID() OptNilString {
+	return s.EntityID
+}
+
+// GetClientID returns the value of ClientID.
+func (s *AppCredentialRevokedEvent) GetClientID() string {
+	return s.ClientID
+}
+
+// GetTokenID returns the value of TokenID.
+func (s *AppCredentialRevokedEvent) GetTokenID() OptString {
+	return s.TokenID
+}
+
+// GetDelegationType returns the value of DelegationType.
+func (s *AppCredentialRevokedEvent) GetDelegationType() OptAppCredentialRevokedEventDelegationType {
+	return s.DelegationType
+}
+
+// GetDelegationID returns the value of DelegationID.
+func (s *AppCredentialRevokedEvent) GetDelegationID() OptString {
+	return s.DelegationID
+}
+
+// GetGrantor returns the value of Grantor.
+func (s *AppCredentialRevokedEvent) GetGrantor() OptString {
+	return s.Grantor
+}
+
+// GetFingerprint returns the value of Fingerprint.
+func (s *AppCredentialRevokedEvent) GetFingerprint() OptString {
+	return s.Fingerprint
+}
+
+// GetRequestID returns the value of RequestID.
+func (s *AppCredentialRevokedEvent) GetRequestID() OptNilString {
+	return s.RequestID
+}
+
+// GetSessionID returns the value of SessionID.
+func (s *AppCredentialRevokedEvent) GetSessionID() OptNilString {
+	return s.SessionID
+}
+
+// GetFlowID returns the value of FlowID.
+func (s *AppCredentialRevokedEvent) GetFlowID() OptNilString {
+	return s.FlowID
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *AppCredentialRevokedEvent) GetMetadata() OptEventMetadata {
+	return s.Metadata
+}
+
+// GetPayload returns the value of Payload.
+func (s *AppCredentialRevokedEvent) GetPayload() AppCredentialPayload {
+	return s.Payload
+}
+
+// SetID sets the value of ID.
+func (s *AppCredentialRevokedEvent) SetID(val string) {
+	s.ID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *AppCredentialRevokedEvent) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *AppCredentialRevokedEvent) SetTeamID(val OptNilString) {
+	s.TeamID = val
+}
+
+// SetEventType sets the value of EventType.
+func (s *AppCredentialRevokedEvent) SetEventType(val string) {
+	s.EventType = val
+}
+
+// SetCategory sets the value of Category.
+func (s *AppCredentialRevokedEvent) SetCategory(val AppCredentialRevokedEventCategory) {
+	s.Category = val
+}
+
+// SetOccurredAt sets the value of OccurredAt.
+func (s *AppCredentialRevokedEvent) SetOccurredAt(val time.Time) {
+	s.OccurredAt = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *AppCredentialRevokedEvent) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetActorID sets the value of ActorID.
+func (s *AppCredentialRevokedEvent) SetActorID(val OptNilString) {
+	s.ActorID = val
+}
+
+// SetActorType sets the value of ActorType.
+func (s *AppCredentialRevokedEvent) SetActorType(val OptNilAppCredentialRevokedEventActorType) {
+	s.ActorType = val
+}
+
+// SetEntityType sets the value of EntityType.
+func (s *AppCredentialRevokedEvent) SetEntityType(val OptNilString) {
+	s.EntityType = val
+}
+
+// SetEntityID sets the value of EntityID.
+func (s *AppCredentialRevokedEvent) SetEntityID(val OptNilString) {
+	s.EntityID = val
+}
+
+// SetClientID sets the value of ClientID.
+func (s *AppCredentialRevokedEvent) SetClientID(val string) {
+	s.ClientID = val
+}
+
+// SetTokenID sets the value of TokenID.
+func (s *AppCredentialRevokedEvent) SetTokenID(val OptString) {
+	s.TokenID = val
+}
+
+// SetDelegationType sets the value of DelegationType.
+func (s *AppCredentialRevokedEvent) SetDelegationType(val OptAppCredentialRevokedEventDelegationType) {
+	s.DelegationType = val
+}
+
+// SetDelegationID sets the value of DelegationID.
+func (s *AppCredentialRevokedEvent) SetDelegationID(val OptString) {
+	s.DelegationID = val
+}
+
+// SetGrantor sets the value of Grantor.
+func (s *AppCredentialRevokedEvent) SetGrantor(val OptString) {
+	s.Grantor = val
+}
+
+// SetFingerprint sets the value of Fingerprint.
+func (s *AppCredentialRevokedEvent) SetFingerprint(val OptString) {
+	s.Fingerprint = val
+}
+
+// SetRequestID sets the value of RequestID.
+func (s *AppCredentialRevokedEvent) SetRequestID(val OptNilString) {
+	s.RequestID = val
+}
+
+// SetSessionID sets the value of SessionID.
+func (s *AppCredentialRevokedEvent) SetSessionID(val OptNilString) {
+	s.SessionID = val
+}
+
+// SetFlowID sets the value of FlowID.
+func (s *AppCredentialRevokedEvent) SetFlowID(val OptNilString) {
+	s.FlowID = val
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *AppCredentialRevokedEvent) SetMetadata(val OptEventMetadata) {
+	s.Metadata = val
+}
+
+// SetPayload sets the value of Payload.
+func (s *AppCredentialRevokedEvent) SetPayload(val AppCredentialPayload) {
+	s.Payload = val
+}
+
+type AppCredentialRevokedEventActorType string
+
+const (
+	AppCredentialRevokedEventActorTypeHuman   AppCredentialRevokedEventActorType = "human"
+	AppCredentialRevokedEventActorTypeService AppCredentialRevokedEventActorType = "service"
+	AppCredentialRevokedEventActorTypeSystem  AppCredentialRevokedEventActorType = "system"
+	AppCredentialRevokedEventActorTypeAgent   AppCredentialRevokedEventActorType = "agent"
+)
+
+// AllValues returns all AppCredentialRevokedEventActorType values.
+func (AppCredentialRevokedEventActorType) AllValues() []AppCredentialRevokedEventActorType {
+	return []AppCredentialRevokedEventActorType{
+		AppCredentialRevokedEventActorTypeHuman,
+		AppCredentialRevokedEventActorTypeService,
+		AppCredentialRevokedEventActorTypeSystem,
+		AppCredentialRevokedEventActorTypeAgent,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s AppCredentialRevokedEventActorType) MarshalText() ([]byte, error) {
+	switch s {
+	case AppCredentialRevokedEventActorTypeHuman:
+		return []byte(s), nil
+	case AppCredentialRevokedEventActorTypeService:
+		return []byte(s), nil
+	case AppCredentialRevokedEventActorTypeSystem:
+		return []byte(s), nil
+	case AppCredentialRevokedEventActorTypeAgent:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *AppCredentialRevokedEventActorType) UnmarshalText(data []byte) error {
+	switch AppCredentialRevokedEventActorType(data) {
+	case AppCredentialRevokedEventActorTypeHuman:
+		*s = AppCredentialRevokedEventActorTypeHuman
+		return nil
+	case AppCredentialRevokedEventActorTypeService:
+		*s = AppCredentialRevokedEventActorTypeService
+		return nil
+	case AppCredentialRevokedEventActorTypeSystem:
+		*s = AppCredentialRevokedEventActorTypeSystem
+		return nil
+	case AppCredentialRevokedEventActorTypeAgent:
+		*s = AppCredentialRevokedEventActorTypeAgent
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Wide-event category.
+type AppCredentialRevokedEventCategory string
+
+const (
+	AppCredentialRevokedEventCategoryRequest AppCredentialRevokedEventCategory = "request"
+	AppCredentialRevokedEventCategoryAuth    AppCredentialRevokedEventCategory = "auth"
+	AppCredentialRevokedEventCategorySession AppCredentialRevokedEventCategory = "session"
+	AppCredentialRevokedEventCategoryAdmin   AppCredentialRevokedEventCategory = "admin"
+	AppCredentialRevokedEventCategoryEntity  AppCredentialRevokedEventCategory = "entity"
+	AppCredentialRevokedEventCategorySignal  AppCredentialRevokedEventCategory = "signal"
+)
+
+// AllValues returns all AppCredentialRevokedEventCategory values.
+func (AppCredentialRevokedEventCategory) AllValues() []AppCredentialRevokedEventCategory {
+	return []AppCredentialRevokedEventCategory{
+		AppCredentialRevokedEventCategoryRequest,
+		AppCredentialRevokedEventCategoryAuth,
+		AppCredentialRevokedEventCategorySession,
+		AppCredentialRevokedEventCategoryAdmin,
+		AppCredentialRevokedEventCategoryEntity,
+		AppCredentialRevokedEventCategorySignal,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s AppCredentialRevokedEventCategory) MarshalText() ([]byte, error) {
+	switch s {
+	case AppCredentialRevokedEventCategoryRequest:
+		return []byte(s), nil
+	case AppCredentialRevokedEventCategoryAuth:
+		return []byte(s), nil
+	case AppCredentialRevokedEventCategorySession:
+		return []byte(s), nil
+	case AppCredentialRevokedEventCategoryAdmin:
+		return []byte(s), nil
+	case AppCredentialRevokedEventCategoryEntity:
+		return []byte(s), nil
+	case AppCredentialRevokedEventCategorySignal:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *AppCredentialRevokedEventCategory) UnmarshalText(data []byte) error {
+	switch AppCredentialRevokedEventCategory(data) {
+	case AppCredentialRevokedEventCategoryRequest:
+		*s = AppCredentialRevokedEventCategoryRequest
+		return nil
+	case AppCredentialRevokedEventCategoryAuth:
+		*s = AppCredentialRevokedEventCategoryAuth
+		return nil
+	case AppCredentialRevokedEventCategorySession:
+		*s = AppCredentialRevokedEventCategorySession
+		return nil
+	case AppCredentialRevokedEventCategoryAdmin:
+		*s = AppCredentialRevokedEventCategoryAdmin
+		return nil
+	case AppCredentialRevokedEventCategoryEntity:
+		*s = AppCredentialRevokedEventCategoryEntity
+		return nil
+	case AppCredentialRevokedEventCategorySignal:
+		*s = AppCredentialRevokedEventCategorySignal
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Delegation kind (omit when unset).
+type AppCredentialRevokedEventDelegationType string
+
+const (
+	AppCredentialRevokedEventDelegationTypeDirect    AppCredentialRevokedEventDelegationType = "direct"
+	AppCredentialRevokedEventDelegationTypeDelegated AppCredentialRevokedEventDelegationType = "delegated"
+	AppCredentialRevokedEventDelegationTypePatShared AppCredentialRevokedEventDelegationType = "pat_shared"
+	AppCredentialRevokedEventDelegationTypeExchanged AppCredentialRevokedEventDelegationType = "exchanged"
+)
+
+// AllValues returns all AppCredentialRevokedEventDelegationType values.
+func (AppCredentialRevokedEventDelegationType) AllValues() []AppCredentialRevokedEventDelegationType {
+	return []AppCredentialRevokedEventDelegationType{
+		AppCredentialRevokedEventDelegationTypeDirect,
+		AppCredentialRevokedEventDelegationTypeDelegated,
+		AppCredentialRevokedEventDelegationTypePatShared,
+		AppCredentialRevokedEventDelegationTypeExchanged,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s AppCredentialRevokedEventDelegationType) MarshalText() ([]byte, error) {
+	switch s {
+	case AppCredentialRevokedEventDelegationTypeDirect:
+		return []byte(s), nil
+	case AppCredentialRevokedEventDelegationTypeDelegated:
+		return []byte(s), nil
+	case AppCredentialRevokedEventDelegationTypePatShared:
+		return []byte(s), nil
+	case AppCredentialRevokedEventDelegationTypeExchanged:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *AppCredentialRevokedEventDelegationType) UnmarshalText(data []byte) error {
+	switch AppCredentialRevokedEventDelegationType(data) {
+	case AppCredentialRevokedEventDelegationTypeDirect:
+		*s = AppCredentialRevokedEventDelegationTypeDirect
+		return nil
+	case AppCredentialRevokedEventDelegationTypeDelegated:
+		*s = AppCredentialRevokedEventDelegationTypeDelegated
+		return nil
+	case AppCredentialRevokedEventDelegationTypePatShared:
+		*s = AppCredentialRevokedEventDelegationTypePatShared
+		return nil
+	case AppCredentialRevokedEventDelegationTypeExchanged:
+		*s = AppCredentialRevokedEventDelegationTypeExchanged
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Merged schema.
+// Ref: #
+type AppCredentialTaken struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptAppCredentialTakenDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *AppCredentialTaken) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *AppCredentialTaken) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *AppCredentialTaken) GetDetails() OptAppCredentialTakenDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *AppCredentialTaken) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *AppCredentialTaken) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *AppCredentialTaken) SetDetails(val OptAppCredentialTakenDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type AppCredentialTakenDetails map[string]jx.Raw
+
+func (s *AppCredentialTakenDetails) init() AppCredentialTakenDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
 // Merged schema.
 // Ref: #
 type AppDeclared struct {
@@ -3931,9 +4696,9 @@ type AppResponse struct {
 	Definition App `json:"definition"`
 	// The client_id of each client the document lists, in its order.
 	Clients []AppClientID `json:"clients"`
-	// The client secrets this write generated: one for each confidential
-	// client of a registered app that had none. Present only in the answer to
-	// the write that generated them.
+	// The secrets this write generated: one for each new confidential client
+	// of a registered app that holds no key, as its credential named
+	// `initial`. Present only in the answer to the write that generated them.
 	ClientSecrets []AppClientSecret `json:"client_secrets"`
 	// When the app was created.
 	CreatedAt time.Time `json:"created_at"`
@@ -16634,12 +17399,14 @@ func (s *ClientRegistrationDeletedEventDelegationType) UnmarshalText(data []byte
 }
 
 // Field to filter or sort client registrations by:
+// - `app`: the slug of the app the client joined (filter only)
 // - `created_at`: RFC3339 timestamp
 // - `expires_at`: RFC3339 timestamp.
 // Ref: #
 type ClientRegistrationFilterField string
 
 const (
+	ClientRegistrationFilterFieldApp       ClientRegistrationFilterField = "app"
 	ClientRegistrationFilterFieldCreatedAt ClientRegistrationFilterField = "created_at"
 	ClientRegistrationFilterFieldExpiresAt ClientRegistrationFilterField = "expires_at"
 )
@@ -16647,6 +17414,7 @@ const (
 // AllValues returns all ClientRegistrationFilterField values.
 func (ClientRegistrationFilterField) AllValues() []ClientRegistrationFilterField {
 	return []ClientRegistrationFilterField{
+		ClientRegistrationFilterFieldApp,
 		ClientRegistrationFilterFieldCreatedAt,
 		ClientRegistrationFilterFieldExpiresAt,
 	}
@@ -16655,6 +17423,8 @@ func (ClientRegistrationFilterField) AllValues() []ClientRegistrationFilterField
 // MarshalText implements encoding.TextMarshaler.
 func (s ClientRegistrationFilterField) MarshalText() ([]byte, error) {
 	switch s {
+	case ClientRegistrationFilterFieldApp:
+		return []byte(s), nil
 	case ClientRegistrationFilterFieldCreatedAt:
 		return []byte(s), nil
 	case ClientRegistrationFilterFieldExpiresAt:
@@ -16667,6 +17437,9 @@ func (s ClientRegistrationFilterField) MarshalText() ([]byte, error) {
 // UnmarshalText implements encoding.TextUnmarshaler.
 func (s *ClientRegistrationFilterField) UnmarshalText(data []byte) error {
 	switch ClientRegistrationFilterField(data) {
+	case ClientRegistrationFilterFieldApp:
+		*s = ClientRegistrationFilterFieldApp
+		return nil
 	case ClientRegistrationFilterFieldCreatedAt:
 		*s = ClientRegistrationFilterFieldCreatedAt
 		return nil
@@ -16886,15 +17659,18 @@ func (s *ClientRegistrationPayloadTokenEndpointAuthMethod) UnmarshalText(data []
 }
 
 // A client that registered itself through dynamic client registration
-// (RFC 7591). It belongs to the project, not to an app: it may get tokens for
-// a `third_party` API of an app that opens dynamic registration, each with the
-// user's consent. It is transient: once past `expires_at` it is purged unless
+// (RFC 7591). It registers at the project and joins the app whose API its
+// first authorization request names: it may then get tokens for that app's
+// `third_party` APIs, each with the user's consent, and a request for another
+// app's API is refused. It is transient: once past `expires_at` it is purged unless
 // a live consent names it. The display fields are the client's own claims; the
 // server checked only its redirect URIs. Its secret is never returned.
 // Ref: #
 type ClientRegistrationResponse struct {
 	// The client_id the server minted for the client.
 	ID string `json:"id"`
+	// The slug of the app the client joined. Absent until its first authorization request names an API.
+	App OptString `json:"app"`
 	// The name the client registered with.
 	ClientName OptString `json:"client_name"`
 	// The client's home page, as the client claims it.
@@ -16924,6 +17700,11 @@ type ClientRegistrationResponse struct {
 // GetID returns the value of ID.
 func (s *ClientRegistrationResponse) GetID() string {
 	return s.ID
+}
+
+// GetApp returns the value of App.
+func (s *ClientRegistrationResponse) GetApp() OptString {
+	return s.App
 }
 
 // GetClientName returns the value of ClientName.
@@ -16989,6 +17770,11 @@ func (s *ClientRegistrationResponse) GetExpiresAt() time.Time {
 // SetID sets the value of ID.
 func (s *ClientRegistrationResponse) SetID(val string) {
 	s.ID = val
+}
+
+// SetApp sets the value of App.
+func (s *ClientRegistrationResponse) SetApp(val OptString) {
+	s.App = val
 }
 
 // SetClientName sets the value of ClientName.
@@ -29399,8 +30185,9 @@ func (s *EvaluatePolicyResponseViolations) init() EvaluatePolicyResponseViolatio
 // Event represents sum type.
 type Event struct {
 	Type                            EventType // switch on this field
-	AppClientSecretAddedEvent       AppClientSecretAddedEvent
 	AppCreatedEvent                 AppCreatedEvent
+	AppCredentialAddedEvent         AppCredentialAddedEvent
+	AppCredentialRevokedEvent       AppCredentialRevokedEvent
 	AppUpdatedEvent                 AppUpdatedEvent
 	AuthAttemptCreatedEvent         AuthAttemptCreatedEvent
 	AuthAttemptHandedOffEvent       AuthAttemptHandedOffEvent
@@ -29455,8 +30242,9 @@ type EventType string
 
 // Possible values for EventType.
 const (
-	AppClientSecretAddedEventEvent       EventType = "app.client_secret.added"
 	AppCreatedEventEvent                 EventType = "app.created"
+	AppCredentialAddedEventEvent         EventType = "app.credential.added"
+	AppCredentialRevokedEventEvent       EventType = "app.credential.revoked"
 	AppUpdatedEventEvent                 EventType = "app.updated"
 	AuthAttemptCreatedEventEvent         EventType = "auth.attempt.created"
 	AuthAttemptHandedOffEventEvent       EventType = "auth.attempt.handed_off"
@@ -29506,11 +30294,14 @@ const (
 	VariableSetEventEvent                EventType = "variable.set"
 )
 
-// IsAppClientSecretAddedEvent reports whether Event is AppClientSecretAddedEvent.
-func (s Event) IsAppClientSecretAddedEvent() bool { return s.Type == AppClientSecretAddedEventEvent }
-
 // IsAppCreatedEvent reports whether Event is AppCreatedEvent.
 func (s Event) IsAppCreatedEvent() bool { return s.Type == AppCreatedEventEvent }
+
+// IsAppCredentialAddedEvent reports whether Event is AppCredentialAddedEvent.
+func (s Event) IsAppCredentialAddedEvent() bool { return s.Type == AppCredentialAddedEventEvent }
+
+// IsAppCredentialRevokedEvent reports whether Event is AppCredentialRevokedEvent.
+func (s Event) IsAppCredentialRevokedEvent() bool { return s.Type == AppCredentialRevokedEventEvent }
 
 // IsAppUpdatedEvent reports whether Event is AppUpdatedEvent.
 func (s Event) IsAppUpdatedEvent() bool { return s.Type == AppUpdatedEventEvent }
@@ -29665,27 +30456,6 @@ func (s Event) IsVariableRemovedEvent() bool { return s.Type == VariableRemovedE
 // IsVariableSetEvent reports whether Event is VariableSetEvent.
 func (s Event) IsVariableSetEvent() bool { return s.Type == VariableSetEventEvent }
 
-// SetAppClientSecretAddedEvent sets Event to AppClientSecretAddedEvent.
-func (s *Event) SetAppClientSecretAddedEvent(v AppClientSecretAddedEvent) {
-	s.Type = AppClientSecretAddedEventEvent
-	s.AppClientSecretAddedEvent = v
-}
-
-// GetAppClientSecretAddedEvent returns AppClientSecretAddedEvent and true boolean if Event is AppClientSecretAddedEvent.
-func (s Event) GetAppClientSecretAddedEvent() (v AppClientSecretAddedEvent, ok bool) {
-	if !s.IsAppClientSecretAddedEvent() {
-		return v, false
-	}
-	return s.AppClientSecretAddedEvent, true
-}
-
-// NewAppClientSecretAddedEventEvent returns new Event from AppClientSecretAddedEvent.
-func NewAppClientSecretAddedEventEvent(v AppClientSecretAddedEvent) Event {
-	var s Event
-	s.SetAppClientSecretAddedEvent(v)
-	return s
-}
-
 // SetAppCreatedEvent sets Event to AppCreatedEvent.
 func (s *Event) SetAppCreatedEvent(v AppCreatedEvent) {
 	s.Type = AppCreatedEventEvent
@@ -29704,6 +30474,48 @@ func (s Event) GetAppCreatedEvent() (v AppCreatedEvent, ok bool) {
 func NewAppCreatedEventEvent(v AppCreatedEvent) Event {
 	var s Event
 	s.SetAppCreatedEvent(v)
+	return s
+}
+
+// SetAppCredentialAddedEvent sets Event to AppCredentialAddedEvent.
+func (s *Event) SetAppCredentialAddedEvent(v AppCredentialAddedEvent) {
+	s.Type = AppCredentialAddedEventEvent
+	s.AppCredentialAddedEvent = v
+}
+
+// GetAppCredentialAddedEvent returns AppCredentialAddedEvent and true boolean if Event is AppCredentialAddedEvent.
+func (s Event) GetAppCredentialAddedEvent() (v AppCredentialAddedEvent, ok bool) {
+	if !s.IsAppCredentialAddedEvent() {
+		return v, false
+	}
+	return s.AppCredentialAddedEvent, true
+}
+
+// NewAppCredentialAddedEventEvent returns new Event from AppCredentialAddedEvent.
+func NewAppCredentialAddedEventEvent(v AppCredentialAddedEvent) Event {
+	var s Event
+	s.SetAppCredentialAddedEvent(v)
+	return s
+}
+
+// SetAppCredentialRevokedEvent sets Event to AppCredentialRevokedEvent.
+func (s *Event) SetAppCredentialRevokedEvent(v AppCredentialRevokedEvent) {
+	s.Type = AppCredentialRevokedEventEvent
+	s.AppCredentialRevokedEvent = v
+}
+
+// GetAppCredentialRevokedEvent returns AppCredentialRevokedEvent and true boolean if Event is AppCredentialRevokedEvent.
+func (s Event) GetAppCredentialRevokedEvent() (v AppCredentialRevokedEvent, ok bool) {
+	if !s.IsAppCredentialRevokedEvent() {
+		return v, false
+	}
+	return s.AppCredentialRevokedEvent, true
+}
+
+// NewAppCredentialRevokedEventEvent returns new Event from AppCredentialRevokedEvent.
+func NewAppCredentialRevokedEventEvent(v AppCredentialRevokedEvent) Event {
+	var s Event
+	s.SetAppCredentialRevokedEvent(v)
 	return s
 }
 
@@ -50544,6 +51356,301 @@ func (s *IssueChallengeRequestPasskeyOptionsUserVerification) UnmarshalText(data
 
 type Limit int
 
+// ListAppClientCredentialsErrorResponse represents sum type.
+type ListAppClientCredentialsErrorResponse struct {
+	Type                ListAppClientCredentialsErrorResponseType // switch on this field
+	AppClientNotFound   AppClientNotFound
+	AppNotFound         AppNotFound
+	AppPermissionDenied AppPermissionDenied
+	AuthUnauthorized    AuthUnauthorized
+	Internal            Internal
+	NotImplemented      NotImplemented
+	ReqInvalid          ReqInvalid
+	Unavailable         Unavailable
+}
+
+// ListAppClientCredentialsErrorResponseType is oneOf type of ListAppClientCredentialsErrorResponse.
+type ListAppClientCredentialsErrorResponseType string
+
+// Possible values for ListAppClientCredentialsErrorResponseType.
+const (
+	AppClientNotFoundListAppClientCredentialsErrorResponse   ListAppClientCredentialsErrorResponseType = "app.client_not_found"
+	AppNotFoundListAppClientCredentialsErrorResponse         ListAppClientCredentialsErrorResponseType = "app.not_found"
+	AppPermissionDeniedListAppClientCredentialsErrorResponse ListAppClientCredentialsErrorResponseType = "app.permission_denied"
+	AuthUnauthorizedListAppClientCredentialsErrorResponse    ListAppClientCredentialsErrorResponseType = "auth.unauthorized"
+	InternalListAppClientCredentialsErrorResponse            ListAppClientCredentialsErrorResponseType = "internal"
+	NotImplementedListAppClientCredentialsErrorResponse      ListAppClientCredentialsErrorResponseType = "not_implemented"
+	ReqInvalidListAppClientCredentialsErrorResponse          ListAppClientCredentialsErrorResponseType = "req.invalid"
+	UnavailableListAppClientCredentialsErrorResponse         ListAppClientCredentialsErrorResponseType = "unavailable"
+)
+
+// IsAppClientNotFound reports whether ListAppClientCredentialsErrorResponse is AppClientNotFound.
+func (s ListAppClientCredentialsErrorResponse) IsAppClientNotFound() bool {
+	return s.Type == AppClientNotFoundListAppClientCredentialsErrorResponse
+}
+
+// IsAppNotFound reports whether ListAppClientCredentialsErrorResponse is AppNotFound.
+func (s ListAppClientCredentialsErrorResponse) IsAppNotFound() bool {
+	return s.Type == AppNotFoundListAppClientCredentialsErrorResponse
+}
+
+// IsAppPermissionDenied reports whether ListAppClientCredentialsErrorResponse is AppPermissionDenied.
+func (s ListAppClientCredentialsErrorResponse) IsAppPermissionDenied() bool {
+	return s.Type == AppPermissionDeniedListAppClientCredentialsErrorResponse
+}
+
+// IsAuthUnauthorized reports whether ListAppClientCredentialsErrorResponse is AuthUnauthorized.
+func (s ListAppClientCredentialsErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedListAppClientCredentialsErrorResponse
+}
+
+// IsInternal reports whether ListAppClientCredentialsErrorResponse is Internal.
+func (s ListAppClientCredentialsErrorResponse) IsInternal() bool {
+	return s.Type == InternalListAppClientCredentialsErrorResponse
+}
+
+// IsNotImplemented reports whether ListAppClientCredentialsErrorResponse is NotImplemented.
+func (s ListAppClientCredentialsErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedListAppClientCredentialsErrorResponse
+}
+
+// IsReqInvalid reports whether ListAppClientCredentialsErrorResponse is ReqInvalid.
+func (s ListAppClientCredentialsErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidListAppClientCredentialsErrorResponse
+}
+
+// IsUnavailable reports whether ListAppClientCredentialsErrorResponse is Unavailable.
+func (s ListAppClientCredentialsErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableListAppClientCredentialsErrorResponse
+}
+
+// SetAppClientNotFound sets ListAppClientCredentialsErrorResponse to AppClientNotFound.
+func (s *ListAppClientCredentialsErrorResponse) SetAppClientNotFound(v AppClientNotFound) {
+	s.Type = AppClientNotFoundListAppClientCredentialsErrorResponse
+	s.AppClientNotFound = v
+}
+
+// GetAppClientNotFound returns AppClientNotFound and true boolean if ListAppClientCredentialsErrorResponse is AppClientNotFound.
+func (s ListAppClientCredentialsErrorResponse) GetAppClientNotFound() (v AppClientNotFound, ok bool) {
+	if !s.IsAppClientNotFound() {
+		return v, false
+	}
+	return s.AppClientNotFound, true
+}
+
+// NewAppClientNotFoundListAppClientCredentialsErrorResponse returns new ListAppClientCredentialsErrorResponse from AppClientNotFound.
+func NewAppClientNotFoundListAppClientCredentialsErrorResponse(v AppClientNotFound) ListAppClientCredentialsErrorResponse {
+	var s ListAppClientCredentialsErrorResponse
+	s.SetAppClientNotFound(v)
+	return s
+}
+
+// SetAppNotFound sets ListAppClientCredentialsErrorResponse to AppNotFound.
+func (s *ListAppClientCredentialsErrorResponse) SetAppNotFound(v AppNotFound) {
+	s.Type = AppNotFoundListAppClientCredentialsErrorResponse
+	s.AppNotFound = v
+}
+
+// GetAppNotFound returns AppNotFound and true boolean if ListAppClientCredentialsErrorResponse is AppNotFound.
+func (s ListAppClientCredentialsErrorResponse) GetAppNotFound() (v AppNotFound, ok bool) {
+	if !s.IsAppNotFound() {
+		return v, false
+	}
+	return s.AppNotFound, true
+}
+
+// NewAppNotFoundListAppClientCredentialsErrorResponse returns new ListAppClientCredentialsErrorResponse from AppNotFound.
+func NewAppNotFoundListAppClientCredentialsErrorResponse(v AppNotFound) ListAppClientCredentialsErrorResponse {
+	var s ListAppClientCredentialsErrorResponse
+	s.SetAppNotFound(v)
+	return s
+}
+
+// SetAppPermissionDenied sets ListAppClientCredentialsErrorResponse to AppPermissionDenied.
+func (s *ListAppClientCredentialsErrorResponse) SetAppPermissionDenied(v AppPermissionDenied) {
+	s.Type = AppPermissionDeniedListAppClientCredentialsErrorResponse
+	s.AppPermissionDenied = v
+}
+
+// GetAppPermissionDenied returns AppPermissionDenied and true boolean if ListAppClientCredentialsErrorResponse is AppPermissionDenied.
+func (s ListAppClientCredentialsErrorResponse) GetAppPermissionDenied() (v AppPermissionDenied, ok bool) {
+	if !s.IsAppPermissionDenied() {
+		return v, false
+	}
+	return s.AppPermissionDenied, true
+}
+
+// NewAppPermissionDeniedListAppClientCredentialsErrorResponse returns new ListAppClientCredentialsErrorResponse from AppPermissionDenied.
+func NewAppPermissionDeniedListAppClientCredentialsErrorResponse(v AppPermissionDenied) ListAppClientCredentialsErrorResponse {
+	var s ListAppClientCredentialsErrorResponse
+	s.SetAppPermissionDenied(v)
+	return s
+}
+
+// SetAuthUnauthorized sets ListAppClientCredentialsErrorResponse to AuthUnauthorized.
+func (s *ListAppClientCredentialsErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedListAppClientCredentialsErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if ListAppClientCredentialsErrorResponse is AuthUnauthorized.
+func (s ListAppClientCredentialsErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedListAppClientCredentialsErrorResponse returns new ListAppClientCredentialsErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedListAppClientCredentialsErrorResponse(v AuthUnauthorized) ListAppClientCredentialsErrorResponse {
+	var s ListAppClientCredentialsErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets ListAppClientCredentialsErrorResponse to Internal.
+func (s *ListAppClientCredentialsErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalListAppClientCredentialsErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if ListAppClientCredentialsErrorResponse is Internal.
+func (s ListAppClientCredentialsErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalListAppClientCredentialsErrorResponse returns new ListAppClientCredentialsErrorResponse from Internal.
+func NewInternalListAppClientCredentialsErrorResponse(v Internal) ListAppClientCredentialsErrorResponse {
+	var s ListAppClientCredentialsErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets ListAppClientCredentialsErrorResponse to NotImplemented.
+func (s *ListAppClientCredentialsErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedListAppClientCredentialsErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if ListAppClientCredentialsErrorResponse is NotImplemented.
+func (s ListAppClientCredentialsErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedListAppClientCredentialsErrorResponse returns new ListAppClientCredentialsErrorResponse from NotImplemented.
+func NewNotImplementedListAppClientCredentialsErrorResponse(v NotImplemented) ListAppClientCredentialsErrorResponse {
+	var s ListAppClientCredentialsErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
+// SetReqInvalid sets ListAppClientCredentialsErrorResponse to ReqInvalid.
+func (s *ListAppClientCredentialsErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidListAppClientCredentialsErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if ListAppClientCredentialsErrorResponse is ReqInvalid.
+func (s ListAppClientCredentialsErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidListAppClientCredentialsErrorResponse returns new ListAppClientCredentialsErrorResponse from ReqInvalid.
+func NewReqInvalidListAppClientCredentialsErrorResponse(v ReqInvalid) ListAppClientCredentialsErrorResponse {
+	var s ListAppClientCredentialsErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets ListAppClientCredentialsErrorResponse to Unavailable.
+func (s *ListAppClientCredentialsErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableListAppClientCredentialsErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if ListAppClientCredentialsErrorResponse is Unavailable.
+func (s ListAppClientCredentialsErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableListAppClientCredentialsErrorResponse returns new ListAppClientCredentialsErrorResponse from Unavailable.
+func NewUnavailableListAppClientCredentialsErrorResponse(v Unavailable) ListAppClientCredentialsErrorResponse {
+	var s ListAppClientCredentialsErrorResponse
+	s.SetUnavailable(v)
+	return s
+}
+
+// ListAppClientCredentialsErrorResponseStatusCode wraps ListAppClientCredentialsErrorResponse with StatusCode.
+type ListAppClientCredentialsErrorResponseStatusCode struct {
+	StatusCode int
+	Response   ListAppClientCredentialsErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *ListAppClientCredentialsErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *ListAppClientCredentialsErrorResponseStatusCode) GetResponse() ListAppClientCredentialsErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *ListAppClientCredentialsErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *ListAppClientCredentialsErrorResponseStatusCode) SetResponse(val ListAppClientCredentialsErrorResponse) {
+	s.Response = val
+}
+
+func (*ListAppClientCredentialsErrorResponseStatusCode) listAppClientCredentialsRes() {}
+
+type ListAppClientCredentialsForbidden ErrorDetails
+
+func (*ListAppClientCredentialsForbidden) listAppClientCredentialsRes() {}
+
+type ListAppClientCredentialsNotFound ErrorDetails
+
+func (*ListAppClientCredentialsNotFound) listAppClientCredentialsRes() {}
+
+// The credentials a client holds through the API, oldest first. A declared client's secret reference
+// and keys in its file are not listed.
+// Ref: #
+type ListAppClientCredentialsResponse struct {
+	Credentials []AppClientCredential `json:"credentials"`
+}
+
+// GetCredentials returns the value of Credentials.
+func (s *ListAppClientCredentialsResponse) GetCredentials() []AppClientCredential {
+	return s.Credentials
+}
+
+// SetCredentials sets the value of Credentials.
+func (s *ListAppClientCredentialsResponse) SetCredentials(val []AppClientCredential) {
+	s.Credentials = val
+}
+
+func (*ListAppClientCredentialsResponse) listAppClientCredentialsRes() {}
+
+type ListAppClientCredentialsUnauthorized ErrorDetails
+
+func (*ListAppClientCredentialsUnauthorized) listAppClientCredentialsRes() {}
+
 // ListAppRevisionsErrorResponse represents sum type.
 type ListAppRevisionsErrorResponse struct {
 	Type                ListAppRevisionsErrorResponseType // switch on this field
@@ -56457,52 +57564,6 @@ func (o OptAppAPISigningAlg) Or(d AppAPISigningAlg) AppAPISigningAlg {
 	return d
 }
 
-// NewOptAppClientAuthMethod returns new OptAppClientAuthMethod with value set to v.
-func NewOptAppClientAuthMethod(v AppClientAuthMethod) OptAppClientAuthMethod {
-	return OptAppClientAuthMethod{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptAppClientAuthMethod is optional AppClientAuthMethod.
-type OptAppClientAuthMethod struct {
-	Value AppClientAuthMethod
-	Set   bool
-}
-
-// IsSet returns true if OptAppClientAuthMethod was set.
-func (o OptAppClientAuthMethod) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptAppClientAuthMethod) Reset() {
-	var v AppClientAuthMethod
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptAppClientAuthMethod) SetTo(v AppClientAuthMethod) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptAppClientAuthMethod) Get() (v AppClientAuthMethod, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptAppClientAuthMethod) Or(d AppClientAuthMethod) AppClientAuthMethod {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
 // NewOptAppClientConsent returns new OptAppClientConsent with value set to v.
 func NewOptAppClientConsent(v AppClientConsent) OptAppClientConsent {
 	return OptAppClientConsent{
@@ -56635,6 +57696,52 @@ func (o OptAppClientIDTokenSignedResponseAlg) Get() (v AppClientIDTokenSignedRes
 
 // Or returns value if set, or given parameter if does not.
 func (o OptAppClientIDTokenSignedResponseAlg) Or(d AppClientIDTokenSignedResponseAlg) AppClientIDTokenSignedResponseAlg {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptAppClientJwk returns new OptAppClientJwk with value set to v.
+func NewOptAppClientJwk(v AppClientJwk) OptAppClientJwk {
+	return OptAppClientJwk{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptAppClientJwk is optional AppClientJwk.
+type OptAppClientJwk struct {
+	Value AppClientJwk
+	Set   bool
+}
+
+// IsSet returns true if OptAppClientJwk was set.
+func (o OptAppClientJwk) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptAppClientJwk) Reset() {
+	var v AppClientJwk
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptAppClientJwk) SetTo(v AppClientJwk) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptAppClientJwk) Get() (v AppClientJwk, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptAppClientJwk) Or(d AppClientJwk) AppClientJwk {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -56917,52 +58024,6 @@ func (o OptAppClientRegistrationNotFoundDetails) Or(d AppClientRegistrationNotFo
 	return d
 }
 
-// NewOptAppClientSecretAddedEventDelegationType returns new OptAppClientSecretAddedEventDelegationType with value set to v.
-func NewOptAppClientSecretAddedEventDelegationType(v AppClientSecretAddedEventDelegationType) OptAppClientSecretAddedEventDelegationType {
-	return OptAppClientSecretAddedEventDelegationType{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptAppClientSecretAddedEventDelegationType is optional AppClientSecretAddedEventDelegationType.
-type OptAppClientSecretAddedEventDelegationType struct {
-	Value AppClientSecretAddedEventDelegationType
-	Set   bool
-}
-
-// IsSet returns true if OptAppClientSecretAddedEventDelegationType was set.
-func (o OptAppClientSecretAddedEventDelegationType) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptAppClientSecretAddedEventDelegationType) Reset() {
-	var v AppClientSecretAddedEventDelegationType
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptAppClientSecretAddedEventDelegationType) SetTo(v AppClientSecretAddedEventDelegationType) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptAppClientSecretAddedEventDelegationType) Get() (v AppClientSecretAddedEventDelegationType, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptAppClientSecretAddedEventDelegationType) Or(d AppClientSecretAddedEventDelegationType) AppClientSecretAddedEventDelegationType {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
 // NewOptAppCreatedEventDelegationType returns new OptAppCreatedEventDelegationType with value set to v.
 func NewOptAppCreatedEventDelegationType(v AppCreatedEventDelegationType) OptAppCreatedEventDelegationType {
 	return OptAppCreatedEventDelegationType{
@@ -57003,6 +58064,236 @@ func (o OptAppCreatedEventDelegationType) Get() (v AppCreatedEventDelegationType
 
 // Or returns value if set, or given parameter if does not.
 func (o OptAppCreatedEventDelegationType) Or(d AppCreatedEventDelegationType) AppCreatedEventDelegationType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptAppCredentialAddedEventDelegationType returns new OptAppCredentialAddedEventDelegationType with value set to v.
+func NewOptAppCredentialAddedEventDelegationType(v AppCredentialAddedEventDelegationType) OptAppCredentialAddedEventDelegationType {
+	return OptAppCredentialAddedEventDelegationType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptAppCredentialAddedEventDelegationType is optional AppCredentialAddedEventDelegationType.
+type OptAppCredentialAddedEventDelegationType struct {
+	Value AppCredentialAddedEventDelegationType
+	Set   bool
+}
+
+// IsSet returns true if OptAppCredentialAddedEventDelegationType was set.
+func (o OptAppCredentialAddedEventDelegationType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptAppCredentialAddedEventDelegationType) Reset() {
+	var v AppCredentialAddedEventDelegationType
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptAppCredentialAddedEventDelegationType) SetTo(v AppCredentialAddedEventDelegationType) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptAppCredentialAddedEventDelegationType) Get() (v AppCredentialAddedEventDelegationType, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptAppCredentialAddedEventDelegationType) Or(d AppCredentialAddedEventDelegationType) AppCredentialAddedEventDelegationType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptAppCredentialNotFoundDetails returns new OptAppCredentialNotFoundDetails with value set to v.
+func NewOptAppCredentialNotFoundDetails(v AppCredentialNotFoundDetails) OptAppCredentialNotFoundDetails {
+	return OptAppCredentialNotFoundDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptAppCredentialNotFoundDetails is optional AppCredentialNotFoundDetails.
+type OptAppCredentialNotFoundDetails struct {
+	Value AppCredentialNotFoundDetails
+	Set   bool
+}
+
+// IsSet returns true if OptAppCredentialNotFoundDetails was set.
+func (o OptAppCredentialNotFoundDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptAppCredentialNotFoundDetails) Reset() {
+	var v AppCredentialNotFoundDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptAppCredentialNotFoundDetails) SetTo(v AppCredentialNotFoundDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptAppCredentialNotFoundDetails) Get() (v AppCredentialNotFoundDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptAppCredentialNotFoundDetails) Or(d AppCredentialNotFoundDetails) AppCredentialNotFoundDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptAppCredentialPayloadOrigin returns new OptAppCredentialPayloadOrigin with value set to v.
+func NewOptAppCredentialPayloadOrigin(v AppCredentialPayloadOrigin) OptAppCredentialPayloadOrigin {
+	return OptAppCredentialPayloadOrigin{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptAppCredentialPayloadOrigin is optional AppCredentialPayloadOrigin.
+type OptAppCredentialPayloadOrigin struct {
+	Value AppCredentialPayloadOrigin
+	Set   bool
+}
+
+// IsSet returns true if OptAppCredentialPayloadOrigin was set.
+func (o OptAppCredentialPayloadOrigin) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptAppCredentialPayloadOrigin) Reset() {
+	var v AppCredentialPayloadOrigin
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptAppCredentialPayloadOrigin) SetTo(v AppCredentialPayloadOrigin) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptAppCredentialPayloadOrigin) Get() (v AppCredentialPayloadOrigin, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptAppCredentialPayloadOrigin) Or(d AppCredentialPayloadOrigin) AppCredentialPayloadOrigin {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptAppCredentialRevokedEventDelegationType returns new OptAppCredentialRevokedEventDelegationType with value set to v.
+func NewOptAppCredentialRevokedEventDelegationType(v AppCredentialRevokedEventDelegationType) OptAppCredentialRevokedEventDelegationType {
+	return OptAppCredentialRevokedEventDelegationType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptAppCredentialRevokedEventDelegationType is optional AppCredentialRevokedEventDelegationType.
+type OptAppCredentialRevokedEventDelegationType struct {
+	Value AppCredentialRevokedEventDelegationType
+	Set   bool
+}
+
+// IsSet returns true if OptAppCredentialRevokedEventDelegationType was set.
+func (o OptAppCredentialRevokedEventDelegationType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptAppCredentialRevokedEventDelegationType) Reset() {
+	var v AppCredentialRevokedEventDelegationType
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptAppCredentialRevokedEventDelegationType) SetTo(v AppCredentialRevokedEventDelegationType) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptAppCredentialRevokedEventDelegationType) Get() (v AppCredentialRevokedEventDelegationType, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptAppCredentialRevokedEventDelegationType) Or(d AppCredentialRevokedEventDelegationType) AppCredentialRevokedEventDelegationType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptAppCredentialTakenDetails returns new OptAppCredentialTakenDetails with value set to v.
+func NewOptAppCredentialTakenDetails(v AppCredentialTakenDetails) OptAppCredentialTakenDetails {
+	return OptAppCredentialTakenDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptAppCredentialTakenDetails is optional AppCredentialTakenDetails.
+type OptAppCredentialTakenDetails struct {
+	Value AppCredentialTakenDetails
+	Set   bool
+}
+
+// IsSet returns true if OptAppCredentialTakenDetails was set.
+func (o OptAppCredentialTakenDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptAppCredentialTakenDetails) Reset() {
+	var v AppCredentialTakenDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptAppCredentialTakenDetails) SetTo(v AppCredentialTakenDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptAppCredentialTakenDetails) Get() (v AppCredentialTakenDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptAppCredentialTakenDetails) Or(d AppCredentialTakenDetails) AppCredentialTakenDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -64507,69 +65798,6 @@ func (o OptListSchemasRevisions) Or(d ListSchemasRevisions) ListSchemasRevisions
 	return d
 }
 
-// NewOptNilAppClientSecretAddedEventActorType returns new OptNilAppClientSecretAddedEventActorType with value set to v.
-func NewOptNilAppClientSecretAddedEventActorType(v AppClientSecretAddedEventActorType) OptNilAppClientSecretAddedEventActorType {
-	return OptNilAppClientSecretAddedEventActorType{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptNilAppClientSecretAddedEventActorType is optional nullable AppClientSecretAddedEventActorType.
-type OptNilAppClientSecretAddedEventActorType struct {
-	Value AppClientSecretAddedEventActorType
-	Set   bool
-	Null  bool
-}
-
-// IsSet returns true if OptNilAppClientSecretAddedEventActorType was set.
-func (o OptNilAppClientSecretAddedEventActorType) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptNilAppClientSecretAddedEventActorType) Reset() {
-	var v AppClientSecretAddedEventActorType
-	o.Value = v
-	o.Set = false
-	o.Null = false
-}
-
-// SetTo sets value to v.
-func (o *OptNilAppClientSecretAddedEventActorType) SetTo(v AppClientSecretAddedEventActorType) {
-	o.Set = true
-	o.Null = false
-	o.Value = v
-}
-
-// IsNull returns true if value is Null.
-func (o OptNilAppClientSecretAddedEventActorType) IsNull() bool { return o.Null }
-
-// SetToNull sets value to null.
-func (o *OptNilAppClientSecretAddedEventActorType) SetToNull() {
-	o.Set = true
-	o.Null = true
-	var v AppClientSecretAddedEventActorType
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptNilAppClientSecretAddedEventActorType) Get() (v AppClientSecretAddedEventActorType, ok bool) {
-	if o.Null {
-		return v, false
-	}
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptNilAppClientSecretAddedEventActorType) Or(d AppClientSecretAddedEventActorType) AppClientSecretAddedEventActorType {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
 // NewOptNilAppCreatedEventActorType returns new OptNilAppCreatedEventActorType with value set to v.
 func NewOptNilAppCreatedEventActorType(v AppCreatedEventActorType) OptNilAppCreatedEventActorType {
 	return OptNilAppCreatedEventActorType{
@@ -64627,6 +65855,132 @@ func (o OptNilAppCreatedEventActorType) Get() (v AppCreatedEventActorType, ok bo
 
 // Or returns value if set, or given parameter if does not.
 func (o OptNilAppCreatedEventActorType) Or(d AppCreatedEventActorType) AppCreatedEventActorType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptNilAppCredentialAddedEventActorType returns new OptNilAppCredentialAddedEventActorType with value set to v.
+func NewOptNilAppCredentialAddedEventActorType(v AppCredentialAddedEventActorType) OptNilAppCredentialAddedEventActorType {
+	return OptNilAppCredentialAddedEventActorType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilAppCredentialAddedEventActorType is optional nullable AppCredentialAddedEventActorType.
+type OptNilAppCredentialAddedEventActorType struct {
+	Value AppCredentialAddedEventActorType
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilAppCredentialAddedEventActorType was set.
+func (o OptNilAppCredentialAddedEventActorType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilAppCredentialAddedEventActorType) Reset() {
+	var v AppCredentialAddedEventActorType
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilAppCredentialAddedEventActorType) SetTo(v AppCredentialAddedEventActorType) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilAppCredentialAddedEventActorType) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilAppCredentialAddedEventActorType) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v AppCredentialAddedEventActorType
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilAppCredentialAddedEventActorType) Get() (v AppCredentialAddedEventActorType, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilAppCredentialAddedEventActorType) Or(d AppCredentialAddedEventActorType) AppCredentialAddedEventActorType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptNilAppCredentialRevokedEventActorType returns new OptNilAppCredentialRevokedEventActorType with value set to v.
+func NewOptNilAppCredentialRevokedEventActorType(v AppCredentialRevokedEventActorType) OptNilAppCredentialRevokedEventActorType {
+	return OptNilAppCredentialRevokedEventActorType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilAppCredentialRevokedEventActorType is optional nullable AppCredentialRevokedEventActorType.
+type OptNilAppCredentialRevokedEventActorType struct {
+	Value AppCredentialRevokedEventActorType
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilAppCredentialRevokedEventActorType was set.
+func (o OptNilAppCredentialRevokedEventActorType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilAppCredentialRevokedEventActorType) Reset() {
+	var v AppCredentialRevokedEventActorType
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilAppCredentialRevokedEventActorType) SetTo(v AppCredentialRevokedEventActorType) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilAppCredentialRevokedEventActorType) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilAppCredentialRevokedEventActorType) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v AppCredentialRevokedEventActorType
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilAppCredentialRevokedEventActorType) Get() (v AppCredentialRevokedEventActorType, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilAppCredentialRevokedEventActorType) Or(d AppCredentialRevokedEventActorType) AppCredentialRevokedEventActorType {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -90647,6 +92001,399 @@ func (s *RequestApiDef) SetStatusCode(val int) {
 }
 
 func (*RequestApiDef) requestApiRes() {}
+
+// RevokeAppClientCredentialErrorResponse represents sum type.
+type RevokeAppClientCredentialErrorResponse struct {
+	Type                  RevokeAppClientCredentialErrorResponseType // switch on this field
+	AppClientNotFound     AppClientNotFound
+	AppCredentialNotFound AppCredentialNotFound
+	AppNotFound           AppNotFound
+	AppPermissionDenied   AppPermissionDenied
+	AppRevisionConflict   AppRevisionConflict
+	AuthCsrfInvalid       AuthCsrfInvalid
+	AuthUnauthorized      AuthUnauthorized
+	EvtInvalid            EvtInvalid
+	Internal              Internal
+	NotImplemented        NotImplemented
+	ReqInvalid            ReqInvalid
+	Unavailable           Unavailable
+}
+
+// RevokeAppClientCredentialErrorResponseType is oneOf type of RevokeAppClientCredentialErrorResponse.
+type RevokeAppClientCredentialErrorResponseType string
+
+// Possible values for RevokeAppClientCredentialErrorResponseType.
+const (
+	AppClientNotFoundRevokeAppClientCredentialErrorResponse     RevokeAppClientCredentialErrorResponseType = "app.client_not_found"
+	AppCredentialNotFoundRevokeAppClientCredentialErrorResponse RevokeAppClientCredentialErrorResponseType = "app.credential_not_found"
+	AppNotFoundRevokeAppClientCredentialErrorResponse           RevokeAppClientCredentialErrorResponseType = "app.not_found"
+	AppPermissionDeniedRevokeAppClientCredentialErrorResponse   RevokeAppClientCredentialErrorResponseType = "app.permission_denied"
+	AppRevisionConflictRevokeAppClientCredentialErrorResponse   RevokeAppClientCredentialErrorResponseType = "app.revision_conflict"
+	AuthCsrfInvalidRevokeAppClientCredentialErrorResponse       RevokeAppClientCredentialErrorResponseType = "auth.csrf_invalid"
+	AuthUnauthorizedRevokeAppClientCredentialErrorResponse      RevokeAppClientCredentialErrorResponseType = "auth.unauthorized"
+	EvtInvalidRevokeAppClientCredentialErrorResponse            RevokeAppClientCredentialErrorResponseType = "evt.invalid"
+	InternalRevokeAppClientCredentialErrorResponse              RevokeAppClientCredentialErrorResponseType = "internal"
+	NotImplementedRevokeAppClientCredentialErrorResponse        RevokeAppClientCredentialErrorResponseType = "not_implemented"
+	ReqInvalidRevokeAppClientCredentialErrorResponse            RevokeAppClientCredentialErrorResponseType = "req.invalid"
+	UnavailableRevokeAppClientCredentialErrorResponse           RevokeAppClientCredentialErrorResponseType = "unavailable"
+)
+
+// IsAppClientNotFound reports whether RevokeAppClientCredentialErrorResponse is AppClientNotFound.
+func (s RevokeAppClientCredentialErrorResponse) IsAppClientNotFound() bool {
+	return s.Type == AppClientNotFoundRevokeAppClientCredentialErrorResponse
+}
+
+// IsAppCredentialNotFound reports whether RevokeAppClientCredentialErrorResponse is AppCredentialNotFound.
+func (s RevokeAppClientCredentialErrorResponse) IsAppCredentialNotFound() bool {
+	return s.Type == AppCredentialNotFoundRevokeAppClientCredentialErrorResponse
+}
+
+// IsAppNotFound reports whether RevokeAppClientCredentialErrorResponse is AppNotFound.
+func (s RevokeAppClientCredentialErrorResponse) IsAppNotFound() bool {
+	return s.Type == AppNotFoundRevokeAppClientCredentialErrorResponse
+}
+
+// IsAppPermissionDenied reports whether RevokeAppClientCredentialErrorResponse is AppPermissionDenied.
+func (s RevokeAppClientCredentialErrorResponse) IsAppPermissionDenied() bool {
+	return s.Type == AppPermissionDeniedRevokeAppClientCredentialErrorResponse
+}
+
+// IsAppRevisionConflict reports whether RevokeAppClientCredentialErrorResponse is AppRevisionConflict.
+func (s RevokeAppClientCredentialErrorResponse) IsAppRevisionConflict() bool {
+	return s.Type == AppRevisionConflictRevokeAppClientCredentialErrorResponse
+}
+
+// IsAuthCsrfInvalid reports whether RevokeAppClientCredentialErrorResponse is AuthCsrfInvalid.
+func (s RevokeAppClientCredentialErrorResponse) IsAuthCsrfInvalid() bool {
+	return s.Type == AuthCsrfInvalidRevokeAppClientCredentialErrorResponse
+}
+
+// IsAuthUnauthorized reports whether RevokeAppClientCredentialErrorResponse is AuthUnauthorized.
+func (s RevokeAppClientCredentialErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedRevokeAppClientCredentialErrorResponse
+}
+
+// IsEvtInvalid reports whether RevokeAppClientCredentialErrorResponse is EvtInvalid.
+func (s RevokeAppClientCredentialErrorResponse) IsEvtInvalid() bool {
+	return s.Type == EvtInvalidRevokeAppClientCredentialErrorResponse
+}
+
+// IsInternal reports whether RevokeAppClientCredentialErrorResponse is Internal.
+func (s RevokeAppClientCredentialErrorResponse) IsInternal() bool {
+	return s.Type == InternalRevokeAppClientCredentialErrorResponse
+}
+
+// IsNotImplemented reports whether RevokeAppClientCredentialErrorResponse is NotImplemented.
+func (s RevokeAppClientCredentialErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedRevokeAppClientCredentialErrorResponse
+}
+
+// IsReqInvalid reports whether RevokeAppClientCredentialErrorResponse is ReqInvalid.
+func (s RevokeAppClientCredentialErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidRevokeAppClientCredentialErrorResponse
+}
+
+// IsUnavailable reports whether RevokeAppClientCredentialErrorResponse is Unavailable.
+func (s RevokeAppClientCredentialErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableRevokeAppClientCredentialErrorResponse
+}
+
+// SetAppClientNotFound sets RevokeAppClientCredentialErrorResponse to AppClientNotFound.
+func (s *RevokeAppClientCredentialErrorResponse) SetAppClientNotFound(v AppClientNotFound) {
+	s.Type = AppClientNotFoundRevokeAppClientCredentialErrorResponse
+	s.AppClientNotFound = v
+}
+
+// GetAppClientNotFound returns AppClientNotFound and true boolean if RevokeAppClientCredentialErrorResponse is AppClientNotFound.
+func (s RevokeAppClientCredentialErrorResponse) GetAppClientNotFound() (v AppClientNotFound, ok bool) {
+	if !s.IsAppClientNotFound() {
+		return v, false
+	}
+	return s.AppClientNotFound, true
+}
+
+// NewAppClientNotFoundRevokeAppClientCredentialErrorResponse returns new RevokeAppClientCredentialErrorResponse from AppClientNotFound.
+func NewAppClientNotFoundRevokeAppClientCredentialErrorResponse(v AppClientNotFound) RevokeAppClientCredentialErrorResponse {
+	var s RevokeAppClientCredentialErrorResponse
+	s.SetAppClientNotFound(v)
+	return s
+}
+
+// SetAppCredentialNotFound sets RevokeAppClientCredentialErrorResponse to AppCredentialNotFound.
+func (s *RevokeAppClientCredentialErrorResponse) SetAppCredentialNotFound(v AppCredentialNotFound) {
+	s.Type = AppCredentialNotFoundRevokeAppClientCredentialErrorResponse
+	s.AppCredentialNotFound = v
+}
+
+// GetAppCredentialNotFound returns AppCredentialNotFound and true boolean if RevokeAppClientCredentialErrorResponse is AppCredentialNotFound.
+func (s RevokeAppClientCredentialErrorResponse) GetAppCredentialNotFound() (v AppCredentialNotFound, ok bool) {
+	if !s.IsAppCredentialNotFound() {
+		return v, false
+	}
+	return s.AppCredentialNotFound, true
+}
+
+// NewAppCredentialNotFoundRevokeAppClientCredentialErrorResponse returns new RevokeAppClientCredentialErrorResponse from AppCredentialNotFound.
+func NewAppCredentialNotFoundRevokeAppClientCredentialErrorResponse(v AppCredentialNotFound) RevokeAppClientCredentialErrorResponse {
+	var s RevokeAppClientCredentialErrorResponse
+	s.SetAppCredentialNotFound(v)
+	return s
+}
+
+// SetAppNotFound sets RevokeAppClientCredentialErrorResponse to AppNotFound.
+func (s *RevokeAppClientCredentialErrorResponse) SetAppNotFound(v AppNotFound) {
+	s.Type = AppNotFoundRevokeAppClientCredentialErrorResponse
+	s.AppNotFound = v
+}
+
+// GetAppNotFound returns AppNotFound and true boolean if RevokeAppClientCredentialErrorResponse is AppNotFound.
+func (s RevokeAppClientCredentialErrorResponse) GetAppNotFound() (v AppNotFound, ok bool) {
+	if !s.IsAppNotFound() {
+		return v, false
+	}
+	return s.AppNotFound, true
+}
+
+// NewAppNotFoundRevokeAppClientCredentialErrorResponse returns new RevokeAppClientCredentialErrorResponse from AppNotFound.
+func NewAppNotFoundRevokeAppClientCredentialErrorResponse(v AppNotFound) RevokeAppClientCredentialErrorResponse {
+	var s RevokeAppClientCredentialErrorResponse
+	s.SetAppNotFound(v)
+	return s
+}
+
+// SetAppPermissionDenied sets RevokeAppClientCredentialErrorResponse to AppPermissionDenied.
+func (s *RevokeAppClientCredentialErrorResponse) SetAppPermissionDenied(v AppPermissionDenied) {
+	s.Type = AppPermissionDeniedRevokeAppClientCredentialErrorResponse
+	s.AppPermissionDenied = v
+}
+
+// GetAppPermissionDenied returns AppPermissionDenied and true boolean if RevokeAppClientCredentialErrorResponse is AppPermissionDenied.
+func (s RevokeAppClientCredentialErrorResponse) GetAppPermissionDenied() (v AppPermissionDenied, ok bool) {
+	if !s.IsAppPermissionDenied() {
+		return v, false
+	}
+	return s.AppPermissionDenied, true
+}
+
+// NewAppPermissionDeniedRevokeAppClientCredentialErrorResponse returns new RevokeAppClientCredentialErrorResponse from AppPermissionDenied.
+func NewAppPermissionDeniedRevokeAppClientCredentialErrorResponse(v AppPermissionDenied) RevokeAppClientCredentialErrorResponse {
+	var s RevokeAppClientCredentialErrorResponse
+	s.SetAppPermissionDenied(v)
+	return s
+}
+
+// SetAppRevisionConflict sets RevokeAppClientCredentialErrorResponse to AppRevisionConflict.
+func (s *RevokeAppClientCredentialErrorResponse) SetAppRevisionConflict(v AppRevisionConflict) {
+	s.Type = AppRevisionConflictRevokeAppClientCredentialErrorResponse
+	s.AppRevisionConflict = v
+}
+
+// GetAppRevisionConflict returns AppRevisionConflict and true boolean if RevokeAppClientCredentialErrorResponse is AppRevisionConflict.
+func (s RevokeAppClientCredentialErrorResponse) GetAppRevisionConflict() (v AppRevisionConflict, ok bool) {
+	if !s.IsAppRevisionConflict() {
+		return v, false
+	}
+	return s.AppRevisionConflict, true
+}
+
+// NewAppRevisionConflictRevokeAppClientCredentialErrorResponse returns new RevokeAppClientCredentialErrorResponse from AppRevisionConflict.
+func NewAppRevisionConflictRevokeAppClientCredentialErrorResponse(v AppRevisionConflict) RevokeAppClientCredentialErrorResponse {
+	var s RevokeAppClientCredentialErrorResponse
+	s.SetAppRevisionConflict(v)
+	return s
+}
+
+// SetAuthCsrfInvalid sets RevokeAppClientCredentialErrorResponse to AuthCsrfInvalid.
+func (s *RevokeAppClientCredentialErrorResponse) SetAuthCsrfInvalid(v AuthCsrfInvalid) {
+	s.Type = AuthCsrfInvalidRevokeAppClientCredentialErrorResponse
+	s.AuthCsrfInvalid = v
+}
+
+// GetAuthCsrfInvalid returns AuthCsrfInvalid and true boolean if RevokeAppClientCredentialErrorResponse is AuthCsrfInvalid.
+func (s RevokeAppClientCredentialErrorResponse) GetAuthCsrfInvalid() (v AuthCsrfInvalid, ok bool) {
+	if !s.IsAuthCsrfInvalid() {
+		return v, false
+	}
+	return s.AuthCsrfInvalid, true
+}
+
+// NewAuthCsrfInvalidRevokeAppClientCredentialErrorResponse returns new RevokeAppClientCredentialErrorResponse from AuthCsrfInvalid.
+func NewAuthCsrfInvalidRevokeAppClientCredentialErrorResponse(v AuthCsrfInvalid) RevokeAppClientCredentialErrorResponse {
+	var s RevokeAppClientCredentialErrorResponse
+	s.SetAuthCsrfInvalid(v)
+	return s
+}
+
+// SetAuthUnauthorized sets RevokeAppClientCredentialErrorResponse to AuthUnauthorized.
+func (s *RevokeAppClientCredentialErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedRevokeAppClientCredentialErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if RevokeAppClientCredentialErrorResponse is AuthUnauthorized.
+func (s RevokeAppClientCredentialErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedRevokeAppClientCredentialErrorResponse returns new RevokeAppClientCredentialErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedRevokeAppClientCredentialErrorResponse(v AuthUnauthorized) RevokeAppClientCredentialErrorResponse {
+	var s RevokeAppClientCredentialErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetEvtInvalid sets RevokeAppClientCredentialErrorResponse to EvtInvalid.
+func (s *RevokeAppClientCredentialErrorResponse) SetEvtInvalid(v EvtInvalid) {
+	s.Type = EvtInvalidRevokeAppClientCredentialErrorResponse
+	s.EvtInvalid = v
+}
+
+// GetEvtInvalid returns EvtInvalid and true boolean if RevokeAppClientCredentialErrorResponse is EvtInvalid.
+func (s RevokeAppClientCredentialErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
+	if !s.IsEvtInvalid() {
+		return v, false
+	}
+	return s.EvtInvalid, true
+}
+
+// NewEvtInvalidRevokeAppClientCredentialErrorResponse returns new RevokeAppClientCredentialErrorResponse from EvtInvalid.
+func NewEvtInvalidRevokeAppClientCredentialErrorResponse(v EvtInvalid) RevokeAppClientCredentialErrorResponse {
+	var s RevokeAppClientCredentialErrorResponse
+	s.SetEvtInvalid(v)
+	return s
+}
+
+// SetInternal sets RevokeAppClientCredentialErrorResponse to Internal.
+func (s *RevokeAppClientCredentialErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalRevokeAppClientCredentialErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if RevokeAppClientCredentialErrorResponse is Internal.
+func (s RevokeAppClientCredentialErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalRevokeAppClientCredentialErrorResponse returns new RevokeAppClientCredentialErrorResponse from Internal.
+func NewInternalRevokeAppClientCredentialErrorResponse(v Internal) RevokeAppClientCredentialErrorResponse {
+	var s RevokeAppClientCredentialErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets RevokeAppClientCredentialErrorResponse to NotImplemented.
+func (s *RevokeAppClientCredentialErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedRevokeAppClientCredentialErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if RevokeAppClientCredentialErrorResponse is NotImplemented.
+func (s RevokeAppClientCredentialErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedRevokeAppClientCredentialErrorResponse returns new RevokeAppClientCredentialErrorResponse from NotImplemented.
+func NewNotImplementedRevokeAppClientCredentialErrorResponse(v NotImplemented) RevokeAppClientCredentialErrorResponse {
+	var s RevokeAppClientCredentialErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
+// SetReqInvalid sets RevokeAppClientCredentialErrorResponse to ReqInvalid.
+func (s *RevokeAppClientCredentialErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidRevokeAppClientCredentialErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if RevokeAppClientCredentialErrorResponse is ReqInvalid.
+func (s RevokeAppClientCredentialErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidRevokeAppClientCredentialErrorResponse returns new RevokeAppClientCredentialErrorResponse from ReqInvalid.
+func NewReqInvalidRevokeAppClientCredentialErrorResponse(v ReqInvalid) RevokeAppClientCredentialErrorResponse {
+	var s RevokeAppClientCredentialErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets RevokeAppClientCredentialErrorResponse to Unavailable.
+func (s *RevokeAppClientCredentialErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableRevokeAppClientCredentialErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if RevokeAppClientCredentialErrorResponse is Unavailable.
+func (s RevokeAppClientCredentialErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableRevokeAppClientCredentialErrorResponse returns new RevokeAppClientCredentialErrorResponse from Unavailable.
+func NewUnavailableRevokeAppClientCredentialErrorResponse(v Unavailable) RevokeAppClientCredentialErrorResponse {
+	var s RevokeAppClientCredentialErrorResponse
+	s.SetUnavailable(v)
+	return s
+}
+
+// RevokeAppClientCredentialErrorResponseStatusCode wraps RevokeAppClientCredentialErrorResponse with StatusCode.
+type RevokeAppClientCredentialErrorResponseStatusCode struct {
+	StatusCode int
+	Response   RevokeAppClientCredentialErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *RevokeAppClientCredentialErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *RevokeAppClientCredentialErrorResponseStatusCode) GetResponse() RevokeAppClientCredentialErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *RevokeAppClientCredentialErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *RevokeAppClientCredentialErrorResponseStatusCode) SetResponse(val RevokeAppClientCredentialErrorResponse) {
+	s.Response = val
+}
+
+func (*RevokeAppClientCredentialErrorResponseStatusCode) revokeAppClientCredentialRes() {}
+
+type RevokeAppClientCredentialForbidden ErrorDetails
+
+func (*RevokeAppClientCredentialForbidden) revokeAppClientCredentialRes() {}
+
+// RevokeAppClientCredentialNoContent is response for RevokeAppClientCredential operation.
+type RevokeAppClientCredentialNoContent struct{}
+
+func (*RevokeAppClientCredentialNoContent) revokeAppClientCredentialRes() {}
+
+type RevokeAppClientCredentialNotFound ErrorDetails
+
+func (*RevokeAppClientCredentialNotFound) revokeAppClientCredentialRes() {}
+
+type RevokeAppClientCredentialUnauthorized ErrorDetails
+
+func (*RevokeAppClientCredentialUnauthorized) revokeAppClientCredentialRes() {}
 
 // RevokeMySessionErrorResponse represents sum type.
 type RevokeMySessionErrorResponse struct {

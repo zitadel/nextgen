@@ -6,7 +6,7 @@ package api
 type OperationName = string
 
 const (
-	AddAppClientSecretOperation            OperationName = "AddAppClientSecret"
+	AddAppClientCredentialOperation        OperationName = "AddAppClientCredential"
 	AddOriginOperation                     OperationName = "AddOrigin"
 	BeginUserPasskeyRegistrationOperation  OperationName = "BeginUserPasskeyRegistration"
 	BuildReleaseOperation                  OperationName = "BuildRelease"
@@ -69,6 +69,7 @@ const (
 	GetVariablesOperation                  OperationName = "GetVariables"
 	InitClaimOperation                     OperationName = "InitClaim"
 	IssueChallengeOperation                OperationName = "IssueChallenge"
+	ListAppClientCredentialsOperation      OperationName = "ListAppClientCredentials"
 	ListAppRevisionsOperation              OperationName = "ListAppRevisions"
 	ListBrandingOperation                  OperationName = "ListBranding"
 	ListDeploymentsOperation               OperationName = "ListDeployments"
@@ -102,6 +103,7 @@ const (
 	QueryUsersOperation                    OperationName = "QueryUsers"
 	RemoveOriginOperation                  OperationName = "RemoveOrigin"
 	RemovePreviewOperation                 OperationName = "RemovePreview"
+	RevokeAppClientCredentialOperation     OperationName = "RevokeAppClientCredential"
 	RevokeMySessionOperation               OperationName = "RevokeMySession"
 	RevokeReleaseOperation                 OperationName = "RevokeRelease"
 	RevokeSessionOperation                 OperationName = "RevokeSession"
@@ -111,8 +113,9 @@ const (
 	UpdateTeamOperation                    OperationName = "UpdateTeam"
 	UpdateVariablesOperation               OperationName = "UpdateVariables"
 	VerifyChallengeProofOperation          OperationName = "VerifyChallengeProof"
-	AppClientSecretAddedOperation          OperationName = "AppClientSecretAdded"
 	AppCreatedOperation                    OperationName = "AppCreated"
+	AppCredentialAddedOperation            OperationName = "AppCredentialAdded"
+	AppCredentialRevokedOperation          OperationName = "AppCredentialRevoked"
 	AppUpdatedOperation                    OperationName = "AppUpdated"
 	AuthAttemptCreatedOperation            OperationName = "AuthAttemptCreated"
 	AuthAttemptHandedOffOperation          OperationName = "AuthAttemptHandedOff"

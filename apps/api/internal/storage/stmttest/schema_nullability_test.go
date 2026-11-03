@@ -63,7 +63,8 @@ func sharedSchemaColumns(t *testing.T) []schematest.ColumnNullability {
 	// SQL. Listing their columns keeps a dialect from dropping a NOT NULL.
 	cols = append(cols, notNullColumns("app_clients", "project_id", "id", "app_id", "slug", "client_id", "created_at")...)
 	cols = append(cols, notNullColumns("app_api_identifiers", "project_id", "identifier", "app_id", "created_at")...)
-	return append(cols, notNullColumns("app_client_secrets", "project_id", "id", "client_row_id", "encoded_hash", "created_at")...)
+	cols = append(cols, notNullColumns("app_client_credentials", "project_id", "id", "client_row_id", "name", "kind", "created_at")...)
+	return append(cols, schematest.Columns("client_registrations", appstore.ClientRegistrationSchema)...)
 }
 
 // notNullColumns lists NOT NULL columns of a table no field schema binds.

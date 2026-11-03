@@ -130,7 +130,7 @@ func TestClientRegistrationMetadataValidate(t *testing.T) {
 func TestClientRegistrationAccessTo(t *testing.T) {
 	t.Parallel()
 
-	registration := &domain.ClientRegistration{ID: "dcr_1"}
+	registration := &domain.ClientRegistration{ID: "dcr_1", AppSlug: "shop"}
 	open := &domain.ResolvedApp{Slug: "shop", Document: parseApp(t, `{
 		"slug":"shop","name":"Shop","registration":{"dynamic":true},"apis":[
 		{"slug":"mcp","identifier":"https://shop.example.com/mcp","third_party":true,"scopes":[{"name":"orders.read"}]},
@@ -145,6 +145,29 @@ func TestClientRegistrationAccessTo(t *testing.T) {
 	assert.False(t, registration.AccessTo(open, orders).Allowed, "an API that is not third_party")
 	assert.False(t, registration.AccessTo(closed, closedMCP).Allowed,
 		"an app that opens client ID metadata documents only")
+
+	other := &domain.ResolvedApp{Slug: "docs", Document: open.Document}
+	assert.False(t, registration.AccessTo(other, mcp).Allowed, "another app than the one it joined")
+	unjoined := &domain.ClientRegistration{ID: "dcr_2"}
+	assert.False(t, unjoined.AccessTo(open, mcp).Allowed, "a client that joined no app yet")
+}
+
+func TestPublicJWKKeyID(t *testing.T) {
+	t.Parallel()
+
+	kid, err := domain.PublicJWKKeyID([]byte(`{"kty":"OKP","crv":"Ed25519","kid":"ci-1","x":"11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo"}`))
+	require.NoError(t, err)
+	assert.Equal(t, "ci-1", kid)
+	for name, raw := range map[string]string{
+		"no kid":         `{"kty":"OKP","crv":"Ed25519","x":"11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo"}`,
+		"a private key":  `{"kty":"OKP","crv":"Ed25519","kid":"1","x":"11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo","d":"nWGxne_9WmC6hEr0kuwsxERJxWl7MmkZcDusAxyuf2A"}`,
+		"no RSA modulus": `{"kty":"RSA","kid":"1","e":"AQAB"}`,
+		"a symmetric":    `{"kty":"oct","kid":"1","k":"c2VjcmV0"}`,
+		"not an object":  `["kty"]`,
+	} {
+		_, err := domain.PublicJWKKeyID([]byte(raw))
+		assert.Error(t, err, name)
+	}
 }
 
 func TestAppDocumentValidate_RefusesMintedClientIDForms(t *testing.T) {
@@ -152,7 +175,7 @@ func TestAppDocumentValidate_RefusesMintedClientIDForms(t *testing.T) {
 
 	for _, id := range []string{"client_01KWH3B", "dcr_01KWH3B"} {
 		doc := parseApp(t, `{"slug":"shop","name":"Shop","clients":[{"slug":"cli","client_id":"`+id+`",
-			"type":"public","grants":["authorization_code"],"redirect_uris":["http://127.0.0.1/callback"]}]}`)
+			"type":"public","grant_types":["authorization_code"],"redirect_uris":["http://127.0.0.1/callback"]}]}`)
 		assert.Equal(t, []string{"/clients/0/client_id"}, violations(t, doc, domain.AppSourceRegistered), id)
 	}
 }

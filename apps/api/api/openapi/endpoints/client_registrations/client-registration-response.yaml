@@ -1,9 +1,10 @@
 type: object
 description: |
   A client that registered itself through dynamic client registration
-  (RFC 7591). It belongs to the project, not to an app: it may get tokens for
-  a `third_party` API of an app that opens dynamic registration, each with the
-  user's consent. It is transient: once past `expires_at` it is purged unless
+  (RFC 7591). It registers at the project and joins the app whose API its
+  first authorization request names: it may then get tokens for that app's
+  `third_party` APIs, each with the user's consent, and a request for another
+  app's API is refused. It is transient: once past `expires_at` it is purged unless
   a live consent names it. The display fields are the client's own claims; the
   server checked only its redirect URIs. Its secret is never returned.
 required:
@@ -18,6 +19,10 @@ properties:
     type: string
     description: The client_id the server minted for the client.
     example: dcr_01KWH3B72K7M7F0N9WD3P2E4YM
+  app:
+    type: string
+    description: The slug of the app the client joined. Absent until its first authorization request names an API.
+    example: shop
   client_name:
     type: string
     description: The name the client registered with.

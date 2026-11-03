@@ -5,6 +5,7 @@ package stmttest
 import (
 	"cmp"
 	"context"
+	"encoding/json"
 	"slices"
 	"strings"
 	"sync"
@@ -138,12 +139,16 @@ func clientRowIDs(rows []*domain.AppClientID) []string {
 	return ids
 }
 
-func secretIDs(secrets []*domain.AppClientSecret) []string {
-	ids := make([]string, 0, len(secrets))
-	for _, secret := range secrets {
-		ids = append(ids, secret.ID)
+func credentialIDs(credentials []*domain.AppClientCredential) []string {
+	ids := make([]string, 0, len(credentials))
+	for _, credential := range credentials {
+		ids = append(ids, credential.ID)
 	}
 	return ids
+}
+
+func secretCredential(projectID, clientRowID, name, hash string) *domain.AppClientCredential {
+	return &domain.AppClientCredential{ProjectID: projectID, ClientRowID: clientRowID, Name: name, Kind: domain.CredentialKindSecret, EncodedHash: hash}
 }
 
 // sha256Hash looks like a hash the server writes; storage keeps it opaque.
@@ -887,9 +892,10 @@ func TestAppStatements_APIIdentifierHeldForGood(t *testing.T) {
 	})
 }
 
-// A registered app's client keeps its secrets as hashes, newest first, and an
-// imported hash is replaced by the server's own on its first use.
-func TestAppStatements_ClientSecrets(t *testing.T) {
+// A client keeps its credentials oldest first, each named once: secrets as
+// hashes, keys as public JWKs, and an imported hash is replaced by the
+// server's own on its first use.
+func TestAppStatements_ClientCredentials(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID := ensureProject(t, d.stmts)
 		otherProject := ensureProject(t, d.stmts)
@@ -898,56 +904,71 @@ func TestAppStatements_ClientSecrets(t *testing.T) {
 		otherClient := createAppClientID(t, d.stmts, projectID, app.ID, "worker", "")
 
 		const imported = "$argon2id$v=19$m=65536,t=1,p=4$c2FsdHNhbHQ$aGFzaGhhc2g"
-		hashes := []string{sha256Hash("a"), imported, sha256Hash("b")}
-		written := make([]*domain.AppClientSecret, 0, len(hashes))
-		for i, hash := range hashes {
-			// Gaps between the writes give the secrets distinct created_at
-			// values, so write order decides the order to expect.
+		expires := time.Now().Add(24 * time.Hour).UTC().Truncate(time.Microsecond)
+		key := json.RawMessage(`{"kty":"OKP","crv":"Ed25519","kid":"ci-1","x":"11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo"}`)
+		written := []*domain.AppClientCredential{
+			secretCredential(projectID, client.ID, "initial", sha256Hash("a")),
+			secretCredential(projectID, client.ID, "from-v4", imported),
+			{ProjectID: projectID, ClientRowID: client.ID, Name: "ci", Kind: domain.CredentialKindKey, PublicKey: key, KeyID: "ci-1", ExpiresAt: &expires},
+		}
+		for i, credential := range written {
+			// Gaps between the writes give the credentials distinct
+			// created_at values, so write order decides the order to expect.
 			if i > 0 {
 				time.Sleep(2 * time.Millisecond)
 			}
-			secret := &domain.AppClientSecret{ProjectID: projectID, ClientRowID: client.ID, EncodedHash: hash}
-			require.NoError(t, d.stmts.CreateAppClientSecret(t.Context(), secret))
-			assert.True(t, domain.PrefixAppClientSecret.Matches(secret.ID), "id %q is not csec_-prefixed", secret.ID)
-			assert.WithinDuration(t, time.Now(), secret.CreatedAt, 5*time.Second)
-			written = append(written, secret)
+			require.NoError(t, d.stmts.CreateAppClientCredential(t.Context(), credential))
+			assert.True(t, domain.PrefixAppClientCredential.Matches(credential.ID), "id %q is not cred_-prefixed", credential.ID)
+			assert.WithinDuration(t, time.Now(), credential.CreatedAt, 5*time.Second)
 		}
-		// Another client's secret proves the client filter.
-		require.NoError(t, d.stmts.CreateAppClientSecret(t.Context(), &domain.AppClientSecret{ProjectID: projectID, ClientRowID: otherClient.ID, EncodedHash: sha256Hash("c")}))
+		// Another client's credential proves the client filter, and may reuse
+		// a name.
+		require.NoError(t, d.stmts.CreateAppClientCredential(t.Context(), secretCredential(projectID, otherClient.ID, "initial", sha256Hash("c"))))
+		err := d.stmts.CreateAppClientCredential(t.Context(), secretCredential(projectID, client.ID, "initial", sha256Hash("e")))
+		assert.ErrorIs(t, err, new(database.UniqueError), "a client holds one credential per name")
 
-		newestFirst := []string{written[2].ID, written[1].ID, written[0].ID}
-		listed, err := d.stmts.ListAppClientSecrets(t.Context(), projectID, client.ID)
+		listed, err := d.stmts.ListAppClientCredentials(t.Context(), projectID, client.ID)
 		require.NoError(t, err)
-		require.Equal(t, newestFirst, secretIDs(listed))
-		for i, secret := range listed {
-			assert.Equal(t, projectID, secret.ProjectID)
-			assert.Equal(t, client.ID, secret.ClientRowID)
-			assert.Equal(t, hashes[len(hashes)-1-i], secret.EncodedHash, "secret %s", secret.ID)
-		}
+		require.Equal(t, credentialIDs(written), credentialIDs(listed))
+		assert.Equal(t, sha256Hash("a"), listed[0].EncodedHash)
+		assert.Equal(t, imported, listed[1].EncodedHash)
+		assert.Nil(t, listed[0].ExpiresAt)
+		assert.Equal(t, domain.CredentialKindKey, listed[2].Kind)
+		assert.JSONEq(t, string(key), string(listed[2].PublicKey))
+		assert.Equal(t, "ci-1", listed[2].KeyID)
+		assert.Empty(t, listed[2].EncodedHash)
+		require.NotNil(t, listed[2].ExpiresAt)
+		assert.True(t, expires.Equal(*listed[2].ExpiresAt), "expires_at %v, want %v", *listed[2].ExpiresAt, expires)
 
 		rehashed := sha256Hash("d")
-		require.NoError(t, d.stmts.UpdateAppClientSecretHash(t.Context(), projectID, written[1].ID, rehashed))
-		listed, err = d.stmts.ListAppClientSecrets(t.Context(), projectID, client.ID)
+		require.NoError(t, d.stmts.UpdateAppClientCredentialHash(t.Context(), projectID, written[1].ID, rehashed))
+		listed, err = d.stmts.ListAppClientCredentials(t.Context(), projectID, client.ID)
 		require.NoError(t, err)
-		// The update replaces the hash only: the secret keeps its place.
-		require.Equal(t, newestFirst, secretIDs(listed))
-		for i, want := range []string{hashes[2], rehashed, hashes[0]} {
-			assert.Equal(t, want, listed[i].EncodedHash, "secret %s", listed[i].ID)
-		}
-
-		err = d.stmts.UpdateAppClientSecretHash(t.Context(), projectID, "csec_does_not_exist", rehashed)
-		assert.ErrorIs(t, err, new(database.NoRowFoundError))
-		err = d.stmts.UpdateAppClientSecretHash(t.Context(), otherProject, written[0].ID, rehashed)
+		// The update replaces the hash only: the credential keeps its place.
+		require.Equal(t, credentialIDs(written), credentialIDs(listed))
+		assert.Equal(t, rehashed, listed[1].EncodedHash)
+		err = d.stmts.UpdateAppClientCredentialHash(t.Context(), projectID, written[2].ID, rehashed)
+		assert.ErrorIs(t, err, new(database.NoRowFoundError), "a key holds no hash")
+		err = d.stmts.UpdateAppClientCredentialHash(t.Context(), otherProject, written[0].ID, rehashed)
 		assert.ErrorIs(t, err, new(database.NoRowFoundError), "the project scopes the update")
 
-		none, err := d.stmts.ListAppClientSecrets(t.Context(), projectID, "client_does_not_exist")
+		require.NoError(t, d.stmts.DeleteAppClientCredential(t.Context(), projectID, client.ID, written[0].ID))
+		err = d.stmts.DeleteAppClientCredential(t.Context(), projectID, client.ID, written[0].ID)
+		assert.ErrorIs(t, err, new(database.NoRowFoundError))
+		err = d.stmts.DeleteAppClientCredential(t.Context(), projectID, otherClient.ID, written[1].ID)
+		assert.ErrorIs(t, err, new(database.NoRowFoundError), "the client scopes the delete")
+		listed, err = d.stmts.ListAppClientCredentials(t.Context(), projectID, client.ID)
+		require.NoError(t, err)
+		assert.Equal(t, credentialIDs(written[1:]), credentialIDs(listed))
+
+		none, err := d.stmts.ListAppClientCredentials(t.Context(), projectID, "client_does_not_exist")
 		require.NoError(t, err)
 		assert.Empty(t, none)
 	})
 }
 
 // The project foreign key cascades through the app to everything under it: its
-// revisions, its client rows and their secrets, and its API identifiers.
+// revisions, its client rows and their credentials, and its API identifiers.
 func TestAppStatements_ProjectDeleteCascades(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID := ensureProject(t, d.stmts)
@@ -956,8 +977,7 @@ func TestAppStatements_ProjectDeleteCascades(t *testing.T) {
 		firstRevisionID := entity.RevisionID
 		reviseApp(t, d, entity, appDocument("v2"))
 		client := createAppClientID(t, d.stmts, projectID, entity.ID, "backend", "")
-		secret := &domain.AppClientSecret{ProjectID: projectID, ClientRowID: client.ID, EncodedHash: sha256Hash("a")}
-		require.NoError(t, d.stmts.CreateAppClientSecret(t.Context(), secret))
+		require.NoError(t, d.stmts.CreateAppClientCredential(t.Context(), secretCredential(projectID, client.ID, "initial", sha256Hash("a"))))
 		identifier := "https://cascade.example.com/" + slug
 		require.NoError(t, d.stmts.CreateAppAPIIdentifier(t.Context(), &domain.AppAPIIdentifier{ProjectID: projectID, Identifier: identifier, AppID: entity.ID}))
 
@@ -975,9 +995,9 @@ func TestAppStatements_ProjectDeleteCascades(t *testing.T) {
 		assert.Empty(t, clients)
 		_, err = d.stmts.GetAppClientIDByClientID(t.Context(), projectID, client.ClientID)
 		assert.ErrorIs(t, err, new(database.NoRowFoundError))
-		secrets, err := d.stmts.ListAppClientSecrets(t.Context(), projectID, client.ID)
+		credentials, err := d.stmts.ListAppClientCredentials(t.Context(), projectID, client.ID)
 		require.NoError(t, err)
-		assert.Empty(t, secrets)
+		assert.Empty(t, credentials)
 		_, err = d.stmts.GetAppAPIIdentifier(t.Context(), projectID, identifier)
 		assert.ErrorIs(t, err, new(database.NoRowFoundError))
 

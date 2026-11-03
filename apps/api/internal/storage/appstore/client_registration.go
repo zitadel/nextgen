@@ -20,6 +20,13 @@ var ClientRegistrationSchema = database.NewSchema(map[domain.ClientRegistrationF
 		Accessor: func(r *domain.ClientRegistration) any { return r.ID },
 		Coerce:   database.CoerceString,
 	},
+	domain.ClientRegistrationFieldAppSlug: {
+		SQLName:  "app_slug",
+		Accessor: func(r *domain.ClientRegistration) any { return r.AppSlug },
+		Coerce:   database.CoerceString,
+		// Empty until the client's first authorization request names an API.
+		Nullable: true,
+	},
 	domain.ClientRegistrationFieldCreatedAt: {
 		SQLName:  "created_at",
 		Accessor: func(r *domain.ClientRegistration) any { return r.CreatedAt },

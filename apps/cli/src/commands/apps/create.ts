@@ -10,7 +10,11 @@ import {
   appPresetSummary,
   composeAppDocument,
 } from "@zitadel/config/app";
-import { APP_FILE_SCHEMA_REF, META_SCHEMA_DIR, metaSchemaFiles } from "@zitadel/config/meta-schemas";
+import {
+  APP_FILE_SCHEMA_REF,
+  META_SCHEMA_DIR,
+  metaSchemaFiles,
+} from "@zitadel/config/meta-schemas";
 
 import { APPS_DIR } from "../../lib/app";
 import { ZitadelError } from "../../lib/errors";
@@ -56,7 +60,9 @@ export default class AppCreate extends Promptable(EnvironmentCommand) {
       options: [...APP_PRESETS],
       description: `The shape of the app. ${APP_PRESETS.map((id) => `${id}: ${appPresetSummary(id)}`).join("; ")}.`,
     }),
-    name: Flags.string({ description: "The app's name, shown on the consent screen. The slug when left out." }),
+    name: Flags.string({
+      description: "The app's name, shown on the consent screen. The slug when left out.",
+    }),
     "redirect-uri": Flags.string({
       multiple: true,
       description: "Where the client may send the user back after sign-in. Repeat for several.",
@@ -64,7 +70,10 @@ export default class AppCreate extends Promptable(EnvironmentCommand) {
     identifier: Flags.string({
       description: "The URI of the API the app serves, which tokens for it carry as aud.",
     }),
-    scope: Flags.string({ multiple: true, description: "A scope the API defines. Repeat for several." }),
+    scope: Flags.string({
+      multiple: true,
+      description: "A scope the API defines. Repeat for several.",
+    }),
     registered: Flags.boolean({
       default: false,
       description: "Register the app through the API instead of declaring it in .zitadel/apps/.",
@@ -103,7 +112,8 @@ export default class AppCreate extends Promptable(EnvironmentCommand) {
         const uri = await this.input({
           kind: "text",
           name: "redirect URI",
-          message: "Where should users be sent back to after they sign in? For example https://shop.example.com/callback.",
+          message:
+            "Where should users be sent back to after they sign in? For example https://shop.example.com/callback.",
           flag: "--redirect-uri",
           parse: parseAbsoluteURI,
           retry: this.suggest(`apps create ${slug} --preset ${preset} --redirect-uri <uri>`),
@@ -113,7 +123,8 @@ export default class AppCreate extends Promptable(EnvironmentCommand) {
         const identifier = await this.input({
           kind: "text",
           name: "API identifier",
-          message: "What URI identifies the API? Tokens for it carry it as their audience, for example https://api.shop.example.com.",
+          message:
+            "What URI identifies the API? Tokens for it carry it as their audience, for example https://api.shop.example.com.",
           flag: "--identifier",
           parse: parseAbsoluteURI,
           retry: this.suggest(`apps create ${slug} --preset ${preset} --identifier <uri>`),
@@ -124,7 +135,12 @@ export default class AppCreate extends Promptable(EnvironmentCommand) {
     const { document } = composeAppDocument(preset, input);
 
     if (flags.registered) {
-      return this.register(document);
+      // A registered app holds no variable reference: the server generates
+      // each new confidential client's first secret and shows it once.
+      return this.register({
+        ...document,
+        clients: document.clients?.map(({ secret: _reference, ...client }) => client),
+      });
     }
     return this.declare(cwd, path, document);
   }
@@ -172,7 +188,9 @@ export default class AppCreate extends Promptable(EnvironmentCommand) {
       next: { commands: next },
       pretty: [
         `Wrote ${path}.`,
-        ...variables.map((name) => `Set ${name} before you deploy: the client authenticates with it.`),
+        ...variables.map(
+          (name) => `Set ${name} before you deploy: the client authenticates with it.`,
+        ),
         "The app is declared with your next deploy.",
       ].join("\n"),
     });
@@ -210,9 +228,13 @@ export default class AppCreate extends Promptable(EnvironmentCommand) {
   }
 }
 
-function parseAbsoluteURI(value: string): { ok: true; value: string } | { ok: false; problem: string } {
+function parseAbsoluteURI(
+  value: string,
+): { ok: true; value: string } | { ok: false; problem: string } {
   const uri = value.trim();
   // The server checks the rest (https, loopback, canonical form) and says
   // which rule a URI breaks; this only keeps a typo from reaching it.
-  return URL.canParse(uri) ? { ok: true, value: uri } : { ok: false, problem: `${value} is not an absolute URI.` };
+  return URL.canParse(uri)
+    ? { ok: true, value: uri }
+    : { ok: false, problem: `${value} is not an absolute URI.` };
 }

@@ -33,28 +33,29 @@ func (c *codeRecorder) Unwrap() http.ResponseWriter {
 	return c.ResponseWriter
 }
 
-// handleAddAppClientSecretRequest handles addAppClientSecret operation.
+// handleAddAppClientCredentialRequest handles addAppClientCredential operation.
 //
-// Adds a secret to a confidential client of an app registered through the
-// API: a generated one, shown once, or an imported value or hash, so a client
-// with a secret it cannot change keeps working. An app the release declares
-// names its secrets as `${{ NAME }}` variables instead, and is refused with
-// `app.declared`.
+// Adds a named credential to a confidential client: a secret the server
+// generates and shows once, an imported secret or hash, or a public key.
+// The app may be declared in the release or registered through the API, and
+// a deploy never removes a credential written here. A public client holds
+// no credential, and a request for one is refused with `app.invalid`.
+// Emits `app.credential.added`.
 //
-// POST /apps/{id}/clients/{client}/secrets
-func (s *Server) handleAddAppClientSecretRequest(args [2]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+// POST /apps/{id}/clients/{client}/credentials
+func (s *Server) handleAddAppClientCredentialRequest(args [2]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
 	statusWriter := &codeRecorder{ResponseWriter: w}
 	w = statusWriter
 	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("addAppClientSecret"),
+		otelogen.OperationID("addAppClientCredential"),
 		semconv.HTTPRequestMethodKey.String("POST"),
-		semconv.HTTPRouteKey.String("/apps/{id}/clients/{client}/secrets"),
+		semconv.HTTPRouteKey.String("/apps/{id}/clients/{client}/credentials"),
 	}
 	// Add attributes from config.
 	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
 
 	// Start a span for this request.
-	ctx, span := s.cfg.Tracer.Start(r.Context(), AddAppClientSecretOperation,
+	ctx, span := s.cfg.Tracer.Start(r.Context(), AddAppClientCredentialOperation,
 		trace.WithAttributes(otelAttrs...),
 		serverSpanKind,
 	)
@@ -109,15 +110,15 @@ func (s *Server) handleAddAppClientSecretRequest(args [2]string, argsEscaped boo
 		}
 		err          error
 		opErrContext = ogenerrors.OperationContext{
-			Name: AddAppClientSecretOperation,
-			ID:   "addAppClientSecret",
+			Name: AddAppClientCredentialOperation,
+			ID:   "addAppClientCredential",
 		}
 	)
 	{
 		type bitset = [1]uint8
 		var satisfied bitset
 		{
-			sctx, ok, err := s.securityOAuth2(ctx, AddAppClientSecretOperation, r)
+			sctx, ok, err := s.securityOAuth2(ctx, AddAppClientCredentialOperation, r)
 			if err != nil {
 				err = &ogenerrors.SecurityError{
 					OperationContext: opErrContext,
@@ -133,11 +134,29 @@ func (s *Server) handleAddAppClientSecretRequest(args [2]string, argsEscaped boo
 				ctx = sctx
 			}
 		}
+		{
+			sctx, ok, err := s.securitySessionCookie(ctx, AddAppClientCredentialOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "SessionCookie",
+					Err:              err,
+				}
+				defer recordError("Security:SessionCookie", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 1
+				ctx = sctx
+			}
+		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -157,7 +176,7 @@ func (s *Server) handleAddAppClientSecretRequest(args [2]string, argsEscaped boo
 			return
 		}
 	}
-	params, err := decodeAddAppClientSecretParams(args, argsEscaped, r)
+	params, err := decodeAddAppClientCredentialParams(args, argsEscaped, r)
 	if err != nil {
 		err = &ogenerrors.DecodeParamsError{
 			OperationContext: opErrContext,
@@ -169,7 +188,7 @@ func (s *Server) handleAddAppClientSecretRequest(args [2]string, argsEscaped boo
 	}
 
 	var rawBody []byte
-	request, rawBody, close, err := s.decodeAddAppClientSecretRequest(r)
+	request, rawBody, close, err := s.decodeAddAppClientCredentialRequest(r)
 	if err != nil {
 		err = &ogenerrors.DecodeRequestError{
 			OperationContext: opErrContext,
@@ -185,13 +204,13 @@ func (s *Server) handleAddAppClientSecretRequest(args [2]string, argsEscaped boo
 		}
 	}()
 
-	var response AddAppClientSecretRes
+	var response AddAppClientCredentialRes
 	if m := s.cfg.Middleware; m != nil {
 		mreq := middleware.Request{
 			Context:          ctx,
-			OperationName:    AddAppClientSecretOperation,
-			OperationSummary: "Add a secret to an app's client",
-			OperationID:      "addAppClientSecret",
+			OperationName:    AddAppClientCredentialOperation,
+			OperationSummary: "Add a credential to an app's client",
+			OperationID:      "addAppClientCredential",
 			Body:             request,
 			RawBody:          rawBody,
 			Params: middleware.Parameters{
@@ -212,9 +231,9 @@ func (s *Server) handleAddAppClientSecretRequest(args [2]string, argsEscaped boo
 		}
 
 		type (
-			Request  = *AddAppClientSecretRequest
-			Params   = AddAppClientSecretParams
-			Response = AddAppClientSecretRes
+			Request  = *AddAppClientCredentialRequest
+			Params   = AddAppClientCredentialParams
+			Response = AddAppClientCredentialRes
 		)
 		response, err = middleware.HookMiddleware[
 			Request,
@@ -223,14 +242,14 @@ func (s *Server) handleAddAppClientSecretRequest(args [2]string, argsEscaped boo
 		](
 			m,
 			mreq,
-			unpackAddAppClientSecretParams,
+			unpackAddAppClientCredentialParams,
 			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.AddAppClientSecret(ctx, request, params)
+				response, err = s.h.AddAppClientCredential(ctx, request, params)
 				return response, err
 			},
 		)
 	} else {
-		response, err = s.h.AddAppClientSecret(ctx, request, params)
+		response, err = s.h.AddAppClientCredential(ctx, request, params)
 	}
 	if err != nil {
 		defer recordError("Internal", err)
@@ -238,7 +257,7 @@ func (s *Server) handleAddAppClientSecretRequest(args [2]string, argsEscaped boo
 		return
 	}
 
-	if err := encodeAddAppClientSecretResponse(response, w, span); err != nil {
+	if err := encodeAddAppClientCredentialResponse(response, w, span); err != nil {
 		defer recordError("EncodeResponse", err)
 		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
 			s.cfg.ErrorHandler(ctx, w, r, err)
@@ -1118,8 +1137,9 @@ func (s *Server) handleCompleteClaimRequest(args [1]string, argsEscaped bool, w 
 // document becomes its new revision. An app the release declares
 // (`.zitadel/apps/<slug>.json`) changes only with a release, and a write to
 // one is refused with `app.declared`.
-// The answer carries what comes next: the `client_id` of each client, and a
-// generated secret for each confidential client that had none, shown once.
+// The answer carries what comes next: the `client_id` of each client, and
+// for each new confidential client that holds no key, a generated secret,
+// shown once, as its credential named `initial`.
 // A client keeps its `client_id` for life: one the document leaves out is
 // minted on first write and kept, one it sets is used as given, and a
 // revision that changes it is refused with `app.field_immutable`. No two
@@ -1128,8 +1148,8 @@ func (s *Server) handleCompleteClaimRequest(args [1]string, argsEscaped bool, w 
 // The document is validated against the `app.json` schema, then against the
 // rules across its fields: a client's `apis` name APIs the app serves, a
 // redirect URI is https or a loopback http URI in canonical form, and a
-// registered app's secrets come from the server, never a `${{ NAME }}`
-// reference. A refused document stores nothing.
+// registered app's credentials are written through the API, never a
+// `${{ NAME }}` reference. A refused document stores nothing.
 //
 // POST /apps
 func (s *Server) handleCreateAppRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -12850,6 +12870,220 @@ func (s *Server) handleIssueChallengeRequest(args [1]string, argsEscaped bool, w
 	}
 }
 
+// handleListAppClientCredentialsRequest handles listAppClientCredentials operation.
+//
+// Lists the credentials a client holds through the API, revoked ones left
+// out, without any secret.
+//
+// GET /apps/{id}/clients/{client}/credentials
+func (s *Server) handleListAppClientCredentialsRequest(args [2]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+	statusWriter := &codeRecorder{ResponseWriter: w}
+	w = statusWriter
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("listAppClientCredentials"),
+		semconv.HTTPRequestMethodKey.String("GET"),
+		semconv.HTTPRouteKey.String("/apps/{id}/clients/{client}/credentials"),
+	}
+	// Add attributes from config.
+	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
+
+	// Start a span for this request.
+	ctx, span := s.cfg.Tracer.Start(r.Context(), ListAppClientCredentialsOperation,
+		trace.WithAttributes(otelAttrs...),
+		serverSpanKind,
+	)
+	defer span.End()
+
+	// Add Labeler to context.
+	labeler := &Labeler{attrs: otelAttrs}
+	ctx = contextWithLabeler(ctx, labeler)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		elapsedDuration := time.Since(startTime)
+
+		attrSet := labeler.AttributeSet()
+		attrs := attrSet.ToSlice()
+		code := statusWriter.status
+		if code != 0 {
+			codeAttr := semconv.HTTPResponseStatusCode(code)
+			attrs = append(attrs, codeAttr)
+			span.SetAttributes(codeAttr)
+		}
+		attrOpt := metric.WithAttributes(attrs...)
+
+		// Increment request counter.
+		s.requests.Add(ctx, 1, attrOpt)
+
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		s.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), attrOpt)
+	}()
+
+	var (
+		recordError = func(stage string, err error) {
+			span.RecordError(err)
+
+			// https://opentelemetry.io/docs/specs/semconv/http/http-spans/#status
+			// Span Status MUST be left unset if HTTP status code was in the 1xx, 2xx or 3xx ranges,
+			// unless there was another error (e.g., network error receiving the response body; or 3xx codes with
+			// max redirects exceeded), in which case status MUST be set to Error.
+			code := statusWriter.status
+			if code < 100 || code >= 500 {
+				span.SetStatus(codes.Error, stage)
+			}
+
+			attrSet := labeler.AttributeSet()
+			attrs := attrSet.ToSlice()
+			if code != 0 {
+				attrs = append(attrs, semconv.HTTPResponseStatusCode(code))
+			}
+
+			s.errors.Add(ctx, 1, metric.WithAttributes(attrs...))
+		}
+		err          error
+		opErrContext = ogenerrors.OperationContext{
+			Name: ListAppClientCredentialsOperation,
+			ID:   "listAppClientCredentials",
+		}
+	)
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			sctx, ok, err := s.securityOAuth2(ctx, ListAppClientCredentialsOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "OAuth2",
+					Err:              err,
+				}
+				defer recordError("Security:OAuth2", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
+			sctx, ok, err := s.securitySessionCookie(ctx, ListAppClientCredentialsOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "SessionCookie",
+					Err:              err,
+				}
+				defer recordError("Security:SessionCookie", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 1
+				ctx = sctx
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+				{0b00000010},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			err = &ogenerrors.SecurityError{
+				OperationContext: opErrContext,
+				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
+			}
+			defer recordError("Security", err)
+			s.cfg.ErrorHandler(ctx, w, r, err)
+			return
+		}
+	}
+	params, err := decodeListAppClientCredentialsParams(args, argsEscaped, r)
+	if err != nil {
+		err = &ogenerrors.DecodeParamsError{
+			OperationContext: opErrContext,
+			Err:              err,
+		}
+		defer recordError("DecodeParams", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+
+	var rawBody []byte
+
+	var response ListAppClientCredentialsRes
+	if m := s.cfg.Middleware; m != nil {
+		mreq := middleware.Request{
+			Context:          ctx,
+			OperationName:    ListAppClientCredentialsOperation,
+			OperationSummary: "List the credentials of an app's client",
+			OperationID:      "listAppClientCredentials",
+			Body:             nil,
+			RawBody:          rawBody,
+			Params: middleware.Parameters{
+				{
+					Name: "project_id",
+					In:   "query",
+				}: params.ProjectID,
+				{
+					Name: "id",
+					In:   "path",
+				}: params.ID,
+				{
+					Name: "client",
+					In:   "path",
+				}: params.Client,
+			},
+			Raw: r,
+		}
+
+		type (
+			Request  = struct{}
+			Params   = ListAppClientCredentialsParams
+			Response = ListAppClientCredentialsRes
+		)
+		response, err = middleware.HookMiddleware[
+			Request,
+			Params,
+			Response,
+		](
+			m,
+			mreq,
+			unpackListAppClientCredentialsParams,
+			func(ctx context.Context, request Request, params Params) (response Response, err error) {
+				response, err = s.h.ListAppClientCredentials(ctx, params)
+				return response, err
+			},
+		)
+	} else {
+		response, err = s.h.ListAppClientCredentials(ctx, params)
+	}
+	if err != nil {
+		defer recordError("Internal", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+
+	if err := encodeListAppClientCredentialsResponse(response, w, span); err != nil {
+		defer recordError("EncodeResponse", err)
+		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
+			s.cfg.ErrorHandler(ctx, w, r, err)
+		}
+		return
+	}
+}
+
 // handleListAppRevisionsRequest handles listAppRevisions operation.
 //
 // Returns every revision of one app, newest first, paginated with a cursor.
@@ -19999,6 +20233,224 @@ func (s *Server) handleRemovePreviewRequest(args [1]string, argsEscaped bool, w 
 	}
 
 	if err := encodeRemovePreviewResponse(response, w, span); err != nil {
+		defer recordError("EncodeResponse", err)
+		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
+			s.cfg.ErrorHandler(ctx, w, r, err)
+		}
+		return
+	}
+}
+
+// handleRevokeAppClientCredentialRequest handles revokeAppClientCredential operation.
+//
+// Revokes one credential: the client can no longer authenticate with it,
+// and its other credentials keep working. Emits `app.credential.revoked`.
+//
+// DELETE /apps/{id}/clients/{client}/credentials/{credential_id}
+func (s *Server) handleRevokeAppClientCredentialRequest(args [3]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
+	statusWriter := &codeRecorder{ResponseWriter: w}
+	w = statusWriter
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("revokeAppClientCredential"),
+		semconv.HTTPRequestMethodKey.String("DELETE"),
+		semconv.HTTPRouteKey.String("/apps/{id}/clients/{client}/credentials/{credential_id}"),
+	}
+	// Add attributes from config.
+	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
+
+	// Start a span for this request.
+	ctx, span := s.cfg.Tracer.Start(r.Context(), RevokeAppClientCredentialOperation,
+		trace.WithAttributes(otelAttrs...),
+		serverSpanKind,
+	)
+	defer span.End()
+
+	// Add Labeler to context.
+	labeler := &Labeler{attrs: otelAttrs}
+	ctx = contextWithLabeler(ctx, labeler)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		elapsedDuration := time.Since(startTime)
+
+		attrSet := labeler.AttributeSet()
+		attrs := attrSet.ToSlice()
+		code := statusWriter.status
+		if code != 0 {
+			codeAttr := semconv.HTTPResponseStatusCode(code)
+			attrs = append(attrs, codeAttr)
+			span.SetAttributes(codeAttr)
+		}
+		attrOpt := metric.WithAttributes(attrs...)
+
+		// Increment request counter.
+		s.requests.Add(ctx, 1, attrOpt)
+
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		s.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), attrOpt)
+	}()
+
+	var (
+		recordError = func(stage string, err error) {
+			span.RecordError(err)
+
+			// https://opentelemetry.io/docs/specs/semconv/http/http-spans/#status
+			// Span Status MUST be left unset if HTTP status code was in the 1xx, 2xx or 3xx ranges,
+			// unless there was another error (e.g., network error receiving the response body; or 3xx codes with
+			// max redirects exceeded), in which case status MUST be set to Error.
+			code := statusWriter.status
+			if code < 100 || code >= 500 {
+				span.SetStatus(codes.Error, stage)
+			}
+
+			attrSet := labeler.AttributeSet()
+			attrs := attrSet.ToSlice()
+			if code != 0 {
+				attrs = append(attrs, semconv.HTTPResponseStatusCode(code))
+			}
+
+			s.errors.Add(ctx, 1, metric.WithAttributes(attrs...))
+		}
+		err          error
+		opErrContext = ogenerrors.OperationContext{
+			Name: RevokeAppClientCredentialOperation,
+			ID:   "revokeAppClientCredential",
+		}
+	)
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			sctx, ok, err := s.securityOAuth2(ctx, RevokeAppClientCredentialOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "OAuth2",
+					Err:              err,
+				}
+				defer recordError("Security:OAuth2", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 0
+				ctx = sctx
+			}
+		}
+		{
+			sctx, ok, err := s.securitySessionCookie(ctx, RevokeAppClientCredentialOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "SessionCookie",
+					Err:              err,
+				}
+				defer recordError("Security:SessionCookie", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 1
+				ctx = sctx
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+				{0b00000010},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			err = &ogenerrors.SecurityError{
+				OperationContext: opErrContext,
+				Err:              ogenerrors.ErrSecurityRequirementIsNotSatisfied,
+			}
+			defer recordError("Security", err)
+			s.cfg.ErrorHandler(ctx, w, r, err)
+			return
+		}
+	}
+	params, err := decodeRevokeAppClientCredentialParams(args, argsEscaped, r)
+	if err != nil {
+		err = &ogenerrors.DecodeParamsError{
+			OperationContext: opErrContext,
+			Err:              err,
+		}
+		defer recordError("DecodeParams", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+
+	var rawBody []byte
+
+	var response RevokeAppClientCredentialRes
+	if m := s.cfg.Middleware; m != nil {
+		mreq := middleware.Request{
+			Context:          ctx,
+			OperationName:    RevokeAppClientCredentialOperation,
+			OperationSummary: "Revoke a credential of an app's client",
+			OperationID:      "revokeAppClientCredential",
+			Body:             nil,
+			RawBody:          rawBody,
+			Params: middleware.Parameters{
+				{
+					Name: "project_id",
+					In:   "query",
+				}: params.ProjectID,
+				{
+					Name: "id",
+					In:   "path",
+				}: params.ID,
+				{
+					Name: "client",
+					In:   "path",
+				}: params.Client,
+				{
+					Name: "credential_id",
+					In:   "path",
+				}: params.CredentialID,
+			},
+			Raw: r,
+		}
+
+		type (
+			Request  = struct{}
+			Params   = RevokeAppClientCredentialParams
+			Response = RevokeAppClientCredentialRes
+		)
+		response, err = middleware.HookMiddleware[
+			Request,
+			Params,
+			Response,
+		](
+			m,
+			mreq,
+			unpackRevokeAppClientCredentialParams,
+			func(ctx context.Context, request Request, params Params) (response Response, err error) {
+				response, err = s.h.RevokeAppClientCredential(ctx, params)
+				return response, err
+			},
+		)
+	} else {
+		response, err = s.h.RevokeAppClientCredential(ctx, params)
+	}
+	if err != nil {
+		defer recordError("Internal", err)
+		s.cfg.ErrorHandler(ctx, w, r, err)
+		return
+	}
+
+	if err := encodeRevokeAppClientCredentialResponse(response, w, span); err != nil {
 		defer recordError("EncodeResponse", err)
 		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
 			s.cfg.ErrorHandler(ctx, w, r, err)

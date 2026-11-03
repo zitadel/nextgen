@@ -112,7 +112,9 @@ describe("buildBundle", () => {
   it("leaves `apps` out when there are none, so a server without the kind takes it", async ({
     dir,
   }) => {
-    const cwd = await project(dir, { ".zitadel/schemas/human-user.json": { objectType: "human-user" } });
+    const cwd = await project(dir, {
+      ".zitadel/schemas/human-user.json": { objectType: "human-user" },
+    });
 
     const { bundle } = await buildBundle(cwd);
 

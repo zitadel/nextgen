@@ -1,8 +1,9 @@
 /**
  * App presets: complete starting documents for the common shapes of an app,
- * so nobody picks grant types or authentication methods by hand. A preset only
- * fills the document (ADR 071 §4): the app keeps its name as an annotation in
- * `preset`, and its behavior comes from the configs the preset wrote.
+ * so nobody picks grant types by hand. A preset only fills the document
+ * (ADR 071 §4): the app keeps the fields, never the preset, so declared,
+ * registered and imported apps share one shape, and the console filters on
+ * what an app holds.
  *
  * The CLI's `app create --preset` and the console offer the same list, and an
  * agent can start from {@link composeAppDocument} directly.
@@ -16,7 +17,7 @@ export const APP_PRESETS = Object.freeze([
   "cli",
   "api",
   "backend",
-  "service-account",
+  "service",
   "mcp-server",
 ] as const);
 
@@ -43,7 +44,6 @@ export type AppDocument = {
   $schema?: string;
   slug: string;
   name: string;
-  preset: AppPresetId;
   clients?: Record<string, unknown>[];
   apis?: Record<string, unknown>[];
   registration?: { client_id_metadata_documents?: boolean; dynamic?: boolean };
@@ -52,10 +52,9 @@ export type AppDocument = {
 type Preset = {
   summary: string;
   needs: readonly AppPresetNeed[];
-  compose: (input: Required<Pick<AppPresetInput, "slug" | "name">> & AppPresetInput) => Omit<
-    AppDocument,
-    "slug" | "name" | "preset"
-  >;
+  compose: (
+    input: Required<Pick<AppPresetInput, "slug" | "name">> & AppPresetInput,
+  ) => Omit<AppDocument, "slug" | "name">;
 };
 
 /** The loopback callbacks a CLI listens on, any port (RFC 8252 §7.3). */
@@ -93,7 +92,7 @@ const PRESETS: Readonly<Record<AppPresetId, Preset>> = Object.freeze({
           slug: "web",
           type: "confidential",
           secret: secretRef(slug, "web"),
-          grants: ["authorization_code", "refresh_token"],
+          grant_types: ["authorization_code", "refresh_token"],
           redirect_uris: [...(redirectUris ?? [])],
         },
       ],
@@ -107,7 +106,7 @@ const PRESETS: Readonly<Record<AppPresetId, Preset>> = Object.freeze({
         {
           slug: "spa",
           type: "public",
-          grants: ["authorization_code", "refresh_token"],
+          grant_types: ["authorization_code", "refresh_token"],
           redirect_uris: [...(redirectUris ?? [])],
         },
       ],
@@ -121,7 +120,7 @@ const PRESETS: Readonly<Record<AppPresetId, Preset>> = Object.freeze({
         {
           slug: "native",
           type: "public",
-          grants: ["authorization_code", "refresh_token"],
+          grant_types: ["authorization_code", "refresh_token"],
           redirect_uris: [...(redirectUris ?? [])],
         },
       ],
@@ -135,7 +134,7 @@ const PRESETS: Readonly<Record<AppPresetId, Preset>> = Object.freeze({
         {
           slug: "cli",
           type: "public",
-          grants: ["authorization_code", "refresh_token"],
+          grant_types: ["authorization_code", "refresh_token"],
           redirect_uris: [...LOOPBACK_REDIRECTS],
         },
       ],
@@ -155,14 +154,14 @@ const PRESETS: Readonly<Record<AppPresetId, Preset>> = Object.freeze({
           slug: "backend",
           type: "confidential",
           secret: secretRef(input.slug, "backend"),
-          grants: ["client_credentials"],
+          grant_types: ["client_credentials"],
           apis: [{ api: "api" }],
         },
       ],
       apis: [api("api", input)],
     }),
   },
-  "service-account": {
+  service: {
     summary: "A job or service that calls APIs as itself",
     needs: [],
     compose: ({ slug }) => ({
@@ -171,7 +170,7 @@ const PRESETS: Readonly<Record<AppPresetId, Preset>> = Object.freeze({
           slug: "service",
           type: "confidential",
           secret: secretRef(slug, "service"),
-          grants: ["client_credentials"],
+          grant_types: ["client_credentials"],
         },
       ],
     }),
@@ -215,7 +214,7 @@ export function composeAppDocument(
   );
   const name = input.name ?? input.slug;
   return {
-    document: { slug: input.slug, name, preset: id, ...preset.compose({ ...input, name }) },
+    document: { slug: input.slug, name, ...preset.compose({ ...input, name }) },
     missing,
   };
 }

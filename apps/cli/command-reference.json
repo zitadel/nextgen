@@ -1278,7 +1278,7 @@
       "flags": [
         {
           "name": "preset",
-          "description": "The shape of the app. web: A server-rendered web app that signs users in, with a secret; spa: A single-page app that signs users in with PKCE and holds no secret; native: A mobile or desktop app that signs users in with PKCE; cli: A command-line tool that signs users in through a loopback redirect; api: An API that accepts access tokens for its identifier; backend: A backend that serves an API and calls others as itself; service-account: A job or service that calls APIs as itself; mcp-server: An MCP server any MCP client can connect to with the user's consent.",
+          "description": "The shape of the app. web: A server-rendered web app that signs users in, with a secret; spa: A single-page app that signs users in with PKCE and holds no secret; native: A mobile or desktop app that signs users in with PKCE; cli: A command-line tool that signs users in through a loopback redirect; api: An API that accepts access tokens for its identifier; backend: A backend that serves an API and calls others as itself; service: A job or service that calls APIs as itself; mcp-server: An MCP server any MCP client can connect to with the user's consent.",
           "type": "option",
           "required": true,
           "options": [
@@ -1288,7 +1288,7 @@
             "cli",
             "api",
             "backend",
-            "service-account",
+            "service",
             "mcp-server"
           ]
         },
@@ -1417,11 +1417,6 @@
           "type": "option"
         },
         {
-          "name": "plain",
-          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
-          "type": "boolean"
-        },
-        {
           "name": "filter",
           "description": "Filter as field=operation:value (operation defaults to equals). Fields: slug (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), source (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), created_at (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal).",
           "type": "option",
@@ -1431,6 +1426,11 @@
           "name": "sort",
           "description": "Sort as field:direction (asc|desc). Fields: slug, created_at.",
           "type": "option"
+        },
+        {
+          "name": "plain",
+          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
+          "type": "boolean"
         },
         {
           "name": "env",
@@ -1766,13 +1766,8 @@
           "type": "option"
         },
         {
-          "name": "plain",
-          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
-          "type": "boolean"
-        },
-        {
           "name": "filter",
-          "description": "Filter as field=operation:value (operation defaults to equals). Fields: created_at (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), expires_at (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal).",
+          "description": "Filter as field=operation:value (operation defaults to equals). Fields: app (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), created_at (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), expires_at (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal).",
           "type": "option",
           "multiple": true
         },
@@ -1780,6 +1775,11 @@
           "name": "sort",
           "description": "Sort as field:direction (asc|desc). Fields: created_at, expires_at.",
           "type": "option"
+        },
+        {
+          "name": "plain",
+          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
+          "type": "boolean"
         },
         {
           "name": "env",
@@ -1801,7 +1801,7 @@
           "command": "client-registrations list --all --json"
         },
         {
-          "command": "client-registrations list --filter created_at=equals:<value> --sort created_at:desc"
+          "command": "client-registrations list --filter app=equals:<value> --sort created_at:desc"
         }
       ]
     },

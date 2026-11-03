@@ -6,12 +6,14 @@
 CREATE TABLE client_registrations (
     project_id      TEXT    NOT NULL,
     id              TEXT    NOT NULL,
+    app_slug        TEXT,
     metadata        TEXT    NOT NULL,
     secret_hash     TEXT,
     created_at      INTEGER NOT NULL,
     expires_at      INTEGER NOT NULL,
     PRIMARY KEY (project_id, id),
     CONSTRAINT chk_client_registrations_id CHECK (id <> ''),
+    CONSTRAINT chk_client_registrations_app_slug CHECK (app_slug <> ''),
     CONSTRAINT chk_client_registrations_metadata CHECK (json_type(metadata) = 'object'),
     CONSTRAINT chk_client_registrations_secret_hash CHECK (secret_hash <> ''),
     CONSTRAINT fk_client_registrations_project
@@ -25,6 +27,11 @@ CREATE INDEX idx_client_registrations_project_created_at
 -- +goose StatementEnd
 
 -- +goose StatementBegin
+CREATE INDEX idx_client_registrations_project_app_slug
+    ON client_registrations (project_id, app_slug, created_at, id);
+-- +goose StatementEnd
+
+-- +goose StatementBegin
 CREATE INDEX idx_client_registrations_project_expires_at
     ON client_registrations (project_id, expires_at, id);
 -- +goose StatementEnd
@@ -32,6 +39,9 @@ CREATE INDEX idx_client_registrations_project_expires_at
 -- +goose Down
 -- +goose StatementBegin
 DROP INDEX IF EXISTS idx_client_registrations_project_expires_at;
+-- +goose StatementEnd
+-- +goose StatementBegin
+DROP INDEX IF EXISTS idx_client_registrations_project_app_slug;
 -- +goose StatementEnd
 -- +goose StatementBegin
 DROP INDEX IF EXISTS idx_client_registrations_project_created_at;

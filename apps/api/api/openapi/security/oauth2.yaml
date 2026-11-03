@@ -28,7 +28,7 @@ flows:
       idp.read: Permission to read identity provider connections
       idp.write: Permission to create and revise identity provider connections
       app.read: Permission to read apps
-      app.write: Permission to register and revise apps and add their client secrets
+      app.write: Permission to register and revise apps, manage their clients' credentials and delete client registrations
       release.read: Permission to read project configuration releases
       release.write: Permission to create and revoke project configuration releases
       deployment.read: Permission to read deployments
@@ -80,7 +80,7 @@ flows:
       idp.read: Permission to read identity provider connections
       idp.write: Permission to create and revise identity provider connections
       app.read: Permission to read apps
-      app.write: Permission to register and revise apps and add their client secrets
+      app.write: Permission to register and revise apps, manage their clients' credentials and delete client registrations
       release.read: Permission to read project configuration releases
       release.write: Permission to create and revoke project configuration releases
       deployment.read: Permission to read deployments

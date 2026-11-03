@@ -5,13 +5,15 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
-	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"hash/crc32"
+	"math/big"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/crypto"
@@ -32,9 +34,18 @@ type CreateAppOutput struct {
 	// Created tells a new app from a new revision of an existing one, which
 	// the caller answers 200 to rather than 201.
 	Created bool
-	// Secrets are the client secrets this write generated, by client slug.
-	// They are returned once and stored only as hashes.
-	Secrets map[string]string
+	// Secrets are the secrets this write generated, by client slug: the
+	// credential named `initial` of each new confidential client of a
+	// registered app that holds no key. They are returned once and stored
+	// only as hashes.
+	Secrets map[string]GeneratedSecret
+}
+
+// GeneratedSecret is a secret the server generated, with the credential that
+// holds it.
+type GeneratedSecret struct {
+	CredentialID string
+	Secret       string
 }
 
 type ListAppsInput struct {
@@ -57,23 +68,34 @@ type ListAppsOutput struct {
 	NextPageToken string
 }
 
-// AddAppClientSecretInput adds a secret to a registered app's confidential
-// client. With neither Secret nor Hash the server generates one; Secret
-// imports a plaintext value and Hash an encoded hash another system wrote,
-// such as v4's bcrypt.
-type AddAppClientSecretInput struct {
+// AddAppClientCredentialInput adds a named credential to a confidential
+// client of a declared or a registered app. With none of Secret, Hash and
+// PublicKey the server generates a secret; Secret imports a plaintext value,
+// Hash an encoded hash another system wrote, such as v4's bcrypt, and
+// PublicKey a JWK the client signs private_key_jwt assertions with.
+type AddAppClientCredentialInput struct {
 	ProjectID  string
 	AppID      string
 	ClientSlug string
+	Name       string
 	Secret     string
 	Hash       string
+	PublicKey  json.RawMessage
+	ExpiresAt  *time.Time
 }
 
-type AddAppClientSecretOutput struct {
-	SecretID string
-	ClientID string
-	// Secret is the generated value, empty for an import. Shown once.
+type AddAppClientCredentialOutput struct {
+	Credential *domain.AppClientCredential
+	ClientID   string
+	// Secret is the generated value, empty for an import or a key. Shown
+	// once.
 	Secret string
+}
+
+// AppClientCredentials are the credentials a client holds through the API.
+type AppClientCredentials struct {
+	ClientID    string
+	Credentials []*domain.AppClientCredential
 }
 
 type AppService interface {
@@ -85,7 +107,9 @@ type AppService interface {
 	GetRevision(ctx context.Context, projectID, revisionID string) (*AppView, error)
 	List(ctx context.Context, input ListAppsInput) (*ListAppsOutput, error)
 	ListRevisions(ctx context.Context, input ListAppRevisionsInput) (*ListAppsOutput, error)
-	AddClientSecret(ctx context.Context, input AddAppClientSecretInput) (*AddAppClientSecretOutput, error)
+	AddClientCredential(ctx context.Context, input AddAppClientCredentialInput) (*AddAppClientCredentialOutput, error)
+	ListClientCredentials(ctx context.Context, projectID, appID, clientSlug string) (*AppClientCredentials, error)
+	RevokeClientCredential(ctx context.Context, projectID, appID, clientSlug, credentialID string) error
 }
 
 // ImportedHashVerifier reads hashes other systems wrote (bcrypt, argon2,
@@ -208,42 +232,42 @@ func (s *appService) write(ctx context.Context, stmts AllStatements, projectID s
 }
 
 // afterWrite brings the rows that outlive revisions in step with the revision
-// just written, generates the secrets a registered app's new confidential
-// clients need, and emits the event, all in the write's transaction.
+// just written, generates the initial secret of a registered app's new
+// confidential clients, and emits the event, all in the write's transaction.
 func (s *appService) afterWrite(ctx context.Context, stmts AllStatements, entity, previous *domain.App, doc domain.AppDocument) (*CreateAppOutput, error) {
-	clients, err := syncAppClientIDs(ctx, stmts, entity, doc)
+	clients, created, err := syncAppClientIDs(ctx, stmts, entity, doc)
 	if err != nil {
 		return nil, err
 	}
 	if err := syncAppIdentifiers(ctx, stmts, entity, doc); err != nil {
 		return nil, err
 	}
-	secrets := map[string]string{}
+	secrets := map[string]GeneratedSecret{}
 	if entity.Source == domain.AppSourceRegistered {
 		for i, client := range doc.Clients {
-			// A private_key_jwt client authenticates with its keys.
-			if !client.EffectiveAuthMethod().UsesSecret() {
-				continue
-			}
-			stored, err := stmts.ListAppClientSecrets(ctx, entity.ProjectID, clients[i].ID)
-			if err != nil {
-				return nil, err
-			}
-			if len(stored) > 0 {
+			// A client that brings its keys needs no secret, and an existing
+			// client keeps the credentials it has.
+			if client.Type != domain.ClientTypeConfidential || len(client.JWKS) > 0 || !created[client.Slug] {
 				continue
 			}
 			plain, encoded, err := newClientSecret()
 			if err != nil {
 				return nil, err
 			}
-			secret := &domain.AppClientSecret{ProjectID: entity.ProjectID, ClientRowID: clients[i].ID, EncodedHash: encoded}
-			if err := stmts.CreateAppClientSecret(ctx, secret); err != nil {
+			credential := &domain.AppClientCredential{
+				ProjectID:   entity.ProjectID,
+				ClientRowID: clients[i].ID,
+				Name:        initialCredentialName,
+				Kind:        domain.CredentialKindSecret,
+				EncodedHash: encoded,
+			}
+			if err := stmts.CreateAppClientCredential(ctx, credential); err != nil {
 				return nil, err
 			}
-			if err := emitAppClientSecretAdded(ctx, stmts, entity, clients[i], secret, "generated"); err != nil {
+			if err := emitAppCredentialEvent(ctx, stmts, domain.EventTypeAppCredentialAdded, entity, clients[i], credential, "generated"); err != nil {
 				return nil, err
 			}
-			secrets[client.Slug] = plain
+			secrets[client.Slug] = GeneratedSecret{CredentialID: credential.ID, Secret: plain}
 		}
 	}
 	if previous == nil {
@@ -261,42 +285,49 @@ func (s *appService) afterWrite(ctx context.Context, stmts AllStatements, entity
 	return &CreateAppOutput{AppView: AppView{App: entity, Clients: clients}, Secrets: secrets}, nil
 }
 
+// initialCredentialName names the secret a registered app's new confidential
+// client gets with the write that creates it.
+const initialCredentialName = "initial"
+
 // syncAppClientIDs gives each client doc lists its client_id: the one its row
 // already holds, the one the document chose, or a minted one. It returns the
-// rows in document order. A chosen id that differs from the client's stored
-// one is refused, and so is one another client holds.
-func syncAppClientIDs(ctx context.Context, stmts AllStatements, entity *domain.App, doc domain.AppDocument) ([]*domain.AppClientID, error) {
+// rows in document order and the slugs of the clients this write created. A
+// chosen id that differs from the client's stored one is refused, and so is
+// one another client holds.
+func syncAppClientIDs(ctx context.Context, stmts AllStatements, entity *domain.App, doc domain.AppDocument) ([]*domain.AppClientID, map[string]bool, error) {
 	stored, err := stmts.ListAppClientIDs(ctx, entity.ProjectID, entity.ID)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	bySlug := indexByID(stored, func(row *domain.AppClientID) string { return row.Slug })
 	rows := make([]*domain.AppClientID, len(doc.Clients))
+	created := map[string]bool{}
 	for i, client := range doc.Clients {
 		if row, ok := bySlug[client.Slug]; ok {
 			if client.ClientID != "" && client.ClientID != row.ClientID {
-				return nil, domain.ErrAppFieldImmutable(map[string]string{"field": fmt.Sprintf("/clients/%d/client_id", i)})
+				return nil, nil, domain.ErrAppFieldImmutable(map[string]string{"field": fmt.Sprintf("/clients/%d/client_id", i)})
 			}
 			rows[i] = row
 			continue
 		}
 		if client.ClientID != "" {
 			if _, err := stmts.GetAppClientIDByClientID(ctx, entity.ProjectID, client.ClientID); err == nil {
-				return nil, domain.ErrAppClientIDTaken(map[string]string{"field": fmt.Sprintf("/clients/%d/client_id", i)})
+				return nil, nil, domain.ErrAppClientIDTaken(map[string]string{"field": fmt.Sprintf("/clients/%d/client_id", i)})
 			} else if _, ok := errors.AsType[*database.NoRowFoundError](err); !ok {
-				return nil, err
+				return nil, nil, err
 			}
 		}
 		row := &domain.AppClientID{ProjectID: entity.ProjectID, AppID: entity.ID, Slug: client.Slug, ClientID: client.ClientID}
 		if err := stmts.CreateAppClientID(ctx, row); err != nil {
 			if _, ok := errors.AsType[*database.UniqueError](err); ok {
-				return nil, domain.ErrAppClientIDTaken(map[string]string{"field": fmt.Sprintf("/clients/%d/client_id", i)}).WithParent(err)
+				return nil, nil, domain.ErrAppClientIDTaken(map[string]string{"field": fmt.Sprintf("/clients/%d/client_id", i)}).WithParent(err)
 			}
-			return nil, err
+			return nil, nil, err
 		}
 		rows[i] = row
+		created[client.Slug] = true
 	}
-	return rows, nil
+	return rows, created, nil
 }
 
 // syncAppIdentifiers ties each API identifier doc lists to the app, for good.
@@ -386,6 +417,11 @@ func mapAppWriteError(err error) error {
 		// Another caller created the slug between the read and the insert.
 		return domain.ErrAppRevisionConflict().WithParent(err)
 	}
+	// A domain error first: one that wraps the unique violation it reports,
+	// such as a taken client_id or credential name, keeps its own code.
+	if de, ok := errors.AsType[domain.Error](err); ok {
+		return de
+	}
 	if _, ok := errors.AsType[*database.UniqueError](err); ok {
 		// Two revisions of one app on the same instant have no newest.
 		return domain.ErrAppRevisionConflict().WithParent(err)
@@ -394,9 +430,6 @@ func mapAppWriteError(err error) error {
 		// project_id is the only foreign key on a new app, so the project was
 		// deleted underneath the call.
 		return domain.ErrAppNotFound().WithParent(err)
-	}
-	if de, ok := errors.AsType[domain.Error](err); ok {
-		return de
 	}
 	return domain.ErrInternal(err).WithMessage("failed to write app")
 }
@@ -561,71 +594,188 @@ func appField(field string) (domain.AppField, error) {
 	}
 }
 
-func (s *appService) AddClientSecret(ctx context.Context, input AddAppClientSecretInput) (_ *AddAppClientSecretOutput, err error) {
-	ctx, end := startSpan(ctx, "AppService.AddClientSecret")
+// maxClientCredentials bounds the credentials one client holds, so a list
+// needs no paging and a token request checks a handful of hashes.
+const maxClientCredentials = 20
+
+func (s *appService) AddClientCredential(ctx context.Context, input AddAppClientCredentialInput) (_ *AddAppClientCredentialOutput, err error) {
+	ctx, end := startSpan(ctx, "AppService.AddClientCredential")
 	defer end(&err)
 
-	if input.Secret != "" && input.Hash != "" {
-		return nil, domain.ErrAppInvalid(nil).WithMessage("app: give a secret or a hash to import, not both")
+	given := 0
+	for _, set := range []bool{input.Secret != "", input.Hash != "", len(input.PublicKey) > 0} {
+		if set {
+			given++
+		}
 	}
-	encoded := ""
+	if given > 1 {
+		return nil, domain.ErrAppInvalid(nil).WithMessage("app: give a secret, a hash or a public key, not several")
+	}
+	credential := &domain.AppClientCredential{
+		ProjectID: input.ProjectID,
+		Name:      input.Name,
+		Kind:      domain.CredentialKindSecret,
+		ExpiresAt: input.ExpiresAt,
+	}
+	out := &AddAppClientCredentialOutput{Credential: credential}
+	origin := "imported"
 	switch {
+	case len(input.PublicKey) > 0:
+		kid, err := domain.PublicJWKKeyID(input.PublicKey)
+		if err != nil {
+			return nil, domain.ErrAppInvalid(map[string]string{"field": "public_key"}).WithParent(err).WithMessage("app: " + err.Error())
+		}
+		credential.Kind, credential.PublicKey, credential.KeyID = domain.CredentialKindKey, input.PublicKey, kid
+		origin = ""
 	case input.Hash != "":
 		if err := s.imported.ValidateHash(input.Hash); err != nil {
 			return nil, domain.ErrAppInvalid(map[string]string{"field": "hash"}).WithParent(err).WithMessage("app: the hash is in no format the server reads")
 		}
-		encoded = input.Hash
+		credential.EncodedHash = input.Hash
 	case input.Secret != "":
-		encoded = sha256Encoded(input.Secret)
+		credential.EncodedHash = sha256Encoded(input.Secret)
+	default:
+		origin = "generated"
+		out.Secret, credential.EncodedHash, err = newClientSecret()
+		if err != nil {
+			return nil, err
+		}
 	}
-	out := &AddAppClientSecretOutput{}
 	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		stmts := tx.Statements()
-		entity, err := stmts.GetApp(ctx, appBy(input.ProjectID, domain.AppFieldID, input.AppID))
-		if err != nil {
-			return mapAppReadError(err)
-		}
-		if entity.Source != domain.AppSourceRegistered {
-			return domain.ErrAppDeclared().WithMessage("app: declared in the release, so its secrets are variables")
-		}
-		doc, err := domain.ParseAppDocument(entity.Document)
-		if err != nil {
-			return domain.ErrInternal(err).WithMessage("stored app document does not parse")
-		}
-		client, ok := doc.Client(input.ClientSlug)
-		if !ok {
-			return domain.ErrAppClientNotFound()
-		}
-		if !client.EffectiveAuthMethod().UsesSecret() {
-			return domain.ErrAppInvalid(nil).WithMessage("app: the client authenticates without a secret: it is public or uses private_key_jwt")
-		}
-		stored, err := stmts.ListAppClientIDs(ctx, input.ProjectID, entity.ID)
+		entity, client, row, err := lockedClient(ctx, stmts, input.ProjectID, input.AppID, input.ClientSlug)
 		if err != nil {
 			return err
 		}
-		i := slices.IndexFunc(stored, func(row *domain.AppClientID) bool { return row.Slug == client.Slug })
-		if i < 0 {
-			return domain.ErrAppClientNotFound()
+		if client.Type != domain.ClientTypeConfidential {
+			return domain.ErrAppInvalid(nil).WithMessage("app: a public client holds no credential: it proves itself with PKCE")
 		}
-		origin := "imported"
-		if encoded == "" {
-			origin = "generated"
-			out.Secret, encoded, err = newClientSecret()
-			if err != nil {
-				return err
+		stored, err := stmts.ListAppClientCredentials(ctx, input.ProjectID, row.ID)
+		if err != nil {
+			return err
+		}
+		if len(stored) >= maxClientCredentials {
+			return domain.ErrAppInvalid(nil).WithMessage(fmt.Sprintf("app: a client holds at most %d credentials; revoke one first", maxClientCredentials))
+		}
+		if credential.Kind == domain.CredentialKindKey {
+			if slices.ContainsFunc(stored, func(c *domain.AppClientCredential) bool { return c.KeyID == credential.KeyID }) ||
+				slices.Contains(documentKeyIDs(client), credential.KeyID) {
+				return domain.ErrAppCredentialTaken(map[string]string{"field": "public_key/kid"})
 			}
 		}
-		secret := &domain.AppClientSecret{ProjectID: input.ProjectID, ClientRowID: stored[i].ID, EncodedHash: encoded}
-		if err := stmts.CreateAppClientSecret(ctx, secret); err != nil {
+		credential.ClientRowID = row.ID
+		if err := stmts.CreateAppClientCredential(ctx, credential); err != nil {
+			if _, ok := errors.AsType[*database.UniqueError](err); ok {
+				return domain.ErrAppCredentialTaken(map[string]string{"field": "name"}).WithParent(err)
+			}
 			return err
 		}
-		out.SecretID, out.ClientID = secret.ID, stored[i].ClientID
-		return emitAppClientSecretAdded(ctx, stmts, entity, stored[i], secret, origin)
+		out.ClientID = row.ClientID
+		return emitAppCredentialEvent(ctx, stmts, domain.EventTypeAppCredentialAdded, entity, row, credential, origin)
 	})
 	if err != nil {
 		return nil, mapAppWriteError(err)
 	}
 	return out, nil
+}
+
+func (s *appService) ListClientCredentials(ctx context.Context, projectID, appID, clientSlug string) (_ *AppClientCredentials, err error) {
+	ctx, end := startSpan(ctx, "AppService.ListClientCredentials")
+	defer end(&err)
+
+	stmts := s.v2Pool.Statements()
+	_, _, row, err := appClient(ctx, stmts, projectID, appID, clientSlug)
+	if err != nil {
+		return nil, err
+	}
+	stored, err := stmts.ListAppClientCredentials(ctx, projectID, row.ID)
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to list client credentials")
+	}
+	return &AppClientCredentials{ClientID: row.ClientID, Credentials: stored}, nil
+}
+
+func (s *appService) RevokeClientCredential(ctx context.Context, projectID, appID, clientSlug, credentialID string) (err error) {
+	ctx, end := startSpan(ctx, "AppService.RevokeClientCredential")
+	defer end(&err)
+
+	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		stmts := tx.Statements()
+		entity, _, row, err := lockedClient(ctx, stmts, projectID, appID, clientSlug)
+		if err != nil {
+			return err
+		}
+		stored, err := stmts.ListAppClientCredentials(ctx, projectID, row.ID)
+		if err != nil {
+			return err
+		}
+		i := slices.IndexFunc(stored, func(c *domain.AppClientCredential) bool { return c.ID == credentialID })
+		if i < 0 {
+			return domain.ErrAppCredentialNotFound()
+		}
+		if err := stmts.DeleteAppClientCredential(ctx, projectID, row.ID, credentialID); err != nil {
+			return err
+		}
+		return emitAppCredentialEvent(ctx, stmts, domain.EventTypeAppCredentialRevoked, entity, row, stored[i], "")
+	})
+	if err != nil {
+		return mapAppWriteError(err)
+	}
+	return nil
+}
+
+// appClient reads the app id names at its newest revision, the client slug
+// names in it, and the row holding the client's id.
+func appClient(ctx context.Context, stmts AllStatements, projectID, appID, slug string) (*domain.App, domain.AppClient, *domain.AppClientID, error) {
+	entity, err := stmts.GetApp(ctx, appBy(projectID, domain.AppFieldID, appID))
+	if err != nil {
+		return nil, domain.AppClient{}, nil, mapAppReadError(err)
+	}
+	doc, err := domain.ParseAppDocument(entity.Document)
+	if err != nil {
+		return nil, domain.AppClient{}, nil, domain.ErrInternal(err).WithMessage("stored app document does not parse")
+	}
+	client, ok := doc.Client(slug)
+	if !ok {
+		return nil, domain.AppClient{}, nil, domain.ErrAppClientNotFound()
+	}
+	rows, err := stmts.ListAppClientIDs(ctx, projectID, entity.ID)
+	if err != nil {
+		return nil, domain.AppClient{}, nil, err
+	}
+	i := slices.IndexFunc(rows, func(row *domain.AppClientID) bool { return row.Slug == slug })
+	if i < 0 {
+		return nil, domain.AppClient{}, nil, domain.ErrAppClientNotFound()
+	}
+	return entity, client, rows[i], nil
+}
+
+// lockedClient is appClient under the app's lock, so credential writes to one
+// app serialize and a kid or the count is checked against what is stored.
+func lockedClient(ctx context.Context, stmts AllStatements, projectID, appID, slug string) (*domain.App, domain.AppClient, *domain.AppClientID, error) {
+	if err := stmts.LockApp(ctx, projectID, appID); err != nil {
+		return nil, domain.AppClient{}, nil, mapAppReadError(err)
+	}
+	return appClient(ctx, stmts, projectID, appID, slug)
+}
+
+// documentKeyIDs returns the kids of the keys in the client's document.
+func documentKeyIDs(client domain.AppClient) []string {
+	var set struct {
+		Keys []struct {
+			Kid string `json:"kid"`
+		} `json:"keys"`
+	}
+	if len(client.JWKS) == 0 || json.Unmarshal(client.JWKS, &set) != nil {
+		return nil
+	}
+	kids := make([]string, 0, len(set.Keys))
+	for _, key := range set.Keys {
+		if key.Kid != "" {
+			kids = append(kids, key.Kid)
+		}
+	}
+	return kids
 }
 
 // clientSecretPrefix marks a secret the server generated, so a scanner can
@@ -638,13 +788,61 @@ const clientSecretPrefix = "zcs_"
 // bogus token request into CPU load.
 const sha256Scheme = "sha256:"
 
+const (
+	base62Digits = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+	// secretBodyLength is 256 random bits in base62, and checksumLength a
+	// CRC32 in base62, each padded to a fixed width.
+	secretBodyLength = 43
+	checksumLength   = 6
+)
+
+// newClientSecret returns a generated secret and its encoded hash. The secret
+// is the prefix, 256 random bits and a CRC32 of both, in base62 at fixed
+// widths: it has no `:` to break HTTP Basic, needs no escaping in a URL, and
+// a scanner or the server tells a typo from a secret before hashing it.
 func newClientSecret() (plain, encoded string, err error) {
 	b := make([]byte, 32)
 	if _, err := rand.Read(b); err != nil {
 		return "", "", domain.ErrInternal(err).WithMessage("failed to generate client secret")
 	}
-	plain = clientSecretPrefix + base64.RawURLEncoding.EncodeToString(b)
+	body := clientSecretPrefix + base62(new(big.Int).SetBytes(b), secretBodyLength)
+	plain = body + secretChecksum(body)
 	return plain, sha256Encoded(plain), nil
+}
+
+// clientSecretWellFormed reports whether secret can be one the server
+// generated: a generated one's checksum must hold. An imported secret keeps
+// the customer's value, which carries no prefix and passes.
+func clientSecretWellFormed(secret string) bool {
+	if !strings.HasPrefix(secret, clientSecretPrefix) {
+		return true
+	}
+	if len(secret) != len(clientSecretPrefix)+secretBodyLength+checksumLength {
+		return false
+	}
+	body := secret[:len(secret)-checksumLength]
+	return subtle.ConstantTimeCompare([]byte(secretChecksum(body)), []byte(secret[len(body):])) == 1
+}
+
+func secretChecksum(body string) string {
+	return base62(big.NewInt(int64(crc32.ChecksumIEEE([]byte(body)))), checksumLength)
+}
+
+// base62 writes n in base62, padded with zeros to width.
+func base62(n *big.Int, width int) string {
+	digits := make([]byte, 0, width)
+	base := big.NewInt(int64(len(base62Digits)))
+	rest := new(big.Int).Set(n)
+	digit := new(big.Int)
+	for rest.Sign() > 0 {
+		rest.DivMod(rest, base, digit)
+		digits = append(digits, base62Digits[digit.Int64()])
+	}
+	for len(digits) < width {
+		digits = append(digits, '0')
+	}
+	slices.Reverse(digits)
+	return string(digits)
 }
 
 func sha256Encoded(secret string) string {
@@ -673,18 +871,20 @@ func emitAppEvent(ctx context.Context, stmts AllStatements, eventType domain.Eve
 	})
 }
 
-func emitAppClientSecretAdded(ctx context.Context, stmts AllStatements, entity *domain.App, client *domain.AppClientID, secret *domain.AppClientSecret, origin string) error {
+func emitAppCredentialEvent(ctx context.Context, stmts AllStatements, eventType domain.EventType, entity *domain.App, client *domain.AppClientID, credential *domain.AppClientCredential, origin string) error {
 	return audit.Emit(ctx, stmts, audit.EmitSpec{
-		Type:       domain.EventTypeAppClientSecretAdded,
+		Type:       eventType,
 		Category:   domain.EventCategoryAdmin,
 		ProjectID:  entity.ProjectID,
 		EntityType: "app",
 		EntityID:   entity.ID,
-		Payload: domain.AppClientSecretAddedPayload{
-			Client:   client.Slug,
-			ClientID: client.ClientID,
-			SecretID: secret.ID,
-			Origin:   origin,
+		Payload: domain.AppCredentialPayload{
+			Client:       client.Slug,
+			ClientID:     client.ClientID,
+			CredentialID: credential.ID,
+			Name:         credential.Name,
+			Kind:         string(credential.Kind),
+			Origin:       origin,
 		},
 	})
 }

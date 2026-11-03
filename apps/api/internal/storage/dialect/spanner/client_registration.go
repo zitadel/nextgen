@@ -17,7 +17,7 @@ const (
 	createClientRegistrationStmt = `INSERT INTO client_registrations ` +
 		`(project_id, id, metadata, secret_hash, expires_at) VALUES (@p1, @p2, @p3, @p4, @p5) THEN RETURN created_at`
 
-	clientRegistrationQuery = `SELECT project_id, id, metadata, secret_hash, created_at, expires_at ` +
+	clientRegistrationQuery = `SELECT project_id, id, app_slug, metadata, secret_hash, created_at, expires_at ` +
 		`FROM client_registrations`
 
 	getClientRegistrationStmt = clientRegistrationQuery + ` WHERE project_id = @p1 AND id = @p2`
@@ -28,6 +28,13 @@ const (
 		`WHERE project_id = @p1 AND expires_at <= @p2 ORDER BY expires_at, id LIMIT @p3`
 
 	extendClientRegistrationStmt = `UPDATE client_registrations SET expires_at = @p3 WHERE project_id = @p1 AND id = @p2`
+
+	// Only a registration that joined no app takes one; the select then reads
+	// the app it holds, this one or the one an earlier request set.
+	joinClientRegistrationAppStmt = `UPDATE client_registrations SET app_slug = @p3 ` +
+		`WHERE project_id = @p1 AND id = @p2 AND app_slug IS NULL`
+
+	clientRegistrationAppStmt = `SELECT app_slug FROM client_registrations WHERE project_id = @p1 AND id = @p2`
 )
 
 type clientRegistrationStatements struct{ statement }
@@ -144,13 +151,32 @@ func (s clientRegistrationStatements) ExtendClientRegistration(ctx context.Conte
 	return nil
 }
 
+// JoinClientRegistrationApp implements [service.ClientRegistrationStatements].
+func (s clientRegistrationStatements) JoinClientRegistrationApp(ctx context.Context, projectID, id, appSlug string) (string, error) {
+	if _, err := s.db.Update(ctx, buildStatement(joinClientRegistrationAppStmt, projectID, id, appSlug).statement()); err != nil {
+		return "", wrapError(err)
+	}
+	var joined spanner.NullString
+	err := s.db.Query(ctx, buildStatement(clientRegistrationAppStmt, projectID, id).statement(), func(iter *spanner.RowIterator) error {
+		var err error
+		joined, err = collectOneRow(iter, func(row *spanner.Row) (spanner.NullString, error) {
+			var app spanner.NullString
+			err := row.Columns(&app)
+			return app, err
+		})
+		return err
+	})
+	return joined.StringVal, err
+}
+
 func scanClientRegistration(row *spanner.Row) (*domain.ClientRegistration, error) {
 	var (
 		entity     domain.ClientRegistration
+		appSlug    spanner.NullString
 		metadata   spanner.NullJSON
 		secretHash spanner.NullString
 	)
-	if err := row.Columns(&entity.ProjectID, &entity.ID, &metadata, &secretHash, &entity.CreatedAt, &entity.ExpiresAt); err != nil {
+	if err := row.Columns(&entity.ProjectID, &entity.ID, &appSlug, &metadata, &secretHash, &entity.CreatedAt, &entity.ExpiresAt); err != nil {
 		return nil, err
 	}
 	raw, err := decodeNullJSON(metadata)
@@ -162,6 +188,7 @@ func scanClientRegistration(row *spanner.Row) (*domain.ClientRegistration, error
 		return nil, wrapError(err)
 	}
 	entity.Metadata = m
+	entity.AppSlug = appSlug.StringVal
 	entity.SecretHash = secretHash.StringVal
 	entity.CreatedAt, entity.ExpiresAt = entity.CreatedAt.UTC(), entity.ExpiresAt.UTC()
 	return &entity, nil

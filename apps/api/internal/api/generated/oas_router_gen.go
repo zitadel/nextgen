@@ -24,7 +24,11 @@ var (
 		"GET": "Authorization",
 	}
 	rn5AllowedHeaders = map[string]string{
+		"GET":  "Authorization",
 		"POST": "Authorization,Content-Type",
+	}
+	rn122AllowedHeaders = map[string]string{
+		"DELETE": "Authorization",
 	}
 	rn94AllowedHeaders = map[string]string{
 		"GET": "Authorization",
@@ -38,7 +42,7 @@ var (
 	rn92AllowedHeaders = map[string]string{
 		"POST": "Authorization,Content-Type",
 	}
-	rn127AllowedHeaders = map[string]string{
+	rn129AllowedHeaders = map[string]string{
 		"POST": "Authorization,Content-Type,Idempotency-Key",
 	}
 	rn26AllowedHeaders = map[string]string{
@@ -65,7 +69,7 @@ var (
 	rn56AllowedHeaders = map[string]string{
 		"GET": "Authorization",
 	}
-	rn123AllowedHeaders = map[string]string{
+	rn125AllowedHeaders = map[string]string{
 		"POST": "Authorization,Content-Type",
 	}
 	rn57AllowedHeaders = map[string]string{
@@ -80,7 +84,7 @@ var (
 	rn21AllowedHeaders = map[string]string{
 		"POST": "Content-Type,Origin",
 	}
-	rn124AllowedHeaders = map[string]string{
+	rn126AllowedHeaders = map[string]string{
 		"POST": "Content-Type,Origin",
 	}
 	rn22AllowedHeaders = map[string]string{
@@ -175,7 +179,7 @@ var (
 	rn83AllowedHeaders = map[string]string{
 		"GET": "Authorization",
 	}
-	rn121AllowedHeaders = map[string]string{
+	rn123AllowedHeaders = map[string]string{
 		"POST": "Authorization",
 	}
 	rn30AllowedHeaders = map[string]string{
@@ -282,7 +286,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.notFound(w, r)
 		return
 	}
-	args := [2]string{}
+	args := [3]string{}
 
 	// Static code generated router with unwrapped path search.
 	switch {
@@ -475,25 +479,29 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 									break
 								}
 								switch elem[0] {
-								case '/': // Prefix: "/secrets"
+								case '/': // Prefix: "/credentials"
 
-									if l := len("/secrets"); len(elem) >= l && elem[0:l] == "/secrets" {
+									if l := len("/credentials"); len(elem) >= l && elem[0:l] == "/credentials" {
 										elem = elem[l:]
 									} else {
 										break
 									}
 
 									if len(elem) == 0 {
-										// Leaf node.
 										switch r.Method {
+										case "GET":
+											s.handleListAppClientCredentialsRequest([2]string{
+												args[0],
+												args[1],
+											}, elemIsEscaped, w, r)
 										case "POST":
-											s.handleAddAppClientSecretRequest([2]string{
+											s.handleAddAppClientCredentialRequest([2]string{
 												args[0],
 												args[1],
 											}, elemIsEscaped, w, r)
 										default:
 											s.notAllowed(w, r, notAllowedParams{
-												allowedMethods: "POST",
+												allowedMethods: "GET,POST",
 												allowedHeaders: rn5AllowedHeaders,
 												acceptPost:     "application/json",
 												acceptPatch:    "",
@@ -501,6 +509,46 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 										}
 
 										return
+									}
+									switch elem[0] {
+									case '/': // Prefix: "/"
+
+										if l := len("/"); len(elem) >= l && elem[0:l] == "/" {
+											elem = elem[l:]
+										} else {
+											break
+										}
+
+										// Param: "credential_id"
+										// Leaf parameter, slashes are prohibited
+										idx := strings.IndexByte(elem, '/')
+										if idx >= 0 {
+											break
+										}
+										args[2] = elem
+										elem = ""
+
+										if len(elem) == 0 {
+											// Leaf node.
+											switch r.Method {
+											case "DELETE":
+												s.handleRevokeAppClientCredentialRequest([3]string{
+													args[0],
+													args[1],
+													args[2],
+												}, elemIsEscaped, w, r)
+											default:
+												s.notAllowed(w, r, notAllowedParams{
+													allowedMethods: "DELETE",
+													allowedHeaders: rn122AllowedHeaders,
+													acceptPost:     "",
+													acceptPatch:    "",
+												})
+											}
+
+											return
+										}
+
 									}
 
 								}
@@ -675,7 +723,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 											default:
 												s.notAllowed(w, r, notAllowedParams{
 													allowedMethods: "POST",
-													allowedHeaders: rn127AllowedHeaders,
+													allowedHeaders: rn129AllowedHeaders,
 													acceptPost:     "application/json",
 													acceptPatch:    "",
 												})
@@ -949,7 +997,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 								default:
 									s.notAllowed(w, r, notAllowedParams{
 										allowedMethods: "POST",
-										allowedHeaders: rn123AllowedHeaders,
+										allowedHeaders: rn125AllowedHeaders,
 										acceptPost:     "application/json",
 										acceptPatch:    "",
 									})
@@ -1130,7 +1178,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 							default:
 								s.notAllowed(w, r, notAllowedParams{
 									allowedMethods: "POST",
-									allowedHeaders: rn124AllowedHeaders,
+									allowedHeaders: rn126AllowedHeaders,
 									acceptPost:     "application/json",
 									acceptPatch:    "",
 								})
@@ -2179,7 +2227,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 								default:
 									s.notAllowed(w, r, notAllowedParams{
 										allowedMethods: "POST",
-										allowedHeaders: rn121AllowedHeaders,
+										allowedHeaders: rn123AllowedHeaders,
 										acceptPost:     "",
 										acceptPatch:    "",
 									})
@@ -3162,7 +3210,7 @@ type Route struct {
 	operationGroup string
 	pathPattern    string
 	count          int
-	args           [2]string
+	args           [3]string
 }
 
 // Name returns ogen operation name.
@@ -3415,29 +3463,73 @@ func (s *Server) FindPath(method string, u *url.URL) (r Route, _ bool) {
 									break
 								}
 								switch elem[0] {
-								case '/': // Prefix: "/secrets"
+								case '/': // Prefix: "/credentials"
 
-									if l := len("/secrets"); len(elem) >= l && elem[0:l] == "/secrets" {
+									if l := len("/credentials"); len(elem) >= l && elem[0:l] == "/credentials" {
 										elem = elem[l:]
 									} else {
 										break
 									}
 
 									if len(elem) == 0 {
-										// Leaf node.
 										switch method {
-										case "POST":
-											r.name = AddAppClientSecretOperation
-											r.summary = "Add a secret to an app's client"
-											r.operationID = "addAppClientSecret"
+										case "GET":
+											r.name = ListAppClientCredentialsOperation
+											r.summary = "List the credentials of an app's client"
+											r.operationID = "listAppClientCredentials"
 											r.operationGroup = ""
-											r.pathPattern = "/apps/{id}/clients/{client}/secrets"
+											r.pathPattern = "/apps/{id}/clients/{client}/credentials"
+											r.args = args
+											r.count = 2
+											return r, true
+										case "POST":
+											r.name = AddAppClientCredentialOperation
+											r.summary = "Add a credential to an app's client"
+											r.operationID = "addAppClientCredential"
+											r.operationGroup = ""
+											r.pathPattern = "/apps/{id}/clients/{client}/credentials"
 											r.args = args
 											r.count = 2
 											return r, true
 										default:
 											return
 										}
+									}
+									switch elem[0] {
+									case '/': // Prefix: "/"
+
+										if l := len("/"); len(elem) >= l && elem[0:l] == "/" {
+											elem = elem[l:]
+										} else {
+											break
+										}
+
+										// Param: "credential_id"
+										// Leaf parameter, slashes are prohibited
+										idx := strings.IndexByte(elem, '/')
+										if idx >= 0 {
+											break
+										}
+										args[2] = elem
+										elem = ""
+
+										if len(elem) == 0 {
+											// Leaf node.
+											switch method {
+											case "DELETE":
+												r.name = RevokeAppClientCredentialOperation
+												r.summary = "Revoke a credential of an app's client"
+												r.operationID = "revokeAppClientCredential"
+												r.operationGroup = ""
+												r.pathPattern = "/apps/{id}/clients/{client}/credentials/{credential_id}"
+												r.args = args
+												r.count = 3
+												return r, true
+											default:
+												return
+											}
+										}
+
 									}
 
 								}

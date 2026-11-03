@@ -15,17 +15,17 @@ import (
 	"go.zitadel.com/zitadel/v5/ogenx"
 )
 
-// Encode encodes AddAppClientSecretBadRequest as json.
-func (s *AddAppClientSecretBadRequest) Encode(e *jx.Encoder) {
+// Encode encodes AddAppClientCredentialBadRequest as json.
+func (s *AddAppClientCredentialBadRequest) Encode(e *jx.Encoder) {
 	unwrapped := (*ErrorDetails)(s)
 
 	unwrapped.Encode(e)
 }
 
-// Decode decodes AddAppClientSecretBadRequest from json.
-func (s *AddAppClientSecretBadRequest) Decode(d *jx.Decoder) error {
+// Decode decodes AddAppClientCredentialBadRequest from json.
+func (s *AddAppClientCredentialBadRequest) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode AddAppClientSecretBadRequest to nil")
+		return errors.New("invalid: unable to decode AddAppClientCredentialBadRequest to nil")
 	}
 	var unwrapped ErrorDetails
 	if err := func() error {
@@ -36,34 +36,34 @@ func (s *AddAppClientSecretBadRequest) Decode(d *jx.Decoder) error {
 	}(); err != nil {
 		return errors.Wrap(err, "alias")
 	}
-	*s = AddAppClientSecretBadRequest(unwrapped)
+	*s = AddAppClientCredentialBadRequest(unwrapped)
 	return nil
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s *AddAppClientSecretBadRequest) MarshalJSON() ([]byte, error) {
+func (s *AddAppClientCredentialBadRequest) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *AddAppClientSecretBadRequest) UnmarshalJSON(data []byte) error {
+func (s *AddAppClientCredentialBadRequest) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
 
-// Encode encodes AddAppClientSecretConflict as json.
-func (s *AddAppClientSecretConflict) Encode(e *jx.Encoder) {
+// Encode encodes AddAppClientCredentialConflict as json.
+func (s *AddAppClientCredentialConflict) Encode(e *jx.Encoder) {
 	unwrapped := (*ErrorDetails)(s)
 
 	unwrapped.Encode(e)
 }
 
-// Decode decodes AddAppClientSecretConflict from json.
-func (s *AddAppClientSecretConflict) Decode(d *jx.Decoder) error {
+// Decode decodes AddAppClientCredentialConflict from json.
+func (s *AddAppClientCredentialConflict) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode AddAppClientSecretConflict to nil")
+		return errors.New("invalid: unable to decode AddAppClientCredentialConflict to nil")
 	}
 	var unwrapped ErrorDetails
 	if err := func() error {
@@ -74,33 +74,33 @@ func (s *AddAppClientSecretConflict) Decode(d *jx.Decoder) error {
 	}(); err != nil {
 		return errors.Wrap(err, "alias")
 	}
-	*s = AddAppClientSecretConflict(unwrapped)
+	*s = AddAppClientCredentialConflict(unwrapped)
 	return nil
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s *AddAppClientSecretConflict) MarshalJSON() ([]byte, error) {
+func (s *AddAppClientCredentialConflict) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *AddAppClientSecretConflict) UnmarshalJSON(data []byte) error {
+func (s *AddAppClientCredentialConflict) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
 
-// Encode encodes AddAppClientSecretErrorResponse as json.
-func (s AddAppClientSecretErrorResponse) Encode(e *jx.Encoder) {
+// Encode encodes AddAppClientCredentialErrorResponse as json.
+func (s AddAppClientCredentialErrorResponse) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
 	e.ObjEnd()
 }
 
-func (s AddAppClientSecretErrorResponse) encodeFields(e *jx.Encoder) {
+func (s AddAppClientCredentialErrorResponse) encodeFields(e *jx.Encoder) {
 	switch s.Type {
-	case AppClientNotFoundAddAppClientSecretErrorResponse:
+	case AppClientNotFoundAddAppClientCredentialErrorResponse:
 		e.FieldStart("code")
 		e.Str("app.client_not_found")
 		{
@@ -116,11 +116,11 @@ func (s AddAppClientSecretErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case AppDeclaredAddAppClientSecretErrorResponse:
+	case AppCredentialTakenAddAppClientCredentialErrorResponse:
 		e.FieldStart("code")
-		e.Str("app.declared")
+		e.Str("app.credential_taken")
 		{
-			s := s.AppDeclared
+			s := s.AppCredentialTaken
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -132,7 +132,7 @@ func (s AddAppClientSecretErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case AppInvalidAddAppClientSecretErrorResponse:
+	case AppInvalidAddAppClientCredentialErrorResponse:
 		e.FieldStart("code")
 		e.Str("app.invalid")
 		{
@@ -148,7 +148,7 @@ func (s AddAppClientSecretErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case AppNotFoundAddAppClientSecretErrorResponse:
+	case AppNotFoundAddAppClientCredentialErrorResponse:
 		e.FieldStart("code")
 		e.Str("app.not_found")
 		{
@@ -164,7 +164,7 @@ func (s AddAppClientSecretErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case AppPermissionDeniedAddAppClientSecretErrorResponse:
+	case AppPermissionDeniedAddAppClientCredentialErrorResponse:
 		e.FieldStart("code")
 		e.Str("app.permission_denied")
 		{
@@ -180,7 +180,7 @@ func (s AddAppClientSecretErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case AppRevisionConflictAddAppClientSecretErrorResponse:
+	case AppRevisionConflictAddAppClientCredentialErrorResponse:
 		e.FieldStart("code")
 		e.Str("app.revision_conflict")
 		{
@@ -196,7 +196,23 @@ func (s AddAppClientSecretErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case AuthUnauthorizedAddAppClientSecretErrorResponse:
+	case AuthCsrfInvalidAddAppClientCredentialErrorResponse:
+		e.FieldStart("code")
+		e.Str("auth.csrf_invalid")
+		{
+			s := s.AuthCsrfInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case AuthUnauthorizedAddAppClientCredentialErrorResponse:
 		e.FieldStart("code")
 		e.Str("auth.unauthorized")
 		{
@@ -212,7 +228,7 @@ func (s AddAppClientSecretErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case EvtInvalidAddAppClientSecretErrorResponse:
+	case EvtInvalidAddAppClientCredentialErrorResponse:
 		e.FieldStart("code")
 		e.Str("evt.invalid")
 		{
@@ -228,7 +244,7 @@ func (s AddAppClientSecretErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case InternalAddAppClientSecretErrorResponse:
+	case InternalAddAppClientCredentialErrorResponse:
 		e.FieldStart("code")
 		e.Str("internal")
 		{
@@ -244,7 +260,7 @@ func (s AddAppClientSecretErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case NotImplementedAddAppClientSecretErrorResponse:
+	case NotImplementedAddAppClientCredentialErrorResponse:
 		e.FieldStart("code")
 		e.Str("not_implemented")
 		{
@@ -260,7 +276,7 @@ func (s AddAppClientSecretErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case ReqInvalidAddAppClientSecretErrorResponse:
+	case ReqInvalidAddAppClientCredentialErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
 		{
@@ -276,7 +292,7 @@ func (s AddAppClientSecretErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case UnavailableAddAppClientSecretErrorResponse:
+	case UnavailableAddAppClientCredentialErrorResponse:
 		e.FieldStart("code")
 		e.Str("unavailable")
 		{
@@ -295,10 +311,10 @@ func (s AddAppClientSecretErrorResponse) encodeFields(e *jx.Encoder) {
 	}
 }
 
-// Decode decodes AddAppClientSecretErrorResponse from json.
-func (s *AddAppClientSecretErrorResponse) Decode(d *jx.Decoder) error {
+// Decode decodes AddAppClientCredentialErrorResponse from json.
+func (s *AddAppClientCredentialErrorResponse) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode AddAppClientSecretErrorResponse to nil")
+		return errors.New("invalid: unable to decode AddAppClientCredentialErrorResponse to nil")
 	}
 	// Sum type discriminator.
 	if typ := d.Next(); typ != jx.Object {
@@ -319,40 +335,43 @@ func (s *AddAppClientSecretErrorResponse) Decode(d *jx.Decoder) error {
 				}
 				switch typ {
 				case "app.client_not_found":
-					s.Type = AppClientNotFoundAddAppClientSecretErrorResponse
+					s.Type = AppClientNotFoundAddAppClientCredentialErrorResponse
 					found = true
-				case "app.declared":
-					s.Type = AppDeclaredAddAppClientSecretErrorResponse
+				case "app.credential_taken":
+					s.Type = AppCredentialTakenAddAppClientCredentialErrorResponse
 					found = true
 				case "app.invalid":
-					s.Type = AppInvalidAddAppClientSecretErrorResponse
+					s.Type = AppInvalidAddAppClientCredentialErrorResponse
 					found = true
 				case "app.not_found":
-					s.Type = AppNotFoundAddAppClientSecretErrorResponse
+					s.Type = AppNotFoundAddAppClientCredentialErrorResponse
 					found = true
 				case "app.permission_denied":
-					s.Type = AppPermissionDeniedAddAppClientSecretErrorResponse
+					s.Type = AppPermissionDeniedAddAppClientCredentialErrorResponse
 					found = true
 				case "app.revision_conflict":
-					s.Type = AppRevisionConflictAddAppClientSecretErrorResponse
+					s.Type = AppRevisionConflictAddAppClientCredentialErrorResponse
+					found = true
+				case "auth.csrf_invalid":
+					s.Type = AuthCsrfInvalidAddAppClientCredentialErrorResponse
 					found = true
 				case "auth.unauthorized":
-					s.Type = AuthUnauthorizedAddAppClientSecretErrorResponse
+					s.Type = AuthUnauthorizedAddAppClientCredentialErrorResponse
 					found = true
 				case "evt.invalid":
-					s.Type = EvtInvalidAddAppClientSecretErrorResponse
+					s.Type = EvtInvalidAddAppClientCredentialErrorResponse
 					found = true
 				case "internal":
-					s.Type = InternalAddAppClientSecretErrorResponse
+					s.Type = InternalAddAppClientCredentialErrorResponse
 					found = true
 				case "not_implemented":
-					s.Type = NotImplementedAddAppClientSecretErrorResponse
+					s.Type = NotImplementedAddAppClientCredentialErrorResponse
 					found = true
 				case "req.invalid":
-					s.Type = ReqInvalidAddAppClientSecretErrorResponse
+					s.Type = ReqInvalidAddAppClientCredentialErrorResponse
 					found = true
 				case "unavailable":
-					s.Type = UnavailableAddAppClientSecretErrorResponse
+					s.Type = UnavailableAddAppClientCredentialErrorResponse
 					found = true
 				default:
 					return errors.Errorf("unknown type %s", typ)
@@ -368,51 +387,55 @@ func (s *AddAppClientSecretErrorResponse) Decode(d *jx.Decoder) error {
 		return errors.New("unable to detect sum type variant")
 	}
 	switch s.Type {
-	case AppClientNotFoundAddAppClientSecretErrorResponse:
+	case AppClientNotFoundAddAppClientCredentialErrorResponse:
 		if err := s.AppClientNotFound.Decode(d); err != nil {
 			return err
 		}
-	case AppDeclaredAddAppClientSecretErrorResponse:
-		if err := s.AppDeclared.Decode(d); err != nil {
+	case AppCredentialTakenAddAppClientCredentialErrorResponse:
+		if err := s.AppCredentialTaken.Decode(d); err != nil {
 			return err
 		}
-	case AppInvalidAddAppClientSecretErrorResponse:
+	case AppInvalidAddAppClientCredentialErrorResponse:
 		if err := s.AppInvalid.Decode(d); err != nil {
 			return err
 		}
-	case AppNotFoundAddAppClientSecretErrorResponse:
+	case AppNotFoundAddAppClientCredentialErrorResponse:
 		if err := s.AppNotFound.Decode(d); err != nil {
 			return err
 		}
-	case AppPermissionDeniedAddAppClientSecretErrorResponse:
+	case AppPermissionDeniedAddAppClientCredentialErrorResponse:
 		if err := s.AppPermissionDenied.Decode(d); err != nil {
 			return err
 		}
-	case AppRevisionConflictAddAppClientSecretErrorResponse:
+	case AppRevisionConflictAddAppClientCredentialErrorResponse:
 		if err := s.AppRevisionConflict.Decode(d); err != nil {
 			return err
 		}
-	case AuthUnauthorizedAddAppClientSecretErrorResponse:
+	case AuthCsrfInvalidAddAppClientCredentialErrorResponse:
+		if err := s.AuthCsrfInvalid.Decode(d); err != nil {
+			return err
+		}
+	case AuthUnauthorizedAddAppClientCredentialErrorResponse:
 		if err := s.AuthUnauthorized.Decode(d); err != nil {
 			return err
 		}
-	case EvtInvalidAddAppClientSecretErrorResponse:
+	case EvtInvalidAddAppClientCredentialErrorResponse:
 		if err := s.EvtInvalid.Decode(d); err != nil {
 			return err
 		}
-	case InternalAddAppClientSecretErrorResponse:
+	case InternalAddAppClientCredentialErrorResponse:
 		if err := s.Internal.Decode(d); err != nil {
 			return err
 		}
-	case NotImplementedAddAppClientSecretErrorResponse:
+	case NotImplementedAddAppClientCredentialErrorResponse:
 		if err := s.NotImplemented.Decode(d); err != nil {
 			return err
 		}
-	case ReqInvalidAddAppClientSecretErrorResponse:
+	case ReqInvalidAddAppClientCredentialErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
 			return err
 		}
-	case UnavailableAddAppClientSecretErrorResponse:
+	case UnavailableAddAppClientCredentialErrorResponse:
 		if err := s.Unavailable.Decode(d); err != nil {
 			return err
 		}
@@ -423,29 +446,29 @@ func (s *AddAppClientSecretErrorResponse) Decode(d *jx.Decoder) error {
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s AddAppClientSecretErrorResponse) MarshalJSON() ([]byte, error) {
+func (s AddAppClientCredentialErrorResponse) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *AddAppClientSecretErrorResponse) UnmarshalJSON(data []byte) error {
+func (s *AddAppClientCredentialErrorResponse) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
 
-// Encode encodes AddAppClientSecretForbidden as json.
-func (s *AddAppClientSecretForbidden) Encode(e *jx.Encoder) {
+// Encode encodes AddAppClientCredentialForbidden as json.
+func (s *AddAppClientCredentialForbidden) Encode(e *jx.Encoder) {
 	unwrapped := (*ErrorDetails)(s)
 
 	unwrapped.Encode(e)
 }
 
-// Decode decodes AddAppClientSecretForbidden from json.
-func (s *AddAppClientSecretForbidden) Decode(d *jx.Decoder) error {
+// Decode decodes AddAppClientCredentialForbidden from json.
+func (s *AddAppClientCredentialForbidden) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode AddAppClientSecretForbidden to nil")
+		return errors.New("invalid: unable to decode AddAppClientCredentialForbidden to nil")
 	}
 	var unwrapped ErrorDetails
 	if err := func() error {
@@ -456,34 +479,34 @@ func (s *AddAppClientSecretForbidden) Decode(d *jx.Decoder) error {
 	}(); err != nil {
 		return errors.Wrap(err, "alias")
 	}
-	*s = AddAppClientSecretForbidden(unwrapped)
+	*s = AddAppClientCredentialForbidden(unwrapped)
 	return nil
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s *AddAppClientSecretForbidden) MarshalJSON() ([]byte, error) {
+func (s *AddAppClientCredentialForbidden) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *AddAppClientSecretForbidden) UnmarshalJSON(data []byte) error {
+func (s *AddAppClientCredentialForbidden) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
 
-// Encode encodes AddAppClientSecretNotFound as json.
-func (s *AddAppClientSecretNotFound) Encode(e *jx.Encoder) {
+// Encode encodes AddAppClientCredentialNotFound as json.
+func (s *AddAppClientCredentialNotFound) Encode(e *jx.Encoder) {
 	unwrapped := (*ErrorDetails)(s)
 
 	unwrapped.Encode(e)
 }
 
-// Decode decodes AddAppClientSecretNotFound from json.
-func (s *AddAppClientSecretNotFound) Decode(d *jx.Decoder) error {
+// Decode decodes AddAppClientCredentialNotFound from json.
+func (s *AddAppClientCredentialNotFound) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode AddAppClientSecretNotFound to nil")
+		return errors.New("invalid: unable to decode AddAppClientCredentialNotFound to nil")
 	}
 	var unwrapped ErrorDetails
 	if err := func() error {
@@ -494,32 +517,36 @@ func (s *AddAppClientSecretNotFound) Decode(d *jx.Decoder) error {
 	}(); err != nil {
 		return errors.Wrap(err, "alias")
 	}
-	*s = AddAppClientSecretNotFound(unwrapped)
+	*s = AddAppClientCredentialNotFound(unwrapped)
 	return nil
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s *AddAppClientSecretNotFound) MarshalJSON() ([]byte, error) {
+func (s *AddAppClientCredentialNotFound) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *AddAppClientSecretNotFound) UnmarshalJSON(data []byte) error {
+func (s *AddAppClientCredentialNotFound) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
 
 // Encode implements json.Marshaler.
-func (s *AddAppClientSecretRequest) Encode(e *jx.Encoder) {
+func (s *AddAppClientCredentialRequest) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
 	e.ObjEnd()
 }
 
 // encodeFields encodes fields.
-func (s *AddAppClientSecretRequest) encodeFields(e *jx.Encoder) {
+func (s *AddAppClientCredentialRequest) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("name")
+		e.Str(s.Name)
+	}
 	{
 		if s.Secret.Set {
 			e.FieldStart("secret")
@@ -532,21 +559,49 @@ func (s *AddAppClientSecretRequest) encodeFields(e *jx.Encoder) {
 			s.Hash.Encode(e)
 		}
 	}
-}
-
-var jsonFieldsNameOfAddAppClientSecretRequest = [2]string{
-	0: "secret",
-	1: "hash",
-}
-
-// Decode decodes AddAppClientSecretRequest from json.
-func (s *AddAppClientSecretRequest) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode AddAppClientSecretRequest to nil")
+	{
+		if s.PublicKey.Set {
+			e.FieldStart("public_key")
+			s.PublicKey.Encode(e)
+		}
 	}
+	{
+		if s.ExpiresAt.Set {
+			e.FieldStart("expires_at")
+			s.ExpiresAt.Encode(e, json.EncodeDateTime)
+		}
+	}
+}
+
+var jsonFieldsNameOfAddAppClientCredentialRequest = [5]string{
+	0: "name",
+	1: "secret",
+	2: "hash",
+	3: "public_key",
+	4: "expires_at",
+}
+
+// Decode decodes AddAppClientCredentialRequest from json.
+func (s *AddAppClientCredentialRequest) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode AddAppClientCredentialRequest to nil")
+	}
+	var requiredBitSet [1]uint8
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
+		case "name":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.Name = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"name\"")
+			}
 		case "secret":
 			if err := func() error {
 				s.Secret.Reset()
@@ -567,115 +622,37 @@ func (s *AddAppClientSecretRequest) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"hash\"")
 			}
-		default:
-			return d.Skip()
-		}
-		return nil
-	}); err != nil {
-		return errors.Wrap(err, "decode AddAppClientSecretRequest")
-	}
-
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *AddAppClientSecretRequest) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *AddAppClientSecretRequest) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode implements json.Marshaler.
-func (s *AddAppClientSecretResponse) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-// encodeFields encodes fields.
-func (s *AddAppClientSecretResponse) encodeFields(e *jx.Encoder) {
-	{
-		e.FieldStart("id")
-		e.Str(s.ID)
-	}
-	{
-		e.FieldStart("client_id")
-		e.Str(s.ClientID)
-	}
-	{
-		if s.Secret.Set {
-			e.FieldStart("secret")
-			s.Secret.Encode(e)
-		}
-	}
-}
-
-var jsonFieldsNameOfAddAppClientSecretResponse = [3]string{
-	0: "id",
-	1: "client_id",
-	2: "secret",
-}
-
-// Decode decodes AddAppClientSecretResponse from json.
-func (s *AddAppClientSecretResponse) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode AddAppClientSecretResponse to nil")
-	}
-	var requiredBitSet [1]uint8
-
-	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
-		switch string(k) {
-		case "id":
-			requiredBitSet[0] |= 1 << 0
+		case "public_key":
 			if err := func() error {
-				v, err := d.Str()
-				s.ID = string(v)
-				if err != nil {
+				s.PublicKey.Reset()
+				if err := s.PublicKey.Decode(d); err != nil {
 					return err
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"id\"")
+				return errors.Wrap(err, "decode field \"public_key\"")
 			}
-		case "client_id":
-			requiredBitSet[0] |= 1 << 1
+		case "expires_at":
 			if err := func() error {
-				v, err := d.Str()
-				s.ClientID = string(v)
-				if err != nil {
+				s.ExpiresAt.Reset()
+				if err := s.ExpiresAt.Decode(d, json.DecodeDateTime); err != nil {
 					return err
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"client_id\"")
-			}
-		case "secret":
-			if err := func() error {
-				s.Secret.Reset()
-				if err := s.Secret.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"secret\"")
+				return errors.Wrap(err, "decode field \"expires_at\"")
 			}
 		default:
 			return d.Skip()
 		}
 		return nil
 	}); err != nil {
-		return errors.Wrap(err, "decode AddAppClientSecretResponse")
+		return errors.Wrap(err, "decode AddAppClientCredentialRequest")
 	}
 	// Validate required fields.
 	var failures []validate.FieldError
 	for i, mask := range [1]uint8{
-		0b00000011,
+		0b00000001,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -687,8 +664,8 @@ func (s *AddAppClientSecretResponse) Decode(d *jx.Decoder) error {
 				bitIdx := bits.TrailingZeros8(result)
 				fieldIdx := i*8 + bitIdx
 				var name string
-				if fieldIdx < len(jsonFieldsNameOfAddAppClientSecretResponse) {
-					name = jsonFieldsNameOfAddAppClientSecretResponse[fieldIdx]
+				if fieldIdx < len(jsonFieldsNameOfAddAppClientCredentialRequest) {
+					name = jsonFieldsNameOfAddAppClientCredentialRequest[fieldIdx]
 				} else {
 					name = strconv.Itoa(fieldIdx)
 				}
@@ -709,29 +686,29 @@ func (s *AddAppClientSecretResponse) Decode(d *jx.Decoder) error {
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s *AddAppClientSecretResponse) MarshalJSON() ([]byte, error) {
+func (s *AddAppClientCredentialRequest) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *AddAppClientSecretResponse) UnmarshalJSON(data []byte) error {
+func (s *AddAppClientCredentialRequest) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
 
-// Encode encodes AddAppClientSecretUnauthorized as json.
-func (s *AddAppClientSecretUnauthorized) Encode(e *jx.Encoder) {
+// Encode encodes AddAppClientCredentialUnauthorized as json.
+func (s *AddAppClientCredentialUnauthorized) Encode(e *jx.Encoder) {
 	unwrapped := (*ErrorDetails)(s)
 
 	unwrapped.Encode(e)
 }
 
-// Decode decodes AddAppClientSecretUnauthorized from json.
-func (s *AddAppClientSecretUnauthorized) Decode(d *jx.Decoder) error {
+// Decode decodes AddAppClientCredentialUnauthorized from json.
+func (s *AddAppClientCredentialUnauthorized) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode AddAppClientSecretUnauthorized to nil")
+		return errors.New("invalid: unable to decode AddAppClientCredentialUnauthorized to nil")
 	}
 	var unwrapped ErrorDetails
 	if err := func() error {
@@ -742,19 +719,19 @@ func (s *AddAppClientSecretUnauthorized) Decode(d *jx.Decoder) error {
 	}(); err != nil {
 		return errors.Wrap(err, "alias")
 	}
-	*s = AddAppClientSecretUnauthorized(unwrapped)
+	*s = AddAppClientCredentialUnauthorized(unwrapped)
 	return nil
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s *AddAppClientSecretUnauthorized) MarshalJSON() ([]byte, error) {
+func (s *AddAppClientCredentialUnauthorized) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *AddAppClientSecretUnauthorized) UnmarshalJSON(data []byte) error {
+func (s *AddAppClientCredentialUnauthorized) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -1664,12 +1641,6 @@ func (s *App) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
-		if s.Preset.Set {
-			e.FieldStart("preset")
-			s.Preset.Encode(e)
-		}
-	}
-	{
 		if s.Clients != nil {
 			e.FieldStart("clients")
 			e.ArrStart()
@@ -1697,18 +1668,17 @@ func (s *App) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfApp = [11]string{
-	0:  "$schema",
-	1:  "slug",
-	2:  "name",
-	3:  "logo_uri",
-	4:  "client_uri",
-	5:  "policy_uri",
-	6:  "tos_uri",
-	7:  "preset",
-	8:  "clients",
-	9:  "apis",
-	10: "registration",
+var jsonFieldsNameOfApp = [10]string{
+	0: "$schema",
+	1: "slug",
+	2: "name",
+	3: "logo_uri",
+	4: "client_uri",
+	5: "policy_uri",
+	6: "tos_uri",
+	7: "clients",
+	8: "apis",
+	9: "registration",
 }
 
 // Decode decodes App from json.
@@ -1793,16 +1763,6 @@ func (s *App) Decode(d *jx.Decoder) error {
 				return nil
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"tos_uri\"")
-			}
-		case "preset":
-			if err := func() error {
-				s.Preset.Reset()
-				if err := s.Preset.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"preset\"")
 			}
 		case "clients":
 			if err := func() error {
@@ -2280,12 +2240,6 @@ func (s *AppClient) encodeFields(e *jx.Encoder) {
 		s.Type.Encode(e)
 	}
 	{
-		if s.AuthMethod.Set {
-			e.FieldStart("auth_method")
-			s.AuthMethod.Encode(e)
-		}
-	}
-	{
 		if s.Secret.Set {
 			e.FieldStart("secret")
 			s.Secret.Encode(e)
@@ -2298,12 +2252,14 @@ func (s *AppClient) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
-		e.FieldStart("grants")
-		e.ArrStart()
-		for _, elem := range s.Grants {
-			elem.Encode(e)
+		if s.GrantTypes != nil {
+			e.FieldStart("grant_types")
+			e.ArrStart()
+			for _, elem := range s.GrantTypes {
+				elem.Encode(e)
+			}
+			e.ArrEnd()
 		}
-		e.ArrEnd()
 	}
 	{
 		if s.RedirectUris != nil {
@@ -2361,22 +2317,21 @@ func (s *AppClient) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfAppClient = [15]string{
+var jsonFieldsNameOfAppClient = [14]string{
 	0:  "slug",
 	1:  "name",
 	2:  "client_id",
 	3:  "type",
-	4:  "auth_method",
-	5:  "secret",
-	6:  "jwks",
-	7:  "grants",
-	8:  "redirect_uris",
-	9:  "post_logout_redirect_uris",
-	10: "first_party",
-	11: "consent",
-	12: "account_choice",
-	13: "id_token_signed_response_alg",
-	14: "apis",
+	4:  "secret",
+	5:  "jwks",
+	6:  "grant_types",
+	7:  "redirect_uris",
+	8:  "post_logout_redirect_uris",
+	9:  "first_party",
+	10: "consent",
+	11: "account_choice",
+	12: "id_token_signed_response_alg",
+	13: "apis",
 }
 
 // Decode decodes AppClient from json.
@@ -2430,16 +2385,6 @@ func (s *AppClient) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"type\"")
 			}
-		case "auth_method":
-			if err := func() error {
-				s.AuthMethod.Reset()
-				if err := s.AuthMethod.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"auth_method\"")
-			}
 		case "secret":
 			if err := func() error {
 				s.Secret.Reset()
@@ -2460,23 +2405,22 @@ func (s *AppClient) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"jwks\"")
 			}
-		case "grants":
-			requiredBitSet[0] |= 1 << 7
+		case "grant_types":
 			if err := func() error {
-				s.Grants = make([]AppClientGrantsItem, 0)
+				s.GrantTypes = make([]AppClientGrantTypesItem, 0)
 				if err := d.Arr(func(d *jx.Decoder) error {
-					var elem AppClientGrantsItem
+					var elem AppClientGrantTypesItem
 					if err := elem.Decode(d); err != nil {
 						return err
 					}
-					s.Grants = append(s.Grants, elem)
+					s.GrantTypes = append(s.GrantTypes, elem)
 					return nil
 				}); err != nil {
 					return err
 				}
 				return nil
 			}(); err != nil {
-				return errors.Wrap(err, "decode field \"grants\"")
+				return errors.Wrap(err, "decode field \"grant_types\"")
 			}
 		case "redirect_uris":
 			if err := func() error {
@@ -2583,7 +2527,7 @@ func (s *AppClient) Decode(d *jx.Decoder) error {
 	// Validate required fields.
 	var failures []validate.FieldError
 	for i, mask := range [2]uint8{
-		0b10001001,
+		0b00001001,
 		0b00000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
@@ -2756,50 +2700,6 @@ func (s *AppClientAPI) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode encodes AppClientAuthMethod as json.
-func (s AppClientAuthMethod) Encode(e *jx.Encoder) {
-	e.Str(string(s))
-}
-
-// Decode decodes AppClientAuthMethod from json.
-func (s *AppClientAuthMethod) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode AppClientAuthMethod to nil")
-	}
-	v, err := d.StrBytes()
-	if err != nil {
-		return err
-	}
-	// Try to use constant string.
-	switch AppClientAuthMethod(v) {
-	case AppClientAuthMethodNone:
-		*s = AppClientAuthMethodNone
-	case AppClientAuthMethodClientSecretBasic:
-		*s = AppClientAuthMethodClientSecretBasic
-	case AppClientAuthMethodClientSecretPost:
-		*s = AppClientAuthMethodClientSecretPost
-	case AppClientAuthMethodPrivateKeyJwt:
-		*s = AppClientAuthMethodPrivateKeyJwt
-	default:
-		*s = AppClientAuthMethod(v)
-	}
-
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s AppClientAuthMethod) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *AppClientAuthMethod) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
 // Encode encodes AppClientConsent as json.
 func (s AppClientConsent) Encode(e *jx.Encoder) {
 	e.Str(string(s))
@@ -2842,44 +2742,297 @@ func (s *AppClientConsent) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode encodes AppClientGrantsItem as json.
-func (s AppClientGrantsItem) Encode(e *jx.Encoder) {
-	e.Str(string(s))
+// Encode implements json.Marshaler.
+func (s *AppClientCredential) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
 }
 
-// Decode decodes AppClientGrantsItem from json.
-func (s *AppClientGrantsItem) Decode(d *jx.Decoder) error {
+// encodeFields encodes fields.
+func (s *AppClientCredential) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("id")
+		e.Str(s.ID)
+	}
+	{
+		e.FieldStart("name")
+		e.Str(s.Name)
+	}
+	{
+		e.FieldStart("kind")
+		s.Kind.Encode(e)
+	}
+	{
+		e.FieldStart("client_id")
+		e.Str(s.ClientID)
+	}
+	{
+		if s.KeyID.Set {
+			e.FieldStart("key_id")
+			s.KeyID.Encode(e)
+		}
+	}
+	{
+		e.FieldStart("created_at")
+		json.EncodeDateTime(e, s.CreatedAt)
+	}
+	{
+		if s.ExpiresAt.Set {
+			e.FieldStart("expires_at")
+			s.ExpiresAt.Encode(e, json.EncodeDateTime)
+		}
+	}
+	{
+		if s.Secret.Set {
+			e.FieldStart("secret")
+			s.Secret.Encode(e)
+		}
+	}
+}
+
+var jsonFieldsNameOfAppClientCredential = [8]string{
+	0: "id",
+	1: "name",
+	2: "kind",
+	3: "client_id",
+	4: "key_id",
+	5: "created_at",
+	6: "expires_at",
+	7: "secret",
+}
+
+// Decode decodes AppClientCredential from json.
+func (s *AppClientCredential) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode AppClientGrantsItem to nil")
+		return errors.New("invalid: unable to decode AppClientCredential to nil")
 	}
-	v, err := d.StrBytes()
-	if err != nil {
-		return err
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "id":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.ID = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"id\"")
+			}
+		case "name":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				v, err := d.Str()
+				s.Name = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"name\"")
+			}
+		case "kind":
+			requiredBitSet[0] |= 1 << 2
+			if err := func() error {
+				if err := s.Kind.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"kind\"")
+			}
+		case "client_id":
+			requiredBitSet[0] |= 1 << 3
+			if err := func() error {
+				v, err := d.Str()
+				s.ClientID = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"client_id\"")
+			}
+		case "key_id":
+			if err := func() error {
+				s.KeyID.Reset()
+				if err := s.KeyID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"key_id\"")
+			}
+		case "created_at":
+			requiredBitSet[0] |= 1 << 5
+			if err := func() error {
+				v, err := json.DecodeDateTime(d)
+				s.CreatedAt = v
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"created_at\"")
+			}
+		case "expires_at":
+			if err := func() error {
+				s.ExpiresAt.Reset()
+				if err := s.ExpiresAt.Decode(d, json.DecodeDateTime); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"expires_at\"")
+			}
+		case "secret":
+			if err := func() error {
+				s.Secret.Reset()
+				if err := s.Secret.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"secret\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode AppClientCredential")
 	}
-	// Try to use constant string.
-	switch AppClientGrantsItem(v) {
-	case AppClientGrantsItemAuthorizationCode:
-		*s = AppClientGrantsItemAuthorizationCode
-	case AppClientGrantsItemRefreshToken:
-		*s = AppClientGrantsItemRefreshToken
-	case AppClientGrantsItemClientCredentials:
-		*s = AppClientGrantsItemClientCredentials
-	default:
-		*s = AppClientGrantsItem(v)
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00101111,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfAppClientCredential) {
+					name = jsonFieldsNameOfAppClientCredential[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
 	}
 
 	return nil
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s AppClientGrantsItem) MarshalJSON() ([]byte, error) {
+func (s *AppClientCredential) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *AppClientGrantsItem) UnmarshalJSON(data []byte) error {
+func (s *AppClientCredential) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes AppClientCredentialKind as json.
+func (s AppClientCredentialKind) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes AppClientCredentialKind from json.
+func (s *AppClientCredentialKind) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode AppClientCredentialKind to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch AppClientCredentialKind(v) {
+	case AppClientCredentialKindSecret:
+		*s = AppClientCredentialKindSecret
+	case AppClientCredentialKindKey:
+		*s = AppClientCredentialKindKey
+	default:
+		*s = AppClientCredentialKind(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s AppClientCredentialKind) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *AppClientCredentialKind) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes AppClientGrantTypesItem as json.
+func (s AppClientGrantTypesItem) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes AppClientGrantTypesItem from json.
+func (s *AppClientGrantTypesItem) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode AppClientGrantTypesItem to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch AppClientGrantTypesItem(v) {
+	case AppClientGrantTypesItemAuthorizationCode:
+		*s = AppClientGrantTypesItemAuthorizationCode
+	case AppClientGrantTypesItemRefreshToken:
+		*s = AppClientGrantTypesItemRefreshToken
+	case AppClientGrantTypesItemClientCredentials:
+		*s = AppClientGrantTypesItemClientCredentials
+	default:
+		*s = AppClientGrantTypesItem(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s AppClientGrantTypesItem) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *AppClientGrantTypesItem) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -4114,14 +4267,19 @@ func (s *AppClientSecret) encodeFields(e *jx.Encoder) {
 		e.Str(s.Client)
 	}
 	{
+		e.FieldStart("credential_id")
+		e.Str(s.CredentialID)
+	}
+	{
 		e.FieldStart("secret")
 		e.Str(s.Secret)
 	}
 }
 
-var jsonFieldsNameOfAppClientSecret = [2]string{
+var jsonFieldsNameOfAppClientSecret = [3]string{
 	0: "client",
-	1: "secret",
+	1: "credential_id",
+	2: "secret",
 }
 
 // Decode decodes AppClientSecret from json.
@@ -4145,8 +4303,20 @@ func (s *AppClientSecret) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"client\"")
 			}
-		case "secret":
+		case "credential_id":
 			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				v, err := d.Str()
+				s.CredentialID = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"credential_id\"")
+			}
+		case "secret":
+			requiredBitSet[0] |= 1 << 2
 			if err := func() error {
 				v, err := d.Str()
 				s.Secret = string(v)
@@ -4167,7 +4337,7 @@ func (s *AppClientSecret) Decode(d *jx.Decoder) error {
 	// Validate required fields.
 	var failures []validate.FieldError
 	for i, mask := range [1]uint8{
-		0b00000011,
+		0b00000111,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -4209,776 +4379,6 @@ func (s *AppClientSecret) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *AppClientSecret) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode implements json.Marshaler.
-func (s *AppClientSecretAddedEvent) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-// encodeFields encodes fields.
-func (s *AppClientSecretAddedEvent) encodeFields(e *jx.Encoder) {
-	{
-		e.FieldStart("id")
-		e.Str(s.ID)
-	}
-	{
-		e.FieldStart("project_id")
-		s.ProjectID.Encode(e)
-	}
-	{
-		if s.TeamID.Set {
-			e.FieldStart("team_id")
-			s.TeamID.Encode(e)
-		}
-	}
-	{
-		e.FieldStart("event_type")
-		e.Str("app.client_secret.added")
-	}
-	{
-		e.FieldStart("category")
-		s.Category.Encode(e)
-	}
-	{
-		e.FieldStart("occurred_at")
-		json.EncodeDateTime(e, s.OccurredAt)
-	}
-	{
-		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
-	}
-	{
-		if s.ActorID.Set {
-			e.FieldStart("actor_id")
-			s.ActorID.Encode(e)
-		}
-	}
-	{
-		if s.ActorType.Set {
-			e.FieldStart("actor_type")
-			s.ActorType.Encode(e)
-		}
-	}
-	{
-		if s.EntityType.Set {
-			e.FieldStart("entity_type")
-			s.EntityType.Encode(e)
-		}
-	}
-	{
-		if s.EntityID.Set {
-			e.FieldStart("entity_id")
-			s.EntityID.Encode(e)
-		}
-	}
-	{
-		e.FieldStart("client_id")
-		e.Str(s.ClientID)
-	}
-	{
-		if s.TokenID.Set {
-			e.FieldStart("token_id")
-			s.TokenID.Encode(e)
-		}
-	}
-	{
-		if s.DelegationType.Set {
-			e.FieldStart("delegation_type")
-			s.DelegationType.Encode(e)
-		}
-	}
-	{
-		if s.DelegationID.Set {
-			e.FieldStart("delegation_id")
-			s.DelegationID.Encode(e)
-		}
-	}
-	{
-		if s.Grantor.Set {
-			e.FieldStart("grantor")
-			s.Grantor.Encode(e)
-		}
-	}
-	{
-		if s.Fingerprint.Set {
-			e.FieldStart("fingerprint")
-			s.Fingerprint.Encode(e)
-		}
-	}
-	{
-		if s.RequestID.Set {
-			e.FieldStart("request_id")
-			s.RequestID.Encode(e)
-		}
-	}
-	{
-		if s.SessionID.Set {
-			e.FieldStart("session_id")
-			s.SessionID.Encode(e)
-		}
-	}
-	{
-		if s.FlowID.Set {
-			e.FieldStart("flow_id")
-			s.FlowID.Encode(e)
-		}
-	}
-	{
-		if s.Metadata.Set {
-			e.FieldStart("metadata")
-			s.Metadata.Encode(e)
-		}
-	}
-	{
-		e.FieldStart("payload")
-		s.Payload.Encode(e)
-	}
-}
-
-var jsonFieldsNameOfAppClientSecretAddedEvent = [22]string{
-	0:  "id",
-	1:  "project_id",
-	2:  "team_id",
-	3:  "event_type",
-	4:  "category",
-	5:  "occurred_at",
-	6:  "created_at",
-	7:  "actor_id",
-	8:  "actor_type",
-	9:  "entity_type",
-	10: "entity_id",
-	11: "client_id",
-	12: "token_id",
-	13: "delegation_type",
-	14: "delegation_id",
-	15: "grantor",
-	16: "fingerprint",
-	17: "request_id",
-	18: "session_id",
-	19: "flow_id",
-	20: "metadata",
-	21: "payload",
-}
-
-// Decode decodes AppClientSecretAddedEvent from json.
-func (s *AppClientSecretAddedEvent) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode AppClientSecretAddedEvent to nil")
-	}
-	var requiredBitSet [3]uint8
-
-	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
-		switch string(k) {
-		case "id":
-			requiredBitSet[0] |= 1 << 0
-			if err := func() error {
-				v, err := d.Str()
-				s.ID = string(v)
-				if err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"id\"")
-			}
-		case "project_id":
-			requiredBitSet[0] |= 1 << 1
-			if err := func() error {
-				if err := s.ProjectID.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"project_id\"")
-			}
-		case "team_id":
-			if err := func() error {
-				s.TeamID.Reset()
-				if err := s.TeamID.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"team_id\"")
-			}
-		case "event_type":
-			requiredBitSet[0] |= 1 << 3
-			if err := func() error {
-				v, err := d.Str()
-				s.EventType = string(v)
-				if err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"event_type\"")
-			}
-		case "category":
-			requiredBitSet[0] |= 1 << 4
-			if err := func() error {
-				if err := s.Category.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"category\"")
-			}
-		case "occurred_at":
-			requiredBitSet[0] |= 1 << 5
-			if err := func() error {
-				v, err := json.DecodeDateTime(d)
-				s.OccurredAt = v
-				if err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"occurred_at\"")
-			}
-		case "created_at":
-			requiredBitSet[0] |= 1 << 6
-			if err := func() error {
-				v, err := json.DecodeDateTime(d)
-				s.CreatedAt = v
-				if err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"created_at\"")
-			}
-		case "actor_id":
-			if err := func() error {
-				s.ActorID.Reset()
-				if err := s.ActorID.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"actor_id\"")
-			}
-		case "actor_type":
-			if err := func() error {
-				s.ActorType.Reset()
-				if err := s.ActorType.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"actor_type\"")
-			}
-		case "entity_type":
-			if err := func() error {
-				s.EntityType.Reset()
-				if err := s.EntityType.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"entity_type\"")
-			}
-		case "entity_id":
-			if err := func() error {
-				s.EntityID.Reset()
-				if err := s.EntityID.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"entity_id\"")
-			}
-		case "client_id":
-			requiredBitSet[1] |= 1 << 3
-			if err := func() error {
-				v, err := d.Str()
-				s.ClientID = string(v)
-				if err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"client_id\"")
-			}
-		case "token_id":
-			if err := func() error {
-				s.TokenID.Reset()
-				if err := s.TokenID.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"token_id\"")
-			}
-		case "delegation_type":
-			if err := func() error {
-				s.DelegationType.Reset()
-				if err := s.DelegationType.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"delegation_type\"")
-			}
-		case "delegation_id":
-			if err := func() error {
-				s.DelegationID.Reset()
-				if err := s.DelegationID.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"delegation_id\"")
-			}
-		case "grantor":
-			if err := func() error {
-				s.Grantor.Reset()
-				if err := s.Grantor.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"grantor\"")
-			}
-		case "fingerprint":
-			if err := func() error {
-				s.Fingerprint.Reset()
-				if err := s.Fingerprint.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"fingerprint\"")
-			}
-		case "request_id":
-			if err := func() error {
-				s.RequestID.Reset()
-				if err := s.RequestID.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"request_id\"")
-			}
-		case "session_id":
-			if err := func() error {
-				s.SessionID.Reset()
-				if err := s.SessionID.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"session_id\"")
-			}
-		case "flow_id":
-			if err := func() error {
-				s.FlowID.Reset()
-				if err := s.FlowID.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"flow_id\"")
-			}
-		case "metadata":
-			if err := func() error {
-				s.Metadata.Reset()
-				if err := s.Metadata.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"metadata\"")
-			}
-		case "payload":
-			requiredBitSet[2] |= 1 << 5
-			if err := func() error {
-				if err := s.Payload.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"payload\"")
-			}
-		default:
-			return d.Skip()
-		}
-		return nil
-	}); err != nil {
-		return errors.Wrap(err, "decode AppClientSecretAddedEvent")
-	}
-	// Validate required fields.
-	var failures []validate.FieldError
-	for i, mask := range [3]uint8{
-		0b01111011,
-		0b00001000,
-		0b00100000,
-	} {
-		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
-			// Mask only required fields and check equality to mask using XOR.
-			//
-			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
-			// Bits of fields which would be set are actually bits of missed fields.
-			missed := bits.OnesCount8(result)
-			for bitN := 0; bitN < missed; bitN++ {
-				bitIdx := bits.TrailingZeros8(result)
-				fieldIdx := i*8 + bitIdx
-				var name string
-				if fieldIdx < len(jsonFieldsNameOfAppClientSecretAddedEvent) {
-					name = jsonFieldsNameOfAppClientSecretAddedEvent[fieldIdx]
-				} else {
-					name = strconv.Itoa(fieldIdx)
-				}
-				failures = append(failures, validate.FieldError{
-					Name:  name,
-					Error: validate.ErrFieldRequired,
-				})
-				// Reset bit.
-				result &^= 1 << bitIdx
-			}
-		}
-	}
-	if len(failures) > 0 {
-		return &validate.Error{Fields: failures}
-	}
-
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *AppClientSecretAddedEvent) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *AppClientSecretAddedEvent) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes AppClientSecretAddedEventActorType as json.
-func (s AppClientSecretAddedEventActorType) Encode(e *jx.Encoder) {
-	e.Str(string(s))
-}
-
-// Decode decodes AppClientSecretAddedEventActorType from json.
-func (s *AppClientSecretAddedEventActorType) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode AppClientSecretAddedEventActorType to nil")
-	}
-	v, err := d.StrBytes()
-	if err != nil {
-		return err
-	}
-	// Try to use constant string.
-	switch AppClientSecretAddedEventActorType(v) {
-	case AppClientSecretAddedEventActorTypeHuman:
-		*s = AppClientSecretAddedEventActorTypeHuman
-	case AppClientSecretAddedEventActorTypeService:
-		*s = AppClientSecretAddedEventActorTypeService
-	case AppClientSecretAddedEventActorTypeSystem:
-		*s = AppClientSecretAddedEventActorTypeSystem
-	case AppClientSecretAddedEventActorTypeAgent:
-		*s = AppClientSecretAddedEventActorTypeAgent
-	default:
-		*s = AppClientSecretAddedEventActorType(v)
-	}
-
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s AppClientSecretAddedEventActorType) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *AppClientSecretAddedEventActorType) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes AppClientSecretAddedEventCategory as json.
-func (s AppClientSecretAddedEventCategory) Encode(e *jx.Encoder) {
-	e.Str(string(s))
-}
-
-// Decode decodes AppClientSecretAddedEventCategory from json.
-func (s *AppClientSecretAddedEventCategory) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode AppClientSecretAddedEventCategory to nil")
-	}
-	v, err := d.StrBytes()
-	if err != nil {
-		return err
-	}
-	// Try to use constant string.
-	switch AppClientSecretAddedEventCategory(v) {
-	case AppClientSecretAddedEventCategoryRequest:
-		*s = AppClientSecretAddedEventCategoryRequest
-	case AppClientSecretAddedEventCategoryAuth:
-		*s = AppClientSecretAddedEventCategoryAuth
-	case AppClientSecretAddedEventCategorySession:
-		*s = AppClientSecretAddedEventCategorySession
-	case AppClientSecretAddedEventCategoryAdmin:
-		*s = AppClientSecretAddedEventCategoryAdmin
-	case AppClientSecretAddedEventCategoryEntity:
-		*s = AppClientSecretAddedEventCategoryEntity
-	case AppClientSecretAddedEventCategorySignal:
-		*s = AppClientSecretAddedEventCategorySignal
-	default:
-		*s = AppClientSecretAddedEventCategory(v)
-	}
-
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s AppClientSecretAddedEventCategory) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *AppClientSecretAddedEventCategory) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes AppClientSecretAddedEventDelegationType as json.
-func (s AppClientSecretAddedEventDelegationType) Encode(e *jx.Encoder) {
-	e.Str(string(s))
-}
-
-// Decode decodes AppClientSecretAddedEventDelegationType from json.
-func (s *AppClientSecretAddedEventDelegationType) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode AppClientSecretAddedEventDelegationType to nil")
-	}
-	v, err := d.StrBytes()
-	if err != nil {
-		return err
-	}
-	// Try to use constant string.
-	switch AppClientSecretAddedEventDelegationType(v) {
-	case AppClientSecretAddedEventDelegationTypeDirect:
-		*s = AppClientSecretAddedEventDelegationTypeDirect
-	case AppClientSecretAddedEventDelegationTypeDelegated:
-		*s = AppClientSecretAddedEventDelegationTypeDelegated
-	case AppClientSecretAddedEventDelegationTypePatShared:
-		*s = AppClientSecretAddedEventDelegationTypePatShared
-	case AppClientSecretAddedEventDelegationTypeExchanged:
-		*s = AppClientSecretAddedEventDelegationTypeExchanged
-	default:
-		*s = AppClientSecretAddedEventDelegationType(v)
-	}
-
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s AppClientSecretAddedEventDelegationType) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *AppClientSecretAddedEventDelegationType) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode implements json.Marshaler.
-func (s *AppClientSecretAddedPayload) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-// encodeFields encodes fields.
-func (s *AppClientSecretAddedPayload) encodeFields(e *jx.Encoder) {
-	{
-		e.FieldStart("client")
-		e.Str(s.Client)
-	}
-	{
-		e.FieldStart("client_id")
-		e.Str(s.ClientID)
-	}
-	{
-		e.FieldStart("secret_id")
-		e.Str(s.SecretID)
-	}
-	{
-		e.FieldStart("origin")
-		s.Origin.Encode(e)
-	}
-}
-
-var jsonFieldsNameOfAppClientSecretAddedPayload = [4]string{
-	0: "client",
-	1: "client_id",
-	2: "secret_id",
-	3: "origin",
-}
-
-// Decode decodes AppClientSecretAddedPayload from json.
-func (s *AppClientSecretAddedPayload) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode AppClientSecretAddedPayload to nil")
-	}
-	var requiredBitSet [1]uint8
-
-	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
-		switch string(k) {
-		case "client":
-			requiredBitSet[0] |= 1 << 0
-			if err := func() error {
-				v, err := d.Str()
-				s.Client = string(v)
-				if err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"client\"")
-			}
-		case "client_id":
-			requiredBitSet[0] |= 1 << 1
-			if err := func() error {
-				v, err := d.Str()
-				s.ClientID = string(v)
-				if err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"client_id\"")
-			}
-		case "secret_id":
-			requiredBitSet[0] |= 1 << 2
-			if err := func() error {
-				v, err := d.Str()
-				s.SecretID = string(v)
-				if err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"secret_id\"")
-			}
-		case "origin":
-			requiredBitSet[0] |= 1 << 3
-			if err := func() error {
-				if err := s.Origin.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"origin\"")
-			}
-		default:
-			return d.Skip()
-		}
-		return nil
-	}); err != nil {
-		return errors.Wrap(err, "decode AppClientSecretAddedPayload")
-	}
-	// Validate required fields.
-	var failures []validate.FieldError
-	for i, mask := range [1]uint8{
-		0b00001111,
-	} {
-		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
-			// Mask only required fields and check equality to mask using XOR.
-			//
-			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
-			// Bits of fields which would be set are actually bits of missed fields.
-			missed := bits.OnesCount8(result)
-			for bitN := 0; bitN < missed; bitN++ {
-				bitIdx := bits.TrailingZeros8(result)
-				fieldIdx := i*8 + bitIdx
-				var name string
-				if fieldIdx < len(jsonFieldsNameOfAppClientSecretAddedPayload) {
-					name = jsonFieldsNameOfAppClientSecretAddedPayload[fieldIdx]
-				} else {
-					name = strconv.Itoa(fieldIdx)
-				}
-				failures = append(failures, validate.FieldError{
-					Name:  name,
-					Error: validate.ErrFieldRequired,
-				})
-				// Reset bit.
-				result &^= 1 << bitIdx
-			}
-		}
-	}
-	if len(failures) > 0 {
-		return &validate.Error{Fields: failures}
-	}
-
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *AppClientSecretAddedPayload) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *AppClientSecretAddedPayload) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes AppClientSecretAddedPayloadOrigin as json.
-func (s AppClientSecretAddedPayloadOrigin) Encode(e *jx.Encoder) {
-	e.Str(string(s))
-}
-
-// Decode decodes AppClientSecretAddedPayloadOrigin from json.
-func (s *AppClientSecretAddedPayloadOrigin) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode AppClientSecretAddedPayloadOrigin to nil")
-	}
-	v, err := d.StrBytes()
-	if err != nil {
-		return err
-	}
-	// Try to use constant string.
-	switch AppClientSecretAddedPayloadOrigin(v) {
-	case AppClientSecretAddedPayloadOriginGenerated:
-		*s = AppClientSecretAddedPayloadOriginGenerated
-	case AppClientSecretAddedPayloadOriginImported:
-		*s = AppClientSecretAddedPayloadOriginImported
-	default:
-		*s = AppClientSecretAddedPayloadOrigin(v)
-	}
-
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s AppClientSecretAddedPayloadOrigin) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *AppClientSecretAddedPayloadOrigin) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -5604,6 +5004,1811 @@ func (s AppCreatedEventDelegationType) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *AppCreatedEventDelegationType) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *AppCredentialAddedEvent) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *AppCredentialAddedEvent) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("id")
+		e.Str(s.ID)
+	}
+	{
+		e.FieldStart("project_id")
+		s.ProjectID.Encode(e)
+	}
+	{
+		if s.TeamID.Set {
+			e.FieldStart("team_id")
+			s.TeamID.Encode(e)
+		}
+	}
+	{
+		e.FieldStart("event_type")
+		e.Str("app.credential.added")
+	}
+	{
+		e.FieldStart("category")
+		s.Category.Encode(e)
+	}
+	{
+		e.FieldStart("occurred_at")
+		json.EncodeDateTime(e, s.OccurredAt)
+	}
+	{
+		e.FieldStart("created_at")
+		json.EncodeDateTime(e, s.CreatedAt)
+	}
+	{
+		if s.ActorID.Set {
+			e.FieldStart("actor_id")
+			s.ActorID.Encode(e)
+		}
+	}
+	{
+		if s.ActorType.Set {
+			e.FieldStart("actor_type")
+			s.ActorType.Encode(e)
+		}
+	}
+	{
+		if s.EntityType.Set {
+			e.FieldStart("entity_type")
+			s.EntityType.Encode(e)
+		}
+	}
+	{
+		if s.EntityID.Set {
+			e.FieldStart("entity_id")
+			s.EntityID.Encode(e)
+		}
+	}
+	{
+		e.FieldStart("client_id")
+		e.Str(s.ClientID)
+	}
+	{
+		if s.TokenID.Set {
+			e.FieldStart("token_id")
+			s.TokenID.Encode(e)
+		}
+	}
+	{
+		if s.DelegationType.Set {
+			e.FieldStart("delegation_type")
+			s.DelegationType.Encode(e)
+		}
+	}
+	{
+		if s.DelegationID.Set {
+			e.FieldStart("delegation_id")
+			s.DelegationID.Encode(e)
+		}
+	}
+	{
+		if s.Grantor.Set {
+			e.FieldStart("grantor")
+			s.Grantor.Encode(e)
+		}
+	}
+	{
+		if s.Fingerprint.Set {
+			e.FieldStart("fingerprint")
+			s.Fingerprint.Encode(e)
+		}
+	}
+	{
+		if s.RequestID.Set {
+			e.FieldStart("request_id")
+			s.RequestID.Encode(e)
+		}
+	}
+	{
+		if s.SessionID.Set {
+			e.FieldStart("session_id")
+			s.SessionID.Encode(e)
+		}
+	}
+	{
+		if s.FlowID.Set {
+			e.FieldStart("flow_id")
+			s.FlowID.Encode(e)
+		}
+	}
+	{
+		if s.Metadata.Set {
+			e.FieldStart("metadata")
+			s.Metadata.Encode(e)
+		}
+	}
+	{
+		e.FieldStart("payload")
+		s.Payload.Encode(e)
+	}
+}
+
+var jsonFieldsNameOfAppCredentialAddedEvent = [22]string{
+	0:  "id",
+	1:  "project_id",
+	2:  "team_id",
+	3:  "event_type",
+	4:  "category",
+	5:  "occurred_at",
+	6:  "created_at",
+	7:  "actor_id",
+	8:  "actor_type",
+	9:  "entity_type",
+	10: "entity_id",
+	11: "client_id",
+	12: "token_id",
+	13: "delegation_type",
+	14: "delegation_id",
+	15: "grantor",
+	16: "fingerprint",
+	17: "request_id",
+	18: "session_id",
+	19: "flow_id",
+	20: "metadata",
+	21: "payload",
+}
+
+// Decode decodes AppCredentialAddedEvent from json.
+func (s *AppCredentialAddedEvent) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode AppCredentialAddedEvent to nil")
+	}
+	var requiredBitSet [3]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "id":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.ID = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"id\"")
+			}
+		case "project_id":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				if err := s.ProjectID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"project_id\"")
+			}
+		case "team_id":
+			if err := func() error {
+				s.TeamID.Reset()
+				if err := s.TeamID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"team_id\"")
+			}
+		case "event_type":
+			requiredBitSet[0] |= 1 << 3
+			if err := func() error {
+				v, err := d.Str()
+				s.EventType = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"event_type\"")
+			}
+		case "category":
+			requiredBitSet[0] |= 1 << 4
+			if err := func() error {
+				if err := s.Category.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"category\"")
+			}
+		case "occurred_at":
+			requiredBitSet[0] |= 1 << 5
+			if err := func() error {
+				v, err := json.DecodeDateTime(d)
+				s.OccurredAt = v
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"occurred_at\"")
+			}
+		case "created_at":
+			requiredBitSet[0] |= 1 << 6
+			if err := func() error {
+				v, err := json.DecodeDateTime(d)
+				s.CreatedAt = v
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"created_at\"")
+			}
+		case "actor_id":
+			if err := func() error {
+				s.ActorID.Reset()
+				if err := s.ActorID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"actor_id\"")
+			}
+		case "actor_type":
+			if err := func() error {
+				s.ActorType.Reset()
+				if err := s.ActorType.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"actor_type\"")
+			}
+		case "entity_type":
+			if err := func() error {
+				s.EntityType.Reset()
+				if err := s.EntityType.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"entity_type\"")
+			}
+		case "entity_id":
+			if err := func() error {
+				s.EntityID.Reset()
+				if err := s.EntityID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"entity_id\"")
+			}
+		case "client_id":
+			requiredBitSet[1] |= 1 << 3
+			if err := func() error {
+				v, err := d.Str()
+				s.ClientID = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"client_id\"")
+			}
+		case "token_id":
+			if err := func() error {
+				s.TokenID.Reset()
+				if err := s.TokenID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"token_id\"")
+			}
+		case "delegation_type":
+			if err := func() error {
+				s.DelegationType.Reset()
+				if err := s.DelegationType.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"delegation_type\"")
+			}
+		case "delegation_id":
+			if err := func() error {
+				s.DelegationID.Reset()
+				if err := s.DelegationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"delegation_id\"")
+			}
+		case "grantor":
+			if err := func() error {
+				s.Grantor.Reset()
+				if err := s.Grantor.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"grantor\"")
+			}
+		case "fingerprint":
+			if err := func() error {
+				s.Fingerprint.Reset()
+				if err := s.Fingerprint.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"fingerprint\"")
+			}
+		case "request_id":
+			if err := func() error {
+				s.RequestID.Reset()
+				if err := s.RequestID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"request_id\"")
+			}
+		case "session_id":
+			if err := func() error {
+				s.SessionID.Reset()
+				if err := s.SessionID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"session_id\"")
+			}
+		case "flow_id":
+			if err := func() error {
+				s.FlowID.Reset()
+				if err := s.FlowID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"flow_id\"")
+			}
+		case "metadata":
+			if err := func() error {
+				s.Metadata.Reset()
+				if err := s.Metadata.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"metadata\"")
+			}
+		case "payload":
+			requiredBitSet[2] |= 1 << 5
+			if err := func() error {
+				if err := s.Payload.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"payload\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode AppCredentialAddedEvent")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [3]uint8{
+		0b01111011,
+		0b00001000,
+		0b00100000,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfAppCredentialAddedEvent) {
+					name = jsonFieldsNameOfAppCredentialAddedEvent[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *AppCredentialAddedEvent) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *AppCredentialAddedEvent) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes AppCredentialAddedEventActorType as json.
+func (s AppCredentialAddedEventActorType) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes AppCredentialAddedEventActorType from json.
+func (s *AppCredentialAddedEventActorType) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode AppCredentialAddedEventActorType to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch AppCredentialAddedEventActorType(v) {
+	case AppCredentialAddedEventActorTypeHuman:
+		*s = AppCredentialAddedEventActorTypeHuman
+	case AppCredentialAddedEventActorTypeService:
+		*s = AppCredentialAddedEventActorTypeService
+	case AppCredentialAddedEventActorTypeSystem:
+		*s = AppCredentialAddedEventActorTypeSystem
+	case AppCredentialAddedEventActorTypeAgent:
+		*s = AppCredentialAddedEventActorTypeAgent
+	default:
+		*s = AppCredentialAddedEventActorType(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s AppCredentialAddedEventActorType) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *AppCredentialAddedEventActorType) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes AppCredentialAddedEventCategory as json.
+func (s AppCredentialAddedEventCategory) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes AppCredentialAddedEventCategory from json.
+func (s *AppCredentialAddedEventCategory) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode AppCredentialAddedEventCategory to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch AppCredentialAddedEventCategory(v) {
+	case AppCredentialAddedEventCategoryRequest:
+		*s = AppCredentialAddedEventCategoryRequest
+	case AppCredentialAddedEventCategoryAuth:
+		*s = AppCredentialAddedEventCategoryAuth
+	case AppCredentialAddedEventCategorySession:
+		*s = AppCredentialAddedEventCategorySession
+	case AppCredentialAddedEventCategoryAdmin:
+		*s = AppCredentialAddedEventCategoryAdmin
+	case AppCredentialAddedEventCategoryEntity:
+		*s = AppCredentialAddedEventCategoryEntity
+	case AppCredentialAddedEventCategorySignal:
+		*s = AppCredentialAddedEventCategorySignal
+	default:
+		*s = AppCredentialAddedEventCategory(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s AppCredentialAddedEventCategory) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *AppCredentialAddedEventCategory) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes AppCredentialAddedEventDelegationType as json.
+func (s AppCredentialAddedEventDelegationType) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes AppCredentialAddedEventDelegationType from json.
+func (s *AppCredentialAddedEventDelegationType) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode AppCredentialAddedEventDelegationType to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch AppCredentialAddedEventDelegationType(v) {
+	case AppCredentialAddedEventDelegationTypeDirect:
+		*s = AppCredentialAddedEventDelegationTypeDirect
+	case AppCredentialAddedEventDelegationTypeDelegated:
+		*s = AppCredentialAddedEventDelegationTypeDelegated
+	case AppCredentialAddedEventDelegationTypePatShared:
+		*s = AppCredentialAddedEventDelegationTypePatShared
+	case AppCredentialAddedEventDelegationTypeExchanged:
+		*s = AppCredentialAddedEventDelegationTypeExchanged
+	default:
+		*s = AppCredentialAddedEventDelegationType(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s AppCredentialAddedEventDelegationType) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *AppCredentialAddedEventDelegationType) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *AppCredentialNotFound) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *AppCredentialNotFound) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("code")
+		e.Str("app.credential_not_found")
+	}
+	{
+		e.FieldStart("message")
+		e.Str(s.Message)
+	}
+	{
+		if s.Details.Set {
+			e.FieldStart("details")
+			s.Details.Encode(e)
+		}
+	}
+}
+
+var jsonFieldsNameOfAppCredentialNotFound = [3]string{
+	0: "code",
+	1: "message",
+	2: "details",
+}
+
+// Decode decodes AppCredentialNotFound from json.
+func (s *AppCredentialNotFound) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode AppCredentialNotFound to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "code":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.Code = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"code\"")
+			}
+		case "message":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				v, err := d.Str()
+				s.Message = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"message\"")
+			}
+		case "details":
+			if err := func() error {
+				s.Details.Reset()
+				if err := s.Details.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"details\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode AppCredentialNotFound")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000011,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfAppCredentialNotFound) {
+					name = jsonFieldsNameOfAppCredentialNotFound[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *AppCredentialNotFound) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *AppCredentialNotFound) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s AppCredentialNotFoundDetails) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields implements json.Marshaler.
+func (s AppCredentialNotFoundDetails) encodeFields(e *jx.Encoder) {
+	for k, elem := range s {
+		e.FieldStart(k)
+
+		if len(elem) != 0 {
+			e.Raw(elem)
+		}
+	}
+}
+
+// Decode decodes AppCredentialNotFoundDetails from json.
+func (s *AppCredentialNotFoundDetails) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode AppCredentialNotFoundDetails to nil")
+	}
+	m := s.init()
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		var elem jx.Raw
+		if err := func() error {
+			v, err := d.RawAppend(nil)
+			elem = jx.Raw(v)
+			if err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrapf(err, "decode field %q", k)
+		}
+		m[string(k)] = elem
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode AppCredentialNotFoundDetails")
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s AppCredentialNotFoundDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *AppCredentialNotFoundDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *AppCredentialPayload) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *AppCredentialPayload) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("client")
+		e.Str(s.Client)
+	}
+	{
+		e.FieldStart("client_id")
+		e.Str(s.ClientID)
+	}
+	{
+		e.FieldStart("credential_id")
+		e.Str(s.CredentialID)
+	}
+	{
+		e.FieldStart("name")
+		e.Str(s.Name)
+	}
+	{
+		e.FieldStart("kind")
+		s.Kind.Encode(e)
+	}
+	{
+		if s.Origin.Set {
+			e.FieldStart("origin")
+			s.Origin.Encode(e)
+		}
+	}
+}
+
+var jsonFieldsNameOfAppCredentialPayload = [6]string{
+	0: "client",
+	1: "client_id",
+	2: "credential_id",
+	3: "name",
+	4: "kind",
+	5: "origin",
+}
+
+// Decode decodes AppCredentialPayload from json.
+func (s *AppCredentialPayload) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode AppCredentialPayload to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "client":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.Client = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"client\"")
+			}
+		case "client_id":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				v, err := d.Str()
+				s.ClientID = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"client_id\"")
+			}
+		case "credential_id":
+			requiredBitSet[0] |= 1 << 2
+			if err := func() error {
+				v, err := d.Str()
+				s.CredentialID = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"credential_id\"")
+			}
+		case "name":
+			requiredBitSet[0] |= 1 << 3
+			if err := func() error {
+				v, err := d.Str()
+				s.Name = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"name\"")
+			}
+		case "kind":
+			requiredBitSet[0] |= 1 << 4
+			if err := func() error {
+				if err := s.Kind.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"kind\"")
+			}
+		case "origin":
+			if err := func() error {
+				s.Origin.Reset()
+				if err := s.Origin.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"origin\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode AppCredentialPayload")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00011111,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfAppCredentialPayload) {
+					name = jsonFieldsNameOfAppCredentialPayload[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *AppCredentialPayload) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *AppCredentialPayload) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes AppCredentialPayloadKind as json.
+func (s AppCredentialPayloadKind) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes AppCredentialPayloadKind from json.
+func (s *AppCredentialPayloadKind) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode AppCredentialPayloadKind to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch AppCredentialPayloadKind(v) {
+	case AppCredentialPayloadKindSecret:
+		*s = AppCredentialPayloadKindSecret
+	case AppCredentialPayloadKindKey:
+		*s = AppCredentialPayloadKindKey
+	default:
+		*s = AppCredentialPayloadKind(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s AppCredentialPayloadKind) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *AppCredentialPayloadKind) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes AppCredentialPayloadOrigin as json.
+func (s AppCredentialPayloadOrigin) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes AppCredentialPayloadOrigin from json.
+func (s *AppCredentialPayloadOrigin) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode AppCredentialPayloadOrigin to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch AppCredentialPayloadOrigin(v) {
+	case AppCredentialPayloadOriginGenerated:
+		*s = AppCredentialPayloadOriginGenerated
+	case AppCredentialPayloadOriginImported:
+		*s = AppCredentialPayloadOriginImported
+	default:
+		*s = AppCredentialPayloadOrigin(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s AppCredentialPayloadOrigin) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *AppCredentialPayloadOrigin) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *AppCredentialRevokedEvent) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *AppCredentialRevokedEvent) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("id")
+		e.Str(s.ID)
+	}
+	{
+		e.FieldStart("project_id")
+		s.ProjectID.Encode(e)
+	}
+	{
+		if s.TeamID.Set {
+			e.FieldStart("team_id")
+			s.TeamID.Encode(e)
+		}
+	}
+	{
+		e.FieldStart("event_type")
+		e.Str("app.credential.revoked")
+	}
+	{
+		e.FieldStart("category")
+		s.Category.Encode(e)
+	}
+	{
+		e.FieldStart("occurred_at")
+		json.EncodeDateTime(e, s.OccurredAt)
+	}
+	{
+		e.FieldStart("created_at")
+		json.EncodeDateTime(e, s.CreatedAt)
+	}
+	{
+		if s.ActorID.Set {
+			e.FieldStart("actor_id")
+			s.ActorID.Encode(e)
+		}
+	}
+	{
+		if s.ActorType.Set {
+			e.FieldStart("actor_type")
+			s.ActorType.Encode(e)
+		}
+	}
+	{
+		if s.EntityType.Set {
+			e.FieldStart("entity_type")
+			s.EntityType.Encode(e)
+		}
+	}
+	{
+		if s.EntityID.Set {
+			e.FieldStart("entity_id")
+			s.EntityID.Encode(e)
+		}
+	}
+	{
+		e.FieldStart("client_id")
+		e.Str(s.ClientID)
+	}
+	{
+		if s.TokenID.Set {
+			e.FieldStart("token_id")
+			s.TokenID.Encode(e)
+		}
+	}
+	{
+		if s.DelegationType.Set {
+			e.FieldStart("delegation_type")
+			s.DelegationType.Encode(e)
+		}
+	}
+	{
+		if s.DelegationID.Set {
+			e.FieldStart("delegation_id")
+			s.DelegationID.Encode(e)
+		}
+	}
+	{
+		if s.Grantor.Set {
+			e.FieldStart("grantor")
+			s.Grantor.Encode(e)
+		}
+	}
+	{
+		if s.Fingerprint.Set {
+			e.FieldStart("fingerprint")
+			s.Fingerprint.Encode(e)
+		}
+	}
+	{
+		if s.RequestID.Set {
+			e.FieldStart("request_id")
+			s.RequestID.Encode(e)
+		}
+	}
+	{
+		if s.SessionID.Set {
+			e.FieldStart("session_id")
+			s.SessionID.Encode(e)
+		}
+	}
+	{
+		if s.FlowID.Set {
+			e.FieldStart("flow_id")
+			s.FlowID.Encode(e)
+		}
+	}
+	{
+		if s.Metadata.Set {
+			e.FieldStart("metadata")
+			s.Metadata.Encode(e)
+		}
+	}
+	{
+		e.FieldStart("payload")
+		s.Payload.Encode(e)
+	}
+}
+
+var jsonFieldsNameOfAppCredentialRevokedEvent = [22]string{
+	0:  "id",
+	1:  "project_id",
+	2:  "team_id",
+	3:  "event_type",
+	4:  "category",
+	5:  "occurred_at",
+	6:  "created_at",
+	7:  "actor_id",
+	8:  "actor_type",
+	9:  "entity_type",
+	10: "entity_id",
+	11: "client_id",
+	12: "token_id",
+	13: "delegation_type",
+	14: "delegation_id",
+	15: "grantor",
+	16: "fingerprint",
+	17: "request_id",
+	18: "session_id",
+	19: "flow_id",
+	20: "metadata",
+	21: "payload",
+}
+
+// Decode decodes AppCredentialRevokedEvent from json.
+func (s *AppCredentialRevokedEvent) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode AppCredentialRevokedEvent to nil")
+	}
+	var requiredBitSet [3]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "id":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.ID = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"id\"")
+			}
+		case "project_id":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				if err := s.ProjectID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"project_id\"")
+			}
+		case "team_id":
+			if err := func() error {
+				s.TeamID.Reset()
+				if err := s.TeamID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"team_id\"")
+			}
+		case "event_type":
+			requiredBitSet[0] |= 1 << 3
+			if err := func() error {
+				v, err := d.Str()
+				s.EventType = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"event_type\"")
+			}
+		case "category":
+			requiredBitSet[0] |= 1 << 4
+			if err := func() error {
+				if err := s.Category.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"category\"")
+			}
+		case "occurred_at":
+			requiredBitSet[0] |= 1 << 5
+			if err := func() error {
+				v, err := json.DecodeDateTime(d)
+				s.OccurredAt = v
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"occurred_at\"")
+			}
+		case "created_at":
+			requiredBitSet[0] |= 1 << 6
+			if err := func() error {
+				v, err := json.DecodeDateTime(d)
+				s.CreatedAt = v
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"created_at\"")
+			}
+		case "actor_id":
+			if err := func() error {
+				s.ActorID.Reset()
+				if err := s.ActorID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"actor_id\"")
+			}
+		case "actor_type":
+			if err := func() error {
+				s.ActorType.Reset()
+				if err := s.ActorType.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"actor_type\"")
+			}
+		case "entity_type":
+			if err := func() error {
+				s.EntityType.Reset()
+				if err := s.EntityType.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"entity_type\"")
+			}
+		case "entity_id":
+			if err := func() error {
+				s.EntityID.Reset()
+				if err := s.EntityID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"entity_id\"")
+			}
+		case "client_id":
+			requiredBitSet[1] |= 1 << 3
+			if err := func() error {
+				v, err := d.Str()
+				s.ClientID = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"client_id\"")
+			}
+		case "token_id":
+			if err := func() error {
+				s.TokenID.Reset()
+				if err := s.TokenID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"token_id\"")
+			}
+		case "delegation_type":
+			if err := func() error {
+				s.DelegationType.Reset()
+				if err := s.DelegationType.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"delegation_type\"")
+			}
+		case "delegation_id":
+			if err := func() error {
+				s.DelegationID.Reset()
+				if err := s.DelegationID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"delegation_id\"")
+			}
+		case "grantor":
+			if err := func() error {
+				s.Grantor.Reset()
+				if err := s.Grantor.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"grantor\"")
+			}
+		case "fingerprint":
+			if err := func() error {
+				s.Fingerprint.Reset()
+				if err := s.Fingerprint.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"fingerprint\"")
+			}
+		case "request_id":
+			if err := func() error {
+				s.RequestID.Reset()
+				if err := s.RequestID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"request_id\"")
+			}
+		case "session_id":
+			if err := func() error {
+				s.SessionID.Reset()
+				if err := s.SessionID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"session_id\"")
+			}
+		case "flow_id":
+			if err := func() error {
+				s.FlowID.Reset()
+				if err := s.FlowID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"flow_id\"")
+			}
+		case "metadata":
+			if err := func() error {
+				s.Metadata.Reset()
+				if err := s.Metadata.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"metadata\"")
+			}
+		case "payload":
+			requiredBitSet[2] |= 1 << 5
+			if err := func() error {
+				if err := s.Payload.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"payload\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode AppCredentialRevokedEvent")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [3]uint8{
+		0b01111011,
+		0b00001000,
+		0b00100000,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfAppCredentialRevokedEvent) {
+					name = jsonFieldsNameOfAppCredentialRevokedEvent[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *AppCredentialRevokedEvent) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *AppCredentialRevokedEvent) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes AppCredentialRevokedEventActorType as json.
+func (s AppCredentialRevokedEventActorType) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes AppCredentialRevokedEventActorType from json.
+func (s *AppCredentialRevokedEventActorType) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode AppCredentialRevokedEventActorType to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch AppCredentialRevokedEventActorType(v) {
+	case AppCredentialRevokedEventActorTypeHuman:
+		*s = AppCredentialRevokedEventActorTypeHuman
+	case AppCredentialRevokedEventActorTypeService:
+		*s = AppCredentialRevokedEventActorTypeService
+	case AppCredentialRevokedEventActorTypeSystem:
+		*s = AppCredentialRevokedEventActorTypeSystem
+	case AppCredentialRevokedEventActorTypeAgent:
+		*s = AppCredentialRevokedEventActorTypeAgent
+	default:
+		*s = AppCredentialRevokedEventActorType(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s AppCredentialRevokedEventActorType) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *AppCredentialRevokedEventActorType) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes AppCredentialRevokedEventCategory as json.
+func (s AppCredentialRevokedEventCategory) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes AppCredentialRevokedEventCategory from json.
+func (s *AppCredentialRevokedEventCategory) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode AppCredentialRevokedEventCategory to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch AppCredentialRevokedEventCategory(v) {
+	case AppCredentialRevokedEventCategoryRequest:
+		*s = AppCredentialRevokedEventCategoryRequest
+	case AppCredentialRevokedEventCategoryAuth:
+		*s = AppCredentialRevokedEventCategoryAuth
+	case AppCredentialRevokedEventCategorySession:
+		*s = AppCredentialRevokedEventCategorySession
+	case AppCredentialRevokedEventCategoryAdmin:
+		*s = AppCredentialRevokedEventCategoryAdmin
+	case AppCredentialRevokedEventCategoryEntity:
+		*s = AppCredentialRevokedEventCategoryEntity
+	case AppCredentialRevokedEventCategorySignal:
+		*s = AppCredentialRevokedEventCategorySignal
+	default:
+		*s = AppCredentialRevokedEventCategory(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s AppCredentialRevokedEventCategory) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *AppCredentialRevokedEventCategory) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes AppCredentialRevokedEventDelegationType as json.
+func (s AppCredentialRevokedEventDelegationType) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes AppCredentialRevokedEventDelegationType from json.
+func (s *AppCredentialRevokedEventDelegationType) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode AppCredentialRevokedEventDelegationType to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch AppCredentialRevokedEventDelegationType(v) {
+	case AppCredentialRevokedEventDelegationTypeDirect:
+		*s = AppCredentialRevokedEventDelegationTypeDirect
+	case AppCredentialRevokedEventDelegationTypeDelegated:
+		*s = AppCredentialRevokedEventDelegationTypeDelegated
+	case AppCredentialRevokedEventDelegationTypePatShared:
+		*s = AppCredentialRevokedEventDelegationTypePatShared
+	case AppCredentialRevokedEventDelegationTypeExchanged:
+		*s = AppCredentialRevokedEventDelegationTypeExchanged
+	default:
+		*s = AppCredentialRevokedEventDelegationType(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s AppCredentialRevokedEventDelegationType) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *AppCredentialRevokedEventDelegationType) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *AppCredentialTaken) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *AppCredentialTaken) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("code")
+		e.Str("app.credential_taken")
+	}
+	{
+		e.FieldStart("message")
+		e.Str(s.Message)
+	}
+	{
+		if s.Details.Set {
+			e.FieldStart("details")
+			s.Details.Encode(e)
+		}
+	}
+}
+
+var jsonFieldsNameOfAppCredentialTaken = [3]string{
+	0: "code",
+	1: "message",
+	2: "details",
+}
+
+// Decode decodes AppCredentialTaken from json.
+func (s *AppCredentialTaken) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode AppCredentialTaken to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "code":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.Code = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"code\"")
+			}
+		case "message":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				v, err := d.Str()
+				s.Message = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"message\"")
+			}
+		case "details":
+			if err := func() error {
+				s.Details.Reset()
+				if err := s.Details.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"details\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode AppCredentialTaken")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000011,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfAppCredentialTaken) {
+					name = jsonFieldsNameOfAppCredentialTaken[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *AppCredentialTaken) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *AppCredentialTaken) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s AppCredentialTakenDetails) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields implements json.Marshaler.
+func (s AppCredentialTakenDetails) encodeFields(e *jx.Encoder) {
+	for k, elem := range s {
+		e.FieldStart(k)
+
+		if len(elem) != 0 {
+			e.Raw(elem)
+		}
+	}
+}
+
+// Decode decodes AppCredentialTakenDetails from json.
+func (s *AppCredentialTakenDetails) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode AppCredentialTakenDetails to nil")
+	}
+	m := s.init()
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		var elem jx.Raw
+		if err := func() error {
+			v, err := d.RawAppend(nil)
+			elem = jx.Raw(v)
+			if err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrapf(err, "decode field %q", k)
+		}
+		m[string(k)] = elem
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode AppCredentialTakenDetails")
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s AppCredentialTakenDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *AppCredentialTakenDetails) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -26513,6 +27718,8 @@ func (s *ClientRegistrationFilterField) Decode(d *jx.Decoder) error {
 	}
 	// Try to use constant string.
 	switch ClientRegistrationFilterField(v) {
+	case ClientRegistrationFilterFieldApp:
+		*s = ClientRegistrationFilterFieldApp
 	case ClientRegistrationFilterFieldCreatedAt:
 		*s = ClientRegistrationFilterFieldCreatedAt
 	case ClientRegistrationFilterFieldExpiresAt:
@@ -26903,6 +28110,12 @@ func (s *ClientRegistrationResponse) encodeFields(e *jx.Encoder) {
 		e.Str(s.ID)
 	}
 	{
+		if s.App.Set {
+			e.FieldStart("app")
+			s.App.Encode(e)
+		}
+	}
+	{
 		if s.ClientName.Set {
 			e.FieldStart("client_name")
 			s.ClientName.Encode(e)
@@ -26974,20 +28187,21 @@ func (s *ClientRegistrationResponse) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfClientRegistrationResponse = [13]string{
+var jsonFieldsNameOfClientRegistrationResponse = [14]string{
 	0:  "id",
-	1:  "client_name",
-	2:  "client_uri",
-	3:  "logo_uri",
-	4:  "policy_uri",
-	5:  "tos_uri",
-	6:  "software_id",
-	7:  "software_version",
-	8:  "redirect_uris",
-	9:  "grant_types",
-	10: "token_endpoint_auth_method",
-	11: "created_at",
-	12: "expires_at",
+	1:  "app",
+	2:  "client_name",
+	3:  "client_uri",
+	4:  "logo_uri",
+	5:  "policy_uri",
+	6:  "tos_uri",
+	7:  "software_id",
+	8:  "software_version",
+	9:  "redirect_uris",
+	10: "grant_types",
+	11: "token_endpoint_auth_method",
+	12: "created_at",
+	13: "expires_at",
 }
 
 // Decode decodes ClientRegistrationResponse from json.
@@ -27010,6 +28224,16 @@ func (s *ClientRegistrationResponse) Decode(d *jx.Decoder) error {
 				return nil
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"id\"")
+			}
+		case "app":
+			if err := func() error {
+				s.App.Reset()
+				if err := s.App.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"app\"")
 			}
 		case "client_name":
 			if err := func() error {
@@ -27082,7 +28306,7 @@ func (s *ClientRegistrationResponse) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"software_version\"")
 			}
 		case "redirect_uris":
-			requiredBitSet[1] |= 1 << 0
+			requiredBitSet[1] |= 1 << 1
 			if err := func() error {
 				s.RedirectUris = make([]string, 0)
 				if err := d.Arr(func(d *jx.Decoder) error {
@@ -27102,7 +28326,7 @@ func (s *ClientRegistrationResponse) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"redirect_uris\"")
 			}
 		case "grant_types":
-			requiredBitSet[1] |= 1 << 1
+			requiredBitSet[1] |= 1 << 2
 			if err := func() error {
 				s.GrantTypes = make([]ClientRegistrationResponseGrantTypesItem, 0)
 				if err := d.Arr(func(d *jx.Decoder) error {
@@ -27120,7 +28344,7 @@ func (s *ClientRegistrationResponse) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"grant_types\"")
 			}
 		case "token_endpoint_auth_method":
-			requiredBitSet[1] |= 1 << 2
+			requiredBitSet[1] |= 1 << 3
 			if err := func() error {
 				if err := s.TokenEndpointAuthMethod.Decode(d); err != nil {
 					return err
@@ -27130,7 +28354,7 @@ func (s *ClientRegistrationResponse) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"token_endpoint_auth_method\"")
 			}
 		case "created_at":
-			requiredBitSet[1] |= 1 << 3
+			requiredBitSet[1] |= 1 << 4
 			if err := func() error {
 				v, err := json.DecodeDateTime(d)
 				s.CreatedAt = v
@@ -27142,7 +28366,7 @@ func (s *ClientRegistrationResponse) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"created_at\"")
 			}
 		case "expires_at":
-			requiredBitSet[1] |= 1 << 4
+			requiredBitSet[1] |= 1 << 5
 			if err := func() error {
 				v, err := json.DecodeDateTime(d)
 				s.ExpiresAt = v
@@ -27164,7 +28388,7 @@ func (s *ClientRegistrationResponse) Decode(d *jx.Decoder) error {
 	var failures []validate.FieldError
 	for i, mask := range [2]uint8{
 		0b00000001,
-		0b00011111,
+		0b00111110,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -45367,11 +46591,11 @@ func (s Event) Encode(e *jx.Encoder) {
 
 func (s Event) encodeFields(e *jx.Encoder) {
 	switch s.Type {
-	case AppClientSecretAddedEventEvent:
+	case AppCreatedEventEvent:
 		e.FieldStart("event_type")
-		e.Str("app.client_secret.added")
+		e.Str("app.created")
 		{
-			s := s.AppClientSecretAddedEvent
+			s := s.AppCreatedEvent
 			{
 				e.FieldStart("id")
 				e.Str(s.ID)
@@ -45485,11 +46709,129 @@ func (s Event) encodeFields(e *jx.Encoder) {
 				s.Payload.Encode(e)
 			}
 		}
-	case AppCreatedEventEvent:
+	case AppCredentialAddedEventEvent:
 		e.FieldStart("event_type")
-		e.Str("app.created")
+		e.Str("app.credential.added")
 		{
-			s := s.AppCreatedEvent
+			s := s.AppCredentialAddedEvent
+			{
+				e.FieldStart("id")
+				e.Str(s.ID)
+			}
+			{
+				e.FieldStart("project_id")
+				s.ProjectID.Encode(e)
+			}
+			{
+				if s.TeamID.Set {
+					e.FieldStart("team_id")
+					s.TeamID.Encode(e)
+				}
+			}
+			{
+				e.FieldStart("category")
+				s.Category.Encode(e)
+			}
+			{
+				e.FieldStart("occurred_at")
+				json.EncodeDateTime(e, s.OccurredAt)
+			}
+			{
+				e.FieldStart("created_at")
+				json.EncodeDateTime(e, s.CreatedAt)
+			}
+			{
+				if s.ActorID.Set {
+					e.FieldStart("actor_id")
+					s.ActorID.Encode(e)
+				}
+			}
+			{
+				if s.ActorType.Set {
+					e.FieldStart("actor_type")
+					s.ActorType.Encode(e)
+				}
+			}
+			{
+				if s.EntityType.Set {
+					e.FieldStart("entity_type")
+					s.EntityType.Encode(e)
+				}
+			}
+			{
+				if s.EntityID.Set {
+					e.FieldStart("entity_id")
+					s.EntityID.Encode(e)
+				}
+			}
+			{
+				e.FieldStart("client_id")
+				e.Str(s.ClientID)
+			}
+			{
+				if s.TokenID.Set {
+					e.FieldStart("token_id")
+					s.TokenID.Encode(e)
+				}
+			}
+			{
+				if s.DelegationType.Set {
+					e.FieldStart("delegation_type")
+					s.DelegationType.Encode(e)
+				}
+			}
+			{
+				if s.DelegationID.Set {
+					e.FieldStart("delegation_id")
+					s.DelegationID.Encode(e)
+				}
+			}
+			{
+				if s.Grantor.Set {
+					e.FieldStart("grantor")
+					s.Grantor.Encode(e)
+				}
+			}
+			{
+				if s.Fingerprint.Set {
+					e.FieldStart("fingerprint")
+					s.Fingerprint.Encode(e)
+				}
+			}
+			{
+				if s.RequestID.Set {
+					e.FieldStart("request_id")
+					s.RequestID.Encode(e)
+				}
+			}
+			{
+				if s.SessionID.Set {
+					e.FieldStart("session_id")
+					s.SessionID.Encode(e)
+				}
+			}
+			{
+				if s.FlowID.Set {
+					e.FieldStart("flow_id")
+					s.FlowID.Encode(e)
+				}
+			}
+			{
+				if s.Metadata.Set {
+					e.FieldStart("metadata")
+					s.Metadata.Encode(e)
+				}
+			}
+			{
+				e.FieldStart("payload")
+				s.Payload.Encode(e)
+			}
+		}
+	case AppCredentialRevokedEventEvent:
+		e.FieldStart("event_type")
+		e.Str("app.credential.revoked")
+		{
+			s := s.AppCredentialRevokedEvent
 			{
 				e.FieldStart("id")
 				e.Str(s.ID)
@@ -51175,11 +52517,14 @@ func (s *Event) Decode(d *jx.Decoder) error {
 					return err
 				}
 				switch typ {
-				case "app.client_secret.added":
-					s.Type = AppClientSecretAddedEventEvent
-					found = true
 				case "app.created":
 					s.Type = AppCreatedEventEvent
+					found = true
+				case "app.credential.added":
+					s.Type = AppCredentialAddedEventEvent
+					found = true
+				case "app.credential.revoked":
+					s.Type = AppCredentialRevokedEventEvent
 					found = true
 				case "app.updated":
 					s.Type = AppUpdatedEventEvent
@@ -51336,12 +52681,16 @@ func (s *Event) Decode(d *jx.Decoder) error {
 		return errors.New("unable to detect sum type variant")
 	}
 	switch s.Type {
-	case AppClientSecretAddedEventEvent:
-		if err := s.AppClientSecretAddedEvent.Decode(d); err != nil {
-			return err
-		}
 	case AppCreatedEventEvent:
 		if err := s.AppCreatedEvent.Decode(d); err != nil {
+			return err
+		}
+	case AppCredentialAddedEventEvent:
+		if err := s.AppCredentialAddedEvent.Decode(d); err != nil {
+			return err
+		}
+	case AppCredentialRevokedEventEvent:
+		if err := s.AppCredentialRevokedEvent.Decode(d); err != nil {
 			return err
 		}
 	case AppUpdatedEventEvent:
@@ -81375,6 +82724,478 @@ func (s *Limit) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes ListAppClientCredentialsErrorResponse as json.
+func (s ListAppClientCredentialsErrorResponse) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+func (s ListAppClientCredentialsErrorResponse) encodeFields(e *jx.Encoder) {
+	switch s.Type {
+	case AppClientNotFoundListAppClientCredentialsErrorResponse:
+		e.FieldStart("code")
+		e.Str("app.client_not_found")
+		{
+			s := s.AppClientNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case AppNotFoundListAppClientCredentialsErrorResponse:
+		e.FieldStart("code")
+		e.Str("app.not_found")
+		{
+			s := s.AppNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case AppPermissionDeniedListAppClientCredentialsErrorResponse:
+		e.FieldStart("code")
+		e.Str("app.permission_denied")
+		{
+			s := s.AppPermissionDenied
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case AuthUnauthorizedListAppClientCredentialsErrorResponse:
+		e.FieldStart("code")
+		e.Str("auth.unauthorized")
+		{
+			s := s.AuthUnauthorized
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case InternalListAppClientCredentialsErrorResponse:
+		e.FieldStart("code")
+		e.Str("internal")
+		{
+			s := s.Internal
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case NotImplementedListAppClientCredentialsErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ReqInvalidListAppClientCredentialsErrorResponse:
+		e.FieldStart("code")
+		e.Str("req.invalid")
+		{
+			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableListAppClientCredentialsErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	}
+}
+
+// Decode decodes ListAppClientCredentialsErrorResponse from json.
+func (s *ListAppClientCredentialsErrorResponse) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode ListAppClientCredentialsErrorResponse to nil")
+	}
+	// Sum type discriminator.
+	if typ := d.Next(); typ != jx.Object {
+		return errors.Errorf("unexpected json type %q", typ)
+	}
+
+	var found bool
+	if err := d.Capture(func(d *jx.Decoder) error {
+		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
+			if found {
+				return d.Skip()
+			}
+			switch string(key) {
+			case "code":
+				typ, err := d.Str()
+				if err != nil {
+					return err
+				}
+				switch typ {
+				case "app.client_not_found":
+					s.Type = AppClientNotFoundListAppClientCredentialsErrorResponse
+					found = true
+				case "app.not_found":
+					s.Type = AppNotFoundListAppClientCredentialsErrorResponse
+					found = true
+				case "app.permission_denied":
+					s.Type = AppPermissionDeniedListAppClientCredentialsErrorResponse
+					found = true
+				case "auth.unauthorized":
+					s.Type = AuthUnauthorizedListAppClientCredentialsErrorResponse
+					found = true
+				case "internal":
+					s.Type = InternalListAppClientCredentialsErrorResponse
+					found = true
+				case "not_implemented":
+					s.Type = NotImplementedListAppClientCredentialsErrorResponse
+					found = true
+				case "req.invalid":
+					s.Type = ReqInvalidListAppClientCredentialsErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableListAppClientCredentialsErrorResponse
+					found = true
+				default:
+					return errors.Errorf("unknown type %s", typ)
+				}
+				return nil
+			}
+			return d.Skip()
+		})
+	}); err != nil {
+		return errors.Wrap(err, "capture")
+	}
+	if !found {
+		return errors.New("unable to detect sum type variant")
+	}
+	switch s.Type {
+	case AppClientNotFoundListAppClientCredentialsErrorResponse:
+		if err := s.AppClientNotFound.Decode(d); err != nil {
+			return err
+		}
+	case AppNotFoundListAppClientCredentialsErrorResponse:
+		if err := s.AppNotFound.Decode(d); err != nil {
+			return err
+		}
+	case AppPermissionDeniedListAppClientCredentialsErrorResponse:
+		if err := s.AppPermissionDenied.Decode(d); err != nil {
+			return err
+		}
+	case AuthUnauthorizedListAppClientCredentialsErrorResponse:
+		if err := s.AuthUnauthorized.Decode(d); err != nil {
+			return err
+		}
+	case InternalListAppClientCredentialsErrorResponse:
+		if err := s.Internal.Decode(d); err != nil {
+			return err
+		}
+	case NotImplementedListAppClientCredentialsErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
+	case ReqInvalidListAppClientCredentialsErrorResponse:
+		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableListAppClientCredentialsErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
+			return err
+		}
+	default:
+		return errors.Errorf("inferred invalid type: %s", s.Type)
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s ListAppClientCredentialsErrorResponse) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *ListAppClientCredentialsErrorResponse) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes ListAppClientCredentialsForbidden as json.
+func (s *ListAppClientCredentialsForbidden) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes ListAppClientCredentialsForbidden from json.
+func (s *ListAppClientCredentialsForbidden) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode ListAppClientCredentialsForbidden to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = ListAppClientCredentialsForbidden(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *ListAppClientCredentialsForbidden) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *ListAppClientCredentialsForbidden) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes ListAppClientCredentialsNotFound as json.
+func (s *ListAppClientCredentialsNotFound) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes ListAppClientCredentialsNotFound from json.
+func (s *ListAppClientCredentialsNotFound) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode ListAppClientCredentialsNotFound to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = ListAppClientCredentialsNotFound(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *ListAppClientCredentialsNotFound) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *ListAppClientCredentialsNotFound) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *ListAppClientCredentialsResponse) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *ListAppClientCredentialsResponse) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("credentials")
+		e.ArrStart()
+		for _, elem := range s.Credentials {
+			elem.Encode(e)
+		}
+		e.ArrEnd()
+	}
+}
+
+var jsonFieldsNameOfListAppClientCredentialsResponse = [1]string{
+	0: "credentials",
+}
+
+// Decode decodes ListAppClientCredentialsResponse from json.
+func (s *ListAppClientCredentialsResponse) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode ListAppClientCredentialsResponse to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "credentials":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				s.Credentials = make([]AppClientCredential, 0)
+				if err := d.Arr(func(d *jx.Decoder) error {
+					var elem AppClientCredential
+					if err := elem.Decode(d); err != nil {
+						return err
+					}
+					s.Credentials = append(s.Credentials, elem)
+					return nil
+				}); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"credentials\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode ListAppClientCredentialsResponse")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000001,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfListAppClientCredentialsResponse) {
+					name = jsonFieldsNameOfListAppClientCredentialsResponse[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *ListAppClientCredentialsResponse) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *ListAppClientCredentialsResponse) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes ListAppClientCredentialsUnauthorized as json.
+func (s *ListAppClientCredentialsUnauthorized) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes ListAppClientCredentialsUnauthorized from json.
+func (s *ListAppClientCredentialsUnauthorized) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode ListAppClientCredentialsUnauthorized to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = ListAppClientCredentialsUnauthorized(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *ListAppClientCredentialsUnauthorized) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *ListAppClientCredentialsUnauthorized) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes ListAppRevisionsErrorResponse as json.
 func (s ListAppRevisionsErrorResponse) Encode(e *jx.Encoder) {
 	e.ObjStart()
@@ -89351,39 +91172,6 @@ func (s *OptAppAPISigningAlg) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode encodes AppClientAuthMethod as json.
-func (o OptAppClientAuthMethod) Encode(e *jx.Encoder) {
-	if !o.Set {
-		return
-	}
-	e.Str(string(o.Value))
-}
-
-// Decode decodes AppClientAuthMethod from json.
-func (o *OptAppClientAuthMethod) Decode(d *jx.Decoder) error {
-	if o == nil {
-		return errors.New("invalid: unable to decode OptAppClientAuthMethod to nil")
-	}
-	o.Set = true
-	if err := o.Value.Decode(d); err != nil {
-		return err
-	}
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s OptAppClientAuthMethod) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *OptAppClientAuthMethod) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
 // Encode encodes AppClientConsent as json.
 func (o OptAppClientConsent) Encode(e *jx.Encoder) {
 	if !o.Set {
@@ -89480,6 +91268,39 @@ func (s OptAppClientIDTokenSignedResponseAlg) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *OptAppClientIDTokenSignedResponseAlg) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes AppClientJwk as json.
+func (o OptAppClientJwk) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes AppClientJwk from json.
+func (o *OptAppClientJwk) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptAppClientJwk to nil")
+	}
+	o.Set = true
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptAppClientJwk) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptAppClientJwk) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -89684,39 +91505,6 @@ func (s *OptAppClientRegistrationNotFoundDetails) UnmarshalJSON(data []byte) err
 	return s.Decode(d)
 }
 
-// Encode encodes AppClientSecretAddedEventDelegationType as json.
-func (o OptAppClientSecretAddedEventDelegationType) Encode(e *jx.Encoder) {
-	if !o.Set {
-		return
-	}
-	e.Str(string(o.Value))
-}
-
-// Decode decodes AppClientSecretAddedEventDelegationType from json.
-func (o *OptAppClientSecretAddedEventDelegationType) Decode(d *jx.Decoder) error {
-	if o == nil {
-		return errors.New("invalid: unable to decode OptAppClientSecretAddedEventDelegationType to nil")
-	}
-	o.Set = true
-	if err := o.Value.Decode(d); err != nil {
-		return err
-	}
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s OptAppClientSecretAddedEventDelegationType) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *OptAppClientSecretAddedEventDelegationType) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
 // Encode encodes AppCreatedEventDelegationType as json.
 func (o OptAppCreatedEventDelegationType) Encode(e *jx.Encoder) {
 	if !o.Set {
@@ -89746,6 +91534,173 @@ func (s OptAppCreatedEventDelegationType) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *OptAppCreatedEventDelegationType) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes AppCredentialAddedEventDelegationType as json.
+func (o OptAppCredentialAddedEventDelegationType) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	e.Str(string(o.Value))
+}
+
+// Decode decodes AppCredentialAddedEventDelegationType from json.
+func (o *OptAppCredentialAddedEventDelegationType) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptAppCredentialAddedEventDelegationType to nil")
+	}
+	o.Set = true
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptAppCredentialAddedEventDelegationType) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptAppCredentialAddedEventDelegationType) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes AppCredentialNotFoundDetails as json.
+func (o OptAppCredentialNotFoundDetails) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes AppCredentialNotFoundDetails from json.
+func (o *OptAppCredentialNotFoundDetails) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptAppCredentialNotFoundDetails to nil")
+	}
+	o.Set = true
+	o.Value = make(AppCredentialNotFoundDetails)
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptAppCredentialNotFoundDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptAppCredentialNotFoundDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes AppCredentialPayloadOrigin as json.
+func (o OptAppCredentialPayloadOrigin) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	e.Str(string(o.Value))
+}
+
+// Decode decodes AppCredentialPayloadOrigin from json.
+func (o *OptAppCredentialPayloadOrigin) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptAppCredentialPayloadOrigin to nil")
+	}
+	o.Set = true
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptAppCredentialPayloadOrigin) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptAppCredentialPayloadOrigin) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes AppCredentialRevokedEventDelegationType as json.
+func (o OptAppCredentialRevokedEventDelegationType) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	e.Str(string(o.Value))
+}
+
+// Decode decodes AppCredentialRevokedEventDelegationType from json.
+func (o *OptAppCredentialRevokedEventDelegationType) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptAppCredentialRevokedEventDelegationType to nil")
+	}
+	o.Set = true
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptAppCredentialRevokedEventDelegationType) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptAppCredentialRevokedEventDelegationType) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes AppCredentialTakenDetails as json.
+func (o OptAppCredentialTakenDetails) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes AppCredentialTakenDetails from json.
+func (o *OptAppCredentialTakenDetails) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptAppCredentialTakenDetails to nil")
+	}
+	o.Set = true
+	o.Value = make(AppCredentialTakenDetails)
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptAppCredentialTakenDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptAppCredentialTakenDetails) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -95057,55 +97012,6 @@ func (s *OptLimit) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode encodes AppClientSecretAddedEventActorType as json.
-func (o OptNilAppClientSecretAddedEventActorType) Encode(e *jx.Encoder) {
-	if !o.Set {
-		return
-	}
-	if o.Null {
-		e.Null()
-		return
-	}
-	e.Str(string(o.Value))
-}
-
-// Decode decodes AppClientSecretAddedEventActorType from json.
-func (o *OptNilAppClientSecretAddedEventActorType) Decode(d *jx.Decoder) error {
-	if o == nil {
-		return errors.New("invalid: unable to decode OptNilAppClientSecretAddedEventActorType to nil")
-	}
-	if d.Next() == jx.Null {
-		if err := d.Null(); err != nil {
-			return err
-		}
-
-		var v AppClientSecretAddedEventActorType
-		o.Value = v
-		o.Set = true
-		o.Null = true
-		return nil
-	}
-	o.Set = true
-	o.Null = false
-	if err := o.Value.Decode(d); err != nil {
-		return err
-	}
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s OptNilAppClientSecretAddedEventActorType) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *OptNilAppClientSecretAddedEventActorType) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
 // Encode encodes AppCreatedEventActorType as json.
 func (o OptNilAppCreatedEventActorType) Encode(e *jx.Encoder) {
 	if !o.Set {
@@ -95151,6 +97057,104 @@ func (s OptNilAppCreatedEventActorType) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *OptNilAppCreatedEventActorType) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes AppCredentialAddedEventActorType as json.
+func (o OptNilAppCredentialAddedEventActorType) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	if o.Null {
+		e.Null()
+		return
+	}
+	e.Str(string(o.Value))
+}
+
+// Decode decodes AppCredentialAddedEventActorType from json.
+func (o *OptNilAppCredentialAddedEventActorType) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptNilAppCredentialAddedEventActorType to nil")
+	}
+	if d.Next() == jx.Null {
+		if err := d.Null(); err != nil {
+			return err
+		}
+
+		var v AppCredentialAddedEventActorType
+		o.Value = v
+		o.Set = true
+		o.Null = true
+		return nil
+	}
+	o.Set = true
+	o.Null = false
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptNilAppCredentialAddedEventActorType) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptNilAppCredentialAddedEventActorType) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes AppCredentialRevokedEventActorType as json.
+func (o OptNilAppCredentialRevokedEventActorType) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	if o.Null {
+		e.Null()
+		return
+	}
+	e.Str(string(o.Value))
+}
+
+// Decode decodes AppCredentialRevokedEventActorType from json.
+func (o *OptNilAppCredentialRevokedEventActorType) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptNilAppCredentialRevokedEventActorType to nil")
+	}
+	if d.Next() == jx.Null {
+		if err := d.Null(); err != nil {
+			return err
+		}
+
+		var v AppCredentialRevokedEventActorType
+		o.Value = v
+		o.Set = true
+		o.Null = true
+		return nil
+	}
+	o.Set = true
+	o.Null = false
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptNilAppCredentialRevokedEventActorType) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptNilAppCredentialRevokedEventActorType) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -131490,6 +133494,464 @@ func (s RequestAPIPayloadMethod) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *RequestAPIPayloadMethod) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes RevokeAppClientCredentialErrorResponse as json.
+func (s RevokeAppClientCredentialErrorResponse) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+func (s RevokeAppClientCredentialErrorResponse) encodeFields(e *jx.Encoder) {
+	switch s.Type {
+	case AppClientNotFoundRevokeAppClientCredentialErrorResponse:
+		e.FieldStart("code")
+		e.Str("app.client_not_found")
+		{
+			s := s.AppClientNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case AppCredentialNotFoundRevokeAppClientCredentialErrorResponse:
+		e.FieldStart("code")
+		e.Str("app.credential_not_found")
+		{
+			s := s.AppCredentialNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case AppNotFoundRevokeAppClientCredentialErrorResponse:
+		e.FieldStart("code")
+		e.Str("app.not_found")
+		{
+			s := s.AppNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case AppPermissionDeniedRevokeAppClientCredentialErrorResponse:
+		e.FieldStart("code")
+		e.Str("app.permission_denied")
+		{
+			s := s.AppPermissionDenied
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case AppRevisionConflictRevokeAppClientCredentialErrorResponse:
+		e.FieldStart("code")
+		e.Str("app.revision_conflict")
+		{
+			s := s.AppRevisionConflict
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case AuthCsrfInvalidRevokeAppClientCredentialErrorResponse:
+		e.FieldStart("code")
+		e.Str("auth.csrf_invalid")
+		{
+			s := s.AuthCsrfInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case AuthUnauthorizedRevokeAppClientCredentialErrorResponse:
+		e.FieldStart("code")
+		e.Str("auth.unauthorized")
+		{
+			s := s.AuthUnauthorized
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case EvtInvalidRevokeAppClientCredentialErrorResponse:
+		e.FieldStart("code")
+		e.Str("evt.invalid")
+		{
+			s := s.EvtInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case InternalRevokeAppClientCredentialErrorResponse:
+		e.FieldStart("code")
+		e.Str("internal")
+		{
+			s := s.Internal
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case NotImplementedRevokeAppClientCredentialErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ReqInvalidRevokeAppClientCredentialErrorResponse:
+		e.FieldStart("code")
+		e.Str("req.invalid")
+		{
+			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableRevokeAppClientCredentialErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	}
+}
+
+// Decode decodes RevokeAppClientCredentialErrorResponse from json.
+func (s *RevokeAppClientCredentialErrorResponse) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode RevokeAppClientCredentialErrorResponse to nil")
+	}
+	// Sum type discriminator.
+	if typ := d.Next(); typ != jx.Object {
+		return errors.Errorf("unexpected json type %q", typ)
+	}
+
+	var found bool
+	if err := d.Capture(func(d *jx.Decoder) error {
+		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
+			if found {
+				return d.Skip()
+			}
+			switch string(key) {
+			case "code":
+				typ, err := d.Str()
+				if err != nil {
+					return err
+				}
+				switch typ {
+				case "app.client_not_found":
+					s.Type = AppClientNotFoundRevokeAppClientCredentialErrorResponse
+					found = true
+				case "app.credential_not_found":
+					s.Type = AppCredentialNotFoundRevokeAppClientCredentialErrorResponse
+					found = true
+				case "app.not_found":
+					s.Type = AppNotFoundRevokeAppClientCredentialErrorResponse
+					found = true
+				case "app.permission_denied":
+					s.Type = AppPermissionDeniedRevokeAppClientCredentialErrorResponse
+					found = true
+				case "app.revision_conflict":
+					s.Type = AppRevisionConflictRevokeAppClientCredentialErrorResponse
+					found = true
+				case "auth.csrf_invalid":
+					s.Type = AuthCsrfInvalidRevokeAppClientCredentialErrorResponse
+					found = true
+				case "auth.unauthorized":
+					s.Type = AuthUnauthorizedRevokeAppClientCredentialErrorResponse
+					found = true
+				case "evt.invalid":
+					s.Type = EvtInvalidRevokeAppClientCredentialErrorResponse
+					found = true
+				case "internal":
+					s.Type = InternalRevokeAppClientCredentialErrorResponse
+					found = true
+				case "not_implemented":
+					s.Type = NotImplementedRevokeAppClientCredentialErrorResponse
+					found = true
+				case "req.invalid":
+					s.Type = ReqInvalidRevokeAppClientCredentialErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableRevokeAppClientCredentialErrorResponse
+					found = true
+				default:
+					return errors.Errorf("unknown type %s", typ)
+				}
+				return nil
+			}
+			return d.Skip()
+		})
+	}); err != nil {
+		return errors.Wrap(err, "capture")
+	}
+	if !found {
+		return errors.New("unable to detect sum type variant")
+	}
+	switch s.Type {
+	case AppClientNotFoundRevokeAppClientCredentialErrorResponse:
+		if err := s.AppClientNotFound.Decode(d); err != nil {
+			return err
+		}
+	case AppCredentialNotFoundRevokeAppClientCredentialErrorResponse:
+		if err := s.AppCredentialNotFound.Decode(d); err != nil {
+			return err
+		}
+	case AppNotFoundRevokeAppClientCredentialErrorResponse:
+		if err := s.AppNotFound.Decode(d); err != nil {
+			return err
+		}
+	case AppPermissionDeniedRevokeAppClientCredentialErrorResponse:
+		if err := s.AppPermissionDenied.Decode(d); err != nil {
+			return err
+		}
+	case AppRevisionConflictRevokeAppClientCredentialErrorResponse:
+		if err := s.AppRevisionConflict.Decode(d); err != nil {
+			return err
+		}
+	case AuthCsrfInvalidRevokeAppClientCredentialErrorResponse:
+		if err := s.AuthCsrfInvalid.Decode(d); err != nil {
+			return err
+		}
+	case AuthUnauthorizedRevokeAppClientCredentialErrorResponse:
+		if err := s.AuthUnauthorized.Decode(d); err != nil {
+			return err
+		}
+	case EvtInvalidRevokeAppClientCredentialErrorResponse:
+		if err := s.EvtInvalid.Decode(d); err != nil {
+			return err
+		}
+	case InternalRevokeAppClientCredentialErrorResponse:
+		if err := s.Internal.Decode(d); err != nil {
+			return err
+		}
+	case NotImplementedRevokeAppClientCredentialErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
+	case ReqInvalidRevokeAppClientCredentialErrorResponse:
+		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableRevokeAppClientCredentialErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
+			return err
+		}
+	default:
+		return errors.Errorf("inferred invalid type: %s", s.Type)
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s RevokeAppClientCredentialErrorResponse) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *RevokeAppClientCredentialErrorResponse) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes RevokeAppClientCredentialForbidden as json.
+func (s *RevokeAppClientCredentialForbidden) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes RevokeAppClientCredentialForbidden from json.
+func (s *RevokeAppClientCredentialForbidden) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode RevokeAppClientCredentialForbidden to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = RevokeAppClientCredentialForbidden(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *RevokeAppClientCredentialForbidden) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *RevokeAppClientCredentialForbidden) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes RevokeAppClientCredentialNotFound as json.
+func (s *RevokeAppClientCredentialNotFound) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes RevokeAppClientCredentialNotFound from json.
+func (s *RevokeAppClientCredentialNotFound) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode RevokeAppClientCredentialNotFound to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = RevokeAppClientCredentialNotFound(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *RevokeAppClientCredentialNotFound) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *RevokeAppClientCredentialNotFound) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes RevokeAppClientCredentialUnauthorized as json.
+func (s *RevokeAppClientCredentialUnauthorized) Encode(e *jx.Encoder) {
+	unwrapped := (*ErrorDetails)(s)
+
+	unwrapped.Encode(e)
+}
+
+// Decode decodes RevokeAppClientCredentialUnauthorized from json.
+func (s *RevokeAppClientCredentialUnauthorized) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode RevokeAppClientCredentialUnauthorized to nil")
+	}
+	var unwrapped ErrorDetails
+	if err := func() error {
+		if err := unwrapped.Decode(d); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return errors.Wrap(err, "alias")
+	}
+	*s = RevokeAppClientCredentialUnauthorized(unwrapped)
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *RevokeAppClientCredentialUnauthorized) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *RevokeAppClientCredentialUnauthorized) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }

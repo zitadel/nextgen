@@ -16,7 +16,7 @@ const (
 	createClientRegistrationStmt = `INSERT INTO client_registrations ` +
 		`(project_id, id, metadata, secret_hash, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?)`
 
-	clientRegistrationQuery = `SELECT project_id, id, metadata, secret_hash, created_at, expires_at ` +
+	clientRegistrationQuery = `SELECT project_id, id, app_slug, metadata, secret_hash, created_at, expires_at ` +
 		`FROM client_registrations`
 
 	getClientRegistrationStmt = clientRegistrationQuery + ` WHERE project_id = ? AND id = ?`
@@ -27,6 +27,13 @@ const (
 		`WHERE project_id = ? AND expires_at <= ? ORDER BY expires_at, id LIMIT ?`
 
 	extendClientRegistrationStmt = `UPDATE client_registrations SET expires_at = ? WHERE project_id = ? AND id = ?`
+
+	// Only a registration that joined no app takes one; the select then reads
+	// the app it holds, this one or the one an earlier request set.
+	joinClientRegistrationAppStmt = `UPDATE client_registrations SET app_slug = ? ` +
+		`WHERE project_id = ? AND id = ? AND app_slug IS NULL`
+
+	clientRegistrationAppStmt = `SELECT app_slug FROM client_registrations WHERE project_id = ? AND id = ?`
 )
 
 type clientRegistrationStatements struct{ statement }
@@ -150,14 +157,27 @@ func (s clientRegistrationStatements) ExtendClientRegistration(ctx context.Conte
 	return nil
 }
 
+// JoinClientRegistrationApp implements [service.ClientRegistrationStatements].
+func (s clientRegistrationStatements) JoinClientRegistrationApp(ctx context.Context, projectID, id, appSlug string) (string, error) {
+	if _, err := s.client.Exec(ctx, joinClientRegistrationAppStmt, appSlug, projectID, id); err != nil {
+		return "", wrapError(err)
+	}
+	var joined sql.NullString
+	if err := s.client.QueryRow(ctx, clientRegistrationAppStmt, projectID, id).Scan(&joined); err != nil {
+		return "", wrapError(err)
+	}
+	return joined.String, nil
+}
+
 func scanClientRegistration(rows *sql.Rows) (*domain.ClientRegistration, error) {
 	var (
 		entity                   domain.ClientRegistration
+		appSlug                  sql.NullString
 		metadata                 string
 		secretHash               sql.NullString
 		createdNano, expiresNano int64
 	)
-	if err := rows.Scan(&entity.ProjectID, &entity.ID, &metadata, &secretHash, &createdNano, &expiresNano); err != nil {
+	if err := rows.Scan(&entity.ProjectID, &entity.ID, &appSlug, &metadata, &secretHash, &createdNano, &expiresNano); err != nil {
 		return nil, err
 	}
 	m, err := appstore.DecodeClientRegistrationMetadata([]byte(metadata))
@@ -165,6 +185,7 @@ func scanClientRegistration(rows *sql.Rows) (*domain.ClientRegistration, error) 
 		return nil, err
 	}
 	entity.Metadata = m
+	entity.AppSlug = appSlug.String
 	entity.SecretHash = secretHash.String
 	entity.CreatedAt, entity.ExpiresAt = timeFromUnixNano(createdNano), timeFromUnixNano(expiresNano)
 	return &entity, nil

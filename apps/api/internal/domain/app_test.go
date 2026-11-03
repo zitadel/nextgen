@@ -16,13 +16,13 @@ const shopApp = `{
   "slug": "shop", "name": "Shop",
   "clients": [
     {"slug": "web", "type": "confidential", "secret": "${{ WEB_SECRET }}",
-     "grants": ["authorization_code", "refresh_token"],
+     "grant_types": ["authorization_code", "refresh_token"],
      "redirect_uris": ["https://shop.example.com/callback", "http://127.0.0.1/callback"],
      "apis": [{"api": "orders"}, {"api": "billing/invoices", "scopes": ["invoices.read"]}]},
     {"slug": "repricer", "type": "confidential", "secret": "${{ REPRICER_SECRET }}",
-     "grants": ["client_credentials"],
+     "grant_types": ["client_credentials"],
      "apis": [{"api": "orders", "scopes": ["orders.write"]}]},
-    {"slug": "ios", "type": "public", "grants": ["authorization_code", "refresh_token"],
+    {"slug": "ios", "type": "public", "grant_types": ["authorization_code", "refresh_token"],
      "redirect_uris": ["com.example.shop:/callback"], "apis": [{"api": "orders"}]}
   ],
   "apis": [
@@ -76,7 +76,7 @@ func TestAppDocumentValidate(t *testing.T) {
 		{
 			name: "a slug names one config across clients and APIs",
 			app: `{"slug":"a","name":"A",
-				"clients":[{"slug":"api","type":"public","grants":["authorization_code"],"redirect_uris":["https://a.example/cb"]}],
+				"clients":[{"slug":"api","type":"public","grant_types":["authorization_code"],"redirect_uris":["https://a.example/cb"]}],
 				"apis":[{"slug":"api","identifier":"https://a.example/api"}]}`,
 			want: []string{"/apis/0/slug"},
 		},
@@ -105,7 +105,7 @@ func TestAppDocumentValidate(t *testing.T) {
 		{
 			name: "a client's own API must exist and define the scopes it lists",
 			app: `{"slug":"a","name":"A",
-				"clients":[{"slug":"c","type":"public","grants":["authorization_code"],"redirect_uris":["https://a.example/cb"],
+				"clients":[{"slug":"c","type":"public","grant_types":["authorization_code"],"redirect_uris":["https://a.example/cb"],
 				  "apis":[{"api":"missing"},{"api":"x","scopes":["x.read","x.nope"]},{"api":"other/y"}]}],
 				"apis":[{"slug":"x","identifier":"https://x.example","scopes":[{"name":"x.read"}]}]}`,
 			want: []string{"/clients/0/apis/0/api", "/clients/0/apis/1/scopes/1"},
@@ -113,66 +113,72 @@ func TestAppDocumentValidate(t *testing.T) {
 		{
 			name: "authorization_code needs a redirect URI, refresh_token needs authorization_code",
 			app: `{"slug":"a","name":"A","clients":[
-				{"slug":"c","type":"public","grants":["authorization_code"]},
-				{"slug":"d","type":"confidential","secret":"${{ D }}","grants":["client_credentials","refresh_token"]}]}`,
-			want: []string{"/clients/0/redirect_uris", "/clients/1/grants"},
+				{"slug":"c","type":"public","grant_types":["authorization_code"]},
+				{"slug":"d","type":"confidential","secret":"${{ D }}","grant_types":["client_credentials","refresh_token"]}]}`,
+			want: []string{"/clients/0/redirect_uris", "/clients/1/grant_types"},
 		},
 		{
 			name: "redirect URIs: https, loopback http, canonical, no fragment, private-use only for public clients",
 			app: `{"slug":"a","name":"A","clients":[
-				{"slug":"c","type":"confidential","secret":"${{ C }}","grants":["authorization_code"],"redirect_uris":[
+				{"slug":"c","type":"confidential","secret":"${{ C }}","grant_types":["authorization_code"],"redirect_uris":[
 				  "https://a.example/cb","http://a.example/cb","http://[::1]:9000/cb","https://a.example/cb#x",
 				  "HTTPS://a.example/cb","com.example.app:/cb"]}]}`,
 			want: []string{"/clients/0/redirect_uris/1", "/clients/0/redirect_uris/3", "/clients/0/redirect_uris/4", "/clients/0/redirect_uris/5"},
 		},
 		{
-			name: "a public client holds no secret and does not act as itself; a confidential one authenticates",
+			name: "a public client holds no credential, signs users in and does not act as itself",
 			app: `{"slug":"a","name":"A","clients":[
-				{"slug":"p","type":"public","auth_method":"client_secret_basic","secret":"${{ P }}",
-				 "grants":["authorization_code","client_credentials"],"redirect_uris":["https://a.example/cb"]},
-				{"slug":"c","type":"confidential","auth_method":"none","secret":"${{ C }}","grants":["client_credentials"]}]}`,
-			want: []string{"/clients/0/auth_method", "/clients/0/secret", "/clients/0/grants", "/clients/1/auth_method"},
+				{"slug":"p","type":"public","secret":"${{ P }}","jwks":{"keys":[{"kty":"OKP","kid":"1"}]},
+				 "grant_types":["authorization_code","client_credentials"],"redirect_uris":["https://a.example/cb"]},
+				{"slug":"n","type":"public"}]}`,
+			want: []string{"/clients/0/secret", "/clients/0/jwks", "/clients/0/grant_types", "/clients/1/grant_types"},
 		},
 		{
-			name: "a private_key_jwt client needs keys and no secret; keys are for private_key_jwt alone",
+			name: "a confidential client holds a secret, keys or both; several keys need a kid each",
 			app: `{"slug":"a","name":"A","clients":[
-				{"slug":"k","type":"confidential","auth_method":"private_key_jwt","grants":["client_credentials"]},
-				{"slug":"s","type":"confidential","auth_method":"private_key_jwt","secret":"${{ S }}",
-				 "jwks":{"keys":[{"kty":"OKP","crv":"Ed25519","x":"11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo"}]},"grants":["client_credentials"]},
-				{"slug":"j","type":"confidential","secret":"${{ J }}","jwks":{"keys":[{"kty":"OKP"}]},"grants":["client_credentials"]},
-				{"slug":"d","type":"confidential","auth_method":"private_key_jwt","grants":["client_credentials"],
+				{"slug":"both","type":"confidential","secret":"${{ BOTH }}","grant_types":["client_credentials"],
+				 "jwks":{"keys":[{"kty":"OKP","crv":"Ed25519","x":"11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo"}]}},
+				{"slug":"d","type":"confidential","grant_types":["client_credentials"],
 				 "jwks":{"keys":[{"kty":"OKP","kid":"1"},{"kty":"OKP","kid":"1"}]}},
-				{"slug":"ok","type":"confidential","auth_method":"private_key_jwt","grants":["client_credentials"],
+				{"slug":"ok","type":"confidential","grant_types":["client_credentials"],
 				 "jwks":{"keys":[{"kty":"OKP","kid":"1"},{"kty":"OKP","kid":"2"}]}}]}`,
-			want: []string{"/clients/0/jwks", "/clients/1/secret", "/clients/2/jwks", "/clients/3/jwks"},
+			want: []string{"/clients/1/jwks"},
+		},
+		{
+			name: "a confidential client without grant_types holds only credentials",
+			app: `{"slug":"a","name":"A","clients":[
+				{"slug":"pat","type":"confidential"},
+				{"slug":"bad","type":"confidential","redirect_uris":["https://a.example/cb"],
+				 "post_logout_redirect_uris":["https://a.example/bye"],"apis":[{"api":"x"}]}],
+				"apis":[{"slug":"x","identifier":"https://x.example"}]}`,
+			want: []string{"/clients/1/apis", "/clients/1/redirect_uris", "/clients/1/post_logout_redirect_uris"},
 		},
 		{
 			name:   "only a first-party client may skip consent",
-			app:    `{"slug":"a","name":"A","clients":[{"slug":"c","type":"public","consent":"skip","grants":["authorization_code"],"redirect_uris":["https://a.example/cb"]}]}`,
+			app:    `{"slug":"a","name":"A","clients":[{"slug":"c","type":"public","consent":"skip","grant_types":["authorization_code"],"redirect_uris":["https://a.example/cb"]}]}`,
 			source: domain.AppSourceRegistered,
 			want:   []string{"/clients/0/consent"},
 		},
 		{
 			name: "a chosen client_id may not look minted",
 			app: `{"slug":"a","name":"A","clients":[{"slug":"c","client_id":"client_01ABC","type":"public",
-				"grants":["authorization_code"],"redirect_uris":["https://a.example/cb"]}]}`,
+				"grant_types":["authorization_code"],"redirect_uris":["https://a.example/cb"]}]}`,
 			want: []string{"/clients/0/client_id"},
 		},
 		{
-			name:   "a declared confidential client needs its secret reference",
-			app:    `{"slug":"a","name":"A","clients":[{"slug":"c","type":"confidential","grants":["client_credentials"]}]}`,
+			name:   "a declared confidential client may hold its credentials through the API alone",
+			app:    `{"slug":"a","name":"A","clients":[{"slug":"c","type":"confidential","grant_types":["client_credentials"]}]}`,
 			source: domain.AppSourceDeclared,
-			want:   []string{"/clients/0/secret"},
 		},
 		{
 			name:   "a registered app holds no secret reference",
-			app:    `{"slug":"a","name":"A","clients":[{"slug":"c","type":"confidential","secret":"${{ C }}","grants":["client_credentials"]}]}`,
+			app:    `{"slug":"a","name":"A","clients":[{"slug":"c","type":"confidential","secret":"${{ C }}","grant_types":["client_credentials"]}]}`,
 			source: domain.AppSourceRegistered,
 			want:   []string{"/clients/0/secret"},
 		},
 		{
 			name:   "a registered confidential client needs no reference",
-			app:    `{"slug":"a","name":"A","clients":[{"slug":"c","type":"confidential","grants":["client_credentials"]}]}`,
+			app:    `{"slug":"a","name":"A","clients":[{"slug":"c","type":"confidential","grant_types":["client_credentials"]}]}`,
 			source: domain.AppSourceRegistered,
 		},
 		{
@@ -201,8 +207,8 @@ func TestAppClientDefaults(t *testing.T) {
 	web, _ := doc.Client("web")
 	ios, _ := doc.Client("ios")
 
-	assert.Equal(t, domain.ClientAuthClientSecretBasic, web.EffectiveAuthMethod())
-	assert.Equal(t, domain.ClientAuthNone, ios.EffectiveAuthMethod())
+	assert.True(t, web.HasGrant(domain.GrantRefreshToken))
+	assert.False(t, ios.HasGrant(domain.GrantClientCredentials))
 
 	assert.True(t, web.IsFirstParty(domain.AppSourceDeclared))
 	assert.True(t, web.IsFirstParty(domain.AppSourceBuiltin))

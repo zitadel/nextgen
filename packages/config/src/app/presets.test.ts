@@ -34,7 +34,7 @@ describe("app presets", () => {
     const { document, missing } = composeAppDocument(id, input);
     expect(missing).toEqual([]);
     expect(check(document), JSON.stringify(check.errors)).toBe(true);
-    expect(document.preset).toBe(id);
+    expect(document).not.toHaveProperty("preset");
   });
 
   it("reports what a preset needs instead of composing a document the server refuses", () => {
@@ -58,6 +58,7 @@ describe("app presets", () => {
 
   it("knows its own ids", () => {
     expect(isAppPreset("web")).toBe(true);
+    expect(isAppPreset("service")).toBe(true);
     expect(isAppPreset("project")).toBe(false);
   });
 });

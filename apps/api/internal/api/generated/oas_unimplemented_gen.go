@@ -13,16 +13,17 @@ type UnimplementedHandler struct{}
 
 var _ Handler = UnimplementedHandler{}
 
-// AddAppClientSecret implements addAppClientSecret operation.
+// AddAppClientCredential implements addAppClientCredential operation.
 //
-// Adds a secret to a confidential client of an app registered through the
-// API: a generated one, shown once, or an imported value or hash, so a client
-// with a secret it cannot change keeps working. An app the release declares
-// names its secrets as `${{ NAME }}` variables instead, and is refused with
-// `app.declared`.
+// Adds a named credential to a confidential client: a secret the server
+// generates and shows once, an imported secret or hash, or a public key.
+// The app may be declared in the release or registered through the API, and
+// a deploy never removes a credential written here. A public client holds
+// no credential, and a request for one is refused with `app.invalid`.
+// Emits `app.credential.added`.
 //
-// POST /apps/{id}/clients/{client}/secrets
-func (UnimplementedHandler) AddAppClientSecret(ctx context.Context, req *AddAppClientSecretRequest, params AddAppClientSecretParams) (r AddAppClientSecretRes, _ error) {
+// POST /apps/{id}/clients/{client}/credentials
+func (UnimplementedHandler) AddAppClientCredential(ctx context.Context, req *AddAppClientCredentialRequest, params AddAppClientCredentialParams) (r AddAppClientCredentialRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -107,8 +108,9 @@ func (UnimplementedHandler) CompleteClaim(ctx context.Context, req *CompleteClai
 // document becomes its new revision. An app the release declares
 // (`.zitadel/apps/<slug>.json`) changes only with a release, and a write to
 // one is refused with `app.declared`.
-// The answer carries what comes next: the `client_id` of each client, and a
-// generated secret for each confidential client that had none, shown once.
+// The answer carries what comes next: the `client_id` of each client, and
+// for each new confidential client that holds no key, a generated secret,
+// shown once, as its credential named `initial`.
 // A client keeps its `client_id` for life: one the document leaves out is
 // minted on first write and kept, one it sets is used as given, and a
 // revision that changes it is refused with `app.field_immutable`. No two
@@ -117,8 +119,8 @@ func (UnimplementedHandler) CompleteClaim(ctx context.Context, req *CompleteClai
 // The document is validated against the `app.json` schema, then against the
 // rules across its fields: a client's `apis` name APIs the app serves, a
 // redirect URI is https or a loopback http URI in canonical form, and a
-// registered app's secrets come from the server, never a `${{ NAME }}`
-// reference. A refused document stores nothing.
+// registered app's credentials are written through the API, never a
+// `${{ NAME }}` reference. A refused document stores nothing.
 //
 // POST /apps
 func (UnimplementedHandler) CreateApp(ctx context.Context, req *CreateAppRequest, params CreateAppParams) (r CreateAppRes, _ error) {
@@ -997,6 +999,16 @@ func (UnimplementedHandler) IssueChallenge(ctx context.Context, req *IssueChalle
 	return r, ht.ErrNotImplemented
 }
 
+// ListAppClientCredentials implements listAppClientCredentials operation.
+//
+// Lists the credentials a client holds through the API, revoked ones left
+// out, without any secret.
+//
+// GET /apps/{id}/clients/{client}/credentials
+func (UnimplementedHandler) ListAppClientCredentials(ctx context.Context, params ListAppClientCredentialsParams) (r ListAppClientCredentialsRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // ListAppRevisions implements listAppRevisions operation.
 //
 // Returns every revision of one app, newest first, paginated with a cursor.
@@ -1454,6 +1466,16 @@ func (UnimplementedHandler) RemoveOrigin(ctx context.Context, req *RemoveOriginR
 //
 // POST /projects/{project_id}/previews/remove
 func (UnimplementedHandler) RemovePreview(ctx context.Context, req *RemovePreviewRequest, params RemovePreviewParams) (r RemovePreviewRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// RevokeAppClientCredential implements revokeAppClientCredential operation.
+//
+// Revokes one credential: the client can no longer authenticate with it,
+// and its other credentials keep working. Emits `app.credential.revoked`.
+//
+// DELETE /apps/{id}/clients/{client}/credentials/{credential_id}
+func (UnimplementedHandler) RevokeAppClientCredential(ctx context.Context, params RevokeAppClientCredentialParams) (r RevokeAppClientCredentialRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

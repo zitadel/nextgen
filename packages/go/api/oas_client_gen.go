@@ -28,16 +28,17 @@ func trimTrailingSlashes(u *url.URL) {
 
 // Invoker invokes operations described by OpenAPI v3 specification.
 type Invoker interface {
-	// AddAppClientSecret invokes addAppClientSecret operation.
+	// AddAppClientCredential invokes addAppClientCredential operation.
 	//
-	// Adds a secret to a confidential client of an app registered through the
-	// API: a generated one, shown once, or an imported value or hash, so a client
-	// with a secret it cannot change keeps working. An app the release declares
-	// names its secrets as `${{ NAME }}` variables instead, and is refused with
-	// `app.declared`.
+	// Adds a named credential to a confidential client: a secret the server
+	// generates and shows once, an imported secret or hash, or a public key.
+	// The app may be declared in the release or registered through the API, and
+	// a deploy never removes a credential written here. A public client holds
+	// no credential, and a request for one is refused with `app.invalid`.
+	// Emits `app.credential.added`.
 	//
-	// POST /apps/{id}/clients/{client}/secrets
-	AddAppClientSecret(ctx context.Context, request *AddAppClientSecretRequest, params AddAppClientSecretParams) (AddAppClientSecretRes, error)
+	// POST /apps/{id}/clients/{client}/credentials
+	AddAppClientCredential(ctx context.Context, request *AddAppClientCredentialRequest, params AddAppClientCredentialParams) (AddAppClientCredentialRes, error)
 	// AddOrigin invokes addOrigin operation.
 	//
 	// Adds one `{pattern, kind}` to the project's origins. A primary pattern
@@ -107,8 +108,9 @@ type Invoker interface {
 	// document becomes its new revision. An app the release declares
 	// (`.zitadel/apps/<slug>.json`) changes only with a release, and a write to
 	// one is refused with `app.declared`.
-	// The answer carries what comes next: the `client_id` of each client, and a
-	// generated secret for each confidential client that had none, shown once.
+	// The answer carries what comes next: the `client_id` of each client, and
+	// for each new confidential client that holds no key, a generated secret,
+	// shown once, as its credential named `initial`.
 	// A client keeps its `client_id` for life: one the document leaves out is
 	// minted on first write and kept, one it sets is used as given, and a
 	// revision that changes it is refused with `app.field_immutable`. No two
@@ -117,8 +119,8 @@ type Invoker interface {
 	// The document is validated against the `app.json` schema, then against the
 	// rules across its fields: a client's `apis` name APIs the app serves, a
 	// redirect URI is https or a loopback http URI in canonical form, and a
-	// registered app's secrets come from the server, never a `${{ NAME }}`
-	// reference. A refused document stores nothing.
+	// registered app's credentials are written through the API, never a
+	// `${{ NAME }}` reference. A refused document stores nothing.
 	//
 	// POST /apps
 	CreateApp(ctx context.Context, request *CreateAppRequest, params CreateAppParams) (CreateAppRes, error)
@@ -823,6 +825,13 @@ type Invoker interface {
 	//
 	// POST /auth_attempts/{attempt_id}/challenges
 	IssueChallenge(ctx context.Context, request *IssueChallengeRequest, params IssueChallengeParams) (IssueChallengeRes, error)
+	// ListAppClientCredentials invokes listAppClientCredentials operation.
+	//
+	// Lists the credentials a client holds through the API, revoked ones left
+	// out, without any secret.
+	//
+	// GET /apps/{id}/clients/{client}/credentials
+	ListAppClientCredentials(ctx context.Context, params ListAppClientCredentialsParams) (ListAppClientCredentialsRes, error)
 	// ListAppRevisions invokes listAppRevisions operation.
 	//
 	// Returns every revision of one app, newest first, paginated with a cursor.
@@ -1184,6 +1193,13 @@ type Invoker interface {
 	//
 	// POST /projects/{project_id}/previews/remove
 	RemovePreview(ctx context.Context, request *RemovePreviewRequest, params RemovePreviewParams) (RemovePreviewRes, error)
+	// RevokeAppClientCredential invokes revokeAppClientCredential operation.
+	//
+	// Revokes one credential: the client can no longer authenticate with it,
+	// and its other credentials keep working. Emits `app.credential.revoked`.
+	//
+	// DELETE /apps/{id}/clients/{client}/credentials/{credential_id}
+	RevokeAppClientCredential(ctx context.Context, params RevokeAppClientCredentialParams) (RevokeAppClientCredentialRes, error)
 	// RevokeMySession invokes revokeMySession operation.
 	//
 	// Logs out by permanently deleting the session.
@@ -1385,21 +1401,22 @@ func (c *Client) requestURL(ctx context.Context) *url.URL {
 	return u
 }
 
-// AddAppClientSecret invokes addAppClientSecret operation.
+// AddAppClientCredential invokes addAppClientCredential operation.
 //
-// Adds a secret to a confidential client of an app registered through the
-// API: a generated one, shown once, or an imported value or hash, so a client
-// with a secret it cannot change keeps working. An app the release declares
-// names its secrets as `${{ NAME }}` variables instead, and is refused with
-// `app.declared`.
+// Adds a named credential to a confidential client: a secret the server
+// generates and shows once, an imported secret or hash, or a public key.
+// The app may be declared in the release or registered through the API, and
+// a deploy never removes a credential written here. A public client holds
+// no credential, and a request for one is refused with `app.invalid`.
+// Emits `app.credential.added`.
 //
-// POST /apps/{id}/clients/{client}/secrets
-func (c *Client) AddAppClientSecret(ctx context.Context, request *AddAppClientSecretRequest, params AddAppClientSecretParams) (AddAppClientSecretRes, error) {
-	res, err := c.sendAddAppClientSecret(ctx, request, params)
+// POST /apps/{id}/clients/{client}/credentials
+func (c *Client) AddAppClientCredential(ctx context.Context, request *AddAppClientCredentialRequest, params AddAppClientCredentialParams) (AddAppClientCredentialRes, error) {
+	res, err := c.sendAddAppClientCredential(ctx, request, params)
 	return res, err
 }
 
-func (c *Client) sendAddAppClientSecret(ctx context.Context, request *AddAppClientSecretRequest, params AddAppClientSecretParams) (res AddAppClientSecretRes, err error) {
+func (c *Client) sendAddAppClientCredential(ctx context.Context, request *AddAppClientCredentialRequest, params AddAppClientCredentialParams) (res AddAppClientCredentialRes, err error) {
 	// Validate request before sending.
 	if err := func() error {
 		if err := request.Validate(); err != nil {
@@ -1410,9 +1427,9 @@ func (c *Client) sendAddAppClientSecret(ctx context.Context, request *AddAppClie
 		return res, errors.Wrap(err, "validate")
 	}
 	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("addAppClientSecret"),
+		otelogen.OperationID("addAppClientCredential"),
 		semconv.HTTPRequestMethodKey.String("POST"),
-		semconv.URLTemplateKey.String("/apps/{id}/clients/{client}/secrets"),
+		semconv.URLTemplateKey.String("/apps/{id}/clients/{client}/credentials"),
 	}
 	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
 
@@ -1428,7 +1445,7 @@ func (c *Client) sendAddAppClientSecret(ctx context.Context, request *AddAppClie
 	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
 
 	// Start a span for this request.
-	ctx, span := c.cfg.Tracer.Start(ctx, AddAppClientSecretOperation,
+	ctx, span := c.cfg.Tracer.Start(ctx, AddAppClientCredentialOperation,
 		trace.WithAttributes(otelAttrs...),
 		clientSpanKind,
 	)
@@ -1484,7 +1501,7 @@ func (c *Client) sendAddAppClientSecret(ctx context.Context, request *AddAppClie
 		}
 		pathParts[3] = encoded
 	}
-	pathParts[4] = "/secrets"
+	pathParts[4] = "/credentials"
 	uri.AddPathParts(u, pathParts[:]...)
 
 	stage = "EncodeQueryParams"
@@ -1513,7 +1530,7 @@ func (c *Client) sendAddAppClientSecret(ctx context.Context, request *AddAppClie
 	if err != nil {
 		return res, errors.Wrap(err, "create request")
 	}
-	if err := encodeAddAppClientSecretRequest(request, r); err != nil {
+	if err := encodeAddAppClientCredentialRequest(request, r); err != nil {
 		return res, errors.Wrap(err, "encode request")
 	}
 
@@ -1522,7 +1539,7 @@ func (c *Client) sendAddAppClientSecret(ctx context.Context, request *AddAppClie
 		var satisfied bitset
 		{
 			stage = "Security:OAuth2"
-			switch err := c.securityOAuth2(ctx, AddAppClientSecretOperation, r); {
+			switch err := c.securityOAuth2(ctx, AddAppClientCredentialOperation, r); {
 			case err == nil: // if NO error
 				satisfied[0] |= 1 << 0
 			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
@@ -1531,11 +1548,23 @@ func (c *Client) sendAddAppClientSecret(ctx context.Context, request *AddAppClie
 				return res, errors.Wrap(err, "security \"OAuth2\"")
 			}
 		}
+		{
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, AddAppClientCredentialOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
+			}
+		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -1559,7 +1588,7 @@ func (c *Client) sendAddAppClientSecret(ctx context.Context, request *AddAppClie
 	defer body.Close()
 
 	stage = "DecodeResponse"
-	result, err := decodeAddAppClientSecretResponse(resp)
+	result, err := decodeAddAppClientCredentialResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}
@@ -2187,8 +2216,9 @@ func (c *Client) sendCompleteClaim(ctx context.Context, request *CompleteClaimRe
 // document becomes its new revision. An app the release declares
 // (`.zitadel/apps/<slug>.json`) changes only with a release, and a write to
 // one is refused with `app.declared`.
-// The answer carries what comes next: the `client_id` of each client, and a
-// generated secret for each confidential client that had none, shown once.
+// The answer carries what comes next: the `client_id` of each client, and
+// for each new confidential client that holds no key, a generated secret,
+// shown once, as its credential named `initial`.
 // A client keeps its `client_id` for life: one the document leaves out is
 // minted on first write and kept, one it sets is used as given, and a
 // revision that changes it is refused with `app.field_immutable`. No two
@@ -2197,8 +2227,8 @@ func (c *Client) sendCompleteClaim(ctx context.Context, request *CompleteClaimRe
 // The document is validated against the `app.json` schema, then against the
 // rules across its fields: a client's `apis` name APIs the app serves, a
 // redirect URI is https or a loopback http URI in canonical form, and a
-// registered app's secrets come from the server, never a `${{ NAME }}`
-// reference. A refused document stores nothing.
+// registered app's credentials are written through the API, never a
+// `${{ NAME }}` reference. A refused document stores nothing.
 //
 // POST /apps
 func (c *Client) CreateApp(ctx context.Context, request *CreateAppRequest, params CreateAppParams) (CreateAppRes, error) {
@@ -10788,6 +10818,185 @@ func (c *Client) sendIssueChallenge(ctx context.Context, request *IssueChallenge
 	return result, nil
 }
 
+// ListAppClientCredentials invokes listAppClientCredentials operation.
+//
+// Lists the credentials a client holds through the API, revoked ones left
+// out, without any secret.
+//
+// GET /apps/{id}/clients/{client}/credentials
+func (c *Client) ListAppClientCredentials(ctx context.Context, params ListAppClientCredentialsParams) (ListAppClientCredentialsRes, error) {
+	res, err := c.sendListAppClientCredentials(ctx, params)
+	return res, err
+}
+
+func (c *Client) sendListAppClientCredentials(ctx context.Context, params ListAppClientCredentialsParams) (res ListAppClientCredentialsRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("listAppClientCredentials"),
+		semconv.HTTPRequestMethodKey.String("GET"),
+		semconv.URLTemplateKey.String("/apps/{id}/clients/{client}/credentials"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, ListAppClientCredentialsOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [5]string
+	pathParts[0] = "/apps/"
+	{
+		// Encode "id" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "id",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			return e.EncodeValue(conv.StringToString(params.ID))
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[1] = encoded
+	}
+	pathParts[2] = "/clients/"
+	{
+		// Encode "client" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "client",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			return e.EncodeValue(conv.StringToString(params.Client))
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[3] = encoded
+	}
+	pathParts[4] = "/credentials"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if unwrapped := string(params.ProjectID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "GET", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, ListAppClientCredentialsOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
+		{
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, ListAppClientCredentialsOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+				{0b00000010},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeListAppClientCredentialsResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
 // ListAppRevisions invokes listAppRevisions operation.
 //
 // Returns every revision of one app, newest first, paginated with a cursor.
@@ -16901,6 +17110,203 @@ func (c *Client) sendRemovePreview(ctx context.Context, request *RemovePreviewRe
 
 	stage = "DecodeResponse"
 	result, err := decodeRemovePreviewResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
+// RevokeAppClientCredential invokes revokeAppClientCredential operation.
+//
+// Revokes one credential: the client can no longer authenticate with it,
+// and its other credentials keep working. Emits `app.credential.revoked`.
+//
+// DELETE /apps/{id}/clients/{client}/credentials/{credential_id}
+func (c *Client) RevokeAppClientCredential(ctx context.Context, params RevokeAppClientCredentialParams) (RevokeAppClientCredentialRes, error) {
+	res, err := c.sendRevokeAppClientCredential(ctx, params)
+	return res, err
+}
+
+func (c *Client) sendRevokeAppClientCredential(ctx context.Context, params RevokeAppClientCredentialParams) (res RevokeAppClientCredentialRes, err error) {
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("revokeAppClientCredential"),
+		semconv.HTTPRequestMethodKey.String("DELETE"),
+		semconv.URLTemplateKey.String("/apps/{id}/clients/{client}/credentials/{credential_id}"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, RevokeAppClientCredentialOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [6]string
+	pathParts[0] = "/apps/"
+	{
+		// Encode "id" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "id",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			return e.EncodeValue(conv.StringToString(params.ID))
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[1] = encoded
+	}
+	pathParts[2] = "/clients/"
+	{
+		// Encode "client" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "client",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			return e.EncodeValue(conv.StringToString(params.Client))
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[3] = encoded
+	}
+	pathParts[4] = "/credentials/"
+	{
+		// Encode "credential_id" parameter.
+		e := uri.NewPathEncoder(uri.PathEncoderConfig{
+			Param:   "credential_id",
+			Style:   uri.PathStyleSimple,
+			Explode: false,
+		})
+		if err := func() error {
+			return e.EncodeValue(conv.StringToString(params.CredentialID))
+		}(); err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		encoded, err := e.Result()
+		if err != nil {
+			return res, errors.Wrap(err, "encode path")
+		}
+		pathParts[5] = encoded
+	}
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if unwrapped := string(params.ProjectID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "DELETE", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, RevokeAppClientCredentialOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
+		{
+			stage = "Security:SessionCookie"
+			switch err := c.securitySessionCookie(ctx, RevokeAppClientCredentialOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"SessionCookie\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+				{0b00000010},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeRevokeAppClientCredentialResponse(resp)
 	if err != nil {
 		return res, errors.Wrap(err, "decode response")
 	}

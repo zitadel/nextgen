@@ -56,14 +56,19 @@ JOIN app_revisions r
 	getAppAPIIdentifierStmt = `SELECT project_id, identifier, app_id, created_at ` +
 		`FROM app_api_identifiers WHERE project_id = @p1 AND identifier = @p2`
 
-	createAppClientSecretStmt = `INSERT INTO app_client_secrets ` +
-		`(project_id, id, client_row_id, encoded_hash) VALUES (@p1, @p2, @p3, @p4) THEN RETURN created_at`
+	createAppClientCredentialStmt = `INSERT INTO app_client_credentials ` +
+		`(project_id, id, client_row_id, name, kind, encoded_hash, public_key, key_id, expires_at) ` +
+		`VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9) THEN RETURN created_at`
 
-	listAppClientSecretsStmt = `SELECT project_id, id, client_row_id, encoded_hash, created_at ` +
-		`FROM app_client_secrets WHERE project_id = @p1 AND client_row_id = @p2 ` +
-		`ORDER BY created_at DESC, id DESC`
+	listAppClientCredentialsStmt = `SELECT project_id, id, client_row_id, name, kind, encoded_hash, public_key, ` +
+		`key_id, created_at, expires_at FROM app_client_credentials ` +
+		`WHERE project_id = @p1 AND client_row_id = @p2 ORDER BY created_at, id`
 
-	updateAppClientSecretHashStmt = `UPDATE app_client_secrets SET encoded_hash = @p3 WHERE project_id = @p1 AND id = @p2`
+	updateAppClientCredentialHashStmt = `UPDATE app_client_credentials SET encoded_hash = @p3 ` +
+		`WHERE project_id = @p1 AND id = @p2 AND kind = 'secret'`
+
+	deleteAppClientCredentialStmt = `DELETE FROM app_client_credentials ` +
+		`WHERE project_id = @p1 AND client_row_id = @p2 AND id = @p3`
 )
 
 type appStatements struct{ statement }
@@ -314,31 +319,63 @@ func (s appStatements) GetAppAPIIdentifier(ctx context.Context, projectID, ident
 	return entity, err
 }
 
-// CreateAppClientSecret implements [service.AppStatements].
-func (s appStatements) CreateAppClientSecret(ctx context.Context, entity *domain.AppClientSecret) error {
-	if err := ensureManagedID(&entity.ID, domain.PrefixAppClientSecret); err != nil {
+// CreateAppClientCredential implements [service.AppStatements].
+func (s appStatements) CreateAppClientCredential(ctx context.Context, entity *domain.AppClientCredential) error {
+	if err := ensureManagedID(&entity.ID, domain.PrefixAppClientCredential); err != nil {
 		return err
 	}
-	stmt := buildStatement(createAppClientSecretStmt,
+	publicKey, err := encodeNullJSON(entity.PublicKey)
+	if err != nil {
+		return err
+	}
+	expiresAt := spanner.NullTime{}
+	if entity.ExpiresAt != nil {
+		expiresAt = spanner.NullTime{Time: *entity.ExpiresAt, Valid: true}
+	}
+	stmt := buildStatement(createAppClientCredentialStmt,
 		entity.ProjectID,
 		entity.ID,
 		entity.ClientRowID,
-		entity.EncodedHash,
+		entity.Name,
+		string(entity.Kind),
+		spanner.NullString{StringVal: entity.EncodedHash, Valid: entity.EncodedHash != ""},
+		publicKey,
+		spanner.NullString{StringVal: entity.KeyID, Valid: entity.KeyID != ""},
+		expiresAt,
 	).statement()
 	return s.db.Write(ctx, stmt, scanReturnedTimestamp(&entity.CreatedAt))
 }
 
-// ListAppClientSecrets implements [service.AppStatements].
-func (s appStatements) ListAppClientSecrets(ctx context.Context, projectID, clientRowID string) ([]*domain.AppClientSecret, error) {
-	var items []*domain.AppClientSecret
-	err := s.db.Query(ctx, buildStatement(listAppClientSecretsStmt, projectID, clientRowID).statement(), func(iter *spanner.RowIterator) error {
+// ListAppClientCredentials implements [service.AppStatements].
+func (s appStatements) ListAppClientCredentials(ctx context.Context, projectID, clientRowID string) ([]*domain.AppClientCredential, error) {
+	var items []*domain.AppClientCredential
+	err := s.db.Query(ctx, buildStatement(listAppClientCredentialsStmt, projectID, clientRowID).statement(), func(iter *spanner.RowIterator) error {
 		var err error
-		items, err = collectRows(iter, func(row *spanner.Row) (*domain.AppClientSecret, error) {
-			var e domain.AppClientSecret
-			if err := row.Columns(&e.ProjectID, &e.ID, &e.ClientRowID, &e.EncodedHash, &e.CreatedAt); err != nil {
+		items, err = collectRows(iter, func(row *spanner.Row) (*domain.AppClientCredential, error) {
+			var (
+				e                domain.AppClientCredential
+				kind             string
+				encodedHash, kid spanner.NullString
+				publicKey        spanner.NullJSON
+				expiresAt        spanner.NullTime
+			)
+			if err := row.Columns(&e.ProjectID, &e.ID, &e.ClientRowID, &e.Name, &kind,
+				&encodedHash, &publicKey, &kid, &e.CreatedAt, &expiresAt); err != nil {
 				return nil, err
 			}
+			raw, err := decodeNullJSON(publicKey)
+			if err != nil {
+				return nil, err
+			}
+			e.Kind = domain.CredentialKind(kind)
+			e.EncodedHash = encodedHash.StringVal
+			e.PublicKey = raw
+			e.KeyID = kid.StringVal
 			e.CreatedAt = e.CreatedAt.UTC()
+			if expiresAt.Valid {
+				expires := expiresAt.Time.UTC()
+				e.ExpiresAt = &expires
+			}
 			return &e, nil
 		})
 		return err
@@ -346,9 +383,21 @@ func (s appStatements) ListAppClientSecrets(ctx context.Context, projectID, clie
 	return items, err
 }
 
-// UpdateAppClientSecretHash implements [service.AppStatements].
-func (s appStatements) UpdateAppClientSecretHash(ctx context.Context, projectID, id, encodedHash string) error {
-	n, err := s.db.Update(ctx, buildStatement(updateAppClientSecretHashStmt, projectID, id, encodedHash).statement())
+// UpdateAppClientCredentialHash implements [service.AppStatements].
+func (s appStatements) UpdateAppClientCredentialHash(ctx context.Context, projectID, id, encodedHash string) error {
+	n, err := s.db.Update(ctx, buildStatement(updateAppClientCredentialHashStmt, projectID, id, encodedHash).statement())
+	if err != nil {
+		return wrapError(err)
+	}
+	if n == 0 {
+		return database.NewNoRowFoundError(nil)
+	}
+	return nil
+}
+
+// DeleteAppClientCredential implements [service.AppStatements].
+func (s appStatements) DeleteAppClientCredential(ctx context.Context, projectID, clientRowID, id string) error {
+	n, err := s.db.Update(ctx, buildStatement(deleteAppClientCredentialStmt, projectID, clientRowID, id).statement())
 	if err != nil {
 		return wrapError(err)
 	}
